@@ -30,8 +30,12 @@ use loot_generation_component::LootGenerationComponent;
 
 #[path = "catalog_entity_animation_controller.rs"]
 mod entity_animation_controller;
+#[path = "flight_configuration_tables.rs"]
+pub(in crate::catalog_v3) mod flight_configuration_tables;
 #[path = "loot_generation_component.rs"]
 mod loot_generation_component;
+
+use flight_configuration_tables::FlightConfigurationTables;
 
 /// Independently scoped configurations with their physical owners.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -46,6 +50,8 @@ pub(crate) struct IndependentConfigurationTables<'source> {
     mission_boards: CatalogTable<MissionBoard<'source>>,
     entity_animation_controllers: CatalogTable<EntityAnimationController<'source>>,
     loot_generation: CatalogTable<LootGenerationComponent<'source>>,
+    #[serde(flatten)]
+    pub(crate) flight: FlightConfigurationTables<'source>,
     #[serde(flatten)]
     jump_drive_definitions: JumpDriveDefinitions<'source>,
 }
@@ -98,6 +104,7 @@ pub(crate) fn read<'source>(
         numbers: &mut configuration_numbers,
     };
     let jump_drive_definitions = components.jump_definitions()?;
+    let flight = FlightConfigurationTables::read(&mut components)?;
     let weapon_action_recoil_definitions = components.weapon_recoil()?;
     let weapon_procedural = components.weapon_procedural()?;
     let mission_boards = components.table(MISSION_BOARDS, MissionBoard::read)?;
@@ -114,6 +121,7 @@ pub(crate) fn read<'source>(
             mission_boards,
             entity_animation_controllers,
             loot_generation,
+            flight,
             jump_drive_definitions,
         },
         weapon_action_recoil_definitions,

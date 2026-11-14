@@ -270,6 +270,8 @@ pub(crate) fn minimal_catalog() -> Value {
             "resourceGroupMembers": resource_groups::members()
         },
         "placements": {
+            "installedConfigurations": absent_table(),
+            "locationInstances": absent_table(),
             "resourceNetworkNodes": absent_table(),
             "resourceNetworkLinkBindings": absent_table(),
             "roomAssociationBindings": absent_table(),
@@ -382,10 +384,9 @@ pub(crate) fn minimal_catalog() -> Value {
         .get_mut("configurations")
         .and_then(Value::as_object_mut)
     {
-        configurations.insert("radarOptions".to_owned(), absent_table());
-    }
-    if let Some(placements) = catalog.get_mut("placements").and_then(Value::as_object_mut) {
-        placements.insert("locationInstances".to_owned(), absent_table());
+        for name in ["radarOptions", "flightControllers", "ifcs", "thrusters"] {
+            configurations.insert(name.to_owned(), absent_table());
+        }
     }
     loot::add_definition_tables(&mut catalog);
     let export_health = health::fixture(&catalog);

@@ -107,7 +107,7 @@ fn exactly_the_game_text_fields_carry_the_game_text_annotation() {
         marked += usize::from(carries);
     }
     assert_eq!(
-        marked, 97,
+        marked, 100,
         "every protected field in the canonical schema is accounted for"
     );
 }
@@ -149,6 +149,7 @@ fn expected_annotation(owner: &str, name: &str, field: &Value, schema: &Value) -
         | ("PlanetClimateAsset", "proceduralAudio")
         | ("PlanetGeologyAsset", "harvestableModelTag" | "proceduralAudio" | "resources")
         | ("RawPlanetAssetMember", "name" | "token")
+        | ("IfcsAeroSurface", "name" | "detachParentPartName" | "transformParentPartName")
         | ("ProjectedMissionText", "key" | "translations" | "itemTokens") => true,
         ("SharedInteraction", "displayType") => false,
         ("BlackboardPropertyBody", "value") => {

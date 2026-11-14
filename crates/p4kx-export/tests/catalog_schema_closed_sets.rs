@@ -30,6 +30,7 @@ const CONTROL_TYPES: &[&str] = &[
     "ExportSourceRole",
     "ExportStageStatus",
     "FireRateUnit",
+    "FlightConfigurationKind",
     "FuseEvidence",
     "HcdSelectionFailure",
     "InputScope",

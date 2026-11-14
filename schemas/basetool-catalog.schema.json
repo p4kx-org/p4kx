@@ -4674,6 +4674,9 @@
         "facilities": {
           "$ref": "#/$defs/CatalogTableOfFacility"
         },
+        "flightControllers": {
+          "$ref": "#/$defs/CatalogTableOfFlightController"
+        },
         "fuelIntakes": {
           "$ref": "#/$defs/CatalogTableOfFuelIntake"
         },
@@ -4682,6 +4685,9 @@
         },
         "hackingChips": {
           "$ref": "#/$defs/CatalogTableOfHackingChip"
+        },
+        "ifcs": {
+          "$ref": "#/$defs/CatalogTableOfIfcs"
         },
         "interactions": {
           "$ref": "#/$defs/CatalogTableOfInteractionConfiguration"
@@ -4764,6 +4770,9 @@
         "shieldGenerators": {
           "$ref": "#/$defs/CatalogTableOfShieldGenerator"
         },
+        "thrusters": {
+          "$ref": "#/$defs/CatalogTableOfThruster"
+        },
         "vehicleArmor": {
           "$ref": "#/$defs/CatalogTableOfVehicleArmor"
         },
@@ -4782,9 +4791,11 @@
         "entityAnimationControllers",
         "explosives",
         "facilities",
+        "flightControllers",
         "fuelIntakes",
         "fuelTanks",
         "hackingChips",
+        "ifcs",
         "interactions",
         "inventoryConfigurations",
         "itemAttachmentConstraints",
@@ -4812,6 +4823,7 @@
         "resourceContainers",
         "resourceNetworkParameters",
         "shieldGenerators",
+        "thrusters",
         "vehicleArmor",
         "weaponActions"
       ],
@@ -5225,6 +5237,9 @@
           },
           "type": "array"
         },
+        "installedConfigurations": {
+          "$ref": "#/$defs/CatalogTableOfInstalledConfiguration"
+        },
         "locationInstances": {
           "$ref": "#/$defs/CatalogTableOfLocationInstance"
         },
@@ -5245,6 +5260,7 @@
         "containerInstances",
         "facilityInstances",
         "facilityInteriorCoverage",
+        "installedConfigurations",
         "locationInstances",
         "resourceNetworkLinkBindings",
         "resourceNetworkNodes",
@@ -6010,6 +6026,25 @@
       ],
       "type": "object"
     },
+    "CatalogTableOfFlightController": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/FlightController"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
     "CatalogTableOfFuelIntake": {
       "description": "One named typed dataset with its measured source-family availability.",
       "properties": {
@@ -6143,6 +6178,25 @@
       ],
       "type": "object"
     },
+    "CatalogTableOfIfcs": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/Ifcs"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
     "CatalogTableOfInfractionDefinition": {
       "description": "One named typed dataset with its measured source-family availability.",
       "properties": {
@@ -6171,6 +6225,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/InfractionSetDefinition"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfInstalledConfiguration": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/InstalledConfiguration"
           },
           "type": "array"
         }
@@ -7701,6 +7774,25 @@
       ],
       "type": "object"
     },
+    "CatalogTableOfThruster": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/Thruster"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
     "CatalogTableOfVehicleArmor": {
       "description": "One named typed dataset with its measured source-family availability.",
       "properties": {
@@ -8752,6 +8844,34 @@
           "type": "object"
         }
       ]
+    },
+    "CollisionDetection": {
+      "description": "Original collision warning time and speed settings.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "collisionDangerCloseWarnTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "collisionWarnSpeed": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "collisionWarnTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "collisionDangerCloseWarnTime",
+        "collisionWarnSpeed",
+        "collisionWarnTime",
+        "sourceType"
+      ],
+      "type": "object"
     },
     "CombatModel": {
       "oneOf": [
@@ -15375,6 +15495,166 @@
       ],
       "type": "object"
     },
+    "FlightConfigurationKind": {
+      "enum": [
+        "flightController",
+        "ifcs",
+        "thruster"
+      ],
+      "type": "string",
+      "x-p4kx-vocabularyClass": "control"
+    },
+    "FlightConfigurationLink": {
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/FlightConfigurationKind"
+        },
+        "owner": {
+          "$ref": "#/$defs/ComponentOwner"
+        }
+      },
+      "required": [
+        "kind",
+        "owner"
+      ],
+      "type": "object"
+    },
+    "FlightController": {
+      "description": "Physical flight-controller settings and input bindings.",
+      "properties": {
+        "PowerOffEffectTag": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "PowerOnEffectTag": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "ShipRecall": {
+          "$ref": "#/$defs/SourcedValueOfShipRecall"
+        },
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "collisionDetection": {
+          "$ref": "#/$defs/SourcedValueOfCollisionDetection"
+        },
+        "componentOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "cycleTransformInteraction": {
+          "$ref": "#/$defs/SourcedValueOfHealthLink"
+        },
+        "deployTransformInteraction": {
+          "$ref": "#/$defs/SourcedValueOfHealthLink"
+        },
+        "disableCoupledModeInteraction": {
+          "$ref": "#/$defs/SourcedValueOfHealthLink"
+        },
+        "disableCruiseControlInteraction": {
+          "$ref": "#/$defs/SourcedValueOfHealthLink"
+        },
+        "disableESPInteraction": {
+          "$ref": "#/$defs/SourcedValueOfHealthLink"
+        },
+        "disableGSafetyInteraction": {
+          "$ref": "#/$defs/SourcedValueOfHealthLink"
+        },
+        "disableProximityAssistInteraction": {
+          "$ref": "#/$defs/SourcedValueOfHealthLink"
+        },
+        "disableVTOLInteraction": {
+          "$ref": "#/$defs/SourcedValueOfHealthLink"
+        },
+        "enableCoupledModeInteraction": {
+          "$ref": "#/$defs/SourcedValueOfHealthLink"
+        },
+        "enableCruiseControlInteraction": {
+          "$ref": "#/$defs/SourcedValueOfHealthLink"
+        },
+        "enableESPInteraction": {
+          "$ref": "#/$defs/SourcedValueOfHealthLink"
+        },
+        "enableGSafetyInteraction": {
+          "$ref": "#/$defs/SourcedValueOfHealthLink"
+        },
+        "enableProximityAssistInteraction": {
+          "$ref": "#/$defs/SourcedValueOfHealthLink"
+        },
+        "enableVTOLInteraction": {
+          "$ref": "#/$defs/SourcedValueOfHealthLink"
+        },
+        "engineOffInteraction": {
+          "$ref": "#/$defs/SourcedValueOfHealthLink"
+        },
+        "engineOnInteraction": {
+          "$ref": "#/$defs/SourcedValueOfHealthLink"
+        },
+        "fuelWarningDisplayTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "hoverAnimPlayInLandingMode": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "hoverAnimPlaybackDuration": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "hudParamsOverride": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "ownerGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "ownerRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "passiveRefuelWarningThresholdPercentage": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "retractTransformInteraction": {
+          "$ref": "#/$defs/SourcedValueOfHealthLink"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "vehicleHudParamsOverride": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        }
+      },
+      "required": [
+        "PowerOffEffectTag",
+        "PowerOnEffectTag",
+        "ShipRecall",
+        "additionalFields",
+        "collisionDetection",
+        "componentOrdinal",
+        "cycleTransformInteraction",
+        "deployTransformInteraction",
+        "disableCoupledModeInteraction",
+        "disableCruiseControlInteraction",
+        "disableESPInteraction",
+        "disableGSafetyInteraction",
+        "disableProximityAssistInteraction",
+        "disableVTOLInteraction",
+        "enableCoupledModeInteraction",
+        "enableCruiseControlInteraction",
+        "enableESPInteraction",
+        "enableGSafetyInteraction",
+        "enableProximityAssistInteraction",
+        "enableVTOLInteraction",
+        "engineOffInteraction",
+        "engineOnInteraction",
+        "fuelWarningDisplayTime",
+        "hoverAnimPlayInLandingMode",
+        "hoverAnimPlaybackDuration",
+        "hudParamsOverride",
+        "ownerGuid",
+        "ownerRecordIndex",
+        "passiveRefuelWarningThresholdPercentage",
+        "retractTransformInteraction",
+        "sourceType",
+        "vehicleHudParamsOverride"
+      ],
+      "type": "object"
+    },
     "FloatOption": {
       "description": "A floating-point option with complete authored metadata.",
       "properties": {
@@ -17035,6 +17315,98 @@
       ],
       "type": "object"
     },
+    "Gimbal": {
+      "description": "Original Pitch and Yaw gimbal controls without axis substitution.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "isFlex": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "pitchAxis": {
+          "$ref": "#/$defs/SourcedValueOfGimbalAxis"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "yawAxis": {
+          "$ref": "#/$defs/SourcedValueOfGimbalAxis"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "isFlex",
+        "pitchAxis",
+        "sourceType",
+        "yawAxis"
+      ],
+      "type": "object"
+    },
+    "GimbalAxis": {
+      "description": "Concrete source type and the original members outside its typed fields.",
+      "properties": {
+        "accel": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "angleMax": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "angleMin": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "animation": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "jointName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "speed": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        }
+      },
+      "required": [
+        "accel",
+        "additionalFields",
+        "angleMax",
+        "angleMin",
+        "animation",
+        "jointName",
+        "sourceType",
+        "speed"
+      ],
+      "type": "object"
+    },
+    "GimbalOverride": {
+      "description": "One authored interaction-state override kept in its source array slot.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "gimbalParams": {
+          "$ref": "#/$defs/SourcedValueOfGimbal"
+        },
+        "interactionState": {
+          "$ref": "#/$defs/SourcedValueOfHealthLink"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "gimbalParams",
+        "interactionState",
+        "sourceType"
+      ],
+      "type": "object"
+    },
     "GiverFaction": {
       "description": "The faction a contract is stated for, with the place that states it.",
       "properties": {
@@ -18055,6 +18427,952 @@
       ],
       "type": "object"
     },
+    "Ifcs": {
+      "description": "The original flight-control configuration of a physical Entity component.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "componentOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "dynamics": {
+          "$ref": "#/$defs/IfcsDynamics"
+        },
+        "environment": {
+          "$ref": "#/$defs/IfcsEnvironment"
+        },
+        "limits": {
+          "$ref": "#/$defs/IfcsLimits"
+        },
+        "ownerGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "ownerRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "precision": {
+          "$ref": "#/$defs/IfcsPrecision"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "systems": {
+          "$ref": "#/$defs/IfcsSystems"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "componentOrdinal",
+        "dynamics",
+        "environment",
+        "limits",
+        "ownerGuid",
+        "ownerRecordIndex",
+        "precision",
+        "sourceType",
+        "systems"
+      ],
+      "type": "object"
+    },
+    "IfcsAcceleration": {
+      "description": "Concrete source type and the original members outside its typed fields.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "angularAccelerationLimiter": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "angularThrustPowerAssignmentModifier": {
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+        },
+        "linearAccelerationLimiterDefault": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "linearThrustPowerAssignmentModifier": {
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+        },
+        "negativeAngularScale": {
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+        },
+        "negativeLinearScale": {
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+        },
+        "positiveAngularScale": {
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+        },
+        "positiveLinearScale": {
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "angularAccelerationLimiter",
+        "angularThrustPowerAssignmentModifier",
+        "linearAccelerationLimiterDefault",
+        "linearThrustPowerAssignmentModifier",
+        "negativeAngularScale",
+        "negativeLinearScale",
+        "positiveAngularScale",
+        "positiveLinearScale",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "IfcsAeroSurface": {
+      "description": "Concrete source type and the original members outside its typed fields.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "criticalAngle": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "detachParentPartName": {
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "x-gameText": true
+        },
+        "flatPlateMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "flatPlateSurface": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "fullyStalledAngle": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "liftLevelFlight": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "minLift": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "name": {
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "x-gameText": true
+        },
+        "negativeAoAMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "offset": {
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+        },
+        "orientation": {
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+        },
+        "peakLift": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "size": {
+          "$ref": "#/$defs/SourcedValueOfInventoryVector2"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "torqueMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+        },
+        "transformParentPartName": {
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "x-gameText": true
+        }
+      },
+      "required": [
+        "additionalFields",
+        "criticalAngle",
+        "detachParentPartName",
+        "flatPlateMultiplier",
+        "flatPlateSurface",
+        "fullyStalledAngle",
+        "liftLevelFlight",
+        "minLift",
+        "name",
+        "negativeAoAMultiplier",
+        "offset",
+        "orientation",
+        "peakLift",
+        "size",
+        "sourceType",
+        "torqueMultiplier",
+        "transformParentPartName"
+      ],
+      "type": "object"
+    },
+    "IfcsAfterburner": {
+      "description": "Independently authored response, timing and capacitor parameters of one afterburner block.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "afterburnAccelMultiplierNegative": {
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+        },
+        "afterburnAccelMultiplierPositive": {
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+        },
+        "afterburnAngAccelMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+        },
+        "afterburnAngTimeToFullAccelerationMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+        },
+        "afterburnAngVelocityMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+        },
+        "afterburnLinSpeedMultiplierNegative": {
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+        },
+        "afterburnLinSpeedMultiplierPositive": {
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+        },
+        "afterburnLinTimeToFullAccelerationMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+        },
+        "afterburnerAngCapacitorScaling": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "afterburnerAngCapacitorScalingCurve": {
+          "$ref": "#/$defs/SourcedValueOfIfcsCurve"
+        },
+        "afterburnerCapacitorThresholdRatio": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "afterburnerPreDelayTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "afterburnerRampDownTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "afterburnerRampMapping": {
+          "$ref": "#/$defs/SourcedValueOfIfcsCurve"
+        },
+        "afterburnerRampUpTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "capacitorAfterburnerAngularCost": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "capacitorAfterburnerIdleCost": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "capacitorAfterburnerLinearCost": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "capacitorAssignmentInputOutputRegen": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "capacitorAssignmentInputOutputRegenNavMode": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "capacitorAssignmentInputOutputUsage": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "capacitorMax": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "capacitorRegenDelayAfterUse": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "capacitorRegenPerSec": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "afterburnAccelMultiplierNegative",
+        "afterburnAccelMultiplierPositive",
+        "afterburnAngAccelMultiplier",
+        "afterburnAngTimeToFullAccelerationMultiplier",
+        "afterburnAngVelocityMultiplier",
+        "afterburnLinSpeedMultiplierNegative",
+        "afterburnLinSpeedMultiplierPositive",
+        "afterburnLinTimeToFullAccelerationMultiplier",
+        "afterburnerAngCapacitorScaling",
+        "afterburnerAngCapacitorScalingCurve",
+        "afterburnerCapacitorThresholdRatio",
+        "afterburnerPreDelayTime",
+        "afterburnerRampDownTime",
+        "afterburnerRampMapping",
+        "afterburnerRampUpTime",
+        "capacitorAfterburnerAngularCost",
+        "capacitorAfterburnerIdleCost",
+        "capacitorAfterburnerLinearCost",
+        "capacitorAssignmentInputOutputRegen",
+        "capacitorAssignmentInputOutputRegenNavMode",
+        "capacitorAssignmentInputOutputUsage",
+        "capacitorMax",
+        "capacitorRegenDelayAfterUse",
+        "capacitorRegenPerSec",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "IfcsAtmosphericFlight": {
+      "description": "Concrete source type and the original members outside its typed fields.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "aerodynamicFxParams": {
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+        },
+        "aerodynamicsParams": {
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+        },
+        "commandControlParams": {
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "aerodynamicFxParams",
+        "aerodynamicsParams",
+        "commandControlParams",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "IfcsCore": {
+      "description": "Concrete source type and the original members outside its typed fields.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "bootWaitTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "spoolUpTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "stunThresholdGs": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "bootWaitTime",
+        "sourceType",
+        "spoolUpTime",
+        "stunThresholdGs"
+      ],
+      "type": "object"
+    },
+    "IfcsCurve": {
+      "description": "Ordered knots and the original lookup table setting of a flight curve.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "points": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfInventoryVector2"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "useLUT": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "points",
+        "sourceType",
+        "useLUT"
+      ],
+      "type": "object"
+    },
+    "IfcsDamageHandling": {
+      "description": "Concrete source type and the original members outside its typed fields.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "thrustThresholdAngNeg": {
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+        },
+        "thrustThresholdAngPos": {
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+        },
+        "thrustThresholdLinNeg": {
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+        },
+        "thrustThresholdLinPos": {
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "sourceType",
+        "thrustThresholdAngNeg",
+        "thrustThresholdAngPos",
+        "thrustThresholdLinNeg",
+        "thrustThresholdLinPos"
+      ],
+      "type": "object"
+    },
+    "IfcsDynamics": {
+      "properties": {
+        "accelerationData": {
+          "$ref": "#/$defs/SourcedValueOfIfcsAcceleration"
+        },
+        "afterburner": {
+          "$ref": "#/$defs/SourcedValueOfIfcsAfterburner"
+        },
+        "afterburnerNew": {
+          "$ref": "#/$defs/SourcedValueOfIfcsAfterburner"
+        },
+        "authoredMotionLimits": {
+          "$ref": "#/$defs/SourcedValueOfIfcsMotionLimits"
+        },
+        "ifcsCoreParams": {
+          "$ref": "#/$defs/SourcedValueOfIfcsCore"
+        },
+        "jerkProfile": {
+          "$ref": "#/$defs/SourcedValueOfIfcsJerk"
+        },
+        "speedProfile": {
+          "$ref": "#/$defs/SourcedValueOfIfcsSpeedProfile"
+        }
+      },
+      "required": [
+        "accelerationData",
+        "afterburner",
+        "afterburnerNew",
+        "authoredMotionLimits",
+        "ifcsCoreParams",
+        "jerkProfile",
+        "speedProfile"
+      ],
+      "type": "object"
+    },
+    "IfcsEnvironment": {
+      "properties": {
+        "aeroSurfaces": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfIfcsAeroSurface"
+        },
+        "atmosphericFlightParams": {
+          "$ref": "#/$defs/SourcedValueOfIfcsAtmosphericFlight"
+        },
+        "dragMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "liftMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "scmMaxDragMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "turbulenceParams": {
+          "$ref": "#/$defs/SourcedValueOfIfcsTurbulence"
+        }
+      },
+      "required": [
+        "aeroSurfaces",
+        "atmosphericFlightParams",
+        "dragMultiplier",
+        "liftMultiplier",
+        "scmMaxDragMultiplier",
+        "turbulenceParams"
+      ],
+      "type": "object"
+    },
+    "IfcsFuelUsage": {
+      "description": "Concrete source type and the original members outside its typed fields.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "atmosphericCurveMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "atmosphericModifier": {
+          "$ref": "#/$defs/SourcedValueOfIfcsCurve"
+        },
+        "fuelCostPer10KNewton": {
+          "$ref": "#/$defs/SourcedValueOfResourceFlowUnit"
+        },
+        "idleCost": {
+          "$ref": "#/$defs/SourcedValueOfResourceFlowUnit"
+        },
+        "noFuelThresholdRatio": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "atmosphericCurveMultiplier",
+        "atmosphericModifier",
+        "fuelCostPer10KNewton",
+        "idleCost",
+        "noFuelThresholdRatio",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "IfcsJerk": {
+      "description": "Concrete source type and the original members outside its typed fields.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "angAccelerationDecay": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "angJerkTime": {
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+        },
+        "linAccelerationDecay": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "linJerkTime": {
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "angAccelerationDecay",
+        "angJerkTime",
+        "linAccelerationDecay",
+        "linJerkTime",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "IfcsLimits": {
+      "properties": {
+        "angularAccelDecay": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "boostSpeedBackward": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "boostSpeedForward": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "linearAccelDecay": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "linearLimiterType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "maxAngularVelocity": {
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+        },
+        "maxSpeed": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "negativeAngularScale": {
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+        },
+        "negativeLinearScale": {
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+        },
+        "pitchYawLimiterType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "positiveAngularScale": {
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+        },
+        "positiveLinearScale": {
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+        },
+        "scmSpeed": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "torqueDistanceThreshold": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "torqueImbalanceMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        }
+      },
+      "required": [
+        "angularAccelDecay",
+        "boostSpeedBackward",
+        "boostSpeedForward",
+        "linearAccelDecay",
+        "linearLimiterType",
+        "maxAngularVelocity",
+        "maxSpeed",
+        "negativeAngularScale",
+        "negativeLinearScale",
+        "pitchYawLimiterType",
+        "positiveAngularScale",
+        "positiveLinearScale",
+        "scmSpeed",
+        "torqueDistanceThreshold",
+        "torqueImbalanceMultiplier"
+      ],
+      "type": "object"
+    },
+    "IfcsMotionLimits": {
+      "description": "Concrete source type and the original members outside its typed fields.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "linearMaxAcceleration": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "rotationMaxAcceleration": {
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "linearMaxAcceleration",
+        "rotationMaxAcceleration",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "IfcsNoFuel": {
+      "description": "Concrete source type and the original members outside its typed fields.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "angularAccelerationModifier": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "angularVelocityModifier": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "linearAccelerationModifier": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "linearMaxSpeed": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "angularAccelerationModifier",
+        "angularVelocityModifier",
+        "linearAccelerationModifier",
+        "linearMaxSpeed",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "IfcsPartDamage": {
+      "description": "Concrete source type and the original members outside its typed fields.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "dragDecreaseCoefficient": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "dragInfluenceMapping": {
+          "$ref": "#/$defs/SourcedValueOfIfcsCurve"
+        },
+        "liftDecreaseCoefficient": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "liftInfluenceMapping": {
+          "$ref": "#/$defs/SourcedValueOfIfcsCurve"
+        },
+        "rollTorqueCoefficient": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "yawTorqueCoefficient": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "dragDecreaseCoefficient",
+        "dragInfluenceMapping",
+        "liftDecreaseCoefficient",
+        "liftInfluenceMapping",
+        "rollTorqueCoefficient",
+        "sourceType",
+        "yawTorqueCoefficient"
+      ],
+      "type": "object"
+    },
+    "IfcsPrecision": {
+      "properties": {
+        "maxSpeedPrecisionModeFullProximityAssist": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "maxSpeedPrecisionModeZeroProximityAssist": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "precisionAccelCurve": {
+          "$ref": "#/$defs/SourcedValueOfIfcsCurve"
+        },
+        "precisionLandingMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "precisionMaxDistance": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "precisionMinDistance": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "refreshCachesOnLandingMode": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        }
+      },
+      "required": [
+        "maxSpeedPrecisionModeFullProximityAssist",
+        "maxSpeedPrecisionModeZeroProximityAssist",
+        "precisionAccelCurve",
+        "precisionLandingMultiplier",
+        "precisionMaxDistance",
+        "precisionMinDistance",
+        "refreshCachesOnLandingMode"
+      ],
+      "type": "object"
+    },
+    "IfcsSpeedProfile": {
+      "description": "Concrete source type and the original members outside its typed fields.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "angularVelocity": {
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+        },
+        "angularVelocityLimiter": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "coreOffRotationModifier": {
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+        },
+        "linearAccelerationRotationModifier": {
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+        },
+        "linearSpeedRotationModifier": {
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+        },
+        "linearVelocityLimiter": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "negativeLinearTimeToFullSpeed": {
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+        },
+        "positiveLinearTimeToFullSpeed": {
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+        },
+        "powerAssignmentRotationModifier": {
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+        },
+        "proximityAssist": {
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "angularVelocity",
+        "angularVelocityLimiter",
+        "coreOffRotationModifier",
+        "linearAccelerationRotationModifier",
+        "linearSpeedRotationModifier",
+        "linearVelocityLimiter",
+        "negativeLinearTimeToFullSpeed",
+        "positiveLinearTimeToFullSpeed",
+        "powerAssignmentRotationModifier",
+        "proximityAssist",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "IfcsSystems": {
+      "properties": {
+        "damageHandling": {
+          "$ref": "#/$defs/SourcedValueOfIfcsDamageHandling"
+        },
+        "formationModeParams": {
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+        },
+        "fuelUsageParams": {
+          "$ref": "#/$defs/SourcedValueOfIfcsFuelUsage"
+        },
+        "hudMessages": {
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+        },
+        "intoxicationModifierRef": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "legacyThrusterEfficiencyParams": {
+          "$ref": "#/$defs/SourcedValueOfIfcsThrusterEfficiency"
+        },
+        "modifiers": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "modifiersLegacy": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "noFuelParams": {
+          "$ref": "#/$defs/SourcedValueOfIfcsNoFuel"
+        },
+        "noFuelParamsLegacy": {
+          "$ref": "#/$defs/SourcedValueOfIfcsNoFuel"
+        },
+        "partDamageParams": {
+          "$ref": "#/$defs/SourcedValueOfIfcsPartDamage"
+        },
+        "thrusterEfficiencyParams": {
+          "$ref": "#/$defs/SourcedValueOfIfcsThrusterEfficiency"
+        },
+        "thrusterImbalanceMessage": {
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+        },
+        "thrusterTypesForAngularControl": {
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+        }
+      },
+      "required": [
+        "damageHandling",
+        "formationModeParams",
+        "fuelUsageParams",
+        "hudMessages",
+        "intoxicationModifierRef",
+        "legacyThrusterEfficiencyParams",
+        "modifiers",
+        "modifiersLegacy",
+        "noFuelParams",
+        "noFuelParamsLegacy",
+        "partDamageParams",
+        "thrusterEfficiencyParams",
+        "thrusterImbalanceMessage",
+        "thrusterTypesForAngularControl"
+      ],
+      "type": "object"
+    },
+    "IfcsThrusterEfficiency": {
+      "description": "Concrete source type and the original members outside its typed fields.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "atmosphericEfficiencyCurve": {
+          "$ref": "#/$defs/SourcedValueOfIfcsCurve"
+        },
+        "maxSupportedAtmosphericEfficiency": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "atmosphericEfficiencyCurve",
+        "maxSupportedAtmosphericEfficiency",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "IfcsTurbulence": {
+      "description": "Concrete source type and the original members outside its typed fields.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "cloudDensityMapping": {
+          "$ref": "#/$defs/SourcedValueOfIfcsCurve"
+        },
+        "cloudDensityTurbulenceAmplitude": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "groundTurbulenceAltitudeMax": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "groundTurbulenceAltitudeMin": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "groundTurbulenceEnabled": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "groundTurbulenceMaxAngAcceleration": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "groundTurbulenceNoise": {
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+        },
+        "groundTurbulenceSpeedMax": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "groundTurbulenceSpeedMin": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "windSpeedMapping": {
+          "$ref": "#/$defs/SourcedValueOfIfcsCurve"
+        },
+        "windSpeedMax": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "windSpeedMin": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "windSpeedTurbulenceAmplitude": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "windSpeedTurbulenceEnabled": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "cloudDensityMapping",
+        "cloudDensityTurbulenceAmplitude",
+        "groundTurbulenceAltitudeMax",
+        "groundTurbulenceAltitudeMin",
+        "groundTurbulenceEnabled",
+        "groundTurbulenceMaxAngAcceleration",
+        "groundTurbulenceNoise",
+        "groundTurbulenceSpeedMax",
+        "groundTurbulenceSpeedMin",
+        "sourceType",
+        "windSpeedMapping",
+        "windSpeedMax",
+        "windSpeedMin",
+        "windSpeedTurbulenceAmplitude",
+        "windSpeedTurbulenceEnabled"
+      ],
+      "type": "object"
+    },
     "ImpoundingDefinition": {
       "properties": {
         "authoredFields": {
@@ -18513,6 +19831,34 @@
       ],
       "type": "object"
     },
+    "InstalledConfiguration": {
+      "description": "Original flight configurations on one resolved vehicle Loadout occurrence.",
+      "properties": {
+        "configurations": {
+          "items": {
+            "$ref": "#/$defs/FlightConfigurationLink"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "shipGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "shipRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "source": {
+          "$ref": "#/$defs/LoadoutFacilityPlacement"
+        }
+      },
+      "required": [
+        "configurations",
+        "shipGuid",
+        "shipRecordIndex",
+        "source"
+      ],
+      "type": "object"
+    },
     "InstalledResourceComponent": {
       "description": "The selected physical resource component and its original relay discriminator.",
       "properties": {
@@ -18613,6 +19959,30 @@
         "value",
         "variation",
         "weighting"
+      ],
+      "type": "object"
+    },
+    "IntegrityCurve": {
+      "description": "Concrete source type and the original members outside its typed fields.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "points": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCurvePoint"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "useLut": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "points",
+        "sourceType",
+        "useLut"
       ],
       "type": "object"
     },
@@ -38450,6 +39820,50 @@
       ],
       "type": "object"
     },
+    "ShipRecall": {
+      "description": "Original physical recall parameters and its referenced AI module tag.",
+      "properties": {
+        "AIModuleTag": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "BrakingDistanceOffset": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "DefaultPlatformDetectionRange": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "ForwardOffset": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "HoverHeightAtDestination": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "MinimumRecallDistance": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "ObstructionDetectionRange": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "AIModuleTag",
+        "BrakingDistanceOffset",
+        "DefaultPlatformDetectionRange",
+        "ForwardOffset",
+        "HoverHeightAtDestination",
+        "MinimumRecallDistance",
+        "ObstructionDetectionRange",
+        "additionalFields",
+        "sourceType"
+      ],
+      "type": "object"
+    },
     "ShipSpawnGroup": {
       "description": "A group of ships that spawn together (`SpawnDescription_ShipGroup`).",
       "properties": {
@@ -39017,6 +40431,30 @@
       },
       "required": [
         "deathEmissionModifierParams"
+      ],
+      "type": "object"
+    },
+    "SignatureEmitter": {
+      "description": "Concrete source type and the original members outside its typed fields.",
+      "properties": {
+        "activeSignature": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "fullDecayTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "activeSignature",
+        "additionalFields",
+        "fullDecayTime",
+        "sourceType"
       ],
       "type": "object"
     },
@@ -47311,6 +48749,139 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfArray_of_SourcedValueOfGimbalOverride": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfGimbalOverride"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfArray_of_SourcedValueOfGroundLayer": {
       "allOf": [
         {
@@ -48071,6 +49642,139 @@
               "value": {
                 "items": {
                   "$ref": "#/$defs/SourcedValueOfHostilityRules"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_of_SourcedValueOfIfcsAeroSurface": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfIfcsAeroSurface"
                 },
                 "type": "array"
               }
@@ -49800,6 +51504,139 @@
               "value": {
                 "items": {
                   "$ref": "#/$defs/SourcedValueOfInventoryLine"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_of_SourcedValueOfInventoryVector2": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfInventoryVector2"
                 },
                 "type": "array"
               }
@@ -63207,6 +65044,136 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfCollisionDetection": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/CollisionDetection"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfCombatModel": {
       "allOf": [
         {
@@ -71007,6 +72974,396 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfGimbal": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/Gimbal"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfGimbalAxis": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/GimbalAxis"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfGimbalOverride": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/GimbalOverride"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfGroundLayer": {
       "allOf": [
         {
@@ -72827,6 +75184,1956 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfIfcsAcceleration": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/IfcsAcceleration"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfIfcsAeroSurface": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/IfcsAeroSurface"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfIfcsAfterburner": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/IfcsAfterburner"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfIfcsAtmosphericFlight": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/IfcsAtmosphericFlight"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfIfcsCore": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/IfcsCore"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfIfcsCurve": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/IfcsCurve"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfIfcsDamageHandling": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/IfcsDamageHandling"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfIfcsFuelUsage": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/IfcsFuelUsage"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfIfcsJerk": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/IfcsJerk"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfIfcsMotionLimits": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/IfcsMotionLimits"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfIfcsNoFuel": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/IfcsNoFuel"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfIfcsPartDamage": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/IfcsPartDamage"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfIfcsSpeedProfile": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/IfcsSpeedProfile"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfIfcsThrusterEfficiency": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/IfcsThrusterEfficiency"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfIfcsTurbulence": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/IfcsTurbulence"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfImpoundingDefinition": {
       "allOf": [
         {
@@ -73441,6 +77748,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/InitialDamage"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfIntegrityCurve": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/IntegrityCurve"
               }
             }
           }
@@ -101760,6 +106197,136 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfShipRecall": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ShipRecall"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfShockwave": {
       "allOf": [
         {
@@ -102244,6 +106811,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/SignatureDeath"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfSignatureEmitter": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/SignatureEmitter"
               }
             }
           }
@@ -111220,6 +115917,122 @@
       "required": [
         "additionalFields",
         "textureName"
+      ],
+      "type": "object"
+    },
+    "Thruster": {
+      "description": "The authored operating parameters of one physical thruster component.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "automateBackwashSize": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "componentOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "fuelBurnRatePer10KNewton": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "fuelBurnRatePer10KNewtonRN": {
+          "$ref": "#/$defs/SourcedValueOfResourceFlowUnit"
+        },
+        "gimbal": {
+          "$ref": "#/$defs/SourcedValueOfGimbal"
+        },
+        "gimbalInteractionStateOverrides": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfGimbalOverride"
+        },
+        "minHealthThrustMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "noFuelThresholdRatio": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "nozzleAnimation": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "onlyActiveInVTOL": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "ownerGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "ownerRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "shipIntegrityLossModifierCurve": {
+          "$ref": "#/$defs/SourcedValueOfIntegrityCurve"
+        },
+        "signatureEmitterParams": {
+          "$ref": "#/$defs/SourcedValueOfSignatureEmitter"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "thrustCapacity": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "thrustCapacityNew": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "thrusterAnimDriver": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "thrusterBackwashAfterburnerMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "thrusterBackwashMaxDensity": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "thrusterBackwashMaxResistance": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "thrusterBackwashMaxSpeed": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "thrusterBackwashSize": {
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+        },
+        "thrusterStrengthSmoothing": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "thrusterType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "toggleThrusterBackwash": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "automateBackwashSize",
+        "componentOrdinal",
+        "fuelBurnRatePer10KNewton",
+        "fuelBurnRatePer10KNewtonRN",
+        "gimbal",
+        "gimbalInteractionStateOverrides",
+        "minHealthThrustMultiplier",
+        "noFuelThresholdRatio",
+        "nozzleAnimation",
+        "onlyActiveInVTOL",
+        "ownerGuid",
+        "ownerRecordIndex",
+        "shipIntegrityLossModifierCurve",
+        "signatureEmitterParams",
+        "sourceType",
+        "thrustCapacity",
+        "thrustCapacityNew",
+        "thrusterAnimDriver",
+        "thrusterBackwashAfterburnerMultiplier",
+        "thrusterBackwashMaxDensity",
+        "thrusterBackwashMaxResistance",
+        "thrusterBackwashMaxSpeed",
+        "thrusterBackwashSize",
+        "thrusterStrengthSmoothing",
+        "thrusterType",
+        "toggleThrusterBackwash"
       ],
       "type": "object"
     },

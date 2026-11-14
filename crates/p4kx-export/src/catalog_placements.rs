@@ -5,8 +5,11 @@ use p4kx_extraction::{Archive, CancelToken, DataForge};
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use super::catalog_independent_configurations::flight_configuration_tables::FlightConfigurationTables;
 use super::facility_instance::FacilityInstance;
-use super::facility_loadout_placements::{self, InteriorRoomCoverage};
+use super::facility_loadout_placements::{
+    self, InstalledConfiguration, InteriorRoomCoverage, LoadoutPlacements,
+};
 use super::resource_network_placements::ResourceNetworkPlacementTables;
 use super::resource_topology_declarations::ResourceTopologyTables;
 use super::starmap_placement::{self, StarmapPlacement};
@@ -29,6 +32,7 @@ pub(crate) struct CatalogPlacements {
     starmap_placements: CatalogTable<StarmapPlacement>,
     facility_instances: CatalogTable<FacilityInstance>,
     facility_interior_coverage: Vec<InteriorRoomCoverage>,
+    installed_configurations: CatalogTable<InstalledConfiguration>,
     container_instances: CatalogTable<ContainerInstance>,
     location_instances: CatalogTable<LocationInstance>,
 }
@@ -40,15 +44,23 @@ impl<'source> Collected<'source> {
         forge: &DataForge<'_>,
         input: &OriginalCatalogInput<'_, '_>,
         placements: &mut Placements,
+        flight: &FlightConfigurationTables<'_>,
         cancel: Option<&CancelToken>,
     ) -> Result<(CatalogPlacements, ResourceTopologyTables<'source>), CatalogError> {
         let origins = input.origins();
-        let (facility_instances, facility_interior_coverage) = facility_loadout_placements::table(
+        let LoadoutPlacements {
+            facilities: facility_instances,
+            rooms: facility_interior_coverage,
+            flight: installed_configurations,
+        } = facility_loadout_placements::table(
             archive,
             forge,
             &self.ships,
             &self.loadouts,
-            &self.entity_configurations,
+            facility_loadout_placements::ConfigurationSources {
+                entities: &self.entity_configurations,
+                flight,
+            },
             input,
             cancel,
         )?;
@@ -59,6 +71,7 @@ impl<'source> Collected<'source> {
             starmap_placements: starmap_placement::table(forge, starmap, origins)?,
             facility_instances,
             facility_interior_coverage,
+            installed_configurations,
             container_instances: placements.take_instances(),
             location_instances: placements.take_locations(),
         };

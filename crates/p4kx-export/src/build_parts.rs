@@ -65,3 +65,17 @@ pub(super) fn faction_identities<'source>(
 ) -> CatalogTable<FactionIdentityDefinition<'source>> {
     faction_identity_definition::table(forge, rows)
 }
+
+pub(super) fn capture_rows(
+    collected: &mut crate::collected::Collected<'_>,
+    filter: Option<&p4kx_extraction::Filter>,
+    recovery_numbers: Vec<crate::catalog_number_capture::CapturedNumber>,
+    configuration_numbers: Vec<crate::catalog_number_capture::CapturedNumber>,
+) {
+    let mut rows = crate::catalog_rows::snapshot(collected, filter);
+    rows.recovery_numbers = recovery_numbers;
+    rows.configuration_numbers.extend(configuration_numbers);
+    if collected.ledger.catalog_rows.replace(rows).is_some() {
+        collected.ledger.conflicting_catalog_rows = true;
+    }
+}

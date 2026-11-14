@@ -2,15 +2,13 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::collections::HashMap;
-use std::iter::Enumerate;
-use std::slice::Iter;
 
-use p4kx_extraction::{
-    Archive, CancelToken, DataForge, SourceUse, SourceUseRole, SourceUses, SourceValue,
-    SourcedValue,
-};
+use p4kx_extraction::{Archive, CancelToken, DataForge, SourceUseRole};
 
 use self::hosts::{RoomAttachment, RoomOwners};
+use self::installed::InstalledConfigurations;
+
+use super::catalog_independent_configurations::flight_configuration_tables::FlightConfigurationTables;
 
 use super::catalog_entity_configurations::EntityConfigurationRows;
 use super::catalog_facility;
@@ -20,7 +18,7 @@ use super::facility_instance::{
 };
 use super::inventory_owner_storage;
 use super::item_component_owner::ComponentOwner;
-use super::loadout_position::{self, LoadoutPosition};
+use super::loadout_position;
 use super::resource_topology_declarations;
 use super::room_associations;
 use crate::build::original_input::OriginalCatalogInput;
@@ -37,6 +35,12 @@ use crate::{CatalogError, ExportAccountingError};
 mod child;
 #[path = "facility_interior_hosts.rs"]
 mod hosts;
+#[path = "installed_configuration.rs"]
+mod installed;
+#[path = "loadout_walk_state.rs"]
+mod loadout_walk_state;
+pub(in crate::catalog_v3) use installed::InstalledConfiguration;
+use loadout_walk_state::{Frame, Path};
 #[path = "facility_interior_placements.rs"]
 mod interior;
 #[path = "facility_model_helper.rs"]
@@ -54,45 +58,60 @@ mod walk;
 
 pub(super) use types::{InteriorFacilityPlacement, InteriorRoomCoverage};
 
-/// Links resolved ship occurrences to their physical configuration rows.
+pub(super) struct LoadoutPlacements {
+    pub(super) facilities: CatalogTable<FacilityInstance>,
+    pub(super) rooms: Vec<InteriorRoomCoverage>,
+    pub(super) flight: CatalogTable<InstalledConfiguration>,
+}
+
+#[derive(Clone, Copy)]
+pub(super) struct ConfigurationSources<'rows, 'source> {
+    pub(super) entities: &'rows EntityConfigurationRows<'source>,
+    pub(super) flight: &'rows FlightConfigurationTables<'source>,
+}
+
+/// Links resolved vehicle occurrences to their physical configuration rows.
 pub(super) fn table(
     archive: &Archive,
     forge: &DataForge<'_>,
     ships: &[Ship<'_>],
     loadouts: &[Loadout],
-    declarations: &EntityConfigurationRows<'_>,
+    configurations: ConfigurationSources<'_, '_>,
     input: &OriginalCatalogInput<'_, '_>,
     cancel: Option<&CancelToken>,
-) -> Result<(CatalogTable<FacilityInstance>, Vec<InteriorRoomCoverage>), CatalogError> {
+) -> Result<LoadoutPlacements, CatalogError> {
     input.check_forge(forge)?;
-    let mut project = Projection::new(declarations, input.origins(), cancel)?;
-    let rooms = RoomOwners::new(declarations)?;
-    let coverage = if project.definitions.is_empty() && rooms.is_empty() {
-        Vec::new()
-    } else {
-        let mut attachments = Vec::new();
-        for (ordinal, loadout) in loadouts.iter().enumerate() {
-            project.check_cancel()?;
-            if loadout.entity_kind == EntityKind::Ship {
-                project.loadout(
-                    loadout,
-                    loadout_position::ordinal(ordinal)?,
-                    &rooms,
-                    &mut attachments,
-                )?;
+    let mut project = Projection::new(configurations.entities, input.origins(), cancel)?;
+    let mut flight_instances = InstalledConfigurations::new(configurations.flight)?;
+    let rooms = RoomOwners::new(configurations.entities)?;
+    let coverage =
+        if project.definitions.is_empty() && rooms.is_empty() && flight_instances.is_empty() {
+            Vec::new()
+        } else {
+            let mut attachments = Vec::new();
+            for (ordinal, loadout) in loadouts.iter().enumerate() {
+                project.check_cancel()?;
+                if loadout.entity_kind == EntityKind::Ship {
+                    project.loadout(
+                        loadout,
+                        loadout_position::ordinal(ordinal)?,
+                        &rooms,
+                        &mut attachments,
+                        &mut flight_instances,
+                    )?;
+                }
             }
-        }
-        let capture = EntryCapture::for_input(input);
-        interior::project(
-            &mut project,
-            archive,
-            forge,
-            ships,
-            &rooms,
-            &attachments,
-            &capture,
-        )?
-    };
+            let capture = EntryCapture::for_input(input);
+            interior::project(
+                &mut project,
+                archive,
+                forge,
+                ships,
+                &rooms,
+                &attachments,
+                &capture,
+            )?
+        };
     let instances = CatalogTable::matching_source_types(
         forge,
         |name| {
@@ -106,7 +125,11 @@ pub(super) fn table(
         },
         project.rows,
     );
-    Ok((instances, coverage))
+    Ok(LoadoutPlacements {
+        facilities: instances,
+        rooms: coverage,
+        flight: FlightConfigurationTables::installed_table(forge, flight_instances.rows),
+    })
 }
 
 #[derive(Clone, Copy)]
@@ -176,14 +199,29 @@ impl<'rows, 'origin> Projection<'rows, 'origin> {
         ordinal: u32,
         rooms: &RoomOwners<'_, '_>,
         room_attachments: &mut Vec<RoomAttachment>,
+        flight: &mut InstalledConfigurations<'_>,
     ) -> Result<(), CatalogError> {
         let root = loadout.root_record_index;
-        let record = self.origins.record(root);
         let ship = ShipContext::read(self.origins, loadout.entity_guid, root)?;
-        let selector =
-            record.observe_header(RecordHeaderField::RecordIndex, SourceUseRole::Selector)?;
-        let mut walk = Path::new(ordinal, selector);
+        let selector = self
+            .origins
+            .record(root)
+            .observe_header(RecordHeaderField::RecordIndex, SourceUseRole::Selector)?;
+        let walk = Path::new(ordinal, selector);
         self.emit(&ship, root, &walk, None)?;
+        flight.emit(&ship, root, || walk.position_cell(&self.origins.uses), None)?;
+        self.walk_ports(loadout, &ship, walk, rooms, room_attachments, flight)
+    }
+
+    fn walk_ports(
+        &mut self,
+        loadout: &Loadout,
+        ship: &ShipContext,
+        mut walk: Path,
+        rooms: &RoomOwners<'_, '_>,
+        room_attachments: &mut Vec<RoomAttachment>,
+        flight: &mut InstalledConfigurations<'_>,
+    ) -> Result<(), CatalogError> {
         let mut stack = vec![Frame::new(&loadout.ports, &walk)];
         while let Some(frame) = stack.last_mut() {
             self.check_cancel()?;
@@ -202,7 +240,11 @@ impl<'rows, 'origin> Projection<'rows, 'origin> {
                 continue;
             };
             let has_rooms = rooms.contains(record);
-            if port.ports.is_empty() && !has_rooms && !self.definitions.contains_key(&record) {
+            if port.ports.is_empty()
+                && !has_rooms
+                && !self.definitions.contains_key(&record)
+                && !flight.contains(record)
+            {
                 continue;
             }
             let parent = walk.checkpoint();
@@ -212,15 +254,16 @@ impl<'rows, 'origin> Projection<'rows, 'origin> {
             walk.uses.extend_from_slice(&proof.source_uses);
             let name_complete = port.append_name_uses(&mut walk.uses)?;
             walk.complete &= proof.source_set_complete && name_complete;
-            self.emit(&ship, record, &walk, Some((port, attachment)))?;
+            let attached = Some((port, attachment));
+            self.emit(ship, record, &walk, attached)?;
+            flight.emit(
+                ship,
+                record,
+                || walk.position_cell(&self.origins.uses),
+                attached,
+            )?;
             if has_rooms {
-                room_attachments.push(RoomAttachment {
-                    record,
-                    ship: ship.clone(),
-                    position: walk.position_cell(&self.origins.uses),
-                    selectors: walk.uses.clone(),
-                    complete: walk.complete,
-                });
+                room_attachments.push(walk.room_attachment(record, ship, &self.origins.uses));
             }
             if port.ports.is_empty() {
                 walk.restore(parent);
@@ -285,67 +328,5 @@ impl<'rows, 'origin> Projection<'rows, 'origin> {
             return Err(CatalogError::Cancelled);
         }
         Ok(())
-    }
-}
-
-struct Frame<'loadout> {
-    ports: Enumerate<Iter<'loadout, LoadoutPort>>,
-    parent: Checkpoint,
-}
-
-impl<'loadout> Frame<'loadout> {
-    fn new(ports: &'loadout [LoadoutPort], path: &Path) -> Self {
-        Self {
-            ports: ports.iter().enumerate(),
-            parent: path.checkpoint(),
-        }
-    }
-}
-
-struct Path {
-    position: LoadoutPosition,
-    uses: Vec<SourceUse>,
-    complete: bool,
-}
-
-#[derive(Clone, Copy)]
-struct Checkpoint {
-    ports: usize,
-    uses: usize,
-    complete: bool,
-}
-
-impl Path {
-    fn position_cell(&self, sources: &SourceUses) -> SourcedValue<LoadoutPosition> {
-        sources.value(
-            SourceValue::Present(self.position.clone()),
-            &self.uses,
-            self.complete,
-        )
-    }
-
-    fn new(loadout_ordinal: u32, root: SourceUse) -> Self {
-        Self {
-            position: LoadoutPosition {
-                loadout_ordinal,
-                port_ordinals: Vec::new(),
-            },
-            uses: vec![root],
-            complete: true,
-        }
-    }
-
-    const fn checkpoint(&self) -> Checkpoint {
-        Checkpoint {
-            ports: self.position.port_ordinals.len(),
-            uses: self.uses.len(),
-            complete: self.complete,
-        }
-    }
-
-    fn restore(&mut self, checkpoint: Checkpoint) {
-        self.position.port_ordinals.truncate(checkpoint.ports);
-        self.uses.truncate(checkpoint.uses);
-        self.complete = checkpoint.complete;
     }
 }

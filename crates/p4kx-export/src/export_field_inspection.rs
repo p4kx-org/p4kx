@@ -26,6 +26,9 @@ pub(crate) enum ConfigurationInspection {
     WeaponActionRecoilDefinition,
     WeaponProceduralDefinition,
     EntityAnimationController,
+    FlightController,
+    Ifcs,
+    Thruster,
 }
 
 /// Inspection of the canonical values relevant to one source scope.

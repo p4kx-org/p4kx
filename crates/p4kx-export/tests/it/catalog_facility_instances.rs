@@ -39,6 +39,7 @@ fn ship_facility_instances_preserve_repeated_nested_and_docked_loadout_positions
     let instances = proof::rows(&catalog, "/placements/facilityInstances/rows")?;
     check_ship_instances(instances)?;
     check_docked_instances(instances)?;
+    check_installed_flight(&catalog)?;
     validate(&catalog)
 }
 
@@ -85,6 +86,51 @@ fn facility_path_keeps_encrypted_ancestor_separate_from_clear_child_and_definiti
         Some(false),
     )?;
     validate(&catalog)
+}
+
+fn check_installed_flight(catalog: &Value) -> TestResult {
+    let rows = proof::rows(catalog, "/placements/installedConfigurations/rows")?;
+    let host = instances_of(rows, fixture::SHIP);
+    let docked = instances_of(rows, fixture::DOCKED);
+    let [root, attachment] = docked.as_slice() else {
+        return Err("the docked vehicle has its own root and attachment".into());
+    };
+    assert_eq!(
+        host.len(),
+        3,
+        "two direct and one nested physical attachments"
+    );
+    for (row, expected) in host
+        .into_iter()
+        .zip([json!([0]), json!([1]), json!([2, 0])])
+    {
+        assert_eq!(
+            proof::at(row, "/source/position/value/portOrdinals")?,
+            &expected,
+            "each original port route remains distinct"
+        );
+        assert_eq!(
+            proof::at(row, "/configurations/0/kind")?,
+            "thruster",
+            "the attachment references the typed flight table"
+        );
+        assert_eq!(
+            proof::at(row, "/configurations/0/owner/ownerGuid/value")?,
+            &common::guid(fixture::SEAT),
+            "the physical component owner is shared across its installations"
+        );
+    }
+    assert_eq!(
+        proof::at(root, "/source/position/value/portOrdinals")?,
+        &json!([]),
+        "the separately selected docked root has no host port"
+    );
+    assert_eq!(
+        proof::at(attachment, "/source/position/value/portOrdinals")?,
+        &json!([0]),
+        "its own child is retained only within its own loadout"
+    );
+    Ok(())
 }
 
 fn check_ship_instances(instances: &[Value]) -> TestResult {

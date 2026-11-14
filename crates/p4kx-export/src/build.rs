@@ -119,19 +119,12 @@ fn assemble<R>(
         catalog_independent_configurations::read(&forge, &projection, options, &mut collected)?;
     particle_library::collect(archive, &entry_capture, options, &mut collected)?;
     let kinds = collected.summary(options.filter.is_none());
-    let mut catalog_rows = crate::catalog_rows::snapshot(&mut collected, options.filter);
-    catalog_rows.recovery_numbers = independent.recovery_numbers;
-    catalog_rows
-        .configuration_numbers
-        .extend(independent.configuration_numbers);
-    if collected
-        .ledger
-        .catalog_rows
-        .replace(catalog_rows)
-        .is_some()
-    {
-        collected.ledger.conflicting_catalog_rows = true;
-    }
+    parts::capture_rows(
+        &mut collected,
+        options.filter,
+        independent.recovery_numbers,
+        independent.configuration_numbers,
+    );
     let blueprints = crate::blueprint_catalog_rows::tables(
         std::mem::take(&mut collected.blueprints),
         &collected.missing_blueprint_categories,
@@ -139,8 +132,14 @@ fn assemble<R>(
         &forge,
         &origins,
     )?;
-    let (catalog_placements, resource_declarations) =
-        collected.catalog_placements(archive, &forge, &input, &mut placements, options.cancel)?;
+    let (catalog_placements, resource_declarations) = collected.catalog_placements(
+        archive,
+        &forge,
+        &input,
+        &mut placements,
+        &independent.tables.flight,
+        options.cancel,
+    )?;
     let health = crate::export_health_prepare::compile_captured(
         std::mem::take(&mut collected.ledger),
         &kinds,

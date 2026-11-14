@@ -16,6 +16,7 @@ pub(super) const DOCKED: u128 = 0x1063_0203;
 const CONTAINER: u128 = 0x1063_0204;
 const MISSING: u128 = 0x1063_0205;
 
+const FLIGHT_THRUSTER: &str = "SCItemThrusterParams";
 const SEAT_COMPONENT: &str = "SCItemSeatParams";
 const STORAGE_COMPONENT: &str = "SCItemInventoryContainerComponentParams";
 const CONTAINER_DEFINITION: &str = "InventoryContainer";
@@ -62,6 +63,11 @@ fn with_loadout(ship_loadout: TestLoadout) -> DataForgeBuilder {
                     TestType::ReferenceTo(CONTAINER_DEFINITION.to_owned()),
                 ),
         )
+        .structure(
+            TestStruct::new(FLIGHT_THRUSTER)
+                .parent("DataForgeComponentParams")
+                .field("thrustCapacity", TestType::Single),
+        )
         .structure(TestStruct::new(CONTAINER_DEFINITION))
         .record(ship(ship_loadout))
         .record(
@@ -72,6 +78,9 @@ fn with_loadout(ship_loadout: TestLoadout) -> DataForgeBuilder {
             )
             .attach_type("Misc")
             .component(seat())
+            .component(TestValue::Struct(
+                TestInstance::new(FLIGHT_THRUSTER).value("thrustCapacity", TestValue::Single(12.0)),
+            ))
             .record(),
         )
         .record(deck())
@@ -86,6 +95,9 @@ fn with_loadout(ship_loadout: TestLoadout) -> DataForgeBuilder {
             .port(TestPort::new("docked_seat"))
             .loadout(loadout([("docked_seat", SEAT)]))
             .component(seat())
+            .component(TestValue::Struct(
+                TestInstance::new(FLIGHT_THRUSTER).value("thrustCapacity", TestValue::Single(12.0)),
+            ))
             .record(),
         )
         .record(TestRecord::new(

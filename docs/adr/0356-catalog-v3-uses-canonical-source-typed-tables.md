@@ -222,3 +222,17 @@ room on the root Entity uses that Entity's origin. Character-definition
 indirection and attached item ship-frame placement have an unsupported
 state. Unavailable ship-frame inputs leave the room-local transforms and
 resolved attachment context available.
+
+## Flight-control configurations and vehicle Loadout positions
+
+The original flight-controller, IFCS and thruster components are independent
+configuration tables. Their identities retain the original Entity Record and
+Components slot, including components outside the item stat block selection.
+Legacy and current IFCS blocks retain separate original values. An unmodeled
+member retains its original field arena within the owning structure.
+
+`placements.installedConfigurations` reuses the resolved facility Loadout walk,
+with the same port selection evidence and a separate typed flight link list.
+The vehicle root has an empty port position. Repeated and invisible attachments
+remain separate placements. The docked vehicle boundary preserves independent
+vehicle roots. See the [flight-control contract](../catalog-flight-configurations.md).

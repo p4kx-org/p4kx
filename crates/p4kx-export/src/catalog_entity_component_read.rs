@@ -186,3 +186,12 @@ impl<'source, Row> ComponentRead<'source, Row> {
         Ok(())
     }
 }
+
+#[path = "catalog_thruster.rs"]
+pub(super) mod catalog_thruster;
+
+#[path = "catalog_flight_controller.rs"]
+pub(super) mod catalog_flight_controller;
+
+#[path = "catalog_ifcs.rs"]
+pub(super) mod catalog_ifcs;
