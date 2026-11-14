@@ -139,10 +139,7 @@ fn the_export_writes_the_package_folder_reports_it_and_remembers_the_choices() -
     let package = summary.package().ok_or("no package in the summary")?;
     assert_eq!(summary.parts(), 3, "the ship, the gun and the relay");
     let manifest = manifest(&folder)?;
-    let libraries = [
-        "Data/objects/test/ship.mtl",
-        "Data/Objects/Test/cube.mtl",
-    ];
+    let libraries = ["Data/objects/test/ship.mtl", "Data/Objects/Test/cube.mtl"];
     let written = check_entity_package_sources(&folder, &manifest, &libraries)?;
     assert_eq!(
         package.files, written,
