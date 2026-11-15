@@ -20,6 +20,7 @@ mod projection;
 mod provider;
 mod schema;
 mod scope_health;
+mod scope_placement;
 mod scope_receipt;
 mod sub_database_components;
 mod sub_database_cycles;

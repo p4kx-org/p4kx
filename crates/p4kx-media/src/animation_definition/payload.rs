@@ -88,7 +88,7 @@ impl DefinitionFamily {
 )]
 pub(super) enum DefinitionPayload<'source> {
     Document(DefinitionDocument),
-    ScopeReceipt(ScopeReceipt),
+    ScopeReceipt(ScopeReceipt<'source>),
     Element(AtlElement<'source>),
     Declaration(AtlDeclaration<'source>),
     Content(AtlContent<'source>),

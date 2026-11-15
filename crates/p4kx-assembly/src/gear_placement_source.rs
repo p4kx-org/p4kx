@@ -62,6 +62,27 @@ impl GearPlacementSource {
     /// Returns the authored bone name when placement evaluated it against the parent model.
     #[must_use]
     pub fn bone_selector(&self) -> Option<SourceLocation> {
-        (self.read_bone && self.declaration.authored_bone).then(|| self.declaration.field("bone"))
+        if self.read_bone {
+            self.declared_bone_selector()
+        } else {
+            None
+        }
+    }
+
+    /// Returns the original gear element addressed by its authored array position.
+    #[must_use]
+    pub fn ordinal_selector(&self) -> SourceLocation {
+        SourceLocation::DataForge {
+            record_index: self.declaration.record,
+            field: format!("gears[{}]", self.declaration.ordinal),
+        }
+    }
+
+    /// Returns the original bone field when supplied.
+    #[must_use]
+    pub fn declared_bone_selector(&self) -> Option<SourceLocation> {
+        self.declaration
+            .authored_bone
+            .then(|| self.declaration.field("bone"))
     }
 }

@@ -719,6 +719,19 @@ An excluded DataForge produces a single input receipt without an owner Record.
 Repeated placements keep separate receipts when they share a parameter Entry.
 Blocked required inputs and incomplete Loadouts still prevent publication.
 
+Entity attachment and landing-gear receipts also carry `placement_detail`.
+An `attachment` gives the resolved `port_path` with slash-separated port names.
+A `landing-gear` gives the owning `owner_path`, the original zero-based `ordinal`
+in the landing-system Record, and `bone` when the Record supplies it. An empty
+`owner_path` means the root Entity owns the gear. The receipt's `placement` and
+subresource indices retain their occurrence identity.
+
+Field origins for port paths cite known original port names. If a route segment
+lacks its original coordinate, its path has `sourceSetComplete: false` and can
+still cite other observed segments. If there is no known contributor, the path's
+`containsEncryptedSource` is `null`. The gear ordinal and bone cite the original
+array element and bone field in the DataForge respectively.
+
 Within a character parameter `AnimationList`, `named-caf` link rows keep each
 concrete animation declaration at the original path attribute's coordinates,
 including repetitions. For relative paths the latest preceding `#filepath`

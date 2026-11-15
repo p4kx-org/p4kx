@@ -2,12 +2,16 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::collections::BTreeSet;
+use std::path::Path;
 
 use p4kx_extraction::Archive;
 use p4kx_media::MediaRecord;
 use serde_json::Value;
 
 use super::{BLOCKED_CDF, CDF, TestResult};
+
+#[path = "animation_scope_placement_origins.rs"]
+mod placement_origins;
 
 const SCOPE_RECEIPT: &str = "animation-definition-scope-receipt";
 
@@ -32,7 +36,11 @@ pub(super) fn verify_root_exclusion(archive: &Archive, rows: &[MediaRecord]) -> 
     Ok(())
 }
 
-pub(super) fn verify_scope_receipts(archive: &Archive, rows: &[MediaRecord]) -> TestResult {
+pub(super) fn verify_scope_receipts(
+    archive: &Archive,
+    rows: &[MediaRecord],
+    base: &Path,
+) -> TestResult {
     let expected_root = source_index(archive, "Data/Game2.dcb")?;
     let expected_parameter = source_index(archive, "Data/Objects/shared.chrparams")?;
     let expected_excluded = source_index(archive, BLOCKED_CDF)?;
@@ -40,9 +48,11 @@ pub(super) fn verify_scope_receipts(archive: &Archive, rows: &[MediaRecord]) -> 
     let mut indices = BTreeSet::new();
     let mut selected_owners = Vec::new();
     let mut outcomes = Vec::new();
-    for row in rows
+    let mut occurrence_rows = Vec::new();
+    for (ordinal, row) in rows
         .iter()
-        .filter(|row| row.subresource.namespace == SCOPE_RECEIPT)
+        .enumerate()
+        .filter(|(_, row)| row.subresource.namespace == SCOPE_RECEIPT)
     {
         schema
             .validate(&serde_json::to_value(row)?)
@@ -57,11 +67,19 @@ pub(super) fn verify_scope_receipts(archive: &Archive, rows: &[MediaRecord]) -> 
             "one receipt per resolved occurrence"
         );
         let state = scope_field(row, "outcome/state").ok_or("coverage disposition")?;
-        if let Some(owner) = receipt_owner(row, state, &expected_parameter, &expected_excluded)? {
+        let owner = receipt_owner(row, state, &expected_parameter, &expected_excluded)?;
+        if let Some(owner) = owner.filter(|_| scope_field(row, "placement") != Some("landing-gear"))
+        {
             selected_owners.push(owner);
         }
+        occurrence_rows.push((ordinal, row));
         outcomes.push(state);
     }
+    verify_outcomes(outcomes, &selected_owners)?;
+    placement_origins::verify(base, &occurrence_rows, &expected_root)
+}
+
+fn verify_outcomes(mut outcomes: Vec<&str>, selected_owners: &[u64]) -> TestResult {
     outcomes.sort_unstable();
     assert_eq!(
         outcomes,
@@ -69,13 +87,15 @@ pub(super) fn verify_scope_receipts(archive: &Archive, rows: &[MediaRecord]) -> 
             "excluded",
             "no-companion",
             "no-rig",
+            "no-rig",
+            "selected",
             "selected",
             "selected",
             "selected"
         ],
         "all four scope outcomes preserve their original multiplicity"
     );
-    let [root, first, second] = selected_owners.as_slice() else {
+    let [root, first, second] = selected_owners else {
         return Err("expected selected occurrence owners".into());
     };
     assert_ne!(

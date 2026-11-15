@@ -19293,6 +19293,56 @@
         }
       ]
     },
+    "PlacementDetail": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "attachment",
+              "type": "string"
+            },
+            "port_path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "port_path"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "bone": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "kind": {
+              "const": "landing-gear",
+              "type": "string"
+            },
+            "ordinal": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "owner_path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "owner_path",
+            "ordinal"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "PlayBankPrefix": {
       "additionalProperties": false,
       "properties": {
@@ -21315,6 +21365,16 @@
         },
         "placement": {
           "$ref": "#/$defs/ScopePlacement"
+        },
+        "placement_detail": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PlacementDetail"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [

@@ -7,7 +7,9 @@ use std::sync::Arc;
 use p4kx_dataforge::Guid;
 use p4kx_extraction::{DataForgeOrigin, SourceLocation};
 
-use crate::{ArchiveModels, Attachment, EntityNode, GearPlacementSource, LandingGear};
+use crate::{
+    ArchiveModels, Attachment, EntityNode, GearPlacementSource, LandingGear, PortNode, PortSource,
+};
 use files::RigPath;
 
 #[path = "entity_rig_files.rs"]
@@ -65,6 +67,24 @@ pub struct EntityRig {
     pub skeleton: Option<RigFile<Option<p4kx_model::SkeletonSource>>>,
     /// Authored parameter rows associated with the declared skeleton.
     pub parameters: Option<RigFile<Vec<RigParameter>>>,
+    port_selectors: Arc<[Option<SourceLocation>]>,
+    gear_source: Option<GearPlacementSource>,
+}
+
+impl EntityRig {
+    /// Returns one observed port-name source per segment of the owning route.
+    ///
+    /// A missing source means the segment's original name has no retained coordinate.
+    #[must_use]
+    pub fn port_selectors(&self) -> &[Option<SourceLocation>] {
+        &self.port_selectors
+    }
+
+    /// Returns the observed declaration of a landing gear placement.
+    #[must_use]
+    pub const fn gear_source(&self) -> Option<&GearPlacementSource> {
+        self.gear_source.as_ref()
+    }
 }
 
 /// Discovers original rig inputs for the root, attachments and landing gear in Loadout order.
@@ -102,20 +122,13 @@ pub fn discover_entity_rigs_using<I: RigInputs>(
         rigs: Vec::new(),
         files: files::RigFiles::default(),
     };
-    catalogue.append(root, "", RigPlacement::Root, inputs)?;
+    catalogue.append(root, "", Placement::root(), inputs)?;
     crate::tree_walk::try_visit(root.ports(), |path, route| {
         inputs.check()?;
         if let Some(port) = route.last()
             && let Attachment::Entity(child) = port.attachment()
         {
-            catalogue.append(
-                child,
-                path,
-                RigPlacement::Attachment {
-                    port_path: path.to_owned(),
-                },
-                inputs,
-            )?;
+            catalogue.append(child, path, Placement::attachment(path, route), inputs)?;
         }
         Ok(())
     })?;
@@ -144,15 +157,56 @@ struct Catalogue<'model, 'archive> {
     files: files::RigFiles,
 }
 
+struct Placement {
+    value: RigPlacement,
+    port_selectors: Arc<[Option<SourceLocation>]>,
+    gear_source: Option<GearPlacementSource>,
+}
+
+impl Placement {
+    fn root() -> Self {
+        Self {
+            value: RigPlacement::Root,
+            port_selectors: Arc::from([]),
+            gear_source: None,
+        }
+    }
+
+    fn attachment(path: &str, route: &[&PortNode]) -> Self {
+        Self {
+            value: RigPlacement::Attachment {
+                port_path: path.to_owned(),
+            },
+            port_selectors: route.iter().map(|port| port_selector(port)).collect(),
+            gear_source: None,
+        }
+    }
+}
+
+fn port_selector(port: &PortNode) -> Option<SourceLocation> {
+    if port.source() != PortSource::PortDefault || port.name().is_empty() {
+        return None;
+    }
+    let position = port.definition()?.position();
+    Some(SourceLocation::DataForge {
+        record_index: position.record_index(),
+        field: format!(
+            "Components[{}].Ports[{}].Name",
+            position.component_ordinal(),
+            position.port_ordinal()
+        ),
+    })
+}
+
 impl Catalogue<'_, '_> {
     fn append<I: RigInputs>(
         &mut self,
         node: &EntityNode,
         path: &str,
-        placement: RigPlacement,
+        placement: Placement,
         inputs: &mut I,
     ) -> Result<(), I::Error> {
-        let geometry = if matches!(placement, RigPlacement::Root) {
+        let geometry = if matches!(placement.value, RigPlacement::Root) {
             node.geometry()
         } else {
             node.own_skin
@@ -160,6 +214,7 @@ impl Catalogue<'_, '_> {
                 .map(|skin| &skin.geometry)
                 .or_else(|| node.geometry())
         };
+        let port_selectors = Arc::clone(&placement.port_selectors);
         self.append_rig(
             node,
             placement,
@@ -175,7 +230,7 @@ impl Catalogue<'_, '_> {
         }
         for gear in node.landing_gear() {
             inputs.check()?;
-            self.append_gear(node, path, gear, inputs)?;
+            self.append_gear(node, path, &port_selectors, gear, inputs)?;
         }
         Ok(())
     }
@@ -184,6 +239,7 @@ impl Catalogue<'_, '_> {
         &mut self,
         node: &EntityNode,
         path: &str,
+        port_selectors: &Arc<[Option<SourceLocation>]>,
         gear: &LandingGear,
         inputs: &mut I,
     ) -> Result<(), I::Error> {
@@ -191,10 +247,14 @@ impl Catalogue<'_, '_> {
         let source = GearPlacementSource::of(node, gear, false);
         self.append_rig(
             node,
-            RigPlacement::LandingGear {
-                owner_path: path.to_owned(),
-                ordinal: gear.source.ordinal,
-                bone: gear.source.authored_bone.then(|| gear.bone().to_owned()),
+            Placement {
+                value: RigPlacement::LandingGear {
+                    owner_path: path.to_owned(),
+                    ordinal: gear.source.ordinal,
+                    bone: gear.source.authored_bone.then(|| gear.bone().to_owned()),
+                },
+                port_selectors: Arc::clone(port_selectors),
+                gear_source: Some(source),
             },
             geometry,
             geometry
@@ -208,7 +268,7 @@ impl Catalogue<'_, '_> {
     fn append_rig<I: RigInputs>(
         &mut self,
         node: &EntityNode,
-        placement: RigPlacement,
+        placement: Placement,
         geometry: Option<&str>,
         geometry_selectors: Vec<SourceLocation>,
         inputs: &mut I,
@@ -221,7 +281,7 @@ impl Catalogue<'_, '_> {
     fn read<I: RigInputs>(
         &mut self,
         node: &EntityNode,
-        placement: RigPlacement,
+        placement: Placement,
         geometry: Option<&str>,
         geometry_selectors: Vec<SourceLocation>,
         inputs: &mut I,
@@ -238,7 +298,7 @@ impl Catalogue<'_, '_> {
             parameters,
         } = rig.unwrap_or_default();
         Ok(EntityRig {
-            placement,
+            placement: placement.value,
             record_index: node.record_index(),
             owner: node.guid(),
             owner_source: self
@@ -250,6 +310,8 @@ impl Catalogue<'_, '_> {
             definition,
             skeleton,
             parameters,
+            port_selectors: placement.port_selectors,
+            gear_source: placement.gear_source,
         })
     }
 }

@@ -10,6 +10,7 @@ use serde::Serialize;
 
 use super::origins;
 use super::payload::{self as wire, DefinitionPayload};
+use super::scope_placement::{PlacementDetail, PlacementEvidence};
 use crate::audio_record_origins as records;
 use crate::origin_capture::OriginSite;
 use crate::origin_contributions::OriginContributions;
@@ -20,9 +21,11 @@ use crate::{
 
 #[derive(Serialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-pub(super) struct ScopeReceipt {
+pub(super) struct ScopeReceipt<'source> {
     input_entry_index: DecimalU64,
     placement: ScopePlacement,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    placement_detail: Option<PlacementDetail<'source>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     owner_record_index: Option<u32>,
     outcome: ScopeOutcome,
@@ -160,7 +163,7 @@ pub(super) fn entity(
         scope.write(
             ordinal as u64,
             placement,
-            rig.record_index,
+            Some(PlacementEvidence { rig, input: &input }),
             outcome,
             proof,
             writer,
@@ -274,7 +277,7 @@ impl<'a, 'directory> Scope<'a, 'directory> {
         &self,
         ordinal: u64,
         placement: ScopePlacement,
-        owner_record_index: Option<u32>,
+        evidence: Option<PlacementEvidence<'_>>,
         outcome: ScopeOutcome,
         proof: OriginContributions,
         writer: &mut MediaWriter<'_>,
@@ -295,15 +298,13 @@ impl<'a, 'directory> Scope<'a, 'directory> {
                 writer,
             )?;
         }
-        if let Some(record) = owner_record_index {
-            let position =
-                usize::try_from(self.input_index).map_err(|_| origin_error::counter())?;
-            let input = writer
-                .origins
-                .input(self.lookup.index.archive, self.physical_entry(position)?)?;
+        let owner_record_index = evidence
+            .as_ref()
+            .and_then(|evidence| evidence.rig.record_index);
+        if let Some((evidence, record)) = evidence.as_ref().zip(owner_record_index) {
             let mut proof = writer.capture_origins();
             proof.add(
-                &input,
+                evidence.input,
                 InputScope::Payload,
                 OriginSite::new("dataforge-record", &[u64::from(record)], "recordIndex"),
                 SourceUseRole::Selector,
@@ -316,6 +317,10 @@ impl<'a, 'directory> Scope<'a, 'directory> {
                 writer,
             )?;
         }
+        let placement_detail = match evidence {
+            Some(evidence) => evidence.write(&mut prepared, writer)?,
+            None => None,
+        };
         prepared.write(
             writer,
             &Subresource::new(wire::SCOPE_RECEIPT, vec![ordinal]),
@@ -323,6 +328,7 @@ impl<'a, 'directory> Scope<'a, 'directory> {
             &DefinitionPayload::ScopeReceipt(ScopeReceipt {
                 input_entry_index: DecimalU64::new(self.input_index),
                 placement,
+                placement_detail,
                 owner_record_index,
                 outcome,
             }),

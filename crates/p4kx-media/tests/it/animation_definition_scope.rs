@@ -7,7 +7,7 @@ use p4kx_extraction::{Archive, Exclusion, Filter};
 use p4kx_media::{ExportOptions, MediaKind, MediaRecord};
 use p4kx_testkit::{
     DataForgeBuilder, TestAnimation, TestDba, TestEntity, TestEntry, TestLoadout, TestLoadoutEntry,
-    TestModel, entity_schema,
+    TestModel, TestPort, entity_schema, landing_system_record,
 };
 use serde_json::Value;
 
@@ -73,7 +73,7 @@ fn unavailable_rig_prevents_complete_scope_and_exclusion_keeps_the_other_branche
         "explicit exclusion leaves the other branches"
     );
     verify_links(&rows)?;
-    receipt_assertions::verify_scope_receipts(&archive, &rows)?;
+    receipt_assertions::verify_scope_receipts(&archive, &rows, &out.join(&index.artifact_base))?;
 
     let mut selection = options(false)?;
     selection.exclude = Exclusion::parse([CDF])?;
@@ -188,13 +188,17 @@ fn database(blocked_branch: bool) -> Vec<u8> {
     if !blocked_branch {
         return builder.record(root.record()).build();
     }
-    let root = root.loadout(TestLoadout::Manual(vec![
-        TestLoadoutEntry::class("blocked", "FixtureBlocked"),
-        TestLoadoutEntry::class("static", "FixtureStatic"),
-        TestLoadoutEntry::class("sharedLeft", "FixtureShared"),
-        TestLoadoutEntry::class("sharedRight", "FixtureShared"),
-        TestLoadoutEntry::class("empty", "FixtureEmpty"),
-    ]));
+    let root = root
+        .vehicle("", "")
+        .landing_system(6)
+        .loadout(TestLoadout::Manual(vec![
+            TestLoadoutEntry::class("blocked", "FixtureBlocked"),
+            TestLoadoutEntry::class("static", "FixtureStatic"),
+            TestLoadoutEntry::class("sharedLeft", "FixtureShared"),
+            TestLoadoutEntry::class("sharedRight", "FixtureShared"),
+            TestLoadoutEntry::class("empty", "FixtureEmpty"),
+        ]))
+        .port(TestPort::new("defaultEmpty").default_item(5));
     let blocked = TestEntity::new(2, "FixtureBlocked", "entities/fixture_blocked.xml")
         .geometry("Objects/blocked.cdf", None);
     let static_model = TestEntity::new(3, "FixtureStatic", "entities/fixture_static.xml")
@@ -209,6 +213,11 @@ fn database(blocked_branch: bool) -> Vec<u8> {
                 .record(),
         )
         .record(TestEntity::new(5, "FixtureEmpty", "entities/fixture_empty.xml").record())
+        .record(landing_system_record(
+            6,
+            "FixtureLanding",
+            &[("strut", "Objects/shared.chr", 5.0)],
+        ))
         .build()
 }
 
