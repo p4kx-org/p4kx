@@ -101,6 +101,18 @@ fn the_first_item_slot_controls_presentation_even_if_its_text_is_absent() -> Tes
         "later slots cannot change the presentation selection"
     );
     assert_eq!(german.total(), 0);
+    let mut failures = Vec::new();
+    check_coverage(Kind::Items, &english, &german, false, 1, &mut failures);
+    assert!(
+        failures.is_empty(),
+        "a selected Item may lack first-slot texts"
+    );
+    check_coverage(Kind::Items, &english, &german, true, 1, &mut failures);
+    assert_eq!(
+        failures.len(),
+        1,
+        "a positive LIVE baseline must retain keyed texts"
+    );
 
     let record = catalog
         .pointer_mut("/items/0/recordIndex/value")

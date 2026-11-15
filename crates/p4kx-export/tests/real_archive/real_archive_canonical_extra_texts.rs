@@ -12,6 +12,9 @@ use super::{
 };
 use crate::catalog_v3_consumer;
 
+#[path = "real_archive_live_item_texts.rs"]
+mod installed_items;
+
 pub(super) fn location_templates(
     catalog: &Value,
     english: &Oracle,

@@ -330,6 +330,7 @@ fn check_coverage(
             && matches!(
                 kind,
                 Kind::Manufacturers
+                    | Kind::Items
                     | Kind::ResourceTypes
                     | Kind::ResourceGroups
                     | Kind::GameplayProperties

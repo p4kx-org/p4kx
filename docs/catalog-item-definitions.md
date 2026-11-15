@@ -45,3 +45,19 @@ of the released v2 Item shape are replaced by these references in schema v3.
 The Item projection carries `itemClass`, `playability` and `variantOf`. Item class is
 a projection of the English description. Variant grouping uses private comparison
 inputs. [Item stats](catalog.md#item-stats) describes the canonical component tables.
+
+## Installed Item text check
+
+Set `P4KX_DATA_P4K` to the installed LIVE Archive and use the configured Archive
+key. Set `P4KX_CATALOG_ITEM_TEXT_RECORD` to the exact original Record path of an
+Item with authored name and description Locale fields and at least one nonempty
+German translation. The check runs the Catalog writer with that Record Filter
+and keeps the output in memory. It compares the physical Record and component
+slots, the original Locale keys and the source and display forms with the
+English and German localization files. The full
+`installed_live_catalog_texts_match_the_independent_source_oracle` check covers
+the LIVE per-kind baselines.
+
+```text
+cargo test --release --locked -p p4kx-export --test real_archive -- --ignored --exact --nocapture real_archive_canonical_texts::extras::installed_items::installed_live_item_texts_match_original_record_and_languages
+```
