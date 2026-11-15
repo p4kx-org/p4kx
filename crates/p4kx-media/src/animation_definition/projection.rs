@@ -11,6 +11,7 @@ use p4kx_extraction::{DecimalU64, SourceUseRole};
 
 use super::blend_reference_index::BlendIndex;
 use super::blend_references;
+use super::chrparams_selectors;
 use super::graph_field::GraphField;
 use super::graph_source::GraphRole;
 use super::links::{self, SubDatabaseSelector};
@@ -57,6 +58,7 @@ impl From<MediaError> for Failure {
 struct Frame<'document> {
     parent: Option<u64>,
     parent_name: Option<&'document str>,
+    params_root: bool,
     filepath: Option<Filepath<'document>>,
     timeline: TimelineNode,
     graph: Option<(GraphRole, AtlPosition)>,
@@ -70,6 +72,7 @@ impl<'document> Frame<'document> {
         Self {
             parent: None,
             parent_name: None,
+            params_root: false,
             filepath: None,
             timeline: TimelineNode::Other,
             graph: None,
@@ -208,7 +211,8 @@ impl DefinitionProjection<'_, '_> {
         Ok(Frame {
             parent: Some(index),
             parent_name: element.namespace().is_none().then(|| element.name()),
-            filepath: Filepath::for_list(self, element, parent.parent_name, writer)?,
+            params_root: parent.parent.is_none() && chrparams_selectors::named(element, "Params"),
+            filepath: Filepath::for_list(self, element, parent.params_root, writer)?,
             timeline,
             graph: graph.map(|role| (role, site.position)),
             branch,
@@ -339,7 +343,13 @@ impl DefinitionProjection<'_, '_> {
             }),
             writer,
         )?;
-        if let Some(kind) = links::kind(self.family, element, parent.parent_name, declaration) {
+        if let Some(kind) = links::kind(
+            self.family,
+            element,
+            parent.parent_name,
+            parent.filepath.is_some(),
+            declaration,
+        ) {
             let sub_database = sub_database.filter(|selector| selector.matches(declaration));
             links::write(
                 self,

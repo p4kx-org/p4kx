@@ -6,6 +6,7 @@ use p4kx_extraction::cryxml::{
 };
 use p4kx_extraction::{NamedCafSelector, SourceUseRole};
 
+use super::chrparams_selectors::{self, AnimationAttributes, Selector};
 use super::links::{self, ReferenceSelection};
 use super::named_dba::{Databases, NamedSelection};
 use super::origins;
@@ -17,8 +18,13 @@ use crate::origin_contributions::OriginContributions;
 use crate::xml_source_projection::declaration_position;
 use crate::{MediaKind, MediaWriter, Status, Subresource};
 
-#[derive(Default)]
+#[path = "wildcard.rs"]
+mod wildcard;
+
+pub(super) use wildcard::Wildcard;
+
 pub(super) struct Filepath<'document> {
+    list: SourceElement<'document>,
     directive: Option<Directive<'document>>,
     databases: Databases,
 }
@@ -32,17 +38,17 @@ impl<'document> Filepath<'document> {
     pub(super) fn for_list(
         projection: &DefinitionProjection<'_, '_>,
         element: SourceElement<'document>,
-        parent_name: Option<&str>,
+        parent_is_params_root: bool,
         writer: &mut MediaWriter<'_>,
     ) -> Result<Option<Self>, Failure> {
         let ordered_list = matches!(projection.family, DefinitionFamily::Chrparams)
-            && element.namespace().is_none()
-            && element.name().eq_ignore_ascii_case("AnimationList")
-            && parent_name.is_some_and(|name| name.eq_ignore_ascii_case("Params"));
+            && parent_is_params_root
+            && chrparams_selectors::named(element, "AnimationList");
         if !ordered_list {
             return Ok(None);
         }
         Ok(Some(Self {
+            list: element,
             directive: None,
             databases: Databases::read(element, projection, writer)?,
         }))
@@ -57,8 +63,7 @@ impl<'document> Filepath<'document> {
         indices: [u64; 2],
         writer: &mut MediaWriter<'_>,
     ) -> Result<(), Failure> {
-        if element.namespace().is_some()
-            || !element.name().eq_ignore_ascii_case("Animation")
+        if !chrparams_selectors::named(element, "Animation")
             || !matches!(
                 declaration.kind(),
                 SourceDeclarationKind::Attribute { namespace: None }
@@ -71,14 +76,14 @@ impl<'document> Filepath<'document> {
         {
             self.directive = Some(Directive {
                 element,
-                attributes: AnimationAttributes::read(element),
+                attributes: Selector::read(element).attributes,
             });
             return Ok(());
         }
         if !declaration.qualified_name().eq_ignore_ascii_case("path") {
             return Ok(());
         }
-        let Some(attributes) = AnimationAttributes::read(element) else {
+        let Some(attributes) = Selector::read(element).attributes else {
             return Ok(());
         };
         let path = declaration.value();
@@ -93,39 +98,17 @@ impl<'document> Filepath<'document> {
                 selector,
             };
             link.write(projection, &self.databases, indices, writer)?;
+        } else if wildcard::is_wildcard(name.value(), path) {
+            wildcard::write(
+                &attributes,
+                self.list,
+                self.directive.as_ref(),
+                projection,
+                indices,
+                writer,
+            )?;
         }
         Ok(())
-    }
-}
-
-struct AnimationAttributes<'document> {
-    name: SourceAttribute<'document>,
-    path: SourceAttribute<'document>,
-}
-
-impl<'document> AnimationAttributes<'document> {
-    fn read(element: SourceElement<'document>) -> Option<Self> {
-        let mut name = None;
-        let mut path = None;
-        for attribute in element
-            .attributes()
-            .filter(|attribute| attribute.namespace().is_none())
-        {
-            let slot = if attribute.name().eq_ignore_ascii_case("name") {
-                &mut name
-            } else if attribute.name().eq_ignore_ascii_case("path") {
-                &mut path
-            } else {
-                continue;
-            };
-            if slot.replace(attribute).is_some() {
-                return None;
-            }
-        }
-        Some(Self {
-            name: name?,
-            path: path?,
-        })
     }
 }
 

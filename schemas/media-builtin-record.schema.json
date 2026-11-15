@@ -1045,6 +1045,23 @@
           "additionalProperties": false,
           "properties": {
             "payload": {
+              "$ref": "#/$defs/Wildcard"
+            },
+            "record_type": {
+              "const": "wildcard",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
               "$ref": "#/$defs/Binding"
             },
             "record_type": {
@@ -5967,6 +5984,26 @@
       ],
       "type": "object"
     },
+    "Attribute": {
+      "additionalProperties": false,
+      "properties": {
+        "position": {
+          "$ref": "#/$defs/AtlPosition"
+        },
+        "qualified_name": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "qualified_name",
+        "value",
+        "position"
+      ],
+      "type": "object"
+    },
     "AudioPayload": {
       "oneOf": [
         {
@@ -10691,6 +10728,86 @@
         "pseudo"
       ],
       "type": "string"
+    },
+    "FilepathScope": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "list_position": {
+              "$ref": "#/$defs/AtlPosition"
+            },
+            "state": {
+              "const": "missing",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "list_position"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "directive_position": {
+              "$ref": "#/$defs/AtlPosition"
+            },
+            "state": {
+              "const": "malformed",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "directive_position"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "directive_position": {
+              "$ref": "#/$defs/AtlPosition"
+            },
+            "path": {
+              "$ref": "#/$defs/Attribute"
+            },
+            "state": {
+              "const": "reset",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "directive_position",
+            "path"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "directive_position": {
+              "$ref": "#/$defs/AtlPosition"
+            },
+            "path": {
+              "$ref": "#/$defs/Attribute"
+            },
+            "state": {
+              "const": "authored",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "directive_position",
+            "path"
+          ],
+          "type": "object"
+        }
+      ]
     },
     "Float32": {
       "description": "A source float whose raw word survives non-finite values and signed zero.",
@@ -27112,6 +27229,36 @@
         "riff-header",
         "summary",
         "chunk-directory"
+      ],
+      "type": "string"
+    },
+    "Wildcard": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/Attribute"
+        },
+        "path": {
+          "$ref": "#/$defs/Attribute"
+        },
+        "preceding_filepath": {
+          "$ref": "#/$defs/FilepathScope"
+        },
+        "state": {
+          "$ref": "#/$defs/WildcardState"
+        }
+      },
+      "required": [
+        "state",
+        "name",
+        "path",
+        "preceding_filepath"
+      ],
+      "type": "object"
+    },
+    "WildcardState": {
+      "enum": [
+        "unexpanded"
       ],
       "type": "string"
     },
@@ -46500,6 +46647,61 @@
                 "properties": {
                   "record_type": {
                     "const": "named-caf"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 2,
+                "minItems": 2
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation-definition"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-definition-wildcard"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationDefinitionPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "wildcard"
                   }
                 },
                 "required": [

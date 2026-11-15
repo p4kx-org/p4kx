@@ -196,3 +196,71 @@ fn database(blocked_branch: bool) -> Vec<u8> {
         .record(static_model.record())
         .build()
 }
+
+#[test]
+fn malformed_filepath_does_not_admit_a_stale_scope_candidate() -> TestResult {
+    let temp = tempfile::tempdir()?;
+    let archive = malformed_filepath_fixture(temp.path())?;
+    let out = temp.path().join("selectors");
+    let options = ExportOptions {
+        kinds: vec![MediaKind::AnimationDefinition, MediaKind::Animation],
+        include: Some(Filter::parse(UNRELATED)?),
+        animation_model: Some(CHR.into()),
+        ..ExportOptions::default()
+    };
+    let index = support::published(p4kx_media::export(&archive, &out, &options)?)?;
+    let rows = support::records(&out, &index, STREAM)?;
+    let selected: Vec<_> = rows
+        .iter()
+        .filter(|row| row.subresource.namespace == "animation-definition-event-timeline")
+        .filter_map(|row| {
+            row.data
+                .pointer("/payload/target/reference/resolution/status")
+                .and_then(Value::as_str)
+        })
+        .collect();
+    assert_eq!(
+        selected,
+        ["resolved", "not-selected", "resolved"],
+        "only usable ordered CAF targets enter the physical scope"
+    );
+    assert_eq!(
+        index.source_entries.written, 2,
+        "an ambiguous event path does not select its decoy document"
+    );
+    Ok(())
+}
+
+fn malformed_filepath_fixture(root: &Path) -> Result<Archive, Box<dyn std::error::Error>> {
+    support::archive_with(
+        root,
+        [
+            TestEntry::stored(CHR, TestModel::cube().cgf()),
+            TestEntry::stored(
+                "Data/Objects/shared.chrparams",
+                br##"<Params><AnimationList>
+                <Animation name="#filepath" path="Animations/First"/>
+                <Animation name="before" path="kept.caf"/>
+                <Animation name="#filepath"/>
+                <Animation name="after" path="stale.caf"/>
+                <Animation name="#filepath" path="Animations/Second"/>
+                <Animation name="restored" path="found.caf"/>
+                <Animation name="$AnimEventDatabase" path="Animations/scope.animevents"/>
+                <Animation name="$AnimEventDatabase" path="Animations/decoy.animevents" Path="Animations/other.animevents"/>
+                </AnimationList></Params>"##,
+            ),
+            TestEntry::stored("Data/Animations/First/kept.caf", b"actual scoped source"),
+            TestEntry::stored("Data/Animations/First/stale.caf", b"old inactive scope"),
+            TestEntry::stored("Data/Animations/Second/found.caf", b"actual restored scope"),
+            TestEntry::stored(
+                "Data/Animations/scope.animevents",
+                br#"<anim_event_list>
+                <animation name="Animations/First/kept.caf"/>
+                <animation name="Animations/First/stale.caf"/>
+                <animation name="Animations/Second/found.caf"/>
+                </anim_event_list>"#,
+            ),
+            TestEntry::stored("Data/Animations/decoy.animevents", b"ambiguous source no read"),
+        ],
+    )
+}

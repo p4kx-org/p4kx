@@ -697,10 +697,17 @@ lookup until a usable directive follows and retains its original XML evidence.
 Explicit `Animations/` or `Data/` paths address the Archive root.
 The row keeps the original name, path and directory text, separately from the
 normalized lookup path and candidate identities. The origin of a relative
-lookup includes the active directive and its directory attribute. Wildcard
-rules remain in the ordered source declarations. A named CAF link looks up
+lookup includes the active directive and its directory attribute. A named CAF link looks up
 physical loose CAF entries without reading their payload. It does not
 identify matches inside a tracks database or establish the clip used at runtime.
+
+`wildcard` rows retain ordered declarations whose unambiguous animation name or
+path contains an authored `*` or `?`. Each row shares the original path
+declaration's indices and keeps both attribute spellings, values and positions.
+`preceding_filepath` identifies the last same-list directive as `authored`,
+`reset`, `malformed` or `missing`, with its source position and original path
+where available. The state is `unexpanded`. Rows report no match count or
+runtime rule. The ordered XML still retains every original declaration.
 
 Selecting both `animation-definition` and `animation`, or using scoped
 animation-definition selection, also writes

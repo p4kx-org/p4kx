@@ -25,7 +25,7 @@ impl Provider for AnimationDefinitionProvider {
         let mut capability = Capability::new(
             MediaKind::AnimationDefinition,
             "p4kx.animation-definition",
-            "1.5.0",
+            "1.6.0",
             "Original character parameters, animation event definitions and Mannequin XML source.",
         );
         capability.field_groups = vec![
@@ -36,6 +36,10 @@ impl Provider for AnimationDefinitionProvider {
             FieldGroup::new(
                 "file-links",
                 "Observed animation database and graph file references.",
+            ),
+            FieldGroup::new(
+                "wildcard-selectors",
+                "Positioned authored wildcard declarations and preceding folder scope.",
             ),
             FieldGroup::new(
                 "named-dba-bindings",

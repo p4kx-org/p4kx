@@ -6,6 +6,7 @@ use p4kx_extraction::cryxml::{
     SourceAttributePosition, SourceDeclaration, SourceDeclarationKind, SourceElement,
 };
 
+use super::chrparams_selectors::{self, Selector};
 use super::graph_source::GraphRole;
 use super::origins;
 use super::payload::{self as wire, DefinitionFamily, DefinitionLink, DefinitionPayload, LinkKind};
@@ -31,6 +32,7 @@ pub(super) fn kind(
     family: DefinitionFamily,
     element: SourceElement<'_>,
     parent: Option<&str>,
+    character_list: bool,
     attribute: &SourceDeclaration<'_>,
 ) -> Option<LinkSelector> {
     if element.namespace().is_some()
@@ -43,24 +45,16 @@ pub(super) fn kind(
     }
     let tag = element.name();
     let name = attribute.qualified_name();
-    if matches!(family, DefinitionFamily::Chrparams)
-        && tag.eq_ignore_ascii_case("Animation")
-        && parent.is_some_and(|name| name.eq_ignore_ascii_case("AnimationList"))
+    if character_list
+        && chrparams_selectors::named(element, "Animation")
         && name.eq_ignore_ascii_case("path")
     {
-        let mut names = element.attributes().filter(|attribute| {
-            attribute.namespace().is_none() && attribute.name().eq_ignore_ascii_case("name")
+        let attributes = Selector::read(element).attributes?;
+        let kind = chrparams_database_kind(attributes.name.value())?;
+        return Some(LinkSelector {
+            kind,
+            name_position: Some(attributes.name.position().clone()),
         });
-        let first = names.next()?;
-        if names.next().is_some() {
-            return None;
-        }
-        if let Some(kind) = chrparams_database_kind(first.value()) {
-            return Some(LinkSelector {
-                kind,
-                name_position: Some(first.position().clone()),
-            });
-        }
     }
     if matches!(family, DefinitionFamily::Adb)
         && let Some(kind) = mannequin_kind(tag, parent, name)

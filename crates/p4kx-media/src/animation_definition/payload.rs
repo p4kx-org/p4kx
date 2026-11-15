@@ -7,6 +7,7 @@ use serde::Serialize;
 
 use super::blend_reference_payload::{BlendCandidate, BlendReference};
 use super::graph_source::{GraphAttribute, GraphNode};
+use super::named_clip::Wildcard;
 use super::named_dba::Binding;
 use super::sub_database_cycles::{SubDatabaseCycle, SubDatabaseEdge};
 use super::sub_database_frontier::Frontier;
@@ -26,6 +27,7 @@ pub(super) const CONTENT: &str = "animation-definition-content";
 pub(super) const BINARY_TEXT: &str = "animation-definition-binary-text";
 pub(super) const LINK: &str = "animation-definition-link";
 pub(super) const NAMED_CAF: &str = "animation-definition-named-caf";
+pub(super) const WILDCARD: &str = "animation-definition-wildcard";
 pub(super) const NAMED_DBA_BINDING: &str = "animation-definition-named-dba-binding";
 pub(super) const EVENT_TIMELINE: &str = "animation-definition-event-timeline";
 pub(super) const EVENT: &str = "animation-definition-event";
@@ -88,6 +90,7 @@ pub(super) enum DefinitionPayload<'source> {
     BinaryText(AtlBinaryText<'source>),
     Link(DefinitionLink<'source>),
     NamedCaf(NamedCaf<'source>),
+    Wildcard(Wildcard<'source>),
     NamedDbaBinding(Binding<'source>),
     EventTimeline(EventTimeline<'source>),
     Event(Event),

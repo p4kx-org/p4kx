@@ -4,6 +4,7 @@
 mod blend_reference_index;
 mod blend_reference_payload;
 mod blend_references;
+mod chrparams_selectors;
 mod definition_scope;
 mod graph_field;
 mod graph_source;

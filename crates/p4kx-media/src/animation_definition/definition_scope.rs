@@ -8,10 +8,10 @@ use p4kx_assembly::{
     ArchiveModels, RigFile, RigInput, RigInputs, RigParameter, discover_entity_rigs_using,
     discover_model_rig_using,
 };
-use p4kx_extraction::{DataForge, DataForgeEntry, Entry, NamedCafSelector};
+use p4kx_extraction::{DataForge, DataForgeEntry, Entry};
 
-use super::links;
-use super::payload::LinkKind;
+use super::chrparams_selectors::{self, Target};
+use super::payload::DefinitionFamily;
 use super::scope_health;
 use crate::animation;
 use crate::checkpoint::IO_BLOCK_BYTES;
@@ -64,7 +64,11 @@ impl DefinitionScope {
         if excluded(lookup, entry) {
             return Ok(());
         }
-        let mut inputs = Inputs { lookup, writer };
+        let mut inputs = Inputs {
+            lookup,
+            writer,
+            targets: Vec::new(),
+        };
         let models = ArchiveModels::from_path_index(lookup.index.index(&inputs.work())?);
         let rig = discover_model_rig_using(&models, path, &mut inputs)?;
         scope_health::verify(
@@ -72,7 +76,8 @@ impl DefinitionScope {
             rig.skeleton.as_ref(),
             rig.parameters.as_ref(),
         )?;
-        self.parameters(rig.parameters.as_ref(), lookup, writer)
+        self.parameters(rig.parameters.as_ref(), writer)?;
+        self.targets(inputs.targets, lookup, writer)
     }
 
     fn entity(
@@ -99,7 +104,11 @@ impl DefinitionScope {
                     "incomplete animation definition scope: unresolved Entity Loadout".into(),
                 ));
             }
-            let mut inputs = Inputs { lookup, writer };
+            let mut inputs = Inputs {
+                lookup,
+                writer,
+                targets: Vec::new(),
+            };
             let models = ArchiveModels::from_path_index(lookup.index.index(&inputs.work())?);
             let rigs = discover_entity_rigs_using(&models, tree, &mut inputs)?;
             for rig in &rigs {
@@ -108,17 +117,16 @@ impl DefinitionScope {
                     rig.skeleton.as_ref(),
                     rig.parameters.as_ref(),
                 )?;
-                self.parameters(rig.parameters.as_ref(), lookup, writer)?;
+                self.parameters(rig.parameters.as_ref(), writer)?;
             }
-            Ok(())
+            self.targets(inputs.targets, lookup, writer)
         })
     }
 
     fn parameters(
         &mut self,
         file: Option<&RigFile<Vec<RigParameter>>>,
-        lookup: &DirectoryLookup<'_>,
-        writer: &mut MediaWriter<'_>,
+        writer: &MediaWriter<'_>,
     ) -> Result<(), MediaError> {
         let Some(file) = file else { return Ok(()) };
         let Some(origin) = file.source() else {
@@ -126,50 +134,25 @@ impl DefinitionScope {
         };
         let position = origin.entry().index();
         reserve(&mut self.definitions, writer)?;
-        if !self.definitions.insert(position) {
-            return Ok(());
-        }
-        let Some(parameters) = file.value() else {
-            return Ok(());
-        };
-        let mut folder = None;
-        for row in parameters {
-            writer.checkpoint()?;
-            if row.name.eq_ignore_ascii_case("#filepath") {
-                folder = Some((row.list, row.path.as_str()));
-            } else if let Some(kind) = links::chrparams_database_kind(&row.name) {
-                if let Some(path) = links::target_path(kind, &row.path) {
-                    self.target(kind, &path, lookup, writer)?;
-                }
-            } else if let Some(clip) = NamedCafSelector::new(&row.name, &row.path)
-                && let Some(path) = clip.archive_path(
-                    folder
-                        .filter(|(list, _)| *list == row.list)
-                        .map(|(_, path)| path),
-                )
-                && let Some(entry) = selected_target(&path, lookup, writer)?
-            {
-                reserve(&mut self.references, writer)?;
-                self.references.insert(entry.index());
-            }
-        }
+        self.definitions.insert(position);
         Ok(())
     }
 
-    fn target(
+    fn targets(
         &mut self,
-        kind: LinkKind,
-        path: &str,
+        targets: Vec<Target>,
         lookup: &DirectoryLookup<'_>,
         writer: &mut MediaWriter<'_>,
     ) -> Result<(), MediaError> {
-        if let Some(entry) = selected_target(path, lookup, writer)? {
-            let positions = match kind {
-                LinkKind::EventDatabase => &mut self.definitions,
-                _ => &mut self.references,
+        for target in targets {
+            let (path, positions) = match target {
+                Target::Definition(path) => (path, &mut self.definitions),
+                Target::Reference(path) => (path, &mut self.references),
             };
-            reserve(positions, writer)?;
-            positions.insert(entry.index());
+            if let Some(entry) = selected_target(&path, lookup, writer)? {
+                reserve(positions, writer)?;
+                positions.insert(entry.index());
+            }
         }
         Ok(())
     }
@@ -214,6 +197,7 @@ fn excluded(lookup: &DirectoryLookup<'_>, entry: &Entry) -> bool {
 struct Inputs<'lookup, 'directory, 'writer, 'run> {
     lookup: &'lookup DirectoryLookup<'directory>,
     writer: &'writer MediaWriter<'run>,
+    targets: Vec<Target>,
 }
 
 impl Inputs<'_, '_, '_, '_> {
@@ -248,7 +232,26 @@ impl RigInputs for Inputs<'_, '_, '_, '_> {
         if entry.is_encrypted() && !self.lookup.index.archive.has_key() {
             return Ok(RigInput::KeyRequired);
         }
-        read_verified(self.lookup, entry, self.writer).map(RigInput::Read)
+        let bytes = read_verified(self.lookup, entry, self.writer)?;
+        if matches!(
+            DefinitionFamily::of(entry.path()),
+            Some(DefinitionFamily::Chrparams)
+        ) {
+            let budget = self.lookup.input_state()?.budget;
+            let writer = self.writer;
+            chrparams_selectors::visit_targets(
+                &bytes,
+                |count| budget.metadata(0, count, writer.limits(), writer.checkpoint),
+                |target| {
+                    self.targets
+                        .try_reserve(1)
+                        .map_err(|cause| allocation(writer, cause))?;
+                    self.targets.push(target);
+                    Ok(())
+                },
+            )?;
+        }
+        Ok(RigInput::Read(bytes))
     }
 }
 

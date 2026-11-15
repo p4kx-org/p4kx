@@ -7,6 +7,7 @@ use std::sync::Arc;
 use p4kx_extraction::cryxml::{SourceAttribute, SourceElement};
 use p4kx_extraction::{Entry, InputScope, SourceUseRole};
 
+use super::super::chrparams_selectors::{self, AnimationAttributes, Selector};
 use super::super::links;
 use super::super::origins;
 use super::super::payload::LinkKind;
@@ -63,7 +64,7 @@ pub(super) fn read(
     let mut banks = Vec::new();
     for element in list.elements() {
         budget.metadata(0, 1, writer.limits(), writer.checkpoint)?;
-        if element.namespace().is_some() || !element.name().eq_ignore_ascii_case("Animation") {
+        if !chrparams_selectors::named(element, "Animation") {
             continue;
         }
         if let Some(bank) = bank(element, projection, &mut cache, writer)? {
@@ -83,27 +84,13 @@ fn bank(
     writer: &mut MediaWriter<'_>,
 ) -> Result<Option<Bank>, Failure> {
     let budget = &projection.context.directory.input_state()?.budget;
-    let mut name = None;
-    let mut path = None;
-    let mut duplicate = false;
-    let mut tracks_database = false;
-    for attribute in element
-        .attributes()
-        .filter(|attribute| attribute.namespace().is_none())
-    {
-        budget.metadata(0, 1, writer.limits(), writer.checkpoint)?;
-        if attribute.name().eq_ignore_ascii_case("name") {
-            tracks_database |= attribute.value().eq_ignore_ascii_case("$TracksDatabase");
-            duplicate |= name.replace(attribute).is_some();
-        } else if attribute.name().eq_ignore_ascii_case("path") {
-            duplicate |= path.replace(attribute).is_some();
-        }
-    }
-    if !tracks_database {
+    let selector = Selector::read(element);
+    budget.metadata(0, selector.work, writer.limits(), writer.checkpoint)?;
+    if !selector.tracks_database {
         return Ok(None);
     }
     let mut evidence = writer.capture_origins();
-    if duplicate || path.is_none() {
+    let Some(AnimationAttributes { name, path }) = selector.attributes else {
         evidence.include(
             &origins::position(
                 projection.input,
@@ -120,9 +107,6 @@ fn bank(
             evidence: proof,
             state: BankState::Other(DatabaseState::InvalidIdentifier),
         }));
-    }
-    let (Some(name), Some(path)) = (name, path) else {
-        return Ok(None);
     };
     let path_evidence = attribute_origin(projection, &path, writer)?;
     evidence.include(&attribute_origin(projection, &name, writer)?, writer)?;
