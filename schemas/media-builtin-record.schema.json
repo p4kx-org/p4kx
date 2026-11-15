@@ -1215,6 +1215,23 @@
           "additionalProperties": false,
           "properties": {
             "payload": {
+              "$ref": "#/$defs/ClipReference"
+            },
+            "record_type": {
+              "const": "clip-reference",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
               "$ref": "#/$defs/SubDatabaseEdge"
             },
             "record_type": {
@@ -8343,6 +8360,117 @@
         "metadata_range"
       ],
       "type": "object"
+    },
+    "ClipReference": {
+      "additionalProperties": false,
+      "properties": {
+        "authored_name": {
+          "type": "string"
+        },
+        "layer_ordinal": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "owner": {
+          "$ref": "#/$defs/ClipReferenceOwner"
+        },
+        "owner_parent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ClipReferenceParent"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "resolution": {
+          "$ref": "#/$defs/ClipReferenceResolution"
+        },
+        "selector_position": {
+          "$ref": "#/$defs/AtlPosition"
+        }
+      },
+      "required": [
+        "owner",
+        "selector_position",
+        "authored_name",
+        "resolution"
+      ],
+      "type": "object"
+    },
+    "ClipReferenceOwner": {
+      "additionalProperties": false,
+      "properties": {
+        "element_ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "kind": {
+          "$ref": "#/$defs/ClipReferenceOwnerKind"
+        }
+      },
+      "required": [
+        "kind",
+        "element_ordinal"
+      ],
+      "type": "object"
+    },
+    "ClipReferenceOwnerKind": {
+      "enum": [
+        "mannequin-fragment",
+        "blend-space-example"
+      ],
+      "type": "string"
+    },
+    "ClipReferenceParent": {
+      "additionalProperties": false,
+      "properties": {
+        "element_ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "kind": {
+          "$ref": "#/$defs/ClipReferenceParentKind"
+        }
+      },
+      "required": [
+        "kind",
+        "element_ordinal"
+      ],
+      "type": "object"
+    },
+    "ClipReferenceParentKind": {
+      "enum": [
+        "fragment-group",
+        "transition-option"
+      ],
+      "type": "string"
+    },
+    "ClipReferenceResolution": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "reason": {
+              "$ref": "#/$defs/UnresolvedClipReason"
+            },
+            "state": {
+              "const": "unresolved",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "reason"
+          ],
+          "type": "object"
+        }
+      ]
     },
     "CompanionPayload": {
       "additionalProperties": false,
@@ -27006,6 +27134,14 @@
         "bits"
       ],
       "type": "object"
+    },
+    "UnresolvedClipReason": {
+      "enum": [
+        "empty-selector",
+        "no-owning-scope",
+        "source-join-unavailable"
+      ],
+      "type": "string"
     },
     "VehicleGrid": {
       "additionalProperties": false,
@@ -47588,6 +47724,61 @@
                 "properties": {
                   "record_type": {
                     "const": "graph-attribute"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 2,
+                "minItems": 2
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation-definition"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-definition-clip-reference"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationDefinitionPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "clip-reference"
                   }
                 },
                 "required": [

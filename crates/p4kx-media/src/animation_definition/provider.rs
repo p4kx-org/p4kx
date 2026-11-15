@@ -20,64 +20,72 @@ use crate::{
 
 pub(crate) struct AnimationDefinitionProvider;
 
+fn field_groups() -> Vec<FieldGroup> {
+    vec![
+        FieldGroup::new(
+            "selection-coverage",
+            "Physical character parameter coverage for each resolved model or Entity rig occurrence.",
+        ),
+        FieldGroup::new(
+            "entity-database-bindings",
+            "Original Entity Mannequin selectors and scoped physical database targets.",
+        ),
+        FieldGroup::new(
+            "source-syntax",
+            "Ordered source elements, declarations and content.",
+        ),
+        FieldGroup::new(
+            "file-links",
+            "Observed animation database and graph file references.",
+        ),
+        FieldGroup::new(
+            "wildcard-selectors",
+            "Positioned authored wildcard declarations and preceding folder scope.",
+        ),
+        FieldGroup::new(
+            "named-dba-bindings",
+            "Physical DBA metadata candidates for exact named CAF paths.",
+        ),
+        FieldGroup::new(
+            "event-bindings",
+            "Exact CAF paths paired with timelines from the authored event database.",
+        ),
+        FieldGroup::new(
+            "event-timelines",
+            "Ordered authored timelines, event attributes and exact CAF references.",
+        ),
+        FieldGroup::new(
+            "animation-graphs",
+            "Positioned Mannequin and blend-space node roles and original attributes.",
+        ),
+        FieldGroup::new(
+            "clip-references",
+            "Original Mannequin and blend-space clip selectors with positioned ownership.",
+        ),
+        FieldGroup::new(
+            "sub-database-cycles",
+            "Positive cycles in the observed, directory-local Mannequin source graph.",
+        ),
+        FieldGroup::new(
+            "sub-database-selectors",
+            "Positioned SubADB selectors with owning ADB definition scopes and physical candidate occurrences.",
+        ),
+        FieldGroup::new(
+            "blend-space-local-references",
+            "Document-local face and pseudo example candidates from separate ordinal and alias evidence.",
+        ),
+    ]
+}
+
 impl Provider for AnimationDefinitionProvider {
     fn capability(&self) -> Capability {
         let mut capability = Capability::new(
             MediaKind::AnimationDefinition,
             "p4kx.animation-definition",
-            "1.9.0",
+            "1.10.0",
             "Original character parameters, animation event definitions and Mannequin XML source.",
         );
-        capability.field_groups = vec![
-            FieldGroup::new(
-                "selection-coverage",
-                "Physical character parameter coverage for each resolved model or Entity rig occurrence.",
-            ),
-            FieldGroup::new(
-                "entity-database-bindings",
-                "Original Entity Mannequin selectors and scoped physical database targets.",
-            ),
-            FieldGroup::new(
-                "source-syntax",
-                "Ordered source elements, declarations and content.",
-            ),
-            FieldGroup::new(
-                "file-links",
-                "Observed animation database and graph file references.",
-            ),
-            FieldGroup::new(
-                "wildcard-selectors",
-                "Positioned authored wildcard declarations and preceding folder scope.",
-            ),
-            FieldGroup::new(
-                "named-dba-bindings",
-                "Physical DBA metadata candidates for exact named CAF paths.",
-            ),
-            FieldGroup::new(
-                "event-bindings",
-                "Exact CAF paths paired with timelines from the authored event database.",
-            ),
-            FieldGroup::new(
-                "event-timelines",
-                "Ordered authored timelines, event attributes and exact CAF references.",
-            ),
-            FieldGroup::new(
-                "animation-graphs",
-                "Positioned Mannequin and blend-space node roles and original attributes.",
-            ),
-            FieldGroup::new(
-                "sub-database-cycles",
-                "Positive cycles in the observed, directory-local Mannequin source graph.",
-            ),
-            FieldGroup::new(
-                "sub-database-selectors",
-                "Positioned SubADB selectors with owning ADB definition scopes and physical candidate occurrences.",
-            ),
-            FieldGroup::new(
-                "blend-space-local-references",
-                "Document-local face and pseudo example candidates from separate ordinal and alias evidence.",
-            ),
-        ];
+        capability.field_groups = field_groups();
         capability
     }
 

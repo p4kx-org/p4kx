@@ -9,7 +9,7 @@ use p4kx_extraction::{DecimalU64, SourceUseRole};
 use super::links::{self, ReferenceSelection};
 use super::origins;
 use super::payload::{self as wire, DefinitionFamily, DefinitionPayload};
-use super::projection::{DefinitionProjection, Failure};
+use super::projection::{DefinitionProjection, ElementSite, Failure};
 use super::timeline_payload::{Event, EventAttribute, EventField, EventTimeline, TimelineTarget};
 use crate::audio_control_payload::AtlPosition;
 use crate::audio_record_origins as records;
@@ -21,14 +21,8 @@ pub(super) enum TimelineNode {
     #[default]
     Other,
     List,
-    Animation(TimelineIdentity),
-    Event(TimelineIdentity),
-}
-
-#[derive(Clone, Copy)]
-pub(super) struct TimelineIdentity {
-    pub(super) index: u64,
-    pub(super) position: AtlPosition,
+    Animation(ElementSite),
+    Event(ElementSite),
 }
 
 impl TimelineNode {
@@ -37,7 +31,7 @@ impl TimelineNode {
         family: DefinitionFamily,
         element: SourceElement<'_>,
         parent_index: Option<u64>,
-        identity: TimelineIdentity,
+        identity: ElementSite,
     ) -> Self {
         if !matches!(family, DefinitionFamily::Animevents) || element.namespace().is_some() {
             return Self::Other;
@@ -100,7 +94,7 @@ impl TimelineNode {
 
 fn write_event(
     projection: &DefinitionProjection<'_, '_>,
-    animation: TimelineIdentity,
+    animation: ElementSite,
     index: u64,
     position: AtlPosition,
     writer: &mut MediaWriter<'_>,

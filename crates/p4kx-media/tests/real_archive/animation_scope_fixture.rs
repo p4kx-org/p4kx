@@ -18,6 +18,12 @@ const CHILD: &str = "FixtureAttachment";
 const ROOT_ADB: &str = "Data/Animations/Mannequin/witness.adb";
 const ATTACHED_ADB: &str = "Data/Animations/Mannequin/attached.adb";
 const SUB_ADB: &str = "Data/Animations/Mannequin/sub.adb";
+const MANNEQUIN: &[u8] = br#"<AnimDB><FragmentList><Idle><Fragment><AnimLayer>
+    <Animation name="clip"/>
+    <Animation name="clip"/>
+    <Animation name=""/>
+    <Animation xmlns:other="urn:fixture" other:name="not-an-authored-selector"/>
+    </AnimLayer></Fragment></Idle></FragmentList></AnimDB>"#;
 const ANIMATED: &str = "SAnimatedCharacterComponentParams";
 const CONTROLLER: &str = "SAnimationControllerParams";
 
@@ -51,6 +57,15 @@ fn synthetic_animation_scope_witness_checks_model_and_entity_publications() -> T
                     .count(),
                 3,
                 "two authored roots and their one shared transitive database",
+            );
+            assert_eq!(
+                expected
+                    .documents
+                    .values()
+                    .map(|doc| doc.clips.remaining())
+                    .sum::<usize>(),
+                3,
+                "the selected database declares two repeated aliases and an empty selector",
             );
             let [_, left, right] = expected.placements.as_slice() else {
                 return Err("the original XML resolves both attachment occurrences".into());
@@ -137,7 +152,7 @@ fn archive(root: &Path) -> TestResult<Archive> {
         ))
         .entry(TestEntry::stored(ROOT_ADB, br#"<AnimDB><SubADBs><SubADB File="Animations/Mannequin/sub.adb"/></SubADBs></AnimDB>"#).encrypted())
         .entry(TestEntry::stored(ATTACHED_ADB, br#"<AnimDB><SubADBs><SubADB File="Data\Animations\Mannequin\Sub.ADB"/></SubADBs></AnimDB>"#))
-        .entry(TestEntry::stored(SUB_ADB, b"<AnimDB><FragmentList><Idle/></FragmentList></AnimDB>").encrypted())
+        .entry(TestEntry::stored(SUB_ADB, MANNEQUIN).encrypted())
         .entry(TestEntry::stored(
             "Data/Objects/unrelated.socpak",
             b"excluded malformed container",

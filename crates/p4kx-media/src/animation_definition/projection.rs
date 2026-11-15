@@ -12,16 +12,17 @@ use p4kx_extraction::{DecimalU64, SourceUseRole};
 use super::blend_reference_index::BlendIndex;
 use super::blend_references;
 use super::chrparams_selectors;
+use super::clip_reference::ClipOwner;
 use super::graph_field::GraphField;
-use super::graph_source::GraphRole;
+use super::graph_source::{self, GraphRole};
 use super::links::{self, SubDatabaseSelector};
 use super::named_clip::Filepath;
 use super::payload::{self as wire, DefinitionFamily, DefinitionPayload};
 #[path = "projection_branch.rs"]
 mod branch;
 
-use super::sub_database_selectors::{BranchSelector, Scopes};
-use super::timeline::{TimelineIdentity, TimelineNode};
+use super::sub_database_selectors::Scopes;
+use super::timeline::TimelineNode;
 use crate::audio_control_payload::{
     AtlBinaryText, AtlContent, AtlDeclaration, AtlElement, AtlLocation, AtlPosition,
 };
@@ -36,6 +37,12 @@ pub(super) struct DefinitionProjection<'a, 'source> {
     pub(super) context: &'a SourceContext<'source>,
     pub(super) input: &'a MediaOriginInput,
     pub(super) family: DefinitionFamily,
+}
+
+#[derive(Clone, Copy)]
+pub(super) struct ElementSite {
+    pub(super) index: u64,
+    pub(super) position: AtlPosition,
 }
 
 pub(super) enum Failure {
@@ -62,6 +69,7 @@ struct Frame<'document> {
     filepath: Option<Filepath<'document>>,
     timeline: TimelineNode,
     graph: Option<(GraphRole, AtlPosition)>,
+    clip_owner: ClipOwner,
     branch: Option<BranchSite>,
     siblings: SourceContents<'document>,
     next_sibling: u64,
@@ -76,6 +84,7 @@ impl<'document> Frame<'document> {
             filepath: None,
             timeline: TimelineNode::Other,
             graph: None,
+            clip_owner: ClipOwner::root(source.is_lossy()),
             branch: None,
             siblings: source.content(),
             next_sibling: 0,
@@ -89,6 +98,7 @@ struct ElementDeclarations<'element, 'document> {
     index: u64,
     timeline: TimelineNode,
     graph: Option<GraphRole>,
+    clip_owner: ClipOwner,
     sub_database: Option<&'element SubDatabaseSelector>,
     branch_selector: Option<AttachedSelector<'element, 'document>>,
 }
@@ -166,12 +176,19 @@ impl DefinitionProjection<'_, '_> {
         writer: &mut MediaWriter<'_>,
     ) -> Result<Frame<'document>, Failure> {
         let syntax = element.syntax()?;
-        let site = TimelineIdentity {
+        let site = ElementSite {
             index,
             position: element_position(&element.position())?,
         };
-        let (graph, sub_database) =
-            self.graph_element(element, parent, site, blend.as_deref_mut(), writer)?;
+        let (graph, sub_database) = graph_source::observe_element(
+            self,
+            element,
+            (parent.graph, parent.parent.is_none()),
+            site,
+            blend.as_deref_mut(),
+            writer,
+        )?;
+        let clip_owner = parent.clip_owner.at(graph, site);
         let timeline = TimelineNode::at(parent.timeline, self.family, element, parent.parent, site);
         branch::positioned_element(
             self,
@@ -182,17 +199,9 @@ impl DefinitionProjection<'_, '_> {
             (timeline, graph),
             writer,
         )?;
-        let branch = BranchSite::for_element(graph, index, site.position, parent.branch);
-        let selector = BranchSelector::of(graph, element, self, writer)?;
-        let branch_selector = branch::attach_selector(
-            self,
-            scopes,
-            element,
-            selector.as_ref(),
-            branch,
-            (index, site.position),
-            writer,
-        )?;
+        let branch_site = (graph, parent.branch);
+        let (branch, branch_selector) =
+            branch::select(self, scopes, element, branch_site, site, writer)?;
         self.declarations(
             &ElementDeclarations {
                 element,
@@ -200,6 +209,7 @@ impl DefinitionProjection<'_, '_> {
                 index,
                 timeline,
                 graph,
+                clip_owner,
                 sub_database: sub_database.as_ref(),
                 branch_selector,
             },
@@ -215,34 +225,11 @@ impl DefinitionProjection<'_, '_> {
             filepath: Filepath::for_list(self, element, parent.params_root, index),
             timeline,
             graph: graph.map(|role| (role, site.position)),
+            clip_owner,
             branch,
             siblings: syntax.content()?,
             next_sibling: 0,
         })
-    }
-
-    fn graph_element(
-        &self,
-        element: SourceElement<'_>,
-        parent: &Frame<'_>,
-        TimelineIdentity { index, position }: TimelineIdentity,
-        blend: Option<&mut BlendIndex<'_>>,
-        writer: &mut MediaWriter<'_>,
-    ) -> Result<(Option<GraphRole>, Option<SubDatabaseSelector>), Failure> {
-        let parent_role = parent.graph.map(|(role, _)| role);
-        let graph = GraphRole::of(self.family, parent_role, parent.parent.is_none(), element);
-        if let Some(blend) = blend {
-            blend.element(graph, parent_role, index, position, writer)?;
-        }
-        let sub_database = SubDatabaseSelector::of(
-            graph,
-            parent.graph,
-            element,
-            self,
-            (index, position),
-            writer,
-        )?;
-        Ok((graph, sub_database))
     }
 
     fn write_element(
@@ -280,15 +267,23 @@ impl DefinitionProjection<'_, '_> {
                 element.sub_database,
                 writer,
             )?;
-            if let Some((selector, scopes, mut site)) = element.branch_selector {
-                site.declaration = position;
-                scopes.tokens(site, selector, &declaration, indices[1], self, writer)?;
+            if let Some(selector) = &element.branch_selector {
+                selector.observe(self, &declaration, (indices[1], position), writer)?;
             }
             element
                 .timeline
                 .write_attribute(self, &declaration, indices, position, writer)?;
             if let Some(graph) = element.graph {
                 let field = GraphField::of(graph, &declaration);
+                if matches!(field, GraphField::AnimationName) {
+                    element.clip_owner.write(
+                        self,
+                        indices,
+                        position,
+                        declaration.value(),
+                        writer,
+                    )?;
+                }
                 if let Some(blend) = blend.as_deref_mut() {
                     blend.declaration(&field, graph, &declaration, indices, position, writer)?;
                 }

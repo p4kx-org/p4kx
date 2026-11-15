@@ -12,12 +12,8 @@ use p4kx_testkit::{
 };
 use serde_json::{Value, json};
 
+use super::animation_definition_origins::Origins;
 use super::support::{self, TestResult};
-
-#[path = "animation_entity_adb_scope_origins.rs"]
-mod origins;
-
-use self::origins::Origins;
 
 const STREAM: &str = "animation-definition.jsonl";
 const ENTITY: &str = "FixtureMannequinOwner";
@@ -86,6 +82,7 @@ fn entity_adb_scope_keeps_authored_placements_and_transitive_sub_database_edges(
     verify_documents(&rows);
     verify_bindings(&archive, &rows, &origins)?;
     verify_graph(&archive, &rows, &origins)?;
+    super::animation_clip_references::verify_scoped(&rows)?;
     verify_tag_imports(&rows, &origins)
 }
 

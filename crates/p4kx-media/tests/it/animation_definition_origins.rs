@@ -41,7 +41,7 @@ impl Origins {
             .and_then(Value::as_array)
             .ok_or("inline original source-use references")?;
         let [reference] = references.as_slice() else {
-            return Err("authored path has just its own original selector".into());
+            return Err("field has exactly one original selector".into());
         };
         self.uses
             .iter()

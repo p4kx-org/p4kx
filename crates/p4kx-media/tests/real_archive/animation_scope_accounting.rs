@@ -11,6 +11,7 @@ use p4kx_extraction::{Archive, ArchiveWatch, Build, Exclusion};
 use p4kx_media::{Digest, ExportOptions, ExportOutcome, Identity, MediaKind, MediaRecord, Status};
 use serde_json::Value;
 
+use super::animation_graph_accounting::clips;
 use super::shader_accounting::require;
 use super::{TestResult, manifests, privacy};
 
@@ -369,6 +370,9 @@ fn observe(
         entry.path == source.entry.path(),
         "original physical Entry path",
     )?;
+    if row.subresource.namespace == clips::NAMESPACE {
+        return source.clips.observe(row);
+    }
     source.actual.observe(&row.subresource.namespace);
     if row.subresource.namespace == "animation-definition-document" {
         require(

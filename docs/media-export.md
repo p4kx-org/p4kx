@@ -880,6 +880,24 @@ role. Follow the source parent ordinal to the owning `SubADB`. Repeated
 declarations and an empty `Name` remain visible. An element with an absent
 `Name` still has a node row.
 
+Starting with animation-definition provider 1.10.0, each Mannequin layer's
+`Animation@name` and each blend-space `Example@AName` in a source without
+repaired strings has a `clip-reference` row keyed by its source element and
+declaration ordinals.
+The row keeps the original name and selector position. Mannequin rows identify
+the fragment, its layer and its parent fragment group or transition option.
+The fragment's `graph-attribute` rows retain its tag selectors. Blend-space
+rows identify the example. All element ordinals are local to the same source
+Entry. Repeated names and empty declarations retain separate rows.
+
+The row's status describes the captured declaration. Its `resolution` reports
+`empty-selector` for an empty name, `no-owning-scope` for a standalone
+declaration or blend-space example, and `source-join-unavailable` for a
+Mannequin declaration processed in Entity mode before any proven clip join.
+Use the separate Entity database binding rows for original placement evidence.
+Each field retains the provenance of the original XML element or declaration
+that supplies it.
+
 `sub-database-selector` rows distinguish absent, empty, repeated and single
 attributes. A single nonempty `SubADB@Tags` is split on the original plus
 signs, retaining repeated and empty tokens. A single nonempty `FragmentID@Name`

@@ -3,7 +3,9 @@
 
 //! Synthetic media contract, source preservation and provider integration tests.
 
+mod animation_clip_references;
 mod animation_dba_metadata;
+mod animation_definition_origins;
 mod animation_definition_provider;
 mod animation_definition_scope;
 mod animation_entity_adb_scope;

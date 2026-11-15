@@ -11,6 +11,7 @@ use p4kx_extraction::cryxml::{
 use p4kx_media::{ContainerIdentity, MediaRecord, Status};
 use serde_json::{Value, json};
 
+use super::clips::{self, Clips, Format, Scope};
 use super::links::{self, Edges, Paths};
 use super::{Family, TestResult, require};
 
@@ -37,6 +38,7 @@ pub(super) struct ExpectedSource<'a> {
     raw_attributes: BTreeMap<[u64; 2], SourceDeclaration<'a>>,
     graph_roots: BTreeMap<u64, Node<'a>>,
     link_declarations: BTreeMap<[u64; 2], links::Selector<'a>>,
+    clips: Clips,
     sub_lists: BTreeSet<u64>,
     nodes: u64,
     family: Family,
@@ -45,11 +47,17 @@ pub(super) struct ExpectedSource<'a> {
 
 impl<'a> ExpectedSource<'a> {
     pub(super) fn new(document: &'a SourceDocument<'a>, family: Family) -> TestResult<Self> {
+        let clips = match family {
+            Family::Adb => Clips::read(document, Format::Mannequin, Scope::Standalone)?,
+            Family::Bspace => Clips::read(document, Format::BlendSpace, Scope::Standalone)?,
+            Family::Comb => Clips::default(),
+        };
         let mut expected = Self {
             raw_nodes: BTreeMap::new(),
             raw_attributes: BTreeMap::new(),
             graph_roots: BTreeMap::new(),
             link_declarations: BTreeMap::new(),
+            clips,
             sub_lists: BTreeSet::new(),
             nodes: 0,
             family,
@@ -155,6 +163,7 @@ impl<'a> ExpectedSource<'a> {
         let namespace = row.subresource.namespace.as_str();
         let payload = row.data.get("payload").ok_or("graph payload missing")?;
         match (namespace, indices) {
+            (clips::NAMESPACE, _) => self.clips.observe(row),
             ("animation-definition-element", [index]) => {
                 let expected = self
                     .raw_nodes
@@ -205,8 +214,9 @@ impl<'a> ExpectedSource<'a> {
             self.raw_nodes.is_empty()
                 && self.raw_attributes.is_empty()
                 && self.graph_roots.is_empty()
-                && self.link_declarations.is_empty(),
-            "original nodes, declarations, typed root and file links are completely represented",
+                && self.link_declarations.is_empty()
+                && self.clips.remaining() == 0,
+            "original nodes, declarations, typed root, file links and clip selectors are retained",
         )
     }
 }
@@ -265,7 +275,7 @@ fn element_position(position: &SourceElementPosition) -> TestResult<Value> {
     }
 }
 
-fn attribute_position(position: &SourceAttributePosition) -> TestResult<Value> {
+pub(super) fn attribute_position(position: &SourceAttributePosition) -> TestResult<Value> {
     match position {
         SourceAttributePosition::Text(range) => Ok(text(range)),
         SourceAttributePosition::CryXml {

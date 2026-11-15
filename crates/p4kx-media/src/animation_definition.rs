@@ -9,6 +9,7 @@ mod blend_references;
 mod chrparams_selectors;
 #[cfg(test)]
 mod chrparams_witness;
+mod clip_reference;
 mod definition_scope;
 mod entity_database_bindings;
 mod event_bindings;

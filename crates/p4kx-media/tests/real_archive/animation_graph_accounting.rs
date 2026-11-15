@@ -14,6 +14,8 @@ use super::archive_replay::Lines;
 use super::shader_accounting::require;
 use super::{TestResult, manifests, privacy};
 
+#[path = "animation_graph_accounting_clips.rs"]
+pub(crate) mod clips;
 #[path = "animation_graph_accounting_links.rs"]
 mod links;
 #[path = "animation_graph_accounting_source.rs"]

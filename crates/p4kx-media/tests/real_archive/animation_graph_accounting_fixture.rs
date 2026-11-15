@@ -15,7 +15,11 @@ fn standalone_definition_graph_replays_text_and_binary_in_physical_archive_scope
     let branches = br#"<AnimDB TagDef="Animations/tag.xml"><SubADBs>
         <SubADB File="animations/CHILD.adb" Tags="Same"><FragmentID Name="Run"/></SubADB>
         <SubADB File="Animations/blank.adb"/><SubADB File="Animations/missing.adb"/>
-        </SubADBs></AnimDB>"#;
+        </SubADBs>
+        <FragmentBlendList><Blend><Tags><Fragment><AnimLayer>
+            <Animation name=" same "/><Animation name=" same "/><Animation name=""/>
+            </AnimLayer></Fragment><AnimLayer><Animation name="outside"/></AnimLayer>
+        </Tags></Blend></FragmentBlendList></AnimDB>"#;
     let binary = TestElement::new("AnimDB")
         .child(
             TestElement::new("FragmentList").child(
@@ -44,7 +48,8 @@ fn standalone_definition_graph_replays_text_and_binary_in_physical_archive_scope
         .entry(TestEntry::stored("Data/Animations/child.adb", b"<AnimDB/>"))
         .entry(TestEntry::stored("Data/Animations/missing.adb", b"<AnimDB/>"))
         .entry(TestEntry::stored("Data/Animations/one.bspace", br#"<ParaGroup>
-            <ExampleList><Example AName="loose" Alias="kept"/><Example AName="absent"/></ExampleList>
+            <ExampleList><Example AName="loose" Alias="kept"/><Example AName="absent"/>
+                <Example AName=""/><Example xmlns:x="urn:fixture" x:AName="foreign"/></ExampleList>
             <Blendable><Face p0="kept"/></Blendable>
             </ParaGroup>"#))
         .entry(TestEntry::stored("Data/Animations/one.comb", br#"<CombinedBlendSpace>

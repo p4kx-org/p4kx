@@ -19,6 +19,7 @@ use serde_json::{Map, Value, json};
 
 use super::adb::{self, Binding};
 use super::adb_rows::Graph;
+use super::clips::{Clips, Format, Scope};
 use super::events::targets as event_targets;
 use super::loadout::{Evidence, Files, Observations, unique};
 use super::{TestResult, manifests, require};
@@ -44,6 +45,7 @@ pub(super) struct Document<'archive> {
     pub(super) entry: &'archive Entry,
     pub(super) bytes: Vec<u8>,
     pub(super) actual: Counts,
+    pub(super) clips: Clips,
     expected: Counts,
     family: Family,
 }
@@ -176,10 +178,10 @@ impl<'archive> Closure<'archive> {
     pub(super) fn verify(&self) -> TestResult {
         self.graph.verify()?;
         require(
-            self.documents
-                .values()
-                .all(|document| document.expected == document.actual),
-            "selected source document, declaration, timeline and event totals agree",
+            self.documents.values().all(|document| {
+                document.expected == document.actual && document.clips.remaining() == 0
+            }),
+            "selected source documents, declarations, timelines, events and clip selectors agree",
         )
     }
 
@@ -280,10 +282,15 @@ impl<'archive> Document<'archive> {
         let source = SourceDocument::parse(&bytes, SourceReadOptions::default())?;
         require(!source.is_lossy(), "complete original source strings")?;
         let expected = Counts::source(source.root(), matches!(family, Family::Events))?;
+        let clips = match family {
+            Family::Adb => Clips::read(&source, Format::Mannequin, Scope::Entity)?,
+            Family::Params | Family::Events => Clips::default(),
+        };
         Ok(Self {
             entry,
             bytes,
             actual: Counts::default(),
+            clips,
             expected,
             family,
         })

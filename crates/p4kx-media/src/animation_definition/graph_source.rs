@@ -5,9 +5,11 @@ use p4kx_extraction::cryxml::{SourceDeclaration, SourceDeclarationKind, SourceEl
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use super::blend_reference_index::BlendIndex;
 use super::graph_field::GraphField;
+use super::links::SubDatabaseSelector;
 use super::payload::{self as wire, DefinitionFamily, DefinitionPayload};
-use super::projection::DefinitionProjection;
+use super::projection::{DefinitionProjection, ElementSite, Failure};
 use crate::audio_control_payload::{AtlDeclaration, AtlLocation, AtlPosition};
 use crate::{MediaError, MediaWriter};
 
@@ -42,6 +44,30 @@ pub(super) enum GraphRole {
     Face,
     BlendSpaces,
     BlendSpaceInput,
+}
+
+pub(super) fn observe_element(
+    projection: &DefinitionProjection<'_, '_>,
+    element: SourceElement<'_>,
+    (parent, root): (Option<(GraphRole, AtlPosition)>, bool),
+    ElementSite { index, position }: ElementSite,
+    blend: Option<&mut BlendIndex<'_>>,
+    writer: &mut MediaWriter<'_>,
+) -> Result<(Option<GraphRole>, Option<SubDatabaseSelector>), Failure> {
+    let parent_role = parent.map(|(role, _)| role);
+    let graph = GraphRole::of(projection.family, parent_role, root, element);
+    if let Some(blend) = blend {
+        blend.element(graph, parent_role, index, position, writer)?;
+    }
+    let selector = SubDatabaseSelector::of(
+        graph,
+        parent,
+        element,
+        projection,
+        (index, position),
+        writer,
+    )?;
+    Ok((graph, selector))
 }
 
 impl GraphRole {
@@ -138,7 +164,7 @@ impl GraphRole {
         indices: [u64; 2],
         position: AtlPosition,
         writer: &mut MediaWriter<'_>,
-    ) -> Result<(), super::projection::Failure> {
+    ) -> Result<(), Failure> {
         if !matches!(attribute.kind(), SourceDeclarationKind::Attribute { .. }) {
             return Ok(());
         }
