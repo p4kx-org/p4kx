@@ -103,3 +103,19 @@ pub(super) fn file(
         writer,
     )
 }
+
+pub(super) fn directory_entry(
+    input: &MediaOriginInput,
+    entry: u64,
+    writer: &MediaWriter<'_>,
+) -> Result<OriginContributions, MediaError> {
+    let mut capture = writer.capture_origins();
+    capture.add(
+        input,
+        InputScope::Payload,
+        OriginSite::new("archive-directory", &[entry], "entry_index"),
+        SourceUseRole::Selector,
+        writer,
+    )?;
+    Ok(capture.finish())
+}

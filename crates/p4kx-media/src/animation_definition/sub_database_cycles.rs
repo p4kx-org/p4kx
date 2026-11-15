@@ -5,7 +5,7 @@ use std::cell::RefCell;
 use std::collections::{HashMap, TryReserveError};
 use std::io;
 
-use p4kx_extraction::{DecimalU64, InputScope, SourceUseRole};
+use p4kx_extraction::{DecimalU64, SourceUseRole};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -15,7 +15,7 @@ use super::sub_database_components::{Components, Graph, Work};
 use super::sub_database_frontier::{Frontier, FrontierReason};
 use crate::audio_control_payload::AtlPosition;
 use crate::audio_record_origins as records;
-use crate::origin_capture::{OriginCapture, OriginSite};
+use crate::origin_capture::OriginCapture;
 use crate::origin_contributions::OriginContributions;
 use crate::origin_input::MediaOriginInput;
 use crate::{DirectoryContext, MediaError, MediaWriter, Status, Subresource, origin_error};
@@ -220,7 +220,7 @@ fn write_edge(
     records::field(
         &mut prepared,
         "/data/payload/source_entry_index",
-        entry_index(owner, edge.source, writer)?,
+        origins::directory_entry(owner, edge.source as u64, writer)?,
         writer,
     )?;
     for address in [
@@ -292,22 +292,6 @@ fn write_cycle(
         }),
         &[],
     )
-}
-
-fn entry_index(
-    input: &MediaOriginInput,
-    entry: usize,
-    writer: &MediaWriter<'_>,
-) -> Result<OriginContributions, MediaError> {
-    let mut capture = writer.capture_origins();
-    capture.add(
-        input,
-        InputScope::Payload,
-        OriginSite::new("archive-directory", &[entry as u64], "entry_index"),
-        SourceUseRole::Selector,
-        writer,
-    )?;
-    Ok(capture.finish())
 }
 
 fn borrowed() -> MediaError {

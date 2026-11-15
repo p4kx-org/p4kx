@@ -331,6 +331,7 @@ impl PhysicalSources {
             directory_ordinal: entry.metadata().original_directory_ordinal(),
             file: RigFile {
                 path: entry.path().to_owned(),
+                entry_index: Some(entry.index()),
                 read,
             },
         });

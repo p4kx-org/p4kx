@@ -10,6 +10,7 @@ use super::event_bindings::EventBinding;
 use super::graph_source::{GraphAttribute, GraphNode};
 use super::named_clip::Wildcard;
 use super::named_dba::Binding;
+use super::scope_receipt::ScopeReceipt;
 use super::sub_database_cycles::{SubDatabaseCycle, SubDatabaseEdge};
 use super::sub_database_frontier::Frontier;
 use super::sub_database_selectors_payload::{
@@ -22,6 +23,7 @@ use crate::audio_control_payload::{
 };
 
 pub(super) const DOCUMENT: &str = "animation-definition-document";
+pub(super) const SCOPE_RECEIPT: &str = "animation-definition-scope-receipt";
 pub(super) const ELEMENT: &str = "animation-definition-element";
 pub(super) const DECLARATION: &str = "animation-definition-declaration";
 pub(super) const CONTENT: &str = "animation-definition-content";
@@ -86,6 +88,7 @@ impl DefinitionFamily {
 )]
 pub(super) enum DefinitionPayload<'source> {
     Document(DefinitionDocument),
+    ScopeReceipt(ScopeReceipt),
     Element(AtlElement<'source>),
     Declaration(AtlDeclaration<'source>),
     Content(AtlContent<'source>),

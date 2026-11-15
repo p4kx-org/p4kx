@@ -13,6 +13,7 @@ use p4kx_extraction::{DataForge, DataForgeEntry, Entry};
 use super::chrparams_selectors::{self, Target};
 use super::payload::DefinitionFamily;
 use super::scope_health;
+use super::scope_receipt::{self, ScopePlacement};
 use crate::animation;
 use crate::checkpoint::IO_BLOCK_BYTES;
 use crate::lookup_work::LookupWork;
@@ -62,7 +63,7 @@ impl DefinitionScope {
     ) -> Result<(), MediaError> {
         let entry = require_target(path, lookup, writer)?;
         if excluded(lookup, entry) {
-            return Ok(());
+            return scope_receipt::excluded(lookup, entry, ScopePlacement::Model, writer);
         }
         let mut inputs = Inputs {
             lookup,
@@ -77,7 +78,8 @@ impl DefinitionScope {
             rig.parameters.as_ref(),
         )?;
         self.parameters(rig.parameters.as_ref(), writer)?;
-        self.targets(inputs.targets, lookup, writer)
+        self.targets(inputs.targets, lookup, writer)?;
+        scope_receipt::model(lookup, entry, &rig, writer)
     }
 
     fn entity(
@@ -92,7 +94,12 @@ impl DefinitionScope {
         })?;
         let entry = require_target(entry.path(), lookup, writer)?;
         if excluded(lookup, entry) {
-            return Ok(());
+            return scope_receipt::excluded(
+                lookup,
+                entry,
+                ScopePlacement::ExcludedEntityInput,
+                writer,
+            );
         }
         let bytes = read_verified(lookup, entry, writer)?;
         let forge = DataForge::open(&bytes).map_err(|cause| {
@@ -119,7 +126,8 @@ impl DefinitionScope {
                 )?;
                 self.parameters(rig.parameters.as_ref(), writer)?;
             }
-            self.targets(inputs.targets, lookup, writer)
+            self.targets(inputs.targets, lookup, writer)?;
+            scope_receipt::entity(lookup, entry, &rigs, writer)
         })
     }
 

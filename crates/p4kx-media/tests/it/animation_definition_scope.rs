@@ -13,6 +13,9 @@ use serde_json::Value;
 
 use super::support::{self, TestResult};
 
+#[path = "animation_scope_receipt_assertions.rs"]
+mod receipt_assertions;
+
 const CDF: &str = "Data/Objects/selected.cdf";
 const CHR: &str = "Data/Objects/shared.chr";
 const BLOCKED_CDF: &str = "Data/Objects/blocked.cdf";
@@ -70,6 +73,7 @@ fn unavailable_rig_prevents_complete_scope_and_exclusion_keeps_the_other_branche
         "explicit exclusion leaves the other branches"
     );
     verify_links(&rows)?;
+    receipt_assertions::verify_scope_receipts(&archive, &rows)?;
 
     let mut selection = options(false)?;
     selection.exclude = Exclusion::parse([CDF])?;
@@ -79,6 +83,8 @@ fn unavailable_rig_prevents_complete_scope_and_exclusion_keeps_the_other_branche
         index.source_entries.written, 0,
         "explicit exclusion of the root admits no definitions"
     );
+    let rows = support::records(&excluded_out, &index, STREAM)?;
+    receipt_assertions::verify_root_exclusion(&archive, &rows)?;
     Ok(())
 }
 
@@ -185,6 +191,9 @@ fn database(blocked_branch: bool) -> Vec<u8> {
     let root = root.loadout(TestLoadout::Manual(vec![
         TestLoadoutEntry::class("blocked", "FixtureBlocked"),
         TestLoadoutEntry::class("static", "FixtureStatic"),
+        TestLoadoutEntry::class("sharedLeft", "FixtureShared"),
+        TestLoadoutEntry::class("sharedRight", "FixtureShared"),
+        TestLoadoutEntry::class("empty", "FixtureEmpty"),
     ]));
     let blocked = TestEntity::new(2, "FixtureBlocked", "entities/fixture_blocked.xml")
         .geometry("Objects/blocked.cdf", None);
@@ -194,6 +203,12 @@ fn database(blocked_branch: bool) -> Vec<u8> {
         .record(root.record())
         .record(blocked.record())
         .record(static_model.record())
+        .record(
+            TestEntity::new(4, "FixtureShared", "entities/fixture_shared.xml")
+                .geometry("Objects/selected.cdf", None)
+                .record(),
+        )
+        .record(TestEntity::new(5, "FixtureEmpty", "entities/fixture_empty.xml").record())
         .build()
 }
 

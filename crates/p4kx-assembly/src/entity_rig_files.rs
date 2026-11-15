@@ -17,11 +17,18 @@ use crate::ArchiveModels;
 pub struct RigFile<T, E = String> {
     /// Requested path, independent of archive lookup normalization.
     pub path: String,
+    pub(crate) entry_index: Option<usize>,
     /// Whether the bytes were read and parsed.
     pub read: Arc<RigFileRead<T, E>>,
 }
 
 impl<T, E> RigFile<T, E> {
+    /// Returns the unique physical Entry identified by lookup.
+    #[must_use]
+    pub const fn entry_index(&self) -> Option<usize> {
+        self.entry_index
+    }
+
     /// Returns the parsed value only when a source was successfully read.
     #[must_use]
     pub fn value(&self) -> Option<&T> {
@@ -249,6 +256,10 @@ fn read<T, I: RigInputs>(
         RigPath::Authored(path) => models.rig_entry(path, &mut check)?,
         RigPath::Exact(path) => models.exact_rig_entry(path, &mut check)?,
     };
+    let entry_index = match &entry {
+        RigEntry::Unique(entry) => Some(entry.index()),
+        _ => None,
+    };
     let read = match entry {
         RigEntry::Missing => Arc::new(RigFileRead::Missing),
         RigEntry::Ambiguous => Arc::new(RigFileRead::Ambiguous),
@@ -265,6 +276,7 @@ fn read<T, I: RigInputs>(
     };
     Ok(RigFile {
         path: path.as_str().to_owned(),
+        entry_index,
         read,
     })
 }

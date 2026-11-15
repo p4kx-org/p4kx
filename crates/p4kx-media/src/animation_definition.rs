@@ -5,6 +5,8 @@ mod blend_reference_index;
 mod blend_reference_payload;
 mod blend_references;
 mod chrparams_selectors;
+#[cfg(test)]
+mod chrparams_witness;
 mod definition_scope;
 mod event_bindings;
 mod graph_field;
@@ -18,6 +20,7 @@ mod projection;
 mod provider;
 mod schema;
 mod scope_health;
+mod scope_receipt;
 mod sub_database_components;
 mod sub_database_cycles;
 mod sub_database_frontier;

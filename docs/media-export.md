@@ -688,6 +688,17 @@ The other requested providers
 retain their own Entry filters. An Animation-only export with
 `--animation-entity` uses the independent clip inventory selection.
 
+Scoped exports write one directory `scope-receipt` record per resolved rig
+occurrence using its ordinal in loadout traversal order. The receipt identifies
+the physical model or DataForge Entry and, for an observed Entity placement,
+its actual owner Record index. A `selected` outcome addresses the exact retained
+parameter Entry. `no-companion` means the derived path was absent from a complete
+directory inventory. `no-rig` means the resolved occurrence had no applicable rig.
+`excluded` identifies the physical Entry blocked by an explicit exclusion.
+An excluded DataForge produces a single input receipt without an owner Record.
+Repeated placements keep separate receipts when they share a parameter Entry.
+Blocked required inputs and incomplete Loadouts still prevent publication.
+
 Within a character parameter `AnimationList`, `named-caf` link rows keep each
 concrete animation declaration at the original path attribute's coordinates,
 including repetitions. For relative paths the latest preceding `#filepath`
@@ -750,6 +761,18 @@ formats and nested physical identity are exercised by the synthetic fixture.
 The installed replay at source revision `2796853dd` also passed and
 reconciled every selected event document, including nested archive sources.
 The model/entity binding scope is verified separately.
+
+The installed `.chrparams` source census can run without producing Media artifacts.
+It traverses physical root and nested archives, CRC-checks each parameter Entry,
+reconciles lexical declarations against the parsed attribute view and compares
+the ordered scoped target plan against an independent syntax-based inventory.
+The receipt records Build identity and aggregate counts. This verifies source
+coverage and selector planning. Selected model/entity export verification also
+checks emitted records and field origins.
+
+```powershell
+cargo test -p p4kx-media --lib installed_chrparams_source_census_reconciles_ordered_declarations_and_scope_targets -- --ignored --nocapture
+```
 
 The `graph-node` and `graph-attribute` rows identify Mannequin fragment
 alternatives, transitions, layers, sub-databases, blend-space examples,

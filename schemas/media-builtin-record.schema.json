@@ -943,6 +943,23 @@
           "additionalProperties": false,
           "properties": {
             "payload": {
+              "$ref": "#/$defs/ScopeReceipt"
+            },
+            "record_type": {
+              "const": "scope-receipt",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
               "$ref": "#/$defs/AtlElement"
             },
             "record_type": {
@@ -21113,6 +21130,109 @@
           "type": "object"
         }
       ]
+    },
+    "ScopeOutcome": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "entry_index": {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            "state": {
+              "const": "selected",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "entry_index"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "entry_index": {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            "state": {
+              "const": "excluded",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "entry_index"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "state": {
+              "const": "no-companion",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "state": {
+              "const": "no-rig",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ScopePlacement": {
+      "enum": [
+        "model",
+        "excluded-entity-input",
+        "entity-root",
+        "attachment",
+        "landing-gear",
+        "other"
+      ],
+      "type": "string"
+    },
+    "ScopeReceipt": {
+      "additionalProperties": false,
+      "properties": {
+        "input_entry_index": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "outcome": {
+          "$ref": "#/$defs/ScopeOutcome"
+        },
+        "owner_record_index": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "placement": {
+          "$ref": "#/$defs/ScopePlacement"
+        }
+      },
+      "required": [
+        "input_entry_index",
+        "placement",
+        "outcome"
+      ],
+      "type": "object"
     },
     "SegmentRecord": {
       "additionalProperties": false,
@@ -46383,6 +46503,61 @@
               "indices": {
                 "maxItems": 0,
                 "minItems": 0
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation-definition"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-definition-scope-receipt"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationDefinitionPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "scope-receipt"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 1,
+                "minItems": 1
               }
             }
           }
