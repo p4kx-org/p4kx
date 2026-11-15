@@ -869,6 +869,11 @@ The receipt records Build identity and aggregate counts. This verifies source
 coverage and selector planning. Selected model/entity export verification also
 checks emitted records and field origins.
 
+On PTU change 13189690 the census checked all 4,286 parameter Entries and
+51,362 original attributes. It opened 10,623 containers and found all parameter
+Entries in the root Archive. The ordered scope plans contained 14,233 exact
+targets. No candidate default-pose spelling matched this Build.
+
 ```powershell
 cargo test -p p4kx-media --lib installed_chrparams_source_census_reconciles_ordered_declarations_and_scope_targets -- --ignored --nocapture
 ```
