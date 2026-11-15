@@ -3,7 +3,8 @@
 
 use rayon::prelude::*;
 
-use super::walk::{self, Found};
+use super::hirc_path_source::PathSourceMode;
+use super::walk::{self, Found, WalkOptions};
 use super::walk_banks::{Banks, Loaded, Spare, select_holders, soundbank_at};
 use super::{
     ArchiveAudio, AudioFileError, AudioIndex, BreakReason, BrokenLink, LanguageChoice,
@@ -42,6 +43,25 @@ impl ArchiveAudio<'_> {
         name: &str,
         choice: &LanguageChoice,
     ) -> Option<TriggerSounds<'_>> {
+        self.resolve_trigger_with(name, choice, PathSourceMode::Omit)
+    }
+
+    /// Resolves a trigger and retains the original HIRC byte spans of the visited path steps.
+    #[must_use]
+    pub fn resolve_trigger_with_path_sources(
+        &self,
+        name: &str,
+        choice: &LanguageChoice,
+    ) -> Option<TriggerSounds<'_>> {
+        self.resolve_trigger_with(name, choice, PathSourceMode::Retain)
+    }
+
+    fn resolve_trigger_with(
+        &self,
+        name: &str,
+        choice: &LanguageChoice,
+        path_sources: PathSourceMode,
+    ) -> Option<TriggerSounds<'_>> {
         let index = self.index();
         let trigger = index.trigger(name)?;
         let events = trigger.events();
@@ -49,7 +69,7 @@ impl ArchiveAudio<'_> {
             .iter()
             .map(|event| select_holders(index, index.event_holders(event.id()), choice))
             .collect();
-        let mut walks = self.walk_soundbanks(index, events, &holders, choice);
+        let mut walks = self.walk_soundbanks(index, events, &holders, choice, path_sources);
         let definition = index.definition_file(trigger);
         let mut sounds = TriggerSounds {
             trigger,
@@ -89,6 +109,7 @@ impl ArchiveAudio<'_> {
                         event,
                         soundbank: Some(soundbank),
                         path: event_step.clone(),
+                        path_sources: Box::default(),
                         reason: BreakReason::Unreadable(error.clone()),
                     }),
                     None => {}
@@ -104,18 +125,22 @@ impl ArchiveAudio<'_> {
         events: &'i [WwiseEvent],
         holders: &[Vec<u32>],
         choice: &LanguageChoice,
+        path_sources: PathSourceMode,
     ) -> Vec<BankWalk<'i>> {
         let mut positions: Vec<u32> = holders.iter().flatten().copied().collect();
         positions.sort_unstable();
         positions.dedup();
         let pairs: usize = holders.iter().map(Vec::len).sum();
-        let budget = (MAX_TRIGGER_OBJECTS / pairs.max(1)).clamp(1, MAX_EVENT_OBJECTS);
+        let options = WalkOptions {
+            budget: (MAX_TRIGGER_OBJECTS / pairs.max(1)).clamp(1, MAX_EVENT_OBJECTS),
+            path_sources,
+        };
         positions
             .par_iter()
             .map(|&position| {
                 (
                     position,
-                    self.walk_soundbank(index, position, events, holders, choice, budget),
+                    self.walk_soundbank(index, position, events, holders, choice, options),
                 )
             })
             .collect()
@@ -128,7 +153,7 @@ impl ArchiveAudio<'_> {
         events: &'i [WwiseEvent],
         holders: &[Vec<u32>],
         choice: &LanguageChoice,
-        budget: usize,
+        options: WalkOptions,
     ) -> Result<Vec<(usize, Found<'i>)>, AudioFileError> {
         let home = Loaded::read(self.archive(), index, position)?;
         let mut spare = Spare::default();
@@ -142,7 +167,7 @@ impl ArchiveAudio<'_> {
             })
             .map(|(number, event)| {
                 let banks = Banks::new(self.archive(), index, choice, home.clone(), &mut spare);
-                (number, walk::event(banks, event, budget))
+                (number, walk::event(banks, event, options))
             })
             .collect())
     }
@@ -163,6 +188,7 @@ fn unselected<'i>(
         event,
         soundbank: None,
         path,
+        path_sources: Box::default(),
         reason,
     }
 }

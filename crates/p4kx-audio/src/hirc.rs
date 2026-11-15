@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::fmt;
-use std::ops::Range;
 
 use crate::bank_object_fields::ObjectFields;
 use crate::bank_reader::SectionReader;
@@ -24,6 +23,11 @@ use crate::hirc_plugin_family::{self, BankPluginKind};
 use crate::hirc_source;
 use crate::hirc_state::{self, StateObject};
 use crate::{BankError, SectionId};
+
+#[path = "hirc_object.rs"]
+mod object;
+
+pub use object::HircObject;
 
 const LAST_SOUND_WITHOUT_CACHE_ID_VERSION: u32 = 150;
 pub(crate) const CONTAINER_VERSION: u32 = 154;
@@ -240,29 +244,6 @@ pub enum HircValue {
     /// A Sound, Action, Event, container or music object whose body does not hold its fields; its
     /// body is kept raw.
     Malformed(BankError),
-}
-
-/// One object of the `HIRC` section, with its ID and its decoded value.
-#[derive(Debug, Clone, PartialEq)]
-pub struct HircObject {
-    /// The type of the object.
-    pub kind: HircKind,
-    /// The object ID.
-    pub id: u32,
-    /// What this reader decodes from the body.
-    pub value: HircValue,
-    pub(crate) body: Range<usize>,
-}
-
-impl HircObject {
-    /// Returns why the body could not be decoded, for a [`HircValue::Malformed`] object.
-    #[must_use]
-    pub const fn error(&self) -> Option<&BankError> {
-        match &self.value {
-            HircValue::Malformed(error) => Some(error),
-            _ => None,
-        }
-    }
 }
 
 /// The objects of a `HIRC` section and the number of bytes after the last of them.

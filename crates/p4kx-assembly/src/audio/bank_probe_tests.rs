@@ -3,7 +3,8 @@
 
 use std::rc::{Rc, Weak};
 
-use super::super::walk::{self, Found};
+use super::super::hirc_path_source::PathSourceMode;
+use super::super::walk::{self, Found, WalkOptions};
 use super::bank_probe::BankProbe;
 use super::{Banks, Loaded, Spare};
 use crate::audio::{
@@ -34,7 +35,11 @@ fn run<'index>(
     )?;
     let choice = LanguageChoice::any();
     let banks = Banks::new(&fixture.archive, index, &choice, home, spare);
-    Ok(walk::event(banks, source::event(index)?, MAX_EVENT_OBJECTS))
+    let options = WalkOptions {
+        budget: MAX_EVENT_OBJECTS,
+        path_sources: PathSourceMode::Omit,
+    };
+    Ok(walk::event(banks, source::event(index)?, options))
 }
 
 fn load_error(result: Result<Loaded<'_>, AudioFileError>) -> TestResult<AudioFileError> {

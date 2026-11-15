@@ -7,6 +7,9 @@
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
+#[path = "wwise_resolve_origin_tests.rs"]
+mod origin_tests;
+
 use p4kx_testkit::{
     ArchiveBuilder, TestAtl, TestBank, TestContainerKind, TestEntry, TestHircObject, TestNodeBase,
     wwise_short_id,
@@ -113,8 +116,22 @@ fn every_variant_is_listed_with_soundbank_wem_and_container_path_as_text() -> Te
 fn every_variant_is_listed_as_json_with_a_stable_shape() -> TestResult {
     let run = resolve("Play_Engine", true, 0)?;
     assert_eq!(run.stdout.lines().count(), 1, "one line of JSON");
-    let value: serde_json::Value = serde_json::from_str(&run.stdout)?;
+    let mut value: serde_json::Value = serde_json::from_str(&run.stdout)?;
+    remove_origins_for_payload_snapshot(&mut value)?;
     insta::assert_snapshot!(serde_json::to_string_pretty(&value)?);
+    Ok(())
+}
+
+pub(super) fn remove_origins_for_payload_snapshot(value: &mut serde_json::Value) -> TestResult {
+    let resolver = value.as_object_mut().ok_or("resolver JSON object")?;
+    for field in ["fieldOrigins", "provenance"] {
+        assert!(
+            resolver
+                .remove(field)
+                .is_some_and(|value| value.is_object()),
+            "structured companion {field} exists"
+        );
+    }
     Ok(())
 }
 

@@ -199,7 +199,8 @@ fn the_localised_variants_are_listed_as_json_with_a_stable_shape() -> TestResult
         0,
     )?;
     assert_eq!(run.stdout.lines().count(), 1, "one line of JSON");
-    let value: serde_json::Value = serde_json::from_str(&run.stdout)?;
+    let mut value: serde_json::Value = serde_json::from_str(&run.stdout)?;
+    super::wwise_resolve::remove_origins_for_payload_snapshot(&mut value)?;
     insta::assert_snapshot!(serde_json::to_string_pretty(&value)?);
     Ok(())
 }

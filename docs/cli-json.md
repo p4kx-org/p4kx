@@ -1009,6 +1009,13 @@ container are followed), `too_many_objects` (at most 16,384 objects per event an
 in the fallback language).
 New kinds may be added in later versions.
 
+The `fieldOrigins` object uses JSON Pointers for every path step's `kind` and `id`, the
+variant's `sound_id` and the break's copy of its final `object`. Each present origin references
+the original bank through the `provenance` inventory. HIRC coordinates are half-open byte spans
+in the decoded bank. Kind evidence includes the decoded bank-version selector and the HIRC
+object. A synthetic Event step has an unknown marker and an incomplete source set. A break
+may name a different bank than the bank that supplied its last observed path step.
+
 ## `p4kx dcb query <archive> <query> --json`
 
 Without `--out`, the line is the Query result itself in its JSON format, as `--format json`

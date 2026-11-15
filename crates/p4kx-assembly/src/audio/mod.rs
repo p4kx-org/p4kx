@@ -11,6 +11,7 @@ mod cache;
 mod entity;
 mod error;
 mod export;
+mod hirc_path_source;
 mod index;
 mod index_read;
 mod language;
@@ -40,6 +41,7 @@ pub use export::{
     ExportFailure, ExportOptions, ExportReport, ExportState, ExportWatch, ExportedSound,
     SoundFormat,
 };
+pub use hirc_path_source::HircPathSource;
 pub use index::AudioIndex;
 pub use language::LanguageChoice;
 pub use p4kx_audio::wwise_id;

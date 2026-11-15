@@ -208,6 +208,7 @@ pub struct SoundVariant<'i> {
     pub(crate) soundbank: &'i IndexedSoundbank,
     pub(crate) sound_id: u32,
     pub(crate) path: Box<[PathStep]>,
+    pub(super) path_sources: Box<[super::HircPathSource]>,
     /// Number of visits still shared with the previous emitted variant in this Event walk.
     pub(crate) shared_path_prefix: usize,
     pub(super) music_clip_features: MusicClipFeatures,
@@ -257,6 +258,12 @@ impl<'i> SoundVariant<'i> {
     #[must_use]
     pub fn path(&self) -> &[PathStep] {
         &self.path
+    }
+
+    /// Returns the original HIRC sources in path order when requested.
+    #[must_use]
+    pub fn path_sources(&self) -> &[super::HircPathSource] {
+        &self.path_sources
     }
 
     /// Returns the ID of the Sound object.

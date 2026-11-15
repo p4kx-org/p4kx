@@ -129,6 +129,7 @@ pub struct BrokenLink<'i> {
     pub(crate) event: &'i WwiseEvent,
     pub(crate) soundbank: Option<&'i IndexedSoundbank>,
     pub(crate) path: Box<[PathStep]>,
+    pub(super) path_sources: Box<[super::HircPathSource]>,
     pub(crate) reason: BreakReason,
 }
 
@@ -150,6 +151,12 @@ impl<'i> BrokenLink<'i> {
     #[must_use]
     pub fn path(&self) -> &[PathStep] {
         &self.path
+    }
+
+    /// Returns the original HIRC sources in path order when requested.
+    #[must_use]
+    pub fn path_sources(&self) -> &[super::HircPathSource] {
+        &self.path_sources
     }
 
     /// Returns the object the way breaks at, the last step of the path.

@@ -218,6 +218,15 @@ impl<B> Soundbank<B> {
         &self.header
     }
 
+    /// Returns the bytes of the version used to decode this bank.
+    #[must_use]
+    pub fn version_byte_range(&self) -> Option<Range<usize>> {
+        self.sections
+            .first()
+            .filter(|section| section.id == SectionId::BKHD)
+            .map(|section| section.body.start..section.body.start + size_of::<u32>())
+    }
+
     /// Returns the quirks the parser worked around, in the order it met them.
     #[must_use]
     pub fn warnings(&self) -> &[BankWarning] {

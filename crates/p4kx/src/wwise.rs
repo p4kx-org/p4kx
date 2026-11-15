@@ -75,11 +75,15 @@ fn resolve(args: &WwiseResolveArgs, as_json: bool) -> Result<()> {
     let audio = ArchiveAudio::new(&archive);
     let index = audio.index();
     let choice = language_choice(index, &args.language)?;
-    let sounds = audio
-        .resolve_trigger_in(&args.trigger, &choice)
-        .ok_or_else(|| UnknownTrigger(args.trigger.clone()))?;
+    let sounds = if as_json {
+        audio.resolve_trigger_with_path_sources(&args.trigger, &choice)
+    } else {
+        audio.resolve_trigger_in(&args.trigger, &choice)
+    }
+    .ok_or_else(|| UnknownTrigger(args.trigger.clone()))?;
     let counts = Counts::of(&sounds);
     if as_json {
+        let (field_origins, provenance) = wwise_json::capture(&archive, &sounds)?;
         json::print(&ResolveJson {
             archive: json::path(archive.path()),
             language: LanguageJson::of(&choice),
@@ -92,6 +96,8 @@ fn resolve(args: &WwiseResolveArgs, as_json: bool) -> Result<()> {
                 .collect(),
             counts,
             issues: issues_json(index),
+            field_origins,
+            provenance,
         })?;
         return Ok(());
     }

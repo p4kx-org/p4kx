@@ -3,16 +3,16 @@
 
 use std::rc::Rc;
 
-use p4kx_audio::{
-    HircKind, HircObject, HircValue, MusicTransitionFeatures, SoundSource, Soundbank,
-};
+use p4kx_audio::{HircKind, HircObject, HircValue, MusicTransitionFeatures, SoundSource};
 
+use super::hirc_path_source::PathSourceMode;
 use super::locate::locate;
 use super::music_clip_features::MusicClipFeatures;
-use super::walk_banks::{Banks, Loaded, Via, select_holders};
+use super::walk_banks::{Banks, Loaded, Via, find_object, select_holders};
 use super::{
-    AudioIndex, BreakReason, BrokenLink, IndexedSoundbank, LanguageChoice, MAX_ACTION_CHAIN,
-    MAX_CONTAINER_CHILDREN, MAX_PATH_DEPTH, NodeKind, PathStep, SoundVariant, WwiseEvent,
+    AudioIndex, BreakReason, BrokenLink, HircPathSource, IndexedSoundbank, LanguageChoice,
+    MAX_ACTION_CHAIN, MAX_CONTAINER_CHILDREN, MAX_PATH_DEPTH, NodeKind, PathStep, SoundVariant,
+    WwiseEvent,
 };
 
 /// The variants and broken links one Wwise event leads to in one soundbank.
@@ -22,9 +22,19 @@ pub(crate) struct Found<'i> {
     pub(crate) breaks: Vec<BrokenLink<'i>>,
 }
 
+#[derive(Clone, Copy)]
+pub(super) struct WalkOptions {
+    pub(super) budget: usize,
+    pub(super) path_sources: PathSourceMode,
+}
+
 /// Follows the Wwise event `event` through the `HIRC` section of the start soundbank of `banks`
 /// to its sounds through indexed bank references.
-pub(crate) fn event<'i>(banks: Banks<'_, 'i>, event: &'i WwiseEvent, budget: usize) -> Found<'i> {
+pub(super) fn event<'i>(
+    banks: Banks<'_, 'i>,
+    event: &'i WwiseEvent,
+    options: WalkOptions,
+) -> Found<'i> {
     let mut walk = Walk {
         index: banks.index,
         choice: banks.choice,
@@ -34,7 +44,7 @@ pub(crate) fn event<'i>(banks: Banks<'_, 'i>, event: &'i WwiseEvent, budget: usi
         path: Vec::new(),
         shared_path_prefix: 0,
         objects: 0,
-        budget,
+        options,
         chain: 0,
         exhausted: false,
         found: Found::default(),
@@ -46,6 +56,7 @@ pub(crate) fn event<'i>(banks: Banks<'_, 'i>, event: &'i WwiseEvent, budget: usi
 struct ResolvedPathStep<'index> {
     owner: Loaded<'index>,
     step: PathStep,
+    source: Option<HircPathSource>,
     transition_features: MusicTransitionFeatures,
 }
 
@@ -58,7 +69,7 @@ struct Walk<'w, 'i> {
     path: Vec<ResolvedPathStep<'i>>,
     shared_path_prefix: usize,
     objects: usize,
-    budget: usize,
+    options: WalkOptions,
     chain: usize,
     exhausted: bool,
     found: Found<'i>,
@@ -70,10 +81,12 @@ impl<'i> Walk<'_, 'i> {
     }
 
     fn spend(&mut self) -> bool {
-        if self.objects >= self.budget {
+        if self.objects >= self.options.budget {
             if !self.exhausted {
                 self.exhausted = true;
-                self.broke(BreakReason::TooManyObjects { limit: self.budget });
+                self.broke(BreakReason::TooManyObjects {
+                    limit: self.options.budget,
+                });
             }
             return false;
         }
@@ -96,7 +109,8 @@ impl<'i> Walk<'_, 'i> {
             Via::At(position) => position == self.current.position,
             Via::Local | Via::Bank(_) | Via::PlayEvent => true,
         };
-        let (bank, entered) = if in_current && find(&self.current.bank, id, wanted).is_some() {
+        let (bank, entered) = if in_current && find_object(&self.current.bank, id, wanted).is_some()
+        {
             (Rc::clone(&self.current.bank), None)
         } else {
             match self.banks.enter(
@@ -112,7 +126,7 @@ impl<'i> Walk<'_, 'i> {
                 }
             }
         };
-        let Some(object) = find(&bank, id, wanted) else {
+        let Some(object) = find_object(&bank, id, wanted) else {
             self.broke(BreakReason::Missing { id });
             return;
         };
@@ -147,6 +161,10 @@ impl<'i> Walk<'_, 'i> {
             step: PathStep {
                 kind: node_kind(object),
                 id: object.id,
+            },
+            source: match self.options.path_sources {
+                PathSourceMode::Omit => None,
+                PathSourceMode::Retain => Some(HircPathSource::of(&self.current, object)),
             },
             transition_features,
         });
@@ -319,6 +337,7 @@ impl<'i> Walk<'_, 'i> {
             soundbank: self.current.soundbank,
             sound_id: self.path.last().map_or(0, |step| step.step.id),
             path: self.public_path(),
+            path_sources: self.path_sources(),
             shared_path_prefix: self.shared_path_prefix,
             music_clip_features,
             music_transition_features: self.transition_features(),
@@ -336,6 +355,17 @@ impl<'i> Walk<'_, 'i> {
         self.path.iter().map(|active| active.step).collect()
     }
 
+    fn path_sources(&self) -> Box<[HircPathSource]> {
+        match self.options.path_sources {
+            PathSourceMode::Omit => Box::default(),
+            PathSourceMode::Retain => self
+                .path
+                .iter()
+                .filter_map(|step| step.source.clone())
+                .collect(),
+        }
+    }
+
     fn broke(&mut self, reason: BreakReason) {
         self.broke_in(None, reason);
     }
@@ -345,19 +375,9 @@ impl<'i> Walk<'_, 'i> {
             event: self.event,
             soundbank: Some(soundbank.unwrap_or(self.current.soundbank)),
             path: self.public_path(),
+            path_sources: self.path_sources(),
             reason,
         });
-    }
-}
-
-fn find(bank: &Soundbank<Vec<u8>>, id: u32, wanted: Option<HircKind>) -> Option<&HircObject> {
-    let found = bank.object(id)?;
-    match wanted {
-        Some(kind) if found.kind != kind => bank
-            .objects()
-            .iter()
-            .find(|object| object.kind == kind && object.id == id),
-        _ => Some(found),
     }
 }
 

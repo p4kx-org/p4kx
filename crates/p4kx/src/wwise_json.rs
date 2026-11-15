@@ -5,9 +5,14 @@ use p4kx_assembly::audio::{
     BreakReason, BrokenLink, IndexedSoundbank, LanguageChoice, PathStep, SoundVariant,
     TriggerSounds, WemLocation, WwiseEvent,
 };
+use p4kx_extraction::{FieldOrigins, SourceInventory};
 use serde::Serialize;
 
 use crate::entity_audio::IssueJson;
+
+#[path = "wwise_path_origins.rs"]
+mod path_origins;
+pub(crate) use path_origins::capture;
 
 /// The JSON shape of `p4kx wwise resolve`.
 #[derive(Serialize)]
@@ -19,6 +24,9 @@ pub(crate) struct ResolveJson<'a> {
     pub(crate) breaks: Vec<BreakJson<'a>>,
     pub(crate) counts: Counts,
     pub(crate) issues: Vec<IssueJson<'a>>,
+    #[serde(rename = "fieldOrigins")]
+    pub(crate) field_origins: FieldOrigins,
+    pub(crate) provenance: SourceInventory,
 }
 
 /// The JSON shape of a resolved trigger.

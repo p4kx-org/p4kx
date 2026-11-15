@@ -8,12 +8,27 @@ use std::rc::Rc;
 use self::bank_probe::BankProbe;
 
 use p4kx_archive::Archive;
-use p4kx_audio::Soundbank;
+use p4kx_audio::{HircKind, HircObject, Soundbank};
 
 use super::read::entry_bytes;
 use super::{
     AudioFileError, AudioIndex, BreakReason, IndexedSoundbank, LanguageChoice, MAX_SOUNDBANK_LEN,
 };
+
+pub(super) fn find_object(
+    bank: &Soundbank<Vec<u8>>,
+    id: u32,
+    wanted: Option<HircKind>,
+) -> Option<&HircObject> {
+    let found = bank.object(id)?;
+    match wanted {
+        Some(kind) if found.kind != kind => bank
+            .objects()
+            .iter()
+            .find(|object| object.kind == kind && object.id == id),
+        _ => Some(found),
+    }
+}
 
 /// A soundbank read from the Archive and parsed, shared by the walks that follow events in it.
 #[derive(Debug, Clone)]
