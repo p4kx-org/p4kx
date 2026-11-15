@@ -61,6 +61,9 @@ and task-local `TMP` and `TEMP`. The ordinary catalog writer sends JSON through 
 pipe to the text verification reader. The reader keeps the schema-v3 sections needed by the
 existing per-kind comparisons, including original mission graphs and the shared language tables.
 It discards unrelated sections as it consumes the stream and checks the exact written byte count.
+For canonical Item definitions it retains the physical record and component positions, source
+carriers and text references used by the oracle. The decoder still checks the syntax of discarded
+Item fields, and synthetic cases compare the results with a fully decoded document.
 The test logs elapsed time for Record progress, opening the output sink and finishing JSON
 decoding. These milestones let a process-memory sample be assigned to preparation or output.
 This check writes no catalog file. It requires complete reads and projections for the text

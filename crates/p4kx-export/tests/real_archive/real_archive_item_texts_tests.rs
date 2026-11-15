@@ -5,7 +5,9 @@ use p4kx_export::Kind;
 use p4kx_testkit::{DataForgeBuilder, TestInstance, TestRecord, TestStruct, TestType, TestValue};
 use serde_json::{Value, json};
 
-use super::{Fixture, TestResult, check_coverage, replace_value};
+use super::{Coverage, Fixture, TestResult, check_coverage, replace_value};
+use crate::catalog_v3_consumer;
+use crate::real_archive_texts::live::census::read_fixture_through_pipe;
 
 const OWNER: &str = "EntityClassDefinition";
 const BASE: &str = "DataForgeComponentParams";
@@ -60,7 +62,7 @@ fn item_translation_mutations_fail_without_changing_historical_baselines() -> Te
         ),
     ] {
         let catalog = mutate_german(&fixture, path, domain, form)?;
-        let (english, german) = fixture.coverage(&catalog, Kind::Items)?;
+        let (english, german) = check_pipe_coverage(&fixture, &catalog, path)?;
         assert_eq!(english.total(), 3, "English denominator is preserved");
         assert_eq!(german.total(), 3, "German denominator is preserved");
         assert_eq!(
@@ -94,7 +96,7 @@ fn the_first_item_slot_controls_presentation_even_if_its_text_is_absent() -> Tes
             Value::Null,
         )?;
     }
-    let (english, german) = fixture.coverage(&catalog, Kind::Items)?;
+    let (english, german) = check_pipe_coverage(&fixture, &catalog, "absent first-slot text")?;
     assert_eq!(
         english.total(),
         0,
@@ -122,6 +124,91 @@ fn the_first_item_slot_controls_presentation_even_if_its_text_is_absent() -> Tes
         fixture.coverage(&catalog, Kind::Items).is_err(),
         "the physical owner cannot be guessed"
     );
+    Ok(())
+}
+
+#[test]
+fn item_text_census_keeps_positions_and_checked_carriers_without_the_nontext_body() -> TestResult {
+    const MANUFACTURER: &str =
+        "/definitions/items/rows/0/components/value/0/value/value/manufacturer";
+    let fixture = Fixture::from_database(&database())?;
+    let mut full = fixture.catalog.clone();
+    replace_value(
+        &mut full,
+        MANUFACTURER,
+        json!({"value": ["opaque manufacturer data".repeat(16_384)]}),
+    )?;
+    let projected = read_fixture_through_pipe(&serde_json::to_vec(&full)?)?;
+    assert!(projected.pointer(MANUFACTURER).is_none());
+    for path in [
+        "/definitions/items/rows/0/recordIndex",
+        "/definitions/items/rows/0/components/sourceUsesRefs",
+        "/definitions/items/rows/0/components/value/2/componentOrdinal",
+        "/definitions/items/rows/0/components/value/2/value/value/localization/value/description",
+    ] {
+        let expected = full.pointer(path).ok_or("original text-census data")?;
+        assert_eq!(projected.pointer(path), Some(expected), "retained {path}");
+    }
+    assert_eq!(
+        catalog_v3_consumer::rows(&projected, Kind::Items)?,
+        catalog_v3_consumer::rows(&full, Kind::Items)?,
+        "flat Item rows and their counts remain intact"
+    );
+    assert_eq!(
+        fixture.coverage(&projected, Kind::Items)?,
+        fixture.coverage(&full, Kind::Items)?
+    );
+    check_corrupt_item_carriers(&fixture)?;
+    assert!(
+        read_fixture_through_pipe(
+            br#"{"definitions":{"items":{"rows":[{"components":{"value":[{"value":{"value":{"manufacturer":[oops]}}}]}}]}}}"#,
+        )
+        .is_err(),
+        "ignored Item payload still needs valid JSON"
+    );
+    Ok(())
+}
+
+fn check_pipe_coverage(
+    fixture: &Fixture,
+    catalog: &Value,
+    context: &str,
+) -> TestResult<(Coverage, Coverage)> {
+    let expected = fixture.coverage(catalog, Kind::Items)?;
+    let projected = read_fixture_through_pipe(&serde_json::to_vec(catalog)?)?;
+    assert_eq!(
+        fixture.coverage(&projected, Kind::Items)?,
+        expected,
+        "same Item text coverage for {context}"
+    );
+    Ok(expected)
+}
+
+fn check_corrupt_item_carriers(fixture: &Fixture) -> TestResult {
+    for (path, replacement) in [
+        ("/definitions/items/rows/0/recordIndex/value", json!(7)),
+        (
+            "/definitions/items/rows/0/components/value/0/value/containsEncryptedSource",
+            json!("invalid"),
+        ),
+        (
+            "/definitions/items/rows/0/components/value/2/kind",
+            json!("unknown"),
+        ),
+        (COMPONENTS, json!("not an array")),
+    ] {
+        let mut corrupted = fixture.catalog.clone();
+        replace_value(&mut corrupted, path, replacement)?;
+        let projected = read_fixture_through_pipe(&serde_json::to_vec(&corrupted)?)?;
+        let census = |document| {
+            fixture
+                .coverage(document, Kind::Items)
+                .map_err(|error| error.to_string())
+        };
+        let expected = census(&corrupted);
+        assert!(expected.is_err(), "bad original {path} fails the oracle");
+        assert_eq!(census(&projected), expected, "same failure for {path}");
+    }
     Ok(())
 }
 

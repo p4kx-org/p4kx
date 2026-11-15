@@ -13,6 +13,8 @@ use serde_json::{Map, Value};
 
 use crate::catalog_v3_consumer;
 
+#[path = "real_archive_item_text_capture.rs"]
+mod item_capture;
 #[path = "real_archive_text_pipe.rs"]
 mod pipe;
 
@@ -49,7 +51,10 @@ pub(super) fn write_catalog(
 }
 
 #[derive(Default)]
-struct TextPaths(BTreeMap<String, Self>);
+struct TextPaths {
+    children: BTreeMap<String, Self>,
+    projection: Option<item_capture::Projection>,
+}
 
 impl TextPaths {
     fn catalog() -> Self {
@@ -61,7 +66,6 @@ impl TextPaths {
             "/schemaVersion",
             "/source",
             "/texts",
-            "/definitions/items",
             "/configurations/contractTemplates",
             "/configurations/missionBrokerEntries",
             "/configurations/blueprintTiers",
@@ -70,14 +74,16 @@ impl TextPaths {
         ] {
             paths.keep(path);
         }
+        paths.keep("/definitions/items").projection = Some(item_capture::ITEM_DEFINITIONS);
         paths
     }
 
-    fn keep(&mut self, path: &str) {
+    fn keep(&mut self, path: &str) -> &mut Self {
         let mut location = self;
         for field in path.trim_start_matches('/').split('/') {
-            location = location.0.entry(field.to_owned()).or_default();
+            location = location.children.entry(field.to_owned()).or_default();
         }
+        location
     }
 
     fn read(&self, input: impl Read) -> serde_json::Result<Value> {
@@ -92,7 +98,9 @@ impl<'de> DeserializeSeed<'de> for &TextPaths {
     type Value = Value;
 
     fn deserialize<D: serde::Deserializer<'de>>(self, deserializer: D) -> Result<Value, D::Error> {
-        if self.0.is_empty() {
+        if let Some(projection) = self.projection {
+            projection.deserialize(deserializer)
+        } else if self.children.is_empty() {
             Value::deserialize(deserializer)
         } else {
             deserializer.deserialize_map(self)
@@ -110,7 +118,7 @@ impl<'de> Visitor<'de> for &TextPaths {
     fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Value, A::Error> {
         let mut kept = Map::new();
         while let Some(field) = map.next_key::<String>()? {
-            if let Some(path) = self.0.get(&field) {
+            if let Some(path) = self.children.get(&field) {
                 kept.insert(field, map.next_value_seed(path)?);
             } else {
                 map.next_value::<IgnoredAny>()?;
@@ -118,4 +126,15 @@ impl<'de> Visitor<'de> for &TextPaths {
         }
         Ok(Value::Object(kept))
     }
+}
+
+pub(in crate::real_archive_texts) fn read_fixture_through_pipe(input: &[u8]) -> TestResult<Value> {
+    use std::io::Write as _;
+
+    let ((), capture) = pipe::transfer(&TextPaths::catalog(), |mut sink| {
+        sink.write_all(input)
+            .map_err(p4kx_export::CatalogError::Write)?;
+        Ok(((), sink))
+    })?;
+    Ok(capture.document)
 }

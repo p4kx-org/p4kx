@@ -14,7 +14,7 @@ use crate::real_archive_shop_inventory_v3::verify_build;
 use crate::real_archive_verification::print_line;
 
 #[path = "real_archive_text_census.rs"]
-mod census;
+pub(super) mod census;
 
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
