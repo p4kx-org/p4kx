@@ -6,6 +6,7 @@ use std::io::{Read, Seek};
 use p4kx_extraction::bank::{BankRtpcCurve, BankRtpcPoint, BankRtpcRow, BankRtpcRows};
 
 use crate::audio_bank_node_origins::NodeSites;
+use crate::audio_bank_origins::BankOrigins;
 use crate::audio_bank_projection::BankProjection;
 use crate::audio_bank_rtpc;
 use crate::audio_bank_rtpc_payload::{RtpcCurveRecord, RtpcOwner, RtpcPointRecord};
@@ -106,33 +107,7 @@ fn emit_point(
 ) -> Result<(), MediaError> {
     let mut prepared = sites.record(input, writer, Some(&fields.from_bits.range))?;
     audio_bank_rtpc::capture_layer(owner, sites, &mut prepared)?;
-    for (name, range, original, interpretation) in [
-        (
-            "from_bits",
-            &fields.from_bits.range,
-            "rtpcFromBits",
-            "input",
-        ),
-        ("to_bits", &fields.to_bits.range, "rtpcToBits", "output"),
-    ] {
-        sites.field(&mut prepared, name, range, original)?;
-        sites.converted(&mut prepared, interpretation, range, original)?;
-    }
-    sites.field(
-        &mut prepared,
-        "interpolation",
-        &fields.interpolation.range,
-        "rtpcInterpolation",
-    )?;
-    let input = fields.input();
-    let output = fields.output();
-    let record = RtpcPointRecord {
-        from_bits: (&fields.from_bits).into(),
-        to_bits: (&fields.to_bits).into(),
-        interpolation: (&fields.interpolation).into(),
-        input: input.is_finite().then_some(input),
-        output: output.is_finite().then_some(output),
-    };
+    let record = point_fields(sites, &mut prepared, fields)?;
     prepared.finish().write(
         writer,
         &Subresource::new(
@@ -143,4 +118,38 @@ fn emit_point(
         &owner.point(&record),
         &[],
     )
+}
+
+pub(crate) fn point_fields(
+    sites: &NodeSites,
+    prepared: &mut BankOrigins<'_, '_, '_>,
+    fields: &BankRtpcPoint,
+) -> Result<RtpcPointRecord, MediaError> {
+    for (name, range, original, interpretation) in [
+        (
+            "from_bits",
+            &fields.from_bits.range,
+            "rtpcFromBits",
+            "input",
+        ),
+        ("to_bits", &fields.to_bits.range, "rtpcToBits", "output"),
+    ] {
+        sites.field(prepared, name, range, original)?;
+        sites.converted(prepared, interpretation, range, original)?;
+    }
+    sites.field(
+        prepared,
+        "interpolation",
+        &fields.interpolation.range,
+        "rtpcInterpolation",
+    )?;
+    let input = fields.input();
+    let output = fields.output();
+    Ok(RtpcPointRecord {
+        from_bits: (&fields.from_bits).into(),
+        to_bits: (&fields.to_bits).into(),
+        interpolation: (&fields.interpolation).into(),
+        input: input.is_finite().then_some(input),
+        output: output.is_finite().then_some(output),
+    })
 }

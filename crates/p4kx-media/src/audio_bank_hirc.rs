@@ -12,6 +12,7 @@ use p4kx_extraction::bank::{
 };
 
 use crate::audio_bank_actor_mixer;
+use crate::audio_bank_attenuation;
 use crate::audio_bank_container_node;
 use crate::audio_bank_dialogue_event;
 use crate::audio_bank_failure::BankPhase;
@@ -95,31 +96,23 @@ fn emit_semantic<R: Read + Seek>(
     inventory: &BankInventory,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
+    let targets = &inventory.hirc_objects;
     match (semantic, version) {
         (BankHircSemantic::Raw(object), version) => emit_raw(projection, &object, version, writer),
         (BankHircSemantic::ActorMixer(actor), Some(version)) => {
             audio_bank_actor_mixer::project(projection, version, *actor, writer)
         }
         (BankHircSemantic::Action(action), Some(version)) => {
-            audio_bank_action_properties::unobserved(
-                projection,
-                version,
-                &action,
-                &inventory.hirc_objects,
-                writer,
-            )
+            audio_bank_action_properties::unobserved(projection, version, &action, targets, writer)
         }
         (BankHircSemantic::ActionWithProperties(mut action), Some(version)) => {
-            audio_bank_action_properties::play(
-                projection,
-                version,
-                &mut action,
-                &inventory.hirc_objects,
-                writer,
-            )
+            audio_bank_action_properties::play(projection, version, &mut action, targets, writer)
         }
         (BankHircSemantic::ContainerWithNode(container), Some(version)) => {
             audio_bank_hirc_container::project(projection, version, *container, writer)
+        }
+        (BankHircSemantic::Attenuation(attenuation), Some(version)) => {
+            audio_bank_attenuation::project(projection, version, *attenuation, writer)
         }
         (BankHircSemantic::DialogueEvent(dialogue), Some(version)) => {
             audio_bank_dialogue_event::project(projection, version, *dialogue, writer)
@@ -136,13 +129,9 @@ fn emit_semantic<R: Read + Seek>(
         (BankHircSemantic::MusicTrack(track), Some(version)) => {
             audio_bank_music_track::project(projection, version, *track, writer)
         }
-        (BankHircSemantic::Event(event), Some(version)) => audio_bank_hirc_event::project(
-            projection,
-            version,
-            event,
-            &inventory.hirc_objects,
-            writer,
-        ),
+        (BankHircSemantic::Event(event), Some(version)) => {
+            audio_bank_hirc_event::project(projection, version, event, targets, writer)
+        }
         (BankHircSemantic::Sound(sound), Some(version)) => {
             emit_unscoped_sound(projection, version, &sound, inventory, writer)
         }
@@ -174,6 +163,9 @@ fn emit_raw(
         | HircKind::SwitchContainer
         | HircKind::LayerContainer => {
             audio_bank_container_node::unsupported(projection, version, original, writer)
+        }
+        HircKind::Attenuation => {
+            audio_bank_attenuation::unsupported(projection, version, original, writer)
         }
         HircKind::DialogueEvent => {
             audio_bank_dialogue_event::unsupported(projection, version, original, writer)

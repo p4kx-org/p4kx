@@ -33,7 +33,8 @@ pub(super) fn insert_payload(base: &mut Value) -> Result<(), MediaError> {
     )
 }
 
-pub(super) const fn bindings() -> [Binding; 15] {
+pub(super) const fn bindings() -> [Binding; 18] {
+    let [attenuation_summary, attenuation_curve, attenuation_point] = attenuation_bindings();
     let [summary, curve, point] = container_bindings();
     let [music_summary, music_curve, music_point] = music_bindings();
     let [blend_summary, blend_curve, blend_point] = blend_bindings();
@@ -89,6 +90,35 @@ pub(super) const fn bindings() -> [Binding; 15] {
         music_summary,
         music_curve,
         music_point,
+        attenuation_summary,
+        attenuation_curve,
+        attenuation_point,
+    ]
+}
+
+const fn attenuation_bindings() -> [Binding; 3] {
+    [
+        Binding::exact(
+            RTPC_PAYLOAD,
+            RtpcOwner::Attenuation.summary_namespace(),
+            "bank-hirc-attenuation-rtpc",
+            2,
+            StatusRule::MalformedLayout,
+        ),
+        Binding::exact(
+            RTPC_PAYLOAD,
+            RtpcOwner::Attenuation.curve_namespace(),
+            "bank-hirc-attenuation-rtpc-curve",
+            3,
+            StatusRule::Complete,
+        ),
+        Binding::exact(
+            RTPC_PAYLOAD,
+            RtpcOwner::Attenuation.point_namespace(),
+            "bank-hirc-attenuation-rtpc-point",
+            4,
+            StatusRule::Complete,
+        ),
     ]
 }
 

@@ -17,6 +17,7 @@ use rayon::prelude::*;
 
 mod adpcm;
 mod animations;
+mod attenuation;
 mod audio_survey;
 mod audio_verification;
 mod bench;

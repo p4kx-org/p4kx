@@ -13,6 +13,8 @@ use crate::bank::Bank;
 
 #[path = "hirc_action_property_source.rs"]
 mod action;
+#[path = "hirc_attenuation_source.rs"]
+mod attenuation;
 #[path = "hirc_blend_source.rs"]
 mod blend;
 #[path = "hirc_container_source_layout.rs"]
@@ -50,6 +52,7 @@ enum SourceFamily {
     Action,
     State,
     Dialogue,
+    Attenuation,
     RandomSequence,
     Switch,
     Blend,
@@ -62,6 +65,7 @@ impl SourceFamily {
             Self::Action => HircKind::Action,
             Self::State => HircKind::State,
             Self::Dialogue => HircKind::DialogueEvent,
+            Self::Attenuation => HircKind::Attenuation,
             Self::RandomSequence => HircKind::RandomSequenceContainer,
             Self::Switch => HircKind::SwitchContainer,
             Self::Blend => HircKind::LayerContainer,
@@ -74,6 +78,7 @@ impl SourceFamily {
             Self::Action => "bnkHircActionProperties",
             Self::State => "bnkHircStandaloneState",
             Self::Dialogue => "bnkDialogueEvent",
+            Self::Attenuation => "bnkAttenuation",
             Self::RandomSequence => "bnkHircRandomSequence",
             Self::Switch => "bnkHircSwitchContainer",
             Self::Blend => "bnkHircBlendContainer",
@@ -86,6 +91,7 @@ impl SourceFamily {
             Self::Action => "actionObjectExtent",
             Self::State => "stateObjectExtent",
             Self::Dialogue => "dialogueExtent",
+            Self::Attenuation => "attenuationExtent",
             Self::RandomSequence => "randomSequenceExtent",
             Self::Switch => "switchContainerExtent",
             Self::Blend => "blendContainerExtent",
@@ -108,6 +114,7 @@ impl<'bank> ObjectSourceFields<'bank> {
             HircKind::Action => SourceFamily::Action,
             HircKind::State => SourceFamily::State,
             HircKind::DialogueEvent => SourceFamily::Dialogue,
+            HircKind::Attenuation => SourceFamily::Attenuation,
             HircKind::RandomSequenceContainer => SourceFamily::RandomSequence,
             HircKind::SwitchContainer => SourceFamily::Switch,
             HircKind::LayerContainer => SourceFamily::Blend,
@@ -159,6 +166,9 @@ fn project<R: Read + Seek, S: Serializer>(
         (BankHircSemantic::DialogueEvent(dialogue), SourceFamily::Dialogue) => {
             serialize_dialogue(serializer, origins, header, *dialogue)
         }
+        (BankHircSemantic::Attenuation(attenuation), SourceFamily::Attenuation) => {
+            attenuation::serialize(serializer, origins, header, *attenuation)
+        }
         (BankHircSemantic::ContainerWithNode(container), SourceFamily::RandomSequence) => {
             random_sequence::serialize(serializer, origins, header, *container)
         }
@@ -181,6 +191,9 @@ fn project<R: Read + Seek, S: Serializer>(
                 }
                 SourceFamily::Dialogue => {
                     serialize_unsupported(serializer, origins, header, &object)
+                }
+                SourceFamily::Attenuation => {
+                    attenuation::unsupported(serializer, origins, header, &object)
                 }
                 SourceFamily::RandomSequence => {
                     random_sequence::unsupported(serializer, origins, header, &object)

@@ -25,6 +25,7 @@ mod bank_rtpc_rows;
 mod bank_shared_node;
 mod bank_source;
 mod bank_source_actor_mixer;
+mod bank_source_attenuation;
 mod bank_source_container;
 mod bank_source_dialogue_event;
 mod bank_source_didx;
@@ -45,6 +46,7 @@ mod error;
 mod hirc;
 mod hirc_action;
 mod hirc_actor_mixer;
+mod hirc_attenuation;
 mod hirc_blend_container;
 mod hirc_container;
 mod hirc_dialogue_event;
@@ -132,6 +134,7 @@ pub use bank_source::{
     BankObservedHeader, BankReadError, BankSectionCursor, BankSource, BankSourceSection,
 };
 pub use bank_source_actor_mixer::BankHircActorMixer;
+pub use bank_source_attenuation::{BankAttenuationPoints, BankHircAttenuation};
 pub use bank_source_container::{
     BankContainerChild, BankContainerChildren, BankContainerRead, BankHircContainer,
     BankHircContainerNode,
@@ -173,6 +176,7 @@ pub use hirc_action::{
     PlayBank,
 };
 pub use hirc_actor_mixer::{ActorMixer, BankActorMixerFields};
+pub use hirc_attenuation::{BankAttenuationCone, BankAttenuationCurve, BankAttenuationFields};
 pub use hirc_blend_container::{
     BankBlendAssociationFields, BankBlendContainerFields, BankBlendExtent, BankBlendLayerFields,
 };

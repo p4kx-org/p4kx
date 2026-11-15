@@ -32,7 +32,9 @@ impl ObjectOrigins {
             family.namespace(),
             family.extent_label(),
             match family {
-                SourceFamily::Action | SourceFamily::State => SourceUses::with_compact_use_refs(),
+                SourceFamily::Action | SourceFamily::State | SourceFamily::Attenuation => {
+                    SourceUses::with_compact_use_refs()
+                }
                 _ => SourceUses::new(),
             },
         )

@@ -39,7 +39,9 @@ pub(crate) fn detail(value: &HircValue) -> Option<Detail<'_>> {
         HircValue::MusicTrack(track) => Detail::Track(track_detail(track)),
         HircValue::MusicSwitch(switch) => Detail::Switch(switch_detail(switch)),
         HircValue::MusicPlaylist(playlist) => Detail::Playlist(playlist_detail(playlist)),
-        HircValue::Event(_) | HircValue::Raw | HircValue::Malformed(_) => return None,
+        HircValue::Event(_) | HircValue::Attenuation | HircValue::Raw | HircValue::Malformed(_) => {
+            return None;
+        }
     })
 }
 

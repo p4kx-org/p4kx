@@ -189,14 +189,15 @@ fn a_decoder_exists_for_exactly_the_kinds_the_reader_decodes() -> TestResult {
         TestHircObject::music_switch(9, &[7], 1, &[7]),
         TestHircObject::music_playlist(10, &[7]),
         TestHircObject::actor_mixer(12, &[1], TestNodeBase::Plain),
+        TestHircObject::raw(14, 13, [0; 24]),
     ];
     let standalone_state = TestHircObject::raw(1, 11, [0; 2]);
     let undecoded: Vec<TestHircObject> = (2_u8..=22)
-        .filter(|byte| ![2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13].contains(byte))
+        .filter(|byte| ![2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14].contains(byte))
         .zip(100_u32..)
         .map(|(byte, id)| TestHircObject::raw(byte, id, [0; 8]))
         .collect();
-    assert_eq!(undecoded.len(), 10, "the kinds without a decoder");
+    assert_eq!(undecoded.len(), 9, "the kinds without a decoder");
     let bank = |version: u32| {
         decoded
             .iter()
@@ -209,7 +210,7 @@ fn a_decoder_exists_for_exactly_the_kinds_the_reader_decodes() -> TestResult {
     for (version, known) in [(154, HircLayout::Decoded), (160, HircLayout::Unsupported)] {
         let mut expected = vec![known; decoded.len()];
         expected.push(HircLayout::Unsupported);
-        expected.extend([HircLayout::Undecoded; 10]);
+        expected.extend(std::iter::repeat_n(HircLayout::Undecoded, undecoded.len()));
         assert_eq!(
             layouts(&bank(version))?,
             expected,

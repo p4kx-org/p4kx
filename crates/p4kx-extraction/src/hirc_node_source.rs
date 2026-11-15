@@ -25,7 +25,7 @@ mod reader;
 #[path = "hirc_node_source_routing.rs"]
 mod routing;
 #[path = "hirc_node_source_rtpc.rs"]
-mod rtpc;
+pub(in crate::hirc_view) mod rtpc;
 #[path = "hirc_node_source_state.rs"]
 mod state;
 

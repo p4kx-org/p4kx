@@ -16,6 +16,9 @@ use crate::{MediaError, schema_merge};
 
 use super::{ACTION_PAYLOAD, Binding, CONTAINER_PAYLOAD, SOUND_PAYLOAD};
 
+#[path = "audio_schema_attenuation.rs"]
+mod attenuation;
+
 const DIALOGUE_PAYLOAD: &str = "DialogueEventPayload";
 
 pub(super) fn insert_payload(base: &mut Value) -> Result<(), MediaError> {
@@ -23,7 +26,8 @@ pub(super) fn insert_payload(base: &mut Value) -> Result<(), MediaError> {
         base,
         DIALOGUE_PAYLOAD,
         schema_merge::serialized_payload::<DialogueEventPayload<'static>>(),
-    )
+    )?;
+    attenuation::insert_payload(base)
 }
 
 const ACTION: Binding = Binding::exact(
@@ -50,12 +54,51 @@ const ACTION_TARGET_CANDIDATE: Binding = Binding::exact(
     StatusRule::Complete,
 );
 
-pub(super) const fn bindings() -> [Binding; 13] {
+pub(super) const fn bindings() -> [Binding; 17] {
+    let [
+        sound,
+        media_resolution,
+        media_candidate,
+        loose_resolution,
+        loose_candidate,
+    ] = sound_bindings();
     let [event, argument, node] = dialogue_bindings();
+    let [summary, selector, curve, point] = attenuation::bindings();
     [
         ACTION,
         ACTION_TARGET_RESOLUTION,
         ACTION_TARGET_CANDIDATE,
+        sound,
+        media_resolution,
+        media_candidate,
+        loose_resolution,
+        loose_candidate,
+        Binding::exact(
+            CONTAINER_PAYLOAD,
+            audio_bank_hirc_container::NAMESPACE,
+            "bank-hirc-container",
+            2,
+            StatusRule::MalformedLayout,
+        ),
+        Binding::exact(
+            CONTAINER_PAYLOAD,
+            audio_bank_hirc_container::CHILD_NAMESPACE,
+            "bank-hirc-container-child",
+            3,
+            StatusRule::Complete,
+        ),
+        event,
+        argument,
+        node,
+        summary,
+        selector,
+        curve,
+        point,
+    ]
+}
+
+const fn sound_bindings() -> [Binding; 5] {
+    [
         Binding::exact(
             SOUND_PAYLOAD,
             audio_bank_hirc_sound::NAMESPACE,
@@ -91,23 +134,6 @@ pub(super) const fn bindings() -> [Binding; 13] {
             3,
             StatusRule::Complete,
         ),
-        Binding::exact(
-            CONTAINER_PAYLOAD,
-            audio_bank_hirc_container::NAMESPACE,
-            "bank-hirc-container",
-            2,
-            StatusRule::MalformedLayout,
-        ),
-        Binding::exact(
-            CONTAINER_PAYLOAD,
-            audio_bank_hirc_container::CHILD_NAMESPACE,
-            "bank-hirc-container-child",
-            3,
-            StatusRule::Complete,
-        ),
-        event,
-        argument,
-        node,
     ]
 }
 

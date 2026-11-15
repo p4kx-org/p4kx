@@ -8,6 +8,7 @@ use crate::bank_reader::SectionReader;
 use crate::bank_structure::{HircEnvelope, OBJECT_HEADER_LEN, OBJECT_ID_LEN};
 use crate::hirc_action::{self, ActionTarget};
 use crate::hirc_actor_mixer::{self, ActorMixer};
+use crate::hirc_attenuation::{self, BankAttenuationFields};
 use crate::hirc_container;
 use crate::hirc_event;
 use crate::hirc_layout::has_decoder;
@@ -221,6 +222,8 @@ pub enum HircValue {
     MusicSwitch(Box<MusicSwitch>),
     /// A music playlist container, in bank version 154.
     MusicPlaylist(Box<MusicPlaylist>),
+    /// A version-154 attenuation whose declared fields occupy the original body.
+    Attenuation,
     /// Any other object, or a Sound or container of another bank version; its body is kept raw.
     Raw,
     /// A Sound, Action, Event, container or music object whose body does not hold its fields; its
@@ -341,6 +344,10 @@ fn value(
         }
         HircKind::MusicPlaylist if version == CONTAINER_VERSION => {
             HircValue::MusicPlaylist(Box::new(hirc_music_parse::playlist(fields)?))
+        }
+        HircKind::Attenuation if version == hirc_attenuation::VERSION => {
+            hirc_attenuation::scan(fields, &mut BankAttenuationFields::default())?;
+            HircValue::Attenuation
         }
         _ => HircValue::Raw,
     })

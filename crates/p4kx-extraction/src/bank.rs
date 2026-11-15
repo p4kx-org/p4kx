@@ -37,15 +37,17 @@ pub use p4kx_audio::{
     BankNodeUserAuxBuses,
 };
 pub use p4kx_audio::{
+    BankAttenuationCone, BankAttenuationCurve, BankAttenuationFields, BankAttenuationPoints,
+    BankDialogueEventFields, BankDialogueEventRow, BankDialogueEventRows, BankDialogueNode,
+    BankDialogueTree, BankDialogueTreeCoverage, BankHircAttenuation, BankHircDialogueEvent,
+    BankHircMusicSwitch, BankMusicSwitchBranch, BankMusicSwitchFields, BankMusicSwitchGroup,
+    BankMusicSwitchNode, BankMusicSwitchRead, BankMusicSwitchRow, BankMusicSwitchRows,
+    BankMusicSwitchTarget,
+};
+pub use p4kx_audio::{
     BankBlendAssociation, BankBlendAssociationFields, BankBlendAssociations,
     BankBlendContainerFields, BankBlendExtent, BankBlendLayer, BankBlendLayerFields,
     BankBlendLayers, BankBlendPoint, BankBlendPointRows,
-};
-pub use p4kx_audio::{
-    BankDialogueEventFields, BankDialogueEventRow, BankDialogueEventRows, BankDialogueNode,
-    BankDialogueTree, BankDialogueTreeCoverage, BankHircDialogueEvent, BankHircMusicSwitch,
-    BankMusicSwitchBranch, BankMusicSwitchFields, BankMusicSwitchGroup, BankMusicSwitchNode,
-    BankMusicSwitchRead, BankMusicSwitchRow, BankMusicSwitchRows, BankMusicSwitchTarget,
 };
 pub use p4kx_audio::{
     BankGraphPoint, BankGraphPointRows, BankMusicTrackAutomation, BankMusicTrackAutomationRows,

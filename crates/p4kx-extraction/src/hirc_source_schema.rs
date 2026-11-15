@@ -6,6 +6,7 @@ use std::borrow::Cow;
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 
 use super::action::ActionSourceSchema;
+use super::attenuation::AttenuationSourceSchema;
 use super::blend::BlendSourceSchema;
 use super::dto::DialogueSourceSchema;
 use super::music_track::MusicTrackSourceSchema;
@@ -23,6 +24,7 @@ impl JsonSchema for ObjectSourceSchema {
     fn json_schema(generator: &mut SchemaGenerator) -> Schema {
         let alternatives = [
             generator.subschema_for::<DialogueSourceSchema>(),
+            generator.subschema_for::<AttenuationSourceSchema>(),
             generator.subschema_for::<RandomSequenceSchema>(),
             generator.subschema_for::<SwitchSourceSchema>(),
             generator.subschema_for::<BlendSourceSchema>(),

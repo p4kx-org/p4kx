@@ -28,6 +28,7 @@ mod audio_bank_action_properties;
 mod audio_bank_action_property_payload;
 mod audio_bank_actor_mixer;
 mod audio_bank_actor_mixer_payload;
+mod audio_bank_attenuation;
 mod audio_bank_blend_association;
 mod audio_bank_blend_container;
 mod audio_bank_blend_layer;

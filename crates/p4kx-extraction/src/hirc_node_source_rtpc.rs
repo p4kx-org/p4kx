@@ -41,10 +41,10 @@ pub(in crate::hirc_view) struct Rtpc<Rows> {
     rows: Rows,
 }
 
-pub(super) type RtpcSchema = Rtpc<Vec<RtpcRow>>;
+pub(in crate::hirc_view) type RtpcSchema = Rtpc<Vec<RtpcRow>>;
 
 impl<'input, R> Rtpc<RtpcRows<'_, 'input, R>> {
-    pub(super) fn read<'view, E: serde::ser::Error>(
+    pub(in crate::hirc_view) fn read<'view, E: serde::ser::Error>(
         origins: &'view ObjectOrigins,
         rows: BankRtpcRows<'input, R>,
     ) -> Result<Rtpc<RtpcRows<'view, 'input, R>>, E> {
@@ -72,7 +72,7 @@ impl<'input, R> Rtpc<RtpcRows<'_, 'input, R>> {
     }
 }
 
-pub(super) struct RtpcRows<'view, 'input, R> {
+pub(in crate::hirc_view) struct RtpcRows<'view, 'input, R> {
     origins: &'view ObjectOrigins,
     rows: RefCell<BankRtpcRows<'input, R>>,
 }

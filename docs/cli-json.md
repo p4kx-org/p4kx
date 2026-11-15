@@ -1745,6 +1745,10 @@ a container, the tracks of a segment, the segments of a playlist and, for a musi
 IDs of its sources. `detail` depends on the type and is `null` for an event (its actions are the
 children) and for undecoded, unsupported and malformed objects.
 
+Version-154 Attenuation objects include `source_fields` with original flags, optional cone
+words, signed curve selectors, ordered conversion curves and initial RTPC fields.
+[Original soundbank attenuation](audio-attenuation.md)
+
 DialogueEvent objects include `source_fields` with the checked original declaration. Its
 `layout` gives decoded, malformed or unsupported source coverage. The original object `status`
 describes the playback reader's coverage. The `fields` member includes authored header words and

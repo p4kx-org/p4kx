@@ -205,6 +205,7 @@ impl<'i> Walk<'_, 'i> {
             HircValue::Sound(source) => self.sound(*source, MusicClipFeatures::default()),
             HircValue::ActorMixer(_)
             | HircValue::State(_)
+            | HircValue::Attenuation
             | HircValue::Malformed(_)
             | HircValue::Raw => self.unresolved_object(object),
         }
@@ -213,7 +214,10 @@ impl<'i> Walk<'_, 'i> {
     fn unresolved_object(&mut self, object: &HircObject) {
         let reason = match &object.value {
             HircValue::Malformed(error)
-                if !matches!(object.kind, HircKind::State | HircKind::ActorMixer) =>
+                if !matches!(
+                    object.kind,
+                    HircKind::State | HircKind::ActorMixer | HircKind::Attenuation
+                ) =>
             {
                 BreakReason::Malformed(error.clone())
             }

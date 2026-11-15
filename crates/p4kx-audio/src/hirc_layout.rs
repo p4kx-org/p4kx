@@ -35,6 +35,7 @@ pub(crate) const fn has_decoder(kind: HircKind) -> bool {
             | HircKind::MusicTrack
             | HircKind::MusicSwitch
             | HircKind::MusicPlaylist
+            | HircKind::Attenuation
     )
 }
 

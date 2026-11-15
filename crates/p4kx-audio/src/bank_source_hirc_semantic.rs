@@ -6,6 +6,7 @@ use std::io::{Read, Seek};
 use crate::BankHircState;
 use crate::BankSoundStateRead;
 use crate::bank_source_actor_mixer::{self, BankHircActorMixer};
+use crate::bank_source_attenuation::{self, BankHircAttenuation};
 use crate::bank_source_container::{self, BankHircContainer, BankHircContainerNode};
 use crate::bank_source_dialogue_event::{self, BankHircDialogueEvent};
 use crate::bank_source_event;
@@ -15,6 +16,7 @@ use crate::bank_source_music_switch::{self, BankHircMusicSwitch};
 use crate::bank_source_music_track::{self, BankHircMusicTrack};
 use crate::bank_source_sound::{self, BankHircSound};
 use crate::hirc::CONTAINER_VERSION;
+use crate::hirc_attenuation;
 use crate::hirc_container::Layout as ContainerLayout;
 use crate::hirc_source;
 use crate::{BankHircEvent, BankObservedHeader, BankReadError, HircKind};
@@ -56,6 +58,8 @@ pub enum BankHircSemantic<'input, R> {
     ActorMixer(Box<BankHircActorMixer<'input, R>>),
     /// Owner-bound `DialogueEvent` arguments and checked physical decision nodes.
     DialogueEvent(Box<BankHircDialogueEvent<'input, R>>),
+    /// Owner-bound attenuation fields and ordered conversion and RTPC points.
+    Attenuation(Box<BankHircAttenuation<'input, R>>),
     /// Owner-bound music playlist interpretation and ordered values.
     MusicPlaylist(Box<BankHircMusicPlaylist<'input, R>>),
     /// Owner-bound music segment interpretation and ordered values.
@@ -82,6 +86,7 @@ impl<R> BankHircSemantic<'_, R> {
             Self::ContainerWithNode(container) => container.object(),
             Self::ActorMixer(actor) => actor.object(),
             Self::DialogueEvent(dialogue) => dialogue.object(),
+            Self::Attenuation(attenuation) => attenuation.object(),
             Self::MusicPlaylist(playlist) => &playlist.object,
             Self::MusicSegment(segment) => &segment.object,
             Self::MusicSwitch(switch) => &switch.object,
@@ -164,6 +169,12 @@ impl<R: Read + Seek> BankHirc<'_, R> {
         let kind = object.kind(version);
         if version >= CONTAINER_VERSION {
             match kind {
+                HircKind::Attenuation
+                    if version == hirc_attenuation::VERSION && mode == NodeMode::SourceFields =>
+                {
+                    return bank_source_attenuation::observe(self.input, &mut self.stopped, object)
+                        .map(|attenuation| BankHircSemantic::Attenuation(Box::new(attenuation)));
+                }
                 HircKind::DialogueEvent
                     if version == CONTAINER_VERSION && mode == NodeMode::SourceFields =>
                 {
