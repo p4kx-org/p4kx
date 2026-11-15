@@ -290,6 +290,10 @@ impl fmt::Debug for SourceUses {
 }
 
 #[cfg(test)]
+#[path = "source_inventory_binding_tests.rs"]
+mod binding_tests;
+
+#[cfg(test)]
 mod tests {
     use super::SourceUses;
     use crate::{InputScope, SourceEvidenceError, SourceInput, SourceLocation, SourceUseRole};

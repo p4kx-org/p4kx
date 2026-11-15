@@ -1,12 +1,18 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::sync::Arc;
+
 use p4kx_archive::{
     DeclaredEncryption, EncryptionDeclarationSource, EntryRecordFormat, SourceEncryption,
 };
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::Serialize;
 
+#[path = "source_inventory_rows.rs"]
+mod rows;
+
+use self::rows::FrozenRows;
 use crate::projection_schema;
 use crate::source_archive_binding::ArchiveSourceBinding;
 use crate::source_details::SourceDetails;
@@ -261,21 +267,55 @@ impl PhysicalSource {
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = projection_schema::require_properties)]
 pub struct SourceInventory {
-    pub(crate) sources: Vec<PhysicalSource>,
-    pub(crate) uses: Vec<SourceUseDescription>,
+    #[schemars(with = "Vec<PhysicalSource>")]
+    sources: FrozenRows<PhysicalSource>,
+    #[schemars(with = "Vec<SourceUseDescription>")]
+    uses: FrozenRows<SourceUseDescription>,
 }
 
 impl SourceInventory {
+    pub(crate) fn new(
+        sources: Vec<Arc<PhysicalSource>>,
+        uses: Vec<Arc<SourceUseDescription>>,
+    ) -> Self {
+        Self {
+            sources: FrozenRows::new(sources),
+            uses: FrozenRows::new(uses),
+        }
+    }
+
     /// Returns the physical sources in stable identifier order.
     #[must_use]
     pub fn sources(&self) -> &[PhysicalSource] {
-        &self.sources
+        self.sources.as_slice()
+    }
+
+    /// Borrows the physical sources in stable identifier order.
+    pub fn iter_sources(&self) -> impl ExactSizeIterator<Item = &PhysicalSource> {
+        self.sources.iter()
+    }
+
+    /// Returns the number of physical sources.
+    #[must_use]
+    pub fn source_count(&self) -> usize {
+        self.sources.len()
     }
 
     /// Returns all observed uses, including separately classified attempts and references.
     #[must_use]
     pub fn uses(&self) -> &[SourceUseDescription] {
-        &self.uses
+        self.uses.as_slice()
+    }
+
+    /// Borrows the observed uses in stable identifier order.
+    pub fn iter_uses(&self) -> impl ExactSizeIterator<Item = &SourceUseDescription> {
+        self.uses.iter()
+    }
+
+    /// Returns the number of observed uses.
+    #[must_use]
+    pub fn use_count(&self) -> usize {
+        self.uses.len()
     }
 }
 

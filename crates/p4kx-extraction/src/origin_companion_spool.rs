@@ -123,14 +123,14 @@ impl StagedOriginCompanion {
         binding: &OriginArtifactBinding,
     ) -> io::Result<()> {
         row(&mut writer, &OriginCompanionRow::header(binding))?;
-        write_sources(&mut writer, self.sources.sources())?;
+        write_sources(&mut writer, self.sources.iter_sources())?;
         self.uses.rewind()?;
         io::copy(&mut self.uses, &mut writer)?;
         self.fields.rewind()?;
         io::copy(&mut self.fields, &mut writer)?;
         write_end_counts(
             &mut writer,
-            self.sources.sources().len() as u64,
+            self.sources.source_count() as u64,
             self.use_count,
             self.field_count,
         )

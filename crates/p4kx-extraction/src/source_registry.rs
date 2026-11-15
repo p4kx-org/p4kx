@@ -41,7 +41,7 @@ pub(crate) enum InputIdentity {
 pub(crate) struct SourceRegistry {
     pub(crate) identity: Arc<()>,
     pub(crate) inputs: Vec<InputIdentity>,
-    pub(crate) sources: BTreeMap<PhysicalSourceRef, PhysicalSource>,
+    pub(crate) sources: BTreeMap<PhysicalSourceRef, Arc<PhysicalSource>>,
     pub(crate) uses: BTreeMap<SourceUseRef, Arc<SourceUseDescription>>,
     use_references: UseReferences,
 }
@@ -162,7 +162,7 @@ impl SourceRegistry {
                 let id = PhysicalSourceRef(format!("a{index}:file"));
                 if !self.sources.contains_key(&id) {
                     let source = source_registration::archive_file(self, id.clone(), byte_length);
-                    self.sources.insert(id.clone(), source);
+                    self.sources.insert(id.clone(), Arc::new(source));
                 }
                 RegisteredSource {
                     id,
@@ -192,9 +192,8 @@ impl SourceRegistry {
     ) -> PhysicalSourceRef {
         let input = self.archive_input(origin);
         let id = PhysicalSourceRef(format!("a{input}:directory"));
-        self.sources
-            .entry(id.clone())
-            .or_insert_with(|| PhysicalSource {
+        self.sources.entry(id.clone()).or_insert_with(|| {
+            Arc::new(PhysicalSource {
                 id: id.clone(),
                 ancestors: Vec::new(),
                 stored_encryption: SourceEncryptionState::Unencrypted,
@@ -202,7 +201,8 @@ impl SourceRegistry {
                 source: PhysicalSourceKind::ArchiveDirectory(ArchiveDirectorySource {
                     admitted_entry_count,
                 }),
-            });
+            })
+        });
         id
     }
 
@@ -225,7 +225,7 @@ impl SourceRegistry {
         let id = PhysicalSourceRef(format!("f{index}"));
         if !self.sources.contains_key(&id) {
             let source = source_registration::file(self, id.clone(), origin);
-            self.sources.insert(id.clone(), source);
+            self.sources.insert(id.clone(), Arc::new(source));
         }
         RegisteredSource {
             id,
@@ -246,12 +246,14 @@ impl SourceRegistry {
     }
 
     pub(crate) fn unknown(&mut self, id: PhysicalSourceRef, ancestors: Vec<PhysicalSourceRef>) {
-        self.sources.entry(id.clone()).or_insert(PhysicalSource {
-            id,
-            ancestors,
-            stored_encryption: SourceEncryptionState::Unknown,
-            binding: None,
-            source: PhysicalSourceKind::Unknown,
+        self.sources.entry(id.clone()).or_insert_with(|| {
+            Arc::new(PhysicalSource {
+                id,
+                ancestors,
+                stored_encryption: SourceEncryptionState::Unknown,
+                binding: None,
+                source: PhysicalSourceKind::Unknown,
+            })
         });
     }
 

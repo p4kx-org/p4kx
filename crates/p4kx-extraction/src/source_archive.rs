@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::sync::Arc;
+
 use p4kx_archive::{
     EntryOrigin, EntryOriginStep, ObservedEntry, ObservedEntryBinding, SourceEncryption,
 };
@@ -274,7 +276,7 @@ impl SourceRegistry {
         let InputIdentity::Archive { source_refs, .. } = self.inputs.get(input)? else {
             return None;
         };
-        let source = self.sources.get(source_refs.get(original)?)?;
+        let source = self.sources.get(source_refs.get(original)?)?.as_ref();
         source
             .binding
             .as_ref()
@@ -343,11 +345,12 @@ impl SourceRegistry {
                 },
             };
             source.binding = binding;
-            self.sources.insert(id.clone(), source);
+            self.sources.insert(id.clone(), Arc::new(source));
         } else if let Some(source) = self.sources.get_mut(id)
             && source.binding.is_none()
+            && binding.is_some()
         {
-            source.binding = binding;
+            Arc::make_mut(source).binding = binding;
         }
     }
 }

@@ -168,6 +168,8 @@ fn sparse_to_full_upgrades_original_row_and_never_downgrades_or_rebinds_uses() -
         std::slice::from_ref(&original_use),
         true,
     );
+    let initial = sources.freeze()?;
+    let initial_wire = serde_json::to_vec(&initial)?;
     let full = source(&sources, &archive, SourceDetails::Full)?;
     assert_eq!(
         sparse.source_ref(),
@@ -185,8 +187,10 @@ fn sparse_to_full_upgrades_original_row_and_never_downgrades_or_rebinds_uses() -
         serde_json::to_vec(&sources.value(SourceValue::Present(3_u32), &[repeated], true))?,
         "field marker and original contribution closure are independent of retained detail level"
     );
-    assert_closed(&sources.freeze()?)?;
-    let full_wire = serde_json::to_vec(&sources.freeze()?)?;
+    let full_snapshot = sources.freeze()?;
+    assert_closed(&full_snapshot)?;
+    let full_wire = serde_json::to_vec(&full_snapshot)?;
+    assert_physical_row_upgraded(&initial, &initial_wire, &full_snapshot)?;
     let again = source(&sources, &archive, SourceDetails::CaptureLimited)?;
     assert_eq!(
         full.source_ref(),
@@ -211,6 +215,33 @@ fn sparse_to_full_upgrades_original_row_and_never_downgrades_or_rebinds_uses() -
     assert_eq!(
         wire["sources"][0]["kind"], "archiveEntry",
         "full upgrade replaces proof-only variant"
+    );
+    Ok(())
+}
+
+fn assert_physical_row_upgraded(
+    initial: &SourceInventory,
+    initial_wire: &[u8],
+    full: &SourceInventory,
+) -> TestResult {
+    assert_eq!(
+        initial_wire,
+        serde_json::to_vec(initial)?,
+        "full observation cannot change the frozen sparse physical row"
+    );
+    let sparse_source = initial
+        .iter_sources()
+        .next()
+        .ok_or("frozen sparse source")?;
+    let full_source = full.iter_sources().next().ok_or("frozen full source")?;
+    assert_eq!(
+        sparse_source.id(),
+        full_source.id(),
+        "the exact original source ID"
+    );
+    assert!(
+        !std::ptr::eq(sparse_source, full_source),
+        "upgraded physical facts replace the row only for new snapshots"
     );
     Ok(())
 }

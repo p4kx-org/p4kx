@@ -234,14 +234,17 @@ pub(crate) fn write_inventory(
     writer: &mut impl Write,
     inventory: &SourceInventory,
 ) -> io::Result<()> {
-    write_sources(writer, inventory.sources())?;
-    for source_use in inventory.uses() {
+    write_sources(writer, inventory.iter_sources())?;
+    for source_use in inventory.iter_uses() {
         row(writer, &OriginCompanionRow::SourceUse { source_use })?;
     }
     Ok(())
 }
 
-pub(crate) fn write_sources(writer: &mut impl Write, sources: &[PhysicalSource]) -> io::Result<()> {
+pub(crate) fn write_sources<'source>(
+    writer: &mut impl Write,
+    sources: impl IntoIterator<Item = &'source PhysicalSource>,
+) -> io::Result<()> {
     for source in sources {
         row(writer, &OriginCompanionRow::Source { source })?;
     }
@@ -255,8 +258,8 @@ pub(crate) fn write_end(
 ) -> io::Result<()> {
     write_end_counts(
         writer,
-        inventory.sources().len() as u64,
-        inventory.uses().len() as u64,
+        inventory.source_count() as u64,
+        inventory.use_count() as u64,
         count,
     )
 }

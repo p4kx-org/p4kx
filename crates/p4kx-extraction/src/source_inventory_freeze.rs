@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::convert::Infallible;
+use std::sync::Arc;
 
 use thiserror::Error;
 
@@ -35,7 +36,7 @@ impl SourceUses {
         }
     }
 
-    /// Freezes the inventory and checks before cloning each physical source or use row.
+    /// Freezes the inventory and checks before retaining each physical source or use row.
     /// The checkpoint runs under the inventory lock and must not re-enter this inventory.
     ///
     /// # Errors
@@ -46,23 +47,21 @@ impl SourceUses {
     ) -> Result<SourceInventory, SourceInventoryFreezeError<E>> {
         check().map_err(SourceInventoryFreezeError::Interrupted)?;
         let registry = source_evidence_error::lock(&self.registry)?;
-        let sources = registry
-            .sources
-            .values()
-            .map(|source| {
-                check().map_err(SourceInventoryFreezeError::Interrupted)?;
-                Ok(source.clone())
-            })
-            .collect::<Result<_, SourceInventoryFreezeError<E>>>()?;
-        let uses = registry
-            .uses
-            .values()
-            .map(|description| {
-                check().map_err(SourceInventoryFreezeError::Interrupted)?;
-                Ok(description.as_ref().clone())
-            })
-            .collect::<Result<_, SourceInventoryFreezeError<E>>>()?;
+        let sources = retain_rows(registry.sources.values(), &mut check)?;
+        let uses = retain_rows(registry.uses.values(), &mut check)?;
         drop(registry);
-        Ok(SourceInventory { sources, uses })
+        Ok(SourceInventory::new(sources, uses))
     }
+}
+
+fn retain_rows<'row, Row: 'row, E>(
+    rows: impl ExactSizeIterator<Item = &'row Arc<Row>>,
+    check: &mut impl FnMut() -> Result<(), E>,
+) -> Result<Vec<Arc<Row>>, SourceInventoryFreezeError<E>> {
+    let mut snapshot = Vec::with_capacity(rows.len());
+    for row in rows {
+        check().map_err(SourceInventoryFreezeError::Interrupted)?;
+        snapshot.push(Arc::clone(row));
+    }
+    Ok(snapshot)
 }
