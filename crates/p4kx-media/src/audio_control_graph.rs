@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::cell::RefCell;
+use std::cell::{OnceCell, RefCell};
 use std::collections::{HashMap, TryReserveError};
 
 use p4kx_extraction::DecimalU64;
@@ -65,6 +65,7 @@ struct Key {
 struct Target {
     site: Site,
     input: MediaOriginInput,
+    declaration_origin: OnceCell<OriginContributions>,
 }
 
 struct Query {
@@ -126,6 +127,7 @@ impl Scope {
         targets.push(Target {
             site,
             input: input.clone(),
+            declaration_origin: OnceCell::new(),
         });
         Ok(())
     }

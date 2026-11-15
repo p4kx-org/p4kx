@@ -9,7 +9,11 @@ use serde_json::{Value, json};
 use crate::support;
 use crate::support::audio_provider::{Origins, TestResult};
 
-const QUERY: &str = r#"<ATLConfig><AudioPreloads><ATLPreloadRequest atl_name="Request"><RTPCDependees><ATLRTPCDependee atl_name = 'SharedRtpc'/><ATLRTPCDependee atl_name='UnresolvedFixture'/></RTPCDependees></ATLPreloadRequest></AudioPreloads></ATLConfig>"#;
+const QUERY: &str = r#"<ATLConfig><AudioPreloads><ATLPreloadRequest atl_name="Request"><RTPCDependees>
+<ATLRTPCDependee atl_name = 'SharedRtpc'/>
+<ATLRTPCDependee atl_name='UnresolvedFixture'/>
+<ATLRTPCDependee atl_name= "SharedRtpc"/>
+</RTPCDependees></ATLPreloadRequest></AudioPreloads></ATLConfig>"#;
 const PLAIN_TARGET: &str =
     r#"<ATLConfig><AudioRTPCs><ATLRtpc atl_name="SharedRtpc"/></AudioRTPCs></ATLConfig>"#;
 const ENCRYPTED_NONMATCH: &str =
@@ -20,16 +24,12 @@ const ENCRYPTED_MATCH: &str = r#"<ATLConfig><AudioRTPCs><ATLRtpc unused="keep" a
 fn atl_observed_candidates_cite_only_the_query_and_actual_name_matches() -> TestResult {
     check_observed_matches(
         ENCRYPTED_NONMATCH,
-        &[
-            (0, "atl_name = 'SharedRtpc'"),
-            (1, r#"atl_name="SharedRtpc""#),
-        ],
+        &[(1, r#"atl_name="SharedRtpc""#)],
         false,
     )?;
     check_observed_matches(
         ENCRYPTED_MATCH,
         &[
-            (0, "atl_name = 'SharedRtpc'"),
             (1, r#"atl_name="SharedRtpc""#),
             (2, "atl_name= 'SharedRtpc'"),
         ],
@@ -70,10 +70,31 @@ fn check_observed_matches(
     };
     let index = support::published(p4kx_media::export(&archive, &output, &options)?)?;
     let rows = support::records(&output, &index, "audio-control.jsonl")?;
+    let origins = Origins::read(&output.join(&index.artifact_base))?;
+    for query in [
+        (0, "atl_name = 'SharedRtpc'"),
+        (2, r#"atl_name= "SharedRtpc""#),
+    ] {
+        check_lookup(&rows, &origins, &documents, query, expected, encrypted)?;
+    }
+    check_shared_directory(&output.join(&index.artifact_base), &index, &rows, &origins)
+}
+
+fn check_lookup(
+    rows: &[p4kx_media::MediaRecord],
+    origins: &Origins,
+    documents: &[&str],
+    (query, declaration): (u64, &str),
+    targets: &[(usize, &str)],
+    encrypted: bool,
+) -> TestResult {
     let (ordinal, summary) = rows
         .iter()
         .enumerate()
-        .find(|(_, row)| row.subresource.namespace == "audio-control-reference-resolution")
+        .find(|(_, row)| {
+            row.subresource.namespace == "audio-control-reference-resolution"
+                && row.subresource.indices == [query]
+        })
         .ok_or("summary of the authored lookup")?;
     assert_eq!(
         summary.data.pointer("/payload/candidates_complete"),
@@ -82,10 +103,9 @@ fn check_observed_matches(
     );
     assert_eq!(
         summary.data.pointer("/payload/observed_candidates"),
-        Some(&json!((expected.len() - 1).to_string())),
+        Some(&json!(targets.len().to_string())),
         "each matching physical declaration contributes one candidate"
     );
-    let origins = Origins::read(&output.join(&index.artifact_base))?;
     let receipt = origins.field_in(
         "records",
         Some("audio-control"),
@@ -93,8 +113,44 @@ fn check_observed_matches(
         "/data/payload/observed_candidates",
         encrypted,
     )?;
-    check_uses(&origins, receipt, &documents, expected)?;
-    check_shared_directory(&output.join(&index.artifact_base), &index, &rows, &origins)
+    let expected: Vec<_> = std::iter::once((0, declaration))
+        .chain(targets.iter().copied())
+        .collect();
+    check_uses(origins, receipt, documents, &expected)?;
+    check_candidate_origins(rows, origins, documents, query, targets)
+}
+
+fn check_candidate_origins(
+    rows: &[p4kx_media::MediaRecord],
+    origins: &Origins,
+    documents: &[&str],
+    query: u64,
+    targets: &[(usize, &str)],
+) -> TestResult {
+    let candidates: Vec<_> = rows
+        .iter()
+        .enumerate()
+        .filter(|(_, row)| {
+            row.subresource.namespace == "audio-control-reference-candidate"
+                && row.subresource.indices.first() == Some(&query)
+        })
+        .collect();
+    assert_eq!(
+        candidates.len(),
+        targets.len(),
+        "each matching physical declaration has its own candidate row"
+    );
+    for ((ordinal, _), target) in candidates.into_iter().zip(targets) {
+        let receipt = origins.field_in(
+            "records",
+            Some("audio-control"),
+            ordinal,
+            "/data/payload/target_element_index",
+            target.0 == 2,
+        )?;
+        check_uses(origins, receipt, documents, std::slice::from_ref(target))?;
+    }
+    Ok(())
 }
 
 fn check_shared_directory(
@@ -179,8 +235,8 @@ fn check_query_fields(
     }
     assert_eq!(
         query_uses.len(),
-        2,
-        "the two queries retain distinct local uses"
+        3,
+        "each query retains its distinct local use"
     );
     Ok(())
 }

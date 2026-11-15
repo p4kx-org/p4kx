@@ -212,7 +212,7 @@ fn query_origins(
     let mut observed = writer.capture_origins();
     observed.include(&query.evidence, writer)?;
     for target in targets {
-        observed.include(&target_declaration_origin(target, writer)?, writer)?;
+        observed.include(target_declaration_origin(target, writer)?, writer)?;
     }
     records::field(
         &mut prepared,
@@ -267,7 +267,7 @@ fn candidate(
     let proof = target_declaration_origin(target, writer)?;
     let mut link = writer.capture_origins();
     link.include(&query.evidence, writer)?;
-    link.include(&proof, writer)?;
+    link.include(proof, writer)?;
     let mut prepared = origins::prepared(owner, link.finish(), writer)?;
     records::field(
         &mut prepared,
@@ -294,17 +294,21 @@ fn candidate(
     )
 }
 
-fn target_declaration_origin(
-    target: &Target,
+fn target_declaration_origin<'target>(
+    target: &'target Target,
     writer: &MediaWriter<'_>,
-) -> Result<OriginContributions, MediaError> {
-    origins::capture(
+) -> Result<&'target OriginContributions, MediaError> {
+    if let Some(proof) = target.declaration_origin.get() {
+        return Ok(proof);
+    }
+    let proof = origins::capture(
         &target.input,
         target.site.position,
         "declaration",
         SourceUseRole::Selector,
         writer,
-    )
+    )?;
+    Ok(target.declaration_origin.get_or_init(|| proof))
 }
 
 fn entry_index(
