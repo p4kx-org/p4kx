@@ -86,10 +86,10 @@ impl Visitor<'_> for ReferenceSeed<'_> {
             ));
         }
         self.budget
-            .charge(value.len().saturating_add(size_of::<SourceUseRef>()))?;
+            .charge(value.len().saturating_add(size_of::<String>()))?;
         let mut owned = String::new();
         owned.try_reserve_exact(value.len()).map_err(E::custom)?;
         owned.push_str(value);
-        Ok(SourceUseRef(owned))
+        Ok(SourceUseRef::decoded(owned.into_boxed_str()))
     }
 }

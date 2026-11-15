@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::cmp::Ordering;
+use std::fmt;
+use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
 use schemars::JsonSchema;
@@ -12,15 +15,79 @@ use crate::source_inventory::{PhysicalSourceRef, SourceEncryptionState};
 use crate::{DecimalU64, Language};
 
 /// A document-local source-use identifier, independent of addresses or pointer values.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, JsonSchema)]
+#[derive(Clone, Serialize, JsonSchema)]
 #[serde(transparent)]
-pub struct SourceUseRef(pub(crate) String);
+pub struct SourceUseRef(#[schemars(with = "String")] ReferenceText);
+
+#[derive(Clone)]
+enum ReferenceText {
+    Registered(Arc<String>),
+    Decoded(Box<str>),
+}
+
+impl ReferenceText {
+    fn as_str(&self) -> &str {
+        match self {
+            Self::Registered(text) => text,
+            Self::Decoded(text) => text,
+        }
+    }
+}
+
+impl Serialize for ReferenceText {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.as_str())
+    }
+}
 
 impl SourceUseRef {
+    pub(crate) fn registered(text: String) -> Self {
+        Self(ReferenceText::Registered(Arc::new(text)))
+    }
+
+    pub(crate) const fn decoded(text: Box<str>) -> Self {
+        Self(ReferenceText::Decoded(text))
+    }
+
     /// Returns the stable document-local reference text.
     #[must_use]
     pub fn as_str(&self) -> &str {
-        &self.0
+        self.0.as_str()
+    }
+}
+
+impl fmt::Debug for SourceUseRef {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_tuple("SourceUseRef")
+            .field(&self.as_str())
+            .finish()
+    }
+}
+
+impl PartialEq for SourceUseRef {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_str() == other.as_str()
+    }
+}
+
+impl Eq for SourceUseRef {}
+
+impl Hash for SourceUseRef {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.as_str().hash(state);
+    }
+}
+
+impl PartialOrd for SourceUseRef {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for SourceUseRef {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.as_str().cmp(other.as_str())
     }
 }
 
@@ -154,7 +221,12 @@ impl SourceLocation {
             } => format!("d{record_index}:{}:{field}", field.len()),
             Self::LocalizationLookup { language, selector } => {
                 let code = language.code();
-                format!("q{}:{code}{}:{}", code.len(), selector.0.len(), selector.0)
+                format!(
+                    "q{}:{code}{}:{}",
+                    code.len(),
+                    selector.as_str().len(),
+                    selector.as_str()
+                )
             }
             Self::ArchiveDirectoryPaths {
                 start_entry_index,
@@ -288,7 +360,7 @@ mod tests {
     -> Result<(), Box<dyn std::error::Error>> {
         let location = SourceLocation::LocalizationLookup {
             language: Language::English,
-            selector: SourceUseRef("a0:d0:11:description:selector".into()),
+            selector: SourceUseRef::registered("a0:d0:11:description:selector".into()),
         };
         let value = serde_json::to_value(location)?;
         assert_eq!(value["type"], "localizationLookup", "lookup variant");

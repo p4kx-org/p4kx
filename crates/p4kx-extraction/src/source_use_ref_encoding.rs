@@ -30,7 +30,7 @@ pub(crate) fn encode(
     append_counted(&mut key, source.as_str());
     let _written = write!(key, "{scope}{role}");
     append_location(&mut key, location);
-    SourceUseRef(key)
+    SourceUseRef::registered(key)
 }
 
 fn append_location(key: &mut String, location: &SourceLocation) {

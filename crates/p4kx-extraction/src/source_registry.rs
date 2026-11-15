@@ -69,7 +69,7 @@ impl UseReferences {
         if matches!(self, Self::CompactCoordinates) {
             return source_use_ref_encoding::encode(source, scope, role, location);
         }
-        let id = SourceUseRef(format!(
+        let id = SourceUseRef::registered(format!(
             "u{}:{}:{}:{}:{}",
             source.0.len(),
             source.0,
@@ -86,7 +86,7 @@ impl UseReferences {
             .aliases
             .entry(id)
             .or_insert_with(|| {
-                SourceUseRef(batch.map_or_else(
+                SourceUseRef::registered(batch.map_or_else(
                     || format!("u{ordinal}"),
                     |batch| format!("u{batch}.{ordinal}"),
                 ))

@@ -92,7 +92,7 @@ fn locations_with_distinct_coordinates() -> Vec<SourceLocation> {
         for selector in selectors {
             locations.push(SourceLocation::LocalizationLookup {
                 language,
-                selector: SourceUseRef(selector.into()),
+                selector: SourceUseRef::registered(selector.into()),
             });
         }
     }

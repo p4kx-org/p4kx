@@ -1,13 +1,99 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::collections::{BTreeSet, HashSet};
+use std::ptr;
 use std::sync::Arc;
 
 use serde_json::{Value, json};
 
-use crate::{InputScope, SourceInput, SourceLocation, SourceUseRole, SourceUses, SourceValue};
+use crate::{
+    InputScope, SourceInput, SourceLocation, SourceUseRef, SourceUseRole, SourceUses, SourceValue,
+};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
+
+#[test]
+fn field_provenance_shares_reference_text_in_all_registry_modes() -> TestResult {
+    for (sources, expected) in [
+        (SourceUses::new(), "u2:u0:payload:selector:d4:4:name"),
+        (SourceUses::with_compact_coordinates(), "c2:u0psd4:name"),
+        (SourceUses::with_compact_use_refs(), "u0"),
+        (SourceUses::with_batched_use_refs(), "u0.0"),
+    ] {
+        let scope = sources.observe(SourceInput::Unknown, InputScope::Payload)?;
+        let field = SourceLocation::DataForge {
+            record_index: 4,
+            field: "name".to_owned(),
+        };
+        let first = scope.at(field.clone(), SourceUseRole::Selector)?;
+        let second = scope.at(field, SourceUseRole::Conversion)?;
+        let reference = first.reference();
+        let clone = reference.clone();
+        assert!(
+            ptr::eq(reference.as_str(), clone.as_str()),
+            "a reference clone keeps the registered text allocation"
+        );
+        let sourced = sources.value(
+            SourceValue::Present("value"),
+            &[second.clone(), first],
+            true,
+        );
+        let origin = sourced.origin();
+        let distinct = origin.source_uses_refs();
+        let retained = distinct
+            .iter()
+            .find(|candidate| candidate.as_str() == expected)
+            .ok_or("retained selector reference")?;
+        assert!(
+            ptr::eq(retained.as_str(), clone.as_str()),
+            "actual field evidence shares the registered reference text"
+        );
+        assert_ne!(retained, second.reference(), "roles remain distinct");
+        assert_eq!(distinct.len(), 2, "both contributors remain");
+        assert!(distinct.is_sorted(), "reference order stays lexical");
+        assert_eq!(
+            serde_json::to_value(retained)?,
+            json!(expected),
+            "reference wire bytes"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn decoded_reference_storage_preserves_wire_identity_and_inline_size() -> TestResult {
+    assert!(
+        size_of::<SourceUseRef>() <= size_of::<String>(),
+        "reference storage must not grow the reader carrier"
+    );
+    let expected = "reference with é";
+    let registered = SourceUseRef::registered(expected.to_owned());
+    let decoded = SourceUseRef::decoded(expected.into());
+    let smaller = SourceUseRef::registered("earlier reference".to_owned());
+    assert_eq!(
+        registered, decoded,
+        "storage mode has no effect on equality"
+    );
+    assert_eq!(
+        HashSet::from([registered.clone(), decoded.clone()]).len(),
+        1,
+        "storage mode has no effect on hashing"
+    );
+    assert_eq!(
+        BTreeSet::from([registered.clone(), decoded.clone(), smaller.clone()])
+            .into_iter()
+            .collect::<Vec<_>>(),
+        [smaller, registered.clone()],
+        "ordering and duplicate detection use the same UTF-8 text"
+    );
+    assert_eq!(
+        serde_json::to_vec(&registered)?,
+        serde_json::to_vec(&decoded)?,
+        "storage mode leaves the wire representation identical"
+    );
+    Ok(())
+}
 
 #[test]
 fn genuine_handles_share_the_original_row_and_keep_identical_freeze_bytes() -> TestResult {

@@ -141,3 +141,16 @@ The compressed writer prepares a typed Catalog once. It first counts serialized 
 frame header and then streams serialization into the encoder. A second raw file adds storage
 without changing the measured decoded bytes. A comparison with raw writer timing is a separate
 experiment.
+
+For byte sizing without creating a catalog file, set `P4KX_DATA_P4K` to LIVE and
+`P4KX_DATA_P4K_B` to PTU with the ordinary installed-Archive key configuration. Run the focused
+installed-pair test.
+
+```text
+cargo test --release --locked -p p4kx-export --test real_archive -- --ignored --exact --nocapture real_archive_catalog_size::normal_catalog_sizes_for_installed_pair
+```
+
+The test checks the source Build and Archive stamp, measures the same encoder with a fixed time
+and normal health policy, and discards the frame as it is written. Capture the exact producer
+revision and binary hash separately. For section bytes, atomic file publication and actual
+consumer import, use the separate evidence above.
