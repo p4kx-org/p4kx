@@ -48,6 +48,34 @@ pub struct ExportOptions {
     pub animation_skeleton: Option<String>,
     /// Entity selector in the root Archive's preferred DataForge for clip discovery.
     pub animation_entity: Option<String>,
+    /// Exact root Archive CDF or CHR Entry for animation-definition selection.
+    pub animation_model: Option<String>,
+}
+
+fn validate_animation_model(options: &ExportOptions) -> Result<(), MediaError> {
+    let Some(path) = options.animation_model.as_deref() else {
+        return Ok(());
+    };
+    if options.animation_entity.is_some()
+        || !options.kinds.contains(&MediaKind::AnimationDefinition)
+    {
+        return Err(MediaError::Contract(
+            "animation model selection requires explicit animation-definition and no Entity selector"
+                .into(),
+        ));
+    }
+    crate::animation::validate_skeleton_path(path)?;
+    if path.contains(['*', '?'])
+        || !path.rsplit_once('.').is_some_and(|(stem, extension)| {
+            !stem.is_empty()
+                && (extension.eq_ignore_ascii_case("cdf") || extension.eq_ignore_ascii_case("chr"))
+        })
+    {
+        return Err(MediaError::Contract(
+            "animation model must be one exact CDF or CHR Entry path".into(),
+        ));
+    }
+    Ok(())
 }
 
 /// Observable result of a generation attempt.
@@ -113,11 +141,13 @@ pub fn export_with(
     if options.animation_entity.is_some()
         && !options.kinds.is_empty()
         && !options.kinds.contains(&MediaKind::Animation)
+        && !options.kinds.contains(&MediaKind::AnimationDefinition)
     {
         return Err(MediaError::Contract(
-            "animation entity selection requires the animation provider".into(),
+            "animation entity selection requires animation or animation-definition".into(),
         ));
     }
+    validate_animation_model(options)?;
     let providers = registry.selected(&options.kinds)?;
     if !options.diagnostic
         && archive

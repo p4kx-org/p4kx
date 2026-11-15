@@ -63,13 +63,13 @@ impl Traversal<'_> {
         for (position, entry) in archive.entries().iter().enumerate() {
             self.admit(position, &inputs, visit.counts_sources(), writer)?;
             let selected = selection.classify(chain, entry.path());
-            {
+            let admitted = {
                 let lookup =
                     DirectoryLookup::new_with_inputs(&index, self.root, chain, selection, &inputs)
                         .with_shaders(self.shaders);
-                visit.entry(entry, selected, &lookup, writer)?;
-            }
-            self.count_selection(selected);
+                visit.entry(entry, selected, &lookup, writer)?
+            };
+            self.count_selection(admitted);
             if !traversal_container::is_container(entry.path()) {
                 continue;
             }
@@ -122,8 +122,8 @@ impl Traversal<'_> {
         Ok(())
     }
 
-    fn count_selection(&mut self, selection: EntrySelection) {
-        if selection == EntrySelection::Included {
+    const fn count_selection(&mut self, selected: bool) {
+        if selected {
             self.entries.written += 1;
         } else {
             self.entries.skipped += 1;

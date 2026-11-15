@@ -677,6 +677,17 @@ Missing, unselected, ambiguous and unsupported paths retain explicit outcomes.
 A reference is an edge. Its target contents remain independently selected sources.
 Malformed documents are diagnosed with retained original bytes in diagnostic exports.
 
+Use explicit `--kind animation-definition` with `--animation-entity <entity>`
+or `--animation-model <entry>` to select definitions from one root Archive
+Entity or an exact CDF/CHR Entry. A CDF uses its authored Model File. The scope
+selects the associated character parameters and their authored event databases.
+The Entity selector uses class, GUID or Record path in the preferred root
+DataForge. Explicit exclusions can leave a scope with no selected documents.
+An unavailable CDF or parameter payload can prevent a complete scoped index.
+The other requested providers
+retain their own Entry filters. An Animation-only export with
+`--animation-entity` uses the independent clip inventory selection.
+
 Within a character parameter `AnimationList`, `named-caf` link rows keep each
 concrete animation declaration at the original path attribute's coordinates,
 including repetitions. For relative paths the latest preceding `#filepath`
@@ -691,7 +702,8 @@ rules remain in the ordered source declarations. A named CAF link looks up
 physical loose CAF entries without reading their payload. It does not
 identify matches inside a tracks database or establish the clip used at runtime.
 
-Selecting both `animation-definition` and `animation` also writes
+Selecting both `animation-definition` and `animation`, or using scoped
+animation-definition selection, also writes
 `named-dba-binding` rows for concrete CAF paths in lists with a
 `$TracksDatabase` declaration. The new row has the same original indices as
 its `named-caf` row. It reports each authored database in order and matches

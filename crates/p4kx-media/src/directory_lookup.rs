@@ -5,6 +5,8 @@ use std::cell::Cell;
 
 #[path = "directory_animation_banks.rs"]
 pub(crate) mod animation_banks;
+#[path = "directory_definition_scope.rs"]
+mod definition_scope;
 #[path = "directory_path_candidates.rs"]
 mod path_candidates;
 
@@ -41,6 +43,7 @@ pub struct DirectoryLookup<'a> {
     pub(crate) work: &'a Cell<u64>,
     pub(crate) source_allowance: u64,
     inputs: Option<&'a DirectoryInputs<'a>>,
+    definition_scope: bool,
     pub(crate) shaders: Option<&'a crate::shader_lookup::ShaderLookup<'a>>,
 }
 
@@ -62,6 +65,7 @@ impl<'a> DirectoryLookup<'a> {
             work,
             source_allowance,
             inputs: None,
+            definition_scope: false,
             shaders: None,
         }
     }
@@ -80,6 +84,7 @@ impl<'a> DirectoryLookup<'a> {
             work: &inputs.budget.work,
             source_allowance: 0,
             inputs: Some(inputs),
+            definition_scope: false,
             shaders: None,
         }
     }
@@ -354,7 +359,7 @@ impl<'a> DirectoryLookup<'a> {
             CandidateState::Unavailable {
                 reason: ReferenceUnavailable::UnsupportedLayout,
             }
-        } else if self.selection.classify(self.chain, entry.path()) != EntrySelection::Included {
+        } else if self.reference_selection(entry) != EntrySelection::Included {
             CandidateState::NotSelected {
                 reason: NotSelectedReason::Filter,
             }

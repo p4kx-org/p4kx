@@ -25,7 +25,7 @@ pub(crate) trait TraversalVisit {
         selection: EntrySelection,
         lookup: &DirectoryLookup<'_>,
         writer: &mut MediaWriter<'_>,
-    ) -> Result<(), MediaError>;
+    ) -> Result<bool, MediaError>;
 
     fn directory_complete(
         &mut self,

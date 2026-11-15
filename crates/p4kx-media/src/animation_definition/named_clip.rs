@@ -6,7 +6,7 @@ use p4kx_extraction::cryxml::{
 };
 use p4kx_extraction::{NamedCafSelector, SourceUseRole};
 
-use super::links::ReferenceSelection;
+use super::links::{self, ReferenceSelection};
 use super::named_dba::{Databases, NamedSelection};
 use super::origins;
 use super::payload::{self as wire, DefinitionFamily, DefinitionPayload, NamedCaf};
@@ -219,7 +219,7 @@ impl Link<'_, '_> {
         let reference = ReferenceSelection {
             authored_path: self.path,
             archive_path: archive_path.as_deref(),
-            kind: Some(MediaKind::Animation),
+            kind: links::reference_kind(projection, MediaKind::Animation, writer),
             original: &path,
             selector: &full,
         }

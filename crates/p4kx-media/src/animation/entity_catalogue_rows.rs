@@ -16,7 +16,7 @@ use wire::{Payload, Scope};
 
 pub(crate) use wire::{CATALOGUE, CatalogueState, bind_schema};
 
-pub(super) fn incomplete_loadout(
+pub(crate) fn incomplete_loadout(
     root: &EntityNode,
     writer: &MediaWriter<'_>,
 ) -> Result<bool, MediaError> {

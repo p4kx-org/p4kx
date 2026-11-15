@@ -50,6 +50,7 @@ fn export(args: &MediaExportArgs, as_json: bool) -> anyhow::Result<ExitCode> {
         texture_mip: args.texture_mip,
         animation_skeleton: args.animation_skeleton.clone(),
         animation_entity: args.animation_entity.clone(),
+        animation_model: args.animation_model.clone(),
     };
     let result = p4kx_media::export(&archive, &args.out, &options)?;
     let (status, index, code) = match &result {

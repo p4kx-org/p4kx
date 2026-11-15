@@ -159,7 +159,7 @@ pub(crate) fn with_reference_input<T>(
             "reference input is outside its active observed source scope".into(),
         ));
     }
-    if lookup.selection.classify(lookup.chain, entry.path()) != EntrySelection::Included {
+    if lookup.reference_selection(entry) != EntrySelection::Included {
         return Err(MediaError::Contract(
             "reference lookup cannot read an unselected target".into(),
         ));

@@ -94,7 +94,12 @@ fn explicit_animation_definition_kind_can_publish_empty_selection() -> TestResul
 fn animation_definition_cli_links_a_named_caf_without_selecting_its_payload() -> TestResult {
     let folder = tempfile::tempdir()?;
     let source = folder.path().join("Data.p4k");
+    let model = "Data/Objects/fixture.chr";
     ArchiveBuilder::new()
+        .entry(TestEntry::stored(
+            model,
+            p4kx_testkit::TestModel::cube().cgf(),
+        ))
         .entry(TestEntry::stored(
             "Data/Objects/fixture.chrparams",
             br##"<Params><AnimationList>
@@ -139,6 +144,49 @@ fn animation_definition_cli_links_a_named_caf_without_selecting_its_payload() ->
             .and_then(Value::as_str),
         Some("not-selected"),
         "definition-only selection retains the target without reading it",
+    );
+    verify_model_scope(&source, folder.path(), model)
+}
+
+fn verify_model_scope(source: &Path, folder: &Path, model: &str) -> TestResult {
+    let scoped = folder.join("model");
+    p4kx_testkit::p4kx()?
+        .args(["media", "export"])
+        .arg(source)
+        .arg("--out")
+        .arg(&scoped)
+        .args([
+            "--kind",
+            "animation-definition",
+            "--animation-model",
+            model,
+            "--filter",
+            "unmatched-include",
+        ])
+        .assert()
+        .success();
+    let index: Value = serde_json::from_slice(&fs::read(scoped.join("media-index.json"))?)?;
+    assert_eq!(
+        index
+            .pointer("/source_entries/written")
+            .and_then(Value::as_u64),
+        Some(1),
+        "the CLI selects the model's parameter file outside the include filter"
+    );
+    let base = index
+        .get("artifact_base")
+        .and_then(Value::as_str)
+        .ok_or("scoped media artifact base")?;
+    let rows = jsonl_rows(&scoped.join(base).join("animation-definition.jsonl"))?;
+    assert!(
+        rows.iter().any(|row| {
+            row.pointer("/data/record_type").and_then(Value::as_str) == Some("named-caf")
+                && row
+                    .pointer("/data/payload/reference/resolution/status")
+                    .and_then(Value::as_str)
+                    == Some("resolved")
+        }),
+        "the scoped CLI resolves the exact CAF while writing only its parameter document"
     );
     Ok(())
 }

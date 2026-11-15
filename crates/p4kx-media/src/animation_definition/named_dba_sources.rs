@@ -165,7 +165,7 @@ fn select(
     let observed = directory.lookup_input_observed(
         OriginalIdentifier::new_with_path(path),
         &archive_path,
-        Some(MediaKind::Animation),
+        links::reference_kind(projection, MediaKind::Animation, writer),
         writer,
     )?;
     evidence.include(&observed.inventory, writer)?;

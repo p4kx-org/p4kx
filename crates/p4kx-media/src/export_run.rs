@@ -12,7 +12,8 @@ use crate::input_budget::InputBudget;
 use crate::source;
 use crate::traversal::Traversal;
 use crate::{
-    ByteScope, ExportOptions, Index, MediaError, MediaWriter, Provider, RootSource, Tally,
+    ByteScope, ExportOptions, Index, MediaError, MediaKind, MediaWriter, Provider, RootSource,
+    Tally,
 };
 
 pub(crate) fn build(
@@ -49,6 +50,9 @@ pub(crate) fn build(
     writer
         .animation_entity
         .clone_from(&options.animation_entity);
+    writer.animation_model.clone_from(&options.animation_model);
+    writer.scoped_animation_definitions = options.kinds.contains(&MediaKind::AnimationDefinition)
+        && (options.animation_entity.is_some() || options.animation_model.is_some());
     writer.origins.observe_root(archive, size)?;
     writer.bind_build(archive, &mut root)?;
     root_callbacks(&root, providers, &mut writer)?;

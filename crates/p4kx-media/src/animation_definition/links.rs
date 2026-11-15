@@ -55,15 +55,9 @@ pub(super) fn kind(
         if names.next().is_some() {
             return None;
         }
-        if first.value().eq_ignore_ascii_case("$TracksDatabase") {
+        if let Some(kind) = chrparams_database_kind(first.value()) {
             return Some(LinkSelector {
-                kind: LinkKind::TracksDatabase,
-                name_position: Some(first.position().clone()),
-            });
-        }
-        if first.value().eq_ignore_ascii_case("$AnimEventDatabase") {
-            return Some(LinkSelector {
-                kind: LinkKind::EventDatabase,
+                kind,
                 name_position: Some(first.position().clone()),
             });
         }
@@ -86,6 +80,16 @@ pub(super) fn kind(
         });
     }
     None
+}
+
+pub(super) const fn chrparams_database_kind(name: &str) -> Option<LinkKind> {
+    if name.eq_ignore_ascii_case("$AnimEventDatabase") {
+        Some(LinkKind::EventDatabase)
+    } else if name.eq_ignore_ascii_case("$TracksDatabase") {
+        Some(LinkKind::TracksDatabase)
+    } else {
+        None
+    }
 }
 
 fn mannequin_kind(tag: &str, parent: Option<&str>, name: &str) -> Option<LinkKind> {
@@ -226,7 +230,9 @@ pub(super) fn write(
     let reference = ReferenceSelection {
         authored_path,
         archive_path: archive_path.as_deref(),
-        kind: kind.target_kind(),
+        kind: kind
+            .target_kind()
+            .and_then(|kind| reference_kind(projection, kind, writer)),
         original: &proof,
         selector: &selection,
     }
@@ -295,6 +301,14 @@ impl LinkKind {
             Self::TagDefinition | Self::FragmentDefinition => None,
         }
     }
+}
+
+pub(super) fn reference_kind(
+    projection: &DefinitionProjection<'_, '_>,
+    kind: MediaKind,
+    writer: &MediaWriter<'_>,
+) -> Option<MediaKind> {
+    (!projection.context.directory.uses_definition_scope() || writer.has_kind(kind)).then_some(kind)
 }
 
 pub(super) fn target_path(kind: LinkKind, path: &str) -> Option<String> {

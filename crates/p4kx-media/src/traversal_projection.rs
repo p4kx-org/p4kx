@@ -9,7 +9,7 @@ use crate::input_budget::InputBudget;
 use crate::required_input;
 use crate::source_selection::EntrySelection;
 use crate::traversal_visit::TraversalVisit;
-use crate::{MediaError, MediaWriter, Provider, SourceContext};
+use crate::{MediaError, MediaKind, MediaWriter, Provider, SourceContext};
 
 pub(crate) struct ProjectionVisit<'run> {
     pub(crate) providers: &'run [&'run dyn Provider],
@@ -59,12 +59,32 @@ impl TraversalVisit for ProjectionVisit<'_> {
         selection: EntrySelection,
         lookup: &DirectoryLookup<'_>,
         writer: &mut MediaWriter<'_>,
-    ) -> Result<(), MediaError> {
-        if selection != EntrySelection::Included {
-            return Ok(());
+    ) -> Result<bool, MediaError> {
+        let scope = writer.scoped_animation_definitions;
+        let definition_selected = scope
+            && selection != EntrySelection::Excluded
+            && lookup.selects_definition(entry.index());
+        let selected = selection == EntrySelection::Included
+            && (!scope
+                || writer
+                    .kinds
+                    .iter()
+                    .any(|kind| kind.capability.kind != MediaKind::AnimationDefinition));
+        if !definition_selected && !selected {
+            return Ok(false);
         }
         let (source, payload) = required_input::retain(lookup, entry, writer)?;
+        let scoped_lookup = lookup.for_definition();
         for (index, provider) in self.providers.iter().enumerate() {
+            let definition = scope
+                && writer
+                    .kinds
+                    .get(index)
+                    .is_some_and(|kind| kind.capability.kind == MediaKind::AnimationDefinition);
+            if (definition && !definition_selected) || (!definition && !selected) {
+                continue;
+            }
+            let lookup = if definition { &scoped_lookup } else { lookup };
             let input = writer.origins.input(lookup.index.archive, entry)?;
             writer.begin_with_input(index, source.clone(), input)?;
             let result = provider
@@ -82,7 +102,7 @@ impl TraversalVisit for ProjectionVisit<'_> {
                 .end_source(result)
                 .map_err(|cause| crate::error::at(&source, cause))?;
         }
-        Ok(())
+        Ok(true)
     }
 
     fn excluded_container(&mut self) {}

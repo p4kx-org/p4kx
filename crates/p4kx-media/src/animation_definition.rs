@@ -4,6 +4,7 @@
 mod blend_reference_index;
 mod blend_reference_payload;
 mod blend_references;
+mod definition_scope;
 mod graph_field;
 mod graph_source;
 mod links;
@@ -14,6 +15,7 @@ mod payload;
 mod projection;
 mod provider;
 mod schema;
+mod scope_health;
 mod sub_database_components;
 mod sub_database_cycles;
 mod sub_database_frontier;
@@ -23,6 +25,7 @@ mod sub_database_selectors_payload;
 mod timeline;
 mod timeline_payload;
 
+pub(crate) use definition_scope::DefinitionScope;
 pub(crate) use provider::AnimationDefinitionProvider;
 pub(crate) use schema::bind_record_schema;
 pub(crate) use sub_database_cycles::SubDatabaseCycles;

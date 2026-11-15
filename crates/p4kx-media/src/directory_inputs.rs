@@ -18,6 +18,7 @@ struct Slot {
 pub(crate) struct DirectoryInputs<'run> {
     pub(crate) budget: &'run InputBudget,
     pub(crate) animation_skeleton: OnceCell<crate::animation::SkeletonSelection>,
+    pub(crate) definition_scope: OnceCell<crate::animation_definition::DefinitionScope>,
     slots: RefCell<HashMap<usize, Slot>>,
     admitted: Cell<u64>,
     count: usize,
@@ -38,6 +39,7 @@ impl<'run> DirectoryInputs<'run> {
         Ok(Self {
             budget,
             animation_skeleton: OnceCell::new(),
+            definition_scope: OnceCell::new(),
             slots: RefCell::new(HashMap::new()),
             admitted: Cell::new(0),
             count,

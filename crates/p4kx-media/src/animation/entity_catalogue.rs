@@ -15,6 +15,7 @@ use crate::{DirectoryLookup, MediaError, MediaWriter, Subresource, required_inpu
 mod rows;
 
 pub(super) use rows::bind_schema;
+pub(crate) use rows::incomplete_loadout;
 
 pub(super) fn emit(
     lookup: &DirectoryLookup<'_>,
@@ -66,7 +67,7 @@ fn project(
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
     with_resolved_entity(selector, forge, lookup, writer, |owner, tree, writer| {
-        let state = if rows::incomplete_loadout(tree, writer)? {
+        let state = if incomplete_loadout(tree, writer)? {
             rows::CatalogueState::IncompleteLoadout
         } else {
             rows::CatalogueState::Available

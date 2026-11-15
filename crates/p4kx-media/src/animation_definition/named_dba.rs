@@ -36,7 +36,9 @@ impl Databases {
         projection: &DefinitionProjection<'_, '_>,
         writer: &mut MediaWriter<'_>,
     ) -> Result<Self, Failure> {
-        if !writer.has_kind(MediaKind::Animation) {
+        if !writer.has_kind(MediaKind::Animation)
+            && !projection.context.directory.uses_definition_scope()
+        {
             return Ok(Self::default());
         }
         Ok(Self {

@@ -4,6 +4,7 @@
 use p4kx_extraction::DecimalU64;
 use p4kx_extraction::cryxml::{SourceDocument, SourceReadOptions};
 
+use super::definition_scope::DefinitionScope;
 use super::graph_source::GraphRole;
 use super::origins;
 use super::payload::{
@@ -62,6 +63,14 @@ impl Provider for AnimationDefinitionProvider {
             ),
         ];
         capability
+    }
+
+    fn directory(
+        &self,
+        context: &mut DirectoryContext<'_, '_, '_>,
+        writer: &mut MediaWriter<'_>,
+    ) -> Result<(), MediaError> {
+        DefinitionScope::plan(context.lookup, writer)
     }
 
     fn directory_complete(

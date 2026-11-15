@@ -166,17 +166,18 @@ impl TraversalVisit for Collector {
         selection: EntrySelection,
         lookup: &DirectoryLookup<'_>,
         writer: &mut MediaWriter<'_>,
-    ) -> Result<(), MediaError> {
+    ) -> Result<bool, MediaError> {
+        let selected = selection == EntrySelection::Included;
         if lookup.index.archive.raw_path(entry.index()).is_some() {
             self.index.inventory =
                 CandidateInventory::Unavailable(ReferenceUnavailable::IncompleteInventory);
         }
         let file = shader_source::file_name(entry.path());
         let Some((name, extension)) = file.rsplit_once('.') else {
-            return Ok(());
+            return Ok(selected);
         };
         if !extension.eq_ignore_ascii_case("ext") {
-            return Ok(());
+            return Ok(selected);
         }
         lookup.input_state()?.budget.metadata(
             0,
@@ -209,7 +210,7 @@ impl TraversalVisit for Collector {
             state,
             read: OnceCell::new(),
         });
-        Ok(())
+        Ok(selected)
     }
 
     fn excluded_container(&mut self) {
