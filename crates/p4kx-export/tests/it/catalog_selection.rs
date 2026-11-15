@@ -220,6 +220,69 @@ fn progress_reaches_every_record_and_cancellation_stops_the_build() -> TestResul
 }
 
 #[test]
+fn ordered_scan_windows_keep_catalog_bytes_and_cancel_before_opening_output() -> TestResult {
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    use p4kx_export::{CatalogPhase, Compression, write_catalog};
+    use rayon::ThreadPoolBuilder;
+
+    let dir = tempfile::tempdir()?;
+    let archive = Archive::open_with_key(
+        fixture::write_multi_window_archive(dir.path())?,
+        Some(p4kx_testkit::test_key()),
+    )?;
+    let sequential = ThreadPoolBuilder::new().num_threads(1).build()?;
+    let parallel = ThreadPoolBuilder::new().num_threads(4).build()?;
+    let options = fixture::options();
+    let first = sequential.install(|| build_catalog(&archive, &options))?;
+    let second = parallel.install(|| build_catalog(&archive, &options))?;
+    assert!(
+        first.json() == second.json(),
+        "worker count preserves bytes across different scan windows"
+    );
+    let catalog = serde_json::from_slice(first.json())?;
+    assert_eq!(
+        fixture::class_names(&catalog)?,
+        ["ACAS", "Contestant", "Paint_Logo", "Zeta", "RSI"],
+        "selected Records from both ends are present in GUID order"
+    );
+    assert!(
+        catalog
+            .pointer("/definitions/manufacturers/rows/3/recordIndex/value")
+            .and_then(serde_json::Value::as_u64)
+            .is_some_and(|index| index > fixture::SCAN_FILLER_RECORDS),
+        "the late selection keeps its physical Record ordinal"
+    );
+
+    let cancel = CancelToken::new();
+    let sink_opened = AtomicBool::new(false);
+    let report = |progress: CatalogProgress| {
+        if progress.phase == CatalogPhase::Records && progress.records_done < progress.records_total
+        {
+            cancel.cancel();
+        }
+    };
+    let options = CatalogOptions {
+        cancel: Some(&cancel),
+        progress: Some(&report),
+        ..options
+    };
+    let result = parallel.install(|| {
+        write_catalog(&archive, &options, Compression::None, || {
+            sink_opened.store(true, Ordering::Relaxed);
+            Ok(std::io::sink())
+        })
+    });
+    assert!(
+        cancel.is_cancelled(),
+        "progress cancelled a running Record scan"
+    );
+    assert!(matches!(result, Err(CatalogError::Cancelled)), "typed stop");
+    assert!(!sink_opened.load(Ordering::Relaxed), "no partial output");
+    Ok(())
+}
+
+#[test]
 fn an_archive_without_dataforge_is_an_error() -> TestResult {
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("Data.p4k");

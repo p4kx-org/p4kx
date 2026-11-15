@@ -14,6 +14,7 @@ use p4kx_testkit::{
 use serde_json::Value;
 
 const EXPORTED_AT: Duration = Duration::from_secs(1_792_000_000);
+pub(super) const SCAN_FILLER_RECORDS: u64 = 1_024;
 
 const MANUFACTURERS: [(u128, &str, &str, &str); 8] = [
     (
@@ -95,17 +96,19 @@ fn database() -> DataForgeBuilder {
     MANUFACTURERS
         .into_iter()
         .fold(builder, |builder, (guid, class, path, code)| {
-            builder.record(
-                TestRecord::new(
-                    guid,
-                    "SCItemManufacturer",
-                    format!("SCItemManufacturer.{class}"),
-                    format!("libs/foundry/records/{path}.xml"),
-                )
-                .value("Code", TestValue::text(code))
-                .value("Localization", localization(class, code)),
-            )
+            builder.record(manufacturer(guid, class, path, code))
         })
+}
+
+fn manufacturer(guid: u128, class: &str, path: &str, code: &str) -> TestRecord {
+    TestRecord::new(
+        guid,
+        "SCItemManufacturer",
+        format!("SCItemManufacturer.{class}"),
+        format!("libs/foundry/records/{path}.xml"),
+    )
+    .value("Code", TestValue::text(code))
+    .value("Localization", localization(class, code))
 }
 
 fn localization(class: &str, code: &str) -> TestValue {
@@ -124,6 +127,32 @@ fn localization(class: &str, code: &str) -> TestValue {
 }
 
 pub(super) fn write_archive(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
+    write_database(dir, &database())
+}
+
+pub(super) fn write_multi_window_archive(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
+    let mut builder = database();
+    for ordinal in 0..SCAN_FILLER_RECORDS {
+        builder = builder.record(
+            TestRecord::new(
+                0xa000_0000_0000_4000_8000_0000_0000_0000 | u128::from(ordinal),
+                "ShopFranchise",
+                format!("ShopFranchise.Scan{ordinal}"),
+                format!("libs/foundry/records/shopfranchise/scan{ordinal}.xml"),
+            )
+            .value("Code", TestValue::text("SCAN")),
+        );
+    }
+    builder = builder.record(manufacturer(
+        0x9000_0000_0000_4000_8000_0000_0000_0001,
+        "Zeta",
+        "scitemmanufacturer/zeta",
+        "ZETA",
+    ));
+    write_database(dir, &builder)
+}
+
+fn write_database(dir: &Path, database: &DataForgeBuilder) -> Result<PathBuf, Box<dyn Error>> {
     let channel = dir.join("PTU");
     std::fs::create_dir(&channel)?;
     write_build_manifest(
@@ -135,7 +164,7 @@ pub(super) fn write_archive(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
     )?;
     let path = channel.join("Data.p4k");
     ArchiveBuilder::new()
-        .entry(TestEntry::zstd("Data\\Game2.dcb", database().build()).encrypted())
+        .entry(TestEntry::zstd("Data\\Game2.dcb", database.build()).encrypted())
         .write_to(&path)?;
     Ok(path)
 }

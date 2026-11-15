@@ -8,12 +8,10 @@ use p4kx_assembly::{ArchiveFiles, Entities};
 use p4kx_extraction::{
     CancelToken, DataForge, DataForgeError, Filter, PointerProbe, Record, TreeBuilder,
 };
-use rayon::prelude::*;
 
 use crate::catalog_crafting::CraftingKinds;
 use crate::catalog_projection::CatalogProjection;
-use crate::catalog_read_failure::CatalogReadFailure;
-use crate::catalog_v3::catalog_entity_configurations::{self, EntityConfigurationRows};
+use crate::catalog_v3::catalog_entity_configurations;
 use crate::catalog_v3::catalog_item_alignment::AlignmentOptions;
 use crate::entity_selection::{Selected, select};
 use crate::export_diagnostic::ExportSourceRole;
@@ -38,6 +36,8 @@ const CRAFTER_STRUCT: &str = "CrafterComponentParams";
 
 #[path = "scan_ammo.rs"]
 mod ammo;
+#[path = "scan_complete.rs"]
+mod complete;
 #[path = "scan_definition_projection.rs"]
 mod definition_projection;
 #[path = "scan_domain.rs"]
@@ -126,16 +126,11 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
             done: AtomicUsize::new(0),
             total: records.len(),
         };
-        let checked: Vec<RecordScan<'f>> = records
-            .par_iter()
-            .map_init(TreeBuilder::new, |trees, record| scan.check(trees, record))
-            .filter_map(Result::transpose)
-            .collect::<Result<_, _>>()?;
         let mut ledger = group_ledger;
         ledger.merge(evidence_ledger);
         ledger.merge(slot_ledger);
         let mut read = scan.complete(
-            checked,
+            &records,
             ledger,
             group_failures
                 .into_iter()
@@ -147,50 +142,6 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
         scan.ammo.dependencies(&mut read.picked, &mut read.ledger)?;
         read.resource_group_members = members;
         Ok(read)
-    }
-
-    fn complete(
-        &self,
-        checked: Vec<RecordScan<'f>>,
-        mut ledger: ExportLedger,
-        failures: impl IntoIterator<Item = CatalogReadFailure<'f>>,
-        slot_problem: Option<crate::scan_signature::SlotProblem>,
-        crafting: &CraftingKinds<'f>,
-    ) -> Result<ScanRead<'f>, CatalogError> {
-        let mut picked = Vec::new();
-        let mut entity_tags = Vec::new();
-        let mut entity_configurations = EntityConfigurationRows::default();
-        for checked in checked {
-            picked.extend(checked.picked);
-            entity_tags.extend(checked.entity.tags);
-            entity_configurations.extend(checked.entity.configurations);
-            ledger.merge(checked.ledger);
-        }
-        picked.extend(failures.into_iter().map(Picked::Failed));
-        let resources = self.resource_commodities(&picked, crafting, &ledger)?;
-        picked.extend(resources.picked);
-        entity_tags.extend(resources.entity_tags);
-        ledger.merge(resources.ledger);
-        picked.extend(self.links.warning().map(Picked::Warned));
-        let has_signatures = picked.iter().any(
-            |pick| matches!(pick, Picked::MineableEntity(entity) if !entity.signatures.is_empty()),
-        );
-        if self.options.filter.is_none() && has_signatures {
-            picked.extend(slot_problem.map(|problem| Picked::Warned(problem.warning())));
-        }
-        let inventories = Kind::ALL.into_iter().filter(|kind| {
-            !kind.has_dedicated_reader() && !kind.is_derived() && self.domain.includes(*kind)
-        });
-        for kind in inventories {
-            ledger.inventory(kind);
-        }
-        Ok(ScanRead {
-            picked,
-            entity_tags,
-            entity_configurations,
-            resource_group_members: Vec::new(),
-            ledger,
-        })
     }
 
     fn check(
