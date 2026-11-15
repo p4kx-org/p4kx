@@ -80,7 +80,7 @@ pub(crate) fn project<'read, 'source>(
         });
     };
     let (reference, (translations, item_tokens)) =
-        projection.mission_key(key, |prepared, selector| {
+        projection.mission_key(key, |prepared, evidence| {
             let mut translations = BTreeMap::new();
             let mut item_tokens = BTreeMap::new();
             for (&language, text) in prepared {
@@ -93,7 +93,7 @@ pub(crate) fn project<'read, 'source>(
                     locale,
                     language,
                     key: key.text,
-                    selector,
+                    selector: &evidence.selector,
                 };
                 let rendered = input.render(text.as_ref(), &selected.decisions, resolve, cancel)?;
                 translations.insert(language.code(), rendered.value);

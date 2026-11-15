@@ -6,6 +6,7 @@ use p4kx_extraction::{SourcedValue, StructValue};
 use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_read::original::OriginalFlowFields;
+use crate::catalog_text_contract::GameTextRef;
 use crate::contract_facts::ContractFacts;
 use crate::contract_missions::{ContractFaction, PickupPlace, ReputationGain};
 use crate::contract_offer::{BlueprintReward, GiverFaction, OfferedAt};
@@ -26,6 +27,7 @@ use crate::texts::Texts;
 pub(crate) struct Found<'f> {
     pub(crate) pickup: Vec<PickupPlace<'f>>,
     pub(crate) offered_at: OfferedAt<'f>,
+    pub(crate) contractor: SourcedValue<GameTextRef>,
     pub(crate) facts: ContractFacts,
     pub(crate) cooldown: ContractCooldown,
     pub(crate) spawns: Resolved,

@@ -31,6 +31,12 @@ pub(super) fn count(
             .push(row.get("name").ok_or("canonical starmap name cell")?);
     }
     for contract in contracts {
+        let contractor = contract.get("contractor").ok_or("contractor text cell")?;
+        counters.count(index.reference(
+            contractor,
+            TextDomain::GameText,
+            TextReferenceShape::Required,
+        )?)?;
         for place in places(contract)? {
             let guid = place
                 .get("starmapObjectGuid")

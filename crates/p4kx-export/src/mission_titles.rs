@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::CancelToken;
+use p4kx_extraction::{CancelToken, SourceValue, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::CatalogError;
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::CatalogProjection;
+use crate::catalog_text_contract::GameTextRef;
 use crate::mission_generator::ContractOccurrence;
 use crate::mission_index::MissionIndex;
 use crate::mission_text_inputs::{
@@ -91,11 +92,36 @@ pub(crate) fn titles<'read, 'source>(
     })
 }
 
-fn select<'read, 'source>(
+/// Projects the nearest usable Contractor parameter and the inputs deciding its selection.
+pub(crate) fn contractor<'source>(
+    layers: &Layers<'_, 'source>,
+    projection: &CatalogProjection<'_, 'source>,
+) -> Result<SourcedValue<GameTextRef>, CatalogError> {
+    let origins = projection.origins();
+    let mut selected = select_layers(layers, origins, |layer| &layer.contractor)?;
+    let value = match selected.key {
+        Some(key) => {
+            selected
+                .decisions
+                .try_reserve(1)
+                .map_err(CatalogError::SourceUseAllocation)?;
+            let (reference, payload) =
+                projection.mission_key(key, |_, evidence| Ok(evidence.payload.clone()))?;
+            selected.decisions.push(payload);
+            SourceValue::Present(reference)
+        }
+        None if selected.unreadable => SourceValue::Unreadable,
+        None => SourceValue::Absent,
+    };
+    Ok(origins
+        .uses
+        .value(value, &selected.decisions, !selected.unreadable))
+}
+
+fn select_layers<'read, 'source>(
     layers: &Layers<'read, 'source>,
-    dependencies: &Dependencies<'read, 'source>,
     origins: &CatalogOrigins,
-    kind: Kind,
+    text: impl Fn(&'read LayerTexts<'source>) -> &'read TextSelection<'source>,
 ) -> Result<SelectedMissionText<'read, 'source>, CatalogError> {
     let mut selected = SelectedMissionText {
         key: None,
@@ -103,14 +129,26 @@ fn select<'read, 'source>(
         unreadable: false,
     };
     for layer in layers.iter() {
-        let text = match kind {
-            Kind::Title => &layer.title,
-            Kind::Description => &layer.description,
-        };
         record(&mut selected, &layer.parameters, origins)?;
-        if consider(&mut selected, text, origins)? {
-            return Ok(selected);
+        if consider(&mut selected, text(layer), origins)? {
+            break;
         }
+    }
+    Ok(selected)
+}
+
+fn select<'read, 'source>(
+    layers: &Layers<'read, 'source>,
+    dependencies: &Dependencies<'read, 'source>,
+    origins: &CatalogOrigins,
+    kind: Kind,
+) -> Result<SelectedMissionText<'read, 'source>, CatalogError> {
+    let mut selected = select_layers(layers, origins, |layer| match kind {
+        Kind::Title => &layer.title,
+        Kind::Description => &layer.description,
+    })?;
+    if selected.key.is_some() {
+        return Ok(selected);
     }
     if matches!(kind, Kind::Title) {
         record(&mut selected, &dependencies.links.template, origins)?;

@@ -71,7 +71,7 @@ pub(crate) struct ContractBase<'a> {
     /// contract, handler): the text the game shows as the giver of the contract, e.g. the
     /// agency, when the contract has no faction reputation.
     #[schemars(extend("x-gameText" = true))]
-    pub(crate) contractor: LocalisedText<'a>,
+    pub(crate) contractor: SourcedValue<GameTextRef>,
     /// The `factionReputation` of the handler, as stored: the faction of a contract that has no
     /// reputation result, e.g. the collector's. `null` when the handler names none.
     pub(crate) faction: Option<ContractFaction<'a>>,

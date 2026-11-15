@@ -5,6 +5,8 @@
 
 use crate::contracts_fixture;
 
+#[path = "catalog_contractor.rs"]
+mod contractor;
 #[path = "catalog_faction_identity.rs"]
 mod faction_identity;
 #[path = "catalog_local_contract_generators.rs"]
@@ -201,23 +203,12 @@ fn an_organisation_token_without_a_variant_takes_the_only_string_variant_else_no
 }
 
 #[test]
-fn a_replacement_that_holds_a_token_is_expanded_and_the_contractor_is_the_nearest_string()
--> TestResult {
+fn a_replacement_that_holds_a_token_is_expanded() -> TestResult {
     let (_, catalog) = build(None)?;
     assert_eq!(
         text(&catalog, entry(&catalog, D, None)?, "title")?.en,
         Some("Pre Wrapped [LOCATION]"),
         "a token inside the text of a replacement is resolved too"
-    );
-    assert_eq!(
-        entry(&catalog, A, Some(SUB_ONE))?["contractor"],
-        json!({"key": "@contractor_acme", "en": "Acme Agency", "de": null}),
-        "the handler's Contractor parameter"
-    );
-    assert_eq!(
-        entry(&catalog, C, None)?["contractor"],
-        json!({"key": null, "en": null, "de": null}),
-        "a handler without one"
     );
     Ok(())
 }

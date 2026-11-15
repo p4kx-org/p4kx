@@ -11440,7 +11440,7 @@
           "description": "Parameter `CanReacceptAfterFailing`; base: `canReacceptAfterFailing` of the handler's\n`defaultAvailability`."
         },
         "contractor": {
-          "$ref": "#/$defs/LocalisedText",
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
           "description": "The `Contractor` string parameter of the first level that states one (sub contract,\ncontract, handler): the text the game shows as the giver of the contract, e.g. the\nagency, when the contract has no faction reputation.",
           "x-gameText": true
         },

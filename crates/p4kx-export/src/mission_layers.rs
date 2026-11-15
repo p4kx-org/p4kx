@@ -5,15 +5,12 @@ use p4kx_extraction::{Guid, StructValue, Value, is_placeholder_key};
 
 use crate::blueprint::as_struct;
 use crate::mission_hauling::{HaulingProperty, property_orders};
-use crate::record_fields::{reference, text};
+use crate::record_fields::reference;
 
-const CONTRACTOR: &str = "Contractor";
-
-/// The mission type, contractor and hauling properties that one contract level overrides.
+/// The mission type and hauling properties that one contract level overrides.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct Layer<'f> {
     pub(crate) mission_type: Option<Guid>,
-    pub(crate) contractor: Option<&'f str>,
     pub(crate) hauling: Vec<HaulingProperty<'f>>,
 }
 
@@ -21,15 +18,7 @@ impl<'f> Layer<'f> {
     /// Reads the overrides in `params`, the `paramOverrides` of a contract or sub contract or
     /// the `contractParams` of a handler.
     pub(crate) fn read(params: Option<&StructValue<'f>>) -> Self {
-        let string_param = |name: &str| {
-            items(params, "stringParamOverrides")
-                .iter()
-                .filter_map(as_struct)
-                .find(|param| text(Some(param), "param") == Some(name))
-                .and_then(|param| key(Some(param), "value"))
-        };
         Self {
-            contractor: string_param(CONTRACTOR),
             mission_type: reference(params, "missionTypeOverride").map(|guid| guid.0),
             hauling: property_orders(params, "propertyOverrides"),
         }

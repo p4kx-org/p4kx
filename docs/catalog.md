@@ -1141,7 +1141,7 @@ that the rule on equal `guid` and `subContractGuid` above drops.
 | `brokerEntryGuid` | The `MissionBrokerEntry` Record the contract names in `missionBrokerEntry`, an entry of `missionBrokerEntries`; `null` when it names none (on LIVE the 419 contracts that name one all resolve) |
 | `notForRelease`, `workInProgress` | The flags as stored, `null` when absent; the catalog does not filter on them |
 | `missionTypeGuid`, `missionType` | The selected `MissionType` Record GUID and its sourced `GameTextRef` into `texts.gameTexts`. The reference keeps the exact original type name even when the definition is outside the Filter. It is `null` if the selected Record is unavailable. |
-| `contractor` | The `Contractor` string parameter (game text) |
+| `contractor` | The sourced protected text reference for the `Contractor` parameter |
 | `pickupPlaces` | Every eligible resolved starmap object the contract is offered at, each `starmapObjectGuid`, `objectType` and the canonical name in `place` |
 | `offeredAt` | Every place the contract is offered at, uncapped (see "Offered at"): `localityGuids` (entries of `missionLocalities`) and `locations` (starmap objects, each `starmapObjectGuid`, `objectType`, `place`), and `brokerFallback` (`true` when `locations` is the broker entry's location because no place is stated) |
 | `faction` | The `factionReputation` of the handler as stored: `guid`, Record `name` and `displayName` (game text), `null` when the handler names none |
@@ -1226,9 +1226,13 @@ with the reward `repuationrewardamount_negative_bigdrop` (-190500); they are lis
 to the handler's own faction in `faction`. The catalog does not add the amounts up (ADR-0065): a
 faction scope and an affinity scope are separate entries.
 
-**Contractor.** The `Contractor` string parameter of the first layer (sub contract, contract,
-handler) that states one: the text the game shows as the giver, e.g. of an agency that has no
-faction reputation (game text).
+**Contractor.** A sourced reference into `texts.gameTexts` for the authored giver label. The
+renderer-independent projection chooses the nearest usable `Contractor` string parameter from the
+sub contract, contract and handler in that order. Each layer contributes only its first matching
+parameter. A missing, non-key or placeholder value falls back to the next layer. A present
+`contractor.value` references `texts.gameTexts[].id.value`, with source uses for the selected key
+and the decisions that chose it. When no key resolves, the cell has a null value and reports its
+source state.
 
 **Pickup places.** The starmap objects named by the prerequisites of the sub contract
 (`additionalPrerequisites`), or, when it names none, of the contract and then of the handler

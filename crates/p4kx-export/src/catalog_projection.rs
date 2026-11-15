@@ -19,7 +19,7 @@ use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_read::original::{OriginalFlowFields, OriginalValueFact};
 use crate::catalog_text_contract::{CanonicalText, CatalogTexts, GameTextRef, PublicNameRef};
-use crate::mission_text_inputs::MissionKey;
+use crate::mission_text_inputs::{MissionKey, SelectedKey};
 use crate::texts::{CATALOG_LANGUAGES, TextProjection, Texts};
 
 type Translations<'source> = BTreeMap<Language, Option<TextProjection<'source>>>;
@@ -190,11 +190,11 @@ impl<'context, 'source> CatalogProjection<'context, 'source> {
     pub(crate) fn mission_key<T>(
         &self,
         key: &MissionKey<'source>,
-        render: impl FnOnce(&Translations<'source>, &SourceUse) -> Result<T, CatalogError>,
+        render: impl FnOnce(&Translations<'source>, &SelectedKey) -> Result<T, CatalogError>,
     ) -> Result<(GameTextRef, T), CatalogError> {
         let observed = key.retain(self.origins())?;
         let translations = self.translations(key.text, false);
-        let value = render(&translations, &observed.selector)?;
+        let value = render(&translations, &observed)?;
         self.insert_pending(
             Domain::GameText,
             key.text,

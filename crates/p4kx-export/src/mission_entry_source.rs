@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{CancelToken, Guid, RecordTree, StructValue};
+use p4kx_extraction::{CancelToken, Guid, RecordTree, SourcedValue, StructValue};
 
 use crate::CatalogError;
 use crate::blueprint::as_struct;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::original::OriginalFlowFields;
+use crate::catalog_text_contract::GameTextRef;
 use crate::contract_missions::{ContractBase, ContractFaction, PickupPlace};
 use crate::contract_offer::OfferedAt;
 use crate::guid_text::CatalogGuid;
@@ -73,14 +74,8 @@ impl<'t, 'f> MissionEntrySource<'t, 'f> {
             self.contract,
             template_data.and_then(|data| data.spawns.as_ref()),
         )?;
-        let prepared_titles = PreparedTitles::read(
-            self.contract,
-            self.handler_texts,
-            owner,
-            context,
-            template_data,
-            broker,
-        )?;
+        let prepared_texts =
+            PreparedContractTexts::read(self, owner, context, template_data, broker)?;
         let (cooldown, prepared_facts) = self.prepare_facts(owner, context)?;
         let make = |sub: Option<&'t StructValue<'f>>| -> Result<PendingContract<'f>, ReadError> {
             let spawns = spawn_levels.resolve(sub)?;
@@ -96,7 +91,8 @@ impl<'t, 'f> MissionEntrySource<'t, 'f> {
             let requirements = shared.facts.requirements.row(owner.fields(), sub)?;
             let (pickup, offered_at) = self.places(sub, &contract_where, broker, context);
             let selection = owner.selection(sub)?;
-            let titles = prepared_titles.project(selection.source.clone(), sub, owner, context)?;
+            let (titles, contractor) =
+                prepared_texts.project(selection.source.clone(), sub, owner, context)?;
             let base = self.entry(
                 (sub, selection),
                 &levels,
@@ -107,6 +103,7 @@ impl<'t, 'f> MissionEntrySource<'t, 'f> {
                     Found {
                         pickup,
                         offered_at,
+                        contractor,
                         facts,
                         cooldown: cooldown.resolve(sub)?,
                         spawns,
@@ -200,6 +197,7 @@ impl<'t, 'f> MissionEntrySource<'t, 'f> {
         let Found {
             pickup,
             offered_at,
+            contractor,
             facts,
             cooldown,
             spawns,
@@ -230,7 +228,7 @@ impl<'t, 'f> MissionEntrySource<'t, 'f> {
                 .and_then(|guid| index.mission_type_name(guid))
                 .map(|key| context.projection.finish_protected_key(key.clone()))
                 .transpose()?,
-            contractor: texts.localised(levels.iter().find_map(|level| level.contractor)),
+            contractor,
             faction,
             pickup_places: pickup,
             offered_at,
@@ -263,7 +261,7 @@ impl<'t, 'f> MissionEntrySource<'t, 'f> {
     }
 }
 
-struct PreparedTitles<'read, 'source> {
+struct PreparedContractTexts<'read, 'source> {
     handler: &'read LayerTexts<'source>,
     contract: LayerTexts<'source>,
     links: TextDependencyLinks,
@@ -271,21 +269,24 @@ struct PreparedTitles<'read, 'source> {
     broker: Option<&'read BrokerTexts<'source>>,
 }
 
-impl<'read, 'source> PreparedTitles<'read, 'source> {
+impl<'read, 'source> PreparedContractTexts<'read, 'source> {
     fn read(
-        contract: &StructValue<'source>,
-        handler: &'read LayerTexts<'source>,
+        source: &MissionEntrySource<'read, 'source>,
         owner: &ContractOwner<'_, '_, '_, 'source>,
         context: &MissionEntryContext<'_, 'source>,
         template: Option<&'read Template<'source>>,
         broker: Option<&'read Broker<'source>>,
     ) -> Result<Self, CatalogError> {
         let origins = context.projection.origins();
-        let contract_texts =
-            LayerTexts::read(owner.fields(), origins, contract, LayerKind::Contract)?;
-        let links = TextDependencyLinks::read(owner.fields(), origins, contract)?;
+        let contract_texts = LayerTexts::read(
+            owner.fields(),
+            origins,
+            source.contract,
+            LayerKind::Contract,
+        )?;
+        let links = TextDependencyLinks::read(owner.fields(), origins, source.contract)?;
         Ok(Self {
-            handler,
+            handler: source.handler_texts,
             contract: contract_texts,
             links,
             template: template.and_then(|template| template.texts.as_ref()),
@@ -299,7 +300,7 @@ impl<'read, 'source> PreparedTitles<'read, 'source> {
         sub: Option<&StructValue<'source>>,
         owner: &ContractOwner<'_, '_, '_, 'source>,
         context: &MissionEntryContext<'_, 'source>,
-    ) -> Result<MissionTitles<'source>, CatalogError> {
+    ) -> Result<(MissionTitles<'source>, SourcedValue<GameTextRef>), CatalogError> {
         let origins = context.projection.origins();
         let sub_texts = sub
             .map(|sub| LayerTexts::read(owner.fields(), origins, sub, LayerKind::SubContract))
@@ -319,7 +320,9 @@ impl<'read, 'source> PreparedTitles<'read, 'source> {
             index: context.index,
             cancel: context.cancel,
         };
-        mission_titles::titles(occurrence, &layers, &dependencies, &inputs)
+        let titles = mission_titles::titles(occurrence, &layers, &dependencies, &inputs)?;
+        let contractor = mission_titles::contractor(&layers, context.projection)?;
+        Ok((titles, contractor))
     }
 }
 

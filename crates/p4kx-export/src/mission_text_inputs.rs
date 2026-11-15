@@ -18,7 +18,7 @@ mod organization;
 #[path = "mission_text_token_inputs.rs"]
 mod token_inputs;
 
-pub(crate) use self::evidence::{Consulted, Decisions, MissionKey};
+pub(crate) use self::evidence::{Consulted, Decisions, MissionKey, SelectedKey};
 pub(crate) use self::item_choice::{MissionItemChoice, MissionItemGap};
 pub(crate) use self::item_texts::MissionItemTexts;
 pub(crate) use self::organization::OrganizationTexts;
@@ -43,12 +43,13 @@ pub(crate) enum LayerKind {
     SubContract,
 }
 
-/// The title, description and token inputs of one actual generator layer.
+/// The text and token inputs of one actual generator layer.
 #[derive(Debug)]
 pub(crate) struct LayerTexts<'source> {
     pub(crate) parameters: Decisions,
     pub(crate) title: TextSelection<'source>,
     pub(crate) description: TextSelection<'source>,
+    pub(crate) contractor: TextSelection<'source>,
     pub(crate) tokens: Tokens<'source>,
 }
 
@@ -74,6 +75,7 @@ impl<'source> LayerTexts<'source> {
         };
         let title = string_override(&fields, params, "Title")?;
         let description = string_override(&fields, params, "Description")?;
+        let contractor = string_override(&fields, params, "Contractor")?;
         let tokens = if let Some(params) = params {
             Tokens::read(&fields, Some(params), "propertyOverrides")?
         } else {
@@ -83,6 +85,7 @@ impl<'source> LayerTexts<'source> {
             parameters,
             title,
             description,
+            contractor,
             tokens,
         })
     }

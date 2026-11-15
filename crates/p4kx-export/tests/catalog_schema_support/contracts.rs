@@ -54,7 +54,7 @@ pub(super) fn contracts() -> Value {
         "workInProgress": null,
         "missionTypeGuid": "50000000-0000-4000-8000-000000000001",
         "missionType": present(json!("text:14:@type_delivery")),
-        "contractor": {"key": null, "en": null, "de": null},
+        "contractor": source(SourceValue::Absent),
         "faction": {
             "guid": "60000000-0000-4000-8000-000000000001",
             "name": "acme",
