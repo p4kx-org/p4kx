@@ -5,8 +5,11 @@ use std::collections::HashMap;
 use std::io::Read;
 use std::sync::Arc;
 
-use p4kx_archive::Archive;
-use p4kx_model::{PrefabLibrary, PrefabRef};
+use p4kx_archive::{Archive, Entry};
+use p4kx_model::{
+    PositionedPrefabLibrary, PrefabError as LibraryReadError, PrefabLibrary, PrefabLibrarySource,
+    PrefabRef,
+};
 use rayon::prelude::*;
 
 use super::{MAX_PREFAB_LIBRARY_LEN, PrefabError};
@@ -22,6 +25,7 @@ pub struct PrefabFile {
     slot: usize,
     name: String,
     library: PrefabLibrary,
+    source: Option<PrefabLibrarySource>,
     by_name: HashMap<String, usize>,
 }
 
@@ -39,6 +43,12 @@ impl PrefabFile {
         &self.library
     }
 
+    /// Returns original XML sites retained by the library parser.
+    #[must_use]
+    pub const fn source(&self) -> Option<&PrefabLibrarySource> {
+        self.source.as_ref()
+    }
+
     pub(super) const fn slot(&self) -> usize {
         self.slot
     }
@@ -54,10 +64,10 @@ pub(super) enum Lookup {
 }
 
 #[derive(Debug)]
-struct Slot {
+struct Slot<'archive> {
     key: String,
     shown: String,
-    entry: usize,
+    entry: &'archive Entry,
 }
 
 type GuidIndex = HashMap<String, Vec<(usize, usize)>>;
@@ -73,7 +83,7 @@ type GuidIndex = HashMap<String, Vec<(usize, usize)>>;
 #[derive(Debug)]
 pub struct PrefabSet<'a> {
     archive: &'a Archive,
-    slots: Vec<Slot>,
+    slots: Vec<Slot<'a>>,
     files: HashMap<String, usize>,
     loaded: HashMap<usize, Arc<PrefabFile>>,
     failed: HashMap<usize, String>,
@@ -102,12 +112,11 @@ impl<'a> PrefabSet<'a> {
     /// Indexes the libraries of `archive`; none is read yet.
     #[must_use]
     pub fn new(archive: &'a Archive) -> Self {
-        let mut slots: Vec<Slot> = archive
+        let mut slots: Vec<Slot<'_>> = archive
             .entries()
             .iter()
-            .enumerate()
-            .filter_map(|(entry, found)| {
-                let path = found.path().trim_start_matches(['/', '\\']);
+            .filter_map(|entry| {
+                let path = entry.path().trim_start_matches(['/', '\\']);
                 let key = normalised(path);
                 let name = key.strip_prefix(FOLDER)?.strip_suffix(EXTENSION)?;
                 let shown = path.get(FOLDER.len()..path.len().checked_sub(EXTENSION.len())?)?;
@@ -118,7 +127,11 @@ impl<'a> PrefabSet<'a> {
                 })
             })
             .collect();
-        slots.sort_by(|a, b| a.key.cmp(&b.key).then(a.entry.cmp(&b.entry)));
+        slots.sort_by(|a, b| {
+            a.key
+                .cmp(&b.key)
+                .then(a.entry.index().cmp(&b.entry.index()))
+        });
         let mut files = HashMap::with_capacity(slots.len());
         for (slot, found) in slots.iter().enumerate() {
             files.entry(found.key.clone()).or_insert(slot);
@@ -136,7 +149,24 @@ impl<'a> PrefabSet<'a> {
     /// Returns the names of the libraries, sorted ignoring case, with `/` as separator and the
     /// case the Archive spells them in.
     pub fn libraries(&self) -> impl ExactSizeIterator<Item = &str> {
-        self.slots.iter().map(|slot| slot.shown.as_str())
+        self.library_entries().map(|(name, _)| name)
+    }
+
+    /// Returns each displayed library name and its physical directory Entry.
+    pub fn library_entries(&self) -> impl ExactSizeIterator<Item = (&str, &'a Entry)> {
+        self.slots
+            .iter()
+            .map(|slot| (slot.shown.as_str(), slot.entry))
+    }
+
+    /// Returns the Entry that supplied a library loaded by this set.
+    #[must_use]
+    pub fn source_entry(&self, file: &PrefabFile) -> Option<&'a Entry> {
+        let loaded = self.loaded.get(&file.slot)?;
+        if !std::ptr::eq(file, loaded.as_ref()) {
+            return None;
+        }
+        self.slots.get(file.slot).map(|slot| slot.entry)
     }
 
     fn slot_of(&self, name: &str) -> Option<usize> {
@@ -184,9 +214,9 @@ impl<'a> PrefabSet<'a> {
                 reason: reason.clone(),
             });
         }
-        match self.read(slot) {
-            Ok(library) => {
-                let file = Arc::new(file_of(slot, self.shown(slot), library));
+        match self.read(slot, PrefabLibrary::parse_positioned) {
+            Ok(parsed) => {
+                let file = Arc::new(file_of(slot, self.shown(slot), parsed));
                 self.loaded.insert(slot, Arc::clone(&file));
                 Ok(file)
             }
@@ -201,11 +231,15 @@ impl<'a> PrefabSet<'a> {
         }
     }
 
-    fn read(&self, slot: usize) -> Result<PrefabLibrary, Failure> {
+    fn read<T>(
+        &self,
+        slot: usize,
+        parse: fn(&[u8]) -> Result<T, LibraryReadError>,
+    ) -> Result<T, Failure> {
         let entry = self
             .slots
             .get(slot)
-            .and_then(|found| self.archive.entries().get(found.entry))
+            .map(|found| found.entry)
             .ok_or_else(|| Failure::Unreadable("the Entry is gone".to_owned()))?;
         let size = entry.uncompressed_size();
         if size > MAX_PREFAB_LIBRARY_LEN {
@@ -225,7 +259,7 @@ impl<'a> PrefabSet<'a> {
             .take(MAX_PREFAB_LIBRARY_LEN)
             .read_to_end(&mut bytes)
             .map_err(|error| Failure::Unreadable(error.to_string()))?;
-        PrefabLibrary::parse(&bytes).map_err(|error| Failure::Unreadable(error.to_string()))
+        parse(&bytes).map_err(|error| Failure::Unreadable(error.to_string()))
     }
 
     fn by_name(&mut self, reference: &PrefabRef) -> Result<Lookup, PrefabError> {
@@ -261,7 +295,9 @@ impl<'a> PrefabSet<'a> {
             let ids_of = |slot: usize| match self.loaded.get(&slot) {
                 Some(file) => Ok(ids(file.library())),
                 None if self.failed.contains_key(&slot) => Ok(Vec::new()),
-                None => self.read(slot).map(|library| ids(&library)),
+                None => self
+                    .read(slot, PrefabLibrary::parse)
+                    .map(|library| ids(&library)),
             };
             let count = self.slots.len();
             let pool = rayon::ThreadPoolBuilder::new()
@@ -338,7 +374,8 @@ fn ids(library: &PrefabLibrary) -> Vec<String> {
         .collect()
 }
 
-fn file_of(slot: usize, name: String, library: PrefabLibrary) -> PrefabFile {
+fn file_of(slot: usize, name: String, parsed: PositionedPrefabLibrary) -> PrefabFile {
+    let library = parsed.library;
     let mut by_name = HashMap::with_capacity(library.prefabs.len());
     for (index, prefab) in library.prefabs.iter().enumerate() {
         by_name
@@ -349,6 +386,7 @@ fn file_of(slot: usize, name: String, library: PrefabLibrary) -> PrefabFile {
         slot,
         name,
         library,
+        source: parsed.source,
         by_name,
     }
 }

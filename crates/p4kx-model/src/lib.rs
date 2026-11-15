@@ -127,6 +127,7 @@ mod physics_blob;
 mod physics_trimesh;
 mod positioned_animation;
 mod prefab;
+mod prefab_source;
 mod reader;
 mod rig_logic_bytes;
 mod second_uv;
@@ -251,6 +252,9 @@ pub use positioned_animation::{PositionedAnimation, PositionedDba};
 pub use prefab::{
     MAX_GROUP_DEPTH, MAX_LIBRARY_OBJECTS, MAX_LIBRARY_PREFABS, Prefab, PrefabError, PrefabLibrary,
     PrefabObject, PrefabRef,
+};
+pub use prefab_source::{
+    PositionedPrefabLibrary, PrefabLibraryNameSource, PrefabLibrarySource, PrefabSource,
 };
 pub use rig_logic_bytes::RigLogicBytes;
 pub use skeleton_source::{PositionedSkeleton, SkeletonSource};

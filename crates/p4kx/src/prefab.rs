@@ -12,10 +12,15 @@ use crate::cli_prefab::{PrefabAction, PrefabArgs, PrefabDumpArgs, PrefabListArgs
 use crate::json;
 use crate::query_table::one_line;
 
+#[path = "prefab_origins.rs"]
+mod origins;
+
 #[derive(Serialize)]
 struct LibrariesJson<'a> {
     archive: String,
     libraries: Vec<&'a str>,
+    #[serde(flatten)]
+    origins: origins::Origins,
 }
 
 #[derive(Serialize)]
@@ -33,6 +38,8 @@ struct PrefabsJson<'a> {
     library: &'a str,
     file: &'a str,
     prefabs: Vec<PrefabRowJson<'a>>,
+    #[serde(flatten)]
+    origins: origins::Origins,
 }
 
 #[derive(Serialize)]
@@ -149,18 +156,18 @@ fn list_command(args: &PrefabListArgs, as_json: bool) -> Result<()> {
     let archive = crate::key::open(&args.archive)?;
     let mut set = PrefabSet::new(&archive);
     let Some(name) = &args.library else {
-        let libraries: Vec<&str> = set.libraries().collect();
         if as_json {
+            let (libraries, origins) = origins::index(&archive, &set)?;
             json::print(&LibrariesJson {
                 archive: json::path(&args.archive),
                 libraries,
+                origins,
             })?;
             return Ok(());
         }
         let mut out = BufWriter::new(io::stdout().lock());
         return finish(
-            libraries
-                .iter()
+            set.libraries()
                 .try_for_each(|library| writeln!(out, "{}", one_line(library)))
                 .and_then(|()| out.flush()),
         );
@@ -188,6 +195,7 @@ fn list_command(args: &PrefabListArgs, as_json: bool) -> Result<()> {
             library: &library.name,
             file: file.file_name(),
             prefabs: rows,
+            origins: origins::detail(&archive, &set, &file)?,
         })?;
         return Ok(());
     }

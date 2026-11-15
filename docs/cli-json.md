@@ -657,6 +657,15 @@ prefab with its groups flattened, `nested` those of type `Prefab` that instance 
 `left_out` the objects whose transform is not usable. A library the Archive lacks is exit code 2,
 one that cannot be read 3.
 
+Both list forms include field-level source markers in `fieldOrigins` and resolve their
+references through `provenance`. Each `libraries` string uses the corresponding physical
+directory path, including when another Entry has the same display name. In the detail
+list, `file` uses directory metadata, and the library name and Prefab rows use the
+original XML payload. Names and IDs retain their attribute or element location. The
+three counts use the relevant original `Objects` subtree or the Prefab element where
+the parser determined it was absent. XML repaired during decoding retains its physical
+payload source with an explicit coordinate omission.
+
 ## `p4kx prefab dump <archive> <library> <prefab> --json`
 
 ```json

@@ -3,7 +3,8 @@
 
 //! Reading prefab libraries.
 
-use p4kx_model::{MAX_GROUP_DEPTH, PrefabError, PrefabLibrary};
+use p4kx_cryxml::{SourceAttributePosition, SourceElementPosition};
+use p4kx_model::{MAX_GROUP_DEPTH, PrefabError, PrefabLibrary, PrefabLibraryNameSource};
 use p4kx_testkit::{TestPrefabLibrary, TestPrefabObject};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -231,5 +232,148 @@ fn a_non_uniform_scale_under_a_turned_group_scales_before_it_turns() -> TestResu
         assert!(row.iter().zip(wanted).all(|(a, e)| (a - e).abs() < 1e-5));
     }
     assert!(near(object.transform.translation(), [-1.0, 1.0, 1.0]));
+    Ok(())
+}
+
+fn text_attribute<'a>(
+    bytes: &'a [u8],
+    position: &SourceAttributePosition,
+) -> Result<&'a [u8], &'static str> {
+    let SourceAttributePosition::Text(range) = position else {
+        return Err("expected a text attribute");
+    };
+    bytes.get(range.clone()).ok_or("attribute range must fit")
+}
+
+#[test]
+fn positioned_prefab_library_records_the_authored_fields_and_selected_objects() -> TestResult {
+    let text = concat!(
+        "\u{feff}<PrefabsLibrary xmlns:extra=\"urn:extra\" extra:Name=\"decoy\" ",
+        "Name=\" démo &amp; hall \"><Prefab extra:Name=\"decoy\" Name=\" hall \" Id=\"\">",
+        "<Objects><Object Type=\"Prefab\" /><Object Type=\"Brush\" Rotate=\"0,0,0,0\" /></Objects>",
+        "<Objects><Object Name=\"ignored\" /></Objects></Prefab><Prefab/></PrefabsLibrary>",
+    );
+    let bytes = text.as_bytes();
+    let positioned = PrefabLibrary::parse_positioned(bytes)?;
+    assert_eq!(positioned.library, PrefabLibrary::parse(bytes)?);
+    assert_eq!(positioned.library.name, "démo & hall");
+    let source = positioned.source.ok_or("expected original positions")?;
+    let PrefabLibraryNameSource::Attribute(name) = &source.name else {
+        return Err("expected original Name attribute".into());
+    };
+    assert_eq!(
+        text_attribute(bytes, name)?,
+        "Name=\" démo &amp; hall \"".as_bytes()
+    );
+    let row = source
+        .prefabs
+        .first()
+        .ok_or("expected first row positions")?;
+    assert_eq!(
+        text_attribute(bytes, row.name.as_ref().ok_or("Name")?)?,
+        b"Name=\" hall \""
+    );
+    assert_eq!(
+        text_attribute(bytes, row.id.as_ref().ok_or("Id")?)?,
+        b"Id=\"\""
+    );
+    let Some(SourceElementPosition::Text(objects)) = &row.objects else {
+        return Err("expected the selected Objects position".into());
+    };
+    let object_text = text.get(objects.clone()).ok_or("Objects range must fit")?;
+    assert!(
+        object_text.starts_with("<Objects><Object Type=\"Prefab\""),
+        "{object_text}"
+    );
+    assert!(!object_text.contains("ignored"), "{object_text}");
+    let hall = positioned
+        .library
+        .find("hall")
+        .ok_or("expected parsed hall")?;
+    assert_eq!(hall.objects.len(), 1);
+    assert_eq!(hall.invalid, 1);
+    assert!(hall.objects.iter().all(|object| object.nested.is_some()));
+    let empty = source
+        .prefabs
+        .get(1)
+        .ok_or("expected second row positions")?;
+    assert_eq!(empty.name, None);
+    assert_eq!(empty.id, None);
+    assert_eq!(empty.objects, None);
+    Ok(())
+}
+
+#[test]
+fn positioned_prefab_library_selects_the_tag_when_the_root_name_is_blank() -> TestResult {
+    let text = b"<Library Name=\"   \"><Prefab Name=\"p\"/></Library>";
+    let positioned = PrefabLibrary::parse_positioned(text)?;
+    let source = positioned.source.ok_or("expected original positions")?;
+    assert_eq!(positioned.library.name, "Library");
+    assert_eq!(source.root, SourceElementPosition::Text(0..text.len()));
+    assert_eq!(
+        source.name,
+        PrefabLibraryNameSource::Element(SourceElementPosition::Text(0..text.len()))
+    );
+    Ok(())
+}
+
+#[test]
+fn positioned_prefab_library_preserves_cryxml_table_indices() -> TestResult {
+    let bytes = TestPrefabLibrary::new("test")
+        .prefab("p", Vec::new())
+        .cryxml();
+    let positioned = PrefabLibrary::parse_positioned(&bytes)?;
+    assert_eq!(positioned.library, PrefabLibrary::parse(&bytes)?);
+    let source = positioned.source.ok_or("expected original positions")?;
+    assert_eq!(
+        source.name,
+        PrefabLibraryNameSource::Attribute(SourceAttributePosition::CryXml {
+            node_index: 0,
+            attribute_index: 0,
+        })
+    );
+    let prefab = source
+        .prefabs
+        .first()
+        .ok_or("expected first row positions")?;
+    assert_eq!(prefab.element, SourceElementPosition::CryXml(1));
+    assert_eq!(prefab.objects, Some(SourceElementPosition::CryXml(2)));
+    assert_eq!(
+        prefab.id,
+        Some(SourceAttributePosition::CryXml {
+            node_index: 1,
+            attribute_index: 3,
+        })
+    );
+    Ok(())
+}
+
+#[test]
+fn positioned_prefab_library_omits_coordinates_when_text_is_repaired() -> TestResult {
+    let text = b"<PrefabsLibrary Name=\"A\xFFB\"><Prefab Name=\"p\"/></PrefabsLibrary>";
+    let positioned = PrefabLibrary::parse_positioned(text)?;
+    assert_eq!(positioned.library, PrefabLibrary::parse(text)?);
+    assert_eq!(positioned.library.name, "A\u{fffd}B");
+    assert!(positioned.source.is_none());
+    Ok(())
+}
+
+#[test]
+fn positioned_prefab_library_omits_coordinates_when_cryxml_strings_are_repaired() -> TestResult {
+    let mut bytes = TestPrefabLibrary::new("broken-library")
+        .prefab("p", Vec::new())
+        .cryxml();
+    let marker = b"broken-library";
+    let position = bytes
+        .windows(marker.len())
+        .position(|bytes| bytes == marker)
+        .ok_or("expected original library name")?;
+    *bytes
+        .get_mut(position)
+        .ok_or("expected library name byte")? = 0xff;
+
+    let positioned = PrefabLibrary::parse_positioned(&bytes)?;
+    assert_eq!(positioned.library, PrefabLibrary::parse(&bytes)?);
+    assert!(positioned.source.is_none());
     Ok(())
 }

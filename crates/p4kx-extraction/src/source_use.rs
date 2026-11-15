@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+#[path = "source_xml_location.rs"]
+mod xml_location;
+
 use std::cmp::Ordering;
 use std::fmt;
 use std::hash::{Hash, Hasher};

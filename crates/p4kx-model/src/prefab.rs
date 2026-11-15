@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::borrow::Cow;
 use std::sync::Arc;
 
 use p4kx_cryxml::{CryXmlError, Xml};
@@ -8,6 +9,7 @@ use thiserror::Error;
 
 use crate::Transform;
 use crate::mtl_xml::XmlElement;
+use crate::prefab_source::{PositionedPrefabLibrary, PrefabLibrarySource, PrefabSource};
 use crate::soc_entities::entity_transform;
 
 /// The most prefabs one library lists.
@@ -121,15 +123,16 @@ impl PrefabLibrary {
     /// Returns [`PrefabError`] when the file is neither, its root is no `PrefabsLibrary` or it
     /// lists more prefabs or objects than are read.
     pub fn parse(bytes: &[u8]) -> Result<Self, PrefabError> {
-        match p4kx_cryxml::read(bytes)? {
-            Xml::CryXml(document) => library(document.root()),
-            Xml::Text(text) => {
-                let text = String::from_utf8_lossy(text);
-                p4kx_cryxml::check_text_depth(&text)?;
-                let document = roxmltree::Document::parse(&text)?;
-                library(document.root_element())
-            }
-        }
+        Ok(parse_library(bytes, SourceCapture::ValuesOnly)?.library)
+    }
+
+    /// Reads the library and the positions of its original fields.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::parse`].
+    pub fn parse_positioned(bytes: &[u8]) -> Result<PositionedPrefabLibrary, PrefabError> {
+        parse_library(bytes, SourceCapture::Positions)
     }
 
     /// Returns the first prefab named `name`, ignoring case.
@@ -141,7 +144,43 @@ impl PrefabLibrary {
     }
 }
 
-fn library<'a>(root: impl XmlElement<'a>) -> Result<PrefabLibrary, PrefabError> {
+#[derive(Clone, Copy)]
+enum SourceCapture {
+    ValuesOnly,
+    Positions,
+}
+
+impl SourceCapture {
+    const fn omit_if_repaired(self, repaired: bool) -> Self {
+        if repaired { Self::ValuesOnly } else { self }
+    }
+}
+
+fn parse_library(
+    bytes: &[u8],
+    capture: SourceCapture,
+) -> Result<PositionedPrefabLibrary, PrefabError> {
+    match p4kx_cryxml::read(bytes)? {
+        Xml::CryXml(document) => library(
+            document.root(),
+            capture.omit_if_repaired(document.is_lossy()),
+        ),
+        Xml::Text(text) => {
+            let text = String::from_utf8_lossy(text);
+            p4kx_cryxml::check_text_depth(&text)?;
+            let document = roxmltree::Document::parse(&text)?;
+            library(
+                document.root_element(),
+                capture.omit_if_repaired(matches!(text, Cow::Owned(_))),
+            )
+        }
+    }
+}
+
+fn library<'a>(
+    root: impl XmlElement<'a>,
+    capture: SourceCapture,
+) -> Result<PositionedPrefabLibrary, PrefabError> {
     let is_library = root.name().eq_ignore_ascii_case("PrefabsLibrary")
         || root
             .children()
@@ -151,26 +190,38 @@ fn library<'a>(root: impl XmlElement<'a>) -> Result<PrefabLibrary, PrefabError> 
             found: root.name().to_owned(),
         });
     }
-    let mut result = PrefabLibrary {
-        name: Some(attribute(root, "Name"))
-            .filter(|name| !name.is_empty())
-            .unwrap_or_else(|| root.name().to_owned()),
+    let authored_name = root
+        .attribute("Name")
+        .map(str::trim)
+        .filter(|name| !name.is_empty());
+    let mut library = PrefabLibrary {
+        name: authored_name.unwrap_or_else(|| root.name()).to_owned(),
         prefabs: Vec::new(),
     };
-    let mut objects = 0_usize;
+    let mut source = match capture {
+        SourceCapture::Positions => PrefabLibrarySource::new(root, authored_name),
+        SourceCapture::ValuesOnly => None,
+    };
+    let mut total_objects = 0_usize;
     for element in root.children() {
         if !element.name().eq_ignore_ascii_case("Prefab") {
             continue;
         }
-        if result.prefabs.len() >= MAX_LIBRARY_PREFABS {
+        if library.prefabs.len() >= MAX_LIBRARY_PREFABS {
             return Err(PrefabError::TooMany {
                 what: "prefabs",
                 limit: MAX_LIBRARY_PREFABS,
             });
         }
-        result.prefabs.push(read_prefab(element, &mut objects)?);
+        let objects = child(element, "Objects");
+        library
+            .prefabs
+            .push(read_prefab(element, objects, &mut total_objects)?);
+        if let Some(source) = &mut source {
+            source.prefabs.push(PrefabSource::new(element, objects));
+        }
     }
-    Ok(result)
+    Ok(PositionedPrefabLibrary { library, source })
 }
 
 fn attribute<'a>(element: impl XmlElement<'a>, name: &str) -> String {
@@ -224,6 +275,7 @@ fn push_members<'a, E: XmlElement<'a>>(
 
 fn read_prefab<'a, E: XmlElement<'a>>(
     element: E,
+    objects: Option<E>,
     total: &mut usize,
 ) -> Result<Prefab, PrefabError> {
     let mut prefab = Prefab {
@@ -233,7 +285,7 @@ fn read_prefab<'a, E: XmlElement<'a>>(
         objects: Vec::new(),
         invalid: 0,
     };
-    let Some(objects) = child(element, "Objects") else {
+    let Some(objects) = objects else {
         return Ok(prefab);
     };
     let mut stack = Vec::new();

@@ -24,43 +24,16 @@ pub(crate) fn attribute_location(
     position: &SourceAttributePosition,
     field: &str,
 ) -> io::Result<SourceLocation> {
-    match position {
-        SourceAttributePosition::Text(range) => Ok(location(
-            "textXmlAttribute",
-            vec![range.start as u64, range.end as u64],
-            field,
-        )),
-        SourceAttributePosition::CryXml {
-            node_index,
-            attribute_index,
-        } => Ok(location(
-            "cryxmlAttribute",
-            vec![u64::from(*node_index), u64::from(*attribute_index)],
-            field,
-        )),
-        _ => Err(io::Error::other(
-            "unrecognized action-map attribute coordinate",
-        )),
-    }
+    SourceLocation::xml_attribute(position, field)
+        .ok_or_else(|| io::Error::other("unrecognized action-map attribute coordinate"))
 }
 
 pub(crate) fn node_location(
     position: &SourceElementPosition,
     field: &str,
 ) -> io::Result<SourceLocation> {
-    match position {
-        SourceElementPosition::Text(range) => Ok(location(
-            "textXmlElement",
-            vec![range.start as u64, range.end as u64],
-            field,
-        )),
-        SourceElementPosition::CryXml(index) => {
-            Ok(location("cryxmlNode", vec![u64::from(*index)], field))
-        }
-        _ => Err(io::Error::other(
-            "unrecognized action-map element coordinate",
-        )),
-    }
+    SourceLocation::xml_element(position, field)
+        .ok_or_else(|| io::Error::other("unrecognized action-map element coordinate"))
 }
 
 pub(crate) fn location(namespace: &str, indices: Vec<u64>, field: &str) -> SourceLocation {

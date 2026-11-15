@@ -6,7 +6,7 @@
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
-use p4kx_testkit::{ArchiveBuilder, TestPrefabLibrary, TestPrefabObject};
+use p4kx_testkit::{ArchiveBuilder, TestEntry, TestPrefabLibrary, TestPrefabObject};
 use serde_json::Value;
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -96,6 +96,143 @@ fn the_libraries_and_their_prefabs_are_listed() -> TestResult {
     let table = run(&["list", "test/rooms"], &archive, false)?;
     assert!(table.stdout.contains("hall"), "{}", table.stdout);
     Ok(())
+}
+
+#[test]
+fn duplicate_library_names_keep_their_physical_directory_sources() -> TestResult {
+    const NAME: &str = "Data/Prefabs/test/shared.xml";
+    let directory = tempfile::tempdir()?;
+    let archive = directory.path().join("Data.p4k");
+    ArchiveBuilder::new()
+        .entry(TestEntry::stored(NAME, b"not an XML payload").encrypted())
+        .entry(TestEntry::stored(NAME, b"another unread payload"))
+        .write_to(&archive)?;
+
+    let result = run(&["list"], &archive, true)?;
+    assert_eq!(result.code, Some(0), "{}", result.stderr);
+    let json: Value = serde_json::from_str(&result.stdout)?;
+    assert_eq!(
+        json["libraries"],
+        serde_json::json!(["test/shared", "test/shared"]),
+        "the directory list retains physical duplicates"
+    );
+    for (index, encryption) in [(0, "encrypted"), (1, "unencrypted")] {
+        let key = format!("/libraries/{index}");
+        let origin = json["fieldOrigins"]
+            .get(&key)
+            .ok_or("missing list origin")?;
+        assert_eq!(
+            origin["containsEncryptedSource"], false,
+            "the root directory supplied the name without reading the payload"
+        );
+        assert_eq!(origin["sourceSetComplete"], true);
+        let source = library_source(&json, origin)?;
+        assert_eq!(source["entryIndex"], index);
+        assert_eq!(source["storedEncryption"], encryption);
+    }
+    Ok(())
+}
+
+fn library_source<'report>(
+    json: &'report Value,
+    origin: &Value,
+) -> Result<&'report Value, Box<dyn Error>> {
+    let usage = source_use(json, origin)?;
+
+    assert_eq!(
+        usage["scope"], "archiveDirectoryMetadata",
+        "name from the directory"
+    );
+    assert_eq!(
+        usage["role"], "conversion",
+        "display name derives from the path"
+    );
+    assert_eq!(
+        usage.pointer("/location/field").and_then(Value::as_str),
+        Some("path"),
+        "exact path field"
+    );
+    json.pointer("/provenance/sources")
+        .and_then(Value::as_array)
+        .and_then(|sources| {
+            sources
+                .iter()
+                .find(|source| source["id"] == usage["source"])
+        })
+        .ok_or_else(|| "unresolved physical directory source".into())
+}
+
+fn source_use<'report>(
+    json: &'report Value,
+    origin: &Value,
+) -> Result<&'report Value, Box<dyn Error>> {
+    let [reference] = origin["sourceUsesRefs"]
+        .as_array()
+        .ok_or("source use refs")?
+        .as_slice()
+    else {
+        return Err("expected one original source use".into());
+    };
+    json.pointer("/provenance/uses")
+        .and_then(Value::as_array)
+        .and_then(|uses| uses.iter().find(|usage| &usage["id"] == reference))
+        .ok_or_else(|| "unresolved source use".into())
+}
+
+#[test]
+fn library_details_keep_directory_and_payload_origins_separate() -> TestResult {
+    let directory = tempfile::tempdir()?;
+    let archive = directory.path().join("Data.p4k");
+    let xml = concat!(
+        "\u{feff}",
+        r#"<PrefabsLibrary Name="Room"><Prefab Name="Hall" Id="room-id"><Objects/></Prefab></PrefabsLibrary>"#,
+    );
+    ArchiveBuilder::new()
+        .entry(TestEntry::stored("Data/Prefabs/test/room.xml", xml.as_bytes()).encrypted())
+        .write_to(&archive)?;
+    let result = run(&["list", "test/room"], &archive, true)?;
+    assert_eq!(result.code, Some(0), "{}", result.stderr);
+    let json: Value = serde_json::from_str(&result.stdout)?;
+    assert_eq!(json["library"], "Room");
+    assert_eq!(json["prefabs"][0]["name"], "Hall");
+    let origins = json["fieldOrigins"].as_object().ok_or("field origins")?;
+    let file = origins.get("/file").ok_or("directory-backed file")?;
+    let path_use = source_use(&json, file)?;
+    assert_eq!(file["containsEncryptedSource"], false);
+    assert_eq!(path_use["scope"], "archiveDirectoryMetadata");
+
+    for (path, literal) in [
+        ("/library", "Name=\"Room\""),
+        ("/prefabs/0/name", "Name=\"Hall\""),
+        ("/prefabs/0/id", "Id=\"room-id\""),
+        ("/prefabs/0/objects", "<Objects/>"),
+        ("/prefabs/0/nested", "<Objects/>"),
+        ("/prefabs/0/left_out", "<Objects/>"),
+    ] {
+        let origin = origins.get(path).ok_or("payload-backed field")?;
+        let usage = source_use(&json, origin)?;
+        assert_eq!(origin["containsEncryptedSource"], true, "{path}");
+        assert_eq!(origin["sourceSetComplete"], true, "{path}");
+        assert_eq!(usage["source"], path_use["source"], "{path}");
+        assert_eq!(usage["scope"], "payload", "{path}");
+        assert_eq!(original_bytes(xml, usage)?, literal, "{path}");
+    }
+    Ok(())
+}
+
+fn original_bytes<'xml>(xml: &'xml str, usage: &Value) -> Result<&'xml str, Box<dyn Error>> {
+    let [start, end] = usage
+        .pointer("/location/indices")
+        .and_then(Value::as_array)
+        .ok_or("XML range")?
+        .as_slice()
+    else {
+        return Err("expected a text XML range".into());
+    };
+    let start = start.as_str().ok_or("start")?.parse::<usize>()?;
+    let end = end.as_str().ok_or("end")?.parse::<usize>()?;
+    xml.get(start..end)
+        .ok_or_else(|| "original source bytes".into())
 }
 
 #[test]

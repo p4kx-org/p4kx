@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_cryxml::{Element, SourceElementPosition};
+use p4kx_cryxml::{Element, SourceAttributePosition, SourceElementPosition};
 
 use crate::MaterialError;
 use crate::mtl_xml_source::{self, Syntax};
@@ -23,6 +23,7 @@ pub(crate) trait XmlElement<'a>: Copy {
             .map(|attribute| attribute.value)
     }
     fn positioned_attribute(self, name: &str) -> Option<PositionedAttribute<'a>>;
+    fn attribute_position(self, name: &str) -> Option<SourceAttributePosition>;
 
     fn attributes(self) -> impl Iterator<Item = (&'a str, &'a str)>;
 
@@ -53,6 +54,12 @@ impl<'a> XmlElement<'a> for Element<'a> {
             })
     }
 
+    fn attribute_position(self, name: &str) -> Option<SourceAttributePosition> {
+        self.source_attributes()
+            .find(|attribute| attribute.name() == name)
+            .map(|attribute| attribute.position().clone())
+    }
+
     fn attributes(self) -> impl Iterator<Item = (&'a str, &'a str)> {
         Element::attributes(self).map(|attribute| (attribute.name(), attribute.value()))
     }
@@ -76,14 +83,16 @@ impl<'a> XmlElement<'a> for roxmltree::Node<'a, '_> {
     }
 
     fn positioned_attribute(self, name: &str) -> Option<PositionedAttribute<'a>> {
-        roxmltree::Node::attributes(&self)
-            .enumerate()
-            .find(|(_, attribute)| attribute.namespace().is_none() && attribute.name() == name)
-            .map(|(ordinal, attribute)| PositionedAttribute {
-                ordinal,
-                name: attribute.name(),
-                value: attribute.value(),
-            })
+        text_attribute(self, name).map(|(ordinal, attribute)| PositionedAttribute {
+            ordinal,
+            name: attribute.name(),
+            value: attribute.value(),
+        })
+    }
+
+    fn attribute_position(self, name: &str) -> Option<SourceAttributePosition> {
+        text_attribute(self, name)
+            .map(|(_, attribute)| SourceAttributePosition::Text(attribute.range()))
     }
 
     fn attributes(self) -> impl Iterator<Item = (&'a str, &'a str)> {
@@ -93,4 +102,13 @@ impl<'a> XmlElement<'a> for roxmltree::Node<'a, '_> {
     fn children(self) -> impl Iterator<Item = Self> {
         roxmltree::Node::children(&self).filter(roxmltree::Node::is_element)
     }
+}
+
+fn text_attribute<'a, 'input>(
+    element: roxmltree::Node<'a, 'input>,
+    name: &str,
+) -> Option<(usize, roxmltree::Attribute<'a, 'input>)> {
+    roxmltree::Node::attributes(&element)
+        .enumerate()
+        .find(|(_, attribute)| attribute.namespace().is_none() && attribute.name() == name)
 }
