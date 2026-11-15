@@ -15,6 +15,9 @@ mod geometry;
 #[path = "catalog_ammo_radar_declaration.rs"]
 mod radar_declaration;
 
+#[path = "catalog_ammo_filter_dependencies.rs"]
+mod filter_dependencies;
+
 #[path = "catalog_weapon_magazine_slots.rs"]
 mod weapon_magazine_slots;
 
@@ -107,7 +110,7 @@ fn ammo_definitions_round_trip_through_the_deterministic_catalog_writer() -> Tes
 }
 
 #[test]
-fn ammo_definitions_respect_selection_while_filtered_dependencies_feed_legacy() -> TestResult {
+fn ammo_definition_rows_distinguish_filtered_dependencies_from_explicit_selection() -> TestResult {
     let source = fixture::database(0.0);
     let (_folder, archive) = common::open(&source, DcbOrigin::Plain)?;
     let items = Filter::parse("*/entities/scitem/*")?;
@@ -116,9 +119,21 @@ fn ammo_definitions_respect_selection_while_filtered_dependencies_feed_legacy() 
         ..common::options()
     };
     let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
-    assert!(
-        proof::rows(&catalog, &format!("{PATH}/rows"))?.is_empty(),
-        "a legacy dependency never auto-selects a definition"
+    let [ammo] = proof::rows(&catalog, &format!("{PATH}/rows"))? else {
+        return Err("one exact dependency Ammo Record".into());
+    };
+    assert_eq!(
+        proof::at(ammo, "/selection")?,
+        "dependency",
+        "a required definition retains its selection role"
+    );
+    assert_eq!(
+        proof::at(
+            kind(&catalog, "ammoDefinitions")?,
+            "/sourceRecords/selected"
+        )?,
+        &json!(0),
+        "emitting a dependency does not select it"
     );
     check_weapons(&catalog)?;
     assert_eq!(
@@ -132,11 +147,19 @@ fn ammo_definitions_respect_selection_while_filtered_dependencies_feed_legacy() 
         ..common::options()
     };
     let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
+    let rows = proof::rows(&catalog, &format!("{PATH}/rows"))?;
     assert_eq!(
-        proof::rows(&catalog, &format!("{PATH}/rows"))?.len(),
+        rows.len(),
         2,
         "explicit Ammo selection emits definitions without weapons"
     );
+    for row in rows {
+        assert_eq!(
+            proof::at(row, "/selection")?,
+            "selected",
+            "ordinary definitions carry their selection role"
+        );
+    }
     assert!(
         proof::rows(&catalog, "/items")?.is_empty(),
         "no Item selection"

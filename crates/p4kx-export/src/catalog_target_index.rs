@@ -134,7 +134,7 @@ fn origins<'source>(
         if !uses_physical_row_identity(kind)
             || !source.disposition.read_succeeded()
             || (matches!(scope, OriginScope::Emitted)
-                && (source.role != ExportSourceRole::Selected
+                && (!projects_catalog_row(kind, source.role)
                     || source.disposition != SourceDisposition::Projected))
             || (matches!(scope, OriginScope::Excluded)
                 && (source.role != ExportSourceRole::Selected
@@ -165,6 +165,14 @@ fn origins<'source>(
             .insert(source.record_index);
     }
     Ok(origins)
+}
+
+const fn projects_catalog_row(kind: Kind, role: ExportSourceRole) -> bool {
+    match role {
+        ExportSourceRole::Selected => true,
+        ExportSourceRole::Dependency => matches!(kind, Kind::AmmoDefinitions),
+        _ => false,
+    }
 }
 
 const fn uses_physical_row_identity(kind: Kind) -> bool {

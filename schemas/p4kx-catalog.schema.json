@@ -767,6 +767,9 @@
         "ownerRecordIndex": {
           "$ref": "#/$defs/SourcedValueOfuint32"
         },
+        "selection": {
+          "$ref": "#/$defs/AmmoSelection"
+        },
         "sourceType": {
           "$ref": "#/$defs/SourcedValueOfstring"
         }
@@ -787,6 +790,7 @@
         "maxRestockCount",
         "ownerGuid",
         "ownerRecordIndex",
+        "selection",
         "sourceType"
       ],
       "type": "object"
@@ -944,6 +948,9 @@
         "ricochetSound": {
           "$ref": "#/$defs/SourcedValueOfAudioResource"
         },
+        "selection": {
+          "$ref": "#/$defs/AmmoSelection"
+        },
         "shotsPerAudioLoop": {
           "$ref": "#/$defs/SourcedValueOfuint32"
         },
@@ -1007,6 +1014,7 @@
         "recordPath",
         "resourceType",
         "ricochetSound",
+        "selection",
         "shotsPerAudioLoop",
         "showtime",
         "size",
@@ -1435,6 +1443,15 @@
         "scanDisplayLayoutOverride"
       ],
       "type": "object"
+    },
+    "AmmoSelection": {
+      "description": "Why a physical ammunition row belongs to this catalog selection.",
+      "enum": [
+        "selected",
+        "dependency"
+      ],
+      "type": "string",
+      "x-p4kx-vocabularyClass": "control"
     },
     "AmmoStats": {
       "description": "The ammunition of a weapon.",

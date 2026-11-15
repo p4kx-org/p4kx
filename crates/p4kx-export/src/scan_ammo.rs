@@ -9,13 +9,15 @@ use std::sync::{Arc, Mutex};
 use p4kx_extraction::{CancelToken, DataForgeError, Filter, Record, RecordTree};
 
 use crate::catalog_projection::CatalogProjection;
-use crate::catalog_v3::ammo_definition::{self, PreparedAmmoDefinition};
+use crate::catalog_v3::ammo_definition::{self, AmmoSelection, PreparedAmmoDefinition};
+use crate::catalog_v3::catalog_item_components::resolution::MagazineDependencies;
 use crate::contract_stats::AmmoStats;
 use crate::entity_selection::{self, Selected};
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_evidence_lock;
 use crate::export_field_inspection::FieldInspection;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
+use crate::picked::Picked;
 use crate::record_observation::RecordObservation;
 use crate::scan_health::ScanError;
 use crate::{CatalogError, ExportAccountingError, Kind, item_stats};
@@ -26,6 +28,7 @@ pub(super) struct AmmoReads<'options, 'input, 'source> {
     filter: Option<&'options Filter>,
     cancel: Option<&'options CancelToken>,
     slots: Mutex<HashMap<u32, Arc<AmmoSlot<'source>>>>,
+    pub(super) magazines: MagazineDependencies<'options, 'source>,
     #[cfg(test)]
     materialized_reads: AtomicUsize,
 }
@@ -49,10 +52,10 @@ enum AmmoRead<'source> {
 struct ReadableAmmo<'source> {
     compatibility: AmmoStats,
     inspection: FieldInspection,
-    selected: Option<SelectedAmmo<'source>>,
+    definition: Option<CanonicalAmmo<'source>>,
 }
 
-struct SelectedAmmo<'source> {
+struct CanonicalAmmo<'source> {
     definition: PreparedAmmoDefinition<'source>,
     projection: ExportLedger,
 }
@@ -68,6 +71,7 @@ impl<'options, 'input, 'source> AmmoReads<'options, 'input, 'source> {
             filter,
             cancel,
             slots: Mutex::new(HashMap::new()),
+            magazines: MagazineDependencies::new(filter),
             #[cfg(test)]
             materialized_reads: AtomicUsize::new(0),
         }
@@ -84,15 +88,16 @@ impl<'options, 'input, 'source> AmmoReads<'options, 'input, 'source> {
                 .as_mut()
                 .ok_or_else(|| CatalogError::from(ExportAccountingError::ConflictingSourceDatum))?;
             let ReadableAmmo {
-                selected,
+                definition,
                 inspection,
                 ..
             } = match read {
                 AmmoRead::Readable(read) => read.as_mut(),
                 AmmoRead::Unreadable(error) => return Err(error.clone().into()),
             };
-            let selected = selected
+            let selected = definition
                 .take()
+                .filter(|row| row.definition.selection() == AmmoSelection::Selected)
                 .ok_or_else(|| CatalogError::from(ExportAccountingError::ConflictingSourceDatum))?;
             retain_inspection(
                 ledger,
@@ -124,6 +129,60 @@ impl<'options, 'input, 'source> AmmoReads<'options, 'input, 'source> {
                 AmmoRead::Unreadable(_) => None,
             })
         })
+    }
+
+    /// Releases canonical rows for required ammunition and magazine dependencies.
+    pub(super) fn dependencies(
+        &self,
+        picked: &mut Vec<Picked<'source>>,
+        ledger: &mut ExportLedger,
+    ) -> Result<(), CatalogError> {
+        picked.extend(
+            self.dependency_rows(ledger)?
+                .into_iter()
+                .map(|row| Picked::AmmoDefinition(Box::new(row))),
+        );
+        picked.extend(
+            self.magazines
+                .take(ledger)?
+                .map(|row| Picked::AmmoMagazineDependency(Box::new(row))),
+        );
+        Ok(())
+    }
+
+    fn dependency_rows(
+        &self,
+        ledger: &mut ExportLedger,
+    ) -> Result<Vec<PreparedAmmoDefinition<'source>>, CatalogError> {
+        let slots = export_evidence_lock::lock(&self.slots)?;
+        let mut rows = Vec::new();
+        for slot in slots.values() {
+            let mut state = export_evidence_lock::lock(&slot.state)?;
+            if !state.dependency_observed {
+                continue;
+            }
+            let Some(AmmoRead::Readable(read)) = &mut state.read else {
+                continue;
+            };
+            if read
+                .definition
+                .as_ref()
+                .is_some_and(|row| row.definition.selection() == AmmoSelection::Dependency)
+                && let Some(retained) = read.definition.take()
+            {
+                retain_inspection(
+                    ledger,
+                    &read.inspection,
+                    Kind::AmmoDefinitions,
+                    ExportSourceRole::Dependency,
+                );
+                ledger.merge(retained.projection);
+                rows.push(retained.definition);
+            }
+            drop(state);
+        }
+        drop(slots);
+        Ok(rows)
     }
 
     fn with<T, E>(
@@ -172,36 +231,47 @@ impl<'options, 'input, 'source> AmmoReads<'options, 'input, 'source> {
             .field_inspections
             .pop()
             .ok_or(ExportAccountingError::ConflictingFieldInspection)?;
-        let selected = matches!(
+        let selection = if matches!(
             entity_selection::select(admission.record(), self.filter),
             Ok(Some(Selected::Entity(Kind::AmmoDefinitions)))
-        )
-        .then(|| self.prepare_selected(tree, admission))
-        .transpose()?;
+        ) {
+            AmmoSelection::Selected
+        } else {
+            AmmoSelection::Dependency
+        };
+        let definition = self.prepare_definition(tree, admission, selection)?;
         Ok(ReadableAmmo {
             compatibility,
             inspection,
-            selected,
+            definition: Some(definition),
         })
     }
 
-    fn prepare_selected(
+    fn prepare_definition(
         &self,
         tree: &RecordTree<'source>,
         admission: &RecordObservation<'_, 'source>,
-    ) -> Result<SelectedAmmo<'source>, CatalogError> {
+        selection: AmmoSelection,
+    ) -> Result<CanonicalAmmo<'source>, CatalogError> {
         let (definition, notes) =
-            ammo_definition::read(self.projection, tree, admission, self.cancel)?;
+            ammo_definition::read(self.projection, tree, admission, self.cancel, selection)?;
         let mut projection = ExportLedger::default();
         crate::source_projection_notes::record(
             Kind::AmmoDefinitions,
-            ExportSourceRole::Selected,
+            selection.role(),
             admission,
             tree,
             notes,
             &mut projection,
         )?;
-        Ok(SelectedAmmo {
+        if selection == AmmoSelection::Dependency {
+            projection.observe(admission.source(
+                Some(Kind::AmmoDefinitions),
+                ExportSourceRole::Dependency,
+                SourceDisposition::Projected,
+            )?);
+        }
+        Ok(CanonicalAmmo {
             definition,
             projection,
         })

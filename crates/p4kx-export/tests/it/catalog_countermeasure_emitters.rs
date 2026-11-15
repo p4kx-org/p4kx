@@ -50,12 +50,22 @@ fn countermeasure_emitters_project_proved_roles_without_copying_ammo() -> TestRe
 }
 
 #[test]
-fn countermeasure_emitters_require_selected_definition_and_proved_route() -> TestResult {
+fn countermeasure_emitters_require_materialized_definition_and_proved_route() -> TestResult {
     let filter = Filter::parse(WEAPON_PATH)?;
     let filtered = build(Case::Countermeasure, DcbOrigin::Plain, Some(&filter))?;
-    assert!(
-        proof::rows(&filtered, EMITTERS)?.is_empty(),
-        "a filter cannot silently publish hidden ammo definitions"
+    let [primary] = proof::rows(&filtered, EMITTERS)? else {
+        return Err("only the route with a retained Ammo dependency can produce an emitter".into());
+    };
+    let [ammo] = proof::rows(&filtered, AMMO)? else {
+        return Err("one original primary dependency".into());
+    };
+    assert_eq!(proof::at(ammo, "/selection")?, "dependency");
+    let route = proof::at(primary, "/route/value")?;
+    proof::present(route, "ammoRole", &json!("primary"), Some(false))?;
+    assert_eq!(
+        proof::at(route, "/ammoRecordIndex/value")?,
+        proof::at(ammo, "/recordIndex/value")?,
+        "the emitter uses the same physical dependency"
     );
     assert_eq!(
         proof::rows(&filtered, SELECTIONS)?.len(),

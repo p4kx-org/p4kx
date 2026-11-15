@@ -54,6 +54,14 @@ pub(super) fn database(impact: f32) -> DataForgeBuilder {
         .record(item(MAGAZINE, "fixture_magazine", vec![container(30)]))
 }
 
+pub(super) fn shared_magazine_database() -> DataForgeBuilder {
+    database(0.0).record(item(
+        0x8127,
+        "fixture_personal_second",
+        vec![weapon(Some(MAGAZINE))],
+    ))
+}
+
 fn ammo_types(builder: DataForgeBuilder) -> DataForgeBuilder {
     builder
         .structure(

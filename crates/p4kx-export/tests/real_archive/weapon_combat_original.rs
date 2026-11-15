@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::BTreeMap;
-
 use p4kx_export::Kind;
 use p4kx_extraction::{DataForge, Filter, Record, RecordTree, StructValue, TreeBuilder, Value};
 
@@ -27,6 +25,7 @@ pub(super) struct Witness<'source> {
     pub(super) mode: usize,
     pub(super) source_type: &'source str,
     pub(super) magazine: Option<u32>,
+    pub(super) container: usize,
 }
 
 pub(super) struct OriginalAction<'tree, 'source> {
@@ -50,7 +49,6 @@ pub(super) fn find<'source>(forge: &'source DataForge<'source>) -> Option<Witnes
     let filter = Filter::new("/ships/weapons/");
     let probe = forge.pointer_probe("Components", WEAPON)?;
     let mut trees = TreeBuilder::new();
-    let mut scopes = None;
     for owner in forge.records() {
         if !matches!(
             real_archive_item_components::selected_item(&owner, &rule, &filter),
@@ -62,8 +60,7 @@ pub(super) fn find<'source>(forge: &'source DataForge<'source>) -> Option<Witnes
         let Ok(owner_tree) = trees.build(&owner) else {
             continue;
         };
-        let scopes = scopes.get_or_insert_with(|| PathScopes::new(forge));
-        if let Some(witness) = inspect(forge, owner_tree, scopes, &mut trees) {
+        if let Some(witness) = inspect(forge, owner_tree, &mut trees) {
             return Some(witness);
         }
     }
@@ -73,7 +70,6 @@ pub(super) fn find<'source>(forge: &'source DataForge<'source>) -> Option<Witnes
 fn inspect<'source>(
     forge: &'source DataForge<'source>,
     tree: RecordTree<'source>,
-    scopes: &mut PathScopes<'source>,
     trees: &mut TreeBuilder<'source>,
 ) -> Option<Witness<'source>> {
     let (component, weapon) = unique(&tree, WEAPON)?;
@@ -82,7 +78,7 @@ fn inspect<'source>(
         MagazineSource::Inline => (&tree, None),
         MagazineSource::Linked(owner) => (owner.as_ref(), Some(owner.record_index())),
     };
-    let (_, source) = unique(ammo_owner, CONTAINER)?;
+    let (container, source) = unique(ammo_owner, CONTAINER)?;
     let source = structure(source)?;
     let raw = structure(weapon)?.field("fireActions")?;
     let actions = array(raw)?;
@@ -93,15 +89,25 @@ fn inspect<'source>(
         let Some(action) = action_inputs(raw) else {
             continue;
         };
+        if !matches!(action.role, Value::Enum("Primary")) {
+            continue;
+        }
         let Some(ammo) = selected_ammo(forge, source, action.role) else {
             continue;
         };
         let Ok(ammo_path) = ammo.record_path() else {
             continue;
         };
-        let Some(filter) = scopes.narrow_filter(tree.record_path(), ammo_path) else {
+        let filter = Filter::new(tree.record_path());
+        if filter.matches(ammo_path)
+            || forge
+                .records()
+                .filter(|record| record.record_path().is_ok_and(|path| filter.matches(path)))
+                .count()
+                != 1
+        {
             continue;
-        };
+        }
         let Ok(ammo_tree) = trees.build(&ammo) else {
             continue;
         };
@@ -117,6 +123,7 @@ fn inspect<'source>(
             mode,
             source_type,
             magazine: magazine_index,
+            container,
         });
     }
     None
@@ -302,72 +309,4 @@ pub(super) fn single(value: &Value<'_>) -> Option<f64> {
         return Some(f64::from(*number));
     }
     None
-}
-
-struct PathScopes<'source> {
-    paths: Vec<&'source str>,
-    bounded: BTreeMap<String, bool>,
-}
-
-impl<'source> PathScopes<'source> {
-    fn new(forge: &'source DataForge<'source>) -> Self {
-        Self {
-            paths: forge
-                .records()
-                .filter_map(|record| record.record_path().ok())
-                .collect(),
-            bounded: BTreeMap::new(),
-        }
-    }
-
-    fn narrow_filter(&mut self, owner_path: &str, ammo_path: &str) -> Option<Filter> {
-        const MAX_SCOPE: usize = 24;
-        let owner = owner_path.rsplit(['/', '\\']).next()?;
-        let ammo = ammo_path.rsplit(['/', '\\']).next()?.to_ascii_lowercase();
-        for token in common_tokens(owner, &ammo) {
-            let token = token.to_ascii_lowercase();
-            let filter = Filter::new(&token);
-            if !filter.matches(owner_path) || !filter.matches(ammo_path) {
-                continue;
-            }
-            let bounded = self.bounded.entry(token).or_insert_with(|| {
-                let matched = self
-                    .paths
-                    .iter()
-                    .filter(|path| filter.matches(path))
-                    .take(MAX_SCOPE + 1)
-                    .count();
-                (2..=MAX_SCOPE).contains(&matched)
-            });
-            if *bounded {
-                return Some(filter);
-            }
-        }
-        None
-    }
-}
-
-fn common_tokens<'a>(owner: &'a str, ammo: &str) -> Vec<&'a str> {
-    const MIN_TOKEN: usize = 7;
-    let owner_ascii = owner.to_ascii_lowercase();
-    if !owner.is_ascii() {
-        return Vec::new();
-    }
-    let mut tokens = Vec::new();
-    for start in 0..owner.len() {
-        for end in (start.saturating_add(MIN_TOKEN)..=owner.len()).rev() {
-            if owner_ascii
-                .get(start..end)
-                .is_some_and(|token| !token.contains(['*', '?']) && ammo.contains(token))
-            {
-                if let Some(token) = owner.get(start..end) {
-                    tokens.push(token);
-                }
-                break;
-            }
-        }
-    }
-    tokens.sort_by_key(|token| std::cmp::Reverse(token.len()));
-    tokens.dedup();
-    tokens
 }

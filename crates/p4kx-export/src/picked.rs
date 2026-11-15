@@ -8,6 +8,7 @@ use crate::blueprint_category::BlueprintCategory;
 use crate::catalog_read_failure::CatalogReadFailure;
 use crate::catalog_v3::ammo_definition::PreparedAmmoDefinition;
 use crate::catalog_v3::blueprint_category_list::PreparedBlueprintCategoryList;
+use crate::catalog_v3::catalog_item_components::resolution::MagazineDependency;
 use crate::catalog_v3::catalog_resource_network_read::resource_network_global::PreparedResourceNetworkGlobal;
 use crate::catalog_v3::explosion_definition::PreparedExplosionDefinition;
 use crate::catalog_v3::faction_definition::PreparedFaction;
@@ -67,6 +68,7 @@ pub(crate) enum Picked<'f> {
     /// One original explosion definition.
     ExplosionDefinition(Box<PreparedExplosionDefinition<'f>>),
     AmmoDefinition(Box<PreparedAmmoDefinition<'f>>),
+    AmmoMagazineDependency(Box<MagazineDependency<'f>>),
     InventoryContainer(Box<PreparedInventoryContainer<'f>>),
     MedicalItemTierConfig(Box<PreparedMedicalTier<'f>>),
     ProceduralPlanetAudio(Box<PreparedPlanetAudio<'f>>),

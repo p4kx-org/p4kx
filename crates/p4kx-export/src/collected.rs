@@ -304,6 +304,7 @@ impl<'f> Collected<'f> {
             Picked::BlueprintCategoryList(entity) => self.blueprint_category_lists.push(entity),
             Picked::ExplosionDefinition(entity) => self.explosion_definitions.push(*entity),
             Picked::AmmoDefinition(entity) => self.ammo_definitions.push(*entity),
+            Picked::AmmoMagazineDependency(magazine) => magazine.collect(&mut self.item_components),
             Picked::InventoryContainer(entity) => self.inventory_containers.push(*entity),
             Picked::MedicalItemTierConfig(entity) => self.medical_item_tier_configs.push(*entity),
             Picked::ProceduralPlanetAudio(entity) => self.procedural_planet_audio.push(*entity),

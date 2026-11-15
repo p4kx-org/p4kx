@@ -18,6 +18,10 @@ use crate::record_header_field::RecordHeaderField;
 use crate::schema_fields::every_field_required;
 use crate::{CatalogError, ExportAccountingError};
 
+#[path = "catalog_magazine_dependencies.rs"]
+mod dependency;
+pub(crate) use dependency::{MagazineDependencies, MagazineDependency};
+
 #[path = "weapon_magazine_selection_evidence.rs"]
 mod evidence;
 
@@ -69,6 +73,7 @@ pub(crate) fn read<'source>(
     fields: &Fields<'_, '_, 'source>,
     observed: MagazineRead<'_, 'source>,
     cancel: Option<&CancelToken>,
+    dependencies: &MagazineDependencies<'_, 'source>,
 ) -> Result<Option<WeaponMagazineResolution>, CatalogError> {
     fields.check_tree(tree)?;
     let context = input.record_context(record)?;
@@ -111,6 +116,7 @@ pub(crate) fn read<'source>(
                 },
                 cancel,
                 &mut evidence,
+                dependencies,
             )?
         }
     };
@@ -147,6 +153,7 @@ fn linked<'source>(
     target: &LinkedTarget<'_, 'source>,
     cancel: Option<&CancelToken>,
     evidence: &mut SelectionEvidence,
+    dependencies: &MagazineDependencies<'_, 'source>,
 ) -> Result<Outcome, CatalogError> {
     caller.check_input(input)?;
     let original = caller.reference_observation()?;
@@ -180,10 +187,14 @@ fn linked<'source>(
             let fields = OriginalFlowFields::read(&scope, cancel)?;
             let resolved = evidence.retain(&fields, target.container)?;
             Ok(match target.container {
-                Some(container) => Outcome::LinkedContainer {
-                    magazine_record_index,
-                    container_ordinal: ComponentOwner::ordinal(&fields, fields.fact(container)?)?,
-                },
+                Some(container) => {
+                    let fact = fields.fact(container)?;
+                    dependencies.retain(input, &target.record, tree, &fields, fact, cancel)?;
+                    Outcome::LinkedContainer {
+                        magazine_record_index,
+                        container_ordinal: ComponentOwner::ordinal(&fields, fact)?,
+                    }
+                }
                 None if resolved => Outcome::LinkedWithoutContainer {
                     magazine_record_index,
                 },

@@ -1,8 +1,8 @@
 # Ammunition definitions
 
 `definitions.ammoDefinitions` contains one row for each selected physical
-`AmmoParams` Record. The ordinary Record filter applies at every path,
-including definitions without a referring weapon. The canonical header
+`AmmoParams` Record and each required primary Ammo dependency. The Record
+filter selects definitions independently of their use by weapons. The canonical header
 retains the GUID, physical `recordIndex`, source type and path. Rows sort
 by GUID and then physical index, so equal GUIDs do not merge physical
 definitions. The table's `availability` describes the source family
@@ -61,13 +61,24 @@ the one-hop `ammoContainerRecord` magazine fallback. `ammoCapacity` is the
 selected container's `maxAmmoCount`. Missing, wrong-type or unreadable
 ammunition leaves the legacy ammo value null. An admitted physical Ammo
 Record is materialized once for both the selected definition and weapon
-dependencies in a catalog scan. A filtered-out definition can still supply
-the legacy view of a selected weapon.
+dependencies in a catalog scan. A selected weapon can retain the exact primary
+Ammo definition as a canonical dependency.
 
 ## Physical containers and slots
 
+Ammo definitions and container configuration rows state `selection: selected` for ordinary
+catalog selection or `selection: dependency` for a physical row retained by an admitted
+weapon's original primary route. Dependencies preserve the same owner keys, fields and
+provenance and do not select their owning Item. A row that is also selected normally appears
+once. Omitted, unreadable and missing source endpoints retain their original decision states.
+
+The installed source check selects one physical weapon owner per Build through its record path.
+It verifies the primary container and dependent Ammo definition by their original Record and slot
+coordinates, then compares the authored damage channels and nominal flight-distance inputs.
+
 `configurations.ammoContainers` contains one row for each physical
-`SAmmoContainerComponentParams` on a selected Item. The rows follow
+`SAmmoContainerComponentParams` on a selected Item or a consulted linked
+primary magazine slot. The rows follow
 `ownerRecordIndex` and `componentOrdinal`, which together identify the
 original component occurrence. Repeated components keep separate rows.
 
@@ -81,7 +92,7 @@ Both attachment arrays preserve their original entries and order.
 container occurrence. `primaryAmmo` and `secondaryAmmo` retain the original
 `ammoParamsRecord` and `secondaryAmmoParamsRecord` References separately.
 Join a resolved `targetRecordIndex` to the physical index in
-`definitions.ammoDefinitions` when the definition is selected. The binding
+`definitions.ammoDefinitions` when the definition is selected or retained as a dependency. The binding
 retains its Reference status when the definition is excluded by the filter.
 Each slot requires a scalar Reference declared for `AmmoParams`. The source
 diagnostic preserves an incompatible declaration independently of a
@@ -107,7 +118,8 @@ consulted by the existing weapon view. The row identifies the first
 applicable weapon component by physical owner and slot. An own container
 records its original component ordinal. A linked route records the actual
 magazine Record index and, when selected, that container's component ordinal.
-The same target body supplies the legacy capacity and ammunition.
+The same target body supplies the canonical container configuration and its bindings. Read
+`maxAmmoCount` from that exact physical slot and follow the primary binding to the Ammo definition.
 
 A readable target with no container, a target whose component selection
 is indeterminate, and an unreadable target body have distinct outcomes.

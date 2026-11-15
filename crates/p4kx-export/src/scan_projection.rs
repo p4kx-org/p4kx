@@ -181,6 +181,7 @@ impl<'f> Scan<'_, '_, 'f> {
                     originals,
                     observed,
                     cancel,
+                    &self.ammo.magazines,
                 )? {
                     read.rows.magazine_resolutions.push(row);
                 }

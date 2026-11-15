@@ -15,6 +15,7 @@ use crate::catalog_number_capture::CapturedNumber;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::original::OriginalFlowFields;
 use crate::catalog_table::CatalogTable;
+use crate::export_diagnostic::ExportSourceRole;
 use crate::record_observation::RecordObservation;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
@@ -23,11 +24,30 @@ use crate::{CatalogError, ExportAccountingError};
 
 pub(crate) const SOURCE_TYPE: &str = "AmmoParams";
 
+/// Why a physical ammunition row belongs to this catalog selection.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
+pub(crate) enum AmmoSelection {
+    Selected,
+    Dependency,
+}
+
+impl AmmoSelection {
+    pub(crate) const fn role(self) -> ExportSourceRole {
+        match self {
+            Self::Selected => ExportSourceRole::Selected,
+            Self::Dependency => ExportSourceRole::Dependency,
+        }
+    }
+}
+
 /// One physical ammunition definition and its original configuration.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct AmmoDefinition<'source> {
+    selection: AmmoSelection,
     #[serde(flatten)]
     source: CanonicalRecordHeader<'source>,
     #[serde(flatten)]
@@ -45,6 +65,10 @@ pub(crate) struct PreparedAmmoDefinition<'source> {
 }
 
 impl<'source> PreparedAmmoDefinition<'source> {
+    pub(crate) const fn selection(&self) -> AmmoSelection {
+        self.definition.selection
+    }
+
     pub(super) const fn inputs(&self) -> &AuthoredAmmoInputs<'source> {
         &self.definition.inputs
     }
@@ -56,6 +80,7 @@ pub(crate) fn read<'source>(
     tree: &RecordTree<'source>,
     admission: &RecordObservation<'_, 'source>,
     cancel: Option<&CancelToken>,
+    selection: AmmoSelection,
 ) -> Result<(PreparedAmmoDefinition<'source>, Vec<FieldError>), CatalogError> {
     let input = projection.original();
     let scope = input.record_scope(admission.record(), tree)?;
@@ -72,6 +97,7 @@ pub(crate) fn read<'source>(
     Ok((
         PreparedAmmoDefinition {
             definition: AmmoDefinition {
+                selection,
                 source: CanonicalRecordHeader::read(tree, input.origins())?,
                 inputs,
                 presentation,

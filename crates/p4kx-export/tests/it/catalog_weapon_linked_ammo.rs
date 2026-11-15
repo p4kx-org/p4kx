@@ -31,9 +31,13 @@ fn linked_projectile_ammo_joins_both_roles_through_the_physical_magazine() -> Te
         let [primary, secondary] = proof::rows(&catalog, ROWS)? else {
             return Err("both physical projectile action rows".into());
         };
-        assert!(
-            proof::rows(&catalog, "/definitions/ammoDefinitions/rows")?.is_empty(),
-            "filter excludes typed Ammo rows"
+        let [required] = proof::rows(&catalog, "/definitions/ammoDefinitions/rows")? else {
+            return Err("one retained original primary dependency".into());
+        };
+        assert_eq!(proof::at(required, "/selection")?, "dependency");
+        assert_eq!(
+            proof::at(required, "/guid/value")?,
+            &json!(common::guid(fixture::PRIMARY))
         );
         let magazine = selected_index(fixture::MAGAZINE)?;
         let weapon = selected_index(fixture::WEAPON)?;

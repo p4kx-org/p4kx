@@ -5,6 +5,7 @@ use p4kx_extraction::{DataForge, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use super::ammo_definition::AmmoSelection;
 use super::authored_fields::Observed;
 use super::item_component_owner::ComponentOwner;
 use crate::CatalogError;
@@ -27,6 +28,7 @@ pub(crate) struct AmmoContainer<'source> {
     #[serde(flatten)]
     owner: ComponentOwner,
     source_type: SourcedValue<&'source str>,
+    selection: AmmoSelection,
     initial_ammo_count: SourcedValue<i32>,
     max_ammo_count: SourcedValue<i32>,
     max_restock_count: SourcedValue<u32>,
@@ -49,8 +51,18 @@ impl<'source> AmmoContainer<'source> {
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
     ) -> Result<Self, CatalogError> {
+        Self::read_with_selection(owner, source, notes, AmmoSelection::Selected)
+    }
+
+    pub(super) fn read_with_selection(
+        owner: ComponentOwner,
+        source: Observed<'_, '_, '_, 'source>,
+        notes: &mut Vec<FieldError>,
+        selection: AmmoSelection,
+    ) -> Result<Self, CatalogError> {
         Ok(Self {
             owner,
+            selection,
             source_type: source.source_type_value()?,
             initial_ammo_count: source.int32("initialAmmoCount", notes)?,
             max_ammo_count: source.int32("maxAmmoCount", notes)?,

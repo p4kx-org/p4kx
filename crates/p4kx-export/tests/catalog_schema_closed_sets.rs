@@ -13,6 +13,7 @@ use serde_json::{Map, Value, json};
 const VOCABULARY_CLASS: &str = "x-p4kx-vocabularyClass";
 const CONTROL_TYPES: &[&str] = &[
     "AlphaUnit",
+    "AmmoSelection",
     "AssignmentKind",
     "AttachmentAxisOptionStatus",
     "BlueprintRangeKind",

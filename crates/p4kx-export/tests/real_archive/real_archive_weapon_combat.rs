@@ -17,6 +17,8 @@ use crate::real_archive_item_durability::{self as proof, Trace};
 use crate::real_archive_shop_inventory_v3::verify_build;
 use crate::real_archive_verification;
 
+#[path = "weapon_combat_dependencies.rs"]
+mod dependencies;
 #[path = "weapon_combat_original.rs"]
 pub(super) mod original;
 
@@ -63,6 +65,7 @@ fn compare(archive: &Archive, entry: &DataForgeEntry, witness: &Witness<'_>) -> 
     let catalog: Value =
         serde_json::from_slice(built.json()).map_err(|_| "read bounded Catalog JSON")?;
     verify_build(archive, &catalog)?;
+    dependencies::check(&catalog, witness)?;
     let owner = &witness.owner;
     let ammo = &witness.ammo;
     let uses = proof::indexed(&catalog, "/provenance/uses", "id")?;

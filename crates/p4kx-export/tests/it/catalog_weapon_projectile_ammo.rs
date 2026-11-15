@@ -28,9 +28,13 @@ fn projectile_ammo_selects_each_original_role_with_complete_physical_evidence() 
         let filter =
             Filter::new("libs/foundry/records/entities/scitem/ships/fixture_projectile_own_route");
         let catalog = build(Case::Unique, origin, Some(&filter))?;
-        assert!(
-            proof::rows(&catalog, "/definitions/ammoDefinitions/rows")?.is_empty(),
-            "filter excludes target definitions without losing the physical selection"
+        let [required] = proof::rows(&catalog, "/definitions/ammoDefinitions/rows")? else {
+            return Err("one retained original primary dependency".into());
+        };
+        assert_eq!(proof::at(required, "/selection")?, "dependency");
+        assert_eq!(
+            proof::at(required, "/guid/value")?,
+            &json!(common::guid(fixture::PRIMARY))
         );
         let [primary, secondary] = proof::rows(&catalog, ROWS)? else {
             return Err("both original projectile actions".into());
@@ -42,13 +46,14 @@ fn projectile_ammo_selects_each_original_role_with_complete_physical_evidence() 
             assert_selected(&catalog, row, &forge, role, guid, marker(origin))?;
         }
         let combat = proof::rows(&catalog, COMBAT_ROWS)?;
-        assert_eq!(combat.len(), 2);
-        for row in combat {
-            assert_eq!(
-                proof::at(row, "/model/value/type")?,
-                "ammoDefinitionUnavailable"
-            );
-        }
+        let [primary, secondary] = combat else {
+            return Err("both authored combat modes".into());
+        };
+        assert_eq!(proof::at(primary, "/model/value/type")?, "nominalBullet");
+        assert_eq!(
+            proof::at(secondary, "/model/value/type")?,
+            "ammoDefinitionUnavailable"
+        );
         let schema = p4kx_export::catalog_schema();
         jsonschema::validator_for(&schema)?
             .validate(&catalog)
