@@ -24420,6 +24420,12 @@
             "null"
           ]
         },
+        "targets_compact": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "tempo": {
           "anyOf": [
             {
