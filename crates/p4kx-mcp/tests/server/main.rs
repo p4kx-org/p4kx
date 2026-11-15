@@ -20,6 +20,7 @@ mod audio_followups;
 mod audio_limits;
 mod audio_music_playlist_source_fields;
 mod audio_music_track_source_fields;
+mod audio_music_transition_source_fields;
 mod audio_objects;
 mod audio_random_sequence_source_fields;
 mod audio_shared_node_fields;

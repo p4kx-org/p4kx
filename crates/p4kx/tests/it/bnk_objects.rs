@@ -22,6 +22,8 @@ mod dialogue_source_fields;
 mod music_playlist_source_fields;
 #[path = "bnk_music_track_source_fields.rs"]
 mod music_track_source_fields;
+#[path = "bnk_music_transition_source_fields.rs"]
+mod music_transition_source_fields;
 #[path = "bnk_random_sequence_source_fields.rs"]
 mod random_sequence_source_fields;
 #[path = "bnk_shared_node_fields.rs"]

@@ -173,7 +173,7 @@ impl Server {
         --json` does: per object its position, ID, type, how far the reader decodes it (decoded, undecoded, unsupported or \
         malformed, with the reason), parent and children, and for sounds, actions, containers and music segments, tracks, \
         switch containers and playlists their fields (media source, target, clips, markers, stingers, switches, playlist \
-        items with nesting and loop counts). type (e.g. music-playlist, sound, event) and id narrow the list; matched \
+        items with nesting and loop counts, and original music transition rules). type (e.g. music-playlist, sound, event) and id narrow the list; matched \
         counts the objects that pass, total and layouts count the whole bank, and objects the reader does not decode are \
         listed and counted, not skipped. Only structure is returned, no audio; resolve_audio_trigger resolves a trigger \
         to its sounds. The content may be forwarded by the client to third parties; game texts and media must not be \

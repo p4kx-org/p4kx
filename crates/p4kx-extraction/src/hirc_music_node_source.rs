@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::cell::RefCell;
 use std::io::{Read, Seek};
 
 use p4kx_audio::{
@@ -17,17 +18,20 @@ use crate::source_value::SourcedValue;
 
 #[path = "hirc_music_stingers.rs"]
 mod stingers;
+#[path = "hirc_music_transition_source.rs"]
+mod transitions;
 
 use self::stingers::{Observation, Stinger, Stingers};
+use self::transitions::{Owner, SharedStingers, TransitionRulesSchema};
 use super::origins::ObjectOrigins;
 
 pub(in crate::hirc_view) type MusicNodeSourceSchema =
-    MusicNodeSourceDocument<Vec<Stinger>, SourceInventory>;
+    MusicNodeSourceDocument<Vec<Stinger>, TransitionRulesSchema, SourceInventory>;
 
 #[derive(Serialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 #[schemars(rename = "MusicNodeObjectSourceFields")]
-pub(in crate::hirc_view) struct MusicNodeSourceDocument<Rows, Inventory> {
+pub(in crate::hirc_view) struct MusicNodeSourceDocument<Rows, Transitions, Inventory> {
     kind: SourceKind,
     layout: SourcedValue<Layout>,
     version: SourcedValue<u32>,
@@ -37,6 +41,9 @@ pub(in crate::hirc_view) struct MusicNodeSourceDocument<Rows, Inventory> {
     stinger_count: Option<SourcedValue<u32>>,
     #[schemars(with = "Vec<Stinger>")]
     stingers: Rows,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<TransitionRulesSchema>")]
+    transition_rules: Option<Transitions>,
     #[schemars(with = "SourceInventory")]
     source_inventory: Inventory,
 }
@@ -64,11 +71,11 @@ pub(super) fn playlist<R: Read + Seek, S: Serializer>(
     serializer: S,
     origins: &ObjectOrigins,
     header: &BankObservedHeader,
-    node: BankHircMusicPlaylist<'_, R>,
+    node: Box<BankHircMusicPlaylist<'_, R>>,
 ) -> Result<S::Ok, S::Error> {
     use BankMusicPlaylistRead::{Decoded, Malformed, Unsupported};
 
-    let disposition = match node.status {
+    let disposition = match &node.status {
         Decoded => (Layout::Decoded, None),
         Malformed(error) => (Layout::Malformed, Some(error.to_string())),
         Unsupported(_) => (Layout::Unsupported, None),
@@ -78,27 +85,14 @@ pub(super) fn playlist<R: Read + Seek, S: Serializer>(
             ));
         }
     };
+    let original = node.object;
     let site = DocumentSite {
         kind: SourceKind::Playlist,
         origins,
         header,
-        original: &node.object,
+        original: &original,
     };
-    observed(
-        serializer,
-        &site,
-        disposition,
-        node.fields.node,
-        node.rows,
-        |row| match row {
-            BankMusicPlaylistRow::Child { .. } => Ok(Observation::Skip),
-            BankMusicPlaylistRow::Stinger { ordinal, value } => {
-                Ok(Observation::Stinger { ordinal, value })
-            }
-            BankMusicPlaylistRow::Item { .. } => Ok(Observation::End),
-            _ => Err("unexpected original music-node row"),
-        },
-    )
+    observed_transitions(serializer, &site, disposition, Owner::Playlist(node))
 }
 
 pub(super) fn segment<R: Read + Seek, S: Serializer>(
@@ -146,11 +140,11 @@ pub(super) fn switch<R: Read + Seek, S: Serializer>(
     serializer: S,
     origins: &ObjectOrigins,
     header: &BankObservedHeader,
-    node: BankHircMusicSwitch<'_, R>,
+    node: Box<BankHircMusicSwitch<'_, R>>,
 ) -> Result<S::Ok, S::Error> {
     use BankMusicSwitchRead::{Decoded, Malformed, Unsupported};
 
-    let disposition = match node.status {
+    let disposition = match &node.status {
         Decoded => (Layout::Decoded, None),
         Malformed(error) => (Layout::Malformed, Some(error.to_string())),
         Unsupported(_) => (Layout::Unsupported, None),
@@ -160,28 +154,65 @@ pub(super) fn switch<R: Read + Seek, S: Serializer>(
             ));
         }
     };
+    let original = node.object;
     let site = DocumentSite {
         kind: SourceKind::Switch,
         origins,
         header,
-        original: &node.object,
+        original: &original,
     };
-    observed(
+    observed_transitions(serializer, &site, disposition, Owner::Switch(node))
+}
+
+const fn playlist_stinger(row: BankMusicPlaylistRow) -> Result<Observation, &'static str> {
+    match row {
+        BankMusicPlaylistRow::Child { .. } => Ok(Observation::Skip),
+        BankMusicPlaylistRow::Stinger { ordinal, value } => {
+            Ok(Observation::Stinger { ordinal, value })
+        }
+        BankMusicPlaylistRow::Item { .. } => Ok(Observation::End),
+        _ => Err("unexpected original music-node row"),
+    }
+}
+
+const fn switch_stinger(row: BankMusicSwitchRow) -> Result<Observation, &'static str> {
+    match row {
+        BankMusicSwitchRow::Child { .. } => Ok(Observation::Skip),
+        BankMusicSwitchRow::Stinger { ordinal, value } => {
+            Ok(Observation::Stinger { ordinal, value })
+        }
+        BankMusicSwitchRow::Group { .. }
+        | BankMusicSwitchRow::Node { .. }
+        | BankMusicSwitchRow::Target { .. } => Ok(Observation::End),
+        _ => Err("unexpected original music-node row"),
+    }
+}
+
+fn observed_transitions<R: Read + Seek, S: Serializer>(
+    serializer: S,
+    site: &DocumentSite<'_>,
+    (layout, error): (Layout, Option<String>),
+    node: Owner<'_, R>,
+) -> Result<S::Ok, S::Error> {
+    let owner = RefCell::new(node);
+    let (stinger_count, rules) = {
+        let current = owner.try_borrow().map_err(S::Error::custom)?;
+        let (node, rules) = current.fields();
+        let stinger_count = site
+            .origins
+            .optional(node.stinger_count.as_ref(), "musicStingerCount")
+            .map_err(S::Error::custom)?;
+        let rules =
+            transitions::observed(site, &layout, rules, &owner).map_err(S::Error::custom)?;
+        (stinger_count, rules)
+    };
+    site.write(
         serializer,
-        &site,
-        disposition,
-        node.fields.node,
-        node.rows,
-        |row| match row {
-            BankMusicSwitchRow::Child { .. } => Ok(Observation::Skip),
-            BankMusicSwitchRow::Stinger { ordinal, value } => {
-                Ok(Observation::Stinger { ordinal, value })
-            }
-            BankMusicSwitchRow::Group { .. }
-            | BankMusicSwitchRow::Node { .. }
-            | BankMusicSwitchRow::Target { .. } => Ok(Observation::End),
-            _ => Err("unexpected original music-node row"),
-        },
+        layout,
+        error,
+        stinger_count,
+        SharedStingers::new(&owner, site.origins),
+        Some(rules),
     )
 }
 
@@ -203,7 +234,14 @@ where
         .optional(fields.stinger_count.as_ref(), "musicStingerCount")
         .map_err(S::Error::custom)?;
     let rows = Stingers::new(input, select, fields.stinger_tail, site.origins);
-    site.write(serializer, layout, error, stinger_count, rows)
+    site.write(
+        serializer,
+        layout,
+        error,
+        stinger_count,
+        rows,
+        None::<TransitionRulesSchema>,
+    )
 }
 
 pub(super) fn unsupported<S: Serializer>(
@@ -219,18 +257,24 @@ pub(super) fn unsupported<S: Serializer>(
         HircKind::MusicSwitch => SourceKind::Switch,
         _ => return Err(S::Error::custom("not an original music node")),
     };
-    DocumentSite {
+    let site = DocumentSite {
         kind,
         origins,
         header,
         original,
-    }
-    .write(
+    };
+    let rules = if matches!(kind, SourceKind::Segment) {
+        None
+    } else {
+        Some(transitions::unsupported(&site).map_err(S::Error::custom)?)
+    };
+    site.write(
         serializer,
         Layout::Unsupported,
         None,
         None,
         [] as [Stinger; 0],
+        rules,
     )
 }
 
@@ -242,13 +286,14 @@ struct DocumentSite<'source> {
 }
 
 impl DocumentSite<'_> {
-    fn write<S: Serializer, Rows: Serialize>(
+    fn write<S: Serializer, Rows: Serialize, Transitions: Serialize>(
         &self,
         serializer: S,
         layout: Layout,
         error: Option<String>,
         stinger_count: Option<SourcedValue<u32>>,
         stingers: Rows,
+        transition_rules: Option<Transitions>,
     ) -> Result<S::Ok, S::Error> {
         MusicNodeSourceDocument {
             kind: self.kind,
@@ -266,6 +311,7 @@ impl DocumentSite<'_> {
                 .map_err(S::Error::custom)?,
             stinger_count,
             stingers,
+            transition_rules,
             source_inventory: self.origins,
         }
         .serialize(serializer)

@@ -207,13 +207,13 @@ fn project<R: Read + Seek, S: Serializer>(
         (
             BankHircSemantic::MusicPlaylist(playlist),
             SourceFamily::MusicNode(HircKind::MusicPlaylist),
-        ) => music_node::playlist(serializer, origins, header, *playlist),
+        ) => music_node::playlist(serializer, origins, header, playlist),
         (
             BankHircSemantic::MusicSegment(segment),
             SourceFamily::MusicNode(HircKind::MusicSegment),
         ) => music_node::segment(serializer, origins, header, *segment),
         (BankHircSemantic::MusicSwitch(switch), SourceFamily::MusicNode(HircKind::MusicSwitch)) => {
-            music_node::switch(serializer, origins, header, *switch)
+            music_node::switch(serializer, origins, header, switch)
         }
         (BankHircSemantic::Plugin(plugin), SourceFamily::Plugin(_)) => {
             effect_source::plugin::serialize(serializer, origins, header, *plugin)

@@ -24,3 +24,8 @@ The same pass records whether checked rules carry nonzero fade time or
 offset words, and whether an allocated object names a nonzero segment.
 Those observations follow the physical nodes reached by TXTP. A rule
 count and an empty allocation carry no omission code by themselves.
+
+The CLI and MCP expose this table in the owning music node's
+`source_fields.transition_rules`. Rule and ID rows share the source inventory
+with the stingers and use the same checked bank cursor. Table coverage
+describes only the transition bytes, independently of later owner fields.

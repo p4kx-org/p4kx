@@ -1871,6 +1871,19 @@ original type and target when readable. Version-154 Play properties include
 the authored target and fade flags plus both original planar lists. The
 property layout distinguishes absent, unsupported and malformed observations.
 
+Music switches and playlists also expose a `source_fields.transition_rules` object.
+Its `layout` distinguishes a decoded table, a malformed table with a checked prefix,
+an unavailable rule count and an unsupported bank version. Its sourced
+`declared_count`, `complete_rules`, `complete_range` and `checked_range` keep
+the authored count separate from the half-open bank-relative byte positions.
+A malformed suffix outside the rule table does not invalidate a complete table.
+The `rows` list retains each `rule`, then its source and destination `id` occurrences.
+IDs retain their list and original positions, including duplicates, zero and sentinel words.
+The rule preserves both fades, cue filters, jump and entry controls, the raw allocation byte
+and the allocated object's segment, fade and playback fields. Signed fade words include
+their original bits and signed value. Each value carries its original field origin.
+This describes authored rules without computing a transition or choosing a playable sequence.
+
 Other object details:
 
 - `state`: standalone State versions 128 through 145 expose `property_count`, `count_range`,
