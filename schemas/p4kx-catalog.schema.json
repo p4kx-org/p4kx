@@ -9438,7 +9438,7 @@
           "description": "`Investigation_Clue_CorpseScanInfo`.",
           "properties": {
             "causeOfDeath": {
-              "$ref": "#/$defs/LocalisedText",
+              "$ref": "#/$defs/SourcedValueOfGameTextRef",
               "description": "The authored cause-of-death text.",
               "x-gameText": true
             },
@@ -23094,12 +23094,12 @@
           "description": "The concrete subtype-specific fields."
         },
         "objectiveLongDescription": {
-          "$ref": "#/$defs/LocalisedText",
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
           "description": "The authored long objective text.",
           "x-gameText": true
         },
         "objectiveShortDescription": {
-          "$ref": "#/$defs/LocalisedText",
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
           "description": "The authored short objective text.",
           "x-gameText": true
         }

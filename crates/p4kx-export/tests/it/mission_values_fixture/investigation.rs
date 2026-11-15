@@ -17,13 +17,17 @@ pub(crate) fn name() -> TestInstance {
 }
 
 pub(crate) fn clue(kind: &str) -> TestInstance {
+    clue_with_text(kind, ["@long", "@short", "@cause"])
+}
+
+fn clue_with_text(kind: &str, [long, short, cause]: [&str; 3]) -> TestInstance {
     let source = TestInstance::new(format!("Investigation_Clue{kind}"))
-        .value("objectiveLongDescription", TestValue::text("@long"))
-        .value("objectiveShortDescription", TestValue::text("@short"));
+        .value("objectiveLongDescription", TestValue::text(long))
+        .value("objectiveShortDescription", TestValue::text(short));
     match kind {
         "_CorpseScanInfo" => source
             .value("name", super::object(name()))
-            .value("causeOfDeath", TestValue::text("@cause")),
+            .value("causeOfDeath", TestValue::text(cause)),
         "_JournalEntry" => source.value("journalEntry", TestValue::Reference(TARGET)),
         _ => source,
     }
@@ -47,6 +51,15 @@ pub(crate) fn clue_item(kind: &str) -> TestInstance {
         "_Datapad" => source.value("canvas", TestValue::Reference(TARGET)),
         _ => source,
     }
+}
+
+pub(crate) fn localized_probe([long, short, cause]: [&str; 3]) -> TestInstance {
+    let scan = super::object(clue_with_text("_CorpseScanInfo", [long, short, cause]));
+    let item = TestInstance::new("Investigation_ClueItem").value("clues", super::array(vec![scan]));
+    let location = TestInstance::new("Investigation_Location")
+        .value("clueItems", super::array(vec![super::object(item)]));
+    TestInstance::new("MissionPropertyValue_Investigation")
+        .value("locations", super::array(vec![super::object(location)]))
 }
 
 pub(crate) fn investigation() -> TestInstance {

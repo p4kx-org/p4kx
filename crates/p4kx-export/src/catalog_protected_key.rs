@@ -46,26 +46,52 @@ impl<'source> ProtectedKey<'source> {
     pub(crate) fn from_fact(
         fact: &OriginalValueFact<'_, '_, 'source>,
     ) -> Result<Self, CatalogError> {
+        let value = match fact.value() {
+            Value::Error(_) => SourceValue::Unreadable,
+            value => crate::mission_layers::key_value(value)
+                .map_or(SourceValue::Absent, SourceValue::Present),
+        };
+        Self::capture(fact, value)
+    }
+
+    /// Retains an authored Locale token verbatim, including an empty or placeholder token.
+    pub(crate) fn read_locale<'scope, 'read>(
+        fields: &OriginalFlowFields<'scope, 'read, 'source>,
+        owner: Option<&OriginalValueFact<'scope, 'read, 'source>>,
+        name: &str,
+    ) -> Result<Self, CatalogError> {
+        let Some((_, fact)) = fields.field(owner, name)? else {
+            return Ok(Self(Evidence::Absent(fields.survey(owner)?)));
+        };
+        let value = match fact.value() {
+            Value::Locale(token) => SourceValue::Present(*token),
+            Value::Null => SourceValue::Null,
+            Value::Error(_) => SourceValue::Unreadable,
+            _ => return Err(ExportAccountingError::ConflictingSourceDatum.into()),
+        };
+        Self::capture(fact, value)
+    }
+
+    fn capture(
+        fact: &OriginalValueFact<'_, '_, 'source>,
+        value: SourceValue<&'source str>,
+    ) -> Result<Self, CatalogError> {
         use SourceUseRole::{Attempted, Conversion, Payload, Selector};
 
         let part = OriginalValuePart::Value;
-        let registration;
-        let mut key;
-        if let Some(text) = crate::mission_layers::key_value(fact.value()) {
-            let payload = fact.observe(part, Payload)?;
-            let selector = fact.observe(part, Selector)?;
-            registration = Some((payload, selector));
-            key = fact.bind(part, SourceValue::Present(text), Payload, true)?;
-        } else if matches!(fact.value(), Value::Error(_)) {
-            return Ok(Self(Evidence::Authored {
-                key: fact.bind(part, SourceValue::Unreadable, Attempted, false)?,
-                registration: None,
-            }));
-        } else {
-            registration = None;
-            key = fact.bind(part, SourceValue::Absent, Selector, true)?;
+        let (role, registration) = match &value {
+            SourceValue::Present(_) => (
+                Payload,
+                Some((fact.observe(part, Payload)?, fact.observe(part, Selector)?)),
+            ),
+            SourceValue::Unreadable => (Attempted, None),
+            _ => (Selector, None),
+        };
+        let complete = role != Attempted;
+        let mut key = fact.bind(part, value, role, complete)?;
+        if complete {
+            key.contribute(fact.observe(part, Conversion)?);
         }
-        key.contribute(fact.observe(part, Conversion)?);
         Ok(Self(Evidence::Authored { key, registration }))
     }
 

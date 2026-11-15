@@ -16,7 +16,7 @@ use serde_json::Value;
 use std::error::Error;
 use std::time::UNIX_EPOCH;
 
-pub(crate) use investigation::investigation;
+pub(crate) use investigation::{investigation, localized_probe};
 pub(crate) use schema::AutoLayout;
 pub(crate) type TestResult = Result<(), Box<dyn Error>>;
 pub(crate) const TARGET: u128 = 0x7900_0000_0000_4000_8000_0000_0000_0001;
@@ -161,10 +161,22 @@ pub(crate) fn build(
     builder: &DataForgeBuilder,
     mode: CatalogPublicationMode,
 ) -> Result<Value, Box<dyn Error>> {
+    build_with_entries(builder, mode, [])
+}
+
+pub(crate) fn build_with_entries(
+    builder: &DataForgeBuilder,
+    mode: CatalogPublicationMode,
+    entries: impl IntoIterator<Item = TestEntry>,
+) -> Result<Value, Box<dyn Error>> {
     let root = tempfile::tempdir()?;
     let path = root.path().join("Data.p4k");
-    ArchiveBuilder::new()
-        .entry(TestEntry::zstd("Data/Game2.dcb", builder.build()))
+    entries
+        .into_iter()
+        .fold(
+            ArchiveBuilder::new().entry(TestEntry::zstd("Data/Game2.dcb", builder.build())),
+            ArchiveBuilder::entry,
+        )
         .write_to(&path)?;
     let archive = Archive::open(&path)?;
     let built = build_catalog(

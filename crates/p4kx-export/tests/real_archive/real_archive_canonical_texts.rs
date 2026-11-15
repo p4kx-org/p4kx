@@ -17,8 +17,8 @@ mod contract_places;
 
 #[path = "real_archive_canonical_extra_texts.rs"]
 mod extras;
-#[path = "real_archive_mission_option_texts.rs"]
-mod option_texts;
+#[path = "real_archive_mission_property_texts.rs"]
+mod mission_property_texts;
 
 #[path = "real_archive_text_counters.rs"]
 mod counters;
@@ -271,7 +271,7 @@ pub(crate) fn kind_coverage(
         _ => {
             let mut counters = CoverageCounters::new(english_oracle, german_oracle);
             let rows = catalog_v3_consumer::rows(catalog, kind)?;
-            option_texts::count(catalog, kind, rows, &mut counters)?;
+            mission_property_texts::count(catalog, kind, rows, &mut counters)?;
             if kind == Kind::Contracts && !rows.is_empty() {
                 contract_places::count(catalog, rows, &mut counters)?;
             }

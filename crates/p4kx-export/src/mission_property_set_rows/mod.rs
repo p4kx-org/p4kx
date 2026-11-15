@@ -4,6 +4,7 @@
 mod compare;
 #[cfg(test)]
 mod tests;
+mod value_texts;
 
 use p4kx_extraction::{CancelToken, Guid};
 use std::collections::BTreeMap;
@@ -212,7 +213,7 @@ impl<'source> MissionPropertySets<'source> {
             }
             for property in row.properties.iter_mut().flatten() {
                 if let Some(value) = &mut property.value {
-                    value.publish_option_names(projection, cancel)?;
+                    value.publish_texts(projection, cancel)?;
                 }
             }
         }

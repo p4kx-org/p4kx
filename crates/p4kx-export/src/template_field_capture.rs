@@ -52,6 +52,14 @@ impl<'source> FieldCapture<'source> for TemplateFieldCapture<'_, '_, '_, 'source
         ProtectedKey::read(self.fields, self.fields.owner_of(parent)?, name)
     }
 
+    fn protected_locale(
+        &self,
+        parent: &StructValue<'source>,
+        name: &str,
+    ) -> Result<ProtectedKey<'source>, CatalogError> {
+        ProtectedKey::read_locale(self.fields, self.fields.owner_of(parent)?, name)
+    }
+
     fn check_declared_target(
         &self,
         parent: &StructValue<'source>,

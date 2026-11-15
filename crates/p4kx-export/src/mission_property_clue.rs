@@ -1,14 +1,20 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::SourcedValue;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::contract::LocalisedText;
+use crate::catalog_text_contract::GameTextRef;
 use crate::definition_reference::DefinitionReference;
 use crate::mission_property_name::InvestigationName;
 use crate::mission_property_source::SourceTagList;
 use crate::owned_reference::OwnedReference;
+
+#[path = "mission_property_clue_text.rs"]
+mod text;
+
+pub(super) use text::ClueText;
 
 /// An investigation clue item and its complete concrete source payload.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -50,11 +56,11 @@ pub(crate) enum ClueItemDetails {
 #[schemars(transform = crate::contract::every_field_required)]
 pub(crate) struct InvestigationClue<'f> {
     /// The authored long objective text.
-    #[schemars(extend("x-gameText" = true))]
-    pub(crate) objective_long_description: LocalisedText<'f>,
+    #[schemars(with = "SourcedValue<GameTextRef>", extend("x-gameText" = true))]
+    pub(crate) objective_long_description: ClueText<'f>,
     /// The authored short objective text.
-    #[schemars(extend("x-gameText" = true))]
-    pub(crate) objective_short_description: LocalisedText<'f>,
+    #[schemars(with = "SourcedValue<GameTextRef>", extend("x-gameText" = true))]
+    pub(crate) objective_short_description: ClueText<'f>,
     /// The concrete subtype-specific fields.
     pub(crate) details: ClueDetails<'f>,
 }
@@ -71,8 +77,8 @@ pub(crate) enum ClueDetails<'f> {
         /// The authored name configuration.
         name: Option<Box<InvestigationName<'f>>>,
         /// The authored cause-of-death text.
-        #[schemars(extend("x-gameText" = true))]
-        cause_of_death: LocalisedText<'f>,
+        #[schemars(with = "SourcedValue<GameTextRef>", extend("x-gameText" = true))]
+        cause_of_death: ClueText<'f>,
     },
     /// `Investigation_Clue_JournalEntry`.
     #[serde(rename_all = "camelCase")]

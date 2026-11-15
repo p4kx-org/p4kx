@@ -60,13 +60,17 @@ Every clue item retains `entityClass`, `spawnTags`, ordered `clues` and `details
 | `corpse` | `Investigation_ClueItem_Corpse` | `suspectRepresented`: owner-local weak Reference |
 | `datapad` | `Investigation_ClueItem_Datapad` | `canvas`: definition Reference |
 
-Every clue retains localised `objectiveLongDescription`, `objectiveShortDescription` and
-concrete `details`:
+Every clue retains protected sourced references for `objectiveLongDescription` and
+`objectiveShortDescription`, alongside concrete `details`. A corpse-scan clue also carries a
+protected `causeOfDeath` reference. Each present value links to `texts.gameTexts[].id.value` with
+the exact authored Locale token and its source occurrence. Empty tokens and tokens without an
+`@` remain present, and placeholders keep their keys with absent translations. Missing and null
+fields keep their source state. Only retained Generator property sets publish these text entries.
 
 | Details discriminator | Source type | Additional fields |
 | --- | --- | --- |
 | `base` | `Investigation_Clue` | None |
-| `corpseScanInfo` | `Investigation_Clue_CorpseScanInfo` | `name`: AI-name configuration; localised `causeOfDeath` |
+| `corpseScanInfo` | `Investigation_Clue_CorpseScanInfo` | `name`: AI-name configuration; protected `causeOfDeath` text |
 | `journalEntry` | `Investigation_Clue_JournalEntry` | `journalEntry`: definition Reference |
 
 ## Options, dependencies and race splits

@@ -21,6 +21,11 @@ pub(crate) trait FieldCapture<'source> {
         parent: &StructValue<'source>,
         name: &str,
     ) -> Result<ProtectedKey<'source>, CatalogError>;
+    fn protected_locale(
+        &self,
+        parent: &StructValue<'source>,
+        name: &str,
+    ) -> Result<ProtectedKey<'source>, CatalogError>;
     fn check_declared_target(
         &self,
         parent: &StructValue<'source>,
