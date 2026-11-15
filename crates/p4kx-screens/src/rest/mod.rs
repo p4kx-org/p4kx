@@ -19,7 +19,7 @@ use p4kx_dataforge::Guid;
 
 pub(crate) use eval::{Given, TEXT_FIELD};
 pub(crate) use graph::Operations;
-pub(crate) use state::{AtRest, key_of, same_parameter};
+pub(crate) use state::{AtRest, BindingOmission, key_of, same_parameter};
 
 /// A value of the operations graph.
 #[derive(Debug, Clone, PartialEq)]

@@ -49,7 +49,41 @@ fn summary_fields(still: &Still, source: &ScreenRenderOrigin) -> Result<FieldOri
         fields.insert(FieldPath::parse(path)?, origin.clone())?;
     }
     diagnostics(&mut fields, still, tool, unknown)?;
+    content_omission_fields(&mut fields, source)?;
     Ok(fields)
+}
+
+fn content_omission_fields(fields: &mut FieldOrigins, source: &ScreenRenderOrigin) -> Result<()> {
+    if source.content_omissions.is_empty() {
+        return Ok(());
+    }
+    fields.insert(
+        FieldPath::parse("/content_omissions")?,
+        source.unknown.clone(),
+    )?;
+    for (index, item) in source.content_omissions.iter().enumerate() {
+        let path = format!("/content_omissions/{index}");
+        for (suffix, origin) in [
+            ("", &item.decision),
+            ("/element", &item.widget_type),
+            ("/widget", &item.widget_name),
+            ("/widget_input", &item.widget_type),
+            ("/widget_input/record_index", &item.widget_type),
+            ("/widget_input/section", &item.widget_type),
+            ("/widget_input/slot", &item.widget_type),
+            ("/field", &item.field),
+            ("/code", &item.decision),
+        ] {
+            fields.insert(
+                FieldPath::parse(&format!("{path}{suffix}"))?,
+                origin.clone(),
+            )?;
+        }
+        if let Some(origin) = &item.source {
+            fields.insert(FieldPath::parse(&format!("{path}/source"))?, origin.clone())?;
+        }
+    }
+    Ok(())
 }
 
 fn diagnostics(

@@ -660,6 +660,10 @@ game names it in the string variable `landscapecanvasguid`, or `portraitcanvasgu
 view; without it the page is self status (ADR-0306).
 _Avoid_: view, tab, screen (a Screen is the whole canvas of a display)
 
+**Render target**:
+An image the game produces for a Screen at run time and that a runtime image Widget identifies.
+A ship silhouette or map view can use one.
+
 **Tab bar**:
 The footer of every page of an MFD, drawn by the `Header / Footer` canvas of the brand: the name of
 the page in a bar between an arrow at each end (`< PAGE NAME >`), the name being the localised

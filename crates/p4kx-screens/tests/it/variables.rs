@@ -5,9 +5,10 @@
 
 use p4kx_dataforge::DataForge;
 use p4kx_screens::{
-    Composed, MAX_VARIABLES, ScreenComposer, ScreenError, Variable, VariableInForce,
+    Composed, ContentOmissionCode, MAX_VARIABLES, ScreenComposer, ScreenError, Variable,
+    VariableInForce,
 };
-use p4kx_testkit::{TestCanvas, TestDim, TestOp, TestValue, TestWidget};
+use p4kx_testkit::{TestCanvas, TestDim, TestInstance, TestOp, TestValue, TestWidget};
 
 use crate::support::{RED, SCREEN, TestResult, database, empty_at, guid_text, red_at, stage};
 
@@ -133,6 +134,74 @@ fn a_value_of_the_wrong_kind_is_listed_and_the_widget_keeps_its_own() -> TestRes
         "{:?}",
         composed.report().unsupported
     );
+    Ok(())
+}
+
+#[test]
+fn a_numeric_field_accepts_zero_and_diagnoses_an_invalid_setting() -> TestResult {
+    let canvas = canvas()
+        .operation("level", TestOp::NamedNumVar("/seatdashboard/level"))
+        .widget(square(TestWidget::display("indicator").background(RED)))
+        .operation("alpha", TestOp::NumField("indicator", "Alpha", "level"));
+    let zero = compose_with(vec![canvas.record()], &["level=0"])?;
+    assert!(empty_at(&zero.rasterize(&stage())?.image, 5, 5));
+    assert_eq!(
+        zero.report().content_omissions,
+        [],
+        "explicit input has no omission"
+    );
+    assert_eq!(zero.report().variables[0].value, "0");
+
+    let invalid = compose_with(vec![canvas.record()], &["level=bad"])?;
+    let issue = invalid
+        .report()
+        .content_omissions
+        .first()
+        .ok_or("the invalid number is not listed")?;
+    assert_eq!(issue.widget, "indicator");
+    assert_eq!(issue.field, "Alpha");
+    assert_eq!(issue.source.as_deref(), Some("/seatdashboard/level"));
+    assert_eq!(issue.code, ContentOmissionCode::UnresolvedInput);
+    assert!(red_at(&invalid.rasterize(&stage())?.image, 5, 5));
+    Ok(())
+}
+
+#[test]
+fn a_binding_after_a_null_widget_reports_its_actual_physical_target() -> TestResult {
+    let widget = |name| {
+        TestValue::Struct(
+            TestInstance::new("BuildingBlocks_DisplayWidget")
+                .named(name)
+                .value("name", TestValue::text(name)),
+        )
+    };
+    let level = TestInstance::new("BuildingBlocks_BindingsNumberVariable")
+        .named("level")
+        .value("binding", TestValue::text("level"));
+    let alpha = TestInstance::new("BuildingBlocks_BindingsNumberField")
+        .value("widget", TestValue::pointer("target"))
+        .value("field", TestValue::text("Alpha"))
+        .value("input", TestValue::pointer("level"));
+    let record = canvas()
+        .record()
+        .value(
+            "scene",
+            TestValue::Array(vec![TestValue::Null, widget("target"), widget("following")]),
+        )
+        .value(
+            "operations",
+            TestValue::Array(vec![TestValue::Struct(level), TestValue::Struct(alpha)]),
+        );
+    let composed = compose_with(vec![record], &["level=bad"])?;
+    let issue = composed
+        .report()
+        .content_omissions
+        .first()
+        .ok_or("the invalid setting is not listed")?;
+    assert_eq!(issue.widget, "target");
+    assert_eq!(issue.widget_input.slot, 1);
+    assert_eq!(issue.field, "Alpha");
+    assert_eq!(issue.source.as_deref(), Some("level"));
     Ok(())
 }
 

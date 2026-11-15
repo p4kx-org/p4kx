@@ -6,13 +6,16 @@
 use p4kx_dataforge::Guid;
 
 use super::Rest;
-use super::graph::FieldKind;
-use super::state::PARAMETER;
+use super::eval::{Eval, TEXT_FIELD};
+use super::graph::{Binding, CANVAS_FIELD, FieldKind};
+use super::state::{AtRest, BindingOmission, PARAMETER, STATE_TAG};
+use crate::report::ContentOmissionCode;
 use crate::style::GeometryModifiers;
+use crate::text::is_placeholder;
 
 /// Reads the tag a node gave: a tag node's tag, or the empty text of a string parameter, which
 /// names none.
-pub(super) fn tag_of(value: Rest) -> Result<Option<Guid>, String> {
+fn tag_of(value: Rest) -> Result<Option<Guid>, String> {
     match value {
         Rest::Tag(tag) => Ok(tag),
         Rest::Text(text) if text.is_empty() => Ok(None),
@@ -21,7 +24,7 @@ pub(super) fn tag_of(value: Rest) -> Result<Option<Guid>, String> {
 }
 
 /// Returns whether a binding of the field `field` of the kind `kind` is evaluated at rest.
-pub(super) fn is_evaluated(kind: FieldKind, field: &str) -> bool {
+fn is_evaluated(kind: FieldKind, field: &str) -> bool {
     match (kind, field) {
         (FieldKind::Other, _) => false,
         (FieldKind::Boolean, "Instantiated" | "IsActive") | (FieldKind::Number, "Alpha") => true,
@@ -34,7 +37,7 @@ pub(super) fn is_evaluated(kind: FieldKind, field: &str) -> bool {
 
 /// Returns why `value` cannot be the value of the layout field `field`; `None` for any other
 /// field and for a value it takes.
-pub(super) fn layout_problem(field: &str, value: &Rest) -> Option<&'static str> {
+fn layout_problem(field: &str, value: &Rest) -> Option<&'static str> {
     if !GeometryModifiers::has_field(field) {
         return None;
     }
@@ -42,5 +45,83 @@ pub(super) fn layout_problem(field: &str, value: &Rest) -> Option<&'static str> 
         Rest::Num(number) if GeometryModifiers::takes(field, *number) => None,
         Rest::Num(_) => Some("a number the layout field does not take"),
         _ => Some("a value that is not a number"),
+    }
+}
+
+impl AtRest {
+    pub(super) fn omit(
+        &mut self,
+        eval: &Eval<'_>,
+        binding: &Binding,
+        code: ContentOmissionCode,
+        detail: Option<String>,
+    ) {
+        let variable = eval.direct_variable(binding.input);
+        let source = variable
+            .filter(|path| !path.trim().is_empty())
+            .map(str::to_owned);
+        self.omissions.push(BindingOmission {
+            operation: binding.operation,
+            variable: variable.and(binding.input),
+            widget: binding.widget,
+            field: binding.field.clone(),
+            source,
+            code,
+            detail,
+        });
+    }
+
+    fn bind_text(&mut self, eval: &mut Eval<'_>, binding: &Binding) -> Result<(), String> {
+        if !(binding.field.starts_with(PARAMETER) || binding.field == TEXT_FIELD) {
+            self.omit(eval, binding, ContentOmissionCode::UnsupportedField, None);
+            return Ok(());
+        }
+        self.text_bound.insert(binding.widget);
+        let Rest::Text(text) = eval.input(binding.input, 0)? else {
+            return Err("a value that is not a text".to_owned());
+        };
+        let explicit = if let Some(path) = eval.direct_variable(binding.input) {
+            if path.trim().is_empty() {
+                self.omit(eval, binding, ContentOmissionCode::SourceMissing, None);
+                return Ok(());
+            }
+            if eval.variable(path).is_none() {
+                self.omit(eval, binding, ContentOmissionCode::VariableMissing, None);
+                return Ok(());
+            }
+            true
+        } else {
+            false
+        };
+        if !is_placeholder(&text) || (explicit && text.is_empty()) {
+            self.localise(binding.widget, &binding.field, text);
+        }
+        Ok(())
+    }
+
+    pub(super) fn apply_binding(
+        &mut self,
+        eval: &mut Eval<'_>,
+        binding: &Binding,
+    ) -> Result<(), String> {
+        match (binding.kind, binding.field.as_str()) {
+            (FieldKind::Localised, _) => self.bind_text(eval, binding)?,
+            (FieldKind::Text, CANVAS_FIELD) => {
+                self.canvases
+                    .insert(binding.widget, eval.canvas(binding.input, 0)?);
+            }
+            (FieldKind::Text, field) if field.ends_with(STATE_TAG) => {
+                self.tag(binding.widget, tag_of(eval.input(binding.input, 0)?)?);
+            }
+            (kind, field) if is_evaluated(kind, field) => {
+                let value = eval.input(binding.input, 0)?;
+                if let Some(why) = layout_problem(field, &value) {
+                    return Err(why.to_owned());
+                }
+                self.set(binding.widget, field, value);
+            }
+            _ => self.omit(eval, binding, ContentOmissionCode::UnsupportedField, None),
+        }
+        Ok(())
     }
 }

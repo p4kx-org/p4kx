@@ -7,10 +7,22 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use p4kx_dataforge::Guid;
 
 use super::Rest;
+use crate::report::ContentOmissionCode;
 use crate::style::GeometryModifiers;
 
 pub(super) const PARAMETER: &str = "ParamInput";
 pub(super) const STATE_TAG: &str = "StateTag";
+
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct BindingOmission {
+    pub(crate) operation: usize,
+    pub(crate) variable: Option<usize>,
+    pub(crate) widget: usize,
+    pub(crate) field: String,
+    pub(crate) source: Option<String>,
+    pub(crate) code: ContentOmissionCode,
+    pub(crate) detail: Option<String>,
+}
 
 /// What the `operations` of one canvas give its widgets at rest, for the parameters its
 /// `WidgetCanvas` hands it.
@@ -26,8 +38,7 @@ pub(crate) struct AtRest {
     pub(super) text_bound: HashSet<usize>,
     pub(super) state_tags: HashMap<usize, Vec<Guid>>,
     pub(super) geometry: HashMap<usize, GeometryModifiers>,
-    pub(super) left_out: Vec<(usize, String)>,
-    pub(super) unknown: Vec<(usize, String, String)>,
+    pub(super) omissions: Vec<BindingOmission>,
 }
 
 /// Returns whether two typed parameters are the same one: parameters of different kinds, a
@@ -166,13 +177,8 @@ impl AtRest {
         self.state_tags.get(&widget).map_or(&[], Vec::as_slice)
     }
 
-    /// Returns the bindings of fields that are not evaluated: widget and field.
-    pub(crate) fn left_out(&self) -> &[(usize, String)] {
-        &self.left_out
-    }
-
-    /// Returns the bindings whose inputs could not be evaluated: widget, field and why.
-    pub(crate) fn unknown(&self) -> &[(usize, String, String)] {
-        &self.unknown
+    /// Returns the bindings of fields or inputs that were not evaluated.
+    pub(crate) fn omissions(&self) -> &[BindingOmission] {
+        &self.omissions
     }
 }

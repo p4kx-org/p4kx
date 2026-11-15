@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use serde::Serialize;
+
 /// The original widget array in a canvas Record.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
 #[non_exhaustive]
+#[serde(rename_all = "snake_case")]
 pub enum WidgetSection {
     /// The canvas's scene array.
     Scene,
@@ -23,7 +26,7 @@ impl WidgetSection {
 }
 
 /// An actual original widget contributing to the listing.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
 #[non_exhaustive]
 pub struct WidgetInput {
     /// The physical canvas Record position.

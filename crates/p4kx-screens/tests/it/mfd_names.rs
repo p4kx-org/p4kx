@@ -5,7 +5,7 @@
 
 use p4kx_dataforge::DataForge;
 use p4kx_gfx::RgbaImage;
-use p4kx_screens::{EDITOR_LABEL, ScreenComposer, TextSources};
+use p4kx_screens::{Composed, ContentOmissionCode, EDITOR_LABEL, ScreenComposer, TextSources};
 use p4kx_testkit::{
     TestCanvas, TestDim, TestInstance, TestOp, TestValue, TestWidget, screens_text_sample,
     text_localisation,
@@ -40,17 +40,26 @@ fn localised_text_of(
     settings: &[&str],
     localise: Option<p4kx_gfx::Localise<'_>>,
 ) -> Result<RgbaImage, Failure> {
+    Ok(compose_text(canvas, settings, localise)?
+        .rasterize(&stage())?
+        .image)
+}
+
+fn compose_text(
+    canvas: &TestCanvas,
+    settings: &[&str],
+    localise: Option<p4kx_gfx::Localise<'_>>,
+) -> Result<Composed, Failure> {
     let bytes = screens_text_sample().record(canvas.record()).build();
     let forge = DataForge::open(&bytes)?;
     let fonts = fonts()?;
-    let composed = ScreenComposer::new(&forge)
+    Ok(ScreenComposer::new(&forge)
         .with_variables(&variables(settings)?)
         .with_texts(TextSources {
             fonts: &fonts,
             localise,
         })
-        .compose(&guid_text(SCREEN), None)?;
-    Ok(composed.rasterize(&stage())?.image)
+        .compose(&guid_text(SCREEN), None)?)
 }
 
 fn editor_label() -> String {
@@ -76,6 +85,34 @@ fn a_localised_variable_gives_the_text_a_field_draws_in_place_of_its_label() -> 
     );
     let named = text_of(&canvas, &["mfdviewname=A"])?;
     assert!(near(pixel(&named, 2, 4), [255, 0, 0, 255], 2), "the name");
+    Ok(())
+}
+
+#[test]
+fn an_explicit_empty_text_is_distinct_from_an_unset_text_variable() -> TestResult {
+    let canvas = titled("A", TestOp::NamedLocalVar("/seatdashboard/mfdviewname"));
+    let unset = compose_text(&canvas, &[], None)?;
+    let issue = unset
+        .report()
+        .content_omissions
+        .first()
+        .ok_or("the missing text variable is not listed")?;
+    assert_eq!(issue.widget, "title");
+    assert_eq!(issue.field, "ParamInput0");
+    assert_eq!(issue.code, ContentOmissionCode::VariableMissing);
+    assert_eq!(issue.source.as_deref(), Some("/seatdashboard/mfdviewname"));
+    let fallback = unset.rasterize(&stage())?.image;
+    assert!(near(pixel(&fallback, 2, 4), [255, 0, 0, 255], 2));
+
+    let empty = compose_text(&canvas, &["mfdviewname="], None)?;
+    assert_eq!(
+        empty.report().content_omissions,
+        [],
+        "explicit input has no omission"
+    );
+    assert_eq!(empty.report().variables[0].value, "");
+    let image = empty.rasterize(&stage())?.image;
+    assert_eq!(pixel(&image, 2, 4), CLEAR);
     Ok(())
 }
 

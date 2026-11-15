@@ -4,9 +4,9 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use p4kx_dataforge::{DataForge, Guid, RecordTree, StructValue};
+use p4kx_dataforge::{DataForge, Guid, RecordTree, Reference, StructValue};
 
-use crate::bindings::{TextBinding, text_bindings};
+use crate::bindings::{TextBinding, index_at, text_bindings};
 use crate::error::ScreenError;
 use crate::geometry::Dim;
 use crate::reader::{as_struct, child, float, items, reference, text};
@@ -84,11 +84,7 @@ impl Canvas {
 
     /// Returns the index in `widgets` of the widget a clone or list repeats.
     pub(crate) fn target_index(&self, target: Target) -> Option<usize> {
-        let index = match target {
-            Target::Scene(index) => index,
-            Target::Library(index) => self.scene_len.checked_add(index)?,
-        };
-        (index < self.widgets.len()).then_some(index)
+        widget_at(&self.widgets, self.scene_len, target)
     }
 
     pub(crate) fn read(tree: &RecordTree<'_>) -> Self {
@@ -116,12 +112,19 @@ impl Canvas {
         let mut widgets: Vec<Widget> = widgets_in("scene", WidgetSection::Scene).collect();
         let scene_len = widgets.len();
         widgets.extend(widgets_in("library", WidgetSection::Library));
+        let find_widget = |reference: &Reference<'_>| {
+            let location = reference.location();
+            let target = index_at(location, "scene")
+                .map(Target::Scene)
+                .or_else(|| index_at(location, "library").map(Target::Library))?;
+            widget_at(&widgets, scene_len, target)
+        };
         let (roots, children) = hierarchy(&widgets, scene_len);
         let unreachable = unreachable_widgets(&widgets, scene_len, &roots, &children);
         Self {
             unreachable,
-            text_bindings: text_bindings(root, scene_len),
-            operations: Operations::read(root, scene_len),
+            text_bindings: text_bindings(root, &find_widget),
+            operations: Operations::read(root, &find_widget),
             arrays: static_arrays(root),
             world_root: raw.then(|| world_root(&widgets, &roots)).flatten(),
             guid,
@@ -140,6 +143,24 @@ impl Canvas {
             embedded: parse_entries(items(root, "embeddedStyles")).into(),
         }
     }
+}
+
+fn widget_at(widgets: &[Widget], scene_len: usize, target: Target) -> Option<usize> {
+    let (scene, library) = widgets.split_at(scene_len);
+    let (section, base, slot) = match target {
+        Target::Scene(slot) => (scene, 0, slot),
+        Target::Library(slot) => (library, scene_len, slot),
+    };
+    if section
+        .get(slot)
+        .is_some_and(|widget| widget.input.slot == slot)
+    {
+        return Some(base + slot);
+    }
+    let index = section
+        .binary_search_by_key(&slot, |widget| widget.input.slot)
+        .ok()?;
+    Some(base + index)
 }
 
 /// Returns the size of the largest root widget of fixed size when it is a few units only, which
@@ -202,9 +223,9 @@ fn hierarchy(widgets: &[Widget], scene_len: usize) -> (Vec<usize>, Vec<Vec<usize
     };
     for (index, widget) in widgets.iter().enumerate() {
         let parent = match widget.parent {
-            Parent::Widget(parent) if parent < scene_len => Some(parent),
-            Parent::Library(parent) => scene_len.checked_add(parent),
-            Parent::Root | Parent::Widget(_) => None,
+            Parent::Widget(slot) => widget_at(widgets, scene_len, Target::Scene(slot)),
+            Parent::Library(slot) => widget_at(widgets, scene_len, Target::Library(slot)),
+            Parent::Root => None,
         };
         let attached = parent.is_some_and(|parent| attach(parent, index));
         if !attached && index < scene_len && !matches!(widget.parent, Parent::Library(_)) {

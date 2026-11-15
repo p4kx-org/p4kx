@@ -9,6 +9,7 @@ use p4kx_extraction::{
 use p4kx_gfx::CanvasSize;
 
 use crate::archive_screen_images::ImageReads;
+use crate::content_omission_origin::ContentOmissionOrigin;
 use crate::still::ObservedStill;
 use crate::still_inputs::StillInputs;
 
@@ -35,7 +36,9 @@ pub struct ScreenRenderOrigin {
     pub tool_authored: FieldOrigin,
     /// A value whose contributing inputs cannot be established.
     pub unknown: FieldOrigin,
-    /// The physical source and use inventory for the artifact and its dimensions.
+    /// Source evidence aligned with each structured omission in the Screen report.
+    pub content_omissions: Vec<ContentOmissionOrigin>,
+    /// The physical source and use inventory for the artifact, its dimensions and diagnostics.
     pub provenance: SourceInventory,
 }
 
@@ -76,12 +79,20 @@ impl ScreenRenderOrigin {
             CanvasSize::Width(_) => registry.origin(&dimensions, true),
             CanvasSize::Fit { .. } => tool_authored.clone(),
         };
+        let content_omissions = drawn
+            .still
+            .report()
+            .content_omissions
+            .iter()
+            .map(|omission| ContentOmissionOrigin::capture(omission, &scope, &registry))
+            .collect::<Result<_, _>>()?;
         Ok(Self {
             artifact: registry.origin(&actual, complete),
             width,
             height,
             tool_authored,
             unknown: registry.origin(&[], false),
+            content_omissions,
             provenance: registry.freeze()?,
         })
     }

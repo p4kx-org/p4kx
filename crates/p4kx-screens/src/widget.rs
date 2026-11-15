@@ -150,11 +150,13 @@ pub(crate) struct Repeat {
     pub(crate) modifiers: Vec<CloneModifier>,
 }
 
+pub(crate) const ARRAY_VARIABLE: &str = "arrayVariable";
+
 impl Repeat {
     fn parse(structure: &StructValue<'_>, canvas: Guid) -> Self {
         Self {
             target: reference(structure, "target").and_then(|target| target_of(target, canvas)),
-            array_variable: text(structure, "arrayVariable")
+            array_variable: text(structure, ARRAY_VARIABLE)
                 .filter(|name| !name.is_empty())
                 .map(str::to_owned),
             modifiers: clone_modifiers(structure, canvas),

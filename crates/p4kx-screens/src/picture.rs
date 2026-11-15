@@ -141,6 +141,7 @@ pub(crate) fn icon_preset_path(preset: &str) -> String {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub(crate) struct Picture {
     pub(crate) texture: String,
+    pub(crate) runtime_source: Option<String>,
     pub(crate) fit: Fit,
     pub(crate) flip: [bool; 2],
     pub(crate) place: [f32; 2],
@@ -149,6 +150,8 @@ pub(crate) struct Picture {
     pub(crate) icon_preset: Option<String>,
     pub(crate) url: String,
 }
+
+pub(crate) const RUNTIME_IMAGE_SOURCE: &str = "imageSource";
 
 impl Picture {
     pub(crate) fn parse(structure: &StructValue<'_>) -> Self {
@@ -174,6 +177,9 @@ impl Picture {
         };
         Self {
             texture: text(structure, "imagePath").unwrap_or_default().to_owned(),
+            runtime_source: text(structure, RUNTIME_IMAGE_SOURCE)
+                .filter(|name| !name.trim().is_empty())
+                .map(str::to_owned),
             fit: Fit::parse(text(structure, "imageScalingMethod")),
             flip: [
                 flag(structure, "flipH").unwrap_or(false),

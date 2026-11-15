@@ -15,6 +15,9 @@ use p4kx_testkit::{
 };
 use serde_json::Value;
 
+#[path = "ui_screen_runtime_origin.rs"]
+mod runtime_origin;
+
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 const CANVAS: &str = "libs/foundry/records/ui/buildingblocks/test/origin_panel";

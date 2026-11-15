@@ -6,10 +6,9 @@ use std::cmp::Ordering;
 use p4kx_dataforge::Guid;
 
 use super::Rest;
-use super::fields::{is_evaluated, layout_problem, tag_of};
-use super::graph::{Binding, CANVAS_FIELD, FieldKind, Input, Node, Operations};
-use super::state::{AtRest, PARAMETER, STATE_TAG, key_of};
-use crate::text::is_placeholder;
+use super::graph::{Input, Node, Operations};
+use super::state::{AtRest, key_of};
+use crate::report::ContentOmissionCode;
 use crate::variables::Variable;
 
 /// Finds the canvas a game variable names, by GUID or record path.
@@ -42,7 +41,7 @@ enum Memo {
     Done(Outcome),
 }
 
-struct Eval<'a> {
+pub(super) struct Eval<'a> {
     nodes: &'a [Node],
     kinds: &'a [String],
     inputs: &'a [(String, Rest)],
@@ -53,6 +52,20 @@ struct Eval<'a> {
 }
 
 impl Eval<'_> {
+    pub(super) fn direct_variable(&self, input: Input) -> Option<&str> {
+        match self.nodes.get(input?)? {
+            Node::Variable { binding, .. } => Some(binding),
+            _ => None,
+        }
+    }
+
+    pub(super) fn variable(&self, binding: &str) -> Option<&Variable> {
+        self.variables
+            .iter()
+            .rev()
+            .find(|variable| variable.matches(binding))
+    }
+
     fn value(&mut self, at: usize, depth: usize) -> Outcome {
         if depth > MAX_DEPTH {
             return Err(TOO_DEEP.to_owned());
@@ -86,7 +99,7 @@ impl Eval<'_> {
         outcome
     }
 
-    fn input(&mut self, input: Input, depth: usize) -> Outcome {
+    pub(super) fn input(&mut self, input: Input, depth: usize) -> Outcome {
         input.map_or_else(
             || Err("an input that is not connected".to_owned()),
             |at| self.value(at, depth + 1),
@@ -129,7 +142,7 @@ impl Eval<'_> {
 
     /// Evaluates the canvas the node `input` picks: the branch of a boolean choice, or the canvas
     /// a game variable that the caller sets names.
-    fn canvas(&mut self, input: Input, depth: usize) -> Result<Guid, String> {
+    pub(super) fn canvas(&mut self, input: Input, depth: usize) -> Result<Guid, String> {
         let nodes = self.nodes;
         match input.and_then(|at| nodes.get(at)) {
             Some(Node::CanvasChoice { canvases, input }) => {
@@ -151,10 +164,7 @@ impl Eval<'_> {
     fn node(&mut self, node: &Node, depth: usize) -> Outcome {
         match node {
             Node::Variable { binding, zero } => self
-                .variables
-                .iter()
-                .rev()
-                .find(|variable| variable.matches(binding))
+                .variable(binding)
                 .map_or_else(|| Ok(zero.clone()), |variable| variable.coerce(zero)),
             Node::Param { parameter, default } => Ok(self
                 .inputs
@@ -291,21 +301,6 @@ const fn whole_if(value: f64, whole: bool) -> f64 {
 }
 
 impl AtRest {
-    /// Takes the text a localised field of a text or of a canvas parameter has at rest: a value
-    /// that is a text of its own, not a placeholder the game fills in. A field whose input is not
-    /// evaluated is not marked as filled and keeps its label.
-    fn bind_text(&mut self, eval: &mut Eval<'_>, binding: &Binding) {
-        if !(binding.field.starts_with(PARAMETER) || binding.field == TEXT_FIELD) {
-            return;
-        }
-        if let Ok(Rest::Text(text)) = eval.input(binding.input, 0) {
-            self.text_bound.insert(binding.widget);
-            if !is_placeholder(&text) {
-                self.localise(binding.widget, &binding.field, text);
-            }
-        }
-    }
-
     /// Evaluates the field bindings of `operations` under `given`, with the canvases that game
     /// variables name found by `lookup`.
     pub(crate) fn resolving(
@@ -335,41 +330,13 @@ impl AtRest {
             memo: operations.nodes.iter().map(|_| Memo::Fresh).collect(),
         };
         for binding in &operations.bindings {
-            if binding.kind == FieldKind::Localised {
-                found.bind_text(&mut eval, binding);
-                continue;
-            }
-            if binding.kind == FieldKind::Text && binding.field == CANVAS_FIELD {
-                match eval.canvas(binding.input, 0) {
-                    Ok(canvas) => {
-                        found.canvases.insert(binding.widget, canvas);
-                    }
-                    Err(why) => found
-                        .unknown
-                        .push((binding.widget, binding.field.clone(), why)),
-                }
-                continue;
-            }
-            if binding.kind == FieldKind::Text && binding.field.ends_with(STATE_TAG) {
-                match eval.input(binding.input, 0).and_then(tag_of) {
-                    Ok(tag) => found.tag(binding.widget, tag),
-                    Err(why) => found
-                        .unknown
-                        .push((binding.widget, binding.field.clone(), why)),
-                }
-                continue;
-            }
-            if !is_evaluated(binding.kind, &binding.field) {
-                found.left_out.push((binding.widget, binding.field.clone()));
-                continue;
-            }
-            match eval.input(binding.input, 0).and_then(|value| {
-                layout_problem(&binding.field, &value).map_or(Ok(value), |why| Err(why.to_owned()))
-            }) {
-                Ok(value) => found.set(binding.widget, &binding.field, value),
-                Err(why) => found
-                    .unknown
-                    .push((binding.widget, binding.field.clone(), why)),
+            if let Err(why) = found.apply_binding(&mut eval, binding) {
+                found.omit(
+                    &eval,
+                    binding,
+                    ContentOmissionCode::UnresolvedInput,
+                    Some(why),
+                );
             }
         }
         found

@@ -57,6 +57,7 @@ mod boxes;
 mod canvas;
 mod colour;
 mod compose;
+mod content_omission_origin;
 mod context;
 mod corners;
 mod elements;
@@ -107,12 +108,13 @@ pub use archive_screen::{ArchiveScreen, ArchiveScreenError, ArchiveScreenRender}
 pub use archive_screen_origin::ScreenRenderOrigin;
 pub use assets::ScreenAssets;
 pub use compose::{Composed, ScreenComposer, TextSources};
+pub use content_omission_origin::ContentOmissionOrigin;
 pub use error::ScreenError;
 pub use font_file::ScreenFontFile;
 pub use images::{ImageSources, LoadTexture, LoadVector};
 pub use inspect::ElementCount;
 pub use limits::Limits;
-pub use report::{Report, Unsupported, VariableInForce};
+pub use report::{ContentOmission, ContentOmissionCode, Report, Unsupported, VariableInForce};
 pub use screen_asset_inputs::{
     CanvasRouteInput, ScreenAssetInputs, WidgetAssetInput, WidgetInput, WidgetSection,
 };

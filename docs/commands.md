@@ -693,7 +693,9 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   `weapons`, `scanning`, `diag`, `shields`, `config`, `comms` and `self`), `portraitcanvasguid` in the portrait view, and its tab bar
   names the page by `--var mfdviewname=<name or @key>`, an `@key` being looked up in the
   language (`--lang`). The UI tab keeps its state and typed
-  variables across sessions.
+  variables across sessions. The render report identifies omitted game render targets, runtime
+  list arrays and unresolved fields by widget and authored field. See
+  [Screen render diagnostics](cli-json.md#screen-content-diagnostics).
 - `p4kx chf to-json <file> [--out <file>] [--archive <Data.p4k>]` converts a CHF character file, e.g. one saved by the
   character customiser, to indented JSON on stdout or in `--out`: its inner versions (7 and 8
   are read), body type, face DNA with every face part named, item ports and material choices.

@@ -2279,17 +2279,39 @@ The JSON summary adds `originReceipt`, `artifactOrigin`, `fieldOrigins` and
 width is an option. The derived height uses both original canvas size fields.
 An unknown diagnostic retains a null origin marker.
 
+### Screen content diagnostics
+
 The screen is an offline still of the authored widget properties, the supported style cascade and
 the evaluated bindings. A source-enabled parent background can appear behind a text widget.
 `variables` describes the caller's settings and whether reachable operations read them.
-`unsupported` records the documented approximations and undecided bindings. The origin companion
+`unsupported` groups approximations and undecided bindings. `content_omissions` is present when
+the renderer finds an omitted runtime target, list data source or field binding. Each row lists
+`element`, `widget`, `widget_input` (`record_index`, `section` and `slot`), `field`, optional
+authored `source` and a `code`. The widget position is its original `scene` or `library` slot.
+Each original widget and authored field or operation has one detailed row per omission code. The grouped report
+keeps per-visit counts when the renderer repeats a widget.
+
+| Code | Condition |
+| --- | --- |
+| `runtime_target` | `imageSource` names a target drawn by the game. |
+| `runtime_array` | `arrayVariable` names game data supplying list rows. |
+| `source_missing` | The widget or binding has no target or variable name. |
+| `variable_missing` | A direct localised binding has no caller value. |
+| `unsupported_field` | The field or its binding kind is outside the renderer. |
+| `unresolved_input` | The graph input could not be evaluated, or its value failed the field's checks. |
+
+Report field origins identify the physical widget, direct authored field or binding operation.
+The omission has an incomplete origin when its runtime inputs are unavailable. Named static
+assets that fail to load are listed as missing or unreadable assets in the same report.
+The origin companion
 identifies the contributing DataForge payload, canvas size fields and observed asset sources.
 See [ADR-0337](adr/0337-a-requested-brand-without-a-brand-style-in-a-canvas-gets-the-default-entries-only.md)
 for the RSI power-page investigation and its runtime evidence boundary.
 
 `--var <name>=<value>` (repeatable, at most 64, only with `--screen`) sets a game variable before
-the bindings are evaluated (ADR-0259); every other variable stays at zero, the state at rest
-(ADR-0110). `p4kx ui render … --screen <MFD> --var powerstate=1` draws the MFD of a powered ship.
+the bindings are evaluated ([ADR-0259](adr/0259-screens-take-game-variables-from-the-caller.md)).
+Other variables keep their type's state-at-rest value (ADR-0110).
+An explicit empty value clears directly bound localised text. `p4kx ui render … --screen <MFD> --var powerstate=1` draws the MFD of a powered ship.
 The bindings of a screen read variables by path, such as `/seatdashboard/powerstate`: a name
 without `/` is the last segment of that path, one with `/` is the whole path, and case is ignored.
 The value is read as the kind of variable a binding names: `true`, `false` or a number for a

@@ -87,7 +87,9 @@ pub(crate) enum UiAction {
         /// is CANVAS (`mapdisplaymaster::isradar=1`); canvases of the same name are not told
         /// apart. Repeatable, at most 64; the last setting of a name wins and case is
         /// ignored. The value is read as a boolean (`true`, `false` or a number), a number or a
-        /// text, as the binding takes it. A name that no canvas of the screen reads is reported,
+        /// text, as the binding takes it. An explicit empty value clears directly bound localised
+        /// text. Numeric variables drive supported layout and state operations. Game render
+        /// targets and runtime arrays are listed in the report. A name no canvas reads is reported,
         /// and the variables in force are listed in the report. The powered MFD shows the page
         /// that `--var landscapecanvasguid=<record path or GUID>` names (`portraitcanvasguid` in
         /// the portrait view) and writes `--var mfdviewname=<name or @key>` in its tab bar; an `@key` is looked up in the language.
