@@ -10,6 +10,9 @@ use serde_json::Value;
 
 use crate::{ArchiveProvider, ExportOptions, Index, ProviderRegistry, ShaderProvider};
 
+#[path = "../tests/real_archive/privacy.rs"]
+pub(crate) mod real_archive_privacy;
+
 pub(crate) type TestResult = Result<(), Box<dyn std::error::Error>>;
 
 pub(crate) fn export(

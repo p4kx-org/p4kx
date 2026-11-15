@@ -16,13 +16,12 @@ use sha2::{Digest as _, Sha256};
 
 use crate::audio_control_projection::{self, Failure};
 use crate::media_writer::Finished;
+use crate::origin_test_support::real_archive_privacy as privacy;
 use crate::{
     Artifact, ContainerIdentity, ExportOptions, ExportOutcome, Identity, Index, MediaError,
     MediaKind, MediaRecord, Status,
 };
 
-#[path = "../tests/real_archive/privacy.rs"]
-mod privacy;
 #[path = "audio_control_accounting_support.rs"]
 mod support;
 

@@ -18,6 +18,9 @@ use crate::{
 
 pub(crate) type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
+#[path = "material_accounting_stream.rs"]
+mod accounting;
+
 pub(crate) struct Probe {
     cancel: CancelToken,
     stop_at: Option<usize>,

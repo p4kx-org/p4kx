@@ -29,6 +29,22 @@ pub(crate) fn project_observed(
     context: &SourceContext<'_>,
     limits: MaterialSourceLimits,
     writer: &mut MediaWriter<'_>,
+    before_capture: impl FnMut(MaterialReadObservation<'_>) -> Result<(), MediaError>,
+) -> Result<Projection, MediaError> {
+    project_with(
+        context,
+        limits,
+        writer,
+        retained_payload::read,
+        before_capture,
+    )
+}
+
+pub(crate) fn project_with(
+    context: &SourceContext<'_>,
+    limits: MaterialSourceLimits,
+    writer: &mut MediaWriter<'_>,
+    read: impl FnOnce(&SourceContext<'_>, &MediaWriter<'_>) -> Result<Vec<u8>, MediaError>,
     mut before_capture: impl FnMut(MaterialReadObservation<'_>) -> Result<(), MediaError>,
 ) -> Result<Projection, MediaError> {
     let bound = count(limits.source_bytes)?;
@@ -39,7 +55,7 @@ pub(crate) fn project_observed(
             writer,
         );
     }
-    let bytes = retained_payload::read(context, writer)?;
+    let bytes = read(context, writer)?;
     let mut reads = crate::material_read_origins::MaterialReadOrigins::default();
     let detail_bytes = writer.limits().record_bytes;
     let library = match MaterialLibrary::parse_with_observer(

@@ -3,13 +3,116 @@
 
 use p4kx_extraction::model::{Material, MaterialError, MaterialLibrary, PaletteSlot};
 use p4kx_extraction::{MaterialAuthoredInfo, MaterialLibrarySourceInfo};
-use p4kx_media::{Float32, MediaRecord, Status};
 use serde_json::{Value, json};
 
-use super::super::TestResult;
-use super::super::shader_accounting::require;
+use super::{
+    Algorithm, Artifact, ByteScope, Float32, KindSummary, MediaKind, MediaRecord, Source, Status,
+    Tally, TestResult, require,
+};
 
-pub(super) fn library(source: &MaterialLibrary, row: &MediaRecord) -> TestResult<bool> {
+#[derive(Debug, Default, PartialEq, Eq)]
+pub(super) struct Counts {
+    pub(super) enumerated: u64,
+    pub(super) selected: u64,
+    pub(super) nested: u64,
+    pub(super) complete: u64,
+    pub(super) partial: u64,
+    pub(super) failed: u64,
+    pub(super) materials: usize,
+    pub(super) records: u64,
+}
+
+impl Counts {
+    pub(super) fn account(
+        &mut self,
+        row: &MediaRecord,
+        original: Result<&MaterialLibrary, &MaterialError>,
+    ) -> TestResult {
+        match original {
+            Ok(source) => {
+                let complete = library(source, row)?;
+                self.materials += source.materials.len();
+                self.complete += u64::from(complete);
+                self.partial += u64::from(!complete);
+            }
+            Err(error) => {
+                failure(error, row)?;
+                self.failed += 1;
+            }
+        }
+        Ok(())
+    }
+
+    pub(super) fn check_totals(&self, entries: &Tally, kind: &KindSummary) -> TestResult {
+        let selected_sources = self.selected;
+        require(
+            kind.provider.kind == MediaKind::Material,
+            "actual material provider",
+        )?;
+        require(
+            entries.enumerated == self.enumerated
+                && entries.written == selected_sources
+                && entries.skipped == self.enumerated - selected_sources
+                && entries.failed == 0
+                && entries.partial == 0,
+            "material Entry counts differ",
+        )?;
+        let tally = &kind.counts.source_entries;
+        require(
+            tally.enumerated == self.selected
+                && tally.written == self.complete
+                && tally.partial == self.partial
+                && tally.failed == self.failed
+                && tally.skipped == 0,
+            "material provider callback counts differ",
+        )?;
+        let records = &kind.counts.records;
+        require(
+            records.enumerated == self.records
+                && records.written == self.records - self.partial - self.failed
+                && records.partial == self.partial
+                && records.failed == self.failed
+                && records.skipped == 0,
+            "material record counts differ",
+        )?;
+        require(
+            kind.counts.converted_outputs.enumerated == 0,
+            "material metadata creates no converted output",
+        )
+    }
+}
+
+pub(super) fn check_source(row: &Source, expected: &Source) -> TestResult {
+    require(
+        row.identity == expected.identity
+            && row.raw == expected.raw
+            && row.root == expected.root
+            && row.size == expected.size
+            && row.declared_integrity == expected.declared_integrity
+            && row.verification == expected.verification,
+        "provider and manifest agree on the verified original input",
+    )
+}
+
+pub(super) fn check_artifact(artifact: &Artifact, source: &Source, size: u64) -> TestResult {
+    let raw = source
+        .raw
+        .as_ref()
+        .ok_or("original raw material artifact")?;
+    require(
+        raw.path == format!("raw/{}", raw.digest.hex)
+            && raw.digest.algorithm == Algorithm::Sha256
+            && raw.digest.scope == ByteScope::DecodedEntryPayload
+            && raw.size == size,
+        "raw path and decoded integrity scope agree with the original Entry",
+    )?;
+    require(
+        artifact.path == raw.path && artifact.size == raw.size && artifact.digest == raw.digest,
+        "exact raw artifact receipt",
+    )
+}
+
+fn library(source: &MaterialLibrary, row: &MediaRecord) -> TestResult<bool> {
     let payload = row.data.get("payload").ok_or("actual material payload")?;
     require(
         row.subresource.namespace == "material-library",
@@ -44,6 +147,7 @@ pub(super) fn library(source: &MaterialLibrary, row: &MediaRecord) -> TestResult
                 .ok_or("actual material surface")?,
         )?;
     }
+    references(source, payload)?;
     let expected = if complete {
         Status::Complete
     } else {
@@ -58,6 +162,69 @@ pub(super) fn library(source: &MaterialLibrary, row: &MediaRecord) -> TestResult
         "source completeness flag",
     )?;
     Ok(complete)
+}
+
+fn references(source: &MaterialLibrary, payload: &Value) -> TestResult {
+    let mut rows = payload
+        .get("references")
+        .and_then(Value::as_array)
+        .ok_or("actual dependency declarations")?
+        .iter();
+    if let Some(palette) = &source.default_palette {
+        reference(rows.next(), "default-palette", None, None, None, palette)?;
+    }
+    for (material_index, material) in source.materials.iter().enumerate() {
+        for (slot, layer) in material.layers.iter().enumerate() {
+            if let Some(path) = layer.attribute("Path") {
+                reference(
+                    rows.next(),
+                    "layer-library",
+                    Some(material_index),
+                    Some(slot),
+                    layer.attribute("Submtl"),
+                    path,
+                )?;
+            }
+        }
+        for (slot, texture) in material.textures.iter().enumerate() {
+            let role = if texture.file.trim_start().starts_with('$') {
+                "engine-placeholder"
+            } else {
+                "texture"
+            };
+            reference(
+                rows.next(),
+                role,
+                Some(material_index),
+                Some(slot),
+                None,
+                &texture.file,
+            )?;
+        }
+    }
+    require(rows.next().is_none(), "additional dependency declarations")
+}
+
+fn reference(
+    row: Option<&Value>,
+    role: &str,
+    material: Option<usize>,
+    slot: Option<usize>,
+    submaterial: Option<&str>,
+    token: &str,
+) -> TestResult {
+    let row = row.ok_or("missing dependency declaration")?;
+    require(
+        row.get("role").and_then(Value::as_str) == Some(role)
+            && row.get("material") == Some(&json!(material))
+            && row.get("slot") == Some(&json!(slot))
+            && row.get("submaterial") == Some(&json!(submaterial))
+            && row
+                .pointer("/reference/original/value")
+                .and_then(Value::as_str)
+                == Some(token),
+        "actual dependency role, position or original token changed",
+    )
 }
 
 fn authored(source: &Material, wire: &Value, index: usize) -> TestResult<bool> {
@@ -146,7 +313,7 @@ fn equal_json(actual: &Value, expected: &Value) -> bool {
     }
 }
 
-pub(super) fn failure(error: &MaterialError, row: &MediaRecord) -> TestResult {
+fn failure(error: &MaterialError, row: &MediaRecord) -> TestResult {
     require(
         row.status == Status::Failed && row.subresource.namespace == "material-library-failure",
         "invalid original bytes require a failed material row",

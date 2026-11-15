@@ -60,12 +60,13 @@ reconstructed the original logical library and its source-backed fields. The
 exhaustive installed material accounting remains separate.
 
 Independent synthetic cases cover roots, unknown submaterial slots, ordered case-distinct/namespaced attributes, mixed text/CDATA/comments/PI including endtag-like data, layers/TexMod/placeholders, strict UTF8 and true CryXml repair, truncation, original ordinals, raw bytes/digests, cancellation/publication and schemas. The Extraction census compares retained root-Entry fields with the shared wire shape in memory.
-The opt-in Media replay additionally runs the actual material provider and reconciles its JSONL
-records, verified raw artifacts, original container/Entry identities and coverage counts against
-a separate read of all selected root and nested `.mtl` Entries. It reports only aggregate counts
-and keeps its temporary generation outside the input installation. Set `P4KX_DATA_P4K` and optionally
-`P4KX_DATA_P4K_B`, then run
-`cargo test -p p4kx-media --test real_archive all_selected_material_libraries_and_raw_artifacts_reconcile -- --ignored --nocapture`.
+The opt-in Media replay runs the material projection and Media writer against a stream observer.
+It reconciles material records, decoded payload sizes and digests, original container and Entry
+identities, and coverage counts across all selected root and nested `.mtl` Entries. It reports
+aggregate counts and writes no installed-Archive export. A small synthetic fixture compares stream
+receipts with a file-backed export and checks the retained payload bytes.
+Set `P4KX_DATA_P4K` and optionally `P4KX_DATA_P4K_B`, then run
+`cargo test --locked -p p4kx-media --lib all_selected_material_libraries_and_raw_artifacts_reconcile -- --ignored --nocapture`.
 Diagnosed structured failures or losses remain separately counted. A traversal or accounting
 failure cannot pass as a complete replay.
 

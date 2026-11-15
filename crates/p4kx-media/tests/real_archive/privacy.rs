@@ -3,9 +3,11 @@
 
 /// A failed source-bound verification without source values or identities.
 #[derive(Debug, PartialEq, Eq)]
-pub(super) struct VerificationFailure;
+pub(crate) struct VerificationFailure;
 
-pub(super) fn redact(result: super::TestResult) -> Result<(), VerificationFailure> {
+pub(crate) fn redact(
+    result: Result<(), Box<dyn std::error::Error>>,
+) -> Result<(), VerificationFailure> {
     result.map_err(|_| VerificationFailure)
 }
 
