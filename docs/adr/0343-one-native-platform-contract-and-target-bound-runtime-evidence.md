@@ -45,7 +45,7 @@ verification or locally traced real-Archive export verification.
 ## Sources
 
 - [GitHub native hosted runners](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)
-- [Pinned Rust toolchain action](https://github.com/dtolnay/rust-toolchain/blob/b725eda525362e7cf34af9a7243cac1e3f01a7ec/action.yml)
+- [Pinned Rust toolchain action](https://github.com/dtolnay/rust-toolchain/blob/df2a88e9fe4098bad09cb42c3dec7187f15861fc/action.yml)
 - [Pinned native installer action](https://github.com/taiki-e/install-action/blob/5488ac5a951645ce95062214902ac4b6bc1a1037/action.yml)
 - [Pinned mold action](https://github.com/rui314/setup-mold/blob/339e96b4ff1f3bd865856ba4cbbe8818a7acb038/action.yml)
 - [cargo-about 0.9.2 multiple-target CLI](https://github.com/EmbarkStudios/cargo-about/blob/0.9.2/src/cargo-about/generate.rs)
