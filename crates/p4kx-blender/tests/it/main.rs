@@ -17,6 +17,7 @@ mod package_ddna_pair;
 mod package_dds_fallback;
 mod package_default_material;
 mod package_entity_classification;
+mod package_forward_illum;
 mod package_glb_budget;
 mod package_glow;
 mod package_interior;

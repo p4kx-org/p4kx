@@ -46,7 +46,7 @@ def _emission():
     raise AssertionError("No source-linked shader")
 
 
-def _render(tree, bsdf) -> None:
+def _render(tree, bsdf, *, check_coverage: bool = True) -> None:
     for item in bpy.context.scene.objects:
         item.hide_render = True
     for collection in list(bpy.data.collections):
@@ -81,6 +81,8 @@ def _render(tree, bsdf) -> None:
     observed = bpy.data.images.load(scene.render.filepath).pixels[(8 * 16 + 8) * 4:(8 * 16 + 9) * 4]
     assert all(math.isclose(actual, expected, abs_tol=0.025)
                for actual, expected in zip(observed, (0.2, 0.2, 0.2, 1.0), strict=True)), tuple(observed)
+    if not check_coverage:
+        return
     opacity.default_value = 0.45
     scene.render.filepath = str(Path(sys.argv[-1]).parent / "covered-emission.exr")
     bpy.ops.render.render(write_still=True)

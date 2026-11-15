@@ -162,6 +162,20 @@ packed roughness channel from the embedded image. Blender checks the packed alph
 and the graph that scales them by `GlossMult` before deriving roughness. The fixture also
 checks the constant palette fallback in both outputs. These are P4KX projection checks.
 
+## Forward Illum and explicit Emittance
+
+This fixture exports a textured GLB and a Blender package for absent, zero and positive
+`Glow`, plus a separate explicit Emittance map. Its original material, diffuse and Emittance
+inputs carry independently checked provenance. The GLB test compares the diffuse alpha and
+static emission. Blender checks the opacity graph, effective emission, and separate texture
+and tint nodes, then renders the explicit Emittance case into a small EXR.
+
+```powershell
+$env:P4KX_SYNTHETIC_FORWARD_ILLUM_PACKAGE = Join-Path $verificationRoot 'forward-illum'
+cargo test --locked -p p4kx-blender --test it -- forward_illum_package_preserves_original_controls_and_glb_alpha_independently
+& 'C:\Program Files\Blender Foundation\Blender 5.3\blender.exe' --background --factory-startup --disable-autoexec --python-exit-code 23 --python-expr 'import sys; sys.dont_write_bytecode = True' --python blender_addon/tests/blender_forward_illum_package.py -- "$env:P4KX_SYNTHETIC_FORWARD_ILLUM_PACKAGE/scene.json"
+```
+
 ## Native package exchange in CI
 
 The focused job builds the native P4KX CLI on each row of the

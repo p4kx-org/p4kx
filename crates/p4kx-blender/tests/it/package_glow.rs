@@ -25,7 +25,7 @@ fn owner_glow_declaration_and_original_primitive_binding_are_published_by_the_pa
         TestEntry::stored(r"Data\Game2.dcb", database()),
         TestEntry::stored(format!("Data/{MODEL_PATH}"), model.cgf()),
         TestEntry::stored("Data/Objects/Test/glow.cgfm", model.cgfm()),
-        TestEntry::stored("Data/Objects/Test/emission.dds", emission_dds()?),
+        TestEntry::stored("Data/Objects/Test/emission.dds", emission_dds([128, 64, 32, 255])?),
         TestEntry::stored(
             r"Data\Objects\Test\glow.cgf.mtl",
             br#"<Material><SubMaterials><Material/><Material Shader="Illum" MtlFlags="1024"/><Material Shader="HardSurface" StringGenMask="%EMITTANCE_MAP" Glow="2" Emissive="0.2,0.4,0.8" Opacity="0.45"><Textures><Texture Map="TexSlot14" File="objects/test/emission.dds"/></Textures></Material></SubMaterials></Material>"#,
@@ -332,7 +332,7 @@ fn verify_physical_glow_use(attribute: &Value, inventory: &Value) -> TestResult 
     Ok(())
 }
 
-fn emission_dds() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+pub(super) fn emission_dds(pixel: [u8; 4]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let dds = SplitDds::new(
         TestTextureFormat::Dx10Block {
             dxgi_format: 28,
@@ -348,6 +348,6 @@ fn emission_dds() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     if payload.len() != 4 {
         return Err("expected one exact RGBA pixel".into());
     }
-    payload.copy_from_slice(&[128, 64, 32, 255]);
+    payload.copy_from_slice(&pixel);
     Ok(bytes)
 }
