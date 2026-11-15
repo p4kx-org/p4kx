@@ -8,9 +8,6 @@ use p4kx_extraction::{Archive, DataForgeEntry};
 
 use crate::archive_key_use::ArchiveKeyUse;
 use crate::build_derived::{add_contracts, add_loadouts, add_paints, add_tags, particle_library};
-use crate::build_harvest::add_harvest_locations;
-use crate::build_loot::add_loot_containers;
-use crate::build_starmap::add_starmap;
 use crate::catalog_definitions::CatalogDefinitions;
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::{CatalogProjection, CatalogTextRegistry};
@@ -85,23 +82,17 @@ fn assemble<R>(
     )?;
     let tags = add_tags(&forge, &input, options, &mut collected)?;
     let paint_summary = add_paints(&forge, &input, &mut collected, options.cancel)?;
+    run.begin(CatalogStage::ResolveLoadouts);
     let loadout_summary = add_loadouts(archive, &entities, &mut collected, &input, options.cancel)?;
     let variants = collected.group_variants();
-    let starmap_summary = add_starmap(&mut collected, placements.counts);
-    add_harvest_locations(
-        archive,
-        &placements,
-        &mut collected,
-        options.cancel,
-        &entry_capture,
-    )?;
-    add_loot_containers(
+    let starmap_summary = scanning::project_locations(
         archive,
         &mut placements,
         &mut collected,
-        options.cancel,
         &entry_capture,
+        run,
     )?;
+    run.begin(CatalogStage::ProjectMissions);
     add_contracts(&forge, &projection, tags, options, &mut collected)?;
     collected.ledger.merge(link_scenario_factions(
         &forge,
@@ -122,6 +113,7 @@ fn assemble<R>(
     particle_library::collect(archive, &entry_capture, options, &mut collected)?;
     let weapon_animation =
         parts::capture_weapon_animation(archive, &entities, &input, options, &mut collected)?;
+    run.begin(CatalogStage::FinalizeProjections);
     let kinds = collected.summary(options.filter.is_none());
     parts::capture_rows(
         &mut collected,

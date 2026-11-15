@@ -109,6 +109,14 @@ pub enum CatalogStage {
     MeasureJson,
     /// Writes the JSON to the chosen output sink.
     WriteJson,
+    /// Resolves default ship and item loadouts.
+    ResolveLoadouts,
+    /// Projects starmap, harvestable and loot locations.
+    ProjectLocations,
+    /// Starts contract and mission projections.
+    ProjectMissions,
+    /// Captures selected rows and assembles Blueprint and placement tables.
+    FinalizeProjections,
 }
 
 impl CatalogStage {
@@ -130,6 +138,10 @@ impl CatalogStage {
             Self::Provenance => "provenance",
             Self::MeasureJson => "measure-json",
             Self::WriteJson => "write-json",
+            Self::ResolveLoadouts => "resolve-loadouts",
+            Self::ProjectLocations => "project-locations",
+            Self::ProjectMissions => "project-missions",
+            Self::FinalizeProjections => "finalize-projections",
         }
     }
 }

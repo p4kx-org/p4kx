@@ -10,13 +10,16 @@ use serde::{Serialize, Serializer};
 
 const TEXT_LEN: usize = 36;
 
+/// Canonical lower-case UUID text as sortable bytes.
+pub(crate) type GuidText = [u8; TEXT_LEN];
+
 /// A GUID written as its canonical lower-case UUID text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) struct CatalogGuid(pub(crate) Guid);
 
 impl CatalogGuid {
     /// Returns the canonical text as bytes, whose order is the order of the catalog.
-    pub(crate) fn text(self) -> [u8; TEXT_LEN] {
+    pub(crate) fn text(self) -> GuidText {
         let mut text = Text {
             bytes: [0; TEXT_LEN],
             len: 0,
@@ -32,7 +35,7 @@ pub(crate) fn sort_by_guid<T>(entities: &mut [T], guid: impl Fn(&T) -> CatalogGu
 }
 
 struct Text {
-    bytes: [u8; TEXT_LEN],
+    bytes: GuidText,
     len: usize,
 }
 

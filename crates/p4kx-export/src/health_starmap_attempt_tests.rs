@@ -9,8 +9,9 @@ use p4kx_testkit::{ArchiveBuilder, TestEntry, test_key};
 use serde_json::{Value, json};
 
 use super::with_entry_capture;
-use crate::ExportAccountingError;
+use crate::export_diagnostic::ExportSourceRole;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
+use crate::{CatalogError, ExportAccountingError, Kind, entry_source, export_health_entries};
 
 const PATH: &str = "Data\\ObjectContainers\\PU\\system\\alpha\\alphasystem.socpak";
 const BYTES: &[u8] = b"actual malformed container bytes";
@@ -57,6 +58,7 @@ fn failed_outer_starmap_open_records_payload_attempt_without_tainting_directory_
             .ok_or(ExportAccountingError::UnobservedFailure)?;
         let sources = capture.frame().sources().clone();
         let path = source.original()?.path_fact()?.into_cell(&sources);
+        shared_dependency_receipts(&ledger)?;
         let inventory = sources.freeze()?;
         Ok((outcome, ledger, path, inventory))
     })?;
@@ -82,6 +84,47 @@ fn failed_outer_starmap_open_records_payload_attempt_without_tainting_directory_
         "leaf payload encryption cannot taint directory metadata"
     );
     attempted(&serde_json::to_value(inventory)?)
+}
+
+fn shared_dependency_receipts(ledger: &ExportLedger) -> Result<(), CatalogError> {
+    let [source] = ledger.entries.as_slice() else {
+        return Err(ExportAccountingError::UnobservedFailure.into());
+    };
+    let original = source.original()?;
+    let expected = original.path_fact()?.into_cell(original.source_uses());
+    let mut ledger_with_dependencies = ExportLedger::default();
+    for kind in [
+        Kind::HarvestableLocations,
+        Kind::HarvestableLocations,
+        Kind::LootContainers,
+    ] {
+        entry_source::dependencies(ledger, &mut ledger_with_dependencies, kind);
+    }
+    let compiled = export_health_entries::compile(ledger_with_dependencies.entries)?;
+    assert_eq!(
+        compiled.sources.len(),
+        2,
+        "each consuming kind retains its own accounting"
+    );
+    assert_eq!(
+        compiled.failed.len(),
+        2,
+        "the failure is visible in both consuming kinds"
+    );
+    for source in compiled.sources {
+        let receipt = source.original()?;
+        assert!(
+            std::ptr::eq(receipt, original),
+            "dependency copies and identical merges share the original receipt"
+        );
+        assert_eq!(source.role, ExportSourceRole::Dependency);
+        assert_eq!(source.disposition, SourceDisposition::ReadFailed);
+        assert_eq!(
+            receipt.path_fact()?.into_cell(receipt.source_uses()),
+            expected
+        );
+    }
+    Ok(())
 }
 
 fn attempted(inventory: &Value) -> TestResult {

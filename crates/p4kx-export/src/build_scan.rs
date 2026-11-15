@@ -6,6 +6,9 @@ use std::sync::Arc;
 use p4kx_assembly::{ArchiveFiles, Entities};
 use p4kx_extraction::{Archive, CancelToken, DataForge};
 
+use crate::build_harvest::add_harvest_locations;
+use crate::build_loot::add_loot_containers;
+use crate::build_starmap::add_starmap;
 use crate::catalog_crafting::CraftingKinds;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::original::EntryCapture;
@@ -15,7 +18,7 @@ use crate::scan::{Scan, ScanDomain};
 use crate::scan_health::ScanRead;
 use crate::starmap_containers::jump_class::JumpEndpointRecords;
 use crate::starmap_containers::{PlacementScope, Placements};
-use crate::{CatalogError, CatalogOptions};
+use crate::{CatalogError, CatalogOptions, StarmapSummary};
 
 /// Reads required placements and assembles ordered selected Record rows.
 pub(super) fn scan<'f>(
@@ -77,6 +80,21 @@ pub(super) fn scan<'f>(
         options,
     )?;
     Ok((collected, placements))
+}
+
+pub(super) fn project_locations(
+    archive: &Archive,
+    placements: &mut Placements,
+    collected: &mut Collected<'_>,
+    capture: &EntryCapture<'_>,
+    run: CatalogRun<'_, '_>,
+) -> Result<StarmapSummary, CatalogError> {
+    run.begin(CatalogStage::ProjectLocations);
+    let summary = add_starmap(collected, placements.counts);
+    let cancel = run.options.cancel;
+    add_harvest_locations(archive, placements, collected, cancel, capture)?;
+    add_loot_containers(archive, placements, collected, cancel, capture)?;
+    Ok(summary)
 }
 
 pub(super) fn collect<'f>(mut crafting: CraftingKinds<'f>, scanned: ScanRead<'f>) -> Collected<'f> {

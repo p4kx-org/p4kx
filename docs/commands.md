@@ -495,6 +495,10 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   `open-dataforge`, `read-localization`, `index-localization` and `initialize-origins` mark the starts
   of database validation, reading and decoding language Entries, indexing translations and binding
   the original input sources, respectively.
+  Within `projections`, `resolve-loadouts` marks default loadout resolution,
+  `project-locations` marks starmap, harvest and loot projections, `project-missions` marks
+  the start of contract and mission projections, and `finalize-projections` marks selected row
+  capture and final Blueprint and placement tables. All four markers precede `export-health`.
   `p4kx catalog schema` prints the catalog's JSON Schema.
 - `p4kx ships <archive> --out <file> [--format json|ndjson] [--filter <filter>]
   [--exported-at <seconds>]` writes the base data of every ship

@@ -10,11 +10,15 @@ use super::super::entry_selection_input::{EntrySelectionUse, SelectionSource};
 use super::AuthoredEntryPath;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::build::original_input::test_support::{self, TestResult};
-use crate::catalog_read::original::EntryCapture;
 use crate::catalog_read::original::health_reference_receipt::ReferenceFrame;
+use crate::catalog_read::original::{
+    EntryCapture, EntryDiagnosis, EntryPathCapture, OriginalDatum,
+};
+use crate::entry_source::EntrySource;
+use crate::export_ledger::SourceDisposition;
 use crate::record_header_field::RecordHeaderField;
 use crate::record_observation::RecordObservation;
-use crate::{CatalogError, ExportAccountingError};
+use crate::{CatalogError, ExportAccountingError, Kind, export_health_entries};
 
 fn bytes() -> Vec<u8> {
     DataForgeBuilder::new()
@@ -143,6 +147,57 @@ fn genuine_own_record_selection_keeps_its_exact_original_name_use() -> TestResul
             SourceUseRole::Payload,
             "the original role remains distinct from selection/conversion"
         );
+        Ok(())
+    })
+}
+
+#[test]
+fn independent_receipts_merge_without_changing_other_owners() -> TestResult {
+    const NAME: &str = "Owner.Shared";
+    let bytes = DataForgeBuilder::new()
+        .version(8)
+        .structure(TestStruct::new("Owner"))
+        .record(TestRecord::new(1, "Owner", NAME, "first.xml"))
+        .record(TestRecord::new(2, "Owner", NAME, "second.xml"))
+        .build();
+    test_support::with_input(&bytes, |forge, input| {
+        let observe = |index| -> TestResult<_> {
+            let record = forge.record(index).ok_or("actual source Record")?;
+            let tree = record.tree()?;
+            let scope = input.record_scope(&record, &tree)?;
+            let admission = RecordObservation::capture(input, &record)?;
+            let capture = EntryPathCapture::new(input, &admission, &scope)?;
+            let path = capture.record_name(&tree)?;
+            Ok(EntrySource::authored_missing(path).observation(
+                Kind::LootContainers,
+                SourceDisposition::ReadFailed,
+                EntryDiagnosis::default(),
+            ))
+        };
+        let first = observe(0)?;
+        let other_owner = first.clone();
+        let second = observe(1)?;
+        let compiled = export_health_entries::compile(vec![first, second])?;
+        let [merged] = compiled.sources.as_slice() else {
+            return Err("one logical Entry failure".into());
+        };
+        let combined = merged.original()?.path_fact()?;
+        let untouched = other_owner.original()?.path_fact()?;
+        let locations = |fact: &OriginalDatum<_>| {
+            let (uses, complete) = fact.contributions();
+            assert!(complete, "each original selector set is complete");
+            uses.iter()
+                .map(|use_| use_.description().location().clone())
+                .collect::<Vec<_>>()
+        };
+        let first_location = RecordHeaderField::RecordName.location(0);
+        let second_location = RecordHeaderField::RecordName.location(1);
+        assert_eq!(
+            locations(&untouched).as_slice(),
+            std::slice::from_ref(&first_location),
+            "merging a receipt does not mutate its other owners"
+        );
+        assert_eq!(locations(&combined), [first_location, second_location]);
         Ok(())
     })
 }

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::sync::Arc;
+
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -69,13 +71,13 @@ pub(crate) struct ArchiveEntryObservation {
     pub(crate) role: ExportSourceRole,
     pub(crate) disposition: SourceDisposition,
     pub(crate) diagnosis: EntryDiagnosis,
-    pub(crate) receipt: Option<EntryReceipt>,
+    pub(crate) receipt: Option<Arc<EntryReceipt>>,
 }
 
 impl ArchiveEntryObservation {
     pub(crate) fn original(&self) -> Result<&EntryReceipt, ExportAccountingError> {
         self.receipt
-            .as_ref()
+            .as_deref()
             .ok_or(ExportAccountingError::UnboundHealthSubject)
     }
 
@@ -84,7 +86,8 @@ impl ArchiveEntryObservation {
             return Err(ExportAccountingError::ConflictingSourceDatum);
         }
         match (&mut self.receipt, &other.receipt) {
-            (Some(left), Some(right)) => left.merge(right),
+            (Some(left), Some(right)) if Arc::ptr_eq(left, right) => Ok(()),
+            (Some(left), Some(right)) => Arc::make_mut(left).merge(right),
             (None, None) => Ok(()),
             _ => Err(ExportAccountingError::UnboundHealthSubject),
         }

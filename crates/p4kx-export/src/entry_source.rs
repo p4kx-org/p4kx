@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::sync::Arc;
+
 use p4kx_assembly::LoadoutFileRead;
 use p4kx_extraction::{Archive, Entry};
 
@@ -149,7 +151,7 @@ impl EntrySource {
             disposition,
             diagnosis,
             operation: self.operation,
-            receipt: Some(self.receipt),
+            receipt: Some(Arc::new(self.receipt)),
         }
     }
 }
