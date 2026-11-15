@@ -823,6 +823,14 @@ original coordinates were unavailable.
 The declaration is available for inspection and tooling. The importer leaves trigger evaluation
 and runtime modifier execution to the original game logic.
 
+The local installed test
+`real_entity_glow::installed_authored_glow_joins_the_original_owner_nodes_and_material_slots`
+compares this join to an original Record, the verified primary model bytes and the decoded
+source subsets. Set `P4KX_DATA_P4K` and `P4KX_PRIVATE_GLOW_SELECTOR` to the Archive and a local
+file containing the exact Record path. Select a Record with an authored named Glow link
+and a drawable subset in its primary model. The check reads the original source in memory
+and produces a pass or a structural failure reason.
+
 ## Authored SOC scene
 
 An interior package written with `--authored-soc` has an `authored_soc` reference in
