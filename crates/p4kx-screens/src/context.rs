@@ -19,6 +19,8 @@ pub(crate) struct Context<'t> {
     pub(crate) texts: Texts<'t>,
     pub(crate) images: Images<'t>,
     pub(crate) inputs: Option<TrackedInputs>,
+    #[cfg(test)]
+    pub(crate) power_trace: Option<crate::power_source_witness::Trace>,
 }
 
 impl Context<'_> {

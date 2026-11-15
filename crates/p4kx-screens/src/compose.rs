@@ -42,6 +42,8 @@ pub struct Composed {
     record_index: u32,
     inputs: TrackedInputs,
     report: Report,
+    #[cfg(test)]
+    pub(crate) power_trace: Option<crate::power_source_witness::Trace>,
     width: u32,
     height: u32,
 }
@@ -75,6 +77,8 @@ impl Composed {
             bitmaps: images.into_bitmaps(),
             record_index,
             inputs: inputs.unwrap_or_default(),
+            #[cfg(test)]
+            power_trace: cx.power_trace,
             report,
             width: pixels_wide,
             height: pixels_high,
@@ -179,6 +183,8 @@ pub struct ScreenComposer<'a, 'f> {
     texts: Option<TextSources<'a>>,
     images: Option<ImageSources<'a>>,
     observe_inputs: bool,
+    #[cfg(test)]
+    pub(crate) power_scope: Option<Guid>,
 }
 
 impl<'a, 'f> ScreenComposer<'a, 'f> {
@@ -194,6 +200,8 @@ impl<'a, 'f> ScreenComposer<'a, 'f> {
             texts: None,
             images: None,
             observe_inputs: false,
+            #[cfg(test)]
+            power_scope: None,
         }
     }
 
@@ -318,6 +326,10 @@ impl<'a, 'f> ScreenComposer<'a, 'f> {
                 Images::new(sources, side, self.limits)
             }),
             inputs: self.observe_inputs.then(TrackedInputs::default),
+            #[cfg(test)]
+            power_trace: self
+                .power_scope
+                .map(crate::power_source_witness::Trace::new),
             ..Context::default()
         }
     }

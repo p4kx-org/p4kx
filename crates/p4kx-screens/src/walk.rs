@@ -265,18 +265,35 @@ impl<'s, 'a, 'f, 't> Walk<'s, 'a, 'f, 't> {
         if elements::draws_no_background(widget) {
             look.background = None;
         }
-        elements::paint(self.cx, widget, &look, area, alpha);
+        self.paint_and_descend(canvas, sibling, &look, (area, alpha, depth));
+        if moved {
+            self.cx.painter.pop_transform();
+            self.turned = self.turned.saturating_sub(1);
+        }
+    }
+
+    fn paint_and_descend(
+        &mut self,
+        canvas: &Canvas,
+        sibling: &Sibling<'_>,
+        look: &Look<'_>,
+        (area, alpha, depth): (Area, f32, usize),
+    ) {
+        let widget = sibling.widget;
+        #[cfg(test)]
+        self.trace_begin();
+        elements::paint(self.cx, widget, look, area, alpha);
+        #[cfg(test)]
+        self.trace_painted(widget, look, alpha);
         let clipped = widget.overflow.clips();
         if clipped {
             self.cx.painter.push_clip(area);
         }
         self.descend(canvas, sibling, area, alpha, depth);
+        #[cfg(test)]
+        self.trace_leave();
         if clipped {
             self.cx.painter.pop_clip();
-        }
-        if moved {
-            self.cx.painter.pop_transform();
-            self.turned = self.turned.saturating_sub(1);
         }
     }
 

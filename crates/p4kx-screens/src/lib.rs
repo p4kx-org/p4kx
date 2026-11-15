@@ -74,6 +74,8 @@ mod look;
 mod paint;
 mod paint_state;
 mod picture;
+#[cfg(test)]
+mod power_source_witness;
 mod reader;
 mod report;
 mod rest;

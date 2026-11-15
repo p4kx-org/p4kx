@@ -64,14 +64,25 @@ pub(crate) fn slot_names(forge: &DataForge<'_>) -> Vec<String> {
     Vec::new()
 }
 
+#[cfg(test)]
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct PaletteSite {
+    pub(crate) record_index: u32,
+    pub(crate) slot: usize,
+}
+
 #[derive(Debug, Clone, Default)]
 pub(crate) struct Palette {
     slots: HashMap<String, Rgba>,
+    #[cfg(test)]
+    pub(crate) sources: HashMap<String, PaletteSite>,
 }
 
 impl Palette {
     pub(crate) fn overlay(&mut self, other: Self) {
         self.slots.extend(other.slots);
+        #[cfg(test)]
+        self.sources.extend(other.sources);
     }
 
     pub(crate) fn of_canvas(
@@ -114,13 +125,24 @@ impl Palette {
         style: &RecordTree<'_>,
         slot_names: &[String],
     ) -> Self {
-        let mut slots = HashMap::new();
-        for (name, value) in slot_names.iter().zip(items(style.root(), "colorStyles")) {
+        let mut palette = Self::default();
+        for (slot, value) in items(style.root(), "colorStyles").iter().enumerate() {
+            let Some(name) = slot_names.get(slot) else {
+                break;
+            };
             if let Some(colour) = resolved_entry(forge, value) {
-                slots.insert(name.clone(), colour);
+                palette.slots.insert(name.clone(), colour);
+                #[cfg(test)]
+                palette.sources.insert(
+                    name.clone(),
+                    PaletteSite {
+                        record_index: style.record_index(),
+                        slot,
+                    },
+                );
             }
         }
-        Self { slots }
+        palette
     }
 
     pub(crate) fn resolve(&self, spec: &ColorSpec, inherited: f32) -> Result<Rgba, String> {

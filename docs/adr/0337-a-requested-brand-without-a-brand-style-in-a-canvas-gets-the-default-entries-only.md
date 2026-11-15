@@ -45,3 +45,20 @@ and label fields, resolved palette, applicable styles and relevant binding input
 update. The renderer evaluates supplied variables and their at-rest defaults. The report lists
 unsupported bindings and approximations. The owner's in-game state and the appearance of the
 labels there remain unverified.
+
+## Trace on the installed Archive
+
+The ignored source test follows the canvas actually selected by the powered RSI MFD and uses the
+original widget coordinates to check the parent Reference, enabled background, inline fill and
+font. It verifies the palette slot of the winning style Record against the background emitted
+by the painter. It also counts direct binding targets and local input References on each
+candidate's visited ancestor chain. The same DataForge is used for the still at rest. The
+test reports Build identity and aggregate counts.
+
+Run the test with the ordinary installed-Archive fixture environment.
+
+    cargo test -p p4kx-screens --lib the_rsi_power_source_trace -- --ignored --nocapture
+
+The binding count does not evaluate every authored input chain or locate unsupported raw
+selectors. The trace therefore verifies the offline paint and its physical sources while the
+in-game state and a complete source account of potentially suppressing rules remain open.
