@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::Value;
+use p4kx_extraction::{SourceUseRole, SourceValue, Value};
 use p4kx_testkit::{DataForgeBuilder, TestInstance, TestRecord, TestStruct, TestType, TestValue};
 
 use super::ReferenceCapture;
 use crate::build::original_input::test_support::{self, TestResult};
-use crate::catalog_read::original::{OriginalRecordScope, OriginalValueEvent, OriginalValueSite};
+use crate::catalog_read::original::{
+    OriginalRecordScope, OriginalValueEvent, OriginalValuePart, OriginalValueSite,
+};
 use crate::record_observation::RecordObservation;
 use crate::{CatalogError, ExportAccountingError};
 
@@ -63,6 +65,58 @@ fn a_wrong_container_leave_preserves_the_actual_active_parent() -> TestResult {
     })
 }
 
+#[test]
+fn sibling_receipts_keep_the_same_ordered_array_uses() -> TestResult {
+    test_support::with_input(&database(Shape::Array), |forge, input| {
+        let record = forge.record(0).ok_or("the actual Owner is absent")?;
+        let tree = record.tree()?;
+        let scope = input.record_scope(&record, &tree)?;
+        let admission = RecordObservation::capture(input, &record)?;
+        let mut capture = ReferenceCapture::new(input, &admission, &scope)?;
+        let (left, expected) = at(&scope, "left", |site| {
+            capture.enter(site)?;
+            let fact = site.fact();
+            let names = scope.dataforge().at(
+                fact.location(OriginalValuePart::FieldName),
+                SourceUseRole::Conversion,
+            )?;
+            let array = scope.dataforge().at(
+                fact.location(OriginalValuePart::Value),
+                SourceUseRole::Selector,
+            )?;
+            Ok((site.ordinal(), [names, array]))
+        })?;
+        let fields = [
+            at(&scope, "left[0]", |site| Ok(capture.body(site)?.field))?,
+            at(&scope, "left[1]", |site| Ok(capture.body(site)?.field))?,
+        ];
+        capture.leave(left)?;
+        let inventory = input.origins().uses.freeze()?;
+        for (position, field) in fields.into_iter().enumerate() {
+            let field = field.finish(&capture.frame)?;
+            let name = format!("left[{position}]");
+            assert!(
+                matches!(field.value(), SourceValue::Present(value) if value.as_str() == name.as_str()),
+                "each sibling retains its own logical path"
+            );
+            let (uses, complete) = field.contributions();
+            assert!(complete, "all original array operands are retained");
+            assert!(
+                uses.iter()
+                    .map(|used| (used.reference(), used.role()))
+                    .eq(expected.iter().map(|used| (used.reference(), used.role()))),
+                "both siblings retain the same ordered exact coordinate and role sequence"
+            );
+        }
+        assert_eq!(
+            inventory,
+            input.origins().uses.freeze()?,
+            "the shared deferred operands materialize the original use IDs"
+        );
+        Ok(())
+    })
+}
+
 fn database(shape: Shape) -> Vec<u8> {
     let owner = match shape {
         Shape::Array => TestStruct::new("Owner")
@@ -86,7 +140,7 @@ fn database(shape: Shape) -> Vec<u8> {
 
 fn value(shape: Shape) -> TestValue {
     match shape {
-        Shape::Array => TestValue::Array(vec![TestValue::text("")]),
+        Shape::Array => TestValue::Array(vec![TestValue::text(""), TestValue::text("")]),
         Shape::Struct => {
             TestValue::Struct(TestInstance::new("Inner").value("empty", TestValue::text("")))
         }

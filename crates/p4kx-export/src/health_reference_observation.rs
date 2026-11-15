@@ -20,7 +20,7 @@ pub(super) struct ReferenceBody {
     pub(super) target_record_path: ReferenceDatum<HealthText>,
     pub(super) target_type: ReferenceDatum<HealthText>,
     pub(super) target_location: ReferenceDatum<HealthText>,
-    pub(super) source_pointer: Option<ReferencePointerBody>,
+    pub(super) source_pointer: Option<Box<ReferencePointerBody>>,
 }
 
 /// Original raw pointer-word recipes carried by an applicable failed pointer.

@@ -35,7 +35,8 @@ pub(super) fn read(
     body.source_pointer = link
         .pointer
         .map(|pointer| pointer_body(&fact, pointer, *error))
-        .transpose()?;
+        .transpose()?
+        .map(Box::new);
     Ok(Some(capture.observation(Some(link.status), body)?))
 }
 

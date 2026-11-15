@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::sync::Arc;
+
 use p4kx_extraction::{SourceLocation, SourceScope, SourceUseRole, SourceUses, SourceValue};
 
 use super::{OriginalDatum, OriginalRecordScope, RecordSubject};
@@ -89,16 +91,19 @@ impl ReferenceFrame {
     }
 }
 
-/// One actual input coordinate and role retained before a public datum is selected.
+/// One actual input coordinate and role shared by deferred source recipes.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct ReferenceUse {
+pub(super) struct ReferenceUse(Arc<ReferenceOperand>);
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ReferenceOperand {
     location: SourceLocation,
     role: SourceUseRole,
 }
 
 impl ReferenceUse {
-    pub(super) const fn captured(location: SourceLocation, role: SourceUseRole) -> Self {
-        Self { location, role }
+    pub(super) fn captured(location: SourceLocation, role: SourceUseRole) -> Self {
+        Self(Arc::new(ReferenceOperand { location, role }))
     }
 }
 
@@ -158,7 +163,10 @@ impl<T> ReferenceDatum<T> {
         let inputs = self
             .inputs
             .into_iter()
-            .map(|input| frame.scope.at(input.location, input.role))
+            .map(|input| {
+                let ReferenceOperand { location, role } = Arc::unwrap_or_clone(input.0);
+                frame.at(location, role)
+            })
             .collect::<Result<Vec<_>, _>>()?;
         Ok(OriginalDatum::observed(self.value, inputs, self.complete))
     }
