@@ -21,6 +21,7 @@ pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
     for (namespace, record_type, indices) in [
         (wire::DOCUMENT, "document", 0),
         (wire::SCOPE_RECEIPT, "scope-receipt", 1),
+        (wire::ENTITY_DATABASE_BINDING, "entity-database-binding", 1),
         (wire::ELEMENT, "element", 1),
         (wire::DECLARATION, "declaration", 2),
         (wire::CONTENT, "content", 1),

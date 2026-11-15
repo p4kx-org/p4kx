@@ -6,7 +6,8 @@ use std::path::Path;
 use p4kx_extraction::{Archive, ArchiveWatch, OpenOptions};
 use p4kx_testkit::{
     ArchiveBuilder, CryXmlByteOrder, CryXmlSignature, DataForgeBuilder, TestElement, TestEntity,
-    TestEntry, TestLoadout, TestModel, entity_schema, test_key, write_build_manifest,
+    TestEntry, TestInstance, TestLoadout, TestModel, TestStruct, TestType, TestValue,
+    entity_schema, test_key, write_build_manifest,
 };
 
 use super::{Selection, TestResult, verify};
@@ -14,6 +15,11 @@ use super::{Selection, TestResult, verify};
 const MODEL: &str = "Data/Objects/witness.cdf";
 const ENTITY: &str = "FixtureScope";
 const CHILD: &str = "FixtureAttachment";
+const ROOT_ADB: &str = "Data/Animations/Mannequin/witness.adb";
+const ATTACHED_ADB: &str = "Data/Animations/Mannequin/attached.adb";
+const SUB_ADB: &str = "Data/Animations/Mannequin/sub.adb";
+const ANIMATED: &str = "SAnimatedCharacterComponentParams";
+const CONTROLLER: &str = "SAnimationControllerParams";
 
 #[test]
 fn synthetic_animation_scope_witness_checks_model_and_entity_publications() -> TestResult {
@@ -32,6 +38,20 @@ fn synthetic_animation_scope_witness_checks_model_and_entity_publications() -> T
             "the synthetic scope contains an authored event database"
         );
         if matches!(selection, Selection::Entity(_)) {
+            assert_eq!(
+                expected.databases.len(),
+                3,
+                "one root and two attachment bindings"
+            );
+            assert_eq!(
+                expected
+                    .documents
+                    .values()
+                    .filter(|document| document.family() == "adb")
+                    .count(),
+                3,
+                "two authored roots and their one shared transitive database",
+            );
             let [_, left, right] = expected.placements.as_slice() else {
                 return Err("the original XML resolves both attachment occurrences".into());
             };
@@ -50,19 +70,42 @@ fn synthetic_animation_scope_witness_checks_model_and_entity_publications() -> T
     Ok(())
 }
 
-fn archive(root: &Path) -> TestResult<Archive> {
+fn dataforge() -> Vec<u8> {
     let entity = TestEntity::new(1, ENTITY, "entities/fixture_scope.xml")
         .geometry("Objects/witness.cdf", None)
-        .loadout(TestLoadout::Xml(r"Scripts\Loadouts\witness.xml".into()));
+        .loadout(TestLoadout::Xml(r"Scripts\Loadouts\witness.xml".into()))
+        .component(locator(
+            ANIMATED,
+            "animDatabase3P",
+            r" ANIMATIONS\Mannequin\Witness.ADB ",
+        ));
     let child = TestEntity::new(2, CHILD, "entities/fixture_attachment.xml")
-        .geometry("Objects/witness.chr", None);
-    let data = entity_schema(DataForgeBuilder::new())
+        .geometry("Objects/witness.chr", None)
+        .component(locator(
+            CONTROLLER,
+            "AnimationDatabase",
+            "Animations/Mannequin/attached.adb",
+        ));
+    entity_schema(DataForgeBuilder::new())
+        .structure(
+            TestStruct::new(ANIMATED)
+                .parent("DataForgeComponentParams")
+                .field("animDatabase3P", TestType::String),
+        )
+        .structure(
+            TestStruct::new(CONTROLLER)
+                .parent("DataForgeComponentParams")
+                .field("AnimationDatabase", TestType::String),
+        )
         .record(entity.record())
         .record(child.record())
-        .build();
+        .build()
+}
+
+fn archive(root: &Path) -> TestResult<Archive> {
     let path = root.join("Data.p4k");
     ArchiveBuilder::new()
-        .entry(TestEntry::stored("Data/Game2.dcb", data))
+        .entry(TestEntry::stored("Data/Game2.dcb", dataforge()))
         .entry(TestEntry::stored(
             "Data/Scripts/Loadouts/witness.xml",
             br#"<Loadout><Loadouts><Loadout loadout="Scripts/Loadouts/pArTs.xml"/></Loadouts></Loadout>"#,
@@ -92,6 +135,9 @@ fn archive(root: &Path) -> TestResult<Archive> {
             "Data/Animations/clip.caf",
             b"reference target",
         ))
+        .entry(TestEntry::stored(ROOT_ADB, br#"<AnimDB><SubADBs><SubADB File="Animations/Mannequin/sub.adb"/></SubADBs></AnimDB>"#).encrypted())
+        .entry(TestEntry::stored(ATTACHED_ADB, br#"<AnimDB><SubADBs><SubADB File="Data\Animations\Mannequin\Sub.ADB"/></SubADBs></AnimDB>"#))
+        .entry(TestEntry::stored(SUB_ADB, b"<AnimDB><FragmentList><Idle/></FragmentList></AnimDB>").encrypted())
         .entry(TestEntry::stored(
             "Data/Objects/unrelated.socpak",
             b"excluded malformed container",
@@ -101,6 +147,10 @@ fn archive(root: &Path) -> TestResult<Archive> {
         path,
         OpenOptions::new().key(Some(test_key())),
     )?)
+}
+
+fn locator(component: &str, field: &str, path: &str) -> TestValue {
+    TestValue::Struct(TestInstance::new(component).value(field, TestValue::text(path)))
 }
 
 fn parts() -> Vec<u8> {

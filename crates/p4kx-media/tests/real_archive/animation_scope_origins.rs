@@ -60,14 +60,14 @@ impl<'a> Fields<'a> {
             for (&field, &required) in expected_fields {
                 let origin = fields
                     .get(&(ordinal, field))
-                    .ok_or("original XML field origin")?;
+                    .ok_or("original scope field origin")?;
                 let shared = origin
                     .set
                     .as_deref()
                     .map(|set| {
                         sets.get(set)
                             .map(Vec::as_slice)
-                            .ok_or("original XML field use set")
+                            .ok_or("original scope field use set")
                     })
                     .transpose()?
                     .unwrap_or_default();
@@ -99,7 +99,7 @@ impl<'a> Fields<'a> {
                     fields
                         .insert((ordinal, field), Field::read(&row)?)
                         .is_none(),
-                    "exactly one provenance row for each XML-backed field",
+                    "exactly one provenance row for each original scope field",
                 )?;
             }
         }
@@ -109,6 +109,7 @@ impl<'a> Fields<'a> {
 
 struct Field {
     encrypted: Option<bool>,
+    complete: bool,
     uses: Vec<String>,
     set: Option<String>,
 }
@@ -127,18 +128,17 @@ impl Field {
             .iter()
             .map(|reference| text(reference, "").map(str::to_owned))
             .collect::<TestResult<_>>()?;
-        require(
-            row.get("sourceSetComplete")
-                .and_then(Value::as_bool)
-                .is_some(),
-            "direct source-set completeness marker",
-        )?;
+        let complete = row
+            .get("sourceSetComplete")
+            .and_then(Value::as_bool)
+            .ok_or("direct source-set completeness marker")?;
         let set = row
             .get("sourceUseSetRef")
             .map(|reference| text(reference, "").map(str::to_owned))
             .transpose()?;
         Ok(Self {
             encrypted,
+            complete,
             uses,
             set,
         })
@@ -155,24 +155,30 @@ impl Evidence<'_> {
     fn verify(&self, field: &Field, shared: &[String], expected: &BTreeSet<Site>) -> TestResult {
         let mut observed = BTreeSet::new();
         let mut encrypted = false;
+        let dataforge = expected
+            .iter()
+            .any(|site| site.namespace == "dataforge-record");
         for reference in field.uses.iter().chain(shared) {
-            let usage = self.uses.get(reference).ok_or("placed XML source use")?;
-            let Some(namespace) = location_namespace(usage) else {
+            let usage = self
+                .uses
+                .get(reference)
+                .ok_or("original scope source use")?;
+            let Some(namespace) = location_namespace(usage, dataforge) else {
                 continue;
             };
             let source = self
                 .sources
                 .get(text(usage, "/source")?)
-                .ok_or("placed XML source")?;
+                .ok_or("original scope source")?;
             let position = source
                 .get("entryIndex")
                 .and_then(Value::as_u64)
-                .ok_or("physical XML Entry index")?;
+                .ok_or("physical scope Entry index")?;
             let entry = self
                 .archive
                 .entries()
                 .get(usize::try_from(position)?)
-                .ok_or("original XML Entry")?;
+                .ok_or("original scope Entry")?;
             require(
                 text(source, "/path/value")? == entry.path()
                     && text(usage, "/scope")? == "payload"
@@ -183,30 +189,47 @@ impl Evidence<'_> {
                         } else {
                             "unencrypted"
                         },
-                "field cites the verified XML Entry payload as a selector",
+                "field cites the verified original Entry payload as a selector",
             )?;
             encrypted |= entry.is_encrypted();
-            observed.insert(Site {
-                entry: entry.index(),
-                namespace,
-                indices: [
-                    text(usage, "/location/indices/0")?.parse()?,
-                    text(usage, "/location/indices/1")?.parse()?,
-                ],
-                field: text(usage, "/location/field")?.to_owned(),
-            });
+            observed.insert(original_site(usage, entry.index(), namespace)?);
         }
+        let encryption_matches = if dataforge {
+            field.complete && field.encrypted == Some(encrypted)
+        } else {
+            !encrypted || field.encrypted == Some(true)
+        };
         require(
-            &observed == expected && (!encrypted || field.encrypted == Some(true)),
-            "exact XML attribute sites and their direct encryption marker",
+            &observed == expected && encryption_matches,
+            "exact original sites and their direct encryption marker",
         )
     }
 }
 
-fn location_namespace(usage: &Value) -> Option<&'static str> {
-    match usage.pointer("/location/namespace").and_then(Value::as_str) {
-        Some("loadout-xml-attribute") => Some("loadout-xml-attribute"),
-        Some("loadout-cryxml-attribute") => Some("loadout-cryxml-attribute"),
+fn original_site(usage: &Value, entry: usize, namespace: &'static str) -> TestResult<Site> {
+    let indices = usage
+        .pointer("/location/indices")
+        .and_then(Value::as_array)
+        .ok_or("original selector coordinates")?
+        .iter()
+        .map(|index| Ok(text(index, "")?.parse()?))
+        .collect::<TestResult<_>>()?;
+    Ok(Site {
+        entry,
+        namespace,
+        indices,
+        field: text(usage, "/location/field")?.to_owned(),
+    })
+}
+
+fn location_namespace(usage: &Value, dataforge: bool) -> Option<&'static str> {
+    match (
+        dataforge,
+        usage.pointer("/location/namespace").and_then(Value::as_str),
+    ) {
+        (true, Some("dataforge-record")) => Some("dataforge-record"),
+        (false, Some("loadout-xml-attribute")) => Some("loadout-xml-attribute"),
+        (false, Some("loadout-cryxml-attribute")) => Some("loadout-cryxml-attribute"),
         _ => None,
     }
 }

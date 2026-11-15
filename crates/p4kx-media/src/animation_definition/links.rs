@@ -3,7 +3,8 @@
 
 use p4kx_extraction::SourceUseRole;
 use p4kx_extraction::cryxml::{
-    SourceAttributePosition, SourceDeclaration, SourceDeclarationKind, SourceElement,
+    SourceAttribute, SourceAttributePosition, SourceDeclaration, SourceDeclarationKind,
+    SourceElement,
 };
 
 use super::chrparams_selectors::{self, Selector};
@@ -91,7 +92,7 @@ pub(super) const fn chrparams_database_kind(name: &str) -> Option<LinkKind> {
     }
 }
 
-fn mannequin_kind(tag: &str, parent: Option<&str>, name: &str) -> Option<LinkKind> {
+pub(super) fn mannequin_kind(tag: &str, parent: Option<&str>, name: &str) -> Option<LinkKind> {
     if parent.is_none() && tag.eq_ignore_ascii_case("AnimDB") {
         if name.eq_ignore_ascii_case("TagDef") {
             return Some(LinkKind::TagDefinition);
@@ -102,6 +103,19 @@ fn mannequin_kind(tag: &str, parent: Option<&str>, name: &str) -> Option<LinkKin
     }
     (tag.eq_ignore_ascii_case("SubADB") && name.eq_ignore_ascii_case("File"))
         .then_some(LinkKind::SubDatabase)
+}
+
+pub(super) fn unique_sub_database_file(
+    element: SourceElement<'_>,
+) -> Result<SourceAttribute<'_>, FrontierReason> {
+    let mut files = element
+        .attributes()
+        .filter(|attr| attr.namespace().is_none() && attr.name().eq_ignore_ascii_case("File"));
+    let first = files.next().ok_or(FrontierReason::MissingFile)?;
+    if files.next().is_some() {
+        return Err(FrontierReason::DuplicateFile);
+    }
+    Ok(first)
 }
 
 pub(super) struct SubDatabaseSelector {
@@ -124,23 +138,16 @@ impl SubDatabaseSelector {
         let Some((_, parent)) = parent else {
             return Ok(None);
         };
-        let mut files = element
-            .attributes()
-            .filter(|attr| attr.namespace().is_none() && attr.name().eq_ignore_ascii_case("File"));
-        let first = files.next();
-        if let (Some(first), None) = (&first, files.next()) {
-            return Ok(Some(Self {
-                file: first.position().clone(),
+        match unique_sub_database_file(element) {
+            Ok(attribute) => Ok(Some(Self {
+                file: attribute.position().clone(),
                 parent,
-            }));
+            })),
+            Err(reason) => {
+                sub_database_frontier::write_attribute_issue(projection, site, reason, writer)?;
+                Ok(None)
+            }
         }
-        let reason = if first.is_some() {
-            FrontierReason::DuplicateFile
-        } else {
-            FrontierReason::MissingFile
-        };
-        sub_database_frontier::write_attribute_issue(projection, site, reason, writer)?;
-        Ok(None)
     }
 
     pub(super) fn matches(&self, declaration: &SourceDeclaration<'_>) -> bool {

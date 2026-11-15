@@ -960,6 +960,23 @@
           "additionalProperties": false,
           "properties": {
             "payload": {
+              "$ref": "#/$defs/EntityDatabaseBinding"
+            },
+            "record_type": {
+              "const": "entity-database-binding",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
               "$ref": "#/$defs/AtlElement"
             },
             "record_type": {
@@ -10419,6 +10436,51 @@
         "ogg"
       ],
       "type": "string"
+    },
+    "EntityDatabaseBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "archive_path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "authored_path": {
+          "type": "string"
+        },
+        "component_index": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "field": {
+          "type": "string"
+        },
+        "owner_record_index": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "port_path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reference": {
+          "$ref": "#/$defs/Reference"
+        }
+      },
+      "required": [
+        "owner_record_index",
+        "component_index",
+        "field",
+        "authored_path",
+        "archive_path",
+        "reference"
+      ],
+      "type": "object"
     },
     "EntryMetadataInfo": {
       "allOf": [
@@ -46701,6 +46763,61 @@
                 "properties": {
                   "record_type": {
                     "const": "scope-receipt"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 1,
+                "minItems": 1
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation-definition"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-definition-entity-database-binding"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationDefinitionPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "entity-database-binding"
                   }
                 },
                 "required": [

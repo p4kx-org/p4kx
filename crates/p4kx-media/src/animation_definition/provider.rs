@@ -25,13 +25,17 @@ impl Provider for AnimationDefinitionProvider {
         let mut capability = Capability::new(
             MediaKind::AnimationDefinition,
             "p4kx.animation-definition",
-            "1.8.0",
+            "1.9.0",
             "Original character parameters, animation event definitions and Mannequin XML source.",
         );
         capability.field_groups = vec![
             FieldGroup::new(
                 "selection-coverage",
                 "Physical character parameter coverage for each resolved model or Entity rig occurrence.",
+            ),
+            FieldGroup::new(
+                "entity-database-bindings",
+                "Original Entity Mannequin selectors and scoped physical database targets.",
             ),
             FieldGroup::new(
                 "source-syntax",

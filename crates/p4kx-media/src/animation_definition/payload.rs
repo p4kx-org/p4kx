@@ -6,6 +6,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::blend_reference_payload::{BlendCandidate, BlendReference};
+use super::entity_database_bindings::EntityDatabaseBinding;
 use super::event_bindings::EventBinding;
 use super::graph_source::{GraphAttribute, GraphNode};
 use super::named_clip::Wildcard;
@@ -24,6 +25,7 @@ use crate::audio_control_payload::{
 
 pub(super) const DOCUMENT: &str = "animation-definition-document";
 pub(super) const SCOPE_RECEIPT: &str = "animation-definition-scope-receipt";
+pub(super) const ENTITY_DATABASE_BINDING: &str = "animation-definition-entity-database-binding";
 pub(super) const ELEMENT: &str = "animation-definition-element";
 pub(super) const DECLARATION: &str = "animation-definition-declaration";
 pub(super) const CONTENT: &str = "animation-definition-content";
@@ -89,6 +91,7 @@ impl DefinitionFamily {
 pub(super) enum DefinitionPayload<'source> {
     Document(DefinitionDocument),
     ScopeReceipt(ScopeReceipt<'source>),
+    EntityDatabaseBinding(EntityDatabaseBinding<'source>),
     Element(AtlElement<'source>),
     Declaration(AtlDeclaration<'source>),
     Content(AtlContent<'source>),

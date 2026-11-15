@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+mod adb_entity_selectors;
+mod adb_graph_scope;
 mod blend_reference_index;
 mod blend_reference_payload;
 mod blend_references;
@@ -8,6 +10,7 @@ mod chrparams_selectors;
 #[cfg(test)]
 mod chrparams_witness;
 mod definition_scope;
+mod entity_database_bindings;
 mod event_bindings;
 mod graph_field;
 mod graph_source;

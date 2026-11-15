@@ -10,7 +10,9 @@ use p4kx_assembly::{
 };
 use p4kx_extraction::{DataForge, DataForgeEntry, Entry};
 
+use super::adb_graph_scope;
 use super::chrparams_selectors::{self, Target};
+use super::entity_database_bindings::Bindings;
 use super::payload::DefinitionFamily;
 use super::scope_health;
 use super::scope_receipt::{self, ScopePlacement};
@@ -43,16 +45,25 @@ impl DefinitionScope {
             return Ok(());
         }
         let mut scope = Self::default();
-        if let Some(path) = writer.animation_model.clone() {
+        let bindings = if let Some(path) = writer.animation_model.clone() {
             scope.model(&path, lookup, writer)?;
+            None
         } else if let Some(selector) = writer.animation_entity.clone() {
-            scope.entity(&selector, lookup, writer)?;
-        }
+            scope.entity(&selector, lookup, writer)?
+        } else {
+            None
+        };
         lookup
             .input_state()?
             .definition_scope
             .set(scope)
-            .map_err(|_| MediaError::Contract("animation definition scope already planned".into()))
+            .map_err(|_| {
+                MediaError::Contract("animation definition scope already planned".into())
+            })?;
+        if let Some(bindings) = bindings {
+            bindings.write(&lookup.for_definition(), writer)?;
+        }
+        Ok(())
     }
 
     fn model(
@@ -87,19 +98,15 @@ impl DefinitionScope {
         selector: &str,
         lookup: &DirectoryLookup<'_>,
         writer: &mut MediaWriter<'_>,
-    ) -> Result<(), MediaError> {
+    ) -> Result<Option<Bindings>, MediaError> {
         let archive = lookup.index.archive;
         let entry = DataForgeEntry::locate(archive).ok_or_else(|| {
             MediaError::Contract("selected animation Entity requires a root DataForge".into())
         })?;
         let entry = require_target(entry.path(), lookup, writer)?;
         if excluded(lookup, entry) {
-            return scope_receipt::excluded(
-                lookup,
-                entry,
-                ScopePlacement::ExcludedEntityInput,
-                writer,
-            );
+            scope_receipt::excluded(lookup, entry, ScopePlacement::ExcludedEntityInput, writer)?;
+            return Ok(None);
         }
         let bytes = read_verified(lookup, entry, writer)?;
         let forge = DataForge::open(&bytes).map_err(|cause| {
@@ -133,7 +140,16 @@ impl DefinitionScope {
                     self.parameters(rig.parameters.as_ref(), writer)?;
                 }
                 self.targets(inputs.targets, lookup, writer)?;
-                scope_receipt::entity(lookup, entry, &rigs, loadout, writer)
+                let bindings = Bindings::collect(&forge, &rigs, loadout, entry, lookup, writer)?;
+                adb_graph_scope::expand(
+                    bindings.roots(lookup, writer)?,
+                    &mut self.definitions,
+                    &mut self.references,
+                    lookup,
+                    writer,
+                )?;
+                scope_receipt::entity(lookup, entry, &rigs, loadout, writer)?;
+                Ok(Some(bindings))
             },
         )
     }
@@ -185,7 +201,7 @@ fn require_target<'lookup>(
     })
 }
 
-fn selected_target<'lookup>(
+pub(super) fn selected_target<'lookup>(
     path: &str,
     lookup: &'lookup DirectoryLookup<'_>,
     writer: &mut MediaWriter<'_>,
@@ -270,7 +286,7 @@ impl RigInputs for Inputs<'_, '_, '_, '_> {
     }
 }
 
-fn read_verified(
+pub(super) fn read_verified(
     lookup: &DirectoryLookup<'_>,
     entry: &Entry,
     writer: &MediaWriter<'_>,
@@ -334,7 +350,10 @@ fn reserve(positions: &mut HashSet<usize>, writer: &MediaWriter<'_>) -> Result<(
         .map_err(|cause| allocation(writer, cause))
 }
 
-fn allocation(writer: &MediaWriter<'_>, cause: std::collections::TryReserveError) -> MediaError {
+pub(super) fn allocation(
+    writer: &MediaWriter<'_>,
+    cause: std::collections::TryReserveError,
+) -> MediaError {
     error::io(
         &writer.root,
         io::Error::new(io::ErrorKind::OutOfMemory, cause),

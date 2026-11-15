@@ -716,6 +716,22 @@ read verifies the declared decoded length and available CRC. Missing, ambiguous,
 excluded and unreadable targets have distinct errors. An unresolved required
 dependency prevents publication of a complete index.
 
+An Entity scope also selects Mannequin ADBs from `animDatabase3P` on animated
+character components and `AnimationDatabase` on controller components of the
+root and its attached Entities. `entity-database-binding` rows retain each
+placement, original component slot and path spelling. The port path is present
+for attachments. The binding uses the original DataForge field for its path
+origin and links to the physical database Entry. Repeated component and port
+occurrences have distinct rows even when they select the same database.
+
+The Entity scope follows direct same-Archive `SubADB@File` declarations and
+emits each selected physical ADB once. Authored TagDef and FragDef sources and
+their imports can supply branch-selector metadata even outside `--include`.
+Explicit exclusions still apply. Missing and ambiguous targets retain their
+link status. Unreadable tag or fragment definitions have a selector scope
+diagnostic. A failed verification of a required ADB payload prevents complete
+publication. The Animation provider is optional for the source graph export.
+
 The Assembly Loadout parser applies a 16 MiB limit per XML document, a maximum
 of eight documents on the active Include chain, and a maximum of 256 files per
 Loadout resolution. Media input limits also apply.
@@ -843,6 +859,8 @@ rig discovery and checks the Media publication against verified source bytes,
 independently derived event-file references and source-local record identities.
 For XML Loadouts it also matches placement fields to the physical port, class
 and Include attributes and checks their direct encryption markers.
+For Mannequin it checks the positioned root and attachment selectors against
+the original DataForge components and reconciles the reachable ADB documents.
 Omitting both selectors skips the fixture without an installed scope receipt.
 
 ```powershell

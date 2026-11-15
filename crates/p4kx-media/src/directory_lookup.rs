@@ -11,6 +11,7 @@ mod path_candidates;
 use p4kx_extraction::sound::wwise_path::{self, LooseName};
 use p4kx_extraction::{Archive, Entry, TextureMemberCandidate};
 
+use self::definition_scope::DefinitionSelection;
 use crate::directory_index::{self, DirectoryIndex, LooseWemMatches};
 use crate::directory_inputs::DirectoryInputs;
 use crate::input_budget::InputBudget;
@@ -42,7 +43,7 @@ pub struct DirectoryLookup<'a> {
     pub(crate) budget: &'a InputBudget,
     pub(crate) source_allowance: u64,
     inputs: Option<&'a DirectoryInputs<'a>>,
-    definition_scope: bool,
+    definition_scope: DefinitionSelection,
     pub(crate) shaders: Option<&'a crate::shader_lookup::ShaderLookup<'a>>,
 }
 
@@ -64,7 +65,7 @@ impl<'a> DirectoryLookup<'a> {
             budget,
             source_allowance,
             inputs: None,
-            definition_scope: false,
+            definition_scope: DefinitionSelection::Filter,
             shaders: None,
         }
     }
@@ -83,7 +84,7 @@ impl<'a> DirectoryLookup<'a> {
             budget: inputs.budget,
             source_allowance: 0,
             inputs: Some(inputs),
-            definition_scope: false,
+            definition_scope: DefinitionSelection::Filter,
             shaders: None,
         }
     }

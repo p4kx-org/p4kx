@@ -8,7 +8,7 @@ use std::io::{self, BufRead, BufReader, Write as _};
 use std::path::Path;
 
 use p4kx_extraction::{Archive, ArchiveWatch, Build, Exclusion};
-use p4kx_media::{ExportOptions, ExportOutcome, Identity, MediaKind, MediaRecord, Status};
+use p4kx_media::{Digest, ExportOptions, ExportOutcome, Identity, MediaKind, MediaRecord, Status};
 use serde_json::Value;
 
 use super::shader_accounting::require;
@@ -25,6 +25,15 @@ mod loadout;
 
 #[path = "animation_scope_origins.rs"]
 mod origins;
+
+#[path = "animation_scope_adb.rs"]
+mod adb;
+
+#[path = "animation_scope_adb_rows.rs"]
+mod adb_rows;
+
+#[path = "animation_scope_events.rs"]
+mod events;
 
 use self::sources::{Closure, Document, Placement};
 
@@ -172,15 +181,26 @@ fn verify(
         .ok_or("definition stream")?;
     let root = output.path().join(&index.artifact_base);
     let stream = BufReader::new(File::open(root.join(&kind.artifact.path))?);
+    observe_rows(archive, &root, &index.source.digest, stream, &mut expected)?;
+    expected.verify()?;
+    output.close()?;
+    expected.report()
+}
+
+fn observe_rows(
+    archive: &Archive,
+    root: &Path,
+    digest: &Digest,
+    stream: impl BufRead,
+    expected: &mut Closure<'_>,
+) -> TestResult {
     let mut placements = 0;
+    let mut databases = expected.databases.iter().enumerate();
     let mut identities = BTreeSet::new();
     let mut fields = origins::Fields::default();
     for (stream_ordinal, line) in stream.lines().enumerate() {
         let row: MediaRecord = serde_json::from_str(&line?)?;
-        require(
-            row.source.root == index.source.digest,
-            "one original archive root",
-        )?;
+        require(row.source.root == *digest, "one original archive root")?;
         require(row.status == Status::Complete, "complete scoped source row")?;
         require(
             identities.insert(record_key(&row)?),
@@ -194,18 +214,27 @@ fn verify(
             receipt(&row, placement, placements, expected.input_entry)?;
             expect_origins(&mut fields, stream_ordinal, placement);
             placements += 1;
-        } else {
-            observe(&root, &row, &mut expected.documents)?;
+        } else if row.subresource.namespace == adb::BINDING {
+            let (ordinal, binding) = databases.next().ok_or("extra Entity database binding")?;
+            binding.verify(&row, ordinal)?;
+            fields.expect(
+                stream_ordinal,
+                "/data/payload/authored_path",
+                &binding.sites,
+            );
+        } else if !expected.graph.observe(&row)? {
+            observe(root, &row, &mut expected.documents)?;
         }
     }
     require(
         placements == expected.placements.len(),
         "every resolved placement retained",
     )?;
-    expected.verify()?;
-    fields.verify(&root, archive)?;
-    output.close()?;
-    expected.report()
+    require(
+        databases.next().is_none(),
+        "every authored Entity database binding retained",
+    )?;
+    fields.verify(root, archive)
 }
 
 fn record_key(row: &MediaRecord) -> TestResult<RecordKey> {

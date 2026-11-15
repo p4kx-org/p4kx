@@ -13,12 +13,13 @@ use p4kx_assembly::{
 use p4kx_extraction::cryxml::{
     SourceDeclarationKind, SourceDocument, SourceElement, SourceReadOptions,
 };
-use p4kx_extraction::{
-    Archive, ArchiveWatch, DataForge, DataForgeEntry, Entry, archive_animation_path,
-};
+use p4kx_extraction::{Archive, ArchiveWatch, DataForge, DataForgeEntry, Entry};
 
 use serde_json::{Map, Value, json};
 
+use super::adb::{self, Binding};
+use super::adb_rows::Graph;
+use super::events::targets as event_targets;
 use super::loadout::{Evidence, Files, Observations, unique};
 use super::{TestResult, manifests, require};
 
@@ -26,6 +27,8 @@ pub(super) struct Closure<'archive> {
     pub(super) input_entry: usize,
     pub(super) placements: Vec<Placement>,
     pub(super) documents: BTreeMap<usize, Document<'archive>>,
+    pub(super) databases: Vec<Binding>,
+    pub(super) graph: Graph,
 }
 
 pub(super) struct Placement {
@@ -42,7 +45,14 @@ pub(super) struct Document<'archive> {
     pub(super) bytes: Vec<u8>,
     pub(super) actual: Counts,
     expected: Counts,
-    events: bool,
+    family: Family,
+}
+
+#[derive(Clone, Copy)]
+pub(super) enum Family {
+    Params,
+    Events,
+    Adb,
 }
 
 #[derive(Default, PartialEq, Eq)]
@@ -65,7 +75,7 @@ impl<'archive> Closure<'archive> {
         let rig =
             discover_model_rig_using(&models, entry.path(), &mut Verified { archive, watch })?;
         let placement = placement(rig.parameters.as_ref(), None, "model")?;
-        Self::read(archive, watch, entry.index(), vec![placement])
+        Self::read(archive, watch, entry.index(), vec![placement], Vec::new())
     }
 
     pub(super) fn entity(
@@ -103,7 +113,8 @@ impl<'archive> Closure<'archive> {
             .iter()
             .map(|rig| entity_placement(rig, &observations))
             .collect::<TestResult<Vec<_>>>()?;
-        Self::read(archive, watch, entry.index(), placements)
+        let databases = adb::bindings(archive, &forge, &rigs, entry.index())?;
+        Self::read(archive, watch, entry.index(), placements, databases)
     }
 
     fn read(
@@ -111,6 +122,7 @@ impl<'archive> Closure<'archive> {
         watch: &ArchiveWatch,
         input_entry: usize,
         placements: Vec<Placement>,
+        databases: Vec<Binding>,
     ) -> TestResult<Self> {
         let parameters: BTreeSet<_> = placements
             .iter()
@@ -128,7 +140,7 @@ impl<'archive> Closure<'archive> {
                 .entries()
                 .get(index)
                 .ok_or("original physical parameter")?;
-            let document = Document::read(archive, entry, watch, &mut allowance, false)?;
+            let document = Document::read(archive, entry, watch, &mut allowance, Family::Params)?;
             let syntax = SourceDocument::parse(&document.bytes, SourceReadOptions::default())?;
             for name in event_targets(syntax.root()) {
                 if let Some(entry) = unique(archive, &name) {
@@ -142,23 +154,27 @@ impl<'archive> Closure<'archive> {
                 .entries()
                 .get(index)
                 .ok_or("original physical event database")?;
-            let document = Document::read(archive, entry, watch, &mut allowance, true)?;
+            let document = Document::read(archive, entry, watch, &mut allowance, Family::Events)?;
             documents.insert(index, document);
         }
+        let graph = adb::read(archive, watch, &databases, &mut allowance, &mut documents)?;
         Ok(Self {
             input_entry,
             placements,
             documents,
+            databases,
+            graph,
         })
     }
 
     pub(super) fn has_events(&self) -> bool {
         self.documents
             .values()
-            .any(|document| document.events && document.expected.timelines > 0)
+            .any(|document| document.expected.timelines > 0)
     }
 
     pub(super) fn verify(&self) -> TestResult {
+        self.graph.verify()?;
         require(
             self.documents
                 .values()
@@ -176,9 +192,10 @@ impl<'archive> Closure<'archive> {
         }
         writeln!(
             io::stdout(),
-            "verified {} definition Entries, {} placements, {declarations} declarations, {timelines} timelines, {events} events",
+            "verified {} definition Entries, {} placements, {} Entity database bindings, {declarations} declarations, {timelines} timelines, {events} events",
             self.documents.len(),
-            self.placements.len()
+            self.placements.len(),
+            self.databases.len(),
         )?;
         Ok(())
     }
@@ -242,19 +259,19 @@ fn placement(
 
 impl<'archive> Document<'archive> {
     pub(super) const fn family(&self) -> &'static str {
-        if self.events {
-            "animevents"
-        } else {
-            "chrparams"
+        match self.family {
+            Family::Params => "chrparams",
+            Family::Events => "animevents",
+            Family::Adb => "adb",
         }
     }
 
-    fn read(
+    pub(super) fn read(
         archive: &'archive Archive,
         entry: &'archive Entry,
         watch: &ArchiveWatch,
         allowance: &mut u64,
-        events: bool,
+        family: Family,
     ) -> TestResult<Self> {
         *allowance = allowance
             .checked_sub(entry.uncompressed_size())
@@ -262,13 +279,13 @@ impl<'archive> Document<'archive> {
         let bytes = verified_bytes(archive, entry, watch)?;
         let source = SourceDocument::parse(&bytes, SourceReadOptions::default())?;
         require(!source.is_lossy(), "complete original source strings")?;
-        let expected = Counts::source(source.root(), events)?;
+        let expected = Counts::source(source.root(), matches!(family, Family::Events))?;
         Ok(Self {
             entry,
             bytes,
             actual: Counts::default(),
             expected,
-            events,
+            family,
         })
     }
 }
@@ -320,44 +337,6 @@ impl Counts {
             _ => {}
         }
     }
-}
-
-fn event_targets(root: SourceElement<'_>) -> Vec<String> {
-    if !is(root, "Params") {
-        return Vec::new();
-    }
-    root.elements()
-        .filter(|element| is(*element, "AnimationList"))
-        .flat_map(SourceElement::elements)
-        .filter(|element| is(*element, "Animation"))
-        .filter_map(|element| {
-            let name = unique_attribute(element, "name")?;
-            let path = unique_attribute(element, "path")?;
-            if !name.eq_ignore_ascii_case("$AnimEventDatabase")
-                || !path
-                    .rsplit_once('.')
-                    .is_some_and(|(_, ext)| ext.eq_ignore_ascii_case("animevents"))
-            {
-                return None;
-            }
-            archive_animation_path(path)
-        })
-        .collect()
-}
-
-fn unique_attribute<'source>(
-    element: SourceElement<'source>,
-    wanted: &str,
-) -> Option<&'source str> {
-    let mut attributes = element.attributes().filter(|attribute| {
-        attribute.namespace().is_none() && attribute.name().eq_ignore_ascii_case(wanted)
-    });
-    let attribute = attributes.next()?;
-    attributes.next().is_none().then(|| attribute.value())
-}
-
-fn is(element: SourceElement<'_>, name: &str) -> bool {
-    element.namespace().is_none() && element.name().eq_ignore_ascii_case(name)
 }
 
 fn is_exact(element: SourceElement<'_>, name: &str) -> bool {

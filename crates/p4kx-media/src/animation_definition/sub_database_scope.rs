@@ -18,8 +18,8 @@ use crate::origin_contributions::OriginContributions;
 use crate::origin_input::MediaOriginInput;
 use crate::xml_source_projection::{declaration_position, element_position};
 use crate::{
-    Identity, MediaError, MediaWriter, OriginalIdentifier, ReferenceResolution, Subresource,
-    required_input,
+    DirectoryLookup, Identity, MediaError, MediaWriter, OriginalIdentifier, ReferenceResolution,
+    Subresource, required_input,
 };
 
 pub(super) struct Scope {
@@ -98,7 +98,7 @@ impl Scope {
         };
         let state = match paths.as_slice() {
             [] => ScopeState::MissingDefinitionSelector,
-            [path] => survey.follow(path)?,
+            [path] => survey.follow(path, projection.context.directory)?,
             _ => ScopeState::DuplicateDefinitionSelector,
         };
         let state = if matches!(state, ScopeState::Complete) {
@@ -127,12 +127,15 @@ impl Scope {
 }
 
 impl Survey<'_, '_, '_, '_> {
-    fn follow(&mut self, path: &str) -> Result<ScopeState, Failure> {
+    fn follow(
+        &mut self,
+        path: &str,
+        directory: &DirectoryLookup<'_>,
+    ) -> Result<ScopeState, Failure> {
         self.work()?;
         let Some(canonical) = links::target_path(LinkKind::TagDefinition, path) else {
             return Ok(ScopeState::InvalidDefinitionPath);
         };
-        let directory = self.projection.context.directory;
         let observed = directory.lookup_input_observed(
             OriginalIdentifier::new_with_path(path),
             &canonical,
@@ -162,14 +165,17 @@ impl Survey<'_, '_, '_, '_> {
             ReferenceResolution::Resolved { .. } => {}
         }
         let position = observed.lookup.input.ok_or_else(contract)?.position;
-        self.read_definition(position)
+        self.read_definition(position, directory)
     }
 
-    fn read_definition(&mut self, position: usize) -> Result<ScopeState, Failure> {
+    fn read_definition(
+        &mut self,
+        position: usize,
+        directory: &DirectoryLookup<'_>,
+    ) -> Result<ScopeState, Failure> {
         if !self.visited.insert(position) {
             return Ok(ScopeState::Complete);
         }
-        let directory = self.projection.context.directory;
         let archive = directory.index.archive;
         let entry = archive.entries().get(position).ok_or_else(contract)?;
         if entry.is_encrypted() && !archive.has_key() {
@@ -214,6 +220,7 @@ impl Survey<'_, '_, '_, '_> {
     }
 
     fn imports(&mut self) -> Result<ScopeState, Failure> {
+        let directory = self.projection.context.directory.for_definition_import();
         while let Some(import) = self.imports.pop_front() {
             self.evidence.include(
                 &origins::position(
@@ -224,7 +231,7 @@ impl Survey<'_, '_, '_, '_> {
                 )?,
                 self.writer,
             )?;
-            if !matches!(self.follow(&import.path)?, ScopeState::Complete) {
+            if !matches!(self.follow(&import.path, &directory)?, ScopeState::Complete) {
                 self.complete = false;
             }
         }

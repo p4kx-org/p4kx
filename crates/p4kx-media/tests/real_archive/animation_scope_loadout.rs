@@ -65,7 +65,7 @@ pub(super) fn unique<'archive>(archive: &'archive Archive, path: &str) -> Option
     (entries.next().is_none() && archive.raw_path(entry.index()).is_none()).then_some(entry)
 }
 
-fn folded(path: &str) -> impl Iterator<Item = u8> + '_ {
+pub(super) fn folded(path: &str) -> impl Iterator<Item = u8> + '_ {
     path.bytes().map(|byte| {
         if byte == b'\\' {
             b'/'
@@ -88,7 +88,7 @@ struct Sites {
 pub(super) struct Site {
     pub(super) entry: usize,
     pub(super) namespace: &'static str,
-    pub(super) indices: [u64; 2],
+    pub(super) indices: Vec<u64>,
     pub(super) field: String,
 }
 
@@ -110,7 +110,7 @@ impl Site {
         Some(Self {
             entry,
             namespace,
-            indices: [u64::from(node), ordinal],
+            indices: vec![u64::from(node), ordinal],
             field: attribute.to_owned(),
         })
     }
