@@ -3,15 +3,19 @@
 
 use std::collections::BTreeMap;
 use std::io;
-use std::path::PathBuf;
 
 use p4kx_assembly::BodyVariant;
 use p4kx_extraction::cryxml::{SourceDocument, SourceElement, SourceReadOptions};
-use p4kx_extraction::{Archive, CancelToken, PhysicalSourceRef};
+use p4kx_extraction::{Archive, CancelToken, PhysicalSourceRef, SourceEncryption};
 use serde_json::{Value, json};
 
 use crate::soc_scene_origin::SocXmlPosition;
 use crate::{PlayerDocument, PlayerDocumentSink, PlayerSourceCapture};
+
+#[path = "player_adb_installed_witness_receipts.rs"]
+mod receipts;
+
+use self::receipts::{DocumentReceipts, Sources};
 
 type Check<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
@@ -20,6 +24,7 @@ struct Witness(BTreeMap<usize, Original>);
 
 struct Original {
     source: PhysicalSourceRef,
+    encryption: SourceEncryption,
     fragments: Vec<Value>,
 }
 
@@ -38,6 +43,7 @@ impl PlayerDocumentSink for Witness {
                 document.index,
                 Original {
                     source: document.source,
+                    encryption: document.original.encryption(),
                     fragments,
                 },
             )
@@ -52,9 +58,7 @@ impl PlayerDocumentSink for Witness {
 #[test]
 #[ignore = "selected Player original members in installed Archive; set P4KX_DATA_P4K"]
 fn selected_player_adb_authored_declarations_match_installed_originals() -> Check {
-    let path = std::env::var_os(p4kx_testkit::REAL_ARCHIVE_VAR)
-        .map(PathBuf::from)
-        .ok_or("input Archive environment required")?;
+    let path = p4kx_testkit::real_archive_path()?;
     let archive = Archive::open_with_key(path, Some(p4kx_testkit::real_archive_key()?))?;
     let mut witness = Witness::default();
     let captured = PlayerSourceCapture::read(
@@ -64,8 +68,7 @@ fn selected_player_adb_authored_declarations_match_installed_originals() -> Chec
         &mut witness,
     )
     .map_err(|_| "selected Player source capture failed")?;
-    verify(&serde_json::to_value(&captured.adb_declarations)?, &witness)?;
-    Ok(())
+    verify(&captured, witness)
 }
 
 fn observe(root: SourceElement<'_>) -> io::Result<Vec<Value>> {
@@ -101,22 +104,40 @@ fn layers(node: SourceElement<'_>) -> io::Result<Vec<Value>> {
     node.elements()
         .enumerate()
         .filter(|(_, layer)| layer.name() == "AnimLayer" && layer.namespace().is_none())
-        .map(|(layer_ordinal, layer)| {
-            let animations = layer
-                .elements()
-                .enumerate()
-                .filter(|(_, row)| row.name() == "Animation" && row.namespace().is_none())
-                .map(|(ordinal, animation)| {
-                    Ok(json!([
-                        ordinal,
-                        position(animation)?,
-                        attributes(animation, "name")?
-                    ]))
-                })
-                .collect::<io::Result<Vec<_>>>()?;
-            Ok(json!([layer_ordinal, position(layer)?, animations]))
-        })
+        .map(|(ordinal, layer)| observe_layer(ordinal, layer))
         .collect()
+}
+
+fn observe_layer(layer_ordinal: usize, layer: SourceElement<'_>) -> io::Result<Value> {
+    let mut blends = Vec::new();
+    let mut animations = Vec::new();
+    let mut preceding_blend = None;
+    for (ordinal, node) in layer.elements().enumerate() {
+        if node.namespace().is_some() {
+            continue;
+        }
+        match node.name() {
+            "Blend" => {
+                preceding_blend = Some(ordinal);
+                blends.push(json!([
+                    ordinal,
+                    position(node)?,
+                    attributes(node, "Duration")?,
+                    attributes(node, "StartTime")?,
+                    attributes(node, "ExitTime")?
+                ]));
+            }
+            "Animation" => animations.push(json!([
+                ordinal,
+                position(node)?,
+                attributes(node, "name")?,
+                attributes(node, "flags")?,
+                preceding_blend
+            ])),
+            _ => {}
+        }
+    }
+    Ok(json!([layer_ordinal, position(layer)?, animations, blends]))
 }
 
 fn position(node: SourceElement<'_>) -> io::Result<Value> {
@@ -134,92 +155,110 @@ fn attributes(node: SourceElement<'_>, name: &str) -> io::Result<Vec<Value>> {
         .collect()
 }
 
-fn verify(product: &Value, witness: &Witness) -> Check {
-    let rows = product.as_array().ok_or("ADB row array")?;
-    if rows.len() != witness.0.len() || rows.is_empty() {
+fn verify(capture: &PlayerSourceCapture, mut witness: Witness) -> Check {
+    if capture.adb_declarations.len() != witness.0.len() || witness.0.is_empty() {
         return Err("source/document coverage disagrees".into());
     }
-    let mut layers_seen = false;
-    for row in rows {
-        let index = serde_json::from_value::<usize>(row["document"].clone())?;
+    let sources = Sources::new(&capture.source_inventory, witness.0.values());
+    let mut coverage = Coverage::default();
+    for declaration in &capture.adb_declarations {
         let expected = witness
             .0
-            .get(&index)
+            .remove(&declaration.document)
             .ok_or("exact selected original document")?;
-        if serde_json::to_value(&expected.source)? != row["source"] {
+        if expected.source != declaration.source {
             return Err("source identity disagrees".into());
         }
-        let mut actual = Vec::new();
-        for option in row["fragments"].as_array().ok_or("ADB options")? {
-            let layers = projected_layers(option)?;
-            layers_seen |= !layers.is_empty();
-            actual.push(json!([
-                option["listOrdinal"],
-                option["groupOrdinal"],
-                option["optionOrdinal"],
-                option["name"]["value"],
-                option["groupPosition"]["value"],
-                option["position"]["value"],
-                projected_attrs(&option["guid"])?,
-                layers,
-            ]));
+        if declaration.fragments.len() != expected.fragments.len() {
+            return Err("authored ADB option count differs".into());
         }
-        if actual != expected.fragments {
-            return Err(
-                "authored option, layer, animation or attribute order/coordinates differ".into(),
-            );
+        let receipts = sources.document(&expected);
+        for (fragment, original) in declaration.fragments.iter().zip(&expected.fragments) {
+            let option = serde_json::to_value(fragment)?;
+            if projected_option(&option, &receipts, &mut coverage)? != *original {
+                return Err(
+                    "authored ADB option or layer order, value or coordinates differ".into(),
+                );
+            }
         }
     }
-    if !layers_seen {
-        return Err("installed sample contains no directly authored animation layers".into());
+    if !coverage.preceding_blend || !coverage.authored_flags {
+        return Err("installed sample needs an ordered blend relation and authored flags".into());
     }
     Ok(())
 }
 
-fn projected_layers(option: &Value) -> Check<Vec<Value>> {
-    option["layers"]
-        .as_array()
-        .ok_or_else(|| "ADB layers".into())
-        .and_then(|layers| {
-            layers
-                .iter()
-                .map(|layer| {
-                    let animations = layer["animations"]
-                        .as_array()
-                        .ok_or("ADB animations")?
-                        .iter()
-                        .map(|animation| {
-                            Ok(json!([
-                                animation["ordinal"],
-                                animation["position"]["value"],
-                                projected_attrs(&animation["name"])?,
-                            ]))
-                        })
-                        .collect::<Check<Vec<_>>>()?;
-                    Ok(json!([
-                        layer["ordinal"],
-                        layer["position"]["value"],
-                        animations
-                    ]))
-                })
-                .collect()
-        })
+#[derive(Default)]
+struct Coverage {
+    preceding_blend: bool,
+    authored_flags: bool,
 }
 
-fn projected_attrs(selection: &Value) -> Check<Vec<Value>> {
-    let rows = selection["occurrences"]
+fn projected_option(
+    option: &Value,
+    receipts: &DocumentReceipts<'_>,
+    coverage: &mut Coverage,
+) -> Check<Value> {
+    let layers = option["layers"]
         .as_array()
-        .ok_or("source occurrences")?;
-    let state = match rows.len() {
-        0 => "absent",
-        1 => "present",
-        _ => "invalid",
-    };
-    if selection["state"] != state || selection["sourceSetComplete"] != true {
-        return Err("sourced selector state".into());
-    }
-    Ok(rows
+        .ok_or("ADB layers")?
         .iter()
-        .map(|row| json!([row["position"], row["value"]["value"]]))
-        .collect())
+        .map(|layer| projected_layer(layer, receipts, coverage))
+        .collect::<Check<Vec<_>>>()?;
+    Ok(json!([
+        option["listOrdinal"],
+        option["groupOrdinal"],
+        option["optionOrdinal"],
+        option["name"]["value"],
+        option["groupPosition"]["value"],
+        option["position"]["value"],
+        receipts.attributes(option, "guid", "GUID")?,
+        layers,
+    ]))
+}
+
+fn projected_layer(
+    layer: &Value,
+    receipts: &DocumentReceipts<'_>,
+    coverage: &mut Coverage,
+) -> Check<Value> {
+    let blends = layer["blends"].as_array().ok_or("ADB blend nodes")?;
+    let projected_blends = blends
+        .iter()
+        .map(|blend| {
+            receipts.position(blend)?;
+            Ok(json!([
+                blend["ordinal"],
+                blend["position"]["value"],
+                receipts.attributes(blend, "duration", "Duration")?,
+                receipts.attributes(blend, "startTime", "StartTime")?,
+                receipts.attributes(blend, "exitTime", "ExitTime")?
+            ]))
+        })
+        .collect::<Check<Vec<_>>>()?;
+    let animations = layer["animations"]
+        .as_array()
+        .ok_or("ADB animation nodes")?
+        .iter()
+        .map(|animation| {
+            receipts.position(animation)?;
+            let preceding = receipts.preceding_blend(layer, animation, blends)?;
+            let flags = receipts.attributes(animation, "flags", "flags")?;
+            coverage.preceding_blend |= preceding.is_some();
+            coverage.authored_flags |= !flags.is_empty();
+            Ok(json!([
+                animation["ordinal"],
+                animation["position"]["value"],
+                receipts.attributes(animation, "name", "name")?,
+                flags,
+                preceding
+            ]))
+        })
+        .collect::<Check<Vec<_>>>()?;
+    Ok(json!([
+        layer["ordinal"],
+        layer["position"]["value"],
+        animations,
+        projected_blends
+    ]))
 }
