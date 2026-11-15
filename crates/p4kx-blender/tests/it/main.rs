@@ -28,6 +28,7 @@ mod package_layout;
 mod package_light_placements;
 mod package_materials;
 mod package_mesh_extras;
+mod package_palette_gloss;
 mod package_palette_provenance;
 mod package_primitive_map;
 mod package_safety;

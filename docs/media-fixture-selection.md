@@ -144,6 +144,24 @@ The fixtures cover synthetic geometry, materials, one texture path and one absol
 animation. Installed archive coverage, additive composition and in-game appearance have separate
 acceptance criteria.
 
+## Palette gloss and packed normal alpha
+
+The focused material fixture exports a textured GLB and a Blender package from the same
+synthetic Archive. It crosses four authored palette gloss bytes with two `GlossMult` values
+and paired materials with and without a normal map. The checks cover the palette origin,
+the source texture and the authored layer multiplier.
+
+```powershell
+$env:P4KX_SYNTHETIC_PALETTE_GLOSS_PACKAGE = Join-Path $verificationRoot 'palette-gloss'
+cargo test --locked -p p4kx-blender --test it -- palette_gloss_fixture_compares_glb_and_blender_package_inputs
+& 'C:\Program Files\Blender Foundation\Blender 5.3\blender.exe' --background --factory-startup --disable-autoexec --python-exit-code 23 --python-expr 'import sys; sys.dont_write_bytecode = True' --python blender_addon/tests/blender_material_gloss_package.py -- "$env:P4KX_SYNTHETIC_PALETTE_GLOSS_PACKAGE/scene.json"
+```
+
+Use a new package directory and the isolated Blender profile above. The GLB test reads the
+packed roughness channel from the embedded image. Blender checks the packed alpha pixels
+and the graph that scales them by `GlossMult` before deriving roughness. The fixture also
+checks the constant palette fallback in both outputs. These are P4KX projection checks.
+
 ## Native package exchange in CI
 
 The focused job builds the native P4KX CLI on each row of the
