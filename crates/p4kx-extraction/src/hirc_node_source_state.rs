@@ -43,10 +43,11 @@ pub(in crate::hirc_view) struct InlineState<Rows> {
     rows: Rows,
 }
 
-pub(super) type InlineStateSchema = InlineState<Vec<InlineStateRow<Vec<InlineStateProperty>>>>;
+pub(in crate::hirc_view) type InlineStateSchema =
+    InlineState<Vec<InlineStateRow<Vec<InlineStateProperty>>>>;
 
 impl<'input, R> InlineState<InlineStateRows<'_, 'input, R>> {
-    pub(super) fn read<'view>(
+    pub(in crate::hirc_view) fn read<'view>(
         origins: &'view ObjectOrigins,
         rows: BankInlineStateRows<'input, R>,
     ) -> Result<InlineState<InlineStateRows<'view, 'input, R>>, SourceEvidenceError> {
@@ -60,7 +61,7 @@ impl<'input, R> InlineState<InlineStateRows<'_, 'input, R>> {
     }
 }
 
-pub(super) struct InlineStateRows<'view, 'input, R> {
+pub(in crate::hirc_view) struct InlineStateRows<'view, 'input, R> {
     origins: &'view ObjectOrigins,
     rows: RefCell<BankInlineStateRows<'input, R>>,
 }

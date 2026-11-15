@@ -176,3 +176,34 @@ fn an_event_listing_itself_many_times_is_cut_at_the_fan_out_limit() -> TestResul
         Ok(())
     })
 }
+
+#[test]
+fn authored_effect_modulator_and_device_objects_keep_unsupported_playback_disposition() -> TestResult
+{
+    for (type_code, complete_prefix_length) in
+        [(16, 15), (17, 15), (19, 4), (20, 4), (21, 16), (22, 4)]
+    {
+        for body_length in [complete_prefix_length, 1] {
+            let body = vec![0; body_length];
+            let bank = TestBank::new(1)
+                .version(154)
+                .object(TestHircObject::raw(type_code, 10, body));
+            resolve(bank, |sounds| {
+                assert!(
+                    sounds.variants().is_empty(),
+                    "metadata targets do not yield audio variants"
+                );
+                let [unresolved] = sounds.breaks() else {
+                    return Err("the authored metadata remains a single unresolved target".into());
+                };
+                assert_eq!(
+                    unresolved.reason(),
+                    &BreakReason::Unsupported,
+                    "source metadata has the existing playback disposition"
+                );
+                Ok(())
+            })?;
+        }
+    }
+    Ok(())
+}

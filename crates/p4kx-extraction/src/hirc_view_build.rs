@@ -41,6 +41,8 @@ pub(crate) fn detail(value: &HircValue) -> Option<Detail<'_>> {
         HircValue::Event(_)
         | HircValue::Attenuation
         | HircValue::Bus
+        | HircValue::Plugin
+        | HircValue::Modulator
         | HircValue::Raw
         | HircValue::Malformed(_) => return None,
     })

@@ -530,3 +530,9 @@ points use the bus-specific namespaces. The complete raw bank and existing
 bytes. A malformed layout carries its checked fields, a diagnostic and any raw
 remainder. Other bank versions keep an explicit unsupported disposition.
 [ADR-0390](adr/0390-v154-bus-routing-and-ducking.md)
+
+## Effects, modulators and audio devices
+
+[Original v154 effect, modulator and audio-device metadata](audio-effect-metadata.md)
+documents the separate plug-in and modulator rows, their exact source ranges
+and the shared State, effect-slot and RTPC companions.

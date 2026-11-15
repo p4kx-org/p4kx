@@ -38,6 +38,9 @@ use crate::{
     audio_bank_music_track,
 };
 
+#[path = "audio_bank_effect_metadata.rs"]
+pub(crate) mod effect_metadata;
+
 pub(crate) const HIRC_NAMESPACE: &str = "audio-bank-hirc";
 pub(crate) const OBJECT_NAMESPACE: &str = "audio-bank-object";
 
@@ -118,6 +121,12 @@ fn emit_semantic<R: Read + Seek>(
         (BankHircSemantic::Attenuation(attenuation), Some(version)) => {
             audio_bank_attenuation::project(projection, version, *attenuation, writer)
         }
+        (BankHircSemantic::Plugin(plugin), Some(version)) => {
+            effect_metadata::plugin::project(projection, version, *plugin, writer)
+        }
+        (BankHircSemantic::Modulator(modulator), Some(version)) => {
+            effect_metadata::modulator::project(projection, version, *modulator, writer)
+        }
         (BankHircSemantic::DialogueEvent(dialogue), Some(version)) => {
             audio_bank_dialogue_event::project(projection, version, *dialogue, writer)
         }
@@ -173,6 +182,12 @@ fn emit_raw(
         }
         HircKind::Attenuation => {
             audio_bank_attenuation::unsupported(projection, version, original, writer)
+        }
+        HircKind::FxShareSet | HircKind::FxCustom | HircKind::AudioDevice => {
+            effect_metadata::plugin::unsupported(projection, version, original, writer)
+        }
+        HircKind::Lfo | HircKind::Envelope | HircKind::TimeModulator => {
+            effect_metadata::modulator::unsupported(projection, version, original, writer)
         }
         HircKind::DialogueEvent => {
             audio_bank_dialogue_event::unsupported(projection, version, original, writer)

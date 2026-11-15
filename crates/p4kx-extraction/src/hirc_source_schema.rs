@@ -9,6 +9,8 @@ use super::action::ActionSourceSchema;
 use super::attenuation::AttenuationSourceSchema;
 use super::blend::BlendSourceSchema;
 use super::dto::DialogueSourceSchema;
+use super::effect_source::modulator::ModulatorSourceSchema;
+use super::effect_source::plugin::PluginSourceSchema;
 use super::music_track::MusicTrackSourceSchema;
 use super::random_sequence::RandomSequenceSchema;
 use super::standalone_state::StateSourceSchema;
@@ -25,6 +27,8 @@ impl JsonSchema for ObjectSourceSchema {
         let alternatives = [
             generator.subschema_for::<DialogueSourceSchema>(),
             generator.subschema_for::<AttenuationSourceSchema>(),
+            generator.subschema_for::<PluginSourceSchema>(),
+            generator.subschema_for::<ModulatorSourceSchema>(),
             generator.subschema_for::<RandomSequenceSchema>(),
             generator.subschema_for::<SwitchSourceSchema>(),
             generator.subschema_for::<BlendSourceSchema>(),

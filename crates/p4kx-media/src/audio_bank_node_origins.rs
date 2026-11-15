@@ -34,6 +34,8 @@ pub(crate) enum NodeKind {
     MusicTransitionRules,
     DialogueEvent,
     Attenuation,
+    Plugin,
+    Modulator,
 }
 
 impl NodeKind {
@@ -56,6 +58,8 @@ impl NodeKind {
             Self::MusicTransitionRules => "bnkMusicTransitionRules",
             Self::DialogueEvent => "bnkDialogueEvent",
             Self::Attenuation => "bnkAttenuation",
+            Self::Plugin => "bnkHircPlugin",
+            Self::Modulator => "bnkHircModulator",
         }
     }
 
@@ -78,6 +82,8 @@ impl NodeKind {
             Self::MusicTransitionRules => "musicTransitionRulePosition",
             Self::DialogueEvent => "dialogueRowPosition",
             Self::Attenuation => "attenuationRowPosition",
+            Self::Plugin => "pluginRowPosition",
+            Self::Modulator => "modulatorRowPosition",
         }
     }
 
@@ -100,6 +106,8 @@ impl NodeKind {
             Self::MusicTransitionRules => "musicTransitionRulesExtent",
             Self::DialogueEvent => "dialogueExtent",
             Self::Attenuation => "attenuationExtent",
+            Self::Plugin => "pluginObjectExtent",
+            Self::Modulator => "modulatorObjectExtent",
         }
     }
 }

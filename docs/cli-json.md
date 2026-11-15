@@ -2935,3 +2935,8 @@ Hashes are unsigned 32-bit numbers. A float is a JSON number, or the string `0x`
 hexadecimal digits when it is not finite (`"0x7fc00000"` for the usual NaN); every float is
 written back with exactly the bits it was read with. `container` and each of its fields may be
 left out; without `frame` the body is always compressed anew.
+
+Wwise v154 effects, modulators and devices expose original type-specific
+`source_fields`, including opaque plug-in byte ranges, typed references,
+original property words and initial RTPCs. See [original effect, modulator
+and audio-device metadata](audio-effect-metadata.md).

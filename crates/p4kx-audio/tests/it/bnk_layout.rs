@@ -179,6 +179,9 @@ fn play_modes_and_group_kinds_are_named() -> TestResult {
 
 #[test]
 fn a_decoder_exists_for_exactly_the_kinds_the_reader_decodes() -> TestResult {
+    const EMPTY_EFFECT: [u8; 15] = [0; 15];
+    const EMPTY_MODULATOR: [u8; 4] = [0; 4];
+    const EMPTY_DEVICE: [u8; EMPTY_EFFECT.len() + 1] = [0; EMPTY_EFFECT.len() + 1];
     let decoded = [
         TestHircObject::sound(1, 2, 0, 3),
         TestHircObject::action(2, 0x0403, 1),
@@ -194,19 +197,20 @@ fn a_decoder_exists_for_exactly_the_kinds_the_reader_decodes() -> TestResult {
         TestHircObject::raw(8, 13, bnk_source_bus::body(0)),
         TestHircObject::raw(14, 14, [0; 24]),
         TestHircObject::raw(18, 15, bnk_source_bus::body(15)),
+        TestHircObject::raw(16, 16, EMPTY_EFFECT),
+        TestHircObject::raw(17, 17, EMPTY_EFFECT),
+        TestHircObject::raw(19, 18, EMPTY_MODULATOR),
+        TestHircObject::raw(20, 19, EMPTY_MODULATOR),
+        TestHircObject::raw(21, 20, EMPTY_DEVICE),
+        TestHircObject::raw(22, 21, EMPTY_MODULATOR),
     ];
     let standalone_state = TestHircObject::raw(1, 11, [0; 2]);
-    let undecoded: Vec<TestHircObject> = (2_u8..=22)
-        .filter(|byte| ![2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 18].contains(byte))
-        .zip(100_u32..)
-        .map(|(byte, id)| TestHircObject::raw(byte, id, [0; 8]))
-        .collect();
-    assert_eq!(undecoded.len(), 7, "the kinds without a decoder");
+    let standalone_dialogue = TestHircObject::raw(15, 22, [0; 8]);
     let bank = |version: u32| {
         decoded
             .iter()
             .chain(std::iter::once(&standalone_state))
-            .chain(&undecoded)
+            .chain(std::iter::once(&standalone_dialogue))
             .cloned()
             .fold(TestBank::new(1).version(version), TestBank::object)
     };
@@ -214,11 +218,11 @@ fn a_decoder_exists_for_exactly_the_kinds_the_reader_decodes() -> TestResult {
     for (version, known) in [(154, HircLayout::Decoded), (160, HircLayout::Unsupported)] {
         let mut expected = vec![known; decoded.len()];
         expected.push(HircLayout::Unsupported);
-        expected.extend(std::iter::repeat_n(HircLayout::Undecoded, undecoded.len()));
+        expected.push(HircLayout::Undecoded);
         assert_eq!(
             layouts(&bank(version))?,
             expected,
-            "State and raw kinds in v{version}"
+            "eager decoder coverage in v{version}"
         );
     }
     let older_state = TestBank::new(1).version(145).object(standalone_state);

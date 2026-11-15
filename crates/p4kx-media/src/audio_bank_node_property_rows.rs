@@ -11,6 +11,7 @@ use p4kx_extraction::bank::{
 use crate::audio_bank_action_property_payload::{
     ActionPropertyPayload, PROPERTY_NAMESPACE as ACTION_PROPERTY_NAMESPACE,
 };
+use crate::audio_bank_hirc::effect_metadata::payload::{MODULATOR_PROPERTY, MetadataPayload};
 use crate::audio_bank_node_origins::NodeSites;
 use crate::audio_bank_node_properties::PROPERTY_NAMESPACE;
 use crate::audio_bank_node_property_payload::{
@@ -29,6 +30,7 @@ use crate::{MediaError, MediaWriter, Status, Subresource};
 pub(crate) enum PropertyScope {
     Node,
     Action,
+    Modulator,
 }
 
 impl PropertyScope {
@@ -36,6 +38,7 @@ impl PropertyScope {
         match self {
             Self::Node => &audio_bank_property_labels::NODE,
             Self::Action => &audio_bank_property_labels::ACTION,
+            Self::Modulator => &audio_bank_property_labels::MODULATOR,
         }
     }
 }
@@ -95,7 +98,7 @@ fn emit_row(
     let words = observed_words(sites, &mut prepared, &row.value, labels)?;
     let interpretation = match projection.scope {
         PropertyScope::Node => voice::project(sites, &mut prepared, row)?,
-        PropertyScope::Action => None,
+        PropertyScope::Action | PropertyScope::Modulator => None,
     };
     let data = NodePropertyRecord {
         ordinal: row.ordinal,
@@ -105,6 +108,10 @@ fn emit_row(
     };
     let [section, object] = sites.indices();
     let indices = vec![section, object, list, u64::from(row.ordinal)];
+    if matches!(projection.scope, PropertyScope::Modulator) {
+        sites.index(&mut prepared, 2, count, labels.word_layout)?;
+        sites.index(&mut prepared, 3, &row.id.range, labels.position)?;
+    }
     let prepared = prepared.finish();
     match projection.scope {
         PropertyScope::Node => prepared.write(
@@ -112,6 +119,13 @@ fn emit_row(
             &Subresource::new(PROPERTY_NAMESPACE, indices),
             Status::Complete,
             &NodePropertyPayload::BankHircNodeProperty(&data),
+            &[],
+        ),
+        PropertyScope::Modulator => prepared.write(
+            writer,
+            &Subresource::new(MODULATOR_PROPERTY, indices),
+            Status::Complete,
+            &MetadataPayload::ModulatorProperty(&data),
             &[],
         ),
         PropertyScope::Action => prepared.write(

@@ -19,6 +19,8 @@ use super::{ACTION_PAYLOAD, Binding, CONTAINER_PAYLOAD, SOUND_PAYLOAD};
 
 #[path = "audio_schema_attenuation.rs"]
 mod attenuation;
+#[path = "audio_schema_effect_metadata.rs"]
+mod effects;
 
 const DIALOGUE_PAYLOAD: &str = "DialogueEventPayload";
 const BUS_PAYLOAD: &str = "BusPayload";
@@ -34,7 +36,8 @@ pub(super) fn insert_payload(base: &mut Value) -> Result<(), MediaError> {
         BUS_PAYLOAD,
         schema_merge::serialized_payload::<BusPayload<'static>>(),
     )?;
-    attenuation::insert_payload(base)
+    attenuation::insert_payload(base)?;
+    effects::insert_payload(base)
 }
 
 const ACTION: Binding = Binding::exact(
@@ -61,7 +64,7 @@ const ACTION_TARGET_CANDIDATE: Binding = Binding::exact(
     StatusRule::Complete,
 );
 
-pub(super) const fn bindings() -> [Binding; 19] {
+pub(super) const fn bindings() -> [Binding; 24] {
     let [
         sound,
         media_resolution,
@@ -72,6 +75,13 @@ pub(super) const fn bindings() -> [Binding; 19] {
     let [event, argument, node] = dialogue_bindings();
     let [summary, selector, curve, point] = attenuation::bindings();
     let [bus, duck] = bus_bindings();
+    let [
+        plugin,
+        bank_data,
+        state_override,
+        modulator,
+        modulator_property,
+    ] = effects::bindings();
     [
         ACTION,
         ACTION_TARGET_RESOLUTION,
@@ -104,6 +114,11 @@ pub(super) const fn bindings() -> [Binding; 19] {
         point,
         bus,
         duck,
+        plugin,
+        bank_data,
+        state_override,
+        modulator,
+        modulator_property,
     ]
 }
 

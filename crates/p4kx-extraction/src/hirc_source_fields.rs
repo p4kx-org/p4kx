@@ -21,6 +21,8 @@ mod blend;
 mod container_layout;
 #[path = "hirc_dialogue_dto.rs"]
 mod dto;
+#[path = "hirc_effect_source.rs"]
+mod effect_source;
 #[path = "hirc_music_track_source.rs"]
 mod music_track;
 #[path = "hirc_source_origins.rs"]
@@ -57,6 +59,8 @@ enum SourceFamily {
     Switch,
     Blend,
     MusicTrack,
+    Plugin(HircKind),
+    Modulator(HircKind),
 }
 
 impl SourceFamily {
@@ -70,6 +74,7 @@ impl SourceFamily {
             Self::Switch => HircKind::SwitchContainer,
             Self::Blend => HircKind::LayerContainer,
             Self::MusicTrack => HircKind::MusicTrack,
+            Self::Plugin(kind) | Self::Modulator(kind) => kind,
         }
     }
 
@@ -83,6 +88,8 @@ impl SourceFamily {
             Self::Switch => "bnkHircSwitchContainer",
             Self::Blend => "bnkHircBlendContainer",
             Self::MusicTrack => "bnkHircMusicTrack",
+            Self::Plugin(_) => "bnkHircPlugin",
+            Self::Modulator(_) => "bnkHircModulator",
         }
     }
 
@@ -96,6 +103,8 @@ impl SourceFamily {
             Self::Switch => "switchContainerExtent",
             Self::Blend => "blendContainerExtent",
             Self::MusicTrack => "musicTrackExtent",
+            Self::Plugin(_) => "pluginObjectExtent",
+            Self::Modulator(_) => "modulatorObjectExtent",
         }
     }
 }
@@ -119,6 +128,12 @@ impl<'bank> ObjectSourceFields<'bank> {
             HircKind::SwitchContainer => SourceFamily::Switch,
             HircKind::LayerContainer => SourceFamily::Blend,
             HircKind::MusicTrack => SourceFamily::MusicTrack,
+            HircKind::FxShareSet | HircKind::FxCustom | HircKind::AudioDevice => {
+                SourceFamily::Plugin(kind)
+            }
+            HircKind::Lfo | HircKind::Envelope | HircKind::TimeModulator => {
+                SourceFamily::Modulator(kind)
+            }
             _ => return None,
         };
         Some(Self {
@@ -181,33 +196,49 @@ fn project<R: Read + Seek, S: Serializer>(
         (BankHircSemantic::MusicTrack(track), SourceFamily::MusicTrack) => {
             music_track::serialize(serializer, origins, header, *track)
         }
+        (BankHircSemantic::Plugin(plugin), SourceFamily::Plugin(_)) => {
+            effect_source::plugin::serialize(serializer, origins, header, *plugin)
+        }
+        (BankHircSemantic::Modulator(modulator), SourceFamily::Modulator(_)) => {
+            effect_source::modulator::serialize(serializer, origins, header, *modulator)
+        }
         (BankHircSemantic::Raw(object), family)
             if object.kind(header.header().version) == family.kind() =>
         {
-            match family {
-                SourceFamily::Action => action::unsupported(serializer, origins, header, &object),
-                SourceFamily::State => {
-                    standalone_state::serialize(serializer, origins, header, &object, None)
-                }
-                SourceFamily::Dialogue => {
-                    serialize_unsupported(serializer, origins, header, &object)
-                }
-                SourceFamily::Attenuation => {
-                    attenuation::unsupported(serializer, origins, header, &object)
-                }
-                SourceFamily::RandomSequence => {
-                    random_sequence::unsupported(serializer, origins, header, &object)
-                }
-                SourceFamily::Switch => switch::unsupported(serializer, origins, header, &object),
-                SourceFamily::Blend => blend::unsupported(serializer, origins, header, &object),
-                SourceFamily::MusicTrack => {
-                    music_track::unsupported(serializer, origins, header, &object)
-                }
-            }
+            project_raw(serializer, origins, header, family, &object)
         }
         _ => Err(S::Error::custom(
             "the selected original object has an unexpected source layout",
         )),
+    }
+}
+
+fn project_raw<S: Serializer>(
+    serializer: S,
+    origins: &ObjectOrigins,
+    header: &BankObservedHeader,
+    family: SourceFamily,
+    object: &BankHircObject,
+) -> Result<S::Ok, S::Error> {
+    match family {
+        SourceFamily::Action => action::unsupported(serializer, origins, header, object),
+        SourceFamily::State => {
+            standalone_state::serialize(serializer, origins, header, object, None)
+        }
+        SourceFamily::Dialogue => serialize_unsupported(serializer, origins, header, object),
+        SourceFamily::Attenuation => attenuation::unsupported(serializer, origins, header, object),
+        SourceFamily::RandomSequence => {
+            random_sequence::unsupported(serializer, origins, header, object)
+        }
+        SourceFamily::Switch => switch::unsupported(serializer, origins, header, object),
+        SourceFamily::Blend => blend::unsupported(serializer, origins, header, object),
+        SourceFamily::MusicTrack => music_track::unsupported(serializer, origins, header, object),
+        SourceFamily::Plugin(_) => {
+            effect_source::plugin::unsupported(serializer, origins, header, object)
+        }
+        SourceFamily::Modulator(_) => {
+            effect_source::modulator::unsupported(serializer, origins, header, object)
+        }
     }
 }
 

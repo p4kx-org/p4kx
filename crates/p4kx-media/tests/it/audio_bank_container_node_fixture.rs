@@ -168,6 +168,23 @@ impl Evidence<'_> {
         self.scalar(row, field, label, u32::from(value), &[value])
     }
 
+    pub(crate) fn bytes(
+        &self,
+        (position, record): (usize, &MediaRecord),
+        field: &str,
+        label: &str,
+        bytes: &[u8],
+    ) -> TestResult {
+        let path = format!("/payload/{field}");
+        let span = record.data.pointer(&path).ok_or("original bytes range")?;
+        assert_eq!(
+            source_span(self.source, &record.data, &path)?,
+            bytes,
+            "opaque authored bytes"
+        );
+        self.receipt(position, &format!("/data{path}"), "payload", label, span)
+    }
+
     pub(crate) fn halfword(
         &self,
         row: (usize, &MediaRecord),

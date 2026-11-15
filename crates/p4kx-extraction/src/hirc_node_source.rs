@@ -25,11 +25,11 @@ mod positioning;
 #[path = "hirc_node_source_reader.rs"]
 mod reader;
 #[path = "hirc_node_source_routing.rs"]
-mod routing;
+pub(super) mod routing;
 #[path = "hirc_node_source_rtpc.rs"]
 pub(in crate::hirc_view) mod rtpc;
 #[path = "hirc_node_source_state.rs"]
-mod state;
+pub(super) mod state;
 
 use self::actor_mixer::{ActorChildrenSchema, ActorChildrenSource};
 use self::bus::{BusFields, BusSchema, DuckRows};

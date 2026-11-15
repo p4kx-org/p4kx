@@ -32,9 +32,11 @@ impl ObjectOrigins {
             family.namespace(),
             family.extent_label(),
             match family {
-                SourceFamily::Action | SourceFamily::State | SourceFamily::Attenuation => {
-                    SourceUses::with_compact_use_refs()
-                }
+                SourceFamily::Action
+                | SourceFamily::State
+                | SourceFamily::Attenuation
+                | SourceFamily::Plugin(_)
+                | SourceFamily::Modulator(_) => SourceUses::with_compact_use_refs(),
                 _ => SourceUses::new(),
             },
         )
@@ -111,6 +113,30 @@ impl ObjectOrigins {
         let range = start..start + size_of::<u32>() as u64;
         let used = self.site("bnkBkhd", "version", &range, SourceUseRole::Payload)?;
         Ok(self.value(header.header().version, &[used]))
+    }
+
+    pub(in crate::hirc_view) fn kind(
+        &self,
+        header: &BankObservedHeader,
+        object: &BankHircObject,
+    ) -> Result<SourcedValue<&'static str>, SourceEvidenceError> {
+        let version = header.section().body_offset();
+        let type_code = object.header_offset();
+        let sources = [
+            self.site(
+                "bnkBkhd",
+                "version",
+                &(version..version + size_of::<u32>() as u64),
+                SourceUseRole::Selector,
+            )?,
+            self.site(
+                "bnkHircObject",
+                "typeCode",
+                &(type_code..type_code + 1),
+                SourceUseRole::Conversion,
+            )?,
+        ];
+        Ok(self.value(object.kind(header.header().version).slug(), &sources))
     }
 
     pub(in crate::hirc_view) fn coverage<T>(

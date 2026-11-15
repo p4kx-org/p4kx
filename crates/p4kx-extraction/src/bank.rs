@@ -14,6 +14,12 @@ use std::path::{Path, PathBuf};
 
 use p4kx_audio::{AudioError, EmbeddedWem, MediaClass, Soundbank};
 pub use p4kx_audio::{
+    BankDeviceSlots, BankEffectFields, BankEffectOverride, BankHircModulator, BankHircPlugin,
+    BankModulatorFields, BankModulatorKind, BankPluginDataReference, BankPluginFields,
+    BankPluginKind, BankPluginParameters, BankPluginRows,
+};
+
+pub use p4kx_audio::{
     BankActionFields, BankActionRead, BankContainerChild, BankContainerChildren,
     BankContainerFields, BankContainerRead, BankDeclaredLengthSource, BankDidx, BankDidxEntry,
     BankEvent, BankEventAction, BankEventCountEncoding, BankEventRead, BankHirc, BankHircAction,

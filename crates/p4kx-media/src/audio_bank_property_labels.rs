@@ -39,3 +39,16 @@ pub(crate) const ACTION: PropertyLabels = PropertyLabels {
     minimum_bits: "actionPropertyMinimumBits",
     maximum_bits: "actionPropertyMaximumBits",
 };
+
+pub(crate) const MODULATOR: PropertyLabels = PropertyLabels {
+    count: "modulatorPropertyCount",
+    checked_ids: "modulatorPropertyCheckedIds",
+    checked_words: "modulatorPropertyCheckedWords",
+    coverage: "modulatorPropertyCoverage",
+    id: "modulatorPropertyId",
+    position: "modulatorPropertyPosition",
+    word_layout: "modulatorPropertyWordLayout",
+    scalar_bits: "modulatorPropertyScalarBits",
+    minimum_bits: "modulatorPropertyMinimumBits",
+    maximum_bits: "modulatorPropertyMaximumBits",
+};

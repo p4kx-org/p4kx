@@ -29,12 +29,15 @@ mod bank_source_attenuation;
 mod bank_source_container;
 mod bank_source_dialogue_event;
 mod bank_source_didx;
+mod bank_source_effect_metadata;
 mod bank_source_event;
 mod bank_source_hirc;
+mod bank_source_modulator;
 mod bank_source_music_playlist;
 mod bank_source_music_segment;
 mod bank_source_music_switch;
 mod bank_source_music_track;
+mod bank_source_plugin;
 mod bank_source_sound;
 mod bank_stid;
 mod bank_structure;
@@ -50,9 +53,12 @@ mod hirc_attenuation;
 mod hirc_blend_container;
 mod hirc_bus_fields;
 mod hirc_container;
+mod hirc_device;
 mod hirc_dialogue_event;
+mod hirc_effect;
 mod hirc_event;
 mod hirc_layout;
+mod hirc_modulator;
 mod hirc_music;
 mod hirc_music_fade;
 mod hirc_music_node;
@@ -77,6 +83,8 @@ mod hirc_node_positioning;
 mod hirc_node_property;
 mod hirc_node_state;
 mod hirc_plugin;
+mod hirc_plugin_family;
+mod hirc_plugin_parameters;
 mod hirc_random_sequence;
 mod hirc_rtpc;
 mod hirc_source;
@@ -112,6 +120,14 @@ pub use bank_graph_point_rows::{
     BankGraphPoint, BankGraphPoint as BankBlendPoint, BankGraphPointRows,
     BankGraphPointRows as BankBlendPointRows,
 };
+pub use bank_source_modulator::BankHircModulator;
+pub use bank_source_plugin::{BankHircPlugin, BankPluginRows};
+pub use hirc_device::BankDeviceSlots;
+pub use hirc_effect::{BankEffectFields, BankEffectOverride};
+pub use hirc_modulator::{BankModulatorFields, BankModulatorKind};
+pub use hirc_plugin_family::BankPluginKind;
+pub use hirc_plugin_parameters::{BankPluginDataReference, BankPluginFields, BankPluginParameters};
+
 pub use bank_inline_state_rows::{BankInlineStateRow, BankInlineStateRows};
 pub use bank_music_track_automation_rows::{
     BankMusicTrackAutomation, BankMusicTrackAutomationRows,

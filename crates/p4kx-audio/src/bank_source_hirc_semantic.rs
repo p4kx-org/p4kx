@@ -10,14 +10,18 @@ use crate::bank_source_attenuation::{self, BankHircAttenuation};
 use crate::bank_source_container::{self, BankHircContainer, BankHircContainerNode};
 use crate::bank_source_dialogue_event::{self, BankHircDialogueEvent};
 use crate::bank_source_event;
+use crate::bank_source_modulator::{self, BankHircModulator};
 use crate::bank_source_music_playlist::{self, BankHircMusicPlaylist};
 use crate::bank_source_music_segment::{self, BankHircMusicSegment};
 use crate::bank_source_music_switch::{self, BankHircMusicSwitch};
 use crate::bank_source_music_track::{self, BankHircMusicTrack};
+use crate::bank_source_plugin::{self, BankHircPlugin};
 use crate::bank_source_sound::{self, BankHircSound};
 use crate::hirc::CONTAINER_VERSION;
 use crate::hirc_attenuation;
 use crate::hirc_container::Layout as ContainerLayout;
+use crate::hirc_modulator::BankModulatorKind;
+use crate::hirc_plugin_family::{self, BankPluginKind};
 use crate::hirc_source;
 use crate::{BankHircEvent, BankObservedHeader, BankReadError, HircKind};
 
@@ -63,6 +67,10 @@ pub enum BankHircSemantic<'input, R> {
     DialogueEvent(Box<BankHircDialogueEvent<'input, R>>),
     /// Owner-bound attenuation fields and ordered conversion and RTPC points.
     Attenuation(Box<BankHircAttenuation<'input, R>>),
+    /// Owner-bound original effect or audio-device declarations.
+    Plugin(Box<BankHircPlugin<'input, R>>),
+    /// Owner-bound original modulation properties and control graphs.
+    Modulator(Box<BankHircModulator<'input, R>>),
     /// Owner-bound music playlist interpretation and ordered values.
     MusicPlaylist(Box<BankHircMusicPlaylist<'input, R>>),
     /// Owner-bound music segment interpretation and ordered values.
@@ -91,6 +99,8 @@ impl<R> BankHircSemantic<'_, R> {
             Self::ActorMixer(actor) => actor.object(),
             Self::DialogueEvent(dialogue) => dialogue.object(),
             Self::Attenuation(attenuation) => attenuation.object(),
+            Self::Plugin(plugin) => plugin.object(),
+            Self::Modulator(modulator) => modulator.object(),
             Self::MusicPlaylist(playlist) => &playlist.object,
             Self::MusicSegment(segment) => &segment.object,
             Self::MusicSwitch(switch) => &switch.object,
@@ -294,12 +304,37 @@ impl<R: Read + Seek> BankHirc<'_, R> {
             HircKind::Sound if hirc_source::has_sound_layout(version) => {
                 return self.sound_semantic(object, version, mode);
             }
-            _ => Ok(BankHircSemantic::Raw(object)),
+            _ => return self.plugin_or_modulator(object, kind, version, mode),
         };
         if result.is_err() {
             self.stopped = true;
         }
         result
+    }
+
+    fn plugin_or_modulator(
+        &mut self,
+        object: BankHircObject,
+        kind: HircKind,
+        version: u32,
+        mode: NodeMode,
+    ) -> Result<BankHircSemantic<'_, R>, BankReadError> {
+        if version == hirc_plugin_family::VERSION && mode == NodeMode::SourceFields {
+            if let Some(plugin) = BankPluginKind::of(kind) {
+                return bank_source_plugin::observe(self.input, &mut self.stopped, object, plugin)
+                    .map(|reader| BankHircSemantic::Plugin(Box::new(reader)));
+            }
+            if let Some(modulator) = BankModulatorKind::of(kind) {
+                return bank_source_modulator::observe(
+                    self.input,
+                    &mut self.stopped,
+                    object,
+                    modulator,
+                )
+                .map(|reader| BankHircSemantic::Modulator(Box::new(reader)));
+            }
+        }
+        Ok(BankHircSemantic::Raw(object))
     }
 
     fn action_with_properties(

@@ -15,6 +15,30 @@ const RTPC_PAYLOAD: &str = "RtpcPayload";
 const CONTAINER_PAYLOAD: &str = "ContainerRtpcPayload";
 const BLEND_PAYLOAD: &str = "BlendLayerRtpcPayload";
 
+const ATTENUATION_RECORD_TYPES: [&str; 3] = [
+    "bank-hirc-attenuation-rtpc",
+    "bank-hirc-attenuation-rtpc-curve",
+    "bank-hirc-attenuation-rtpc-point",
+];
+
+const PLUGIN_RECORD_TYPES: [&str; 3] = [
+    "bank-hirc-plugin-rtpc",
+    "bank-hirc-plugin-rtpc-curve",
+    "bank-hirc-plugin-rtpc-point",
+];
+
+const MODULATOR_RECORD_TYPES: [&str; 3] = [
+    "bank-hirc-modulator-rtpc",
+    "bank-hirc-modulator-rtpc-curve",
+    "bank-hirc-modulator-rtpc-point",
+];
+
+const BUS_RECORD_TYPES: [&str; 3] = [
+    "bank-hirc-bus-rtpc",
+    "bank-hirc-bus-rtpc-curve",
+    "bank-hirc-bus-rtpc-point",
+];
+
 pub(super) fn insert_payload(base: &mut Value) -> Result<(), MediaError> {
     schema_merge::insert_payload(
         base,
@@ -33,10 +57,30 @@ pub(super) fn insert_payload(base: &mut Value) -> Result<(), MediaError> {
     )
 }
 
-pub(super) const fn bindings() -> [Binding; 21] {
-    let [attenuation_summary, attenuation_curve, attenuation_point] = attenuation_bindings();
-    let [bus_summary, bus_curve, bus_point] = bus_bindings();
-    let [sound_summary, sound_curve, sound_point] = sound_bindings();
+pub(super) const fn bindings() -> [Binding; 27] {
+    let [sound_summary, sound_curve, sound_point] = shared_bindings(
+        RtpcOwner::Sound,
+        [
+            "bank-hirc-sound-rtpc",
+            "bank-hirc-sound-rtpc-curve",
+            "bank-hirc-sound-rtpc-point",
+        ],
+    );
+    let [actor_summary, actor_curve, actor_point] = shared_bindings(
+        RtpcOwner::ActorMixer,
+        [
+            "bank-hirc-actor-mixer-rtpc",
+            "bank-hirc-actor-mixer-rtpc-curve",
+            "bank-hirc-actor-mixer-rtpc-point",
+        ],
+    );
+    let [attenuation_summary, attenuation_curve, attenuation_point] =
+        shared_bindings(RtpcOwner::Attenuation, ATTENUATION_RECORD_TYPES);
+    let [plugin_summary, plugin_curve, plugin_point] =
+        shared_bindings(RtpcOwner::Plugin, PLUGIN_RECORD_TYPES);
+    let [modulator_summary, modulator_curve, modulator_point] =
+        shared_bindings(RtpcOwner::Modulator, MODULATOR_RECORD_TYPES);
+    let [bus_summary, bus_curve, bus_point] = shared_bindings(RtpcOwner::Bus, BUS_RECORD_TYPES);
     let [summary, curve, point] = container_bindings();
     let [music_summary, music_curve, music_point] = music_bindings();
     let [blend_summary, blend_curve, blend_point] = blend_bindings();
@@ -44,27 +88,9 @@ pub(super) const fn bindings() -> [Binding; 21] {
         sound_summary,
         sound_curve,
         sound_point,
-        Binding::exact(
-            RTPC_PAYLOAD,
-            RtpcOwner::ActorMixer.summary_namespace(),
-            "bank-hirc-actor-mixer-rtpc",
-            2,
-            StatusRule::MalformedLayout,
-        ),
-        Binding::exact(
-            RTPC_PAYLOAD,
-            RtpcOwner::ActorMixer.curve_namespace(),
-            "bank-hirc-actor-mixer-rtpc-curve",
-            3,
-            StatusRule::Complete,
-        ),
-        Binding::exact(
-            RTPC_PAYLOAD,
-            RtpcOwner::ActorMixer.point_namespace(),
-            "bank-hirc-actor-mixer-rtpc-point",
-            4,
-            StatusRule::Complete,
-        ),
+        actor_summary,
+        actor_curve,
+        actor_point,
         summary,
         curve,
         point,
@@ -80,81 +106,38 @@ pub(super) const fn bindings() -> [Binding; 21] {
         bus_summary,
         bus_curve,
         bus_point,
+        plugin_summary,
+        plugin_curve,
+        plugin_point,
+        modulator_summary,
+        modulator_curve,
+        modulator_point,
     ]
 }
 
-const fn sound_bindings() -> [Binding; 3] {
+const fn shared_bindings(
+    owner: RtpcOwner,
+    [summary, curve, point]: [&'static str; 3],
+) -> [Binding; 3] {
     [
         Binding::exact(
             RTPC_PAYLOAD,
-            RtpcOwner::Sound.summary_namespace(),
-            "bank-hirc-sound-rtpc",
+            owner.summary_namespace(),
+            summary,
             2,
             StatusRule::MalformedLayout,
         ),
         Binding::exact(
             RTPC_PAYLOAD,
-            RtpcOwner::Sound.curve_namespace(),
-            "bank-hirc-sound-rtpc-curve",
+            owner.curve_namespace(),
+            curve,
             3,
             StatusRule::Complete,
         ),
         Binding::exact(
             RTPC_PAYLOAD,
-            RtpcOwner::Sound.point_namespace(),
-            "bank-hirc-sound-rtpc-point",
-            4,
-            StatusRule::Complete,
-        ),
-    ]
-}
-
-const fn attenuation_bindings() -> [Binding; 3] {
-    [
-        Binding::exact(
-            RTPC_PAYLOAD,
-            RtpcOwner::Attenuation.summary_namespace(),
-            "bank-hirc-attenuation-rtpc",
-            2,
-            StatusRule::MalformedLayout,
-        ),
-        Binding::exact(
-            RTPC_PAYLOAD,
-            RtpcOwner::Attenuation.curve_namespace(),
-            "bank-hirc-attenuation-rtpc-curve",
-            3,
-            StatusRule::Complete,
-        ),
-        Binding::exact(
-            RTPC_PAYLOAD,
-            RtpcOwner::Attenuation.point_namespace(),
-            "bank-hirc-attenuation-rtpc-point",
-            4,
-            StatusRule::Complete,
-        ),
-    ]
-}
-
-const fn bus_bindings() -> [Binding; 3] {
-    [
-        Binding::exact(
-            RTPC_PAYLOAD,
-            RtpcOwner::Bus.summary_namespace(),
-            "bank-hirc-bus-rtpc",
-            2,
-            StatusRule::MalformedLayout,
-        ),
-        Binding::exact(
-            RTPC_PAYLOAD,
-            RtpcOwner::Bus.curve_namespace(),
-            "bank-hirc-bus-rtpc-curve",
-            3,
-            StatusRule::Complete,
-        ),
-        Binding::exact(
-            RTPC_PAYLOAD,
-            RtpcOwner::Bus.point_namespace(),
-            "bank-hirc-bus-rtpc-point",
+            owner.point_namespace(),
+            point,
             4,
             StatusRule::Complete,
         ),

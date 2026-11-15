@@ -3,7 +3,9 @@
 
 use std::io::{Read, Seek};
 
-use p4kx_audio::{BankNodeAdvancedFields, BankNodeFxKind, BankNodeFxSlot};
+use p4kx_audio::{
+    BankNodeAdvancedFields, BankNodeFxKind, BankNodeFxList, BankNodeFxSlot, BankNodeFxSlots,
+};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -16,7 +18,7 @@ use super::reader::NodeReader;
 
 #[derive(Serialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-pub(super) struct NodeFx {
+pub(in crate::hirc_view) struct NodeFx {
     #[serde(skip_serializing_if = "Option::is_none")]
     override_parent_bits: Option<SourcedValue<u8>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -37,6 +39,18 @@ impl NodeFx {
         let Some(list) = node.fx(kind) else {
             return Ok(None);
         };
+        let Some(mut output) = Self::observe(origins, list, kind)? else {
+            return Ok(None);
+        };
+        output.read_rows(origins, node.fx_slots(kind))?;
+        Ok(Some(output))
+    }
+
+    pub(in crate::hirc_view) fn observe<E: serde::ser::Error>(
+        origins: &ObjectOrigins,
+        list: BankNodeFxList<'_>,
+        kind: BankNodeFxKind,
+    ) -> Result<Option<Self>, E> {
         if list.fields.start.is_none() {
             return Ok(None);
         }
@@ -49,7 +63,7 @@ impl NodeFx {
             ),
             _ => return Err(E::custom("unexpected original node effect layout")),
         };
-        let mut output = Self {
+        Ok(Some(Self {
             override_parent_bits: origins
                 .optional(list.fields.override_parent_bits.as_ref(), labels.0)
                 .map_err(E::custom)?,
@@ -65,16 +79,22 @@ impl NodeFx {
                 .transpose()
                 .map_err(E::custom)?,
             slots: Vec::new(),
-        };
-        if let Some(rows) = node.fx_slots(kind) {
+        }))
+    }
+
+    pub(in crate::hirc_view) fn read_rows<R: Read + Seek, E: serde::ser::Error>(
+        &mut self,
+        origins: &ObjectOrigins,
+        rows: Option<BankNodeFxSlots<'_, R>>,
+    ) -> Result<(), E> {
+        if let Some(rows) = rows {
             for row in rows {
                 let slot = row.map_err(E::custom)?;
-                output
-                    .slots
+                self.slots
                     .push(NodeFxSlot::read(origins, &slot).map_err(E::custom)?);
             }
         }
-        Ok(Some(output))
+        Ok(())
     }
 }
 

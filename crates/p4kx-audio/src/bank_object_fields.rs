@@ -28,6 +28,14 @@ pub(crate) trait ObjectFields {
     fn read_array<const N: usize>(&mut self) -> Result<[u8; N], Self::Error>;
     fn skip_bytes(&mut self, len: u64) -> Result<(), Self::Error>;
 
+    fn require_exhausted(&self, context: &'static str) -> Result<(), Self::Error> {
+        if self.remaining_bytes() == 0 {
+            Ok(())
+        } else {
+            Err(BankError::invalid(SectionId::HIRC, context).into())
+        }
+    }
+
     fn read_u8(&mut self) -> Result<BankHircField<u8>, Self::Error> {
         self.scalar(u8::from_le_bytes)
     }

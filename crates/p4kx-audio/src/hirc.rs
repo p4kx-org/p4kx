@@ -4,6 +4,7 @@
 use std::fmt;
 use std::ops::Range;
 
+use crate::bank_object_fields::ObjectFields;
 use crate::bank_reader::SectionReader;
 use crate::bank_structure::{HircEnvelope, OBJECT_HEADER_LEN, OBJECT_ID_LEN};
 use crate::hirc_action::{self, ActionTarget};
@@ -11,12 +12,15 @@ use crate::hirc_actor_mixer::{self, ActorMixer};
 use crate::hirc_attenuation::{self, BankAttenuationFields};
 use crate::hirc_bus_fields::{self, BankHircBusFields};
 use crate::hirc_container;
+use crate::hirc_effect::BankEffectFields;
 use crate::hirc_event;
 use crate::hirc_layout::has_decoder;
+use crate::hirc_modulator::{self, BankModulatorFields, BankModulatorKind};
 use crate::hirc_music::{MusicPlaylist, MusicSegment, MusicSwitch, MusicTrack};
 use crate::hirc_music_parse;
 use crate::hirc_music_track;
 use crate::hirc_node::Container;
+use crate::hirc_plugin_family::{self, BankPluginKind};
 use crate::hirc_source;
 use crate::hirc_state::{self, StateObject};
 use crate::{BankError, SectionId};
@@ -227,6 +231,10 @@ pub enum HircValue {
     MusicPlaylist(Box<MusicPlaylist>),
     /// A version-154 attenuation whose declared fields occupy the original body.
     Attenuation,
+    /// An effect or device whose version-154 fields occupy the complete original body.
+    Plugin,
+    /// A version-154 modulator whose fields occupy the complete original body.
+    Modulator,
     /// Any other object, or a Sound or container of another bank version; its body is kept raw.
     Raw,
     /// A Sound, Action, Event, container or music object whose body does not hold its fields; its
@@ -358,6 +366,29 @@ fn value(
             hirc_attenuation::scan(fields, &mut BankAttenuationFields::default())?;
             HircValue::Attenuation
         }
-        _ => HircValue::Raw,
+        _ => return effect_metadata(kind, version, fields),
     })
+}
+
+fn effect_metadata<F: ObjectFields>(
+    kind: HircKind,
+    version: u32,
+    fields: &mut F,
+) -> Result<HircValue, F::Error> {
+    if version != hirc_plugin_family::VERSION {
+        return Ok(HircValue::Raw);
+    }
+    if let Some(plugin) = BankPluginKind::of(kind) {
+        hirc_plugin_family::scan(
+            fields,
+            &mut BankEffectFields::default(),
+            plugin.device_slots().as_mut(),
+        )?;
+        return Ok(HircValue::Plugin);
+    }
+    if BankModulatorKind::of(kind).is_some() {
+        hirc_modulator::scan(fields, &mut BankModulatorFields::default())?;
+        return Ok(HircValue::Modulator);
+    }
+    Ok(HircValue::Raw)
 }

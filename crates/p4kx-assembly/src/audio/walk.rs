@@ -207,6 +207,8 @@ impl<'i> Walk<'_, 'i> {
             | HircValue::State(_)
             | HircValue::Attenuation
             | HircValue::Bus
+            | HircValue::Plugin
+            | HircValue::Modulator
             | HircValue::Malformed(_)
             | HircValue::Raw => self.unresolved_object(object),
         }
@@ -222,6 +224,12 @@ impl<'i> Walk<'_, 'i> {
                         | HircKind::Attenuation
                         | HircKind::AudioBus
                         | HircKind::AuxiliaryBus
+                        | HircKind::FxShareSet
+                        | HircKind::FxCustom
+                        | HircKind::AudioDevice
+                        | HircKind::Lfo
+                        | HircKind::Envelope
+                        | HircKind::TimeModulator
                 ) =>
             {
                 BreakReason::Malformed(error.clone())

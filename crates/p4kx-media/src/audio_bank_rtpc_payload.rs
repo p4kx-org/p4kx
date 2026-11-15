@@ -41,6 +41,18 @@ pub(crate) enum RtpcPayload<'row> {
     AttenuationCurve(&'row RtpcCurveRecord),
     #[serde(rename = "bank-hirc-attenuation-rtpc-point")]
     AttenuationPoint(&'row RtpcPointRecord),
+    #[serde(rename = "bank-hirc-plugin-rtpc")]
+    PluginSummary(&'row RtpcRecord),
+    #[serde(rename = "bank-hirc-plugin-rtpc-curve")]
+    PluginCurve(&'row RtpcCurveRecord),
+    #[serde(rename = "bank-hirc-plugin-rtpc-point")]
+    PluginPoint(&'row RtpcPointRecord),
+    #[serde(rename = "bank-hirc-modulator-rtpc")]
+    ModulatorSummary(&'row RtpcRecord),
+    #[serde(rename = "bank-hirc-modulator-rtpc-curve")]
+    ModulatorCurve(&'row RtpcCurveRecord),
+    #[serde(rename = "bank-hirc-modulator-rtpc-point")]
+    ModulatorPoint(&'row RtpcPointRecord),
 }
 
 #[derive(Serialize, JsonSchema)]
@@ -85,6 +97,8 @@ pub(crate) enum RtpcOwner {
     Container,
     MusicNode,
     Attenuation,
+    Plugin,
+    Modulator,
     BlendLayer(BlendLayerSite),
 }
 
@@ -135,6 +149,8 @@ impl RtpcOwner {
             Self::Container => "audio-bank-hirc-container-rtpc",
             Self::MusicNode => "audio-bank-hirc-music-node-rtpc",
             Self::Attenuation => "audio-bank-hirc-attenuation-rtpc",
+            Self::Plugin => "audio-bank-hirc-plugin-rtpc",
+            Self::Modulator => "audio-bank-hirc-modulator-rtpc",
             Self::BlendLayer(_) => BLEND_SUMMARY_NAMESPACE,
         }
     }
@@ -147,6 +163,8 @@ impl RtpcOwner {
             Self::Container => "audio-bank-hirc-container-rtpc-curve",
             Self::MusicNode => "audio-bank-hirc-music-node-rtpc-curve",
             Self::Attenuation => "audio-bank-hirc-attenuation-rtpc-curve",
+            Self::Plugin => "audio-bank-hirc-plugin-rtpc-curve",
+            Self::Modulator => "audio-bank-hirc-modulator-rtpc-curve",
             Self::BlendLayer(_) => BLEND_CURVE_NAMESPACE,
         }
     }
@@ -159,6 +177,8 @@ impl RtpcOwner {
             Self::Container => "audio-bank-hirc-container-rtpc-point",
             Self::MusicNode => "audio-bank-hirc-music-node-rtpc-point",
             Self::Attenuation => "audio-bank-hirc-attenuation-rtpc-point",
+            Self::Plugin => "audio-bank-hirc-plugin-rtpc-point",
+            Self::Modulator => "audio-bank-hirc-modulator-rtpc-point",
             Self::BlendLayer(_) => BLEND_POINT_NAMESPACE,
         }
     }
@@ -171,6 +191,8 @@ impl RtpcOwner {
             Self::Container => RtpcExport::Container(ContainerRtpcPayload::Summary(value)),
             Self::MusicNode => RtpcExport::Shared(RtpcPayload::MusicSummary(value)),
             Self::Attenuation => RtpcExport::Shared(RtpcPayload::AttenuationSummary(value)),
+            Self::Plugin => RtpcExport::Shared(RtpcPayload::PluginSummary(value)),
+            Self::Modulator => RtpcExport::Shared(RtpcPayload::ModulatorSummary(value)),
             Self::BlendLayer(_) => RtpcExport::BlendLayer(BlendLayerRtpcPayload::Summary(value)),
         }
     }
@@ -183,6 +205,8 @@ impl RtpcOwner {
             Self::Container => RtpcExport::Container(ContainerRtpcPayload::Curve(value)),
             Self::MusicNode => RtpcExport::Shared(RtpcPayload::MusicCurve(value)),
             Self::Attenuation => RtpcExport::Shared(RtpcPayload::AttenuationCurve(value)),
+            Self::Plugin => RtpcExport::Shared(RtpcPayload::PluginCurve(value)),
+            Self::Modulator => RtpcExport::Shared(RtpcPayload::ModulatorCurve(value)),
             Self::BlendLayer(_) => RtpcExport::BlendLayer(BlendLayerRtpcPayload::Curve(value)),
         }
     }
@@ -195,6 +219,8 @@ impl RtpcOwner {
             Self::Container => RtpcExport::Container(ContainerRtpcPayload::Point(value)),
             Self::MusicNode => RtpcExport::Shared(RtpcPayload::MusicPoint(value)),
             Self::Attenuation => RtpcExport::Shared(RtpcPayload::AttenuationPoint(value)),
+            Self::Plugin => RtpcExport::Shared(RtpcPayload::PluginPoint(value)),
+            Self::Modulator => RtpcExport::Shared(RtpcPayload::ModulatorPoint(value)),
             Self::BlendLayer(_) => RtpcExport::BlendLayer(BlendLayerRtpcPayload::Point(value)),
         }
     }

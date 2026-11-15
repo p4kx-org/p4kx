@@ -4,6 +4,7 @@
 //! How far the reader decodes a `HIRC` object, and its place in the hierarchy.
 
 use crate::{BankError, HircKind, HircObject, HircValue, SoundSource};
+use crate::{BankModulatorKind, BankPluginKind};
 
 /// How far this reader decodes a `HIRC` object.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -38,7 +39,8 @@ pub(crate) const fn has_decoder(kind: HircKind) -> bool {
             | HircKind::MusicSwitch
             | HircKind::MusicPlaylist
             | HircKind::Attenuation
-    )
+    ) || BankPluginKind::of(kind).is_some()
+        || BankModulatorKind::of(kind).is_some()
 }
 
 impl HircKind {
