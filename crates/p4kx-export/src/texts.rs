@@ -60,6 +60,15 @@ impl LanguageCount {
             unresolved: AtomicUsize::new(0),
         }
     }
+
+    fn note(&self, resolved: bool) {
+        let counter = if resolved {
+            &self.resolved
+        } else {
+            &self.unresolved
+        };
+        counter.fetch_add(1, Ordering::Relaxed);
+    }
 }
 
 impl<'e> Texts<'e> {
@@ -126,12 +135,15 @@ impl<'e> Texts<'e> {
             .iter()
             .find(|count| count.language == language)?;
         let text = self.lookup_forms(language, key);
-        if text.as_ref().is_some_and(|text| !text.display.is_empty()) {
-            count.resolved.fetch_add(1, Ordering::Relaxed);
-        } else {
-            count.unresolved.fetch_add(1, Ordering::Relaxed);
-        }
+        count.note(text.as_ref().is_some_and(|text| !text.display.is_empty()));
         text
+    }
+
+    /// Counts one lookup occurrence per supported language from prepared outcomes.
+    pub(crate) fn note_languages(&self, mut resolved: impl FnMut(Language) -> bool) {
+        for count in &self.languages {
+            count.note(resolved(count.language));
+        }
     }
 
     fn lookup_forms(&self, language: Language, key: &str) -> Option<TextProjection<'e>> {

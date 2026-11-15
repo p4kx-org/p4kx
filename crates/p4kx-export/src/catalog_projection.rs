@@ -252,6 +252,20 @@ impl<'context, 'source> CatalogProjection<'context, 'source> {
         selector: SourceUse,
     ) -> Result<(), CatalogError> {
         let placeholder = is_placeholder_key(key);
+        let mut state = crate::export_evidence_lock::lock(&self.registry.state)?;
+        let RegistryState { pending, coverage } = &mut *state;
+        if let Some(row) = pending.get_mut(&(domain, key)) {
+            let owner = self
+                .owner
+                .ok_or(ExportAccountingError::UnscopedCatalogText)?;
+            let lookup = Lookup::from_projection(&row.translations, !placeholder);
+            lookup.recount(self.texts);
+            coverage.record(owner, lookup);
+            row.payloads.push(payload);
+            row.selectors.push(selector);
+            return Ok(());
+        }
+        drop(state);
         if placeholder {
             self.texts.note_placeholder();
         }
@@ -287,11 +301,7 @@ impl<'context, 'source> CatalogProjection<'context, 'source> {
         let owner = self
             .owner
             .ok_or(ExportAccountingError::UnscopedCatalogText)?;
-        let lookup = if looked_up {
-            Lookup::Projected(&translations)
-        } else {
-            Lookup::Placeholder
-        };
+        let lookup = Lookup::from_projection(&translations, looked_up);
         state.coverage.record(owner, lookup);
         let row = state
             .pending
@@ -386,3 +396,7 @@ fn identifier(domain: Domain, key: &str) -> String {
     };
     format!("{prefix}:{}:{key}", key.len())
 }
+
+#[cfg(test)]
+#[path = "catalog_projection_tests.rs"]
+mod tests;

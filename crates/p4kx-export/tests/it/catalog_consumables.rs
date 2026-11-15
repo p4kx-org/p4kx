@@ -198,6 +198,19 @@ fn check_localization(built: &BuiltCatalog) -> TestResult {
         english.resolved, 3,
         "two subtypes share one name key and one has a resolved effect description"
     );
+    let legacy = built
+        .summary()
+        .text(Language::English)
+        .ok_or("missing English legacy summary")?;
+    assert_eq!(
+        (legacy.resolved, legacy.unresolved, legacy.placeholder),
+        (
+            english.resolved,
+            english.missing_key + english.empty_source + english.empty_display,
+            english.placeholder,
+        ),
+        "both summaries count each shared lookup occurrence"
+    );
     Ok(())
 }
 

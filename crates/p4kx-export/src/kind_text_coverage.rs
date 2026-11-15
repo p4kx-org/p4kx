@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use p4kx_extraction::Language;
 
 use crate::Kind;
-use crate::texts::{CATALOG_LANGUAGES, TextProjection};
+use crate::texts::{CATALOG_LANGUAGES, TextProjection, Texts};
 
 pub(super) type Translations<'source> = BTreeMap<Language, Option<TextProjection<'source>>>;
 
@@ -73,7 +73,27 @@ pub(super) enum Lookup<'lookup, 'source> {
     Projected(&'lookup Translations<'source>),
 }
 
-impl Lookup<'_, '_> {
+impl<'lookup, 'source> Lookup<'lookup, 'source> {
+    pub(super) const fn from_projection(
+        translations: &'lookup Translations<'source>,
+        looked_up: bool,
+    ) -> Self {
+        if looked_up {
+            Self::Projected(translations)
+        } else {
+            Self::Placeholder
+        }
+    }
+
+    pub(super) fn recount(self, texts: &Texts<'_>) {
+        match self {
+            Self::Placeholder => texts.note_placeholder(),
+            Self::Projected(_) => {
+                texts.note_languages(|language| self.outcome(language) == Outcome::Resolved);
+            }
+        }
+    }
+
     fn outcome(self, language: Language) -> Outcome {
         match self {
             Self::Placeholder => Outcome::Placeholder,
