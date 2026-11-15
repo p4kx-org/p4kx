@@ -12,6 +12,10 @@ use serde::{Deserialize, Serialize};
 use crate::PackageResult;
 use crate::material_emission_origins::{self, EmissionEvidence};
 
+#[cfg(test)]
+#[path = "package_material_emission_tests.rs"]
+mod tests;
+
 /// Original material emission controls and the static preview selected from them.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[non_exhaustive]
