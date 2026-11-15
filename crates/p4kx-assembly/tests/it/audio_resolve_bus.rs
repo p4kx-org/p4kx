@@ -31,7 +31,11 @@ fn malformed_bus_targets_keep_the_unsupported_playback_reason()
     let archive = Archive::open_with_key(path, Some(p4kx_testkit::test_key()))?;
     let audio = ArchiveAudio::new(&archive);
     let report = audio.resolve_trigger(TRIGGER).ok_or("trigger resolves")?;
-    assert!(report.variants().is_empty());
+    assert_eq!(
+        report.variants().len(),
+        0,
+        "bus targets produce no sound variants"
+    );
     let [primary, auxiliary] = report.breaks() else {
         return Err("both bus targets retain their playback disposition".into());
     };
