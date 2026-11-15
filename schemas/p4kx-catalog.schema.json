@@ -4521,6 +4521,25 @@
       ],
       "type": "object"
     },
+    "CapacityStatus": {
+      "enum": [
+        "available",
+        "ownerComponentsUnreadable",
+        "ambiguousComponents",
+        "missingStorageComponent",
+        "missingContainerReference",
+        "unresolvedContainerReference",
+        "ambiguousContainerReference",
+        "containerOutsideSelection",
+        "containerUnavailable",
+        "missingCapacity",
+        "unreadableCapacity",
+        "unsupportedCapacity",
+        "invalidCapacity"
+      ],
+      "type": "string",
+      "x-p4kx-vocabularyClass": "control"
+    },
     "CargoBoxSizesOfResourceFloat32": {
       "description": "A box-size Class with sourced values keyed by the exact decimal SCU size.",
       "properties": {
@@ -4592,6 +4611,9 @@
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
         },
+        "capacity": {
+          "$ref": "#/$defs/CargoGridCapacity"
+        },
         "crateGenPercentageOnDestroy": {
           "$ref": "#/$defs/SourcedValueOfResourceFloat32"
         },
@@ -4619,6 +4641,7 @@
       },
       "required": [
         "additionalFields",
+        "capacity",
         "crateGenPercentageOnDestroy",
         "crateMaxOnDestroy",
         "damageConfiguration",
@@ -4627,6 +4650,43 @@
         "minVolatilePowerToExplode",
         "miningOnly",
         "transformDependant"
+      ],
+      "type": "object"
+    },
+    "CargoGridCapacity": {
+      "properties": {
+        "containerRecordIndex": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourcedValueOfuint32"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "scu": {
+          "$ref": "#/$defs/SourcedValueOfdouble"
+        },
+        "status": {
+          "$ref": "#/$defs/CapacityStatus"
+        },
+        "storageComponentOrdinal": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourcedValueOfuint32"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "containerRecordIndex",
+        "scu",
+        "status",
+        "storageComponentOrdinal"
       ],
       "type": "object"
     },

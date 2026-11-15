@@ -162,7 +162,9 @@ pub use entity_bone::{
     BONE_THRUSTER, bone_thruster_definition, bone_thruster_entries, bone_thruster_housing,
 };
 pub use entity_cargo::{TestCapacity, closed_container_record, open_container_record};
-pub use entity_cargo_grid_sample::cargo_grid_facility_database;
+pub use entity_cargo_grid_sample::{
+    TestCargoGridLayout, cargo_grid_facility_database, cargo_grid_facility_database_for,
+};
 pub use entity_clothing::{TestClothingCondition, TestZoneChunk, clothing_component};
 pub use entity_creature::{
     CREATURE, CREATURE_ANIMATED, CREATURE_ANIMATION_DATABASE_LOST, CREATURE_ANIMATION_NESTED_LOST,

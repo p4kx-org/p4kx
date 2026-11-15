@@ -8,6 +8,7 @@ use serde::Serialize;
 use super::super::authored_fields::Observed;
 use super::super::interaction_source::RecordLink;
 use super::super::inventory_dimensions::InventoryVector3;
+use super::CargoGridCapacity;
 use crate::CatalogError;
 use crate::catalog_record_reference::CatalogRecordReference;
 use crate::resource_float::ResourceFloat32;
@@ -23,6 +24,9 @@ const DAMAGE: &str = "CommodityDamageConfiguration";
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(super) struct CargoGrid<'source> {
+    #[serde(serialize_with = "serialize_capacity")]
+    #[schemars(with = "CargoGridCapacity")]
+    pub(super) capacity: Option<CargoGridCapacity>,
     dimensions: SourcedValue<InventoryVector3<'source>>,
     crate_gen_percentage_on_destroy: SourcedValue<ResourceFloat32>,
     crate_max_on_destroy: SourcedValue<i32>,
@@ -66,6 +70,7 @@ impl<'source> CargoGrid<'source> {
             ("damageConfiguration", damage_configuration.state()),
         ])?;
         Ok(Self {
+            capacity: None,
             dimensions,
             crate_gen_percentage_on_destroy,
             crate_max_on_destroy,
@@ -77,4 +82,18 @@ impl<'source> CargoGrid<'source> {
             additional_fields,
         })
     }
+}
+
+#[expect(
+    clippy::ref_option,
+    reason = "Serde passes the unfinished field by reference to the custom serializer"
+)]
+fn serialize_capacity<S: serde::Serializer>(
+    capacity: &Option<CargoGridCapacity>,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    capacity
+        .as_ref()
+        .ok_or_else(|| <S::Error as serde::ser::Error>::custom("unreconciled cargo grid capacity"))?
+        .serialize(serializer)
 }

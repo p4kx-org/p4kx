@@ -24,6 +24,12 @@ pub(super) struct InventoryEntityRows<'source> {
 }
 
 impl<'source> InventoryEntityRows<'source> {
+    pub(super) fn item_storage(&self) -> impl Iterator<Item = &InventoryOwnerStorage<'source>> {
+        self.storage
+            .iter()
+            .filter(|row| row.item_container_params().is_some())
+    }
+
     pub(super) fn storage_owners(&self) -> impl Iterator<Item = &ComponentOwner> {
         self.storage.iter().map(|row| &row.owner)
     }

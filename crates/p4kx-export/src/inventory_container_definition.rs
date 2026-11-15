@@ -46,6 +46,16 @@ pub(crate) struct PreparedInventoryContainer<'source> {
     pub(crate) numbers: Vec<CapturedNumber>,
 }
 
+impl<'source> PreparedInventoryContainer<'source> {
+    pub(super) const fn inventory_type(&self) -> &SourcedValue<InventoryContainerType<'source>> {
+        &self.definition.inventory_type
+    }
+
+    pub(super) const fn interior_dimensions(&self) -> &SourcedValue<InventoryVector3<'source>> {
+        &self.definition.interior_dimensions
+    }
+}
+
 impl<'source> InventoryContainerDefinition<'source> {
     fn read(
         header: CanonicalRecordHeader<'source>,

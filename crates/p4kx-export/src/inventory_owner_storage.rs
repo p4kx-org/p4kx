@@ -60,6 +60,17 @@ struct ItemStorage<'source> {
 }
 
 impl<'source> InventoryOwnerStorage<'source> {
+    pub(super) const fn item_container_params(&self) -> Option<&ContainerLink<'source>> {
+        match &self.fields {
+            StorageFields::ItemStorage(storage) => Some(&storage.container_params),
+            StorageFields::VehicleStorage { .. } => None,
+        }
+    }
+
+    pub(super) const fn source_type(&self) -> &SourcedValue<&'source str> {
+        &self.source_type
+    }
+
     pub(super) fn item(
         owner: ComponentOwner,
         source: Observed<'_, '_, '_, 'source>,

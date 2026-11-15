@@ -67,6 +67,10 @@ impl ComponentOwner {
         &self.component_ordinal
     }
 
+    pub(super) const fn record_index(&self) -> &SourcedValue<u32> {
+        &self.owner_record_index
+    }
+
     pub(super) const fn key(&self) -> (Option<u32>, Option<u32>) {
         (
             self.owner_record_index.value().copied(),

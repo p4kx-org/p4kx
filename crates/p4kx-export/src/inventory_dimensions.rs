@@ -68,6 +68,10 @@ pub(super) struct InventoryVector3<'source> {
 }
 
 impl<'source> InventoryVector3<'source> {
+    pub(super) const fn coordinates(&self) -> [&SourcedValue<ResourceFloat32>; 3] {
+        [&self.axes.x, &self.axes.y, &self.z]
+    }
+
     pub(super) fn class_field(
         source: Observed<'_, '_, '_, 'source>,
         field: &str,

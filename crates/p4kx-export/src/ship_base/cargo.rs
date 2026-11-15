@@ -7,12 +7,11 @@ use p4kx_assembly::{EntityNode, LoadoutEntry};
 use p4kx_extraction::{DataForge, Guid, RecordTree, StructValue, TreeBuilder, Value};
 
 use super::model::{Cargo, CargoGrid, Source, SourceKind};
-use crate::catalog_v3::cargo_source::{self, CargoUnit};
+use crate::catalog_v3::cargo_source::{self, CargoUnit, round_capacity};
 use crate::record_fields::{number, number_value, structure};
 
 const GRID_TYPE: &str = "CargoGrid";
 const TEMPLATE_SUFFIX: &str = "_template";
-const CUBIC_METRES_PER_SCU: f64 = 1.953_125;
 const CELL_METRES_NUMERATOR: u32 = 5;
 const CELL_METRES_DENOMINATOR: f64 = 4.0;
 const CELL_TOLERANCE: f64 = 1e-4;
@@ -28,7 +27,7 @@ struct Container {
 
 #[derive(Debug, Clone)]
 enum Shape {
-    Open { dimensions: [f64; 3] },
+    Open { dimensions: [f64; 3], scu: f64 },
     Closed { scu: f64, unit: CargoUnit },
     Unknown(String),
 }
@@ -67,7 +66,7 @@ impl<'f> CargoReader<'f> {
         let known = grids.is_empty() || grids.len() > with_issue;
         let scu = grids.iter().filter_map(|grid| grid.scu).sum::<f64>();
         Cargo {
-            scu: known.then(|| round(scu)),
+            scu: known.then(|| round_capacity(scu)),
             cells: known.then(|| total_cells(&grids)).flatten(),
             grids_with_issue: with_issue,
             grids,
@@ -136,16 +135,16 @@ fn fill(grid: &mut CargoGrid, container: &Container) {
         field: path,
     };
     match &container.shape {
-        Shape::Open { dimensions } => {
+        Shape::Open { dimensions, scu } => {
             grid.shape = Some("open");
             grid.dimensions = Some(*dimensions);
-            grid.scu = Some(round(volume(*dimensions) / CUBIC_METRES_PER_SCU));
+            grid.scu = Some(round_capacity(*scu));
             grid.cells = cells(*dimensions);
             grid.source = Some(field("interiorDimensions".to_owned()));
         }
         Shape::Closed { scu, unit } => {
             grid.shape = Some("closed");
-            grid.scu = Some(round(*scu));
+            grid.scu = Some(round_capacity(*scu));
             grid.source = Some(field(format!(
                 "inventoryType/capacity/{}/{}",
                 unit.source_type(),
@@ -177,16 +176,14 @@ fn read_container(tree: &RecordTree<'_>) -> Container {
 }
 
 fn open(dimensions: [f64; 3]) -> Shape {
-    if dimensions
-        .iter()
-        .all(|side| side.is_finite() && *side > 0.0)
-    {
-        Shape::Open { dimensions }
-    } else {
-        Shape::Unknown(format!(
-            "the interior dimensions {dimensions:?} must be finite, positive lengths"
-        ))
-    }
+    cargo_source::open_capacity(dimensions).map_or_else(
+        || {
+            Shape::Unknown(format!(
+                "the interior dimensions {dimensions:?} must be finite, positive lengths"
+            ))
+        },
+        |scu| Shape::Open { dimensions, scu },
+    )
 }
 
 fn closed(root: &StructValue<'_>) -> Shape {
@@ -196,28 +193,19 @@ fn closed(root: &StructValue<'_>) -> Shape {
     };
     let name = unit.source_type();
     let field = unit.amount_field();
-    let divisor = match unit {
-        CargoUnit::Standard => 1.0,
-        CargoUnit::Centi => 100.0,
-        CargoUnit::Micro => 1_000_000.0,
-    };
     let amount = match capacity.and_then(|capacity| capacity.field(field)) {
         Some(Value::Int32(value)) => Some(f64::from(*value)),
         Some(Value::UInt32(value)) => Some(f64::from(*value)),
         Some(value) => number_value(value).map(f64::from),
         None => None,
     };
-    match amount.map(|value| value / divisor) {
-        Some(scu) if scu.is_finite() && scu >= 0.0 => Shape::Closed { scu, unit },
+    match amount.map(|value| unit.normalize(value)) {
+        Some(scu) if cargo_source::is_valid_closed_capacity(scu) => Shape::Closed { scu, unit },
         Some(scu) => Shape::Unknown(format!(
             "the capacity {scu} SCU of {name} must be finite and nonnegative"
         )),
         None => Shape::Unknown(format!("the capacity {name} states no {field}")),
     }
-}
-
-fn volume([x, y, z]: [f64; 3]) -> f64 {
-    x * y * z
 }
 
 fn cells(dimensions: [f64; 3]) -> Option<u64> {
@@ -261,16 +249,7 @@ fn total_cells(grids: &[CargoGrid]) -> Option<u64> {
     })
 }
 
-fn round(value: f64) -> f64 {
-    let rounded = (value * 1e4).round() / 1e4;
-    if rounded.abs() < f64::EPSILON {
-        0.0
-    } else {
-        rounded
-    }
-}
-
 /// Rounds a sum to four decimals.
 pub(super) fn rounded(value: f64) -> f64 {
-    round(value)
+    round_capacity(value)
 }

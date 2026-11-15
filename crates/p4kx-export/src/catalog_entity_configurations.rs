@@ -3,12 +3,12 @@
 
 use std::cell::RefCell;
 
-use p4kx_extraction::{CancelToken, DataForge, RecordTree, StructValue, Value};
+use p4kx_extraction::{CancelToken, DataForge, RecordTree, SourceUses, StructValue, Value};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::authored_fields::Observed;
-use super::catalog_facility::{self, Facility, FacilityKind};
+use super::catalog_facility::{self, Facility, FacilityKind, OwnerComponents};
 use super::catalog_fuel_configurations::{
     FuelConfigurationKind, FuelConfigurationRows, FuelConfigurationTables,
 };
@@ -17,6 +17,7 @@ use super::catalog_item_alignment::{ItemAlignmentKind, ItemAlignmentRows, ItemAl
 use super::catalog_resource_component::{self, ResourceComponent};
 use super::catalog_resource_connection::{self, ConnectionKind, ResourceConnection};
 use super::catalog_vehicle_armor::{self, VehicleArmor};
+use super::inventory_container_definition::PreparedInventoryContainer;
 use super::inventory_entity_configurations::{InventoryEntityRows, InventoryEntityTables};
 use super::inventory_item_occupancy::InventoryItemOccupancy;
 use super::item_alignment_options::AlignmentOptions;
@@ -27,7 +28,6 @@ use super::resource_topology_declarations::{
 };
 use super::room_associations::{self, RoomAssociations};
 use super::{inventory_owner_bounds, inventory_owner_storage};
-use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_number_capture::CapturedNumber;
 use crate::catalog_projection::CatalogProjection;
@@ -37,6 +37,7 @@ use crate::record_observation::RecordObservation;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 use crate::template_field_capture::TemplateFieldCapture;
+use crate::{CatalogError, CatalogOptions};
 
 #[derive(Default)]
 pub(crate) struct EntityConfigurationRows<'source> {
@@ -46,6 +47,7 @@ pub(crate) struct EntityConfigurationRows<'source> {
     inventory: InventoryEntityRows<'source>,
     interactions: Vec<InteractionConfiguration<'source>>,
     facilities: Vec<Facility<'source>>,
+    cargo_owners: Vec<OwnerComponents>,
     resources: Vec<ResourceComponent<'source>>,
     connections: Vec<ResourceConnection<'source>>,
     vehicle_armor: Vec<VehicleArmor<'source>>,
@@ -131,10 +133,29 @@ impl<'source> EntityConfigurationRows<'source> {
         self.inventory.extend(other.inventory);
         self.interactions.extend(other.interactions);
         self.facilities.extend(other.facilities);
+        self.cargo_owners.extend(other.cargo_owners);
         self.resources.extend(other.resources);
         self.connections.extend(other.connections);
         self.vehicle_armor.extend(other.vehicle_armor);
         self.numbers.extend(other.numbers);
+    }
+
+    pub(super) fn resolve_cargo_capacities(
+        &mut self,
+        forge: &DataForge<'_>,
+        containers: &[PreparedInventoryContainer<'source>],
+        sources: &SourceUses,
+        options: &CatalogOptions<'_>,
+    ) -> Result<(), CatalogError> {
+        catalog_facility::project_cargo_capacity(
+            &mut self.facilities,
+            &self.cargo_owners,
+            self.inventory.item_storage(),
+            containers,
+            forge,
+            sources,
+            options,
+        )
     }
 
     pub(crate) fn into_tables(
@@ -247,7 +268,7 @@ pub(crate) fn read<'source>(
     let input = projection.original();
     let mut rows = EntityConfigurationRows::default();
     let mut notes = Vec::new();
-    let Some(Value::Array(components)) = tree.field("Components") else {
+    let Some(authored_components @ Value::Array(components)) = tree.field("Components") else {
         return Ok((rows, notes));
     };
     let mut components = components
@@ -283,6 +304,13 @@ pub(crate) fn read<'source>(
             projection,
             &mut notes,
         )?;
+    }
+    if rows.facilities.iter().any(Facility::cargo_grid) {
+        rows.cargo_owners.push(OwnerComponents::read(
+            tree.record_index(),
+            &originals,
+            authored_components,
+        )?);
     }
     rows.numbers = numbers.into_inner();
     Ok((rows, notes))

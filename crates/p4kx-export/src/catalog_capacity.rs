@@ -50,7 +50,29 @@ pub(super) enum ResourceCapacity<'source> {
     },
 }
 
+#[derive(Clone, Copy)]
+pub(super) enum CargoAmount<'amount> {
+    Standard(&'amount SourcedValue<ResourceFloat32>),
+    Integer(CargoUnit, &'amount SourcedValue<i32>),
+}
+
 impl<'source> ResourceCapacity<'source> {
+    pub(super) const fn cargo_amount(&self) -> Option<CargoAmount<'_>> {
+        match self {
+            Self::StandardCargoUnit {
+                standard_cargo_units,
+                ..
+            } => Some(CargoAmount::Standard(standard_cargo_units)),
+            Self::CentiCargoUnit { centi_scu, .. } => {
+                Some(CargoAmount::Integer(CargoUnit::Centi, centi_scu))
+            }
+            Self::MicroCargoUnit { micro_scu, .. } => {
+                Some(CargoAmount::Integer(CargoUnit::Micro, micro_scu))
+            }
+            Self::Base { .. } | Self::UnknownUnit { .. } => None,
+        }
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

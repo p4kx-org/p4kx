@@ -139,7 +139,7 @@ fn assemble<R>(
         &input,
         &mut placements,
         &independent.tables.flight,
-        options.cancel,
+        options,
     )?;
     let health = parts::require_publishable(&mut collected, &kinds, &input, run)?;
     let key_use = ArchiveKeyUse::of(archive);

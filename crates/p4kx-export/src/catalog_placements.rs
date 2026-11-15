@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{Archive, CancelToken, DataForge};
+use p4kx_extraction::{Archive, DataForge};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -13,7 +13,6 @@ use super::facility_loadout_placements::{
 use super::resource_network_placements::ResourceNetworkPlacementTables;
 use super::resource_topology_declarations::ResourceTopologyTables;
 use super::starmap_placement::{self, StarmapPlacement};
-use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_table::CatalogTable;
 use crate::collected::Collected;
@@ -22,6 +21,7 @@ use crate::starmap_containers::Placements;
 use crate::starmap_containers::instance::ContainerInstance;
 use crate::starmap_containers::jump_endpoint::JumpEndpoint;
 use crate::starmap_containers::location_instance::LocationInstance;
+use crate::{CatalogError, CatalogOptions};
 
 /// Contextual placements and relationships keyed by their physical definitions.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -47,9 +47,16 @@ impl<'source> Collected<'source> {
         input: &OriginalCatalogInput<'_, '_>,
         placements: &mut Placements,
         flight: &FlightConfigurationTables<'_>,
-        cancel: Option<&CancelToken>,
+        options: &CatalogOptions<'_>,
     ) -> Result<(CatalogPlacements, ResourceTopologyTables<'source>), CatalogError> {
         let origins = input.origins();
+        self.entity_configurations.resolve_cargo_capacities(
+            forge,
+            &self.inventory_containers,
+            &origins.uses,
+            options,
+        )?;
+        let cancel = options.cancel;
         let LoadoutPlacements {
             facilities: facility_instances,
             rooms: facility_interior_coverage,

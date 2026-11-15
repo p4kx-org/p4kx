@@ -14,6 +14,9 @@ use crate::catalog_projection::CatalogProjection;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 
+#[path = "facility_cargo_capacity.rs"]
+mod capacity;
+pub(super) use capacity::{CargoGridCapacity, OwnerComponents, project as project_cargo_capacity};
 #[path = "facility_cargo_grid.rs"]
 mod cargo_grid;
 #[path = "facility_logout.rs"]
@@ -74,6 +77,25 @@ enum FacilityFields<'source> {
 }
 
 impl<'source> Facility<'source> {
+    pub(super) const fn cargo_grid(&self) -> bool {
+        matches!(self.fields, FacilityFields::CargoGrid(_))
+    }
+
+    pub(super) const fn source_type(&self) -> &SourcedValue<&'source str> {
+        &self.source_type
+    }
+
+    pub(super) fn set_cargo_capacity(
+        &mut self,
+        capacity: CargoGridCapacity,
+    ) -> Result<(), CatalogError> {
+        let FacilityFields::CargoGrid(grid) = &mut self.fields else {
+            return Err(crate::ExportAccountingError::ConflictingSourceDatum.into());
+        };
+        grid.capacity = Some(capacity);
+        Ok(())
+    }
+
     pub(super) fn read(
         kind: FacilityKind,
         owner: ComponentOwner,

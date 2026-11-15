@@ -126,7 +126,9 @@ finite and nonnegative. The ship's `scu` sums the readable grid capacities and r
 result to four decimals. `gridsWithIssue` counts the unreadable capacities, making the
 reported SCU a lower bound when this count is positive. The open-grid and ship `cells`
 counts are `null` if the count exceeds the `u64` range. Readable SCU stays available
-independently of the cell count.
+independently of the cell count. The sum includes readable grids flagged `miningOnly` or
+`invisible`. The v3 catalog exposes their capacity and both flags per grid.
+See [Cargo grid facilities](catalog-ship-facilities.md#cargo-grid-facilities).
 On LIVE, 76 grids carry an `issue`, in two kinds that are facts of the game data, not of the
 reading: the Javelin's and the Hornet F7C's grids refer to `InventoryContainer` Records that do not
 exist (dangling References, so no capacity), and `MISC_Hull_A_CargoPlate` is a `CargoGrid` item

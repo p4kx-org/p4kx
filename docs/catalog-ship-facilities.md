@@ -60,8 +60,39 @@ The `cargoGrid` kind carries the physical `SCItemCargoGridParams` component.
 Reference with target identity and resolution status. The component's
 `additionalFields` arena retains other authored members.
 
-Cargo capacity in ShipBase comes from the selected `InventoryContainer` Record.
-[Ship base data](ship-base-data.md) describes the capacity and cell projections.
+`capacity` links the grid to the sole item-storage component on the same physical Entity.
+`storageComponentOrdinal` gives that component's original slot, and
+`containerRecordIndex` addresses its unique `InventoryContainer` Record in
+`definitions.inventoryContainers`. Both are sourced values or `null` when the identity
+cannot be established. For `status: available`, `scu.value` is capacity in standard cargo
+units, rounded to four decimals. Open containers use the product of their positive finite
+`interiorDimensions` in metres divided by 1.953125. Closed containers use the stored
+nonnegative finite amount in standard, hundredth or millionth SCU. The grid's own
+`dimensions` are a separate authored field. The derived value's source uses identify the
+component and Reference selectors, the container type and the actual dimension or unit
+operands. [ADR-0395](adr/0395-cargo-grid-capacity-uses-physical-inventory-bindings.md)
+
+The other status values identify unreadable or ambiguous owner components, missing storage,
+a missing, unresolved or ambiguous container Reference, a container outside the selected
+Records or otherwise unavailable, or missing, unreadable, unsupported or invalid capacity.
+The sourced `scu` follows the corresponding absence or failure state.
+
+For a Loadout, join each occupied port's facility configuration to its Cargo Grid and count
+each physical port occurrence. A readable `miningOnly.value` of `false` identifies capacity
+to include in a commodity total. A value of `true` identifies mining-only capacity. Report
+the capacity or classification as unknown when its corresponding value is unavailable.
+`invisible` remains a separate authored flag. A complete commodity total requires a classification
+and readable capacity for each eligible grid. A Loadout attachment without a matching facility
+remains unclassified. ShipBase and the ship catalog's `cargoScu` retain readable capacity from
+both flag values. [Ship base data](ship-base-data.md#cargo)
+
+An occupied Loadout attachment with a `ResourceContainer` component supplies its own
+capacity and resource restrictions in `configurations.resourceContainers.rows`. This is
+the authored storage used by the mining pods inspected in the installed Builds. Join by
+`loadouts[].ports[].sourceConstraints.attachedItem.targetRecordIndex.value` and
+`ownerRecordIndex.value` to follow each occupied port. Such a pod is separate from the
+inventory cargo sum. An empty Cargo Grid port contributes no capacity.
+[Resource container and Loadout contract](catalog-fuel-capacity.md#loadout-instances)
 
 ## Logout and outfit storage facilities
 
@@ -180,3 +211,24 @@ Entity slots, transforms and component ordinals. Nested facility evidence is
 checked when the bounded sample contains it. A publication refusal caused only
 by malformed ShopInventory inputs is reported separately. In that case the
 tests verify placement rows in the diagnostic export.
+
+## Installed cargo capacity checks
+
+Set `P4KX_DATA_P4K` to the installed Archive and use the configured Archive key. Run the
+source census for the exact Cargo Grid component and its descendants. It reports declaration
+and instance counts. The strict flagged-grid witness accepts `P4KX_CATALOG_CARGO_GRID_FILTER`
+and exact suffixless Item paths in `P4KX_CATALOG_CARGO_MINING_ITEM` and
+`P4KX_CATALOG_CARGO_CONTROL_ITEM`. The filter must admit both Items and their inventory
+container Records when the Build contains both flag variants.
+
+For the separate mining-pod source, set `P4KX_CATALOG_MINING_SHIP` and
+`P4KX_CATALOG_MINING_POD` to the original suffixless Record paths.
+`P4KX_CATALOG_MINING_FILTER` can select both in one scoped catalog.
+`P4KX_CATALOG_MINING_CONTROL_SHIP` selects an ordinary Cargo Grid ship to check its
+legacy capacity against original container operands. The test streams each scoped
+catalog into the verifier.
+
+```text
+cargo test --release --locked -p p4kx-export --test real_archive -- --ignored --exact --nocapture real_archive_cargo_grid_capacity::installed_grid_flag_source_census
+cargo test --release --locked -p p4kx-export --test real_archive -- --ignored --exact --nocapture real_archive_mining_storage::installed_mining_storage_stays_outside_ship_cargo_scu
+```
