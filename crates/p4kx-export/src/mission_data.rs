@@ -6,7 +6,7 @@ use p4kx_extraction::{
 };
 
 use crate::CatalogError;
-use crate::catalog_projection::CatalogProjection;
+use crate::catalog_projection::{CatalogProjection, ProtectedKey};
 use crate::catalog_read::original::OriginalFlowFields;
 
 use crate::contract_mission_data::{
@@ -36,13 +36,20 @@ pub(crate) fn mission_type<'source>(
         .original()
         .record_scope(admission.record(), tree)?;
     let fields = OriginalFlowFields::read(&scope, cancel)?;
-    let type_name = projection.protected_key_field(&fields, None, "LocalisedTypeName")?;
+    let type_name = projection.finish_protected_key(mission_type_key(&fields)?)?;
     Ok(MissionType {
         guid: CatalogGuid(tree.guid()),
         class_name: class_name(tree),
         record_path: tree.record_path(),
         type_name,
     })
+}
+
+/// Captures the protected source field shared by mission types and contract rows.
+pub(crate) fn mission_type_key<'source>(
+    fields: &OriginalFlowFields<'_, '_, 'source>,
+) -> Result<ProtectedKey<'source>, CatalogError> {
+    ProtectedKey::read(fields, None, "LocalisedTypeName")
 }
 
 /// Returns the mission locality the Record tree `tree` describes.

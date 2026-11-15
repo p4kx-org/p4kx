@@ -10,6 +10,7 @@ use rayon::prelude::*;
 
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_origins::CatalogOrigins;
+use crate::catalog_projection::ProtectedKey;
 use crate::catalog_read::original::RewardRead;
 use crate::contract_hauling::HaulingRequirement;
 use crate::export_ledger::ExportLedger;
@@ -54,12 +55,6 @@ pub(crate) struct Template<'f> {
     pub(crate) spawns: Option<Level>,
 }
 
-/// A `MissionType` Record: the key of its localised name.
-#[derive(Debug)]
-pub(crate) struct MissionTypeName<'f> {
-    pub(crate) name_key: Option<&'f str>,
-}
-
 enum RewardDependency {
     Original(RewardRead),
     UnreadablePath(RewardRead),
@@ -83,7 +78,7 @@ enum Piece<'f> {
     Template(Guid, Template<'f>, SpawnPools<'f>),
     Failed(CatalogReadFailure<'f>),
     FailedTemplate(CatalogReadFailure<'f>, FailedTemplate),
-    Type(Guid, MissionTypeName<'f>),
+    Type(Guid, ProtectedKey<'f>),
     Organization(Guid, Option<OrganizationTexts<'f>>),
     Item((Guid, u32), MissionItemTexts<'f>),
     Reward(Guid, u32, RewardDependency),
@@ -101,7 +96,7 @@ pub(crate) struct MissionIndex<'f> {
     templates: HashMap<Guid, Template<'f>>,
     failed_templates: HashMap<Guid, Vec<FailedTemplate>>,
     template_source: Option<TemplateReadSource>,
-    types: HashMap<Guid, MissionTypeName<'f>>,
+    types: HashMap<Guid, ProtectedKey<'f>>,
     organizations: HashMap<Guid, OrganizationTexts<'f>>,
     items: HashMap<(Guid, u32), MissionItemTexts<'f>>,
     rewards: BTreeMap<(Guid, u32), RewardDependency>,
@@ -337,7 +332,7 @@ impl<'f> MissionIndex<'f> {
             .check(origins)
     }
 
-    pub(crate) fn mission_type(&self, guid: Guid) -> Option<&MissionTypeName<'f>> {
+    pub(crate) fn mission_type_name(&self, guid: Guid) -> Option<&ProtectedKey<'f>> {
         self.types.get(&guid)
     }
 

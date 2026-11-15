@@ -11563,7 +11563,14 @@
           "description": "The `minStanding` of the contract: the lowest standing that is offered it, the `guid` of an\nentry of `reputationStandings`; `null` when the contract states none. A sub contract\nshares the contract's value."
         },
         "missionType": {
-          "$ref": "#/$defs/LocalisedText",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourcedValueOfGameTextRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
           "description": "The localised name of the mission type.",
           "x-gameText": true
         },

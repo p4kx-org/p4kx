@@ -66,7 +66,7 @@ pub(crate) struct ContractBase<'a> {
     pub(crate) mission_type_guid: Option<CatalogGuid>,
     /// The localised name of the mission type.
     #[schemars(extend("x-gameText" = true))]
-    pub(crate) mission_type: LocalisedText<'a>,
+    pub(crate) mission_type: Option<SourcedValue<GameTextRef>>,
     /// The `Contractor` string parameter of the first level that states one (sub contract,
     /// contract, handler): the text the game shows as the giver of the contract, e.g. the
     /// agency, when the contract has no faction reputation.

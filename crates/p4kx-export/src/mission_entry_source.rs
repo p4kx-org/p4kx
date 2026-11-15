@@ -226,11 +226,10 @@ impl<'t, 'f> MissionEntrySource<'t, 'f> {
             not_for_release: boolean(Some(self.contract), "notForRelease"),
             work_in_progress: boolean(Some(self.contract), "workInProgress"),
             mission_type_guid: mission_type.map(CatalogGuid),
-            mission_type: texts.localised(
-                mission_type
-                    .and_then(|guid| index.mission_type(guid))
-                    .and_then(|kind| kind.name_key),
-            ),
+            mission_type: mission_type
+                .and_then(|guid| index.mission_type_name(guid))
+                .map(|key| context.projection.finish_protected_key(key.clone()))
+                .transpose()?,
             contractor: texts.localised(levels.iter().find_map(|level| level.contractor)),
             faction,
             pickup_places: pickup,

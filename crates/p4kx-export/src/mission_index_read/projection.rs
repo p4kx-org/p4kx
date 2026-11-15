@@ -8,6 +8,7 @@ use crate::catalog_read::original::OriginalFlowFields;
 use crate::catalog_v3::tag_catalog::CapturedTags;
 use crate::mission_text_inputs::{BrokerTexts, MissionItemTexts, OrganizationTexts, TemplateTexts};
 
+use crate::mission_data;
 use crate::mission_hauling;
 use crate::mission_layers;
 use crate::record_fields;
@@ -15,7 +16,7 @@ use crate::record_read::ReadError;
 use crate::spawn_layers::Level;
 use crate::spawn_pools::SpawnPools;
 
-use super::super::{Broker, MissionTypeName, Piece, RewardDependency, Template, TemplateFacts};
+use super::super::{Broker, Piece, RewardDependency, Template, TemplateFacts};
 use super::selection::Action;
 
 pub(super) const FACTION_DISPLAY_NAME: &str = "displayName";
@@ -44,12 +45,11 @@ pub(super) fn project<'f>(
                 pools,
             ))
         }
-        Action::Type => Some(Piece::Type(
-            guid,
-            MissionTypeName {
-                name_key: mission_layers::key(root, "LocalisedTypeName"),
-            },
-        )),
+        Action::Type => texts
+            .map(|input| {
+                mission_data::mission_type_key(input.fields).map(|key| Piece::Type(guid, key))
+            })
+            .transpose()?,
         Action::Organization => Some(Piece::Organization(
             guid,
             texts

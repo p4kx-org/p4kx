@@ -1140,7 +1140,7 @@ that the rule on equal `guid` and `subContractGuid` above drops.
 | `templateGuid` | The `ContractTemplate` Record the contract names, an entry of `contractTemplates` |
 | `brokerEntryGuid` | The `MissionBrokerEntry` Record the contract names in `missionBrokerEntry`, an entry of `missionBrokerEntries`; `null` when it names none (on LIVE the 419 contracts that name one all resolve) |
 | `notForRelease`, `workInProgress` | The flags as stored, `null` when absent; the catalog does not filter on them |
-| `missionTypeGuid`, `missionType` | The `MissionType` Record and its localised name (game text) |
+| `missionTypeGuid`, `missionType` | The selected `MissionType` Record GUID and its sourced `GameTextRef` into `texts.gameTexts`. The reference keeps the exact original type name even when the definition is outside the Filter. It is `null` if the selected Record is unavailable. |
 | `contractor` | The `Contractor` string parameter (game text) |
 | `pickupPlaces` | Every eligible resolved starmap object the contract is offered at, each `starmapObjectGuid`, `objectType` and the canonical name in `place` |
 | `offeredAt` | Every place the contract is offered at, uncapped (see "Offered at"): `localityGuids` (entries of `missionLocalities`) and `locations` (starmap objects, each `starmapObjectGuid`, `objectType`, `place`), and `brokerFallback` (`true` when `locations` is the broker entry's location because no place is stated) |

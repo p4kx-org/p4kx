@@ -20,6 +20,8 @@ mod location_vocabulary;
 mod mission_boards;
 #[path = "catalog_mission_scenario_definitions.rs"]
 mod mission_scenario_definitions;
+#[path = "catalog_contract_mission_types.rs"]
+mod mission_types;
 #[path = "catalog_npc_spawn_definitions.rs"]
 mod npc_spawn_definitions;
 
@@ -166,7 +168,11 @@ fn a_template_reference_that_resolves_to_nothing_leaves_the_template_data_out() 
         "the override still applies"
     );
     assert_eq!(dangling["missionTypeGuid"], Value::Null);
-    assert_eq!(dangling["missionType"]["en"], Value::Null);
+    assert_eq!(
+        dangling["missionType"],
+        Value::Null,
+        "there is no resolved original type"
+    );
     Ok(())
 }
 
@@ -179,7 +185,7 @@ fn a_template_outside_the_template_folder_is_found_by_its_type() -> TestResult {
         "40000000-0000-4000-8000-000000000003"
     );
     assert_eq!(text(&catalog, stray, "title")?.en, Some("Plain Title"));
-    assert_eq!(stray["missionType"]["en"], "Delivery");
+    assert_eq!(mission_types::name(&catalog, stray)?.en, Some("Delivery"));
     Ok(())
 }
 
@@ -222,7 +228,10 @@ fn a_contract_without_a_template_takes_title_type_and_place_from_its_broker_entr
     let brokered = entry(&catalog, E, None)?;
     assert_eq!(brokered["templateGuid"], Value::Null);
     assert_eq!(text(&catalog, brokered, "title")?.en, Some("Broker Haul"));
-    assert_eq!(brokered["missionType"]["en"], "Delivery");
+    assert_eq!(
+        mission_types::name(&catalog, brokered)?.en,
+        Some("Delivery")
+    );
     assert_eq!(
         places(&catalog, &brokered["pickupPlaces"])?,
         [("Planet", "Hurston")],
@@ -294,31 +303,6 @@ fn the_title_falls_back_to_the_handler_and_then_the_template() -> TestResult {
         text(&catalog, entry(&catalog, C, None)?, "title")?.en,
         Some("Handler Title"),
         "the handler's title wins over the template's"
-    );
-    Ok(())
-}
-
-#[test]
-fn the_mission_type_is_the_nearest_override_else_the_template_type() -> TestResult {
-    let (_, catalog) = build(None)?;
-    assert_eq!(
-        entry(&catalog, A, None)?["missionType"],
-        json!({"key": "@type_delivery", "en": "Delivery", "de": "Lieferung"}),
-        "the template's type"
-    );
-    assert_eq!(
-        entry(&catalog, A, Some(SUB_ONE))?["missionType"]["en"],
-        "Escort",
-        "the sub contract's override"
-    );
-    assert_eq!(
-        entry(&catalog, C, None)?["missionType"]["en"],
-        "Bounty",
-        "the handler's override"
-    );
-    assert_eq!(
-        entry(&catalog, C, None)?["missionTypeGuid"],
-        "50000000-0000-4000-8000-000000000002"
     );
     Ok(())
 }
