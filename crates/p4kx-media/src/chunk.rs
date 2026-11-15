@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::artifact_placement;
 use crate::chunk_copy;
 use crate::origin_prepared::PreparedRecordOrigins;
-use crate::{Artifact, MediaError, MediaWriter};
+use crate::{Artifact, Digest, MediaError, MediaWriter};
 
 /// Element representation of a typed payload chunk.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema)]
@@ -217,15 +217,22 @@ impl MediaWriter<'_> {
         let size = chunk_size(&layout, self.limits.chunk_bytes)?;
         self.reserve_output(size)?;
         let directory = self.root.join("chunks");
+        #[cfg(test)]
+        if let Some(observer) = self.chunk_observer {
+            let digest = chunk_copy::observed(self, &directory, input, size)?;
+            let artifact = chunk_artifact(digest, size);
+            self.checkpoint()?;
+            let created = observer
+                .typed_chunk(&artifact)
+                .map_err(|cause| crate::error::io(&directory, cause))?;
+            self.record_chunk(&artifact, accounting, created)?;
+            return Ok(ChunkReference { artifact, layout });
+        }
         let chunk_copy::ChunkFile {
             mut temporary,
             digest,
         } = chunk_copy::copy(self, &directory, input, size)?;
-        let artifact = Artifact {
-            path: format!("chunks/{}", digest.hex),
-            size,
-            digest,
-        };
+        let artifact = chunk_artifact(digest, size);
         let result = (|| {
             let created = artifact_placement::place(
                 self,
@@ -233,21 +240,39 @@ impl MediaWriter<'_> {
                 &mut temporary,
                 "typed chunk content-address collision",
             )?;
-            if matches!(accounting, ChunkAccounting::RetainedMetadata)
-                && let Some(input) = self.origins.directory().cloned()
-            {
-                self.artifact_with_input(&artifact, &input, p4kx_extraction::InputScope::Payload)?;
-            } else if let ChunkAccounting::Converted(Some(origins)) = accounting {
-                self.artifact_with_origins(&artifact, origins)?;
-            } else {
-                self.artifact(&artifact)?;
-            }
-            if matches!(accounting, ChunkAccounting::Converted(_)) {
-                self.converted_output(created)?;
-            }
+            self.record_chunk(&artifact, accounting, created)?;
             Ok(ChunkReference { artifact, layout })
         })();
         temporary.finish(result)
+    }
+
+    fn record_chunk(
+        &mut self,
+        artifact: &Artifact,
+        accounting: ChunkAccounting<'_>,
+        created: bool,
+    ) -> Result<(), MediaError> {
+        if matches!(accounting, ChunkAccounting::RetainedMetadata)
+            && let Some(input) = self.origins.directory().cloned()
+        {
+            self.artifact_with_input(artifact, &input, p4kx_extraction::InputScope::Payload)?;
+        } else if let ChunkAccounting::Converted(Some(origins)) = accounting {
+            self.artifact_with_origins(artifact, origins)?;
+        } else {
+            self.artifact(artifact)?;
+        }
+        if matches!(accounting, ChunkAccounting::Converted(_)) {
+            self.converted_output(created)?;
+        }
+        Ok(())
+    }
+}
+
+fn chunk_artifact(digest: Digest, size: u64) -> Artifact {
+    Artifact {
+        path: format!("chunks/{}", digest.hex),
+        size,
+        digest,
     }
 }
 
@@ -278,3 +303,7 @@ fn chunk_size(layout: &ChunkLayout, limit: u64) -> Result<u64, MediaError> {
     }
     Ok(size)
 }
+
+#[cfg(test)]
+#[path = "chunk_observer_tests.rs"]
+mod observed_tests;

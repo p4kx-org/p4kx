@@ -21,6 +21,11 @@ pub(crate) trait StreamObserver {
     fn finish(&self, _relative: &str) -> io::Result<()> {
         Ok(())
     }
+
+    /// Returns whether the complete typed chunk is new to the observed destination.
+    fn typed_chunk(&self, _artifact: &Artifact) -> io::Result<bool> {
+        Err(io::Error::other("typed chunk has no observation sink"))
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -52,6 +57,11 @@ impl<'a> StreamDestination<'a> {
 
     pub(crate) const fn checkpoint(self) -> Checkpoint<'a> {
         self.checkpoint
+    }
+
+    #[cfg(test)]
+    pub(crate) const fn observer(self) -> Option<&'a dyn StreamObserver> {
+        self.observer
     }
 
     pub(crate) fn create(self, root: &Path, relative: String) -> Result<Stream<'a>, MediaError> {

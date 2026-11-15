@@ -25,10 +25,24 @@ pub(crate) fn copy<'a>(
 ) -> Result<ChunkFile<'a>, MediaError> {
     let mut temporary =
         artifact_placement::temporary(writer, directory, "chunk staging directory is missing")?;
-    match stream(writer, directory, input, size, &mut temporary) {
+    let result = stream(writer, directory, input, size, &mut temporary).and_then(|digest| {
+        temporary.sync_all()?;
+        Ok(digest)
+    });
+    match result {
         Ok(digest) => Ok(ChunkFile { temporary, digest }),
         Err(primary) => temporary.finish(Err(primary)),
     }
+}
+
+#[cfg(test)]
+pub(crate) fn observed(
+    writer: &MediaWriter<'_>,
+    directory: &Path,
+    input: &mut dyn Read,
+    size: u64,
+) -> Result<Digest, MediaError> {
+    stream(writer, directory, input, size, &mut std::io::sink())
 }
 
 fn stream(
@@ -36,7 +50,7 @@ fn stream(
     directory: &Path,
     input: &mut dyn Read,
     size: u64,
-    temporary: &mut TemporaryFile<'_>,
+    output: &mut dyn Write,
 ) -> Result<Digest, MediaError> {
     let mut remaining = size;
     let mut hash = Sha256::new();
@@ -60,7 +74,7 @@ fn stream(
         let bytes = bytes
             .get(..read)
             .ok_or_else(|| MediaError::Contract("invalid chunk reader result".into()))?;
-        temporary
+        output
             .write_all(bytes)
             .map_err(|source| error::io(directory, source))?;
         hash.update(bytes);
@@ -76,7 +90,6 @@ fn stream(
             "typed chunk payload exceeds its declared count".into(),
         ));
     }
-    temporary.sync_all()?;
     Ok(Digest {
         algorithm: Algorithm::Sha256,
         scope: ByteScope::ArtifactFile,

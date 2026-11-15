@@ -38,6 +38,8 @@ pub struct MediaWriter<'a> {
     pub(crate) root: PathBuf,
     pub(crate) checkpoint: Checkpoint<'a>,
     namespace: Option<&'a OwnedDirectoryPermit>,
+    #[cfg(test)]
+    pub(crate) chunk_observer: Option<&'a dyn StreamObserver>,
     pub(crate) limits: Limits,
     pub(crate) kinds: Vec<KindStream<'a>>,
     pub(crate) manifest: Stream<'a>,
@@ -125,6 +127,8 @@ impl<'a> MediaWriter<'a> {
             root: root.into(),
             checkpoint: destination.checkpoint(),
             namespace,
+            #[cfg(test)]
+            chunk_observer: destination.observer(),
             limits,
             kinds,
             manifest: destination.create(root, "artifacts.jsonl".into())?,

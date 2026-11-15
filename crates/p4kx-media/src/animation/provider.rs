@@ -18,6 +18,10 @@ use crate::{
 
 pub(crate) struct AnimationProvider;
 
+#[cfg(test)]
+#[path = "provider_observation_tests.rs"]
+mod observation_tests;
+
 impl Provider for AnimationProvider {
     fn capability(&self) -> Capability {
         let mut capability = Capability::new(
@@ -76,50 +80,63 @@ impl Provider for AnimationProvider {
         context: &SourceContext<'_>,
         writer: &mut MediaWriter<'_>,
     ) -> Result<Projection, MediaError> {
-        let name = context.entry.path();
-        let Some(family) = Family::of(name) else {
-            return Ok(Projection::Skipped);
-        };
-        let input = context.origin_input(writer)?;
-        let origins = AnimationOrigins {
-            input: &input,
-            entry: context.entry.index(),
-        };
-        let bytes = required_reader::read_all(context, writer)?;
-        let size = bytes.len() as u64;
-        let file = match ChunkFile::parse(bytes) {
-            Ok(file) => file,
-            Err(error) => {
-                entry(family, None, Some(&error), size, &origins, writer)?;
-                return Ok(Projection::Written);
-            }
-        };
-        super::projection::table(&file, &origins, writer)?;
-        let skeleton = match family {
-            Family::Caf | Family::Dba => skeleton_selection::selected(context, writer)?,
-            Family::Aim | Family::CafImage | Family::DirectionalBlendImage => None,
-        };
-        if let Some(skeleton) = skeleton {
-            skeleton.write(&origins, writer)?;
-        }
-        let skeleton = skeleton.and_then(skeleton_selection::SkeletonSelection::parsed);
-        let image_issue = image_projection::write(&file, family, context, &origins, writer)?;
-        let clip_issue = clips(name, family, &file, &origins, skeleton, writer)?;
-        let issue = match (&image_issue, &clip_issue) {
-            (Some(cause), _) => Some(cause as &dyn Error),
-            (None, Some(cause)) => Some(cause as &dyn Error),
-            (None, None) => None,
-        };
-        entry(
-            family,
-            Some(file.chunks().len()),
-            issue,
-            size,
-            &origins,
-            writer,
-        )?;
-        Ok(Projection::Written)
+        project_with(context, writer, required_reader::read_all)
     }
+}
+
+pub(super) fn project_with(
+    context: &SourceContext<'_>,
+    writer: &mut MediaWriter<'_>,
+    read: impl FnOnce(&SourceContext<'_>, &MediaWriter<'_>) -> Result<Vec<u8>, MediaError>,
+) -> Result<Projection, MediaError> {
+    let name = context.entry.path();
+    let Some(family) = Family::of(name) else {
+        return Ok(Projection::Skipped);
+    };
+    let input = context.origin_input(writer)?;
+    let origins = AnimationOrigins {
+        input: &input,
+        entry: context.entry.index(),
+    };
+    let bytes = read(context, writer)?;
+    let size = bytes.len() as u64;
+    if size != context.source.size {
+        return Err(MediaError::Contract(
+            "animation payload length differs from the verified source".into(),
+        ));
+    }
+    let file = match ChunkFile::parse(bytes) {
+        Ok(file) => file,
+        Err(error) => {
+            entry(family, None, Some(&error), size, &origins, writer)?;
+            return Ok(Projection::Written);
+        }
+    };
+    super::projection::table(&file, &origins, writer)?;
+    let skeleton = match family {
+        Family::Caf | Family::Dba => skeleton_selection::selected(context, writer)?,
+        Family::Aim | Family::CafImage | Family::DirectionalBlendImage => None,
+    };
+    if let Some(skeleton) = skeleton {
+        skeleton.write(&origins, writer)?;
+    }
+    let skeleton = skeleton.and_then(skeleton_selection::SkeletonSelection::parsed);
+    let image_issue = image_projection::write(&file, family, context, &origins, writer)?;
+    let clip_issue = clips(name, family, &file, &origins, skeleton, writer)?;
+    let issue = match (&image_issue, &clip_issue) {
+        (Some(cause), _) => Some(cause as &dyn Error),
+        (None, Some(cause)) => Some(cause as &dyn Error),
+        (None, None) => None,
+    };
+    entry(
+        family,
+        Some(file.chunks().len()),
+        issue,
+        size,
+        &origins,
+        writer,
+    )?;
+    Ok(Projection::Written)
 }
 
 fn clips(

@@ -128,6 +128,12 @@ reports that its observed candidate list is incomplete.
 
 ## Installed Archive verification
 
+The synthetic observation test feeds verified Entry bytes to the normal animation projection
+and streams typed chunks through the same size and SHA-256 checks as the file-backed writer.
+It compares the JSONL, frame and value receipts, and original byte ranges with a small
+file-backed export. Run it with
+`cargo test --locked -p p4kx-media --lib observed_animation_matches_published_source_rows_and_key_chunks`.
+
 The opt-in Media census selects every CAF, DBA and AIM Entry across the root and nested
 containers. Each family uses a separate temporary generation. It verifies physical selection,
 raw bytes, chunk and clip order, original controller words, declared and decoded key counts,
