@@ -4521,6 +4521,52 @@
       ],
       "type": "object"
     },
+    "CargoBoxSizesOfResourceFloat32": {
+      "description": "A box-size Class with sourced values keyed by the exact decimal SCU size.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "byScu": {
+          "additionalProperties": {
+            "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          },
+          "type": "object"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "byScu",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "CargoBoxSizesOfint32": {
+      "description": "A box-size Class with sourced values keyed by the exact decimal SCU size.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "byScu": {
+          "additionalProperties": {
+            "$ref": "#/$defs/SourcedValueOfint32"
+          },
+          "type": "object"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "byScu",
+        "sourceType"
+      ],
+      "type": "object"
+    },
     "CargoFillType": {
       "description": "How a cargo manifest shares the capacity among its resources.",
       "type": "string",
@@ -4581,6 +4627,70 @@
         "minVolatilePowerToExplode",
         "miningOnly",
         "transformDependant"
+      ],
+      "type": "object"
+    },
+    "CargoLoadingGlobal": {
+      "description": "The authored time inputs for automated and cargo-deck loading.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "autoLoadingBaseLoadingTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "autoLoadingBaseUnloadingTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "autoLoadingBoxSizeLoadingTime": {
+          "$ref": "#/$defs/SourcedValueOfCargoBoxSizesOfResourceFloat32"
+        },
+        "autoLoadingBoxSizeUnloadingTime": {
+          "$ref": "#/$defs/SourcedValueOfCargoBoxSizesOfResourceFloat32"
+        },
+        "cargoDeckLoadingTimePerSCU": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "className": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "autoLoadingBaseLoadingTime",
+        "autoLoadingBaseUnloadingTime",
+        "autoLoadingBoxSizeLoadingTime",
+        "autoLoadingBoxSizeUnloadingTime",
+        "cargoDeckLoadingTimePerSCU",
+        "className",
+        "fileName",
+        "guid",
+        "metadataTag",
+        "recordIndex",
+        "recordName",
+        "recordPath",
+        "sourceType"
       ],
       "type": "object"
     },
@@ -4823,6 +4933,9 @@
         "blueprintTiers": {
           "$ref": "#/$defs/CatalogTableOfBlueprintTier"
         },
+        "cargoLoadingGlobals": {
+          "$ref": "#/$defs/CatalogTableOfCargoLoadingGlobal"
+        },
         "clothing": {
           "$ref": "#/$defs/CatalogTableOfClothing"
         },
@@ -4967,6 +5080,9 @@
         "shieldGenerators": {
           "$ref": "#/$defs/CatalogTableOfShieldGenerator"
         },
+        "shopCommodityGlobals": {
+          "$ref": "#/$defs/CatalogTableOfShopCommodityGlobal"
+        },
         "suitArmor": {
           "$ref": "#/$defs/CatalogTableOfSuitArmor"
         },
@@ -4987,6 +5103,7 @@
         "ammoContainers",
         "attachableModifiers",
         "blueprintTiers",
+        "cargoLoadingGlobals",
         "clothing",
         "consumables",
         "contractTemplates",
@@ -5035,6 +5152,7 @@
         "resourceContainers",
         "resourceNetworkParameters",
         "shieldGenerators",
+        "shopCommodityGlobals",
         "suitArmor",
         "thrusters",
         "turretHealth",
@@ -5875,6 +5993,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/BrokerProjection"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfCargoLoadingGlobal": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/CargoLoadingGlobal"
           },
           "type": "array"
         }
@@ -8089,6 +8226,25 @@
       ],
       "type": "object"
     },
+    "CatalogTableOfShopCommodityGlobal": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/ShopCommodityGlobal"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
     "CatalogTableOfShopInventoryResolution": {
       "description": "One named typed dataset with its measured source-family availability.",
       "properties": {
@@ -9939,6 +10095,10 @@
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `blueprints`."
         },
+        "cargoLoadingGlobals": {
+          "$ref": "#/$defs/KindCompleteness",
+          "description": "The filtered physical cargo loading and unloading settings selection."
+        },
         "cargoManifests": {
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `cargoManifests`."
@@ -10264,6 +10424,10 @@
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `ships`."
         },
+        "shopCommodityGlobals": {
+          "$ref": "#/$defs/KindCompleteness",
+          "description": "The filtered physical commodity shop settings selection."
+        },
         "shopInventories": {
           "$ref": "#/$defs/KindCompleteness",
           "description": "The complete physical inventory file selection, independent of Record filters."
@@ -10315,6 +10479,7 @@
         "blueprintCategoryLists",
         "blueprintPools",
         "blueprints",
+        "cargoLoadingGlobals",
         "cargoManifests",
         "climateAssets",
         "commodities",
@@ -10401,6 +10566,7 @@
         "shadingClasses",
         "shipStoreSlugs",
         "ships",
+        "shopCommodityGlobals",
         "shopInventories",
         "shops",
         "soilTextureSets",
@@ -25144,6 +25310,14 @@
         {
           "description": "Physical global definitions of the authored contract scope labels and icons.",
           "value": "contractScopes"
+        },
+        {
+          "description": "Physical DataForge cargo-loading settings Records.",
+          "value": "cargoLoadingGlobals"
+        },
+        {
+          "description": "Physical DataForge commodity shop settings Records.",
+          "value": "shopCommodityGlobals"
         }
       ]
     },
@@ -42526,6 +42700,58 @@
         "registryName",
         "starmapObjectGuid",
         "system"
+      ],
+      "type": "object"
+    },
+    "ShopCommodityGlobal": {
+      "description": "The authored fee inputs for automated commodity loading.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "autoLoadingBasePrice": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        },
+        "autoLoadingBoxSizePrices": {
+          "$ref": "#/$defs/SourcedValueOfCargoBoxSizesOfint32"
+        },
+        "className": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "autoLoadingBasePrice",
+        "autoLoadingBoxSizePrices",
+        "className",
+        "fileName",
+        "guid",
+        "metadataTag",
+        "recordIndex",
+        "recordName",
+        "recordPath",
+        "sourceType"
       ],
       "type": "object"
     },
@@ -69184,6 +69410,266 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/BulletPierceability"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfCargoBoxSizesOfResourceFloat32": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/CargoBoxSizesOfResourceFloat32"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfCargoBoxSizesOfint32": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/CargoBoxSizesOfint32"
               }
             }
           }

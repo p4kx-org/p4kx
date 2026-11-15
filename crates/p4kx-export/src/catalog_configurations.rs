@@ -6,6 +6,7 @@ use serde::Serialize;
 
 use crate::broker_entry::BrokerProjection;
 use crate::catalog_table::CatalogTable;
+use crate::catalog_v3::cargo_globals::CargoGlobalTables;
 use crate::catalog_v3::catalog_ammo_containers::AmmoContainer;
 use crate::catalog_v3::catalog_durability::{Degradation, Distortion, Durability};
 use crate::catalog_v3::catalog_emp::Emp;
@@ -43,6 +44,8 @@ pub(crate) struct CatalogConfigurations<'source> {
     pub(crate) weapon_actions: CatalogTable<WeaponActions<'source>>,
     pub(crate) missile_configurations: CatalogTable<MissileConfiguration<'source>>,
     pub(crate) jump_drives: CatalogTable<JumpDrive<'source>>,
+    #[serde(flatten)]
+    pub(crate) cargo_globals: CargoGlobalTables<'source>,
     pub(crate) quantum_drives: CatalogTable<QuantumDrive<'source>>,
     pub(crate) quantum_interdiction: CatalogTable<QuantumInterdictionGenerator<'source>>,
     pub(crate) shield_generators: CatalogTable<ShieldGenerator<'source>>,

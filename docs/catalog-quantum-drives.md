@@ -44,6 +44,12 @@ Numeric cells preserve their original type and exact representation. A floating-
 payloads retain their source bits. The schema stores the two modes independently. Fuel, acceleration,
 travel time and efficiency calculations belong to consumers.
 
+Consumers modeling quantum travel can interpret `stageOneAccelRate` and
+`stageTwoAccelRate` as metres per second squared (m/s²), based on the player
+measurements reported in [#1152](https://github.com/p4kx-org/p4kx/issues/1152).
+The DataForge declarations provide the stored numbers without an explicit unit.
+P4KX preserves them as authored in both `standard.value` and `spline.value`.
+
 For consumers migrating from the draft flat `items[].stats.quantumDrive`, the three root values
 map to the same-named row cells. The former `driveSpeed`, `cooldownTime`, `spoolUpTime`,
 `stageOneAccelRate`, `stageTwoAccelRate` and `engageSpeed` map to `standard.value`. Select the

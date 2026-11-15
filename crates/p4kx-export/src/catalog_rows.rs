@@ -101,6 +101,7 @@ fn append_gameplay_definitions(emitted: &mut Vec<CatalogRow>, collected: &Collec
             .chain(resource_network_global::sources(
                 &collected.resource_network_globals,
             ))
+            .chain(collected.cargo_globals.sources())
             .chain(collected.loot_kinds.definitions.sources())
             .map(|(kind, guid, path, _)| CatalogRow {
                 kind,

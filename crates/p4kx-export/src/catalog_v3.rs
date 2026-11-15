@@ -130,6 +130,7 @@ mod authored_effect_resource;
 mod authored_projectile;
 #[path = "authored_rgb.rs"]
 mod authored_rgb;
+pub(crate) mod cargo_globals;
 #[path = "cargo_source.rs"]
 pub(crate) mod cargo_source;
 #[path = "catalog_ammo_bindings.rs"]
@@ -394,10 +395,9 @@ pub(crate) use commodity_modules::{
 
 #[path = "canonical_record_header.rs"]
 pub(crate) mod canonical_record_header;
+#[path = "export_health_capture.rs"]
+pub(crate) mod export_health_capture;
 #[path = "record_header_field.rs"]
 pub(crate) mod record_header_field;
 #[path = "source_header.rs"]
 pub(crate) mod source_header;
-
-#[path = "export_health_capture.rs"]
-pub(crate) mod export_health_capture;

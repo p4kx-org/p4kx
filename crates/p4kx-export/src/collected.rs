@@ -16,6 +16,7 @@ use crate::catalog_read_failure::CatalogReadFailure;
 use crate::catalog_table::{CatalogTable, DatasetAvailability};
 use crate::catalog_v3::ammo_definition::PreparedAmmoDefinition;
 use crate::catalog_v3::blueprint_category_list::PreparedBlueprintCategoryList;
+use crate::catalog_v3::cargo_globals::CargoGlobals;
 use crate::catalog_v3::catalog_entity_configurations::EntityConfigurationRows;
 use crate::catalog_v3::catalog_item_components::ItemComponentRows;
 use crate::catalog_v3::catalog_resource_network_read::resource_network_global::PreparedResourceNetworkGlobal;
@@ -97,6 +98,7 @@ pub(crate) struct Collected<'f> {
     pub(crate) inventory_containers: Vec<PreparedInventoryContainer<'f>>,
     pub(crate) medical_item_tier_configs: Vec<PreparedMedicalTier<'f>>,
     pub(crate) procedural_planet_audio: Vec<PreparedPlanetAudio<'f>>,
+    pub(crate) cargo_globals: CargoGlobals<'f>,
     pub(crate) resource_network_globals: Vec<PreparedResourceNetworkGlobal<'f>>,
     pub(crate) ammo_definitions: Vec<PreparedAmmoDefinition<'f>>,
     pub(crate) gameplay_properties: Vec<GameplayPropertyDefinition<'f>>,
@@ -208,6 +210,7 @@ impl<'f> Collected<'f> {
             medical_item_tier_configs: Vec::new(),
             procedural_planet_audio: Vec::new(),
             resource_network_globals: Vec::new(),
+            cargo_globals: CargoGlobals::default(),
             ammo_definitions: Vec::new(),
             gameplay_properties: crafting.properties,
             quality: crafting.quality,
@@ -303,6 +306,8 @@ impl<'f> Collected<'f> {
             Picked::MedicalItemTierConfig(entity) => self.medical_item_tier_configs.push(*entity),
             Picked::ProceduralPlanetAudio(entity) => self.procedural_planet_audio.push(*entity),
             Picked::ResourceNetworkGlobal(entity) => self.resource_network_globals.push(*entity),
+            Picked::CargoLoadingGlobal(row) => self.cargo_globals.loading.push(*row),
+            Picked::ShopCommodityGlobal(row) => self.cargo_globals.shop.push(*row),
             Picked::Starmap(read) => {
                 self.starmap_definitions.push_object(read.definition);
                 self.starmap_objects.push(read.object);

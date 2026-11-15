@@ -94,6 +94,8 @@ fn record_types_disambiguate_kinds_that_share_a_path() {
                 | Kind::MedicalItemTierConfigs
                 | Kind::ProceduralPlanetAudio
                 | Kind::ResourceNetworkGlobals
+                | Kind::CargoLoadingGlobals
+                | Kind::ShopCommodityGlobals
                 | Kind::StarmapTypes
                 | Kind::StarmapPresets
                 | Kind::StarmapAmenities => assert_tag_path(by_path),

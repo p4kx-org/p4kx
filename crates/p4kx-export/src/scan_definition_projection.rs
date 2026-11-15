@@ -5,6 +5,7 @@ use p4kx_extraction::RecordTree;
 
 use super::Scan;
 use crate::Kind;
+use crate::catalog_v3::cargo_globals;
 use crate::catalog_v3::law_kinds::LawPick;
 use crate::catalog_v3::location_vocabulary::{self, LocationVocabularyPick};
 use crate::catalog_v3::medical::medical_tier_config;
@@ -33,6 +34,9 @@ impl<'f> Scan<'_, '_, 'f> {
             Kind::MedicalItemTierConfigs => self.medical_definition(admission, tree)?,
             Kind::ProceduralPlanetAudio => self.planet_audio(admission, tree)?,
             Kind::ResourceNetworkGlobals => self.resource_network_global(admission, tree)?,
+            Kind::CargoLoadingGlobals | Kind::ShopCommodityGlobals => {
+                cargo_globals::read(kind, tree, self.projection, admission, self.options.cancel)?
+            }
             Kind::Factions => self.faction_definition(admission, tree)?,
             Kind::StarmapTypes | Kind::StarmapPresets | Kind::StarmapAmenities => {
                 self.starmap_definition(kind, admission, tree)?
@@ -42,15 +46,7 @@ impl<'f> Scan<'_, '_, 'f> {
             | Kind::AutoSpawns
             | Kind::AutoSpawnSets
             | Kind::EncounterIndices => self.npc_spawn_definition(kind, admission, tree)?,
-            Kind::BlueprintCategoryLists => {
-                let read = crate::catalog_v3::blueprint_category_list_read::read(
-                    tree,
-                    self.projection,
-                    admission,
-                    self.options.cancel,
-                )?;
-                (Picked::BlueprintCategoryList(read.value), read.notes)
-            }
+            Kind::BlueprintCategoryLists => self.blueprint_category_list(admission, tree)?,
             Kind::BlueprintCategories => {
                 let read = crate::blueprint_category::read(
                     tree,
@@ -85,6 +81,20 @@ impl<'f> Scan<'_, '_, 'f> {
             _ => return self.read_mission_definition(kind, admission, tree),
         };
         Ok(Some(projection))
+    }
+
+    fn blueprint_category_list(
+        &self,
+        admission: &RecordObservation<'_, 'f>,
+        tree: &RecordTree<'f>,
+    ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
+        let read = crate::catalog_v3::blueprint_category_list_read::read(
+            tree,
+            self.projection,
+            admission,
+            self.options.cancel,
+        )?;
+        Ok((Picked::BlueprintCategoryList(read.value), read.notes))
     }
 
     fn resource_type_definition(

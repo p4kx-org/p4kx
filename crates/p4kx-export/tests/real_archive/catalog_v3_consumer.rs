@@ -104,6 +104,8 @@ pub(crate) fn row_location(kind: Kind) -> Cow<'static, str> {
         Kind::StarmapAmenities => "/definitions/starmapAmenities",
         Kind::StarmapObjects => "/definitions/starmapObjects",
         Kind::Commodities => "/definitions/commodities",
+        Kind::CargoLoadingGlobals => "/configurations/cargoLoadingGlobals",
+        Kind::ShopCommodityGlobals => "/configurations/shopCommodityGlobals",
         _ => kind.name(),
     };
     Cow::Borrowed(path)
@@ -155,6 +157,8 @@ fn checked_table<'catalog>(
                     | Kind::StarmapTypes
                     | Kind::StarmapPresets
                     | Kind::StarmapAmenities
+                    | Kind::CargoLoadingGlobals
+                    | Kind::ShopCommodityGlobals
             )
         {
             record_header(row)?;
@@ -292,6 +296,8 @@ pub(crate) fn field<'row>(row: &'row Value, kind: Kind, name: &str) -> TestResul
                 | Kind::Tags
                 | Kind::QualityDistributions
                 | Kind::QualityQuantizations
+                | Kind::CargoLoadingGlobals
+                | Kind::ShopCommodityGlobals
         )
     {
         present(value)

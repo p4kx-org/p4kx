@@ -6,13 +6,11 @@ use std::sync::Arc;
 use p4kx_assembly::{ArchiveFiles, Entities};
 use p4kx_extraction::{Archive, CancelToken, DataForgeEntry};
 
-use crate::CatalogError;
 use crate::archive_key_use::ArchiveKeyUse;
 use crate::build_derived::{add_contracts, add_loadouts, add_paints, add_tags, particle_library};
 use crate::build_harvest::add_harvest_locations;
 use crate::build_loot::add_loot_containers;
 use crate::build_starmap::add_starmap;
-use crate::catalog_crafting;
 use crate::catalog_definitions::CatalogDefinitions;
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::CatalogProjection;
@@ -31,6 +29,7 @@ use crate::options::{CatalogRun, CatalogStage};
 use crate::ship_store_slugs::StoreSlugs;
 use crate::shops::add_shops;
 use crate::texts::{TextSources, Texts};
+use crate::{CatalogError, catalog_crafting};
 #[path = "build_catalog.rs"]
 pub(crate) mod api;
 pub use api::{build_catalog, build_catalog_from, write_catalog, write_catalog_from};
@@ -317,6 +316,7 @@ fn assemble<R>(
             weapon_actions: components.weapon_actions,
             missile_configurations: components.missile_configurations,
             jump_drives: components.jump_drives,
+            cargo_globals: collected.cargo_globals.into_tables(&forge),
             quantum_drives: components.quantum_drives,
             quantum_interdiction: components.quantum_interdiction,
             shield_generators: components.shield_generators,

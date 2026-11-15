@@ -253,11 +253,15 @@ pub enum Kind {
     MissionItems,
     /// Physical global definitions of the authored contract scope labels and icons.
     ContractScopes,
+    /// Physical DataForge cargo-loading settings Records.
+    CargoLoadingGlobals,
+    /// Physical DataForge commodity shop settings Records.
+    ShopCommodityGlobals,
 }
 
 impl Kind {
     /// Every kind, in the order of the catalog.
-    pub const ALL: [Self; 103] = [
+    pub const ALL: [Self; 105] = [
         Self::Manufacturers,
         Self::Items,
         Self::Ships,
@@ -361,6 +365,8 @@ impl Kind {
         Self::MissionModuleDeclarations,
         Self::MissionItems,
         Self::ContractScopes,
+        Self::CargoLoadingGlobals,
+        Self::ShopCommodityGlobals,
     ];
 }
 

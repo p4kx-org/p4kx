@@ -3,7 +3,6 @@
 
 //! Integration tests of `p4kx-export`, built as one test binary.
 #![recursion_limit = "256"]
-
 mod blueprint_category_v3_contract;
 mod blueprint_category_v3_failures;
 mod blueprint_category_v3_fixture;
@@ -31,6 +30,7 @@ mod canonical_header;
 mod canonical_header_fixture;
 mod canonical_header_origin;
 mod catalog_broker_entries;
+mod catalog_cargo_globals;
 mod catalog_commodity;
 mod catalog_compression;
 mod catalog_consumables;

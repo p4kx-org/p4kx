@@ -217,6 +217,8 @@ const fn uses_physical_row_identity(kind: Kind) -> bool {
                 | Kind::MedicalItemTierConfigs
                 | Kind::ProceduralPlanetAudio
                 | Kind::ResourceNetworkGlobals
+                | Kind::CargoLoadingGlobals
+                | Kind::ShopCommodityGlobals
                 | Kind::AmmoDefinitions
                 | Kind::Tags
                 | Kind::Commodities

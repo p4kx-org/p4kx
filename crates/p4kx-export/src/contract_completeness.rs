@@ -40,6 +40,10 @@ pub(crate) struct Completeness<'a> {
     pub(crate) procedural_planet_audio: KindCompleteness<'a>,
     /// The filtered physical DataForge resource network global selection.
     pub(crate) resource_network_globals: KindCompleteness<'a>,
+    /// The filtered physical cargo loading and unloading settings selection.
+    pub(crate) cargo_loading_globals: KindCompleteness<'a>,
+    /// The filtered physical commodity shop settings selection.
+    pub(crate) shop_commodity_globals: KindCompleteness<'a>,
     /// The filtered physical `ExplosionRecord` selection.
     pub(crate) explosion_definitions: KindCompleteness<'a>,
     /// The filtered physical `AmmoParams` selection.
@@ -219,6 +223,8 @@ impl<'a> Completeness<'a> {
             medical_item_tier_configs: completeness,
             procedural_planet_audio: completeness,
             resource_network_globals: completeness,
+            cargo_loading_globals: completeness,
+            shop_commodity_globals: completeness,
             ammo_definitions: completeness,
             gameplay_properties: completeness,
             quality_distributions: completeness,

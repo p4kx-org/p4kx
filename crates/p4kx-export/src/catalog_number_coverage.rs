@@ -20,6 +20,8 @@ pub(super) const fn uses_owned_number(kind: Kind) -> bool {
                 | Kind::Factions
                 | Kind::ProceduralPlanetAudio
                 | Kind::ResourceNetworkGlobals
+                | Kind::CargoLoadingGlobals
+                | Kind::ShopCommodityGlobals
                 | Kind::FactionIdentities
                 | Kind::FactionReputations
                 | Kind::ReputationScopes
@@ -84,6 +86,7 @@ pub(super) const fn expected_owned_number(
             | Kind::AmmoDefinitions
             | Kind::InventoryContainers
             | Kind::ResourceNetworkGlobals
+            | Kind::CargoLoadingGlobals
             | Kind::MedicalItemTierConfigs
             | Kind::FactionReputations
             | Kind::ReputationStandings
@@ -113,6 +116,8 @@ const fn uses_authored_raw_number(kind: Kind) -> bool {
             | Kind::Factions
             | Kind::ProceduralPlanetAudio
             | Kind::ResourceNetworkGlobals
+            | Kind::CargoLoadingGlobals
+            | Kind::ShopCommodityGlobals
             | Kind::FactionIdentities
             | Kind::FactionReputations
             | Kind::ReputationScopes

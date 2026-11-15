@@ -72,6 +72,8 @@ fn expected_completeness() -> Value {
         "harvestableLocations",
         "shops",
         "shopInventories",
+        "cargoLoadingGlobals",
+        "shopCommodityGlobals",
         "particleLibraries",
         "planetResources",
         "creatures",

@@ -7,6 +7,7 @@ use crate::blueprint_category::BlueprintCategory;
 use crate::catalog_read_failure::CatalogReadFailure;
 use crate::catalog_v3::ammo_definition::PreparedAmmoDefinition;
 use crate::catalog_v3::blueprint_category_list::PreparedBlueprintCategoryList;
+use crate::catalog_v3::cargo_globals::{PreparedCargoLoadingGlobal, PreparedShopCommodityGlobal};
 use crate::catalog_v3::catalog_item_components::resolution::MagazineDependency;
 use crate::catalog_v3::catalog_resource_network_read::resource_network_global::PreparedResourceNetworkGlobal;
 use crate::catalog_v3::explosion_definition::PreparedExplosionDefinition;
@@ -72,6 +73,8 @@ pub(crate) enum Picked<'f> {
     MedicalItemTierConfig(Box<PreparedMedicalTier<'f>>),
     ProceduralPlanetAudio(Box<PreparedPlanetAudio<'f>>),
     ResourceNetworkGlobal(Box<PreparedResourceNetworkGlobal<'f>>),
+    CargoLoadingGlobal(Box<PreparedCargoLoadingGlobal<'f>>),
+    ShopCommodityGlobal(Box<PreparedShopCommodityGlobal<'f>>),
     FactionIdentity(
         Box<crate::catalog_v3::faction_identity_definition::PreparedFactionIdentity<'f>>,
     ),
@@ -166,6 +169,8 @@ impl<'f> Picked<'f> {
             | Kind::MedicalItemTierConfigs
             | Kind::ProceduralPlanetAudio
             | Kind::ResourceNetworkGlobals
+            | Kind::CargoLoadingGlobals
+            | Kind::ShopCommodityGlobals
             | Kind::Factions
             | Kind::FactionIdentities
             | Kind::ReputationPerks

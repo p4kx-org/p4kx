@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::catalog_v3::cargo_globals;
 use crate::catalog_v3::loot_definition_catalog::LootDefinitionKind;
 use crate::selection::Kind;
 
@@ -138,6 +139,8 @@ impl Kind {
                 prefixes: &[""],
                 type_name: crate::catalog_v3::catalog_resource_network_read::resource_network_global::SOURCE_TYPE,
             },
+            Self::CargoLoadingGlobals => cargo_globals::LOADING_RULE,
+            Self::ShopCommodityGlobals => cargo_globals::SHOP_RULE,
             Self::ExplosionDefinitions => KindRule {
                 prefixes: &[""],
                 type_name: crate::catalog_v3::explosion_definition::SOURCE_TYPE,
