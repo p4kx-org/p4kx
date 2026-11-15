@@ -84,6 +84,8 @@ def test_glb_json_budget_checks_padded_size_before_reading(
         ({"accessors": [{"bufferView": 0, "byteOffset": 1, "componentType": 5126, "count": 1, "type": "VEC3"}]}, "misaligned"),
         ({"meshes": [{"primitives": [{"attributes": {"POSITION": 2}}]}]}, "primitive attribute accessor index"),
         ({"meshes": [{"primitives": [{"attributes": {"POSITION": 0}, "material": 2}]}]}, "primitive material index"),
+        ({"meshes": [{"primitives": []}]}, "GLB mesh 0 must have at least one primitive"),
+        ({"meshes": [{}]}, "GLB mesh 0 must have at least one primitive"),
         ({"nodes": [{"mesh": 3}]}, "node mesh index"),
         ({"images": [{"bufferView": 2}]}, "image bufferView index"),
         ({"images": [{"uri": "data:image/png;base64,AAAA"}]}, "external file"),

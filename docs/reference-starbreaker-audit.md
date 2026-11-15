@@ -620,3 +620,50 @@ integration `2889c5bd2`.
   can still delay cancellation.
   [P4KX package regression](../crates/p4kx-blender/tests/it/package_write_context.rs) ·
   [StarBreaker checkpoints](https://github.com/diogotr7/StarBreaker/commit/94c8fba3b).
+
+## StarBreaker issue #59: repeated multipart mounts and empty meshes
+
+The report identifies StarBreaker v0.3.2 and describes a wrong node-to-mesh
+association and an importer error from empty primitives. The source of the
+official v0.3.2 release contains a path that explains the association error.
+A packed-mesh cache hit adds no mesh. An NMC child still calls the
+hierarchy builder, which pops the last
+mesh before appending the per-node meshes. An earlier node can then point to
+the replacement at that index. The same builder creates a mesh after
+filtering hidden submeshes even if no primitive remains. These are source
+findings, independent of a reproduction of the reported ship.
+[Issue #59](https://github.com/diogotr7/StarBreaker/issues/59) ·
+[v0.3.2 release](https://github.com/diogotr7/StarBreaker/releases/tag/v0.3.2) ·
+[Child call](https://github.com/diogotr7/StarBreaker/blob/450fa284d4b1cbed6832675297dfb02579c0abd3/crates/starbreaker-3d/src/gltf/glb_builder.rs#L574-L625) ·
+[Cache hit](https://github.com/diogotr7/StarBreaker/blob/450fa284d4b1cbed6832675297dfb02579c0abd3/crates/starbreaker-3d/src/gltf/glb_builder.rs#L915-L925) ·
+[Mesh removal and reconstruction](https://github.com/diogotr7/StarBreaker/blob/450fa284d4b1cbed6832675297dfb02579c0abd3/crates/starbreaker-3d/src/gltf/glb_builder.rs#L1103-L1187).
+
+P4KX assigns the appended mesh index at the producing instance and model
+node positions. A duplicate instance reuses the producer's complete
+node-to-mesh table. The observed vertex map uses emitted mesh order and
+the producer's scene and model node positions. The layout omits meshes
+with no drawable submesh. The existing shared-mesh source-map and
+all-hidden-material fixtures exercise those rules. A new repeated-mount
+fixture interleaves a different model with the same node names and checks
+which primitive indices each node reads. Mesh names are optional in glTF
+and cannot prove that a node refers to the intended geometry.
+[P4KX instance selection](../crates/p4kx-gltf/src/scene.rs) ·
+[Node-to-mesh table](../crates/p4kx-gltf/src/document.rs) ·
+[Layout](../crates/p4kx-gltf/src/layout.rs) ·
+[Source-map fixture](../crates/p4kx-gltf/tests/it/mesh_vertex_maps.rs) ·
+[Hidden-material fixture](../crates/p4kx-gltf/tests/it/materials.rs) ·
+[Repeated-mount fixture](../crates/p4kx-gltf/tests/it/scene_mesh_instances.rs) ·
+[glTF mesh properties](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-mesh).
+
+The Blender package preflight had a separate gap. An in-memory synthetic
+GLB with an empty primitive array passed the structural check. Omitting
+the array led to an unhandled `KeyError` when collecting POSITION accessors.
+The preflight now rejects both with a package diagnostic identifying the
+mesh. A valid GLB can still describe a scene with transform nodes and no
+mesh. A synthetic probe checks the package parser with Blender 5.3's
+bundled Python. The Rust test checker also rejects empty primitive lists.
+The reported Blender import failure remains upstream runtime evidence.
+[glTF primitive requirement](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-mesh-primitives) ·
+[Package validation](../blender_addon/p4kx_importer/glb_references.py) ·
+[Preflight regression](../blender_addon/tests/test_glb_preflight.py) ·
+[Rust checker](../crates/p4kx-testkit/src/glb.rs).

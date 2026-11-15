@@ -212,8 +212,11 @@ def _scene_references(document: dict[str, Any], accessors: int, materials: int) 
         _optional_reference(node, "skin", len(skins), "node skin")
         for child in _array(node, "children"):
             _reference(child, len(nodes), "child node")
-    for mesh in meshes:
-        for primitive in _objects(mesh, "primitives"):
+    for index, mesh in enumerate(meshes):
+        primitives = _objects(mesh, "primitives")
+        if not primitives:
+            raise PackageError(f"GLB mesh {index} must have at least one primitive.")
+        for primitive in primitives:
             _optional_reference(primitive, "material", materials, "primitive material")
             _optional_reference(primitive, "indices", accessors, "primitive indices accessor")
             attributes = read_object(primitive.get("attributes"), "GLB primitive attributes")
