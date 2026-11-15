@@ -36,6 +36,43 @@ pub(super) fn location_templates(
     Ok(counters.finish())
 }
 
+pub(super) fn npc_names(
+    catalog: &Value,
+    english: &Oracle,
+    german: &Oracle,
+) -> TestResult<(Coverage, Coverage)> {
+    let index = TextIndex::new(catalog)?;
+    let mut counters = CoverageCounters::new(english, german);
+    for pool in catalog_v3_consumer::rows(catalog, Kind::ContractNpcSpawns)? {
+        for group in super::graph::array(pool, "groups")? {
+            for option in super::graph::array(group, "options")? {
+                let name = option.get("embeddedName").ok_or("NPC embedded name")?;
+                if name.is_null() {
+                    continue;
+                }
+                count_npc_name(&index, &mut counters, name)?;
+            }
+        }
+    }
+    Ok(counters.finish())
+}
+
+fn count_npc_name(
+    index: &TextIndex<'_>,
+    counters: &mut CoverageCounters<'_>,
+    name: &Value,
+) -> TestResult<()> {
+    for field in ["givenName", "givenLastName", "givenNickName"] {
+        let target = index.reference(
+            name.get(field).ok_or("NPC name reference")?,
+            TextDomain::GameText,
+            TextReferenceShape::Required,
+        )?;
+        counters.count(target)?;
+    }
+    Ok(())
+}
+
 pub(super) fn compare(
     counters: &mut CoverageCounters<'_>,
     index: &TextIndex<'_>,

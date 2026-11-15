@@ -7,6 +7,7 @@ use super::reads::FieldReads;
 use super::reference_shape::{self, ReferenceShape};
 use super::violation::FieldViolation;
 use crate::CatalogError;
+use crate::catalog_projection::ProtectedKey;
 use crate::catalog_read::original::ExampleBodyReceipt;
 use crate::definition_reference::DefinitionReference;
 use crate::record_read::ReadError;
@@ -14,6 +15,12 @@ use crate::record_read::ReadError;
 /// The existing original frame receiving actual borrowed fields and guard failures.
 pub(crate) trait FieldCapture<'source> {
     fn check_parent(&self, parent: &StructValue<'source>) -> Result<(), CatalogError>;
+    /// Retains an original key occurrence on an admitted structure.
+    fn protected_key(
+        &self,
+        parent: &StructValue<'source>,
+        name: &str,
+    ) -> Result<ProtectedKey<'source>, CatalogError>;
     fn check_declared_target(
         &self,
         parent: &StructValue<'source>,

@@ -4,7 +4,7 @@
 use p4kx_extraction::{Guid, RecordTree, StructValue, TagTree};
 
 use crate::entity_spawn_model::EntitySpawnPool;
-use crate::npc_spawn_model::NpcSpawnPool;
+use crate::npc_spawn_model::DraftNpcPool;
 use crate::record_read::ReadError;
 use crate::source_fields::FieldCapture;
 use crate::spawn_model::{LocationQuery, ShipSpawnPool};
@@ -26,7 +26,7 @@ pub(crate) use input::{ReadContext, ReadFields};
 #[derive(Debug)]
 pub(crate) enum Spawn<'source> {
     Ships(ShipSpawnPool),
-    Npcs(NpcSpawnPool<'source>),
+    Npcs(DraftNpcPool<'source>),
     Entities(EntitySpawnPool),
     Location(LocationQuery),
 }

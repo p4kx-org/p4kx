@@ -9,6 +9,10 @@ use p4kx_extraction::{
     is_placeholder_key,
 };
 
+#[path = "catalog_protected_key.rs"]
+mod protected_key;
+pub(crate) use protected_key::ProtectedKey;
+
 use super::catalog_text_forms;
 use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
@@ -143,35 +147,19 @@ impl<'context, 'source> CatalogProjection<'context, 'source> {
         &self,
         fact: &OriginalValueFact<'_, '_, 'source>,
     ) -> Result<SourcedValue<GameTextRef>, CatalogError> {
-        use crate::catalog_read::original::OriginalValuePart;
-        use p4kx_extraction::Value;
         fact.check_input(self.original)?;
-        let key = match fact.value() {
-            Value::String(key) | Value::Locale(key)
-                if key.starts_with('@') && !is_placeholder_key(key) =>
-            {
-                SourceValue::Present(*key)
-            }
-            Value::Error(_) => SourceValue::Unreadable,
-            _ => SourceValue::Absent,
-        };
-        let (role, complete) = match &key {
-            SourceValue::Present(_) => (SourceUseRole::Payload, true),
-            SourceValue::Unreadable => (SourceUseRole::Attempted, false),
-            _ => (SourceUseRole::Selector, true),
-        };
-        let mut key = fact.bind(OriginalValuePart::Value, key, role, complete)?;
-        if !matches!(fact.value(), Value::Error(_)) {
-            key.contribute(fact.observe(OriginalValuePart::Value, SourceUseRole::Conversion)?);
-        }
-        Ok(key
-            .try_map(|key| {
-                let payload = fact.observe(OriginalValuePart::Value, SourceUseRole::Payload)?;
-                let selector = fact.observe(OriginalValuePart::Value, SourceUseRole::Selector)?;
-                self.register_uses(Domain::GameText, key, payload, selector)?;
-                Ok::<_, CatalogError>(GameTextRef(identifier(Domain::GameText, key)))
-            })?
-            .into_cell(&self.origins().uses))
+        self.finish_protected_key(ProtectedKey::from_fact(fact)?)
+    }
+
+    /// Registers a retained protected lookup and preserves the original field evidence.
+    pub(crate) fn finish_protected_key(
+        &self,
+        key: ProtectedKey<'source>,
+    ) -> Result<SourcedValue<GameTextRef>, CatalogError> {
+        key.map(&self.origins().uses, |key, payload, selector| {
+            self.register_uses(Domain::GameText, key, payload, selector)?;
+            Ok(GameTextRef(identifier(Domain::GameText, key)))
+        })
     }
 
     fn register(

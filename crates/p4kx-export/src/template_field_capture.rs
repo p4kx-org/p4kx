@@ -4,6 +4,7 @@
 use p4kx_extraction::{Field, SourceScope, SourceUses, StructValue, Value};
 
 use crate::build::original_input::OriginalCatalogInput;
+use crate::catalog_projection::ProtectedKey;
 use crate::catalog_read::original::{
     ExampleBodyCapture, ExampleBodyReceipt, FieldFailureKind, OriginalFlowFields,
 };
@@ -41,6 +42,14 @@ impl<'source> FieldCapture<'source> for TemplateFieldCapture<'_, '_, '_, 'source
     fn check_parent(&self, parent: &StructValue<'source>) -> Result<(), CatalogError> {
         self.fields.owner_of(parent)?;
         Ok(())
+    }
+
+    fn protected_key(
+        &self,
+        parent: &StructValue<'source>,
+        name: &str,
+    ) -> Result<ProtectedKey<'source>, CatalogError> {
+        ProtectedKey::read(self.fields, self.fields.owner_of(parent)?, name)
     }
 
     fn check_declared_target(

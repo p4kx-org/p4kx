@@ -258,8 +258,14 @@ pub(crate) fn kind_coverage(
     ) {
         return canonical_coverage(catalog, kind, english_oracle, german_oracle);
     }
-    if kind == Kind::MissionLocationTemplates {
-        return extras::location_templates(catalog, english_oracle, german_oracle);
+    match kind {
+        Kind::MissionLocationTemplates => {
+            return extras::location_templates(catalog, english_oracle, german_oracle);
+        }
+        Kind::ContractNpcSpawns => {
+            return extras::npc_names(catalog, english_oracle, german_oracle);
+        }
+        _ => {}
     }
     if kind == Kind::Items {
         let mut counters = CoverageCounters::new(english_oracle, german_oracle);

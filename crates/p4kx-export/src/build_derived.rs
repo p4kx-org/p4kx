@@ -56,7 +56,6 @@ pub(crate) fn add_contracts<'f>(
     options: &CatalogOptions<'_>,
     collected: &mut Collected<'f>,
 ) -> Result<(), CatalogError> {
-    let texts = projection.legacy_texts();
     let missions = missions::read(
         forge,
         projection,
@@ -91,7 +90,7 @@ pub(crate) fn add_contracts<'f>(
     let mut pools = missions.pools;
     pools.merge(template_pools);
     pools.merge(broker_pools);
-    collected.add_spawns(missions.siblings.location_templates, pools, texts);
+    collected.add_spawns(missions.siblings.location_templates, pools, projection)?;
     collected.add_broker_entries(broker_read, broker_definitions);
     configurations.flows.extend(broker_flows);
     configurations.properties.extend(broker_properties);

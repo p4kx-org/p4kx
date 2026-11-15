@@ -50,7 +50,7 @@ use crate::mission_generator::GeneratorDefinition;
 use crate::mission_kinds::MissionKinds;
 use crate::mission_property_set::MissionPropertySet;
 use crate::mission_titles::MissionTitles;
-use crate::npc_spawn_model::NpcSpawnPool;
+use crate::npc_spawn_model::PublishedNpcPool;
 use crate::paint_port::VehicleFacts;
 use crate::picked::Picked;
 use crate::playability::PlayabilitySummary;
@@ -119,7 +119,7 @@ pub(crate) struct Collected<'f> {
     pub(crate) template_configurations: TemplateConfigurations<'f>,
     pub(crate) broker_projections: Vec<BrokerProjection<'f>>,
     pub(crate) broker_definitions: Vec<BrokerDefinition<'f>>,
-    pub(crate) contract_npc_spawns: Vec<NpcSpawnPool<'f>>,
+    pub(crate) contract_npc_spawns: Vec<PublishedNpcPool>,
     pub(crate) contract_entity_spawns: Vec<EntitySpawnPool>,
     pub(crate) mission_property_sets: Vec<MissionPropertySet<'f>>,
     pub(crate) port_items: Vec<crate::loadout::Wanted>,

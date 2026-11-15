@@ -36,7 +36,7 @@ pub(crate) use crate::contract_store_slugs::ShipStoreSlug;
 pub(crate) use crate::entity_spawn_model::EntitySpawnPool;
 pub(crate) use crate::location_template::MissionLocationTemplate;
 pub(crate) use crate::mission_property_set::MissionPropertySet;
-pub(crate) use crate::npc_spawn_model::NpcSpawnPool;
+pub(crate) use crate::npc_spawn_model::PublishedNpcPool;
 
 pub(crate) use crate::resource_type_contract::ResourceType;
 pub(crate) use crate::schema_fields::every_field_required;
@@ -139,7 +139,7 @@ pub(crate) struct Catalog<'a> {
     pub(crate) contract_location_queries: Vec<LocationQuery>,
     /// The distinct NPC spawn descriptions of the contracts, templates and broker entries, ordered
     /// by identifier.
-    pub(crate) contract_npc_spawns: Vec<NpcSpawnPool<'a>>,
+    pub(crate) contract_npc_spawns: Vec<PublishedNpcPool>,
     /// The distinct entity spawn descriptions of the contracts, templates and broker entries,
     /// ordered by identifier.
     pub(crate) contract_entity_spawns: Vec<EntitySpawnPool>,

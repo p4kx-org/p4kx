@@ -1684,9 +1684,9 @@ the `matchConditions` as for a location query, and `forcedOrganizationGuid`, the
 `debugForceChosenOrganization`, a `MissionOrganization` Record no kind lists). The contract-level
 properties add `missionItem` (`conditions`, the `matchConditions` as for a location query,
 `forcedItemGuid`, the original debug-only `debugForceChosenItem` reference to a `definitions.missionItems` row when selected, `minItemsToFind`
-and `maxItemsToFind`), `aiName` (the fields of an embedded NPC name, see "NPC and entity spawns":
-`randomName`, `randomLastName`, `randomNickName`, `givenName`, `givenLastName`, `givenNickName`,
-`chanceOfNickName` and `nameDataGuid`), `combinedDataSetEntries` (`entryProperties`, the variables
+and `maxItemsToFind`), `aiName` (`randomName`, `randomLastName`, `randomNickName`,
+`givenName`, `givenLastName`, `givenNickName`, `chanceOfNickName` and `nameDataGuid`),
+`combinedDataSetEntries` (`entryProperties`, the variables
 of the `dataSetEntryProperties`), `haulingOrders` (`requirements` as in "Hauling orders"), `reward`
 (`reward`, the `rewardDef` as the `reward` of a broker entry, `null` without one), `timeTrialRace`
 (`targetSplits`, ordered structures with `targetSplit`) and `starMapLocation` (no fields).
@@ -1823,11 +1823,14 @@ enum `EExcludeSpawnGender` as stored: `Male`, `Female` or `None`, listed in `x-v
 and `factionOverrideGuid` (a `Faction` Record no kind lists). Tags are full tag paths; what a tag
 means is not stated by the Archive and the catalog does not interpret it.
 
-The `embeddedName` (`MissionPropertyValue_AIName`, `null` when absent; 22 options on LIVE, all of
-them with placeholder texts) has `randomName`, `randomLastName`, `randomNickName`, `givenName`,
-`givenLastName` and `givenNickName` (game texts, the keys with their English and German texts; a
-placeholder key such as `@LOC_UNINITIALIZED` has a `null` key and no texts), `chanceOfNickName` and
-`nameDataGuid` (the `CharacterRandomNameParams` Record, no kind lists these).
+The `embeddedName` (`MissionPropertyValue_AIName`, `null` when absent) has `randomName`,
+`randomLastName`, `randomNickName`, `chanceOfNickName` and `nameDataGuid` (the
+`CharacterRandomNameParams` Record). The fields `givenName`, `givenLastName` and `givenNickName`
+are sourced references into `texts.gameTexts`. Each refers to its exact original field occurrence
+in the selected pool, and its target provides the original key and all installed translation forms.
+Empty and placeholder keys have an absent reference with the original field evidence. Pool
+identifiers use the untranslated key-only content. Translations and provenance do not participate
+in the identifier (ADR-0324, ADR-0356).
 
 **Entity spawn descriptions (`contractEntitySpawns`).** An entry has `guid` and `groups`
 (`SpawnDescription_EntityGroup`: `name` and `slots`; a slot is a `SpawnDescription_EntityOptions`,

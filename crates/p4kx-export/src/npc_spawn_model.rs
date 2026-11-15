@@ -9,6 +9,13 @@ use crate::guid_text::CatalogGuid;
 use crate::spawn_model::{TagPaths, TagTerm};
 use crate::texts::Texts;
 
+#[path = "npc_spawn_names.rs"]
+mod names;
+pub(crate) use names::{NpcSpawnName, PendingNpcName};
+
+pub(crate) type DraftNpcPool<'source> = NpcSpawnPool<PendingNpcName<'source>>;
+pub(crate) type PublishedNpcPool = NpcSpawnPool<NpcSpawnName>;
+
 /// An item an NPC carries (`SpawnSettingsInventoryItem`).
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -119,8 +126,8 @@ impl<'a> AiName<'a> {
 /// One alternative of an NPC group (`SpawnDescription_NPCOption`): the game spawns one of them.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct NpcSpawnOption<'a> {
+#[schemars(rename = "NpcSpawnOption", transform = every_field_required)]
+pub(crate) struct NpcSpawnOption<Name> {
     /// The `priority`; `-1` as stored means none.
     pub(crate) priority: Option<i64>,
     /// The `includeLocationAISpawnTags` flag; `null` when absent.
@@ -135,39 +142,28 @@ pub(crate) struct NpcSpawnOption<'a> {
     /// The `missionVariableName` of the property the `nameProperty` points to, `null` when absent.
     pub(crate) name_property_variable: Option<String>,
     /// The `embeddedName`, `null` when absent.
-    pub(crate) embedded_name: Option<AiName<'a>>,
+    pub(crate) embedded_name: Option<Name>,
 }
 
 /// A group of NPCs that spawn together (`SpawnDescription_NPC_Group`).
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct NpcSpawnGroup<'a> {
+#[schemars(rename = "NpcSpawnGroup", transform = every_field_required)]
+pub(crate) struct NpcSpawnGroup<Name> {
     /// The `Name` of the group, `null` when empty.
     pub(crate) name: Option<String>,
     /// The alternatives in stored order.
-    pub(crate) options: Vec<NpcSpawnOption<'a>>,
+    pub(crate) options: Vec<NpcSpawnOption<Name>>,
 }
 
 /// An NPC spawn description of a contract: what a `MissionPropertyValue_NPCSpawnDescriptions`
 /// property states, shared by every contract that states the same.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct NpcSpawnPool<'a> {
+#[schemars(rename = "NpcSpawnPool", transform = every_field_required)]
+pub(crate) struct NpcSpawnPool<Name> {
     /// The identifier of the content (see the catalog documentation); not a GUID of the Archive.
     pub(crate) guid: CatalogGuid,
     /// The groups in stored order.
-    pub(crate) groups: Vec<NpcSpawnGroup<'a>>,
-}
-
-impl<'a> NpcSpawnPool<'a> {
-    /// Resolves the texts of every embedded name with `texts`.
-    pub(crate) fn resolve(&mut self, texts: &Texts<'a>) {
-        self.groups
-            .iter_mut()
-            .flat_map(|group| &mut group.options)
-            .filter_map(|option| option.embedded_name.as_mut())
-            .for_each(|name| name.resolve(texts));
-    }
+    pub(crate) groups: Vec<NpcSpawnGroup<Name>>,
 }

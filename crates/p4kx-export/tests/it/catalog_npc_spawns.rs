@@ -168,60 +168,113 @@ fn equal_descriptions_share_one_entry_whoever_states_them() -> TestResult {
 
 #[test]
 fn an_npc_description_states_every_field_of_the_records() -> TestResult {
+    use crate::health_origin_assertions as proof;
+
     let catalog = build()?;
     let squad = pool(
         &catalog,
         "contractNpcSpawns",
         &crate::catalog_contracts::entry_by_level(&catalog, false)?["npcSpawns"][0],
     )?;
+    let option = proof::at(squad, "/groups/0/options/0")?;
+    let name = proof::at(option, "/embeddedName")?;
+    check_protected_name(&catalog, name)?;
     assert_eq!(
-        squad["groups"][0]["options"][0],
-        json!({
-            "priority": 2,
-            "includeLocationAISpawnTags": true,
-            "weight": 0.5,
-            "autoSpawnSettings": {
-                "name": "Squad (Grenadier x1)",
-                "initialActivity": "Sentry",
-                "excludeShipCrew": true,
-                "excludeSpawnGender": "Female",
-                "minGroupSize": -1,
-                "maxGroupSize": 4,
-                "maxConcurrentSpawns": 4,
-                "maxSpawns": 6,
-                "minSpawnDelay": 0,
-                "maxSpawnDelay": 10,
-                "missionAlliedMarker": false,
-                "isCritical": true,
-                "characterTags": {"positiveTags": ["ShipModel"], "negativeTags": ["Kill"]},
-                "closetTags": {"positiveTags": ["Missions.Hijacked"], "negativeTags": []},
-                "roomTags": {"positiveTags": [], "negativeTags": []},
-                "defendAreaTags": {"positiveTags": ["Kill"], "negativeTags": []},
-                "scheduleAreaTags": {"positiveTags": [], "negativeTags": ["ShipModel"]},
-                "entityTags": ["Missions.Hijacked"],
-                "inventoryItems": [{
-                    "entityClassGuid": OWNER,
-                    "quantity": 3,
-                    "amountInventoriesToFill": 1,
-                    "markAsMissionItem": true
-                }],
-                "factionOverrideGuid": OWNER
-            },
-            "identifierTags": ["Kill"],
-            "namePropertyVariable": null,
-            "embeddedName": {
-                "randomName": true,
-                "randomLastName": false,
-                "randomNickName": true,
-                "givenName": {"key": "@place_name", "en": "Hijacked Ship", "de": null},
-                "givenLastName": {"key": null, "en": null, "de": null},
-                "givenNickName": {"key": null, "en": null, "de": null},
-                "chanceOfNickName": 0.25,
-                "nameDataGuid": OWNER
-            }
-        })
+        option,
+        &expected_squad_option(name)?,
+        "all non-text spawn settings survive the canonical projection",
+    );
+    proof::closure(&catalog)
+}
+
+fn check_protected_name(catalog: &Value, name: &Value) -> TestResult {
+    use crate::health_origin_assertions as proof;
+    use crate::text_forms_assertions::{direct, forms, present};
+
+    let reference = proof::present(name, "givenName", &json!("text:11:@place_name"), Some(true))?;
+    direct(reference)?;
+    let mut previous = proof::at(reference, "/sourceUsesRefs")?;
+    for field in ["givenLastName", "givenNickName"] {
+        let absent = proof::cell(name, field, "absent")?;
+        direct(absent)?;
+        assert_eq!(
+            proof::at(absent, "/containsEncryptedSource")?.as_bool(),
+            Some(true),
+            "an authored placeholder has its own original input",
+        );
+        let contributors = proof::at(absent, "/sourceUsesRefs")?;
+        assert_ne!(
+            contributors, previous,
+            "each authored slot has distinct evidence"
+        );
+        previous = contributors;
+    }
+    let mut targets = proof::rows(catalog, "/texts/gameTexts")?
+        .iter()
+        .filter(|row| row.pointer("/id/value") == reference.get("value"));
+    let target = targets.next().ok_or("protected NPC name target")?;
+    assert!(targets.next().is_none(), "one canonical target per key");
+    assert_eq!(
+        proof::at(target, "/key/value")?.as_str(),
+        Some("@place_name"),
+        "the selected original key",
+    );
+    present(forms(target, "en")?, "displayText", "Hijacked Ship")?;
+    present(forms(target, "fr")?, "displayText", "Site de mission")?;
+    assert!(
+        target.pointer("/translations/value/de").is_none(),
+        "German has no source entry",
     );
     Ok(())
+}
+
+fn expected_squad_option(name: &Value) -> Result<Value, Box<dyn Error>> {
+    use crate::health_origin_assertions as proof;
+
+    Ok(json!({
+        "priority": 2,
+        "includeLocationAISpawnTags": true,
+        "weight": 0.5,
+        "autoSpawnSettings": {
+            "name": "Squad (Grenadier x1)",
+            "initialActivity": "Sentry",
+            "excludeShipCrew": true,
+            "excludeSpawnGender": "Female",
+            "minGroupSize": -1,
+            "maxGroupSize": 4,
+            "maxConcurrentSpawns": 4,
+            "maxSpawns": 6,
+            "minSpawnDelay": 0,
+            "maxSpawnDelay": 10,
+            "missionAlliedMarker": false,
+            "isCritical": true,
+            "characterTags": {"positiveTags": ["ShipModel"], "negativeTags": ["Kill"]},
+            "closetTags": {"positiveTags": ["Missions.Hijacked"], "negativeTags": []},
+            "roomTags": {"positiveTags": [], "negativeTags": []},
+            "defendAreaTags": {"positiveTags": ["Kill"], "negativeTags": []},
+            "scheduleAreaTags": {"positiveTags": [], "negativeTags": ["ShipModel"]},
+            "entityTags": ["Missions.Hijacked"],
+            "inventoryItems": [{
+                "entityClassGuid": OWNER,
+                "quantity": 3,
+                "amountInventoriesToFill": 1,
+                "markAsMissionItem": true
+            }],
+            "factionOverrideGuid": OWNER
+        },
+        "identifierTags": ["Kill"],
+        "namePropertyVariable": null,
+        "embeddedName": {
+            "randomName": true,
+            "randomLastName": false,
+            "randomNickName": true,
+            "givenName": proof::at(name, "/givenName")?,
+            "givenLastName": proof::at(name, "/givenLastName")?,
+            "givenNickName": proof::at(name, "/givenNickName")?,
+            "chanceOfNickName": 0.25,
+            "nameDataGuid": OWNER
+        }
+    }))
 }
 
 #[test]

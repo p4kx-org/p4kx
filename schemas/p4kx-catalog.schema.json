@@ -30985,6 +30985,72 @@
       ],
       "type": "object"
     },
+    "NpcSpawnName": {
+      "description": "Protected text references and settings of an embedded NPC name.",
+      "properties": {
+        "chanceOfNickName": {
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "givenLastName": {
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "description": "The original `characterGivenLastName`.",
+          "x-gameText": true
+        },
+        "givenName": {
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "description": "The original `characterGivenName`.",
+          "x-gameText": true
+        },
+        "givenNickName": {
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "description": "The original `characterGivenNickName`.",
+          "x-gameText": true
+        },
+        "nameDataGuid": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Guid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "randomLastName": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "randomName": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "randomNickName": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "chanceOfNickName",
+        "givenLastName",
+        "givenName",
+        "givenNickName",
+        "nameDataGuid",
+        "randomLastName",
+        "randomName",
+        "randomNickName"
+      ],
+      "type": "object"
+    },
     "NpcSpawnOption": {
       "description": "One alternative of an NPC group (`SpawnDescription_NPCOption`): the game spawns one of them.",
       "properties": {
@@ -31002,7 +31068,7 @@
         "embeddedName": {
           "anyOf": [
             {
-              "$ref": "#/$defs/AiName"
+              "$ref": "#/$defs/NpcSpawnName"
             },
             {
               "type": "null"

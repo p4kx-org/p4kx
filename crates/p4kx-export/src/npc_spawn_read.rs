@@ -8,7 +8,8 @@ use crate::entity_spawn_model::{
     EntitySpawnGroup, EntitySpawnOption, EntitySpawnPool, EntitySpawnSlot,
 };
 use crate::npc_spawn_model::{
-    AiName, AutoSpawnSettings, NpcSpawnGroup, NpcSpawnOption, NpcSpawnPool, SpawnInventoryItem,
+    AiName, AutoSpawnSettings, DraftNpcPool, NpcSpawnGroup, NpcSpawnOption, NpcSpawnPool,
+    PendingNpcName, SpawnInventoryItem,
 };
 use crate::record_read::ReadError;
 use crate::spawn_model::{self, TagTerm};
@@ -22,7 +23,7 @@ impl<'source> Reader<'_, 'source> {
     pub(crate) fn npcs(
         &self,
         value: &StructValue<'source>,
-    ) -> Result<NpcSpawnPool<'source>, ReadError> {
+    ) -> Result<DraftNpcPool<'source>, ReadError> {
         let groups = self
             .fields(Some(value))
             .structs("spawnDescriptions")?
@@ -34,7 +35,10 @@ impl<'source> Reader<'_, 'source> {
         })
     }
 
-    fn npc_group(&self, group: &StructValue<'source>) -> Result<NpcSpawnGroup<'source>, ReadError> {
+    fn npc_group(
+        &self,
+        group: &StructValue<'source>,
+    ) -> Result<NpcSpawnGroup<PendingNpcName<'source>>, ReadError> {
         let fields = self.fields(Some(group));
         let name = fields.owned("Name")?;
         let options = fields
@@ -86,7 +90,7 @@ impl<'source> Reader<'_, 'source> {
     fn npc_option(
         &self,
         option: &StructValue<'source>,
-    ) -> Result<NpcSpawnOption<'source>, ReadError> {
+    ) -> Result<NpcSpawnOption<PendingNpcName<'source>>, ReadError> {
         let fields = self.fields(Some(option));
         Ok(NpcSpawnOption {
             priority: fields.integer("priority")?,
@@ -100,7 +104,7 @@ impl<'source> Reader<'_, 'source> {
             name_property_variable: fields.variable("nameProperty")?,
             embedded_name: fields
                 .one("embeddedName")?
-                .map(|name| read_ai_name(&self.fields(Some(name))))
+                .map(|name| embedded_name(&self.fields(Some(name))))
                 .transpose()?,
         })
     }
@@ -185,9 +189,25 @@ impl<'source> Reader<'_, 'source> {
     }
 }
 
+const NAME_KEYS: [&str; 3] = [
+    "characterGivenName",
+    "characterGivenLastName",
+    "characterGivenNickName",
+];
+
+fn embedded_name<'source>(
+    fields: &ReadFields<'_, '_, 'source>,
+) -> Result<PendingNpcName<'source>, ReadError> {
+    Ok(PendingNpcName {
+        legacy: read_ai_name(fields)?,
+        keys: fields.retain_name_keys(NAME_KEYS)?,
+    })
+}
+
 fn read_ai_name<'source>(
     fields: &ReadFields<'_, '_, 'source>,
 ) -> Result<AiName<'source>, ReadError> {
+    let [given, family, nickname] = NAME_KEYS;
     let keyed = |field: &str| -> Result<_, ReadError> {
         Ok(LocalisedText {
             key: fields.key(field)?,
@@ -198,9 +218,9 @@ fn read_ai_name<'source>(
         random_name: fields.boolean("randomName")?,
         random_last_name: fields.boolean("randomLastName")?,
         random_nick_name: fields.boolean("randomNickName")?,
-        given_name: keyed("characterGivenName")?,
-        given_last_name: keyed("characterGivenLastName")?,
-        given_nick_name: keyed("characterGivenNickName")?,
+        given_name: keyed(given)?,
+        given_last_name: keyed(family)?,
+        given_nick_name: keyed(nickname)?,
         chance_of_nick_name: fields.number("chanceOfNickName")?,
         name_data_guid: fields.reference("characterNameData")?,
     })

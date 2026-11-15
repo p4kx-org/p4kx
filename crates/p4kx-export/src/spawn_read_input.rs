@@ -3,6 +3,7 @@
 
 use p4kx_extraction::{RecordTree, StructValue, Value};
 
+use crate::catalog_projection::ProtectedKey;
 use crate::guid_text::CatalogGuid;
 use crate::record_fields;
 use crate::record_read::ReadError;
@@ -104,6 +105,20 @@ impl<'reader, 'parent, 'source> ReadFields<'reader, 'parent, 'source> {
         Ok(self
             .scalar(name)?
             .and_then(crate::mission_layers::key_value))
+    }
+
+    pub(crate) fn retain_name_keys(
+        &self,
+        [given, family, nickname]: [&str; 3],
+    ) -> Result<Option<[ProtectedKey<'source>; 3]>, ReadError> {
+        let (Some(capture), Some(parent)) = (self.reader.capture(), self.parent) else {
+            return Ok(None);
+        };
+        Ok(Some([
+            capture.protected_key(parent, given)?,
+            capture.protected_key(parent, family)?,
+            capture.protected_key(parent, nickname)?,
+        ]))
     }
 
     pub(crate) fn strict_number(&self, name: &str, path: &str) -> Result<Option<f32>, ReadError> {

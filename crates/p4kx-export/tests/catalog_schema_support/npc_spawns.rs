@@ -5,6 +5,8 @@
 
 use serde_json::json;
 
+use super::source_values;
+
 pub(super) fn npc_spawns() -> serde_json::Value {
     json!([{
         "guid": "e5000000-0000-4000-8000-000000000001",
@@ -50,15 +52,22 @@ pub(super) fn npc_spawns() -> serde_json::Value {
                     "randomName": true,
                     "randomLastName": true,
                     "randomNickName": false,
-                    "givenName": {"key": "@mg_miles_capturegang_marker_001", "en": "Marker", "de": null},
-                    "givenLastName": {"key": null, "en": null, "de": null},
-                    "givenNickName": {"key": null, "en": null, "de": null},
+                    "givenName": source_values::present(json!("text:23:@fixture_location_title")),
+                    "givenLastName": absent_name(),
+                    "givenNickName": absent_name(),
                     "chanceOfNickName": 0.05,
                     "nameDataGuid": "e8000000-0000-4000-8000-000000000001"
                 }
             }]
         }]
     }])
+}
+
+fn absent_name() -> serde_json::Value {
+    json!({
+        "state": "absent", "value": null, "sourceUsesRefs": [],
+        "sourceSetComplete": true, "containsEncryptedSource": false
+    })
 }
 
 pub(super) fn entity_spawns() -> serde_json::Value {
