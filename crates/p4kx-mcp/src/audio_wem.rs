@@ -2,18 +2,22 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_assembly::audio::MAX_SOUNDBANK_LEN;
-use p4kx_extraction::{AudioError, Bank, EmbeddedWem};
+use p4kx_extraction::{AudioError, Bank};
 
 use crate::archives::Opened;
 
-use crate::audio_params::{MAX_NAME_LEN, SoundbankParams, WemParams};
+use crate::audio_params::WemParams;
 use crate::audio_shapes::LocationShape;
-use crate::audio_wem_input::{Held, WemOps, candidates, read};
-use crate::audio_wem_shapes::{SoundbankWemsResult, WemInfoResult, WemShape};
+use crate::audio_wem_input::{Held, candidates, read};
+use crate::audio_wem_shapes::{WemInfoResult, WemShape};
 
 use crate::budget::{fill_within, json_len};
-use crate::error::{ToolError, capped};
+use crate::error::ToolError;
 use crate::page::Page;
+
+#[path = "audio_wem_list.rs"]
+mod list;
+pub(crate) use list::{EvidenceError as ListEvidenceError, soundbank_wems};
 
 /// A WEM that cannot be parsed as a sound.
 fn unreadable(id: Option<u32>, size: u64, error: Option<&AudioError>) -> WemShape {
@@ -32,51 +36,6 @@ fn unreadable(id: Option<u32>, size: u64, error: Option<&AudioError>) -> WemShap
         plugin_media: plugin,
         error: error.filter(|_| !plugin).map(ToString::to_string),
     }
-}
-
-fn embedded_shape(wem: &EmbeddedWem<'_>) -> WemShape {
-    let size = wem.bytes().len() as u64;
-    let id = Some(wem.id());
-    if wem.is_prefetch() {
-        return unreadable(id, size, None);
-    }
-    match wem.parse() {
-        Ok(parsed) => parsed.shape(id, size),
-        Err(error) => unreadable(id, size, Some(&error)),
-    }
-}
-
-/// Returns one page of the WEMs the soundbank at `params.soundbank` embeds, each described by its
-/// header.
-pub(crate) fn soundbank_wems(
-    opened: &Opened,
-    params: &SoundbankParams,
-    page: Page,
-) -> Result<SoundbankWemsResult, ToolError> {
-    let path = capped("soundbank", &params.soundbank, MAX_NAME_LEN * 4)?;
-    let bank = open_bank(opened, path)?;
-    let soundbank = bank.soundbank();
-    let wems: Vec<EmbeddedWem<'_>> = soundbank.wems().collect();
-    let items = page.slice(&wems).iter().map(embedded_shape);
-    let mut result = SoundbankWemsResult {
-        archive: opened.archive().path().display().to_string(),
-        soundbank: bank.name().to_owned(),
-        version: soundbank.header().version,
-        bank_id: soundbank.header().id,
-        total: wems.len(),
-        wems: Vec::new(),
-        next_cursor: None,
-    };
-    let (listed, next_cursor) = fill_within(
-        page,
-        wems.len(),
-        json_len(&result),
-        items.map(Ok),
-        |wem: &WemShape| format!("WEM {}", wem.id.unwrap_or_default()),
-    )?;
-    result.wems = listed;
-    result.next_cursor = next_cursor;
-    Ok(result)
 }
 
 /// Reads the soundbank Entry at `path`, refusing one larger than the audio index reads.

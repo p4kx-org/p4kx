@@ -994,6 +994,14 @@ range in the decoded WEM. Other decoders identify the selected encoded data chun
 Embedded WEM coordinates begin with the ID, DATA-relative offset and size of the selected media
 in the original soundbank. The WAV bytes and existing playback-window fields keep their format.
 
+For `list_soundbank_wems`, `fieldOrigins` addresses the bank fields, returned WEM metadata and
+page navigation. The bank path uses Archive directory metadata. The version and bank ID identify
+the original BKHD words. WEM IDs and sizes identify their original DIDX words, and the WEM parser
+uses refer to the selected DATA range followed by WEM-relative coordinates. Prefetch and plug-in
+results retain the original controls for their disposition. When a malformed WEM prevents exact
+field coordinates, its source and the missing coordinates are reported. Origin records count toward
+the response budget. The cursor continues at the first unreturned WEM.
+
 For `read_entry_text`, `fieldOrigins` identifies the inputs of each result field. UTF-8 pages keep
 their original decoded Entry byte range after the byte order mark and character alignment.
 UTF-16 and CryXml use the original converter input, while result offsets count UTF-8 bytes.

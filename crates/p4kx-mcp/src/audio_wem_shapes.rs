@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::{FieldOrigins, SourceInventory};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -53,6 +54,11 @@ pub(crate) struct SoundbankWemsResult {
     /// The cursor of the next page; absent on the last page.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) next_cursor: Option<String>,
+    /// Immediate per-field origins at pointers into this result.
+    #[serde(rename = "fieldOrigins")]
+    pub(crate) field_origins: FieldOrigins,
+    /// Physical sources and uses referenced by the field origins on this page.
+    pub(crate) provenance: SourceInventory,
 }
 
 /// A WEM with where the Archive holds it.
@@ -110,5 +116,5 @@ pub(crate) struct ExcerptResult {
     #[serde(rename = "fieldOrigins")]
     pub(crate) field_origins: crate::audio_excerpt_origin::ExcerptFieldOrigins,
     /// Original source and contribution coordinates used by this response.
-    pub(crate) provenance: p4kx_extraction::SourceInventory,
+    pub(crate) provenance: SourceInventory,
 }

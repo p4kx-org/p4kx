@@ -229,6 +229,18 @@ impl<B: AsRef<[u8]>> Soundbank<B> {
         })
     }
 
+    /// Returns the physical section tags and their half-open body ranges in bank order.
+    pub fn source_section_bodies(
+        &self,
+    ) -> impl ExactSizeIterator<Item = (SectionId, Range<u64>)> + '_ {
+        self.sections.iter().map(|section| {
+            (
+                section.id,
+                section.body.start as u64..section.body.end as u64,
+            )
+        })
+    }
+
     /// Returns the first section with the tag `id`.
     #[must_use]
     pub fn section(&self, id: SectionId) -> Option<Section<'_>> {

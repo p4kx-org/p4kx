@@ -146,7 +146,8 @@ impl Server {
         description = "List the WEMs a soundbank (.bnk Entry) embeds, page by page: per WEM its ID, size, codec, \
         channels, sample rate, frame count and duration, whether it only is the prefetched start of a streamed sound \
         (whose whole file is a loose WEM Entry named by the ID) and why it cannot be read if so. Only metadata is \
-        returned, no audio. The content may be forwarded by the client to third parties; game texts and media must \
+        returned, with per-field original source evidence and encryption markers. The response budget includes \
+        that evidence. The content may be forwarded by the client to third parties; game texts and media must \
         not be redistributed.",
         output_schema = rmcp::handler::server::tool::schema_for_output::<SoundbankWemsResult>(),
         annotations(

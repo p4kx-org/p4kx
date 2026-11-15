@@ -28,6 +28,7 @@ mod audio_shared_node_fields;
 mod audio_state_action_source_fields;
 mod audio_switch_source_fields;
 mod audio_wem;
+mod audio_wem_list_origins;
 mod channel_notice;
 mod chunk_origins;
 mod complete_audio_events;
