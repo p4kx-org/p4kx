@@ -1,21 +1,25 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::fs;
 use std::io::{self, Read, Write};
-use std::ops::Range;
 use std::path::Path;
 
-use p4kx_extraction::chunks::{ChunkFile, ivo};
-use p4kx_extraction::model::{PhysicsBlob, PhysicsGeometry, StatObjPhysics};
-use p4kx_extraction::{Archive, ArchiveWatch};
-use p4kx_media::{ExportOptions, ExportOutcome, MediaKind, MediaRecord};
+use p4kx_extraction::{Archive, ArchiveWatch, Build};
+use p4kx_media::{ExportOptions, ExportOutcome, MediaKind, MediaRecord, Status};
 use p4kx_testkit::{ArchiveBuilder, TestEntry};
 use serde_json::Value;
 use sha2::{Digest as _, Sha256};
 
 use super::{TestResult, privacy};
+
+#[path = "model_collision_table_oracle.rs"]
+mod oracle;
+#[path = "model_collision_replay_tests.rs"]
+mod synthetic;
+
+use oracle::{Evidence, Tally};
 
 const SOURCE_SAMPLES: usize = 96;
 const MAX_ENTRY_BYTES: u64 = 256 << 10;
@@ -34,36 +38,81 @@ fn verify() -> TestResult {
     )?;
     let watch = ArchiveWatch::new(&source);
     watch.check()?;
-    let data = select(&source, &watch)?;
-    let folder = tempfile::tempdir()?;
-    let path = folder.path().join("Data.p4k");
-    let original_digest = Sha256::digest(&data);
-    let expected = inspect(&data)?;
-    ArchiveBuilder::new()
-        .entry(TestEntry::stored("sample.cgf", data))
-        .write_to(&path)?;
-    let replay = Archive::open(path)?;
-    let output = folder.path().join("out");
-    let options = ExportOptions {
-        kinds: vec![MediaKind::Model],
-        ..ExportOptions::default()
-    };
-    let ExportOutcome::Published { index, .. } = p4kx_media::export(&replay, &output, &options)?
-    else {
-        return Err("selected original payload did not produce a complete replay".into());
-    };
-    let base = output.join(&index.artifact_base);
-    let rows = fs::read_to_string(base.join("model.jsonl"))?;
-    let actual = check_rows(&base, &rows, &original_digest, &expected.slots)?;
-    if expected.tally != actual {
-        return Err("replay occurrence counts differ from source collision payloads".into());
+    let build = source.build().ok_or("authoritative installed Build")?;
+    let directory = source
+        .path()
+        .parent()
+        .ok_or("installed channel directory")?;
+    let mut source_tally = Tally::default();
+    for (ordinal, sample) in select(&source, &watch)?.iter().enumerate() {
+        let expected = Evidence::read(sample)?;
+        replay(sample, expected.partial(), |generation, rows| {
+            check_rows(generation, rows, &Sha256::digest(sample), &expected)?;
+            accumulate(&mut source_tally, expected.tally());
+            Ok(())
+        })?;
+        watch.check()?;
+        writeln!(
+            io::stdout().lock(),
+            "Reconciled original collision sample {}.",
+            ordinal + 1
+        )?;
     }
-    watch.check()?;
-    writeln!(io::stdout().lock(), "original collision replay: {actual:?}")?;
+    if Build::read_from(directory)?.as_ref() != Some(build) {
+        return Err("installed Build changed during collision replay".into());
+    }
+    writeln!(
+        io::stdout().lock(),
+        "Installed change {}, original collision tables {}, dispositions {:?}, vertices {}, triangles {}.",
+        build.change_number(),
+        source_tally.tables,
+        source_tally.dispositions,
+        source_tally.vertices,
+        source_tally.triangles,
+    )?;
     Ok(())
 }
 
-fn select(source: &Archive, watch: &ArchiveWatch) -> TestResult<Vec<u8>> {
+fn accumulate(total: &mut Tally, addition: Tally) {
+    total.tables += addition.tables;
+    total.vertices += addition.vertices;
+    total.triangles += addition.triangles;
+    for (kind, count) in addition.dispositions {
+        *total.dispositions.entry(kind).or_default() += count;
+    }
+}
+
+fn replay(
+    data: &[u8],
+    partial_collision: bool,
+    check: impl FnOnce(&Path, &str) -> TestResult,
+) -> TestResult {
+    let folder = tempfile::tempdir()?;
+    let path = folder.path().join("Data.p4k");
+    ArchiveBuilder::new()
+        .entry(TestEntry::stored("sample.cgf", data))
+        .write_to(&path)?;
+    let archive = Archive::open(path)?;
+    let output = folder.path().join("out");
+    let options = ExportOptions {
+        kinds: vec![MediaKind::Model],
+        diagnostic: true,
+        ..ExportOptions::default()
+    };
+    let generation = match p4kx_media::export(&archive, &output, &options)? {
+        ExportOutcome::Published { index, .. } if !partial_collision => {
+            output.join(&index.artifact_base)
+        }
+        ExportOutcome::Incomplete { diagnostic, .. } => {
+            diagnostic.parent().ok_or("diagnostic generation")?.into()
+        }
+        _ => return Err("original sample replay did not produce a Model Media generation".into()),
+    };
+    let rows = fs::read_to_string(generation.join("model.jsonl"))?;
+    check(&generation, &rows)
+}
+
+fn select(source: &Archive, watch: &ArchiveWatch) -> TestResult<Vec<Vec<u8>>> {
     let candidates = source
         .entries()
         .iter()
@@ -75,6 +124,8 @@ fn select(source: &Archive, watch: &ArchiveWatch) -> TestResult<Vec<u8>> {
                 })
         })
         .collect::<Vec<_>>();
+    let mut samples = Vec::new();
+    let mut dispositions = BTreeSet::new();
     let limit = candidates.len().min(SOURCE_SAMPLES);
     for ordinal in 0..limit {
         watch.poll()?;
@@ -83,124 +134,181 @@ fn select(source: &Archive, watch: &ArchiveWatch) -> TestResult<Vec<u8>> {
             .ok_or("selected physical Entry")?;
         let mut bytes = Vec::new();
         source.open_entry_verified(entry)?.read_to_end(&mut bytes)?;
-        let tally = inspect(&bytes)?.tally;
-        if tally.slots > 0 && tally.vertices > 0 {
-            return Ok(bytes);
+        let evidence = Evidence::read(&bytes)?;
+        let tally = evidence.tally();
+        let contributes = tally
+            .dispositions
+            .keys()
+            .any(|kind| !dispositions.contains(kind));
+        if contributes {
+            dispositions.extend(tally.dispositions.keys().copied());
+            samples.push(bytes);
         }
     }
-    Err("no bounded original collision source with positive vertex coverage".into())
-}
-
-#[derive(Debug, Default, PartialEq, Eq)]
-struct Count {
-    chunks: usize,
-    slots: usize,
-    vertices: usize,
-    triangles: usize,
+    if !dispositions.contains("trimesh") {
+        return Err("no bounded original triangle collision witness".into());
+    }
+    Ok(samples)
 }
 
 #[derive(Default)]
-struct Observed {
-    tally: Count,
-    slots: BTreeMap<[u64; 2], OriginalSlot>,
+struct Coverage {
+    tables: BTreeSet<u64>,
+    slots: BTreeSet<[u64; 2]>,
+    vertices: BTreeSet<[u64; 3]>,
+    triangles: BTreeSet<[u64; 3]>,
 }
 
-struct OriginalSlot {
-    packed_key: u32,
-    range: Range<u64>,
-}
-
-fn inspect(data: &[u8]) -> TestResult<Observed> {
-    let mut observed = Observed::default();
-    let Ok(file) = ChunkFile::parse(data) else {
-        return Ok(observed);
-    };
-    for (index, chunk) in file.chunks().iter().enumerate() {
-        if chunk.chunk_type() != ivo::STAT_OBJ_PHYSICS {
-            continue;
-        }
-        observed.tally.chunks += 1;
-        let physics = StatObjPhysics::read_chunk(&file, index)?;
-        let bytes = file.chunk_data(index).ok_or("original collision chunk")?;
-        for slot in physics.slots() {
-            observed.tally.slots += 1;
-            let declared = slot.declared_range();
-            let start = usize::try_from(declared.start)?;
-            let end = usize::try_from(declared.end)?;
-            if slot.bytes() != bytes.get(start..end) {
-                return Err("source slot differs from original chunk byte slice".into());
-            }
-            let source = OriginalSlot {
-                packed_key: slot.key(),
-                range: chunk.offset() + declared.start..chunk.offset() + declared.end,
-            };
-            observed
-                .slots
-                .insert([index as u64, slot.ordinal() as u64], source);
-            if let PhysicsBlob::Geometry(PhysicsGeometry::Trimesh(mesh)) = slot.blob() {
-                observed.tally.vertices += mesh.vertices().len();
-                observed.tally.triangles += mesh.triangles().len();
-            }
-        }
-    }
-    Ok(observed)
-}
-
-fn check_rows(
-    base: &Path,
-    rows: &str,
-    expected: &[u8],
-    slots: &BTreeMap<[u64; 2], OriginalSlot>,
-) -> TestResult<Count> {
-    let mut tally = Count::default();
+fn check_rows(generation: &Path, rows: &str, digest: &[u8], expected: &Evidence<'_>) -> TestResult {
+    let mut coverage = Coverage::default();
     let mut raw = None;
     let schema = jsonschema::validator_for(&p4kx_media::builtin_record_schema()?)?;
     for line in rows.lines() {
         let record: MediaRecord = serde_json::from_str(line)?;
         if !schema.is_valid(&serde_json::to_value(&record)?) {
-            return Err("model replay record fails the public schema".into());
+            return Err("collision replay row fails the public schema".into());
         }
         let path = &record
             .source
             .raw
             .as_ref()
-            .ok_or("replay retained original source")?
+            .ok_or("retained original source")?
             .path;
         if raw.as_ref().is_some_and(|prior| prior != path) {
-            return Err("projection does not share its original retained artifact".into());
+            return Err("collision rows use different retained physical Entries".into());
         }
         raw = Some(path.clone());
-        match record.subresource.namespace.as_str() {
-            "model-physics-table" => tally.chunks += 1,
-            "model-physics-slot" => {
-                tally.slots += 1;
-                check_slot(&record, slots)?;
-            }
-            "model-physics-vertex" => tally.vertices += 1,
-            "model-physics-triangle" => tally.triangles += 1,
-            _ => {}
-        }
+        coverage.row(&record, expected)?;
     }
-    let bytes = fs::read(base.join(raw.ok_or("replay output contains no model source")?))?;
-    if Sha256::digest(bytes).as_slice() != expected {
+    let bytes = fs::read(generation.join(raw.ok_or("replay output contains no Model sources")?))?;
+    if Sha256::digest(bytes).as_slice() != digest {
         return Err("retained replay bytes differ from original archive Entry".into());
     }
-    Ok(tally)
-}
-
-fn check_slot(record: &MediaRecord, slots: &BTreeMap<[u64; 2], OriginalSlot>) -> TestResult {
-    let physical = <[u64; 2]>::try_from(record.subresource.indices.as_slice())?;
-    let slot = slots.get(&physical).ok_or("physical original slot")?;
-    let row = record.data.get("payload").ok_or("slot payload")?;
-    for (path, expected) in [
-        ("/packed_key", u64::from(slot.packed_key)),
-        ("/retained_range/start", slot.range.start),
-        ("/retained_range/end_exclusive", slot.range.end),
-        ("/declared_length", slot.range.end - slot.range.start),
-    ] {
-        if row.pointer(path).and_then(Value::as_u64) != Some(expected) {
-            return Err("wire slot fact differs from the physical original slot".into());
-        }
+    let tally = expected.tally();
+    if (
+        coverage.tables.len(),
+        coverage.slots.len(),
+        coverage.vertices.len(),
+        coverage.triangles.len(),
+    ) != (
+        expected.tables.len(),
+        expected.slots.len(),
+        tally.vertices,
+        tally.triangles,
+    ) {
+        return Err("collision replay lost original physical rows".into());
     }
     Ok(())
+}
+
+impl Coverage {
+    fn row(&mut self, row: &MediaRecord, originals: &Evidence<'_>) -> TestResult {
+        let indices = row.subresource.indices.as_slice();
+        match row.subresource.namespace.as_str() {
+            "model-physics-table" => {
+                let [chunk] = <[u64; 1]>::try_from(indices)?;
+                unique(&mut self.tables, chunk)?;
+                let expected = originals
+                    .tables
+                    .get(&chunk)
+                    .ok_or("original collision table")?;
+                compare(row, &expected.value(), expected.partial())
+            }
+            "model-physics-slot" => {
+                let identity = <[u64; 2]>::try_from(indices)?;
+                unique(&mut self.slots, identity)?;
+                let expected = originals
+                    .slots
+                    .get(&identity)
+                    .ok_or("original collision slot")?;
+                compare(row, &expected.value(), expected.partial())
+            }
+            "model-physics-vertex" => {
+                mesh_row(row, originals, &mut self.vertices, MeshRecord::Vertex)
+            }
+            "model-physics-triangle" => {
+                mesh_row(row, originals, &mut self.triangles, MeshRecord::Triangle)
+            }
+            _ => Ok(()),
+        }
+    }
+}
+
+fn unique<T: Ord>(seen: &mut BTreeSet<T>, identity: T) -> TestResult {
+    if !seen.insert(identity) {
+        return Err("duplicate physical collision row".into());
+    }
+    Ok(())
+}
+
+#[derive(Clone, Copy)]
+enum MeshRecord {
+    Vertex,
+    Triangle,
+}
+
+fn mesh_row(
+    row: &MediaRecord,
+    originals: &Evidence<'_>,
+    seen: &mut BTreeSet<[u64; 3]>,
+    shape: MeshRecord,
+) -> TestResult {
+    let identity = <[u64; 3]>::try_from(row.subresource.indices.as_slice())?;
+    unique(seen, identity)?;
+    let [chunk, slot, ordinal] = identity;
+    let mesh = originals
+        .slots
+        .get(&[chunk, slot])
+        .and_then(|slot| slot.blob.mesh())
+        .ok_or("row must belong to an original triangle mesh slot")?;
+    let ordinal = usize::try_from(ordinal)?;
+    let value = match shape {
+        MeshRecord::Vertex => mesh.vertex(ordinal),
+        MeshRecord::Triangle => mesh.triangle(ordinal),
+    }
+    .ok_or("row has no original mesh element")?;
+    compare(row, &value, false)
+}
+
+fn compare(row: &MediaRecord, original: &Value, partial: bool) -> TestResult {
+    let actual = row.data.get("payload").ok_or("collision row payload")?;
+    let status = if partial {
+        Status::Partial
+    } else {
+        Status::Complete
+    };
+    if row.status != status || !equal(actual, original) {
+        return Err(
+            "Media collision row differs from the original layout or its disposition".into(),
+        );
+    }
+    Ok(())
+}
+
+fn equal(actual: &Value, original: &Value) -> bool {
+    match (actual, original) {
+        (Value::Object(a), Value::Object(b)) => {
+            a.len() == b.len()
+                && b.iter()
+                    .all(|(key, expected)| a.get(key).is_some_and(|actual| equal(actual, expected)))
+        }
+        (Value::Array(a), Value::Array(b)) => {
+            a.len() == b.len() && a.iter().zip(b).all(|(a, b)| equal(a, b))
+        }
+        (Value::Number(a), Value::Number(b)) if a.is_f64() && b.is_f64() => {
+            let (Some(a), Some(b)) = (a.as_f64(), b.as_f64()) else {
+                return false;
+            };
+            binary32(a).to_bits() == binary32(b).to_bits()
+        }
+        _ => actual == original,
+    }
+}
+
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "the original collision scalar is binary32"
+)]
+const fn binary32(value: f64) -> f32 {
+    value as f32
 }

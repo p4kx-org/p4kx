@@ -317,6 +317,16 @@ ordinal. Their fields carry original float words, u16 vertex indices and per-tri
 bytes. The shared per-field origin receipts identify the exact source bytes. Model material
 dependencies and converted geometry have separate coverage.
 
+The installed collision replay checks representative CRC-verified CGF and CGA Entries
+against an independent byte reader. It reconciles blob ranges, typed dispositions, vertices
+and triangle indices with schema-validated Model Media records in small temporary replay
+Archives. Run it separately for each Build with `P4KX_DATA_P4K` and the normal Archive key
+configuration.
+
+```powershell
+cargo test --locked -p p4kx-media --test real_archive -- model_collision_replay::installed_collision_slots_match_original_bytes_and_model_media_replay --ignored --exact --nocapture
+```
+
 `--kind animation` retains CAF, DBA and AIM sources with chunk and clip inventory, original
 metadata and controller words, and typed decoded frame and key chunks. The same provider
 retains both global animation images and writes the ordered CAF image records.
