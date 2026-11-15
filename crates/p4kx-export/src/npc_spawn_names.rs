@@ -21,23 +21,23 @@ pub(crate) struct PendingNpcName<'source> {
     pub(crate) keys: Option<[ProtectedKey<'source>; 3]>,
 }
 
-/// Protected text references and settings of an embedded NPC name.
+/// Protected text references and settings of an NPC name.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct NpcSpawnName {
+#[schemars(rename = "NpcSpawnName", transform = every_field_required)]
+pub(crate) struct NpcSpawnName<Text = SourcedValue<GameTextRef>> {
     pub(crate) random_name: Option<bool>,
     pub(crate) random_last_name: Option<bool>,
     pub(crate) random_nick_name: Option<bool>,
     /// The original `characterGivenName`.
     #[schemars(extend("x-gameText" = true))]
-    pub(crate) given_name: SourcedValue<GameTextRef>,
+    pub(crate) given_name: Text,
     /// The original `characterGivenLastName`.
     #[schemars(extend("x-gameText" = true))]
-    pub(crate) given_last_name: SourcedValue<GameTextRef>,
+    pub(crate) given_last_name: Text,
     /// The original `characterGivenNickName`.
     #[schemars(extend("x-gameText" = true))]
-    pub(crate) given_nick_name: SourcedValue<GameTextRef>,
+    pub(crate) given_nick_name: Text,
     pub(crate) chance_of_nick_name: Option<f32>,
     pub(crate) name_data_guid: Option<CatalogGuid>,
 }

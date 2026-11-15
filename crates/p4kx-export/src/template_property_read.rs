@@ -114,9 +114,7 @@ impl<'f> PropertyReader<'_, '_, 'f> {
                 max_items_to_find: integer(parent, "maxItemsToFind"),
             },
             Some(PropertyValueKind::AiName) => {
-                let mut name = self.reader.ai_name(value)?;
-                name.resolve(self.texts);
-                PropertyValue::AiName(name)
+                PropertyValue::AiName(Box::new(self.reader.ai_name(value)?))
             }
             Some(PropertyValueKind::CombinedDataSetEntries) => {
                 PropertyValue::CombinedDataSetEntries {

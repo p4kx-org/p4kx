@@ -120,6 +120,7 @@ pub(super) enum OutputFault {
     MissingContracts,
     SetIdentity,
     DuplicateSetIdentity,
+    TextInventory,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -147,6 +148,8 @@ pub(super) enum SourceFault {
     DeclarationTextValue,
     ValuePresence,
     ValueType,
+    AiNameProjection,
+    AiNameKey,
     ScopedType,
     FilterFieldMissing,
     FilterPresence,

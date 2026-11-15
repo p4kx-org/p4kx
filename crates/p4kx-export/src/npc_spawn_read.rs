@@ -3,13 +3,15 @@
 
 use p4kx_extraction::StructValue;
 
+use crate::ExportAccountingError;
 use crate::contract::LocalisedText;
 use crate::entity_spawn_model::{
     EntitySpawnGroup, EntitySpawnOption, EntitySpawnPool, EntitySpawnSlot,
 };
+use crate::mission_property_set::MissionPropertyText;
 use crate::npc_spawn_model::{
-    AiName, AutoSpawnSettings, DraftNpcPool, NpcSpawnGroup, NpcSpawnOption, NpcSpawnPool,
-    PendingNpcName, SpawnInventoryItem,
+    AiName, AutoSpawnSettings, DraftNpcPool, NpcSpawnGroup, NpcSpawnName, NpcSpawnOption,
+    NpcSpawnPool, PendingNpcName, SpawnInventoryItem,
 };
 use crate::record_read::ReadError;
 use crate::spawn_model::{self, TagTerm};
@@ -180,12 +182,26 @@ fn inventory_item(fields: &ReadFields<'_, '_, '_>) -> Result<SpawnInventoryItem,
 }
 
 impl<'source> Reader<'_, 'source> {
-    /// Reads AI-name keys through the same admitted field accesses as embedded names.
+    /// Reads name settings and retains protected text from the same admitted fields.
     pub(crate) fn ai_name(
         &self,
         name: &StructValue<'source>,
-    ) -> Result<AiName<'source>, ReadError> {
-        read_ai_name(&self.fields(Some(name)))
+    ) -> Result<NpcSpawnName<MissionPropertyText<'source>>, ReadError> {
+        let fields = self.fields(Some(name));
+        let name = read_ai_name(&fields)?;
+        let [given, family, nickname] = fields
+            .retain_name_keys(NAME_KEYS)?
+            .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+        Ok(NpcSpawnName {
+            random_name: name.random_name,
+            random_last_name: name.random_last_name,
+            random_nick_name: name.random_nick_name,
+            given_name: MissionPropertyText::pending(name.given_name.key, given),
+            given_last_name: MissionPropertyText::pending(name.given_last_name.key, family),
+            given_nick_name: MissionPropertyText::pending(name.given_nick_name.key, nickname),
+            chance_of_nick_name: name.chance_of_nick_name,
+            name_data_guid: name.name_data_guid,
+        })
     }
 }
 

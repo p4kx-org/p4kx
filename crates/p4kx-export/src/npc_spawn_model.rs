@@ -7,7 +7,6 @@ use serde::Serialize;
 use crate::contract::{LocalisedText, every_field_required};
 use crate::guid_text::CatalogGuid;
 use crate::spawn_model::{TagPaths, TagTerm};
-use crate::texts::Texts;
 
 #[path = "npc_spawn_names.rs"]
 mod names;
@@ -108,19 +107,6 @@ pub(crate) struct AiName<'a> {
     pub(crate) chance_of_nick_name: Option<f32>,
     /// The `characterNameData` Record (`CharacterRandomNameParams`), `null` when absent.
     pub(crate) name_data_guid: Option<CatalogGuid>,
-}
-
-impl<'a> AiName<'a> {
-    /// Replaces the keys of the three texts with the texts `texts` resolves them to.
-    pub(crate) fn resolve(&mut self, texts: &Texts<'a>) {
-        for text in [
-            &mut self.given_name,
-            &mut self.given_last_name,
-            &mut self.given_nick_name,
-        ] {
-            *text = texts.localised(text.key);
-        }
-    }
 }
 
 /// One alternative of an NPC group (`SpawnDescription_NPCOption`): the game spawns one of them.

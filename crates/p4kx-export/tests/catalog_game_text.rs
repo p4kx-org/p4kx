@@ -84,6 +84,23 @@ fn exactly_the_game_text_fields_carry_the_game_text_annotation() {
         .get("$defs")
         .and_then(Value::as_object)
         .expect("catalog definitions");
+    let name_variant = schema
+        .pointer("/$defs/PropertyValue/oneOf")
+        .and_then(Value::as_array)
+        .and_then(|variants| {
+            variants.iter().find(|variant| {
+                variant
+                    .pointer("/properties/type/const")
+                    .and_then(Value::as_str)
+                    == Some("aiName")
+            })
+        })
+        .expect("the direct Generator AI-name variant");
+    assert_eq!(
+        name_variant.get("$ref").and_then(Value::as_str),
+        Some("#/$defs/NpcSpawnName"),
+        "Generator AI names use the same protected fields as the NPC name schema",
+    );
     let mut properties = Vec::new();
     collect_properties(&schema, "Catalog", &mut properties);
     for (owner, definition) in definitions {
@@ -108,7 +125,7 @@ fn exactly_the_game_text_fields_carry_the_game_text_annotation() {
         marked += usize::from(carries);
     }
     assert_eq!(
-        marked, 105,
+        marked, 102,
         "every protected field in the canonical schema is accounted for"
     );
 }

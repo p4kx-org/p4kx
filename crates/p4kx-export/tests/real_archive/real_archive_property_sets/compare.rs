@@ -12,6 +12,7 @@ use super::error::{
 use super::health::Health;
 use super::published::Published;
 use super::{Counts, OracleResult, health, source, values};
+use crate::real_archive_canonical_texts::TextIndex;
 use crate::real_archive_contracts::v3;
 
 struct SourceOutcome {
@@ -47,7 +48,7 @@ pub(super) fn check<'f>(
         &tree,
         rows,
         &sets,
-        &published.by_guid,
+        published,
         &SourceOutcome {
             ambiguous: health::ambiguous(health, record.index()),
             failure: health::production_failure(health, record.index()),
@@ -60,7 +61,7 @@ fn check_owner(
     tree: &RecordTree<'_>,
     rows: &[&Value],
     sets: &[&Value],
-    by_guid: &HashMap<&str, &Value>,
+    published: &Published<'_>,
     outcome: &SourceOutcome,
     checked: &mut Counts,
 ) -> OracleResult {
@@ -85,7 +86,7 @@ fn check_owner(
             checked.quarantined += 1;
             continue;
         };
-        checked.scoped += check_set(tree, source, set)?;
+        checked.scoped += check_set(tree, source, set, &published.texts)?;
         checked.sets.insert(
             set["guid"]
                 .as_str()
@@ -100,7 +101,7 @@ fn check_owner(
         let Some(expected) = raw.rows.get(&key) else {
             continue;
         };
-        check_joins(row, expected, by_guid, &owner, outcome.ambiguous)?;
+        check_joins(row, expected, &published.by_guid, &owner, outcome.ambiguous)?;
         checked.rows.insert(key);
     }
     Ok(())
@@ -110,6 +111,7 @@ fn check_set(
     tree: &RecordTree<'_>,
     source: &source::SourceSet<'_, '_>,
     set: &Value,
+    texts: &TextIndex<'_>,
 ) -> OracleResult<usize> {
     require_equal!(
         set["recordPath"],
@@ -126,7 +128,12 @@ fn check_set(
         source.level.name(),
         Failure::SourceCompare(SourceFault::SetLevel)
     );
-    values::check(source.properties, &set["properties"], tree.record_index())
+    values::check(
+        source.properties,
+        &set["properties"],
+        tree.record_index(),
+        texts,
+    )
 }
 
 fn check_joins(

@@ -3,7 +3,10 @@
 
 //! One contract-level property of each type of value.
 
+use p4kx_extraction::SourceValue;
 use serde_json::{Value, json};
+
+use super::source_values;
 
 pub(super) fn template_properties() -> Value {
     Value::Array([links_and_items(), the_rest()].concat())
@@ -44,9 +47,9 @@ fn links_and_items() -> Vec<Value> {
                 "randomName": true,
                 "randomLastName": true,
                 "randomNickName": false,
-                "givenName": {"key": null, "en": null, "de": null},
-                "givenLastName": {"key": null, "en": null, "de": null},
-                "givenNickName": {"key": null, "en": null, "de": null},
+                "givenName": source_values::source(SourceValue::Absent),
+                "givenLastName": source_values::source(SourceValue::Absent),
+                "givenNickName": source_values::source(SourceValue::Absent),
                 "chanceOfNickName": 0.05,
                 "nameDataGuid": "e8000000-0000-4000-8000-000000000001"
             }

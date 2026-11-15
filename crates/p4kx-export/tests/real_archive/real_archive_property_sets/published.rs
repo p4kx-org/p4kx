@@ -7,6 +7,7 @@ use serde_json::Value;
 
 use super::OracleResult;
 use super::error::{Failure, OutputFault};
+use crate::real_archive_canonical_texts::TextIndex;
 use crate::real_archive_contracts::v3;
 
 type OwnerRows<'a> = HashMap<&'a str, Vec<&'a Value>>;
@@ -16,6 +17,7 @@ pub(super) struct Published<'a> {
     pub(super) sets: &'a [Value],
     pub(super) contracts: &'a [Value],
     by_owner: HashMap<u64, OwnerRows<'a>>,
+    pub(super) texts: TextIndex<'a>,
     pub(super) by_guid: HashMap<&'a str, &'a Value>,
 }
 
@@ -52,10 +54,15 @@ impl<'a> Published<'a> {
         if by_guid.len() != sets.len() {
             return Err(Failure::OutputParse(OutputFault::DuplicateSetIdentity));
         }
+        let texts = Failure::classify(
+            TextIndex::new(document),
+            Failure::OutputParse(OutputFault::TextInventory),
+        )?;
         Ok(Self {
             sets,
             contracts,
             by_owner,
+            texts,
             by_guid,
         })
     }

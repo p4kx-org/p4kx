@@ -3,8 +3,11 @@
 
 #[path = "mission_property_set_rows/mod.rs"]
 mod rows;
+#[path = "mission_property_text.rs"]
+mod text;
 
 pub(crate) use rows::{MissionPropertySets, SetOwner};
+pub(crate) use text::MissionPropertyText;
 
 use schemars::JsonSchema;
 use serde::Serialize;

@@ -13,6 +13,7 @@ use super::super::error::{
 use super::super::published::Published;
 use super::super::{Counts, TestResult, compare, health, values};
 use super::fixture::Fixture;
+use crate::real_archive_canonical_texts::TextIndex;
 
 pub(super) const SENTINEL: &str = "SENTINEL_PRIVATE_VALUE_GUID_RECORD_PATH";
 
@@ -70,6 +71,11 @@ pub(super) fn assert_sanitized(failure: Failure) {
 }
 
 fn compare_mutation(fixture: &Fixture, document: &Value) -> TestResult<Failure> {
+    compare_document(fixture, document)?
+        .ok_or_else(|| "the mutated source output was accepted".into())
+}
+
+fn compare_document(fixture: &Fixture, document: &Value) -> TestResult<Option<Failure>> {
     let published = Published::read(document)?;
     let report = health::read(document)?;
     let forge = fixture.entry.open()?;
@@ -78,10 +84,10 @@ fn compare_mutation(fixture: &Fixture, document: &Value) -> TestResult<Failure> 
     for record in forge.records() {
         if let Err(failure) = compare::check(&record, &mut trees, &published, &report, &mut checked)
         {
-            return Ok(failure);
+            return Ok(Some(failure));
         }
     }
-    Err("the mutated source output was accepted".into())
+    Ok(None)
 }
 
 #[test]
@@ -130,7 +136,9 @@ fn declaration_value_mismatches_retain_no_source_or_output_content() -> TestResu
 #[test]
 fn invalid_raw_shapes_retain_no_source_value() -> TestResult {
     let actual = serde_json::json!([null]);
-    let failure = values::check(&[SourceValue::String(SENTINEL)], &actual, 0)
+    let catalog = serde_json::json!({"texts": {"publicNames": [], "gameTexts": []}});
+    let texts = TextIndex::new(&catalog)?;
+    let failure = values::check(&[SourceValue::String(SENTINEL)], &actual, 0, &texts)
         .err()
         .ok_or("a raw string declaration was accepted")?;
     assert_eq!(
@@ -139,6 +147,44 @@ fn invalid_raw_shapes_retain_no_source_value() -> TestResult {
         "source shape errors are typed independently of their contents"
     );
     assert_sanitized(failure);
+    Ok(())
+}
+
+#[test]
+fn direct_generator_name_references_match_each_original_field() -> TestResult {
+    let fixture = Fixture::new()?;
+    let document = fixture.catalog()?;
+    assert_eq!(
+        compare_document(&fixture, &document)?,
+        None,
+        "independently read source names match the original export",
+    );
+    let rejected = Failure::SourceCompare(SourceFault::AiNameKey);
+    for swap in [true, false] {
+        let mut changed = document.clone();
+        let name = changed
+            .pointer_mut("/missionPropertySets/0/properties/1/value")
+            .ok_or("direct Generator name property")?;
+        let first = name["givenName"]["value"].clone();
+        let last = name["givenLastName"]["value"].clone();
+        assert!(
+            first.is_string() && last.is_string() && first != last,
+            "the original fields resolve to distinct valid targets",
+        );
+        if swap {
+            name["givenName"]["value"] = last;
+            name["givenLastName"]["value"] = first;
+        } else {
+            name["givenName"]["state"] = serde_json::json!("absent");
+            name["givenName"]["value"] = Value::Null;
+        }
+        let actual = compare_mutation(&fixture, &changed)?;
+        assert_eq!(
+            actual, rejected,
+            "existing targets cannot be swapped or omitted",
+        );
+        assert_sanitized(actual);
+    }
     Ok(())
 }
 

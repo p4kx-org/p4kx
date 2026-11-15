@@ -4,7 +4,7 @@
 use p4kx_export::Kind;
 use serde_json::Value;
 
-use super::{CoverageCounters, TestResult, TextDomain, TextIndex, TextReferenceShape};
+use super::{CoverageCounters, TestResult, TextDomain, TextIndex, TextReferenceShape, TextTarget};
 
 pub(super) fn count(
     catalog: &Value,
@@ -28,6 +28,15 @@ pub(super) fn count(
                         count_option(option, &texts, counters)?;
                     }
                 }
+                Some("aiName") => {
+                    for field in ["/givenName", "/givenLastName", "/givenNickName"] {
+                        let target = required_reference(value, field, &texts)?;
+                        if target.is_some_and(|target| !is_lookup_key(target.key)) {
+                            return Err(format!("invalid direct Generator name at {field}").into());
+                        }
+                        counters.count(target)?;
+                    }
+                }
                 Some("investigation") => count_investigation(value, &texts, counters)?,
                 _ => {}
             }
@@ -45,10 +54,10 @@ fn count_investigation(
         for item in entries(location, "clueItems")? {
             for clue in entries(item, "clues")? {
                 for field in ["/objectiveLongDescription", "/objectiveShortDescription"] {
-                    count_clue_text(clue, field, texts, counters)?;
+                    counters.count(required_reference(clue, field, texts)?)?;
                 }
                 if super::graph::text(clue, "/details/type")? == "corpseScanInfo" {
-                    count_clue_text(clue, "/details/causeOfDeath", texts, counters)?;
+                    counters.count(required_reference(clue, "/details/causeOfDeath", texts)?)?;
                 }
             }
         }
@@ -56,17 +65,19 @@ fn count_investigation(
     Ok(())
 }
 
-fn count_clue_text(
-    clue: &Value,
+fn required_reference<'index, 'catalog>(
+    owner: &Value,
     field: &str,
-    texts: &TextIndex<'_>,
-    counters: &mut CoverageCounters<'_>,
-) -> TestResult<()> {
-    let carrier = clue
+    texts: &'index TextIndex<'catalog>,
+) -> TestResult<Option<&'index TextTarget<'catalog>>> {
+    let carrier = owner
         .pointer(field)
-        .ok_or_else(|| format!("required Generator clue text at {field}"))?;
-    let target = texts.reference(carrier, TextDomain::GameText, TextReferenceShape::Required)?;
-    counters.count(target)
+        .ok_or_else(|| format!("required Generator text at {field}"))?;
+    texts.reference(carrier, TextDomain::GameText, TextReferenceShape::Required)
+}
+
+fn is_lookup_key(key: &str) -> bool {
+    key.starts_with('@') && !p4kx_extraction::is_placeholder_key(key)
 }
 
 fn entries<'value>(
@@ -90,8 +101,7 @@ fn count_option(
         .get("textId")
         .ok_or("original Generator option textId")?
     {
-        Value::String(key) => Some(key.as_str())
-            .filter(|key| key.starts_with('@') && !p4kx_extraction::is_placeholder_key(key)),
+        Value::String(key) => Some(key.as_str()).filter(|key| is_lookup_key(key)),
         Value::Null => None,
         _ => return Err("invalid original Generator option textId".into()),
     };

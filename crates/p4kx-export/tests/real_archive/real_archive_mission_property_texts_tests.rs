@@ -103,6 +103,78 @@ fn generator_investigation_text_coverage_keeps_historical_locale_tokens() -> Tes
     Ok(())
 }
 
+#[test]
+fn generator_ai_name_coverage_checks_each_protected_name_occurrence() -> TestResult {
+    let english = Oracle::parse("known=Known");
+    let german = Oracle::parse("known=Bekannt");
+    let mut catalog = ai_name_catalog();
+    let (en, de) = mission_coverage(&catalog, &english, &german)?;
+    assert_eq!(
+        [en.resolved, de.resolved],
+        [2, 2],
+        "a shared registry row still counts per name field",
+    );
+    assert_eq!(
+        [en.fallback, de.fallback],
+        [1, 1],
+        "an admitted key without a translation still counts",
+    );
+    assert_eq!(
+        [en.contradictions, de.contradictions],
+        [0, 0],
+        "both languages match the independent INI",
+    );
+    replace_value(
+        &mut catalog,
+        "/missionPropertySets/0/properties/0/value/givenNickName",
+        present(&json!("broken")),
+    )?;
+    assert!(
+        mission_coverage(&catalog, &english, &german).is_err(),
+        "a broken name join fails the coverage check",
+    );
+    Ok(())
+}
+
+fn ai_name_catalog() -> Value {
+    let empty_forms = json!({"sourceText": absent(), "displayText": absent()});
+    json!({
+        "texts": {
+            "publicNames": [],
+            "gameTexts": [
+                {
+                    "id": present(&json!("shared")),
+                    "key": present(&json!("@known")),
+                    "translations": present(&json!({
+                        "en": forms("Known"), "de": forms("Bekannt")
+                    }))
+                },
+                {
+                    "id": present(&json!("missing")),
+                    "key": present(&json!("@missing")),
+                    "translations": present(&json!({"en": empty_forms, "de": empty_forms}))
+                }
+            ]
+        },
+        "missionPropertySets": [{
+            "properties": [
+                {"value": {
+                    "type": "aiName",
+                    "givenName": present(&json!("shared")),
+                    "givenLastName": absent(),
+                    "givenNickName": present(&json!("shared"))
+                }},
+                {"value": {
+                    "type": "aiName",
+                    "givenName": present(&json!("missing")),
+                    "givenLastName": absent(),
+                    "givenNickName": absent()
+                }}
+            ]
+        }]
+    })
+}
+
 fn investigation_catalog() -> Value {
     let absent = absent();
     let no_forms = json!({"sourceText": absent, "displayText": absent});

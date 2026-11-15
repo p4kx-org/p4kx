@@ -5,9 +5,11 @@
 
 use crate::mission_values_fixture::{self as fixture, Owner, TestResult};
 use p4kx_export::CatalogPublicationMode;
-use p4kx_testkit::{TestInstance, TestValue};
+use p4kx_extraction::Language;
+use p4kx_testkit::{TestEntry, TestInstance, TestValue};
 use serde_json::{Value, json};
 
+use crate::health_origin_assertions as proof;
 use crate::mission_canonical_health as canonical_health;
 
 #[path = "mission_name_canonical.rs"]
@@ -194,23 +196,139 @@ fn malformed_present_name_tokens_and_nonfinite_chances_fail_their_original_owner
 }
 
 #[test]
-fn investigation_source_additions_leave_legacy_ai_name_properties_unchanged() -> TestResult {
-    let document = fixture::build(
-        &fixture::database(
-            vec![fixture::property(
-                "Legacy",
+fn generator_ai_names_retain_their_lookup_policy_and_original_field_evidence() -> TestResult {
+    let database = fixture::database(
+        vec![
+            fixture::property(
+                "Given",
+                name(TestValue::text("@given"), fixture::TARGET, 0.25),
+            ),
+            fixture::property(
+                "Bare",
                 name(TestValue::text("plain"), fixture::MISSING, 0.0),
-            )],
-            Owner::Generator,
-        ),
-        CatalogPublicationMode::Normal,
-    )?;
-    let value = fixture::generator_value(&document, "Legacy")?;
-    assert_eq!(value["type"], "aiName");
-    assert_eq!(value["givenName"]["key"], Value::Null);
-    assert_eq!(value["nameDataGuid"], Value::Null);
-    assert!(value.get("source").is_none());
+            ),
+        ],
+        Owner::Generator,
+    );
+    let english = TestEntry::stored(
+        Language::English.global_ini_path(),
+        b"given=Given name\nplain=Not a name key\nLOC_UNINITIALIZED=Placeholder\n",
+    );
+    let catalog =
+        fixture::build_with_entries(&database, CatalogPublicationMode::Normal, [english])?;
+    let value = fixture::generator_value(&catalog, "Given")?;
+    verify_direct_name_settings(value);
+    verify_direct_name_field_evidence(&catalog, value)?;
+
+    let bare = fixture::generator_value(&catalog, "Bare")?;
+    assert_eq!(
+        bare["nameDataGuid"],
+        Value::Null,
+        "the unresolved name data stays null"
+    );
+    proof::cell(bare, "givenName", "absent")?;
+    assert!(
+        proof::rows(&catalog, "/texts/gameTexts")?
+            .iter()
+            .all(|row| {
+                !matches!(
+                    row.pointer("/key/value").and_then(Value::as_str),
+                    Some("plain" | "" | "@LOC_UNINITIALIZED")
+                )
+            }),
+        "discarded name tokens do not register protected text",
+    );
+    proof::closure(&catalog)
+}
+
+fn verify_direct_name_settings(value: &Value) {
+    assert_eq!(
+        value["type"], "aiName",
+        "the direct property tag stays stable"
+    );
+    assert_eq!(
+        value["randomName"], false,
+        "an authored false flag stays false"
+    );
+    assert_eq!(
+        value["chanceOfNickName"], 0.25,
+        "the exact nickname chance stays intact"
+    );
+    assert_eq!(
+        value["nameDataGuid"],
+        crate::catalog_crafting_support::text(fixture::TARGET),
+        "the resolved name data retains its identity",
+    );
+    assert!(
+        value.get("source").is_none(),
+        "the direct variant has no second name payload"
+    );
+}
+
+fn verify_direct_name_field_evidence(catalog: &Value, value: &Value) -> TestResult {
+    let reference = proof::present(value, "givenName", &json!("text:6:@given"), Some(false))?;
+    let row = crate::commodity_v3_fixture::text_row(catalog, "gameTexts", &reference["value"])?;
+    assert_eq!(
+        row.pointer("/translations/value/en/displayText/value"),
+        Some(&json!("Given name")),
+        "the reference resolves to the original English display text",
+    );
+    let uses = proof::uses(catalog, reference)?;
+    assert!(
+        uses.iter().any(|used| {
+            used["role"] == "payload"
+                && used.pointer("/location/namespace").and_then(Value::as_str)
+                    == Some("dataforgeValue")
+                && used.pointer("/location/indices/1").is_some()
+        }),
+        "the reference identifies the original Generator Locale field",
+    );
+
+    for field in ["givenLastName", "givenNickName"] {
+        let absent = proof::cell(value, field, "absent")?;
+        assert_eq!(
+            absent["containsEncryptedSource"], false,
+            "the absent decision has clear source evidence"
+        );
+        assert_ne!(
+            absent["sourceUsesRefs"], reference["sourceUsesRefs"],
+            "each name field carries its own location"
+        );
+    }
     Ok(())
+}
+
+#[test]
+fn ambiguous_generator_ai_name_is_quarantined_before_text_publication() -> TestResult {
+    use crate::mission_property_sets_fixture::{generator, parameters};
+
+    let property =
+        |key| fixture::property("Name", name(TestValue::text(key), fixture::TARGET, 0.25));
+    let database =
+        fixture::database(vec![property("@retained")], Owner::Generator).record(generator([
+            parameters(vec![property("@discarded")]),
+            parameters(vec![property("@retained")]),
+            parameters(vec![property("@retained")]),
+        ]));
+    let catalog = fixture::build(&database, CatalogPublicationMode::DiagnosticPartial)?;
+    let sets = proof::rows(&catalog, "/missionPropertySets")?;
+    assert_eq!(
+        sets.len(),
+        3,
+        "the other three property sets remain available"
+    );
+    for set in sets {
+        assert_ne!(set["level"], "handler", "the ambiguous handler is withheld");
+        let value = fixture::field(set, "/properties/0/value")?;
+        proof::present(value, "givenName", &json!("text:9:@retained"), Some(false))?;
+    }
+    assert!(
+        proof::rows(&catalog, "/texts/gameTexts")?
+            .iter()
+            .all(|row| row.pointer("/key/value").and_then(Value::as_str) != Some("@discarded")),
+        "the discarded handler cannot register a text",
+    );
+    proof::closure(&catalog)
 }
 
 #[test]

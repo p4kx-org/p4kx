@@ -500,77 +500,6 @@
       ],
       "type": "object"
     },
-    "AiName": {
-      "description": "The name an NPC gets (`MissionPropertyValue_AIName`): drawn at random or given.",
-      "properties": {
-        "chanceOfNickName": {
-          "description": "The `chanceOfNickName`, 0 to 1; `null` when absent.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "givenLastName": {
-          "$ref": "#/$defs/LocalisedText",
-          "description": "The `characterGivenLastName`.",
-          "x-gameText": true
-        },
-        "givenName": {
-          "$ref": "#/$defs/LocalisedText",
-          "description": "The `characterGivenName`.",
-          "x-gameText": true
-        },
-        "givenNickName": {
-          "$ref": "#/$defs/LocalisedText",
-          "description": "The `characterGivenNickName`.",
-          "x-gameText": true
-        },
-        "nameDataGuid": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Guid"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The `characterNameData` Record (`CharacterRandomNameParams`), `null` when absent."
-        },
-        "randomLastName": {
-          "description": "The `randomLastName` flag; `null` when absent.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "randomName": {
-          "description": "The `randomName` flag; `null` when absent.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "randomNickName": {
-          "description": "The `randomNickName` flag; `null` when absent.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        }
-      },
-      "required": [
-        "chanceOfNickName",
-        "givenLastName",
-        "givenName",
-        "givenNickName",
-        "nameDataGuid",
-        "randomLastName",
-        "randomName",
-        "randomNickName"
-      ],
-      "type": "object"
-    },
     "AimAction": {
       "description": "Stored aim modifier, geometry settings and reload UI flag of a concrete aim action.",
       "properties": {
@@ -31000,7 +30929,7 @@
       "type": "object"
     },
     "NpcSpawnName": {
-      "description": "Protected text references and settings of an embedded NPC name.",
+      "description": "Protected text references and settings of an NPC name.",
       "properties": {
         "chanceOfNickName": {
           "format": "float",
@@ -34818,7 +34747,7 @@
           "type": "object"
         },
         {
-          "$ref": "#/$defs/AiName",
+          "$ref": "#/$defs/NpcSpawnName",
           "description": "`MissionPropertyValue_AIName`: the name an NPC gets.",
           "properties": {
             "type": {

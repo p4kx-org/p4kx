@@ -11,8 +11,9 @@ use crate::mission_property_auto::AutoSpawns;
 use crate::mission_property_investigation::Investigation;
 use crate::mission_property_option::{FloatOption, IntegerOption, StringOption, TagOption};
 use crate::mission_property_race::TimeTrialSplit;
+use crate::mission_property_set::MissionPropertyText;
 use crate::mission_property_source::SourceTagList;
-use crate::npc_spawn_model::AiName;
+use crate::npc_spawn_model::NpcSpawnName;
 use crate::scoped_location::ScopedLocation;
 use crate::spawn_model::{LocationCondition, TagPaths};
 
@@ -142,7 +143,7 @@ pub(crate) enum PropertyValue<'a> {
     },
     /// `MissionPropertyValue_AIName`: the name an NPC gets.
     #[serde(rename = "aiName")]
-    AiName(AiName<'a>),
+    AiName(#[schemars(with = "NpcSpawnName")] Box<NpcSpawnName<MissionPropertyText<'a>>>),
     /// `MissionPropertyValue_CombinedDataSetEntries`: the properties whose data set entries the
     /// mission combines.
     #[serde(rename_all = "camelCase")]

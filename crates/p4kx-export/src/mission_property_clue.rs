@@ -8,13 +8,12 @@ use serde::Serialize;
 use crate::catalog_text_contract::GameTextRef;
 use crate::definition_reference::DefinitionReference;
 use crate::mission_property_name::InvestigationName;
+use crate::mission_property_set::MissionPropertyText;
 use crate::mission_property_source::SourceTagList;
 use crate::owned_reference::OwnedReference;
 
 #[path = "mission_property_clue_text.rs"]
 mod text;
-
-pub(super) use text::ClueText;
 
 /// An investigation clue item and its complete concrete source payload.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -57,10 +56,10 @@ pub(crate) enum ClueItemDetails {
 pub(crate) struct InvestigationClue<'f> {
     /// The authored long objective text.
     #[schemars(with = "SourcedValue<GameTextRef>", extend("x-gameText" = true))]
-    pub(crate) objective_long_description: ClueText<'f>,
+    pub(crate) objective_long_description: MissionPropertyText<'f>,
     /// The authored short objective text.
     #[schemars(with = "SourcedValue<GameTextRef>", extend("x-gameText" = true))]
-    pub(crate) objective_short_description: ClueText<'f>,
+    pub(crate) objective_short_description: MissionPropertyText<'f>,
     /// The concrete subtype-specific fields.
     pub(crate) details: ClueDetails<'f>,
 }
@@ -78,7 +77,7 @@ pub(crate) enum ClueDetails<'f> {
         name: Option<Box<InvestigationName<'f>>>,
         /// The authored cause-of-death text.
         #[schemars(with = "SourcedValue<GameTextRef>", extend("x-gameText" = true))]
-        cause_of_death: ClueText<'f>,
+        cause_of_death: MissionPropertyText<'f>,
     },
     /// `Investigation_Clue_JournalEntry`.
     #[serde(rename_all = "camelCase")]

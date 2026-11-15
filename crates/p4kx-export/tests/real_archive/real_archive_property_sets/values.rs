@@ -7,12 +7,18 @@ use serde_json::Value;
 use super::OracleResult;
 use super::error::{self, Failure, SourceFault};
 use super::source;
+use crate::real_archive_canonical_texts::{TextDomain, TextIndex, TextReferenceShape};
 
 const fn fault(category: SourceFault) -> Failure {
     Failure::SourceCompare(category)
 }
 
-pub(super) fn check(source: &[SourceValue<'_>], actual: &Value, owner: u32) -> OracleResult<usize> {
+pub(super) fn check(
+    source: &[SourceValue<'_>],
+    actual: &Value,
+    owner: u32,
+    texts: &TextIndex<'_>,
+) -> OracleResult<usize> {
     let actual = actual
         .as_array()
         .ok_or(fault(SourceFault::PropertyArrayShape))?;
@@ -28,23 +34,7 @@ pub(super) fn check(source: &[SourceValue<'_>], actual: &Value, owner: u32) -> O
             error::require(actual.is_null(), fault(SourceFault::NullDeclaration))?;
             continue;
         };
-        for (field, key) in [
-            ("missionVariableName", "variable"),
-            ("extendedTextToken", "token"),
-        ] {
-            match source.field(field) {
-                None | Some(SourceValue::Null) => {
-                    error::require(
-                        actual[key].is_null(),
-                        fault(SourceFault::DeclarationTextValue),
-                    )?;
-                }
-                Some(SourceValue::String(text)) => {
-                    require_equal!(actual[key], *text, fault(SourceFault::DeclarationTextValue));
-                }
-                _ => return Err(fault(SourceFault::DeclarationTextShape)),
-            }
-        }
+        check_declaration_text(source, actual)?;
         match source
             .field("value")
             .map(source::structure)
@@ -68,11 +58,68 @@ pub(super) fn check(source: &[SourceValue<'_>], actual: &Value, owner: u32) -> O
                 if source_type == "ScopedLocation" {
                     check_scoped(value, &actual["value"], owner)?;
                     scoped += 1;
+                } else if source_type == "AIName" {
+                    check_ai_name(value, &actual["value"], texts)?;
                 }
             }
         }
     }
     Ok(scoped)
+}
+
+fn check_declaration_text(source: &StructValue<'_>, actual: &Value) -> OracleResult {
+    for (field, key) in [
+        ("missionVariableName", "variable"),
+        ("extendedTextToken", "token"),
+    ] {
+        match source.field(field) {
+            None | Some(SourceValue::Null) => {
+                error::require(
+                    actual[key].is_null(),
+                    fault(SourceFault::DeclarationTextValue),
+                )?;
+            }
+            Some(SourceValue::String(text)) => {
+                require_equal!(actual[key], *text, fault(SourceFault::DeclarationTextValue));
+            }
+            _ => return Err(fault(SourceFault::DeclarationTextShape)),
+        }
+    }
+    Ok(())
+}
+
+fn check_ai_name(source: &StructValue<'_>, actual: &Value, texts: &TextIndex<'_>) -> OracleResult {
+    let shape = fault(SourceFault::AiNameProjection);
+    let invalid_key = fault(SourceFault::AiNameKey);
+    require_equal!(actual["type"], "aiName", shape);
+    for (member, field) in [
+        ("characterGivenName", "givenName"),
+        ("characterGivenLastName", "givenLastName"),
+        ("characterGivenNickName", "givenNickName"),
+    ] {
+        let raw = source.field(member);
+        let (state, expected) = match raw {
+            Some(SourceValue::Locale(key) | SourceValue::String(key))
+                if key.starts_with('@') && !p4kx_extraction::is_placeholder_key(key) =>
+            {
+                ("present", Some(*key))
+            }
+            Some(SourceValue::Error(_)) => ("unreadable", None),
+            _ => ("absent", None),
+        };
+        let actual = actual.get(field).ok_or(shape)?;
+        let target = Failure::classify(
+            texts.reference(actual, TextDomain::GameText, TextReferenceShape::Required),
+            shape,
+        )?;
+        require_equal!(actual["state"], state, invalid_key);
+        require_equal!(
+            target.and_then(|row| row.source().pointer("/key/value").and_then(Value::as_str)),
+            expected,
+            invalid_key
+        );
+    }
+    Ok(())
 }
 
 fn check_scoped(source: &StructValue<'_>, actual: &Value, owner: u32) -> OracleResult {

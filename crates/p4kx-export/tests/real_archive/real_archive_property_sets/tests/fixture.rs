@@ -86,6 +86,13 @@ fn schema() -> DataForgeBuilder {
                 .parent("BaseMissionPropertyValue"),
         )
         .structure(
+            TestStruct::new("MissionPropertyValue_AIName")
+                .parent("BaseMissionPropertyValue")
+                .field("characterGivenName", TestType::Locale)
+                .field("characterGivenLastName", TestType::String)
+                .field("characterGivenNickName", TestType::Locale),
+        )
+        .structure(
             TestStruct::new("CareerContract")
                 .field("id", TestType::Guid)
                 .field("debugName", TestType::String),
@@ -100,9 +107,17 @@ fn generator(index: u128) -> TestRecord {
             "value",
             TestValue::Struct(TestInstance::new("MissionPropertyValue_ScopedLocation")),
         );
+    let name = TestInstance::new("MissionPropertyValue_AIName")
+        .value("characterGivenName", TestValue::text("@first"))
+        .value("characterGivenLastName", TestValue::text("@last"))
+        .value("characterGivenNickName", TestValue::text("bare"));
+    let name = TestInstance::new("MissionProperty")
+        .value("missionVariableName", TestValue::text("Name"))
+        .value("extendedTextToken", TestValue::text("Name"))
+        .value("value", TestValue::Struct(name));
     let parameters = TestInstance::new("ContractParamOverrides").value(
         "propertyOverrides",
-        TestValue::Array(vec![TestValue::Struct(property)]),
+        TestValue::Array(vec![TestValue::Struct(property), TestValue::Struct(name)]),
     );
     let contract = TestInstance::new("CareerContract")
         .value("id", TestValue::Guid(FIRST + 100 + index))

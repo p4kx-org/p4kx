@@ -48,9 +48,12 @@ object. Its nullable `characterGivenName`, `characterGivenLastName` and `charact
 keep the original Locale tokens, including empty strings, placeholders and non-`@` text. Its
 nullable `characterNameData` is the complete definition Reference, retaining a dangling GUID or
 resolved physical target metadata. The presentation fields keep their existing key normalisation;
-`nameDataGuid` stays null for an unresolved source link. The existing `aiName` property variant and
-embedded NPC-name API retain their shape and meaning. Present malformed fields and nonfinite
+`nameDataGuid` stays null for an unresolved source link. Present malformed fields and nonfinite
 nickname chances fail the investigation owner with the exact indexed name-field location.
+
+The direct Generator `aiName` variant exposes the same name settings as an embedded NPC name.
+`givenName`, `givenLastName` and `givenNickName` are sourced protected text references. Empty,
+bare and placeholder keys retain their original field evidence with an `absent` state.
 
 Every clue item retains `entityClass`, `spawnTags`, ordered `clues` and `details`:
 

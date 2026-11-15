@@ -4,9 +4,10 @@
 use p4kx_extraction::{StructValue, Value};
 
 use crate::mission_property_clue::{
-    ClueDetails, ClueItemDetails, ClueText, InvestigationClue, InvestigationClueItem,
+    ClueDetails, ClueItemDetails, InvestigationClue, InvestigationClueItem,
 };
 use crate::mission_property_name_read;
+use crate::mission_property_set::MissionPropertyText;
 use crate::mission_property_source;
 use crate::owned_reference_read;
 use crate::record_read::ReadError;
@@ -111,7 +112,12 @@ fn clue<'source>(
                 capture,
             )?
             .map(Box::new),
-            cause_of_death: ClueText::read(source, "causeOfDeath", view.cause()?, capture)?,
+            cause_of_death: MissionPropertyText::read_locale(
+                source,
+                "causeOfDeath",
+                view.cause()?,
+                capture,
+            )?,
         },
         ClueKind::JournalEntry => ClueDetails::JournalEntry {
             journal_entry: view.journal()?.map(ReferenceShape::into_owned),
@@ -119,13 +125,13 @@ fn clue<'source>(
     };
     view.check()?;
     Ok(InvestigationClue {
-        objective_long_description: ClueText::read(
+        objective_long_description: MissionPropertyText::read_locale(
             source,
             "objectiveLongDescription",
             view.long_description()?,
             capture,
         )?,
-        objective_short_description: ClueText::read(
+        objective_short_description: MissionPropertyText::read_locale(
             source,
             "objectiveShortDescription",
             view.short_description()?,
