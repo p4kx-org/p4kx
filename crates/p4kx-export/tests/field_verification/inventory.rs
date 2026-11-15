@@ -60,13 +60,14 @@ impl BuildIdentity {
     pub(crate) fn of_archive(archive: &Archive) -> Option<Self> {
         let build = archive.build()?;
         let channel = ChannelKind::of_archive(archive.path()).name()?;
-        Some(Self {
+        let identity = Self {
             channel: channel.to_owned(),
             branch: build.branch().to_owned(),
             version: build.version().to_owned(),
             change_number: build.change_number().to_owned(),
             build_id: build.build_id().to_owned(),
-        })
+        };
+        identity.complete().then_some(identity)
     }
 
     fn complete(&self) -> bool {

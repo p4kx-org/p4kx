@@ -1,20 +1,29 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::io::Read as _;
 use std::path::Path;
 
-use p4kx_extraction::{Archive, ArchiveWatch, DataForge, DataForgeEntry};
+use p4kx_extraction::{Archive, ArchiveWatch, DataForge, DataForgeEntry, MAX_DATAFORGE_SIZE};
 use serde::Serialize;
 
+use super::inventory::BuildIdentity;
 use super::resource_declarations::Scope;
 use super::{resource_declarations, resource_metadata_output};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct SourceBuild<'a> {
+struct BuildVersion<'a> {
     branch: &'a str,
     version: &'a str,
     change_number: &'a str,
+}
+
+#[derive(Serialize)]
+#[serde(untagged)]
+enum SourceBuild<'a> {
+    Version(BuildVersion<'a>),
+    Identity(BuildIdentity),
 }
 
 #[derive(Serialize)]
@@ -26,22 +35,19 @@ struct Metadata<'a> {
     declarations: resource_declarations::Declarations,
 }
 
-fn document<'a>(
-    archive: &'a Archive,
-    forge: &DataForge<'_>,
-    scope: Scope,
-    cancelled: &impl Fn() -> bool,
-) -> super::Result<Metadata<'a>> {
-    Ok(Metadata {
-        schema_version: 1,
-        data_forge_format_version: forge.version(),
-        source_build: archive.build().map(|build| SourceBuild {
+fn source_build(archive: &Archive, scope: Scope) -> super::Result<Option<SourceBuild<'_>>> {
+    if matches!(scope, Scope::QuantumDrives) {
+        let build = BuildIdentity::of_archive(archive)
+            .ok_or("quantum declaration evidence needs a complete Build and known Channel")?;
+        return Ok(Some(SourceBuild::Identity(build)));
+    }
+    Ok(archive.build().map(|build| {
+        SourceBuild::Version(BuildVersion {
             branch: build.branch(),
             version: build.version(),
             change_number: build.change_number(),
-        }),
-        declarations: resource_declarations::collect_scope(forge, scope, cancelled)?,
-    })
+        })
+    }))
 }
 
 pub(crate) fn publish(
@@ -51,11 +57,57 @@ pub(crate) fn publish(
     destination: &resource_metadata_output::Destination,
     scope: Scope,
 ) -> super::Result<()> {
+    publish_document(
+        forge,
+        source_build(archive, scope)?,
+        watch,
+        destination,
+        scope,
+    )
+}
+
+fn publish_document(
+    forge: &DataForge<'_>,
+    source_build: Option<SourceBuild<'_>>,
+    watch: &ArchiveWatch,
+    destination: &resource_metadata_output::Destination,
+    scope: Scope,
+) -> super::Result<()> {
     watch.check()?;
-    let metadata = document(archive, forge, scope, &|| watch.poll().is_err())?;
+    let metadata = Metadata {
+        schema_version: 1,
+        data_forge_format_version: forge.version(),
+        source_build,
+        declarations: resource_declarations::collect_scope(forge, scope, &|| {
+            watch.poll().is_err()
+        })?,
+    };
     let bytes = serde_json::to_vec_pretty(&metadata)?;
     watch.check()?;
     destination.write(&bytes)
+}
+
+pub(crate) fn read_and_publish(
+    archive: &Archive,
+    destination: &resource_metadata_output::Destination,
+    scope: Scope,
+) -> super::Result<()> {
+    let watch = ArchiveWatch::new(archive);
+    watch.check()?;
+    let build = source_build(archive, scope)?;
+    let original = DataForgeEntry::locate(archive).ok_or("original DataForge Entry absent")?;
+    let size = original.uncompressed_size();
+    if size > MAX_DATAFORGE_SIZE {
+        return Err("DataForge Entry exceeds the supported size".into());
+    }
+    let mut bytes = Vec::new();
+    bytes.try_reserve_exact(usize::try_from(size)?)?;
+    archive
+        .open_entry_verified(original)?
+        .reject_overlong()
+        .read_to_end(&mut bytes)?;
+    let forge = DataForge::open(&bytes)?;
+    publish_document(&forge, build, &watch, destination, scope)
 }
 
 #[test]
@@ -70,6 +122,7 @@ pub(crate) fn run(scope: Scope) -> super::Result<()> {
     let output_variable = match scope {
         Scope::Resources => "P4KX_RESOURCE_SCHEMA_OUT",
         Scope::MissionProperties => "P4KX_MISSION_PROPERTY_SCHEMA_OUT",
+        Scope::QuantumDrives => "P4KX_QUANTUM_SCHEMA_OUT",
     };
     let output = std::env::var_os(output_variable).ok_or("explicit metadata output absent")?;
     let destination =
@@ -78,18 +131,16 @@ pub(crate) fn run(scope: Scope) -> super::Result<()> {
         p4kx_testkit::real_archive_path()?,
         Some(p4kx_testkit::real_archive_key()?),
     )?;
-    let watch = ArchiveWatch::new(&archive);
-    watch.check()?;
-    let loaded = DataForgeEntry::read(&archive)?;
-    watch.check()?;
-    let forge = loaded.open()?;
-    publish(&archive, &forge, &watch, &destination, scope)?;
+    read_and_publish(&archive, &destination, scope)?;
     super::report(match scope {
         Scope::Resources => {
             "resource schema declaration artifact written; no Record values or identities surveyed"
         }
         Scope::MissionProperties => {
             "mission-property schema declaration artifact written; no Record values or identities surveyed"
+        }
+        Scope::QuantumDrives => {
+            "quantum-drive schema declaration artifact written; no Record values or identities surveyed"
         }
     });
     Ok(())

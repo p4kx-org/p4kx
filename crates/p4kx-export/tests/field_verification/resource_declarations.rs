@@ -11,10 +11,17 @@ use super::error::{self, Error, Kind};
 #[cfg(test)]
 mod root_bounds_tests;
 
-const ROOTS: [&str; 3] = [
+const RESOURCE_ROOTS: &[&str] = &[
     "ResourceType",
     "ResourceTypeGroup",
     "ResourceTypeProperties",
+];
+const QUANTUM_ROOTS: &[&str] = &[
+    "SCItemQuantumDriveParams",
+    "SQuantumDriveParams",
+    "SQuantumDriveEffectBaseParams",
+    "SQuantumDriveEffectParams_LEGACY",
+    "SQuantumDriveEffectTemplateRef",
 ];
 const MAX_DEFINITIONS: usize = 1_000_000;
 const MAX_SELECTED: usize = 10_000;
@@ -27,6 +34,7 @@ const MAX_DECLARATION_TEXT: usize = 8 << 20;
 pub(crate) enum Scope {
     Resources,
     MissionProperties,
+    QuantumDrives,
 }
 
 #[derive(Debug, Serialize)]
@@ -48,24 +56,26 @@ fn roots<'f>(
     scope: Scope,
     cancelled: &impl Fn() -> bool,
 ) -> super::Result<Roots<'f>> {
-    match scope {
-        Scope::Resources => {
-            error::check(cancelled)?;
-            Ok(Roots {
-                names: ROOTS.into_iter().map(str::to_owned).collect(),
-                wanted: ROOTS
-                    .into_iter()
-                    .filter(|root| definitions.contains_key(root))
-                    .collect(),
-                missing: ROOTS
-                    .into_iter()
-                    .filter(|root| !definitions.contains_key(root))
-                    .map(str::to_owned)
-                    .collect(),
-            })
-        }
-        Scope::MissionProperties => mission_roots(definitions, cancelled),
-    }
+    let names = match scope {
+        Scope::Resources => RESOURCE_ROOTS,
+        Scope::QuantumDrives => QUANTUM_ROOTS,
+        Scope::MissionProperties => return mission_roots(definitions, cancelled),
+    };
+    error::check(cancelled)?;
+    Ok(Roots {
+        names: names.iter().copied().map(str::to_owned).collect(),
+        wanted: names
+            .iter()
+            .copied()
+            .filter(|root| definitions.contains_key(root))
+            .collect(),
+        missing: names
+            .iter()
+            .copied()
+            .filter(|root| !definitions.contains_key(root))
+            .map(str::to_owned)
+            .collect(),
+    })
 }
 
 fn mission_roots<'f>(

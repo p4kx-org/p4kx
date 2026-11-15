@@ -19,6 +19,7 @@ struct Edge<'arena> {
 pub(super) enum Selection<'path> {
     RootMember { name: &'path str },
     OwnedReference { owner: &'path str, name: &'path str },
+    OwnedReferenceSlot { owner: &'path str, name: &'path str },
 }
 
 pub(super) fn select<'arena>(
@@ -37,7 +38,7 @@ pub(super) fn select<'arena>(
     let mut stack = Vec::new();
     let root_name = match selection {
         Selection::RootMember { name } => Some(name),
-        Selection::OwnedReference { .. } => None,
+        Selection::OwnedReference { .. } | Selection::OwnedReferenceSlot { .. } => None,
     };
     push_fields(&mut stack, array(arena, "roots")?, root_name, cancelled)?;
     let mut visited = HashSet::new();
@@ -89,28 +90,24 @@ fn push_selected<'arena>(
     payload: Option<&'arena Value>,
 ) -> super::Result<()> {
     let value = match selection {
-        Selection::RootMember { .. } => match field(cell, "state")?.as_str() {
-            Some("present" | "null" | "unreadable") => cell,
-            _ => {
-                return Err(Error::new(
-                    Kind::Input,
-                    "arena root must represent an original member",
-                )
-                .into());
-            }
-        },
-        Selection::OwnedReference { .. } => {
-            let Some(payload) = payload else {
-                return Ok(());
-            };
-            if payload.get("type").and_then(Value::as_str) != Some("recordReference") {
+        Selection::RootMember { .. } => original_slot(cell)?,
+        Selection::OwnedReference { .. } | Selection::OwnedReferenceSlot { .. } => {
+            if payload.is_some_and(|value| {
+                value.get("type").and_then(Value::as_str) != Some("recordReference")
+            }) {
                 return Err(Error::new(
                     Kind::Mapping,
                     "reviewed arena field is not a Record Reference",
                 )
                 .into());
             }
-            payload
+            if matches!(selection, Selection::OwnedReferenceSlot { .. }) {
+                original_slot(cell)?
+            } else if let Some(payload) = payload {
+                payload
+            } else {
+                return Ok(());
+            }
         }
     };
     if output.len() >= MAX_VALUES {
@@ -118,6 +115,17 @@ fn push_selected<'arena>(
     }
     output.push(value);
     Ok(())
+}
+
+fn original_slot(cell: &Value) -> super::Result<&Value> {
+    match field(cell, "state")?.as_str() {
+        Some("present" | "null" | "unreadable") => Ok(cell),
+        _ => Err(Error::new(
+            Kind::Input,
+            "arena selector must identify an original member",
+        )
+        .into()),
+    }
 }
 
 fn push_children<'arena>(
@@ -132,7 +140,12 @@ fn push_children<'arena>(
                 .as_str()
                 .ok_or("authored arena concrete owner type")?;
             let selected_name = match selection {
-                Selection::OwnedReference { owner, name } if kind == owner => Some(name),
+                Selection::OwnedReference { owner, name }
+                | Selection::OwnedReferenceSlot { owner, name }
+                    if kind == owner =>
+                {
+                    Some(name)
+                }
                 _ => None,
             };
             push_fields(stack, array(payload, "fields")?, selected_name, cancelled)

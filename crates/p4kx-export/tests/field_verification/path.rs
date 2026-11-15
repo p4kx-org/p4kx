@@ -17,6 +17,7 @@ pub(crate) enum Step {
     Each,
     Matching { field: String, value: String },
     OwnedArenaReference { owner: String, name: String },
+    OwnedArenaReferenceSlot { owner: String, name: String },
     ArenaRootMember { name: String },
 }
 
@@ -37,7 +38,10 @@ impl Path {
     }
 
     pub(super) fn counts_original_occurrences(&self) -> bool {
-        matches!(self.0.last(), Some(Step::ArenaRootMember { .. }))
+        matches!(
+            self.0.last(),
+            Some(Step::ArenaRootMember { .. } | Step::OwnedArenaReferenceSlot { .. })
+        )
     }
 
     pub(crate) fn validate(&self) -> super::Result<()> {
@@ -52,6 +56,9 @@ impl Path {
                 Step::Field { name } => valid(name),
                 Step::Matching { field, value } => valid(field) && valid(value),
                 Step::OwnedArenaReference { owner, name } => valid(owner) && valid(name),
+                Step::OwnedArenaReferenceSlot { owner, name } => {
+                    valid(owner) && valid(name) && index + 1 == self.0.len()
+                }
                 Step::ArenaRootMember { name } => valid(name) && index + 1 == self.0.len(),
                 Step::Each => true,
             };
@@ -85,24 +92,19 @@ impl Path {
                         &mut next,
                         cancelled,
                     )?,
+                    Step::OwnedArenaReferenceSlot { owner, name } => arena_path::select(
+                        value,
+                        Selection::OwnedReferenceSlot { owner, name },
+                        &mut next,
+                        cancelled,
+                    )?,
                     Step::ArenaRootMember { name } => arena_path::select(
                         value,
                         Selection::RootMember { name },
                         &mut next,
                         cancelled,
                     )?,
-                    Step::Each => {
-                        if let Some(values) = value.as_array() {
-                            if next.len().saturating_add(values.len()) > MAX_VALUES {
-                                return Err(Error::new(
-                                    Kind::Bounds,
-                                    "projection result exceeds its bound",
-                                )
-                                .into());
-                            }
-                            next.extend(values);
-                        }
-                    }
+                    Step::Each => append_array_elements(&mut next, value)?,
                     Step::Matching {
                         field,
                         value: expected,
@@ -122,6 +124,17 @@ impl Path {
         }
         Ok(current)
     }
+}
+
+fn append_array_elements<'a>(output: &mut Vec<&'a Value>, value: &'a Value) -> super::Result<()> {
+    let Some(values) = value.as_array() else {
+        return Ok(());
+    };
+    if output.len().saturating_add(values.len()) > MAX_VALUES {
+        return Err(Error::new(Kind::Bounds, "projection result exceeds its bound").into());
+    }
+    output.extend(values);
+    Ok(())
 }
 
 fn push<'a>(values: &mut Vec<&'a Value>, value: &'a Value) -> super::Result<()> {

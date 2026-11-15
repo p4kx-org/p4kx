@@ -58,6 +58,13 @@ It follows the arena's local indices from its roots and rejects out-of-range or
 repeated or unreachable nodes. Same-named fields in other owners do not count.
 The quantum profile mapping applies this to its original effect-tag Reference.
 
+The terminal step `{"kind":"ownedArenaReferenceSlot","owner":"<type>","name":"<field>"}`
+retains the exact original field cell. It checks the Record Reference payload when present
+and counts the null, unreadable and populated slots separately from missing fields.
+The twelve scalar Tag References declared by `SQuantumDriveEffectParams_LEGACY` use this
+step in both quantum profiles. Their scoped source baseline recorded no populated occurrences,
+so a populated legacy slot triggers review even when the catalog retains it.
+
 Use `{"kind":"arenaRootMember","name":"<field>"}` as the final step for a reviewed
 generic arena root member. It matches direct root entries only and counts retained
 occurrences, including explicit null and unreadable states, against the original
@@ -113,13 +120,14 @@ with no Records. It adds their parents and owned Class/StrongPointer closure und
 bounds. It shares the output and Archive-change guards with the resource survey.
 
 The artifact contains type names, parents, declared field names, data types, array flags and target
-type names, plus the DataForge format version and optional source Build branch/version/change.
+type names, plus the DataForge format version and source Build information. The Resource and
+Mission Property surveys include the manifest branch, version and change number when available.
 The collector never enumerates Records, builds canonical trees, reads field values, resolves
 Reference targets or emits Record names, paths, GUIDs, instance counts, localization text or enum
 options. This check provides declaration evidence; it provides no populated-field or numerical
 agreement evidence.
 
-Both output paths must be explicitly configured. The task root and existing output parent must be
+All output paths must be explicitly configured. The task root and existing output parent must be
 direct directories, the destination must remain contained, and creating an existing file fails.
 The artifact is bounded to 8 MiB. Review the collector and exact command before any real execution:
 
@@ -145,6 +153,19 @@ cargo test --release -p p4kx-export --test field_verification --locked --offline
 Select the private Archive and task-local `TMP`/`TEMP` explicitly, and review the collector and
 exact invocation before execution. Declaration names and field shapes explain schema support;
 they do not establish which values are populated or exported.
+
+The ignored `quantum_declaration_metadata::quantum_effect_declarations_only` test checks the drive,
+profile, effect base, legacy effect and effect template reference declarations. It distinguishes a
+missing owner from a declared owner with no fields, and preserves declared fields without concrete
+instances. It requires the full Channel and manifest identity in `sourceBuild`, in the same shape
+as `expectedAbsences[].build`. One verified DataForge Entry is read into memory. Only the
+declaration artifact is written.
+
+~~~powershell
+$env:P4KX_METADATA_TASK_ROOT = 'D:\Coding\Agents\Temp\codex\p4kx-050-implementation\quantum-declarations'
+$env:P4KX_QUANTUM_SCHEMA_OUT = Join-Path $env:P4KX_METADATA_TASK_ROOT 'quantum-declarations.private.json'
+cargo test --release --locked --offline -p p4kx-export --test field_verification -- quantum_declaration_metadata::quantum_effect_declarations_only --ignored --exact
+~~~
 
 ## Offline published reference
 

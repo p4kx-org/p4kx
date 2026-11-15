@@ -7,6 +7,22 @@ use super::path::{Path, Step};
 use super::published_model::{CatalogTarget, Family, Field};
 use super::units::Unit;
 
+pub(super) const LEGACY_EFFECT_OWNER: &str = "SQuantumDriveEffectParams_LEGACY";
+pub(super) const LEGACY_EFFECT_FIELDS: [&str; 12] = [
+    "alignEffectTag",
+    "pinchEffectTag",
+    "travelEffectTag",
+    "enterFlashEffectTag",
+    "exitFlashEffectTag",
+    "spoolEffectTag",
+    "pinchStrengthTag",
+    "spoolStrengthTag",
+    "trailsTag",
+    "trailsStrTag",
+    "interdictionEffectTag",
+    "interdictionExitFlashTag",
+];
+
 fn shield_mappings() -> impl Iterator<Item = Mapping> {
     let outer = [
         ("MaxShieldHealth", "maxHealth"),
@@ -117,6 +133,7 @@ fn quantum_mappings() -> impl Iterator<Item = Mapping> {
         .chain(quantum_profile_mappings())
         .chain(quantum_heat_mappings())
         .chain(std::iter::once(quantum_effect_reference()))
+        .chain(quantum_legacy_effect_references())
         .chain(quantum_arena_roots())
 }
 
@@ -244,6 +261,26 @@ fn quantum_arena_roots() -> impl Iterator<Item = Mapping> {
             name: field.to_owned(),
         });
         mapped(owner, field, group, path, declared_target)
+    })
+}
+
+fn quantum_legacy_effect_references() -> impl Iterator<Item = Mapping> {
+    LEGACY_EFFECT_FIELDS.into_iter().map(|field| {
+        let mut path = Path::fields(&["effectTags", "value"]);
+        path.0.push(Step::OwnedArenaReferenceSlot {
+            owner: LEGACY_EFFECT_OWNER.to_owned(),
+            name: field.to_owned(),
+        });
+        Mapping {
+            previously_empty: true,
+            ..mapped(
+                LEGACY_EFFECT_OWNER,
+                field,
+                super::coverage::QUANTUM_PROFILES,
+                path,
+                Some("Tag"),
+            )
+        }
     })
 }
 
