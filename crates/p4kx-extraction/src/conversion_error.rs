@@ -108,6 +108,17 @@ pub enum ConversionError {
         /// The limit in bytes.
         limit: u64,
     },
+    /// A trigger's traversal stopped before resolving all its source paths.
+    #[error("cannot export audio trigger {trigger}: traversal stopped at event {event}")]
+    IncompleteAudioResolution {
+        /// The trigger being exported.
+        trigger: String,
+        /// Event whose traversal stopped.
+        event: String,
+        /// The actual traversal error.
+        #[source]
+        source: Box<dyn StdError + Send + Sync>,
+    },
     /// The sound cannot be read or converted.
     #[error("{sound}")]
     Audio {

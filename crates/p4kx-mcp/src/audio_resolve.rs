@@ -96,6 +96,7 @@ fn envelope(
         },
         trigger: event::trigger(sounds, &mut text)?,
         counts: convert::counts(sounds),
+        truncated_by_limits: sounds.truncated_by_limits(),
         variants: Vec::new(),
         breaks,
         issues,

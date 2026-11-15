@@ -5,41 +5,52 @@ use std::collections::HashMap;
 
 use p4kx_audio::Loop;
 
-use super::super::tree::{Combine, Group, Leaf, Node};
+use super::super::tree::{GroupId, Leaf, Node, Tree};
 use super::{MAX_COMMENT_LEN, SoundFile, comment_text, render};
 use crate::audio::music_clip_features::MusicClipFeatures;
 use crate::audio::playback_features::PlaybackFeatures;
 use crate::audio::{NodeKind, PathStep, SourceKind};
 
 fn render_text(
-    tree: &Group,
+    tree: &Tree,
     header: &[String],
     files: &HashMap<u32, SoundFile<'_>>,
 ) -> Result<String, String> {
     render(tree, header, files).map(|rendered| rendered.text)
 }
 
-fn leaf(wem_id: u32) -> Node {
-    Node::Leaf(Leaf {
+fn sound(wem_id: u32) -> Leaf {
+    Leaf {
         wem_id: Some(wem_id),
         source_id: wem_id,
         kind: SourceKind::Embedded,
         music_clip_features: MusicClipFeatures::default(),
         playback_features: PlaybackFeatures::default(),
         variant: 0,
-    })
+    }
 }
 
-fn group(kind: NodeKind, id: u32, children: Vec<Node>) -> Group {
-    Group {
-        step: PathStep { kind, id },
-        combine: match kind {
-            NodeKind::Sequence => Combine::Segments,
-            NodeKind::Random => Combine::Select,
-            _ => Combine::Layers,
-        },
-        children,
+fn leaf(wem_id: u32) -> Node {
+    Node::Leaf(sound(wem_id))
+}
+
+fn add_children(tree: &mut Tree, group: GroupId, children: Vec<Node>) {
+    for child in children {
+        tree.add_child(group, child)
+            .expect("a defined fixture group");
     }
+}
+
+fn group(tree: &mut Tree, kind: NodeKind, id: u32, children: Vec<Node>) -> Node {
+    let id = tree.add_group(PathStep { kind, id });
+    add_children(tree, id, children);
+    Node::Group(id)
+}
+
+fn tree(kind: NodeKind, id: u32, children: Vec<Node>) -> Tree {
+    let mut tree = Tree::new(PathStep { kind, id });
+    add_children(&mut tree, Tree::ROOT, children);
+    tree
 }
 
 fn files() -> HashMap<u32, SoundFile<'static>> {
@@ -69,19 +80,18 @@ fn files() -> HashMap<u32, SoundFile<'static>> {
 
 #[test]
 fn a_group_of_one_child_is_the_child() {
-    let tree = group(
-        NodeKind::Event,
-        5,
-        vec![Node::Group(group(NodeKind::Action, 6, vec![leaf(1)]))],
-    );
+    let mut tree = tree(NodeKind::Event, 5, Vec::new());
+    let action = group(&mut tree, NodeKind::Action, 6, vec![leaf(1)]);
+    add_children(&mut tree, Tree::ROOT, vec![action]);
 
     assert_eq!(render_text(&tree, &[], &files()).as_deref(), Ok("a.ogg\n"));
 }
 
 #[test]
 fn groups_nest_after_their_children() {
-    let inner = group(NodeKind::Random, 7, vec![leaf(1), leaf(2)]);
-    let tree = group(NodeKind::Event, 5, vec![leaf(1), Node::Group(inner)]);
+    let mut tree = tree(NodeKind::Event, 5, Vec::new());
+    let inner = group(&mut tree, NodeKind::Random, 7, vec![leaf(1), leaf(2)]);
+    add_children(&mut tree, Tree::ROOT, vec![leaf(1), inner]);
 
     let text = render_text(&tree, &["x".to_owned()], &files());
 
@@ -102,7 +112,7 @@ group = -L2 #@layer-v
 
 #[test]
 fn a_sequence_is_a_segment_group() {
-    let tree = group(NodeKind::Sequence, 9, vec![leaf(1), leaf(2)]);
+    let tree = tree(NodeKind::Sequence, 9, vec![leaf(1), leaf(2)]);
 
     let text = render_text(&tree, &[], &files()).expect("renders");
 
@@ -118,12 +128,27 @@ group = -S2
 
 #[test]
 fn a_sound_without_a_file_fails_the_render() {
-    let tree = group(NodeKind::Event, 5, vec![leaf(1), leaf(3)]);
+    let tree = tree(NodeKind::Event, 5, vec![leaf(1), leaf(3)]);
 
     assert_eq!(
         render_text(&tree, &[], &files()),
         Err("embedded source 3 has no file".to_owned())
     );
+}
+
+#[test]
+fn a_deep_single_child_path_builds_renders_and_drops() {
+    let mut tree = tree(NodeKind::Event, 0, Vec::new());
+    let path: Vec<_> = (1..=8_192)
+        .map(|id| PathStep {
+            kind: NodeKind::Sequence,
+            id,
+        })
+        .collect();
+    tree.insert(Tree::ROOT, &path, 0, sound(1))
+        .expect("the complete fixture path");
+    assert_eq!(render_text(&tree, &[], &files()).as_deref(), Ok("a.ogg\n"));
+    drop(tree);
 }
 
 #[test]

@@ -101,6 +101,18 @@ pub enum BreakReason {
 }
 
 impl BreakReason {
+    /// Returns whether a traversal limit left authored routes unvisited.
+    #[must_use]
+    pub const fn truncated_by_limit(&self) -> bool {
+        matches!(
+            self,
+            Self::TooDeep { .. }
+                | Self::ChainTooLong { .. }
+                | Self::TooManyChildren { .. }
+                | Self::TooManyObjects { .. }
+        )
+    }
+
     /// Returns a stable code for the reason, e.g. `missing`, for scripts.
     #[must_use]
     pub const fn kind(&self) -> &'static str {

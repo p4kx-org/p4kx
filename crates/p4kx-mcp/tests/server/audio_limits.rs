@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_assembly::audio::MAX_CONTAINER_CHILDREN;
 use p4kx_testkit::{
     TestAtl, TestBank, TestCodec, TestEntry, TestHircObject, TestPlaylistItem, TestWem,
     test_signal, wwise_short_id,
@@ -103,6 +104,67 @@ fn events_are_complete_and_soundbank_previews_keep_their_totals() -> TestResult 
         "the complete original trigger name is retained"
     );
     Ok(())
+}
+
+#[test]
+fn a_truncated_trigger_reports_the_traversal_cut_on_every_page() -> TestResult {
+    let install = truncated_trigger()?;
+    let mut server = serve(&install)?;
+    let first = server.ok(
+        "resolve_audio_trigger",
+        &json!({ "trigger": "Play_Limited", "limit": 1 }),
+    )?;
+    assert_eq!(
+        first["truncated_by_limits"], true,
+        "the Event action list has an unfollowed Play action"
+    );
+    assert_eq!(
+        first["counts"]["variants"], 2,
+        "only two Play actions reached"
+    );
+    assert_eq!(
+        first["breaks"][0]["kind"], "too_many_children",
+        "the first page reports the traversal limit"
+    );
+    let cursor = first["next_cursor"].as_str().ok_or("second variant page")?;
+    let second = server.ok(
+        "resolve_audio_trigger",
+        &json!({ "trigger": "Play_Limited", "limit": 1, "cursor": cursor }),
+    )?;
+    assert_eq!(
+        second["truncated_by_limits"], true,
+        "the cutoff is visible after the first page"
+    );
+    assert_eq!(
+        second["breaks"],
+        json!([]),
+        "break details stay on the first page"
+    );
+    Ok(())
+}
+
+fn truncated_trigger() -> TestResult<Install> {
+    const PLAY: u32 = 1;
+    const STOP: u32 = 2;
+    const SOUND: u32 = 3;
+    const EVENT: &str = "E_Limited";
+    let mut actions = vec![PLAY, PLAY];
+    actions.resize(MAX_CONTAINER_CHILDREN, STOP);
+    actions.push(PLAY);
+    let bank = TestBank::new(1)
+        .object(TestHircObject::event(wwise_short_id(EVENT), &actions))
+        .object(TestHircObject::action(PLAY, 0x0403, SOUND))
+        .object(TestHircObject::action(STOP, 0x0102, SOUND))
+        .object(TestHircObject::sound(SOUND, 21, 2, 0))
+        .bytes();
+    let definitions = TestAtl::new("SC_Limited").trigger("Play_Limited", &[EVENT]);
+    Install::new(vec![
+        TestEntry::zstd(
+            "Data\\Libs\\GameAudio\\SC_Limited.xml",
+            definitions.to_cryxml(),
+        ),
+        TestEntry::stored("Data\\Sounds\\wwise\\Limited.bnk", bank),
+    ])
 }
 
 #[test]

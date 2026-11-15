@@ -60,6 +60,7 @@ struct TriggerJson<'a> {
 
 #[derive(Serialize)]
 struct SoundsJson<'a> {
+    truncated_by_limits: bool,
     variants: Vec<VariantJson<'a>>,
     breaks: Vec<BreakJson<'a>>,
 }
@@ -219,6 +220,7 @@ fn trigger_json<'a>(
 ) -> TriggerJson<'a> {
     TriggerJson {
         sounds: sounds.map(|sounds| SoundsJson {
+            truncated_by_limits: sounds.truncated_by_limits(),
             variants: sounds.variants().iter().map(wwise_json::variant).collect(),
             breaks: sounds
                 .breaks()

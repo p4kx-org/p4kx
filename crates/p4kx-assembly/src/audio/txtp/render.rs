@@ -4,6 +4,7 @@
 use std::collections::HashMap;
 use std::fmt::Write;
 use std::ops::Range;
+use std::slice;
 
 use p4kx_audio::Loop;
 
@@ -12,7 +13,7 @@ use crate::audio::playback_features::{PlaybackFeature, PlaybackFeatures};
 use crate::audio::{ExportLoopOrigin, ExportedWemOrigin};
 
 use super::TxtpApproximation;
-use super::tree::{Combine, Group, Leaf, Node};
+use super::tree::{Combine, Group, Leaf, Node, Tree};
 
 /// The longest text of a comment line, in characters.
 const MAX_COMMENT_LEN: usize = 160;
@@ -162,7 +163,7 @@ impl RenderedTxtp<'_> {
 ///
 /// Returns why the TXTP cannot be written: a sound has no usable file in `files`.
 pub(super) fn render<'a>(
-    tree: &Group,
+    tree: &Tree,
     header: &[String],
     files: &HashMap<u32, SoundFile<'a>>,
 ) -> Result<RenderedTxtp<'a>, String> {
@@ -178,32 +179,59 @@ pub(super) fn render<'a>(
         let _ = writeln!(rendered.text, "# {}", comment_text(line));
     }
     let header_end = rendered.text.len();
-    group_lines(&mut rendered, tree, 0, files)?;
+    group_lines(&mut rendered, tree, files)?;
     rendered.insert_notes(header_end);
     Ok(rendered)
 }
 
+struct GroupCursor<'a> {
+    group: &'a Group,
+    children: slice::Iter<'a, Node>,
+    depth: usize,
+    first_command: usize,
+}
+
+impl<'a> GroupCursor<'a> {
+    fn new(group: &'a Group, depth: usize, first_command: usize) -> Self {
+        Self {
+            group,
+            children: group.children.iter(),
+            depth,
+            first_command,
+        }
+    }
+
+    const fn emits_group(&self) -> bool {
+        self.group.children.len() != 1
+    }
+}
+
 fn group_lines<'a>(
     rendered: &mut RenderedTxtp<'a>,
-    group: &Group,
-    depth: usize,
+    tree: &Tree,
     files: &HashMap<u32, SoundFile<'a>>,
 ) -> Result<(), String> {
-    let [only] = group.children.as_slice() else {
-        let first_command = rendered.commands.len();
-        for child in &group.children {
-            match child {
-                Node::Leaf(leaf) => leaf_line(rendered, leaf, depth + 1, files)?,
-                Node::Group(inner) => group_lines(rendered, inner, depth + 1, files)?,
+    let root = tree
+        .group(Tree::ROOT)
+        .ok_or("the TXTP root group is missing")?;
+    let mut groups = vec![GroupCursor::new(root, 0, 0)];
+    while let Some(cursor) = groups.last_mut() {
+        let depth = cursor.depth + usize::from(cursor.emits_group());
+        match cursor.children.next() {
+            Some(Node::Leaf(leaf)) => leaf_line(rendered, leaf, depth, files)?,
+            Some(Node::Group(id)) => {
+                let group = tree.group(*id).ok_or("a TXTP child group is missing")?;
+                groups.push(GroupCursor::new(group, depth, rendered.commands.len()));
+            }
+            None => {
+                if cursor.emits_group() {
+                    group_line(rendered, cursor.group, cursor.depth, cursor.first_command);
+                }
+                groups.pop();
             }
         }
-        group_line(rendered, group, depth, first_command);
-        return Ok(());
-    };
-    match only {
-        Node::Leaf(leaf) => leaf_line(rendered, leaf, depth, files),
-        Node::Group(inner) => group_lines(rendered, inner, depth, files),
     }
+    Ok(())
 }
 
 fn leaf_line<'a>(

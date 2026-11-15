@@ -17,6 +17,8 @@ use p4kx_testkit::{
 };
 use serde_json::Value;
 
+#[path = "wwise_extract_resolution_limits.rs"]
+mod resolution_limits;
 #[path = "wwise_txtp_approximation.rs"]
 mod txtp_approximation;
 #[path = "wwise_txtp_clip_omissions.rs"]

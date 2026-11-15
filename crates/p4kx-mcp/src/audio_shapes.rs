@@ -272,10 +272,10 @@ pub(crate) struct BreakShape {
     pub(crate) message: String,
 }
 
-/// How many variants a trigger has and how they are located.
+/// How many variants the resolver found and how they are located.
 #[derive(Debug, Clone, Copy, Serialize, JsonSchema)]
 pub(crate) struct CountsShape {
-    /// All variants.
+    /// Variants found across all pages.
     pub(crate) variants: usize,
     /// Variants whose WEM is located.
     pub(crate) located: usize,
@@ -298,6 +298,8 @@ pub(crate) struct TriggerSoundsResult {
     pub(crate) trigger: TriggerShape,
     /// How the variants and links count over all pages.
     pub(crate) counts: CountsShape,
+    /// Whether traversal limits caused the resolver to leave references unfollowed.
+    pub(crate) truncated_by_limits: bool,
     /// The variants on this page.
     pub(crate) variants: Vec<VariantShape>,
     /// The broken links, on the first page only, at most 25;

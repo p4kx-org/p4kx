@@ -88,6 +88,7 @@ fn resolve(args: &WwiseResolveArgs, as_json: bool) -> Result<()> {
             archive: json::path(archive.path()),
             language: LanguageJson::of(&choice),
             trigger: wwise_json::trigger(&sounds),
+            truncated_by_limits: sounds.truncated_by_limits(),
             variants: sounds.variants().iter().map(wwise_json::variant).collect(),
             breaks: sounds
                 .breaks()

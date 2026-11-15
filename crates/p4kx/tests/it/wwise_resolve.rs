@@ -141,6 +141,10 @@ fn broken_links_are_listed_with_the_object_where_the_chain_breaks() -> TestResul
     insta::assert_snapshot!(text.stdout);
     let json = resolve("Play_Broken", true, 0)?;
     let value: serde_json::Value = serde_json::from_str(&json.stdout)?;
+    assert_eq!(
+        value["truncated_by_limits"], false,
+        "ordinary broken links do not exhaust a limit"
+    );
     insta::assert_snapshot!(serde_json::to_string_pretty(&value["breaks"])?);
     Ok(())
 }

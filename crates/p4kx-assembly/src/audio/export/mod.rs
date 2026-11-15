@@ -19,6 +19,7 @@ use self::loop_origins::CaptureOrigins;
 pub(crate) use self::loop_origins::ExportedWemOrigin;
 pub use self::loop_origins::{ExportLoopOrigin, ExportLoopOrigins};
 use self::write::Target;
+use super::export_preflight;
 use super::{ArchiveAudio, TriggerSounds};
 
 /// The file format a sound is exported in.
@@ -215,8 +216,7 @@ impl ArchiveAudio<'_> {
     ///
     /// # Errors
     ///
-    /// Returns a [`ConversionError`] when `folder` is in a Star Citizen installation or cannot be
-    /// created.
+    /// Returns a [`ConversionError`] for a truncated resolution or an invalid output folder.
     pub fn export_sounds(
         &self,
         triggers: &[&TriggerSounds<'_>],
@@ -231,8 +231,7 @@ impl ArchiveAudio<'_> {
     ///
     /// # Errors
     ///
-    /// Returns a [`ConversionError`] when `folder` is in a Star Citizen installation or cannot be
-    /// created.
+    /// Returns the same errors as [`Self::export_sounds`].
     pub fn export_sounds_watched(
         &self,
         triggers: &[&TriggerSounds<'_>],
@@ -266,6 +265,9 @@ impl ArchiveAudio<'_> {
         watch: &ExportWatch,
         capture: CaptureOrigins,
     ) -> Result<(ExportReport, ExportLoopOrigins), ConversionError> {
+        if let Some(cut) = export_preflight::traversal_cut(triggers) {
+            return Err(cut.into_error());
+        }
         let plan = plan::build(triggers);
         let mut origins = ExportLoopOrigins::default();
         watch.plan(plan.jobs.len());

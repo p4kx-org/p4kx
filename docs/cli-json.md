@@ -828,7 +828,7 @@ A **Trigger**:
 | `definition` | string or `null` | Path of the ATL definition Entry; `null` when no definition has the trigger |
 | `events` | array | One Event per `WwiseEvent` of the definition, in order |
 | `unmatched` | object or `null` | Why the trigger reaches no soundbank: `kind` and `message` |
-| `sounds` | object | With `--sounds` only: `variants` and `breaks` as `p4kx wwise resolve` lists them |
+| `sounds` | object | Lists `truncated_by_limits`, `variants` and `breaks` for each resolved trigger with `--sounds` or `--extract`, using the same fields as `p4kx wwise resolve` |
 
 With `--sounds`, each trigger that has a definition is resolved as by `p4kx wwise resolve` (the
 soundbanks of the trigger are read again) and the document gets a `language` object with
@@ -1000,7 +1000,7 @@ and `issues` are not repeated in it.
 {"archive": "…", "language": {"requested": "German", "fallback": "English(US)"},
  "trigger": {"name": "Play_QDrive_Spool", "definition": "Data\\Libs\\GameAudio\\SC_SSQD_QDrive.xml",
              "events": [{"name": "Play_QDrive_Spool", "id": 2178236557, "localised": false}]},
- "variants": [Variant, …], "breaks": [Break, …],
+ "truncated_by_limits": false, "variants": [Variant, …], "breaks": [Break, …],
  "counts": {"variants": 14, "located": 0, "unlocated": 14, "plugins": 0, "breaks": 0},
  "issues": [Issue, …]}
 ```
@@ -1012,6 +1012,10 @@ the same `issues`; each soundbank holding one of the trigger's events is then re
 sound) and random, sequence, switch and blend containers to Sound objects. Variants and breaks
 come in the order of the trigger's events, their soundbanks in path order and each container's
 children in bank order. Broken links do not change the exit code.
+
+`truncated_by_limits` is `true` when a depth, action-chain, child-count or object-budget limit cuts
+the walk short. The inspection still succeeds and `variants` and `counts` describe the part reached.
+The corresponding entry in `breaks` gives the limit and why the walk stopped.
 
 A **Variant**:
 

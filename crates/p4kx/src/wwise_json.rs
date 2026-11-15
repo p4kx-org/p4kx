@@ -20,6 +20,7 @@ pub(crate) struct ResolveJson<'a> {
     pub(crate) archive: String,
     pub(crate) language: LanguageJson<'a>,
     pub(crate) trigger: TriggerJson<'a>,
+    pub(crate) truncated_by_limits: bool,
     pub(crate) variants: Vec<VariantJson<'a>>,
     pub(crate) breaks: Vec<BreakJson<'a>>,
     pub(crate) counts: Counts,

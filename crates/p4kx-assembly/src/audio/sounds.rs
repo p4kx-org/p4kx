@@ -358,4 +358,16 @@ impl<'i> TriggerSounds<'i> {
     pub fn breaks(&self) -> &[BrokenLink<'i>] {
         &self.breaks
     }
+
+    /// Returns whether a traversal limit left any authored route unvisited.
+    #[must_use]
+    pub fn truncated_by_limits(&self) -> bool {
+        self.first_truncation().is_some()
+    }
+
+    pub(super) fn first_truncation(&self) -> Option<&BrokenLink<'i>> {
+        self.breaks()
+            .iter()
+            .find(|link| link.reason().truncated_by_limit())
+    }
 }

@@ -92,11 +92,13 @@ impl Server {
 
     #[tool(
         description = "Resolve an audio trigger to its sounds: follow each Wwise event through its actions and random, \
-        sequence, switch and blend containers and list every variant with its soundbank, WEM ID, how the source is \
+        sequence, switch and blend containers and list the variants reached with their soundbank, WEM ID, how the source is \
         stored, where the WEM is (embedded in a soundbank, or a loose WEM Entry for streamed sounds) and the object \
         path from the event. Localised sounds are resolved for lang, with fallback_lang where that has none. Broken \
-        links and their reasons come with the first page. Variants are paged with a cursor. Only paths, IDs and \
-        metadata are returned, no audio. Retained text is complete within the existing 256 KiB response budget; an item that cannot fit first is refused. \
+        links and their reasons come with the first page. When a traversal limit leaves references unfollowed, \
+        truncated_by_limits is true on every page and counts describe the variants reached. Variants are paged with a cursor. \
+        Only paths, IDs and metadata are returned, no audio. Retained text is complete within the existing 256 KiB response budget; \
+        an item that cannot fit first is refused. \
         The content may be forwarded by the client to third parties; game texts \
         and media must not be redistributed.",
         output_schema = rmcp::handler::server::tool::schema_for_output::<TriggerSoundsResult>(),

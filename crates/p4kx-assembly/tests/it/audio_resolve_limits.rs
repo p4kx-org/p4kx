@@ -4,16 +4,21 @@
 //! Resolution bounds the depth, the fan-out and the size of an untrusted soundbank hierarchy.
 
 use std::error::Error;
+use std::fs;
+use std::path::Path;
 
 use p4kx_assembly::audio::{
-    ArchiveAudio, BreakReason, MAX_CONTAINER_CHILDREN, MAX_EVENT_OBJECTS, MAX_PATH_DEPTH,
-    TriggerSounds,
+    ArchiveAudio, BreakReason, ExportLoopOrigins, ExportOptions, ExportReport, ExportState,
+    ExportWatch, ExportedSound, MAX_CONTAINER_CHILDREN, MAX_EVENT_OBJECTS, MAX_PATH_DEPTH,
+    SoundFormat, TriggerSounds, write_txtp, write_txtp_with_loop_origins,
 };
-use p4kx_extraction::Archive;
+use p4kx_extraction::{Archive, CancelToken, ConflictPolicy, ConversionError};
 use p4kx_testkit::{
     ArchiveBuilder, TestAtl, TestBank, TestContainerKind, TestEntry, TestHircObject, TestNodeBase,
     wwise_short_id,
 };
+
+use crate::audio_txtp_support::pcm;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -31,6 +36,14 @@ fn resolve_bytes(
     bytes: Vec<u8>,
     check: impl FnOnce(&TriggerSounds<'_>) -> TestResult,
 ) -> TestResult {
+    with_archive(bytes, |archive, _| {
+        let audio = ArchiveAudio::new(archive);
+        let sounds = audio.resolve_trigger("Play_It").ok_or("Play_It resolves")?;
+        check(&sounds)
+    })
+}
+
+fn with_archive(bytes: Vec<u8>, check: impl FnOnce(&Archive, &Path) -> TestResult) -> TestResult {
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("Data.p4k");
     ArchiveBuilder::new()
@@ -41,9 +54,7 @@ fn resolve_bytes(
         .entry(TestEntry::stored("Data\\Sounds\\wwise\\Deep.bnk", bytes))
         .write_to(&path)?;
     let archive = Archive::open_with_key(&path, Some(p4kx_testkit::test_key()))?;
-    let audio = ArchiveAudio::new(&archive);
-    let sounds = audio.resolve_trigger("Play_It").ok_or("Play_It resolves")?;
-    check(&sounds)
+    check(&archive, dir.path())
 }
 
 fn random(id: u32, children: &[u32]) -> TestHircObject {
@@ -68,6 +79,137 @@ fn a_path_deeper_than_the_limit_is_cut_at_the_limit() -> TestResult {
             "reason"
         );
         assert_eq!(deep.path().len(), MAX_PATH_DEPTH, "path at the limit");
+        Ok(())
+    })
+}
+
+fn with_truncated_resolution(
+    check: impl FnOnce(&ArchiveAudio<'_>, &TriggerSounds<'_>, &Path) -> TestResult,
+) -> TestResult {
+    let terminal = 100 + u32::try_from(MAX_PATH_DEPTH)?;
+    let bank = TestBank::new(1)
+        .wem(7, pcm().bytes())
+        .object(TestHircObject::event(wwise_short_id("Play_It"), &[1]))
+        .object(TestHircObject::action(1, PLAY, 10))
+        .object(random(10, &[20, 100]))
+        .object(TestHircObject::sound(20, 7, 0, 0))
+        .object(TestHircObject::sound(terminal, 7, 0, 0));
+    let bank = (100..terminal).fold(bank, |bank, id| bank.object(random(id, &[id + 1])));
+    with_archive(bank.bytes(), |archive, root| {
+        let audio = ArchiveAudio::new(archive);
+        let sounds = audio.resolve_trigger("Play_It").ok_or("Play_It resolves")?;
+        let [good] = sounds.variants() else {
+            return Err("exactly one route resolves before the limit".into());
+        };
+        assert!(good.location().is_some(), "the good WEM can be written");
+        assert!(sounds.truncated_by_limits(), "the other route is truncated");
+        check(&audio, &sounds, root)
+    })
+}
+
+fn assert_export_cut(error: &ConversionError) -> TestResult {
+    let ConversionError::IncompleteAudioResolution {
+        trigger,
+        event,
+        source,
+    } = error
+    else {
+        return Err(format!("expected incomplete resolution, got {error:?}").into());
+    };
+    assert_eq!(
+        (trigger.as_str(), event.as_str()),
+        ("Play_It", "Play_It"),
+        "identify the trigger and event that stopped publication"
+    );
+    assert_eq!(
+        source.downcast_ref::<BreakReason>(),
+        Some(&BreakReason::TooDeep {
+            limit: MAX_PATH_DEPTH,
+        }),
+        "retain the original limit as the error source"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_truncated_resolution_stops_audio_before_planning_or_creating_outputs() -> TestResult {
+    with_truncated_resolution(|audio, sounds, root| {
+        let options = ExportOptions {
+            format: SoundFormat::Raw,
+            policy: ConflictPolicy::Overwrite,
+        };
+        let missing = root.join("not-created");
+        let triggers = [sounds];
+        let watch = ExportWatch::default();
+        let error = audio
+            .export_sounds_watched_with_loop_origins(&triggers, &missing, options, &watch)
+            .expect_err("the incomplete walk stops planning");
+        assert_export_cut(&error)?;
+        assert_eq!((watch.total(), watch.done()), (0, 0), "no work planned");
+        assert!(!missing.exists(), "no destination created");
+
+        let existing = root.join("Play_It.wem");
+        fs::write(&existing, b"previous WEM")?;
+        let error = audio
+            .export_sounds(&triggers, root, options)
+            .expect_err("the incomplete walk stops replacement");
+        assert_export_cut(&error)?;
+        assert_eq!(fs::read(existing)?, b"previous WEM");
+        Ok(())
+    })
+}
+
+#[test]
+fn a_truncated_resolution_stops_txtp_even_with_a_whole_audio_file() -> TestResult {
+    with_truncated_resolution(|audio, sounds, root| {
+        let wem = root.join("Play_It.wem");
+        let previous = pcm().bytes();
+        fs::write(&wem, &previous)?;
+        let report = ExportReport {
+            sounds: vec![ExportedSound {
+                trigger: "Play_It".to_owned(),
+                wem_id: 7,
+                path: wem,
+                format: SoundFormat::Raw,
+                size: u64::try_from(previous.len())?,
+                state: ExportState::Kept,
+                unconverted: None,
+                loop_points: None,
+                prefetch_only: false,
+            }],
+            ..ExportReport::default()
+        };
+        let txtp = root.join("Play_It.txtp");
+        fs::write(&txtp, b"previous TXTP")?;
+        let triggers = [sounds];
+        let policy = ConflictPolicy::Overwrite;
+        let direct = write_txtp(&triggers, &report, root, policy);
+        assert_eq!(direct.files, [], "the legacy writer publishes no files");
+        let [skip] = direct.skipped.as_slice() else {
+            return Err("the blocked event is reported once".into());
+        };
+        assert_eq!(
+            (skip.trigger.as_str(), skip.event.as_str()),
+            ("Play_It", "Play_It")
+        );
+        assert!(skip.reason.contains("path is deeper"), "{}", skip.reason);
+
+        let error = write_txtp_with_loop_origins(
+            audio.archive(),
+            &triggers,
+            &report,
+            root,
+            policy,
+            &CancelToken::new(),
+            &ExportLoopOrigins::default(),
+        )
+        .expect_err("the incomplete walk stops text and receipt publication");
+        let cause = error
+            .get_ref()
+            .and_then(|source| source.downcast_ref::<ConversionError>())
+            .ok_or("typed traversal error")?;
+        assert_export_cut(cause)?;
+        assert_eq!(fs::read(txtp)?, b"previous TXTP");
         Ok(())
     })
 }

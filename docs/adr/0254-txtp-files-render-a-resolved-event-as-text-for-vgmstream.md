@@ -50,6 +50,16 @@ decoding) and ADR-0250 (the object kinds). The format is that of vgmstream's `do
 - **Names from the Archive stay in comments.** The header comment holds the event and trigger
   name with control characters replaced, so a name cannot start a TXTP line of its own.
 
+## Traversal and rendering
+
+The sound and TXTP exporters preflight the resolved triggers for traversal cutoffs. A cutoff
+aborts the requested batch before file creation or replacement. The error carries the trigger,
+event and limit. Ordinary broken links remain visible in the TXTP report and header.
+
+TXTP stores group links as indices and visits them in postorder with an explicit stack of group
+cursors. Tree construction and destruction use the same flat representation. Group boundaries,
+single-child collapse, command order and byte addresses follow the resolved paths.
+
 ## Consequences
 
 - TXTP arranges the resolved sound files. Music clip positions, trims, transitions and authored

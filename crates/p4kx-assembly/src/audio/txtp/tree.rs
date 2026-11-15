@@ -47,8 +47,11 @@ pub(super) struct Leaf {
 #[derive(Debug, PartialEq, Eq)]
 pub(super) enum Node {
     Leaf(Leaf),
-    Group(Group),
+    Group(GroupId),
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct GroupId(usize);
 
 /// An object of the path that plays several children.
 #[derive(Debug, PartialEq, Eq)]
@@ -66,62 +69,105 @@ impl Group {
             children: Vec::new(),
         }
     }
+}
+
+/// A playback tree whose group links are indices, independent of native stack depth.
+pub(super) struct Tree {
+    groups: Vec<Group>,
+}
+
+impl Tree {
+    pub(super) const ROOT: GroupId = GroupId(0);
+
+    pub(super) fn new(root: PathStep) -> Self {
+        Self {
+            groups: vec![Group::new(root)],
+        }
+    }
+
+    pub(super) fn group(&self, id: GroupId) -> Option<&Group> {
+        self.groups.get(id.0)
+    }
+
+    pub(super) fn add_group(&mut self, step: PathStep) -> GroupId {
+        let id = GroupId(self.groups.len());
+        self.groups.push(Group::new(step));
+        id
+    }
+
+    pub(super) fn add_child(&mut self, parent: GroupId, child: Node) -> Option<()> {
+        self.groups.get_mut(parent.0)?.children.push(child);
+        Some(())
+    }
 
     /// Adds a leaf in visit order, reusing only the groups still open in the source walk.
-    fn insert(&mut self, steps: &[PathStep], shared_prefix: usize, leaf: Leaf) {
-        let Some((step, rest)) = steps.split_first() else {
-            self.children.push(Node::Leaf(leaf));
-            return;
-        };
-        if shared_prefix > 0
-            && let Some(Node::Group(last)) = self.children.last_mut()
-            && last.step == *step
-        {
-            last.insert(rest, shared_prefix - 1, leaf);
-            return;
+    pub(super) fn insert(
+        &mut self,
+        mut parent: GroupId,
+        steps: &[PathStep],
+        mut shared_prefix: usize,
+        leaf: Leaf,
+    ) -> Option<()> {
+        for &step in steps {
+            if shared_prefix > 0
+                && let Some(existing) = self.last_group(parent, step)
+            {
+                parent = existing;
+                shared_prefix -= 1;
+                continue;
+            }
+            let id = self.add_group(step);
+            self.add_child(parent, Node::Group(id))?;
+            parent = id;
+            shared_prefix = 0;
         }
-        let mut group = Self::new(*step);
-        group.insert(rest, 0, leaf);
-        self.children.push(Node::Group(group));
+        self.add_child(parent, Node::Leaf(leaf))
+    }
+
+    fn last_group(&self, parent: GroupId, step: PathStep) -> Option<GroupId> {
+        let Node::Group(child) = self.group(parent)?.children.last()? else {
+            return None;
+        };
+        (self.group(*child)?.step == step).then_some(*child)
     }
 }
 
-/// Rebuilds the tree of objects the variants of one Wwise event play, from the Event object down.
-/// The paths are at most `MAX_PATH_DEPTH` long, so the tree is as deep.
+/// Rebuilds the objects played by the variants of one Wwise event, from the Event down.
 ///
-/// A Sound object is a leaf; the last object of a music variant's path, a music track, holds its
-/// sources as leaves. Returns `None` for no variants.
-pub(super) fn build(variants: &[SoundVariant<'_>]) -> Option<Group> {
+/// A Sound is a leaf. The final `MusicTrack` of a music variant holds its sources as leaves.
+pub(super) fn build(variants: &[SoundVariant<'_>]) -> Option<Tree> {
     let root = *variants.first()?.path().first()?;
-    let mut first_variant = 0;
-    let mut holders = variants
-        .chunk_by(|_, next| next.shared_path_prefix > 0)
-        .map(|holder| {
-            let group = build_holder(root, holder, first_variant);
-            first_variant += holder.len();
-            group
-        });
+    let mut holders = variants.chunk_by(|_, next| next.shared_path_prefix > 0);
     let first = holders.next()?;
+    let mut tree = Tree::new(root);
     let Some(second) = holders.next() else {
-        return Some(first);
+        build_holder(&mut tree, Tree::ROOT, first, 0)?;
+        return Some(tree);
     };
-    let mut tree = Group::new(root);
-    tree.children
-        .extend([first, second].into_iter().chain(holders).map(Node::Group));
+    let mut first_variant = 0;
+    for holder in [first, second].into_iter().chain(holders) {
+        let group = tree.add_group(root);
+        build_holder(&mut tree, group, holder, first_variant)?;
+        tree.add_child(Tree::ROOT, Node::Group(group))?;
+        first_variant += holder.len();
+    }
     Some(tree)
 }
 
-fn build_holder(root: PathStep, variants: &[SoundVariant<'_>], first_variant: usize) -> Group {
-    let mut tree = Group::new(root);
+fn build_holder(
+    tree: &mut Tree,
+    root: GroupId,
+    variants: &[SoundVariant<'_>],
+    first_variant: usize,
+) -> Option<()> {
     for (offset, variant) in variants.iter().enumerate() {
-        let variant_index = first_variant + offset;
-        let path = variant.path();
-        let below = path.get(1..).unwrap_or_default();
+        let below = variant.path().get(1..).unwrap_or_default();
         let owners = match below.split_last() {
             Some((last, owners)) if last.kind == NodeKind::Sound => owners,
             _ => below,
         };
         tree.insert(
+            root,
             owners,
             variant.shared_path_prefix.saturating_sub(1),
             Leaf {
@@ -130,9 +176,9 @@ fn build_holder(root: PathStep, variants: &[SoundVariant<'_>], first_variant: us
                 kind: variant.source_kind(),
                 music_clip_features: variant.music_clip_features,
                 playback_features: variant.playback_features,
-                variant: variant_index,
+                variant: first_variant + offset,
             },
-        );
+        )?;
     }
-    tree
+    Some(())
 }

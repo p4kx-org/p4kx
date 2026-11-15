@@ -34,6 +34,7 @@ use p4kx_extraction::{Archive, ArchiveWatch, ArchiveWriteProtection, CancelToken
 use self::origins::OriginInputs;
 use self::render::{RenderedTxtp, SoundFile, comment_text, render};
 use super::export::name::{StemSet, portable_stem};
+use super::export_preflight;
 use super::{
     ExportLoopOrigins, ExportReport, ExportState, ExportedSound, SoundVariant, TriggerSounds,
 };
@@ -128,6 +129,7 @@ impl TxtpReport {
 /// An event with broken links is written with a header comment that says it is incomplete, and
 /// [`TxtpFile::breaks`] counts them. A file that cannot be written, e.g. because its path is too
 /// long, is listed in [`TxtpReport::skipped`] with the error; the other events are still written.
+/// A traversal limit skips the export before writing and reports the blocking event.
 #[must_use]
 pub fn write_txtp(
     triggers: &[&TriggerSounds<'_>],
@@ -135,6 +137,16 @@ pub fn write_txtp(
     folder: &Path,
     policy: ConflictPolicy,
 ) -> TxtpReport {
+    if let Some(cut) = export_preflight::traversal_cut(triggers) {
+        return TxtpReport {
+            files: Vec::new(),
+            skipped: vec![TxtpSkip {
+                trigger: cut.trigger.to_owned(),
+                event: comment_text(cut.event),
+                reason: format!("audio resolution incomplete ({})", cut.reason),
+            }],
+        };
+    }
     write_files(
         triggers,
         exported,
@@ -151,7 +163,7 @@ pub fn write_txtp(
 /// Pass triggers resolved with physical path sources from the same archive.
 ///
 /// # Errors
-/// Returns an error when the archive changed or cannot be protected from output writes.
+/// Returns an error when resolution was truncated, the archive changed or write protection fails.
 #[must_use = "the report carries the write outcomes"]
 pub fn write_txtp_with_origins(
     archive: &Archive,
@@ -167,7 +179,7 @@ pub fn write_txtp_with_origins(
 /// Writes TXTP origins using loop evidence from the same sound export.
 ///
 /// # Errors
-/// Returns an error when the archive changed or cannot be protected from output writes.
+/// Returns the same output errors as [`write_txtp_with_origins`].
 pub fn write_txtp_with_loop_origins(
     archive: &Archive,
     triggers: &[&TriggerSounds<'_>],
@@ -197,6 +209,9 @@ fn write_with_evidence(
     cancel: &CancelToken,
     loop_origins: Option<&ExportLoopOrigins>,
 ) -> io::Result<TxtpReport> {
+    if let Some(cut) = export_preflight::traversal_cut(triggers) {
+        return Err(io::Error::other(cut.into_error()));
+    }
     ArchiveWatch::new(archive)
         .check()
         .map_err(io::Error::other)?;
