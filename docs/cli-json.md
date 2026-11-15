@@ -2169,6 +2169,14 @@ The JSON summary adds `originReceipt`, `artifactOrigin`, `fieldOrigins` and
 width is an option. The derived height uses both original canvas size fields.
 An unknown diagnostic retains a null origin marker.
 
+The screen is an offline still of the authored widget properties, the supported style cascade and
+the evaluated bindings. A source-enabled parent background can appear behind a text widget.
+`variables` describes the caller's settings and whether reachable operations read them.
+`unsupported` records the documented approximations and undecided bindings. The origin companion
+identifies the contributing DataForge payload, canvas size fields and observed asset sources.
+See [ADR-0337](adr/0337-a-requested-brand-without-a-brand-style-in-a-canvas-gets-the-default-entries-only.md)
+for the RSI power-page investigation and its runtime evidence boundary.
+
 `--var <name>=<value>` (repeatable, at most 64, only with `--screen`) sets a game variable before
 the bindings are evaluated (ADR-0259); every other variable stays at zero, the state at rest
 (ADR-0110). `p4kx ui render … --screen <MFD> --var powerstate=1` draws the MFD of a powered ship.
