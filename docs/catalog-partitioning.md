@@ -152,5 +152,19 @@ cargo test --release --locked -p p4kx-export --test real_archive -- --ignored --
 
 The test checks the source Build and Archive stamp, measures the same encoder with a fixed time
 and normal health policy, and discards the frame as it is written. Capture the exact producer
-revision and binary hash separately. For section bytes, atomic file publication and actual
-consumer import, use the separate evidence above.
+revision and binary hash separately.
+
+Set `P4KX_CATALOG_SECTION_CENSUS=1` for section sizes and provenance counts in the same run.
+The writer sends the finished Zstd stream through a bounded pipe. The reader checks the
+encoded and decoded lengths, counts rows in both provenance inventories, and reports the exact
+compact UTF-8 lengths of the top-level members and their registered section members.
+Report framing separately and keep nested measurements inside their parent counts.
+Source-use arrays are counted by byte length and reference occurrences. Repeated nonempty arrays
+are grouped by SHA-256 fingerprint of the emitted array bytes. Their sorted, unique references
+make identical arrays share a fingerprint. The measurement does not establish equality across
+hash collisions.
+
+The census keeps one counter per nonempty fingerprint and includes the decoder's use of memory
+in the benchmark process. Use the sink-only run for producer-only memory measurements. Neither
+mode requires another serialization pass. For atomic file publication and actual consumer import,
+use the separate evidence above.

@@ -9,11 +9,14 @@ use std::path::Path;
 use std::time::{Instant, UNIX_EPOCH};
 
 use p4kx_channels::channel_name;
-use p4kx_export::{CatalogError, CatalogOptions, Compression, write_catalog_from};
+use p4kx_export::{CatalogError, CatalogOptions, CatalogSummary, Compression, write_catalog_from};
 use p4kx_extraction::{Archive, ArchiveKey, ArchiveWatch, Build, DataForgeEntry};
 use p4kx_testkit::{real_archive_key, real_archive_pair};
 
 use crate::real_archive_verification::print_line;
+
+#[path = "real_archive_catalog_section_pipe.rs"]
+mod sections;
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
@@ -88,20 +91,18 @@ fn measure(path: &Path, channel: &str, build: &Build, key: &ArchiveKey) -> TestR
     if !entry.origin().matches_archive(&archive) {
         return Err(format!("{channel} DataForge source does not match the opened Archive").into());
     }
-    let result = write_catalog_from(
-        &archive,
-        &entry,
-        &CatalogOptions::new(UNIX_EPOCH),
-        Compression::ZSTD,
-        || Ok(io::sink()),
-    );
+    let options = CatalogOptions::new(UNIX_EPOCH);
+    let result = measure_writer(&archive, &entry, &options);
     let elapsed = started.elapsed();
     watch
         .check()
         .map_err(|_| format!("{channel} input changed during catalog sizing"))?;
-    let (summary, _) = result.map_err(|error| {
-        let reason = match error {
-            CatalogError::IncompleteExport(_) => "normal publication refused by export health",
+    let (summary, census) = result.map_err(|error| {
+        let reason = match error.downcast_ref::<CatalogError>() {
+            Some(CatalogError::IncompleteExport(_)) => {
+                "normal publication refused by export health"
+            }
+            None => "normal catalog section census failed",
             _ => "normal catalog generation failed",
         };
         format!(
@@ -120,5 +121,46 @@ fn measure(path: &Path, channel: &str, build: &Build, key: &ArchiveKey) -> TestR
         summary.size(),
         elapsed.as_millis()
     ));
+    print_census(channel, change, &summary, census.as_ref())
+}
+
+fn print_census(
+    channel: &str,
+    change: &str,
+    summary: &CatalogSummary,
+    census: Option<&sections::Census>,
+) -> TestResult {
+    if let Some(census) = census {
+        census
+            .reconcile(summary)
+            .map_err(|error| format!("{channel} change={change}: {error}"))?;
+        print_line(&format!(
+            "catalog census input={channel} change={change} {}",
+            serde_json::to_string(census)?
+        ));
+    }
     Ok(())
+}
+
+fn measure_writer(
+    archive: &Archive,
+    entry: &DataForgeEntry,
+    options: &CatalogOptions<'_>,
+) -> TestResult<(CatalogSummary, Option<sections::Census>)> {
+    if std::env::var_os("P4KX_CATALOG_SECTION_CENSUS").is_some_and(|value| value == "1") {
+        let (summary, census) = sections::transfer(|writer| {
+            write_catalog_from(archive, entry, options, Compression::ZSTD, || Ok(writer))
+        })?;
+        Ok((summary, Some(census)))
+    } else {
+        let (summary, _) =
+            write_catalog_from(
+                archive,
+                entry,
+                options,
+                Compression::ZSTD,
+                || Ok(io::sink()),
+            )?;
+        Ok((summary, None))
+    }
 }

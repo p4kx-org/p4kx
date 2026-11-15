@@ -22,6 +22,7 @@ mod real_archive_blueprints;
 mod real_archive_broker_entries;
 mod real_archive_canonical_texts;
 mod real_archive_catalog_links;
+mod real_archive_catalog_pipe;
 mod real_archive_catalog_ships;
 mod real_archive_catalog_size;
 mod real_archive_catalog_tags;
