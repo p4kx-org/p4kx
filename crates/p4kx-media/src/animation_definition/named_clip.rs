@@ -28,7 +28,7 @@ pub(super) struct Filepath<'document> {
     list: SourceElement<'document>,
     list_index: u64,
     directive: Option<Directive<'document>>,
-    databases: Databases,
+    databases: Option<Databases>,
 }
 
 struct Directive<'document> {
@@ -42,20 +42,16 @@ impl<'document> Filepath<'document> {
         element: SourceElement<'document>,
         parent_is_params_root: bool,
         list_index: u64,
-        writer: &mut MediaWriter<'_>,
-    ) -> Result<Option<Self>, Failure> {
+    ) -> Option<Self> {
         let ordered_list = matches!(projection.family, DefinitionFamily::Chrparams)
             && parent_is_params_root
             && chrparams_selectors::named(element, "AnimationList");
-        if !ordered_list {
-            return Ok(None);
-        }
-        Ok(Some(Self {
+        ordered_list.then_some(Self {
             list: element,
             list_index,
             directive: None,
-            databases: Databases::read(element, projection, writer)?,
-        }))
+            databases: None,
+        })
     }
 
     pub(super) const fn list_index(&self) -> u64 {
@@ -103,10 +99,11 @@ impl<'document> Filepath<'document> {
                 path,
                 path_position: position,
                 directive: self.directive.as_ref(),
+                list: self.list,
                 list_index: self.list_index,
                 selector,
             };
-            link.write(projection, &self.databases, indices, writer)?;
+            link.write(projection, &mut self.databases, indices, writer)?;
         } else if wildcard::is_wildcard(name.value(), path) {
             wildcard::write(
                 &attributes,
@@ -173,6 +170,7 @@ struct Link<'directive, 'document> {
     path: &'document str,
     path_position: AtlPosition,
     directive: Option<&'directive Directive<'document>>,
+    list: SourceElement<'document>,
     list_index: u64,
     selector: NamedCafSelector<'document>,
 }
@@ -181,22 +179,15 @@ impl Link<'_, '_> {
     fn write(
         &self,
         projection: &DefinitionProjection<'_, '_>,
-        databases: &Databases,
+        databases: &mut Option<Databases>,
         indices: [u64; 2],
         writer: &mut MediaWriter<'_>,
     ) -> Result<(), Failure> {
-        let name = origins::position(
-            projection.input,
-            self.name_position,
-            SourceUseRole::Selector,
-            writer,
-        )?;
-        let path = origins::position(
-            projection.input,
-            self.path_position,
-            SourceUseRole::Selector,
-            writer,
-        )?;
+        let selector_origin = |position| {
+            origins::position(projection.input, position, SourceUseRole::Selector, writer)
+        };
+        let name = selector_origin(self.name_position)?;
+        let path = selector_origin(self.path_position)?;
         let scope = Scope::of(self, projection, writer)?;
         let full = combine([&name, &path, &scope.selection], writer)?;
         let path_selection = combine([&path, &scope.selection], writer)?;
@@ -218,13 +209,14 @@ impl Link<'_, '_> {
         }
         .resolve(projection, &mut prepared, writer)?;
         if let Some(archive_path) = &archive_path {
-            databases.write(
+            self.write_dba_binding(
                 &NamedSelection {
                     authored_path: self.path,
                     archive_path,
                     original: &path,
                     selector: &full,
                 },
+                databases,
                 projection,
                 indices,
                 writer,
@@ -245,6 +237,21 @@ impl Link<'_, '_> {
             &[],
         )?;
         Ok(())
+    }
+
+    fn write_dba_binding(
+        &self,
+        selection: &NamedSelection<'_>,
+        databases: &mut Option<Databases>,
+        projection: &DefinitionProjection<'_, '_>,
+        indices: [u64; 2],
+        writer: &mut MediaWriter<'_>,
+    ) -> Result<(), Failure> {
+        let databases = match databases {
+            Some(observed) => observed,
+            empty @ None => empty.insert(Databases::read(self.list, projection, writer)?),
+        };
+        databases.write(selection, projection, indices, writer)
     }
 
     fn observe_event_alias(

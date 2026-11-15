@@ -3,10 +3,12 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::{self, Read, Write as _};
+use std::sync::Arc;
 
 use p4kx_assembly::{
-    ArchiveModels, Attachment, LoadoutResolver, RigFile, RigFileRead, RigInput, RigInputs,
-    RigParameter, RigPlacement, discover_entity_rigs_using, discover_model_rig_using,
+    ArchiveModels, Attachment, Entities, EntityRig, LoadoutResolver, RigFile, RigFileRead,
+    RigInput, RigInputs, RigParameter, RigPlacement, discover_entity_rigs_using,
+    discover_model_rig_using,
 };
 use p4kx_extraction::cryxml::{
     SourceDeclarationKind, SourceDocument, SourceElement, SourceReadOptions,
@@ -15,6 +17,9 @@ use p4kx_extraction::{
     Archive, ArchiveWatch, DataForge, DataForgeEntry, Entry, archive_animation_path,
 };
 
+use serde_json::{Map, Value, json};
+
+use super::loadout::{Evidence, Files, Observations, unique};
 use super::{TestResult, manifests, require};
 
 pub(super) struct Closure<'archive> {
@@ -28,6 +33,8 @@ pub(super) struct Placement {
     pub(super) role: &'static str,
     pub(super) state: &'static str,
     pub(super) parameter: Option<usize>,
+    pub(super) detail: Option<Value>,
+    pub(super) evidence: Evidence,
 }
 
 pub(super) struct Document<'archive> {
@@ -69,7 +76,13 @@ impl<'archive> Closure<'archive> {
         let entry = DataForgeEntry::locate(archive).ok_or("original DataForge Entry")?;
         let bytes = verified_bytes(archive, entry, watch)?;
         let forge = DataForge::open(&bytes)?;
-        let mut resolver = LoadoutResolver::new(&forge);
+        let files = Files { archive, watch };
+        let observations = Arc::new(Observations::default());
+        let mut resolver = LoadoutResolver::with_observed_entities(
+            Arc::new(Entities::new(&forge)),
+            observations.clone(),
+        )
+        .with_files(&files);
         let owner = resolver.entities().find(selector)?;
         let tree = resolver.resolve(&owner)?;
         let mut complete = tree.issues().is_empty();
@@ -82,21 +95,13 @@ impl<'archive> Closure<'archive> {
         });
         require(
             complete,
-            "selected real Entity has a fully resolved DataForge loadout",
+            "selected real Entity has a fully resolved Archive Loadout",
         )?;
         let models = ArchiveModels::new(archive);
         let rigs = discover_entity_rigs_using(&models, &tree, &mut Verified { archive, watch })?;
         let placements = rigs
             .iter()
-            .map(|rig| {
-                let role = match &rig.placement {
-                    RigPlacement::Root => "entity-root",
-                    RigPlacement::Attachment { .. } => "attachment",
-                    RigPlacement::LandingGear { .. } => "landing-gear",
-                    _ => "other",
-                };
-                placement(rig.parameters.as_ref(), rig.record_index, role)
-            })
+            .map(|rig| entity_placement(rig, &observations))
             .collect::<TestResult<Vec<_>>>()?;
         Self::read(archive, watch, entry.index(), placements)
     }
@@ -179,6 +184,36 @@ impl<'archive> Closure<'archive> {
     }
 }
 
+fn entity_placement(rig: &EntityRig, observations: &Observations) -> TestResult<Placement> {
+    let (role, detail) = match &rig.placement {
+        RigPlacement::Root => ("entity-root", None),
+        RigPlacement::Attachment { port_path } => (
+            "attachment",
+            Some(json!({"kind":"attachment", "port_path":port_path})),
+        ),
+        RigPlacement::LandingGear {
+            owner_path,
+            ordinal,
+            bone,
+        } => {
+            let mut detail = Map::from_iter([
+                ("kind".into(), json!("landing-gear")),
+                ("owner_path".into(), json!(owner_path)),
+                ("ordinal".into(), json!(ordinal)),
+            ]);
+            if let Some(bone) = bone {
+                detail.insert("bone".into(), json!(bone));
+            }
+            ("landing-gear", Some(Value::Object(detail)))
+        }
+        _ => ("other", None),
+    };
+    let mut placement = placement(rig.parameters.as_ref(), rig.record_index, role)?;
+    placement.detail = detail;
+    placement.evidence = observations.placement(rig)?;
+    Ok(placement)
+}
+
 fn placement(
     file: Option<&RigFile<Vec<RigParameter>>>,
     owner: Option<u32>,
@@ -200,6 +235,8 @@ fn placement(
         role,
         state,
         parameter,
+        detail: None,
+        evidence: Evidence::default(),
     })
 }
 
@@ -325,25 +362,6 @@ fn is(element: SourceElement<'_>, name: &str) -> bool {
 
 fn is_exact(element: SourceElement<'_>, name: &str) -> bool {
     element.namespace().is_none() && element.name() == name
-}
-
-fn unique<'archive>(archive: &'archive Archive, path: &str) -> Option<&'archive Entry> {
-    let mut entries = archive
-        .entries()
-        .iter()
-        .filter(|entry| folded(entry.path()).eq(folded(path)));
-    let entry = entries.next()?;
-    (entries.next().is_none() && archive.raw_path(entry.index()).is_none()).then_some(entry)
-}
-
-fn folded(path: &str) -> impl Iterator<Item = u8> + '_ {
-    path.bytes().map(|byte| {
-        if byte == b'\\' {
-            b'/'
-        } else {
-            byte.to_ascii_lowercase()
-        }
-    })
 }
 
 struct Verified<'a> {

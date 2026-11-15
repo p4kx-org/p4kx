@@ -50,6 +50,58 @@ fn scoped_animation_definitions_follow_authored_targets_beyond_the_include() -> 
 }
 
 #[test]
+fn a_wildcard_only_scope_retains_the_database_link_without_reading_its_payload() -> TestResult {
+    let temp = tempfile::tempdir()?;
+    let archive = support::archive_with(
+        temp.path(),
+        [
+            TestEntry::stored(CHR, TestModel::cube().cgf()),
+            TestEntry::stored(
+                "Data/Objects/shared.chrparams",
+                br##"<Params><AnimationList>
+                    <Animation name="#filepath" path="Animations/Scope"/>
+                    <Animation name="idle*" path="*.caf"/>
+                    <Animation name="$TracksDatabase" path="Animations/only.dba"/>
+                </AnimationList></Params>"##,
+            ),
+            TestEntry::stored("Data/Animations/only.dba", b"unreadable bank").with_crc32(0),
+        ],
+    )?;
+    let options = ExportOptions {
+        kinds: vec![MediaKind::AnimationDefinition],
+        animation_model: Some(CHR.into()),
+        ..ExportOptions::default()
+    };
+    let output = temp.path().join("wildcard");
+    let index = support::published(p4kx_media::export(&archive, &output, &options)?)?;
+    let rows = support::records(&output, &index, STREAM)?;
+    let link = rows
+        .iter()
+        .find(|row| {
+            row.data.pointer("/payload/kind").and_then(Value::as_str) == Some("tracks-database")
+        })
+        .ok_or("authored tracks database link")?;
+    assert_eq!(
+        link.data
+            .pointer("/payload/reference/resolution/status")
+            .and_then(Value::as_str),
+        Some("resolved"),
+        "the real directory target remains resolvable"
+    );
+    assert!(
+        rows.iter()
+            .any(|row| row.subresource.namespace == "animation-definition-wildcard"),
+        "retain the original wildcard"
+    );
+    assert!(
+        rows.iter()
+            .all(|row| row.subresource.namespace != "animation-definition-named-dba-binding"),
+        "no concrete CAF selector needs a bank lookup"
+    );
+    Ok(())
+}
+
+#[test]
 fn unavailable_rig_prevents_complete_scope_and_exclusion_keeps_the_other_branches() -> TestResult {
     let temp = tempfile::tempdir()?;
     let archive = fixture(temp.path(), true)?;

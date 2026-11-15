@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Write as _};
@@ -20,7 +20,13 @@ mod sources;
 #[path = "animation_scope_fixture.rs"]
 mod fixture;
 
-use self::sources::{Closure, Placement};
+#[path = "animation_scope_loadout.rs"]
+mod loadout;
+
+#[path = "animation_scope_origins.rs"]
+mod origins;
+
+use self::sources::{Closure, Document, Placement};
 
 const MODEL_VAR: &str = "P4KX_ANIMATION_SCOPE_MODEL";
 const ENTITY_VAR: &str = "P4KX_ANIMATION_SCOPE_ENTITY";
@@ -168,7 +174,8 @@ fn verify(
     let stream = BufReader::new(File::open(root.join(&kind.artifact.path))?);
     let mut placements = 0;
     let mut identities = BTreeSet::new();
-    for line in stream.lines() {
+    let mut fields = origins::Fields::default();
+    for (stream_ordinal, line) in stream.lines().enumerate() {
         let row: MediaRecord = serde_json::from_str(&line?)?;
         require(
             row.source.root == index.source.digest,
@@ -185,9 +192,10 @@ fn verify(
                 .get(placements)
                 .ok_or("extra placement receipt")?;
             receipt(&row, placement, placements, expected.input_entry)?;
+            expect_origins(&mut fields, stream_ordinal, placement);
             placements += 1;
         } else {
-            observe(&root, &row, &mut expected)?;
+            observe(&root, &row, &mut expected.documents)?;
         }
     }
     require(
@@ -195,6 +203,7 @@ fn verify(
         "every resolved placement retained",
     )?;
     expected.verify()?;
+    fields.verify(&root, archive)?;
     output.close()?;
     expected.report()
 }
@@ -252,8 +261,9 @@ fn receipt(
         "exact scope input Entry",
     )?;
     require(
-        payload.pointer("/placement").and_then(Value::as_str) == Some(expected.role),
-        "placement role",
+        payload.pointer("/placement").and_then(Value::as_str) == Some(expected.role)
+            && payload.get("placement_detail") == expected.detail.as_ref(),
+        "placement role and original port or landing-gear coordinates",
     )?;
     require(
         payload
@@ -269,11 +279,39 @@ fn receipt(
     )
 }
 
+fn expect_origins<'a>(fields: &mut origins::Fields<'a>, ordinal: usize, placement: &'a Placement) {
+    let evidence = &placement.evidence;
+    let names_field = match placement.role {
+        "attachment" => "/data/payload/placement_detail/port_path",
+        "landing-gear" => "/data/payload/placement_detail/owner_path",
+        _ => return,
+    };
+    fields.expect(ordinal, names_field, &evidence.names);
+    if placement.owner.is_some() {
+        fields.expect(
+            ordinal,
+            "/data/payload/owner_record_index",
+            &evidence.selection,
+        );
+    }
+    if placement.parameter.is_some() {
+        fields.expect(
+            ordinal,
+            "/data/payload/outcome/entry_index",
+            &evidence.selection,
+        );
+    }
+}
+
 fn index_field(value: &Value, field: &str) -> Option<usize> {
     value.pointer(field)?.as_str()?.parse().ok()
 }
 
-fn observe(base: &Path, row: &MediaRecord, expected: &mut Closure<'_>) -> TestResult {
+fn observe(
+    base: &Path,
+    row: &MediaRecord,
+    documents: &mut BTreeMap<usize, Document<'_>>,
+) -> TestResult {
     let Identity::Entry { entry, .. } = &row.source.identity else {
         require(
             row.subresource.namespace == "animation-definition-event-binding",
@@ -285,8 +323,7 @@ fn observe(base: &Path, row: &MediaRecord, expected: &mut Closure<'_>) -> TestRe
             ("/event_database_entry_index", "animevents"),
         ] {
             let index = index_field(payload, field).ok_or("event binding physical input")?;
-            let input = expected
-                .documents
+            let input = documents
                 .get(&index)
                 .ok_or("binding source outside selected closure")?;
             require(
@@ -296,8 +333,7 @@ fn observe(base: &Path, row: &MediaRecord, expected: &mut Closure<'_>) -> TestRe
         }
         return Ok(());
     };
-    let source = expected
-        .documents
+    let source = documents
         .get_mut(&entry.entry_index)
         .ok_or("unselected physical document")?;
     require(

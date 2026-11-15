@@ -783,8 +783,11 @@ Matching ignores case and slash direction. Duplicate names and declarations
 retain each observed candidate in order. A completed all-bank miss allows
 the separate loose lookup. Missing database Entries, filtered inputs and
 unavailable metadata have distinct states. Incomplete bank coverage cannot
-prove a loose fallback. Definition-only export keeps the file links and does
-not open DBA payloads.
+prove a loose fallback. In a scoped Definition export an exact normalized CAF
+selector activates the bank search for its own `AnimationList`. A list without
+such a selector keeps its original file links and wildcard declarations without
+reading the DBA payloads. A whole-Archive Definition-only export keeps the links
+without searching the banks.
 
 Animation-event rows give each direct `animation` timeline and `event`
 its own source element identity. Event attributes have separate ordered rows
@@ -838,6 +841,8 @@ are outside that allowance. Each generation is removed after inspection. The
 exporter hashes the root Archive for each generation. The witness shares Assembly
 rig discovery and checks the Media publication against verified source bytes,
 independently derived event-file references and source-local record identities.
+For XML Loadouts it also matches placement fields to the physical port, class
+and Include attributes and checks their direct encryption markers.
 Omitting both selectors skips the fixture without an installed scope receipt.
 
 ```powershell
