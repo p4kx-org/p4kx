@@ -114,6 +114,8 @@ fn assemble<R>(
         &jump_owners,
     )?;
     particle_library::collect(archive, &entry_capture, options, &mut collected)?;
+    let weapon_animation =
+        parts::capture_weapon_animation(archive, &entities, &input, options, &mut collected)?;
     let kinds = collected.summary(options.filter.is_none());
     parts::capture_rows(
         &mut collected,
@@ -224,6 +226,7 @@ fn assemble<R>(
             ),
             ammo_definitions: weapon_tables.ammunition,
             weapon_action_recoil_definitions: independent.weapon_action_recoil_definitions,
+            weapon_animation_sources: weapon_animation.sources,
             weapon_procedural: independent.weapon_procedural,
             damage_resistance_macros: independent.damage_resistance_macros,
             turret_health_modifiers: independent.turret_health_modifiers,
@@ -289,6 +292,7 @@ fn assemble<R>(
             resource_group_parents: group_tables.parents,
             weapon_magazine_resolutions: components.magazine_resolutions,
             weapon_combat_bases: weapon_tables.combat,
+            weapon_player_animation_candidates: weapon_animation.candidates,
             weapon_projectile_ammo_selections: components.projectile_ammo_selections,
             tag_paths: CatalogTable::new(&forge, &["Tag"], collected.tags.paths),
             commodity_presentation: commodity_tables.presentation,

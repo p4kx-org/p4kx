@@ -325,7 +325,9 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
         Ok(note(source.type_name().to_owned(), path).with_body(body))
     }
 
-    fn structure(&self) -> Result<&'read StructValue<'source>, CatalogError> {
+    pub(in crate::catalog_v3) fn structure(
+        &self,
+    ) -> Result<&'read StructValue<'source>, CatalogError> {
         let Some(owner) = self.owner else {
             return Ok(self.originals.root());
         };

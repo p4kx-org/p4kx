@@ -4,3 +4,7 @@
   and the authored power and temperature modifier blocks with per-value source provenance.
   Action nodes link to shared original recoil definitions with hand, aim, body and head settings.
   Physical Entity animation-controller components retain their authored Mannequin file locators.
+
+- Catalog v3 exports the original Player Mannequin branch and option evidence,
+  including scoped fragment selectors, authoring attributes and candidate links
+  back to physical personal weapon attachments.

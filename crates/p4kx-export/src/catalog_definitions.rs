@@ -132,6 +132,8 @@ pub(crate) struct CatalogDefinitions<'source> {
     pub(crate) procedural_planet_audio: CatalogTable<ProceduralPlanetAudio<'source>>,
     pub(crate) resource_network_globals: CatalogTable<ResourceNetworkGlobal<'source>>,
     pub(crate) ammo_definitions: CatalogTable<AmmoDefinition<'source>>,
+    pub(crate) weapon_animation_sources:
+        crate::catalog_v3::catalog_projections::weapon_reload::WeaponAnimationSources<'source>,
     pub(crate) weapon_action_recoil_definitions:
         CatalogTable<WeaponActionRecoilDefinition<'source>>,
     #[serde(flatten)]

@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::DataForge;
+use p4kx_assembly::Entities;
+use p4kx_extraction::{Archive, DataForge};
 
+use crate::catalog_projections::weapon_reload::{self, WeaponAnimation};
 use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::catalog_item_components::item_definition::ItemDefinition;
 use crate::catalog_v3::faction_identity_definition::{
@@ -72,6 +74,23 @@ pub(super) fn faction_identities<'source>(
     rows: Vec<PreparedFactionIdentity<'source>>,
 ) -> CatalogTable<FactionIdentityDefinition<'source>> {
     faction_identity_definition::table(forge, rows)
+}
+
+pub(super) fn capture_weapon_animation<'source>(
+    archive: &Archive,
+    entities: &Entities<'source>,
+    input: &super::original_input::OriginalCatalogInput<'_, 'source>,
+    options: &crate::CatalogOptions<'_>,
+    collected: &mut crate::collected::Collected<'source>,
+) -> Result<WeaponAnimation<'source>, crate::CatalogError> {
+    weapon_reload::read(
+        archive,
+        entities,
+        input,
+        &collected.item_definitions,
+        options.cancel,
+        &mut collected.ledger,
+    )
 }
 
 pub(super) fn capture_rows(

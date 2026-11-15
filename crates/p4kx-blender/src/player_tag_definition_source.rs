@@ -2,6 +2,9 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_extraction::cryxml::SourceElement;
+use p4kx_extraction::cryxml::tag_definition::{
+    Member as SourceMember, Section as SourceSection, TagDefinition, Tags,
+};
 use p4kx_extraction::{
     CancelToken, SourceScope, SourceUse, SourceUseRole, SourceUses, SourceValue, SourcedValue,
 };
@@ -9,7 +12,6 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::soc_scene::SocSceneError;
-use crate::soc_scene_class_mannequin::children;
 #[path = "player_tag_definition_attribute.rs"]
 mod attribute;
 
@@ -183,6 +185,7 @@ impl PendingDefinition {
         origin: &XmlOrigin<'_>,
         cancel: &CancelToken,
     ) -> Result<Self, SocSceneError> {
+        let definition = TagDefinition::from_root(root);
         let mut result = Self {
             owner: Owner {
                 scope: origin.scope.clone(),
@@ -191,17 +194,17 @@ impl PendingDefinition {
             },
             root: position(root)?,
             root_name: root.name().to_owned(),
-            known_root: root.name() == "TagDefinition" && root.namespace().is_none(),
+            known_root: definition.is_some(),
             version: PendingAttribute::read(root, "version")?,
             sections: Vec::new(),
         };
-        if !result.known_root {
+        let Some(definition) = definition else {
             return Ok(result);
-        }
-        for child in root.elements().filter(|node| node.namespace().is_none()) {
-            match child.name() {
-                "Imports" => {
-                    for import in children(child, "Import") {
+        };
+        for section in definition.sections() {
+            match section {
+                SourceSection::Imports(imports) => {
+                    for import in imports.elements() {
                         check(cancel)?;
                         result.owner.edges.push(PendingEdge::read(
                             Role::Import,
@@ -210,29 +213,25 @@ impl PendingDefinition {
                         )?);
                     }
                 }
-                "Tags" => result.read_tags(child, cancel)?,
-                _ => {}
+                SourceSection::Tags(tags) => result.read_tags(tags, cancel)?,
             }
         }
         Ok(result)
     }
 
-    fn read_tags(
-        &mut self,
-        list: SourceElement<'_>,
-        cancel: &CancelToken,
-    ) -> Result<(), SocSceneError> {
+    fn read_tags(&mut self, list: Tags<'_>, cancel: &CancelToken) -> Result<(), SocSceneError> {
         let mut members = Vec::new();
-        for row in list.elements().filter(|node| node.namespace().is_none()) {
+        for row in list.members() {
             check(cancel)?;
-            match row.name() {
-                "Tag" => members.push(PendingMember::Tag(PendingTag::read(
+            match row {
+                SourceMember::Tag(row) => members.push(PendingMember::Tag(PendingTag::read(
                     row,
                     &mut self.owner.edges,
                 )?)),
-                "Group" => {
+                SourceMember::Group(group) => {
+                    let row = group.element();
                     let mut tags = Vec::new();
-                    for tag in children(row, "Tag") {
+                    for tag in group.tags() {
                         check(cancel)?;
                         tags.push(PendingTag::read(tag, &mut self.owner.edges)?);
                     }
@@ -242,11 +241,10 @@ impl PendingDefinition {
                         tags,
                     }));
                 }
-                _ => {}
             }
         }
         self.sections.push(PendingSection {
-            position: position(list)?,
+            position: position(list.element())?,
             members,
         });
         Ok(())

@@ -205,6 +205,16 @@ pub(crate) fn minimal_catalog() -> Value {
             "starmapPresets": absent_table(),
             "starmapAmenities": absent_table(),
             "ammoDefinitions": absent_table(),
+            "weaponAnimationSources": {
+                "player": null,
+                "actorBindings": [],
+                "controllers": [],
+                "databases": [],
+                "tagDefinitions": [],
+                "scopes": [],
+                "branches": [],
+                "fragmentSelectors": []
+            },
             "weaponActionRecoilDefinitions": absent_table(),
             "weaponProceduralAnimations": absent_table(),
             "actorProceduralRecoilConfigs": absent_table(),
@@ -282,7 +292,7 @@ pub(crate) fn minimal_catalog() -> Value {
             "containerInstances": absent_table()
         },
         "texts": {"publicNames": public_names(), "gameTexts": []},
-        "projections": {"contracts": contracts::contracts(), "missionTitles": contracts::titles(), "blueprintPresentation": blueprints::presentation(), "qualityQuantizationResources": quality::inverse(), "commodityPresentation": commodities::presentation(), "tagPaths": tags::paths(), "resourceGroupParents": resource_groups::parents(), "weaponMagazineResolutions": absent_table(), "weaponProjectileAmmoSelections": absent_table(), "weaponCombatBases": absent_table(), "jumpConnections": absent_table()},
+        "projections": {"contracts": contracts::contracts(), "missionTitles": contracts::titles(), "blueprintPresentation": blueprints::presentation(), "qualityQuantizationResources": quality::inverse(), "commodityPresentation": commodities::presentation(), "tagPaths": tags::paths(), "resourceGroupParents": resource_groups::parents(), "weaponMagazineResolutions": absent_table(), "weaponProjectileAmmoSelections": absent_table(), "weaponPlayerAnimationCandidates": absent_table(), "weaponCombatBases": absent_table(), "jumpConnections": absent_table()},
         "provenance": {"sources": [], "uses": []},
 
         "blueprintPools": blueprints::pools(),

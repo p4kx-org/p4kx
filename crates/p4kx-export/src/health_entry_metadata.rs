@@ -118,15 +118,19 @@ impl EntryMetadata {
     }
 
     pub(super) fn attempted_payload(&self) -> Result<(), CatalogError> {
-        self.scope.for_scope(InputScope::Payload).at(
+        self.payload_read(SourceUseRole::Attempted)?;
+        Ok(())
+    }
+
+    pub(super) fn payload_read(&self, role: SourceUseRole) -> Result<SourceUse, CatalogError> {
+        self.payload_at(
             SourceLocation::Subresource {
                 namespace: "archiveEntryRead".to_owned(),
                 indices: Vec::new(),
                 field: "content".to_owned(),
             },
-            SourceUseRole::Attempted,
-        )?;
-        Ok(())
+            role,
+        )
     }
 }
 

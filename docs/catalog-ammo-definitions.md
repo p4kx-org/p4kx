@@ -293,6 +293,42 @@ relationship for the two witnesses. A concrete reload animation, event
 or elapsed time requires a bound Fragment option and its applicable
 animation inputs.
 
+### Player Mannequin branches and options
+
+When the selected item definitions contain personal weapon attachments,
+`definitions.items.rows[].components.value[].value.value.weaponMotion` carries the original
+`AttachDef.Type` and `AttachDef.Tags`. The attachment keeps its physical
+component ordinal. `definitions.weaponAnimationSources` contains the
+Player Entity candidates and their ordered animation component locators.
+The controller, AnimDB, TagDefinition, and import rows identify the
+verified archive reads. A physical file is identified by `inputRef` and
+`entryIndex`. Text XML coordinates are byte spans. CryXml coordinates use
+the original node and attribute indices.
+
+The database rows retain ordered `SubADB` and `FragmentID` selectors,
+fragment options, and nested elements with original source coordinates.
+`Tags`, `FragTags`, `BlendOutDuration`, `Blend` attributes `Duration`,
+`StartTime` and `ExitTime`, and `Animation` attributes `name`, `speed` and
+`flags` retain their original spellings. `ProcLayer` and other nested
+elements retain attributes, sibling ordinals and parent pointers.
+Timing interpretation and units depend on the owning Mannequin format.
+
+Each fragment selector links to its same-name options by original position.
+Its state records whether the parent and target resolve the name to the
+same physical `FragDef` declaration. The source rows distinguish missing
+groups, invalid paths, ambiguous targets, incomplete scopes, and cycles.
+A weapon tag candidate requires at least one common authored attachment
+and option tag with a unique declaration in the target's `TagDef`. Each
+match gives the two zero-based token indices and the original declaration.
+The `weaponPlayerAnimationCandidates` projection links the weapon
+attachment, Player component, branch and option. `playback` is `unverified`.
+Runtime fragment or animation selection, and elapsed reload time, require
+separate evidence.
+
+Each source field and candidate state carries per-value provenance. A
+candidate state's provenance includes the weapon attachment and the scoped
+option selection.
+
 A projectile launcher's `projectileType` is the stored label of the
 declared `EProjectileType` Enum. A readable different declaration is
 `unsupported`. A failed declaration or label read is `unreadable`. The ammunition

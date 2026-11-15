@@ -28,6 +28,7 @@ mod source_position;
 mod source_start_tag;
 mod source_syntax;
 mod strings;
+pub mod tag_definition;
 mod write;
 mod xml_write_field;
 

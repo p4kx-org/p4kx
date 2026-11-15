@@ -94,6 +94,15 @@ impl<'input> SourceDocument<'input> {
         Ok(Self { document })
     }
 
+    /// Whether this exact original parse owns the borrowed element.
+    #[must_use]
+    pub fn owns_element(&self, element: SourceElement<'_>) -> bool {
+        match &self.document {
+            ParsedDocument::Text { document, .. } => element.belongs_to_text(document),
+            ParsedDocument::CryXml(document) => element.belongs_to_cryxml(document),
+        }
+    }
+
     /// Returns the original source format.
     #[must_use]
     pub const fn format(&self) -> Format {

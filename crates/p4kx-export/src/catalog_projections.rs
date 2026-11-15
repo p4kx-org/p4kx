@@ -15,6 +15,9 @@ use super::catalog_item_components::resolution::WeaponMagazineResolution;
 use super::catalog_weapon_projectile_ammo::WeaponProjectileAmmoSelection;
 use super::weapon_combat_base::WeaponCombatBase;
 
+#[path = "weapon_reload.rs"]
+pub(crate) mod weapon_reload;
+
 #[derive(Debug, Serialize, JsonSchema)]
 #[expect(
     clippy::empty_enums,
@@ -40,6 +43,8 @@ pub(crate) struct CatalogProjections<'source> {
     pub(crate) jump_connections: CatalogTable<JumpConnection>,
     pub(crate) weapon_magazine_resolutions: CatalogTable<WeaponMagazineResolution>,
     pub(crate) weapon_projectile_ammo_selections: CatalogTable<WeaponProjectileAmmoSelection>,
+    pub(crate) weapon_player_animation_candidates:
+        CatalogTable<weapon_reload::WeaponPlayerAnimationCandidate>,
     pub(crate) weapon_combat_bases: CatalogTable<WeaponCombatBase<'source>>,
     pub(crate) resource_group_parents:
         CatalogTable<super::resource_group_catalog::ResourceGroupParent>,

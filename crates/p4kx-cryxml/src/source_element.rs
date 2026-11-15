@@ -36,6 +36,14 @@ impl<'document> SourceElement<'document> {
         }
     }
 
+    pub(crate) fn belongs_to_text(self, document: &roxmltree::Document<'_>) -> bool {
+        matches!(self.view, ElementView::Text { node, .. } if std::ptr::eq(node.document(), document))
+    }
+
+    pub(crate) fn belongs_to_cryxml(self, document: &crate::Document<'_>) -> bool {
+        matches!(self.view, ElementView::CryXml(element) if element.is_from(document))
+    }
+
     /// Returns the text element's local name or the stored CryXml name.
     #[must_use]
     pub fn name(self) -> &'document str {

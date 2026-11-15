@@ -37,7 +37,7 @@ pub(crate) enum LooseArchivePathState {
 #[schemars(transform = every_field_required)]
 pub(crate) struct LooseArchivePath {
     pub(crate) state: SourcedValue<LooseArchivePathState>,
-    targets: Vec<SourcedValue<PhysicalEntryRef>>,
+    pub(crate) targets: Vec<SourcedValue<PhysicalEntryRef>>,
 }
 
 /// Lazily indexes the Archive directory for repeated sourced path resolutions.

@@ -62,6 +62,7 @@ struct ItemAttachmentPresentation<'source> {
     grade: SourcedValue<ResourceNumber>,
     manufacturer: ItemManufacturer<'source>,
     localization: SourcedValue<ItemLocalization>,
+    weapon_motion: Option<WeaponAttachmentMotion<'source>>,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
@@ -97,7 +98,41 @@ struct ItemPurchasable {
     display_type: SourcedValue<GameTextRef>,
 }
 
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(transform = every_field_required)]
+struct WeaponAttachmentMotion<'source> {
+    item_type: SourcedValue<&'source str>,
+    tags: SourcedValue<&'source str>,
+}
+
+pub(crate) struct WeaponAttachment<'item, 'source> {
+    pub(crate) record: &'item SourcedValue<u32>,
+    pub(crate) slot: &'item SourcedValue<u32>,
+    pub(crate) item_type: &'item SourcedValue<&'source str>,
+    pub(crate) tags: &'item SourcedValue<&'source str>,
+}
+
 impl<'source> ItemDefinition<'source> {
+    pub(crate) fn weapon_attachments(&self) -> impl Iterator<Item = WeaponAttachment<'_, 'source>> {
+        self.components
+            .value()
+            .into_iter()
+            .flatten()
+            .filter_map(|component| {
+                let ItemDefinitionComponentKind::Attachment(attachment) = &component.body else {
+                    return None;
+                };
+                let source = attachment.value()?.weapon_motion.as_ref()?;
+                Some(WeaponAttachment {
+                    record: &self.header.record_index,
+                    slot: &component.component_ordinal,
+                    item_type: &source.item_type,
+                    tags: &source.tags,
+                })
+            })
+    }
+
     pub(super) fn read(
         tree: &RecordTree<'source>,
         originals: &OriginalFlowFields<'_, '_, 'source>,
@@ -225,6 +260,7 @@ impl<'source> ItemAttachmentPresentation<'source> {
         notes: &mut Vec<FieldError>,
     ) -> Result<Self, CatalogError> {
         Ok(Self {
+            weapon_motion: WeaponAttachmentMotion::read(source, notes)?,
             grade: source.authored_number("Grade", notes)?,
             manufacturer: match source.storage_type("Manufacturer")? {
                 None | Some(DataType::Reference) => {
@@ -252,5 +288,29 @@ impl ItemPhysics {
         Ok(Self {
             mass: source.single("Mass", notes)?,
         })
+    }
+}
+
+impl<'source> WeaponAttachmentMotion<'source> {
+    fn read(
+        source: Observed<'_, '_, '_, 'source>,
+        notes: &mut Vec<FieldError>,
+    ) -> Result<Option<Self>, CatalogError> {
+        let raw = source.structure()?.field("Type");
+        let Some(Value::Enum(name) | Value::String(name)) = raw else {
+            return Ok(None);
+        };
+        if !name.eq_ignore_ascii_case("WeaponPersonal") {
+            return Ok(None);
+        }
+        let item_type = if matches!(raw, Some(Value::Enum(_))) {
+            source.borrowed_declared_enum("Type", notes)?
+        } else {
+            source.borrowed_string("Type", notes)?
+        };
+        Ok(Some(Self {
+            item_type,
+            tags: source.borrowed_string("Tags", notes)?,
+        }))
     }
 }

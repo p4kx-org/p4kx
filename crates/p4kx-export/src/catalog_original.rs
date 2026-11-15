@@ -172,8 +172,11 @@ mod health_entry_receipt;
 mod health_entry_retention;
 #[path = "health_entry_soc.rs"]
 mod health_entry_soc;
+#[path = "health_entry_source_xml.rs"]
+mod health_entry_source_xml;
 #[path = "health_entry_xml.rs"]
 mod health_entry_xml;
+pub(crate) use health_entry_source_xml::{EntrySourceXml, SourceXmlAttribute};
 #[path = "health_failed_entry.rs"]
 mod health_failed_entry;
 

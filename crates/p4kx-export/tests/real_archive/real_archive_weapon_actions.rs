@@ -7,8 +7,8 @@ use std::time::UNIX_EPOCH;
 
 use p4kx_export::{CatalogOptions, CatalogPublicationMode, Kind, build_catalog_from};
 use p4kx_extraction::{
-    Archive, ArchiveWatch, DataForgeEntry, DataForgeOrigin, Filter, InputScope, Record, RecordTree,
-    SourceEncryption, SourceInput, SourceUses, Value as Original,
+    Archive, ArchiveWatch, DataForge, DataForgeEntry, DataForgeOrigin, Filter, InputScope, Record,
+    RecordTree, SourceEncryption, SourceInput, SourceUses, Value as Original,
 };
 use p4kx_testkit::{real_archive_key, real_archive_path};
 use serde_json::Value;
@@ -30,9 +30,11 @@ type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 const COMPONENT: &str = "SCItemWeaponComponentParams";
 const AUDITED_PTU_CHANGE: &str = "13189690";
-const WITNESSES: &[(&str, &str)] = &[
+const PERSONAL_WITNESSES: [(&str, &str); 2] = [
     ("P8-SC", "behr_smg_ballistic_01"),
     ("Volt", "volt_sniper_energy_01"),
+];
+const SHIP_WITNESSES: &[(&str, &str)] = &[
     ("Revenant", "apar_ballisticgatling_s4"),
     ("Tractor beam", "grin_tractorbeam_s1"),
 ];
@@ -66,7 +68,7 @@ fn representative_weapon_actions_match_original_slots_and_inputs() -> TestResult
         ));
     }
     let mut coverage = BTreeMap::new();
-    for (label, basename) in WITNESSES {
+    for (label, basename) in PERSONAL_WITNESSES.iter().chain(SHIP_WITNESSES) {
         let mut owners = 0;
         for record in forge.records() {
             watch
@@ -97,6 +99,27 @@ fn representative_weapon_actions_match_original_slots_and_inputs() -> TestResult
         ));
     }
     Ok(())
+}
+
+pub(super) fn personal_witnesses<'forge>(
+    forge: &'forge DataForge<'forge>,
+) -> TestResult<[Record<'forge>; 2]> {
+    let mut selected = Vec::new();
+    for (_, name) in PERSONAL_WITNESSES {
+        let mut found = Vec::new();
+        for record in forge.records() {
+            if is_witness(&record, name)? {
+                found.push(record);
+            }
+        }
+        let [owner] = found.as_slice() else {
+            return Err("expected one physical owner per personal weapon; supply P4KX_RELOAD_WITNESS_RECORD_INDICES for an exact local pair".into());
+        };
+        selected.push(*owner);
+    }
+    selected
+        .try_into()
+        .map_err(|_| "two physical personal weapons".into())
 }
 
 fn is_witness(record: &Record<'_>, basename: &str) -> TestResult<bool> {

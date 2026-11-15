@@ -386,9 +386,8 @@ mod text_forms_states;
 mod variant_groups;
 mod variants_fixture;
 
-mod mission_template_original;
-
 mod mission_canonical_health;
+mod mission_template_original;
 mod quality_field_capture;
 mod scoped_canonical_failures;
 
@@ -401,3 +400,4 @@ mod template_fixture_modifiers;
 mod template_fixture_options;
 mod template_fixture_tags;
 mod template_fixture_text;
+mod weapon_player_animation_candidates;
