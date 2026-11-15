@@ -10,8 +10,8 @@ use serde::Serialize;
 #[path = "report_entry_origins.rs"]
 mod entry_origins;
 
-use self::entry_origins::{EntryOriginFields, EntryOrigins};
 use crate::record_report::{RecordLevel, record_level};
+use crate::report_origins::{ReportOriginFields, ReportOrigins};
 use crate::{
     Build, ChangeKind, Comparison, DirectoryCounts, Entry, EntryChange, EntryCounts, Level, Side,
 };
@@ -90,8 +90,8 @@ struct EntryLevel<'a> {
     /// Every added, removed or changed Entry, ordered by path ignoring case and separator kind.
     changes: Vec<EntryChangeReport<'a>>,
     #[serde(flatten)]
-    #[schemars(with = "EntryOriginFields")]
-    origins: EntryOrigins,
+    #[schemars(with = "ReportOriginFields")]
+    origins: ReportOrigins,
 }
 
 /// One added, removed or changed Entry.
@@ -220,7 +220,7 @@ fn entry_level<'a>(comparison: &'a Comparison<'_>) -> EntryLevel<'a> {
         .iter()
         .map(EntryChangeReport::from)
         .collect();
-    let origins = EntryOrigins::capture(comparison, &changes);
+    let origins = ReportOrigins(entry_origins::capture(comparison, &changes));
     EntryLevel {
         counts: comparison.entry_counts(),
         directories: comparison.directory_counts(),

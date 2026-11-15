@@ -805,6 +805,12 @@
         "counts": {
           "$ref": "#/$defs/RecordCounts",
           "description": "The number of Records per change kind."
+        },
+        "fieldOrigins": {
+          "$ref": "#/$defs/FieldOrigins"
+        },
+        "provenance": {
+          "$ref": "#/$defs/SourceInventory"
         }
       },
       "required": [

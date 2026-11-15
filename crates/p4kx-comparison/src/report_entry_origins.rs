@@ -2,13 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_archive::{Archive, Entry};
-use p4kx_extraction::{
-    EntryDirectoryOrigins, EntryDirectoryOriginsError, FieldOrigin, FieldOrigins, FieldPath,
-    SourceInventory, SourceUses,
-};
-use schemars::JsonSchema;
-use serde::ser::Error as _;
-use serde::{Serialize, Serializer};
+use p4kx_extraction::{EntryDirectoryOrigins, FieldOrigins, SourceUses};
 
 #[path = "report_entry_decision.rs"]
 mod decision;
@@ -16,42 +10,12 @@ mod decision;
 use crate::Comparison;
 use crate::report::{ChecksumReport, EntryChangeReport};
 
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = historical_optional)]
-pub(super) struct EntryOriginFields {
-    field_origins: FieldOrigins,
-    provenance: SourceInventory,
-}
+use crate::report_origins::{ReportOriginFields, ReportOriginsError, put};
 
-fn historical_optional(schema: &mut schemars::Schema) {
-    if let Some(properties) = schema.as_object_mut() {
-        properties.remove("required");
-    }
-}
-
-#[derive(Debug)]
-pub(super) struct EntryOrigins(Result<EntryOriginFields, EntryDirectoryOriginsError>);
-
-impl Serialize for EntryOrigins {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        self.0
-            .as_ref()
-            .map_err(S::Error::custom)?
-            .serialize(serializer)
-    }
-}
-
-impl EntryOrigins {
-    pub(super) fn capture(comparison: &Comparison<'_>, changes: &[EntryChangeReport<'_>]) -> Self {
-        Self(capture(comparison, changes))
-    }
-}
-
-fn capture(
+pub(super) fn capture(
     comparison: &Comparison<'_>,
     changes: &[EntryChangeReport<'_>],
-) -> Result<EntryOriginFields, EntryDirectoryOriginsError> {
+) -> Result<ReportOriginFields, ReportOriginsError> {
     let uses = SourceUses::with_compact_use_refs();
     let old = comparison.old_side().owner();
     let new = comparison.new_side().owner();
@@ -102,10 +66,7 @@ fn capture(
         )?;
         put(&mut fields, &format!("{path}/change"), origin)?;
     }
-    Ok(EntryOriginFields {
-        field_origins: fields,
-        provenance: uses.freeze()?,
-    })
+    ReportOriginFields::finish(fields, &uses)
 }
 
 fn observe(
@@ -115,7 +76,7 @@ fn observe(
     uses: &SourceUses,
     fields: &mut FieldOrigins,
     side: &str,
-) -> Result<EntryDirectoryOrigins, EntryDirectoryOriginsError> {
+) -> Result<EntryDirectoryOrigins, ReportOriginsError> {
     let observed = EntryDirectoryOrigins::observe(owner, entry, uses.clone())?;
     put(fields, &format!("{side}/size"), observed.size_origin()?)?;
     if let Some(checksum) = checksum {
@@ -127,12 +88,4 @@ fn observe(
         )?;
     }
     Ok(observed)
-}
-
-fn put(
-    fields: &mut FieldOrigins,
-    path: &str,
-    origin: FieldOrigin,
-) -> Result<(), EntryDirectoryOriginsError> {
-    Ok(fields.insert(FieldPath::parse(path)?, origin)?)
 }

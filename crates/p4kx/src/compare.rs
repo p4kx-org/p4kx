@@ -8,7 +8,7 @@ use std::process::ExitCode;
 use anyhow::Result;
 use p4kx_comparison::{
     Archive, ArchiveError, CompareOptions, Comparison, DEFAULT_CONTEXT, DataForges,
-    DirectoryCounts, Filter, Levels, Side, compare, line_diff,
+    DirectoryCounts, Filter, Levels, Side, compare, compare_with_dataforge_entries, line_diff,
 };
 use thiserror::Error;
 
@@ -61,8 +61,19 @@ pub(crate) fn run(args: &CompareArgs, as_json: bool) -> Result<ExitCode> {
         .as_ref()
         .map(|(old, new)| dataforges::open_both(old, new))
         .transpose()?;
-    let both = forges.as_ref().map(|(old, new)| DataForges { old, new });
-    let comparison = compare(&old, &new, both, &options)?;
+    let comparison = match (&forge_entries, &forges) {
+        (Some((old_entry, new_entry)), Some((before, after))) => compare_with_dataforge_entries(
+            &old,
+            &new,
+            DataForges {
+                old: before,
+                new: after,
+            },
+            [old_entry, new_entry],
+            &options,
+        ),
+        _ => compare(&old, &new, None, &options),
+    }?;
     if let Some(path) = &args.report {
         comparison
             .save_report(path)

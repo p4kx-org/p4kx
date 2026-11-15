@@ -7,7 +7,11 @@ use std::error::Error;
 use std::path::Path;
 
 use assert_cmd::Command;
-use p4kx_testkit::{ArchiveBuilder, DataForgeBuilder, TestEntry, write_build_manifest};
+use p4kx_testkit::{
+    ArchiveBuilder, DataForgeBuilder, TestEntry, TestRecord, TestStruct, TestType,
+    write_build_manifest,
+};
+use serde_json::{Value, json};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -123,6 +127,45 @@ fn the_report_holds_both_sides_the_levels_the_filter_and_the_entry_changes() -> 
 }
 
 #[test]
+fn the_record_report_keeps_bound_input_proof_in_json_and_saved_report() -> TestResult {
+    let directory = tempfile::tempdir()?;
+    for (path, name) in [(OLD, "Original"), (NEW, "Updated")] {
+        let forge = DataForgeBuilder::new()
+            .structure(TestStruct::new("Ship").field("speed", TestType::Int32))
+            .record(TestRecord::new(1, "Ship", name, "ship.xml"))
+            .build();
+        let archive = ArchiveBuilder::new().entry(TestEntry::stored("Data\\Game2.dcb", forge));
+        write(directory.path(), path, &archive)?;
+    }
+
+    let output = stdout(
+        p4kx(directory.path())?.args([OLD, NEW, "--records", "--report", "report.json", "--json"]),
+        1,
+    )?;
+    let printed: Value = serde_json::from_str(&output)?;
+    let saved: Value =
+        serde_json::from_reader(std::fs::File::open(directory.path().join("report.json"))?)?;
+    assert_eq!(
+        printed, saved,
+        "record reports share the same physical-sources carrier"
+    );
+    let origins = printed
+        .pointer("/records/fieldOrigins")
+        .ok_or("record header origins")?;
+    for side in ["old", "new"] {
+        let header = origins
+            .get(format!("/records/changes/0/{side}/name"))
+            .ok_or("present name field source")?;
+        assert_eq!(
+            header.get("containsEncryptedSource"),
+            Some(&json!(false)),
+            "the {side} header carries clear DataForge input proof",
+        );
+    }
+    Ok(())
+}
+
+#[test]
 fn the_report_is_deterministic() -> TestResult {
     let dir = pair()?;
     let mut reports = Vec::new();
@@ -148,7 +191,7 @@ fn json_prints_the_report_as_one_line() -> TestResult {
     let line = stdout(p4kx(dir.path())?.args(["--json", OLD, NEW]), 1)?;
 
     assert_eq!(line.lines().count(), 1, "one line: {line}");
-    let report: serde_json::Value = serde_json::from_str(&line)?;
+    let report: Value = serde_json::from_str(&line)?;
     assert_eq!(
         report.pointer("/entries/counts"),
         Some(&serde_json::json!({"added": 2, "removed": 1, "changed": 2})),

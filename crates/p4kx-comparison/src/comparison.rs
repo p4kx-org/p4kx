@@ -8,7 +8,8 @@ use std::sync::atomic::AtomicBool;
 
 use p4kx_channels::PublicPatches;
 use p4kx_extraction::{
-    ArchiveWriteProtection, CancelToken, ConversionError, write_replacing_protected,
+    ArchiveWriteProtection, CancelToken, ConversionError, DataForgeOrigin,
+    write_replacing_protected,
 };
 use serde::{Serialize, Serializer};
 
@@ -103,8 +104,23 @@ impl fmt::Debug for Side<'_> {
     }
 }
 
+#[derive(Debug, Clone, Default)]
+pub(crate) struct RecordSources {
+    pub(crate) old: Option<DataForgeOrigin>,
+    pub(crate) new: Option<DataForgeOrigin>,
+}
+
+impl RecordSources {
+    pub(crate) fn new(old: Option<&DataForgeOrigin>, new: Option<&DataForgeOrigin>) -> Self {
+        Self {
+            old: old.cloned(),
+            new: new.cloned(),
+        }
+    }
+}
+
 /// The result of comparing an old with a new Archive.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct Comparison<'a> {
     pub(crate) old: Side<'a>,
     pub(crate) new: Side<'a>,
@@ -112,6 +128,18 @@ pub struct Comparison<'a> {
     pub(crate) filter: Option<String>,
     pub(crate) entries: Vec<EntryChange<'a>>,
     pub(crate) records: Vec<RecordChange<'a>>,
+    pub(crate) record_sources: RecordSources,
+}
+
+impl PartialEq for Comparison<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.old == other.old
+            && self.new == other.new
+            && self.levels == other.levels
+            && self.filter == other.filter
+            && self.entries == other.entries
+            && self.records == other.records
+    }
 }
 
 impl<'a> Comparison<'a> {

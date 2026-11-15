@@ -5,12 +5,13 @@ use std::cmp::Ordering;
 
 use rayon::prelude::*;
 
+use crate::comparison::RecordSources;
 use crate::entry_change::EntryDecision;
 use crate::path_key::cmp_normalised;
 use crate::record_compare::compare_records;
 use crate::{
     Archive, CancelToken, CompareOptions, Comparison, ComparisonError, ComparisonProgress,
-    DataForges, Entry, EntryChange, Side,
+    DataForgeEntry, DataForges, Entry, EntryChange, Side,
 };
 
 const PROGRESS_STEP: usize = 1 << 16;
@@ -86,7 +87,37 @@ pub fn compare<'a>(
             .filter_map(|joined| joined.resolve(old, new))
             .collect(),
         records,
+        record_sources: RecordSources::default(),
     })
+}
+
+/// Compares the Archives and retains the original input of each bound DataForge.
+///
+/// Evidence requires the exact opened bytes and the original Archive owner.
+///
+/// # Errors
+///
+/// Returns the same comparison errors as [compare].
+pub fn compare_with_dataforge_entries<'a>(
+    old: &'a Archive,
+    new: &'a Archive,
+    dataforges: DataForges<'a>,
+    entries: [&DataForgeEntry; 2],
+    options: &CompareOptions<'_>,
+) -> Result<Comparison<'a>, ComparisonError> {
+    let mut comparison = compare(old, new, Some(dataforges), options)?;
+    if options.levels.records {
+        let [old_entry, new_entry] = entries;
+        comparison.record_sources = RecordSources::new(
+            old_entry
+                .origin_of(dataforges.old)
+                .filter(|origin| origin.matches_archive(old)),
+            new_entry
+                .origin_of(dataforges.new)
+                .filter(|origin| origin.matches_archive(new)),
+        );
+    }
+    Ok(comparison)
 }
 
 /// Checks that a level is selected, that the Record level has DataForges, and that the

@@ -190,11 +190,15 @@ fn diff<'a>(pair: Joined<'a>, options: &CompareOptions<'_>) -> Option<RecordChan
 }
 
 fn state<'a>(record: Record<'a>, record_path: &'a str) -> Result<RecordState<'a>, DataForgeError> {
+    let name = record.name()?;
+    let tag = record.tag()?.filter(|tag| !tag.is_empty());
+    let structure = record.struct_type()?;
     Ok(RecordState {
         record_path,
-        name: record.name()?,
-        tag: record.tag()?.filter(|tag| !tag.is_empty()),
-        type_name: record.type_name()?,
+        name,
+        tag,
+        type_name: structure.name()?,
+        structure: structure.index(),
     })
 }
 

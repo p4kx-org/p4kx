@@ -1,5 +1,6 @@
 ---
-source: crates/p4kx/tests/compare_nested.rs
+source: crates/p4kx/tests/it/compare_nested.rs
+assertion_line: 158
 expression: report
 ---
 {
@@ -149,6 +150,497 @@ expression: report
           }
         ]
       }
-    ]
+    ],
+    "fieldOrigins": {
+      "/records/changes/0/guid": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u14"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/new/name": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u20"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/new/record_path": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u19"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/new/type": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u21",
+          "u22"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/old/name": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u16"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/old/record_path": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u15"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/old/type": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u17",
+          "u18"
+        ],
+        "sourceSetComplete": true
+      }
+    },
+    "provenance": {
+      "sources": [
+        {
+          "id": "a0.0",
+          "ancestors": [],
+          "storedEncryption": "unencrypted",
+          "kind": "archiveEntry",
+          "entryIndex": 0,
+          "path": {
+            "state": "present",
+            "value": "Data\\Game2.dcb",
+            "containsEncryptedSource": false,
+            "sourceUsesRefs": [
+              "u0"
+            ],
+            "sourceSetComplete": true
+          },
+          "recordFormat": "zipCentralDirectory",
+          "recordRange": {
+            "offset": "766",
+            "length": "266"
+          },
+          "zipFlags": {
+            "state": "present",
+            "value": 0,
+            "containsEncryptedSource": false,
+            "sourceUsesRefs": [
+              "u1"
+            ],
+            "sourceSetComplete": true
+          },
+          "declarations": {
+            "state": "present",
+            "value": [
+              {
+                "state": "present",
+                "value": {
+                  "kind": "cigExtraBlock",
+                  "valueOffset": "994",
+                  "declaredBlockLength": {
+                    "state": "present",
+                    "value": 6,
+                    "containsEncryptedSource": false,
+                    "sourceUsesRefs": [
+                      "u2"
+                    ],
+                    "sourceSetComplete": true
+                  },
+                  "rawWord": {
+                    "state": "present",
+                    "value": 0,
+                    "containsEncryptedSource": false,
+                    "sourceUsesRefs": [
+                      "u3"
+                    ],
+                    "sourceSetComplete": true
+                  },
+                  "rawBytes": {
+                    "state": "present",
+                    "value": [
+                      0,
+                      0
+                    ],
+                    "containsEncryptedSource": false,
+                    "sourceUsesRefs": [
+                      "u4"
+                    ],
+                    "sourceSetComplete": true
+                  }
+                },
+                "containsEncryptedSource": false,
+                "sourceUsesRefs": [
+                  "u5"
+                ],
+                "sourceSetComplete": true
+              }
+            ],
+            "containsEncryptedSource": false,
+            "sourceUsesRefs": [
+              "u6"
+            ],
+            "sourceSetComplete": true
+          }
+        },
+        {
+          "id": "a1.0",
+          "ancestors": [],
+          "storedEncryption": "unencrypted",
+          "kind": "archiveEntry",
+          "entryIndex": 0,
+          "path": {
+            "state": "present",
+            "value": "Data\\Game2.dcb",
+            "containsEncryptedSource": false,
+            "sourceUsesRefs": [
+              "u7"
+            ],
+            "sourceSetComplete": true
+          },
+          "recordFormat": "zipCentralDirectory",
+          "recordRange": {
+            "offset": "762",
+            "length": "266"
+          },
+          "zipFlags": {
+            "state": "present",
+            "value": 0,
+            "containsEncryptedSource": false,
+            "sourceUsesRefs": [
+              "u8"
+            ],
+            "sourceSetComplete": true
+          },
+          "declarations": {
+            "state": "present",
+            "value": [
+              {
+                "state": "present",
+                "value": {
+                  "kind": "cigExtraBlock",
+                  "valueOffset": "990",
+                  "declaredBlockLength": {
+                    "state": "present",
+                    "value": 6,
+                    "containsEncryptedSource": false,
+                    "sourceUsesRefs": [
+                      "u9"
+                    ],
+                    "sourceSetComplete": true
+                  },
+                  "rawWord": {
+                    "state": "present",
+                    "value": 0,
+                    "containsEncryptedSource": false,
+                    "sourceUsesRefs": [
+                      "u10"
+                    ],
+                    "sourceSetComplete": true
+                  },
+                  "rawBytes": {
+                    "state": "present",
+                    "value": [
+                      0,
+                      0
+                    ],
+                    "containsEncryptedSource": false,
+                    "sourceUsesRefs": [
+                      "u11"
+                    ],
+                    "sourceSetComplete": true
+                  }
+                },
+                "containsEncryptedSource": false,
+                "sourceUsesRefs": [
+                  "u12"
+                ],
+                "sourceSetComplete": true
+              }
+            ],
+            "containsEncryptedSource": false,
+            "sourceUsesRefs": [
+              "u13"
+            ],
+            "sourceSetComplete": true
+          }
+        }
+      ],
+      "uses": [
+        {
+          "id": "u0",
+          "source": "a0.0",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "path"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u1",
+          "source": "a0.0",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "generalPurposeFlags"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u10",
+          "source": "a1.0",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations[0].rawWord"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u11",
+          "source": "a1.0",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations[0].rawBytes"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u12",
+          "source": "a1.0",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations[0]"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u13",
+          "source": "a1.0",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u14",
+          "source": "a1.0",
+          "scope": "payload",
+          "role": "payload",
+          "location": {
+            "type": "dataForge",
+            "recordIndex": 2,
+            "field": "guid"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u15",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "conversion",
+          "location": {
+            "type": "dataForge",
+            "recordIndex": 2,
+            "field": "fileName"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u16",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "conversion",
+          "location": {
+            "type": "dataForge",
+            "recordIndex": 2,
+            "field": "recordName"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u17",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "selector",
+          "location": {
+            "type": "dataForge",
+            "recordIndex": 2,
+            "field": "sourceType"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u18",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "payload",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeStructDefinition",
+            "indices": [
+              "3"
+            ],
+            "field": "name"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u19",
+          "source": "a1.0",
+          "scope": "payload",
+          "role": "conversion",
+          "location": {
+            "type": "dataForge",
+            "recordIndex": 2,
+            "field": "fileName"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u2",
+          "source": "a0.0",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations[0].declaredBlockLength"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u20",
+          "source": "a1.0",
+          "scope": "payload",
+          "role": "conversion",
+          "location": {
+            "type": "dataForge",
+            "recordIndex": 2,
+            "field": "recordName"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u21",
+          "source": "a1.0",
+          "scope": "payload",
+          "role": "selector",
+          "location": {
+            "type": "dataForge",
+            "recordIndex": 2,
+            "field": "sourceType"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u22",
+          "source": "a1.0",
+          "scope": "payload",
+          "role": "payload",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeStructDefinition",
+            "indices": [
+              "3"
+            ],
+            "field": "name"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u3",
+          "source": "a0.0",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations[0].rawWord"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u4",
+          "source": "a0.0",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations[0].rawBytes"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u5",
+          "source": "a0.0",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations[0]"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u6",
+          "source": "a0.0",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u7",
+          "source": "a1.0",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "path"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u8",
+          "source": "a1.0",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "generalPurposeFlags"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u9",
+          "source": "a1.0",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations[0].declaredBlockLength"
+          },
+          "effectiveEncryption": "unencrypted"
+        }
+      ]
+    }
   }
 }

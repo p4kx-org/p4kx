@@ -2818,6 +2818,7 @@ code is 0 without and 1 with differences on any compared level.
 | `entries.directories` | array | The same counts per top-level directory (`directory`, empty for the root), ordered ignoring case |
 | `entries.fieldOrigins`, `entries.provenance` | objects | Immediate origins for the emitted Entry path, change decision and each physical old or new side's size and checksum, with a shared source and use inventory. Paths are JSON Pointers from the report root. Historical v1 reports may omit these members. |
 | `entries.changes` | array | One object per Entry: `path` (as the new side stores it, the old side for a removed Entry), `change` (`added`, `removed` or `changed`), and `old` and `new` with `size` and the checksum for the sides that have it: `crc32c` for an Archive Entry, `crc32` for an Entry of a plain ZIP archive (a SHA-256 would be `sha256` as 64 hex digits; no Entry states one) |
+| `records.fieldOrigins`, `records.provenance` | objects | Immediate origins for the reported Record GUID and present old/new header members. Paths are JSON Pointers from the report root. Historical v1 reports may omit these members. |
 | `records.counts` | object | `added`, `removed`, `moved`, `changed` and `unreadable` Record counts |
 | `records.changes` | array | One object per Record: `guid`, `change` (`added`, `removed`, `moved`, `changed` or `unreadable`), `old` and `new` with `record_path`, `name`, `tag` (version 8 only, absent without one) and `type` for the sides that have it and can be read, `fields`, and `errors` for an unreadable Record |
 | `records.changes[].fields` | array | One object per changed field or array element, nested ones included: `path` (its location, e.g. `hull.plates[1].armor`), and `old` and `new` values for the sides that have it; empty for an added, removed or unreadable Record |
@@ -2834,6 +2835,13 @@ entry and its compared opposing path when available. A source used only as an op
 retains its physical Entry identity and encryption proof with compact source details. The
 one-sided contributor set is incomplete because
 the earlier join decisions do not form part of that receipt.
+
+The Record header origins describe the exact DataForge bytes read from each Archive.
+The GUID comes from the selected new Record header, or from the old header when the new side
+has no Record. Each present side's path, name, tag and type have its own origin. Type retains
+both the Record's struct selector and the selected definition's name. A library comparison
+supplied only opened DataForges has unknown header encryption. An absent side or tag has no
+field to annotate.
 
 Records are joined by GUID. A Record is `moved` when its record path differs, ignoring case and
 separator kind; its changed fields are listed as well. It is `changed` when its name, its type

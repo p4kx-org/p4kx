@@ -4,6 +4,10 @@
 use schemars::JsonSchema;
 use serde::Serialize;
 
+#[path = "report_record_origins.rs"]
+mod origins;
+
+use crate::report_origins::{ReportOriginFields, ReportOrigins};
 use crate::value_report::{GuidSchema, ValueReport, display};
 use crate::{
     Comparison, FieldChange, Guid, RecordChange, RecordChangeKind, RecordCounts, RecordError,
@@ -18,6 +22,9 @@ pub(crate) struct RecordLevel<'a> {
     /// Every added, removed, moved, changed or unreadable Record, ordered by record path ignoring
     /// case and separator kind, then by GUID.
     changes: Vec<RecordChangeReport<'a>>,
+    #[serde(flatten)]
+    #[schemars(with = "ReportOriginFields")]
+    origins: ReportOrigins,
 }
 
 /// One added, removed, moved, changed or unreadable Record.
@@ -138,6 +145,7 @@ impl<'a> From<&'a RecordChange<'_>> for RecordChangeReport<'a> {
 pub(crate) fn record_level<'a>(comparison: &'a Comparison<'_>) -> RecordLevel<'a> {
     RecordLevel {
         counts: comparison.record_counts(),
+        origins: ReportOrigins(origins::capture(comparison)),
         changes: comparison
             .record_changes()
             .iter()

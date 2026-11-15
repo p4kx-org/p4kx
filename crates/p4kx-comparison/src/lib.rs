@@ -23,6 +23,7 @@ mod record_change;
 mod record_compare;
 mod record_report;
 mod report;
+mod report_origins;
 mod schema_diff;
 mod schema_report;
 mod schema_side;
@@ -31,7 +32,7 @@ mod text_diff;
 mod value_report;
 
 pub use changed_value::ChangedValue;
-pub use compare::compare;
+pub use compare::{compare, compare_with_dataforge_entries};
 pub use comparison::{Comparison, Side};
 pub use decode::{Encoding, MAX_DIFF_LEN, MAX_DIFF_LINES};
 pub use entry_change::{ChangeKind, DirectoryCounts, EntryChange, EntryCounts};

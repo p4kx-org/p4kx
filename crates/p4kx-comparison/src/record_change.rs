@@ -55,13 +55,25 @@ impl RecordError {
 }
 
 /// What identifies a Record on one side: its record path, name, tag and type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy)]
 pub struct RecordState<'a> {
     pub(crate) record_path: &'a str,
     pub(crate) name: &'a str,
     pub(crate) tag: Option<&'a str>,
     pub(crate) type_name: &'a str,
+    pub(crate) structure: u32,
 }
+
+impl PartialEq for RecordState<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.record_path == other.record_path
+            && self.name == other.name
+            && self.tag == other.tag
+            && self.type_name == other.type_name
+    }
+}
+
+impl Eq for RecordState<'_> {}
 
 impl<'a> RecordState<'a> {
     /// Returns the record path, without `.xml`.

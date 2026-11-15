@@ -3,6 +3,8 @@
 
 use std::sync::Arc;
 
+use crate::comparison::RecordSources;
+
 use p4kx_channels::PublicPatches;
 use thiserror::Error;
 
@@ -11,7 +13,7 @@ use crate::record_compare::{compare_record, compare_records};
 use crate::{
     Archive, CancelToken, CompareOptions, Comparison, ComparisonError, ComparisonProgress,
     DataForgeEntry, DataForgeError, DataForges, EntryChange, Filter, Levels, RecordChange,
-    RecordKey, SchemaDiff, Side, compare, compare_schema,
+    RecordKey, SchemaDiff, Side, compare, compare_schema, compare_with_dataforge_entries,
 };
 
 /// The DataForge Entries of the old and the new Archive, owned.
@@ -172,7 +174,7 @@ impl OwnedComparison {
 
     /// Compares both Archives again on the levels of this Comparison, narrowed to `filter`, and
     /// hands the whole Comparison, the Record level included, to `use_it`; it is what
-    /// [`compare`] gives with these settings.
+    /// [`compare_with_dataforge_entries`] gives with these settings.
     ///
     /// # Errors
     ///
@@ -195,8 +197,16 @@ impl OwnedComparison {
             progress: None,
             public_patches: self.public_patches.as_ref(),
         };
-        let both = forges.as_ref().map(|(old, new)| DataForges { old, new });
-        let comparison = compare(&self.old, &self.new, both, &options)?;
+        let comparison = match (&self.dataforges, &forges) {
+            (Some(entries), Some((old, new))) => compare_with_dataforge_entries(
+                &self.old,
+                &self.new,
+                DataForges { old, new },
+                [&entries.old, &entries.new],
+                &options,
+            ),
+            _ => compare(&self.old, &self.new, None, &options),
+        }?;
         Ok(use_it(&comparison))
     }
 
@@ -285,6 +295,7 @@ impl OwnedComparison {
             filter: self.filter.clone(),
             entries: Vec::new(),
             records: Vec::new(),
+            record_sources: RecordSources::default(),
         }
     }
 }
