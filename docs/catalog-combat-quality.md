@@ -5,7 +5,7 @@
 weapon values. Consumers select equipment, modes, branches and qualities, apply the formula
 and aggregate their selected loadouts. The versioned fixtures describe synthetic builds.
 Measured Crafting results can warrant a new version of the formula contract.
-[Original formula agreement](https://github.com/krt-profit/basetool/issues/2821#issuecomment-6878138700)
+[ADR-0388](adr/0388-versioned-crafting-quality-and-weapon-base-values.md)
 
 ## Quality key and the active recipe
 

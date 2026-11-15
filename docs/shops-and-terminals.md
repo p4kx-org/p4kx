@@ -120,8 +120,9 @@ and box-size base prices. The `genericmobiterminals` Records are mission props.
 
 The Archive has no UEX ID. A mapping has to go by name and place: `ShopName`, the brand of the
 container path, and the starmap object name against the UEX terminal name and star system. Out of
-the 77 location containers 63 reach a starmap object by name; a shop name is the open end. The
-Basetool keeps the mapping and the manual remainder.
+the 77 location containers 63 reach a starmap object by name; a shop name is the open end.
+The catalog provides the inputs for this mapping. The UEX ID and any manual matches
+are maintained by the consumer.
 
 ## Decision
 

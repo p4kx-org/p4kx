@@ -17,8 +17,9 @@ source-use arrays make up roughly three quarters of that section. Moving only th
 1.077 GB in the LIVE file and 0.949 GB in the PTU file, including the full provenance inventory.
 Split large tables at deterministic boundaries in their existing row order. Start a new part at
 system changes for world placements where practical. A system may span several parts. Keep a row
-and all its nested values together. Measure a row larger than the part target separately. Retain
-the complete single-file Export.
+and all its nested values together. Treat the requested part size as a target and record an
+oversized row with its actual lengths. Test against decoded bytes, stored bytes and consumer
+limits separately. Retain the complete single-file Export.
 
 ## Proposed domains
 
@@ -34,10 +35,12 @@ the complete single-file Export.
 Assign each dataset one owning domain. Check an exhaustive manifest registry of JSON Pointers
 against the Schema. Each entry records its shape, row order and key type for arrays and for
 `{availability, rows}` objects. Include singleton values and empty datasets so reconstruction
-retains every property. Keep parent routes and child instances in the world domain. Shared text
-and provenance keep their namespaces across the snapshot. Their independently compressed parts
-can be fetched in the dependency closure of a selected domain. Protected `gameTexts` use
-independent parts and retain the `x-gameText` policy.
+retains every property. Register nested collections inside singleton objects independently
+when they need file boundaries, including their parent path and collection order. Keep parent
+routes and child instances in the world domain. Shared text and provenance keep their namespaces
+across the snapshot and can be fetched within a domain's dependency closure. Protected
+`gameTexts` use independent parts. Apply `x-gameText` throughout the bundle, including inline
+values such as a container's authored label.
 
 ## Selective imports
 
@@ -61,14 +64,19 @@ this index by table and key range so small imports can fetch only the ranges the
   the requested domain can report an authored link as pending until those parts arrive.
 
 For example, importing a Crafting recipe can resolve its finished item through
-`definitions.items` and its resources through `definitions.resourceTypes`. A contract can use
-the same recipe and fetch a location separately. The existing IDs and source markers travel
-with each owning row. One complete bundle reconstructs the logical single-file Export.
+`definitions.items` and its resources through `definitions.resourceTypes`. A contract that
+awards from a Blueprint pool can look up the pool and fetch any required locations separately.
+The existing IDs and source markers travel with each owning row. A part is the fetch unit.
+An importer follows the dependencies of the actual rows it needs from that part. Following
+every row in a fetched dependency part would make a narrow query load unrelated domains.
+One complete bundle reconstructs the logical single-file Export.
 
 ## Referential integrity
 
-- Prepare Catalog v3 once. Keep table names, selection, availability, ordering and row data. A
-  separate `bundleVersion` describes packaging. `schemaVersion` describes the logical Catalog.
+- Prepare Catalog v3 once and partition that prepared snapshot. A separate filtered Export per
+  domain would change its selection, provenance inventory and document-local identifiers. Keep
+  table names, selection, availability, ordering and row data. A separate `bundleVersion`
+  describes packaging. `schemaVersion` describes the logical Catalog.
 - The manifest binds one generation to the source Build tuple, archive receipt, export options and
   each part's relative path, table or row range, row count, stored and decoded length and SHA-256.
   Bind each table to its total row count and assign nonoverlapping half-open row ranges that
@@ -81,7 +89,8 @@ with each owning row. One complete bundle reconstructs the logical single-file E
   occurrence keys. Source-use IDs are opaque and valid within their generation. Follow
   `sourceUsesRefs` from selected rows, texts and retained inventories until no additional use,
   selector, source or ancestor remains. Physical source metadata and TextForms carry their
-  own evidence. Keep health metadata with its atom table. Preserve
+  own evidence. Preserve the entire provenance inventory in a complete bundle, including
+  observations without an incoming reference. Keep health metadata with its atom table. Preserve
   `containsEncryptedSource` and `sourceSetComplete` on each datum.
 - Track download state separately from source state. An unfetched part, a Filter-excluded target,
   a dangling link and unreadable source have distinct meanings. Resolve staged parts and cyclic
@@ -110,7 +119,9 @@ placement or terrain parts, and that resolving a single world location loads jus
 parts and dependencies. Measure stored and decoded bytes, generation time and peak producer and
 consumer memory. Record selective bytes transferred, including indexes and dependency parts.
 The current writer streams serialization from a prepared catalog.
-Smaller files alone leave that producer preparation cost in place.
+Smaller files alone leave that producer preparation cost in place. If the prepared catalog
+exceeds memory before publishing, profile source reading and materialization as their own
+work. Keep those measurements distinct from the package reader and the transfer benchmark.
 
 ## Measuring a complete export
 

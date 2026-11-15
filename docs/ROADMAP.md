@@ -13,12 +13,12 @@ add-on ZIP, with notes from `CHANGELOG.md`.
 | Release | State | Content |
 |---|---|---|
 | 0.1.0 | Released | Archive, browsing, Extraction and the command line |
-| 0.2.0 | Released | Readable game data: CryXml and DataForge as XML and JSON, the Basetool catalog, the Comparison, textures, localisation and first commands for Queries, audio, models, UI movies, socpak containers, CHF files and the MCP server |
-| 0.3.0 | Released | The first Release as P4KX; the Basetool catalog as a full game-data export, `.json.zst` for the upload, `p4kx coverage` |
-| 0.4.0 | [Released](https://github.com/p4kx-org/p4kx/releases/tag/v0.4.0) | The 3D side: Assemblies, interiors, characters and armour, the Blender package and add-on, MFD screens and holograms, Wwise resolution; more Basetool catalog kinds with `schemaVersion` 2; P4KX's own theme and the smallest-window layout. Milestones M1 to M14 are complete |
-| 0.4.1 | [Released](https://github.com/p4kx-org/p4kx/releases/tag/v0.4.1) | The first follow-ups of the 3D, render, texture, material, character and Assembly work, further Basetool catalog kinds and documentation |
-| 0.4.2 | [Released](https://github.com/p4kx-org/p4kx/releases/tag/v0.4.2) | Creatures, hair, heads and skins, liveries and stencil decals in the primary decal colour, glass and layered materials, MFD screens with game variables, Direct3D 12 first in the window, audio (`.txtp` files, soundbank objects), exclusion Filters, folder conversion, portable file names, DataForge files without an Archive, and the contract kinds of the Basetool catalog (templates, broker entries, NPC and entity spawns, property values) |
-| 0.5.0 | Next, GitHub milestone `v0.5.0` | The remaining screen work (run-time pictures, text sizes, buttons), the second and third stencil colours and the emblem of a livery, open Assembly, NPC and starmap fixes (port rotation, generic NPC heads, Starchitect-style system containers), further catalog kinds (planet data, loot themes, the `ResourceType` Records as a kind of their own so that every `resourceGuid` joins exactly one row, while a commodity stays identified by its `guid`), the full Linux build, [native macOS support on Apple Silicon](macos-support.md), and the open questions on face rigs and additive animations; the milestone lists the rest |
+| 0.2.0 | Released | Readable game data: CryXml and DataForge as XML and JSON, the first catalog, the Comparison, textures, localisation and first commands for Queries, audio, models, UI movies, socpak containers, CHF files and the MCP server |
+| 0.3.0 | Released | The first Release as P4KX; the catalog as a full game-data export, `.json.zst` for the upload, `p4kx coverage` |
+| 0.4.0 | [Released](https://github.com/p4kx-org/p4kx/releases/tag/v0.4.0) | The 3D side: Assemblies, interiors, characters and armour, the Blender package and add-on, MFD screens and holograms, Wwise resolution; more catalog kinds with `schemaVersion` 2; P4KX's own theme and the smallest-window layout. Milestones M1 to M14 are complete |
+| 0.4.1 | [Released](https://github.com/p4kx-org/p4kx/releases/tag/v0.4.1) | The first follow-ups of the 3D, render, texture, material, character and Assembly work, further catalog kinds and documentation |
+| 0.4.2 | [Released](https://github.com/p4kx-org/p4kx/releases/tag/v0.4.2) | Creatures, hair, heads and skins, liveries and stencil decals in the primary decal colour, glass and layered materials, MFD screens with game variables, Direct3D 12 first in the window, audio (`.txtp` files, soundbank objects), exclusion Filters, folder conversion, portable file names, DataForge files without an Archive, and the contract kinds of the catalog (templates, broker entries, NPC and entity spawns, property values) |
+| 0.5.0 | Next, GitHub milestone `v0.5.0` | The remaining screen work (run-time pictures, text sizes, buttons), the second and third stencil colours and the emblem of a livery, open Assembly, NPC and starmap fixes (port rotation, generic NPC heads, Starchitect-style system containers), the P4KX catalog with schema v3 and further catalog kinds (planet data, loot themes, the `ResourceType` Records as a kind of their own so that every `resourceGuid` joins exactly one row, while a commodity stays identified by its `guid`), the full Linux build, [native macOS support on Apple Silicon](macos-support.md), and the open questions on face rigs and additive animations; the milestone lists the rest |
 
 The open work of a release is its GitHub milestone, not this document. The milestones M1 to M14
 below are the plan of 0.4.0; the later releases only follow their GitHub milestones.
@@ -68,11 +68,10 @@ milestone delivered.
 
 ### M3 — Exports (replaces the earlier reference tool)
 
-- Basetool catalog in the new format (ADR-0002): manufacturers, items, ships, commodities,
+- Versioned catalog (ADR-0002): manufacturers, items, ships, commodities,
   blueprints; Channel, Build and completeness per kind; JSON Schema generated from the Rust types
   and checked in.
 - Record export as one JSON file per Record or one NDJSON file, from the same Record tree.
-- Hand-off: a separate session adapts the Basetool import.
 
 ### M4 — Comparison
 
