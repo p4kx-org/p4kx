@@ -41,6 +41,7 @@ pub use breaks::{BreakReason, BrokenLink};
 pub use cache::ArchiveAudio;
 pub use entity::{EntityAudio, EntityTrigger, EventMatch, Unmatched};
 pub use error::{AudioFileError, AudioIssue};
+pub(crate) use export::ExportedWemOrigin;
 pub use export::{
     ExportFailure, ExportLoopOrigin, ExportLoopOrigins, ExportOptions, ExportReport, ExportState,
     ExportWatch, ExportedSound, SoundFormat,

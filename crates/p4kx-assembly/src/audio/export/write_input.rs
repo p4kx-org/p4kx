@@ -4,7 +4,7 @@
 use p4kx_archive::ObservedEntryBinding;
 use p4kx_audio::{EmbeddedWemSource, Soundbank, Wem};
 
-use super::super::ExportLoopOrigin;
+use super::super::loop_origins::CapturedSoundOrigin;
 
 pub(super) struct GroupInput<'a> {
     pub(super) bytes: &'a [u8],
@@ -41,11 +41,16 @@ pub(super) struct SoundInput<'a> {
 }
 
 impl SoundInput<'_> {
-    pub(super) fn loop_origin(
-        &self,
-        id: u32,
-        wem: Option<&Wem<&[u8]>>,
-    ) -> Option<ExportLoopOrigin> {
-        ExportLoopOrigin::capture(id, wem?, self.binding?, self.embedded)
+    pub(super) fn origin(&self, id: u32, wem: Option<&Wem<&[u8]>>) -> Option<CapturedSoundOrigin> {
+        if self.prefetch {
+            return None;
+        }
+        Some(CapturedSoundOrigin::capture(
+            id,
+            wem,
+            self.binding?,
+            self.embedded,
+            self.bytes.len() as u64,
+        ))
     }
 }

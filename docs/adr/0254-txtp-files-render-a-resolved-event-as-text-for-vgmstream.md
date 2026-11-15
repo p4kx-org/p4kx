@@ -119,9 +119,13 @@ rendered paths.
 `select-first-alternative` describes the first rendered multi-child choice in postorder. Its
 selector evidence includes the original object type, bank version, child count, Random mode
 when used and the original ID words of the rendered direct children. Each child use retains its
-physical ordinal and range. Broken or unrendered child occurrences supply no ID use. The remaining
-sources of routing and media eligibility keep the contributor set incomplete. The direct marker
-still reports any proven encrypted contributor.
+physical ordinal and range. Broken or unrendered child occurrences supply no ID use.
+Each file line inside that group's rendered command range also uses the WEM that supplied its
+newly written audio. The checked WEM payload range and, for embedded sound, the physical DIDX
+and DATA selectors contribute to the choice. This works for audio without a loop and for raw
+fallback that supplied the bytes of the written file. Kept audio has no new physical receipt.
+The remaining routing and media eligibility evidence keeps the contributor set incomplete.
+The direct marker reports any proven encrypted contributor.
 
 The decimal `#I` tokens have separate `textBytes` addresses at `/commands/{index}/loop/start`
 and `/commands/{index}/loop/end`. The index counts rendered file lines. The evidence reuses the

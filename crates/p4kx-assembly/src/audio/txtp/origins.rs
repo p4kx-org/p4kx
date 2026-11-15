@@ -17,7 +17,8 @@ use crate::audio::hirc_path_source::HircSelectionChild;
 use super::diagnostic::{DiagnosticSource, TxtpDiagnostic};
 use super::loop_origin;
 use super::render::RenderedLoop;
-use super::selection::SelectionDiagnostic;
+use super::selection::{SelectionDiagnostic, SelectionNodes};
+use super::wem_origin;
 
 pub(super) struct OriginInputs<'a> {
     pub(super) diagnostics: &'a [TxtpDiagnostic<'a>],
@@ -170,11 +171,26 @@ fn selection_origin(
     sources: &SourceUses,
     selection: &SelectionDiagnostic<'_>,
 ) -> io::Result<FieldOrigin> {
+    let mut actual = match &selection.nodes {
+        Some(nodes) => selection_node_uses(archive, sources, nodes)?,
+        None => Vec::new(),
+    };
+    for media in selection.media.iter().flatten() {
+        wem_origin::admission_uses(archive, sources, media, &mut actual)?;
+    }
+    Ok(sources.origin(&actual, false))
+}
+
+fn selection_node_uses(
+    archive: &Archive,
+    sources: &SourceUses,
+    selection: &SelectionNodes<'_>,
+) -> io::Result<Vec<SourceUse>> {
     use SourceUseRole::Selector;
 
     let owner = selection.owner;
     let Some(entry) = owner.entry(archive) else {
-        return Ok(sources.origin(&[], false));
+        return Ok(Vec::new());
     };
     let (namespace, count, id) = match owner.kind() {
         HircKind::RandomSequenceContainer => (
@@ -188,7 +204,7 @@ fn selection_origin(
             "containerChildId",
         ),
         HircKind::MusicSwitch => ("bnkHircMusicNode", "musicChildCount", "musicChildId"),
-        _ => return Ok(sources.origin(&[], false)),
+        _ => return Ok(Vec::new()),
     };
     let scope = sources
         .observe(SourceInput::ArchiveView(entry), InputScope::Payload)
@@ -225,7 +241,7 @@ fn selection_origin(
     for child in &selection.children {
         actual.push(child_use(&scope, namespace, id, child)?);
     }
-    Ok(sources.origin(&actual, false))
+    Ok(actual)
 }
 
 fn child_use(

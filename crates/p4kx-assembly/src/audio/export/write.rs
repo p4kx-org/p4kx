@@ -19,12 +19,9 @@ use rayon::prelude::*;
 mod input;
 
 use self::input::{GroupInput, SoundInput};
-use super::loop_origins::CaptureLoopOrigins;
+use super::loop_origins::{CaptureOrigins, CapturedSoundOrigin};
 use super::plan::{Job, Origin};
-use super::{
-    ExportFailure, ExportLoopOrigin, ExportOptions, ExportState, ExportWatch, ExportedSound,
-    SoundFormat,
-};
+use super::{ExportFailure, ExportOptions, ExportState, ExportWatch, ExportedSound, SoundFormat};
 use crate::audio::read::entry_bytes;
 use crate::audio::{ArchiveAudio, MAX_SOUNDBANK_LEN};
 
@@ -32,7 +29,7 @@ type Outcome = Result<WrittenSound, ExportFailure>;
 
 pub(super) struct WrittenSound {
     pub(super) sound: ExportedSound,
-    pub(super) loop_origin: Option<ExportLoopOrigin>,
+    pub(super) origin: Option<CapturedSoundOrigin>,
 }
 
 /// The folder the sounds go into.
@@ -65,7 +62,7 @@ pub(super) fn run(
     target: Target<'_>,
     options: ExportOptions,
     watch: &ExportWatch,
-    capture: CaptureLoopOrigins,
+    capture: CaptureOrigins,
 ) -> Vec<Outcome> {
     let mut groups: Vec<(Origin, Vec<usize>)> = Vec::new();
     let mut slots: HashMap<Origin, usize> = HashMap::new();
@@ -101,7 +98,7 @@ fn run_group(
     (origin, members): (Origin, &[usize]),
     (target, options): (Target<'_>, ExportOptions),
     watch: &ExportWatch,
-    capture: CaptureLoopOrigins,
+    capture: CaptureOrigins,
 ) -> Vec<(usize, Outcome)> {
     if watch.is_cancelled() {
         return Vec::new();
@@ -134,8 +131,8 @@ fn run_group(
         Origin::Loose(_) => None,
     };
     let binding = match capture {
-        CaptureLoopOrigins::Omit => None,
-        CaptureLoopOrigins::Retain => audio
+        CaptureOrigins::Omit => None,
+        CaptureOrigins::Retain => audio
             .archive()
             .observed_entry(entry)
             .as_ref()
@@ -243,8 +240,8 @@ fn write_sound(
                 loop_points,
                 prefetch_only: input.prefetch,
             },
-            loop_origin: if emitted.state == ExportState::Written {
-                input.loop_origin(job.wem_id, wem.as_ref())
+            origin: if emitted.state == ExportState::Written {
+                input.origin(job.wem_id, wem.as_ref())
             } else {
                 None
             },

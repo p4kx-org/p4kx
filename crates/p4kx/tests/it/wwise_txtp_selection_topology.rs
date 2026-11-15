@@ -18,6 +18,9 @@ use super::super::txtp_origin_assertions::check_address;
 use super::super::{EMBEDDED, Fixture, PLAY, TestResult, pcm};
 use super::{FLAGS, SELECTION, SELECTION_FIELD, TXTP_FILE, selection_origin};
 
+#[path = "wwise_txtp_selection_media.rs"]
+mod media;
+
 const EVENT: &str = "Play_Topology";
 const TXTP: &str = "Play_Topology.txtp";
 const BANK_PATH: &str = "Data/Sounds/wwise/Topology.bnk";
@@ -40,7 +43,7 @@ fn selection_attests_to_rendered_physical_children_in_plain_and_encrypted_banks(
     let expected = original_sites(&bank)?;
     for encrypted in [false, true] {
         let fixture = fixture(&bank, encrypted)?;
-        let report = export(&fixture)?;
+        let report = export(&fixture, &[])?;
         let file = report.pointer(TXTP_FILE).ok_or("written TXTP file")?;
         let origin = selection_origin(file)?;
         assert_eq!(
@@ -178,8 +181,50 @@ fn decimal(value: &Value) -> Result<usize, Box<dyn Error>> {
 
 fn referenced_sites<'a>(
     file: &'a Value,
-    origin: &Value,
+    origin: &'a Value,
 ) -> Result<BTreeSet<Site<'a>>, Box<dyn Error>> {
+    let mut sites = BTreeSet::new();
+    for observation in selection_uses(file, origin)? {
+        let observation = observation?;
+        if observation.is_media() {
+            continue;
+        }
+        assert_eq!(observation.path()?, BANK_PATH, "the actual owning bank");
+        assert!(
+            sites.insert(Site::from_use(observation.site)?),
+            "no duplicate use of one physical word"
+        );
+    }
+    Ok(sites)
+}
+
+struct SelectionUse<'a> {
+    site: &'a Value,
+    physical: &'a Value,
+}
+
+impl<'a> SelectionUse<'a> {
+    fn path(&self) -> Result<&'a str, &'static str> {
+        self.physical
+            .pointer("/path/value")
+            .and_then(Value::as_str)
+            .ok_or("physical path")
+    }
+
+    fn is_media(&self) -> bool {
+        matches!(
+            self.site
+                .pointer("/location/namespace")
+                .and_then(Value::as_str),
+            Some("wemBytes" | "bnkDidx" | "bnkSection")
+        )
+    }
+}
+
+fn selection_uses<'a>(
+    file: &'a Value,
+    origin: &'a Value,
+) -> Result<impl Iterator<Item = Result<SelectionUse<'a>, &'static str>>, &'static str> {
     let all = file
         .pointer("/provenance/uses")
         .and_then(Value::as_array)
@@ -192,50 +237,21 @@ fn referenced_sites<'a>(
         .get("sourceUsesRefs")
         .and_then(Value::as_array)
         .ok_or("contributor references")?;
-    let mut sites = BTreeSet::new();
-    for reference in refs {
-        let observed = all
+    Ok(refs.iter().map(|reference| {
+        let site = all
             .iter()
             .find(|source_use| source_use.get("id") == Some(reference))
             .ok_or("resolved use reference")?;
         let physical = sources
             .iter()
-            .find(|source| source.get("id") == observed.get("source"))
-            .ok_or("physical bank entry")?;
-        assert_eq!(
-            physical.pointer("/path/value").and_then(Value::as_str),
-            Some(BANK_PATH),
-            "the actual owning bank"
-        );
-        assert!(
-            sites.insert(Site::from_use(observed)?),
-            "no duplicate use of one physical word"
-        );
-    }
-    Ok(sites)
+            .find(|source| source.get("id") == site.get("source"))
+            .ok_or("physical entry")?;
+        Ok(SelectionUse { site, physical })
+    }))
 }
 
 fn check_txtp(out: &Path, file: &Value, origin: &Value) -> TestResult {
-    let text = fs::read_to_string(out.join(TXTP))?;
-    let receipt = file
-        .get("originReceipt")
-        .and_then(Value::as_str)
-        .ok_or("TXTP receipt name")?;
-    let receipt = fs::read_to_string(out.join(receipt))?;
-    let mut addressed = receipt.lines().map(serde_json::from_str::<Value>);
-    let row = addressed
-        .find_map(|row| match row {
-            Ok(row)
-                if row.pointer("/address/field").and_then(Value::as_str)
-                    == Some(SELECTION_FIELD) =>
-            {
-                Some(Ok(row))
-            }
-            Err(error) => Some(Err(error)),
-            Ok(_) => None,
-        })
-        .ok_or("receipt's addressed choice")??;
-    let _span = check_address(&row, text.as_bytes(), SELECTION, origin)?;
+    let text = check_receipt(out, file, origin)?;
     let commands: Vec<_> = text
         .lines()
         .map(str::trim_start)
@@ -259,7 +275,31 @@ fn check_txtp(out: &Path, file: &Value, origin: &Value) -> TestResult {
     Ok(())
 }
 
-fn export(fixture: &Fixture) -> Result<Value, Box<dyn Error>> {
+fn check_receipt(out: &Path, file: &Value, origin: &Value) -> Result<String, Box<dyn Error>> {
+    let text = fs::read_to_string(out.join(TXTP))?;
+    let receipt = file
+        .get("originReceipt")
+        .and_then(Value::as_str)
+        .ok_or("TXTP receipt name")?;
+    let receipt = fs::read_to_string(out.join(receipt))?;
+    let mut addressed = receipt.lines().map(serde_json::from_str::<Value>);
+    let row = addressed
+        .find_map(|row| match row {
+            Ok(row)
+                if row.pointer("/address/field").and_then(Value::as_str)
+                    == Some(SELECTION_FIELD) =>
+            {
+                Some(Ok(row))
+            }
+            Err(error) => Some(Err(error)),
+            Ok(_) => None,
+        })
+        .ok_or("receipt's addressed choice")??;
+    let _span = check_address(&row, text.as_bytes(), SELECTION, origin)?;
+    Ok(text)
+}
+
+fn export(fixture: &Fixture, extra_flags: &[&str]) -> Result<Value, Box<dyn Error>> {
     let result = p4kx_testkit::p4kx()?
         .arg("--json")
         .arg("--key")
@@ -270,6 +310,7 @@ fn export(fixture: &Fixture) -> Result<Value, Box<dyn Error>> {
         .arg("--out")
         .arg(&fixture.out)
         .args(FLAGS)
+        .args(extra_flags)
         .output()?;
     assert_eq!(
         result.status.code(),

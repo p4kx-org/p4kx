@@ -952,7 +952,10 @@ includes the group count and tree size. A transition object also cites its alloc
 where applicable for the first rendered selection group. It also cites each directly rendered
 child ID word at `[start, endExclusive, physicalChildOrdinal]`. Two occurrences of the same ID
 retain separate positions. Nested groups are considered before their containing group.
-The routing and media decisions that made these children playable are only partially covered.
+The selection also cites the WEM range used to write each newly written audio file named by
+that group. `wemBytes/mediaPayload` has `[start, endExclusive]` in decoded Entry coordinates.
+An embedded WEM also cites its DIDX triplet and the selected DATA section. Kept audio has no
+new write evidence. The routing and media contributor set remains incomplete.
 `sourceSetComplete` is `false` and `containsEncryptedSource` is `true` for a proved encrypted
 contributor or `null` while no encrypted contributor has been proved.
 

@@ -15,7 +15,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use p4kx_audio::Loop;
 use p4kx_extraction::{ArchiveWriteProtection, CancelToken, ConflictPolicy, ConversionError};
 
-use self::loop_origins::CaptureLoopOrigins;
+use self::loop_origins::CaptureOrigins;
+pub(crate) use self::loop_origins::ExportedWemOrigin;
 pub use self::loop_origins::{ExportLoopOrigin, ExportLoopOrigins};
 use self::write::Target;
 use super::{ArchiveAudio, TriggerSounds};
@@ -239,7 +240,7 @@ impl ArchiveAudio<'_> {
         options: ExportOptions,
         watch: &ExportWatch,
     ) -> Result<ExportReport, ConversionError> {
-        self.export_sounds_with(triggers, folder, options, watch, CaptureLoopOrigins::Omit)
+        self.export_sounds_with(triggers, folder, options, watch, CaptureOrigins::Omit)
             .map(|(report, _)| report)
     }
 
@@ -254,7 +255,7 @@ impl ArchiveAudio<'_> {
         options: ExportOptions,
         watch: &ExportWatch,
     ) -> Result<(ExportReport, ExportLoopOrigins), ConversionError> {
-        self.export_sounds_with(triggers, folder, options, watch, CaptureLoopOrigins::Retain)
+        self.export_sounds_with(triggers, folder, options, watch, CaptureOrigins::Retain)
     }
 
     fn export_sounds_with(
@@ -263,7 +264,7 @@ impl ArchiveAudio<'_> {
         folder: &Path,
         options: ExportOptions,
         watch: &ExportWatch,
-        capture: CaptureLoopOrigins,
+        capture: CaptureOrigins,
     ) -> Result<(ExportReport, ExportLoopOrigins), ConversionError> {
         let plan = plan::build(triggers);
         let mut origins = ExportLoopOrigins::default();
@@ -297,7 +298,7 @@ impl ArchiveAudio<'_> {
         for outcome in write::run(self, &plan.jobs, target, options, watch, capture) {
             match outcome {
                 Ok(written) => {
-                    if let Some(origin) = written.loop_origin {
+                    if let Some(origin) = written.origin {
                         origins.insert(&written.sound, origin);
                     }
                     report.sounds.push(written.sound);

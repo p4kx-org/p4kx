@@ -18,6 +18,7 @@ mod output;
 mod render;
 mod selection;
 mod tree;
+mod wem_origin;
 
 pub use self::approximation::TxtpApproximation;
 pub use self::origins::TxtpOrigins;
@@ -366,6 +367,7 @@ fn files_of<'a>(
                     name,
                     loop_points: sound.loop_points,
                     loop_origin: loop_origins.and_then(|origins| origins.for_sound(sound)),
+                    media_origin: loop_origins.and_then(|origins| origins.media_for_sound(sound)),
                     prefetch_only: sound.prefetch_only,
                 },
             ))

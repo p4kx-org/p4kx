@@ -7,9 +7,9 @@ use std::ops::Range;
 
 use p4kx_audio::Loop;
 
-use crate::audio::ExportLoopOrigin;
 use crate::audio::music_clip_features::MusicClipFeatures;
 use crate::audio::playback_features::{PlaybackFeature, PlaybackFeatures};
+use crate::audio::{ExportLoopOrigin, ExportedWemOrigin};
 
 use super::TxtpApproximation;
 use super::selection::SelectionTopology;
@@ -29,6 +29,7 @@ pub(super) struct SoundFile<'a> {
     /// The loop of the WEM in frames, written as `#I`.
     pub(super) loop_points: Option<Loop>,
     pub(super) loop_origin: Option<&'a ExportLoopOrigin>,
+    pub(super) media_origin: Option<&'a ExportedWemOrigin>,
     /// Whether the file holds only the prefetched start of a streamed WEM.
     pub(super) prefetch_only: bool,
 }
@@ -56,7 +57,7 @@ pub(super) struct RenderedTxtp<'a> {
     pub(super) approximation_ranges: Vec<Range<usize>>,
     pub(super) loops: Vec<RenderedLoop<'a>>,
     pub(super) selection: Option<SelectionTopology>,
-    sound_count: usize,
+    pub(super) media: Vec<Option<&'a ExportedWemOrigin>>,
 }
 
 impl RenderedTxtp<'_> {
@@ -66,7 +67,7 @@ impl RenderedTxtp<'_> {
         }
         let mut markers = self.loops.iter().peekable();
         Some(
-            (0..self.sound_count)
+            (0..self.media.len())
                 .map(|command| {
                     markers
                         .next_if(|entry| entry.command == command)
@@ -167,7 +168,7 @@ pub(super) fn render<'a>(
         approximation_ranges: Vec::new(),
         loops: Vec::new(),
         selection: None,
-        sound_count: 0,
+        media: Vec::new(),
     };
     for line in header {
         let _ = writeln!(rendered.text, "# {}", comment_text(line));
@@ -185,13 +186,14 @@ fn group_lines<'a>(
     files: &HashMap<u32, SoundFile<'a>>,
 ) -> Result<(), String> {
     let [only] = group.children.as_slice() else {
+        let first_command = rendered.media.len();
         for child in &group.children {
             match child {
                 Node::Leaf(leaf) => leaf_line(rendered, leaf, depth + 1, files)?,
                 Node::Group(inner) => group_lines(rendered, inner, depth + 1, files)?,
             }
         }
-        group_line(rendered, group, depth);
+        group_line(rendered, group, depth, first_command);
         return Ok(());
     };
     match only {
@@ -227,14 +229,14 @@ fn leaf_line<'a>(
         text.push(' ');
         let end = number(text, points.end);
         rendered.loops.push(RenderedLoop {
-            command: rendered.sound_count,
+            command: rendered.media.len(),
             points,
             start,
             end,
             source: file.loop_origin,
         });
     }
-    rendered.sound_count += 1;
+    rendered.media.push(file.media_origin);
     text.push('\n');
     Ok(())
 }
@@ -245,14 +247,17 @@ fn number(text: &mut String, value: u64) -> Range<usize> {
     start..text.len()
 }
 
-fn group_line(rendered: &mut RenderedTxtp<'_>, group: &Group, depth: usize) {
+fn group_line(rendered: &mut RenderedTxtp<'_>, group: &Group, depth: usize, first_command: usize) {
     let count = group.children.len();
     let (kind, selection, mix) = match group.combine {
         Combine::Layers => ('L', "", " #@layer-v"),
         Combine::Segments => ('S', "", ""),
         Combine::Select => {
             if rendered.selection.is_none() {
-                rendered.selection = Some(SelectionTopology::of(group));
+                rendered.selection = Some(SelectionTopology::of(
+                    group,
+                    first_command..rendered.media.len(),
+                ));
             }
             rendered.note(TxtpApproximation::SelectFirstAlternative);
             ('R', ">1", "")

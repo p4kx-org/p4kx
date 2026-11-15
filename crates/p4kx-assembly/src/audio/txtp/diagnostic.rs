@@ -21,7 +21,7 @@ pub(super) enum DiagnosticSource<'a> {
 }
 
 pub(super) fn collect<'a>(
-    rendered: &RenderedTxtp<'_>,
+    rendered: &'a RenderedTxtp<'a>,
     variants: &'a [SoundVariant<'_>],
 ) -> Vec<TxtpDiagnostic<'a>> {
     rendered
@@ -36,7 +36,7 @@ pub(super) fn collect<'a>(
                 TxtpApproximation::SelectFirstAlternative => rendered
                     .selection
                     .as_ref()
-                    .and_then(|selection| selection.resolve(variants))
+                    .map(|selection| selection.resolve(variants, &rendered.media))
                     .map(DiagnosticSource::Selection),
                 _ => variants
                     .iter()
