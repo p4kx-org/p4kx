@@ -11,13 +11,21 @@ const MAX_VARIABLE_LENGTH_BYTES: usize = 5;
 const STRING_READ_BYTES: usize = 64;
 
 /// A scalar read and its original half-open byte range in the bank.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub struct BankHircField<T> {
     /// The decoded value.
     pub value: T,
     /// The original bank-relative range of the scalar.
     pub range: Range<u64>,
+}
+
+impl<T> BankHircField<T> {
+    pub(crate) const fn with_bank_offset(mut self, bank_offset: u64) -> Self {
+        self.range.start += bank_offset;
+        self.range.end += bank_offset;
+        self
+    }
 }
 
 pub(crate) trait ObjectFields {

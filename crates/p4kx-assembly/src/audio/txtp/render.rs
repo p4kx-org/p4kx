@@ -3,6 +3,7 @@
 
 use std::collections::HashMap;
 use std::fmt::Write;
+use std::ops::Range;
 
 use p4kx_audio::Loop;
 
@@ -41,6 +42,7 @@ pub(super) fn comment_text(text: &str) -> String {
 pub(super) struct RenderedTxtp {
     pub(super) text: String,
     pub(super) approximations: Vec<TxtpApproximation>,
+    pub(super) approximation_ranges: Vec<Range<usize>>,
 }
 
 impl RenderedTxtp {
@@ -106,7 +108,9 @@ impl RenderedTxtp {
         let mut notes = String::new();
         for approximation in &self.approximations {
             notes.push_str("# approximation: ");
+            let start = offset + notes.len();
             notes.push_str(approximation.code());
+            self.approximation_ranges.push(start..offset + notes.len());
             notes.push('\n');
         }
         self.text.insert_str(offset, &notes);
@@ -127,6 +131,7 @@ pub(super) fn render(
     let mut rendered = RenderedTxtp {
         text: String::new(),
         approximations: Vec::new(),
+        approximation_ranges: Vec::new(),
     };
     for line in header {
         let _ = writeln!(rendered.text, "# {}", comment_text(line));

@@ -942,6 +942,18 @@ Playlist loop and automation evidence describe the owning playlist or track alon
 These codes appear in both the JSON report and the TXTP header, including on
 single-child paths. The WEM's own loop marker remains part of the file command.
 An empty array means the writer emitted no reported approximation code.
+Each reported code has a `fieldOrigins` entry at `/approximations/{index}` on the file row.
+`sourceUsesRefs` index its `provenance` inventory. Container-transition and Blend-curve codes
+cite the first positive checked field reached in playback order and its BNK layout version.
+Codes without exact source evidence carry `containsEncryptedSource: null` and
+`sourceSetComplete: false`.
+
+`originReceipt` is the sibling `<file>.p4kx-origin.jsonl` for a newly published file. Its digest
+binds the exact TXTP bytes and `textBytes` addresses identify the code tokens in the header.
+The companion covers the diagnosed fields. A kept file preserves any existing companion and has
+`originReceipt: null` in the current report. A byte-verified retained code has unknown provenance
+in this report because equality of the TXTP bytes establishes only the code value.
+
 A retained file has `"approximations": null` when its text was unverified or differed from the
 generated text. The sound export determines the exit code and reports missing audio files in
 `failures`. A cancellation stops TXTP generation.

@@ -162,7 +162,11 @@ impl<'i> Walk<'_, 'i> {
             },
             source: match self.options.path_sources {
                 PathSourceMode::Omit => None,
-                PathSourceMode::Retain => Some(HircPathSource::of(&self.current, object)),
+                PathSourceMode::Retain => Some(HircPathSource::of(
+                    self.banks.archive(),
+                    &self.current,
+                    object,
+                )),
             },
             playback_features,
         });

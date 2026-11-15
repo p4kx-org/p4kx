@@ -63,6 +63,7 @@ impl Layout {
 pub(crate) fn container(
     kind: HircKind,
     fields: &mut SectionReader<'_>,
+    bank_offset: u64,
 ) -> Result<Container, BankError> {
     let layout = Layout::of(kind)
         .ok_or_else(|| BankError::invalid(SectionId::HIRC, "the object is not a container"))?;
@@ -82,24 +83,22 @@ pub(crate) fn container(
             .switch
             .as_ref()
             .is_some_and(BankSwitchContainerFields::has_conditions),
-        timing: timing(&original),
+        timing: timing(original, bank_offset),
     })
 }
 
-fn timing(original: &BankContainerFields) -> ContainerTiming {
-    if original
+fn timing(original: BankContainerFields, bank_offset: u64) -> ContainerTiming {
+    if let Some(mode) = original
         .random_sequence
-        .as_ref()
-        .and_then(|fields| fields.transition_mode.as_ref())
-        .is_some_and(|mode| mode.value != 0)
+        .and_then(|fields| fields.transition_mode)
+        .filter(|mode| mode.value != 0)
     {
-        ContainerTiming::Transition
-    } else if original
+        ContainerTiming::Transition(mode.with_bank_offset(bank_offset))
+    } else if let Some(count) = original
         .blend
-        .as_ref()
-        .is_some_and(BankBlendContainerFields::has_crossfade_points)
+        .and_then(BankBlendContainerFields::into_first_crossfade_point_count)
     {
-        ContainerTiming::BlendCurve
+        ContainerTiming::BlendCurve(count.with_bank_offset(bank_offset))
     } else {
         ContainerTiming::None
     }

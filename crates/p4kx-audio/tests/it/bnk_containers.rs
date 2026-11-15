@@ -116,11 +116,27 @@ fn each_nonzero_random_sequence_transition_mode_is_observed() -> TestResult {
             .ok_or("checked transition mode byte")?;
         assert_eq!(*field, 0, "synthetic base mode is disabled");
         *field = mode;
-        let (_, value) = decoded(TestHircObject::raw(5, 5, body), 154)?;
-        let HircValue::Container(container) = value else {
+        let bytes = TestBank::new(1)
+            .object(TestHircObject::raw(0xa0, 91, [0; 13]))
+            .object(TestHircObject::raw(5, 5, body))
+            .bytes();
+        let bank = Soundbank::parse(&bytes)?;
+        let object = bank.objects().last().ok_or("second object")?;
+        let HircValue::Container(container) = &object.value else {
             return Err("expected a checked Random/Sequence transition mode".into());
         };
         assert!(container.has_authored_transitions(), "nonzero mode {mode}");
+        let source = container
+            .transition_mode_evidence()
+            .ok_or("mode evidence")?;
+        let start = object.id_byte_range().end + TRANSITION_MODE;
+        assert_eq!(source.value, mode, "original mode is kept");
+        assert_eq!(
+            source.range,
+            start as u64..(start + 1) as u64,
+            "only the original mode byte is cited"
+        );
+        assert_eq!(bytes.get(start), Some(&mode), "position is bank-relative");
     }
     Ok(())
 }
@@ -148,6 +164,67 @@ fn a_blend_controller_with_an_empty_association_curve_is_neutral() -> TestResult
         return Err("expected a checked Layer with a controller and empty curve".into());
     };
     assert!(!container.has_blend_curves(), "no original curve points");
+    Ok(())
+}
+
+#[test]
+fn a_blend_reports_the_first_positive_checked_point_count_in_bank_order() -> TestResult {
+    const CHILDREN: [u32; 3] = [101, 102, 103];
+    const WORD: usize = size_of::<u32>();
+    let mut body = body_of(TestHircObject::container(
+        TestContainerKind::Blend,
+        5,
+        &CHILDREN,
+        TestNodeBase::Plain,
+    ))?;
+    let end = body
+        .len()
+        .checked_sub(1)
+        .ok_or("continuous-validation byte")?;
+    let start = end
+        .checked_sub(CHILDREN.len() * 5 * WORD)
+        .ok_or("association rows")?;
+    let expected = CHILDREN
+        .into_iter()
+        .flat_map(|child| [child, 1, 0, 0, 0])
+        .flat_map(u32::to_le_bytes);
+    assert!(
+        body.get(start..end)
+            .ok_or("original association range")?
+            .iter()
+            .copied()
+            .eq(expected),
+        "the fixture starts with one complete point per association"
+    );
+    let replacement = [101_u32, 0, 102, 2, 0, 0, 0, 0, 0, 0, 103, 1, 0, 0, 0];
+    drop(body.splice(
+        start..end,
+        replacement.into_iter().flat_map(u32::to_le_bytes),
+    ));
+    let bytes = TestBank::new(1)
+        .object(TestHircObject::raw(9, 5, body))
+        .bytes();
+    let bank = Soundbank::parse(&bytes)?;
+    let object = bank.objects().first().ok_or("layer container")?;
+    let HircValue::Container(container) = &object.value else {
+        return Err("expected a checked Layer with populated associations".into());
+    };
+    let source = container
+        .blend_point_count_evidence()
+        .ok_or("point count evidence")?;
+    let field_start = object.id_byte_range().end + start + 3 * WORD;
+    let field_end = field_start + WORD;
+    assert_eq!(source.value, 2, "the empty first association is skipped");
+    assert_eq!(
+        source.range,
+        field_start as u64..field_end as u64,
+        "the second association supplies the first positive count"
+    );
+    assert_eq!(
+        bytes.get(field_start..field_end),
+        Some(2_u32.to_le_bytes().as_slice()),
+        "only the exact original count word is cited"
+    );
     Ok(())
 }
 

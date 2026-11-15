@@ -51,7 +51,10 @@ pub use p4kx_audio::wwise_id;
 pub use references::{TriggerReference, TriggerScope, trigger_references, trigger_references_in};
 pub use search::{MAX_SEARCH_PAGE, SearchPage, TriggerHit};
 pub use sounds::{NodeKind, PathStep, SoundVariant, SourceKind, TriggerSounds, WemLocation};
-pub use txtp::{TxtpApproximation, TxtpFile, TxtpReport, TxtpSkip, write_txtp};
+pub use txtp::{
+    TxtpApproximation, TxtpFile, TxtpOrigins, TxtpReport, TxtpSkip, write_txtp,
+    write_txtp_with_origins,
+};
 pub use users::TriggerUsers;
 pub use wem_selection::WemSelection;
 

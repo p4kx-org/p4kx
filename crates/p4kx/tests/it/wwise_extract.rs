@@ -23,6 +23,8 @@ mod txtp_approximation;
 mod txtp_clip_omissions;
 #[path = "wwise_txtp_container_omissions.rs"]
 mod txtp_container_omissions;
+#[path = "wwise_txtp_origins.rs"]
+mod txtp_origins;
 #[path = "wwise_txtp_transition_omissions.rs"]
 mod txtp_transition_omissions;
 
@@ -327,7 +329,12 @@ fn txtp_writes_one_file_per_event_next_to_the_sounds() -> TestResult {
     let report = extract(&fixture, "Play_Single", &["--format", "wav", "--txtp"], 0)?;
     assert_eq!(
         names(&fixture.out)?,
-        ["Play_Single.txtp", "Play_Single.wav"]
+        [
+            ".p4kx-origin.lock",
+            "Play_Single.txtp",
+            "Play_Single.txtp.p4kx-origin.jsonl",
+            "Play_Single.wav",
+        ]
     );
     assert_eq!(
         fs::read_to_string(fixture.out.join("Play_Single.txtp"))?,

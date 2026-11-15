@@ -43,6 +43,26 @@ pub(crate) fn write_replacing_before<T>(
     write: impl FnOnce(&mut BufWriter<File>) -> io::Result<T>,
     before_publish: impl FnOnce(&StagedOutput<'_>) -> io::Result<()>,
 ) -> io::Result<T> {
+    write_staged(out, protection, cancel, write, |value, staged| {
+        before_publish(staged)?;
+        staged.check().map_err(protection_error)?;
+        fs::rename(staged.temporary(), out)?;
+        Ok(StageDisposition::Moved(value))
+    })
+}
+
+pub(crate) enum StageDisposition<T> {
+    Moved(T),
+    Cleanup(T),
+}
+
+pub(crate) fn write_staged<T, Output>(
+    out: &Path,
+    protection: Option<&ArchiveWriteProtection>,
+    cancel: Option<&CancelToken>,
+    write: impl FnOnce(&mut BufWriter<File>) -> io::Result<T>,
+    place: impl FnOnce(T, &StagedOutput<'_>) -> io::Result<StageDisposition<Output>>,
+) -> io::Result<Output> {
     let uncancelled = CancelToken::new();
     let actual_cancel = cancel.unwrap_or(&uncancelled);
     let check =
@@ -62,14 +82,17 @@ pub(crate) fn write_replacing_before<T>(
             .sync_all()?;
         let staged = StagedOutput::new(&temporary, out, &ownership, protection, cancel);
         staged.check().map_err(protection_error)?;
-        before_publish(&staged)?;
-        staged.check().map_err(protection_error)?;
-        fs::rename(&temporary, out)?;
-        Ok(value)
+        place(value, &staged)
     });
-    if let Err(write) = result {
-        let cleanup = ownership.remove(&temporary, actual_cancel.flag());
-        return Err(match cleanup {
+    match result {
+        Ok(StageDisposition::Moved(value)) => Ok(value),
+        Ok(StageDisposition::Cleanup(value)) => {
+            ownership
+                .remove(&temporary, actual_cancel.flag())
+                .map_err(io::Error::other)?;
+            Ok(value)
+        }
+        Err(write) => Err(match ownership.remove(&temporary, actual_cancel.flag()) {
             Ok(()) => write,
             Err(cleanup) => crate::OwnedOutputError::Cleanup {
                 primary: Box::new(crate::OwnedOutputError::Io {
@@ -79,9 +102,8 @@ pub(crate) fn write_replacing_before<T>(
                 cleanup,
             }
             .into_io_error(),
-        });
+        }),
     }
-    result
 }
 
 fn protection_error(error: WriteProtectionError) -> io::Error {

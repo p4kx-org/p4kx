@@ -145,6 +145,10 @@ impl<'w, 'i> Banks<'w, 'i> {
         }
     }
 
+    pub(super) const fn archive(&self) -> &Archive {
+        self.archive
+    }
+
     /// Selects a referenced bank and shares an admitted active owner before consulting the spare.
     pub(crate) fn enter<'active>(
         &mut self,

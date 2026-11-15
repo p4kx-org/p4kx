@@ -320,7 +320,7 @@ fn value(
         | HircKind::LayerContainer
             if version == CONTAINER_VERSION =>
         {
-            HircValue::Container(hirc_container::container(kind, fields)?)
+            HircValue::Container(hirc_container::container(kind, fields, bank_offset)?)
         }
         HircKind::ActorMixer if version == hirc_actor_mixer::VERSION => {
             HircValue::ActorMixer(hirc_actor_mixer::read(fields, bank_offset)?)

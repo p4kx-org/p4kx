@@ -6,8 +6,8 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 use crate::{
-    ArchiveWriteProtection, CancelToken, OriginArtifactBinding, OriginArtifactName,
-    OriginDigestWriter, check_protected_output,
+    ArchiveWriteProtection, CancelToken, OriginArtifactBinding, OriginArtifactDigest,
+    OriginArtifactName, OriginDigestWriter, check_protected_output,
 };
 
 use crate::origin_file_io;
@@ -26,6 +26,8 @@ mod lock;
 mod lock_retirement;
 #[path = "file_receipt_ordinary.rs"]
 mod ordinary;
+#[path = "file_receipt_publication.rs"]
+mod publication;
 #[path = "file_receipt_target.rs"]
 mod target_path;
 
@@ -41,6 +43,7 @@ use directory_table::ReplacementPath;
 use header::ReceiptOwner;
 use lock::{Contention, ReceiptLock, invalid, protection_error, regular_file};
 pub(crate) use ordinary::OrdinaryReplacement;
+pub use publication::FilePublication;
 use target_path::{BindTarget, TargetLeaf, bind_target, lexical_receipt, sibling_receipt, target};
 
 const COMPANION_SUFFIX: &str = ".p4kx-origin.jsonl";
@@ -160,6 +163,18 @@ impl<'source> FileReceipt<'source> {
         )?;
         let held =
             held.ok_or_else(|| io::Error::other("artifact committed without the origin lock"))?;
+        self.publish_companion(&held, digest, |writer, binding| {
+            describe(writer, binding, &result)
+        })?;
+        Ok(result)
+    }
+
+    fn publish_companion(
+        &self,
+        held: &ReceiptLock,
+        digest: OriginArtifactDigest,
+        describe: impl FnOnce(&mut dyn Write, &OriginArtifactBinding) -> io::Result<()>,
+    ) -> io::Result<()> {
         let binding = OriginArtifactBinding::File {
             path: self.artifact_name.clone(),
             digest,
@@ -168,10 +183,9 @@ impl<'source> FileReceipt<'source> {
             &self.receipt,
             self.receipt_protection,
             Some(&self.cancel),
-            |writer| describe(writer, &binding, &result),
+            |writer| describe(writer, &binding),
             |_| held.check(&self.cancel),
-        )?;
-        Ok(result)
+        )
     }
 
     fn acquire(&self, contention: Contention) -> io::Result<ReceiptLock> {

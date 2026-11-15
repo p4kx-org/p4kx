@@ -104,3 +104,16 @@ Playlist loop and automation evidence is scoped to the owning playlist or
 track along that path. An automation clip index remains an authored field.
 The codes are emitted once per generated file in JSON and the TXTP header.
 The render commands and the WEM loop marker retain their own meaning.
+
+The CLI records approximation origins in the portable companion specified by ADR-0357.
+`textBytes` addresses cover the code token alone. The file row and companion share the source
+inventory and the immediate encryption and completeness flag at `/approximations/{index}`.
+The first positive owner in render order accounts for a deduplicated code. A transition code uses
+the exact active mode word. A Blend code uses the first positive count of a fully validated
+association point table. Their decoded layout also uses the bank version word. The other codes
+carry unknown origin until their exact contributors are available. These receipts establish the
+source of the diagnostic text. They describe the declared controls that the exporter observed.
+
+A replacement binds the companion to the complete TXTP digest. A kept file preserves its
+existing companion. The current report exposes unknown origins for byte-verified retained text
+without a verified contributor binding for that occurrence.

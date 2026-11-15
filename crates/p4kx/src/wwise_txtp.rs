@@ -5,8 +5,10 @@ use std::io::{self, Write};
 use std::path::Path;
 
 use p4kx_assembly::audio::{
-    ExportReport, ExportState, TriggerSounds, TxtpApproximation, TxtpReport, write_txtp,
+    ExportReport, ExportState, TriggerSounds, TxtpApproximation, TxtpReport,
+    write_txtp_with_origins,
 };
+use p4kx_extraction::{Archive, CancelToken, FieldOrigins, SourceInventory};
 use serde::Serialize;
 
 use crate::cli_wwise::WwiseExtractArgs;
@@ -15,16 +17,16 @@ use crate::json;
 
 /// The JSON shape of the TXTP files of an export.
 #[derive(Serialize)]
-pub(crate) struct TxtpJson {
+pub(crate) struct TxtpJson<'a> {
     written: usize,
     kept: usize,
     skipped: usize,
-    files: Vec<TxtpFileJson>,
+    files: Vec<TxtpFileJson<'a>>,
     skips: Vec<TxtpSkipJson>,
 }
 
 #[derive(Serialize)]
-struct TxtpFileJson {
+struct TxtpFileJson<'a> {
     trigger: String,
     event: String,
     file: String,
@@ -32,6 +34,12 @@ struct TxtpFileJson {
     kept: bool,
     breaks: usize,
     approximations: Option<Vec<&'static str>>,
+    #[serde(rename = "fieldOrigins", skip_serializing_if = "Option::is_none")]
+    field_origins: Option<&'a FieldOrigins>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    provenance: Option<&'a SourceInventory>,
+    #[serde(rename = "originReceipt")]
+    origin_receipt: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -46,12 +54,21 @@ pub(crate) fn write(
     sounds: &TriggerSounds<'_>,
     exported: &ExportReport,
     args: &WwiseExtractArgs,
-) -> TxtpReport {
-    write_txtp(&[sounds], exported, &args.out, policy(args.export.conflict))
+    archive: &Archive,
+    cancel: &CancelToken,
+) -> io::Result<TxtpReport> {
+    write_txtp_with_origins(
+        archive,
+        &[sounds],
+        exported,
+        &args.out,
+        policy(args.export.conflict),
+        cancel,
+    )
 }
 
 /// Returns the JSON shape of `report`.
-pub(crate) fn to_json(report: &TxtpReport) -> TxtpJson {
+pub(crate) fn to_json(report: &TxtpReport) -> TxtpJson<'_> {
     TxtpJson {
         written: report.written_count(),
         kept: report.kept_count(),
@@ -73,6 +90,14 @@ pub(crate) fn to_json(report: &TxtpReport) -> TxtpJson {
                         .map(TxtpApproximation::code)
                         .collect()
                 }),
+                field_origins: file.origins.as_ref().map(|origins| &origins.field_origins),
+                provenance: file.origins.as_ref().map(|origins| &origins.provenance),
+                origin_receipt: file
+                    .origin_receipt
+                    .as_deref()
+                    .and_then(Path::file_name)
+                    .and_then(std::ffi::OsStr::to_str)
+                    .map(str::to_owned),
             })
             .collect(),
         skips: report

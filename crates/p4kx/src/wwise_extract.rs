@@ -30,7 +30,7 @@ struct ExtractJson<'a> {
     #[serde(flatten)]
     export: ExportJson,
     #[serde(skip_serializing_if = "Option::is_none")]
-    txtp: Option<TxtpJson>,
+    txtp: Option<TxtpJson<'a>>,
     issues: Vec<IssueJson<'a>>,
 }
 
@@ -186,11 +186,16 @@ pub(crate) fn run(args: &WwiseExtractArgs, as_json: bool) -> Result<ExitCode> {
     let audio = ArchiveAudio::new(&archive);
     let index = audio.index();
     let choice = language_choice(index, &args.language)?;
-    let sounds = audio
-        .resolve_trigger_in(&args.trigger, &choice)
-        .ok_or_else(|| UnknownTrigger::new(&args.trigger))?;
+    let resolved = if args.txtp {
+        audio.resolve_trigger_with_path_sources(&args.trigger, &choice)
+    } else {
+        audio.resolve_trigger_in(&args.trigger, &choice)
+    };
+    let sounds = resolved.ok_or_else(|| UnknownTrigger::new(&args.trigger))?;
     let report = export(&audio, &[&sounds], &args.out, &args.export, &cancel)?;
-    let txtp = (args.txtp && !report.cancelled).then(|| wwise_txtp::write(&sounds, &report, args));
+    let txtp = (args.txtp && !report.cancelled)
+        .then(|| wwise_txtp::write(&sounds, &report, args, &archive, &cancel))
+        .transpose()?;
     if as_json {
         json::print(&ExtractJson {
             archive: json::path(archive.path()),

@@ -3,18 +3,30 @@
 
 use std::fs::File;
 use std::io::{self, BufRead, BufReader};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use p4kx_extraction::{
-    ConflictPolicy, ConversionError, check_path_length, write_replacing_counted,
+    Archive, ArchiveWriteProtection, CancelToken, ConflictPolicy, ConversionError, FilePublication,
+    FileReceipt, check_path_length, write_replacing_counted,
 };
 
 use crate::audio::ExportState;
+
+use super::TxtpOrigins;
+use super::diagnostic::TxtpDiagnostic;
+
+pub(super) struct OriginContext<'a> {
+    pub(super) archive: &'a Archive,
+    pub(super) protection: &'a ArchiveWriteProtection,
+    pub(super) cancel: &'a CancelToken,
+}
 
 pub(super) struct PublishedFile {
     pub(super) size: u64,
     pub(super) state: ExportState,
     pub(super) verified_content: bool,
+    pub(super) origins: Option<TxtpOrigins>,
+    pub(super) origin_receipt: Option<PathBuf>,
 }
 
 pub(super) fn write(
@@ -22,16 +34,9 @@ pub(super) fn write(
     text: &str,
     policy: ConflictPolicy,
 ) -> Result<PublishedFile, String> {
-    let absolute = std::path::absolute(path).map_err(|error| error.to_string())?;
-    check_path_length(&absolute).map_err(|limit| limit.to_string())?;
-    if policy == ConflictPolicy::Skip
-        && let Ok(existing) = std::fs::symlink_metadata(path)
-    {
-        return Ok(PublishedFile {
-            size: existing.len(),
-            state: ExportState::Kept,
-            verified_content: false,
-        });
+    check_length(path)?;
+    if let Some(kept) = skip_existing(path, policy) {
+        return Ok(kept);
     }
     let replaced = write_replacing_counted(path, policy == ConflictPolicy::IfChanged, |out| {
         out.write_all(text.as_bytes())
@@ -53,6 +58,82 @@ pub(super) fn write(
         size: replaced.len,
         state,
         verified_content,
+        origins: None,
+        origin_receipt: None,
+    })
+}
+
+pub(super) fn write_with_origins(
+    path: &Path,
+    text: &str,
+    policy: ConflictPolicy,
+    context: &OriginContext<'_>,
+    diagnostics: &[TxtpDiagnostic<'_>],
+) -> Result<PublishedFile, String> {
+    check_length(path)?;
+    if let Some(kept) = skip_existing(path, policy) {
+        return Ok(kept);
+    }
+    publish_with_origins(path, text, policy, context, diagnostics)
+        .map_err(|error| error.to_string())
+}
+
+fn publish_with_origins(
+    path: &Path,
+    text: &str,
+    policy: ConflictPolicy,
+    context: &OriginContext<'_>,
+    diagnostics: &[TxtpDiagnostic<'_>],
+) -> io::Result<PublishedFile> {
+    let receipt = FileReceipt::new_with_cancel(
+        path,
+        Some(context.protection),
+        Some(context.protection),
+        context.cancel.clone(),
+    )?;
+    let origins = TxtpOrigins::capture(Some(context.archive), diagnostics)?;
+    match receipt.publish_bytes(text.as_bytes(), policy, |writer, binding| {
+        origins.write_companion(writer, binding)
+    })? {
+        FilePublication::Written { size } => Ok(PublishedFile {
+            size,
+            state: ExportState::Written,
+            verified_content: true,
+            origins: Some(origins),
+            origin_receipt: Some(receipt.path().to_path_buf()),
+        }),
+        FilePublication::Kept {
+            size,
+            verified_content,
+        } => Ok(PublishedFile {
+            size,
+            state: ExportState::Kept,
+            verified_content,
+            origins: verified_content
+                .then(|| TxtpOrigins::capture(None, diagnostics))
+                .transpose()?,
+            origin_receipt: None,
+        }),
+        _ => Err(io::Error::other("unknown TXTP publication outcome")),
+    }
+}
+
+fn check_length(path: &Path) -> Result<(), String> {
+    let absolute = std::path::absolute(path).map_err(|error| error.to_string())?;
+    check_path_length(&absolute).map_err(|limit| limit.to_string())
+}
+
+fn skip_existing(path: &Path, policy: ConflictPolicy) -> Option<PublishedFile> {
+    if policy != ConflictPolicy::Skip {
+        return None;
+    }
+    let existing = std::fs::symlink_metadata(path).ok()?;
+    Some(PublishedFile {
+        size: existing.len(),
+        state: ExportState::Kept,
+        verified_content: false,
+        origins: None,
+        origin_receipt: None,
     })
 }
 

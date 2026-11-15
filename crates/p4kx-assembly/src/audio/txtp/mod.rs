@@ -11,16 +11,20 @@
 //! follow the portable rule of ADR-0248.
 
 mod approximation;
+mod diagnostic;
+mod origins;
 mod output;
 mod render;
 mod tree;
 
 pub use self::approximation::TxtpApproximation;
+pub use self::origins::TxtpOrigins;
 
 use std::collections::HashMap;
+use std::io;
 use std::path::{Path, PathBuf};
 
-use p4kx_extraction::ConflictPolicy;
+use p4kx_extraction::{Archive, ArchiveWatch, ArchiveWriteProtection, CancelToken, ConflictPolicy};
 
 use self::render::{RenderedTxtp, SoundFile, comment_text, render};
 use super::export::name::{StemSet, portable_stem};
@@ -51,6 +55,10 @@ pub struct TxtpFile {
     pub breaks: usize,
     /// Approximation codes for written or byte-verified content, or `None` when unchecked.
     pub approximations: Option<Vec<TxtpApproximation>>,
+    /// Field-addressed origin of the emitted approximation codes when reported.
+    pub origins: Option<TxtpOrigins>,
+    /// Companion path for a file committed by this export.
+    pub origin_receipt: Option<PathBuf>,
 }
 
 /// A Wwise event that got no TXTP.
@@ -117,6 +125,64 @@ pub fn write_txtp(
     folder: &Path,
     policy: ConflictPolicy,
 ) -> TxtpReport {
+    write_files(
+        triggers,
+        exported,
+        folder,
+        &Destination {
+            policy,
+            origins: None,
+        },
+    )
+}
+
+/// Writes TXTP and binds its field-origin companion to each newly published file.
+///
+/// Pass triggers resolved with physical path sources from the same archive.
+///
+/// # Errors
+/// Returns an error when the archive changed or cannot be protected from output writes.
+#[must_use = "the report carries the write outcomes"]
+pub fn write_txtp_with_origins(
+    archive: &Archive,
+    triggers: &[&TriggerSounds<'_>],
+    exported: &ExportReport,
+    folder: &Path,
+    policy: ConflictPolicy,
+    cancel: &CancelToken,
+) -> io::Result<TxtpReport> {
+    ArchiveWatch::new(archive)
+        .check()
+        .map_err(io::Error::other)?;
+    let protection =
+        ArchiveWriteProtection::new(archive.path(), cancel.flag()).map_err(io::Error::other)?;
+    let origins = output::OriginContext {
+        archive,
+        protection: &protection,
+        cancel,
+    };
+    Ok(write_files(
+        triggers,
+        exported,
+        folder,
+        &Destination {
+            policy,
+            origins: Some(origins),
+        },
+    ))
+}
+
+struct Destination<'a> {
+    policy: ConflictPolicy,
+    origins: Option<output::OriginContext<'a>>,
+}
+
+fn write_files(
+    triggers: &[&TriggerSounds<'_>],
+    exported: &ExportReport,
+    folder: &Path,
+    destination: &Destination<'_>,
+) -> TxtpReport {
     let sounds: HashMap<(&str, u32), &ExportedSound> = exported
         .sounds
         .iter()
@@ -146,7 +212,15 @@ pub fn write_txtp(
                         "{}.{EXTENSION}",
                         stems.unique(&portable_stem(event.name(), FALLBACK_STEM))
                     ));
-                    publish_event(path, name, event.name(), breaks, rendered, policy)
+                    publish_event(
+                        path,
+                        name,
+                        event.name(),
+                        breaks,
+                        rendered,
+                        variants,
+                        destination,
+                    )
                 });
             match written {
                 Ok(file) => report.files.push(file),
@@ -167,9 +241,21 @@ fn publish_event(
     event: &str,
     breaks: usize,
     rendered: RenderedTxtp,
-    policy: ConflictPolicy,
+    variants: &[SoundVariant<'_>],
+    destination: &Destination<'_>,
 ) -> Result<TxtpFile, String> {
-    let publication = output::write(&path, &rendered.text, policy)?;
+    let publication = if let Some(context) = &destination.origins {
+        let diagnostics = diagnostic::collect(&rendered, variants);
+        output::write_with_origins(
+            &path,
+            &rendered.text,
+            destination.policy,
+            context,
+            &diagnostics,
+        )?
+    } else {
+        output::write(&path, &rendered.text, destination.policy)?
+    };
     Ok(TxtpFile {
         trigger: trigger.to_owned(),
         event: event.to_owned(),
@@ -180,6 +266,8 @@ fn publish_event(
         approximations: publication
             .verified_content
             .then_some(rendered.approximations),
+        origins: publication.origins,
+        origin_receipt: publication.origin_receipt,
     })
 }
 

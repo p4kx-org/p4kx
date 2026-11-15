@@ -53,21 +53,39 @@ impl Container {
     /// Returns whether the checked Random/Sequence transition mode is nonzero.
     #[must_use]
     pub const fn has_authored_transitions(&self) -> bool {
-        matches!(self.timing, ContainerTiming::Transition)
+        self.transition_mode_evidence().is_some()
     }
 
     /// Returns whether an original Blend child association contains checked crossfade points.
     #[must_use]
     pub const fn has_blend_curves(&self) -> bool {
-        matches!(self.timing, ContainerTiming::BlendCurve)
+        self.blend_point_count_evidence().is_some()
+    }
+
+    /// Returns the nonzero Random/Sequence transition mode and its bank-relative range.
+    #[must_use]
+    pub const fn transition_mode_evidence(&self) -> Option<&BankHircField<u8>> {
+        match &self.timing {
+            ContainerTiming::Transition(mode) => Some(mode),
+            ContainerTiming::None | ContainerTiming::BlendCurve(_) => None,
+        }
+    }
+
+    /// Returns the first nonempty checked Blend curve's point count in physical order.
+    #[must_use]
+    pub const fn blend_point_count_evidence(&self) -> Option<&BankHircField<u32>> {
+        match &self.timing {
+            ContainerTiming::BlendCurve(count) => Some(count),
+            ContainerTiming::None | ContainerTiming::Transition(_) => None,
+        }
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub(crate) enum ContainerTiming {
     None,
-    Transition,
-    BlendCurve,
+    Transition(BankHircField<u8>),
+    BlendCurve(BankHircField<u32>),
 }
 
 /// Original words that locate and supply the parent in a node base.
