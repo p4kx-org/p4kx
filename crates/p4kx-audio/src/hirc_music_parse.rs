@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use crate::bank_object_fields::BankHircField;
 use crate::bank_reader::SectionReader;
 use crate::hirc_music::{
     MusicMarker, MusicNode, MusicPlaylist, MusicSegment, MusicStinger, MusicSwitch,
@@ -20,8 +19,11 @@ use crate::hirc_music_transition::{
 use crate::hirc_node::{self, ID_LEN};
 use crate::{BankError, SectionId};
 
-pub(crate) fn segment(fields: &mut SectionReader<'_>) -> Result<MusicSegment, BankError> {
-    let node = node(fields, &mut BankMusicNodeFields::default())?;
+pub(crate) fn segment(
+    fields: &mut SectionReader<'_>,
+    bank_offset: u64,
+) -> Result<MusicSegment, BankError> {
+    let node = node(fields, bank_offset)?;
     let (duration, count) =
         hirc_music_segment::header(fields, &mut BankMusicSegmentFields::default())?;
     let mut markers = Vec::with_capacity(capacity(fields, count, ID_LEN + 8 + 1));
@@ -51,7 +53,6 @@ pub(crate) fn switch(
         rule_count,
         transition_features,
         transition_evidence,
-        child_count,
     } = transition_node(fields, bank_offset)?;
     let mut observed = BankMusicSwitchFields::default();
     let mut groups = SwitchGroups::default();
@@ -100,7 +101,6 @@ pub(crate) fn switch(
         has_decision_conditions: decision_evidence.is_some(),
         decision_evidence,
         transition_evidence,
-        child_count,
     })
 }
 
@@ -123,7 +123,6 @@ pub(crate) fn playlist(
         rule_count,
         transition_features,
         transition_evidence,
-        ..
     } = transition_node(fields, bank_offset)?;
     let count = fields.u32()?;
     let mut items = Vec::with_capacity(capacity(fields, count, PLAYLIST_ITEM_LEN));
@@ -147,14 +146,12 @@ pub(crate) fn playlist(
     })
 }
 
-fn node(
-    fields: &mut SectionReader<'_>,
-    original: &mut BankMusicNodeFields,
-) -> Result<MusicNode, BankError> {
-    let (parent_id, count, _) = hirc_music_node::head(fields, original)?;
+fn node(fields: &mut SectionReader<'_>, bank_offset: u64) -> Result<MusicNode, BankError> {
+    let mut original = BankMusicNodeFields::default();
+    let (parent_id, count, _) = hirc_music_node::head(fields, &mut original)?;
     let children = hirc_node::read_children(fields, count)?;
-    let meter = hirc_music_node::meter(fields, original)?;
-    let count = hirc_music_node::stinger_count(fields, original)?;
+    let meter = hirc_music_node::meter(fields, &mut original)?;
+    let count = hirc_music_node::stinger_count(fields, &mut original)?;
     let mut stingers = Vec::with_capacity(capacity(fields, count, STINGER_LEN));
     for _ in 0..count {
         let original = hirc_music_node::stinger(fields)?;
@@ -168,6 +165,9 @@ fn node(
         children,
         meter,
         stingers,
+        child_count: original
+            .child_count
+            .map(|count| count.with_bank_offset(bank_offset)),
     })
 }
 
@@ -176,15 +176,13 @@ struct TransitionNode {
     rule_count: u32,
     transition_features: MusicTransitionFeatures,
     transition_evidence: MusicTransitionEvidence,
-    child_count: Option<BankHircField<u32>>,
 }
 
 fn transition_node(
     fields: &mut SectionReader<'_>,
     bank_offset: u64,
 ) -> Result<TransitionNode, BankError> {
-    let mut original = BankMusicNodeFields::default();
-    let node = node(fields, &mut original)?;
+    let node = node(fields, bank_offset)?;
     let mut observed = BankMusicTransitionFields::default();
     let rule_count = hirc_music_transition::read(fields, &mut observed)?;
     Ok(TransitionNode {
@@ -192,9 +190,6 @@ fn transition_node(
         rule_count,
         transition_features: observed.features,
         transition_evidence: observed.evidence.with_bank_offset(bank_offset),
-        child_count: original
-            .child_count
-            .map(|count| count.with_bank_offset(bank_offset)),
     })
 }
 

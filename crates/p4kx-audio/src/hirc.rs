@@ -335,7 +335,7 @@ fn value(
             HircValue::Bus
         }
         HircKind::MusicSegment if version == CONTAINER_VERSION => {
-            HircValue::MusicSegment(Box::new(hirc_music_parse::segment(fields)?))
+            HircValue::MusicSegment(Box::new(hirc_music_parse::segment(fields, bank_offset)?))
         }
         HircKind::MusicTrack if version == CONTAINER_VERSION => HircValue::MusicTrack(Box::new(
             hirc_music_track::track(version, fields, bank_offset)?,

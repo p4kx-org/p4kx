@@ -15,6 +15,7 @@ const LOOP_WORD: usize = size_of::<u16>();
 const SWITCH_WORD: usize = size_of::<u32>();
 const DEFAULT_VALUE: usize = PLAIN_NODE_BYTES + size_of::<u8>() + SWITCH_WORD;
 const GROUP_COUNT: usize = DEFAULT_VALUE + 3 * SWITCH_WORD + size_of::<u8>();
+const EAGER_CHILDREN: [u32; 3] = [0x8412_abda, 0x8412_abda, 0x0acc_e55c];
 
 #[test]
 fn random_sequence_records_the_first_non_neutral_loop_word() -> TestResult {
@@ -90,9 +91,8 @@ fn a_switch_without_a_default_cites_the_checked_nonempty_membership_count() -> T
 
 #[test]
 fn eager_children_keep_their_physical_words_even_when_ids_repeat() -> TestResult {
-    const FIRST: u32 = 0x8412_abda;
-    const LAST: u32 = 0x0acc_e55c;
-    let children = [FIRST, FIRST, LAST];
+    let children = EAGER_CHILDREN;
+    let [first, _, last] = children;
     for (kind, original) in [
         (
             5,
@@ -114,7 +114,7 @@ fn eager_children_keep_their_physical_words_even_when_ids_repeat() -> TestResult
         ),
         (
             12,
-            TestHircObject::music_switch(20, &children, 0x42, &[FIRST, LAST]),
+            TestHircObject::music_switch(20, &children, 0x42, &[first, last]),
         ),
     ] {
         let bytes = TestBank::new(1)
@@ -142,6 +142,35 @@ fn eager_children_keep_their_physical_words_even_when_ids_repeat() -> TestResult
             )?,
             _ => return Err("a decoded container or music switch".into()),
         }
+    }
+    Ok(())
+}
+
+#[test]
+fn eager_music_segment_and_playlist_keep_physical_child_words() -> TestResult {
+    let children = EAGER_CHILDREN;
+    for original in [
+        TestHircObject::music_segment(20, &children, &[]),
+        TestHircObject::music_playlist(20, &children),
+    ] {
+        let bytes = TestBank::new(1)
+            .object(TestHircObject::raw(0xa0, 91, [0; 13]))
+            .object(original)
+            .bytes();
+        let bank = Soundbank::parse(bytes.as_slice())?;
+        let object = bank.object(20).ok_or("original music node")?;
+        let node = match &object.value {
+            HircValue::MusicSegment(segment) => &segment.node,
+            HircValue::MusicPlaylist(playlist) => &playlist.node,
+            _ => return Err("a decoded segment or playlist".into()),
+        };
+        assert_eq!(node.children, children, "decoded child order");
+        let count = node
+            .child_count_evidence()
+            .ok_or("music node child count")?;
+        check_child_words(&bytes, count, children, |ordinal| {
+            node.child_id_byte_range(ordinal)
+        })?;
     }
     Ok(())
 }

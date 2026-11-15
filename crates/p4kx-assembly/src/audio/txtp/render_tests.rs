@@ -26,7 +26,6 @@ fn leaf(wem_id: u32) -> Node {
         kind: SourceKind::Embedded,
         music_clip_features: MusicClipFeatures::default(),
         playback_features: PlaybackFeatures::default(),
-        source: None,
         variant: 0,
     })
 }
@@ -34,7 +33,6 @@ fn leaf(wem_id: u32) -> Node {
 fn group(kind: NodeKind, id: u32, children: Vec<Node>) -> Group {
     Group {
         step: PathStep { kind, id },
-        source: None,
         combine: match kind {
             NodeKind::Sequence => Combine::Segments,
             NodeKind::Random => Combine::Select,

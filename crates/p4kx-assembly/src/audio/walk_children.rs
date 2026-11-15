@@ -32,8 +32,8 @@ impl FollowedEdge<'_> {
             Self::Child { owner, ordinal } => {
                 if !matches!(owner.value, HircValue::Event(_)) {
                     return parent?
-                        .selection_child(&owner.value, ordinal)
-                        .map(HircInboundSource::Selection);
+                        .child(&owner.value, ordinal)
+                        .map(HircInboundSource::Child);
                 }
                 HircRouteSource::event_action(archive, bank, owner, ordinal)
             }

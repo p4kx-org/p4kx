@@ -948,11 +948,13 @@ controls cite the first triggering checked fields reached in playback order and 
 version. This includes the exact loop control, switch default or membership, clip time or event,
 automation point count and transition fade or object segment. Evidence for a music switch tree
 includes the group count and tree size. A transition object also cites its allocation flag.
-`select-first-alternative` cites the original type, layout version, child count and Random mode
-where applicable for the first rendered selection group. It also cites each directly rendered
-child ID word at `[start, endExclusive, physicalChildOrdinal]`. Two occurrences of the same ID
-retain separate positions. Nested groups are considered before their containing group.
-Rendered file lines in that group carry their successfully followed Event and Action links.
+`select-first-alternative` describes the first rendered multi-child choice. Nested groups are
+considered before their containing group. The file commands within that choice carry the child
+links on their resolved paths, including ancestors and single-child groups collapsed by the
+renderer. Each child ID uses `[start, endExclusive, physicalChildOrdinal]` in its owning decoded
+bank. The evidence includes the owner's type and count and the layout version. Random and Sequence
+containers also contribute their mode. Repeated IDs keep their separate positions.
+These paths carry their successfully followed Event and Action links.
 Each Event action ID is addressed by its original `[start, endExclusive, actionOrdinal]`.
 The Action type and target use half-open ranges in the owning decoded bank. An explicitly
 selected foreign Play bank also contributes the original bank ID. The source evidence

@@ -4,20 +4,18 @@
 use std::io::{self, Write};
 use std::ops::Range;
 
-use p4kx_audio::HircKind;
 use p4kx_extraction::{
     Archive, DecimalU64, FieldOrigin, FieldOrigins, FieldPath, InputScope, OriginArtifactBinding,
-    OriginOutputAddress, SourceInput, SourceInventory, SourceLocation, SourceScope, SourceUse,
-    SourceUseRole, SourceUses,
+    OriginOutputAddress, SourceInput, SourceInventory, SourceUseRole, SourceUses,
 };
 
 use crate::audio::ExportLoopOrigin;
-use crate::audio::hirc_path_source::{HircRouteSource, HircSelectionChild};
 
 use super::diagnostic::{DiagnosticSource, TxtpDiagnostic};
 use super::loop_origin;
+use super::path_origin::{self, offset, source_use};
 use super::render::RenderedLoop;
-use super::selection::{SelectionDiagnostic, SelectionNodes};
+use super::selection::SelectionDiagnostic;
 use super::wem_origin;
 
 pub(super) struct OriginInputs<'a> {
@@ -171,12 +169,10 @@ fn selection_origin(
     sources: &SourceUses,
     selection: &SelectionDiagnostic<'_>,
 ) -> io::Result<FieldOrigin> {
-    let mut actual = match &selection.nodes {
-        Some(nodes) => selection_node_uses(archive, sources, nodes)?,
-        None => Vec::new(),
-    };
+    let mut actual = Vec::new();
+    path_origin::children(archive, sources, &selection.children, &mut actual)?;
     for route in &selection.routes {
-        route_uses(archive, sources, route, &mut actual)?;
+        path_origin::route(archive, sources, route, &mut actual)?;
     }
     for media in selection
         .commands
@@ -186,152 +182,4 @@ fn selection_origin(
         wem_origin::admission_uses(archive, sources, media, &mut actual)?;
     }
     Ok(sources.origin(&actual, false))
-}
-
-fn route_uses(
-    archive: &Archive,
-    sources: &SourceUses,
-    route: &HircRouteSource,
-    actual: &mut Vec<SourceUse>,
-) -> io::Result<()> {
-    use SourceUseRole::Selector;
-
-    let Some(entry) = route.entry(archive) else {
-        return Ok(());
-    };
-    let scope = sources
-        .observe(SourceInput::ArchiveView(entry), InputScope::Payload)
-        .map_err(io::Error::other)?;
-    for word in route.words() {
-        actual.push(positioned_use(
-            &scope,
-            word.namespace,
-            word.field,
-            word.bytes.clone(),
-            word.ordinal,
-            Selector,
-        )?);
-    }
-    if let Some(range) = route.version_bytes() {
-        let range = offset(range.start)?..offset(range.end)?;
-        actual.push(source_use(&scope, "bnkBkhd", "version", range, Selector)?);
-    }
-    Ok(())
-}
-
-fn selection_node_uses(
-    archive: &Archive,
-    sources: &SourceUses,
-    selection: &SelectionNodes<'_>,
-) -> io::Result<Vec<SourceUse>> {
-    use SourceUseRole::Selector;
-
-    let owner = selection.owner;
-    let Some(entry) = owner.entry(archive) else {
-        return Ok(Vec::new());
-    };
-    let (namespace, count, id) = match owner.kind() {
-        HircKind::RandomSequenceContainer => (
-            "bnkHircRandomSequence",
-            "containerChildCount",
-            "containerChildId",
-        ),
-        HircKind::SwitchContainer => (
-            "bnkHircSwitchContainer",
-            "containerChildCount",
-            "containerChildId",
-        ),
-        HircKind::MusicSwitch => ("bnkHircMusicNode", "musicChildCount", "musicChildId"),
-        _ => return Ok(Vec::new()),
-    };
-    let scope = sources
-        .observe(SourceInput::ArchiveView(entry), InputScope::Payload)
-        .map_err(io::Error::other)?;
-    let mut actual = vec![
-        source_use(
-            &scope,
-            "bnkHircObject",
-            "typeCode",
-            owner.kind_bytes(),
-            Selector,
-        )?,
-        source_use(
-            &scope,
-            namespace,
-            count,
-            owner.child_count_bytes(),
-            Selector,
-        )?,
-    ];
-    if let Some(range) = owner.version_bytes() {
-        let range = offset(range.start)?..offset(range.end)?;
-        actual.push(source_use(&scope, "bnkBkhd", "version", range, Selector)?);
-    }
-    if let Some(range) = owner.random_mode_bytes() {
-        actual.push(source_use(
-            &scope,
-            namespace,
-            "randomSequenceMode",
-            range,
-            Selector,
-        )?);
-    }
-    for child in &selection.children {
-        actual.push(child_use(&scope, namespace, id, child)?);
-    }
-    Ok(actual)
-}
-
-fn child_use(
-    scope: &SourceScope,
-    namespace: &str,
-    field: &str,
-    child: &HircSelectionChild,
-) -> io::Result<SourceUse> {
-    positioned_use(
-        scope,
-        namespace,
-        field,
-        child.id_bytes(),
-        Some(child.ordinal()),
-        SourceUseRole::Selector,
-    )
-}
-
-fn source_use(
-    scope: &SourceScope,
-    namespace: &str,
-    field: &str,
-    range: Range<u64>,
-    role: SourceUseRole,
-) -> io::Result<SourceUse> {
-    positioned_use(scope, namespace, field, range, None, role)
-}
-
-fn positioned_use(
-    scope: &SourceScope,
-    namespace: &str,
-    field: &str,
-    range: Range<u64>,
-    ordinal: Option<usize>,
-    role: SourceUseRole,
-) -> io::Result<SourceUse> {
-    let mut indices = vec![range.start, range.end];
-    if let Some(ordinal) = ordinal {
-        indices.push(offset(ordinal)?);
-    }
-    scope
-        .at(
-            SourceLocation::Subresource {
-                namespace: namespace.to_owned(),
-                indices,
-                field: field.to_owned(),
-            },
-            role,
-        )
-        .map_err(io::Error::other)
-}
-
-fn offset(position: usize) -> io::Result<u64> {
-    u64::try_from(position).map_err(io::Error::other)
 }

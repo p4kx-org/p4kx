@@ -5,7 +5,7 @@ use p4kx_audio::HircKind;
 
 use crate::audio::music_clip_features::MusicClipFeatures;
 use crate::audio::playback_features::PlaybackFeatures;
-use crate::audio::{HircPathSource, NodeKind, PathStep, SoundVariant, SourceKind};
+use crate::audio::{NodeKind, PathStep, SoundVariant, SourceKind};
 
 /// How the children of a group play together.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -30,25 +30,6 @@ impl Combine {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) struct PathPosition {
-    variant: usize,
-    step: usize,
-}
-
-impl PathPosition {
-    const fn next(self) -> Self {
-        Self {
-            variant: self.variant,
-            step: self.step + 1,
-        }
-    }
-
-    pub(super) fn source<'a>(self, variants: &'a [SoundVariant<'_>]) -> Option<&'a HircPathSource> {
-        variants.get(self.variant)?.path_sources().get(self.step)
-    }
-}
-
 /// A sound a group plays.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct Leaf {
@@ -59,7 +40,6 @@ pub(super) struct Leaf {
     pub(super) kind: SourceKind,
     pub(super) music_clip_features: MusicClipFeatures,
     pub(super) playback_features: PlaybackFeatures,
-    pub(super) source: Option<PathPosition>,
     pub(super) variant: usize,
 }
 
@@ -70,42 +50,25 @@ pub(super) enum Node {
     Group(Group),
 }
 
-impl Node {
-    pub(super) const fn source(&self) -> Option<PathPosition> {
-        match self {
-            Self::Leaf(leaf) => leaf.source,
-            Self::Group(group) => group.source,
-        }
-    }
-}
-
 /// An object of the path that plays several children.
 #[derive(Debug, PartialEq, Eq)]
 pub(super) struct Group {
     pub(super) step: PathStep,
     pub(super) combine: Combine,
     pub(super) children: Vec<Node>,
-    pub(super) source: Option<PathPosition>,
 }
 
 impl Group {
-    const fn new(step: PathStep, source: Option<PathPosition>) -> Self {
+    const fn new(step: PathStep) -> Self {
         Self {
             step,
             combine: Combine::of(step.kind),
             children: Vec::new(),
-            source,
         }
     }
 
     /// Adds a leaf in visit order, reusing only the groups still open in the source walk.
-    fn insert(
-        &mut self,
-        steps: &[PathStep],
-        position: PathPosition,
-        shared_prefix: usize,
-        leaf: Leaf,
-    ) {
+    fn insert(&mut self, steps: &[PathStep], shared_prefix: usize, leaf: Leaf) {
         let Some((step, rest)) = steps.split_first() else {
             self.children.push(Node::Leaf(leaf));
             return;
@@ -114,11 +77,11 @@ impl Group {
             && let Some(Node::Group(last)) = self.children.last_mut()
             && last.step == *step
         {
-            last.insert(rest, position.next(), shared_prefix - 1, leaf);
+            last.insert(rest, shared_prefix - 1, leaf);
             return;
         }
-        let mut group = Self::new(*step, Some(position));
-        group.insert(rest, position.next(), 0, leaf);
+        let mut group = Self::new(*step);
+        group.insert(rest, 0, leaf);
         self.children.push(Node::Group(group));
     }
 }
@@ -142,38 +105,24 @@ pub(super) fn build(variants: &[SoundVariant<'_>]) -> Option<Group> {
     let Some(second) = holders.next() else {
         return Some(first);
     };
-    let mut tree = Group::new(root, None);
+    let mut tree = Group::new(root);
     tree.children
         .extend([first, second].into_iter().chain(holders).map(Node::Group));
     Some(tree)
 }
 
 fn build_holder(root: PathStep, variants: &[SoundVariant<'_>], first_variant: usize) -> Group {
-    let root_source = Some(PathPosition {
-        variant: first_variant,
-        step: 0,
-    });
-    let mut tree = Group::new(root, root_source);
+    let mut tree = Group::new(root);
     for (offset, variant) in variants.iter().enumerate() {
         let variant_index = first_variant + offset;
         let path = variant.path();
         let below = path.get(1..).unwrap_or_default();
-        let (owners, leaf_source) = match below.split_last() {
-            Some((last, owners)) if last.kind == NodeKind::Sound => (
-                owners,
-                Some(PathPosition {
-                    variant: variant_index,
-                    step: path.len() - 1,
-                }),
-            ),
-            _ => (below, None),
+        let owners = match below.split_last() {
+            Some((last, owners)) if last.kind == NodeKind::Sound => owners,
+            _ => below,
         };
         tree.insert(
             owners,
-            PathPosition {
-                variant: variant_index,
-                step: 1,
-            },
             variant.shared_path_prefix.saturating_sub(1),
             Leaf {
                 wem_id: variant.wem_id(),
@@ -181,7 +130,6 @@ fn build_holder(root: PathStep, variants: &[SoundVariant<'_>], first_variant: us
                 kind: variant.source_kind(),
                 music_clip_features: variant.music_clip_features,
                 playback_features: variant.playback_features,
-                source: leaf_source,
                 variant: variant_index,
             },
         );

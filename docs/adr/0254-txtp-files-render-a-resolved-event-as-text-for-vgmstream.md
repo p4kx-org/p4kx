@@ -117,9 +117,12 @@ version word establishes the decoded layout. The receipts describe declared cont
 rendered paths.
 
 `select-first-alternative` describes the first rendered multi-child choice in postorder. Its
-selector evidence includes the original object type, bank version, child count, Random mode
-when used and the original ID words of the rendered direct children. Each child use retains its
-physical ordinal and range. Broken or unrendered child occurrences supply no ID use.
+command range identifies the actual variants that contribute. Their paths provide the entered
+child links of Random, Sequence, Switch, Blend, MusicSegment, MusicSwitch and MusicPlaylist
+objects, including ancestors and collapsed single-child groups. Each link cites its owner type,
+bank layout, child count and the physical ordinal and range of the original child ID. Random
+and Sequence links also cite their mode. The MusicPlaylist resolver follows the original child
+list. Broken or unrendered child occurrences supply no ID use.
 The variants under that group carry their entered Event and Action links. The proof includes
 the original Event action count, each used action ID at its physical ordinal, the Action type
 and target ID, and the explicit bank ID when used to enter a foreign bank. These words and

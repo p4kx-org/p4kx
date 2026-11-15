@@ -54,6 +54,21 @@ pub struct MusicNode {
     pub meter: MusicMeter,
     /// The stingers of the node.
     pub stingers: Vec<MusicStinger>,
+    pub(crate) child_count: Option<BankHircField<u32>>,
+}
+
+impl MusicNode {
+    /// Returns the original checked child count and its bank-relative range.
+    #[must_use]
+    pub const fn child_count_evidence(&self) -> Option<&BankHircField<u32>> {
+        self.child_count.as_ref()
+    }
+
+    /// Returns the bank-relative range of the child ID at its original physical ordinal.
+    #[must_use]
+    pub fn child_id_byte_range(&self, ordinal: usize) -> Option<Range<u64>> {
+        counted_id_byte_range(self.child_count_evidence()?, ordinal)
+    }
 }
 
 /// A named position in a music segment.
@@ -164,7 +179,6 @@ pub struct MusicSwitch {
     /// The checked tree is nonempty and declares state or switch groups.
     pub has_decision_conditions: bool,
     pub(crate) decision_evidence: Option<MusicSwitchDecisionEvidence>,
-    pub(crate) child_count: Option<BankHircField<u32>>,
     pub(crate) transition_evidence: MusicTransitionEvidence,
 }
 
@@ -172,13 +186,13 @@ impl MusicSwitch {
     /// Returns the original checked child count and its bank-relative range.
     #[must_use]
     pub const fn child_count_evidence(&self) -> Option<&BankHircField<u32>> {
-        self.child_count.as_ref()
+        self.node.child_count_evidence()
     }
 
     /// Returns the bank-relative range of the child ID at its original physical ordinal.
     #[must_use]
     pub fn child_id_byte_range(&self, ordinal: usize) -> Option<Range<u64>> {
-        counted_id_byte_range(self.child_count_evidence()?, ordinal)
+        self.node.child_id_byte_range(ordinal)
     }
 
     /// Returns the original group count and tree size of a checked conditional tree.

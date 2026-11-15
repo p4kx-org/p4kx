@@ -15,6 +15,7 @@ mod diagnostic;
 mod loop_origin;
 mod origins;
 mod output;
+mod path_origin;
 mod render;
 mod selection;
 mod tree;

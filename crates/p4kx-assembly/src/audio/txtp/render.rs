@@ -12,7 +12,6 @@ use crate::audio::playback_features::{PlaybackFeature, PlaybackFeatures};
 use crate::audio::{ExportLoopOrigin, ExportedWemOrigin};
 
 use super::TxtpApproximation;
-use super::selection::SelectionTopology;
 use super::tree::{Combine, Group, Leaf, Node};
 
 /// The longest text of a comment line, in characters.
@@ -61,7 +60,7 @@ pub(super) struct RenderedTxtp<'a> {
     pub(super) approximations: Vec<TxtpApproximation>,
     pub(super) approximation_ranges: Vec<Range<usize>>,
     pub(super) loops: Vec<RenderedLoop<'a>>,
-    pub(super) selection: Option<SelectionTopology>,
+    pub(super) selection: Option<Range<usize>>,
     pub(super) commands: Vec<RenderedCommand<'a>>,
 }
 
@@ -262,10 +261,7 @@ fn group_line(rendered: &mut RenderedTxtp<'_>, group: &Group, depth: usize, firs
         Combine::Segments => ('S', "", ""),
         Combine::Select => {
             if rendered.selection.is_none() {
-                rendered.selection = Some(SelectionTopology::of(
-                    group,
-                    first_command..rendered.commands.len(),
-                ));
+                rendered.selection = Some(first_command..rendered.commands.len());
             }
             rendered.note(TxtpApproximation::SelectFirstAlternative);
             ('R', ">1", "")

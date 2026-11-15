@@ -7,7 +7,6 @@ use std::fs;
 use std::ops::Range;
 use std::path::Path;
 
-use p4kx_extraction::Soundbank;
 use p4kx_testkit::{
     ArchiveBuilder, TestAtl, TestBank, TestContainerKind, TestEntry, TestHircObject, TestNodeBase,
     test_key, wwise_short_id,
@@ -16,10 +15,14 @@ use serde_json::{Value, json};
 
 use super::super::txtp_origin_assertions::check_address;
 use super::super::{EMBEDDED, Fixture, PLAY, TestResult, pcm};
-use super::{FLAGS, SELECTION, SELECTION_FIELD, TXTP_FILE, selection_origin};
+use super::{FLAGS, SELECTION, TXTP_FILE, selection_origin};
 
+#[path = "wwise_txtp_selection_containers.rs"]
+mod containers;
 #[path = "wwise_txtp_selection_media.rs"]
 mod media;
+#[path = "wwise_txtp_selection_music.rs"]
+mod music;
 #[path = "wwise_txtp_selection_route.rs"]
 mod route;
 
@@ -33,16 +36,20 @@ const FIRST_WEM: u32 = 100;
 const SECOND_WEM: u32 = 101;
 const MISSING: u32 = 999;
 const CHILDREN: [u32; 4] = [MISSING, FIRST_SOUND, FIRST_SOUND, SECOND_SOUND];
-const RANDOM_HIRC_TYPE: u8 = 5;
-const PLAIN_NODE_LEN: usize = 31;
-const MODE_OFFSET: usize = PLAIN_NODE_LEN + 4 * size_of::<u16>() + 3 * size_of::<f32>() + 2;
-const RANDOM_SEQUENCE: &str = "bnkHircRandomSequence";
 const ID_BYTES: usize = size_of::<u32>();
 
 #[test]
 fn selection_attests_to_rendered_physical_children_in_plain_and_encrypted_banks() -> TestResult {
     let bank = bank();
-    let expected = original_sites(&bank)?;
+    let expected = containers::original_sites(
+        &bank,
+        &[containers::ContainerCase {
+            id: CONTAINER,
+            kind: TestContainerKind::Random,
+            children: &CHILDREN,
+            followed: &[1, 2, 3],
+        }],
+    )?;
     for encrypted in [false, true] {
         let fixture = fixture(&bank, encrypted)?;
         let report = export(&fixture, &[])?;
@@ -74,53 +81,6 @@ fn selection_attests_to_rendered_physical_children_in_plain_and_encrypted_banks(
         check_txtp(&fixture.out, file, origin)?;
     }
     Ok(())
-}
-
-fn original_sites(bytes: &[u8]) -> Result<BTreeSet<Site<'static>>, Box<dyn Error>> {
-    let bank = Soundbank::parse(bytes)?;
-    let object = bank
-        .objects()
-        .iter()
-        .find(|object| object.id == CONTAINER)
-        .ok_or("container")?;
-    let kind = object.byte_range().start;
-    let mode = object.id_byte_range().end + MODE_OFFSET;
-    let count = mode + 2;
-    let first = count + ID_BYTES;
-    assert_eq!(
-        bytes.get(kind),
-        Some(&RANDOM_HIRC_TYPE),
-        "original HIRC kind byte"
-    );
-    assert_eq!(bytes.get(mode), Some(&0), "original Random mode byte");
-    assert_eq!(
-        bytes.get(count..first),
-        Some(u32::try_from(CHILDREN.len())?.to_le_bytes().as_slice()),
-        "original declared child count",
-    );
-    let version = bank.version_byte_range().ok_or("bank version word")?;
-    let mut sites = BTreeSet::from([
-        Site::word("bnkBkhd", "version", version),
-        Site::word("bnkHircObject", "typeCode", kind..kind + 1),
-        Site::word(RANDOM_SEQUENCE, "randomSequenceMode", mode..mode + 1),
-        Site::word(RANDOM_SEQUENCE, "containerChildCount", count..first),
-    ]);
-    for (ordinal, id) in CHILDREN.into_iter().enumerate() {
-        let start = first + ordinal * ID_BYTES;
-        let end = start + ID_BYTES;
-        assert_eq!(
-            bytes.get(start..end),
-            Some(id.to_le_bytes().as_slice()),
-            "child word {ordinal}"
-        );
-        if id != MISSING {
-            sites.insert(Site {
-                ordinal: Some(ordinal),
-                ..Site::word(RANDOM_SEQUENCE, "containerChildId", start..end)
-            });
-        }
-    }
-    Ok(sites)
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -262,16 +222,7 @@ fn selection_uses<'a>(
 
 fn check_txtp(out: &Path, file: &Value, origin: &Value) -> TestResult {
     let text = check_receipt(out, file, origin)?;
-    let commands: Vec<_> = text
-        .lines()
-        .map(str::trim_start)
-        .filter(|line| {
-            line.starts_with("group = ")
-                || Path::new(line)
-                    .extension()
-                    .is_some_and(|extension| extension.eq_ignore_ascii_case("wav"))
-        })
-        .collect();
+    let commands: Vec<_> = rendered_commands(&text).collect();
     assert_eq!(
         commands,
         [
@@ -285,7 +236,17 @@ fn check_txtp(out: &Path, file: &Value, origin: &Value) -> TestResult {
     Ok(())
 }
 
+fn rendered_commands(text: &str) -> impl Iterator<Item = &str> {
+    text.lines().map(str::trim).filter(|line| {
+        line.starts_with("group = ")
+            || Path::new(line)
+                .extension()
+                .is_some_and(|extension| extension.eq_ignore_ascii_case("wav"))
+    })
+}
+
 fn check_receipt(out: &Path, file: &Value, origin: &Value) -> Result<String, Box<dyn Error>> {
+    let field = selection_field(file)?;
     let text = fs::read_to_string(out.join(TXTP))?;
     let receipt = file
         .get("originReceipt")
@@ -297,7 +258,7 @@ fn check_receipt(out: &Path, file: &Value, origin: &Value) -> Result<String, Box
         .find_map(|row| match row {
             Ok(row)
                 if row.pointer("/address/field").and_then(Value::as_str)
-                    == Some(SELECTION_FIELD) =>
+                    == Some(field.as_str()) =>
             {
                 Some(Ok(row))
             }
@@ -307,6 +268,16 @@ fn check_receipt(out: &Path, file: &Value, origin: &Value) -> Result<String, Box
         .ok_or("receipt's addressed choice")??;
     let _span = check_address(&row, text.as_bytes(), SELECTION, origin)?;
     Ok(text)
+}
+
+fn selection_field(file: &Value) -> Result<String, &'static str> {
+    let index = file["approximations"]
+        .as_array()
+        .ok_or("approximation list")?
+        .iter()
+        .position(|code| code == SELECTION)
+        .ok_or("reported selection")?;
+    Ok(format!("/approximations/{index}"))
 }
 
 fn export(fixture: &Fixture, extra_flags: &[&str]) -> Result<Value, Box<dyn Error>> {
@@ -331,22 +302,29 @@ fn export(fixture: &Fixture, extra_flags: &[&str]) -> Result<Value, Box<dyn Erro
 }
 
 fn fixture(bank: &[u8], encrypted: bool) -> Result<Fixture, Box<dyn Error>> {
-    let dir = tempfile::tempdir()?;
-    let archive = dir.path().join("Data.p4k");
-    let out = dir.path().join("out");
-    let definitions = TestAtl::new("SC_Audio").trigger(EVENT, &[EVENT]);
     let bank = if encrypted {
         TestEntry::zstd(BANK_PATH, bank).encrypted()
     } else {
         TestEntry::stored(BANK_PATH, bank)
     };
-    ArchiveBuilder::new()
-        .entry(TestEntry::zstd(
-            "Data/Libs/GameAudio/SC_Audio.xml",
-            definitions.to_cryxml(),
-        ))
-        .entry(bank)
-        .write_to(&archive)?;
+    fixture_with_entries([bank])
+}
+
+fn fixture_with_entries(
+    entries: impl IntoIterator<Item = TestEntry>,
+) -> Result<Fixture, Box<dyn Error>> {
+    let dir = tempfile::tempdir()?;
+    let archive = dir.path().join("Data.p4k");
+    let out = dir.path().join("out");
+    let definitions = TestAtl::new("SC_Audio").trigger(EVENT, &[EVENT]);
+    let mut builder = ArchiveBuilder::new().entry(TestEntry::zstd(
+        "Data/Libs/GameAudio/SC_Audio.xml",
+        definitions.to_cryxml(),
+    ));
+    for entry in entries {
+        builder = builder.entry(entry);
+    }
+    builder.write_to(&archive)?;
     Ok(Fixture {
         _dir: dir,
         archive,

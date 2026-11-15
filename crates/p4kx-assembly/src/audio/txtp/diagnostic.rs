@@ -7,7 +7,7 @@ use crate::audio::{HircPathSource, SoundVariant};
 
 use super::TxtpApproximation;
 use super::render::RenderedTxtp;
-use super::selection::SelectionDiagnostic;
+use super::selection::{self, SelectionDiagnostic};
 
 pub(super) struct TxtpDiagnostic<'a> {
     pub(super) approximation: TxtpApproximation,
@@ -36,7 +36,8 @@ pub(super) fn collect<'a>(
                 TxtpApproximation::SelectFirstAlternative => rendered
                     .selection
                     .as_ref()
-                    .map(|selection| selection.resolve(variants, &rendered.commands))
+                    .and_then(|commands| rendered.commands.get(commands.clone()))
+                    .map(|commands| selection::resolve(variants, commands))
                     .map(DiagnosticSource::Selection),
                 _ => variants
                     .iter()
