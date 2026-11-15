@@ -1,17 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use crate::MediaKind;
-use p4kx_extraction::FieldOrigin;
-
-use std::io::Write;
+use std::io::{self, Write};
 use std::path::Path;
 
-use p4kx_extraction::{DecimalU64, SourceUses};
+use p4kx_extraction::{DecimalU64, FieldOrigin, SourceUses};
 use sha2::{Digest as _, Sha256};
 
 use crate::artifact::{Stream, StreamDestination};
-use crate::checkpoint::Checkpoint;
+use crate::checkpoint::{Checkpoint, IO_BLOCK_BYTES};
 use crate::origin_contract::use_sets::Sets;
 use crate::origin_contract::{
     OriginCoverage, OriginField, OriginProfile, OriginProtocol, OriginReceipts, OriginRow,
@@ -20,7 +17,7 @@ use crate::origin_contract::{
 use crate::origin_contributions::OriginContributions;
 use crate::origin_prepared::PreparedRecordOrigins;
 use crate::origin_resolver::OriginResolver;
-use crate::{Artifact, MediaError, error, hashing, origin_error, origin_json};
+use crate::{Artifact, MediaError, MediaKind, error, hashing, origin_error, origin_json};
 
 #[path = "origin_stream_reference_cache.rs"]
 mod reference_cache;
@@ -28,6 +25,7 @@ mod reference_cache;
 /// Streaming provenance files with unchanged payload-stream admission budgets.
 pub(crate) struct OriginTransport<'a> {
     fields: Stream<'a>,
+    row_buffer: Vec<u8>,
     sets: Sets,
     summaries: Vec<OriginStreamSummary>,
     destination: StreamDestination<'a>,
@@ -50,6 +48,7 @@ impl<'a> OriginTransport<'a> {
         summaries.push(summary(OriginStream::IndexBuild));
         Ok(Self {
             fields: destination.create(root, "field-origins.jsonl".into())?,
+            row_buffer: Vec::with_capacity(IO_BLOCK_BYTES),
             sets: Sets::default(),
             summaries,
             destination,
@@ -158,15 +157,18 @@ impl<'a> OriginTransport<'a> {
             "origin-sources.jsonl",
             inventory.sources(),
             self.destination,
+            &mut self.row_buffer,
         )?;
         let uses = inventory_stream(
             root,
             "origin-uses.jsonl",
             inventory.uses(),
             self.destination,
+            &mut self.row_buffer,
         )?;
         write_row(
             &mut self.fields,
+            &mut self.row_buffer,
             &OriginRow::Eof {
                 streams: &self.summaries,
             },
@@ -176,7 +178,7 @@ impl<'a> OriginTransport<'a> {
             .destination
             .create(root, "origin-use-sets.jsonl".into())?;
         self.sets
-            .visit(|row| write_row(&mut sets, &row, checkpoint))?;
+            .visit(|row| write_row(&mut sets, &mut self.row_buffer, &row, checkpoint))?;
         Ok(OriginReceipts {
             protocol: OriginProtocol::V2,
             sets: sets.finish()?,
@@ -188,7 +190,12 @@ impl<'a> OriginTransport<'a> {
     }
 
     fn write(&mut self, row: &OriginRow<'_>) -> Result<(), MediaError> {
-        write_row(&mut self.fields, row, self.destination.checkpoint())
+        write_row(
+            &mut self.fields,
+            &mut self.row_buffer,
+            row,
+            self.destination.checkpoint(),
+        )
     }
 }
 
@@ -197,29 +204,64 @@ fn inventory_stream<T: serde::Serialize>(
     relative: &str,
     rows: &[T],
     destination: StreamDestination<'_>,
+    row_buffer: &mut Vec<u8>,
 ) -> Result<Artifact, MediaError> {
     let mut stream = destination.create(root, relative.into())?;
     for row in rows {
-        write_row(&mut stream, row, destination.checkpoint())?;
+        write_row(&mut stream, row_buffer, row, destination.checkpoint())?;
     }
     stream.finish()
 }
 
 fn write_row<T: serde::Serialize>(
     stream: &mut Stream<'_>,
+    bytes: &mut Vec<u8>,
     row: &T,
     checkpoint: Checkpoint<'_>,
 ) -> Result<(), MediaError> {
     checkpoint.check()?;
+    bytes.clear();
+    let mut buffered = BufferedRow { stream, bytes };
     let serialised = serde_json::to_writer(
-        crate::observed_write::ObservedWrite::new(&mut *stream, &checkpoint),
+        crate::observed_write::ObservedWrite::new(&mut buffered, &checkpoint),
         row,
     );
     crate::json_output::finish(serialised, checkpoint)?;
-    stream
+    let written = buffered
         .write_all(b"\n")
-        .map_err(|cause| error::io(stream.path(), cause))?;
-    checkpoint.check()
+        .and_then(|()| buffered.drain())
+        .map_err(|cause| error::io(buffered.stream.path(), cause));
+    crate::output_operation::checked(written, checkpoint.check())
+}
+
+struct BufferedRow<'buffer, 'stream> {
+    stream: &'buffer mut Stream<'stream>,
+    bytes: &'buffer mut Vec<u8>,
+}
+
+impl BufferedRow<'_, '_> {
+    fn drain(&mut self) -> io::Result<()> {
+        self.stream.write_all(self.bytes)?;
+        self.bytes.clear();
+        Ok(())
+    }
+}
+
+impl Write for BufferedRow<'_, '_> {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        if self.bytes.len() == IO_BLOCK_BYTES {
+            self.drain()?;
+        }
+        let count = bytes.len().min(IO_BLOCK_BYTES - self.bytes.len());
+        let (prefix, _) = bytes.split_at(count);
+        self.bytes.extend_from_slice(prefix);
+        Ok(count)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.drain()?;
+        self.stream.flush()
+    }
 }
 
 const fn summary(stream: OriginStream) -> OriginStreamSummary {
