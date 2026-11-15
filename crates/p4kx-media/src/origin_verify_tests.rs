@@ -180,6 +180,25 @@ fn source_use_receipt_corruption_is_rejected() -> TestResult {
 }
 
 #[test]
+fn altered_origin_use_set_bytes_invalidate_the_generation() -> TestResult {
+    let fixture = Fixture::new()?;
+    let path = fixture.root.join(&fixture.receipts().sets.path);
+    let mut bytes = std::fs::read(&path)?;
+    assert_eq!(
+        bytes.len() as u64,
+        fixture.receipts().sets.size,
+        "the tampering fixture preserves the committed size"
+    );
+    bytes.push(b'\n');
+    std::fs::write(path, bytes)?;
+    assert!(
+        fixture.verify(&fixture.index).is_err(),
+        "the fourth origin artifact is protected"
+    );
+    Ok(())
+}
+
+#[test]
 fn missing_actual_artifact_occurrence_is_rejected() -> TestResult {
     let fixture = Fixture::new()?;
     let mut rows = fixture.rows()?;

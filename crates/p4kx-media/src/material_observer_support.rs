@@ -144,6 +144,7 @@ pub(crate) fn same_outputs(
         &baseline.artifact_manifest,
         &receipts.sources,
         &receipts.uses,
+        &receipts.sets,
         &receipts.fields,
     ]) {
         same_file(first, second, &artifact.path)?;

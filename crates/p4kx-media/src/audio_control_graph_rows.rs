@@ -123,7 +123,7 @@ fn directory_coverage(
     Ok(Coverage {
         directory_complete,
         blocked,
-        evidence: capture.finish(),
+        evidence: capture.finish().share_uses(),
     })
 }
 

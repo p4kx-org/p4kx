@@ -38,7 +38,7 @@ impl Cache {
             return emit(&previous.origin, previous.encoded.as_deref());
         }
 
-        let origin = actual.field_origin();
+        let origin = actual.field_origin()?;
         if uses > 1
             && self.largest.as_ref().is_none_or(|previous| {
                 previous.encoded.is_none() || uses >= previous.contribution.uses.len()

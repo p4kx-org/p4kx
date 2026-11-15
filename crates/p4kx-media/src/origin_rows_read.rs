@@ -5,6 +5,7 @@ use p4kx_extraction::{FieldOrigin, FieldOriginSeed, OriginReaderLimits};
 use serde::Deserialize;
 use serde::de::{DeserializeSeed, Deserializer};
 
+use crate::origin_contract::use_sets::SetId;
 use crate::origin_contract::{OriginCoverage, OriginProfile, OriginScope, OriginStreamSummary};
 use crate::origin_value_read;
 
@@ -18,7 +19,7 @@ pub(crate) enum ReadRow {
     Field {
         scope: OriginScope,
         field: String,
-        origin: FieldOrigin,
+        origin: ReadOrigin,
     },
     End {
         scope: OriginScope,
@@ -27,6 +28,23 @@ pub(crate) enum ReadRow {
     Eof {
         streams: Vec<OriginStreamSummary>,
     },
+}
+
+pub(crate) struct ReadOrigin {
+    pub(crate) local: FieldOrigin,
+    pub(crate) set: Option<SetId>,
+    marker: Option<bool>,
+    complete: bool,
+}
+
+impl ReadOrigin {
+    pub(crate) const fn contains_encrypted_source(&self) -> Option<bool> {
+        self.marker
+    }
+
+    pub(crate) const fn source_set_complete(&self) -> bool {
+        self.complete
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -103,6 +121,8 @@ struct Parts {
     marker: Marker,
     #[serde(rename = "sourceUsesRefs")]
     references: Option<Vec<String>>,
+    #[serde(rename = "sourceUseSetRef", default, deserialize_with = "read_set")]
+    set: Option<SetId>,
     #[serde(rename = "sourceSetComplete")]
     complete: Option<bool>,
     coverage: Option<OriginCoverage>,
@@ -113,7 +133,7 @@ impl Parts {
     fn origin(
         &mut self,
         limits: OriginReaderLimits,
-    ) -> Result<FieldOrigin, serde::de::value::Error> {
+    ) -> Result<ReadOrigin, serde::de::value::Error> {
         use serde::de::Error as _;
         let marker = match std::mem::take(&mut self.marker) {
             Marker::Present(marker) => marker,
@@ -125,9 +145,28 @@ impl Parts {
         };
         let references = take(&mut self.references, "sourceUsesRefs")?;
         let complete = take(&mut self.complete, "sourceSetComplete")?;
-        FieldOriginSeed::new(limits).deserialize(origin_value_read::deserializer(
-            marker, references, complete,
-        ))
+        let set = self.set.take();
+        let (local_marker, local_complete) = if set.is_some() {
+            if !references.is_sorted_by(|left, right| left < right) {
+                return Err(serde::de::value::Error::custom(
+                    "field-local source uses are not sorted and unique",
+                ));
+            }
+            (Some(false), true)
+        } else {
+            (marker, complete)
+        };
+        let local = FieldOriginSeed::new(limits).deserialize(origin_value_read::deserializer(
+            local_marker,
+            references,
+            local_complete,
+        ))?;
+        Ok(ReadOrigin {
+            local,
+            set,
+            marker,
+            complete,
+        })
     }
 
     const fn require_consumed(&self) -> Result<(), &'static str> {
@@ -137,6 +176,7 @@ impl Parts {
             || self.field.is_some()
             || !matches!(self.marker, Marker::Missing)
             || self.references.is_some()
+            || self.set.is_some()
             || self.complete.is_some()
             || self.coverage.is_some()
             || self.streams.is_some()
@@ -153,6 +193,10 @@ fn take<T, E: serde::de::Error>(field: &mut Option<T>, name: &'static str) -> Re
 
 fn read_marker<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Marker, D::Error> {
     Option::<bool>::deserialize(deserializer).map(Marker::Present)
+}
+
+fn read_set<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<SetId>, D::Error> {
+    SetId::deserialize(deserializer).map(Some)
 }
 
 #[cfg(test)]

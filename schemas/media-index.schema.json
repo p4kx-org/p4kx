@@ -509,7 +509,7 @@
       "description": "The closed field-origin transport contract.",
       "oneOf": [
         {
-          "const": "p4kx.field-origins/1",
+          "const": "p4kx.field-origins/2",
           "description": "Shared original inventories and occurrence-scoped immediate origins.",
           "type": "string"
         }
@@ -525,6 +525,10 @@
         "protocol": {
           "$ref": "#/$defs/OriginProtocol",
           "description": "Closed transport capability."
+        },
+        "sets": {
+          "$ref": "#/$defs/Artifact",
+          "description": "Framed shared source-use memberships."
         },
         "sources": {
           "$ref": "#/$defs/Artifact",
@@ -546,6 +550,7 @@
         "protocol",
         "sources",
         "uses",
+        "sets",
         "fields",
         "streams"
       ],

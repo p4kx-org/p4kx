@@ -9,7 +9,7 @@ use p4kx_extraction::{
     SourceUseRole, SourceUses,
 };
 
-use crate::origin_contributions::{OriginContributions, OriginCut};
+use crate::origin_contributions::{OriginContributions, OriginCut, SharedUseSet};
 use crate::origin_input::MediaOriginInput;
 use crate::{MediaError, MediaWriter, origin_error};
 
@@ -67,6 +67,7 @@ impl<'a> OriginSite<'a> {
 pub(crate) struct OriginCapture {
     owner: SourceUses,
     uses: BTreeMap<String, SourceUse>,
+    shared: Option<Arc<SharedUseSet>>,
     witness: Option<SourceUse>,
     complete: bool,
     cut: bool,
@@ -80,6 +81,7 @@ impl OriginCapture {
         Self {
             owner: owner.clone(),
             uses: BTreeMap::new(),
+            shared: None,
             witness: None,
             complete: true,
             cut: false,
@@ -202,6 +204,9 @@ impl OriginCapture {
         for cut in contribution.cuts.iter().copied() {
             self.cut(cut);
         }
+        if let Some(shared) = &contribution.shared {
+            self.retain_shared(shared)?;
+        }
         for actual in contribution.uses.iter().cloned() {
             self.retain(actual, self.limit)?;
         }
@@ -217,9 +222,34 @@ impl OriginCapture {
         OriginContributions {
             owner: self.owner,
             uses,
+            shared: self.shared,
             complete: self.complete,
             cuts: self.cuts.into(),
         }
+    }
+
+    fn retains_shared(&self, actual: &SourceUse) -> bool {
+        self.shared
+            .as_ref()
+            .is_some_and(|shared| shared.contains(actual))
+    }
+
+    fn retain_shared(&mut self, shared: &Arc<SharedUseSet>) -> Result<(), MediaError> {
+        if self
+            .shared
+            .as_ref()
+            .is_some_and(|previous| Arc::ptr_eq(previous, shared))
+        {
+            return Ok(());
+        }
+        if !self.cut && self.shared.is_none() {
+            self.shared = Some(Arc::clone(shared));
+            return Ok(());
+        }
+        for actual in shared.uses.iter().cloned() {
+            self.retain(actual, self.limit)?;
+        }
+        Ok(())
     }
 
     fn retain(&mut self, actual: SourceUse, limit: u64) -> Result<(), MediaError> {
@@ -233,7 +263,7 @@ impl OriginCapture {
             return self.retain_witness(&actual);
         }
         let key = actual.reference().as_str();
-        if self.uses.contains_key(key) {
+        if self.uses.contains_key(key) || self.retains_shared(&actual) {
             return Ok(());
         }
         let bytes = u64::try_from(key.len())
@@ -248,6 +278,11 @@ impl OriginCapture {
         self.complete = false;
         self.cut = true;
         self.cut(OriginCut::FieldUses);
+        if let Some(shared) = self.shared.take() {
+            for original in shared.uses.iter() {
+                self.retain_witness(original)?;
+            }
+        }
         let retained = std::mem::take(&mut self.uses);
         for original in retained.into_values() {
             self.retain_witness(&original)?;

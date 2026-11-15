@@ -32,6 +32,7 @@ fn repeated_reference_array_preserves_the_exact_field_stream_bytes() -> TestResu
     let second = usage(&owner, "one")?;
     let third = usage(&owner, "two")?;
     let origin = |uses, complete, cuts: &[OriginCut]| OriginContributions {
+        shared: None,
         owner: owner.clone(),
         uses,
         complete,
@@ -93,7 +94,7 @@ fn check_field(
     let expected = serde_json::to_vec(&ReferenceRow::Field {
         scope,
         field,
-        origin: &contribution.field_origin(),
+        origin: &contribution.field_origin()?,
         cuts: &contribution.cuts,
     })?;
     let actual = cache.with_origin(contribution, |origin, encoded| {
@@ -111,7 +112,7 @@ fn check_field(
     })?;
     assert_eq!(
         actual, expected,
-        "field origin keeps the canonical V1 bytes"
+        "field origin keeps the canonical inline origin bytes"
     );
 
     Ok(())

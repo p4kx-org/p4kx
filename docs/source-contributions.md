@@ -102,7 +102,7 @@ an avoidable traversal cut with an opaque location. Both reasons retain the orig
 source, byte domain, role and encryption witness. A contributing opaque use makes the
 contributor set incomplete; a known encrypted witness still yields true. A read attempt
 alone remains Attempted and cannot become an opaque Conversion. These operations impose
-no new global metadata, writer or schema quota. The closed `p4kx.field-origins/1` omission
+no new global metadata, writer or schema quota. The closed `p4kx.field-origins/2` omission
 vocabulary admits `captureLimit` and `unavailable`; missing and unknown reasons are refused.
 ## Physical sources and byte domains
 
@@ -290,7 +290,7 @@ alone is not evidence that those output carriers are complete.
 
 The owning Material provider selects the closed `materialLibrary`, `materialFailure`,
 `materialSourceLimit` or `materialConfigurationFailure` profile. These profiles extend
-`p4kx.field-origins/1` for the unreleased 0.5.0 contract; Material payload versions and
+`p4kx.field-origins/2` for the unreleased 0.5.0 contract; Material payload versions and
 serialized payload bytes remain unchanged. A public provider's matching capability or
 namespace does not grant a built-in profile.
 

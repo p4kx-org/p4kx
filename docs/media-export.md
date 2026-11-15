@@ -539,9 +539,9 @@ No game files or keys are fixtures; source assets and generated real-Archive out
 
 ## Field origins
 
-Each current generation additionally commits `origin-sources.jsonl`, `origin-uses.jsonl` and
-`field-origins.jsonl`. The optional index group `field_origins` identifies their hashes and
-the independent capability `p4kx.field-origins/1`. Catalog schema versions do not apply.
+Each current generation additionally commits `origin-sources.jsonl`, `origin-uses.jsonl`,
+`origin-use-sets.jsonl` and `field-origins.jsonl`. The optional index group `field_origins` identifies their hashes and
+the independent capability `p4kx.field-origins/2`. Catalog schema versions do not apply.
 The first two files use the original shared PhysicalSource and SourceUseDescription serializers;
 they supplement the existing Media `sources.jsonl` and `artifacts.jsonl`.
 
@@ -551,7 +551,17 @@ supply their closed stream kind, contiguous decimal-string ordinal, producer pro
 of the original payload line including its newline. The Index Build projection has the separate
 hash domain defined below. Field rows carry
 absolute escaped RFC 6901 pointers and the immediate shared FieldOrigin:
-`containsEncryptedSource`, `sourceUsesRefs` and `sourceSetComplete`. Explicit end coverage
+`containsEncryptedSource`, `sourceUsesRefs` and `sourceSetComplete`. A field may
+also carry `sourceUseSetRef`. Its actual contributors are the sorted unique
+union of the referenced shared set and the field-local `sourceUsesRefs`.
+The immediate marker and completeness describe that union.
+
+The `sets` descriptor in `field_origins` binds `origin-use-sets.jsonl`. A `set` row
+carries a contiguous decimal-string `id` and `members` count. Ordered `member`
+rows carry a `sourceUseRef` from the same generation's `origin-uses.jsonl`.
+An `end` row repeats the set ID. The terminal `eof` stores `sets` and `members`
+totals as decimal strings. This format streams membership without a list-sized
+record. Explicit end coverage
 counts and the terminal EOF preserve row and field multiplicities. Repeated equal artifacts may
 share their bytes while retaining different origins for each actual manifest occurrence.
 
@@ -590,7 +600,7 @@ ancestor state. Known encrypted or unknown outer witnesses cannot disappear thro
 leaf ancestor list. Missing optional details retain existing minimal proof; legacy alias text is
 not treated as a new physical identity rule. Validation does not restore original input handles.
 
-The existing staged generation and index replacement commit all three receipts atomically.
+The existing staged generation and index replacement commit all four receipts atomically.
 Reuse checks the receipts, payload-line hashes, exact addresses and ordinals, source/use closure,
 coverage totals and EOF. Historical index files without this capability have unknown provenance;
 they cannot be reported as a freshly migrated current skip. The consumer's finite metadata
@@ -642,7 +652,7 @@ a verified historical skip preserves that absence, while regeneration emits the
 current carrier. Missing the entire origin capability still follows the existing
 historical-generation upgrade rule.
 
-This extends the unreleased `p4kx.field-origins/1` contract. Media stays at
+This extends the unreleased `p4kx.field-origins/2` contract. Media stays at
 `p4kx-media` `1.0`; the catalog writer for 0.5.0 emits only schema `3`.
 The projection uses the existing Index/record bound: its compact nullable Build
 bytes are part of the Index base payload. It introduces no additional manifest

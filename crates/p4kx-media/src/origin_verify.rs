@@ -139,7 +139,7 @@ fn field(
             "field origin scope or absolute address disagrees with actual payload",
         ));
     }
-    inventory.validate_origin(&origin)?;
+    inventory.validate_field(&origin, policy.fields.field_uses)?;
     coverage.observe(&origin)
 }
 

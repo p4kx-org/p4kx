@@ -8,13 +8,17 @@ use serde_json::value::RawValue;
 
 use crate::{Artifact, MediaKind};
 
+#[path = "origin_use_sets.rs"]
+pub(crate) mod use_sets;
+use self::use_sets::SetId;
+
 /// The closed field-origin transport contract.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[non_exhaustive]
 pub enum OriginProtocol {
     /// Shared original inventories and occurrence-scoped immediate origins.
-    #[serde(rename = "p4kx.field-origins/1")]
-    V1,
+    #[serde(rename = "p4kx.field-origins/2")]
+    V2,
 }
 
 /// One payload stream whose individual occurrences have separate origins.
@@ -148,6 +152,8 @@ pub struct OriginReceipts {
     pub sources: Artifact,
     /// Original shared `SourceUseDescription` rows.
     pub uses: Artifact,
+    /// Framed shared source-use memberships.
+    pub sets: Artifact,
     /// Occurrence, field, completion and EOF rows.
     pub fields: Artifact,
     /// Complete multiplicities for every payload stream.
@@ -183,6 +189,8 @@ pub(crate) enum OriginRow<'a> {
 pub(crate) struct OriginField<'a> {
     contains_encrypted_source: Option<bool>,
     source_uses_refs: OriginReferences<'a>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    source_use_set_ref: Option<SetId>,
     source_set_complete: bool,
 }
 
@@ -190,6 +198,7 @@ pub(crate) struct OriginField<'a> {
 #[serde(untagged)]
 enum OriginReferences<'a> {
     Uses(&'a [SourceUseRef]),
+    Local(&'a [&'a SourceUseRef]),
     Encoded(&'a RawValue),
 }
 
@@ -201,6 +210,22 @@ impl<'a> OriginField<'a> {
                 || OriginReferences::Uses(origin.source_uses_refs()),
                 OriginReferences::Encoded,
             ),
+            source_use_set_ref: None,
+            source_set_complete: origin.source_set_complete(),
+        }
+    }
+}
+
+impl<'a> OriginField<'a> {
+    pub(crate) fn with_set(
+        origin: &FieldOrigin,
+        local: &'a [&'a SourceUseRef],
+        set: SetId,
+    ) -> Self {
+        Self {
+            contains_encrypted_source: origin.contains_encrypted_source(),
+            source_uses_refs: OriginReferences::Local(local),
+            source_use_set_ref: Some(set),
             source_set_complete: origin.source_set_complete(),
         }
     }

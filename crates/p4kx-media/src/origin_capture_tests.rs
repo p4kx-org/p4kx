@@ -41,7 +41,7 @@ fn minimal_original_proof_keeps_encryption_when_optional_details_are_not_capture
                 writer,
             )?;
             let contribution = capture.finish();
-            let origin = contribution.field_origin();
+            let origin = contribution.field_origin()?;
             assert_eq!(origin.contains_encrypted_source(), Some(true));
             assert!(
                 origin.source_set_complete(),
@@ -92,7 +92,7 @@ fn a_late_encrypted_witness_survives_local_capture_cut_and_the_next_field_recove
                     writer,
                 )?;
             }
-            let origin = capture.finish().field_origin();
+            let origin = capture.finish().field_origin()?;
             assert_eq!(
                 origin.contains_encrypted_source(),
                 Some(true),
@@ -116,7 +116,7 @@ fn a_late_encrypted_witness_survives_local_capture_cut_and_the_next_field_recove
                 SourceUseRole::Payload,
                 writer,
             )?;
-            let later = later.finish().field_origin();
+            let later = later.finish().field_origin()?;
             assert_eq!(later.contains_encrypted_source(), Some(false));
             assert!(
                 later.source_set_complete(),
@@ -147,7 +147,7 @@ fn attempted_and_reference_targets_do_not_taint_the_retained_plain_value() -> Te
                     add_plain(&mut capture, &plain, writer)?;
                 }
                 let contributions = capture.finish();
-                let origin = contributions.field_origin();
+                let origin = contributions.field_origin()?;
                 assert_eq!(origin.contains_encrypted_source(), Some(false));
                 assert!(origin.source_set_complete());
                 assert_eq!(

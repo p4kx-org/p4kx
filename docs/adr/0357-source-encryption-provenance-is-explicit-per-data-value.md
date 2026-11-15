@@ -143,7 +143,7 @@ scope stays unknown and can be reused as such or regenerated; it grants no missi
 proof. The existing Index base bound already includes the Build projection, so
 there is no new manifest input cap or payload-output budget.
 
-This extends the unreleased `p4kx.field-origins/1` capability while Media stays
+This extends the `p4kx.field-origins/2` capability while Media stays
 `1.0`. The 0.5.0 catalog writer emits schema `3` only. These three version
 contracts are independent. [Media export](../media-export.md#build-declaration-origins)
 and [shared observations](../source-contributions.md#build-manifest-observations)

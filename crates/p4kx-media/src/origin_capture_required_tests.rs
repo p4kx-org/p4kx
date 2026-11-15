@@ -40,7 +40,7 @@ fn required_input_receipt_keeps_original_handle_after_actual_read_without_wire_m
                         SourceUseRole::Conversion,
                         writer,
                     )?;
-                    let origin = capture.finish().field_origin();
+                    let origin = capture.finish().field_origin()?;
                     assert_eq!(origin.contains_encrypted_source(), Some(false));
                     assert!(origin.source_set_complete());
                     let receipt = input.receipt().clone();

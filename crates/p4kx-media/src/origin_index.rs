@@ -17,6 +17,7 @@ use crate::{
 
 const SOURCES_PATH: &str = "origin-sources.jsonl";
 const USES_PATH: &str = "origin-uses.jsonl";
+const SETS_PATH: &str = "origin-use-sets.jsonl";
 const FIELDS_PATH: &str = "field-origins.jsonl";
 const SHA256_HEX_BYTES: usize = 64;
 #[derive(Clone, Copy)]
@@ -239,12 +240,13 @@ fn byte_len(bytes: usize) -> Result<u64, MediaError> {
 }
 
 pub(crate) fn validate_receipts(receipts: &OriginReceipts) -> Result<(), MediaError> {
-    if receipts.protocol != OriginProtocol::V1 {
+    if receipts.protocol != OriginProtocol::V2 {
         return Err(invalid("unsupported origin protocol"));
     }
     for (artifact, path) in [
         (&receipts.sources, SOURCES_PATH),
         (&receipts.uses, USES_PATH),
+        (&receipts.sets, SETS_PATH),
         (&receipts.fields, FIELDS_PATH),
     ] {
         if artifact.path != path
@@ -312,9 +314,10 @@ fn maximum_receipts() -> OriginReceipts {
         },
     };
     OriginReceipts {
-        protocol: OriginProtocol::V1,
+        protocol: OriginProtocol::V2,
         sources: artifact(SOURCES_PATH),
         uses: artifact(USES_PATH),
+        sets: artifact(SETS_PATH),
         fields: artifact(FIELDS_PATH),
         streams: streams()
             .map(|stream| OriginStreamSummary {

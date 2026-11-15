@@ -49,6 +49,7 @@ pub(super) fn directory(
         .map_err(origin_error::evidence)?
     {
         return Ok(OriginContributions {
+            shared: None,
             uses: [range].into(),
             ..OriginContributions::independent(owner)
         });

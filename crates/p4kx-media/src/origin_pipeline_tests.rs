@@ -140,7 +140,12 @@ fn provenance_transport_does_not_spend_the_original_payload_output_budget() -> T
         .field_origins
         .as_ref()
         .ok_or("required current origins")?;
-    assert!(receipts.fields.size > 0 && receipts.sources.size > 0 && receipts.uses.size > 0);
+    assert!(
+        receipts.fields.size > 0
+            && receipts.sources.size > 0
+            && receipts.uses.size > 0
+            && receipts.sets.size > 0
+    );
     let options = crate::ExportOptions {
         limits: crate::Limits {
             output_bytes: payload_bytes,

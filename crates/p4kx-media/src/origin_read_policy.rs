@@ -20,11 +20,13 @@ impl OriginReadPolicy {
             .sources
             .size
             .max(receipts.uses.size)
+            .max(receipts.sets.size)
             .max(receipts.fields.size);
         let inventory_bytes = receipts
             .sources
             .size
             .saturating_add(receipts.uses.size)
+            .saturating_add(receipts.sets.size)
             .saturating_mul((1 + size_of::<FieldOrigin>() + size_of::<SourceUseRef>()) as u64);
         let field_bytes = usize::try_from(line_bytes).unwrap_or(usize::MAX);
         Self {

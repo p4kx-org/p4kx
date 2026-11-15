@@ -68,9 +68,14 @@ fn survey(root: &Path) -> TestResult<(Value, Value)> {
 
 fn check(root: &Path, checkpoint: Checkpoint<'_>, source: &Value, usage: &Value) -> TestResult {
     let receipts = OriginReceipts {
-        protocol: OriginProtocol::V1,
+        protocol: OriginProtocol::V2,
         sources: write_row(root, "origin-sources.jsonl", source)?,
         uses: write_row(root, "origin-uses.jsonl", usage)?,
+        sets: write_row(
+            root,
+            "origin-use-sets.jsonl",
+            &json!({"type":"eof","sets":"0","members":"0"}),
+        )?,
         fields: origin_index_test_support::artifact("field-origins.jsonl"),
         streams: Vec::new(),
     };

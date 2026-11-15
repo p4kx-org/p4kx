@@ -149,9 +149,10 @@ fn index(build: Option<Value>, declared: bool) -> Result<Index, Box<dyn std::err
     let mut index: Index = serde_json::from_value(value)?;
     if declared {
         index.field_origins = Some(OriginReceipts {
-            protocol: OriginProtocol::V1,
+            protocol: OriginProtocol::V2,
             sources: support::artifact("origin-sources.jsonl"),
             uses: support::artifact("origin-uses.jsonl"),
+            sets: support::artifact("origin-use-sets.jsonl"),
             fields: support::artifact("field-origins.jsonl"),
             streams: vec![summary(0)],
         });

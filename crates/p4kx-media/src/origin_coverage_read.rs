@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{DecimalU64, FieldOrigin};
+use p4kx_extraction::DecimalU64;
 
 use crate::MediaError;
 use crate::origin_contract::OriginCoverage;
+use crate::origin_rows_read::ReadOrigin;
 
 /// Counts orthogonal mapping outcomes without replacing projection health.
 pub(crate) struct Coverage {
@@ -26,7 +27,7 @@ impl Coverage {
         }
     }
 
-    pub(crate) fn observe(&mut self, origin: &FieldOrigin) -> Result<(), MediaError> {
+    pub(crate) fn observe(&mut self, origin: &ReadOrigin) -> Result<(), MediaError> {
         increment(&mut self.fields)?;
         if origin.source_set_complete() {
             increment(&mut self.complete)?;

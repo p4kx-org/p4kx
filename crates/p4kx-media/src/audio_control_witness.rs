@@ -227,7 +227,7 @@ fn verify_origin(
         return Err("one matching physical ATL source use".into());
     };
     let description = source_use.description();
-    let proof = observed.field_origin();
+    let proof = observed.field_origin()?;
     require(
         proof.source_set_complete()
             && proof.contains_encrypted_source() == Some(entry.is_encrypted())

@@ -12,10 +12,12 @@ use sha2::{Digest as _, Sha256};
 
 use crate::artifact::Stream;
 use crate::checkpoint::Checkpoint;
+use crate::origin_contract::use_sets::Sets;
 use crate::origin_contract::{
     OriginCoverage, OriginField, OriginProfile, OriginProtocol, OriginReceipts, OriginRow,
     OriginScope, OriginStream, OriginStreamSummary,
 };
+use crate::origin_contributions::OriginContributions;
 use crate::origin_prepared::PreparedRecordOrigins;
 use crate::origin_resolver::OriginResolver;
 use crate::{Artifact, MediaError, error, hashing, origin_error, origin_json};
@@ -26,6 +28,7 @@ mod reference_cache;
 /// Streaming provenance files with unchanged payload-stream admission budgets.
 pub(crate) struct OriginTransport<'a> {
     fields: Stream<'a>,
+    sets: Sets,
     summaries: Vec<OriginStreamSummary>,
     checkpoint: Checkpoint<'a>,
     max_depth: u32,
@@ -47,6 +50,7 @@ impl<'a> OriginTransport<'a> {
         summaries.push(summary(OriginStream::IndexBuild));
         Ok(Self {
             fields: Stream::create(root, "field-origins.jsonl".into(), &checkpoint)?,
+            sets: Sets::default(),
             summaries,
             checkpoint,
             max_depth,
@@ -90,15 +94,7 @@ impl<'a> OriginTransport<'a> {
                 let address = address(stream, field);
                 let field = address.as_ref();
                 let contribution = resolver.resolve(field, prepared)?;
-                references.with_origin(&contribution, |origin, encoded| {
-                    observe(&mut coverage, origin)?;
-                    self.write(&OriginRow::Field {
-                        scope: &scope,
-                        field,
-                        origin: OriginField::new(origin, encoded),
-                        cuts: &contribution.cuts,
-                    })
-                })
+                self.emit_field(&scope, field, &contribution, &mut coverage, &mut references)
             },
         )?;
         self.write(&OriginRow::End {
@@ -112,6 +108,42 @@ impl<'a> OriginTransport<'a> {
         summary.occurrences = increment(summary.occurrences, 1)?;
         summary.fields = increment(summary.fields, coverage.fields.get())?;
         Ok(())
+    }
+
+    fn emit_field(
+        &mut self,
+        scope: &OriginScope,
+        field: &str,
+        contribution: &OriginContributions,
+        coverage: &mut OriginCoverage,
+        references: &mut reference_cache::Cache,
+    ) -> Result<(), MediaError> {
+        if let Some(shared) = &contribution.shared {
+            let id = self.sets.register(shared)?;
+            let origin = contribution.field_origin()?;
+            let local: Vec<_> = contribution
+                .uses
+                .iter()
+                .filter(|used| !shared.contains(used))
+                .map(p4kx_extraction::SourceUse::reference)
+                .collect();
+            observe(coverage, &origin)?;
+            return self.write(&OriginRow::Field {
+                scope,
+                field,
+                origin: OriginField::with_set(&origin, &local, id),
+                cuts: &contribution.cuts,
+            });
+        }
+        references.with_origin(contribution, |origin, encoded| {
+            observe(coverage, origin)?;
+            self.write(&OriginRow::Field {
+                scope,
+                field,
+                origin: OriginField::new(origin, encoded),
+                cuts: &contribution.cuts,
+            })
+        })
     }
 
     pub(crate) fn finish(
@@ -134,8 +166,12 @@ impl<'a> OriginTransport<'a> {
             },
             self.checkpoint,
         )?;
+        let mut sets = Stream::create(root, "origin-use-sets.jsonl".into(), &self.checkpoint)?;
+        self.sets
+            .visit(|row| write_row(&mut sets, &row, self.checkpoint))?;
         Ok(OriginReceipts {
-            protocol: OriginProtocol::V1,
+            protocol: OriginProtocol::V2,
+            sets: sets.finish()?,
             sources,
             uses,
             fields: self.fields.finish()?,

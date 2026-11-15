@@ -13,14 +13,20 @@ use crate::origin_inventory_wire::{
 };
 use crate::origin_line_reader::OriginLines;
 use crate::origin_read_policy::{InventoryBudget, OriginReadPolicy};
+use crate::origin_rows_read::ReadOrigin;
 use crate::origin_source_facts::SourceFacts;
 use crate::{MediaError, origin_inventory_wire};
+
+#[path = "origin_use_sets_read.rs"]
+mod use_sets;
+use self::use_sets::{Evidence, ReadSet};
 
 /// Descriptive wire facts only, never original-input or `SourceUse` authority.
 pub(crate) struct ReadInventory {
     sources: BTreeMap<String, SourceFacts>,
     facts: Vec<FieldOrigin>,
     uses: BTreeMap<String, UseFacts>,
+    sets: Vec<ReadSet>,
 }
 
 struct UseFacts {
@@ -47,11 +53,14 @@ impl ReadInventory {
             sources: BTreeMap::new(),
             facts: Vec::new(),
             uses: BTreeMap::new(),
+            sets: Vec::new(),
         };
         let mut budget = InventoryBudget::new(policy);
         inventory.read_sources(root, receipts, checkpoint, policy, &mut budget)?;
         inventory.read_uses(root, receipts, checkpoint, policy, &mut budget)?;
         inventory.validate(&mut budget)?;
+        let sets = OriginLines::open(root, &receipts.sets, checkpoint, policy.line_bytes)?;
+        inventory.sets = use_sets::read(sets, &mut budget, |id| inventory.contributor(id))?;
         Ok(inventory)
     }
 
@@ -268,37 +277,61 @@ impl ReadInventory {
         Ok(done)
     }
     pub(crate) fn validate_origin(&self, origin: &FieldOrigin) -> Result<(), MediaError> {
-        let mut state = Encryption::Unencrypted;
-        let mut opaque = false;
+        let mut evidence = Evidence::empty();
         for reference in origin.source_uses_refs() {
-            let used = self
-                .uses
-                .get(reference.as_str())
-                .ok_or_else(|| invalid("field origin source-use reference is missing"))?;
-            if !used.role.contributes() {
-                return Err(invalid(
-                    "field origin includes an attempted or untouched reference",
-                ));
-            }
-            state = state.combine(used.effective_encryption);
-            opaque |= used.location.kind == LocationKind::Opaque;
+            evidence.include(self.contributor(reference.as_str())?);
         }
-        if opaque && origin.source_set_complete() {
-            return Err(invalid(
-                "opaque contributing use requires incomplete field coverage",
-            ));
-        }
-        let expected = match (state, origin.source_set_complete()) {
-            (Encryption::Encrypted, _) => Some(true),
-            (Encryption::Unencrypted, true) => Some(false),
-            (Encryption::Unknown, _) | (Encryption::Unencrypted, false) => None,
+        evidence.validate(
+            origin.contains_encrypted_source(),
+            origin.source_set_complete(),
+        )
+    }
+
+    pub(crate) fn validate_field(
+        &self,
+        origin: &ReadOrigin,
+        limit: usize,
+    ) -> Result<(), MediaError> {
+        let Some(set) = origin.set else {
+            return self.validate_origin(&origin.local);
         };
-        if origin.contains_encrypted_source() != expected {
+        let index = usize::try_from(set.0.get())
+            .map_err(|_| invalid("field origin use-set reference is not representable"))?;
+        let set = self
+            .sets
+            .get(index)
+            .ok_or_else(|| invalid("field origin use-set reference is missing"))?;
+        let local = origin.local.source_uses_refs();
+        if set.members.len().saturating_add(local.len()) > limit {
+            return Err(invalid("field origin use set exceeds reader policy"));
+        }
+        let mut evidence = set.evidence;
+        for reference in local {
+            if set.contains(reference.as_str()) {
+                return Err(invalid("field-local source use repeats a shared member"));
+            }
+            evidence.include(self.contributor(reference.as_str())?);
+        }
+        evidence.validate(
+            origin.contains_encrypted_source(),
+            origin.source_set_complete(),
+        )
+    }
+
+    fn contributor(&self, reference: &str) -> Result<Evidence, MediaError> {
+        let used = self
+            .uses
+            .get(reference)
+            .ok_or_else(|| invalid("field origin source-use reference is missing"))?;
+        if !used.role.contributes() {
             return Err(invalid(
-                "field marker disagrees with its descriptive source-use evidence",
+                "field origin includes an attempted or untouched reference",
             ));
         }
-        Ok(())
+        Ok(Evidence {
+            encryption: used.effective_encryption,
+            opaque: used.location.kind == LocationKind::Opaque,
+        })
     }
 }
 
