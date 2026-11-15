@@ -23,25 +23,25 @@ read-only and game assets: never copy them or anything extracted from them into 
 never write into the game folders. Development output and scratch files go under
 `D:\Coding\Agents\Temp\<agent>\<task>\`, using `codex` or `claude` for the agent folder.
 
-Never read `loginData.json` or other launcher credential files in the game folders. Tests against a
-real Archive are `#[ignore]`d and need `P4KX_DATA_P4K`; CI uses synthetic
-fixtures. Run them with `TMP` and `TEMP` under that task's scratch folder so the
-extracted subset lands there; the suite also uses the stored key (`P4KX_ARCHIVE_KEY`, else the
-file named by `P4KX_KEY_FILE`, else `p4kx key set`'s file), so none is set by hand:
+Never read `loginData.json` or other launcher credential files in the game folders. CI uses
+synthetic fixtures. Installed-Archive tests are `#[ignore]`d and need `P4KX_DATA_P4K`. Select
+the exact test name and check its output path and data scope first. Tests that publish whole
+Media kinds can write large temporary exports. Prefer an observer that consumes the same
+serialized output and verifies it without publishing files. See
+[installed ATL checks](docs/media-audio-control.md#installed-atl-checks) for that pattern.
+
+Point `TMP` and `TEMP` at the task's scratch folder. Tests use the configured Archive key
+(`P4KX_ARCHIVE_KEY`, then the file named by `P4KX_KEY_FILE`, then the `p4kx key set` file).
 
 ```powershell
 $env:TMP = 'D:\Coding\Agents\Temp\codex\real-archive\tmp'; $env:TEMP = $env:TMP
 New-Item -ItemType Directory -Force -Path $env:TMP | Out-Null
 $env:P4KX_DATA_P4K = 'C:\Program Files\Roberts Space Industries\StarCitizen\LIVE\Data.p4k'
-$env:P4KX_DATA_P4K_B = 'C:\Program Files\Roberts Space Industries\StarCitizen\PTU\Data.p4k'
-cargo test --release --workspace --locked -- --ignored
+cargo test --release --locked -p p4kx-extraction --test real_archive -- verify::a_sample_of_a_real_archive_verifies_without_a_mismatch --ignored --exact
 ```
 
-That runs every real-Archive test in the workspace, whatever test file it lives in. In the crates
-that group their tests (see "Test layout"), the real-Archive tests are the modules of the
-`real_archive` test binary, so one test runs as
-`cargo test --release -p <crate> --test real_archive -- <test_name> --ignored`. The CI suite
-runs faster with cargo-nextest: `cargo nextest run --workspace --locked`, then
+Set `P4KX_DATA_P4K_B` when the selected test compares two Builds. See "Test layout" for test
+targets and name qualifiers. The CI suite runs faster with cargo-nextest: `cargo nextest run --workspace --locked`, then
 `cargo test --workspace --locked --doc` for the doctests nextest skips; `cargo test --workspace
 --locked` stays valid. `rust-toolchain.toml` pins the compiler; `.config/nextest-version`
 pins cargo-nextest. `.github/scripts/check-build-tools.ps1 -Verify -Nextest` checks installed
