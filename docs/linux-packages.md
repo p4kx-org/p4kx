@@ -322,8 +322,8 @@ evidence from the matching build. [AMD64 CI job](https://github.com/p4kx-org/p4k
 
 At integration commit `4d536b4a8`, both native package consumers passed the checks for all
 four package formats, including the Documents-portal sessions and deb and Flatpak lifecycle.
-These job results apply to the packages built in that run. [AMD64 package job](https://github.com/p4kx-org/p4kx/actions/runs/43093045183/job/130918688724) ·
-[ARM64 package job](https://github.com/p4kx-org/p4kx/actions/runs/43093045183/job/130918688710)
+These job results apply to the packages built in that run. [AMD64 package job](https://github.com/p4kx-org/p4kx/actions/runs/43093045183/job/130918688710) ·
+[ARM64 package job](https://github.com/p4kx-org/p4kx/actions/runs/43093045183/job/130918688724)
 
 For a branch-only native Linux validation, dispatch the existing `release.yml` workflow with
 `linux-only=true`. It runs preparation and both Linux producer/consumer rows. Use the branch

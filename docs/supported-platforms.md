@@ -33,8 +33,10 @@ the sidecar and archive hash before extracting or running tests.
 The partitioned synthetic suite retains nextest process isolation. Explicit smoke steps require
 non-empty selections for CLI Archive listing, extraction and conversion; MCP initialization,
 tool listing and a read-only request; and GUI frames followed by exit. Windows and Linux check a
-software adapter. Linux uses native lavapipe under Xvfb. macOS checks native Metal. Actual step outcomes populate the native runtime artifact
-only after successful execution.
+software adapter. Linux uses native lavapipe for both the X11 window under Xvfb and the Wayland
+window under isolated Weston. The Wayland check disables X11 for that process and requires the
+viewport to report native 2× scaling. The packaged Linux smoke uses Xvfb. macOS checks native
+Metal. Actual step outcomes populate the native runtime artifact only after successful execution.
 
 GUI and package smoke processes set an absolute `P4KX_FOLDERS_ROOT` to isolate settings, keys,
 cache and application data through the production folder resolver. Merely replacing `APPDATA`

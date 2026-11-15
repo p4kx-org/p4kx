@@ -72,6 +72,8 @@ impl App {
             return;
         };
         if frames.drawn() {
+            #[cfg(target_os = "linux")]
+            crate::smoke::report_native_scale(ctx);
             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
         } else {
             ctx.request_repaint();
