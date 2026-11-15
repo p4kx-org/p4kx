@@ -11,7 +11,7 @@ use p4kx_media::{ExportOptions, Identity, MediaKind, MediaRecord};
 use p4kx_testkit::{ArchiveBuilder, TestChunkFile, TestEntry, test_key};
 use serde_json::{Value, json};
 
-use super::model_physics_frame_provider::nmc_collision_fixture;
+use super::model_physics_frame_provider::{TWO_ANCESTOR_ENTITY_FRAME, nmc_collision_fixture};
 use super::model_vehicle_grid_provider::{FORGE, MODEL, schema, vehicle};
 use super::support::{self, TestResult};
 
@@ -113,15 +113,7 @@ fn check_references(rows: &[MediaRecord]) -> TestResult {
 
 fn check_original_bytes(rows: &[MediaRecord], base: &Path, model: &[u8]) -> TestResult {
     let frame = find(rows, 1, "model-physics-frame", &[0, 0])?;
-    field(
-        frame,
-        "/payload/entity",
-        &json!([
-            [0.0, -3.0, 0.0, 10.0],
-            [2.0, 0.0, 0.0, 28.0],
-            [0.0, 0.0, 4.0, 30.0]
-        ]),
-    );
+    field(frame, "/payload/entity", &json!(TWO_ANCESTOR_ENTITY_FRAME));
     let whole = find(rows, 1, "model-physics-frame", &[0, 2])?;
     field(whole, "/payload/disposition", &json!("whole-object"));
     field(whole, "/payload/entity", &Value::Null);

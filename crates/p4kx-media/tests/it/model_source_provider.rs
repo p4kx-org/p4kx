@@ -165,7 +165,7 @@ fn assert_chunk_origins(
     Ok(())
 }
 
-fn assert_exact_use(uses: &[Value], field: &str, range: Range<u64>) {
+pub(super) fn assert_exact_use(uses: &[Value], field: &str, range: Range<u64>) {
     let location = json!({
         "type": "subresource",
         "namespace": "model-byte-range",
