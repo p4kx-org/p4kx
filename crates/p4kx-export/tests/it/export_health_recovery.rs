@@ -152,6 +152,32 @@ fn recovered_diagnostic_output_has_one_global_marker_and_only_observed_counts() 
         Some(&serde_json::to_value(health)?),
         "the file-only roundtrip retains the exact uncertainty"
     );
+    assert_incomplete_language_absence(&catalog)
+}
+
+fn assert_incomplete_language_absence(catalog: &Value) -> TestResult {
+    let language = catalog
+        .pointer("/texts/languageSources/fr")
+        .ok_or("observed French availability")?;
+    assert_eq!(
+        language.get("state").and_then(Value::as_str),
+        Some("absent"),
+        "no French Entry was found in the admitted paths"
+    );
+    assert_eq!(
+        language.get("sourceSetComplete").and_then(Value::as_bool),
+        Some(false),
+        "recovery uncertainty leaves the absence proof incomplete"
+    );
+    let sites = crate::health_origin_assertions::uses(catalog, language)?;
+    let [site] = sites.as_slice() else {
+        return Err("one retained survey of the admitted paths".into());
+    };
+    assert_eq!(
+        site.pointer("/location/type").and_then(Value::as_str),
+        Some("archiveDirectoryPaths"),
+        "absence keeps the actually consulted directory evidence"
+    );
     Ok(())
 }
 

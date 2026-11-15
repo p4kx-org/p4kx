@@ -33,6 +33,7 @@ impl TextSources {
 
 /// Resolves localisation keys in every catalog language and counts what resolves.
 pub(crate) struct Texts<'e> {
+    sources: &'e TextSources,
     set: TextSet<'e>,
     notes: Vec<LocalizationNote>,
     languages: [LanguageCount; CATALOG_LANGUAGES.len()],
@@ -70,6 +71,7 @@ impl<'e> Texts<'e> {
         })?;
         let notes = sources.set.notes(&set);
         Ok(Self {
+            sources,
             set,
             notes,
             languages: CATALOG_LANGUAGES.map(LanguageCount::new),
@@ -81,6 +83,16 @@ impl<'e> Texts<'e> {
         self.lookup_forms(language, key)
             .map(|text| text.display)
             .filter(|value| !value.is_empty())
+    }
+
+    pub(crate) fn source_entry(&self, language: Language) -> Option<&'e LocalizationEntry> {
+        self.sources.entry(language)
+    }
+
+    pub(crate) fn skipped_lines(&self, language: Language) -> Option<usize> {
+        self.set
+            .ini(language)
+            .map(p4kx_extraction::GlobalIni::skipped)
     }
 
     /// Returns a note for every `global.ini` that was read lossily or had lines skipped.

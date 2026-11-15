@@ -18,7 +18,10 @@ use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_read::original::{OriginalFlowFields, OriginalValueFact};
-use crate::catalog_text_contract::{CanonicalText, CatalogTexts, GameTextRef, PublicNameRef};
+use crate::catalog_text_contract::{
+    CanonicalText, CatalogLanguagePolicy, CatalogTexts, GameTextRef, PublicNameRef,
+    language_sources,
+};
 use crate::mission_text_inputs::{MissionKey, SelectedKey};
 use crate::texts::{CATALOG_LANGUAGES, TextProjection, Texts};
 
@@ -274,6 +277,8 @@ impl<'context, 'source> CatalogProjection<'context, 'source> {
             }
         }
         Ok(CatalogTexts {
+            language_policy: CatalogLanguagePolicy::AVAILABLE_SUPPORTED,
+            language_sources: language_sources(self.texts, self.origins())?,
             public_names,
             game_texts,
         })

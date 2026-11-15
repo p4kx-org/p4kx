@@ -99,6 +99,14 @@ language entry. No fallback or template evaluation becomes stored data. Names/de
 displayText; UI format consumers use sourceText as inert data. The two values come from one
 original lookup and retain the existing once-per-occurrence display-based summary counts.
 
+`texts.languagePolicy` declares availability-based selection and the absence of fallback.
+`texts.languageSources` carries one state per supported language independently of text row
+selection. Present Entries retain their path, encoding and whole-file decoding and parser
+observations. The directory path and decoded payload have separate source uses and encryption
+markers. A source set for absence is complete only when the root directory survey is
+complete. Incomplete directory evidence retains the observed paths and marks the absence
+proof incomplete.
+
 Both forms carry direct actual origins: sourceText uses its authored key, winning language payload
 and justified original Entry-decoding contributions; displayText also uses the actual display
 Conversion. Whole-Entry decoding facts do not claim a particular winning value was altered.

@@ -5646,6 +5646,46 @@
       "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?([eE][+-]?[0-9]+)?$",
       "type": "string"
     },
+    "CatalogLanguagePolicy": {
+      "description": "The document's language selection and fallback policy.",
+      "properties": {
+        "fallback": {
+          "$ref": "#/$defs/LanguageFallback"
+        },
+        "selection": {
+          "$ref": "#/$defs/LanguageSelection"
+        }
+      },
+      "required": [
+        "fallback",
+        "selection"
+      ],
+      "type": "object"
+    },
+    "CatalogLanguageSource": {
+      "description": "The observed input and diagnostics of one selected language.",
+      "properties": {
+        "encoding": {
+          "$ref": "#/$defs/SourcedValueOfSourceIniEncoding"
+        },
+        "lossyDecoding": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "path": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "skippedMalformedLines": {
+          "$ref": "#/$defs/SourcedValueOfuint"
+        }
+      },
+      "required": [
+        "encoding",
+        "lossyDecoding",
+        "path",
+        "skippedMalformedLines"
+      ],
+      "type": "object"
+    },
     "CatalogPlacements": {
       "description": "Contextual placements and relationships keyed by their physical definitions.",
       "properties": {
@@ -8828,6 +8868,15 @@
           "type": "array",
           "x-gameText": true
         },
+        "languagePolicy": {
+          "$ref": "#/$defs/CatalogLanguagePolicy"
+        },
+        "languageSources": {
+          "additionalProperties": {
+            "$ref": "#/$defs/SourcedValueOfCatalogLanguageSource"
+          },
+          "type": "object"
+        },
         "publicNames": {
           "items": {
             "$ref": "#/$defs/CanonicalTextOfPublicNameRef"
@@ -8837,6 +8886,8 @@
       },
       "required": [
         "gameTexts",
+        "languagePolicy",
+        "languageSources",
         "publicNames"
       ],
       "type": "object"
@@ -25508,6 +25559,20 @@
         "writtenRows"
       ],
       "type": "object"
+    },
+    "LanguageFallback": {
+      "enum": [
+        "none"
+      ],
+      "type": "string",
+      "x-p4kx-vocabularyClass": "control"
+    },
+    "LanguageSelection": {
+      "enum": [
+        "availableSupported"
+      ],
+      "type": "string",
+      "x-p4kx-vocabularyClass": "control"
     },
     "LaserTrigger": {
       "properties": {
@@ -43657,6 +43722,17 @@
         }
       ],
       "required": []
+    },
+    "SourceIniEncoding": {
+      "enum": [
+        "utf8",
+        "utf8Bom",
+        "utf16Le",
+        "utf16Be",
+        "unknown"
+      ],
+      "type": "string",
+      "x-p4kx-vocabularyClass": "control"
     },
     "SourceInventory": {
       "description": "Immutable sorted physical sources and observed use inventory for one prepared result.",
@@ -69860,6 +69936,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/CatalogJsonNumber"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfCatalogLanguageSource": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/CatalogLanguageSource"
               }
             }
           }
@@ -117135,6 +117341,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/SourceEncryptionDeclaration"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfSourceIniEncoding": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/SourceIniEncoding"
               }
             }
           }

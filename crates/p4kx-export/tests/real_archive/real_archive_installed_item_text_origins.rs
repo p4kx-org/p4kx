@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{EntryOrigin, Language, SourceEncryption};
+use p4kx_extraction::{EntryOrigin, InputScope, Language, SourceEncryption};
 use serde_json::{Value, json};
 
 use super::TestResult;
@@ -84,7 +84,7 @@ impl<'catalog> TextOrigins<'catalog> {
         if used.pointer("/location/language").and_then(Value::as_str) != Some(language.code()) {
             return Err("a lookup cites a different language".into());
         }
-        self.physical_source(used, locale)?;
+        self.physical_source(used, locale, InputScope::Payload)?;
         let key = used
             .pointer("/location/selector")
             .ok_or("the original lookup key selector")?;
@@ -102,16 +102,29 @@ impl<'catalog> TextOrigins<'catalog> {
                 "the text's key must come from a physical DataForge Record selector".into(),
             );
         }
-        self.physical_source(used, self.dataforge)
+        self.physical_source(used, self.dataforge, InputScope::Payload)
     }
 
-    fn physical_source(&self, used: &Value, original: &EntryOrigin) -> TestResult<()> {
-        let source = referenced(
+    pub(super) fn use_site(&self, reference: &Value) -> TestResult<&'catalog Value> {
+        referenced(self.uses, reference)
+    }
+
+    pub(super) fn source(&self, used: &Value) -> TestResult<&'catalog Value> {
+        referenced(
             self.sources,
             used.get("source").ok_or("physical source reference")?,
-        )?;
+        )
+    }
+
+    pub(super) fn physical_source(
+        &self,
+        used: &Value,
+        original: &EntryOrigin,
+        scope: InputScope,
+    ) -> TestResult<()> {
+        let source = self.source(used)?;
         let entry = original.entry();
-        if used.get("scope").and_then(Value::as_str) != Some("payload")
+        if used.get("scope") != Some(&json!(scope))
             || source.get("kind").and_then(Value::as_str) != Some("archiveEntry")
             || source.get("entryIndex").and_then(Value::as_u64) != Some(u64::from(entry.ordinal()))
             || source.pointer("/path/value").and_then(Value::as_str) != Some(entry.path())
@@ -169,7 +182,7 @@ fn referenced<'a>(rows: &'a [Value], wanted: &Value) -> TestResult<&'a Value> {
         .ok_or_else(|| "unresolved text origin reference".into())
 }
 
-fn rows<'a>(value: &'a Value, path: &str) -> TestResult<&'a [Value]> {
+pub(super) fn rows<'a>(value: &'a Value, path: &str) -> TestResult<&'a [Value]> {
     value
         .pointer(path)
         .and_then(Value::as_array)
@@ -177,7 +190,7 @@ fn rows<'a>(value: &'a Value, path: &str) -> TestResult<&'a [Value]> {
         .ok_or_else(|| "missing text provenance row array".into())
 }
 
-const fn encryption_marker(state: SourceEncryption) -> Option<bool> {
+pub(super) const fn encryption_marker(state: SourceEncryption) -> Option<bool> {
     match state {
         SourceEncryption::Encrypted => Some(true),
         SourceEncryption::Unencrypted => Some(false),

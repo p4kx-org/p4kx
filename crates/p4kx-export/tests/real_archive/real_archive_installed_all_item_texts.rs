@@ -13,6 +13,8 @@ use crate::real_archive_shop_inventory_v3::verify_build;
 use crate::real_archive_text_oracle::Oracle;
 use crate::real_archive_verification::print_line;
 
+#[path = "real_archive_installed_language_sources.rs"]
+mod language_sources;
 #[path = "real_archive_installed_item_text_origins.rs"]
 mod origins;
 
@@ -45,6 +47,7 @@ fn installed_item_texts_match_every_available_archive_language() -> TestResult<(
     let evidence = TextOrigins::new(&catalog, dataforge, original.record_index())?;
     let locales = LocalizationSet::read_all(&archive)?;
     let languages = original_languages(&archive, &locales, &summary)?;
+    language_sources::verify(&catalog, &locales, &evidence, archive.entries().len())?;
     compare_item(
         &original, &catalog, &locales, &languages, &evidence, channel,
     )?;

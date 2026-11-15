@@ -10,6 +10,13 @@ use serde::Serialize;
 
 use crate::schema_fields::every_field_required;
 
+#[path = "catalog_language_sources.rs"]
+mod language_sources;
+
+pub(crate) use language_sources::{
+    CatalogLanguagePolicy, CatalogLanguageSources, language_sources,
+};
+
 /// A reference into the public short-name domain.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(transparent)]
@@ -45,6 +52,8 @@ pub(crate) struct TextForms<'source> {
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct CatalogTexts<'source> {
+    pub(crate) language_policy: CatalogLanguagePolicy,
+    pub(crate) language_sources: CatalogLanguageSources<'source>,
     pub(crate) public_names: Vec<CanonicalText<'source, PublicNameRef>>,
     #[schemars(extend("x-gameText" = true))]
     pub(crate) game_texts: Vec<CanonicalText<'source, GameTextRef>>,

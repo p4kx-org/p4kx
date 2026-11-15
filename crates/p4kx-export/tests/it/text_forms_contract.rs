@@ -8,6 +8,9 @@ use crate::text_forms_assertions as check;
 use crate::text_forms_fixture::{self as fixture, Origin, TestResult};
 use crate::text_forms_origin_assertions::{self as origins, Lookup};
 
+#[path = "catalog_language_sources.rs"]
+mod language_sources;
+
 #[test]
 fn text_forms_keep_raw_template_bytes_and_the_original_display_value() -> TestResult {
     let raw = " \t%.3f widgets\\n%+.1f %% \u{2003}";

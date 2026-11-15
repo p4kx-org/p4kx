@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use p4kx_extraction::{
     Archive, DataForgeEntry, DataForgeOrigin, IniEncoding, InputScope, Language, SourceInput,
-    SourceScope, SourceUses,
+    SourceScope, SourceUse, SourceUses,
 };
 
 use crate::CatalogError;
@@ -21,6 +21,8 @@ pub(crate) struct CatalogOrigins {
     health_texts: HealthTextCapture,
     entry_frame: Arc<EntryFrame>,
     locales: BTreeMap<Language, CatalogLocaleInput>,
+    locale_directory: Option<SourceUse>,
+    locale_directory_complete: bool,
 }
 
 /// One original locale input and its recorded Entry-decoding contribution.
@@ -78,12 +80,21 @@ impl CatalogOrigins {
                 );
             }
         }
+        let locale_directory = if locales.len() < Language::ALL.len() {
+            uses.observe_root_directory_paths(archive)?
+        } else {
+            None
+        };
+        let locale_directory_complete = locale_directory.is_some()
+            && crate::export_archive_health::inventory(archive).is_none();
         let entry_frame = Arc::new(EntryFrame::new(archive, &uses));
         Ok(Self {
             uses,
             entry_frame,
             dataforge,
             locales,
+            locale_directory,
+            locale_directory_complete,
             health_texts: HealthTextCapture::new(),
         })
     }
@@ -102,5 +113,13 @@ impl CatalogOrigins {
 
     pub(crate) fn locale(&self, language: Language) -> Option<&CatalogLocaleInput> {
         self.locales.get(&language)
+    }
+
+    pub(crate) const fn locale_directory(&self) -> Option<&SourceUse> {
+        self.locale_directory.as_ref()
+    }
+
+    pub(crate) const fn locale_directory_complete(&self) -> bool {
+        self.locale_directory_complete
     }
 }

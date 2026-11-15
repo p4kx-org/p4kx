@@ -6,6 +6,26 @@ authored key and existing IDs. Public names and public short UI format templates
 owner/reference/table context protects both forms. The shared TextForms type has no global
 `x-gameText` annotation. Encryption origin is an independent axis.
 
+## Language policy and source diagnostics
+
+`texts.languagePolicy` records `selection: "availableSupported"` and `fallback: "none"`.
+The CLI and GUI Catalog writers use this shared policy. Each actual supported language appears
+in the canonical text rows when the Archive contains its selected `global.ini`.
+
+`texts.languageSources` contains one sourced cell for each supported language code, including
+when the catalog has no canonical text rows. A present cell includes the exact Entry `path`,
+the decoder-selected `encoding`, the `lossyDecoding` indicator and the `skippedMalformedLines` count.
+The index counts nonblank lines without `=` or with an empty key as malformed. The count
+describes the whole Entry. Individual text forms retain their own winning value or absence.
+
+The path cites directory metadata. The other three fields cite the corresponding decoding or
+indexing operation on the actual Entry in the `globalIni` source namespace. A language with no
+matching Entry has state `absent`; the source set is complete if the root directory survey
+established the absence. Archive reads and index failures use the existing error path.
+[Catalog design](adr/0356-catalog-v3-uses-canonical-source-typed-tables.md),
+[per-value provenance](adr/0357-source-encryption-provenance-is-explicit-per-data-value.md),
+[localization limits](adr/0394-localization-is-complete-by-default.md).
+
 ## One lookup, two values
 
 The existing sourced `translations` map contains only actually available supported languages.

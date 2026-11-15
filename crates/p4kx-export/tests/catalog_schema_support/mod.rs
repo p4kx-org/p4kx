@@ -3,6 +3,7 @@
 
 //! A synthetic catalog for structural schema checks.
 
+use p4kx_extraction::SourceValue;
 use serde_json::{Value, json};
 
 mod blueprint_categories;
@@ -147,10 +148,10 @@ pub(crate) fn minimal_catalog() -> Value {
             "guid": "90000000-0000-4000-8000-000000000001",
             "className": "ACAS_Ship",
             "recordPath": "libs/foundry/records/entities/spaceships/acas_ship",
-            "name": source_values::source(p4kx_extraction::SourceValue::Absent),
-            "description": source_values::source(p4kx_extraction::SourceValue::Absent),
+            "name": source_values::source(SourceValue::Absent),
+            "description": source_values::source(SourceValue::Absent),
             "role": source_values::present(json!("name:27:@vehicle_class_lightfreight")),
-            "career": source_values::source(p4kx_extraction::SourceValue::Absent),
+            "career": source_values::source(SourceValue::Absent),
             "crewSize": 2,
             "manufacturerGuid": null,
             "vehicleDefinition": null,
@@ -290,6 +291,8 @@ pub(crate) fn minimal_catalog() -> Value {
             "containerInstances": absent_table()
         },
         "texts": {
+            "languagePolicy": {"selection": "availableSupported", "fallback": "none"},
+            "languageSources": source_values::language_sources(),
             "publicNames": public_names(),
             "gameTexts": [reputation::mission_type_text(), spawns::location_name_text()]
         },
