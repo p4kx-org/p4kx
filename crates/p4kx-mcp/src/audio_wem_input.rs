@@ -120,6 +120,7 @@ pub(crate) enum Source {
     Embedded {
         position: usize,
         media: EmbeddedSite,
+        triplet_offset: u64,
     },
 }
 
@@ -132,6 +133,14 @@ pub(crate) struct EmbeddedSite {
 }
 
 impl EmbeddedSite {
+    pub(crate) const fn of(wem: &EmbeddedWem<'_>) -> Self {
+        Self {
+            id: wem.id(),
+            offset: wem.offset(),
+            len: wem.bytes().len() as u64,
+        }
+    }
+
     const fn matches(self, wem: &EmbeddedWem<'_>) -> bool {
         wem.id() == self.id && wem.offset() == self.offset && wem.bytes().len() as u64 == self.len
     }
@@ -143,6 +152,12 @@ pub(crate) struct Candidate {
     pub(crate) source: Source,
     pub(crate) location: LocationShape,
     language: LanguageSource,
+}
+
+impl Candidate {
+    pub(crate) fn observed_language<'a>(&self, archive: &'a Archive) -> LanguageInput<'a> {
+        self.language.observed(archive)
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -186,8 +201,13 @@ pub(crate) fn candidates(
             let index = opened.audio_index();
             let places: Vec<Candidate> = index
                 .loose_wem(id)
-                .chain(index.embedded_wem(id))
-                .filter_map(|place| indexed_candidate(&index, place, id))
+                .map(|place| (place, None))
+                .chain(
+                    index
+                        .embedded_wem_with_triplet_offsets(id)
+                        .map(|(place, offset)| (place, Some(offset))),
+                )
+                .filter_map(|(place, offset)| indexed_candidate(&index, place, id, offset))
                 .collect();
             if places.is_empty() {
                 return Err(ToolError::UnknownWem(id));
@@ -228,7 +248,12 @@ pub(crate) fn candidates(
     }
 }
 
-fn indexed_candidate(index: &AudioIndex, place: WemLocation<'_>, id: u32) -> Option<Candidate> {
+fn indexed_candidate(
+    index: &AudioIndex,
+    place: WemLocation<'_>,
+    id: u32,
+    triplet_offset: Option<u64>,
+) -> Option<Candidate> {
     let source = match place {
         WemLocation::Entry { entry, .. } => Source::Entry(usize::try_from(entry).ok()?),
         WemLocation::Soundbank {
@@ -238,6 +263,7 @@ fn indexed_candidate(index: &AudioIndex, place: WemLocation<'_>, id: u32) -> Opt
         } => Source::Embedded {
             position: soundbank.entry_position(),
             media: EmbeddedSite { id, offset, len },
+            triplet_offset: triplet_offset?,
         },
         _ => return None,
     };
@@ -282,15 +308,20 @@ pub(crate) enum Held<'a> {
     /// A WEM that parsed.
     Parsed(ParsedWem<'a>),
     /// The prefetched start of a streamed WEM.
-    Prefetch,
+    Prefetch(EmbeddedRead<'a>),
     /// Bytes that are no sound.
-    Unreadable(AudioError),
+    Unreadable(EmbeddedRead<'a>, AudioError),
+}
+
+pub(crate) struct EmbeddedRead<'a> {
+    pub(crate) wem: EmbeddedWem<'a>,
+    pub(crate) source: SourceInput<'a>,
 }
 
 pub(crate) struct ParsedWem<'a> {
     pub(crate) wem: &'a dyn WemOps,
     pub(crate) source: SourceInput<'a>,
-    pub(crate) embedded: Option<EmbeddedSite>,
+    pub(crate) embedded: Option<EmbeddedWem<'a>>,
     pub(crate) language: LanguageInput<'a>,
 }
 
@@ -302,7 +333,7 @@ pub(crate) fn read<R>(
 ) -> Result<R, ToolError> {
     let archive = opened.archive();
     let path = &candidate.location.path;
-    let language = candidate.language.observed(archive);
+    let language = candidate.observed_language(archive);
     match candidate.source {
         Source::Entry(position) => {
             let sound = Sound::from_archive_position_observed(archive, position)
@@ -314,7 +345,9 @@ pub(crate) fn read<R>(
                 language,
             }))
         }
-        Source::Embedded { position, media } => {
+        Source::Embedded {
+            position, media, ..
+        } => {
             if let Some(entry) = archive.entries().get(position)
                 && entry.uncompressed_size() > MAX_SOUNDBANK_LEN
             {
@@ -331,19 +364,21 @@ pub(crate) fn read<R>(
                 .filter(|wem| media.matches(wem))
                 .or_else(|| soundbank.wems().find(|wem| media.matches(wem)))
                 .ok_or(ToolError::UnknownWem(media.id))?;
+            let source = bank
+                .archive_origin()
+                .map_or(SourceInput::Unknown, SourceInput::Archive);
+            let observed = EmbeddedRead { wem, source };
             if wem.is_prefetch() {
-                return visit(Held::Prefetch);
+                return visit(Held::Prefetch(observed));
             }
             match wem.parse() {
                 Ok(parsed) => visit(Held::Parsed(ParsedWem {
                     wem: &parsed,
-                    source: bank
-                        .archive_origin()
-                        .map_or(SourceInput::Unknown, SourceInput::Archive),
-                    embedded: Some(media),
+                    source,
+                    embedded: Some(wem),
                     language,
                 })),
-                Err(error) => visit(Held::Unreadable(error)),
+                Err(error) => visit(Held::Unreadable(observed, error)),
             }
         }
     }

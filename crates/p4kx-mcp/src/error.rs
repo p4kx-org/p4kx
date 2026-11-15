@@ -120,9 +120,9 @@ pub(crate) enum ToolError {
     /// A model field's source evidence could not be represented.
     #[error("cannot retain the model field source evidence")]
     ModelEvidence(#[from] ModelEvidenceError),
-    /// An embedded WEM list's original input or field addresses could not be retained.
-    #[error("cannot retain the soundbank WEM list source evidence")]
-    WemListEvidence(#[from] crate::audio_wem::ListEvidenceError),
+    /// A WEM result's original input or field addresses could not be retained.
+    #[error("cannot retain WEM source evidence")]
+    WemEvidence(#[from] crate::audio_wem::EvidenceError),
     /// A DataForge field's original input or address could not be retained.
     #[error("cannot retain the DataForge field evidence")]
     ForgeEvidence(#[from] crate::forge_origins::EvidenceError),

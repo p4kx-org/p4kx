@@ -223,8 +223,9 @@ impl Server {
     #[tool(
         description = "Describe one WEM, named by wem_id or by the Entry path of a loose WEM: every place that holds it \
         (embedded in a soundbank, or a loose Entry per language; paged with a cursor) and, read from the first place that holds the whole \
-        sound, its codec, channels, sample rate, frame count, duration and whether it loops. Only metadata is returned, \
-        no audio. The content may be forwarded by the client to third parties; game texts and media must not be \
+        sound, its codec, channels, sample rate, frame count, duration and whether it loops. Metadata includes per-field \
+        source evidence and encryption markers. Only metadata is returned. The content may be forwarded by the client \
+        to third parties. Game texts and media must not be \
         redistributed.",
         output_schema = rmcp::handler::server::tool::schema_for_output::<WemInfoResult>(),
         annotations(

@@ -8,7 +8,7 @@ use serde::Serialize;
 use crate::audio_shapes::LocationShape;
 
 /// What the header of a WEM says.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub(crate) struct WemShape {
     /// The WEM ID; absent for a loose WEM Entry whose file name is no ID.
     pub(crate) id: Option<u32>,
@@ -79,6 +79,11 @@ pub(crate) struct WemInfoResult {
     pub(crate) described: LocationShape,
     /// The WEM as read from `described`.
     pub(crate) wem: WemShape,
+    /// Immediate per-field origins at pointers into this result.
+    #[serde(rename = "fieldOrigins")]
+    pub(crate) field_origins: FieldOrigins,
+    /// Physical sources and uses referenced by this result.
+    pub(crate) provenance: SourceInventory,
 }
 
 /// An audio excerpt; the WAV itself is the audio content block of the result.

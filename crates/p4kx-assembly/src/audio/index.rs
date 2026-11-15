@@ -119,6 +119,7 @@ impl AudioIndex {
                             soundbank: position,
                             offset: wem.offset,
                             len: wem.len,
+                            triplet_offset: wem.triplet_offset,
                         });
                     }
                 }
@@ -192,16 +193,28 @@ impl AudioIndex {
 
     /// Returns where the soundbanks embed the WEM `id` in their `DATA` sections, in path order.
     pub fn embedded_wem(&self, id: u32) -> impl Iterator<Item = WemLocation<'_>> {
+        self.embedded_wem_with_triplet_offsets(id)
+            .map(|(location, _)| location)
+    }
+
+    /// Returns embedded WEM locations with their physical bank-relative DIDX triplet offsets.
+    pub fn embedded_wem_with_triplet_offsets(
+        &self,
+        id: u32,
+    ) -> impl Iterator<Item = (WemLocation<'_>, u64)> {
         self.media
             .get(&id)
             .map_or(&[][..], |spots| spots)
             .iter()
             .filter_map(|spot| {
-                Some(WemLocation::Soundbank {
-                    soundbank: self.soundbanks.get(usize::try_from(spot.soundbank).ok()?)?,
-                    offset: spot.offset,
-                    len: spot.len,
-                })
+                Some((
+                    WemLocation::Soundbank {
+                        soundbank: self.soundbanks.get(usize::try_from(spot.soundbank).ok()?)?,
+                        offset: spot.offset,
+                        len: spot.len,
+                    },
+                    spot.triplet_offset,
+                ))
             })
     }
 
@@ -298,6 +311,7 @@ struct MediaSpot {
     soundbank: u32,
     offset: u64,
     len: u64,
+    triplet_offset: u64,
 }
 
 #[cfg(test)]

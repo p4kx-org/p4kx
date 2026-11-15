@@ -5,6 +5,7 @@ use p4kx_testkit::{TestBank, TestEntry};
 use serde_json::{Value, json};
 
 use crate::audio::{serve, stereo};
+use crate::audio_origin_assertions::{assert_marker, source_path, uses};
 use crate::support::{Install, TestResult};
 
 const WAV: &str = "/content/1/data";
@@ -151,56 +152,4 @@ fn the_excerpt_schema_declares_the_binary_origin_and_all_pointers_resolve() -> T
         assert!(reply.pointer(pointer).is_some(), "{pointer}");
     }
     Ok(())
-}
-
-fn origin<'a>(meta: &'a Value, field: &str) -> TestResult<&'a Value> {
-    meta.get("fieldOrigins")
-        .and_then(|fields| fields.get(field))
-        .ok_or_else(|| format!("missing origin: {field}").into())
-}
-
-fn assert_marker(meta: &Value, field: &str, encrypted: bool) -> TestResult {
-    let origin = origin(meta, field)?;
-    assert_eq!(
-        origin.get("containsEncryptedSource"),
-        Some(&json!(encrypted)),
-        "{field}"
-    );
-    assert_eq!(
-        origin.get("sourceSetComplete"),
-        Some(&json!(true)),
-        "{field}"
-    );
-    Ok(())
-}
-
-fn uses<'a>(meta: &'a Value, field: &str) -> TestResult<Vec<&'a Value>> {
-    let refs = origin(meta, field)?
-        .get("sourceUsesRefs")
-        .and_then(Value::as_array)
-        .ok_or("source references")?;
-    let uses = meta
-        .pointer("/provenance/uses")
-        .and_then(Value::as_array)
-        .ok_or("source uses")?;
-    refs.iter()
-        .map(|id| {
-            uses.iter()
-                .find(|site| site.get("id") == Some(id))
-                .ok_or_else(|| "unresolved use".into())
-        })
-        .collect()
-}
-
-fn source_path<'a>(meta: &'a Value, site: &Value) -> TestResult<&'a str> {
-    meta.pointer("/provenance/sources")
-        .and_then(Value::as_array)
-        .and_then(|sources| {
-            sources
-                .iter()
-                .find(|source| source.get("id") == site.get("source"))
-        })
-        .and_then(|source| source.pointer("/path/value"))
-        .and_then(Value::as_str)
-        .ok_or_else(|| "source path".into())
 }

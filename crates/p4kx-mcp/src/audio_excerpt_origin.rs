@@ -192,7 +192,7 @@ impl AudioEvidence {
         Ok(Self {
             uses,
             scope,
-            embedded: parsed.embedded,
+            embedded: parsed.embedded.as_ref().map(EmbeddedSite::of),
             complete,
         })
     }

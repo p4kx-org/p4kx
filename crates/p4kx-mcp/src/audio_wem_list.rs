@@ -5,6 +5,7 @@ use p4kx_extraction::{AudioError, EmbeddedWem, Wem};
 
 use crate::archives::Opened;
 use crate::audio_params::{MAX_NAME_LEN, SoundbankParams};
+use crate::audio_wem::EvidenceError;
 use crate::audio_wem_input::WemOps as _;
 use crate::audio_wem_shapes::{SoundbankWemsResult, WemShape};
 use crate::budget::fit_prefix;
@@ -13,8 +14,6 @@ use crate::page::Page;
 
 #[path = "audio_wem_list_origins.rs"]
 mod origins;
-
-pub(crate) use origins::EvidenceError;
 
 /// Returns one page of embedded WEM headers and their original source fields.
 pub(crate) fn soundbank_wems(

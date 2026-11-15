@@ -151,8 +151,8 @@ fn decode(
 ) -> Result<Option<(ExcerptResult, Vec<u8>)>, ToolError> {
     read(opened, place, |held| match held {
         Held::Parsed(wem) => decode_wem(opened, place, id, ask, &wem).map(Some),
-        Held::Prefetch => Ok(None),
-        Held::Unreadable(error) => Err(audio_error(&place.location.path, error)),
+        Held::Prefetch(_) => Ok(None),
+        Held::Unreadable(_, error) => Err(audio_error(&place.location.path, error)),
     })
 }
 

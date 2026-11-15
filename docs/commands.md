@@ -1002,6 +1002,14 @@ results retain the original controls for their disposition. When a malformed WEM
 field coordinates, its source and the missing coordinates are reported. Origin records count toward
 the response budget. The cursor continues at the first unreturned WEM.
 
+For `get_wem_info`, the origins of `locations` describe the individual indexed locations. The
+codec, channel count and other decoded fields identify the WEM that supplied their values. The
+tool keeps the same preferred description across location pages, and the page budget includes
+the origin records. A listed location outside that source does not contribute to a decoded field.
+For a WEM ID lookup, the location count and page navigation carry unknown aggregate origin when
+the audio index has no complete membership receipt. Individual location fields can still cite
+their directory metadata or the indexed DIDX words.
+
 For `read_entry_text`, `fieldOrigins` identifies the inputs of each result field. UTF-8 pages keep
 their original decoded Entry byte range after the byte order mark and character alignment.
 UTF-16 and CryXml use the original converter input, while result offsets count UTF-8 bytes.

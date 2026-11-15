@@ -6,18 +6,20 @@ use p4kx_extraction::{AudioError, Bank};
 
 use crate::archives::Opened;
 
-use crate::audio_params::WemParams;
-use crate::audio_shapes::LocationShape;
-use crate::audio_wem_input::{Held, candidates, read};
-use crate::audio_wem_shapes::{WemInfoResult, WemShape};
-
-use crate::budget::{fill_within, json_len};
+use crate::audio_wem_shapes::WemShape;
 use crate::error::ToolError;
-use crate::page::Page;
+
+#[path = "audio_wem_info.rs"]
+mod info;
+pub(crate) use info::info;
 
 #[path = "audio_wem_list.rs"]
 mod list;
-pub(crate) use list::{EvidenceError as ListEvidenceError, soundbank_wems};
+pub(crate) use list::soundbank_wems;
+
+#[path = "audio_wem_payload_origins.rs"]
+mod payload_origins;
+pub(crate) use payload_origins::EvidenceError;
 
 /// A WEM that cannot be parsed as a sound.
 fn unreadable(id: Option<u32>, size: u64, error: Option<&AudioError>) -> WemShape {
@@ -50,64 +52,4 @@ pub(crate) fn open_bank(opened: &Opened, path: &str) -> Result<Bank, ToolError> 
     }
     Bank::from_archive_observed(opened.archive(), path)
         .map_err(|error| ToolError::converted(path, "a soundbank", error))
-}
-
-/// Describes the WEM `params` names from the first place that holds all of it.
-pub(crate) fn info(
-    opened: &Opened,
-    params: &WemParams,
-    page: Page,
-) -> Result<WemInfoResult, ToolError> {
-    let (id, places) = candidates(opened, params.wem_id, params.path.as_deref())?;
-    page.check(places.len())?;
-    let mut first: Option<(LocationShape, WemShape)> = None;
-    let mut failure: Option<ToolError> = None;
-    for place in &places {
-        let size = place.location.len;
-        let outcome = read(opened, place, |held| {
-            Ok(match held {
-                Held::Parsed(parsed) => (parsed.wem.shape(id, size), true),
-                Held::Prefetch => (unreadable(id, size, None), false),
-                Held::Unreadable(error) => (unreadable(id, size, Some(&error)), false),
-            })
-        });
-        match outcome {
-            Ok((shape, true)) => {
-                first = Some((place.location.clone(), shape));
-                break;
-            }
-            Ok((shape, false)) => {
-                first.get_or_insert_with(|| (place.location.clone(), shape));
-            }
-            Err(error) => {
-                failure.get_or_insert(error);
-            }
-        }
-    }
-    let Some((described, wem)) = first else {
-        return Err(failure.unwrap_or(ToolError::WemSelector));
-    };
-    let total = places.len();
-    let mut result = WemInfoResult {
-        archive: opened.archive().path().display().to_string(),
-        wem_id: id,
-        locations_total: total,
-        locations: Vec::new(),
-        next_cursor: None,
-        described,
-        wem,
-    };
-    let (listed, next_cursor) = fill_within(
-        page,
-        total,
-        json_len(&result),
-        places
-            .into_iter()
-            .skip(page.offset())
-            .map(|place| Ok(place.location)),
-        |location: &LocationShape| format!("location {}", location.path),
-    )?;
-    result.locations = listed;
-    result.next_cursor = next_cursor;
-    Ok(result)
 }

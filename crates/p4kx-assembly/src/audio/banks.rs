@@ -67,6 +67,7 @@ pub(crate) struct EmbeddedMedia {
     pub(crate) id: u32,
     pub(crate) offset: u64,
     pub(crate) len: u64,
+    pub(crate) triplet_offset: u64,
 }
 
 /// What the audio index keeps of one soundbank.
@@ -94,6 +95,7 @@ pub(crate) fn read(path: &str, entry: usize, bytes: &[u8]) -> Result<BankContent
             id: wem.id(),
             offset: wem.offset(),
             len: u64::try_from(wem.bytes().len()).unwrap_or(u64::MAX),
+            triplet_offset: wem.source().triplet_offset(),
         })
         .collect();
     let stingers = bank
