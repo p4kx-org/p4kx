@@ -9,7 +9,7 @@ use serde::{Serialize, Serializer};
 
 use crate::projection_schema;
 use crate::source_inventory::SourceEncryptionState;
-use crate::source_use::{SourceLocation, SourceUse, SourceUseRef};
+use crate::source_use::{SourceLocation, SourceUse, SourceUseDescription, SourceUseRef};
 
 #[path = "field_origin_refs.rs"]
 mod refs;
@@ -53,7 +53,7 @@ impl SharedFieldOrigin {
         uses: impl IntoIterator<Item = &'a SourceUse>,
         complete: bool,
     ) -> Self {
-        let facts = OriginFacts::measure(uses, complete);
+        let facts = OriginFacts::measure(uses.into_iter().map(SourceUse::description), complete);
         Self {
             identity,
             contains_encrypted_source: facts.contains_encrypted_source,
@@ -154,7 +154,10 @@ struct OriginFacts {
 }
 
 impl OriginFacts {
-    fn measure<'a>(uses: impl IntoIterator<Item = &'a SourceUse>, mut complete: bool) -> Self {
+    fn measure<'a>(
+        uses: impl IntoIterator<Item = &'a SourceUseDescription>,
+        mut complete: bool,
+    ) -> Self {
         let mut refs = Vec::new();
         let mut encrypted = false;
         let mut unknown = !complete;
@@ -162,15 +165,12 @@ impl OriginFacts {
             .into_iter()
             .filter(|source| source.role().contributes());
         for source in contributing {
-            if matches!(
-                source.description().location(),
-                SourceLocation::Opaque { .. }
-            ) {
+            if matches!(source.location(), SourceLocation::Opaque { .. }) {
                 complete = false;
                 unknown = true;
             }
-            refs.push(source.reference().clone());
-            match source.encryption() {
+            refs.push(source.id().clone());
+            match source.effective_encryption() {
                 SourceEncryptionState::Encrypted => encrypted = true,
                 SourceEncryptionState::Unknown => unknown = true,
                 SourceEncryptionState::Unencrypted => {}
@@ -199,6 +199,18 @@ impl FieldOrigin {
         uses: impl IntoIterator<Item = &'a SourceUse>,
         complete: bool,
     ) -> Self {
+        Self::from_descriptions(
+            identity,
+            uses.into_iter().map(SourceUse::description),
+            complete,
+        )
+    }
+
+    pub(crate) fn from_descriptions<'a>(
+        identity: Arc<()>,
+        uses: impl IntoIterator<Item = &'a SourceUseDescription>,
+        complete: bool,
+    ) -> Self {
         let facts = OriginFacts::measure(uses, complete);
         Self {
             identity: Some(identity),
@@ -217,7 +229,10 @@ impl FieldOrigin {
     ) -> Self {
         Self {
             identity: Some(Arc::clone(&shared.identity)),
-            fields: shared.fields_with(OriginFacts::measure(uses, complete)),
+            fields: shared.fields_with(OriginFacts::measure(
+                uses.into_iter().map(SourceUse::description),
+                complete,
+            )),
         }
     }
 

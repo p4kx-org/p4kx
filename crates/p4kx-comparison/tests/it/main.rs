@@ -7,6 +7,7 @@ mod common;
 mod container_entries;
 mod duplicate_guids;
 mod entries;
+mod entry_aggregate_origins;
 mod entry_decision_origins;
 mod forge_pair;
 mod line_diff;

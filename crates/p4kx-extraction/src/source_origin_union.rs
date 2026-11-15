@@ -4,7 +4,7 @@
 use std::sync::Arc;
 
 use crate::source_evidence_error::{self, SourceEvidenceError};
-use crate::{FieldOrigin, SourceUse, SourceValue, SourcedValue};
+use crate::{FieldOrigin, SourceValue, SourcedValue};
 
 use super::SourceUses;
 
@@ -18,29 +18,37 @@ impl SourceUses {
         value: SourceValue<T>,
         origins: &[&FieldOrigin],
     ) -> Result<SourcedValue<T>, SourceEvidenceError> {
-        if origins
-            .iter()
-            .any(|origin| !origin.belongs_to(&self.identity))
-        {
-            return Err(SourceEvidenceError::ForeignEvidence);
-        }
+        let origin = self.origin_with_origins(origins.iter().copied(), true)?;
+        Ok(SourcedValue::new(value, origin))
+    }
+
+    /// Binds an aggregate to its already registered contributors and local completeness.
+    ///
+    /// # Errors
+    /// Returns an error when a contributor is foreign or cannot be resolved.
+    pub fn origin_with_origins<'a>(
+        &self,
+        origins: impl IntoIterator<Item = &'a FieldOrigin>,
+        mut complete: bool,
+    ) -> Result<FieldOrigin, SourceEvidenceError> {
         let registry = source_evidence_error::lock(&self.registry)?;
-        let complete = origins.iter().all(|origin| origin.source_set_complete());
-        let uses = origins
-            .iter()
-            .flat_map(|origin| origin.source_uses_refs())
-            .map(|reference| {
-                registry
+        let mut uses = Vec::new();
+        for origin in origins {
+            if !origin.belongs_to(&self.identity) {
+                return Err(SourceEvidenceError::ForeignEvidence);
+            }
+            complete &= origin.source_set_complete();
+            for reference in origin.source_uses_refs() {
+                let description = registry
                     .uses
                     .get(reference)
-                    .map(|description| SourceUse {
-                        description: Arc::clone(description),
-                        identity: Arc::clone(&self.identity),
-                    })
-                    .ok_or(SourceEvidenceError::ForeignEvidence)
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(self.value(value, &uses, complete))
+                    .ok_or(SourceEvidenceError::ForeignEvidence)?;
+                uses.push(description.as_ref());
+            }
+        }
+        let result = FieldOrigin::from_descriptions(Arc::clone(&self.identity), uses, complete);
+        drop(registry);
+        Ok(result)
     }
 }
 

@@ -220,10 +220,11 @@ fn entry_level<'a>(comparison: &'a Comparison<'_>) -> EntryLevel<'a> {
         .iter()
         .map(EntryChangeReport::from)
         .collect();
-    let origins = ReportOrigins(entry_origins::capture(comparison, &changes));
+    let directories = comparison.directory_counts();
+    let origins = ReportOrigins(entry_origins::capture(comparison, &changes, &directories));
     EntryLevel {
         counts: comparison.entry_counts(),
-        directories: comparison.directory_counts(),
+        directories,
         changes,
         origins,
     }

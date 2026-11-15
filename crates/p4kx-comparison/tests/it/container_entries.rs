@@ -97,7 +97,40 @@ fn two_containers_compare_by_plain_crc32_and_the_report_matches_the_schema() -> 
         "and no CRC-32C: {change}"
     );
     check_origins(&report)?;
+    check_aggregates(&report)?;
     check_historical_schema(report)
+}
+
+fn check_aggregates(report: &Value) -> TestResult {
+    let origins = report
+        .pointer("/entries/fieldOrigins")
+        .ok_or("Entry report field origins")?;
+    for path in ["/entries/counts/changed", "/entries/directories/0/changed"] {
+        let origin = origins.get(path).ok_or("aggregate field origin")?;
+        assert_eq!(
+            origin
+                .get("containsEncryptedSource")
+                .and_then(Value::as_bool),
+            Some(true),
+            "the aggregate uses a child comparison inside an encrypted container",
+        );
+        assert_eq!(
+            origin.get("sourceSetComplete").and_then(Value::as_bool),
+            Some(true),
+            "the matched decision and group assignments are complete",
+        );
+    }
+    let label = origins
+        .get("/entries/directories/0/directory")
+        .ok_or("directory label source")?;
+    assert_eq!(
+        label
+            .get("containsEncryptedSource")
+            .and_then(Value::as_bool),
+        Some(false),
+        "the displayed directory comes from the clear new side",
+    );
+    Ok(())
 }
 
 fn check_historical_schema(mut report: Value) -> TestResult {

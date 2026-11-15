@@ -23,6 +23,7 @@ mod record_change;
 mod record_compare;
 mod record_report;
 mod report;
+mod report_entry_aggregates;
 mod report_origins;
 mod schema_diff;
 mod schema_report;

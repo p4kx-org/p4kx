@@ -2826,6 +2826,13 @@ code is 0 without and 1 with differences on any compared level.
 
 `entries` is absent when the Entry level was not compared, `records` when the Record level was
 not compared.
+An Entry count retains the change-decision sources of the emitted rows counted in it.
+A directory count also retains the selected path of each row and the first selected path
+that identifies that group. The `directory` label comes from that first path, including
+the empty label for root files. Zero counts remain unknown without a retained absence survey.
+A nonzero count inherits any incomplete one-sided decision evidence. A filter scopes these
+observations to the selected rows.
+
 The Entry field markers describe the directory metadata used by the report. The source inventory
 records the Entry's payload encryption and its container ancestry separately. A missing comparison
 side has no stored fields to attach an origin to. Each `change` carries the direct join evidence.
