@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::error::Error;
-use std::io::{self, BufReader, PipeWriter, Read};
+use std::io::{self, BufReader, PipeWriter, Read, Write};
 
 use p4kx_export::{CatalogError, CatalogSummary, ZSTD_WINDOW_LOG};
 use serde::Serialize;
@@ -27,14 +27,20 @@ pub(super) struct Census {
 }
 
 impl Census {
-    pub(super) fn reconcile(&self, summary: &CatalogSummary) -> io::Result<()> {
-        if Some(self.encoded_bytes) != summary.compressed_size()
-            || self.decoded.decoded_bytes != summary.size()
-        {
+    pub(super) fn reconcile_sizes(&self, encoded: u64, decoded: u64) -> io::Result<()> {
+        if self.encoded_bytes != encoded || self.decoded.decoded_bytes != decoded {
             return Err(profile::invalid(
                 "producer and census encoded/decoded byte counts differ",
             ));
         }
+        Ok(())
+    }
+
+    pub(super) fn reconcile(&self, summary: &CatalogSummary) -> io::Result<()> {
+        let encoded = summary
+            .compressed_size()
+            .ok_or_else(|| profile::invalid("producer did not write a compressed catalog"))?;
+        self.reconcile_sizes(encoded, summary.size())?;
         let inventory = summary.source_inventory();
         if self.decoded.physical_sources != inventory.source_count() as u64
             || self.decoded.source_uses != inventory.use_count() as u64
@@ -56,11 +62,35 @@ pub(super) fn transfer<T>(
 }
 
 fn decode(input: impl Read) -> io::Result<Census> {
+    decode_to(input, io::sink())
+}
+
+pub(super) fn decode_to(input: impl Read, mut output: impl Write) -> io::Result<Census> {
     let mut decoder = zstd::Decoder::new(CountingReader::new(input))?;
     decoder.window_log_max(ZSTD_WINDOW_LOG)?;
-    let report = scan::read(BufReader::new(&mut decoder))?;
+    let report = scan::read(BufReader::new(CopyingReader {
+        decoded: &mut decoder,
+        output: &mut output,
+    }))?;
+    output.flush()?;
     Ok(Census {
         encoded_bytes: decoder.finish().into_inner().byte_count(),
         decoded: report,
     })
+}
+
+struct CopyingReader<R, W> {
+    decoded: R,
+    output: W,
+}
+
+impl<R: Read, W: Write> Read for CopyingReader<R, W> {
+    fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+        let count = self.decoded.read(buffer)?;
+        let bytes = buffer
+            .get(..count)
+            .ok_or_else(|| profile::invalid("decoded read exceeded its buffer"))?;
+        self.output.write_all(bytes)?;
+        Ok(count)
+    }
 }

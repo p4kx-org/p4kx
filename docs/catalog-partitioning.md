@@ -197,3 +197,18 @@ The census keeps one counter per nonempty fingerprint and includes the decoder's
 in the benchmark process. Use the sink-only run for producer-only memory measurements. Neither
 mode requires another serialization pass. For atomic file publication and actual consumer import,
 use the separate evidence above.
+
+### Reconciling an existing measurement
+
+Set `P4KX_CATALOG_MEASUREMENT_DIR` to the private directory containing the completed
+normal writer receipt `receipt.private.json` and its `p4kx-catalog.json.zst` output.
+Then run the artifact reconciliation as a separate process.
+
+```text
+cargo test --release --locked -p p4kx-export --test real_archive -- --ignored --exact --nocapture real_archive_catalog_size::artifact::reconcile_completed_catalog_artifact
+```
+
+One streaming decode produces the section and reference-set census and copies the exact
+UTF-8 bytes to `p4kx-catalog.json` in that directory. Publication requires the encoded
+and decoded lengths to agree with the writer receipt. An existing raw file is preserved.
+The installed Archive is unnecessary for this check.

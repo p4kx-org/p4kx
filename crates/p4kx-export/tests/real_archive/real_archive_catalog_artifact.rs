@@ -1,0 +1,73 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// SPDX-FileCopyrightText: 2026 the P4KX contributors
+
+use std::fs::{self, File};
+use std::io::{self, BufReader};
+use std::path::{Path, PathBuf};
+
+use serde::Deserialize;
+
+use super::{sections, support};
+
+const FRAME: &str = "p4kx-catalog.json.zst";
+const RAW: &str = "p4kx-catalog.json";
+
+#[derive(Deserialize)]
+struct Measurement {
+    status: String,
+    mode: String,
+    sizes: Sizes,
+}
+
+#[derive(Deserialize)]
+struct Sizes {
+    #[serde(rename = "encodedBytes")]
+    encoded: u64,
+    #[serde(rename = "decodedBytes")]
+    decoded: u64,
+    #[serde(rename = "fileBytes")]
+    file: u64,
+}
+
+#[test]
+#[ignore = "completed private catalog measurement: set P4KX_CATALOG_MEASUREMENT_DIR"]
+fn reconcile_completed_catalog_artifact() -> support::TestResult {
+    let directory = std::env::var_os("P4KX_CATALOG_MEASUREMENT_DIR")
+        .map(PathBuf::from)
+        .ok_or("P4KX_CATALOG_MEASUREMENT_DIR is required")?;
+    let receipt = File::open(directory.join("receipt.private.json"))?;
+    let measurement: Measurement = serde_json::from_reader(BufReader::new(receipt))?;
+    if measurement.status != "complete" || measurement.mode != "normal" {
+        return Err("the measurement receipt must describe a completed normal export".into());
+    }
+    let census = reconcile(&directory, &measurement.sizes)?;
+    support::print_line(&format!(
+        "catalog artifact {}",
+        serde_json::to_string(&census)?
+    ));
+    Ok(())
+}
+
+fn reconcile(directory: &Path, sizes: &Sizes) -> support::TestResult<sections::Census> {
+    let frame = File::open(directory.join(FRAME))?;
+    if frame.metadata()?.len() != sizes.encoded || sizes.file != sizes.encoded {
+        return Err("compressed file length differs from the producer receipt".into());
+    }
+    let raw = directory.join(RAW);
+    match fs::symlink_metadata(&raw) {
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error.into()),
+        Ok(_) => return Err("the raw catalog already exists".into()),
+    }
+    let mut staged = tempfile::NamedTempFile::new_in(directory)?;
+    let census = sections::decode_to(frame, staged.as_file_mut())?;
+    census.reconcile_sizes(sizes.encoded, sizes.decoded)?;
+    if staged.as_file().metadata()?.len() != sizes.decoded {
+        return Err("raw file length differs from the reconciled decoded size".into());
+    }
+    staged.persist_noclobber(raw).map_err(|error| error.error)?;
+    Ok(census)
+}
+
+#[path = "real_archive_catalog_artifact_tests.rs"]
+mod tests;

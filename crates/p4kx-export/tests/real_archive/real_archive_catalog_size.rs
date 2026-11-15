@@ -10,6 +10,8 @@ use p4kx_export::{
 };
 use p4kx_extraction::{Archive, DataForgeEntry};
 
+#[path = "real_archive_catalog_artifact.rs"]
+mod artifact;
 #[path = "real_archive_catalog_section_pipe.rs"]
 mod sections;
 #[path = "real_archive_catalog_size_support.rs"]
