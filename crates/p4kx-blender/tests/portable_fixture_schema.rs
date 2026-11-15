@@ -21,7 +21,7 @@ fn native_cli_packages_match_the_manifest_schema() -> Result<(), Box<dyn Error>>
     );
     let schema = p4kx_blender::manifest_schema();
     let validator = jsonschema::validator_for(&schema).map_err(|error| error.to_string())?;
-    for case in ["assembly", "livery"] {
+    for case in ["assembly", "livery", "character"] {
         let manifest: Value =
             serde_json::from_slice(&fs::read(root.join(case).join("scene.json"))?)?;
         let errors: Vec<_> = validator

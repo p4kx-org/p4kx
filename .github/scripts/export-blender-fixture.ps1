@@ -46,6 +46,10 @@ function Export-Packages {
     if ($LASTEXITCODE -ne 0) { throw 'Synthetic assembly export failed.' }
     & $Executable --json --key-file $syntheticKey entity package (Join-Path $FixtureRoot 'livery.p4k') TEST_Livery --texture-mip 2 --out (Join-Path $PackageRoot 'livery') | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'Synthetic livery export failed.' }
+    & $Executable --json --key-file $syntheticKey character package (Join-Path $FixtureRoot 'character.p4k') `
+        --chf (Join-Path $FixtureRoot 'hero.chf') --anim all --expression CTL_a --materials colours `
+        --out (Join-Path $PackageRoot 'character') | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'Synthetic character export failed.' }
 }
 
 $repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))

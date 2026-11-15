@@ -22,7 +22,7 @@ from p4kx_importer.package_digests import RECEIPT_NAME, file_sha256, is_sha256, 
 from p4kx_importer.validate_package import validate_package  # noqa: E402
 
 ARTIFACT_PREFIX = "p4kx-blender-package-"
-CASES = ("assembly", "livery")
+CASES = ("assembly", "livery", "character")
 SYSTEMS = {"windows": "Windows", "linux": "Linux", "macos": "Darwin"}
 MACHINES = {"amd64": {"amd64", "x86_64"}, "arm64": {"arm64", "aarch64"}}
 
@@ -139,8 +139,8 @@ def verify_headless(folders: dict[str, Path], version: str) -> None:
     expected = tuple(int(part) for part in version.split("."))
     require(bpy.app.version == expected, f"Expected bpy {version}, found {bpy.app.version_string}")
     for target, folder in folders.items():
-        verify_packages(folder / "packages", render_images=False)
-        print(f"Blender {version} imported {target} assembly and livery")
+        reports = verify_packages(folder / "packages", render_images=False)
+        print(json.dumps({"blender": version, "target": target, "cases": reports}))
 
 
 def main() -> None:

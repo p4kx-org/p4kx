@@ -18,6 +18,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 
 from p4kx_importer import importer, package  # noqa: E402
+from p4kx_importer.package_digests import RECEIPT_NAME, file_sha256  # noqa: E402
 
 
 def require(condition: bool, message: str) -> None:
@@ -196,15 +197,80 @@ def verify(folder: Path, case: str, expected_meshes: int, *, render_image: bool 
 
 
 def verify_packages(root: Path, *, render_images: bool = True) -> list[dict[str, object]]:
-    """Checks both authored cases with the same scene expectations."""
+    """Checks the authored geometry, material and animation cases."""
     return [
         verify(root / "assembly", "assembly", 3, render_image=render_images),
         verify(root / "livery", "livery", 4, render_image=render_images),
+        verify_character(root / "character"),
     ]
 
 
+def verify_character(folder: Path) -> dict[str, object]:
+    """Checks the authored Character rig, shape key and absolute clip in Blender."""
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    addon_utils.enable("io_scene_gltf2", default_set=False)
+    scene = bpy.context.scene
+    scene.render.fps = 30
+    scene.render.fps_base = 1.0
+    scene_file = folder / "scene.json"
+    loaded = package.load_package(scene_file)
+    result = importer.import_package(bpy.context, loaded)
+    require(not result.warnings, f"character import warnings: {result.warnings}")
+    require((result.armatures, result.actions, result.shape_keys) == (1, 1, 1), "character import counts differ")
+    (armature,) = (obj for obj in bpy.data.objects if obj.type == "ARMATURE")
+    character = scene_node(result.root, "hero")
+    require(armature.parent is character, "the armature must belong to the Character node")
+    bones = {bone.name: bone.parent.name if bone.parent else None for bone in armature.data.bones}
+    require(bones == {"pelvis": None, "spine": "pelvis", "head": "spine"}, f"character bone hierarchy differs: {bones}")
+    shapes = [
+        key.name
+        for mesh in bpy.data.meshes
+        if mesh.shape_keys is not None
+        for key in mesh.shape_keys.key_blocks[1:]
+    ]
+    require(shapes == ["CTL_a"], f"the selected expression must be present: {shapes}")
+    animation = armature.animation_data
+    action = animation.action if animation else None
+    require(action is not None and action.name == "absolute_stride", "the authored CAF must be an active armature action")
+    start, end = action.frame_range
+    require(abs(start) < 1e-4 and abs(end - 30.0) < 1e-4, f"character action range differs: {start}..{end}")
+    samples = verify_character_pose(scene, armature)
+    receipt_path = folder / RECEIPT_NAME
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    (rig_mesh,) = (mesh for mesh in loaded.meshes.values() if mesh.rig is not None)
+    return {
+        "case": "character",
+        "bones": bones,
+        "armatures": result.armatures,
+        "actions": result.actions,
+        "shape_keys": shapes,
+        "action": action.name,
+        "action_frames": [start, end],
+        "samples_metres": samples,
+        "warnings": list(result.warnings),
+        "source_revision": receipt["generator"].get("source_revision"),
+        "scene_sha256": file_sha256(scene_file),
+        "mesh_sha256": file_sha256(folder / rig_mesh.file),
+        "receipt_sha256": file_sha256(receipt_path),
+        "importer_sha256": file_sha256(Path(importer.__file__)),
+        "blender_build": bpy.app.build_hash.decode("ascii"),
+    }
+
+
+def verify_character_pose(scene: bpy.types.Scene, armature: bpy.types.Object) -> list[dict[str, object]]:
+    """Compares evaluated pelvis positions with the CAF keys in source Z-up axes."""
+    samples = []
+    for frame, expected in [(0, (0.0, 0.0, 0.0)), (9, (1.5, -0.25, 0.75)), (30, (-0.5, 0.5, 0.0))]:
+        scene.frame_set(frame)
+        evaluated = armature.evaluated_get(bpy.context.evaluated_depsgraph_get())
+        position = evaluated.matrix_world @ evaluated.pose.bones["pelvis"].head
+        require(close_vector(position, expected), f"pelvis at {frame}: {tuple(position)}, expected {expected}")
+        samples.append({"frame": frame, "pelvis": list(position)})
+    return samples
+
+
 def main() -> None:
-    """Verifies both source-built synthetic packages and writes the local evidence report."""
+    """Verifies source-built synthetic packages and writes the local evidence report."""
     arguments = sys.argv[sys.argv.index("--") + 1:]
     require(len(arguments) == 1, "provide the absolute package root")
     root = Path(arguments[0])

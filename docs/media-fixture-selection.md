@@ -75,7 +75,7 @@ Blender session remains unchanged.
 
 ## Rust-exported synthetic packages in Blender
 
-`p4kx-testkit` can write two synthetic source Archives for an end-to-end exporter/importer check.
+`p4kx-testkit` can write three synthetic source Archives for an end-to-end exporter/importer check.
 Build the CLI from the same checkout as the importer. In a dedicated PowerShell session, choose
 an absolute scratch root outside the repository and the game installation:
 
@@ -92,10 +92,12 @@ $env:P4KX_GAME_CHECK = 'off'
 Remove-Item Env:P4KX_ARCHIVE_KEY -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path $env:TMP, $env:P4KX_LAUNCHER_DIR, $packages | Out-Null
 cargo run --locked -p p4kx-testkit --example blender_consumer_fixture -- $fixtures
+$env:P4KX_SOURCE_REVISION = (git rev-parse HEAD).Trim()
 cargo build --locked -p p4kx --bin p4kx
 $p4kx = Join-Path $env:CARGO_TARGET_DIR 'debug/p4kx.exe'
 & $p4kx --json --key-file "$fixtures/synthetic.key" entity package "$fixtures/assembly.p4k" TEST_Ship --out "$packages/assembly"
 & $p4kx --json --key-file "$fixtures/synthetic.key" entity package "$fixtures/livery.p4k" TEST_Livery --texture-mip 2 --out "$packages/livery"
+& $p4kx --json --key-file "$fixtures/synthetic.key" character package "$fixtures/character.p4k" --chf "$fixtures/hero.chf" --anim all --expression CTL_a --materials colours --out "$packages/character"
 ```
 
 Use `debug/p4kx` on Linux. Check each command's exit status before continuing. The fixture directory
@@ -103,14 +105,14 @@ must be new. The generated key is exclusively `p4kx_testkit::test_key`, not a ga
 The source fixtures intentionally include unresolved attachments and unsupported palette input;
 the CLI reports these separately from importer warnings.
 
-Run the consumer with the installed Blender 5.2 executable in a separate background process:
+Run the consumer with Blender 5.2 or 5.3 in a separate background process:
 
 ```powershell
 $env:BLENDER_USER_CONFIG = Join-Path $verificationRoot 'blender-config'
 $env:BLENDER_USER_SCRIPTS = Join-Path $verificationRoot 'blender-scripts'
 $env:BLENDER_USER_DATAFILES = Join-Path $verificationRoot 'blender-data'
 $env:PYTHONDONTWRITEBYTECODE = '1'
-& 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe' --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 1 --python blender_addon/tests/verify_exported_package.py -- $packages
+& 'C:\Program Files\Blender Foundation\Blender 5.3\blender.exe' --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 1 --python blender_addon/tests/verify_exported_package.py -- $packages
 ```
 
 Give the process a 180-second watchdog and capture stdout/stderr separately. Do not reuse an
@@ -122,27 +124,33 @@ cases and checks these independent authored fixture expectations:
 | Assembly | 6 / 4 / 3 | Z-up attachment positions, nested parent, quarter-turn, material assignments |
 | Livery | 7 / 7 / 4 | Shared collection instances, one shared 2x2 mip texture, connected primary/secondary palette constants |
 
-Both cases require twelve triangles per cube, finite vertices, authored evaluated world bounds
+The Assembly and Livery cases require twelve triangles per cube, finite vertices, authored evaluated world bounds
 and no additional importer warnings. Scene-node lookup uses only the imported root's direct
 objects, because Blender can give mesh-template objects the same authored name first. Bounds
 include the fixture cube's ten-metre mesh-node offset where present.
 
+The Character case imports one armature with three authored bones, one action and one expression
+shape key. At 30 fps, the action spans frames 0 through 30. The test samples the evaluated pelvis
+at its three authored CAF keys in source Z-up metres with a tolerance of `1e-5` m.
+
 The consumer writes `consumer-report.json` and two fixed-camera 320x240 CPU renders beside the
-package folders. Inspect both renders and retain source/importer, exporter executable, Blender
-executable and package-file hashes with the process result. The report counts file-backed images
+package folders. The Character row records the Blender build, package and importer hashes, bone
+hierarchy, action range and measured positions. The native artifact exchange also verifies the
+exporter executable identity and all package-file hashes. The report counts file-backed images
 and excludes rendering-only datablocks. Palette checks inspect connected
 shader inputs; rendered pixel colour is not a source-fidelity assertion.
 
-This check covers synthetic unrigged geometry, materials and one texture path. It does not prove
-installed LIVE/PTU coverage, Character rigs, animation, audio, other CPUs or in-game appearance.
+The fixtures cover synthetic geometry, materials, one texture path and one absolute rig-bound
+animation. Installed archive coverage, additive composition and in-game appearance have separate
+acceptance criteria.
 
 ## Native package exchange in CI
 
 The focused job builds the native P4KX CLI on each row of the
-[platform contract](supported-platforms.md). It generates the assembly and livery packages twice
-with `blender_consumer_fixture` and `p4kx entity package`, compares the complete path and byte
-inventory, then validates the actual manifests against the Blender package schema. The uploaded
-artifact contains only the two packages and a receipt for the source revision, workflow run,
+[platform contract](supported-platforms.md). It generates the Assembly, Livery and Character
+packages twice with `blender_consumer_fixture` and the normal package export commands, compares
+the complete path and byte inventory, then validates the manifests against the Blender package
+schema. The uploaded artifact contains the three packages and a receipt for the source revision, workflow run,
 native target, exporter digest and every file digest.
 
 Every add-on row downloads all five producer artifacts from that workflow run. Its native Python
@@ -156,8 +164,8 @@ Windows AMD64, Ubuntu 24.04 AMD64 and macOS ARM64 use the upstream Python 3.13 w
 Blender 5.2.3 and 5.3.0. Windows ARM64 uses the 5.2.3 wheel and the official 5.3.0 portable
 distribution. Its 5.3.0 job verifies the pinned ZIP digest and the executable's ARM64 PE
 machine before running Blender with an isolated profile. Each version runs the same headless
-synthetic smoke and imports the actual exchanged packages to check authored geometry, transforms
-and material bindings. The CI import omits the optional CPU renders used for interactive visual
+synthetic smoke and imports the exchanged packages to check authored geometry, transforms,
+material bindings and rig animation. The optional CPU renders are reserved for local visual
 review. [Blender 5.2.3 wheel files](https://pypi.org/project/bpy/5.2.3/#files) ·
 [Blender 5.3.0 wheel files](https://pypi.org/project/bpy/5.3.0/#files) ·
 [Blender 5.3.0 official ZIP checksums](https://download.blender.org/release/Blender5.3/blender-5.3.0.sha256)

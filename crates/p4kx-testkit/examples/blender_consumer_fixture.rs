@@ -8,6 +8,9 @@ use std::path::PathBuf;
 
 use p4kx_testkit::{ArchiveBuilder, TestEntry, assembly_entries, livery_entries, test_key};
 
+#[path = "blender_consumer_fixture/character.rs"]
+mod character;
+
 struct Case {
     name: &'static str,
     entries: fn() -> Vec<TestEntry>,
@@ -31,12 +34,17 @@ fn main() -> Result<(), Box<dyn Error>> {
             name: "livery",
             entries: livery_entries,
         },
+        Case {
+            name: "character",
+            entries: character::entries,
+        },
     ] {
         (case.entries)()
             .into_iter()
             .fold(ArchiveBuilder::new(), ArchiveBuilder::entry)
             .write_to(output.join(format!("{}.p4k", case.name)))?;
     }
+    character::write_chf(&output)?;
     std::fs::write(output.join("synthetic.key"), test_key().to_hex())?;
     Ok(())
 }
