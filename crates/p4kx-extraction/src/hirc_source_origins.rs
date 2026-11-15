@@ -36,7 +36,8 @@ impl ObjectOrigins {
                 | SourceFamily::State
                 | SourceFamily::Attenuation
                 | SourceFamily::Plugin(_)
-                | SourceFamily::Modulator(_) => SourceUses::with_compact_use_refs(),
+                | SourceFamily::Modulator(_)
+                | SourceFamily::MusicNode(_) => SourceUses::with_compact_use_refs(),
                 _ => SourceUses::new(),
             },
         )

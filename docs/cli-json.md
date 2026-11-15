@@ -1819,6 +1819,12 @@ includes its checked complete curves. Crossfade points keep each readable binary
 word and the original interpolation code. Association references carry unchecked
 resolution. Unknown and non-finite words remain available.
 
+Version-154 MusicSegment, MusicSwitch and MusicPlaylist objects expose `source_fields.stinger_count` and their original
+`stingers` in physical order. Every row carries the trigger and segment IDs, sync code,
+cue filter, signed repeat time with its raw word, and look-ahead count when readable.
+The final truncated row retains its checked byte range and complete words. Older layouts
+have an explicit unsupported status and no interpreted rows.
+
 Version-154 AudioBus and AuxiliaryBus objects expose their checked source layout in
 `node_fields.object_status`. The `node_fields.bus` extension keeps original bus
 settings, root device share-set, recovery and volume words, ordered duck targets

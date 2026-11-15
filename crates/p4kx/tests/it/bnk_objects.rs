@@ -18,6 +18,8 @@ use serde_json::Value;
 mod blend_source_fields;
 #[path = "bnk_dialogue_source_fields.rs"]
 mod dialogue_source_fields;
+#[path = "bnk_music_playlist_source_fields.rs"]
+mod music_playlist_source_fields;
 #[path = "bnk_music_track_source_fields.rs"]
 mod music_track_source_fields;
 #[path = "bnk_random_sequence_source_fields.rs"]
@@ -135,10 +137,13 @@ fn the_json_has_a_stable_shape() -> TestResult {
     let mut report = json(&[], &file)?;
     report["soundbank"] = "[FILE]".into();
     for object in report["objects"].as_array_mut().ok_or("objects")? {
-        let action = object["type"] == "action";
+        let has_independent_source_test = matches!(
+            object["type"].as_str(),
+            Some("action" | "music-playlist" | "music-segment" | "music-switch")
+        );
         let fields = object.as_object_mut().ok_or("object")?;
         fields.remove("node_fields");
-        if action {
+        if has_independent_source_test {
             fields.remove("source_fields");
         }
     }

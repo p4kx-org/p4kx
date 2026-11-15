@@ -11,6 +11,7 @@ use super::blend::BlendSourceSchema;
 use super::dto::DialogueSourceSchema;
 use super::effect_source::modulator::ModulatorSourceSchema;
 use super::effect_source::plugin::PluginSourceSchema;
+use super::music_node::MusicNodeSourceSchema;
 use super::music_track::MusicTrackSourceSchema;
 use super::random_sequence::RandomSequenceSchema;
 use super::standalone_state::StateSourceSchema;
@@ -33,6 +34,7 @@ impl JsonSchema for ObjectSourceSchema {
             generator.subschema_for::<SwitchSourceSchema>(),
             generator.subschema_for::<BlendSourceSchema>(),
             generator.subschema_for::<MusicTrackSourceSchema>(),
+            generator.subschema_for::<MusicNodeSourceSchema>(),
             generator.subschema_for::<ActionSourceSchema>(),
             generator.subschema_for::<StateSourceSchema>(),
         ];

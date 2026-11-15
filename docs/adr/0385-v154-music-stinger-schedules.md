@@ -17,5 +17,11 @@ signed repeat time also retains its raw bits. Explicit zeros, repeated IDs
 and unknown synchronization codes remain present. The exported fields are
 authored scheduling declarations.
 
+The same checked reader backs `bnk objects --json` and MCP `list_soundbank_objects`. Their
+`source_fields` holds the original count, ordered stinger rows and an object-local source inventory.
+A truncated row includes only the readable words. The layout status reports original object
+coverage and each row carries its own completeness value. Unsupported versions keep an explicit
+layout and empty stinger rows.
+
 The version-154 word order and signed repeat time follow [wwiser's music node reader](https://github.com/bnnm/wwiser/blob/6d4b5bfb45afc52cda9d68fbbe0cbd97de0e26a3/wwiser/parser/wparser.py#L2116)
 and [StarBreaker's music node reader](https://github.com/diogotr7/StarBreaker/blob/7d3f01e76307354bbc56a64a70eb5167b1189b64/crates/starbreaker-wwise/src/hirc/music.rs#L56).

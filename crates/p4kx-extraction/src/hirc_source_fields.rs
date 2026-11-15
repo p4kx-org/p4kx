@@ -23,6 +23,8 @@ mod container_layout;
 mod dto;
 #[path = "hirc_effect_source.rs"]
 mod effect_source;
+#[path = "hirc_music_node_source.rs"]
+mod music_node;
 #[path = "hirc_music_track_source.rs"]
 mod music_track;
 #[path = "hirc_source_origins.rs"]
@@ -59,6 +61,7 @@ enum SourceFamily {
     Switch,
     Blend,
     MusicTrack,
+    MusicNode(HircKind),
     Plugin(HircKind),
     Modulator(HircKind),
 }
@@ -74,7 +77,7 @@ impl SourceFamily {
             Self::Switch => HircKind::SwitchContainer,
             Self::Blend => HircKind::LayerContainer,
             Self::MusicTrack => HircKind::MusicTrack,
-            Self::Plugin(kind) | Self::Modulator(kind) => kind,
+            Self::MusicNode(kind) | Self::Plugin(kind) | Self::Modulator(kind) => kind,
         }
     }
 
@@ -88,6 +91,7 @@ impl SourceFamily {
             Self::Switch => "bnkHircSwitchContainer",
             Self::Blend => "bnkHircBlendContainer",
             Self::MusicTrack => "bnkHircMusicTrack",
+            Self::MusicNode(_) => "bnkHircMusicNode",
             Self::Plugin(_) => "bnkHircPlugin",
             Self::Modulator(_) => "bnkHircModulator",
         }
@@ -103,6 +107,7 @@ impl SourceFamily {
             Self::Switch => "switchContainerExtent",
             Self::Blend => "blendContainerExtent",
             Self::MusicTrack => "musicTrackExtent",
+            Self::MusicNode(_) => "musicNodeExtent",
             Self::Plugin(_) => "pluginObjectExtent",
             Self::Modulator(_) => "modulatorObjectExtent",
         }
@@ -128,6 +133,9 @@ impl<'bank> ObjectSourceFields<'bank> {
             HircKind::SwitchContainer => SourceFamily::Switch,
             HircKind::LayerContainer => SourceFamily::Blend,
             HircKind::MusicTrack => SourceFamily::MusicTrack,
+            HircKind::MusicPlaylist | HircKind::MusicSegment | HircKind::MusicSwitch => {
+                SourceFamily::MusicNode(kind)
+            }
             HircKind::FxShareSet | HircKind::FxCustom | HircKind::AudioDevice => {
                 SourceFamily::Plugin(kind)
             }
@@ -196,6 +204,17 @@ fn project<R: Read + Seek, S: Serializer>(
         (BankHircSemantic::MusicTrack(track), SourceFamily::MusicTrack) => {
             music_track::serialize(serializer, origins, header, *track)
         }
+        (
+            BankHircSemantic::MusicPlaylist(playlist),
+            SourceFamily::MusicNode(HircKind::MusicPlaylist),
+        ) => music_node::playlist(serializer, origins, header, *playlist),
+        (
+            BankHircSemantic::MusicSegment(segment),
+            SourceFamily::MusicNode(HircKind::MusicSegment),
+        ) => music_node::segment(serializer, origins, header, *segment),
+        (BankHircSemantic::MusicSwitch(switch), SourceFamily::MusicNode(HircKind::MusicSwitch)) => {
+            music_node::switch(serializer, origins, header, *switch)
+        }
         (BankHircSemantic::Plugin(plugin), SourceFamily::Plugin(_)) => {
             effect_source::plugin::serialize(serializer, origins, header, *plugin)
         }
@@ -233,6 +252,9 @@ fn project_raw<S: Serializer>(
         SourceFamily::Switch => switch::unsupported(serializer, origins, header, object),
         SourceFamily::Blend => blend::unsupported(serializer, origins, header, object),
         SourceFamily::MusicTrack => music_track::unsupported(serializer, origins, header, object),
+        SourceFamily::MusicNode(kind) => {
+            music_node::unsupported(serializer, origins, header, object, kind)
+        }
         SourceFamily::Plugin(_) => {
             effect_source::plugin::unsupported(serializer, origins, header, object)
         }
