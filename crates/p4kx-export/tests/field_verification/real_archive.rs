@@ -11,7 +11,7 @@ use serde_json::Value;
 
 use super::accounting;
 use super::error::{Error, Kind as ErrorKind};
-use super::inventory::Inventory;
+use super::inventory::{BuildIdentity, Inventory};
 use super::published_io::Dataset;
 use super::published_model::{Build, BuildGate, PUBLICATIONS};
 
@@ -109,7 +109,10 @@ fn field_inventory_observes_declared_populated_and_exported_source_values() -> s
             .map(|failure| failure.guid().parse())
             .collect::<Result<_, _>>()?,
         exclusions,
-        scope,
+        super::coverage::Scope {
+            filter: scope,
+            build: BuildIdentity::of_archive(&archive).as_ref(),
+        },
         &|| false,
     )?;
     report_counts(&counts);
@@ -135,11 +138,11 @@ fn record_filter() -> super::Result<Option<Filter>> {
 fn report_counts(counts: &BTreeMap<super::inventory::FieldKey, accounting::Counts>) {
     for (field, count) in counts {
         super::report(&format!(
-            "{}.{}{}: declared={} present={} populated={} exported={} unhandled={} unreviewed={} rejected={} source-errors={} missing-targets={} missing-export-GUID={} excluded={} target-changed={} newly-populated={}",
+            "{}.{}{}: declaration={:?} present={} populated={} exported={} unhandled={} unreviewed={} rejected={} source-errors={} missing-targets={} missing-export-GUID={} excluded={} target-changed={} newly-populated={}",
             field.owner,
             field.field,
             if field.array_element { "[]" } else { "" },
-            count.declared,
+            count.declaration,
             count.present,
             count.populated,
             count.exported,
@@ -360,7 +363,7 @@ fn a_reviewed_rsi_patch_is_bound_to_the_exact_channel_and_change() -> super::Res
     Ok(())
 }
 
-fn build_fixture(channel: &Path, change: &str) -> super::Result<Archive> {
+pub(super) fn build_fixture(channel: &Path, change: &str) -> super::Result<Archive> {
     use p4kx_testkit::{ArchiveBuilder, TestEntry, write_build_manifest};
 
     std::fs::create_dir(channel)?;

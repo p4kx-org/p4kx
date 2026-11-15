@@ -81,6 +81,7 @@ fn inventory() -> Inventory {
             "Tag".to_owned(),
         ],
         fields,
+        expected_absences: Vec::new(),
     }
 }
 

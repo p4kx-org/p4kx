@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use p4kx_extraction::Guid;
 use serde_json::Value;
 
-use super::inventory::{Disposition, FieldKey, Inventory};
+use super::inventory::{BuildIdentity, Disposition, FieldKey, Inventory};
 use super::joins::Index;
 use super::schema::Schema;
 use super::source::Observations;
@@ -32,9 +32,18 @@ pub(crate) enum Population {
     NewlyPopulated,
 }
 
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DeclarationState {
+    #[default]
+    Missing,
+    Declared,
+    ExpectedAbsent,
+    UnexpectedlyDeclared,
+}
+
 #[derive(Debug, Default, Clone, Copy)]
 pub(crate) struct Counts {
-    pub(crate) declared: bool,
+    pub(crate) declaration: DeclarationState,
     pub(crate) array: bool,
     pub(crate) review: Review,
     pub(crate) present: u64,
@@ -48,6 +57,17 @@ pub(crate) struct Counts {
     pub(crate) excluded: u64,
     pub(crate) target: Target,
     pub(crate) population: Population,
+}
+
+impl Counts {
+    fn review_expected_absence(&mut self) {
+        self.declaration = if self.declaration == DeclarationState::Missing && self.present == 0 {
+            DeclarationState::ExpectedAbsent
+        } else {
+            DeclarationState::UnexpectedlyDeclared
+        };
+        self.review = Review::Reviewed;
+    }
 }
 
 pub(crate) struct Projection<'a> {
@@ -70,7 +90,7 @@ fn declared(
     mapping: Option<&super::inventory::Mapping>,
 ) -> Counts {
     Counts {
-        declared: true,
+        declaration: DeclarationState::Declared,
         array: declaration.array,
         review: if mapping.is_some() {
             Review::Reviewed
@@ -91,9 +111,11 @@ pub(crate) fn count_fields(
     observations: &Observations,
     inventory: &Inventory,
     projection: &Projection<'_>,
+    build: Option<&BuildIdentity>,
     cancelled: &impl Fn() -> bool,
 ) -> super::Result<BTreeMap<FieldKey, Counts>> {
     let mappings = inventory.reviewed()?;
+    let expected_absences = inventory.absent_on(build);
     let mut counts = BTreeMap::new();
     for (key, declaration) in &schema.declarations {
         counts.insert(
@@ -144,7 +166,10 @@ pub(crate) fn count_fields(
         }
     }
     for key in mappings.keys() {
-        counts.entry(key.clone()).or_default();
+        let count = counts.entry(key.clone()).or_default();
+        if expected_absences.contains(key) && schema.owners.contains_key(&key.owner) {
+            count.review_expected_absence();
+        }
     }
     Ok(counts)
 }
@@ -182,8 +207,10 @@ pub(crate) fn regressions(counts: &BTreeMap<FieldKey, Counts>) -> usize {
     counts
         .values()
         .filter(|count| {
-            !count.declared
-                || count.review == Review::Unreviewed
+            matches!(
+                count.declaration,
+                DeclarationState::Missing | DeclarationState::UnexpectedlyDeclared
+            ) || count.review == Review::Unreviewed
                 || count.unhandled > 0
                 || count.rejected > 0
                 || count.read_errors > 0

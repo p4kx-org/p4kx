@@ -274,6 +274,7 @@ pub(crate) fn inventory() -> Inventory {
             "SCItemQuantumDriveParams".to_owned(),
         ],
         fields,
+        expected_absences: Vec::new(),
     }
 }
 

@@ -11,7 +11,7 @@ use crate::catalog_v3_consumer;
 use super::accounting::{self, Counts, Projection};
 use super::audit_scope;
 use super::error::{self, Error, Kind};
-use super::inventory::{Disposition, FieldKey, Inventory};
+use super::inventory::{BuildIdentity, Disposition, FieldKey, Inventory};
 use super::joins::{self, Index, Multiplicity};
 use super::path::Path;
 use super::schema::Schema;
@@ -155,17 +155,23 @@ fn quantum_profiles<'a>(
     Ok(profiles)
 }
 
+#[derive(Clone, Copy, Default)]
+pub(crate) struct Scope<'a> {
+    pub(crate) filter: Option<&'a Filter>,
+    pub(crate) build: Option<&'a BuildIdentity>,
+}
+
 pub(crate) fn run(
     forge: &DataForge<'_>,
     inventory: &Inventory,
     catalog: &Value,
     rejected: BTreeSet<Guid>,
     exclusions: BTreeMap<Guid, String>,
-    filter: Option<&Filter>,
+    scope: Scope<'_>,
     cancelled: &impl Fn() -> bool,
 ) -> super::Result<BTreeMap<FieldKey, Counts>> {
     let schema = Schema::read(forge, &inventory.roots, cancelled)?;
-    let observations = observations(forge, &schema, inventory, filter, cancelled)?;
+    let observations = observations(forge, &schema, inventory, scope.filter, cancelled)?;
     let groups = projections(catalog, inventory, cancelled)?;
     accounting::count_fields(
         &schema,
@@ -176,6 +182,7 @@ pub(crate) fn run(
             rejected,
             exclusions,
         },
+        scope.build,
         cancelled,
     )
 }

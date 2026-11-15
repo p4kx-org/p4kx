@@ -7,7 +7,8 @@ use p4kx_extraction::{Archive, DataForge, DataForgeEntry};
 use p4kx_testkit::{ArchiveBuilder, TestEntry};
 use serde_json::{Value, json};
 
-use super::accounting;
+use super::accounting::{self, DeclarationState};
+use super::coverage::Scope;
 use super::fixtures::{self, GUID};
 use super::inventory::{Disposition, FieldKey, Inventory, Mapping};
 use super::path::Path;
@@ -24,7 +25,7 @@ fn survey(
         &projected(),
         BTreeSet::new(),
         BTreeMap::new(),
-        None,
+        Scope::default(),
         &|| false,
     )
 }
@@ -40,8 +41,9 @@ fn declared_present_populated_and_primitive_array_elements_have_independent_coun
     let container = counts
         .get(&FieldKey::new("SyntheticParams", "weights"))
         .ok_or("array field absent")?;
-    assert!(
-        container.declared,
+    assert_eq!(
+        container.declaration,
+        DeclarationState::Declared,
         "the source schema declares the array even before reading instances"
     );
     assert!(
@@ -67,8 +69,9 @@ fn declared_present_populated_and_primitive_array_elements_have_independent_coun
     let future = counts
         .get(&FieldKey::new("SyntheticParams", "future"))
         .ok_or("future field absent")?;
-    assert!(
-        future.declared,
+    assert_eq!(
+        future.declaration,
+        DeclarationState::Declared,
         "the empty resource family is schema-declared"
     );
     assert_eq!(
@@ -169,7 +172,7 @@ fn a_successful_public_mapper_cannot_hide_a_populated_nested_block() -> super::R
             .map(|failure| failure.guid().parse())
             .collect::<Result<_, _>>()?,
         BTreeMap::new(),
-        None,
+        Scope::default(),
         &|| false,
     )?;
     let silent = counts
@@ -211,6 +214,7 @@ fn generic_readability_and_a_real_typed_mapper_rejection_are_counted_separately(
                 path: Path::fields(&["objectiveTokens"]),
             },
         }],
+        expected_absences: Vec::new(),
     };
     let counts = accounting::count_fields(
         &tagged.schema,
@@ -221,6 +225,7 @@ fn generic_readability_and_a_real_typed_mapper_rejection_are_counted_separately(
             rejected: tagged.rejected,
             exclusions: BTreeMap::new(),
         },
+        None,
         &|| false,
     )?;
     let observed = counts.get(&key).ok_or("tagged value observation absent")?;
@@ -253,7 +258,7 @@ fn unreviewed_declarations_exclusions_and_inventory_errors_are_visible() -> supe
         &projected(),
         BTreeSet::new(),
         BTreeMap::new(),
-        None,
+        Scope::default(),
         &|| false,
     )?;
     assert!(
@@ -272,7 +277,7 @@ fn unreviewed_declarations_exclusions_and_inventory_errors_are_visible() -> supe
         &projected(),
         BTreeSet::new(),
         excluded,
-        None,
+        Scope::default(),
         &|| false,
     )?;
     assert!(

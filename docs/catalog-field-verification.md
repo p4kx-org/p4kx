@@ -90,6 +90,14 @@ independence cannot be established. Source reads, coverage regressions and numer
 remain failures. Physical Records sharing a mapped GUID, including aliases outside the mapped
 selection, fail with both table indices instead of merging observations or masking selected data.
 
+Private inventories may include `expectedAbsences` for declarations confirmed
+absent in a specific Build. Each entry contains the reviewed field key in
+`source`, a `build` with `channel`, `branch`, `version`, `changeNumber` and
+`buildId`, and a nonempty `reason`. The verifier reports `expected-absent`
+only when the opened Archive matches all five values and the owning type is
+present. A returned declaration is a verification failure even with zero
+populated values. Keep the exact Build receipts in the private inventory.
+
 ## Metadata-only declaration surveys
 
 The ignored `resource_metadata::resource_owned_type_declarations_only` test writes only DataForge

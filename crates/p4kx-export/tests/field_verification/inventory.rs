@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
+use p4kx_channels::ChannelKind;
+use p4kx_extraction::Archive;
 use serde::{Deserialize, Serialize};
 
 use super::error::{Error, Kind};
@@ -44,12 +46,59 @@ pub(crate) struct Mapping {
     pub(crate) previously_empty: bool,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct BuildIdentity {
+    channel: String,
+    branch: String,
+    version: String,
+    change_number: String,
+    build_id: String,
+}
+
+impl BuildIdentity {
+    pub(crate) fn of_archive(archive: &Archive) -> Option<Self> {
+        let build = archive.build()?;
+        let channel = ChannelKind::of_archive(archive.path()).name()?;
+        Some(Self {
+            channel: channel.to_owned(),
+            branch: build.branch().to_owned(),
+            version: build.version().to_owned(),
+            change_number: build.change_number().to_owned(),
+            build_id: build.build_id().to_owned(),
+        })
+    }
+
+    fn complete(&self) -> bool {
+        ChannelKind::from_name(&self.channel).name() == Some(self.channel.as_str())
+            && [
+                &self.branch,
+                &self.version,
+                &self.change_number,
+                &self.build_id,
+            ]
+            .into_iter()
+            .all(|part| !part.trim().is_empty())
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct ExpectedAbsence {
+    source: FieldKey,
+    build: BuildIdentity,
+    reason: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct Inventory {
     pub(crate) schema_version: u32,
     pub(crate) roots: Vec<String>,
     pub(crate) fields: Vec<Mapping>,
+    /// Reviews a declaration's absence only for the exact named manifest and Channel.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(crate) expected_absences: Vec<ExpectedAbsence>,
 }
 
 impl Inventory {
@@ -90,6 +139,34 @@ impl Inventory {
                 return Err(Error::new(Kind::Mapping, "duplicate owning field mapping").into());
             }
         }
+        self.review_absences(&fields)?;
         Ok(fields)
+    }
+
+    fn review_absences(&self, fields: &BTreeMap<FieldKey, &Mapping>) -> super::Result<()> {
+        let mut reviewed = BTreeSet::new();
+        for absence in &self.expected_absences {
+            if !fields.contains_key(&absence.source)
+                || !absence.build.complete()
+                || absence.reason.trim().is_empty()
+            {
+                return Err(Error::new(
+                    Kind::Mapping,
+                    "expected absence needs a reviewed field, complete Build and reason",
+                )
+                .into());
+            }
+            if !reviewed.insert((&absence.source, &absence.build)) {
+                return Err(Error::new(Kind::Mapping, "duplicate expected Build absence").into());
+            }
+        }
+        Ok(())
+    }
+
+    pub(crate) fn absent_on(&self, build: Option<&BuildIdentity>) -> BTreeSet<&FieldKey> {
+        self.expected_absences
+            .iter()
+            .filter_map(|absence| (build == Some(&absence.build)).then_some(&absence.source))
+            .collect()
     }
 }

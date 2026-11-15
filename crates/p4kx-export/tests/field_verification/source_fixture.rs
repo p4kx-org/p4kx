@@ -180,5 +180,6 @@ pub(crate) fn probe_inventory() -> Inventory {
         schema_version: 1,
         roots: vec!["SyntheticParams".to_owned()],
         fields,
+        expected_absences: Vec::new(),
     }
 }

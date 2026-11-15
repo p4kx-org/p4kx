@@ -23,6 +23,7 @@ mod mutations_arena_path;
 mod mutations_audit_scope;
 mod mutations_boundaries;
 mod mutations_compare;
+mod mutations_expected_absences;
 mod mutations_mission_property_metadata;
 mod mutations_published;
 mod mutations_resource_metadata;

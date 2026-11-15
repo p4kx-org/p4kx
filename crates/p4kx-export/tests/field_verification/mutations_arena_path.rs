@@ -79,6 +79,36 @@ fn root_member_accounting_requires_the_original_slot_even_when_its_value_is_null
     };
     let owner = super::fixtures::GUID.parse()?;
     let (schema, observations) = null_root_observation(owner, &key);
+    for (row, exported, unhandled) in &root_member_projections() {
+        let projection = Projection {
+            groups: BTreeMap::from([(group.clone(), BTreeMap::from([(owner, vec![row])]))]),
+            rejected: BTreeSet::new(),
+            exclusions: BTreeMap::new(),
+        };
+        let counts = accounting::count_fields(
+            &schema,
+            &observations,
+            &inventory,
+            &projection,
+            None,
+            &|| false,
+        )?;
+        let count = counts.get(&key).ok_or("accounted arena root")?;
+        assert_eq!(
+            (count.populated, count.exported, count.unhandled),
+            (0, *exported, *unhandled),
+            "lost, altered or excess original slots fail the audit"
+        );
+    }
+    let false_absence = json!({"additionalFields":{
+        "roots":[edge("tracePoint", "0")],
+        "values":[{"value":carrier("absent", Value::Null)}]
+    }});
+    assert!(path.select(&false_absence, &|| false).is_err());
+    Ok(())
+}
+
+fn root_member_projections() -> [(Value, u64, u64); 4] {
     let null_cell = carrier("null", Value::Null);
     let row = json!({"additionalFields": {
         "roots":[edge("tracePoint", "0"), edge("nested", "1")],
@@ -97,32 +127,12 @@ fn root_member_accounting_requires_the_original_slot_even_when_its_value_is_null
         "roots":[edge("tracePoint", "0")],
         "values":[node(json!({"type":"string","value":{"type":"gameText","sourceText":""}}))]
     }});
-    for (row, exported, unhandled) in [
-        (&row, 1, 0),
-        (&nested_only, 0, 1),
-        (&duplicate, 2, 1),
-        (&empty_text, 1, 1),
-    ] {
-        let projection = Projection {
-            groups: BTreeMap::from([(group.clone(), BTreeMap::from([(owner, vec![row])]))]),
-            rejected: BTreeSet::new(),
-            exclusions: BTreeMap::new(),
-        };
-        let counts =
-            accounting::count_fields(&schema, &observations, &inventory, &projection, &|| false)?;
-        let count = counts.get(&key).ok_or("accounted arena root")?;
-        assert_eq!(
-            (count.populated, count.exported, count.unhandled),
-            (0, exported, unhandled),
-            "lost, altered or excess original slots fail the audit"
-        );
-    }
-    let false_absence = json!({"additionalFields":{
-        "roots":[edge("tracePoint", "0")],
-        "values":[{"value":carrier("absent", Value::Null)}]
-    }});
-    assert!(path.select(&false_absence, &|| false).is_err());
-    Ok(())
+    [
+        (row, 1, 0),
+        (nested_only, 0, 1),
+        (duplicate, 2, 1),
+        (empty_text, 1, 1),
+    ]
 }
 
 fn null_root_observation(
