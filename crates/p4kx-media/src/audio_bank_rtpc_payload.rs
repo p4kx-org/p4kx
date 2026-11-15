@@ -17,6 +17,12 @@ pub(crate) enum RtpcPayload<'row> {
     SoundCurve(&'row RtpcCurveRecord),
     #[serde(rename = "bank-hirc-sound-rtpc-point")]
     SoundPoint(&'row RtpcPointRecord),
+    #[serde(rename = "bank-hirc-bus-rtpc")]
+    BusSummary(&'row RtpcRecord),
+    #[serde(rename = "bank-hirc-bus-rtpc-curve")]
+    BusCurve(&'row RtpcCurveRecord),
+    #[serde(rename = "bank-hirc-bus-rtpc-point")]
+    BusPoint(&'row RtpcPointRecord),
     #[serde(rename = "bank-hirc-actor-mixer-rtpc")]
     ActorMixerSummary(&'row RtpcRecord),
     #[serde(rename = "bank-hirc-actor-mixer-rtpc-curve")]
@@ -75,6 +81,7 @@ pub(crate) enum RtpcExport<'row> {
 pub(crate) enum RtpcOwner {
     Sound,
     ActorMixer,
+    Bus,
     Container,
     MusicNode,
     Attenuation,
@@ -124,6 +131,7 @@ impl RtpcOwner {
         match self {
             Self::Sound => "audio-bank-hirc-sound-rtpc",
             Self::ActorMixer => "audio-bank-hirc-actor-mixer-rtpc",
+            Self::Bus => "audio-bank-hirc-bus-rtpc",
             Self::Container => "audio-bank-hirc-container-rtpc",
             Self::MusicNode => "audio-bank-hirc-music-node-rtpc",
             Self::Attenuation => "audio-bank-hirc-attenuation-rtpc",
@@ -135,6 +143,7 @@ impl RtpcOwner {
         match self {
             Self::Sound => "audio-bank-hirc-sound-rtpc-curve",
             Self::ActorMixer => "audio-bank-hirc-actor-mixer-rtpc-curve",
+            Self::Bus => "audio-bank-hirc-bus-rtpc-curve",
             Self::Container => "audio-bank-hirc-container-rtpc-curve",
             Self::MusicNode => "audio-bank-hirc-music-node-rtpc-curve",
             Self::Attenuation => "audio-bank-hirc-attenuation-rtpc-curve",
@@ -146,6 +155,7 @@ impl RtpcOwner {
         match self {
             Self::Sound => "audio-bank-hirc-sound-rtpc-point",
             Self::ActorMixer => "audio-bank-hirc-actor-mixer-rtpc-point",
+            Self::Bus => "audio-bank-hirc-bus-rtpc-point",
             Self::Container => "audio-bank-hirc-container-rtpc-point",
             Self::MusicNode => "audio-bank-hirc-music-node-rtpc-point",
             Self::Attenuation => "audio-bank-hirc-attenuation-rtpc-point",
@@ -157,6 +167,7 @@ impl RtpcOwner {
         match self {
             Self::Sound => RtpcExport::Shared(RtpcPayload::SoundSummary(value)),
             Self::ActorMixer => RtpcExport::Shared(RtpcPayload::ActorMixerSummary(value)),
+            Self::Bus => RtpcExport::Shared(RtpcPayload::BusSummary(value)),
             Self::Container => RtpcExport::Container(ContainerRtpcPayload::Summary(value)),
             Self::MusicNode => RtpcExport::Shared(RtpcPayload::MusicSummary(value)),
             Self::Attenuation => RtpcExport::Shared(RtpcPayload::AttenuationSummary(value)),
@@ -168,6 +179,7 @@ impl RtpcOwner {
         match self {
             Self::Sound => RtpcExport::Shared(RtpcPayload::SoundCurve(value)),
             Self::ActorMixer => RtpcExport::Shared(RtpcPayload::ActorMixerCurve(value)),
+            Self::Bus => RtpcExport::Shared(RtpcPayload::BusCurve(value)),
             Self::Container => RtpcExport::Container(ContainerRtpcPayload::Curve(value)),
             Self::MusicNode => RtpcExport::Shared(RtpcPayload::MusicCurve(value)),
             Self::Attenuation => RtpcExport::Shared(RtpcPayload::AttenuationCurve(value)),
@@ -179,6 +191,7 @@ impl RtpcOwner {
         match self {
             Self::Sound => RtpcExport::Shared(RtpcPayload::SoundPoint(value)),
             Self::ActorMixer => RtpcExport::Shared(RtpcPayload::ActorMixerPoint(value)),
+            Self::Bus => RtpcExport::Shared(RtpcPayload::BusPoint(value)),
             Self::Container => RtpcExport::Container(ContainerRtpcPayload::Point(value)),
             Self::MusicNode => RtpcExport::Shared(RtpcPayload::MusicPoint(value)),
             Self::Attenuation => RtpcExport::Shared(RtpcPayload::AttenuationPoint(value)),

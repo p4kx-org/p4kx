@@ -3,6 +3,7 @@
 
 use serde_json::Value;
 
+use crate::audio_bank_bus::payload::{self as bus_payload, BusPayload};
 use crate::audio_bank_dialogue_payload::{ARGUMENT, DialogueEventPayload, NODE, SUMMARY};
 use crate::audio_bank_hirc_action;
 use crate::audio_bank_hirc_action::reference as action_target;
@@ -20,12 +21,18 @@ use super::{ACTION_PAYLOAD, Binding, CONTAINER_PAYLOAD, SOUND_PAYLOAD};
 mod attenuation;
 
 const DIALOGUE_PAYLOAD: &str = "DialogueEventPayload";
+const BUS_PAYLOAD: &str = "BusPayload";
 
 pub(super) fn insert_payload(base: &mut Value) -> Result<(), MediaError> {
     schema_merge::insert_payload(
         base,
         DIALOGUE_PAYLOAD,
         schema_merge::serialized_payload::<DialogueEventPayload<'static>>(),
+    )?;
+    schema_merge::insert_payload(
+        base,
+        BUS_PAYLOAD,
+        schema_merge::serialized_payload::<BusPayload<'static>>(),
     )?;
     attenuation::insert_payload(base)
 }
@@ -54,7 +61,7 @@ const ACTION_TARGET_CANDIDATE: Binding = Binding::exact(
     StatusRule::Complete,
 );
 
-pub(super) const fn bindings() -> [Binding; 17] {
+pub(super) const fn bindings() -> [Binding; 19] {
     let [
         sound,
         media_resolution,
@@ -64,6 +71,7 @@ pub(super) const fn bindings() -> [Binding; 17] {
     ] = sound_bindings();
     let [event, argument, node] = dialogue_bindings();
     let [summary, selector, curve, point] = attenuation::bindings();
+    let [bus, duck] = bus_bindings();
     [
         ACTION,
         ACTION_TARGET_RESOLUTION,
@@ -94,6 +102,8 @@ pub(super) const fn bindings() -> [Binding; 17] {
         selector,
         curve,
         point,
+        bus,
+        duck,
     ]
 }
 
@@ -131,6 +141,25 @@ const fn sound_bindings() -> [Binding; 5] {
             SOUND_PAYLOAD,
             sound_loose::CANDIDATE_NAMESPACE,
             "bank-hirc-sound-loose-wem-candidate",
+            3,
+            StatusRule::Complete,
+        ),
+    ]
+}
+
+const fn bus_bindings() -> [Binding; 2] {
+    [
+        Binding::exact(
+            BUS_PAYLOAD,
+            bus_payload::SUMMARY,
+            "bank-hirc-bus",
+            2,
+            StatusRule::MalformedLayout,
+        ),
+        Binding::exact(
+            BUS_PAYLOAD,
+            bus_payload::DUCK,
+            "bank-hirc-bus-duck",
             3,
             StatusRule::Complete,
         ),

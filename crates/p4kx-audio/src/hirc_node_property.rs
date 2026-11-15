@@ -96,7 +96,7 @@ pub(crate) fn scan<F: ObjectFields>(
     )
 }
 
-fn scan_list<F: ObjectFields>(
+pub(crate) fn scan_list<F: ObjectFields>(
     fields: &mut F,
     kind: BankNodePropertyKind,
     observed: &mut Option<BankNodePropertyExtent>,

@@ -7709,6 +7709,151 @@
       ],
       "type": "object"
     },
+    "BusObservations": {
+      "additionalProperties": false,
+      "properties": {
+        "channel_config_bits": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint32"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "device_shareset_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint32"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "duck_count": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint32"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "hdr_flags": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint8"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "max_duck_volume_bits": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint32"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "max_instances": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint16"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "override_bus_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint32"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "playback_flags": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint8"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "raw_remainder": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankEntryRange"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "recovery_time": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_int32"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "BusPayload": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/NodeDeclaration_BusObservations"
+            },
+            "record_type": {
+              "const": "bank-hirc-bus",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/DuckRecord"
+            },
+            "record_type": {
+              "const": "bank-hirc-bus-duck",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "BusPayload"
+    },
     "ByteOrder": {
       "description": "Byte order used inside each numeric element.",
       "oneOf": [
@@ -9982,6 +10127,38 @@
         "raw_date",
         "raw_time",
         "calendar"
+      ],
+      "type": "object"
+    },
+    "DuckRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "bus_id": {
+          "$ref": "#/$defs/BankField_uint32"
+        },
+        "fade_curve": {
+          "$ref": "#/$defs/BankField_uint8"
+        },
+        "fade_in_time": {
+          "$ref": "#/$defs/BankField_int32"
+        },
+        "fade_out_time": {
+          "$ref": "#/$defs/BankField_int32"
+        },
+        "target_property": {
+          "$ref": "#/$defs/BankField_uint8"
+        },
+        "volume_bits": {
+          "$ref": "#/$defs/BankField_uint32"
+        }
+      },
+      "required": [
+        "bus_id",
+        "volume_bits",
+        "fade_out_time",
+        "fade_in_time",
+        "fade_curve",
+        "target_property"
       ],
       "type": "object"
     },
@@ -16104,6 +16281,113 @@
         }
       ]
     },
+    "NodeDeclaration_BusObservations": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layout": {
+              "const": "decoded",
+              "type": "string"
+            },
+            "observed": {
+              "$ref": "#/$defs/BusObservations"
+            },
+            "version": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "layout",
+            "version",
+            "observed"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layout": {
+              "const": "malformed",
+              "type": "string"
+            },
+            "observed": {
+              "$ref": "#/$defs/BusObservations"
+            },
+            "version": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "layout",
+            "version",
+            "observed"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layout": {
+              "const": "absent",
+              "type": "string"
+            },
+            "version": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "layout",
+            "version"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layout": {
+              "const": "unavailable",
+              "type": "string"
+            },
+            "version": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "layout",
+            "version"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layout": {
+              "const": "unsupported",
+              "type": "string"
+            },
+            "version": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "layout",
+            "version"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "NodeDeclaration_DialogueEventObservations": {
       "oneOf": [
         {
@@ -19726,6 +20010,57 @@
             },
             "record_type": {
               "const": "bank-hirc-sound-rtpc-point",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/RtpcRecord"
+            },
+            "record_type": {
+              "const": "bank-hirc-bus-rtpc",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/RtpcCurveRecord"
+            },
+            "record_type": {
+              "const": "bank-hirc-bus-rtpc-curve",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/RtpcPointRecord"
+            },
+            "record_type": {
+              "const": "bank-hirc-bus-rtpc-point",
               "type": "string"
             }
           },
@@ -31966,6 +32301,210 @@
           "subresource": {
             "properties": {
               "namespace": {
+                "const": "audio-bank-hirc-bus"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/BusPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-hirc-bus"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 2,
+                    "minItems": 2
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "else": {
+              "properties": {
+                "issues": {
+                  "items": {
+                    "properties": {
+                      "severity": {
+                        "const": "info"
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "complete"
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "data": {
+                  "properties": {
+                    "payload": {
+                      "properties": {
+                        "layout": {
+                          "const": "malformed"
+                        }
+                      },
+                      "required": [
+                        "layout"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "payload"
+                  ]
+                }
+              },
+              "required": [
+                "data"
+              ]
+            },
+            "then": {
+              "properties": {
+                "issues": {
+                  "contains": {
+                    "properties": {
+                      "severity": {
+                        "enum": [
+                          "warning",
+                          "error"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "partial"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-hirc-bus-duck"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/BusPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-hirc-bus-duck"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 3,
+                    "minItems": 3
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
                 "const": "audio-bank-music-segment"
               }
             },
@@ -36078,6 +36617,288 @@
                     "properties": {
                       "record_type": {
                         "const": "bank-hirc-attenuation-rtpc-point"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 4,
+                    "minItems": 4
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-hirc-bus-rtpc"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/RtpcPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-hirc-bus-rtpc"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 2,
+                    "minItems": 2
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "else": {
+              "properties": {
+                "issues": {
+                  "items": {
+                    "properties": {
+                      "severity": {
+                        "const": "info"
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "complete"
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "data": {
+                  "properties": {
+                    "payload": {
+                      "properties": {
+                        "layout": {
+                          "const": "malformed"
+                        }
+                      },
+                      "required": [
+                        "layout"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "payload"
+                  ]
+                }
+              },
+              "required": [
+                "data"
+              ]
+            },
+            "then": {
+              "properties": {
+                "issues": {
+                  "contains": {
+                    "properties": {
+                      "severity": {
+                        "enum": [
+                          "warning",
+                          "error"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "partial"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-hirc-bus-rtpc-curve"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/RtpcPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-hirc-bus-rtpc-curve"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 3,
+                    "minItems": 3
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-hirc-bus-rtpc-point"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/RtpcPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-hirc-bus-rtpc-point"
                       }
                     },
                     "required": [

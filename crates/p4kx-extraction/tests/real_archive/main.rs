@@ -58,6 +58,7 @@ mod soc_chunks;
 mod sound;
 mod sound_extraction;
 mod soundbank;
+mod soundbank_bus;
 mod soundbank_hirc;
 mod stencil_census;
 mod stencil_params;

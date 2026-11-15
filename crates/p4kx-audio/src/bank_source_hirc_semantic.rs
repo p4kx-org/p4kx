@@ -21,10 +21,11 @@ use crate::hirc_container::Layout as ContainerLayout;
 use crate::hirc_source;
 use crate::{BankHircEvent, BankObservedHeader, BankReadError, HircKind};
 
-use super::sound_states;
+use super::bus::BankHircBus;
 use super::{
     BankHirc, BankHircAction, BankHircActionProperties, BankHircObject, BankHircSoundNode,
 };
+use super::{bus, sound_states};
 
 /// A physical HIRC occurrence and any selected bounded interpretation.
 #[non_exhaustive]
@@ -48,6 +49,8 @@ pub enum BankHircSemantic<'input, R> {
     },
     /// Owner-bound Sound and sequential source cursors for its node chunks.
     SoundWithNode(BankHircSoundNode<'input, R>),
+    /// Owner-bound bus interpretation and original duck target rows.
+    Bus(Box<BankHircBus<'input, R>>),
     /// Owner-bound standalone State interpretation.
     State(BankHircState),
     /// Owner-bound container interpretation and ordered children.
@@ -81,6 +84,7 @@ impl<R> BankHircSemantic<'_, R> {
             Self::Event(event) => &event.object,
             Self::Sound(sound) | Self::SoundWithStates { sound, .. } => &sound.object,
             Self::SoundWithNode(node) => &node.sound().object,
+            Self::Bus(bus) => bus.object(),
             Self::State(state) => &state.object,
             Self::Container(container) => &container.object,
             Self::ContainerWithNode(container) => container.object(),
@@ -278,6 +282,11 @@ impl<R: Read + Seek> BankHirc<'_, R> {
                     version,
                 )
                 .map(|actor| BankHircSemantic::ActorMixer(Box::new(actor)));
+            }
+            HircKind::AudioBus | HircKind::AuxiliaryBus
+                if mode == NodeMode::SourceFields && version == hirc_source::NODE_BASE_VERSION =>
+            {
+                bus::observe(self.input, object).map(|bus| BankHircSemantic::Bus(Box::new(bus)))
             }
             HircKind::State if mode != NodeMode::Raw => {
                 self.state(object, version).map(BankHircSemantic::State)

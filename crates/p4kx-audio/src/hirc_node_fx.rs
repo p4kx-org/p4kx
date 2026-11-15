@@ -45,7 +45,7 @@ impl BankNodeFxList<'_> {
     /// Returns the complete original list extent when all authored fields fit.
     #[must_use]
     pub fn complete_range(self) -> Option<Range<u64>> {
-        let start = self.fields.override_parent_bits.as_ref()?.range.start;
+        let start = self.fields.start?;
         let count = self.declared_count?.value;
         let slots = self.fields.slots_range.as_ref()?;
         let expected = u64::from(count) * SLOT_LEN as u64;
@@ -61,6 +61,25 @@ pub(crate) fn scan<F: ObjectFields>(
 ) -> Result<(), F::Error> {
     observed.start = Some(input.offset());
     observed.override_parent_bits = Some(input.read_u8()?);
+    scan_slots(input, kind, observed, declared)
+}
+
+pub(crate) fn scan_owned<F: ObjectFields>(
+    input: &mut F,
+    kind: BankNodeFxKind,
+    observed: &mut BankNodeFxFields,
+    declared: &mut Option<BankHircField<u8>>,
+) -> Result<(), F::Error> {
+    observed.start = Some(input.offset());
+    scan_slots(input, kind, observed, declared)
+}
+
+fn scan_slots<F: ObjectFields>(
+    input: &mut F,
+    kind: BankNodeFxKind,
+    observed: &mut BankNodeFxFields,
+    declared: &mut Option<BankHircField<u8>>,
+) -> Result<(), F::Error> {
     let count = input.read_u8()?;
     let required = u64::from(count.value) * SLOT_LEN as u64;
     *declared = Some(count);

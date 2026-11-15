@@ -206,6 +206,7 @@ impl<'i> Walk<'_, 'i> {
             HircValue::ActorMixer(_)
             | HircValue::State(_)
             | HircValue::Attenuation
+            | HircValue::Bus
             | HircValue::Malformed(_)
             | HircValue::Raw => self.unresolved_object(object),
         }
@@ -216,7 +217,11 @@ impl<'i> Walk<'_, 'i> {
             HircValue::Malformed(error)
                 if !matches!(
                     object.kind,
-                    HircKind::State | HircKind::ActorMixer | HircKind::Attenuation
+                    HircKind::State
+                        | HircKind::ActorMixer
+                        | HircKind::Attenuation
+                        | HircKind::AudioBus
+                        | HircKind::AuxiliaryBus
                 ) =>
             {
                 BreakReason::Malformed(error.clone())

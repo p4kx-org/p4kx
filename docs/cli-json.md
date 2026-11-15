@@ -1723,13 +1723,11 @@ An illustrative example, shortened and with values that do not come from one ban
 ```
 
 `total` is the number of objects in the `HIRC` section and `layouts` counts all of them by how far
-the reader decodes them: `decoded` (the fields of the type were read; containers and music objects must use their whole
-body, a sound, action or event is not checked for bytes after its fields), `undecoded` (a type the
-reader has no decoder for, e.g. actor-mixers, buses and states; the body is skipped),
-`unsupported` (a decoded type in a bank version whose layout is not known: Sound below version 150,
-standalone State outside versions 128–145, containers and music objects below 154, or any
-decoded type above 154) and `malformed` (the body does
-not hold the fields of its type). `matched` counts the objects that pass `--type` and `--id`;
+the reader decodes them. `decoded` identifies a readable layout. Containers, music objects
+and buses must use their whole body. `undecoded` identifies a type without a decoder, such as
+an LFO or an unrecognized type byte. `unsupported` identifies a recognized soundbank object
+whose version has no verified decoder. The bus layout requires version 154. `malformed`
+identifies an invalid body for a supported layout. `matched` counts the objects that pass `--type` and `--id`;
 `objects` holds `limit` of them from `offset` on, in bank order, and `next_offset` is where the
 next page starts, `null` on the last. A bank without a `HIRC` section has `total` 0.
 
@@ -1742,8 +1740,8 @@ Each object has `index` (its position in the section), `id`, `type` (`state`, `s
 ID of the parent node, `null` for a node at the top and for an object without a parent field;
 `children` lists the IDs the object holds in bank order: the actions of an event, the children of
 a container, the tracks of a segment, the segments of a playlist and, for a music track, the media
-IDs of its sources. `detail` depends on the type and is `null` for an event (its actions are the
-children) and for undecoded, unsupported and malformed objects.
+IDs of its sources. `detail` holds the available eager type-specific fields. Event actions
+appear in `children`. Checked bus declarations appear in `node_fields`.
 
 Version-154 Attenuation objects include `source_fields` with original flags, optional cone
 words, signed curve selectors, ordered conversion curves and initial RTPC fields.
@@ -1784,6 +1782,15 @@ Rows carry physical Layer, curve, association and point positions. Initial RTPC 
 includes its checked complete curves. Crossfade points keep each readable binary32
 word and the original interpolation code. Association references carry unchecked
 resolution. Unknown and non-finite words remain available.
+
+Version-154 AudioBus and AuxiliaryBus objects expose their checked source layout in
+`node_fields.object_status`. The `node_fields.bus` extension keeps original bus
+settings, root device share-set, recovery and volume words, ordered duck targets
+and any raw remainder. The shared node fields include the original properties,
+positioning, Aux routing, effects, metadata, inline State and RTPC. An
+unsupported bus version reports that disposition and retains its original
+body. Every exported value cites the owning bank bytes.
+[Bus source contract](media-bank-metadata.md#audiobus-and-auxiliarybus)
 
 Version-154 MusicTrack objects include `source_fields` with original track
 controls, source, clip, automation and switch-member rows. Clip records preserve

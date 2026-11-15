@@ -34,7 +34,7 @@ impl NodeFx {
         node: &mut NodeReader<'_, '_, R>,
         kind: BankNodeFxKind,
     ) -> Result<Option<Self>, E> {
-        let Some(list) = node.parent().map(|parent| parent.fx(kind)) else {
+        let Some(list) = node.fx(kind) else {
             return Ok(None);
         };
         if list.fields.start.is_none() {

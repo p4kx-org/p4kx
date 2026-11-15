@@ -31,6 +31,8 @@ pub(crate) const fn has_decoder(kind: HircKind) -> bool {
             | HircKind::SwitchContainer
             | HircKind::LayerContainer
             | HircKind::ActorMixer
+            | HircKind::AudioBus
+            | HircKind::AuxiliaryBus
             | HircKind::MusicSegment
             | HircKind::MusicTrack
             | HircKind::MusicSwitch

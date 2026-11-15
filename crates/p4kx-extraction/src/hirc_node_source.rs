@@ -18,6 +18,8 @@ use crate::source_value::SourcedValue;
 
 #[path = "hirc_actor_mixer_children_source.rs"]
 mod actor_mixer;
+#[path = "hirc_bus_source.rs"]
+mod bus;
 #[path = "hirc_node_source_positioning.rs"]
 mod positioning;
 #[path = "hirc_node_source_reader.rs"]
@@ -30,6 +32,7 @@ pub(in crate::hirc_view) mod rtpc;
 mod state;
 
 use self::actor_mixer::{ActorChildrenSchema, ActorChildrenSource};
+use self::bus::{BusFields, BusSchema, DuckRows};
 use self::positioning::{Positioning, PositioningRows, PositioningSchema};
 use self::reader::NodeReader;
 use self::routing::{NodeAdvancedSettings, NodeAux, NodeFx};
@@ -45,6 +48,7 @@ pub(super) type NodeSourceSchema = NodeDocument<
     InlineStateSchema,
     RtpcSchema,
     ActorChildrenSchema,
+    BusSchema,
 >;
 
 /// Original shared HIRC node declarations for one selected physical occurrence.
@@ -62,19 +66,20 @@ impl<'bank> NodeSourceFields<'bank> {
         kind: HircKind,
         status: Status,
     ) -> Option<Self> {
-        (bank.soundbank().header().has_shared_node_layout()
-            && matches!(
-                kind,
-                HircKind::Sound
-                    | HircKind::ActorMixer
-                    | HircKind::RandomSequenceContainer
-                    | HircKind::SwitchContainer
-                    | HircKind::LayerContainer
-                    | HircKind::MusicSegment
-                    | HircKind::MusicTrack
-                    | HircKind::MusicSwitch
-                    | HircKind::MusicPlaylist
-            ))
+        (reader::is_bus(kind)
+            || (bank.soundbank().header().has_shared_node_layout()
+                && matches!(
+                    kind,
+                    HircKind::Sound
+                        | HircKind::ActorMixer
+                        | HircKind::RandomSequenceContainer
+                        | HircKind::SwitchContainer
+                        | HircKind::LayerContainer
+                        | HircKind::MusicSegment
+                        | HircKind::MusicTrack
+                        | HircKind::MusicSwitch
+                        | HircKind::MusicPlaylist
+                )))
         .then_some(Self {
             bank,
             index,
@@ -99,7 +104,7 @@ impl Serialize for NodeSourceFields<'_> {
 #[derive(Serialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 #[schemars(rename = "SharedNodeSourceFields")]
-pub(super) struct NodeDocument<Inventory, Positioning, State, Rtpc, Children> {
+pub(super) struct NodeDocument<Inventory, Positioning, State, Rtpc, Children, Bus> {
     version: SourcedValue<u32>,
     object_status: SourcedValue<Status>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -134,6 +139,9 @@ pub(super) struct NodeDocument<Inventory, Positioning, State, Rtpc, Children> {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schemars(with = "Option<ActorChildrenSchema>")]
     actor_mixer_children: Option<Children>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<BusSchema>")]
+    bus: Option<Bus>,
     #[schemars(with = "SourceInventory")]
     source_inventory: Inventory,
 }
@@ -165,16 +173,15 @@ fn project<R: Read + Seek, S: Serializer>(
     observed: &mut BankHircSemantic<'_, R>,
     status: Status,
 ) -> Result<S::Ok, S::Error> {
-    let object_status = origins
-        .coverage(status, header, observed.object())
-        .map_err(S::Error::custom)?;
-    let node = NodeReader::new(observed)
+    let object_status =
+        observed_status(origins, header, observed, status).map_err(S::Error::custom)?;
+    let node = NodeReader::new(observed, header.header().version)
         .ok_or_else(|| S::Error::custom("unexpected original node layout"))?;
     let node = RefCell::new(node);
     let mut reader = node.try_borrow_mut().map_err(S::Error::custom)?;
     let parent = reader.parent();
     let parent_id = parent.and_then(|parent| parent.parent_id.as_ref());
-    let override_bus_id = parent.and_then(|parent| parent.override_bus_id());
+    let override_bus_id = reader.override_bus_id();
     let priority_flags = parent.and_then(|parent| parent.priority_flags.as_ref());
     let document = NodeDocument {
         version: origins.version(header).map_err(S::Error::custom)?,
@@ -220,10 +227,46 @@ fn project<R: Read + Seek, S: Serializer>(
             node: &node,
         }),
         actor_mixer_children: ActorChildrenSource::new(origins, &node, &reader),
+        bus: project_bus(origins, header, &node, &reader).map_err(S::Error::custom)?,
         source_inventory: origins,
     };
     drop(reader);
     document.serialize(serializer)
+}
+
+type BusSource<'view, 'source, 'input, R> = BusFields<DuckRows<'view, 'source, 'input, R>>;
+
+fn project_bus<'view, 'source, 'input, R>(
+    origins: &'view ObjectOrigins,
+    header: &BankObservedHeader,
+    node: &'view RefCell<NodeReader<'source, 'input, R>>,
+    reader: &NodeReader<'_, '_, R>,
+) -> Result<Option<BusSource<'view, 'source, 'input, R>>, crate::SourceEvidenceError> {
+    let NodeReader::Bus(bus) = reader else {
+        return Ok(None);
+    };
+    BusFields::read(origins, header, bus, DuckRows { origins, node }).map(Some)
+}
+
+fn observed_status<R>(
+    origins: &ObjectOrigins,
+    header: &BankObservedHeader,
+    observed: &BankHircSemantic<'_, R>,
+    previous: Status,
+) -> Result<SourcedValue<Status>, crate::SourceEvidenceError> {
+    let status = coverage_status(observed, header.header().version, previous);
+    origins.coverage(status, header, observed.object())
+}
+
+fn coverage_status<R>(observed: &BankHircSemantic<'_, R>, version: u32, status: Status) -> Status {
+    match observed {
+        BankHircSemantic::Bus(bus) if bus.format_error().is_some() => Status::Malformed,
+        BankHircSemantic::Bus(_) => Status::Decoded,
+        BankHircSemantic::Raw(object) if reader::is_bus(object.kind(version)) => {
+            Status::Unsupported
+        }
+        _ => status,
+    }
 }
 
 fn positioning<'view, 'source, 'input, R, E: serde::ser::Error>(
@@ -232,8 +275,7 @@ fn positioning<'view, 'source, 'input, R, E: serde::ser::Error>(
     reader: &NodeReader<'_, '_, R>,
 ) -> Result<Option<Positioning<PositioningRows<'view, 'source, 'input, R>>>, E> {
     reader
-        .playback()
-        .map(|fields| &fields.positioning)
+        .positioning()
         .filter(|fields| fields.start.is_some())
         .map(|fields| Positioning::read(origins, fields, PositioningRows { origins, node }))
         .transpose()

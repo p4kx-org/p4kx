@@ -11,6 +11,8 @@ use p4kx_audio::{
 };
 use p4kx_testkit::{TestBank, TestContainerKind, TestHircObject, TestNodeBase, TestPlaylistItem};
 
+use super::bnk_source_bus;
+
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
 const PARENT: u32 = 0x2C21_1B2E;
@@ -25,7 +27,7 @@ fn layouts(bank: &TestBank) -> Result<Vec<HircLayout>, Box<dyn std::error::Error
 fn decoded_undecoded_unsupported_and_malformed_objects_are_told_apart() -> TestResult {
     let bank = TestBank::new(1)
         .object(TestHircObject::event(1, &[2]))
-        .object(TestHircObject::raw(8, 3, [0; 8]))
+        .object(TestHircObject::raw(0xb7, 3, [0; 8]))
         .object(TestHircObject::raw(2, 4, [0; 3]));
     assert_eq!(
         layouts(&bank)?,
@@ -189,15 +191,17 @@ fn a_decoder_exists_for_exactly_the_kinds_the_reader_decodes() -> TestResult {
         TestHircObject::music_switch(9, &[7], 1, &[7]),
         TestHircObject::music_playlist(10, &[7]),
         TestHircObject::actor_mixer(12, &[1], TestNodeBase::Plain),
-        TestHircObject::raw(14, 13, [0; 24]),
+        TestHircObject::raw(8, 13, bnk_source_bus::body(0)),
+        TestHircObject::raw(14, 14, [0; 24]),
+        TestHircObject::raw(18, 15, bnk_source_bus::body(15)),
     ];
     let standalone_state = TestHircObject::raw(1, 11, [0; 2]);
     let undecoded: Vec<TestHircObject> = (2_u8..=22)
-        .filter(|byte| ![2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14].contains(byte))
+        .filter(|byte| ![2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 18].contains(byte))
         .zip(100_u32..)
         .map(|(byte, id)| TestHircObject::raw(byte, id, [0; 8]))
         .collect();
-    assert_eq!(undecoded.len(), 9, "the kinds without a decoder");
+    assert_eq!(undecoded.len(), 7, "the kinds without a decoder");
     let bank = |version: u32| {
         decoded
             .iter()

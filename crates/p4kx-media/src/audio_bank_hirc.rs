@@ -13,6 +13,7 @@ use p4kx_extraction::bank::{
 
 use crate::audio_bank_actor_mixer;
 use crate::audio_bank_attenuation;
+use crate::audio_bank_bus;
 use crate::audio_bank_container_node;
 use crate::audio_bank_dialogue_event;
 use crate::audio_bank_failure::BankPhase;
@@ -99,6 +100,9 @@ fn emit_semantic<R: Read + Seek>(
     let targets = &inventory.hirc_objects;
     match (semantic, version) {
         (BankHircSemantic::Raw(object), version) => emit_raw(projection, &object, version, writer),
+        (BankHircSemantic::Bus(bus), Some(version)) => {
+            audio_bank_bus::project(projection, version, *bus, writer)
+        }
         (BankHircSemantic::ActorMixer(actor), Some(version)) => {
             audio_bank_actor_mixer::project(projection, version, *actor, writer)
         }
@@ -155,6 +159,9 @@ fn emit_raw(
         return Ok(());
     };
     match original.kind(version.version) {
+        HircKind::AudioBus | HircKind::AuxiliaryBus => {
+            audio_bank_bus::unsupported(projection, version, original, writer)
+        }
         HircKind::Sound => {
             audio_bank_node_properties::unsupported(projection, version, original, writer)?;
             audio_bank_node_declarations::unsupported(projection, version, original, writer)

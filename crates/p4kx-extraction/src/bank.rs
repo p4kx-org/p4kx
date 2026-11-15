@@ -30,11 +30,11 @@ pub use p4kx_audio::{
     MediaStorage, MusicTrackKind, SoundSource, StateObject, StateProperties, StateProperty,
 };
 pub use p4kx_audio::{
-    BankActorMixerFields, BankHircActionProperties, BankHircActorMixer, BankHircContainerNode,
-    BankHircSoundNode, BankNodeAuxFields, BankNodeFxFields, BankNodeFxKind, BankNodeFxList,
-    BankNodeFxSlot, BankNodeFxSlots, BankNodePropertyExtent, BankNodePropertyExtents,
-    BankNodePropertyKind, BankNodePropertyRow, BankNodePropertyRows, BankNodePropertyValue,
-    BankNodeUserAuxBuses,
+    BankActorMixerFields, BankBusDuckRow, BankBusDuckRows, BankHircActionProperties,
+    BankHircActorMixer, BankHircBus, BankHircBusFields, BankHircContainerNode, BankHircSoundNode,
+    BankNodeAuxFields, BankNodeFxFields, BankNodeFxKind, BankNodeFxList, BankNodeFxSlot,
+    BankNodeFxSlots, BankNodePropertyExtent, BankNodePropertyExtents, BankNodePropertyKind,
+    BankNodePropertyRow, BankNodePropertyRows, BankNodePropertyValue, BankNodeUserAuxBuses,
 };
 pub use p4kx_audio::{
     BankAttenuationCone, BankAttenuationCurve, BankAttenuationFields, BankAttenuationPoints,

@@ -48,6 +48,7 @@ mod hirc_action;
 mod hirc_actor_mixer;
 mod hirc_attenuation;
 mod hirc_blend_container;
+mod hirc_bus_fields;
 mod hirc_container;
 mod hirc_dialogue_event;
 mod hirc_event;
@@ -149,6 +150,9 @@ pub use bank_source_hirc::{
     BankActionRead, BankHirc, BankHircAction, BankHircActionProperties, BankHircObject,
     BankHircRtpc, BankHircSemantic, BankHircSoundStates, BankHircState, BankRtpcRead,
     BankSoundStateRead, BankStateRead,
+};
+pub use bank_source_hirc::{
+    BankBusDuckRow, BankBusDuckRows, BankHircBus, BankHircBusFields, BankHircBusSettings,
 };
 pub use bank_source_music_playlist::{
     BankHircMusicPlaylist, BankMusicPlaylistDepth, BankMusicPlaylistFields, BankMusicPlaylistRead,

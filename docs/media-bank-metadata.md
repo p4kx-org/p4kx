@@ -37,6 +37,11 @@ and fallback selection.
 | `audio-bank-hirc-sound-media-candidate` | `bank-hirc-sound-media-candidate` | HIRC section, Sound object and candidate ordinals |
 | `audio-bank-hirc-sound-loose-wem-resolution` | `bank-hirc-sound-loose-wem-resolution` | Physical loose WEM candidates in the Sound's owning Archive |
 | `audio-bank-hirc-sound-loose-wem-candidate` | `bank-hirc-sound-loose-wem-candidate` | Physical Entry ordinal of one canonical loose WEM observation |
+| `audio-bank-hirc-bus` | `bank-hirc-bus` | HIRC section and bus object ordinals |
+| `audio-bank-hirc-bus-duck` | `bank-hirc-bus-duck` | HIRC section, bus object and duck target ordinals |
+| `audio-bank-hirc-bus-rtpc` | `bank-hirc-bus-rtpc` | HIRC section and bus object ordinals |
+| `audio-bank-hirc-bus-rtpc-curve` | `bank-hirc-bus-rtpc-curve` | HIRC section, bus object and curve ordinals |
+| `audio-bank-hirc-bus-rtpc-point` | `bank-hirc-bus-rtpc-point` | HIRC section, bus object, curve and point ordinals |
 | `audio-bank-hirc-sound-rtpc` | `bank-hirc-sound-rtpc` | HIRC section and Sound object ordinals |
 | `audio-bank-hirc-sound-rtpc-curve` | `bank-hirc-sound-rtpc-curve` | HIRC section, Sound object and curve ordinals |
 | `audio-bank-hirc-sound-rtpc-point` | `bank-hirc-sound-rtpc-point` | HIRC section, Sound object, curve and point ordinals |
@@ -494,6 +499,7 @@ The source coverage depends on the HIRC owner and the observed bank version.
 | --- | --- | --- |
 | v154 Sound, ActorMixer, Random/Sequence, Switch, Blend | Shared properties, priority, effects, Aux, positioning, advanced settings, inline State and RTPC | node_fields plus type-specific source_fields where available |
 | v154 MusicSegment, MusicTrack, MusicSwitch, MusicPlaylist | The same shared groups, alongside music decisions and timing | node_fields plus MusicTrack source_fields |
+| v154 AudioBus, AuxiliaryBus | Bus routing, settings, duck targets and shared source groups | `node_fields` and its `bus` extension |
 | v154 Play Action | Separate property summary and scalar/ranged rows | source_fields with type, target, PlayBank and property declarations |
 | Standalone State v128–145 | Standalone property summary and ordered raw words | source_fields with the original bundle and raw range |
 | Standalone State outside v128–145 | Explicit unsupported disposition and retained object bytes | source_fields with unsupported disposition and raw range |
@@ -505,3 +511,22 @@ populated examples in the source probe and in the selected bank. Standalone Stat
 separately from inline State.
 
     cargo test --release --locked -p p4kx-media --test real_archive original_shared_wwise_node_groups_reconcile -- --ignored --nocapture
+
+## AudioBus and AuxiliaryBus
+
+The checked v154 source reader exports AudioBus and AuxiliaryBus declarations.
+The `audio-bank-hirc-bus` row includes the override bus, the conditional root
+device share-set, the playback flags, maximum instances, packed channel
+configuration, HDR flags, recovery time, maximum duck-volume bits and duck
+count. An absent device word and a present zero have separate representations.
+The `audio-bank-hirc-bus-duck` rows keep the original target order, target bus,
+volume bits, signed fade words, curve code and property code. The numeric words
+keep their authored width and do not imply a measured runtime value.
+
+The shared property, positioning, effects, metadata, auxiliary routing and
+inline State rows retain the same physical owner. Bus RTPC summary, curves and
+points use the bus-specific namespaces. The complete raw bank and existing
+`audio-bank-object.body_range` remain available to reconcile all original
+bytes. A malformed layout carries its checked fields, a diagnostic and any raw
+remainder. Other bank versions keep an explicit unsupported disposition.
+[ADR-0390](adr/0390-v154-bus-routing-and-ducking.md)

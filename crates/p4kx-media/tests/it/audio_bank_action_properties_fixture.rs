@@ -52,7 +52,7 @@ pub(super) fn original_bank(version: u32, body: Vec<u8>) -> Vec<u8> {
     TestBank::new(5)
         .version(version)
         .object(TestHircObject::raw(3, 123, body))
-        .object(TestHircObject::raw(8, TARGET, []))
+        .object(TestHircObject::raw(0xa8, TARGET, []))
         .object(TestHircObject::event(1, &[]))
         .bytes()
 }

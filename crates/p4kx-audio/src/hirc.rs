@@ -9,6 +9,7 @@ use crate::bank_structure::{HircEnvelope, OBJECT_HEADER_LEN, OBJECT_ID_LEN};
 use crate::hirc_action::{self, ActionTarget};
 use crate::hirc_actor_mixer::{self, ActorMixer};
 use crate::hirc_attenuation::{self, BankAttenuationFields};
+use crate::hirc_bus_fields::{self, BankHircBusFields};
 use crate::hirc_container;
 use crate::hirc_event;
 use crate::hirc_layout::has_decoder;
@@ -214,6 +215,8 @@ pub enum HircValue {
     Container(Container),
     /// An `ActorMixer`'s shared node parent and children, in bank version 154.
     ActorMixer(ActorMixer),
+    /// A checked `AudioBus` or `AuxiliaryBus` declaration.
+    Bus,
     /// A music segment, in bank version 154.
     MusicSegment(Box<MusicSegment>),
     /// A music track, in bank version 154.
@@ -332,6 +335,12 @@ fn value(
         }
         HircKind::ActorMixer if version == hirc_actor_mixer::VERSION => {
             HircValue::ActorMixer(hirc_actor_mixer::read(fields, bank_offset)?)
+        }
+        HircKind::AudioBus | HircKind::AuxiliaryBus
+            if version == hirc_source::NODE_BASE_VERSION =>
+        {
+            hirc_bus_fields::scan(fields, &mut BankHircBusFields::default())?;
+            HircValue::Bus
         }
         HircKind::MusicSegment if version == CONTAINER_VERSION => {
             HircValue::MusicSegment(Box::new(hirc_music_parse::segment(fields)?))

@@ -124,6 +124,7 @@ fn an_event_with_more_than_127_actions_reads_a_two_byte_count() -> TestResult {
 #[test]
 fn other_objects_keep_their_kind_id_and_raw_body() -> TestResult {
     let bytes = TestBank::new(1)
+        .version(153)
         .object(TestHircObject::raw(8, 0x1234, [9, 8, 7]))
         .object(TestHircObject::raw(0x30, 0x5678, []))
         .bytes();

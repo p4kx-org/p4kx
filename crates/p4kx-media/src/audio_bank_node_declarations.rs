@@ -6,10 +6,10 @@ use std::ops::Range;
 
 use p4kx_extraction::BankError;
 use p4kx_extraction::bank::{
-    BankContainerRead, BankHircActorMixer, BankHircContainerNode, BankHircObject,
-    BankHircSoundNode, BankNodeAuxFields, BankNodeFxKind, BankNodeFxSlots, BankNodeParentFields,
-    BankNodePlaybackFields, BankNodeUserAuxBuses, BankPositioningRows, BankPositioningTableKind,
-    BankSharedNode, BankSoundContinuation, BankSoundRead,
+    BankContainerRead, BankHircActorMixer, BankHircBus, BankHircBusFields, BankHircContainerNode,
+    BankHircObject, BankHircSoundNode, BankNodeAuxFields, BankNodeFxKind, BankNodeFxSlots,
+    BankNodeParentFields, BankNodePlaybackFields, BankNodeUserAuxBuses, BankPositioningRows,
+    BankPositioningTableKind, BankSharedNode, BankSoundContinuation, BankSoundRead,
 };
 
 use crate::audio_bank_inventory::VersionSite;
@@ -30,6 +30,7 @@ pub(crate) enum Owner<'node, 'input, R> {
     Sound(&'node mut BankHircSoundNode<'input, R>),
     ActorMixer(&'node mut BankHircActorMixer<'input, R>),
     Container(&'node mut BankHircContainerNode<'input, R>),
+    Bus(&'node mut BankHircBus<'input, R>),
     Shared {
         object: BankHircObject,
         node: &'node mut BankSharedNode<'input, R>,
@@ -45,6 +46,7 @@ pub(crate) struct Declarations<'context, 'source> {
 
 struct Source<'fields> {
     fields: Option<&'fields BankNodeParentFields>,
+    bus: Option<&'fields BankHircBusFields>,
     aux: Option<&'fields BankNodeAuxFields>,
     playback: Option<&'fields BankNodePlaybackFields>,
     disposition: Disposition<'fields>,
@@ -79,6 +81,7 @@ impl<R: Read + Seek> Owner<'_, '_, R> {
             Self::Sound(node) => node.sound().object,
             Self::ActorMixer(node) => *node.object(),
             Self::Container(node) => *node.object(),
+            Self::Bus(bus) => *bus.object(),
             Self::Shared { object, .. } => *object,
         }
     }
@@ -91,6 +94,7 @@ impl<R: Read + Seek> Owner<'_, '_, R> {
                 let disposition = container_disposition(node.status())?;
                 Ok(Source {
                     fields: Some(&fields.node),
+                    bus: None,
                     aux: Some(&fields.aux),
                     playback: Some(&fields.playback),
                     disposition,
@@ -100,13 +104,22 @@ impl<R: Read + Seek> Owner<'_, '_, R> {
                 let fields = node.fields();
                 Ok(Source {
                     fields: Some(&fields.node),
+                    bus: None,
                     aux: Some(&fields.parameters.aux),
                     playback: Some(&fields.parameters.playback),
                     disposition: container_disposition(node.status())?,
                 })
             }
+            Self::Bus(bus) => Ok(Source {
+                fields: None,
+                bus: Some(bus.fields()),
+                aux: Some(&bus.fields().aux),
+                playback: None,
+                disposition: Disposition::Observed(bus.format_error()),
+            }),
             Self::Shared { node, error, .. } => Ok(Source {
                 fields: Some(node.parent()),
+                bus: None,
                 aux: Some(&node.parameters().aux),
                 playback: Some(&node.parameters().playback),
                 disposition: Disposition::Observed(*error),
@@ -122,6 +135,7 @@ impl<R: Read + Seek> Owner<'_, '_, R> {
             Self::Sound(node) => node.user_aux_buses(),
             Self::ActorMixer(node) => node.user_aux_buses(),
             Self::Container(node) => node.user_aux_buses(),
+            Self::Bus(bus) => bus.user_aux_buses(),
             Self::Shared { node, .. } => node.user_aux_buses(),
         }
         .map_err(|cause| bank.replay_failure(cause))
@@ -135,6 +149,7 @@ impl<R: Read + Seek> Owner<'_, '_, R> {
             Self::Sound(node) => node.positioning_rows(kind),
             Self::ActorMixer(node) => node.positioning_rows(kind),
             Self::Container(node) => node.positioning_rows(kind),
+            Self::Bus(bus) => bus.positioning_rows(kind),
             Self::Shared { node, .. } => node.positioning_rows(kind),
         }
     }
@@ -144,6 +159,7 @@ impl<R: Read + Seek> Owner<'_, '_, R> {
             Self::Sound(node) => node.fx_slots(kind),
             Self::ActorMixer(node) => node.fx_slots(kind),
             Self::Container(node) => node.fx_slots(kind),
+            Self::Bus(bus) => bus.fx_slots(kind),
             Self::Shared { node, .. } => node.fx_slots(kind),
         }
     }
@@ -186,6 +202,7 @@ fn sound_source<'node, R>(
         .and_then(|node| node.base.as_ref());
     Ok(Source {
         fields: base.map(|base| &base.fields),
+        bus: None,
         aux: base.map(|base| &base.aux),
         playback: base.map(|base| &base.playback),
         disposition,
@@ -210,7 +227,10 @@ pub(crate) fn emit<R: Read + Seek>(
             &declarations,
             kind,
             source.disposition,
-            source.fields.map(|fields| fields.fx(kind)),
+            source
+                .bus
+                .map(|bus| bus.fx(kind))
+                .or_else(|| source.fields.map(|fields| fields.fx(kind))),
             writer,
         )?;
     }
@@ -221,7 +241,16 @@ pub(crate) fn emit<R: Read + Seek>(
         buses.as_ref(),
         writer,
     )?;
-    playback_summaries(&declarations, source.disposition, source.playback, writer)?;
+    if let Some(bus) = source.bus {
+        audio_bank_node_positioning::summary(
+            &declarations,
+            source.disposition,
+            Some(&bus.positioning),
+            writer,
+        )?;
+    } else {
+        playback_summaries(&declarations, source.disposition, source.playback, writer)?;
+    }
     for kind in LISTS {
         if let Some(slots) = owner.slots(kind) {
             audio_bank_node_fx::slots(&declarations, kind, slots, writer)?;

@@ -17,6 +17,8 @@ use crate::{
 
 #[path = "bank_hirc_action_properties.rs"]
 mod action_properties;
+#[path = "bank_source_bus.rs"]
+mod bus;
 #[path = "bank_source_hirc_semantic.rs"]
 mod semantic;
 #[path = "bank_hirc_sound_node.rs"]
@@ -28,6 +30,9 @@ mod sound_states;
 #[path = "bank_source_state.rs"]
 mod state;
 pub use self::action_properties::BankHircActionProperties;
+pub use self::bus::{
+    BankBusDuckRow, BankBusDuckRows, BankHircBus, BankHircBusFields, BankHircBusSettings,
+};
 pub use self::semantic::BankHircSemantic;
 pub use self::sound_node::BankHircSoundNode;
 pub use self::sound_rtpc::{BankHircRtpc, BankRtpcRead};

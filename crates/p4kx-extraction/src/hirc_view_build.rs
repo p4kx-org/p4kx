@@ -16,8 +16,7 @@ use crate::hirc_view::{
     TrackSwitchView,
 };
 
-/// Returns the type-dependent fields of a decoded object; `None` for an Event, a raw body and a
-/// malformed one.
+/// Returns the eager type-dependent detail where the object exposes it.
 pub(crate) fn detail(value: &HircValue) -> Option<Detail<'_>> {
     Some(match value {
         HircValue::State(state) => Detail::State(hirc_view_state::detail(state)),
@@ -39,9 +38,11 @@ pub(crate) fn detail(value: &HircValue) -> Option<Detail<'_>> {
         HircValue::MusicTrack(track) => Detail::Track(track_detail(track)),
         HircValue::MusicSwitch(switch) => Detail::Switch(switch_detail(switch)),
         HircValue::MusicPlaylist(playlist) => Detail::Playlist(playlist_detail(playlist)),
-        HircValue::Event(_) | HircValue::Attenuation | HircValue::Raw | HircValue::Malformed(_) => {
-            return None;
-        }
+        HircValue::Event(_)
+        | HircValue::Attenuation
+        | HircValue::Bus
+        | HircValue::Raw
+        | HircValue::Malformed(_) => return None,
     })
 }
 

@@ -33,33 +33,17 @@ pub(super) fn insert_payload(base: &mut Value) -> Result<(), MediaError> {
     )
 }
 
-pub(super) const fn bindings() -> [Binding; 18] {
+pub(super) const fn bindings() -> [Binding; 21] {
     let [attenuation_summary, attenuation_curve, attenuation_point] = attenuation_bindings();
+    let [bus_summary, bus_curve, bus_point] = bus_bindings();
+    let [sound_summary, sound_curve, sound_point] = sound_bindings();
     let [summary, curve, point] = container_bindings();
     let [music_summary, music_curve, music_point] = music_bindings();
     let [blend_summary, blend_curve, blend_point] = blend_bindings();
     [
-        Binding::exact(
-            RTPC_PAYLOAD,
-            RtpcOwner::Sound.summary_namespace(),
-            "bank-hirc-sound-rtpc",
-            2,
-            StatusRule::MalformedLayout,
-        ),
-        Binding::exact(
-            RTPC_PAYLOAD,
-            RtpcOwner::Sound.curve_namespace(),
-            "bank-hirc-sound-rtpc-curve",
-            3,
-            StatusRule::Complete,
-        ),
-        Binding::exact(
-            RTPC_PAYLOAD,
-            RtpcOwner::Sound.point_namespace(),
-            "bank-hirc-sound-rtpc-point",
-            4,
-            StatusRule::Complete,
-        ),
+        sound_summary,
+        sound_curve,
+        sound_point,
         Binding::exact(
             RTPC_PAYLOAD,
             RtpcOwner::ActorMixer.summary_namespace(),
@@ -93,6 +77,35 @@ pub(super) const fn bindings() -> [Binding; 18] {
         attenuation_summary,
         attenuation_curve,
         attenuation_point,
+        bus_summary,
+        bus_curve,
+        bus_point,
+    ]
+}
+
+const fn sound_bindings() -> [Binding; 3] {
+    [
+        Binding::exact(
+            RTPC_PAYLOAD,
+            RtpcOwner::Sound.summary_namespace(),
+            "bank-hirc-sound-rtpc",
+            2,
+            StatusRule::MalformedLayout,
+        ),
+        Binding::exact(
+            RTPC_PAYLOAD,
+            RtpcOwner::Sound.curve_namespace(),
+            "bank-hirc-sound-rtpc-curve",
+            3,
+            StatusRule::Complete,
+        ),
+        Binding::exact(
+            RTPC_PAYLOAD,
+            RtpcOwner::Sound.point_namespace(),
+            "bank-hirc-sound-rtpc-point",
+            4,
+            StatusRule::Complete,
+        ),
     ]
 }
 
@@ -116,6 +129,32 @@ const fn attenuation_bindings() -> [Binding; 3] {
             RTPC_PAYLOAD,
             RtpcOwner::Attenuation.point_namespace(),
             "bank-hirc-attenuation-rtpc-point",
+            4,
+            StatusRule::Complete,
+        ),
+    ]
+}
+
+const fn bus_bindings() -> [Binding; 3] {
+    [
+        Binding::exact(
+            RTPC_PAYLOAD,
+            RtpcOwner::Bus.summary_namespace(),
+            "bank-hirc-bus-rtpc",
+            2,
+            StatusRule::MalformedLayout,
+        ),
+        Binding::exact(
+            RTPC_PAYLOAD,
+            RtpcOwner::Bus.curve_namespace(),
+            "bank-hirc-bus-rtpc-curve",
+            3,
+            StatusRule::Complete,
+        ),
+        Binding::exact(
+            RTPC_PAYLOAD,
+            RtpcOwner::Bus.point_namespace(),
+            "bank-hirc-bus-rtpc-point",
             4,
             StatusRule::Complete,
         ),

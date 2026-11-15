@@ -25,6 +25,7 @@ mod audio_bank_actor_mixer_provider;
 mod audio_bank_actor_mixer_raw;
 mod audio_bank_attenuation_provider;
 mod audio_bank_blend_container_provider;
+mod audio_bank_bus_provider;
 mod audio_bank_container_node_provider;
 mod audio_bank_dialogue_event_provider;
 mod audio_bank_event_candidate_provider;
