@@ -100,10 +100,29 @@ selection, fail with both table indices instead of merging observations or maski
 Private inventories may include `expectedAbsences` for declarations confirmed
 absent in a specific Build. Each entry contains the reviewed field key in
 `source`, a `build` with `channel`, `branch`, `version`, `changeNumber` and
-`buildId`, and a nonempty `reason`. The verifier reports `expected-absent`
+`buildId`, and a nonempty `reason`. The verifier reports `ExpectedAbsent`
 only when the opened Archive matches all five values and the owning type is
 present. A returned declaration is a verification failure even with zero
 populated values. Keep the exact Build receipts in the private inventory.
+
+### Focused Quantum field survey
+
+The Quantum survey uses all reviewed drive and profile mappings, including the twelve legacy
+effect References. Its declaration census starts at `SCItemQuantumDriveParams` and includes
+the owned declaration closure. Set `P4KX_FIELD_RECORD_FILTER` to a private drive Record path.
+The survey requires populated source and export evidence for both `params` and `splineJumpParams`.
+The same filter scopes the original census and the in-memory catalog excerpt.
+
+For a reviewed declaration absence, set `P4KX_FIELD_EXPECTED_ABSENCES` to a private JSON file
+whose top-level array has the same shape as `expectedAbsences`. Take its `build` from the
+metadata survey's `sourceBuild` object for the same Archive. Leave the variable unset when
+all mapped declarations are expected. Use existing private Archive/key configuration and
+task-local `TMP` and `TEMP`.
+
+~~~powershell
+$env:P4KX_FIELD_RECORD_FILTER = '<private Quantum drive Record path>'
+cargo test --release --locked --offline -p p4kx-export --test field_verification -- quantum_field_inventory::quantum_field_inventory_observes_both_original_profiles --ignored --exact --nocapture
+~~~
 
 ## Metadata-only declaration surveys
 

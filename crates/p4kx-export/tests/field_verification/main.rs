@@ -37,6 +37,7 @@ mod published_projection_tests;
 mod published_projections;
 mod published_validate;
 mod quantum_declaration_metadata;
+mod quantum_field_inventory;
 mod real_archive;
 mod resource_declarations;
 mod resource_metadata;

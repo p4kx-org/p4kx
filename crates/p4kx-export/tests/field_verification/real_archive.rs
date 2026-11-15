@@ -11,9 +11,9 @@ use serde_json::Value;
 
 use super::accounting;
 use super::error::{Error, Kind as ErrorKind};
-use super::inventory::{BuildIdentity, Inventory};
+use super::inventory::{BuildIdentity, FieldKey, Inventory};
 use super::published_io::Dataset;
-use super::published_model::{Build, BuildGate, PUBLICATIONS};
+use super::published_model::{Build, BuildGate, MAX_METADATA_BYTES, PUBLICATIONS};
 
 struct ReviewedPatch {
     channel: &'static str,
@@ -57,32 +57,28 @@ fn archive() -> super::Result<Archive> {
 fn inventory() -> super::Result<Inventory> {
     std::env::var_os("P4KX_FIELD_INVENTORY").map_or_else(
         || Ok(super::baseline::inventory()),
-        |path| super::published_io::read_json(Path::new(&path), 4 << 20, &|| false),
+        |path| super::published_io::read_json(Path::new(&path), MAX_METADATA_BYTES, &|| false),
     )
 }
 
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn field_inventory_observes_declared_populated_and_exported_source_values() -> super::Result<()> {
+    let inventory = inventory()?;
+    let filter = record_filter()?;
+    verify_field_inventory(&inventory, filter.as_ref()).map(|_| ())
+}
+
+pub(super) fn verify_field_inventory(
+    inventory: &Inventory,
+    scope: Option<&Filter>,
+) -> super::Result<BTreeMap<FieldKey, accounting::Counts>> {
     let archive = archive()?;
     let loaded = DataForgeEntry::read(&archive)?;
     let forge = loaded.open()?;
-    let inventory = inventory()?;
-    let kinds = super::audit_scope::kinds(&inventory)?;
+    let kinds = super::audit_scope::kinds(inventory)?;
     let watch = ArchiveWatch::new(&archive);
-    let filter = record_filter()?;
-    let scope = filter.as_ref();
-    if scope.is_some() {
-        let selected = super::source_scope::records(&forge, &kinds, scope, &|| false)?;
-        assert!(
-            !selected.is_empty(),
-            "the field-audit filter must select a source Record"
-        );
-        super::report(&format!(
-            "explicit Record filter: {} source owners",
-            selected.len()
-        ));
-    }
+    report_scope(&forge, &kinds, scope)?;
     let options = p4kx_export::CatalogOptions {
         filter: scope,
         ..super::audit_scope::options(SystemTime::now())
@@ -93,14 +89,14 @@ fn field_inventory_observes_declared_populated_and_exported_source_values() -> s
         super::report(&format!("mapped production health: {error}"));
     }
     let catalog: Value = serde_json::from_slice(built.json())?;
-    let exclusions = exclusions(&forge, &inventory, scope)?;
+    let exclusions = exclusions(&forge, inventory, scope)?;
     super::report(&format!(
         "source selection exclusions: {}",
         exclusions.len()
     ));
     let counts = super::coverage::run(
         &forge,
-        &inventory,
+        inventory,
         &catalog,
         built
             .summary()
@@ -123,10 +119,29 @@ fn field_inventory_observes_declared_populated_and_exported_source_values() -> s
         "every declared/populated field requires a reviewed disposition and retained projection"
     );
     health?;
+    Ok(counts)
+}
+
+fn report_scope(
+    forge: &DataForge<'_>,
+    kinds: &[p4kx_export::Kind],
+    scope: Option<&Filter>,
+) -> super::Result<()> {
+    if scope.is_some() {
+        let selected = super::source_scope::records(forge, kinds, scope, &|| false)?;
+        assert!(
+            !selected.is_empty(),
+            "the field-audit filter must select a source Record"
+        );
+        super::report(&format!(
+            "explicit Record filter: {} source owners",
+            selected.len()
+        ));
+    }
     Ok(())
 }
 
-fn record_filter() -> super::Result<Option<Filter>> {
+pub(super) fn record_filter() -> super::Result<Option<Filter>> {
     match std::env::var("P4KX_FIELD_RECORD_FILTER") {
         Ok(value) if !value.trim().is_empty() => Ok(Some(Filter::parse(&value)?)),
         Ok(_) => Err(Error::new(ErrorKind::Input, "empty field-audit Record filter").into()),
@@ -135,7 +150,7 @@ fn record_filter() -> super::Result<Option<Filter>> {
     }
 }
 
-fn report_counts(counts: &BTreeMap<super::inventory::FieldKey, accounting::Counts>) {
+fn report_counts(counts: &BTreeMap<FieldKey, accounting::Counts>) {
     for (field, count) in counts {
         super::report(&format!(
             "{}.{}{}: declaration={:?} present={} populated={} exported={} unhandled={} unreviewed={} rejected={} source-errors={} missing-targets={} missing-export-GUID={} excluded={} target-changed={} newly-populated={}",

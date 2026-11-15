@@ -7,6 +7,7 @@ use super::path::{Path, Step};
 use super::published_model::{CatalogTarget, Family, Field};
 use super::units::Unit;
 
+pub(super) const QUANTUM_DRIVE_OWNER: &str = "SCItemQuantumDriveParams";
 pub(super) const LEGACY_EFFECT_OWNER: &str = "SQuantumDriveEffectParams_LEGACY";
 pub(super) const LEGACY_EFFECT_FIELDS: [&str; 12] = [
     "alignEffectTag",
@@ -118,7 +119,7 @@ fn quantum_mappings() -> impl Iterator<Item = Mapping> {
     .into_iter()
     .map(|(source, target)| {
         mapped(
-            "SCItemQuantumDriveParams",
+            QUANTUM_DRIVE_OWNER,
             source,
             super::coverage::QUANTUM_DRIVES,
             Path::fields(&[target, "value"]),
@@ -236,7 +237,7 @@ fn quantum_effect_reference() -> Mapping {
 fn quantum_arena_roots() -> impl Iterator<Item = Mapping> {
     [
         (
-            "SCItemQuantumDriveParams",
+            QUANTUM_DRIVE_OWNER,
             "tracePoint",
             super::coverage::QUANTUM_DRIVES,
             None,
@@ -303,14 +304,21 @@ fn mapped(
 }
 
 pub(crate) fn inventory() -> Inventory {
-    let fields = shield_mappings().chain(quantum_mappings()).collect();
+    inventory_with(
+        &["SCItemShieldGeneratorParams", QUANTUM_DRIVE_OWNER],
+        shield_mappings().chain(quantum_mappings()),
+    )
+}
+
+pub(super) fn quantum_inventory() -> Inventory {
+    inventory_with(&[QUANTUM_DRIVE_OWNER], quantum_mappings())
+}
+
+fn inventory_with(roots: &[&str], fields: impl Iterator<Item = Mapping>) -> Inventory {
     Inventory {
         schema_version: 1,
-        roots: vec![
-            "SCItemShieldGeneratorParams".to_owned(),
-            "SCItemQuantumDriveParams".to_owned(),
-        ],
-        fields,
+        roots: roots.iter().copied().map(str::to_owned).collect(),
+        fields: fields.collect(),
         expected_absences: Vec::new(),
     }
 }
