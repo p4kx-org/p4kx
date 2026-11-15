@@ -11,22 +11,29 @@ use crate::source_use::SourceUseRef;
 #[derive(Debug)]
 pub(super) enum OriginRefs {
     Flat(Vec<SourceUseRef>),
+    Basis(Arc<[SourceUseRef]>),
     Shared(Box<SharedRefs>),
 }
 
 impl OriginRefs {
-    pub(super) fn shared(basis: &Arc<[SourceUseRef]>, mut additions: Vec<SourceUseRef>) -> Self {
-        additions.retain(|item| basis.binary_search(item).is_err());
-        Self::Shared(Box::new(SharedRefs {
-            basis: Arc::clone(basis),
-            additions,
-            expanded: OnceLock::new(),
-        }))
+    pub(super) fn shared(basis: &Arc<[SourceUseRef]>, additions: Vec<SourceUseRef>) -> Self {
+        if basis.is_empty() {
+            Self::Flat(additions)
+        } else if additions.is_empty() {
+            Self::Basis(Arc::clone(basis))
+        } else {
+            Self::Shared(Box::new(SharedRefs {
+                basis: Arc::clone(basis),
+                additions,
+                expanded: OnceLock::new(),
+            }))
+        }
     }
 
     pub(super) fn as_slice(&self) -> &[SourceUseRef] {
         match self {
             Self::Flat(refs) => refs,
+            Self::Basis(refs) => refs,
             Self::Shared(refs) => refs.expanded.get_or_init(|| refs.iter().cloned().collect()),
         }
     }
@@ -34,6 +41,7 @@ impl OriginRefs {
     fn iter(&self) -> RefIter<'_> {
         match self {
             Self::Flat(refs) => RefIter::new(refs, &[]),
+            Self::Basis(refs) => RefIter::new(refs, &[]),
             Self::Shared(refs) => refs.iter(),
         }
     }
@@ -56,6 +64,7 @@ impl Serialize for OriginRefs {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
             Self::Flat(refs) => refs.serialize(serializer),
+            Self::Basis(refs) => refs.as_ref().serialize(serializer),
             Self::Shared(refs) => serializer.collect_seq(refs.iter()),
         }
     }

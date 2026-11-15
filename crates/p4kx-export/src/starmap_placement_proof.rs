@@ -25,7 +25,7 @@ pub(crate) struct ChildOrigins {
     record: XmlAttributeSource,
     entity: ChildText,
     label: ChildText,
-    jump_fields: Option<(ChildText, ChildText, XmlAttributeSource)>,
+    jump_fields: Option<Box<JumpFields>>,
 }
 
 impl ChildOrigins {
@@ -43,11 +43,11 @@ impl ChildOrigins {
             entity: ChildText::read(xml, child, "entityName")?,
             label: ChildText::read(xml, child, "label")?,
             jump_fields: if attribute(child, "starMapRecord").is_some() {
-                Some((
-                    ChildText::read(xml, child, "guid")?,
-                    ChildText::read(xml, child, "classGuid")?,
-                    xml.attribute_source(child, "external")?,
-                ))
+                Some(Box::new(JumpFields {
+                    guid: ChildText::read(xml, child, "guid")?,
+                    class_guid: ChildText::read(xml, child, "classGuid")?,
+                    external: xml.attribute_source(child, "external")?,
+                }))
             } else {
                 None
             },
@@ -55,10 +55,10 @@ impl ChildOrigins {
     }
 
     pub(crate) fn external_selector(&self) -> Result<SourceUse, CatalogError> {
-        let Some((_, _, external)) = &self.jump_fields else {
+        let Some(fields) = &self.jump_fields else {
             return Err(crate::ExportAccountingError::ConflictingSourceDatum.into());
         };
-        external.observe(SourceUseRole::Selector)
+        fields.external.observe(SourceUseRole::Selector)
     }
 
     pub(crate) fn record_selector(&self) -> Result<SourceUse, CatalogError> {
@@ -66,12 +66,12 @@ impl ChildOrigins {
     }
 
     pub(crate) fn jump_declaration(&self, sources: &SourceUses) -> Result<JumpChild, CatalogError> {
-        let Some((guid, class, _)) = &self.jump_fields else {
+        let Some(fields) = &self.jump_fields else {
             return Err(crate::ExportAccountingError::ConflictingSourceDatum.into());
         };
         Ok(JumpChild {
-            guid: guid.guid(sources)?,
-            class_guid: class.guid(sources)?,
+            guid: fields.guid.guid(sources)?,
+            class_guid: fields.class_guid.guid(sources)?,
             entity_name: self.entity.project(sources)?,
         })
     }
@@ -79,6 +79,13 @@ impl ChildOrigins {
     pub(crate) fn entity_name(&self) -> Option<&str> {
         self.entity.value.as_deref()
     }
+}
+
+#[derive(Debug)]
+struct JumpFields {
+    guid: ChildText,
+    class_guid: ChildText,
+    external: XmlAttributeSource,
 }
 
 #[derive(Debug)]

@@ -283,6 +283,22 @@ fn by_path<'catalog>(
 }
 
 #[test]
+fn a_selected_placement_keeps_original_and_loot_dependency_entry_proofs() -> TestResult {
+    let catalog = catalog(None, true, LABEL_KEY)?;
+    let starmap = entries::failure(&catalog, "starmapObjects", "enumeration")?;
+    let loot = entries::failure(&catalog, "lootContainers", "enumeration")?;
+    let ([source], [dependency]) = (starmap.as_slice(), loot.as_slice()) else {
+        return Err("expected one source failure and one inherited Loot failure".into());
+    };
+    assert_eq!(
+        proof::at(source, "/path")?,
+        proof::at(dependency, "/path")?,
+        "the inherited entry retains the original path and its full source proof"
+    );
+    Ok(())
+}
+
+#[test]
 fn an_unfiltered_catalog_discovers_file_instances_without_matching_records() -> TestResult {
     let catalog = catalog(None, false, LABEL_KEY)?;
     assert_eq!(

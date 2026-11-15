@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::borrow::Cow;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{Serialize, Serializer};
@@ -44,6 +44,7 @@ pub struct SharedFieldOrigin {
     contains_encrypted_source: Option<bool>,
     source_uses_refs: Arc<[SourceUseRef]>,
     source_set_complete: bool,
+    fields: OnceLock<Arc<OriginFields>>,
 }
 
 impl SharedFieldOrigin {
@@ -58,11 +59,44 @@ impl SharedFieldOrigin {
             contains_encrypted_source: facts.contains_encrypted_source,
             source_uses_refs: facts.references.into(),
             source_set_complete: facts.source_set_complete,
+            fields: OnceLock::new(),
         }
     }
 
     pub(crate) fn belongs_to(&self, identity: &Arc<()>) -> bool {
         Arc::ptr_eq(&self.identity, identity)
+    }
+
+    fn fields_with(&self, mut local: OriginFacts) -> Arc<OriginFields> {
+        local
+            .references
+            .retain(|reference| self.source_uses_refs.binary_search(reference).is_err());
+        let source_set_complete = self.source_set_complete && local.source_set_complete;
+        let contains_encrypted_source = match (
+            self.contains_encrypted_source,
+            local.contains_encrypted_source,
+        ) {
+            (Some(true), _) | (_, Some(true)) => Some(true),
+            (Some(false), Some(false)) if source_set_complete => Some(false),
+            _ => None,
+        };
+        if local.references.is_empty()
+            && source_set_complete == self.source_set_complete
+            && contains_encrypted_source == self.contains_encrypted_source
+        {
+            return Arc::clone(self.fields.get_or_init(|| {
+                Arc::new(OriginFields {
+                    contains_encrypted_source,
+                    source_uses_refs: OriginRefs::Basis(Arc::clone(&self.source_uses_refs)),
+                    source_set_complete,
+                })
+            }));
+        }
+        Arc::new(OriginFields {
+            contains_encrypted_source,
+            source_uses_refs: OriginRefs::shared(&self.source_uses_refs, local.references),
+            source_set_complete,
+        })
     }
 }
 
@@ -181,23 +215,9 @@ impl FieldOrigin {
         uses: impl IntoIterator<Item = &'a SourceUse>,
         complete: bool,
     ) -> Self {
-        let local = OriginFacts::measure(uses, complete);
-        let source_set_complete = shared.source_set_complete && local.source_set_complete;
-        let contains_encrypted_source = match (
-            shared.contains_encrypted_source,
-            local.contains_encrypted_source,
-        ) {
-            (Some(true), _) | (_, Some(true)) => Some(true),
-            (Some(false), Some(false)) if source_set_complete => Some(false),
-            _ => None,
-        };
         Self {
             identity: Some(Arc::clone(&shared.identity)),
-            fields: Arc::new(OriginFields {
-                contains_encrypted_source,
-                source_uses_refs: OriginRefs::shared(&shared.source_uses_refs, local.references),
-                source_set_complete,
-            }),
+            fields: shared.fields_with(OriginFacts::measure(uses, complete)),
         }
     }
 

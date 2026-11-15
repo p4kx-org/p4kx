@@ -3,6 +3,7 @@
 
 use std::error::Error;
 use std::path::Path;
+use std::sync::Arc;
 
 use p4kx_testkit::{ArchiveBuilder, TestEntry};
 
@@ -12,6 +13,39 @@ use crate::{
 };
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
+
+#[test]
+fn unchanged_shared_origins_reuse_the_same_field_bundle() -> TestResult {
+    let sources = SourceUses::new();
+    let scope = sources.observe(SourceInput::Unknown, InputScope::Payload)?;
+    let used = evidence(&scope, "basis", SourceUseRole::Selector)?;
+    let shared = sources.shared_origin(std::slice::from_ref(&used), true);
+    let first = sources.origin_with_shared(&shared, &[], true)?;
+    let repeated = sources.origin_with_shared(&shared, &[used], true)?;
+    let incomplete = sources.origin_with_shared(&shared, &[], false)?;
+    assert!(
+        Arc::ptr_eq(&first.fields, &repeated.fields),
+        "an identical contributor set and certainty share the bundle"
+    );
+    assert!(
+        !Arc::ptr_eq(&first.fields, &incomplete.fields),
+        "a changed certainty requires its own bundle"
+    );
+    assert!(
+        first.source_set_complete(),
+        "the original proof is complete"
+    );
+    assert!(
+        !incomplete.source_set_complete(),
+        "an incomplete projection keeps its own certainty"
+    );
+    assert_eq!(
+        first.source_uses_refs(),
+        incomplete.source_uses_refs(),
+        "uncertainty leaves the actual input references intact"
+    );
+    Ok(())
+}
 
 #[test]
 fn a_shared_origin_serializes_the_sorted_unique_union_without_expanding_it() -> TestResult {

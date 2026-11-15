@@ -59,12 +59,12 @@ pub(super) fn scan<'f>(
     placements.release_record_lookup();
     run.begin(CatalogStage::Projections);
     let mut collected = collect(crafting, scanned);
-    let entry_ledger = if matches!(scope, Some(PlacementScope::RecordSelection)) {
-        placements.ledger.clone()
-    } else {
-        std::mem::take(&mut placements.ledger)
-    };
-    collected.ledger.merge(entry_ledger);
+    // Harvest and loot consume placement dependencies in RecordSelection scope.
+    if matches!(scope, Some(PlacementScope::ArchiveInventory)) {
+        collected
+            .ledger
+            .merge(std::mem::take(&mut placements.ledger));
+    }
     collected.ledger.archive_inventory_problem = crate::export_archive_health::inventory(archive);
     let original = projection.original();
     let capture = EntryCapture::for_input(original);
