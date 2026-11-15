@@ -163,8 +163,8 @@ Skeleton File and attachment Binding keep the exact authored path and the owning
 candidate identities. The lookup uses the existing Data-prefixed path convention and falls back
 to the exact relative path after a complete miss. Absent attributes, authored empty or invalid
 paths, missing targets, duplicate targets and unselected physical targets stay distinguishable.
-The references establish physical identities without reading their target payloads. Join them
-to model collision or skeleton facts by the root Archive and physical Entry identity.
+The directory lookup establishes each reference from metadata. Join it to model collision or
+skeleton facts by the root Archive and physical Entry identity.
 
 An authored attachment Material attribute also has a `material_reference` alongside its
 unchanged original spelling. A mapped sibling lookup requires Binding to identify one physical
@@ -178,10 +178,30 @@ remain unread and neither claims that an attachment was used during assembly.
 Bone attachments carry the authored bone name, material override, relative position in metres
 and relative quaternion in WXYZ order. An absent position or rotation uses the CDF offset
 default for that bone attachment. Malformed values retain their original spelling with a null
-decoded value. Nonbone attachments retain any source strings for these offsets. These are
-bone-relative declarations. They do not assert that a named bone exists, or apply a skeleton
-bind pose to the collider. Each field retains its original text attribute span or CryXml node
-and attribute table coordinates, including its source encryption state.
+decoded value. Nonbone attachments retain any source strings for these offsets. Each field
+retains its original text attribute span or CryXml node and attribute table coordinates,
+including its source encryption state.
+
+The optional `rig_placement` on a `CA_BONE` attachment connects the authored offsets to the
+declared rig. Its `rig` reference keeps the original Model File spelling and the resolution
+in the immediately owning Archive directory. It is independent of the attachment's geometry
+Binding. A unique selected Model Entry supplies the preferred skeleton chunk. The loader uses
+the retained Entry and the existing Media work and byte budgets. Skeleton selection prefers
+the first `CompiledBones2` chunk, then the first `CompiledBones` chunk if no `CompiledBones2`
+exists. `skeleton_chunk` and `bone_ordinals` identify the original table positions. Bone names
+match ignoring ASCII case, and multiple matching bones retain their ordinals in source order.
+
+`disposition` distinguishes declaration and archive lookup results, unavailable or unsupported
+rigs, missing or ambiguous bones, unavailable bind frames and invalid authored offsets.
+A `bound` result includes `rig_from_attachment`, a row-major 3 × 4 affine in the declared
+rig's Z-up space with translation in metres. It composes the bone's parent-relative bind pose
+chain with the authored attachment offset. Other dispositions leave the matrix null. An
+unselected rig retains its physical directory identity without reading its payload.
+
+Placement field origins name the actual CDF attributes and rig selection inputs. A composed
+frame cites each original bone's relative pose on the proven parent route, with its chunk and
+bone ordinal and half-open decoded byte range. The field's encryption marker reflects both
+the CDF and the selected rig contributors.
 
 The model provider reads vehicle physics-grid declarations when the physical DataForge Entry
 is selected. It uses the Archive's preferred DataForge Entry and the authored

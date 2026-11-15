@@ -74,12 +74,13 @@ struct SkeletonChunk<'file> {
 
 impl<'file> SkeletonChunk<'file> {
     fn primary<B: AsRef<[u8]>>(file: &'file ChunkFile<B>) -> Option<Self> {
-        let (layout, (index, chunk)) = [
-            (Layout::Compiled2, ivo::COMPILED_BONES_2),
-            (Layout::Compiled, ivo::COMPILED_BONES),
-        ]
-        .into_iter()
-        .find_map(|(layout, kind)| Some((layout, file.chunks_of(kind).next()?)))?;
+        let index = PositionedSkeleton::primary_ordinal(file.chunks())?;
+        let chunk = file.chunks().get(index)?;
+        let layout = if chunk.chunk_type() == ivo::COMPILED_BONES_2 {
+            Layout::Compiled2
+        } else {
+            Layout::Compiled
+        };
         Some(Self {
             index,
             start: chunk.offset(),
@@ -195,6 +196,16 @@ pub struct PositionedSkeleton {
 }
 
 impl PositionedSkeleton {
+    /// Returns the first `CompiledBones2` ordinal or falls back to the first `CompiledBones`.
+    ///
+    /// Selection preserves the original type priority before version and payload validation.
+    #[must_use]
+    pub fn primary_ordinal(chunks: &[Chunk]) -> Option<usize> {
+        [ivo::COMPILED_BONES_2, ivo::COMPILED_BONES]
+            .into_iter()
+            .find_map(|kind| chunks.iter().position(|chunk| chunk.chunk_type() == kind))
+    }
+
     /// Returns whether the original chunk uses a measured IVO skeleton layout.
     #[must_use]
     pub const fn supports(chunk: &Chunk) -> bool {

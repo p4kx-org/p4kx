@@ -1,8 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::ops::Range;
+
 use p4kx_extraction::{EntryOrigin, SourceLocation};
-use p4kx_model::{Bone, ModelBoneSource, ModelBoneSources, ModelFile};
+use p4kx_model::{
+    AttachmentBoneBinding, Bone, ModelBoneSource, ModelBoneSources, ModelFile,
+    resolve_attachment_bone,
+};
 
 use crate::model_placement_sources::{BoneOwner, ModelAnchor};
 use crate::placement::BoneSelection;
@@ -85,6 +90,24 @@ impl<'a> BonePlacementSource<'a> {
         self.ordinal
     }
 
+    /// Returns the original count of physical bones in this skeleton.
+    #[must_use]
+    pub const fn bone_count_range(&self) -> Range<u64> {
+        self.fields.count_range()
+    }
+
+    /// Returns the complete original name span for this skeleton's physical bones.
+    #[must_use]
+    pub fn bone_name_table_range(&self) -> Option<Range<u64>> {
+        let count = self.skeleton.len();
+        if self.fields.bone(count).is_some() {
+            return None;
+        }
+        let first = self.fields.bone(0)?.name();
+        let last = self.fields.bone(count.checked_sub(1)?)?.name();
+        Some(first.start..last.end)
+    }
+
     /// Returns the original fields from the chosen bone to its root.
     pub fn bones(&self) -> impl Iterator<Item = (usize, &'a ModelBoneSource)> {
         self.fields.lineage(self.skeleton, self.ordinal)
@@ -115,5 +138,27 @@ impl Part {
         ordinal: usize,
     ) -> Option<BonePlacementSource<'_>> {
         BonePlacementSource::new(self, self.attachments.get(ordinal)?.bone_selection?)
+    }
+
+    /// Returns original fields when a unique, fully sourced bone establishes the attachment frame.
+    #[must_use]
+    pub fn verified_attachment_bone_placement_source(
+        &self,
+        ordinal: usize,
+    ) -> Option<BonePlacementSource<'_>> {
+        let attachment = self.attachments.get(ordinal)?;
+        let source = BonePlacementSource::new(self, attachment.bone_selection?)?;
+        let AttachmentBoneBinding::Bound {
+            ordinal, lineage, ..
+        } = resolve_attachment_bone(source.skeleton, attachment.bone())
+        else {
+            return None;
+        };
+        (ordinal == source.ordinal
+            && source.bone_name_table_range().is_some()
+            && lineage
+                .into_iter()
+                .all(|at| source.fields.bone(at).is_some()))
+        .then_some(source)
     }
 }

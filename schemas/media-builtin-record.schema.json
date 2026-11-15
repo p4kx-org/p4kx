@@ -5770,6 +5770,16 @@
         },
         "relative_rotation_wxyz": {
           "$ref": "#/$defs/BoneOffset2"
+        },
+        "rig_placement": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AttachmentRig"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -5782,6 +5792,86 @@
         "relative_rotation_wxyz"
       ],
       "type": "object"
+    },
+    "AttachmentRig": {
+      "additionalProperties": false,
+      "properties": {
+        "bone_ordinals": {
+          "items": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "disposition": {
+          "$ref": "#/$defs/AttachmentRigDisposition"
+        },
+        "rig": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Reference"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rig_from_attachment": {
+          "items": {
+            "items": {
+              "format": "float",
+              "type": "number"
+            },
+            "maxItems": 4,
+            "minItems": 4,
+            "type": "array"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "skeleton_chunk": {
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "rig",
+        "disposition",
+        "skeleton_chunk",
+        "bone_ordinals",
+        "rig_from_attachment"
+      ],
+      "type": "object"
+    },
+    "AttachmentRigDisposition": {
+      "enum": [
+        "no-rig-declaration",
+        "ambiguous-rig-declaration",
+        "target-missing",
+        "target-ambiguous",
+        "target-not-selected",
+        "target-unavailable",
+        "unsupported-rig",
+        "malformed-rig",
+        "no-skeleton",
+        "bone-name-missing",
+        "bone-name-invalid",
+        "missing-bone",
+        "ambiguous-bone",
+        "unavailable-frame",
+        "invalid-offset",
+        "bound"
+      ],
+      "type": "string"
     },
     "AttenuationCone": {
       "additionalProperties": false,

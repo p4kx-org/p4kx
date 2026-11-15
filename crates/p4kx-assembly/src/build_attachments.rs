@@ -4,13 +4,13 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use p4kx_model::Transform;
+use p4kx_model::{Transform, attachment_offset};
 
 use crate::build::{Libraries, Library, issue, library_key_of, materials_for};
 use crate::build_models::Loaded;
 use crate::flatten::Draft;
 use crate::placement;
-use crate::{AttachedModel, Issue, IssueKind, ProvidedAttachment};
+use crate::{AttachedModel, Issue, IssueKind};
 
 /// Places the bone attachments of the model `loaded` of a part: each at its bone in the bind
 /// pose of the part's skeleton, offset by the attachment. A bone the skeleton lacks is an issue,
@@ -36,7 +36,7 @@ pub(crate) fn attached(
                 .map(|name| library_key_of(name, &attachment.entry));
             let materials = materials_for(draft, key, libraries, reported, issues);
             let bone = placement::bone_placement(&loaded.model, &attachment.bone);
-            let offset = offset_of(attachment);
+            let offset = attachment_offset(attachment.position, attachment.rotation);
             if bone.is_none() {
                 let helper = attachment.bone.clone();
                 issues.push(issue(draft, IssueKind::HelperNotFound { helper }));
@@ -59,11 +59,4 @@ pub(crate) fn attached(
             }
         })
         .collect()
-}
-
-/// Returns the transform of the attachment's own position and rotation; the reader of the
-/// definition lets only finite values and a rotation with length through.
-fn offset_of(attachment: &ProvidedAttachment) -> Option<Transform> {
-    let [w, x, y, z] = attachment.rotation.map(f64::from);
-    Transform::from_quaternion([w, x, y, z], attachment.position.map(f64::from))
 }

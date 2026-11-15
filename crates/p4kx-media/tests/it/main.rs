@@ -113,6 +113,7 @@ mod material_provider_status;
 mod material_streamed;
 mod material_support;
 mod model_cdf_material_reference;
+mod model_cdf_rig_placement;
 mod model_character_provider;
 mod model_companion_provider;
 mod model_glb_fixture;

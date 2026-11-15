@@ -97,6 +97,40 @@ pub(super) struct Attachment {
     pub(super) bone_name: Option<String>,
     pub(super) relative_position: BoneOffset<[f32; 3]>,
     pub(super) relative_rotation_wxyz: BoneOffset<[f32; 4]>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(super) rig_placement: Option<Box<AttachmentRig>>,
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(super) struct AttachmentRig {
+    #[schemars(schema_with = "optional_reference")]
+    pub(super) rig: Option<Reference>,
+    pub(super) disposition: AttachmentRigDisposition,
+    pub(super) skeleton_chunk: Option<usize>,
+    pub(super) bone_ordinals: Vec<usize>,
+    pub(super) rig_from_attachment: Option<[[f32; 4]; 3]>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(super) enum AttachmentRigDisposition {
+    NoRigDeclaration,
+    AmbiguousRigDeclaration,
+    TargetMissing,
+    TargetAmbiguous,
+    TargetNotSelected,
+    TargetUnavailable,
+    UnsupportedRig,
+    MalformedRig,
+    NoSkeleton,
+    BoneNameMissing,
+    BoneNameInvalid,
+    MissingBone,
+    AmbiguousBone,
+    UnavailableFrame,
+    InvalidOffset,
+    Bound,
 }
 
 #[derive(Serialize, JsonSchema)]

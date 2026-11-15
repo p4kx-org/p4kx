@@ -64,6 +64,32 @@ fn positioned_skeletons_keep_each_original_layout_and_name_slot() {
 }
 
 #[test]
+fn primary_skeleton_keeps_an_unsupported_preferred_row() -> Result<(), Box<dyn std::error::Error>> {
+    let bones = TestSkeleton::two_bones();
+    let input = TestChunkFile::ivo()
+        .chunk(ivo::COMPILED_BONES.id(), 0x901, bones.compiled_bones())
+        .chunk(ivo::COMPILED_BONES_2.id(), 0x901, bones.compiled_bones_2())
+        .chunk(ivo::COMPILED_BONES_2.id(), 0x900, bones.compiled_bones_2());
+    let file = ChunkFile::parse(input.bytes())?;
+    let selected = PositionedSkeleton::primary_ordinal(file.chunks());
+    assert_eq!(selected, Some(1), "first preferred chunk takes priority");
+    let chunk = file
+        .chunks()
+        .get(selected.ok_or("original selection")?)
+        .ok_or("selected original chunk")?;
+    assert!(
+        !PositionedSkeleton::supports(chunk),
+        "the chosen layout is unproved"
+    );
+    assert_eq!(
+        PositionedSkeleton::primary_ordinal(file.chunks().get(..1).ok_or("fallback chunk")?),
+        Some(0),
+        "CompiledBones is the fallback when the preferred kind is absent"
+    );
+    Ok(())
+}
+
+#[test]
 fn positioned_skeleton_requires_its_original_extent_and_finite_pose() {
     let mut data = TestSkeleton::two_bones().compiled_bones_2();
     let rotation = data.get_mut(16..20).expect("first rotation word");

@@ -38,6 +38,12 @@ mod character_origin;
 mod character_payload;
 #[path = "model_source/character_reference.rs"]
 mod character_reference;
+#[path = "model_source/character_rig.rs"]
+mod character_rig;
+#[path = "model_source/character_rig_input.rs"]
+mod character_rig_input;
+#[path = "model_source/character_rig_placement.rs"]
+mod character_rig_placement;
 
 #[path = "model_source/skeleton.rs"]
 mod skeleton;

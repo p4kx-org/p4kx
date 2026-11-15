@@ -4,7 +4,7 @@
 use p4kx_extraction::SourceUseRole;
 use p4kx_extraction::cryxml::{SourceElement, SourceReadError};
 use p4kx_extraction::model::character_definition::{
-    CharacterDefinition, relative_position, relative_rotation,
+    self, CharacterDefinition, relative_position, relative_rotation,
 };
 
 use super::character_origin::CharacterElement;
@@ -12,7 +12,10 @@ use super::character_payload::{
     self as wire, Attachment, BoneOffset, CharacterRecord, Definition, Skeleton,
 };
 use super::character_reference::CharacterReferences;
+use super::character_rig::CharacterRig;
+use super::character_rig_placement::{self, AttachmentPose};
 use super::origins::{self, ModelOrigins};
+use crate::origin_prepared::PreparedRecordOrigins;
 use crate::{
     MediaError, MediaIssue, MediaWriter, Projection, Severity, SourceContext, Status, Subresource,
     required_reader,
@@ -41,12 +44,38 @@ pub(super) fn emit(
             writer.checkpoint()?;
             write_skeleton(index, model, &origins, &references, writer)?;
         }
+        let first_bone = first_bone_attachment(&source, writer)?;
+        let rig = first_bone
+            .map(|indices| CharacterRig::read(&source, &origins, &references, indices, writer))
+            .transpose()?;
         for (indices, attachment) in source.attachments() {
             writer.checkpoint()?;
-            write_attachment(indices, attachment, &origins, &references, writer)?;
+            write_attachment(
+                indices,
+                attachment,
+                &origins,
+                &references,
+                rig.as_ref(),
+                writer,
+            )?;
         }
     }
     Ok(Projection::Written)
+}
+
+fn first_bone_attachment(
+    source: &CharacterDefinition<'_>,
+    writer: &MediaWriter<'_>,
+) -> Result<Option<[usize; 2]>, MediaError> {
+    for (indices, attachment) in source.attachments() {
+        writer.checkpoint()?;
+        if character_definition::attribute(attachment, "Type")
+            .is_some_and(|kind| character_rig_placement::is_bone(kind.value()))
+        {
+            return Ok(Some(indices));
+        }
+    }
+    Ok(None)
 }
 
 fn write_definition(
@@ -124,46 +153,80 @@ fn write_attachment(
     element: SourceElement<'_>,
     origins: &ModelOrigins<'_>,
     references: &CharacterReferences<'_, '_>,
+    rig: Option<&CharacterRig>,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
     let attachment = CharacterElement::new(element, origins);
     let mut prepared = attachment.prepare(writer)?;
-    let mut original = |name, pointer| attachment.field(name, pointer, &mut prepared, writer);
-    let name = original("AName", "/data/payload/name")?;
-    let bone_name = original("BoneName", "/data/payload/bone_name")?;
-    let (attachment_type, kind_origin) = attachment.value("Type", writer)?;
-    origins::at(
-        &mut prepared,
-        "/data/payload/attachment_type",
-        kind_origin.clone(),
-        writer,
-    )?;
-    let is_bone = attachment_type.is_some_and(|kind| kind.eq_ignore_ascii_case("CA_BONE"));
-    let mut offset =
-        |name, pointer| attachment.offset(name, pointer, &kind_origin, &mut prepared, writer);
-    let position = offset("RelPosition", "/data/payload/relative_position")?;
-    let rotation = offset("RelRotation", "/data/payload/relative_rotation_wxyz")?;
-    let links = references.attachment(&attachment, &mut prepared, writer)?;
+    let payload = attachment_payload(&attachment, references, rig, &mut prepared, writer)?;
     prepared.write(
         writer,
         &Subresource::new(wire::ATTACHMENT, indices.map(|value| value as u64).to_vec()),
         Status::Complete,
-        &CharacterRecord::Attachment(Attachment {
-            name: name.map(str::to_owned),
-            kind: attachment_type.map(str::to_owned),
-            binding: links.binding,
-            material: links.material.map(str::to_owned),
-            material_reference: links.material_reference,
-            bone_name: bone_name.map(str::to_owned),
-            relative_position: BoneOffset {
-                authored: position.map(str::to_owned),
-                value: is_bone.then(|| relative_position(position)).flatten(),
-            },
-            relative_rotation_wxyz: BoneOffset {
-                authored: rotation.map(str::to_owned),
-                value: is_bone.then(|| relative_rotation(rotation)).flatten(),
-            },
-        }),
+        &CharacterRecord::Attachment(payload),
         &[],
     )
+}
+
+fn attachment_payload(
+    element: &CharacterElement<'_, '_>,
+    references: &CharacterReferences<'_, '_>,
+    rig: Option<&CharacterRig>,
+    prepared: &mut PreparedRecordOrigins,
+    writer: &mut MediaWriter<'_>,
+) -> Result<Attachment, MediaError> {
+    let mut field = |name, path| {
+        element
+            .field(name, path, prepared, writer)
+            .map(|value| value.map(str::to_owned))
+    };
+    let name = field("AName", "/data/payload/name")?;
+    let bone = field("BoneName", "/data/payload/bone_name")?;
+    let (kind, kind_origin) = element.value("Type", writer)?;
+    origins::at(
+        prepared,
+        "/data/payload/attachment_type",
+        kind_origin.clone(),
+        writer,
+    )?;
+    let is_bone = kind.is_some_and(character_rig_placement::is_bone);
+    let mut offset = |name, path| element.offset(name, path, &kind_origin, prepared, writer);
+    let position = offset("RelPosition", "/data/payload/relative_position")?;
+    let rotation = offset("RelRotation", "/data/payload/relative_rotation_wxyz")?;
+    let position = BoneOffset {
+        authored: position.map(str::to_owned),
+        value: is_bone.then(|| relative_position(position)).flatten(),
+    };
+    let rotation = BoneOffset {
+        authored: rotation.map(str::to_owned),
+        value: is_bone.then(|| relative_rotation(rotation)).flatten(),
+    };
+    let links = references.attachment(element, prepared, writer)?;
+    let rig_placement = if is_bone {
+        let rig = rig.ok_or_else(|| {
+            MediaError::Contract("CDF bone attachment has no rig selection".into())
+        })?;
+        let authored = AttachmentPose {
+            element,
+            kind: &kind_origin,
+            bone: bone.as_deref(),
+            position: position.value,
+            rotation: rotation.value,
+            strings_lossy: references.strings_lossy,
+        };
+        Some(rig.write(&authored, prepared, writer)?)
+    } else {
+        None
+    };
+    Ok(Attachment {
+        name,
+        kind: kind.map(str::to_owned),
+        binding: links.binding,
+        material: links.material.map(str::to_owned),
+        material_reference: links.material_reference,
+        bone_name: bone,
+        relative_position: position,
+        relative_rotation_wxyz: rotation,
+        rig_placement,
+    })
 }

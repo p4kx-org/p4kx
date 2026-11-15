@@ -454,9 +454,11 @@ The manifest node indexes place the resulting objects below their existing owner
 `collision-helpers.json` records each source model and its original `StatObjPhysics` chunk
 and slot ordinals. It keeps the packed key, placement and triangulation with individual
 source contributions. `receipt.json` binds the companion bytes to the package. The CDF
-placement exposes the authored `Model.File` separately from the selected rig Entry,
-skeleton chunk and original bone used by the Assembly. CDF attachments with an unavailable
-bind pose and whole-object collider keys remain documented without a preview placement.
+placement exposes the authored `Model.File` and the selected rig Entry, skeleton chunk and
+original bone. A verified helper placement requires a unique named bone that agrees with the
+Assembly's selected ordinal and source fields for the complete bind-pose chain. CDF attachments
+with an unavailable bind pose and whole-object collider keys remain documented without a preview
+placement.
 The helper preview currently draws indexed triangles. Analytic primitives and other
 collision blob kinds retain their Media records and original bytes.
 

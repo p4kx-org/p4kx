@@ -41,7 +41,7 @@ pub(super) fn capture(
             attachment_uses.push(scope.at(location, role).map_err(error)?);
         }
     }
-    let matched_rig = owner.attachment_bone_placement_source(ordinal);
+    let matched_rig = owner.verified_attachment_bone_placement_source(ordinal);
     let selected_rig = matched_rig
         .as_ref()
         .map(|rig| bind_rig(rig, input, &mut attachment_uses))
@@ -93,6 +93,23 @@ fn bind_rig(
                     .map_err(error)?,
             );
         }
+    }
+    let names = rig
+        .bone_name_table_range()
+        .ok_or_else(|| error(std::io::Error::other("missing original skeleton names")))?;
+    for (field, range) in [("count", rig.bone_count_range()), ("names", names)] {
+        uses.push(
+            scope
+                .at(
+                    SourceLocation::Subresource {
+                        namespace: "model-skeleton-name-selection".into(),
+                        indices: vec![rig.chunk() as u64, range.start, range.end],
+                        field: field.into(),
+                    },
+                    SourceUseRole::Selector,
+                )
+                .map_err(error)?,
+        );
     }
     bind_lineage(rig, input, &scope, &mut uses)?;
     let origin = input.evidence.origin(&uses, true);

@@ -39,6 +39,7 @@ mod animation_header;
 mod animation_keys;
 mod animation_read;
 mod animation_source;
+mod attachment_bone_binding;
 mod bone;
 mod bone_extend;
 mod bone_map;
@@ -165,6 +166,9 @@ pub use animation_error::{AnimationError, CorruptAnimation};
 pub use animation_header::AnimationHeader;
 pub use animation_read::{MAX_ANIMATION_KEYS, MAX_DATABASE_KEYS};
 pub use animation_source::{AnimationMetadata, AnimationSource, AnimationTiming, DbaAnimationName};
+pub use attachment_bone_binding::{
+    AttachmentBoneBinding, attachment_offset, resolve_attachment_bone,
+};
 pub use bone::{Bone, BoneTransform};
 pub use bone_extend::{
     chained_world_poses, chained_world_poses_observing, extend_skeleton, extend_skeleton_placed,
