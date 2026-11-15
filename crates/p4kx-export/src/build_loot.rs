@@ -22,7 +22,7 @@ use crate::starmap_containers::Placements;
 /// Returns [`CatalogError::Cancelled`] once `cancel` is cancelled.
 pub(crate) fn add_loot_containers(
     archive: &Archive,
-    placements: &Placements,
+    placements: &mut Placements,
     collected: &mut Collected<'_>,
     cancel: Option<&CancelToken>,
     capture: &EntryCapture<'_>,
@@ -50,6 +50,9 @@ pub(crate) fn add_loot_containers(
         several,
     } = located;
     collected.ledger.merge(ledger);
+    collected
+        .ledger
+        .merge(std::mem::take(&mut placements.ledger));
     let mut details: Vec<String> = unreadable.iter().map(ToString::to_string).collect();
     if beyond_limit > 0 {
         details.push(format!(

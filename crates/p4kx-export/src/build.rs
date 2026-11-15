@@ -95,14 +95,11 @@ fn assemble<R>(
     )?;
     add_loot_containers(
         archive,
-        &placements,
+        &mut placements,
         &mut collected,
         options.cancel,
         &entry_capture,
     )?;
-    collected
-        .ledger
-        .merge(std::mem::take(&mut placements.ledger));
     add_contracts(&forge, &projection, tags, options, &mut collected)?;
     collected.ledger.merge(link_scenario_factions(
         &forge,
