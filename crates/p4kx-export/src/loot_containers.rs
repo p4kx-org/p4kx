@@ -27,8 +27,6 @@ pub(crate) struct Located {
     pub(crate) containers: Vec<LootContainer>,
     /// The containers and entity files that cannot be read, ordered by path.
     pub(crate) unreadable: Vec<UnreadableContainer>,
-    /// How many containers the limit on the walk left unread.
-    pub(crate) beyond_limit: usize,
     /// The entity files that name several different containers or configs, as `container: file`,
     /// ordered.
     pub(crate) several: Vec<String>,
@@ -49,7 +47,6 @@ pub(crate) fn locate(
     let index = Index::new(archive);
     let Explored {
         summaries,
-        beyond_limit,
         mut ledger,
     } = explore(archive, &index, opened, cancel, capture)?;
     let (tags, observed) = read_tags(archive, &summaries, cancel, capture)?;
@@ -62,7 +59,6 @@ pub(crate) fn locate(
         ledger,
         containers,
         unreadable: unreadable(archive, &summaries, &tags),
-        beyond_limit,
         several: several(archive, &summaries),
     })
 }

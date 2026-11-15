@@ -10,16 +10,12 @@ use rayon::prelude::*;
 
 use crate::catalog_read::original::EntryCapture;
 use crate::entry_source::EntrySource;
-use crate::export_entry_ledger::EntryOperation;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
 use crate::loot_entxml::EntityLink;
 use crate::loot_unreadable::Unreadable;
 use crate::starmap_index::Index;
 use crate::starmap_walk::Opened;
 use crate::{CatalogError, ExportAccountingError, Kind};
-
-/// The most distinct containers followed from the system containers.
-pub(crate) const MAX_CONTAINERS: usize = 1 << 18;
 
 /// An entity of a container that carries a multi config.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -42,15 +38,14 @@ pub(crate) struct Summary {
     pub(crate) several: Vec<String>,
 }
 
-/// The containers read, by Archive entry, and how many distinct containers the limit left unread.
+/// The containers read, by physical Archive Entry, with their source observations.
 pub(crate) struct Explored {
     pub(crate) ledger: ExportLedger,
     pub(crate) summaries: HashMap<usize, Summary>,
-    pub(crate) beyond_limit: usize,
 }
 
-/// Reads the containers in `opened` and every container their entities place, breadth first,
-/// each once, until none is left or [`MAX_CONTAINERS`] are read.
+/// Reads the containers in `opened` and every container their entities place, breadth first.
+/// Each physical Entry is read once.
 pub(crate) fn explore(
     archive: &Archive,
     index: &Index<'_>,
@@ -58,29 +53,13 @@ pub(crate) fn explore(
     cancel: Option<&CancelToken>,
     capture: &EntryCapture<'_>,
 ) -> Result<Explored, CatalogError> {
-    explore_within(archive, index, opened, cancel, MAX_CONTAINERS, capture)
-}
-
-fn explore_within(
-    archive: &Archive,
-    index: &Index<'_>,
-    opened: &[Opened],
-    cancel: Option<&CancelToken>,
-    limit: usize,
-    capture: &EntryCapture<'_>,
-) -> Result<Explored, CatalogError> {
     let mut ledger = ExportLedger::default();
     let mut summaries: HashMap<usize, Summary> = HashMap::new();
-    let mut unread: HashSet<usize> = HashSet::new();
     let mut frontier: Vec<usize> = opened.iter().map(|root| root.entry).collect();
     while !frontier.is_empty() && !cancel.is_some_and(CancelToken::is_cancelled) {
         frontier.sort_unstable();
         frontier.dedup();
         frontier.retain(|entry| !summaries.contains_key(entry));
-        let room = limit.saturating_sub(summaries.len());
-        if frontier.len() > room {
-            unread.extend(frontier.split_off(room));
-        }
         let read: Vec<_> = frontier
             .par_iter()
             .filter(|_| !cancel.is_some_and(CancelToken::is_cancelled))
@@ -95,25 +74,7 @@ fn explore_within(
             ledger.merge(observed);
         }
     }
-    for entry in &unread {
-        if let Some(entry) = archive.entries().get(*entry) {
-            EntrySource::outer(capture, archive, entry)?
-                .operation(EntryOperation::Enumeration)
-                .record(
-                    &mut ledger,
-                    Kind::LootContainers,
-                    SourceDisposition::ReadFailed,
-                );
-        }
-    }
-    if !unread.is_empty() {
-        ledger.incomplete_inventory(Kind::LootContainers);
-    }
-    Ok(Explored {
-        ledger,
-        summaries,
-        beyond_limit: unread.len(),
-    })
+    Ok(Explored { ledger, summaries })
 }
 
 fn summarise(

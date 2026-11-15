@@ -7,6 +7,7 @@ use std::sync::Arc;
 use p4kx_testkit::{ArchiveBuilder, TestContainer, TestElement, TestEntry, test_key};
 
 use super::*;
+use crate::export_entry_ledger::EntryOperation;
 
 fn explore(
     archive: &Archive,
@@ -16,19 +17,6 @@ fn explore(
 ) -> Explored {
     crate::catalog_read::original::with_entry_capture(archive, |capture| {
         super::explore(archive, index, opened, cancel, capture)
-    })
-    .expect("original Entry capture")
-}
-
-fn explore_within(
-    archive: &Archive,
-    index: &Index<'_>,
-    opened: &[Opened],
-    cancel: Option<&CancelToken>,
-    limit: usize,
-) -> Explored {
-    crate::catalog_read::original::with_entry_capture(archive, |capture| {
-        super::explore_within(archive, index, opened, cancel, limit, capture)
     })
     .expect("original Entry capture")
 }
@@ -153,7 +141,6 @@ fn a_cycle_of_containers_is_read_once_each() {
     let root = root_of(&archive, "a");
     let explored = explore(&archive, &index, std::slice::from_ref(&root), None);
     assert_eq!(explored.summaries.len(), 2);
-    assert_eq!(explored.beyond_limit, 0);
     let a = explored.summaries.get(&root.entry).expect("a");
     assert_eq!(a.placed.len(), 1);
     assert_eq!(a.placed[0].entry, index.find(&written("b")));
@@ -173,6 +160,23 @@ fn a_placed_container_the_archive_lacks_has_no_entry() {
     let a = explored.summaries.get(&root.entry).expect("a");
     assert_eq!(a.placed, [placed(&written("ghost"), None)]);
     assert_eq!(a.nested.len(), 0);
+    let missing = explored
+        .ledger
+        .entries
+        .iter()
+        .find(|entry| entry.operation == EntryOperation::Enumeration)
+        .expect("authored missing Entry observation");
+    assert_eq!(
+        missing.kind,
+        Kind::LootContainers,
+        "loot owns the missing link"
+    );
+    assert_eq!(
+        missing.disposition,
+        SourceDisposition::ReadFailed,
+        "a genuinely absent target is still a failed read"
+    );
+    assert!(missing.original().is_ok(), "actual authored link receipt");
 }
 
 #[test]
@@ -191,7 +195,7 @@ fn an_entity_file_with_several_links_is_noted() {
 }
 
 #[test]
-fn containers_beyond_the_limit_are_counted_not_read() {
+fn all_reachable_physical_containers_are_opened_once() {
     let dir = tempfile::tempdir().expect("a directory");
     let archive = open(
         dir.path(),
@@ -201,14 +205,40 @@ fn containers_beyond_the_limit_are_counted_not_read() {
                 &[entity(&written("b"), None), entity(&written("c"), None)],
             ),
             socpak("b", &[entity(&written("c"), None)]),
-            socpak("c", &[]),
+            socpak("c", &[entity(&written("d"), Some(CONFIG))]),
+            socpak("d", &[]),
+            socpak("elsewhere", &[]),
         ],
     );
     let index = Index::new(&archive);
     let root = root_of(&archive, "a");
-    let explored = explore_within(&archive, &index, &[root], None, 2);
-    assert_eq!(explored.summaries.len(), 2);
-    assert_eq!(explored.beyond_limit, 1);
+    let explored = explore(&archive, &index, std::slice::from_ref(&root), None);
+    assert_eq!(explored.summaries.len(), 4, "only the reachable subgraph");
+    let mut opened: Vec<_> = explored
+        .ledger
+        .entries
+        .iter()
+        .filter(|entry| entry.operation == EntryOperation::ContainerDirectory)
+        .map(|entry| {
+            assert_eq!(
+                entry.disposition,
+                SourceDisposition::Projected,
+                "all reachable directories were opened"
+            );
+            assert!(entry.original().is_ok(), "physical directory receipt");
+            entry.entry_index
+        })
+        .collect();
+    opened.sort_unstable();
+    let mut expected = ["a", "b", "c", "d"].map(|name| index.find(&written(name)));
+    expected.sort_unstable();
+    assert_eq!(opened, expected, "both paths to c share one physical read");
+    let placed = below(root.entry, &explored.summaries);
+    assert_eq!(
+        paths(&placed),
+        [path_of(&archive, index.find(&written("d")).expect("d"))],
+        "the deepest placement is retained"
+    );
 }
 
 #[test]

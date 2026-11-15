@@ -2251,8 +2251,8 @@ started in: `starmapObjectGuid` is the object the Child that reaches it hangs be
 "Locations" above, with `null` for a container no Child reaches or an object the catalog lacks). A
 container placed under several roots gives a row for each, and containers that place each other
 (A places B places A) are read once. The warning `unreadable_loot_containers` names a container or
-entity file that cannot be read, a `.soc` that cannot be counted, a placed container the Archive
-lacks, and containers beyond the limit of the walk, each with its reason. An entity file that names
+entity file that cannot be read, a `.soc` that cannot be counted, or a placed container the Archive
+lacks, with the reason for each. An entity file that names
 several different containers or multi configs uses the first of each in document order and is
 warned about (`ambiguous_loot_entity_files`). The cost of the walk is the size of the subgraph below
 each distinct root; it is not memoised, as it is negligible on LIVE.

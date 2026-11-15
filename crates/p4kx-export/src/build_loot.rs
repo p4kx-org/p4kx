@@ -9,7 +9,6 @@ use crate::collected::Collected;
 use crate::crafting_warning::CraftingWarning;
 use crate::harvest_locations::Objects;
 use crate::loot_containers::{Located, locate};
-use crate::loot_walk::MAX_CONTAINERS;
 use crate::starmap_containers::Placements;
 
 /// Finds the containers below the system containers that are placed with a multi config and
@@ -34,7 +33,7 @@ pub(crate) fn add_loot_containers(
     );
     let located = locate(
         archive,
-        &placements.opened,
+        &std::mem::take(&mut placements.opened),
         &Objects::new(&collected.starmap_objects),
         cancel,
         capture,
@@ -46,19 +45,13 @@ pub(crate) fn add_loot_containers(
         ledger,
         containers,
         unreadable,
-        beyond_limit,
         several,
     } = located;
     collected.ledger.merge(ledger);
     collected
         .ledger
         .merge(std::mem::take(&mut placements.ledger));
-    let mut details: Vec<String> = unreadable.iter().map(ToString::to_string).collect();
-    if beyond_limit > 0 {
-        details.push(format!(
-            "{beyond_limit} containers beyond the limit of {MAX_CONTAINERS} are not read"
-        ));
-    }
+    let details: Vec<String> = unreadable.iter().map(ToString::to_string).collect();
     if !details.is_empty() {
         collected
             .warnings
