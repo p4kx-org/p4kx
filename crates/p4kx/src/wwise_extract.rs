@@ -9,7 +9,7 @@ use anyhow::Result;
 use p4kx_assembly::audio::{
     ArchiveAudio, ExportOptions, ExportReport, ExportState, ExportWatch, SoundFormat, TriggerSounds,
 };
-use p4kx_extraction::CancelToken;
+use p4kx_extraction::{CancelToken, ConversionError};
 use serde::Serialize;
 
 use crate::cli::AudioOutput;
@@ -187,14 +187,17 @@ pub(crate) fn run(args: &WwiseExtractArgs, as_json: bool) -> Result<ExitCode> {
     let cancel = cancel_on_interrupt()?;
     let archive = crate::key::open(&args.archive)?;
     let audio = ArchiveAudio::new(&archive);
-    let index = audio.index();
-    let choice = language_choice(index, &args.language)?;
-    let resolved = if args.txtp {
-        audio.resolve_trigger_with_path_sources(&args.trigger, &choice)
-    } else {
-        audio.resolve_trigger_in(&args.trigger, &choice)
-    };
-    let sounds = resolved.ok_or_else(|| UnknownTrigger::new(&args.trigger))?;
+    let index = audio
+        .index_until(&cancel)
+        .ok_or(ConversionError::Cancelled)?;
+    let choice = language_choice(index, &args.resolve)?;
+    let mut options = args.resolve.options(&cancel);
+    if args.txtp {
+        options = options.with_path_sources();
+    }
+    let sounds = audio
+        .resolve_trigger_with_options(&args.trigger, &choice, options)?
+        .ok_or_else(|| UnknownTrigger::new(&args.trigger))?;
     let (report, txtp) = if args.txtp {
         let watch = ExportWatch::linked(cancel.clone());
         let (report, origins) = audio.export_sounds_watched_with_loop_origins(

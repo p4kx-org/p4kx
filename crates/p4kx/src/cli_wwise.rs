@@ -4,6 +4,8 @@
 use std::path::PathBuf;
 
 use clap::{Args, Subcommand};
+use p4kx_assembly::audio::ResolveOptions;
+use p4kx_extraction::CancelToken;
 
 use crate::cli::{AudioOutput, Conflict};
 use crate::exit::EXIT_CODES_HELP;
@@ -74,7 +76,7 @@ pub(crate) struct WwiseExtractArgs {
     #[arg(long)]
     pub(crate) txtp: bool,
     #[command(flatten)]
-    pub(crate) language: AudioLanguageArgs,
+    pub(crate) resolve: AudioResolveArgs,
 }
 
 /// How exported sounds are written.
@@ -133,12 +135,12 @@ pub(crate) struct WwiseResolveArgs {
     /// The audio trigger as its ATL definition names it, e.g. `Play_QDrive_Spool`; ignores case.
     pub(crate) trigger: String,
     #[command(flatten)]
-    pub(crate) language: AudioLanguageArgs,
+    pub(crate) resolve: AudioResolveArgs,
 }
 
-/// The language the localised sounds are resolved in.
+/// Language selection and traversal controls for audio trigger resolution.
 #[derive(Debug, Args)]
-pub(crate) struct AudioLanguageArgs {
+pub(crate) struct AudioResolveArgs {
     /// The language folder below Data/Sounds/wwise to resolve localised sounds in, as the
     /// Archive spells it, e.g. English(US); ignores case. Without it, the fallback language.
     #[arg(long, value_name = "LANGUAGE")]
@@ -147,4 +149,17 @@ pub(crate) struct AudioLanguageArgs {
     /// English(US), or the first language folder when the Archive has none of that name.
     #[arg(long, value_name = "LANGUAGE")]
     pub(crate) fallback_lang: Option<String>,
+    /// Limits attempted HIRC objects and music track sources per trigger. Without it, full
+    /// traversal. A cut is reported by inspection and prevents extraction.
+    #[arg(long, value_name = "COUNT")]
+    max_visits: Option<usize>,
+}
+
+impl AudioResolveArgs {
+    /// Returns the caller's traversal options for one trigger.
+    pub(crate) fn options<'a>(&self, cancel: &'a CancelToken) -> ResolveOptions<'a> {
+        let options = ResolveOptions::default().with_cancel(cancel);
+        self.max_visits
+            .map_or(options, |limit| options.with_max_visits(limit))
+    }
 }

@@ -32,6 +32,7 @@ mod audio_limits;
 mod audio_loose_fallbacks;
 mod audio_resolve;
 mod audio_resolve_banks;
+mod audio_resolve_budget;
 mod audio_resolve_bus;
 mod audio_resolve_cross;
 mod audio_resolve_cross_language;

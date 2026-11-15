@@ -298,12 +298,12 @@ pub(crate) struct TriggerSoundsResult {
     pub(crate) trigger: TriggerShape,
     /// How the variants and links count over all pages.
     pub(crate) counts: CountsShape,
-    /// Whether traversal limits caused the resolver to leave references unfollowed.
+    /// Whether the caller's visit budget left references unfollowed.
     pub(crate) truncated_by_limits: bool,
     /// The variants on this page.
     pub(crate) variants: Vec<VariantShape>,
-    /// The broken links, on the first page only, at most 25;
-    /// `counts.breaks` says how many there are.
+    /// Up to 25 broken links on the first page. The last slot includes a late visit cutoff.
+    /// `counts.breaks` gives the total reached.
     pub(crate) breaks: Vec<BreakShape>,
     /// The first files of the audio data that could not be read, at most 20.
     pub(crate) issues: Vec<IssueShape>,

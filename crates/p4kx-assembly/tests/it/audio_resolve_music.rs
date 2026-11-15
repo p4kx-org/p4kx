@@ -6,9 +6,7 @@
 
 use std::error::Error;
 
-use p4kx_assembly::audio::{
-    ArchiveAudio, BreakReason, BrokenLink, MAX_CONTAINER_CHILDREN, SoundVariant, TriggerSounds,
-};
+use p4kx_assembly::audio::{ArchiveAudio, BreakReason, BrokenLink, SoundVariant, TriggerSounds};
 use p4kx_extraction::Archive;
 use p4kx_testkit::{ArchiveBuilder, TestAtl, TestBank, TestEntry, TestHircObject, wwise_short_id};
 
@@ -135,19 +133,19 @@ fn music_objects_that_refer_back_are_cut_as_cycles() -> TestResult {
 }
 
 #[test]
-fn a_track_with_more_sources_than_the_limit_follows_only_the_first() -> TestResult {
-    let sources: Vec<u32> = (9000..9000 + u32::try_from(MAX_CONTAINER_CHILDREN)? + 5).collect();
+fn a_wide_music_track_resolves_every_authored_source_in_order() -> TestResult {
+    let sources: Vec<u32> = (9000..).take(1_029).collect();
     let bank = music_bank().object(TestHircObject::music_track(10, &sources));
     with_bank(&bank, |sounds| {
-        assert_eq!(sounds.variants().len(), MAX_CONTAINER_CHILDREN);
         assert!(
             sounds
-                .breaks()
+                .variants()
                 .iter()
-                .any(|link| matches!(link.reason(), BreakReason::TooManyChildren { .. })),
-            "{:?}",
-            sounds.breaks()
+                .map(SoundVariant::wem_id)
+                .eq(sources.iter().copied().map(Some)),
+            "each MusicTrack source appears in the authored order"
         );
+        assert!(sounds.breaks().is_empty(), "{:?}", sounds.breaks());
         Ok(())
     })
 }

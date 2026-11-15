@@ -1,8 +1,8 @@
 # An event walk enters one other soundbank and follows Trigger actions to stingers
 
 Decided for issue #597. Amends the resolution rules of ADR-0115 and builds on ADR-0033.
-The bank-entry and retention rules are superseded by ADR-0362. The historical decision and LIVE
-measurements below describe the earlier bank-count policy, not the current reader's limits.
+The bank-entry, retention and traversal-limit rules are superseded by ADR-0362. The decision
+and LIVE measurements below describe the earlier policy.
 
 ## Decision
 

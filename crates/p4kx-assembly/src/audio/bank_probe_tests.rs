@@ -4,11 +4,12 @@
 use std::rc::{Rc, Weak};
 
 use super::super::hirc_path_source::PathSourceMode;
-use super::super::walk::{self, Found, WalkOptions};
+use super::super::resolve_options::ResolveWork;
+use super::super::walk::{self, Found};
 use super::bank_probe::BankProbe;
 use super::{Banks, Loaded, Spare};
 use crate::audio::{
-    AudioFileError, AudioIndex, BreakReason, IndexedSoundbank, LanguageChoice, MAX_EVENT_OBJECTS,
+    AudioFileError, AudioIndex, BreakReason, IndexedSoundbank, LanguageChoice, ResolveOptions,
 };
 
 #[path = "bank_probe_source.rs"]
@@ -35,11 +36,13 @@ fn run<'index>(
     )?;
     let choice = LanguageChoice::any();
     let banks = Banks::new(&fixture.archive, index, &choice, home, spare);
-    let options = WalkOptions {
-        budget: MAX_EVENT_OBJECTS,
-        path_sources: PathSourceMode::Omit,
-    };
-    Ok(walk::event(banks, source::event(index)?, options))
+    let mut work = ResolveWork::new(ResolveOptions::default());
+    Ok(walk::event(
+        banks,
+        source::event(index)?,
+        PathSourceMode::Omit,
+        &mut work,
+    ))
 }
 
 fn load_error(result: Result<Loaded<'_>, AudioFileError>) -> TestResult<AudioFileError> {

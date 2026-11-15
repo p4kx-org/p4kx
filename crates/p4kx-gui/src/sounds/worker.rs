@@ -8,10 +8,10 @@ use std::thread;
 
 use p4kx_assembly::audio::{
     ArchiveAudio, AudioIndex, ExportOptions, ExportReport, ExportWatch, LanguageChoice,
-    TriggerSounds,
+    ResolveOptions, TriggerSounds,
 };
 use p4kx_assembly::{ENTITY_TYPE, Entities};
-use p4kx_extraction::CancelToken;
+use p4kx_extraction::{CancelToken, ConversionError};
 
 use super::resolve::{entity_rows, search_rows, sound_list};
 use super::view::{EntityInfo, IndexInfo, ListSource, SoundList, TriggerList};
@@ -194,7 +194,7 @@ pub(super) fn run(
                         Answer::List(generation, make_list(index, &audio, list))
                     }
                     Request::Resolve(generation, trigger) => {
-                        Answer::Sounds(generation, resolve(&audio, &choice, &trigger))
+                        Answer::Sounds(generation, resolve(&audio, &choice, &trigger, cancel))
                     }
                     Request::Language(name) => {
                         choice = LanguageChoice::new(name.as_deref(), default_language);
@@ -314,9 +314,12 @@ fn resolve(
     audio: &ArchiveAudio<'_>,
     choice: &LanguageChoice,
     trigger: &str,
+    cancel: &CancelToken,
 ) -> Result<SoundList, String> {
+    let options = ResolveOptions::default().with_cancel(cancel);
     audio
-        .resolve_trigger_in(trigger, choice)
+        .resolve_trigger_with_options(trigger, choice, options)
+        .map_err(|error| describe(&error))?
         .map(|sounds| sound_list(&sounds))
         .ok_or_else(|| trigger.to_owned())
 }
@@ -328,10 +331,21 @@ fn write(
 ) -> Result<Written, String> {
     let mut missing = Vec::new();
     let mut resolved: Vec<TriggerSounds<'_>> = Vec::new();
+    let options = ResolveOptions::default().with_cancel(export.watch.cancel_token());
     for name in &export.triggers {
-        match audio.resolve_trigger_in(name, choice) {
-            Some(sounds) => resolved.push(sounds),
-            None => missing.push(name.clone()),
+        match audio.resolve_trigger_with_options(name, choice, options) {
+            Ok(Some(sounds)) => resolved.push(sounds),
+            Ok(None) => missing.push(name.clone()),
+            Err(ConversionError::Cancelled) => {
+                return Ok((
+                    ExportReport {
+                        cancelled: true,
+                        ..ExportReport::default()
+                    },
+                    missing,
+                ));
+            }
+            Err(error) => return Err(describe(&error)),
         }
     }
     let triggers: Vec<&TriggerSounds<'_>> = resolved.iter().collect();

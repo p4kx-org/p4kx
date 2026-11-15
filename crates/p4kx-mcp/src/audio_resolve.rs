@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_assembly::audio::{AudioIndex, LanguageChoice, TriggerSounds};
+use p4kx_assembly::audio::{AudioIndex, LanguageChoice, ResolveOptions, TriggerSounds};
 
 use crate::archives::Opened;
 use crate::audio_convert as convert;
@@ -58,8 +58,16 @@ pub(crate) fn resolve(
         params.lang.as_deref(),
         params.fallback_lang.as_deref(),
     )?;
+    let options = ResolveOptions::default();
+    let options = params
+        .max_visits
+        .map_or(options, |limit| options.with_max_visits(limit));
     let sounds = audio
-        .resolve_trigger_in(&params.trigger, &choice)
+        .resolve_trigger_with_options(&params.trigger, &choice, options)
+        .map_err(|source| ToolError::AudioResolution {
+            trigger: params.trigger.clone(),
+            source: Box::new(source),
+        })?
         .ok_or_else(|| ToolError::UnknownTrigger(params.trigger.clone()))?;
     let total = sounds.variants().len();
     let mut result = envelope(opened, index, &sounds, &choice, page)?;
@@ -113,10 +121,16 @@ fn breaks(
     if page.offset() != 0 {
         return Ok(Vec::new());
     }
-    sounds
-        .breaks()
+    let links = sounds.breaks();
+    let late_cut = links
         .iter()
-        .take(MAX_BREAKS)
+        .enumerate()
+        .find(|(_, link)| link.reason().truncated_by_limit())
+        .and_then(|(index, link)| (index >= MAX_BREAKS).then_some(link));
+    links
+        .iter()
+        .take(MAX_BREAKS - usize::from(late_cut.is_some()))
+        .chain(late_cut)
         .map(|link| convert::broken_link(link, text))
         .collect()
 }

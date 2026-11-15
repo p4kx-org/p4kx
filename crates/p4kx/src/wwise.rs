@@ -9,10 +9,12 @@ use p4kx_assembly::audio::{
     ArchiveAudio, AudioIndex, BrokenLink, IndexedSoundbank, LanguageChoice, PathStep, SoundVariant,
     SourceKind, TriggerSounds, WemLocation,
 };
+use p4kx_extraction::ConversionError;
 use thiserror::Error;
 
-use crate::cli::{AudioLanguageArgs, WwiseAction, WwiseArgs, WwiseResolveArgs};
+use crate::cli::{AudioResolveArgs, WwiseAction, WwiseArgs, WwiseResolveArgs};
 use crate::entity_audio::{issues_json, warn};
+use crate::extract::cancel_on_interrupt;
 use crate::json;
 use crate::query_table::one_line;
 use crate::wwise_json::{self, Counts, LanguageJson, ResolveJson};
@@ -49,7 +51,7 @@ pub(crate) fn run(args: &WwiseArgs, as_json: bool) -> Result<ExitCode> {
 /// Archive, and the fallback defaults to the game's default language.
 pub(crate) fn language_choice(
     index: &AudioIndex,
-    args: &AudioLanguageArgs,
+    args: &AudioResolveArgs,
 ) -> Result<LanguageChoice, UnknownAudioLanguage> {
     let known = |name: &str| {
         index.language(name).ok_or_else(|| UnknownAudioLanguage {
@@ -71,16 +73,20 @@ pub(crate) fn language_choice(
 
 /// Prints every sound variant of an audio trigger and every broken link.
 fn resolve(args: &WwiseResolveArgs, as_json: bool) -> Result<()> {
+    let cancel = cancel_on_interrupt()?;
     let archive = crate::key::open(&args.archive)?;
     let audio = ArchiveAudio::new(&archive);
-    let index = audio.index();
-    let choice = language_choice(index, &args.language)?;
-    let sounds = if as_json {
-        audio.resolve_trigger_with_path_sources(&args.trigger, &choice)
-    } else {
-        audio.resolve_trigger_in(&args.trigger, &choice)
+    let index = audio
+        .index_until(&cancel)
+        .ok_or(ConversionError::Cancelled)?;
+    let choice = language_choice(index, &args.resolve)?;
+    let mut options = args.resolve.options(&cancel);
+    if as_json {
+        options = options.with_path_sources();
     }
-    .ok_or_else(|| UnknownTrigger(args.trigger.clone()))?;
+    let sounds = audio
+        .resolve_trigger_with_options(&args.trigger, &choice, options)?
+        .ok_or_else(|| UnknownTrigger::new(&args.trigger))?;
     let counts = Counts::of(&sounds);
     if as_json {
         let (field_origins, provenance) = wwise_json::capture(&archive, &sounds)?;

@@ -240,6 +240,15 @@ pub(crate) enum ToolError {
     /// No ATL definition has the audio trigger.
     #[error("no ATL definition has the audio trigger `{0}`; search_audio_triggers finds triggers")]
     UnknownTrigger(String),
+    /// Trigger resolution failed.
+    #[error("cannot resolve the audio trigger `{trigger}`")]
+    AudioResolution {
+        /// The trigger.
+        trigger: String,
+        /// The resolver failure.
+        #[source]
+        source: Box<ConversionError>,
+    },
     /// The audio language is no language folder of the Archive.
     #[error(
         "the Archive holds no audio language `{language}`; its language folders are: {available}"

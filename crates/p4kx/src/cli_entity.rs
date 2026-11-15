@@ -8,7 +8,7 @@ use p4kx_assembly::{ChangeError, LoadoutChanges, LoadoutPicks};
 
 use crate::cli_model::lod_range;
 use crate::cli_package_mesh::PackageMeshArgs;
-use crate::cli_wwise::{AudioLanguageArgs, SoundExportArgs};
+use crate::cli_wwise::{AudioResolveArgs, SoundExportArgs};
 use crate::exit::EXIT_CODES_HELP;
 
 /// The material modes of `p4kx entity glb --materials`.
@@ -247,5 +247,5 @@ pub(crate) struct EntityAudioArgs {
     #[command(flatten)]
     pub(crate) export: SoundExportArgs,
     #[command(flatten)]
-    pub(crate) language: AudioLanguageArgs,
+    pub(crate) resolve: AudioResolveArgs,
 }

@@ -1013,9 +1013,11 @@ sound) and random, sequence, switch and blend containers to Sound objects. Varia
 come in the order of the trigger's events, their soundbanks in path order and each container's
 children in bank order. Broken links do not change the exit code.
 
-`truncated_by_limits` is `true` when a depth, action-chain, child-count or object-budget limit cuts
-the walk short. The inspection still succeeds and `variants` and `counts` describe the part reached.
-The corresponding entry in `breaks` gives the limit and why the walk stopped.
+`truncated_by_limits` is `true` when the caller's `--max-visits <count>` stops the walk. The budget
+covers each attempted HIRC object and each MusicTrack source across the trigger's Events and
+soundbanks. Omit the flag for complete traversal. A budgeted inspection still succeeds and
+`variants` and `counts` describe the part reached. The corresponding entry in `breaks` gives
+the limit and why the walk stopped.
 
 A **Variant**:
 
@@ -1057,11 +1059,9 @@ step where the chain breaks, the last of `path`), `target` (for `missing`, `othe
 one that cannot, which is the other soundbank when the walk was leaving the soundbank of the
 event), `missing` (the object refers to an ID the soundbank does not hold; for a Trigger action,
 a trigger no stinger names), `other_soundbank` (a Play action names no eligible indexed
-soundbank), `chain_too_long` (more than 8 PlayEvent and Trigger actions in a row),
-`malformed`, `unknown_layout` (an object of a bank version other than 154), `unsupported` (an
-object kind that is not followed, e.g. an actor-mixer), `cycle`,
-`too_deep` (a path of 32 objects), `too_many_children` (only the first 1024 children of a
-container are followed), `too_many_objects` (at most 16,384 objects per event and soundbank) and
+soundbank), `malformed`, `unknown_layout` (an object of a bank version other than 154),
+`unsupported` (an object kind that is not followed, e.g. an actor-mixer), `cycle`,
+`too_many_objects` (the trigger exceeds the caller's visit budget) and
 `no_localisation` (a localised event or streamed sound has no soundbank or WEM in `requested` nor
 in the fallback language).
 New kinds may be added in later versions.

@@ -399,8 +399,10 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   for nonzero transition fade time or offset and `omit-music-transition-segments`
   for an allocated transition object with an authored segment ID.
   `p4kx entity audio --extract <folder>` does the same for every trigger of an Entity.
-  A traversal cutoff aborts the requested export before creating or replacing any files. The
-  error identifies the blocking trigger, event and limit.
+  `wwise resolve`, `wwise extract` and `entity audio` accept an optional `--max-visits <count>`
+  per trigger. The count includes each attempted HIRC object and MusicTrack source in authored
+  Event and selected soundbank order. A budget cutoff aborts the requested export before creating
+  or replacing files. The error identifies the blocking trigger, event and limit.
 - `p4kx loc languages <archive>` lists the languages the Archive holds a `global.ini` for, with
   their codes (`en`, `de`, `fr`, `it`, `es-ES`, `es-419`, `pt-BR`, `ja`, `ko`, `zh-Hans`,
   `zh-Hant`); `p4kx loc get <archive> <key> [--lang <language>] [--fallback <language>]` prints the
@@ -873,7 +875,7 @@ change. `p4kx-mcp --version` and `-V` show the legal notice.
 | `list_model_items` | One `section` of a model Entry, paged: `materials`, `nodes`, `meshes`, `bones`, `animations`, `unread_animations` or `chunks`, each item shaped as in `p4kx model info --json` |
 | `search_audio_triggers` | The audio triggers whose name or Wwise event names match `search` (a substring or a glob), as `p4kx wwise events`: events, the soundbanks holding them, why a trigger leads to none, and, with `entities` above 0 (the default is 0, because the lookup reads every Entity), the Entities naming it; complete event lists, names and Entity identifiers share the existing 256 KiB response budget, with explicit refusal of an item that cannot fit first |
 | `get_entity_sounds` | The audio triggers an Entity (`entity`: GUID, record path or class name) names, each with its ATL definition, events and soundbanks, as `p4kx entity audio`; complete event lists, identities and reference coordinates share the existing response budget |
-| `resolve_audio_trigger` | The sound variants reached for a trigger (`trigger`, `lang`, `fallback_lang`), with soundbank, WEM ID, source kind, location and object path. Broken links appear on the first page. `truncated_by_limits` is true on every page if a traversal limit left references unfollowed. Counts cover the variants reached. Retained names and paths are complete within the response budget, and oversized items are refused. |
+| `resolve_audio_trigger` | The sound variants reached for a trigger (`trigger`, `lang`, `fallback_lang`), with soundbank, WEM ID, source kind, location and object path. Optional `max_visits` limits the same traversal work as `--max-visits` and must match across pages. Broken links appear on the first page, including any visit-budget cutoff. `truncated_by_limits` reports the cutoff on every page and counts cover the variants reached. Retained names and paths are complete within the response budget, and oversized items are refused. |
 | `list_soundbank_wems` | The WEMs a soundbank (`soundbank`) embeds, paged, as `p4kx bnk list`: ID, size, codec, channels, sample rate, frames, duration, prefetch. No audio |
 | `list_soundbank_objects` | The `HIRC` objects of a soundbank (`soundbank`) in bank order, paged with a cursor, as `p4kx bnk objects --json` lists them: type, ID, parent, children, how far the reader decodes the object, and the fields of sounds, actions, containers, ActorMixers and music objects. Type-specific source fields, including Play Action properties, standalone State and version-154 bus routing and ducking, and shared version-154 node fields carry per-value receipts within the whole-object response budget. `type` (as `p4kx bnk objects --type`) and `id` narrow it; `matched` counts the objects that pass, `total` and `layouts` the whole bank. Objects the reader does not decode are listed and counted. No audio |
 | `get_wem_info` | One WEM by `wem_id` or loose Entry `path`: every indexed place that holds it and, from the first complete candidate that parses, its codec, channels, sample rate, duration and loop; the search is independent of location paging. No audio |

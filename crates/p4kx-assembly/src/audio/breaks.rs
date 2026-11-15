@@ -60,28 +60,6 @@ pub enum BreakReason {
         /// The ID referred to.
         id: u32,
     },
-    /// The path is as long as [`MAX_PATH_DEPTH`](super::MAX_PATH_DEPTH) allows.
-    #[error("the path is deeper than {limit} objects")]
-    TooDeep {
-        /// The limit.
-        limit: usize,
-    },
-    /// `PlayEvent` and `Trigger` actions follow one another more often than
-    /// [`MAX_ACTION_CHAIN`](super::MAX_ACTION_CHAIN) allows.
-    #[error("more than {limit} PlayEvent and Trigger actions follow one another")]
-    ChainTooLong {
-        /// The limit.
-        limit: usize,
-    },
-    /// The container has more children than
-    /// [`MAX_CONTAINER_CHILDREN`](super::MAX_CONTAINER_CHILDREN); the rest are left out.
-    #[error("the container has {count} children; only the first {limit} are followed")]
-    TooManyChildren {
-        /// How many children it has.
-        count: usize,
-        /// The limit.
-        limit: usize,
-    },
     /// A localised sound has no WEM in the language asked for or in the fallback language.
     #[error("{}", no_localisation(.language, .fallback))]
     NoLocalisation {
@@ -90,10 +68,8 @@ pub enum BreakReason {
         /// The fallback language, empty when there is none.
         fallback: Box<str>,
     },
-    /// The walk followed as many references as its budget allows, at most
-    /// [`MAX_EVENT_OBJECTS`](super::MAX_EVENT_OBJECTS) and a share of
-    /// [`MAX_TRIGGER_OBJECTS`](super::MAX_TRIGGER_OBJECTS); the rest are left out.
-    #[error("the event leads to more than {limit} references; the rest are left out")]
+    /// The trigger has more visits than the caller's budget allows.
+    #[error("the trigger exceeds the visit budget of {limit}, leaving references unfollowed")]
     TooManyObjects {
         /// The limit.
         limit: usize,
@@ -104,13 +80,7 @@ impl BreakReason {
     /// Returns whether a traversal limit left authored routes unvisited.
     #[must_use]
     pub const fn truncated_by_limit(&self) -> bool {
-        matches!(
-            self,
-            Self::TooDeep { .. }
-                | Self::ChainTooLong { .. }
-                | Self::TooManyChildren { .. }
-                | Self::TooManyObjects { .. }
-        )
+        matches!(self, Self::TooManyObjects { .. })
     }
 
     /// Returns a stable code for the reason, e.g. `missing`, for scripts.
@@ -125,9 +95,6 @@ impl BreakReason {
             Self::UnknownLayout { .. } => "unknown_layout",
             Self::Unsupported => "unsupported",
             Self::Cycle { .. } => "cycle",
-            Self::TooDeep { .. } => "too_deep",
-            Self::ChainTooLong { .. } => "chain_too_long",
-            Self::TooManyChildren { .. } => "too_many_children",
             Self::TooManyObjects { .. } => "too_many_objects",
             Self::NoLocalisation { .. } => "no_localisation",
         }

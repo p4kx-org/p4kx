@@ -63,6 +63,9 @@ pub(crate) struct TriggerParams {
     /// The language folder used where `lang` has no localisation of a sound; `English(US)` by
     /// default, or the first language folder when the Archive has none of that name.
     pub(crate) fallback_lang: Option<String>,
+    /// Optional budget for HIRC object and music track source visits across the whole trigger.
+    /// Omit it to follow all reachable references. Use the same budget on every page.
+    pub(crate) max_visits: Option<usize>,
     /// The `next_cursor` of the previous page; omit it for the first page.
     pub(crate) cursor: Option<String>,
     /// The page size, 100 by default, at most 1000.

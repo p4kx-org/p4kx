@@ -75,7 +75,13 @@ impl ExportWatch {
         }
     }
 
-    /// Asks the export to stop at the next write.
+    /// Returns the token that stops resolution and export.
+    #[must_use]
+    pub const fn cancel_token(&self) -> &CancelToken {
+        &self.token
+    }
+
+    /// Asks the export to stop.
     pub fn cancel(&self) {
         self.token.cancel();
     }

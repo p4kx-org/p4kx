@@ -9,9 +9,9 @@ use anyhow::Result;
 use p4kx_assembly::Entities;
 use p4kx_assembly::audio::{
     ArchiveAudio, AudioIndex, EntityAudio, EntityTrigger, EventMatch, ExportReport,
-    IndexedSoundbank, LanguageChoice, TriggerSounds, Unmatched, trigger_references,
+    IndexedSoundbank, LanguageChoice, ResolveOptions, TriggerSounds, Unmatched, trigger_references,
 };
-use p4kx_extraction::{CancelToken, DataForgeEntry, Record};
+use p4kx_extraction::{CancelToken, ConversionError, DataForgeEntry, Record};
 use serde::Serialize;
 
 use crate::cli::EntityAudioArgs;
@@ -99,27 +99,39 @@ struct Counts {
     unmatched: usize,
 }
 
+impl Counts {
+    fn of(audio: &EntityAudio<'_>) -> Self {
+        let triggers = audio.triggers().len();
+        let matched = audio.matched_count();
+        Self {
+            triggers,
+            matched,
+            unmatched: triggers.saturating_sub(matched),
+        }
+    }
+}
+
 /// Prints the audio triggers of an Entity with their Wwise events and soundbanks.
 pub(crate) fn run(args: &EntityAudioArgs, as_json: bool) -> Result<ExitCode> {
-    let cancel = interrupt_if_extracting(args)?;
+    let resolve_variants = args.sounds || args.extract.is_some();
+    let cancel = resolve_variants
+        .then(cancel_on_interrupt)
+        .transpose()?
+        .unwrap_or_default();
     let archive = crate::key::open(&args.archive)?;
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;
     let entity = Entities::new(&forge).find(&args.entity)?;
     let references = trigger_references(&entity.tree()?);
     let audio = ArchiveAudio::new(&archive);
-    let index = audio.index();
-    let choice = language_choice(index, &args.language)?;
+    let index = audio
+        .index_until(&cancel)
+        .ok_or(ConversionError::Cancelled)?;
+    let choice = language_choice(index, &args.resolve)?;
     let resolved = index.resolve(references);
-    let sounds = resolve_sounds(&audio, &resolved, &choice, args);
-    let counts = Counts {
-        triggers: resolved.triggers().len(),
-        matched: resolved.matched_count(),
-        unmatched: resolved
-            .triggers()
-            .len()
-            .saturating_sub(resolved.matched_count()),
-    };
+    let options = resolve_variants.then(|| args.resolve.options(&cancel));
+    let sounds = resolve_sounds(&audio, &resolved, &choice, options)?;
+    let counts = Counts::of(&resolved);
     let report = export_sounds(&audio, &sounds, args, &cancel)?;
     let code = report
         .as_ref()
@@ -128,7 +140,7 @@ pub(crate) fn run(args: &EntityAudioArgs, as_json: bool) -> Result<ExitCode> {
         json::print(&AudioJson {
             archive: json::path(archive.path()),
             entry: entry.path(),
-            language: (args.sounds || args.extract.is_some()).then(|| LanguageJson::of(&choice)),
+            language: resolve_variants.then(|| LanguageJson::of(&choice)),
             entity: entity_json(&entity),
             triggers: resolved
                 .triggers()
@@ -161,27 +173,19 @@ pub(crate) fn run(args: &EntityAudioArgs, as_json: bool) -> Result<ExitCode> {
     Ok(code)
 }
 
-fn interrupt_if_extracting(args: &EntityAudioArgs) -> Result<CancelToken> {
-    if args.extract.is_some() {
-        cancel_on_interrupt()
-    } else {
-        Ok(CancelToken::new())
-    }
-}
-
 fn resolve_sounds<'i>(
     audio: &'i ArchiveAudio<'_>,
     resolved: &EntityAudio<'i>,
     choice: &LanguageChoice,
-    args: &EntityAudioArgs,
-) -> Vec<Option<TriggerSounds<'i>>> {
-    if !(args.sounds || args.extract.is_some()) {
-        return Vec::new();
-    }
+    options: Option<ResolveOptions<'_>>,
+) -> Result<Vec<Option<TriggerSounds<'i>>>, ConversionError> {
+    let Some(options) = options else {
+        return Ok(Vec::new());
+    };
     resolved
         .triggers()
         .iter()
-        .map(|trigger| audio.resolve_trigger_in(trigger.name(), choice))
+        .map(|trigger| audio.resolve_trigger_with_options(trigger.name(), choice, options))
         .collect()
 }
 

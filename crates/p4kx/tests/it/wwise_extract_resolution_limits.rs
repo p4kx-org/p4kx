@@ -5,7 +5,6 @@ use std::error::Error;
 use std::fs;
 use std::process::Output;
 
-use p4kx_assembly::audio::MAX_PATH_DEPTH;
 use p4kx_testkit::{
     ArchiveBuilder, DataForgeBuilder, TestAtl, TestBank, TestContainerKind, TestEntity, TestEntry,
     TestHircObject, TestNodeBase, audio_schema, entity_schema, wwise_short_id,
@@ -22,8 +21,11 @@ const COMPLETE_ACTION: u32 = 2;
 const ROOT_CONTAINER: u32 = 10;
 const AUDIBLE_SOUND: u32 = 11;
 const CHAIN_START: u32 = 12;
+const CHAIN_LENGTH: u32 = 64;
 const AUDIBLE_WEM: u32 = 100;
 const CUT_WEM: u32 = 101;
+const VISIT_LIMIT: &str = "4";
+const BUDGET_ARGS: [&str; 2] = ["--max-visits", VISIT_LIMIT];
 const PRIOR_BYTES: &[u8] = b"prior export payload";
 const PRIOR_FILES: [&str; 3] = [
     "Play_DepthCut.txtp",
@@ -32,17 +34,20 @@ const PRIOR_FILES: [&str; 3] = [
 ];
 
 #[test]
-fn traversal_depth_cut_refuses_wwise_exports_before_any_publication() -> TestResult {
+fn explicit_visit_budget_refuses_wwise_exports_before_any_publication() -> TestResult {
     let fixture = fixture()?;
     check_partial_resolution(&fixture)?;
-    assert_depth_failure(&extract(&fixture, &[])?)?;
+    assert_budget_failure(&extract(&fixture, &BUDGET_ARGS)?)?;
     assert!(!fixture.out.exists(), "no new output directory");
 
     fs::create_dir(&fixture.out)?;
     for name in PRIOR_FILES {
         fs::write(fixture.out.join(name), PRIOR_BYTES)?;
     }
-    assert_depth_failure(&extract(&fixture, &["--txtp"])?)?;
+    assert_budget_failure(&extract(
+        &fixture,
+        &["--txtp", "--max-visits", VISIT_LIMIT],
+    )?)?;
     assert_eq!(names(&fixture.out)?, PRIOR_FILES, "no new export artifacts");
     for name in PRIOR_FILES {
         assert_eq!(
@@ -55,7 +60,7 @@ fn traversal_depth_cut_refuses_wwise_exports_before_any_publication() -> TestRes
 }
 
 #[test]
-fn traversal_depth_cut_refuses_the_entity_audio_batch_before_any_publication() -> TestResult {
+fn explicit_visit_budget_refuses_the_entity_audio_batch_before_any_publication() -> TestResult {
     let fixture = fixture()?;
     check_entity_inspection(&fixture)?;
     let output = p4kx_testkit::p4kx()?
@@ -66,9 +71,41 @@ fn traversal_depth_cut_refuses_the_entity_audio_batch_before_any_publication() -
         .arg("--extract")
         .arg(&fixture.out)
         .args(["--format", "wav", "--conflict", "overwrite"])
+        .args(BUDGET_ARGS)
         .output()?;
-    assert_depth_failure(&output)?;
+    assert_budget_failure(&output)?;
     assert!(!fixture.out.exists(), "the batch publishes neither trigger");
+    Ok(())
+}
+
+#[test]
+fn default_resolution_exports_a_long_path_and_both_wav_files() -> TestResult {
+    let fixture = fixture()?;
+    let output = extract(&fixture, &["--txtp"])?;
+    assert!(
+        output.status.success(),
+        "complete export succeeds: {output:?}"
+    );
+    let report: Value = serde_json::from_slice(&output.stdout)?;
+    assert_eq!(
+        report.get("written").and_then(Value::as_u64),
+        Some(2),
+        "both WEMs are converted"
+    );
+    assert_eq!(
+        report.get("breaks").and_then(Value::as_u64),
+        Some(0),
+        "the default walk follows the whole path"
+    );
+    let playlist = fs::read_to_string(fixture.out.join(format!("{CUT}.txtp")))?;
+    for wem in [AUDIBLE_WEM, CUT_WEM] {
+        let wav = format!("{CUT}_{wem}.wav");
+        assert!(
+            fixture.out.join(&wav).is_file(),
+            "the export contains {wav}"
+        );
+        assert!(playlist.contains(&wav), "the playlist references {wav}");
+    }
     Ok(())
 }
 
@@ -78,6 +115,7 @@ fn check_partial_resolution(fixture: &Fixture) -> TestResult {
         .args(["wwise", "resolve"])
         .arg(&fixture.archive)
         .arg(CUT)
+        .args(BUDGET_ARGS)
         .output()?;
     assert!(
         output.status.success(),
@@ -94,6 +132,7 @@ fn check_entity_inspection(fixture: &Fixture) -> TestResult {
         .arg(&fixture.archive)
         .arg(ENTITY)
         .arg("--sounds")
+        .args(BUDGET_ARGS)
         .output()?;
     assert!(
         output.status.success(),
@@ -135,12 +174,12 @@ fn check_capped_sounds(report: &Value) -> TestResult {
         return Err(format!("expected one traversal cut: {breaks:?}").into());
     };
     assert_eq!(
-        cut["kind"], "too_deep",
-        "the other branch reaches the depth bound"
+        cut["kind"], "too_many_objects",
+        "the other branch reaches the caller's visit budget"
     );
     assert_eq!(
         cut["message"],
-        depth_reason(),
+        budget_reason(),
         "the original diagnostic is included"
     );
     Ok(())
@@ -159,19 +198,19 @@ fn extract(fixture: &Fixture, flags: &[&str]) -> Result<Output, Box<dyn Error>> 
         .output()?)
 }
 
-fn assert_depth_failure(output: &Output) -> TestResult {
+fn assert_budget_failure(output: &Output) -> TestResult {
     assert_eq!(output.status.code(), Some(1), "export refused: {output:?}");
     assert!(output.stdout.is_empty(), "there is no success JSON report");
     let stderr = std::str::from_utf8(&output.stderr)?;
     assert!(
-        stderr.contains(CUT) && stderr.contains(&depth_reason()),
+        stderr.contains(CUT) && stderr.contains(&budget_reason()),
         "stderr identifies the actual cut and its trigger: {stderr}"
     );
     Ok(())
 }
 
-fn depth_reason() -> String {
-    format!("the path is deeper than {MAX_PATH_DEPTH} objects")
+fn budget_reason() -> String {
+    format!("the trigger exceeds the visit budget of {VISIT_LIMIT}, leaving references unfollowed")
 }
 
 fn fixture() -> Result<Fixture, Box<dyn Error>> {
@@ -195,7 +234,7 @@ fn fixture() -> Result<Fixture, Box<dyn Error>> {
             "Data/Libs/GameAudio/AudioDepth.xml",
             definitions.to_cryxml(),
         ))
-        .entry(TestEntry::stored("Data/Sounds/wwise/Depth.bnk", bank()?))
+        .entry(TestEntry::stored("Data/Sounds/wwise/Depth.bnk", bank()))
         .write_to(&archive)?;
     Ok(Fixture {
         _dir: directory,
@@ -204,8 +243,8 @@ fn fixture() -> Result<Fixture, Box<dyn Error>> {
     })
 }
 
-fn bank() -> Result<Vec<u8>, Box<dyn Error>> {
-    let terminal = CHAIN_START + u32::try_from(MAX_PATH_DEPTH)?;
+fn bank() -> Vec<u8> {
+    let terminal = CHAIN_START + CHAIN_LENGTH;
     let mut bank = TestBank::new(wwise_short_id("Depth"))
         .version(154)
         .wem(AUDIBLE_WEM, pcm())
@@ -228,7 +267,7 @@ fn bank() -> Result<Vec<u8>, Box<dyn Error>> {
     for id in CHAIN_START..terminal {
         bank = bank.object(sequence(id, &[id + 1]));
     }
-    Ok(bank.bytes())
+    bank.bytes()
 }
 
 fn sequence(id: u32, children: &[u32]) -> TestHircObject {

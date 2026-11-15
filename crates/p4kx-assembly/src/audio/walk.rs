@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::rc::Rc;
+use std::collections::HashSet;
 
 use p4kx_audio::{HircKind, HircObject, HircValue, SoundSource};
 
@@ -9,16 +9,18 @@ use super::hirc_path_source::{HircInboundSource, PathSourceMode};
 use super::locate::locate;
 use super::music_clip_features::MusicClipFeatures;
 use super::playback_features::PlaybackFeatures;
+use super::resolve_options::{ResolveWork, WorkStop};
 use super::walk_banks::{Banks, Loaded, Via, find_object};
-use super::{
-    AudioIndex, BreakReason, BrokenLink, HircPathSource, IndexedSoundbank, LanguageChoice,
-    MAX_ACTION_CHAIN, MAX_CONTAINER_CHILDREN, MAX_PATH_DEPTH, NodeKind, PathStep, SoundVariant,
-    WwiseEvent,
-};
+use super::{BreakReason, BrokenLink, HircPathSource, IndexedSoundbank, NodeKind, PathStep};
+use super::{SoundVariant, WwiseEvent};
 
 #[path = "walk_children.rs"]
 mod children;
+#[path = "walk_cursor.rs"]
+mod cursor;
+
 use self::children::FollowedEdge;
+use self::cursor::{Visit, WalkCursor};
 
 /// The variants and broken links one Wwise event leads to in one soundbank.
 #[derive(Debug, Default)]
@@ -27,174 +29,215 @@ pub(crate) struct Found<'i> {
     pub(crate) breaks: Vec<BrokenLink<'i>>,
 }
 
-#[derive(Clone, Copy)]
-pub(super) struct WalkOptions {
-    pub(super) budget: usize,
-    pub(super) path_sources: PathSourceMode,
-}
-
 /// Follows the Wwise event `event` through the `HIRC` section of the start soundbank of `banks`
 /// to its sounds through indexed bank references.
 pub(super) fn event<'i>(
     banks: Banks<'_, 'i>,
     event: &'i WwiseEvent,
-    options: WalkOptions,
+    path_sources: PathSourceMode,
+    work: &mut ResolveWork<'_>,
 ) -> Found<'i> {
     let mut walk = Walk {
-        index: banks.index,
-        choice: banks.choice,
-        current: banks.home.clone(),
         banks,
         event,
         path: Vec::new(),
+        active: HashSet::new(),
         shared_path_prefix: 0,
-        objects: 0,
-        options,
-        chain: 0,
-        exhausted: false,
+        path_sources,
         found: Found::default(),
     };
-    walk.reach(event.id(), None, Via::Local, None);
+    match walk.run(work) {
+        Ok(()) => {}
+        Err(WorkStop::Budget { limit }) => walk.broke(BreakReason::TooManyObjects { limit }),
+        Err(WorkStop::Cancelled) => return Found::default(),
+    }
     walk.found
 }
 
-struct ResolvedPathStep<'index> {
-    owner: Loaded<'index>,
+#[derive(Clone, Copy)]
+struct Target {
+    id: u32,
+    wanted: Option<HircKind>,
+    via: Via,
+    inbound: Option<FollowedEdge>,
+}
+
+#[derive(PartialEq, Eq, Hash)]
+struct ActiveObject {
+    position: u32,
+    id: u32,
+}
+
+struct Frame<'i> {
+    owner: Loaded<'i>,
+    object_number: usize,
     step: PathStep,
     source: Option<HircPathSource>,
     playback_features: PlaybackFeatures,
+    cursor: WalkCursor<'i>,
+}
+
+impl Frame<'_> {
+    fn object(&self) -> Option<&HircObject> {
+        self.owner.bank.objects().get(self.object_number)
+    }
+
+    const fn active_object(&self) -> ActiveObject {
+        ActiveObject {
+            position: self.owner.position,
+            id: self.step.id,
+        }
+    }
 }
 
 struct Walk<'w, 'i> {
-    index: &'i AudioIndex,
-    choice: &'w LanguageChoice,
     banks: Banks<'w, 'i>,
-    current: Loaded<'i>,
     event: &'i WwiseEvent,
-    path: Vec<ResolvedPathStep<'i>>,
+    path: Vec<Frame<'i>>,
+    active: HashSet<ActiveObject>,
     shared_path_prefix: usize,
-    objects: usize,
-    options: WalkOptions,
-    chain: usize,
-    exhausted: bool,
+    path_sources: PathSourceMode,
     found: Found<'i>,
 }
 
 impl<'i> Walk<'_, 'i> {
-    fn spend(&mut self) -> bool {
-        if self.objects >= self.options.budget {
-            if !self.exhausted {
-                self.exhausted = true;
-                self.broke(BreakReason::TooManyObjects {
-                    limit: self.options.budget,
-                });
+    fn run(&mut self, work: &mut ResolveWork<'_>) -> Result<(), WorkStop> {
+        self.reach(
+            Target {
+                id: self.event.id(),
+                wanted: Some(HircKind::Event),
+                via: Via::Local,
+                inbound: None,
+            },
+            work,
+        )?;
+        while let Some(frame) = self.path.last_mut() {
+            if work.cancelled() {
+                return Err(WorkStop::Cancelled);
             }
-            return false;
+            let object = frame.owner.bank.objects().get(frame.object_number);
+            match frame.cursor.next(object, work)? {
+                Some(Visit::Follow(target)) => self.reach(target, work)?,
+                Some(Visit::Sound(source)) => self.sound(source, MusicClipFeatures::default()),
+                Some(Visit::Track(source, features)) => {
+                    work.spend()?;
+                    self.sound(source, features);
+                }
+                Some(Visit::Break(reason)) => self.broke(reason),
+                None => self.leave(),
+            }
         }
-        self.objects += 1;
-        true
+        Ok(())
     }
 
-    fn reach(
-        &mut self,
-        id: u32,
-        wanted: Option<HircKind>,
-        via: Via,
-        inbound: Option<FollowedEdge<'_>>,
-    ) {
-        if !self.spend() {
-            return;
-        }
-        if self.path.len() >= MAX_PATH_DEPTH {
-            self.broke(BreakReason::TooDeep {
-                limit: MAX_PATH_DEPTH,
-            });
-            return;
-        }
-        let wanted = wanted.or_else(|| self.path.is_empty().then_some(HircKind::Event));
-        let in_current = match via {
-            Via::At(position) => position == self.current.position,
+    fn reach(&mut self, target: Target, work: &mut ResolveWork<'_>) -> Result<(), WorkStop> {
+        work.spend()?;
+        let current = self.current();
+        let from = current.position;
+        let in_current = match target.via {
+            Via::At(position) => position == from,
             Via::Local | Via::Bank(_) | Via::PlayEvent => true,
         };
-        let (bank, entered) = if in_current && find_object(&self.current.bank, id, wanted).is_some()
+        let owner = if in_current && find_object(&current.bank, target.id, target.wanted).is_some()
         {
-            (Rc::clone(&self.current.bank), None)
+            current.clone()
         } else {
             match self.banks.enter(
-                self.current.position,
-                id,
-                via,
-                self.path.iter().map(|active| &active.owner),
+                from,
+                target.id,
+                target.via,
+                self.path.iter().map(|frame| &frame.owner),
             ) {
-                Ok(next) => (Rc::clone(&next.bank), Some(next)),
+                Ok(owner) => owner,
                 Err(refused) => {
                     self.broke_in(refused.bank, refused.reason);
-                    return;
+                    return Ok(());
                 }
             }
         };
-        let Some(object) = find_object(&bank, id, wanted) else {
-            self.broke(BreakReason::Missing { id });
-            return;
+        self.enter(owner, target, work)
+    }
+
+    fn enter(
+        &mut self,
+        owner: Loaded<'i>,
+        target: Target,
+        work: &ResolveWork<'_>,
+    ) -> Result<(), WorkStop> {
+        let Some(object) = find_object(&owner.bank, target.id, target.wanted) else {
+            self.broke(BreakReason::Missing { id: target.id });
+            return Ok(());
         };
-        let position = entered
-            .as_ref()
-            .map_or(self.current.position, |next| next.position);
         #[cfg(test)]
-        self.banks.probe_selection(position, object.id, &bank);
-        if self
-            .path
-            .iter()
-            .any(|active| active.owner.position == position && active.step.id == id)
-        {
-            self.broke(BreakReason::Cycle { id });
-            return;
+        self.banks
+            .probe_selection(owner.position, object.id, &owner.bank);
+        if !self.active.insert(ActiveObject {
+            position: owner.position,
+            id: target.id,
+        }) {
+            self.broke(BreakReason::Cycle { id: target.id });
+            return Ok(());
         }
-        let inbound = inbound.and_then(|edge| self.inbound_source(edge, via, entered.as_ref()));
-        let left = entered.map(|next| std::mem::replace(&mut self.current, next));
-        self.enter(object, inbound);
-        self.visit(object);
-        self.leave(left);
-    }
 
-    fn inbound_source(
-        &self,
-        edge: FollowedEdge<'_>,
-        via: Via,
-        entered: Option<&Loaded<'_>>,
-    ) -> Option<HircInboundSource> {
-        if matches!(self.options.path_sources, PathSourceMode::Omit) {
-            return None;
-        }
-        let bank_id = match via {
-            Via::Bank(id) if entered.is_some() => Some(id),
-            _ => None,
+        let source = match self.path_sources {
+            PathSourceMode::Omit => None,
+            PathSourceMode::Retain => Some(HircPathSource::of(
+                self.banks.archive(),
+                &owner,
+                object,
+                self.inbound_source(target, owner.position),
+            )),
         };
-        let parent = self.path.last().and_then(|step| step.source.as_ref());
-        edge.source(self.banks.archive(), &self.current, parent, bank_id)
-    }
-
-    fn enter(&mut self, object: &HircObject, inbound: Option<HircInboundSource>) {
+        let cursor = WalkCursor::new(
+            object,
+            owner.bank.header().version,
+            self.banks.index,
+            self.banks.choice,
+            work,
+        )?;
         let playback_features = self
             .playback_features()
             .combine(PlaybackFeatures::observe(&object.value));
-        self.path.push(ResolvedPathStep {
-            owner: self.current.clone(),
-            step: PathStep {
-                kind: node_kind(object),
-                id: object.id,
-            },
-            source: match self.options.path_sources {
-                PathSourceMode::Omit => None,
-                PathSourceMode::Retain => Some(HircPathSource::of(
-                    self.banks.archive(),
-                    &self.current,
-                    object,
-                    inbound,
-                )),
-            },
+        let step = PathStep {
+            kind: node_kind(object),
+            id: object.id,
+        };
+        // Bank objects are in physical order, including distinct occurrences of duplicate IDs.
+        let start = object.byte_range().start;
+        let object_number = owner
+            .bank
+            .objects()
+            .partition_point(|candidate| candidate.byte_range().start < start);
+        self.path.push(Frame {
+            owner,
+            object_number,
+            step,
+            source,
             playback_features,
+            cursor,
         });
+        Ok(())
+    }
+
+    fn current(&self) -> &Loaded<'i> {
+        self.path
+            .last()
+            .map_or(&self.banks.home, |frame| &frame.owner)
+    }
+
+    fn inbound_source(&self, target: Target, position: u32) -> Option<HircInboundSource> {
+        let parent = self.path.last()?;
+        let bank_id = match target.via {
+            Via::Bank(id) if position != parent.owner.position => Some(id),
+            _ => None,
+        };
+        target.inbound?.source(
+            self.banks.archive(),
+            &parent.owner,
+            parent.object()?,
+            parent.source.as_ref(),
+            bank_id,
+        )
     }
 
     fn playback_features(&self) -> PlaybackFeatures {
@@ -203,139 +246,23 @@ impl<'i> Walk<'_, 'i> {
             .map_or_default(|step| step.playback_features)
     }
 
-    fn leave(&mut self, previous: Option<Loaded<'i>>) {
-        self.path.pop();
+    fn leave(&mut self) {
+        if let Some(frame) = self.path.pop() {
+            self.active.remove(&frame.active_object());
+        }
         self.shared_path_prefix = self.shared_path_prefix.min(self.path.len());
-        if let Some(previous) = previous {
-            self.current = previous;
-        }
-    }
-
-    fn visit(&mut self, object: &HircObject) {
-        match &object.value {
-            HircValue::Event(actions) => self.children(actions, object),
-            HircValue::Action(action) => {
-                if action.is_play() {
-                    let via = action
-                        .bank
-                        .map_or(Via::Local, |bank| Via::Bank(bank.bank_id));
-                    self.reach(
-                        action.target_id,
-                        None,
-                        via,
-                        Some(FollowedEdge::Action(object)),
-                    );
-                } else if action.is_play_event() {
-                    self.chained(|walk| {
-                        walk.reach(
-                            action.target_id,
-                            Some(HircKind::Event),
-                            Via::PlayEvent,
-                            Some(FollowedEdge::Action(object)),
-                        );
-                    });
-                } else if action.is_trigger() {
-                    self.chained(|walk| walk.stingers(action.target_id, object));
-                }
-            }
-            HircValue::Container(container) => {
-                self.children(&container.children, object);
-            }
-            HircValue::MusicSegment(segment) => self.children(&segment.node.children, object),
-            HircValue::MusicSwitch(switch) => {
-                self.children(&switch.node.children, object);
-            }
-            HircValue::MusicPlaylist(playlist) => self.children(&playlist.node.children, object),
-            HircValue::MusicTrack(track) => {
-                let music_clips = MusicClipFeatures::observe(track);
-                for source in track.sources.iter().take(MAX_CONTAINER_CHILDREN) {
-                    if !self.spend() {
-                        break;
-                    }
-                    self.sound(*source, music_clips);
-                }
-                if track.sources.len() > MAX_CONTAINER_CHILDREN {
-                    self.broke(BreakReason::TooManyChildren {
-                        count: track.sources.len(),
-                        limit: MAX_CONTAINER_CHILDREN,
-                    });
-                }
-            }
-            HircValue::Sound(source) => self.sound(*source, MusicClipFeatures::default()),
-            HircValue::ActorMixer(_)
-            | HircValue::State(_)
-            | HircValue::Attenuation
-            | HircValue::Bus
-            | HircValue::Plugin
-            | HircValue::Modulator
-            | HircValue::Malformed(_)
-            | HircValue::Raw => self.unresolved_object(object),
-        }
-    }
-
-    fn unresolved_object(&mut self, object: &HircObject) {
-        let reason = match &object.value {
-            HircValue::Malformed(error)
-                if !matches!(
-                    object.kind,
-                    HircKind::State
-                        | HircKind::ActorMixer
-                        | HircKind::Attenuation
-                        | HircKind::AudioBus
-                        | HircKind::AuxiliaryBus
-                        | HircKind::FxShareSet
-                        | HircKind::FxCustom
-                        | HircKind::AudioDevice
-                        | HircKind::Lfo
-                        | HircKind::Envelope
-                        | HircKind::TimeModulator
-                ) =>
-            {
-                BreakReason::Malformed(error.clone())
-            }
-            HircValue::Raw
-                if matches!(
-                    object.kind,
-                    HircKind::Sound
-                        | HircKind::RandomSequenceContainer
-                        | HircKind::SwitchContainer
-                        | HircKind::LayerContainer
-                        | HircKind::MusicSegment
-                        | HircKind::MusicTrack
-                        | HircKind::MusicSwitch
-                        | HircKind::MusicPlaylist
-                ) =>
-            {
-                BreakReason::UnknownLayout {
-                    version: self.current.bank.header().version,
-                }
-            }
-            _ => BreakReason::Unsupported,
-        };
-        self.broke(reason);
-    }
-
-    fn chained(&mut self, follow: impl FnOnce(&mut Self)) {
-        if self.chain >= MAX_ACTION_CHAIN {
-            self.broke(BreakReason::ChainTooLong {
-                limit: MAX_ACTION_CHAIN,
-            });
-            return;
-        }
-        self.chain += 1;
-        follow(self);
-        self.chain -= 1;
     }
 
     fn sound(&mut self, source: SoundSource, music_clip_features: MusicClipFeatures) {
-        let located = locate(self.index, self.current.soundbank, self.choice, &source);
+        let bank = self.current().soundbank;
+        let located = locate(self.banks.index, bank, self.banks.choice, &source);
         if located.missing_localisation {
-            self.broke(self.choice.no_localisation());
+            self.broke(self.banks.choice.no_localisation());
         }
         self.found.variants.push(SoundVariant {
             event: self.event,
-            soundbank: self.current.soundbank,
-            sound_id: self.path.last().map_or(0, |step| step.step.id),
+            soundbank: bank,
+            sound_id: self.path.last().map_or(0, |frame| frame.step.id),
             path: self.public_path(),
             path_sources: self.path_sources(),
             shared_path_prefix: self.shared_path_prefix,
@@ -352,16 +279,16 @@ impl<'i> Walk<'_, 'i> {
     }
 
     fn public_path(&self) -> Box<[PathStep]> {
-        self.path.iter().map(|active| active.step).collect()
+        self.path.iter().map(|frame| frame.step).collect()
     }
 
     fn path_sources(&self) -> Box<[HircPathSource]> {
-        match self.options.path_sources {
+        match self.path_sources {
             PathSourceMode::Omit => Box::default(),
             PathSourceMode::Retain => self
                 .path
                 .iter()
-                .filter_map(|step| step.source.clone())
+                .filter_map(|frame| frame.source.clone())
                 .collect(),
         }
     }
@@ -371,9 +298,10 @@ impl<'i> Walk<'_, 'i> {
     }
 
     fn broke_in(&mut self, soundbank: Option<&'i IndexedSoundbank>, reason: BreakReason) {
+        let soundbank = soundbank.unwrap_or_else(|| self.current().soundbank);
         self.found.breaks.push(BrokenLink {
             event: self.event,
-            soundbank: Some(soundbank.unwrap_or(self.current.soundbank)),
+            soundbank: Some(soundbank),
             path: self.public_path(),
             path_sources: self.path_sources(),
             reason,

@@ -38,7 +38,7 @@ pub(crate) use crate::cli_socpak::{SocpakAction, SocpakArgs, SocpakSource};
 pub(crate) use crate::cli_ui::{UiAction, UiArgs, UiScreensArgs};
 pub(crate) use crate::cli_verify::VerifyArgs;
 pub(crate) use crate::cli_wwise::{
-    AudioLanguageArgs, WwiseAction, WwiseArgs, WwiseEventsArgs, WwiseResolveArgs,
+    AudioResolveArgs, WwiseAction, WwiseArgs, WwiseEventsArgs, WwiseResolveArgs,
 };
 use crate::exit::EXIT_CODES_HELP;
 use crate::notice::{LEGAL_NOTICE, VERSION};

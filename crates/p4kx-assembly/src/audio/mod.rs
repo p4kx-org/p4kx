@@ -26,6 +26,8 @@ mod playback_features;
 mod read;
 mod references;
 mod resolve;
+mod resolve_bounded;
+mod resolve_options;
 mod search;
 mod sounds;
 mod txtp;
@@ -53,6 +55,7 @@ pub use index::AudioIndex;
 pub use language::LanguageChoice;
 pub use p4kx_audio::wwise_id;
 pub use references::{TriggerReference, TriggerScope, trigger_references, trigger_references_in};
+pub use resolve_options::ResolveOptions;
 pub use search::{MAX_SEARCH_PAGE, SearchPage, TriggerHit};
 pub use sounds::{NodeKind, PathStep, SoundVariant, SourceKind, TriggerSounds, WemLocation};
 pub use txtp::{
@@ -84,19 +87,3 @@ pub const MAX_LOOSE_WEMS: usize = 1 << 22;
 
 /// The most language folders one index holds; WEMs in further ones are left out.
 pub const MAX_LANGUAGES: usize = 1 << 10;
-
-/// The most objects a container path holds, the Event object included.
-pub const MAX_PATH_DEPTH: usize = 32;
-
-/// The most `PlayEvent` and `Trigger` actions that follow one another on one path.
-pub const MAX_ACTION_CHAIN: usize = 8;
-
-/// The most children of one container that are followed.
-pub const MAX_CONTAINER_CHILDREN: usize = 1024;
-
-/// The most objects followed from one Wwise event in one soundbank.
-pub const MAX_EVENT_OBJECTS: usize = 1 << 14;
-
-/// The most objects followed for one audio trigger over all its events and soundbanks; the share
-/// of each event in each soundbank shrinks once the product exceeds it.
-pub const MAX_TRIGGER_OBJECTS: usize = 1 << 21;
