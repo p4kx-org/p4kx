@@ -134,6 +134,7 @@ fn track(object: &HircObject, next: &mut usize) -> Option<Visit> {
 }
 
 struct StingerCursor<'i> {
+    trigger: u32,
     candidates: slice::Iter<'i, Stinger>,
     chosen: Vec<u32>,
 }
@@ -165,6 +166,7 @@ fn stinger_continuation<'i>(
         ))));
     }
     Ok(Continuation::Stingers(StingerCursor {
+        trigger,
         candidates: stingers.iter(),
         chosen,
     }))
@@ -181,7 +183,10 @@ impl StingerCursor<'_> {
                     id: stinger.segment_id,
                     wanted: None,
                     via: Via::At(stinger.bank),
-                    inbound: Some(FollowedEdge::Action),
+                    inbound: Some(FollowedEdge::Stinger {
+                        trigger: self.trigger,
+                        declaration: stinger.scheduled_at,
+                    }),
                 })));
             }
         }

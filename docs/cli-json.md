@@ -937,6 +937,8 @@ post-exit, destination pre-entry or match-source-cue flag on a MusicPlaylist
 or MusicSwitch. A Switch MusicTrack can add the same code from its original
 transition sync selector. Immediate and unknown sync codes do not prove a
 scheduled transition.
+A rendered Trigger route can add `omit-music-stinger-scheduling` from the
+selected stinger declaration's known non-immediate sync word.
 Rendered paths can also add `omit-container-transitions` for a nonzero declared
 Random/Sequence transition mode and `omit-blend-curves` for original checked
 Blend association curve points. Mode zero does not activate stored timing words.

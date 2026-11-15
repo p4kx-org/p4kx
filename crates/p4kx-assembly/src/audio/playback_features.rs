@@ -4,7 +4,7 @@
 use p4kx_audio::{HircValue, MusicTransitionFeatures};
 
 #[derive(Clone, Copy)]
-#[repr(u8)]
+#[repr(u16)]
 pub(super) enum PlaybackFeature {
     MusicFades = 1 << 0,
     MusicTransitionSegments = 1 << 1,
@@ -14,10 +14,11 @@ pub(super) enum PlaybackFeature {
     ContainerTransitions = 1 << 5,
     BlendCurves = 1 << 6,
     MusicTransitionScheduling = 1 << 7,
+    MusicStingerScheduling = 1 << 8,
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub(super) struct PlaybackFeatures(u8);
+pub(super) struct PlaybackFeatures(u16);
 
 impl PlaybackFeatures {
     pub(super) fn observe(value: &HircValue) -> Self {
@@ -62,12 +63,12 @@ impl PlaybackFeatures {
     }
 
     pub(super) const fn contains(self, feature: PlaybackFeature) -> bool {
-        self.0 & feature as u8 != 0
+        self.0 & feature as u16 != 0
     }
 
-    const fn observe_flag(&mut self, feature: PlaybackFeature, present: bool) {
+    pub(super) const fn observe_flag(&mut self, feature: PlaybackFeature, present: bool) {
         if present {
-            self.0 |= feature as u8;
+            self.0 |= feature as u16;
         }
     }
 

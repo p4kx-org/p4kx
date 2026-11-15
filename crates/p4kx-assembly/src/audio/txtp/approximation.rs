@@ -19,6 +19,8 @@ pub enum TxtpApproximation {
     OmitMusicTransitionSegments,
     /// The rendered path omits an enabled music transition scheduling control.
     OmitMusicTransitionScheduling,
+    /// The rendered Trigger route omits a known non-immediate stinger sync control.
+    OmitMusicStingerScheduling,
     /// The rendered path omits authored container or playlist loop controls.
     OmitContainerLoops,
     /// The rendered path omits authored switch or state selection.
@@ -43,6 +45,7 @@ impl TxtpApproximation {
             Self::OmitMusicTransitionFades => "omit-music-transition-fades",
             Self::OmitMusicTransitionSegments => "omit-music-transition-segments",
             Self::OmitMusicTransitionScheduling => "omit-music-transition-scheduling",
+            Self::OmitMusicStingerScheduling => "omit-music-stinger-scheduling",
             Self::OmitContainerLoops => "omit-container-loops",
             Self::OmitContainerConditions => "omit-container-conditions",
             Self::OmitMusicTrackAutomation => "omit-music-track-automation",

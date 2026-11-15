@@ -153,12 +153,17 @@ fn node(fields: &mut SectionReader<'_>, bank_offset: u64) -> Result<MusicNode, B
     let meter = hirc_music_node::meter(fields, &mut original)?;
     let count = hirc_music_node::stinger_count(fields, &mut original)?;
     let mut stingers = Vec::with_capacity(capacity(fields, count, STINGER_LEN));
+    let mut scheduled_stingers = Vec::new();
     for _ in 0..count {
         let original = hirc_music_node::stinger(fields)?;
+        let ordinal = stingers.len();
         stingers.push(MusicStinger {
             trigger_id: original.trigger_id.value,
             segment_id: original.segment_id.value,
         });
+        if hirc_music_transition::is_scheduled_music_sync(original.sync_play_at.value) {
+            scheduled_stingers.push((ordinal, original.with_bank_offset(bank_offset)));
+        }
     }
     Ok(MusicNode {
         parent_id,
@@ -168,6 +173,7 @@ fn node(fields: &mut SectionReader<'_>, bank_offset: u64) -> Result<MusicNode, B
         child_count: original
             .child_count
             .map(|count| count.with_bank_offset(bank_offset)),
+        scheduled_stingers: scheduled_stingers.into_boxed_slice(),
     })
 }
 

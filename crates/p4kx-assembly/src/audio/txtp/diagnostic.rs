@@ -39,6 +39,13 @@ pub(super) fn collect<'a>(
                     .and_then(|commands| rendered.commands.get(commands.clone()))
                     .map(|commands| selection::resolve(variants, commands))
                     .map(DiagnosticSource::Selection),
+                TxtpApproximation::OmitMusicStingerScheduling => rendered
+                    .commands
+                    .iter()
+                    .filter_map(|command| variants.get(command.variant))
+                    .flat_map(SoundVariant::path_sources)
+                    .find(|source| source.diagnostic_site(approximation).is_some())
+                    .map(DiagnosticSource::Authored),
                 _ => variants
                     .iter()
                     .flat_map(SoundVariant::path_sources)

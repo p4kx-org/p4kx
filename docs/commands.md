@@ -401,6 +401,8 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   allocated transition object with an authored segment ID. Known scheduled
   sync selectors and active entry, jump and transition flags are reported as
   `omit-music-transition-scheduling` where present on the rendered path.
+  A rendered Trigger route whose stinger declares a known non-immediate sync
+  control reports `omit-music-stinger-scheduling`.
   `p4kx entity audio --extract <folder>` does the same for every trigger of an Entity.
   `wwise resolve`, `wwise extract` and `entity audio` accept an optional `--max-visits <count>`
   per trigger. The count includes each attempted HIRC object and MusicTrack source in authored

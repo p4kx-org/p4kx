@@ -4,9 +4,9 @@
 use std::collections::{HashMap, HashSet};
 
 use p4kx_archive::{Archive, Entry};
-use p4kx_audio::MusicStinger;
 use p4kx_extraction::CancelToken;
 
+use super::banks::{BankStinger, StingerDeclaration};
 use super::index_read::{self, BankRead};
 use super::language::SOUND_FOLDER;
 use super::media::{BankPath, Limits, LooseMedia, WemSource};
@@ -263,7 +263,7 @@ impl AudioIndex {
         self.bank_ids.get(&id).map_or(&[], |positions| positions)
     }
 
-    pub(crate) fn stingers(&self, trigger: u32) -> &[Stinger] {
+    pub(super) fn stingers(&self, trigger: u32) -> &[Stinger] {
         self.stingers.get(&trigger).map_or(&[], |found| found)
     }
 }
@@ -278,31 +278,31 @@ fn boxed<T>(lists: HashMap<u32, Vec<T>>) -> HashMap<u32, Box<[T]>> {
 #[derive(Default)]
 struct StingerList {
     found: HashMap<u32, Vec<Stinger>>,
-    seen: HashSet<(u32, Stinger)>,
+    seen: HashSet<(u32, u32, u32)>,
 }
 
 impl StingerList {
-    fn add(&mut self, bank: u32, stingers: &[MusicStinger]) {
+    fn add(&mut self, bank: u32, stingers: &[BankStinger]) {
         for stinger in stingers {
-            let found = Stinger {
-                bank,
-                segment_id: stinger.segment_id,
-            };
-            if self.seen.insert((stinger.trigger_id, found)) {
-                self.found
-                    .entry(stinger.trigger_id)
-                    .or_default()
-                    .push(found);
+            let trigger = stinger.ids.trigger_id;
+            let segment = stinger.ids.segment_id;
+            if self.seen.insert((trigger, bank, segment)) {
+                self.found.entry(trigger).or_default().push(Stinger {
+                    bank,
+                    segment_id: segment,
+                    scheduled_at: stinger.scheduled_at,
+                });
             }
         }
     }
 }
 
 /// The segment a stinger plays and the soundbank, by position, whose music node declares it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub(crate) struct Stinger {
-    pub(crate) bank: u32,
-    pub(crate) segment_id: u32,
+#[derive(Debug)]
+pub(super) struct Stinger {
+    pub(super) bank: u32,
+    pub(super) segment_id: u32,
+    pub(super) scheduled_at: Option<StingerDeclaration>,
 }
 
 /// Where a soundbank embeds a WEM.
@@ -316,18 +316,23 @@ struct MediaSpot {
 
 #[cfg(test)]
 mod tests {
+    use p4kx_audio::MusicStinger;
+
     use super::*;
 
-    fn stinger(trigger_id: u32, segment_id: u32) -> MusicStinger {
-        MusicStinger {
-            trigger_id,
-            segment_id,
+    fn stinger(trigger_id: u32, segment_id: u32) -> BankStinger {
+        BankStinger {
+            ids: MusicStinger {
+                trigger_id,
+                segment_id,
+            },
+            scheduled_at: None,
         }
     }
 
     #[test]
     fn all_distinct_stinger_tuples_survive_multiple_banks() {
-        let crafted: Vec<MusicStinger> = (0..524_288).map(|number| stinger(number, 1)).collect();
+        let crafted: Vec<BankStinger> = (0..524_288).map(|number| stinger(number, 1)).collect();
         let mut list = StingerList::default();
         list.add(0, &crafted);
         list.add(1, &crafted);

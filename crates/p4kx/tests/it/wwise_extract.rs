@@ -31,6 +31,8 @@ mod txtp_loop_origins;
 mod txtp_origin_assertions;
 #[path = "wwise_txtp_origins.rs"]
 mod txtp_origins;
+#[path = "wwise_txtp_stinger_scheduling.rs"]
+mod txtp_stinger_scheduling;
 #[path = "wwise_txtp_transition_omissions.rs"]
 mod txtp_transition_omissions;
 

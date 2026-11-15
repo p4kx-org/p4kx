@@ -3,7 +3,11 @@
 
 use std::ops::Range;
 
-use p4kx_audio::{Container, ContainerLoopEvidence, ContainerSwitchEvidence, HircValue};
+use p4kx_audio::{
+    BankMusicStinger, Container, ContainerLoopEvidence, ContainerSwitchEvidence, HircObject,
+    HircValue,
+};
+use p4kx_extraction::SourceUseRole;
 
 use super::txtp::TxtpApproximation;
 
@@ -15,6 +19,7 @@ pub(super) struct DiagnosticWord {
     pub(super) namespace: &'static str,
     pub(super) field: &'static str,
     pub(super) bytes: Range<u64>,
+    pub(super) role: SourceUseRole,
 }
 
 impl DiagnosticWord {
@@ -23,7 +28,13 @@ impl DiagnosticWord {
             namespace,
             field,
             bytes: bytes.clone(),
+            role: SourceUseRole::Conversion,
         }
+    }
+
+    const fn with_selector_role(mut self) -> Self {
+        self.role = SourceUseRole::Selector;
+        self
     }
 }
 
@@ -32,6 +43,7 @@ pub(super) struct DiagnosticSite {
     pub(super) approximation: TxtpApproximation,
     first: DiagnosticWord,
     second: Option<DiagnosticWord>,
+    selectors: Vec<DiagnosticWord>,
 }
 
 impl DiagnosticSite {
@@ -40,6 +52,7 @@ impl DiagnosticSite {
             approximation,
             first: word,
             second: None,
+            selectors: Vec::new(),
         }
     }
 
@@ -49,7 +62,40 @@ impl DiagnosticSite {
     }
 
     pub(super) fn words(&self) -> impl Iterator<Item = &DiagnosticWord> {
-        std::iter::once(&self.first).chain(self.second.as_ref())
+        std::iter::once(&self.first)
+            .chain(self.second.as_ref())
+            .chain(&self.selectors)
+    }
+
+    pub(super) fn stinger(owner: &HircObject, row: &BankMusicStinger) -> Option<Self> {
+        const MUSIC_NODE: &str = "bnkHircMusicNode";
+        const OBJECT: &str = "bnkHircObject";
+        let owner_id = owner.id_byte_range();
+        let owner_id = u64::try_from(owner_id.start).ok()?..u64::try_from(owner_id.end).ok()?;
+        let mut site = Self::one(
+            TxtpApproximation::OmitMusicStingerScheduling,
+            DiagnosticWord::new(
+                MUSIC_NODE,
+                "musicStingerSyncPlayAt",
+                &row.sync_play_at.range,
+            ),
+        );
+        site.selectors = vec![
+            DiagnosticWord::new(OBJECT, "objectId", &owner_id).with_selector_role(),
+            DiagnosticWord::new(
+                MUSIC_NODE,
+                "musicStingerScheduleTriggerId",
+                &row.trigger_id.range,
+            )
+            .with_selector_role(),
+            DiagnosticWord::new(
+                MUSIC_NODE,
+                "musicStingerScheduleSegmentId",
+                &row.segment_id.range,
+            )
+            .with_selector_role(),
+        ];
+        Some(site)
     }
 }
 

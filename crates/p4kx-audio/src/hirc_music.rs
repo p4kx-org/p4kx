@@ -11,6 +11,8 @@ use crate::bank_structure::counted_id_byte_range;
 use crate::hirc::SoundSource;
 use crate::hirc_music_playlist::MusicPlaylistLoopEvidence;
 use crate::hirc_music_playlist_depth::PlaylistDepth;
+use crate::hirc_music_stinger::BankMusicStinger;
+pub use crate::hirc_music_stinger::MusicStinger;
 use crate::hirc_music_track::MusicTrackEvidence;
 use crate::hirc_music_transition::{
     MusicTransitionEvidence, MusicTransitionFadeEvidence, MusicTransitionFeatures,
@@ -32,15 +34,6 @@ pub struct MusicMeter {
     pub beat_value: u8,
 }
 
-/// A segment a music node plays when a trigger fires.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct MusicStinger {
-    /// The ID of the trigger.
-    pub trigger_id: u32,
-    /// The ID of the segment it plays.
-    pub segment_id: u32,
-}
-
 /// The fields every music node shares: its place in the hierarchy, its children, its meter and
 /// its stingers.
 #[derive(Debug, Clone, PartialEq)]
@@ -55,6 +48,7 @@ pub struct MusicNode {
     /// The stingers of the node.
     pub stingers: Vec<MusicStinger>,
     pub(crate) child_count: Option<BankHircField<u32>>,
+    pub(crate) scheduled_stingers: Box<[(usize, BankMusicStinger)]>,
 }
 
 impl MusicNode {

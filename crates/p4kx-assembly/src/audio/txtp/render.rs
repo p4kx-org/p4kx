@@ -114,6 +114,10 @@ impl RenderedTxtp<'_> {
                 TxtpApproximation::OmitMusicTransitionScheduling,
             ),
             (
+                PlaybackFeature::MusicStingerScheduling,
+                TxtpApproximation::OmitMusicStingerScheduling,
+            ),
+            (
                 PlaybackFeature::Loops,
                 TxtpApproximation::OmitContainerLoops,
             ),

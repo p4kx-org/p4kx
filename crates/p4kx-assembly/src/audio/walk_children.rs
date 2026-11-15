@@ -4,9 +4,10 @@
 use std::sync::Arc;
 
 use p4kx_archive::Archive;
-use p4kx_audio::{HircObject, HircValue};
+use p4kx_audio::{BankMusicStinger, HircObject, HircValue};
 
 use crate::audio::HircPathSource;
+use crate::audio::banks::{StingerDeclaration, music_node};
 use crate::audio::hirc_path_source::{HircInboundSource, HircRouteSource};
 use crate::audio::walk_banks::Loaded;
 
@@ -14,9 +15,31 @@ use crate::audio::walk_banks::Loaded;
 pub(super) enum FollowedEdge {
     Child(usize),
     Action,
+    Stinger {
+        trigger: u32,
+        declaration: Option<StingerDeclaration>,
+    },
 }
 
 impl FollowedEdge {
+    pub(super) fn stinger_scheduling<'bank>(
+        self,
+        bank: &'bank Loaded<'_>,
+        segment: u32,
+    ) -> Option<(&'bank HircObject, &'bank BankMusicStinger)> {
+        let Self::Stinger {
+            trigger,
+            declaration: Some(declaration),
+        } = self
+        else {
+            return None;
+        };
+        let owner = bank.bank.objects().get(declaration.object)?;
+        let node = music_node(&owner.value)?;
+        let row = node.stinger_scheduling_evidence(declaration.row)?;
+        (row.trigger_id.value == trigger && row.segment_id.value == segment).then_some((owner, row))
+    }
+
     pub(super) fn source(
         self,
         archive: &Archive,
@@ -34,7 +57,9 @@ impl FollowedEdge {
                 }
                 HircRouteSource::event_action(archive, bank, owner, ordinal)
             }
-            Self::Action => HircRouteSource::action(archive, bank, owner, bank_id),
+            Self::Action | Self::Stinger { .. } => {
+                HircRouteSource::action(archive, bank, owner, bank_id)
+            }
         }?;
         Some(HircInboundSource::Route(Arc::new(route)))
     }

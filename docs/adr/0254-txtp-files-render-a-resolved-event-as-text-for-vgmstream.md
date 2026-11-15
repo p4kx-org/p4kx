@@ -116,8 +116,14 @@ The codes are emitted once per generated file in JSON and the TXTP header.
 The render commands and the WEM loop marker retain their own meaning.
 
 `omit-music-transition-scheduling` reports a MusicPlaylist or MusicSwitch rule
-with an enabled source post-exit, destination pre-entry or match-source-cue
-flag. The same rule can have zero fade timing and no transition segment.
+with a known non-immediate source sync control, active destination entry or
+jump selector, or enabled source post-exit, destination pre-entry or
+match-source-cue flag. A Switch MusicTrack can supply the same code from its
+transition sync word. These controls can apply with zero fade timing.
+
+`omit-music-stinger-scheduling` reports a known non-immediate sync control
+in the stinger declaration followed by a rendered Trigger route. It cites
+the declaring object and the original trigger, segment and sync words.
 
 The CLI records approximation origins in the portable companion specified by ADR-0357.
 `textBytes` addresses cover the code token alone. The file row and companion share the source

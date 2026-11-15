@@ -4,9 +4,19 @@
 use std::ops::Range;
 
 use crate::bank_object_fields::{BankHircField, ObjectFields};
+use crate::hirc_music::MusicNode;
 
 const WORD_COUNT: usize = 6;
 pub(crate) const STINGER_LEN: usize = WORD_COUNT * size_of::<u32>();
+
+/// A segment a music node plays when a trigger fires.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct MusicStinger {
+    /// The ID of the trigger.
+    pub trigger_id: u32,
+    /// The ID of the segment it plays.
+    pub segment_id: u32,
+}
 
 /// Original fields of a complete version-154 music stinger.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -26,6 +36,32 @@ pub struct BankMusicStinger {
     pub segment_look_ahead: BankHircField<u32>,
     /// Original extent after the IDs.
     pub opaque_range: Range<u64>,
+}
+
+impl BankMusicStinger {
+    pub(crate) const fn with_bank_offset(self, offset: u64) -> Self {
+        Self {
+            trigger_id: self.trigger_id.with_bank_offset(offset),
+            segment_id: self.segment_id.with_bank_offset(offset),
+            sync_play_at: self.sync_play_at.with_bank_offset(offset),
+            cue_filter_hash: self.cue_filter_hash.with_bank_offset(offset),
+            dont_repeat_time_bits: self.dont_repeat_time_bits.with_bank_offset(offset),
+            segment_look_ahead: self.segment_look_ahead.with_bank_offset(offset),
+            opaque_range: self.opaque_range.start + offset..self.opaque_range.end + offset,
+        }
+    }
+}
+
+impl MusicNode {
+    /// Returns the original row at `ordinal` when it declares a known non-immediate sync control.
+    #[must_use]
+    pub fn stinger_scheduling_evidence(&self, ordinal: usize) -> Option<&BankMusicStinger> {
+        let position = self
+            .scheduled_stingers
+            .binary_search_by_key(&ordinal, |(ordinal, _)| *ordinal)
+            .ok()?;
+        self.scheduled_stingers.get(position).map(|(_, row)| row)
+    }
 }
 
 /// Readable words of the final truncated version-154 music stinger.

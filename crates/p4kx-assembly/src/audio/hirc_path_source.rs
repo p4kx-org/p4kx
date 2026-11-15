@@ -34,6 +34,7 @@ impl HircPathSource {
         owner: &Loaded<'_>,
         object: &HircObject,
         inbound: Option<HircInboundSource>,
+        inbound_diagnostic: Option<DiagnosticSite>,
     ) -> Self {
         let entry_position = owner.soundbank.entry_position();
         let version = owner.bank.version_byte_range();
@@ -44,8 +45,13 @@ impl HircPathSource {
             object: object.byte_range(),
             id: object.id_byte_range(),
             version,
-            diagnostics: BoundDiagnosticSites::of(archive, entry_position, &object.value)
-                .map(Arc::new),
+            diagnostics: BoundDiagnosticSites::of(
+                archive,
+                entry_position,
+                &object.value,
+                inbound_diagnostic,
+            )
+            .map(Arc::new),
             child_owner,
             inbound,
             terminal: TerminalSourceTable::capture(archive, owner, object).map(Arc::new),
@@ -137,8 +143,14 @@ struct BoundDiagnosticSites {
 }
 
 impl BoundDiagnosticSites {
-    fn of(archive: &Archive, entry_position: usize, value: &HircValue) -> Option<Self> {
-        let sites = hirc_diagnostic_sites::checked_sites(value);
+    fn of(
+        archive: &Archive,
+        entry_position: usize,
+        value: &HircValue,
+        inbound_diagnostic: Option<DiagnosticSite>,
+    ) -> Option<Self> {
+        let mut sites = hirc_diagnostic_sites::checked_sites(value);
+        sites.extend(inbound_diagnostic);
         if sites.is_empty() {
             return None;
         }

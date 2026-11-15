@@ -146,7 +146,7 @@ fn diagnostic_origin(
             word.namespace,
             word.field,
             word.bytes.clone(),
-            SourceUseRole::Conversion,
+            word.role,
         )?);
     }
     let version = source.version_bytes();

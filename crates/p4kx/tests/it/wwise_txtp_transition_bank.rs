@@ -140,16 +140,7 @@ fn switch_track(
 
 impl AuthoredRule {
     fn apply(self, bytes: &mut [u8]) -> TestResult {
-        let rule_header = [1_u32, 0x5200_0001, 2, 0x5200_0002, 0x5200_0003].map(u32::to_le_bytes);
-        let header = rule_header.as_flattened();
-        let positions: Vec<_> = bytes
-            .windows(header.len())
-            .enumerate()
-            .filter_map(|(offset, value)| (value == header).then_some(offset + header.len()))
-            .collect();
-        let [ordinary, allocated] = positions.as_slice() else {
-            return Err("two original transition rules".into());
-        };
+        let [ordinary, allocated] = rule_positions(bytes)?;
         match self {
             Self::SourceFade => word(bytes, ordinary + FADE_OFFSET, (-15_i32).to_le_bytes())?,
             Self::DestinationFade => word(bytes, ordinary + SOURCE_RULE_LEN, 18_i32.to_le_bytes())?,
@@ -170,13 +161,7 @@ impl AuthoredRule {
                     (-31_i32).to_le_bytes(),
                 )?;
             }
-            Self::MatchSourceCue => {
-                let flag = bytes
-                    .get_mut(ordinary + SOURCE_RULE_LEN + DESTINATION_RULE_LEN - 1)
-                    .ok_or("original match-source-cue flag")?;
-                assert_eq!(*flag, 0, "the baseline rule has the field disabled");
-                *flag = 1;
-            }
+            Self::MatchSourceCue => enable_match_source_cue(bytes, ordinary)?,
             Self::SourceSync => word(
                 bytes,
                 ordinary + SOURCE_SYNC_OFFSET,
@@ -211,6 +196,28 @@ impl AuthoredRule {
         }
         Ok(())
     }
+}
+
+fn rule_positions(bytes: &[u8]) -> Result<[usize; 2], Box<dyn Error>> {
+    let rule_header = [1_u32, 0x5200_0001, 2, 0x5200_0002, 0x5200_0003].map(u32::to_le_bytes);
+    let header = rule_header.as_flattened();
+    let mut positions = bytes
+        .windows(header.len())
+        .enumerate()
+        .filter_map(|(offset, value)| (value == header).then_some(offset + header.len()));
+    match (positions.next(), positions.next(), positions.next()) {
+        (Some(ordinary), Some(allocated), None) => Ok([ordinary, allocated]),
+        _ => Err("two original transition rules".into()),
+    }
+}
+
+fn enable_match_source_cue(bytes: &mut [u8], ordinary: usize) -> TestResult {
+    let flag = bytes
+        .get_mut(ordinary + SOURCE_RULE_LEN + DESTINATION_RULE_LEN - 1)
+        .ok_or("original match-source-cue flag")?;
+    assert_eq!(*flag, 0, "the baseline rule has the field disabled");
+    *flag = 1;
+    Ok(())
 }
 
 fn word<const N: usize>(bytes: &mut [u8], offset: usize, value: [u8; N]) -> TestResult {

@@ -23,5 +23,11 @@ A truncated row includes only the readable words. The layout status reports orig
 coverage and each row carries its own completeness value. Unsupported versions keep an explicit
 layout and empty stinger rows.
 
+TXTP reports `omit-music-stinger-scheduling` when a rendered Trigger route
+follows a declaration with a known non-immediate synchronization control.
+It uses the first physical declaration admitted for the existing bank,
+trigger and segment selection. The diagnosis cites that declaration's sync
+word, trigger and segment IDs, HIRC object ID and bank version.
+
 The version-154 word order and signed repeat time follow [wwiser's music node reader](https://github.com/bnnm/wwiser/blob/6d4b5bfb45afc52cda9d68fbbe0cbd97de0e26a3/wwiser/parser/wparser.py#L2116)
 and [StarBreaker's music node reader](https://github.com/diogotr7/StarBreaker/blob/7d3f01e76307354bbc56a64a70eb5167b1189b64/crates/starbreaker-wwise/src/hirc/music.rs#L56).

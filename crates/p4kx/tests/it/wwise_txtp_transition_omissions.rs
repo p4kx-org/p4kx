@@ -46,6 +46,27 @@ const AUTOMATION_CODE: &str = "omit-music-track-automation";
 const SOURCE_SYNC_MEDIA: u32 = 2_509;
 const DESTINATION_ENTRY_MEDIA: u32 = 2_510;
 const DESTINATION_JUMP_MEDIA: u32 = 2_511;
+const CONTAINER_EVENTS: [(&str, u32, AuthoredRule); 11] = [
+    (SOURCE_FADE, 2_501, AuthoredRule::SourceFade),
+    (DESTINATION_FADE, 2_502, AuthoredRule::DestinationFade),
+    (OBJECT_FADE, 2_503, AuthoredRule::ObjectFade),
+    (SEGMENT, 2_504, AuthoredRule::Segment),
+    (ZERO, 2_505, AuthoredRule::Default),
+    (MATCH_SOURCE_CUE, 2_508, AuthoredRule::MatchSourceCue),
+    (SOURCE_SYNC, SOURCE_SYNC_MEDIA, AuthoredRule::SourceSync),
+    (
+        DESTINATION_ENTRY,
+        DESTINATION_ENTRY_MEDIA,
+        AuthoredRule::DestinationEntry,
+    ),
+    (
+        DESTINATION_JUMP,
+        DESTINATION_JUMP_MEDIA,
+        AuthoredRule::DestinationJump,
+    ),
+    (INACTIVE_PARAMETERS, 2_512, AuthoredRule::InactiveParameters),
+    (UNKNOWN_SELECTORS, 2_513, AuthoredRule::UnknownSelectors),
+];
 
 #[test]
 fn txtp_reports_each_proven_music_transition_fade_on_the_rendered_owner() -> TestResult {
@@ -290,27 +311,7 @@ fn fixture() -> Result<Fixture, Box<dyn Error>> {
     let out = dir.path().join("out");
     let mut atl = TestAtl::new("MusicTransitions");
     let mut builder = ArchiveBuilder::new();
-    for (event, media, authored) in [
-        (SOURCE_FADE, 2_501, AuthoredRule::SourceFade),
-        (DESTINATION_FADE, 2_502, AuthoredRule::DestinationFade),
-        (OBJECT_FADE, 2_503, AuthoredRule::ObjectFade),
-        (SEGMENT, 2_504, AuthoredRule::Segment),
-        (ZERO, 2_505, AuthoredRule::Default),
-        (MATCH_SOURCE_CUE, 2_508, AuthoredRule::MatchSourceCue),
-        (SOURCE_SYNC, SOURCE_SYNC_MEDIA, AuthoredRule::SourceSync),
-        (
-            DESTINATION_ENTRY,
-            DESTINATION_ENTRY_MEDIA,
-            AuthoredRule::DestinationEntry,
-        ),
-        (
-            DESTINATION_JUMP,
-            DESTINATION_JUMP_MEDIA,
-            AuthoredRule::DestinationJump,
-        ),
-        (INACTIVE_PARAMETERS, 2_512, AuthoredRule::InactiveParameters),
-        (UNKNOWN_SELECTORS, 2_513, AuthoredRule::UnknownSelectors),
-    ] {
+    for (event, media, authored) in CONTAINER_EVENTS {
         atl = atl.trigger(event, &[event]);
         builder = builder
             .entry(TestEntry::stored(

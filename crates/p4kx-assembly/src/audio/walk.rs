@@ -5,10 +5,11 @@ use std::collections::HashSet;
 
 use p4kx_audio::{HircKind, HircObject, HircValue, SoundSource};
 
+use super::hirc_diagnostic_sites::DiagnosticSite;
 use super::hirc_path_source::{HircInboundSource, PathSourceMode};
 use super::locate::locate;
 use super::music_clip_features::MusicClipFeatures;
-use super::playback_features::PlaybackFeatures;
+use super::playback_features::{PlaybackFeature, PlaybackFeatures};
 use super::resolve_options::{ResolveWork, WorkStop};
 use super::walk_banks::{Banks, Loaded, Via, find_object};
 use super::{BreakReason, BrokenLink, HircPathSource, IndexedSoundbank, NodeKind, PathStep};
@@ -179,6 +180,9 @@ impl<'i> Walk<'_, 'i> {
             return Ok(());
         }
 
+        let stinger = target
+            .inbound
+            .and_then(|edge| edge.stinger_scheduling(&owner, target.id));
         let source = match self.path_sources {
             PathSourceMode::Omit => None,
             PathSourceMode::Retain => Some(HircPathSource::of(
@@ -186,6 +190,7 @@ impl<'i> Walk<'_, 'i> {
                 &owner,
                 object,
                 self.inbound_source(target, owner.position),
+                stinger.and_then(|(owner, row)| DiagnosticSite::stinger(owner, row)),
             )),
         };
         let cursor = WalkCursor::new(
@@ -195,9 +200,10 @@ impl<'i> Walk<'_, 'i> {
             self.banks.choice,
             work,
         )?;
-        let playback_features = self
+        let mut playback_features = self
             .playback_features()
             .combine(PlaybackFeatures::observe(&object.value));
+        playback_features.observe_flag(PlaybackFeature::MusicStingerScheduling, stinger.is_some());
         let step = PathStep {
             kind: node_kind(object),
             id: object.id,
