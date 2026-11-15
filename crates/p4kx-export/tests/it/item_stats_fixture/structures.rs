@@ -150,14 +150,17 @@ fn others() -> Vec<TestStruct> {
     vec![
         component("SCItemMissileParams")
             .field("explosionParams", class("ExplosionParams"))
-            .field("targetingParams", class("MissileTargetingParams"))
-            .field("GCSParams", class("MissileGcsParams")),
-        singles("MissileGcsParams", &["linearSpeed"]),
+            .field("targetingParams", class("STargetingParams"))
+            .field("GCSParams", class("SGuidanceAndControlParams")),
+        singles("SGuidanceAndControlParams", &["linearSpeed"]),
         singles(
-            "MissileTargetingParams",
+            "STargetingParams",
             &["lockTime", "lockingAngle", "lockRangeMin", "lockRangeMax"],
         )
-        .field("trackingSignalType", TestType::String),
+        .field(
+            "trackingSignalType",
+            TestType::Enum("ESignatureType".to_owned()),
+        ),
         singles_component("SHealthComponentParams", &["Health"]),
     ]
 }
@@ -186,20 +189,23 @@ fn with_loop(loop_shape: TestStruct) -> DataForgeBuilder {
         .chain(components())
         .chain(others())
         .fold(
-            DataForgeBuilder::new().version(8).enumeration(
-                "EItemType",
-                [
-                    "WeaponGun",
-                    "Shield",
-                    "QuantumDrive",
-                    "PowerPlant",
-                    "Cooler",
-                    "Missile",
-                    "Misc",
-                    "Magazine",
-                    "WeaponPersonal",
-                ],
-            ),
+            DataForgeBuilder::new()
+                .version(8)
+                .enumeration("ESignatureType", ["Infrared"])
+                .enumeration(
+                    "EItemType",
+                    [
+                        "WeaponGun",
+                        "Shield",
+                        "QuantumDrive",
+                        "PowerPlant",
+                        "Cooler",
+                        "Missile",
+                        "Misc",
+                        "Magazine",
+                        "WeaponPersonal",
+                    ],
+                ),
             DataForgeBuilder::structure,
         )
 }

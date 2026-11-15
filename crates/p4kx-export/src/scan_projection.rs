@@ -64,7 +64,6 @@ impl<'f> Scan<'_, '_, 'f> {
             let (definition, read, stats) = self.item_components(tree, trees, admission, ledger)?;
             let (mut item, line) = crate::item::item(tree, self.texts);
             item.variant_key = item_variant::key(tree, stats.as_ref());
-            item.stats = stats.and_then(ItemStats::into_published).map(Box::new);
             return Ok(Some(
                 Picked::Item {
                     entity: item,

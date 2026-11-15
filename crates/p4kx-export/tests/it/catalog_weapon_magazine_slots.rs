@@ -87,7 +87,7 @@ fn weapon_magazine_slots_preserve_order_duplicate_targets_conditions_and_raw_ign
             ["present"; 3],
             marker,
         )?;
-        check_weapons(&catalog)?;
+        check_weapons(&catalog, marker)?;
         proof::closure(&catalog)?;
     }
     Ok(())

@@ -71,7 +71,7 @@ fn durability_keeps_health_only_and_every_original_component_occurrence() -> Tes
             &json!({"rawBits": "43e10000", "finite": 450.0}),
             Some(encrypted),
         )?;
-        assert_legacy_gate(&catalog)?;
+        assert_item_identity(&catalog)?;
     }
     Ok(())
 }
@@ -218,7 +218,7 @@ fn assert_receipt<'source>(
     );
 }
 
-fn assert_legacy_gate(catalog: &Value) -> TestResult {
+fn assert_item_identity(catalog: &Value) -> TestResult {
     let items = proof::rows(catalog, "/items")?;
     let own = common::guid(HEALTH_ONLY);
     let specialist = common::guid(SPECIALIST);
@@ -227,16 +227,13 @@ fn assert_legacy_gate(catalog: &Value) -> TestResult {
             .iter()
             .find(|row| row.get("guid").and_then(Value::as_str) == Some(guid))
     };
-    assert_eq!(
-        lookup(&own).and_then(|row| row.get("stats")),
-        Some(&Value::Null),
-        "temporary legacy presence semantics"
-    );
-    assert_eq!(
-        lookup(&specialist).and_then(|row| row.pointer("/stats/health")),
-        Some(&json!(450.0)),
-        "temporary legacy specialist value stays exact"
-    );
+    for guid in [own, specialist] {
+        let item = lookup(&guid).ok_or("Item row for original Health owner")?;
+        assert!(
+            item.get("stats").is_none(),
+            "health belongs to the physical Durability row"
+        );
+    }
     Ok(())
 }
 

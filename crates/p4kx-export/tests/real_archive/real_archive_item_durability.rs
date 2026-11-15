@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap};
 use std::error::Error;
 use std::time::SystemTime;
 
@@ -80,15 +80,6 @@ fn compare(
     let mut counts = BTreeMap::new();
     let items = indexed(catalog, "/items", "guid")?;
     let uses = indexed(catalog, "/provenance/uses", "id")?;
-    let shield_owners = rows(catalog, "/configurations/shieldGenerators/rows")?
-        .iter()
-        .map(|row| {
-            Ok((
-                u32::try_from(number(row, "/ownerRecordIndex/value")?)?,
-                text(row, "/ownerGuid/value")?,
-            ))
-        })
-        .collect::<Result<HashSet<_>>>()?;
     let DataForgeOrigin::Archive(entry) = origin else {
         return Err("the DCB must have an observed archive origin".into());
     };
@@ -102,20 +93,21 @@ fn compare(
 
     for row in rows(catalog, "/configurations/durability/rows")? {
         let guid = text(row, "/ownerGuid/value")?;
-        let item = items
+        items
             .get(guid)
-            .ok_or("durability owner in the item table")?;
+            .ok_or("durability owner in the Item table")?;
         let owner = u32::try_from(number(row, "/ownerRecordIndex/value")?)?;
-        let Some(category) = category(item, shield_owners.contains(&(owner, guid))) else {
-            continue;
-        };
-        if counts.contains_key(category) {
-            continue;
-        }
         let slot = usize::try_from(number(row, "/componentOrdinal/value")?)?;
         let record = forge.record(owner).ok_or("physical Health owner")?;
         assert!(record.guid().to_string() == guid, "the Record GUID matches");
         let tree = record.tree()?;
+        let Some(category) = sample::classify(&tree)? else {
+            continue;
+        };
+        let category = category.label();
+        if counts.contains_key(category) {
+            continue;
+        }
         let component = component(&tree, slot)?;
         let DataValue::Struct(health) = component else {
             return Err("the original component slot must contain a struct".into());
@@ -136,18 +128,6 @@ fn compare(
         }
     }
     Ok(counts)
-}
-
-fn category(item: &Value, shield_generator: bool) -> Option<&'static str> {
-    if item["type"] == "Armor" {
-        Some("armour")
-    } else if shield_generator {
-        Some("shield")
-    } else if item["stats"].is_null() {
-        Some("health-only")
-    } else {
-        None
-    }
 }
 
 fn component<'tree, 'source>(

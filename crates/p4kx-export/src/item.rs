@@ -60,7 +60,6 @@ pub(crate) fn item<'f>(tree: &RecordTree<'f>, texts: &Texts<'f>) -> (Item<'f>, C
         class: line.class(),
         playability: playability(tree),
         variant_of: None,
-        stats: None,
         variant_key: None,
         required_tags: if r#type.is_some_and(crate::paint::is_paint_type) {
             words(text(definition, "RequiredTags"))

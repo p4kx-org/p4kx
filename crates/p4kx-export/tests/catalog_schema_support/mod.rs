@@ -143,7 +143,6 @@ pub(crate) fn minimal_catalog() -> Value {
             "displayType": {"key": null, "en": null, "de": null},
             "itemClass": "Military",
             "playability": "player",
-            "stats": null,
             "variantOf": null
         }],
         "ships": [{

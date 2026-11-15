@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use super::canonical_weapons::{ammo_definition, primary_ammo};
 use p4kx_export::{CatalogOptions, Compression, Kind, build_catalog};
 use p4kx_extraction::Filter;
 use serde_json::{Value, json};
@@ -25,7 +26,7 @@ const PATH: &str = "/definitions/ammoDefinitions";
 const NONFINITE_IMPACT_RADIUS: f32 = f32::from_bits(0x7fc0_1234);
 
 #[test]
-fn ammo_definitions_share_source_with_legacy_weapons_and_preserve_unlinked_rows() -> TestResult {
+fn ammo_definitions_share_source_with_weapon_routes_and_preserve_unlinked_rows() -> TestResult {
     let source = fixture::database(NONFINITE_IMPACT_RADIUS);
     let (_folder, archive) = common::open(&source, DcbOrigin::Encrypted)?;
     let catalog: Value =
@@ -35,7 +36,7 @@ fn ammo_definitions_share_source_with_legacy_weapons_and_preserve_unlinked_rows(
     };
     check_bullet(&catalog, bullet)?;
     check_tachyon(tachyon)?;
-    check_weapons(&catalog)?;
+    check_weapons(&catalog, true)?;
     assert_eq!(
         proof::at(&catalog, "/exportHealth/status")?,
         "complete",
@@ -105,7 +106,7 @@ fn ammo_definitions_round_trip_through_the_deterministic_catalog_writer() -> Tes
     };
     check_bullet(&catalog, bullet)?;
     check_tachyon(tachyon)?;
-    check_weapons(&catalog)?;
+    check_weapons(&catalog, true)?;
     proof::closure(&catalog)
 }
 
@@ -135,7 +136,7 @@ fn ammo_definition_rows_distinguish_filtered_dependencies_from_explicit_selectio
         &json!(0),
         "emitting a dependency does not select it"
     );
-    check_weapons(&catalog)?;
+    check_weapons(&catalog, false)?;
     assert_eq!(
         proof::at(kind(&catalog, "items")?, "/sourceRecords/dependencies")?,
         &json!(2),
@@ -232,45 +233,22 @@ fn check_tachyon(row: &Value) -> TestResult {
     Ok(())
 }
 
-fn check_weapons(catalog: &Value) -> TestResult {
-    let direct = weapon(catalog, fixture::DIRECT)?;
-    let personal = weapon(catalog, fixture::PERSONAL)?;
-    let first = proof::at(direct, "/ammo")?;
-    let second = proof::at(personal, "/ammo")?;
+fn check_weapons(catalog: &Value, encrypted: bool) -> TestResult {
+    let direct = primary_ammo(catalog, fixture::DIRECT, "ownContainer", 200, encrypted)?;
+    let linked = primary_ammo(catalog, fixture::PERSONAL, "linkedContainer", 30, encrypted)?;
     assert_eq!(
-        first, second,
-        "both legacy routes reach the same physical ammunition"
+        proof::at(direct, "/targetRecordIndex/value")?,
+        proof::at(linked, "/targetRecordIndex/value")?,
+        "both routes reach the same physical ammunition"
     );
-    assert_eq!(
-        proof::at(first, "/speed")?,
-        &json!(12.5),
-        "previous primary speed"
-    );
-    assert_eq!(
-        proof::at(first, "/lifetime")?,
-        &json!(0.0),
-        "previous primary lifetime"
-    );
-    assert_eq!(
-        proof::at(direct, "/ammoCapacity")?,
-        &json!(200),
-        "direct capacity"
-    );
-    assert_eq!(
-        proof::at(personal, "/ammoCapacity")?,
-        &json!(30),
-        "magazine capacity"
-    );
+    let definition = ammo_definition(catalog, direct)?;
+    for (field, value) in [
+        ("speed", json!({"rawBits":"41480000", "finite":12.5})),
+        ("lifetime", json!({"rawBits":"00000000", "finite":0.0})),
+    ] {
+        proof::present(definition, field, &value, Some(encrypted))?;
+    }
     Ok(())
-}
-
-fn weapon(catalog: &Value, guid: u128) -> TestResult<&Value> {
-    let expected = json!(common::guid(guid));
-    let row = proof::rows(catalog, "/items")?
-        .iter()
-        .find(|row| row.get("guid") == Some(&expected))
-        .ok_or("selected weapon Item")?;
-    proof::at(row, "/stats/weapon")
 }
 
 fn kind<'catalog>(catalog: &'catalog Value, name: &str) -> TestResult<&'catalog Value> {

@@ -38,7 +38,6 @@ fn weapon_launchers_preserve_authored_selectors_by_physical_action_owner() -> Te
     let (_folder, archive) = common::open(&builder, DcbOrigin::Encrypted)?;
     let built = build_catalog(&archive, &common::options())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
-    check_legacy(&catalog)?;
     check_ammo_binding(&catalog)?;
     let [first, repeated] = proof::rows(&catalog, "/configurations/weaponActions/rows")? else {
         return Err("one action row per original weapon component occurrence".into());
@@ -202,31 +201,6 @@ fn check_single(node: &Value, path: &str, raw_bits: &str) -> TestResult {
         proof::at(node, path)?,
         raw_bits,
         "stored Single bits at {path}"
-    );
-    Ok(())
-}
-
-fn check_legacy(catalog: &Value) -> TestResult {
-    let legacy = proof::at(catalog, "/items/0/stats/weapon")?;
-    let [rapid, burst, beam] = proof::rows(legacy, "/fireActions")? else {
-        return Err("the legacy list projects the first physical weapon only".into());
-    };
-    for (row, original) in [(rapid, RAPID), (burst, BURST), (beam, BEAM)] {
-        assert_eq!(
-            proof::at(row, "/kind")?,
-            original,
-            "unchanged legacy action type/order"
-        );
-    }
-    assert_eq!(
-        proof::at(rapid, "/heatPerShot")?,
-        &json!(0.5),
-        "legacy heat retains its input"
-    );
-    assert_eq!(
-        proof::at(legacy, "/ammo/speed")?,
-        &json!(1.25),
-        "legacy selects the original primary slot"
     );
     Ok(())
 }

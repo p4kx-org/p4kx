@@ -188,55 +188,19 @@ fn the_schema_accepts_unknown_fields_and_kinds_but_not_unknown_versions() -> Tes
 }
 
 #[test]
-fn the_stat_blocks_accept_additions_and_new_closed_values_but_stay_required() -> TestResult {
+fn items_publish_canonical_component_tables_without_a_flat_stat_field() -> TestResult {
+    let schema = serde_json::to_value(p4kx_export::catalog_schema())?;
+    let item = schema
+        .pointer("/$defs/Item")
+        .ok_or("catalog Item definition")?;
+    assert!(
+        item.pointer("/properties/stats").is_none(),
+        "the Item schema lists identity and presentation fields"
+    );
     let validator = jsonschema::validator_for(&p4kx_export::catalog_schema())?;
-    let mut stats = minimal_catalog();
-    stats["items"][0]["stats"] = json!({
-        "weapon": {
-            "fireActions": [{
-                "kind": "SWeaponActionFireNewParams", "name": null, "fireRate": 600.0,
-                "pellets": 1, "ammoCost": 1, "heatPerShot": null, "chargeTime": null,
-                "overchargeTime": null, "cooldownTime": null, "hitType": "NewHit", "fullDamageRange": null,
-                "zeroDamageRange": null, "damagePerSecond": null, "spread": null,
-                "extra": true
-            }],
-            "ammoCapacity": null,
-            "ammo": null,
-            "extra": true
-        },
-        "armor": null, "clothing": null, "radar": null, "tractorBeam": null,
-        "weaponModifier": null, "miningLaser": null, "miningModifier": null,
-        "missile": {
-            "damage": null, "explosionMinRadius": null, "explosionMaxRadius": null,
-            "trackingSignalType": "NewSignal", "lockTime": null, "lockingAngle": null,
-            "lockRangeMin": null, "lockRangeMax": null, "linearSpeed": null
-        },
-        "health": 1.5, "extra": true
-    });
     assert!(
-        validator.is_valid(&stats),
-        "stat blocks with additions and new values"
-    );
-    let mut no_block = stats.clone();
-    if let Some(block) = no_block["items"][0]["stats"].as_object_mut() {
-        block.remove("radar");
-    }
-    assert!(!validator.is_valid(&no_block), "every block is present");
-    let mut no_action_field = stats.clone();
-    if let Some(action) =
-        no_action_field["items"][0]["stats"]["weapon"]["fireActions"][0].as_object_mut()
-    {
-        action.remove("fireRate");
-    }
-    assert!(
-        !validator.is_valid(&no_action_field),
-        "every field of a fire mode is present"
-    );
-    let mut number_kind = stats;
-    number_kind["items"][0]["stats"]["weapon"]["fireActions"][0]["kind"] = json!(3);
-    assert!(
-        !validator.is_valid(&number_kind),
-        "the kind of a fire mode stays a string"
+        validator.is_valid(&minimal_catalog()),
+        "canonical tables validate independently"
     );
     Ok(())
 }
@@ -248,7 +212,6 @@ fn every_field_the_schema_lists_is_required() -> TestResult {
         ("ships", "crewSize", "a ship"),
         ("ships", "variantOf", "a ship states its variant base"),
         ("items", "variantOf", "an item states its variant base"),
-        ("items", "stats", "an item states its stat blocks"),
         ("blueprintPools", "rewardSources", "a pool"),
     ] {
         let mut catalog = minimal_catalog();

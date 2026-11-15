@@ -96,8 +96,8 @@ fn shield_variant_groups_use_original_stats_after_the_wire_field_is_removed() ->
     let different = item("shield_different")?;
     for row in [base, twin, different] {
         assert!(
-            row["stats"].is_null(),
-            "a shield with no remaining data has null stats"
+            row.get("stats").is_none(),
+            "the Item wire excludes private comparison inputs"
         );
     }
     assert!(base["variantOf"].is_null(), "the base retains its identity");
@@ -111,7 +111,7 @@ fn shield_variant_groups_use_original_stats_after_the_wire_field_is_removed() ->
     );
     let resource_item = item("shield_with_resources")?;
     assert!(
-        resource_item["stats"].is_null(),
+        resource_item.get("stats").is_none(),
         "the shield and resource component publish their own independent configuration rows"
     );
     let resource = catalog["configurations"]["resourceComponents"]["rows"]

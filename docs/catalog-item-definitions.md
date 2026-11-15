@@ -25,6 +25,6 @@ value representation. A readable manufacturer target outside the export filter
 remains a reference while `definitions.manufacturers` follows its own selection.
 See `exportHealth` for the separately measured target materialization.
 
-The transitional Item projection carries `itemClass`, `playability`, `variantOf`
-and `stats`. Item class is a projection of the English description. Variant
-grouping uses its established private comparison inputs.
+The Item projection carries `itemClass`, `playability` and `variantOf`. Item class is
+a projection of the English description. Variant grouping uses private comparison
+inputs. [Item stats](catalog.md#item-stats) describes the canonical component tables.

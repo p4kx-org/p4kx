@@ -52,17 +52,16 @@ Asset paths preserve original spelling and case. Numeric geometry and simulation
 their stored widths and raw float words. The authored `enforceCosseratStrechShear` field is
 exported as `enforceCosseratStretchShear`.
 
-## Existing weapon view
+## Reading the original primary ammunition
 
-The existing `items[].stats.weapon.ammo` still shows the original primary
-`ammoParamsRecord` selection and its established speed, lifetime, damage
-and detonation subset. The weapon's own container takes precedence over
-the one-hop `ammoContainerRecord` magazine fallback. `ammoCapacity` is the
-selected container's `maxAmmoCount`. Missing, wrong-type or unreadable
-ammunition leaves the legacy ammo value null. An admitted physical Ammo
-Record is materialized once for both the selected definition and weapon
-dependencies in a catalog scan. A selected weapon can retain the exact primary
-Ammo definition as a canonical dependency.
+The physical weapon's own container takes precedence over the one-hop
+`ammoContainerRecord` magazine fallback. Join the magazine resolution
+to the chosen container to read `maxAmmoCount` and its `primaryAmmo`
+Reference. The binding retains the target status for missing or wrong-type ammunition.
+A readable physical Ammo Record appears once even when multiple weapons share it.
+The record supplies its original speed, lifetime, damage and detonation fields.
+Filtered weapon selections can retain the exact container and ammunition physical
+dependencies without selecting additional Items.
 
 ## Physical containers and slots
 
@@ -175,9 +174,8 @@ A projectile launcher's `heatCost` and the action's
 `heatPerShot` remain independent Single values. The other admitted action
 declarations retain their original fields and local value links under the
 `authored` alternative. Other admitted launchers retain their concrete
-`sourceType` and original field arena under the same alternative. The
-legacy `items[].stats.weapon.fireActions` list
-retains its existing flattening and precedence.
+`sourceType` and original field arena under the same alternative. Follow the
+authored action indices to retrieve the inputs of the selected action and its children.
 
 ### Original action field inventory
 

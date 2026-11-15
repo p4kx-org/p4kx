@@ -6,7 +6,10 @@ use p4kx_extraction::{Archive, Filter};
 use serde_json::{Value, json};
 
 use crate::commodity_v3_fixture::{self as common, TestResult};
-use crate::gear_fixture::{self, ARMOR, ARMOR_DANGLING, CLOTHING, RADAR, WRAPPED_TRACTOR};
+use crate::gear_fixture::{
+    self, ARMOR, ARMOR_DANGLING, BEAM, CLOTHING, PARALLEL, PLAIN_MODIFIER, RADAR, TRACTOR,
+    WRAPPED_TRACTOR,
+};
 use crate::health_origin_assertions as proof;
 
 #[test]
@@ -46,7 +49,16 @@ fn a_filtered_suit_keeps_its_physical_resistance_macro_dependency() -> TestResul
     let energy = proof::at(resistance, "/energy/value")?;
     number(energy, "multiplier", 0.75)?;
     number(energy, "threshold", 2.0)?;
-    proof::cell(resistance, "stun", "absent")?;
+    number(energy, "damageCap", 0.0)?;
+    number(energy, "damageCapLimit", 0.0)?;
+    for field in ["distortion", "thermal", "biochemical", "stun"] {
+        proof::cell(resistance, field, "absent")?;
+    }
+    assert_eq!(
+        proof::at(&catalog, "/configurations/clothing/rows")?,
+        &json!([]),
+        "suit armor does not imply clothing"
+    );
     proof::closure(&catalog)
 }
 
@@ -55,6 +67,7 @@ fn a_dangling_suit_reference_never_admits_another_macros_values() -> TestResult 
     let filter = Filter::new("*/gear/armor_dangling");
     let catalog = catalog(Some(&filter))?;
     let suit = owner(&catalog, "suitArmor", 0, ARMOR_DANGLING, 2)?;
+    number(suit, "integrityMilestoneToBreak", 0.1)?;
     let macro_ref = proof::at(suit, "/damageResistance/value")?;
     assert_eq!(
         proof::at(macro_ref, "/status")?,
@@ -149,6 +162,9 @@ fn a_wrapped_tractor_beam_has_exact_original_action_inputs_and_residual_fields()
     let filter = Filter::new("*/gear/wrapped_tractor");
     let catalog = catalog(Some(&filter))?;
     let weapon = owner(&catalog, "weaponActions", 0, WRAPPED_TRACTOR, 8)?;
+    let [_, _] = proof::rows(weapon, "/fireActions/value")? else {
+        return Err("both original top-level fire actions".into());
+    };
     let [beam, toggle, tractor] = proof::rows(weapon, "/actionNodes")? else {
         return Err("a direct beam, a toggle and its nested tractor beam".into());
     };
@@ -199,6 +215,84 @@ fn a_wrapped_tractor_beam_has_exact_original_action_inputs_and_residual_fields()
     validator
         .validate(&catalog)
         .map_err(|error| error.to_string())?;
+    proof::closure(&catalog)
+}
+
+#[test]
+fn a_direct_tractor_keeps_all_original_force_and_geometry() -> TestResult {
+    let filter = Filter::new("*/gear/tractor");
+    let catalog = catalog(Some(&filter))?;
+    let weapon = owner(&catalog, "weaponActions", 0, TRACTOR, 5)?;
+    let [node] = proof::rows(weapon, "/actionNodes")? else {
+        return Err("one original tractor action".into());
+    };
+    assert_eq!(proof::at(weapon, "/fireActions/value/0/value")?, 0);
+    assert_eq!(proof::at(node, "/kind/type")?, "tractorBeam");
+    let body = proof::at(node, "/kind/value")?;
+    for (field, value) in [
+        ("minForce", 1500.0),
+        ("maxForce", 500_000.0),
+        ("minDistance", 0.0),
+        ("maxDistance", 150.0),
+        ("fullStrengthDistance", 75.0),
+        ("maxVolume", 300_000.0),
+        ("maxAngle", 60.0),
+    ] {
+        number(body, field, value)?;
+    }
+    proof::closure(&catalog)
+}
+
+#[test]
+fn direct_and_parallel_beams_keep_the_original_action_structure() -> TestResult {
+    let direct_filter = Filter::new("*/gear/beam");
+    let direct = catalog(Some(&direct_filter))?;
+    let weapon = owner(&direct, "weaponActions", 0, BEAM, 6)?;
+    let direct_damage = beam_damage(proof::at(weapon, "/actionNodes/0")?, 2340.0)?;
+    number(direct_damage, "physical", 0.0)?;
+    proof::closure(&direct)?;
+
+    let parallel_filter = Filter::new("*/gear/parallel");
+    let parallel = catalog(Some(&parallel_filter))?;
+    let weapon = owner(&parallel, "weaponActions", 0, PARALLEL, 7)?;
+    let [wrapper, first, second] = proof::rows(weapon, "/actionNodes")? else {
+        return Err("parallel wrapper and both original beams".into());
+    };
+    assert_eq!(proof::at(wrapper, "/kind/type")?, "parallel");
+    let [first_slot, second_slot] = proof::rows(wrapper, "/kind/value/weaponActions/value")? else {
+        return Err("both ordered parallel child slots".into());
+    };
+    assert_eq!(proof::at(first_slot, "/value")?, 1);
+    assert_eq!(proof::at(second_slot, "/value")?, 2);
+    beam_damage(first, 10.0)?;
+    beam_damage(second, 10.0)?;
+    proof::closure(&parallel)
+}
+
+fn beam_damage(node: &Value, energy: f32) -> TestResult<&Value> {
+    proof::present(
+        node,
+        "sourceType",
+        &json!("SWeaponActionFireBeamParams"),
+        Some(true),
+    )?;
+    let damage = proof::at(node, "/kind/value/damagePerSecond/value")?;
+    assert_eq!(
+        proof::at(damage, "/type")?,
+        "channels",
+        "the original beam channel declaration"
+    );
+    let channels = proof::at(damage, "/value")?;
+    number(channels, "energy", energy)?;
+    Ok(channels)
+}
+
+#[test]
+fn an_authored_empty_attachment_keeps_its_component_and_modifier_slots() -> TestResult {
+    let filter = Filter::new("*/gear/plain_modifier");
+    let catalog = catalog(Some(&filter))?;
+    let row = owner(&catalog, "attachableModifiers", 0, PLAIN_MODIFIER, 10)?;
+    proof::present(row, "modifiers", &json!([]), Some(true))?;
     proof::closure(&catalog)
 }
 

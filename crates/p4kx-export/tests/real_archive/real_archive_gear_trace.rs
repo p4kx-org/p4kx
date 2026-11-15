@@ -4,48 +4,54 @@
 //! Every gameplay property a blueprint modifies finds its stat field on the item the blueprint
 //! produces, on a real Archive; runs with `--ignored` when `P4KX_DATA_P4K` names one.
 
-use std::collections::{BTreeMap, HashMap};
-use std::error::Error;
-use std::time::SystemTime;
-
-use p4kx_export::{CatalogOptions, Kind, build_catalog};
-use p4kx_extraction::Archive;
-use p4kx_testkit::real_archive_path;
+use p4kx_export::Kind;
 use serde_json::Value;
+use std::collections::{BTreeMap, HashMap};
 
 use crate::catalog_v3_consumer;
 use crate::real_archive_blueprints::Blueprints;
 
-type TestResult = Result<(), Box<dyn Error>>;
+use crate::real_archive_equipment_catalog::{
+    TestResult, WEAPONS, action_nodes, catalog, definition, owner_rows, primary_ammo,
+};
 
 const FIELDS: [(&str, &[&str]); 29] = [
     (
         "gpp_armor_damagemitigation",
-        &["armor.damageResistance.physical.multiplier"],
+        &["armorMacro.damageResistance.value.physical.value.multiplier.value"],
     ),
     (
         "gpp_armor_temperaturemin",
-        &["clothing.temperatureResistanceMin"],
+        &["clothing.temperatureResistance.value.minResistance.value"],
     ),
     (
         "gpp_armor_temperaturemax",
-        &["clothing.temperatureResistanceMax"],
+        &["clothing.temperatureResistance.value.maxResistance.value"],
     ),
     (
         "gpp_armor_radiationcapacity",
-        &["clothing.radiationCapacity"],
+        &["clothing.radiationResistance.value.maximumRadiationCapacity.value"],
     ),
     (
         "gpp_armor_radiationdissipation",
-        &["clothing.radiationDissipationRate"],
+        &["clothing.radiationResistance.value.radiationDissipationRate.value"],
     ),
-    ("gpp_health_maxhealth", &["health"]),
+    ("gpp_health_maxhealth", &["health.health.value"]),
     (
         "gpp_weapon_damage",
-        &["weapon.ammo.damage", "weapon.fireActions[].damagePerSecond"],
+        &[
+            "ammo.projectileParams.value.kind.value.damage.value",
+            "weapon.actionNodes[].kind.value.damagePerSecond.value.value",
+        ],
     ),
-    ("gpp_weapon_firerate", &["weapon.fireActions[].fireRate"]),
-    ("gpp_weapon_spread", &["weapon.fireActions[].spread"]),
+    (
+        "gpp_weapon_firerate",
+        &["weapon.actionNodes[].kind.value.fireRate.value"],
+    ),
+    (
+        "gpp_weapon_spread",
+        &["weapon.actionNodes[].kind.value.launchParams.value.spreadParams.value"],
+    ),
     ("gpp_weapon_recoil_kick", &[]),
     ("gpp_weapon_recoil_handling", &[]),
     ("gpp_weapon_recoil_smoothness", &[]),
@@ -61,11 +67,11 @@ const FIELDS: [(&str, &[&str]); 29] = [
     ("gpp_shield_maxhealth", &["shield.maxHealth.value"]),
     (
         "gpp_radar_minaimassistdistance",
-        &["radar.aimAssistDistanceMin"],
+        &["radar.aimAssist.value.distanceMinAssignment.value"],
     ),
     (
         "gpp_radar_maxaimassistdistance",
-        &["radar.aimAssistDistanceMax"],
+        &["radar.aimAssist.value.distanceMaxAssignment.value"],
     ),
     (
         "gpp_quantum_speed",
@@ -75,24 +81,30 @@ const FIELDS: [(&str, &[&str]); 29] = [
         "gpp_quantum_fuelrequirement",
         &["quantumDrive.fuelRequirement.value"],
     ),
-    ("gpp_weapon_tractor_force", &["tractorBeam.maxForce"]),
-    ("gpp_weapon_tractor_maxdist", &["tractorBeam.maxDistance"]),
+    ("gpp_weapon_tractor_force", &["tractor.maxForce.value"]),
+    ("gpp_weapon_tractor_maxdist", &["tractor.maxDistance.value"]),
     (
         "gpp_weapon_tractor_fullstrengthdist",
-        &["tractorBeam.fullStrengthDistance"],
+        &["tractor.fullStrengthDistance.value"],
     ),
-    ("gpp_weapon_tractor_maxvolume", &["tractorBeam.maxVolume"]),
+    ("gpp_weapon_tractor_maxvolume", &["tractor.maxVolume.value"]),
     (
         "gpp_weapon_hullscraping_radius",
-        &["weaponModifier.salvage.radiusMultiplier"],
+        &[
+            "attachment.modifiers.value[].value.value.weaponModifier.value.weaponStats.value.salvageModifier.value.radiusMultiplier.value",
+        ],
     ),
     (
         "gpp_weapon_hullscraping_speed",
-        &["weaponModifier.salvage.salvageSpeedMultiplier"],
+        &[
+            "attachment.modifiers.value[].value.value.weaponModifier.value.weaponStats.value.salvageModifier.value.salvageSpeedMultiplier.value",
+        ],
     ),
     (
         "gpp_weapon_hullscraping_efficiency",
-        &["weaponModifier.salvage.extractionEfficiency"],
+        &[
+            "attachment.modifiers.value[].value.value.weaponModifier.value.weaponStats.value.salvageModifier.value.extractionEfficiency.value",
+        ],
     ),
     ("gpp_crafter_craftspeed", &[]),
     ("gpp_crafter_dismantleefficiency", &[]),
@@ -128,29 +140,57 @@ fn filled(value: &Value, name: &str) -> bool {
 
 fn source_blocks<'catalog>(
     catalog: &'catalog Value,
-    item: &'catalog Value,
+    item: &Value,
     block: &str,
 ) -> Vec<&'catalog Value> {
     let table = match block {
+        "health" => "/configurations/durability/rows",
         "shield" => "/configurations/shieldGenerators/rows",
         "quantumDrive" => "/configurations/quantumDrives/rows",
         "resourceGeneration" => "/configurations/resourceComponents/rows",
-        _ => {
-            return item["stats"]
-                .get(block)
-                .filter(|value| !value.is_null())
+        "clothing" => "/configurations/clothing/rows",
+        "radar" => "/configurations/itemRadars/rows",
+        "weapon" => WEAPONS,
+        "attachment" => "/configurations/attachableModifiers/rows",
+        "tractor" => {
+            return owner_rows(catalog, WEAPONS, item)
+                .flat_map(action_nodes)
+                .filter(|action| {
+                    action.pointer("/kind/type").and_then(Value::as_str) == Some("tractorBeam")
+                })
+                .filter_map(|action| action.pointer("/kind/value"))
+                .collect();
+        }
+        "armorMacro" => {
+            return owner_rows(catalog, "/configurations/suitArmor/rows", item)
+                .filter_map(|row| row.pointer("/damageResistance/value/targetRecordIndex/value"))
+                .filter_map(|target| {
+                    definition(
+                        catalog,
+                        "/definitions/damageResistanceMacros/rows",
+                        target,
+                        "/source/recordIndex/value",
+                    )
+                })
+                .collect();
+        }
+        "ammo" => {
+            return primary_ammo(catalog, item)
+                .and_then(|ammo| ammo.definition)
                 .into_iter()
                 .collect();
         }
+        _ => return Vec::new(),
     };
-    let guid = item.get("guid");
-    catalog
-        .pointer(table)
-        .and_then(Value::as_array)
-        .into_iter()
-        .flatten()
-        .filter(|row| guid.is_some() && row.pointer("/ownerGuid/value") == guid)
-        .collect()
+    owner_rows(catalog, table, item).collect()
+}
+
+fn uses_only_beams(catalog: &Value, item: &Value) -> bool {
+    let mut firing = owner_rows(catalog, WEAPONS, item)
+        .flat_map(action_nodes)
+        .filter_map(|node| node.pointer("/kind/type").and_then(Value::as_str))
+        .filter(|kind| matches!(*kind, "beam" | "single" | "rapid" | "burst" | "tractorBeam"));
+    firing.next() == Some("beam") && firing.all(|kind| kind == "beam")
 }
 
 fn item_reaches(catalog: &Value, item: &Value, path: &str) -> bool {
@@ -173,9 +213,7 @@ fn item_reaches(catalog: &Value, item: &Value, path: &str) -> bool {
     reason = "one pass over the blueprints that prints its evidence as it goes"
 )]
 fn every_modified_property_is_filled_on_the_item_the_blueprint_produces() -> TestResult {
-    let archive = Archive::open_with_key(real_archive_path()?, None)?;
-    let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
-    let catalog: Value = serde_json::from_slice(built.json())?;
+    let catalog = catalog()?;
     let mut classes = HashMap::new();
     for property in catalog_v3_consumer::rows(&catalog, Kind::GameplayProperties)? {
         let guid = catalog_v3_consumer::identity(property, Kind::GameplayProperties)?;
@@ -224,17 +262,17 @@ fn every_modified_property_is_filled_on_the_item_the_blueprint_produces() -> Tes
                 continue;
             };
             if !paths.iter().any(|path| item_reaches(&catalog, item, path)) {
-                let beams_only = item["stats"]["weapon"]["fireActions"]
-                    .as_array()
-                    .is_some_and(|actions| {
-                        actions
-                            .iter()
-                            .all(|action| action["kind"] == "SWeaponActionFireBeamParams")
-                    });
+                let beams_only = uses_only_beams(&catalog, item);
                 let without_source = (class == "gpp_weapon_firerate" && beams_only)
                     || paths.iter().all(|path| {
                         let block = path.split('.').next().unwrap_or(path);
-                        source_blocks(&catalog, item, block).is_empty()
+                        if block == "armorMacro" {
+                            owner_rows(&catalog, "/configurations/suitArmor/rows", item)
+                                .next()
+                                .is_none()
+                        } else {
+                            source_blocks(&catalog, item, block).is_empty()
+                        }
                     });
                 let list = if without_source {
                     &mut no_source

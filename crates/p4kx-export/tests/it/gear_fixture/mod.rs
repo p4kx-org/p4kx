@@ -15,9 +15,7 @@ use p4kx_testkit::{
     TestValue,
 };
 
-pub(crate) use mining::{
-    GADGET, GLOBALS, LASER, LASER_RANGE, LASER_TWIN, MODULE, MODULE_INSTABILITY,
-};
+pub(crate) use mining::{GLOBALS, LASER, LASER_RANGE, LASER_TWIN, MODULE, MODULE_INSTABILITY};
 use structures::database;
 
 pub(crate) const ARMOR: u128 = 0x1000_0000_0000_4000_8000_0000_0000_0001;

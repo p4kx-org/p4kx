@@ -35,7 +35,7 @@ fn weapon_magazine_resolution_observes_the_legacy_own_and_linked_container_route
         DcbOrigin::Encrypted,
         CatalogPublicationMode::Normal,
     )?;
-    super::check_weapons(&output)?;
+    super::check_weapons(&output, true)?;
     let own = outcome(&output, direct.record_index(), "ownContainer")?;
     let own_ordinal = proof::present(own, "containerOrdinal", &json!(2), Some(true))?;
     origins::exact(
@@ -88,7 +88,7 @@ fn weapon_magazine_resolution_distinguishes_readable_target_without_container() 
         DcbOrigin::Encrypted,
         CatalogPublicationMode::Normal,
     )?;
-    no_legacy_ammo(&output)?;
+    no_container(&output, target.index())?;
     let missing = outcome(&output, personal.record_index(), "linkedWithoutContainer")?;
     target_index(&output, missing, &forge, &personal, &target)?;
     proof::closure(&output)
@@ -119,7 +119,7 @@ fn weapon_magazine_resolution_keeps_the_physical_header_when_target_body_is_unre
         "the unreadable magazine is demanded only by the real legacy link"
     );
     let output = diagnostic(&bytes, &filter)?;
-    no_legacy_ammo(&output)?;
+    no_container(&output, target.index())?;
     let unreadable = outcome(&output, personal.record_index(), "linkedTargetUnreadable")?;
     target_index(&output, unreadable, &forge, &personal, &target)?;
     assert_eq!(
@@ -165,7 +165,7 @@ fn weapon_magazine_resolution_retains_a_self_link_without_recursive_selection() 
         DcbOrigin::Encrypted,
         CatalogPublicationMode::Normal,
     )?;
-    no_legacy_ammo(&output)?;
+    no_container(&output, target.index())?;
     let linked = outcome(&output, personal.record_index(), "linkedWithoutContainer")?;
     target_index(&output, linked, &forge, &personal, &target)?;
     proof::closure(&output)
@@ -332,14 +332,13 @@ fn target_index<'source>(
     )
 }
 
-fn no_legacy_ammo(catalog: &Value) -> TestResult {
-    let weapon = super::super::weapon(catalog, fixture::PERSONAL)?;
-    for field in ["ammoCapacity", "ammo"] {
-        assert_eq!(
-            weapon.get(field),
-            Some(&Value::Null),
-            "{field} keeps its existing absent primary outcome"
-        );
-    }
+fn no_container(catalog: &Value, target: u32) -> TestResult {
+    let rows = proof::rows(catalog, "/configurations/ammoContainers/rows")?;
+    let target = json!(target);
+    assert!(
+        rows.iter()
+            .all(|row| row.pointer("/ownerRecordIndex/value") != Some(&target)),
+        "an unavailable container has no physical row in the original target"
+    );
     Ok(())
 }

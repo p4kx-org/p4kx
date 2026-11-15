@@ -190,11 +190,23 @@ fn check_resistance(row: &Value, encrypted: bool) -> TestResult {
 }
 
 fn check_suit_owners(catalog: &Value, encrypted: bool) -> TestResult {
-    let suit = item(catalog, fixture::SUIT)?;
-    assert!(
-        suit.pointer("/stats/armor").is_some_and(Value::is_object),
-        "suit armour retains its own stats"
-    );
+    item(catalog, fixture::SUIT)?;
+    let suit_rows = proof::rows(catalog, "/configurations/suitArmor/rows")?;
+    let [suit_only, both] = suit_rows else {
+        return Err("both original suit armour occurrences".into());
+    };
+    proof::present(
+        suit_only,
+        "ownerGuid",
+        &json!(common::guid(fixture::SUIT)),
+        Some(encrypted),
+    )?;
+    proof::present(
+        both,
+        "ownerGuid",
+        &json!(common::guid(fixture::BOTH)),
+        Some(encrypted),
+    )?;
     let suit_guid = common::guid(fixture::SUIT);
     assert!(
         proof::rows(catalog, TABLE)?.iter().all(|row| row
@@ -211,16 +223,13 @@ fn check_suit_owners(catalog: &Value, encrypted: bool) -> TestResult {
         Some(encrypted),
     )?;
     proof::cell(dual, "damageMultiplier", "null")?;
-    assert!(
-        item(catalog, fixture::BOTH)?
-            .pointer("/stats/armor")
-            .is_some_and(Value::is_object),
-        "the same Entity retains its separate suit armour"
-    );
-    let vehicle = item(catalog, fixture::KNOWN)?;
-    assert!(
-        vehicle["stats"].is_null(),
-        "vehicle armour has an independent canonical row"
+    item(catalog, fixture::BOTH)?;
+    item(catalog, fixture::KNOWN)?;
+    let suit_slot = proof::at(both, "/componentOrdinal/value")?;
+    let vehicle_slot = proof::at(dual, "/componentOrdinal/value")?;
+    assert_ne!(
+        suit_slot, vehicle_slot,
+        "the same Item has independent original armour slots"
     );
     Ok(())
 }

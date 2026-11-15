@@ -87,16 +87,16 @@ identifier.
 `SDistortionParams` retains `DecayDelay`, `DecayRate`, `Maximum`, `WarningRatio`, `RecoveryRatio`,
 `PowerRatioAtMaxDistortion` and `PowerChangeOnlyAtMaxDistortion`.
 
-## Source states and legacy selection
+## Source states and physical Health occurrences
 
 Every source-backed value includes its own provenance. Single fields preserve their IEEE-754 `rawBits`.
 Finite fields also expose the finite decimal value. NaN and infinity remain present with a null
 decimal value. False and zero remain present. An undeclared field is absent. A failed read is
 unreadable and retains its attempted evidence in provenance without contributing a value.
 
-The existing specialist stats gate uses the first original Health component for its finite health
-value and variant grouping. The separate durability table follows all observed Health components.
-Vehicle hull and armour data have their own source families.
+The durability table follows all observed Health components. Variant identity uses the first
+original Health component as its private comparison input. Vehicle hull and armour data have
+their own source families.
 
 ## Verification
 

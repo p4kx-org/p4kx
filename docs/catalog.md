@@ -54,7 +54,7 @@ The rule is ADR-0054 (amending ADR-0002):
   health, source mode, diagnostic severity/stage/unit, source role and positive Reference-result
   status types reject unknown values. Their definitions carry `x-p4kx-vocabularyClass: "control"`.
   Unknown controls never become successful reads, resolved links or import/deletion permission.
-- **Loadouts (#393), paints, item stats and the starmap are kinds of the same catalog.** The
+- **Loadouts (#393), paints, item configurations and the starmap are kinds of the same catalog.** The
   `.json.zst` form compresses the complete JSON. See [Compressed form](#compressed-form).
 - **Version 2 (ADR-0161)** is breaking against version 1 in one respect: a paint also needs its own
   `RequiredTags` offered by the port or the ship (see "Paints"), so `paints[].shipGuids` lists
@@ -421,7 +421,6 @@ An item takes its fields from the components of its `EntityClassDefinition`:
 | `itemClass` | `Civilian`, `Competition`, `Industrial`, `Military` or `Stealth`, or `null` |
 | `playability` | `player`, `mission` or `special`, or `null`; see "Playability" below |
 | `variantOf` | The `guid` of the base of the item's variant group, `null` for a base and an ungrouped item; see "Variant groups" below |
-| `stats` | Item stat blocks, health and resource states. See "Item stats" below. |
 
 `itemClass` takes the options of the DataForge enum `EItemClass` (without `UNDEFINED`). No
 DataForge field carries it: it is read from the first line of the English `description` that
@@ -477,154 +476,66 @@ those parts too. No value is below 1 or above 7.
 
 #### Item stats
 
-`stats` is a compact view of the authored fields below (ADR-0065). Absent blocks and unstated
-fields are `null`. Derived weapon metrics belong to `projections.weaponCombatBases`. Shield,
-quantum drive and resource parameters use their physical component tables.
-[Weapon values](catalog-combat-quality.md) · [Shield generators](catalog-shield-generators.md) ·
-[Quantum drives](catalog-quantum-drives.md) · [Resource components](catalog-resource-components.md)
-The `kind` of a fire mode and
-`trackingSignalType` are closed sets that the schema keeps as strings. The blocks `armor`,
-`clothing`, `radar`, `tractorBeam` and `weaponModifier` and the fire-mode field `damagePerSecond`
-follow ADR-0072; the blocks `miningLaser` and `miningModifier` and the fire-mode fields `hitType`,
-`fullDamageRange` and `zeroDamageRange` follow ADR-0262.
+The catalog exposes component facts in canonical tables. Join an Item definition's
+`recordIndex.value` in `definitions.items` to `ownerRecordIndex.value` in a component table.
+`componentOrdinal.value` identifies the original slot within the same physical Record. A logical
+GUID can match several physical Records. The examples below use JSON paths through sourced cells.
+A sourced field keeps its own encryption marker and source references. Numeric fields preserve
+their stored unit, finite numeric value and exact binary representation, including nonfinite values.
 
-Owner-field and named-structure lookups inspect every materialized owned descendant,
-starting at the root and then following stored field and array order depth first. They
-use an iterative stack proportional to active depth. These lookups impose no separate
-16- or 32-level cutoff. They do not follow Reference links; ammunition and other domain
-links use their stated readers. Canonical reader failures remain failures and are not
-proof that an unexamined source field is absent.
-| Block | Present when | Fields and sources |
-|-------|--------------|--------------------|
-| `weapon` | the item has `Components[SCItemWeaponComponentParams]` (ship weapons and FPS weapons) | `fireActions`: per element of `fireActions`, in stored order, with a sequence (`sequenceEntries`) flattened to its entries: `kind` (the struct, e.g. `SWeaponActionFireRapidParams`), `name`, `fireRate` (rounds per minute), `pelletCount` (as `pellets`; `pellets` where a Record states that instead) and `ammoCost` of `launchParams`, `heatPerShot`, `chargeTime`, `overchargeTime`, `cooldownTime` (each of the fire mode, when stated), and `damagePerSecond` (the damage types of the beam's `damagePerSecond`, the power of a mining laser; `null` for a mode without one), and `spread` (see below); a beam also has `hitType`, `fullDamageRange` and `zeroDamageRange` (the two ranges in metres); a parallel mode (`weaponActions`) is listed as its entries; a charged or wrapped mode reads `fireRate`, `launchParams` and `name` from its `weaponAction` when it has none of its own. `ammoCapacity`: `maxAmmoCount` of the ammo container, the magazine's capacity (see below). `ammo`: the `AmmoParams` Record that the container's `ammoParamsRecord` links to, `null` without a readable one: `speed`, `lifetime`, `damage` (the damage types of `projectileParams.damage`), `detonationDamage`, `detonationMinRadius` and `detonationMaxRadius` (from `explosionParams`) |
-| `health` | the first `Components[SHealthComponentParams]` has a readable `Health` value | the stored `Health` scalar. `configurations.durability` preserves all physical occurrences. |
-| `missile` | `Components[SCItemMissileParams]` | `damage` (the damage types of `explosionParams.damage`), `explosionMinRadius`, `explosionMaxRadius`, `trackingSignalType`, `lockTime`, `lockingAngle`, `lockRangeMin`, `lockRangeMax` (of `targetingParams`) and `linearSpeed` (of `GCSParams`) |
-| `armor` | `Components[SCItemSuitArmorParams]` (armour pieces, 2,388 items on LIVE 4.10.2 out of 2,391 Records; the rest are development leftovers) | `integrityMilestoneToBreak`; `damageResistance`: the `damageResistance` struct of the `DamageResistanceMacro` Record that `damageResistance` links to, `null` without a readable one (a Record that is missing, has another struct or cannot be built): `ignoreMeleeDamage` (`IgnoreMeleeDamage`) and per damage type `physical`, `energy`, `distortion`, `thermal`, `biochemical`, `stun` (`PhysicalResistance` and so on) the entry `multiplier`, `threshold`, `damageCap`, `damageCapLimit` (`Multiplier`, `Threshold`, `DamageCap`, `DamageCapLimit`) |
-| `clothing` | `Components[SCItemClothingParams]` (4,423 items on LIVE 4.10.2 out of 4,426 Records; armour carries this component too) | `temperatureResistanceMin` and `temperatureResistanceMax` (`TemperatureResistance.MinResistance` and `.MaxResistance`), `radiationCapacity` (`RadiationResistance.MaximumRadiationCapacity`), `radiationDissipationRate` (`RadiationResistance.RadiationDissipationRate`), `gForceResistance` (`Flight.gForceResistance`) |
-| `radar` | `Components[SCItemRadarComponentParams]` | `aimAssistDistanceMin`, `aimAssistDistanceMax`, `aimAssistOutsideRangeBuffer` (`aimAssist.distanceMinAssignment`, `.distanceMaxAssignment`, `.outsideRangeBufferDistance`), `pingCooldownTime` (`pingProperties.cooldownTime`) |
-| `tractorBeam` | the weapon component holds an `SWeaponActionFireTractorBeamParams` (ship tractor beams and salvage heads) | of the first such struct below `Components[SCItemWeaponComponentParams]`: `minForce`, `maxForce`, `minDistance`, `maxDistance`, `fullStrengthDistance`, `maxVolume`, `maxAngle` |
-| `weaponModifier` | `Components[EntityComponentAttachableModifierParams]` holds an `SSalvageModifier` or an `STractorModifier` | `salvage`: `radiusMultiplier`, `salvageSpeedMultiplier`, `extractionEfficiency` of the first `SSalvageModifier`; `tractor`: `forceMultiplier`, `fullStrengthDistMultiplier`, `maxDistMultiplier`, `maxVolumeMultiplier` of the first `STractorModifier`; each `null` without that struct. Salvage modifiers and tractor attachments carry them in `modifiers[].weaponModifier.weaponStats` |
-| `miningLaser` | `Components[SEntityComponentMiningLaserParams]` (ship mining lasers and the FPS mining multi-tool) | `isOptimalRateGood` (`miningLaserModifiers.isOptimalRateGood`), `throttleLerpSpeed`, `throttleMinimum` (a fraction of 1), `usesPowerThrottle`, `globalParamsGuid` (the `MiningLaserGlobalParams` Record `globalParams` links to), `filterModifier` (`filterParams.filterModifier.value`) and `modifiers` (the rest of `miningLaserModifiers`): each the `value` of a `FloatModifierMultiplicative` in percent as stored and `null` when unset, `instability` (`laserInstability`), `optimalChargeWindowSize`, `resistance`, `shatterDamage`, `clusterFactor`, `optimalChargeWindowRate`, `catastrophicChargeWindowRate`. The beams are fire modes of `weapon.fireActions`: the mining beam has `hitType` `ElectricArc`, the extraction beam `Extraction`; their ranges are in metres |
-| `miningModifier` | `Components[EntityComponentAttachableModifierParams]` holds an `ItemMiningModifierParams`, an `ItemMineableRockModifierParams` or a `MiningFilterItemModifierParams` (mining modules and gadgets) | `activationMethod` (`ActivateOnAttach` for a passive module, `ActivateOnDemand` for an active module or a gadget), `charges` (-1 for a gadget that is not used up), `canInterrupt`, `isInterruptible`; `laser`: the first `ItemMiningModifierParams` as `lifetime` (`modifierLifetime.lifetime`, seconds, `null` for a modifier that lasts) and `isOptimalRateGood` and `modifiers` (the values of `MiningLaserModifier`, as for the laser); `rock`: the same for the first `ItemMineableRockModifierParams` (gadgets); `filter`: `lifetime` and `filterModifier` of the first `MiningFilterItemModifierParams`; `fireActionModifiers`: per `ItemWeaponModifiersParams` in stored order, `fireActionIndex`, `lifetime` and `damageMultiplier` (`weaponModifier.weaponStats.damageMultiplier`); each of `laser`, `rock` and `filter` is `null` without that struct |
+| Domain | Canonical tables |
+| --- | --- |
+| Health and durability | [`configurations.durability`](catalog-durability.md) |
+| Shields and quantum drives | [`configurations.shieldGenerators`](catalog-shield-generators.md) and [`configurations.quantumDrives`](catalog-quantum-drives.md) |
+| Weapons, ammunition and magazines | [`configurations.weaponActions`, `configurations.ammoContainers`, `declarations.ammoBindings` and `definitions.ammoDefinitions`](catalog-ammo-definitions.md) |
+| Missile targeting, guidance and explosion | [`configurations.missileConfigurations` and `configurations.explosives`](catalog-missiles.md) |
+| Suit armor, clothing and device radar | [`configurations.suitArmor`, `definitions.damageResistanceMacros`, `configurations.clothing` and `configurations.itemRadars`](catalog-worn-gear.md) |
+| Mining lasers, modules, gadgets and salvage attachments | [`configurations.miningLasers`, `definitions.miningLaserGlobals` and `configurations.attachableModifiers`](catalog-mining-configurations.md) |
+| Resource flows and signatures | [`configurations.resourceComponents`](catalog-resource-components.md) |
+| Derived weapon base values and quality calculations | [`projections.weaponCombatBases` and the versioned formula contract](catalog-combat-quality.md) |
+
+The tables retain separate ordered action nodes and authentic weapon component slots. A fire slot's
+value identifies an entry of the same row's `actionNodes`. Wrapper nodes identify their own child slots
+and preserve their own inputs. Ammunition choices and capacity use the physical container chosen by
+[`projections.weaponMagazineResolutions`](catalog-ammo-definitions.md#physical-containers-and-slots),
+then the matching container declaration and the exact linked Ammo Record. Capacity belongs to
+`configurations.ammoContainers.rows[].maxAmmoCount`. The definition stores baseline projectile
+speed and lifetime, bullet damage, and projectile detonation damage and radii.
 
 ##### From a gameplay property to a stat field
 
-The Archive holds no link from a `CraftingGameplayPropertyDef` to the item field it changes: the
-Record has a name (`propertyName`), a unit format, a display transformation and ordered name
-overrides, none of which identifies an item stat field (ADR-0072). The catalog therefore states
-no stat link per entry of `definitions.gameplayProperties.rows`. Resolve a modifier's
-`propertyGuid` against those rows' sourced `guid.value`, then use that row's `className.value`
-as the key into the stat-field table below. The table covers the 29 properties of LIVE 4.10.2;
-`real_archive_gear_stats` checks that every catalogued `className.value` has a row. A multiplier-kind
-modifier scales the base value of the field; an additive one adds to it.
+A `CraftingGameplayPropertyDef` describes a property without referencing an Item component field.
+Resolve a modifier's original `gameplayPropertyRecord` Reference by its physical target index in
+`definitions.gameplayProperties`. The definition's `className.value` selects the mapping below.
+Use the versioned formula to combine contributions for the selected physical value in its documented
+unit. A missing component or field leaves the corresponding value unavailable. [Formula contract](catalog-combat-quality.md)
 
-| `className` | Catalog base input | Items |
-|-------------|------------------------------------|-------|
-| `GPP_Armor_DamageMitigation` | `armor.damageResistance.<type>.multiplier` for all six types; the SC Wiki's physical value is `physical.multiplier` | armour |
-| `GPP_Armor_TemperatureMin` | `clothing.temperatureResistanceMin` | armour, clothing |
-| `GPP_Armor_TemperatureMax` | `clothing.temperatureResistanceMax` | armour, clothing |
-| `GPP_Armor_RadiationCapacity` | `clothing.radiationCapacity` | armour, clothing |
-| `GPP_Armor_RadiationDissipation` | `clothing.radiationDissipationRate` | armour, clothing |
-| `GPP_Health_MaxHealth` | `configurations.durability.rows[].health` | ship components, weapons |
-| `GPP_Weapon_Damage` | `weapon.ammo.damage` (guns), `weapon.fireActions[].damagePerSecond` (mining lasers) | weapons |
-| `GPP_Weapon_FireRate` | `weapon.fireActions[].fireRate` | personal weapons |
-| `GPP_Weapon_Recoil_Kick` | none: see below | personal weapons |
-| `GPP_Weapon_Recoil_Handling` | none: see below | personal weapons |
-| `GPP_Weapon_Recoil_Smoothness` | none: see below | personal weapons |
-| `GPP_Weapon_ReloadSpeed` | none: see below | personal weapons |
-| `GPP_Weapon_Spread` | `weapon.fireActions[].spread` | personal weapons |
-| `GPP_ItemResource_PowerGeneration` | Authored `Power` generation amount in `configurations.resourceComponents` | power plants |
-| `GPP_ItemResource_CoolantGeneration` | Authored `Coolant` generation amount in `configurations.resourceComponents` | coolers |
-| `GPP_Shield_MaxHealth` | `configurations.shieldGenerators.rows[].maxHealth` | shields |
-| `GPP_Radar_MinAimAssistDistance` | `radar.aimAssistDistanceMin` | radars |
-| `GPP_Radar_MaxAimAssistDistance` | `radar.aimAssistDistanceMax` | radars |
-| `GPP_Quantum_Speed` | `configurations.quantumDrives.rows[].standard.value.driveSpeed` | quantum drives |
-| `GPP_Quantum_FuelRequirement` | `configurations.quantumDrives.rows[].fuelRequirement` | quantum drives |
-| `GPP_Weapon_Tractor_Force` | `tractorBeam.maxForce` | tractor beams, salvage heads |
-| `GPP_Weapon_Tractor_MaxDist` | `tractorBeam.maxDistance` | tractor beams, salvage heads |
-| `GPP_Weapon_Tractor_FullStrengthDist` | `tractorBeam.fullStrengthDistance` | tractor beams, salvage heads |
-| `GPP_Weapon_Tractor_MaxVolume` | `tractorBeam.maxVolume` | tractor beams, salvage heads |
-| `GPP_Weapon_HullScraping_Radius` | `weaponModifier.salvage.radiusMultiplier` | salvage modifiers |
-| `GPP_Weapon_HullScraping_Speed` | `weaponModifier.salvage.salvageSpeedMultiplier` | salvage modifiers |
-| `GPP_Weapon_HullScraping_Efficiency` | `weaponModifier.salvage.extractionEfficiency` | salvage modifiers |
-| `GPP_Crafter_CraftSpeed` | none: a property of a crafting station, not of an item | crafting stations |
-| `GPP_Crafter_DismantleEfficiency` | none: a property of a crafting station, not of an item | crafting stations |
+In the table, component fields are relative to the row of the named table. A node body is the
+selected `configurations.weaponActions` row's `actionNodes[].kind.value` for the applicable action.
 
-The resource component rows retain the physical component, state and delta order, the amount
-type and its original unit. Select the base flow for the fitted component. To reproduce the
-compact scalar, select the first authored generation side for the requested resource. Use its
-stored amount and unit. [Resource flow selection](catalog-resource-components.md#previous-convenience-values)
+| Property class | Canonical inputs |
+| --- | --- |
+| `GPP_Armor_DamageMitigation` | Join `suitArmor.damageResistance.value.targetRecordIndex.value` to `damageResistanceMacros.source.recordIndex.value`. Each applicable `damageResistance.value.<channel>.value.multiplier` retains the original value. |
+| `GPP_Armor_TemperatureMin`, `GPP_Armor_TemperatureMax` | `clothing.temperatureResistance.value.minResistance` and `maxResistance`. |
+| `GPP_Armor_RadiationCapacity`, `GPP_Armor_RadiationDissipation` | `clothing.radiationResistance.value.maximumRadiationCapacity` and `radiationDissipationRate`. |
+| `GPP_Health_MaxHealth` | `durability.health`. |
+| `GPP_Weapon_Damage` | Bullet damage from the selected Ammo definition's `projectileParams.value.kind.value.damage`, or the beam node's `damagePerSecond`. |
+| `GPP_Weapon_FireRate`, `GPP_Weapon_Spread` | Node `fireRate` and `launchParams.value.spreadParams`. Charged actions link to child nodes by `weaponAction.value`. A beam's original spread declaration remains in its authored fields when present. |
+| `GPP_Weapon_Recoil_Kick`, `GPP_Weapon_Recoil_Handling`, `GPP_Weapon_Recoil_Smoothness` | Authored recoil settings and their linked data. A scalar reduction requires a consumer rule. |
+| `GPP_Weapon_ReloadSpeed` | Authored weapon motion inputs. A single elapsed time requires a consumer rule. |
+| `GPP_ItemResource_PowerGeneration`, `GPP_ItemResource_CoolantGeneration` | `resourceComponents.states.value[].value.deltas.value[].value.generation` for `Power` and `Coolant`. Apply the property to its own stored amount and unit. |
+| `GPP_Shield_MaxHealth` | `shieldGenerators.maxHealth`. |
+| `GPP_Radar_MinAimAssistDistance`, `GPP_Radar_MaxAimAssistDistance` | `itemRadars.aimAssist.value.distanceMinAssignment` and `distanceMaxAssignment`. |
+| `GPP_Quantum_Speed`, `GPP_Quantum_FuelRequirement` | `quantumDrives.standard.value.driveSpeed` and `quantumDrives.fuelRequirement`. |
+| `GPP_Weapon_Tractor_Force`, `GPP_Weapon_Tractor_MaxDist`, `GPP_Weapon_Tractor_FullStrengthDist`, `GPP_Weapon_Tractor_MaxVolume` | Tractor beam node `maxForce`, `maxDistance`, `fullStrengthDistance` and `maxVolume`. |
+| `GPP_Weapon_HullScraping_Radius`, `GPP_Weapon_HullScraping_Speed`, `GPP_Weapon_HullScraping_Efficiency` | `attachableModifiers.modifiers.value[].value` weapon branch. Its `value.weaponModifier.value.weaponStats.value.salvageModifier.value` holds `radiusMultiplier`, `salvageSpeedMultiplier` and `extractionEfficiency`. |
+| `GPP_Crafter_CraftSpeed`, `GPP_Crafter_DismantleEfficiency` | These properties apply to crafting stations. |
 
-Properties with none: the three recoil properties and the reload speed have no single stat field.
-A personal weapon's recoil is the weapon's `actorProceduralRecoilConfig` and the `recoil` of its
-fire modes, Records with curves per stance and aim state, and its reload times are in further
-Records; reducing them to one number is a model of the game, which ADR-0065 leaves to the
-consumer. The SC Wiki has no field for them either. The two crafter properties modify the station
-that crafts, which is not an item with `stats`. The spread has a field, `spread` of a fire mode
-(`launchParams.spreadParams`, or `spreadParams` of a beam): `min`, `max`, `firstAttack`, `attack`
-and `decay` as stored. No LIVE blueprint modifies the spread or the reload speed.
-
-`GPP_Armor_DamageMitigation` is one factor; the Archive does not say which damage types it
-scales, so the catalog gives the `multiplier` of all six (`physical`, `energy`, `distortion`,
-`thermal`, `biochemical`, `stun`) and the SC Wiki's `physical` is `physical.multiplier`.
-
-Items without the source component: some produced items carry no field for a property their
-blueprint modifies, and the catalog states `null` for the block rather than a default. On LIVE
-4.10.2 these are the backpacks, which have no `SCItemSuitArmorParams`, `SCItemClothingParams` or
-health (16 items for the damage mitigation, 7 for the temperatures, 1 for the radiation
-dissipation), `hdtc_shoes_01_01_01`, a piece of clothing with `clothing` but no `armor`, for the
-damage mitigation, the 8 fuel nozzles for `GPP_Health_MaxHealth` (no health component) and the
-personal weapons that only fire a beam (`none_smg_energy_01`) for `GPP_Weapon_FireRate` (no
-`fireRate`). The clothing pieces of the issue's 1,346 mitigation targets are these items: where
-`armor` is `null` the Archive holds no damage resistance for the piece, and a consumer treats the
-base value as unstated. `real_archive_gear_trace` checks every modifier of every blueprint
-against the produced item and prints these lists.
-
-`resourceStates` lists the states of `Components[ItemResourceComponentParams].states` in stored
-order: `name`, `emSignature` and `irSignature` (`signatureParams`: `nominal` is `nominalSignature`,
-`decayRate`), and `flows`. A flow is one `generation` or `consumption` of a delta of the state:
-`kind` (the struct of the delta, e.g. `ItemResourceDeltaGeneration`, `ItemResourceDeltaConversion`,
-`ItemResourceDeltaConsumption`, `ItemResourceDeltaStorage`), `direction`, `resource`, `amount` (the
-first number of `resourceAmountPerSecond`) and `unit` (the struct holding it:
-`SPowerSegmentResourceUnit`, `SStandardResourceUnit`, `SMicroResourceUnit`, `SCentiResourceUnit`).
-Units differ between structs and are not converted. A delta without a `generation` or
-`consumption` (a network reflection) gives no flow.
-
-Raw values that need care:
-
-- A quantum drive range of `f32::MAX` retains its exact source bits in
-  `configurations.quantumDrives.rows[].jumpRange`.
-- A nonfinite number in a remaining flat stat block is `null`. Canonical numeric cells preserve
-  its bits and provide a null finite projection.
-- `weapon.ammoCapacity` is the capacity of the ammo container, which is the magazine and not the
-  weapon body: a ship weapon holds `Components[SAmmoContainerComponentParams]` itself; a weapon
-  without one (the personal weapons, ballistic and energy alike) links its magazine entity by
-  `Components[SCItemWeaponComponentParams].ammoContainerRecord`, and the container of that entity,
-  one hop, is read instead. `weapon.ammo` is read from the `AmmoParams` Record of that container's
-  `ammoParamsRecord`. A Reference to a missing Record, to a Record of another struct, or to a
-  Record that cannot be built leaves `ammo` `null`; the item stays in the catalog.
-- The fire-mode fields `name`, `fireRate`, `heatPerShot`, `chargeTime`, `overchargeTime`,
-  `cooldownTime` and `launchParams` are read from the fire mode and, where it has none of its own,
-  from its `weaponAction`.
-
-A damage object has `physical`, `energy`, `distortion`, `thermal`, `biochemical` and `stun`
-(`DamagePhysical` and so on); a type the struct does not hold is `null`. An item with at least one
-of the six blocks also carries `health` (`SHealthComponentParams.Health`) and `resourceStates`;
-the signature and power draw inputs are in `resourceStates`, not in separate blocks. Items without a
-block carry neither.
-
-The block of a power plant or a cooler follows from the type because both share the resource
-component; every other block follows from its component, and no class name or record name enters
-a rule. A damage object is read from the first struct below the named parent that states a damage
-type, and a generation from the structs of its type below the resource component, so a field the
-game moves turns into `null` rather than into a wrong number; the real-Archive test
-(`real_archive_item_stats`) counts the filled fields of each block.
-
-Size: an item without stats adds `"stats":null` (14 bytes, about 0.3 MB for the 23,280 items of
-LIVE); an item with a block adds a few hundred bytes, two to three thousand items about 1 MB,
-which compresses well because the keys repeat.
-The mining blocks and the three beam fields of every fire mode added 0.35 MB (349,210 bytes) to the
-plain catalog of LIVE 4.10.2.
+Armor damage mitigation has one input modifier. The source keeps six independent resistance channel
+values and provides no rule for choosing affected channels. For resources, the authored order and the
+separate consumption and generation sides stay visible. The consumer can reproduce the former flat
+power or coolant summary by choosing the first applicable generation amount in original state and
+delta order. Match the resource identifier case-insensitively and keep the matching source unit.
 
 A ship takes its fields from `VehicleComponentParams`:
 

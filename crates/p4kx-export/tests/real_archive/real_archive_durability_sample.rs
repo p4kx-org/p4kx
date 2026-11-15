@@ -24,14 +24,14 @@ const ARMOUR: &str = "SCItemVehicleArmorParams";
 const ROWS: &str = "/configurations/durability/rows";
 
 #[derive(Clone, Copy, Eq, Ord, PartialEq, PartialOrd)]
-enum Category {
+pub(super) enum Category {
     HealthOnly,
     Shield,
     Armour,
 }
 
 impl Category {
-    const fn label(self) -> &'static str {
+    pub(super) const fn label(self) -> &'static str {
         match self {
             Self::HealthOnly => "health-only",
             Self::Shield => "shield",
@@ -101,7 +101,7 @@ fn select<'source>(
     Ok(selected)
 }
 
-fn classify(tree: &RecordTree<'_>) -> Result<Option<Category>> {
+pub(super) fn classify(tree: &RecordTree<'_>) -> Result<Option<Category>> {
     let slots = original_slots(tree)?;
     let components = || {
         slots.iter().filter_map(|value| match value {
@@ -220,8 +220,8 @@ fn compare(
         .ok_or("the physical Health owner has an Item row")?;
     if category == Category::HealthOnly {
         assert!(
-            cell(item, "stats")?.is_null(),
-            "health-only Item remains outside specialist stats"
+            item.get("stats").is_none(),
+            "health belongs to the physical Durability row"
         );
     }
     let mut rows = components::component_rows(catalog, ROWS)?;

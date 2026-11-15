@@ -49,7 +49,7 @@ fn resource_only_and_specialist_items_share_the_canonical_wire_contract() -> Tes
             .find(|item| item["guid"] == common::guid(guid))
             .ok_or("resource item")?;
         assert!(
-            item["stats"].is_null(),
+            item.get("stats").is_none(),
             "resource facts use their configuration table"
         );
         let configuration = component(&catalog, guid)?;

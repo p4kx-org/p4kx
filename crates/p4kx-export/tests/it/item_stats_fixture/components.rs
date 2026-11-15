@@ -151,7 +151,7 @@ pub(super) fn missile() -> TestValue {
             (
                 "targetingParams".to_owned(),
                 instance(
-                    "MissileTargetingParams",
+                    "STargetingParams",
                     vec![
                         ("trackingSignalType".to_owned(), TestValue::text("Infrared")),
                         single("lockTime", 2.0),
@@ -163,7 +163,10 @@ pub(super) fn missile() -> TestValue {
             ),
             (
                 "GCSParams".to_owned(),
-                instance("MissileGcsParams", vec![single("linearSpeed", 300.0)]),
+                instance(
+                    "SGuidanceAndControlParams",
+                    vec![single("linearSpeed", 300.0)],
+                ),
             ),
         ],
     )

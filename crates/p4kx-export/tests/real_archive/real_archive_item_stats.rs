@@ -1,189 +1,192 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The typed stat blocks of items in the P4KX catalog of a real Archive; runs with
-//! `--ignored` when `P4KX_DATA_P4K` names one.
-
-use std::error::Error;
-use std::time::SystemTime;
-
-use p4kx_export::{CatalogOptions, build_catalog};
-use p4kx_extraction::Archive;
-use p4kx_testkit::real_archive_path;
 use serde_json::Value;
 
-type TestResult = Result<(), Box<dyn Error>>;
+use crate::real_archive_equipment_catalog::{
+    TestResult, WEAPONS, action_nodes, bullet_damage, catalog, item, item_catalog, owner,
+    owner_rows, primary_ammo,
+};
+use crate::real_archive_item_durability::rows;
+use crate::real_archive_resource_components::known_generation_amount;
+use crate::real_archive_verification::print_line;
 
-const BLOCKS: [(&str, &[&str]); 2] = [
-    ("weapon", &["fireActions", "ammoCapacity", "ammo"]),
-    (
-        "missile",
-        &["damage", "explosionMaxRadius", "lockTime", "linearSpeed"],
-    ),
-];
-
-const MIN_SHARE: f64 = 0.8;
-
-const fn present(value: &Value) -> bool {
-    match value {
-        Value::Null => false,
-        Value::Array(items) => !items.is_empty(),
-        _ => true,
-    }
-}
-
-#[expect(clippy::print_stdout, reason = "the numbers are the result of the run")]
-fn report(line: &str) {
-    println!("{line}");
-}
-
-fn catalog() -> Result<Value, Box<dyn Error>> {
-    let archive = Archive::open_with_key(real_archive_path()?, None)?;
-    let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
-    report(&format!("catalog size: {} bytes", built.json().len()));
-    Ok(serde_json::from_slice(built.json())?)
-}
+const MISSILES: &str = "/configurations/missileConfigurations/rows";
+const SHIELDS: &str = "/configurations/shieldGenerators/rows";
+const EXPLOSIVES: &str = "/configurations/explosives/rows";
 
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
-fn every_stat_block_is_filled_for_the_items_that_have_it() -> TestResult {
+fn every_component_table_covers_its_authored_item_family() -> TestResult {
     let catalog = catalog()?;
-    let items = catalog["items"].as_array().ok_or("the items array")?;
-    let with_stats = items.iter().filter(|item| !item["stats"].is_null()).count();
-    report(&format!("{with_stats} of {} items have stats", items.len()));
-    let mut problems = Vec::new();
-    for (block, fields) in BLOCKS {
-        let holders: Vec<&Value> = items
+    let items = rows(&catalog, "/items")?;
+    let weapons: Vec<_> = items
+        .iter()
+        .filter(|item| owner_rows(&catalog, WEAPONS, item).next().is_some())
+        .collect();
+    check_share(
+        "weapon fire actions",
+        weapons
             .iter()
-            .filter(|item| present(&item["stats"][block]))
-            .collect();
-        report(&format!("{block}: {} items", holders.len()));
-        if holders.is_empty() {
-            problems.push(format!("no item has a {block} block"));
-            continue;
-        }
-        for field in fields {
-            let filled = holders
-                .iter()
-                .filter(|item| present(&item["stats"][block][field]))
-                .count();
-            #[expect(clippy::cast_precision_loss, reason = "counts far below 2^52")]
-            let share = filled as f64 / holders.len() as f64;
-            report(&format!("  {field}: {filled} of {} filled", holders.len()));
-            if share < MIN_SHARE {
-                problems.push(format!("{block}.{field}: {filled} of {}", holders.len()));
-            }
-        }
-        if let Some(sample) = holders.iter().find(|item| {
-            fields
-                .iter()
-                .all(|field| present(&item["stats"][block][field]))
-        }) {
-            report(&format!(
-                "  sample {}: {}",
-                sample["className"],
-                serde_json::to_string(&sample["stats"])?
-            ));
-        }
-    }
-    check_shield_coverage(&catalog, &mut problems)?;
-    assert!(problems.is_empty(), "blocks below 80 %: {problems:?}");
-    Ok(())
+            .filter(|item| {
+                owner_rows(&catalog, WEAPONS, item).any(|row| action_nodes(row).next().is_some())
+            })
+            .count(),
+        weapons.len(),
+    );
+    check_share(
+        "weapon primary capacity",
+        weapons
+            .iter()
+            .filter(|item| {
+                primary_ammo(&catalog, item)
+                    .is_some_and(|ammo| ammo.container["maxAmmoCount"]["value"].is_number())
+            })
+            .count(),
+        weapons.len(),
+    );
+    check_share(
+        "weapon ammunition definitions",
+        weapons
+            .iter()
+            .filter(|item| {
+                primary_ammo(&catalog, item).is_some_and(|ammo| ammo.definition.is_some())
+            })
+            .count(),
+        weapons.len(),
+    );
+    validate_missile_and_shield_coverage(&catalog)
 }
 
-fn shields(catalog: &Value) -> Result<&[Value], Box<dyn Error>> {
-    catalog
-        .pointer("/configurations/shieldGenerators/rows")
-        .and_then(Value::as_array)
-        .map(Vec::as_slice)
-        .ok_or_else(|| "canonical shield generator rows".into())
-}
-
-fn check_shield_coverage(catalog: &Value, problems: &mut Vec<String>) -> TestResult {
-    let rows = shields(catalog)?;
-    report(&format!("shield generators: {} rows", rows.len()));
-    if rows.is_empty() {
-        problems.push("no canonical shield generator row".to_owned());
-        return Ok(());
+fn validate_missile_and_shield_coverage(catalog: &Value) -> TestResult {
+    let missiles = rows(catalog, MISSILES)?;
+    let explosives = rows(catalog, EXPLOSIVES)?;
+    let ordnance: Vec<_> = explosives
+        .iter()
+        .filter(|row| {
+            row.pointer("/configuration/value/type")
+                .and_then(Value::as_str)
+                == Some("missile")
+        })
+        .collect();
+    for (label, path) in [
+        (
+            "missile damage",
+            "/configuration/value/value/explosionParams/value/damage/value",
+        ),
+        (
+            "missile maximum radius",
+            "/configuration/value/value/explosionParams/value/maxRadius/value/finite",
+        ),
+    ] {
+        check_share(
+            label,
+            ordnance.iter().filter(|row| present(row, path)).count(),
+            missiles.len(),
+        );
     }
+    for (label, path) in [
+        (
+            "missile lock time",
+            "/targeting/value/lockTime/value/finite",
+        ),
+        ("missile speed", "/guidance/value/linearSpeed/value/finite"),
+    ] {
+        check_share(
+            label,
+            missiles.iter().filter(|row| present(row, path)).count(),
+            missiles.len(),
+        );
+    }
+    let shields = rows(catalog, SHIELDS)?;
     for field in [
         "maxHealth",
         "maxRegen",
         "downedRegenDelay",
         "damagedRegenDelay",
     ] {
-        let pointer = format!("/{field}/value/finite");
-        let filled = rows
-            .iter()
-            .filter(|row| row.pointer(&pointer).is_some_and(Value::is_number))
-            .count();
-        #[expect(clippy::cast_precision_loss, reason = "counts far below 2^52")]
-        let share = filled as f64 / rows.len() as f64;
-        report(&format!("  {field}: {filled} of {} filled", rows.len()));
-        if share < MIN_SHARE {
-            problems.push(format!(
-                "shieldGenerators.{field}: {filled} of {}",
-                rows.len()
-            ));
-        }
+        let path = format!("/{field}/value/finite");
+        check_share(
+            field,
+            shields.iter().filter(|row| present(row, &path)).count(),
+            shields.len(),
+        );
     }
     Ok(())
 }
 
-fn item_of<'c>(items: &'c [Value], class: &str) -> Result<&'c Value, String> {
-    items
-        .iter()
-        .find(|item| item["className"] == class)
-        .ok_or_else(|| format!("no item {class}"))
+fn check_share(label: &str, filled: usize, total: usize) {
+    print_line(&format!("{label}: {filled} of {total}"));
+    assert!(
+        total > 0 && filled.saturating_mul(5) >= total.saturating_mul(4),
+        "{label} covers at least 80 percent of its original family"
+    );
 }
 
-fn stats_of<'c>(items: &'c [Value], class: &str) -> Result<&'c Value, String> {
-    Ok(&item_of(items, class)?["stats"])
+fn present(row: &Value, path: &str) -> bool {
+    row.pointer(path).is_some_and(|value| !value.is_null())
 }
 
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn known_items_carry_their_known_values() -> TestResult {
-    let catalog = catalog()?;
-    let items = catalog["items"].as_array().ok_or("the items array")?;
-    let item = item_of(items, "SHLD_GODI_S01_FR66_SCItem")?;
-    let guid = item.get("guid").ok_or("known shield item GUID")?;
-    let shield = shields(&catalog)?
-        .iter()
-        .find(|row| row.pointer("/ownerGuid/value") == Some(guid))
-        .ok_or("known shield generator configuration")?;
-    assert_eq!(
-        shield
-            .pointer("/maxHealth/value/finite")
-            .and_then(Value::as_f64),
-        Some(3_168.0),
-        "known original shield health in the canonical configuration"
-    );
-    let missile = stats_of(items, "MISL_S07_IR_TALN_Hellion")?;
-    assert_eq!(missile["missile"]["trackingSignalType"], "Infrared");
-    let cooler = item_of(items, "COOL_JUST_S02_Snowpack_SCItem")?;
-    assert_eq!(
-        crate::real_archive_resource_components::known_generation_amount(
-            &catalog, cooler, "Coolant"
+    for (class, table, field, expected) in [
+        (
+            "SHLD_GODI_S01_FR66_SCItem",
+            SHIELDS,
+            "/maxHealth/value/finite",
+            Value::from(3168.0),
         ),
-        Some(46.0)
-    );
-    let plant = item_of(items, "POWR_JUST_S03_Durango_SCItem")?;
+        (
+            "MISL_S07_IR_TALN_Hellion",
+            MISSILES,
+            "/targeting/value/trackingSignalType/value",
+            Value::from("Infrared"),
+        ),
+    ] {
+        let current = item_catalog(class)?;
+        let row = owner(&current, table, item(&current, class)?)?;
+        assert_eq!(
+            row.pointer(field),
+            Some(&expected),
+            "the stored original component field"
+        );
+    }
+    for (class, resource, amount) in [
+        ("COOL_JUST_S02_Snowpack_SCItem", "Coolant", 46.0),
+        ("POWR_JUST_S03_Durango_SCItem", "Power", 24.0),
+    ] {
+        let current = item_catalog(class)?;
+        assert_eq!(
+            known_generation_amount(&current, item(&current, class)?, resource),
+            Some(amount),
+            "stored generation in its own original unit"
+        );
+    }
+    known_weapon_and_quantum_drive()
+}
+
+fn known_weapon_and_quantum_drive() -> TestResult {
+    const WEAPON: &str = "VNCL_LaserCannon_S1";
+    const QUANTUM: &str = "QDRV_WETK_S04_Idris_TEMP";
+    let current = item_catalog(WEAPON)?;
+    let weapon = owner(&current, WEAPONS, item(&current, WEAPON)?)?;
+    let first = action_nodes(weapon)
+        .next()
+        .ok_or("first original fire action")?;
     assert_eq!(
-        crate::real_archive_resource_components::known_generation_amount(&catalog, plant, "Power"),
-        Some(24.0)
+        first
+            .pointer("/kind/value/fireRate/value")
+            .and_then(Value::as_i64),
+        Some(350),
+        "the original first action fire rate"
     );
-    let laser = stats_of(items, "VNCL_LaserCannon_S1")?;
-    assert_eq!(laser["weapon"]["fireActions"][0]["fireRate"], 350.0);
-    let item = item_of(items, "QDRV_WETK_S04_Idris_TEMP")?;
-    let guid = item.get("guid").ok_or("known quantum drive item GUID")?;
-    let drive = catalog
-        .pointer("/configurations/quantumDrives/rows")
-        .and_then(Value::as_array)
-        .ok_or("canonical quantum drives")?
-        .iter()
-        .find(|row| row.pointer("/ownerGuid/value") == Some(guid))
-        .ok_or("known quantum drive configuration")?;
+    let current = item_catalog(QUANTUM)?;
+    let drive = owner(
+        &current,
+        "/configurations/quantumDrives/rows",
+        item(&current, QUANTUM)?,
+    )?;
     assert!(
         drive
             .pointer("/jumpRange/value/finite")
@@ -198,28 +201,29 @@ fn known_items_carry_their_known_values() -> TestResult {
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn personal_weapons_take_ammunition_from_their_magazine() -> TestResult {
     let catalog = catalog()?;
-    let items = catalog["items"].as_array().ok_or("the items array")?;
-    let personal: Vec<&Value> = items
+    let personal: Vec<_> = rows(&catalog, "/items")?
         .iter()
-        .filter(|item| item["type"] == "WeaponPersonal" && present(&item["stats"]["weapon"]))
+        .filter(|item| item["type"] == "WeaponPersonal")
+        .filter(|item| owner_rows(&catalog, WEAPONS, item).next().is_some())
         .collect();
-    let with_ammo = personal
+    let magazines = personal
         .iter()
         .filter(|item| {
-            present(&item["stats"]["weapon"]["ammo"]["damage"])
-                && item["stats"]["weapon"]["ammoCapacity"]
-                    .as_i64()
-                    .is_some_and(|capacity| capacity > 0)
+            primary_ammo(&catalog, item).is_some_and(|ammo| {
+                ammo.definition.and_then(bullet_damage).is_some()
+                    && ammo
+                        .container
+                        .pointer("/maxAmmoCount/value")
+                        .and_then(Value::as_i64)
+                        .is_some_and(|count| count > 0)
+            })
         })
         .count();
-    report(&format!(
-        "personal weapons: {}, with magazine ammunition: {with_ammo}",
-        personal.len()
-    ));
-    assert!(with_ammo > 0, "a personal weapon with magazine ammunition");
-    #[expect(clippy::cast_precision_loss, reason = "counts far below 2^52")]
-    let share = with_ammo as f64 / personal.len() as f64;
-    assert!(share >= MIN_SHARE, "{with_ammo} of {}", personal.len());
+    check_share(
+        "personal weapons with magazine ammunition",
+        magazines,
+        personal.len(),
+    );
     Ok(())
 }
 
@@ -227,23 +231,25 @@ fn personal_weapons_take_ammunition_from_their_magazine() -> TestResult {
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn weapons_state_ammunition_damage_and_a_fire_rate() -> TestResult {
     let catalog = catalog()?;
-    let items = catalog["items"].as_array().ok_or("the items array")?;
-    let damaging = items
-        .iter()
-        .filter(|item| present(&item["stats"]["weapon"]["ammo"]["damage"]))
-        .count();
-    let rated = items
+    let damaging = rows(&catalog, "/items")?
         .iter()
         .filter(|item| {
-            item["stats"]["weapon"]["fireActions"]
-                .as_array()
-                .is_some_and(|actions| actions.iter().any(|action| present(&action["fireRate"])))
+            primary_ammo(&catalog, item)
+                .and_then(|ammo| ammo.definition)
+                .and_then(bullet_damage)
+                .is_some()
         })
         .count();
-    report(&format!(
+    let rated = rows(&catalog, WEAPONS)?
+        .iter()
+        .filter(|weapon| {
+            action_nodes(weapon).any(|node| present(node, "/kind/value/fireRate/value"))
+        })
+        .count();
+    print_line(&format!(
         "weapons with ammunition damage: {damaging}, with a fire rate: {rated}"
     ));
-    assert!(damaging > 0, "a weapon with ammunition damage");
-    assert!(rated > 0, "a weapon with a fire rate");
+    assert!(damaging > 0, "a weapon with original ammunition damage");
+    assert!(rated > 0, "a weapon with an original fire rate");
     Ok(())
 }

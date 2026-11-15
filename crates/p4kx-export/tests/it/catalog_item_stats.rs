@@ -1,22 +1,21 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The typed stat blocks of items in the P4KX catalog, through the public API.
+//! Physical item configuration checks through the public catalog API.
 
+use crate::commodity_v3_fixture::{self as common, TestResult};
+use crate::health_origin_assertions as proof;
 use crate::item_stats_fixture;
 
-use std::error::Error;
 use std::time::{Duration, UNIX_EPOCH};
 
-use item_stats_fixture::{
-    COOLER, CYCLIC_AMMO_GUN, DANGLING_GUN, DRIVE, GUN, MISSILE, PERSONAL_GUN, PLAIN, PLANT, SHIELD,
-    UNBOUNDED_DRIVE, WRONG_TYPE_GUN,
-};
+use item_stats_fixture::{COOLER, DRIVE, MISSILE, PLAIN, PLANT, SHIELD, UNBOUNDED_DRIVE};
 use p4kx_export::{CatalogOptions, build_catalog};
 use p4kx_extraction::Archive;
 use serde_json::{Value, json};
 
-type TestResult = Result<(), Box<dyn Error>>;
+#[path = "catalog_item_canonical_weapons.rs"]
+mod canonical_weapons;
 
 #[path = "catalog_ammo_containers.rs"]
 mod ammo_containers;
@@ -62,12 +61,12 @@ mod shield;
 #[path = "catalog_vehicle_armor.rs"]
 mod vehicle_armor;
 
-fn catalog() -> Result<Value, Box<dyn Error>> {
+fn catalog() -> TestResult<Value> {
     let (_directory, archive) = ammo_source::archive(ammo_source::AmmoSource::CyclicMembers)?;
     catalog_from(&archive)
 }
 
-fn catalog_from(archive: &Archive) -> Result<Value, Box<dyn Error>> {
+fn catalog_from(archive: &Archive) -> TestResult<Value> {
     let options = CatalogOptions {
         publication_mode: p4kx_export::CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000))
@@ -75,142 +74,39 @@ fn catalog_from(archive: &Archive) -> Result<Value, Box<dyn Error>> {
     let built = build_catalog(archive, &options)?;
     assert!(
         !built.summary().export_health().is_complete(),
-        "the exact source errors remain visible independently of readable stats"
+        "the exact source errors remain visible alongside readable components"
     );
     Ok(serde_json::from_slice(built.json())?)
 }
 
-fn item(catalog: &Value, guid: u128) -> Result<Value, Box<dyn Error>> {
-    let text = format!("{guid:032x}");
-    let wanted = format!(
-        "{}-{}-{}-{}-{}",
-        &text[0..8],
-        &text[8..12],
-        &text[12..16],
-        &text[16..20],
-        &text[20..32]
-    );
-    catalog["items"]
-        .as_array()
-        .and_then(|items| items.iter().find(|item| item["guid"] == wanted.as_str()))
-        .cloned()
-        .ok_or_else(|| format!("item {wanted}").into())
+fn item(catalog: &Value, guid: u128) -> TestResult<&Value> {
+    let guid = common::guid(guid);
+    proof::rows(catalog, "/items")?
+        .iter()
+        .find(|row| row.get("guid").and_then(Value::as_str) == Some(guid.as_str()))
+        .ok_or_else(|| format!("item {guid}").into())
 }
 
-#[test]
-fn a_weapon_carries_its_fire_modes_and_ammunition_as_stored() -> TestResult {
-    let gun = item(&catalog()?, GUN)?;
-    let weapon = &gun["stats"]["weapon"];
-    assert_eq!(
-        weapon["fireActions"],
-        json!([
-            {
-                "kind": "SWeaponActionFireRapidParams",
-                "name": "rapid",
-                "fireRate": 600.0,
-                "pellets": 1,
-                "ammoCost": 1,
-                "heatPerShot": 0.5,
-                "chargeTime": null,
-                "overchargeTime": null,
-                "cooldownTime": null,
-                "hitType": null,
-                "fullDamageRange": null,
-                "zeroDamageRange": null,
-                "damagePerSecond": null,
-                "spread": {"min": 0.18, "max": 5.0, "firstAttack": 1.35, "attack": 1.25, "decay": 6.5}
-            },
-            {
-                "kind": "SWeaponActionFireChargedParams",
-                "name": "rapid",
-                "fireRate": 120.0,
-                "pellets": 1,
-                "ammoCost": 1,
-                "heatPerShot": 0.5,
-                "chargeTime": 1.5,
-                "overchargeTime": 3.0,
-                "cooldownTime": 0.25,
-                "hitType": null,
-                "fullDamageRange": null,
-                "zeroDamageRange": null,
-                "damagePerSecond": null,
-                "spread": {"min": 0.18, "max": 5.0, "firstAttack": 1.35, "attack": 1.25, "decay": 6.5}
-            }
-        ])
-    );
-    assert_eq!(weapon["ammoCapacity"], 200);
-    assert_eq!(
-        weapon["ammo"],
-        json!({
-            "speed": 1100.0,
-            "lifetime": 2.5,
-            "damage": {
-                "physical": 30.0, "energy": 2.0, "distortion": null,
-                "thermal": null, "biochemical": null, "stun": null
-            },
-            "detonationDamage": {
-                "physical": 7.0, "energy": 0.0, "distortion": null,
-                "thermal": null, "biochemical": null, "stun": null
-            },
-            "detonationMinRadius": 1.0,
-            "detonationMaxRadius": 4.0
-        })
-    );
-    Ok(())
+fn owner<'catalog>(
+    catalog: &'catalog Value,
+    table: &str,
+    guid: u128,
+) -> TestResult<&'catalog Value> {
+    let guid = common::guid(guid);
+    proof::rows(catalog, table)?
+        .iter()
+        .find(|row| row.pointer("/ownerGuid/value").and_then(Value::as_str) == Some(guid.as_str()))
+        .ok_or_else(|| format!("physical owner {guid} in {table}").into())
 }
 
-#[test]
-fn a_weapon_whose_ammunition_record_is_missing_has_null_ammo() -> TestResult {
-    let gun = item(&catalog()?, DANGLING_GUN)?;
-    assert!(gun["stats"]["weapon"]["ammo"].is_null());
-    assert_eq!(gun["stats"]["weapon"]["ammoCapacity"], 200);
-    Ok(())
-}
-
-#[test]
-fn a_weapon_with_an_ammunition_record_of_another_struct_keeps_the_item_and_has_null_ammo()
--> TestResult {
-    let gun = item(&catalog()?, WRONG_TYPE_GUN)?;
-    assert!(gun["stats"]["weapon"]["ammo"].is_null());
-    assert_eq!(gun["stats"]["weapon"]["ammoCapacity"], 200);
-    Ok(())
-}
-
-#[test]
-fn a_weapon_keeps_readable_ammo_fields_beside_exact_inline_cycle_errors() -> TestResult {
-    let gun = item(&catalog()?, CYCLIC_AMMO_GUN)?;
-    assert_eq!(
-        gun["stats"]["weapon"]["ammo"],
-        json!({
-            "speed": 0.0,
-            "lifetime": 0.0,
-            "damage": null,
-            "detonationDamage": null,
-            "detonationMinRadius": null,
-            "detonationMaxRadius": null
-        })
-    );
-    assert_eq!(gun["stats"]["weapon"]["ammoCapacity"], 200);
-    Ok(())
-}
-
-#[test]
-fn a_weapon_whose_ammo_layout_genuinely_cannot_be_built_keeps_the_item_and_null_ammo() -> TestResult
-{
-    let (_directory, archive) = ammo_source::archive(ammo_source::AmmoSource::InvalidLayout)?;
-    let gun = item(&catalog_from(&archive)?, CYCLIC_AMMO_GUN)?;
-    assert!(gun["stats"]["weapon"]["ammo"].is_null());
-    assert_eq!(gun["stats"]["weapon"]["ammoCapacity"], 200);
-    Ok(())
-}
-
-#[test]
-fn a_personal_weapon_takes_capacity_and_ammunition_from_its_magazine() -> TestResult {
-    let gun = item(&catalog()?, PERSONAL_GUN)?;
-    let weapon = &gun["stats"]["weapon"];
-    assert_eq!(weapon["ammoCapacity"], 30);
-    assert_eq!(weapon["ammo"]["speed"], 1100.0);
-    assert_eq!(weapon["ammo"]["damage"]["physical"], 30.0);
+fn single(owner: &Value, field: &str, value: f32) -> TestResult {
+    let finite: Value = serde_json::from_str(&serde_json::to_string(&value)?)?;
+    proof::present(
+        owner,
+        field,
+        &json!({"rawBits":format!("{:08x}", value.to_bits()), "finite":finite}),
+        Some(true),
+    )?;
     Ok(())
 }
 
@@ -230,16 +126,7 @@ fn an_unbounded_jump_range_is_exported_as_stored() -> TestResult {
 #[test]
 fn a_shield_carries_its_values_and_its_health() -> TestResult {
     let catalog = catalog()?;
-    let shield = item(&catalog, SHIELD)?;
-    let stats = &shield["stats"];
-    let rows = catalog
-        .pointer("/configurations/shieldGenerators/rows")
-        .and_then(Value::as_array)
-        .ok_or("canonical shield generators")?;
-    let generator = rows
-        .iter()
-        .find(|row| row.pointer("/ownerGuid/value") == shield.get("guid"))
-        .ok_or("shield generator for the selected item")?;
+    let generator = owner(&catalog, "/configurations/shieldGenerators/rows", SHIELD)?;
     for (field, value) in [
         ("maxHealth", 8000.0),
         ("maxRegen", 160.0),
@@ -247,30 +134,23 @@ fn a_shield_carries_its_values_and_its_health() -> TestResult {
         ("downedRegenDelay", 5.0),
         ("damagedRegenDelay", 2.5),
     ] {
-        assert_eq!(
-            generator.pointer(&format!("/{field}/value/finite")),
-            Some(&json!(value)),
-            "canonical shield field {field} keeps its meaning"
-        );
+        proof::present(generator, field, &shield::number(value), Some(true))?;
     }
-    assert!(
-        stats.get("shield").is_none(),
-        "one canonical shield wire location"
-    );
-    assert!(stats.get("power").is_none() && stats.get("heat").is_none());
-    assert_eq!(stats["health"], 450.0);
-    assert!(stats["weapon"].is_null() && stats["missile"].is_null());
+    let durability = owner(&catalog, "/configurations/durability/rows", SHIELD)?;
+    single(durability, "health", 450.0)?;
+    for path in [
+        "/configurations/weaponActions/rows",
+        "/configurations/missileConfigurations/rows",
+        "/configurations/resourceComponents/rows",
+    ] {
+        assert!(owner(&catalog, path, SHIELD).is_err());
+    }
     Ok(())
 }
 
 #[test]
 fn a_quantum_drive_carries_its_range_and_drive_parameters() -> TestResult {
     let catalog = catalog()?;
-    let drive = item(&catalog, DRIVE)?;
-    assert!(
-        drive.pointer("/stats/quantumDrive").is_none(),
-        "one canonical quantum drive wire location"
-    );
     let row = quantum_drive(&catalog, DRIVE)?;
     for (path, expected) in [
         ("/fuelRequirement/value/finite", 0.5),
@@ -292,15 +172,8 @@ fn a_quantum_drive_carries_its_range_and_drive_parameters() -> TestResult {
     Ok(())
 }
 
-fn quantum_drive(catalog: &Value, guid: u128) -> Result<&Value, Box<dyn Error>> {
-    let item = item(catalog, guid)?;
-    catalog
-        .pointer("/configurations/quantumDrives/rows")
-        .and_then(Value::as_array)
-        .ok_or("canonical quantum drive rows")?
-        .iter()
-        .find(|row| row.pointer("/ownerGuid/value") == item.get("guid"))
-        .ok_or_else(|| "canonical quantum drive of the selected item".into())
+fn quantum_drive(catalog: &Value, guid: u128) -> TestResult<&Value> {
+    owner(catalog, "/configurations/quantumDrives/rows", guid)
 }
 
 #[test]
@@ -316,11 +189,6 @@ fn a_power_plant_and_a_cooler_carry_the_rate_of_their_own_resource() -> TestResu
             40.0,
         ),
     ] {
-        let item = item(&catalog, owner)?;
-        assert!(
-            item["stats"].is_null(),
-            "only the canonical table publishes resource fields"
-        );
         let row = resource_components::component(&catalog, owner)?;
         let state = &row["states"]["value"][0]["value"];
         let generated = &state["deltas"]["value"][0]["value"]["generation"]["value"];
@@ -351,31 +219,55 @@ fn a_power_plant_and_a_cooler_carry_the_rate_of_their_own_resource() -> TestResu
 
 #[test]
 fn a_missile_carries_its_explosion_and_targeting() -> TestResult {
-    let missile = item(&catalog()?, MISSILE)?;
-    assert_eq!(
-        missile["stats"]["missile"],
-        json!({
-            "damage": {
-                "physical": 1500.0, "energy": 0.0, "distortion": null,
-                "thermal": null, "biochemical": null, "stun": null
-            },
-            "explosionMinRadius": 2.0,
-            "explosionMaxRadius": 12.0,
-            "trackingSignalType": "Infrared",
-            "lockTime": 2.0,
-            "lockingAngle": 45.0,
-            "lockRangeMin": 100.0,
-            "lockRangeMax": 5000.0,
-            "linearSpeed": 300.0
-        })
-    );
+    let catalog = catalog()?;
+    let missile = owner(
+        &catalog,
+        "/configurations/missileConfigurations/rows",
+        MISSILE,
+    )?;
+    let targeting = proof::at(missile, "/targeting/value")?;
+    proof::present(
+        targeting,
+        "trackingSignalType",
+        &json!("Infrared"),
+        Some(true),
+    )?;
+    for (field, value) in [
+        ("lockTime", 2.0),
+        ("lockingAngle", 45.0),
+        ("lockRangeMin", 100.0),
+        ("lockRangeMax", 5000.0),
+    ] {
+        single(targeting, field, value)?;
+    }
+    single(proof::at(missile, "/guidance/value")?, "linearSpeed", 300.0)?;
+    let ordnance = owner(&catalog, "/configurations/explosives/rows", MISSILE)?;
+    for field in ["ownerRecordIndex", "componentOrdinal"] {
+        assert_eq!(missile.get(field), ordnance.get(field));
+    }
+    assert_eq!(proof::at(ordnance, "/configuration/value/type")?, "missile");
+    let explosion = proof::at(ordnance, "/configuration/value/value/explosionParams/value")?;
+    single(explosion, "minRadius", 2.0)?;
+    single(explosion, "maxRadius", 12.0)?;
+    canonical_weapons::channels(proof::at(explosion, "/damage/value")?, 1500.0, 0.0)?;
     Ok(())
 }
 
 #[test]
-fn an_item_without_a_stat_block_has_null_stats_whatever_connections_it_has() -> TestResult {
-    let plain = item(&catalog()?, PLAIN)?;
-    assert!(plain["stats"].is_null());
+fn a_health_only_item_keeps_its_original_health_without_specialist_rows() -> TestResult {
+    let catalog = catalog()?;
+    item(&catalog, PLAIN)?;
+    let durability = owner(&catalog, "/configurations/durability/rows", PLAIN)?;
+    single(durability, "health", 450.0)?;
+    for path in [
+        "/configurations/weaponActions/rows",
+        "/configurations/shieldGenerators/rows",
+        "/configurations/quantumDrives/rows",
+        "/configurations/resourceComponents/rows",
+        "/configurations/missileConfigurations/rows",
+    ] {
+        assert!(owner(&catalog, path, PLAIN).is_err());
+    }
     Ok(())
 }
 

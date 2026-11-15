@@ -30,7 +30,6 @@ fn weapon_action_wrappers_preserve_original_edges_and_entry_metadata() -> TestRe
     let (_folder, archive) = common::open(&database, DcbOrigin::Encrypted)?;
     let built = build_catalog(&archive, &common::options())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
-    check_legacy(&catalog)?;
     let row = proof::at(&catalog, "/configurations/weaponActions/rows/0")?;
     proof::present(row, "ownerRecordIndex", &json!(OWNER), Some(true))?;
     proof::present(row, "componentOrdinal", &json!(1), Some(true))?;
@@ -217,24 +216,6 @@ fn check_occurrence(catalog: &Value, cell: &Value, ordinal: u64) -> TestResult {
         }),
         "the actual original child route is cited in its owning Record"
     );
-    Ok(())
-}
-
-fn check_legacy(catalog: &Value) -> TestResult {
-    let actual = proof::rows(catalog, "/items/0/stats/weapon/fireActions")?;
-    let expected = [RAPID, TOGGLE, CONDITIONAL, DYNAMIC, CHARGED];
-    assert_eq!(
-        actual.len(),
-        expected.len(),
-        "the previous flattened list length"
-    );
-    for (row, expected) in actual.iter().zip(expected) {
-        assert_eq!(
-            proof::at(row, "/kind")?,
-            expected,
-            "the previous flattened action type"
-        );
-    }
     Ok(())
 }
 

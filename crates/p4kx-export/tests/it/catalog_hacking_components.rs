@@ -38,7 +38,7 @@ fn hacking_components_keep_zero_charges_and_ordered_original_modifier_values() -
         );
         let charge = configuration(charges, 1, CHARGES, "hackingChip", encrypted)?;
         proof::present(charge, "maxCharges", &json!(0), Some(encrypted))?;
-        check_item_without_specialist_stats(&catalog)?;
+        check_item_owning_chip(&catalog)?;
         let values = configuration(modifiers, 2, MODIFIERS, "removableChip", encrypted)?;
         let values = proof::rows(values, "/values/value")?;
         assert_eq!(
@@ -224,15 +224,15 @@ fn check_modifier(
     Ok(())
 }
 
-fn check_item_without_specialist_stats(catalog: &Value) -> TestResult {
+fn check_item_owning_chip(catalog: &Value) -> TestResult {
     let owner = common::guid(fixture::OWNER);
     let item = proof::rows(catalog, "/items")?
         .iter()
         .find(|row| row.get("guid").and_then(Value::as_str) == Some(owner.as_str()))
         .ok_or("item owning the original chip")?;
     assert!(
-        proof::at(item, "/stats")?.is_null(),
-        "the independent chip requires no specialist stats"
+        item.get("stats").is_none(),
+        "the chip facts belong to the dedicated configuration rows"
     );
     Ok(())
 }

@@ -103,7 +103,7 @@ fn shield_generator_keeps_original_values_slots_and_independent_provenance() -> 
         assert!(
             proof::rows(&catalog, "/items")?
                 .iter()
-                .all(|item| item.pointer("/stats/shield").is_none()),
+                .all(|item| item.get("stats").is_none()),
             "the shield configuration has one canonical wire location"
         );
     }
@@ -220,7 +220,7 @@ fn verify_ranges(row: &Value, path: &str, expected: &[(f32, f32)], encrypted: bo
     Ok(())
 }
 
-fn number(value: f32) -> Value {
+pub(super) fn number(value: f32) -> Value {
     json!({"type":"f32", "rawBits":format!("{:08x}", value.to_bits()), "finite":value})
 }
 

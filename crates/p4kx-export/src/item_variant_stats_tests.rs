@@ -1,12 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use serde_json::Value;
-
 use super::stats_digest;
 use crate::contract_stats::{
-    ItemStatBlocks, ItemStats, ItemStatsFields, PublishedItemStats, QuantumDriveStats,
-    ResourceFlow, ResourceState, ShieldStats, Signature, WeaponStats,
+    ItemStatBlocks, ItemStats, ItemStatsFields, QuantumDriveStats, ResourceFlow, ResourceState,
+    ShieldStats, Signature, WeaponStats,
 };
 use crate::digest::Wide;
 
@@ -128,47 +126,5 @@ fn compact_item_variant_bytes_and_digest_keep_the_device_slots() -> TestResult {
         Some(Wide::new().digest()),
         "an item without legacy stats hashes zero bytes"
     );
-    Ok(())
-}
-
-#[test]
-fn published_stats_keep_fields_outside_device_configurations() -> TestResult {
-    let published = stats(Some(shield()), Some(quantum()))
-        .into_published()
-        .ok_or("public stats still present")?;
-    let expected = format!(
-        "{WEAPON}{}",
-        concat!(
-            r#","missile":null,"armor":null,"clothing":null,"radar":null,"#,
-            r#""tractorBeam":null,"weaponModifier":null,"miningLaser":null,"#,
-            r#""miningModifier":null,"health":450.0}"#,
-        )
-    );
-    assert_eq!(
-        serde_json::to_string(&published)?,
-        expected,
-        "the public view preserves values and wire order of the remaining fields"
-    );
-    let schema = serde_json::to_value(schemars::schema_for!(PublishedItemStats<'static>))?;
-    let properties = schema
-        .get("properties")
-        .and_then(Value::as_object)
-        .ok_or("published stat properties")?;
-    let required = schema
-        .get("required")
-        .and_then(Value::as_array)
-        .ok_or("published required fields")?;
-    let expected = serde_json::from_str::<Value>(&expected)?;
-    let expected = expected.as_object().ok_or("expected stats object")?;
-    assert!(
-        properties.keys().eq(expected.keys()) && required.len() == expected.len(),
-        "schema keys are exactly the emitted keys"
-    );
-    for field in expected.keys() {
-        assert!(
-            required.iter().any(|name| name.as_str() == Some(field)),
-            "the emitted field {field} is required even when nullable"
-        );
-    }
     Ok(())
 }

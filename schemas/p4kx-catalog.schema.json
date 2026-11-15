@@ -1453,74 +1453,6 @@
       "type": "string",
       "x-p4kx-vocabularyClass": "control"
     },
-    "AmmoStats": {
-      "description": "The ammunition of a weapon.",
-      "properties": {
-        "damage": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Damage"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The damage on impact, from `projectileParams.damage`."
-        },
-        "detonationDamage": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Damage"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The damage of the detonation, from the `damage` of `explosionParams`."
-        },
-        "detonationMaxRadius": {
-          "description": "`explosionParams.maxRadius`, in metres.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "detonationMinRadius": {
-          "description": "`explosionParams.minRadius`, in metres.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "lifetime": {
-          "description": "`lifetime`, in seconds.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "speed": {
-          "description": "`speed`, in metres per second.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        }
-      },
-      "required": [
-        "damage",
-        "detonationDamage",
-        "detonationMaxRadius",
-        "detonationMinRadius",
-        "lifetime",
-        "speed"
-      ],
-      "type": "object"
-    },
     "AnimatedPrimeState": {
       "description": "Concrete source type and the original members outside its typed fields.",
       "properties": {
@@ -1850,35 +1782,6 @@
       ],
       "type": "object"
     },
-    "ArmorStats": {
-      "description": "The suit armour of an item, raw facts of `SCItemSuitArmorParams` (ADR-0072).",
-      "properties": {
-        "damageResistance": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/DamageResistance"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The `damageResistance` of the `DamageResistanceMacro` Record that `damageResistance` links\nto; `null` without a readable one."
-        },
-        "integrityMilestoneToBreak": {
-          "description": "`integrityMilestoneToBreak`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        }
-      },
-      "required": [
-        "damageResistance",
-        "integrityMilestoneToBreak"
-      ],
-      "type": "object"
-    },
     "AssignmentKind": {
       "enum": [
         "base",
@@ -1899,7 +1802,7 @@
               "type": "string"
             },
             "value": {
-              "$ref": "#/$defs/MiningEffect2"
+              "$ref": "#/$defs/MiningEffect"
             }
           },
           "required": [
@@ -1915,7 +1818,7 @@
               "type": "string"
             },
             "value": {
-              "$ref": "#/$defs/MiningEffect2"
+              "$ref": "#/$defs/MiningEffect"
             }
           },
           "required": [
@@ -1931,7 +1834,7 @@
               "type": "string"
             },
             "value": {
-              "$ref": "#/$defs/FilterEffect2"
+              "$ref": "#/$defs/FilterEffect"
             }
           },
           "required": [
@@ -9356,59 +9259,6 @@
       ],
       "type": "object"
     },
-    "ClothingStats": {
-      "description": "The worn properties of an item, raw facts of `SCItemClothingParams`.",
-      "properties": {
-        "gForceResistance": {
-          "description": "`Flight.gForceResistance`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "radiationCapacity": {
-          "description": "`RadiationResistance.MaximumRadiationCapacity`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "radiationDissipationRate": {
-          "description": "`RadiationResistance.RadiationDissipationRate`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "temperatureResistanceMax": {
-          "description": "`TemperatureResistance.MaxResistance`, in degrees Celsius.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "temperatureResistanceMin": {
-          "description": "`TemperatureResistance.MinResistance`, in degrees Celsius.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        }
-      },
-      "required": [
-        "gForceResistance",
-        "radiationCapacity",
-        "radiationDissipationRate",
-        "temperatureResistanceMax",
-        "temperatureResistanceMin"
-      ],
-      "type": "object"
-    },
     "ClueDetails": {
       "description": "The subtype-specific source fields of an investigation clue.",
       "oneOf": [
@@ -12523,68 +12373,6 @@
       ],
       "type": "object"
     },
-    "Damage": {
-      "description": "Damage by type, as the Archive states it.",
-      "properties": {
-        "biochemical": {
-          "description": "`DamageBiochemical`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "distortion": {
-          "description": "`DamageDistortion`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "energy": {
-          "description": "`DamageEnergy`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "physical": {
-          "description": "`DamagePhysical`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "stun": {
-          "description": "`DamageStun`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "thermal": {
-          "description": "`DamageThermal`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        }
-      },
-      "required": [
-        "biochemical",
-        "distortion",
-        "energy",
-        "physical",
-        "stun",
-        "thermal"
-      ],
-      "type": "object"
-    },
     "DamageChannels": {
       "description": "A fixed vector keyed by the original damage channels.",
       "properties": {
@@ -12714,94 +12502,6 @@
       "required": [
         "damageMacro",
         "damageTotal"
-      ],
-      "type": "object"
-    },
-    "DamageResistance": {
-      "description": "The resistances of a `DamageResistanceMacro`, one entry per damage type.",
-      "properties": {
-        "biochemical": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/ResistanceEntry"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "`BiochemicalResistance`."
-        },
-        "distortion": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/ResistanceEntry"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "`DistortionResistance`."
-        },
-        "energy": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/ResistanceEntry"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "`EnergyResistance`."
-        },
-        "ignoreMeleeDamage": {
-          "description": "`IgnoreMeleeDamage`.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "physical": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/ResistanceEntry"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "`PhysicalResistance`."
-        },
-        "stun": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/ResistanceEntry"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "`StunResistance`."
-        },
-        "thermal": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/ResistanceEntry"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "`ThermalResistance`."
-        }
-      },
-      "required": [
-        "biochemical",
-        "distortion",
-        "energy",
-        "ignoreMeleeDamage",
-        "physical",
-        "stun",
-        "thermal"
       ],
       "type": "object"
     },
@@ -16688,32 +16388,6 @@
       "type": "object"
     },
     "FilterEffect": {
-      "description": "The filter change of a `MiningFilterItemModifierParams`.",
-      "properties": {
-        "filterModifier": {
-          "description": "`filterParams.filterModifier.value`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "lifetime": {
-          "description": "`modifierLifetime.lifetime`, in seconds; `null` for a modifier that lasts.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        }
-      },
-      "required": [
-        "filterModifier",
-        "lifetime"
-      ],
-      "type": "object"
-    },
-    "FilterEffect2": {
       "description": "Concrete source type and the original members outside its typed fields.",
       "properties": {
         "additionalFields": {
@@ -16734,175 +16408,6 @@
         "filterParams",
         "modifierLifetime",
         "sourceType"
-      ],
-      "type": "object"
-    },
-    "FireAction": {
-      "description": "One fire mode of a weapon.",
-      "properties": {
-        "ammoCost": {
-          "description": "`launchParams.ammoCost`, the rounds one shot uses.",
-          "format": "int64",
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "chargeTime": {
-          "description": "`chargeTime` of the fire mode, when stated, in seconds.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "cooldownTime": {
-          "description": "`cooldownTime` of the fire mode, when stated, in seconds.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "damagePerSecond": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Damage"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "`damagePerSecond`, the damage a beam does each second; `null` for a mode without one."
-        },
-        "fireRate": {
-          "description": "`fireRate`, in rounds per minute. `fireRate`, `heatPerShot`, `chargeTime`,\n`overchargeTime`, `cooldownTime`, `name` and `launchParams` are read from the fire mode and,\nwhere it has none of its own, from its `weaponAction`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "fullDamageRange": {
-          "description": "`fullDamageRange` of a beam, in metres: the distance up to which it does full damage.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "heatPerShot": {
-          "description": "`heatPerShot`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "hitType": {
-          "description": "`hitType` of a beam, e.g. `ElectricArc` for a mining beam and `Extraction` for an\nextraction beam. A closed set the game may extend; the schema keeps a string.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "kind": {
-          "description": "The struct of the fire mode, e.g. `SWeaponActionFireRapidParams`. A closed set the game\nmay extend; the schema keeps a string.",
-          "type": "string"
-        },
-        "name": {
-          "description": "The `name` of the fire mode.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "overchargeTime": {
-          "description": "`overchargeTime` of the fire mode, when stated, in seconds.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "pellets": {
-          "description": "`launchParams.pelletCount` (`pellets` where a Record states that instead), the projectiles\nof one shot.",
-          "format": "int64",
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "spread": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Spread"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "`launchParams.spreadParams`; `null` for a mode without one."
-        },
-        "zeroDamageRange": {
-          "description": "`zeroDamageRange` of a beam, in metres: the distance from which it does no damage.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        }
-      },
-      "required": [
-        "ammoCost",
-        "chargeTime",
-        "cooldownTime",
-        "damagePerSecond",
-        "fireRate",
-        "fullDamageRange",
-        "heatPerShot",
-        "hitType",
-        "kind",
-        "name",
-        "overchargeTime",
-        "pellets",
-        "spread",
-        "zeroDamageRange"
-      ],
-      "type": "object"
-    },
-    "FireActionModifier": {
-      "description": "The damage multiplier an `ItemWeaponModifiersParams` applies to one fire action of the laser.",
-      "properties": {
-        "damageMultiplier": {
-          "description": "`weaponModifier.weaponStats.damageMultiplier`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "fireActionIndex": {
-          "description": "`fireActionIndex`, the index into the laser's `fireActions` as stored.",
-          "format": "int64",
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "lifetime": {
-          "description": "`modifierLifetime.lifetime`, in seconds; `null` for a modifier that lasts.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        }
-      },
-      "required": [
-        "damageMultiplier",
-        "fireActionIndex",
-        "lifetime"
       ],
       "type": "object"
     },
@@ -23573,17 +23078,6 @@
             "null"
           ]
         },
-        "stats": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/ItemStats"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Published stat blocks, health and resource states, when present."
-        },
         "subType": {
           "description": "The item subtype of `AttachDef.SubType`, e.g. `Power`, `null` without one.",
           "type": [
@@ -23630,7 +23124,6 @@
         "playability",
         "recordPath",
         "size",
-        "stats",
         "subType",
         "tags",
         "type",
@@ -24117,131 +23610,6 @@
         "objectContainer",
         "ownerGuid",
         "ownerRecordIndex"
-      ],
-      "type": "object"
-    },
-    "ItemStats": {
-      "description": "Published item stat blocks and health.",
-      "properties": {
-        "armor": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/ArmorStats"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The suit armour block, from `SCItemSuitArmorParams`."
-        },
-        "clothing": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/ClothingStats"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The worn properties block, from `SCItemClothingParams`."
-        },
-        "health": {
-          "description": "The hit points, from `SHealthComponentParams.Health`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "miningLaser": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/MiningLaserStats"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The mining laser block, from `SEntityComponentMiningLaserParams`: ship lasers and the FPS\nmining tool."
-        },
-        "miningModifier": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/MiningModifierStats"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The mining module or gadget block, from the `EntityComponentAttachableModifierParams` that\nholds a mining modifier."
-        },
-        "missile": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/MissileStats"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The missile block, from `SCItemMissileParams`."
-        },
-        "radar": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/RadarStats"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The radar block, from `SCItemRadarComponentParams`."
-        },
-        "tractorBeam": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/TractorBeamStats"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The tractor beam block, from the `SWeaponActionFireTractorBeamParams` of the weapon."
-        },
-        "weapon": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/WeaponStats"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The weapon block, from `SCItemWeaponComponentParams`."
-        },
-        "weaponModifier": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/WeaponModifierStats"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The tractor and salvage multipliers of an attachment, from\n`EntityComponentAttachableModifierParams`."
-        }
-      },
-      "required": [
-        "armor",
-        "clothing",
-        "health",
-        "miningLaser",
-        "miningModifier",
-        "missile",
-        "radar",
-        "tractorBeam",
-        "weapon",
-        "weaponModifier"
       ],
       "type": "object"
     },
@@ -28761,43 +28129,6 @@
       "type": "object"
     },
     "MiningEffect": {
-      "description": "The mining modifiers one `ItemMiningModifierParams` or `ItemMineableRockModifierParams`\napplies.",
-      "properties": {
-        "isOptimalRateGood": {
-          "description": "`MiningLaserModifier.isOptimalRateGood`.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "lifetime": {
-          "description": "`modifierLifetime.lifetime`, in seconds; `null` for a modifier that lasts.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "modifiers": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/MiningModifierValues"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "`MiningLaserModifier`; `null` without it."
-        }
-      },
-      "required": [
-        "isOptimalRateGood",
-        "lifetime",
-        "modifiers"
-      ],
-      "type": "object"
-    },
-    "MiningEffect2": {
       "description": "Concrete source type and the original members outside its typed fields.",
       "properties": {
         "additionalFields": {
@@ -29229,237 +28560,6 @@
       ],
       "type": "object"
     },
-    "MiningLaserStats": {
-      "description": "A mining laser, raw facts of `SEntityComponentMiningLaserParams` (ADR-0262).\n\nThe beams are fire modes of `weapon.fireActions`: their `hitType`, `fullDamageRange`,\n`zeroDamageRange` and `damagePerSecond`.",
-      "properties": {
-        "filterModifier": {
-          "description": "`filterParams.filterModifier.value`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "globalParamsGuid": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Guid"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The `MiningLaserGlobalParams` Record `globalParams` links to."
-        },
-        "isOptimalRateGood": {
-          "description": "`miningLaserModifiers.isOptimalRateGood`.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "modifiers": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/MiningModifierValues"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "`miningLaserModifiers`; `null` without them."
-        },
-        "throttleLerpSpeed": {
-          "description": "`throttleLerpSpeed`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "throttleMinimum": {
-          "description": "`throttleMinimum`, the lowest throttle as a fraction of 1.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "usesPowerThrottle": {
-          "description": "`usesPowerThrottle`.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        }
-      },
-      "required": [
-        "filterModifier",
-        "globalParamsGuid",
-        "isOptimalRateGood",
-        "modifiers",
-        "throttleLerpSpeed",
-        "throttleMinimum",
-        "usesPowerThrottle"
-      ],
-      "type": "object"
-    },
-    "MiningModifierStats": {
-      "description": "A mining module or gadget, raw facts of the `EntityComponentAttachableModifierParams` that\nholds a mining modifier (ADR-0262).",
-      "properties": {
-        "activationMethod": {
-          "description": "`activationMethod`, e.g. `ActivateOnAttach` for a passive module and `ActivateOnDemand`\nfor an active module or a gadget. A closed set the game may extend; the schema keeps a\nstring.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "canInterrupt": {
-          "description": "`canInterrupt`.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "charges": {
-          "description": "`charges`; -1 for a gadget that is not used up.",
-          "format": "int64",
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "filter": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/FilterEffect"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The first `MiningFilterItemModifierParams`; `null` without one."
-        },
-        "fireActionModifiers": {
-          "description": "The `ItemWeaponModifiersParams` in stored order: the multiplier per fire action.",
-          "items": {
-            "$ref": "#/$defs/FireActionModifier"
-          },
-          "type": "array"
-        },
-        "isInterruptible": {
-          "description": "`isInterruptible`.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "laser": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/MiningEffect"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The first `ItemMiningModifierParams`: the change to the laser; `null` without one."
-        },
-        "rock": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/MiningEffect"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The first `ItemMineableRockModifierParams`: the change to the rock; `null` without one."
-        }
-      },
-      "required": [
-        "activationMethod",
-        "canInterrupt",
-        "charges",
-        "filter",
-        "fireActionModifiers",
-        "isInterruptible",
-        "laser",
-        "rock"
-      ],
-      "type": "object"
-    },
-    "MiningModifierValues": {
-      "description": "The modifiers of a `MiningLaserModifiers` struct, each the `value` of a\n`FloatModifierMultiplicative` as stored, in percent; `null` for a modifier the struct leaves\nunset.",
-      "properties": {
-        "catastrophicChargeWindowRate": {
-          "description": "`catastrophicChargeWindowRateModifier`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "clusterFactor": {
-          "description": "`clusterFactorModifier`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "instability": {
-          "description": "`laserInstability`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "optimalChargeWindowRate": {
-          "description": "`optimalChargeWindowRateModifier`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "optimalChargeWindowSize": {
-          "description": "`optimalChargeWindowSizeModifier`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "resistance": {
-          "description": "`resistanceModifier`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "shatterDamage": {
-          "description": "`shatterdamageModifier`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        }
-      },
-      "required": [
-        "catastrophicChargeWindowRate",
-        "clusterFactor",
-        "instability",
-        "optimalChargeWindowRate",
-        "optimalChargeWindowSize",
-        "resistance",
-        "shatterDamage"
-      ],
-      "type": "object"
-    },
     "MiningModifiers": {
       "description": "The authored float modifiers used by a mining laser or attachable modifier.",
       "properties": {
@@ -29717,97 +28817,6 @@
         "randomness",
         "range",
         "sourceType"
-      ],
-      "type": "object"
-    },
-    "MissileStats": {
-      "description": "A missile.",
-      "properties": {
-        "damage": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Damage"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The damage of the explosion, from the `damage` of `explosionParams`."
-        },
-        "explosionMaxRadius": {
-          "description": "`explosionParams.maxRadius`, in metres.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "explosionMinRadius": {
-          "description": "`explosionParams.minRadius`, in metres.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "linearSpeed": {
-          "description": "`GCSParams.linearSpeed`, in metres per second.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "lockRangeMax": {
-          "description": "`targetingParams.lockRangeMax`, in metres.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "lockRangeMin": {
-          "description": "`targetingParams.lockRangeMin`, in metres.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "lockTime": {
-          "description": "`targetingParams.lockTime`, in seconds.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "lockingAngle": {
-          "description": "`targetingParams.lockingAngle`, in degrees.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "trackingSignalType": {
-          "description": "`targetingParams.trackingSignalType`. A closed set the game may extend; the schema keeps a\nstring.",
-          "type": [
-            "string",
-            "null"
-          ]
-        }
-      },
-      "required": [
-        "damage",
-        "explosionMaxRadius",
-        "explosionMinRadius",
-        "linearSpeed",
-        "lockRangeMax",
-        "lockRangeMin",
-        "lockTime",
-        "lockingAngle",
-        "trackingSignalType"
       ],
       "type": "object"
     },
@@ -36833,50 +35842,6 @@
       ],
       "type": "object"
     },
-    "RadarStats": {
-      "description": "A radar, raw facts of `SCItemRadarComponentParams`.",
-      "properties": {
-        "aimAssistDistanceMax": {
-          "description": "`aimAssist.distanceMaxAssignment`, in metres.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "aimAssistDistanceMin": {
-          "description": "`aimAssist.distanceMinAssignment`, in metres.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "aimAssistOutsideRangeBuffer": {
-          "description": "`aimAssist.outsideRangeBufferDistance`, in metres.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "pingCooldownTime": {
-          "description": "`pingProperties.cooldownTime`, in seconds.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        }
-      },
-      "required": [
-        "aimAssistDistanceMax",
-        "aimAssistDistanceMin",
-        "aimAssistOutsideRangeBuffer",
-        "pingCooldownTime"
-      ],
-      "type": "object"
-    },
     "RadarTagTerm": {
       "description": "The exact positive and negative tag slots of one authored term.",
       "properties": {
@@ -38004,50 +36969,6 @@
         "owner",
         "recordIndex",
         "scenariosValue"
-      ],
-      "type": "object"
-    },
-    "ResistanceEntry": {
-      "description": "The resistance to one damage type, as stored: the multiplier is the factor damage is scaled\nby, not a mitigation.",
-      "properties": {
-        "damageCap": {
-          "description": "`DamageCap`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "damageCapLimit": {
-          "description": "`DamageCapLimit`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "multiplier": {
-          "description": "`Multiplier`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "threshold": {
-          "description": "`Threshold`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        }
-      },
-      "required": [
-        "damageCap",
-        "damageCapLimit",
-        "multiplier",
-        "threshold"
       ],
       "type": "object"
     },
@@ -40432,41 +39353,6 @@
       "type": "object"
     },
     "SalvageModifier": {
-      "description": "An `SSalvageModifier`.",
-      "properties": {
-        "extractionEfficiency": {
-          "description": "`extractionEfficiency`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "radiusMultiplier": {
-          "description": "`radiusMultiplier`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "salvageSpeedMultiplier": {
-          "description": "`salvageSpeedMultiplier`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        }
-      },
-      "required": [
-        "extractionEfficiency",
-        "radiusMultiplier",
-        "salvageSpeedMultiplier"
-      ],
-      "type": "object"
-    },
-    "SalvageModifier2": {
       "description": "Concrete source type and the original members outside its typed fields.",
       "properties": {
         "additionalFields": {
@@ -111158,7 +110044,7 @@
           "then": {
             "properties": {
               "value": {
-                "$ref": "#/$defs/SalvageModifier2"
+                "$ref": "#/$defs/SalvageModifier"
               }
             }
           }
@@ -118958,7 +117844,7 @@
           "then": {
             "properties": {
               "value": {
-                "$ref": "#/$defs/TractorModifier2"
+                "$ref": "#/$defs/TractorModifier"
               }
             }
           }
@@ -120128,7 +119014,7 @@
           "then": {
             "properties": {
               "value": {
-                "$ref": "#/$defs/WeaponModifierStats2"
+                "$ref": "#/$defs/WeaponModifierStats"
               }
             }
           }
@@ -121926,59 +120812,6 @@
         "mode",
         "name",
         "selector"
-      ],
-      "type": "object"
-    },
-    "Spread": {
-      "description": "The spread of a fire mode, as stored in `SSpreadParams`.",
-      "properties": {
-        "attack": {
-          "description": "`attack`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "decay": {
-          "description": "`decay`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "firstAttack": {
-          "description": "`firstAttack`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "max": {
-          "description": "`max`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "min": {
-          "description": "`min`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        }
-      },
-      "required": [
-        "attack",
-        "decay",
-        "firstAttack",
-        "max",
-        "min"
       ],
       "type": "object"
     },
@@ -125197,122 +124030,7 @@
       ],
       "type": "object"
     },
-    "TractorBeamStats": {
-      "description": "A tractor beam, from its `SWeaponActionFireTractorBeamParams`.",
-      "properties": {
-        "fullStrengthDistance": {
-          "description": "`fullStrengthDistance`, in metres.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "maxAngle": {
-          "description": "`maxAngle`, in degrees.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "maxDistance": {
-          "description": "`maxDistance`, in metres.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "maxForce": {
-          "description": "`maxForce`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "maxVolume": {
-          "description": "`maxVolume`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "minDistance": {
-          "description": "`minDistance`, in metres.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "minForce": {
-          "description": "`minForce`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        }
-      },
-      "required": [
-        "fullStrengthDistance",
-        "maxAngle",
-        "maxDistance",
-        "maxForce",
-        "maxVolume",
-        "minDistance",
-        "minForce"
-      ],
-      "type": "object"
-    },
     "TractorModifier": {
-      "description": "An `STractorModifier`.",
-      "properties": {
-        "forceMultiplier": {
-          "description": "`forceMultiplier`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "fullStrengthDistMultiplier": {
-          "description": "`fullStrengthDistMultiplier`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "maxDistMultiplier": {
-          "description": "`maxDistMultiplier`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "maxVolumeMultiplier": {
-          "description": "`maxVolumeMultiplier`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        }
-      },
-      "required": [
-        "forceMultiplier",
-        "fullStrengthDistMultiplier",
-        "maxDistMultiplier",
-        "maxVolumeMultiplier"
-      ],
-      "type": "object"
-    },
-    "TractorModifier2": {
       "description": "Concrete source type and the original members outside its typed fields.",
       "properties": {
         "additionalFields": {
@@ -126472,38 +125190,6 @@
       "type": "object"
     },
     "WeaponModifierStats": {
-      "description": "The tractor and salvage multipliers an attachment applies, from the `weaponStats` of its\n`EntityComponentAttachableModifierParams`.",
-      "properties": {
-        "salvage": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/SalvageModifier"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The `salvageModifier`; `null` without one."
-        },
-        "tractor": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/TractorModifier"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The `tractorModifier`; `null` without one."
-        }
-      },
-      "required": [
-        "salvage",
-        "tractor"
-      ],
-      "type": "object"
-    },
-    "WeaponModifierStats2": {
       "description": "Concrete source type and the original members outside its typed fields.",
       "properties": {
         "additionalFields": {
@@ -126640,43 +125326,6 @@
         "ownerGuid",
         "ownerRecordIndex",
         "selection"
-      ],
-      "type": "object"
-    },
-    "WeaponStats": {
-      "description": "A weapon: its fire modes and the ammunition it fires.",
-      "properties": {
-        "ammo": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/AmmoStats"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The ammunition, from the `AmmoParams` Record that `ammoParamsRecord` of that container\nlinks to; `null` without a readable one."
-        },
-        "ammoCapacity": {
-          "description": "`maxAmmoCount` of the ammo container: the weapon's own `SAmmoContainerComponentParams` or,\nfor a weapon without one, that of the magazine entity `ammoContainerRecord` links to. The\ncapacity of the magazine, not of the weapon body.",
-          "format": "int64",
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "fireActions": {
-          "description": "The fire modes of `fireActions` in stored order; a sequence is flattened to its entries.",
-          "items": {
-            "$ref": "#/$defs/FireAction"
-          },
-          "type": "array"
-        }
-      },
-      "required": [
-        "ammo",
-        "ammoCapacity",
-        "fireActions"
       ],
       "type": "object"
     },
