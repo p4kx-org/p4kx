@@ -30,6 +30,13 @@ function Assert-P4kxDocumentHello {
     if ($actual.Hash -cne $Case.hello_hash) { throw 'The real document grant exported different bytes.' }
 }
 
+function Assert-P4kxDocumentInsideEmpty {
+    param($Case)
+    if (@(Get-ChildItem -LiteralPath $Case.inside -Force).Count -ne 0) {
+        throw 'Protected installation destination contains output after refusal.'
+    }
+}
+
 function Test-P4kxDocumentUnknownSource {
     param($Case, [string]$Source, [string]$Inside, [string]$Outside)
     Assert-P4kxDocumentSandboxTest $Case @('-e', (Join-Path ([IO.Path]::GetDirectoryName($Source)) 'Bin64')) 'hidden-bin64' 1
@@ -41,7 +48,8 @@ function Test-P4kxDocumentUnknownSource {
     $null = Invoke-P4kxDocumentCaseExtract $Case $Source (Join-Path $Inside 'absent-suffix') 'absent-suffix-refusal' 'SourceMembership'
     $direct = Join-Path $Case.game 'direct-refused'
     $null = Invoke-P4kxDocumentCaseExtract $Case $Source $direct 'host-parent-refusal' 'SourceMembership'
-    if ((Get-ChildItem -LiteralPath $Case.inside -Force).Count -ne 0 -or (Test-Path -LiteralPath $direct)) { throw 'A neutral source-membership refusal created output.' }
+    Assert-P4kxDocumentInsideEmpty $Case
+    if (Test-Path -LiteralPath $direct) { throw 'A neutral source-membership refusal created output.' }
     return @{read_only_archive='success'; writable_export='success'; source_membership_refusal='success'; empty_protection_refusal='success'; absent_suffix_refusal='success'}
 }
 
@@ -50,6 +58,7 @@ function Test-P4kxDocumentKnownInstallation {
     $directory = Add-P4kxDocumentCaseGrant $Case $Case.game
     Assert-P4kxDocumentSandboxTest $Case @('-d', (Join-Path $directory 'Bin64')) 'visible-bin64' 0
     $null = Invoke-P4kxDocumentCaseExtract $Case (Join-Path $directory 'Data.p4k') $Inside 'known-installation-refusal' 'Installation'
+    Assert-P4kxDocumentInsideEmpty $Case
     return 'success'
 }
 

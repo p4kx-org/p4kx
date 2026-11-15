@@ -4,7 +4,7 @@ Mutates source-bound Documents verification without connecting to any service.
 #>
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'test-documents-evidence-fixture.ps1')
-. (Join-Path $PSScriptRoot 'flatpak-documents.ps1')
+. (Join-Path $PSScriptRoot 'flatpak-document-cases.ps1')
 . (Join-Path $PSScriptRoot 'flatpak-prerequisites.ps1')
 $platform = Get-P4kxLinuxPlatform 'x86_64-unknown-linux-gnu'
 $revision = 'a' * 40
@@ -89,4 +89,38 @@ foreach ($expected in @('Installation', 'SourceMembership', 'ExistingSource')) {
     if (-not $rejected) { throw 'A top-level refusal accepted the Entry-only failure status.' }
 }
 Assert-P4kxFlatpakPrerequisiteOutcome @{exit_code=1; stderr='[p4kx.runtime.documents-api5] [p4kx.documents.unsupported-interface:4] synthetic'} | Out-Null
-'PASS: structural contract, provenance/capability/controller/API4 mutations and exact typed refusals; no portal or runtime executed.'
+& {
+    function Add-P4kxDocumentCaseGrant {
+        param($Case, [string]$Path)
+        if ($Path -cne $Case.game) { throw 'Fixture did not grant the known installation.' }
+        return Join-Path $Case.inside 'portal-source'
+    }
+    function Assert-P4kxDocumentSandboxTest {
+        param($Case, [string[]]$Arguments, [string]$Name, [int]$ExpectedExit)
+        if ($Name -cne 'visible-bin64' -or $ExpectedExit -ne 0) { throw 'Fixture did not confirm installation visibility.' }
+    }
+    function Invoke-P4kxDocumentCaseExtract {
+        param($Case, [string]$Source, [string]$Output, [string]$Name, [string]$Expected)
+        if ($Name -cne 'known-installation-refusal' -or $Expected -cne 'Installation') { throw 'Fixture did not require a typed installation refusal.' }
+        if ($Case.leave_output) { 'unexpected export' | Set-Content -LiteralPath $Case.artifact }
+    }
+
+    $inside = [IO.Directory]::CreateTempSubdirectory('p4kx-test-installation-refusal-').FullName
+    $artifact = Join-Path $inside 'unexpected.txt'
+    try {
+        $case = @{game=(Join-Path $inside 'game'); inside=$inside; artifact=$artifact; leave_output=$false}
+        $alias = Join-Path $inside 'portal-target'
+        if ((Test-P4kxDocumentKnownInstallation $case $alias) -cne 'success') { throw 'An empty host destination did not establish the refusal.' }
+
+        $case.leave_output = $true
+        $rejected = $false
+        try { Test-P4kxDocumentKnownInstallation $case $alias | Out-Null }
+        catch { $rejected = $_.Exception.Message -ceq 'Protected installation destination contains output after refusal.' }
+        if (-not $rejected) { throw 'A refusal that left output on the host was accepted.' }
+    }
+    finally {
+        if (Test-Path -LiteralPath $artifact) { Remove-Item -LiteralPath $artifact }
+        Remove-Item -LiteralPath $inside
+    }
+}
+'PASS: structural contract, provenance/capability/controller/API4 mutations, exact typed refusals and known-installation host inventory; no portal or runtime executed.'
