@@ -6,13 +6,12 @@ use std::fmt;
 use crate::bank_object_fields::ObjectFields;
 use crate::bank_reader::SectionReader;
 use crate::bank_structure::{HircEnvelope, OBJECT_HEADER_LEN, OBJECT_ID_LEN};
-use crate::hirc_action::{self, ActionTarget};
+use crate::hirc_action::ActionTarget;
 use crate::hirc_actor_mixer::{self, ActorMixer};
 use crate::hirc_attenuation::{self, BankAttenuationFields};
 use crate::hirc_bus_fields::{self, BankHircBusFields};
 use crate::hirc_container;
 use crate::hirc_effect::BankEffectFields;
-use crate::hirc_event;
 use crate::hirc_layout::has_decoder;
 use crate::hirc_modulator::{self, BankModulatorFields, BankModulatorKind};
 use crate::hirc_music::{MusicPlaylist, MusicSegment, MusicSwitch, MusicTrack};
@@ -28,6 +27,7 @@ use crate::{BankError, SectionId};
 mod object;
 
 pub use object::HircObject;
+use object::HircRouteEvidence;
 
 const LAST_SOUND_WITHOUT_CACHE_ID_VERSION: u32 = 150;
 pub(crate) const CONTAINER_VERSION: u32 = 154;
@@ -269,13 +269,15 @@ pub(crate) fn parse(version: u32, body: &[u8], base: usize) -> Result<Hirc, Bank
         let mut fields = SectionReader::new(SectionId::HIRC, object);
         let id = fields.u32()?;
         let bank_offset = base + range.start;
-        let value = value(kind, version, &mut fields, bank_offset as u64)
+        let mut route = HircRouteEvidence::default();
+        let value = value(kind, version, &mut fields, bank_offset as u64, &mut route)
             .unwrap_or_else(HircValue::Malformed);
         objects.push(HircObject {
             kind,
             id,
             value,
             body: bank_offset..base + range.end,
+            route,
         });
     }
     Ok(Hirc {
@@ -302,6 +304,7 @@ fn value(
     version: u32,
     fields: &mut SectionReader<'_>,
     bank_offset: u64,
+    route: &mut HircRouteEvidence,
 ) -> Result<HircValue, BankError> {
     if has_unknown_layout(kind, version) {
         return Err(BankError::UnsupportedObjectLayout { kind, version });
@@ -313,8 +316,8 @@ fn value(
         HircKind::Sound if hirc_source::has_sound_layout(version) => {
             HircValue::Sound(hirc_source::sound(version, fields)?)
         }
-        HircKind::Action => HircValue::Action(hirc_action::action(version, fields)?),
-        HircKind::Event => HircValue::Event(hirc_event::read(version, fields)?),
+        HircKind::Action => return route.read_action(version, fields, bank_offset),
+        HircKind::Event => return route.read_event(version, fields, bank_offset),
         HircKind::RandomSequenceContainer
         | HircKind::SwitchContainer
         | HircKind::LayerContainer

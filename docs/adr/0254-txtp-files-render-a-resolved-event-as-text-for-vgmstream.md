@@ -120,6 +120,11 @@ rendered paths.
 selector evidence includes the original object type, bank version, child count, Random mode
 when used and the original ID words of the rendered direct children. Each child use retains its
 physical ordinal and range. Broken or unrendered child occurrences supply no ID use.
+The variants under that group carry their entered Event and Action links. The proof includes
+the original Event action count, each used action ID at its physical ordinal, the Action type
+and target ID, and the explicit bank ID when used to enter a foreign bank. These words and
+layout versions belong to the bank that supplied the link. The first rendered choice uses
+the first corresponding action occurrence even when another occurrence has the same ID.
 Each file line inside that group's rendered command range also uses the WEM that supplied its
 newly written audio. The checked WEM payload range and, for embedded sound, the physical DIDX
 and DATA selectors contribute to the choice. This works for audio without a loop and for raw

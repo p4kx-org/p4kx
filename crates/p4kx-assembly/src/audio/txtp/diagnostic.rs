@@ -36,7 +36,7 @@ pub(super) fn collect<'a>(
                 TxtpApproximation::SelectFirstAlternative => rendered
                     .selection
                     .as_ref()
-                    .map(|selection| selection.resolve(variants, &rendered.media))
+                    .map(|selection| selection.resolve(variants, &rendered.commands))
                     .map(DiagnosticSource::Selection),
                 _ => variants
                     .iter()

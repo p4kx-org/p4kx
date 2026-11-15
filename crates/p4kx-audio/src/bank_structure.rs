@@ -3,6 +3,7 @@
 
 use std::ops::Range;
 
+use crate::bank_object_fields::BankHircField;
 use crate::bank_reader::SectionReader;
 use crate::{BankError, SectionId};
 
@@ -10,6 +11,17 @@ pub(crate) const SECTION_HEADER_LEN: usize = 8;
 pub(crate) const DIDX_ENTRY_LEN: usize = 12;
 pub(crate) const OBJECT_HEADER_LEN: usize = 5;
 pub(crate) const OBJECT_ID_LEN: usize = 4;
+
+pub(crate) fn counted_id_byte_range(
+    count: &BankHircField<u32>,
+    ordinal: usize,
+) -> Option<Range<u64>> {
+    let index = u32::try_from(ordinal)
+        .ok()
+        .filter(|&index| index < count.value)?;
+    let start = count.range.end + u64::from(index) * OBJECT_ID_LEN as u64;
+    Some(start..start + OBJECT_ID_LEN as u64)
+}
 
 const UNIQUE_SECTIONS: [SectionId; 5] = [
     SectionId::BKHD,

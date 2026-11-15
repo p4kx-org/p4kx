@@ -952,6 +952,11 @@ includes the group count and tree size. A transition object also cites its alloc
 where applicable for the first rendered selection group. It also cites each directly rendered
 child ID word at `[start, endExclusive, physicalChildOrdinal]`. Two occurrences of the same ID
 retain separate positions. Nested groups are considered before their containing group.
+Rendered file lines in that group carry their successfully followed Event and Action links.
+Each Event action ID is addressed by its original `[start, endExclusive, actionOrdinal]`.
+The Action type and target use half-open ranges in the owning decoded bank. An explicitly
+selected foreign Play bank also contributes the original bank ID. The source evidence
+includes the Event action count and each contributing bank's layout version.
 The selection also cites the WEM range used to write each newly written audio file named by
 that group. `wemBytes/mediaPayload` has `[start, endExclusive]` in decoded Entry coordinates.
 An embedded WEM also cites its DIDX triplet and the selected DATA section. Kept audio has no

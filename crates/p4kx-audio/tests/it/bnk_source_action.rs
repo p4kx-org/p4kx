@@ -7,8 +7,8 @@ use std::ops::Range;
 
 use p4kx_audio::{
     BankActionRead, BankError, BankHirc, BankHircAction, BankHircField, BankObservedHeader,
-    BankPlayBankDecision, BankReadError, BankSource, BankSourceSection, HircKind, HircValue,
-    SectionId, Soundbank,
+    BankPlayBankDecision, BankReadError, BankSource, BankSourceSection, HircKind, HircObject,
+    HircValue, SectionId, Soundbank,
 };
 use p4kx_testkit::{TestBank, TestHircObject};
 
@@ -35,9 +35,14 @@ fn bank_source_action_reads_exact_play_fields_and_skips_opaque_properties() -> T
     let mut hirc = bank.hirc(&section)?;
     trace.borrow_mut().clear();
 
+    let eager = Soundbank::parse(bytes.as_slice())?;
+    let [eager_play, eager_stop, eager_event] = eager.objects() else {
+        return Err("three original objects".into());
+    };
     let first = next(&mut hirc, &header)?;
     assert_eq!(first.object.id(), ACTION_ID, "original Action ID");
     assert_eq!(first.object.ordinal(), 0, "original first object");
+    check_eager_action(eager_play, &first.status)?;
     check_play_fields(first.status)?;
     assert_eq!(
         trace.borrow().as_slice(),
@@ -58,12 +63,16 @@ fn bank_source_action_reads_exact_play_fields_and_skips_opaque_properties() -> T
     let second = next(&mut hirc, &header)?;
     assert_eq!(second.object.id(), ACTION_ID, "duplicate short ID");
     assert_eq!(second.object.ordinal(), 1, "second original occurrence");
+    check_eager_action(eager_stop, &second.status)?;
     check_non_play(second.status)?;
     assert!(
         matches!(next(&mut hirc, &header)?.status, BankActionRead::NotAction),
         "the physical Event has no Action payload"
     );
-    check_legacy_actions(&bytes)?;
+    assert!(
+        eager_event.action_evidence().is_none(),
+        "eager Event has no Action evidence"
+    );
     Ok(())
 }
 
@@ -90,6 +99,11 @@ fn bank_source_action_keeps_version_gated_and_unsupported_paths_distinct() -> Te
                     "legacy equivalence"
                 );
                 assert_eq!(target.bank, None, "pre-154 Play has no PlayBank");
+                assert_eq!(
+                    original.action_evidence(),
+                    Some(&fields),
+                    "eager version-gated evidence"
+                );
                 assert!(
                     matches!(fields.play_bank, BankPlayBankDecision::VersionGated),
                     "version gate"
@@ -110,6 +124,10 @@ fn bank_source_action_keeps_version_gated_and_unsupported_paths_distinct() -> Te
                     "original version is outside the known Action layout"
                 );
                 assert_eq!(original.error(), Some(&error), "legacy error equivalence");
+                assert!(
+                    original.action_evidence().is_none(),
+                    "unsupported Action has no eager evidence"
+                );
                 assert_eq!(
                     trace.borrow().as_slice(),
                     [64..69, 69..73],
@@ -268,28 +286,19 @@ fn check_play_fields(status: BankActionRead) -> TestResult {
     check_field(play.bank_type, 0x9988_AABB, 106..110)
 }
 
-fn check_legacy_actions(bytes: &[u8]) -> TestResult {
-    let bank = Soundbank::parse(bytes)?;
-    let [first, second, _] = bank.objects() else {
-        return Err("three original objects".into());
-    };
-    let (HircValue::Action(first), HircValue::Action(second)) = (&first.value, &second.value)
-    else {
-        return Err("legacy Action fields".into());
+fn check_eager_action(object: &HircObject, status: &BankActionRead) -> TestResult {
+    let BankActionRead::Decoded { target, fields } = status else {
+        return Err("decoded Action occurrence".into());
     };
     assert_eq!(
-        (
-            first.action_type,
-            first.target_id,
-            first.bank.map(|bank| (bank.bank_id, bank.bank_type))
-        ),
-        (PLAY, TARGET, Some((0, 0x9988_AABB))),
-        "legacy Play values"
+        object.value,
+        HircValue::Action(*target),
+        "same decoded Action target"
     );
     assert_eq!(
-        (second.action_type, second.target_id, second.bank),
-        (STOP, TARGET, None),
-        "legacy non-Play values"
+        object.action_evidence(),
+        Some(fields),
+        "same original Action reads"
     );
     Ok(())
 }

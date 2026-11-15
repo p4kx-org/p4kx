@@ -51,13 +51,18 @@ pub(super) struct RenderedLoop<'a> {
     pub(super) source: Option<&'a ExportLoopOrigin>,
 }
 
+pub(super) struct RenderedCommand<'a> {
+    pub(super) variant: usize,
+    pub(super) media: Option<&'a ExportedWemOrigin>,
+}
+
 pub(super) struct RenderedTxtp<'a> {
     pub(super) text: String,
     pub(super) approximations: Vec<TxtpApproximation>,
     pub(super) approximation_ranges: Vec<Range<usize>>,
     pub(super) loops: Vec<RenderedLoop<'a>>,
     pub(super) selection: Option<SelectionTopology>,
-    pub(super) media: Vec<Option<&'a ExportedWemOrigin>>,
+    pub(super) commands: Vec<RenderedCommand<'a>>,
 }
 
 impl RenderedTxtp<'_> {
@@ -67,7 +72,7 @@ impl RenderedTxtp<'_> {
         }
         let mut markers = self.loops.iter().peekable();
         Some(
-            (0..self.media.len())
+            (0..self.commands.len())
                 .map(|command| {
                     markers
                         .next_if(|entry| entry.command == command)
@@ -168,7 +173,7 @@ pub(super) fn render<'a>(
         approximation_ranges: Vec::new(),
         loops: Vec::new(),
         selection: None,
-        media: Vec::new(),
+        commands: Vec::new(),
     };
     for line in header {
         let _ = writeln!(rendered.text, "# {}", comment_text(line));
@@ -186,7 +191,7 @@ fn group_lines<'a>(
     files: &HashMap<u32, SoundFile<'a>>,
 ) -> Result<(), String> {
     let [only] = group.children.as_slice() else {
-        let first_command = rendered.media.len();
+        let first_command = rendered.commands.len();
         for child in &group.children {
             match child {
                 Node::Leaf(leaf) => leaf_line(rendered, leaf, depth + 1, files)?,
@@ -229,14 +234,17 @@ fn leaf_line<'a>(
         text.push(' ');
         let end = number(text, points.end);
         rendered.loops.push(RenderedLoop {
-            command: rendered.media.len(),
+            command: rendered.commands.len(),
             points,
             start,
             end,
             source: file.loop_origin,
         });
     }
-    rendered.media.push(file.media_origin);
+    rendered.commands.push(RenderedCommand {
+        variant: leaf.variant,
+        media: file.media_origin,
+    });
     text.push('\n');
     Ok(())
 }
@@ -256,7 +264,7 @@ fn group_line(rendered: &mut RenderedTxtp<'_>, group: &Group, depth: usize, firs
             if rendered.selection.is_none() {
                 rendered.selection = Some(SelectionTopology::of(
                     group,
-                    first_command..rendered.media.len(),
+                    first_command..rendered.commands.len(),
                 ));
             }
             rendered.note(TxtpApproximation::SelectFirstAlternative);

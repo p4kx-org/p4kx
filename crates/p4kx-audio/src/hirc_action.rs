@@ -54,7 +54,7 @@ impl ActionTarget {
 }
 
 /// Original scalar reads used by one Action interpretation.
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct BankActionFields {
     /// Original action type when readable.
@@ -66,7 +66,7 @@ pub struct BankActionFields {
 }
 
 /// The `PlayBank` branch actually reached by the Action reader.
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum BankPlayBankDecision {
     /// Required Action fields failed before the branch could be consulted.
@@ -81,7 +81,7 @@ pub enum BankPlayBankDecision {
 }
 
 /// Original reads that locate or supply `PlayBank` fields.
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct BankPlayBankFields {
     /// The original ordinary property count when readable.
@@ -134,8 +134,42 @@ impl BankPlayProperties {
 pub(crate) fn action(
     version: u32,
     fields: &mut SectionReader<'_>,
-) -> Result<ActionTarget, BankError> {
-    read(version, fields, &mut BankActionFields::default(), &mut None)
+    bank_offset: u64,
+) -> Result<(ActionTarget, BankActionFields), BankError> {
+    let mut observed = BankActionFields::default();
+    let target = read(version, fields, &mut observed, &mut None)?;
+    Ok((target, observed.with_bank_offset(bank_offset)))
+}
+
+impl BankActionFields {
+    fn with_bank_offset(self, bank_offset: u64) -> Self {
+        let play_bank = match self.play_bank {
+            BankPlayBankDecision::Play(fields) => BankPlayBankDecision::Play(BankPlayBankFields {
+                property_count: fields
+                    .property_count
+                    .map(|field| field.with_bank_offset(bank_offset)),
+                ranged_property_count: fields
+                    .ranged_property_count
+                    .map(|field| field.with_bank_offset(bank_offset)),
+                bank_id: fields
+                    .bank_id
+                    .map(|field| field.with_bank_offset(bank_offset)),
+                bank_type: fields
+                    .bank_type
+                    .map(|field| field.with_bank_offset(bank_offset)),
+            }),
+            decision => decision,
+        };
+        Self {
+            action_type: self
+                .action_type
+                .map(|field| field.with_bank_offset(bank_offset)),
+            target_id: self
+                .target_id
+                .map(|field| field.with_bank_offset(bank_offset)),
+            play_bank,
+        }
+    }
 }
 
 pub(crate) fn read<F: ObjectFields>(

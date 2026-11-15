@@ -5,6 +5,7 @@ use std::ops::Range;
 
 use crate::bank_object_fields::{BankHircField, ObjectFields};
 use crate::bank_reader::SectionReader;
+use crate::bank_structure::counted_id_byte_range;
 use crate::hirc_node_aux::{self, BankNodeAuxFields};
 use crate::hirc_node_fx::{self, BankNodeFxFields, BankNodeFxKind, BankNodeFxList};
 use crate::hirc_node_parameters::BankNodeParameters;
@@ -61,7 +62,7 @@ impl Container {
     /// Returns the bank-relative range of the child ID at its original physical ordinal.
     #[must_use]
     pub fn child_id_byte_range(&self, ordinal: usize) -> Option<Range<u64>> {
-        child_id_byte_range(self.child_count_evidence()?, ordinal)
+        counted_id_byte_range(self.child_count_evidence()?, ordinal)
     }
 
     /// Returns the original Random/Sequence mode byte, including zero or an unknown mode.
@@ -269,17 +270,6 @@ fn read_parent<F: ObjectFields>(
     let id = parent.value;
     observed.parent_id = Some(parent);
     Ok(id)
-}
-
-pub(crate) fn child_id_byte_range(
-    count: &BankHircField<u32>,
-    ordinal: usize,
-) -> Option<Range<u64>> {
-    let index = u32::try_from(ordinal)
-        .ok()
-        .filter(|&index| index < count.value)?;
-    let start = count.range.end + u64::from(index) * ID_LEN as u64;
-    Some(start..start + ID_LEN as u64)
 }
 
 pub(crate) fn checked_child_bytes(count: u32, available: u64) -> Result<u64, BankError> {

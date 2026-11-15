@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::collections::HashSet;
 use std::ops::Range;
+use std::ptr;
 
-use crate::audio::hirc_path_source::{HircSelectionChild, HircSelectionOwner};
-use crate::audio::{ExportedWemOrigin, SoundVariant};
+use crate::audio::hirc_path_source::{HircRouteSource, HircSelectionChild, HircSelectionOwner};
+use crate::audio::{HircPathSource, SoundVariant};
 
+use super::render::RenderedCommand;
 use super::tree::{Group, Node, PathPosition};
 
 pub(super) struct SelectionTopology {
@@ -26,11 +29,21 @@ impl SelectionTopology {
     pub(super) fn resolve<'a>(
         &self,
         variants: &'a [SoundVariant<'_>],
-        media: &'a [Option<&'a ExportedWemOrigin>],
+        commands: &'a [RenderedCommand<'a>],
     ) -> SelectionDiagnostic<'a> {
+        let commands = commands.get(self.commands.clone()).unwrap_or_default();
+        let mut observed = HashSet::new();
+        let routes = commands
+            .iter()
+            .filter_map(|command| variants.get(command.variant))
+            .flat_map(SoundVariant::path_sources)
+            .filter_map(HircPathSource::inbound_route)
+            .filter(|route| observed.insert(ptr::from_ref(*route)))
+            .collect();
         SelectionDiagnostic {
             nodes: self.resolve_nodes(variants),
-            media: media.get(self.commands.clone()).unwrap_or_default(),
+            commands,
+            routes,
         }
     }
 
@@ -50,7 +63,8 @@ impl SelectionTopology {
 
 pub(super) struct SelectionDiagnostic<'a> {
     pub(super) nodes: Option<SelectionNodes<'a>>,
-    pub(super) media: &'a [Option<&'a ExportedWemOrigin>],
+    pub(super) commands: &'a [RenderedCommand<'a>],
+    pub(super) routes: Vec<&'a HircRouteSource>,
 }
 
 pub(super) struct SelectionNodes<'a> {

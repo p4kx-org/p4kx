@@ -27,6 +27,7 @@ fn leaf(wem_id: u32) -> Node {
         music_clip_features: MusicClipFeatures::default(),
         playback_features: PlaybackFeatures::default(),
         source: None,
+        variant: 0,
     })
 }
 

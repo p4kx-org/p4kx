@@ -7,6 +7,7 @@ use std::fmt;
 use std::ops::Range;
 
 use crate::bank_object_fields::BankHircField;
+use crate::bank_structure::counted_id_byte_range;
 use crate::hirc::SoundSource;
 use crate::hirc_music_playlist::MusicPlaylistLoopEvidence;
 use crate::hirc_music_playlist_depth::PlaylistDepth;
@@ -15,7 +16,6 @@ use crate::hirc_music_transition::{
     MusicTransitionEvidence, MusicTransitionFadeEvidence, MusicTransitionFeatures,
     MusicTransitionSegmentEvidence,
 };
-use crate::hirc_node;
 
 /// The tempo and time signature of a music node.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -178,7 +178,7 @@ impl MusicSwitch {
     /// Returns the bank-relative range of the child ID at its original physical ordinal.
     #[must_use]
     pub fn child_id_byte_range(&self, ordinal: usize) -> Option<Range<u64>> {
-        hirc_node::child_id_byte_range(self.child_count_evidence()?, ordinal)
+        counted_id_byte_range(self.child_count_evidence()?, ordinal)
     }
 
     /// Returns the original group count and tree size of a checked conditional tree.

@@ -20,6 +20,8 @@ use super::{FLAGS, SELECTION, SELECTION_FIELD, TXTP_FILE, selection_origin};
 
 #[path = "wwise_txtp_selection_media.rs"]
 mod media;
+#[path = "wwise_txtp_selection_route.rs"]
+mod route;
 
 const EVENT: &str = "Play_Topology";
 const TXTP: &str = "Play_Topology.txtp";
@@ -142,7 +144,7 @@ impl<'a> Site<'a> {
     }
 
     fn from_use(observed: &'a Value) -> Result<Self, Box<dyn Error>> {
-        assert_eq!(observed["role"], "selector", "topology uses are selectors");
+        assert_eq!(observed["role"], "selector", "the word selects the path");
         assert_eq!(
             observed["scope"], "payload",
             "positions address the bank payload"
@@ -186,7 +188,7 @@ fn referenced_sites<'a>(
     let mut sites = BTreeSet::new();
     for observation in selection_uses(file, origin)? {
         let observation = observation?;
-        if observation.is_media() {
+        if observation.is_media() || observation.is_route() {
             continue;
         }
         assert_eq!(observation.path()?, BANK_PATH, "the actual owning bank");
@@ -213,11 +215,19 @@ impl<'a> SelectionUse<'a> {
 
     fn is_media(&self) -> bool {
         matches!(
-            self.site
-                .pointer("/location/namespace")
-                .and_then(Value::as_str),
+            self.namespace(),
             Some("wemBytes" | "bnkDidx" | "bnkSection")
         )
+    }
+
+    fn is_route(&self) -> bool {
+        matches!(self.namespace(), Some("bnkHircEvent" | "bnkHircAction"))
+    }
+
+    fn namespace(&self) -> Option<&'a str> {
+        self.site
+            .pointer("/location/namespace")
+            .and_then(Value::as_str)
     }
 }
 

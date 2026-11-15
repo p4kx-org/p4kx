@@ -60,6 +60,7 @@ pub(super) struct Leaf {
     pub(super) music_clip_features: MusicClipFeatures,
     pub(super) playback_features: PlaybackFeatures,
     pub(super) source: Option<PathPosition>,
+    pub(super) variant: usize,
 }
 
 /// A child of a group: a sound or another group.
@@ -181,6 +182,7 @@ fn build_holder(root: PathStep, variants: &[SoundVariant<'_>], first_variant: us
                 music_clip_features: variant.music_clip_features,
                 playback_features: variant.playback_features,
                 source: leaf_source,
+                variant: variant_index,
             },
         );
     }

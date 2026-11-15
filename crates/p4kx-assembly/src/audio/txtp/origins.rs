@@ -12,7 +12,7 @@ use p4kx_extraction::{
 };
 
 use crate::audio::ExportLoopOrigin;
-use crate::audio::hirc_path_source::HircSelectionChild;
+use crate::audio::hirc_path_source::{HircRouteSource, HircSelectionChild};
 
 use super::diagnostic::{DiagnosticSource, TxtpDiagnostic};
 use super::loop_origin;
@@ -175,10 +175,48 @@ fn selection_origin(
         Some(nodes) => selection_node_uses(archive, sources, nodes)?,
         None => Vec::new(),
     };
-    for media in selection.media.iter().flatten() {
+    for route in &selection.routes {
+        route_uses(archive, sources, route, &mut actual)?;
+    }
+    for media in selection
+        .commands
+        .iter()
+        .filter_map(|command| command.media)
+    {
         wem_origin::admission_uses(archive, sources, media, &mut actual)?;
     }
     Ok(sources.origin(&actual, false))
+}
+
+fn route_uses(
+    archive: &Archive,
+    sources: &SourceUses,
+    route: &HircRouteSource,
+    actual: &mut Vec<SourceUse>,
+) -> io::Result<()> {
+    use SourceUseRole::Selector;
+
+    let Some(entry) = route.entry(archive) else {
+        return Ok(());
+    };
+    let scope = sources
+        .observe(SourceInput::ArchiveView(entry), InputScope::Payload)
+        .map_err(io::Error::other)?;
+    for word in route.words() {
+        actual.push(positioned_use(
+            &scope,
+            word.namespace,
+            word.field,
+            word.bytes.clone(),
+            word.ordinal,
+            Selector,
+        )?);
+    }
+    if let Some(range) = route.version_bytes() {
+        let range = offset(range.start)?..offset(range.end)?;
+        actual.push(source_use(&scope, "bnkBkhd", "version", range, Selector)?);
+    }
+    Ok(())
 }
 
 fn selection_node_uses(
@@ -250,17 +288,14 @@ fn child_use(
     field: &str,
     child: &HircSelectionChild,
 ) -> io::Result<SourceUse> {
-    let bytes = child.id_bytes();
-    scope
-        .at(
-            SourceLocation::Subresource {
-                namespace: namespace.to_owned(),
-                indices: vec![bytes.start, bytes.end, offset(child.ordinal())?],
-                field: field.to_owned(),
-            },
-            SourceUseRole::Selector,
-        )
-        .map_err(io::Error::other)
+    positioned_use(
+        scope,
+        namespace,
+        field,
+        child.id_bytes(),
+        Some(child.ordinal()),
+        SourceUseRole::Selector,
+    )
 }
 
 fn source_use(
@@ -270,11 +305,26 @@ fn source_use(
     range: Range<u64>,
     role: SourceUseRole,
 ) -> io::Result<SourceUse> {
+    positioned_use(scope, namespace, field, range, None, role)
+}
+
+fn positioned_use(
+    scope: &SourceScope,
+    namespace: &str,
+    field: &str,
+    range: Range<u64>,
+    ordinal: Option<usize>,
+    role: SourceUseRole,
+) -> io::Result<SourceUse> {
+    let mut indices = vec![range.start, range.end];
+    if let Some(ordinal) = ordinal {
+        indices.push(offset(ordinal)?);
+    }
     scope
         .at(
             SourceLocation::Subresource {
                 namespace: namespace.to_owned(),
-                indices: vec![range.start, range.end],
+                indices,
                 field: field.to_owned(),
             },
             role,

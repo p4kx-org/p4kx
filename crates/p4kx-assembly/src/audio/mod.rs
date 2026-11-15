@@ -14,6 +14,7 @@ mod error;
 mod export;
 mod hirc_diagnostic_sites;
 mod hirc_path_source;
+mod hirc_route_source;
 mod index;
 mod index_read;
 mod language;

@@ -8,6 +8,7 @@ use p4kx_archive::{Archive, ObservedEntry, ObservedEntryBinding};
 use p4kx_audio::{ContainerKind, HircKind, HircObject, HircValue};
 
 use super::hirc_diagnostic_sites::{self, DiagnosticSite};
+pub(super) use super::hirc_route_source::HircRouteSource;
 
 use super::txtp::TxtpApproximation;
 
@@ -22,7 +23,7 @@ pub struct HircPathSource {
     version: Option<Range<usize>>,
     diagnostics: Option<Arc<BoundDiagnosticSites>>,
     selection_owner: Option<Arc<HircSelectionOwner>>,
-    inbound_child: Option<HircSelectionChild>,
+    inbound: Option<HircInboundSource>,
 }
 
 impl HircPathSource {
@@ -30,7 +31,7 @@ impl HircPathSource {
         archive: &Archive,
         owner: &Loaded<'_>,
         object: &HircObject,
-        inbound_child: Option<HircSelectionChild>,
+        inbound: Option<HircInboundSource>,
     ) -> Self {
         let entry_position = owner.soundbank.entry_position();
         let version = owner.bank.version_byte_range();
@@ -44,7 +45,7 @@ impl HircPathSource {
             diagnostics: BoundDiagnosticSites::of(archive, entry_position, &object.value)
                 .map(Arc::new),
             selection_owner,
-            inbound_child,
+            inbound,
         }
     }
 
@@ -53,7 +54,17 @@ impl HircPathSource {
     }
 
     pub(super) const fn inbound_child(&self) -> Option<&HircSelectionChild> {
-        self.inbound_child.as_ref()
+        match &self.inbound {
+            Some(HircInboundSource::Selection(child)) => Some(child),
+            _ => None,
+        }
+    }
+
+    pub(super) fn inbound_route(&self) -> Option<&HircRouteSource> {
+        match &self.inbound {
+            Some(HircInboundSource::Route(route)) => Some(route),
+            _ => None,
+        }
     }
 
     pub(super) fn selection_child(
@@ -114,6 +125,12 @@ impl HircPathSource {
     pub fn version_bytes(&self) -> Option<Range<usize>> {
         self.version.clone()
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum HircInboundSource {
+    Selection(HircSelectionChild),
+    Route(Arc<HircRouteSource>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

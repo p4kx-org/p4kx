@@ -48,12 +48,16 @@ pub(crate) const fn require_actions(count: u32, remaining: u64) -> Result<(), Ba
     Ok(())
 }
 
-pub(crate) fn read(version: u32, fields: &mut SectionReader<'_>) -> Result<Vec<u32>, BankError> {
-    let count = count(BankEventCountEncoding::for_version(version), fields)?.value;
-    require_actions(count, fields.remaining_bytes())?;
-    let mut actions = Vec::with_capacity(usize::try_from(count).unwrap_or(usize::MAX));
-    for _ in 0..count {
+pub(crate) fn read(
+    version: u32,
+    fields: &mut SectionReader<'_>,
+    bank_offset: u64,
+) -> Result<(Vec<u32>, BankHircField<u32>), BankError> {
+    let count = count(BankEventCountEncoding::for_version(version), fields)?;
+    require_actions(count.value, fields.remaining_bytes())?;
+    let mut actions = Vec::with_capacity(usize::try_from(count.value).unwrap_or(usize::MAX));
+    for _ in 0..count.value {
         actions.push(fields.read_u32()?.value);
     }
-    Ok(actions)
+    Ok((actions, count.with_bank_offset(bank_offset)))
 }
