@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_audio::MusicClip;
+use p4kx_audio::MusicTrack;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub(super) struct MusicClipFeatures {
@@ -11,18 +11,11 @@ pub(super) struct MusicClipFeatures {
 }
 
 impl MusicClipFeatures {
-    pub(super) fn observe(clips: &[MusicClip]) -> Self {
-        let mut observed = Self::default();
-        for clip in clips {
-            for value in [clip.play_at, clip.begin_trim, clip.end_trim] {
-                if value.is_finite() {
-                    observed.timing |= value != 0.0;
-                } else {
-                    observed.nonfinite_timing = true;
-                }
-            }
-            observed.posted_events |= clip.event_id != 0;
+    pub(super) const fn observe(track: &MusicTrack) -> Self {
+        Self {
+            timing: track.clip_timing_evidence().is_some(),
+            nonfinite_timing: track.nonfinite_clip_timing_evidence().is_some(),
+            posted_events: track.clip_event_evidence().is_some(),
         }
-        observed
     }
 }

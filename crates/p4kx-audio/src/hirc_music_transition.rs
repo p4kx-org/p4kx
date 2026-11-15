@@ -4,6 +4,7 @@
 use std::ops::Range;
 
 use crate::bank_object_fields::{BankHircField, ObjectFields};
+use crate::hirc_music_fade::MusicFadeTimingField;
 use crate::hirc_music_transition_rule::{self, BankMusicTransitionRuleFields};
 
 /// Compact observations from the original rules of one music node.
@@ -34,16 +35,129 @@ impl MusicTransitionFeatures {
             segments: self.segments || other.segments,
         }
     }
+}
 
-    fn observe(&mut self, rule: &BankMusicTransitionRuleFields) {
+/// The transition rule member that supplies a nonzero fade timing word.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum MusicTransitionFadeSide {
+    /// Original source rule fade.
+    Source,
+    /// Original destination rule fade.
+    Destination,
+    /// Original fade-in on an allocated transition object.
+    ObjectFadeIn,
+    /// Original fade-out on an allocated transition object.
+    ObjectFadeOut,
+}
+
+/// The first nonzero fade timing word and its original transition rule context.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct MusicTransitionFadeEvidence {
+    /// Original fade member.
+    pub side: MusicTransitionFadeSide,
+    /// Original signed field kind.
+    pub field: MusicFadeTimingField,
+    /// Original signed word bits and byte range.
+    pub word: BankHircField<u32>,
+    /// Original allocation byte when the word belongs to a transition object.
+    pub allocation_flag: Option<BankHircField<u8>>,
+}
+
+impl MusicTransitionFadeEvidence {
+    fn of(rule: &BankMusicTransitionRuleFields) -> Option<Self> {
         let object = rule.transition_object.as_ref();
-        self.fades |= rule.source.fade.has_timing()
-            || rule.destination.fade.has_timing()
-            || object
-                .is_some_and(|object| object.fade_in.has_timing() || object.fade_out.has_timing());
-        self.segments |= object
-            .and_then(|object| object.segment_id.as_ref())
-            .is_some_and(|id| id.value != 0);
+        [
+            (
+                MusicTransitionFadeSide::Source,
+                Some(&rule.source.fade),
+                None,
+            ),
+            (
+                MusicTransitionFadeSide::Destination,
+                Some(&rule.destination.fade),
+                None,
+            ),
+            (
+                MusicTransitionFadeSide::ObjectFadeIn,
+                object.map(|value| &value.fade_in),
+                rule.allocation_flag.as_ref(),
+            ),
+            (
+                MusicTransitionFadeSide::ObjectFadeOut,
+                object.map(|value| &value.fade_out),
+                rule.allocation_flag.as_ref(),
+            ),
+        ]
+        .into_iter()
+        .find_map(|(side, fade, allocation_flag)| {
+            let (field, word) = fade?.timing_evidence()?;
+            Some(Self {
+                side,
+                field,
+                word: word.clone(),
+                allocation_flag: allocation_flag.cloned(),
+            })
+        })
+    }
+}
+
+/// Original allocation and segment fields of an omitted transition object.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct MusicTransitionSegmentEvidence {
+    /// Original nonzero allocation byte.
+    pub allocation_flag: BankHircField<u8>,
+    /// Original nonzero segment reference.
+    pub segment_id: BankHircField<u32>,
+}
+
+impl MusicTransitionSegmentEvidence {
+    fn of(rule: &BankMusicTransitionRuleFields) -> Option<Self> {
+        let allocation_flag = rule.allocation_flag.as_ref()?;
+        let segment_id = rule.transition_object.as_ref()?.segment_id.as_ref()?;
+        (allocation_flag.value != 0 && segment_id.value != 0).then(|| Self {
+            allocation_flag: allocation_flag.clone(),
+            segment_id: segment_id.clone(),
+        })
+    }
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub(crate) struct MusicTransitionEvidence {
+    pub(crate) fade: Option<MusicTransitionFadeEvidence>,
+    pub(crate) segment: Option<MusicTransitionSegmentEvidence>,
+}
+
+impl MusicTransitionEvidence {
+    fn observe(&mut self, rule: &BankMusicTransitionRuleFields) -> MusicTransitionFeatures {
+        if self.fade.is_none() {
+            self.fade = MusicTransitionFadeEvidence::of(rule);
+        }
+        if self.segment.is_none() {
+            self.segment = MusicTransitionSegmentEvidence::of(rule);
+        }
+        MusicTransitionFeatures {
+            fades: self.fade.is_some(),
+            segments: self.segment.is_some(),
+        }
+    }
+
+    pub(crate) fn with_bank_offset(self, bank_offset: u64) -> Self {
+        Self {
+            fade: self.fade.map(|fade| MusicTransitionFadeEvidence {
+                word: fade.word.with_bank_offset(bank_offset),
+                allocation_flag: fade
+                    .allocation_flag
+                    .map(|flag| flag.with_bank_offset(bank_offset)),
+                ..fade
+            }),
+            segment: self.segment.map(|segment| MusicTransitionSegmentEvidence {
+                allocation_flag: segment.allocation_flag.with_bank_offset(bank_offset),
+                segment_id: segment.segment_id.with_bank_offset(bank_offset),
+            }),
+        }
     }
 }
 
@@ -61,6 +175,7 @@ pub struct BankMusicTransitionFields {
     pub complete_rules: u32,
     /// Timing and segment features found in readable original rule fields.
     pub features: MusicTransitionFeatures,
+    pub(crate) evidence: MusicTransitionEvidence,
 }
 
 pub(crate) fn read<F: ObjectFields>(
@@ -91,7 +206,7 @@ fn scan<F: ObjectFields>(
     for ordinal in 0..count {
         let first_count = fields.read_u32()?;
         let (rule, read) = hirc_music_transition_rule::read(fields, first_count);
-        observed.features.observe(&rule);
+        observed.features = observed.evidence.observe(&rule);
         read?;
         observed.rules_range = Some(start..fields.offset());
         observed.complete_rules = ordinal + 1;

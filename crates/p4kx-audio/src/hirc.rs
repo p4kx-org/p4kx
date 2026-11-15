@@ -334,14 +334,14 @@ fn value(
         HircKind::MusicSegment if version == CONTAINER_VERSION => {
             HircValue::MusicSegment(Box::new(hirc_music_parse::segment(fields)?))
         }
-        HircKind::MusicTrack if version == CONTAINER_VERSION => {
-            HircValue::MusicTrack(Box::new(hirc_music_track::track(version, fields)?))
-        }
+        HircKind::MusicTrack if version == CONTAINER_VERSION => HircValue::MusicTrack(Box::new(
+            hirc_music_track::track(version, fields, bank_offset)?,
+        )),
         HircKind::MusicSwitch if version == CONTAINER_VERSION => {
-            HircValue::MusicSwitch(Box::new(hirc_music_parse::switch(fields)?))
+            HircValue::MusicSwitch(Box::new(hirc_music_parse::switch(fields, bank_offset)?))
         }
         HircKind::MusicPlaylist if version == CONTAINER_VERSION => {
-            HircValue::MusicPlaylist(Box::new(hirc_music_parse::playlist(fields)?))
+            HircValue::MusicPlaylist(Box::new(hirc_music_parse::playlist(fields, bank_offset)?))
         }
         HircKind::Attenuation if version == hirc_attenuation::VERSION => {
             hirc_attenuation::scan(fields, &mut BankAttenuationFields::default())?;

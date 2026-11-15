@@ -208,7 +208,7 @@ impl<'i> Walk<'_, 'i> {
             HircValue::MusicSwitch(switch) => self.children(&switch.node.children),
             HircValue::MusicPlaylist(playlist) => self.children(&playlist.node.children),
             HircValue::MusicTrack(track) => {
-                let music_clips = MusicClipFeatures::observe(&track.clips);
+                let music_clips = MusicClipFeatures::observe(track);
                 for source in track.sources.iter().take(MAX_CONTAINER_CHILDREN) {
                     if !self.spend() {
                         break;

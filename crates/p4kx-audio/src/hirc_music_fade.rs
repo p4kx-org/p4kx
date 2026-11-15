@@ -15,12 +15,27 @@ pub struct BankMusicFadeFields {
     pub offset_bits: Option<BankHircField<u32>>,
 }
 
+/// The signed word of a fade that changes timing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum MusicFadeTimingField {
+    /// Original fade time.
+    Time,
+    /// Original fade offset.
+    Offset,
+}
+
 impl BankMusicFadeFields {
-    pub(crate) fn has_timing(&self) -> bool {
-        [&self.time_bits, &self.offset_bits]
-            .into_iter()
-            .flatten()
-            .any(|word| word.value != 0)
+    pub(crate) fn timing_evidence(&self) -> Option<(MusicFadeTimingField, &BankHircField<u32>)> {
+        [
+            (MusicFadeTimingField::Time, self.time_bits.as_ref()),
+            (MusicFadeTimingField::Offset, self.offset_bits.as_ref()),
+        ]
+        .into_iter()
+        .find_map(|(field, word)| {
+            word.filter(|word| word.value != 0)
+                .map(|word| (field, word))
+        })
     }
 }
 

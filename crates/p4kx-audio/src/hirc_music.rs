@@ -5,9 +5,15 @@
 
 use std::fmt;
 
+use crate::bank_object_fields::BankHircField;
 use crate::hirc::SoundSource;
+use crate::hirc_music_playlist::MusicPlaylistLoopEvidence;
 use crate::hirc_music_playlist_depth::PlaylistDepth;
-use crate::hirc_music_transition::MusicTransitionFeatures;
+use crate::hirc_music_track::MusicTrackEvidence;
+use crate::hirc_music_transition::{
+    MusicTransitionEvidence, MusicTransitionFadeEvidence, MusicTransitionFeatures,
+    MusicTransitionSegmentEvidence,
+};
 
 /// The tempo and time signature of a music node.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -134,6 +140,7 @@ pub struct MusicTrack {
     pub has_automation: bool,
     /// An original switch transition fade has a nonzero time or offset.
     pub has_switch_fades: bool,
+    pub(crate) evidence: MusicTrackEvidence,
 }
 
 /// A music switch container: plays the child that matches the current states or switches.
@@ -154,6 +161,38 @@ pub struct MusicSwitch {
     pub targets_compact: bool,
     /// The checked tree is nonempty and declares state or switch groups.
     pub has_decision_conditions: bool,
+    pub(crate) decision_evidence: Option<MusicSwitchDecisionEvidence>,
+    pub(crate) transition_evidence: MusicTransitionEvidence,
+}
+
+impl MusicSwitch {
+    /// Returns the original group count and tree size of a checked conditional tree.
+    #[must_use]
+    pub const fn decision_conditions_evidence(&self) -> Option<&MusicSwitchDecisionEvidence> {
+        self.decision_evidence.as_ref()
+    }
+
+    /// Returns the first nonzero fade timing word in the complete transition rules.
+    #[must_use]
+    pub const fn transition_fade_evidence(&self) -> Option<&MusicTransitionFadeEvidence> {
+        self.transition_evidence.fade.as_ref()
+    }
+
+    /// Returns the first allocated transition object with a nonzero segment reference.
+    #[must_use]
+    pub const fn transition_segment_evidence(&self) -> Option<&MusicTransitionSegmentEvidence> {
+        self.transition_evidence.segment.as_ref()
+    }
+}
+
+/// The original header words proving a nonempty conditional tree.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct MusicSwitchDecisionEvidence {
+    /// Original nonzero group count.
+    pub group_count: BankHircField<u32>,
+    /// Original nonzero size of the checked decision tree.
+    pub tree_size: BankHircField<u32>,
 }
 
 /// One item of a music playlist.
@@ -280,9 +319,29 @@ pub struct MusicPlaylist {
     pub items: Vec<MusicPlaylistItem>,
     /// At least one checked item differs from one play with zero loop modifiers.
     pub has_authored_loops: bool,
+    pub(crate) loop_evidence: Option<MusicPlaylistLoopEvidence>,
+    pub(crate) transition_evidence: MusicTransitionEvidence,
 }
 
 impl MusicPlaylist {
+    /// Returns the first original item word that makes its loop controls non-neutral.
+    #[must_use]
+    pub const fn authored_loop_evidence(&self) -> Option<&MusicPlaylistLoopEvidence> {
+        self.loop_evidence.as_ref()
+    }
+
+    /// Returns the first nonzero fade timing word in the complete transition rules.
+    #[must_use]
+    pub const fn transition_fade_evidence(&self) -> Option<&MusicTransitionFadeEvidence> {
+        self.transition_evidence.fade.as_ref()
+    }
+
+    /// Returns the first allocated transition object with a nonzero segment reference.
+    #[must_use]
+    pub const fn transition_segment_evidence(&self) -> Option<&MusicTransitionSegmentEvidence> {
+        self.transition_evidence.segment.as_ref()
+    }
+
     /// Returns the nesting depth of every item, 0 for an item of the top group: an item with
     /// `children` of N is followed by its N child items (each with their own).
     pub fn item_depths(&self) -> impl Iterator<Item = usize> + '_ {

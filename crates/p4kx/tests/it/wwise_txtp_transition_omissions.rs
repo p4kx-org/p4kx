@@ -5,10 +5,13 @@ use std::error::Error;
 use std::fs;
 
 use p4kx_testkit::{ArchiveBuilder, TestAtl, TestBank, TestEntry, TestHircObject, wwise_short_id};
-use serde_json::json;
+use serde_json::{Value, json};
 
+use super::txtp_origin_assertions::check_plain_fields;
 use super::{Fixture, PLAY, TestResult, extract, hirc_payload, pcm};
 
+const TRACK: &str = "bnkHircMusicTrack";
+const MUSIC_NODE: &str = "bnkHircMusicNode";
 const SOURCE_FADE: &str = "Play_Source_Transition_Fade";
 const DESTINATION_FADE: &str = "Play_Destination_Transition_Fade";
 const OBJECT_FADE: &str = "Play_Object_Transition_Fade";
@@ -52,14 +55,19 @@ enum AuthoredRule {
 #[test]
 fn txtp_reports_each_proven_music_transition_fade_on_the_rendered_owner() -> TestResult {
     let fixture = fixture()?;
-    for trigger in [SOURCE_FADE, DESTINATION_FADE] {
-        expect(
+    for (trigger, field) in [
+        (SOURCE_FADE, "musicTransitionSourceOffsetBits"),
+        (DESTINATION_FADE, "musicTransitionDestinationTimeBits"),
+    ] {
+        let report = expect(
             &fixture,
             trigger,
             &[CLIP_CODE, FADE_CODE, LOOPS_CODE, AUTOMATION_CODE],
         )?;
+        check_plain_fields(&report, FADE_CODE, MUSIC_NODE, &[field])?;
+        check_plain_fields(&report, LOOPS_CODE, MUSIC_NODE, &["musicPlaylistLoopCount"])?;
     }
-    expect(
+    let report = expect(
         &fixture,
         OBJECT_FADE,
         &[
@@ -70,37 +78,72 @@ fn txtp_reports_each_proven_music_transition_fade_on_the_rendered_owner() -> Tes
             AUTOMATION_CODE,
         ],
     )?;
-    expect(&fixture, ZERO, &[CLIP_CODE, LOOPS_CODE, AUTOMATION_CODE])
+    check_plain_fields(
+        &report,
+        FADE_CODE,
+        MUSIC_NODE,
+        &[
+            "musicTransitionObjectFadeOutOffsetBits",
+            "musicTransitionAllocationFlag",
+        ],
+    )?;
+    expect(&fixture, ZERO, &[CLIP_CODE, LOOPS_CODE, AUTOMATION_CODE])?;
+    Ok(())
 }
 
 #[test]
 fn txtp_reports_an_allocated_transition_segment_independently_of_fades() -> TestResult {
     let fixture = fixture()?;
-    expect(
+    let report = expect(
         &fixture,
         SEGMENT,
         &[CLIP_CODE, SEGMENT_CODE, CONDITIONS_CODE, AUTOMATION_CODE],
+    )?;
+    check_plain_fields(
+        &report,
+        SEGMENT_CODE,
+        MUSIC_NODE,
+        &[
+            "musicTransitionObjectSegmentId",
+            "musicTransitionAllocationFlag",
+        ],
+    )?;
+    check_plain_fields(
+        &report,
+        CONDITIONS_CODE,
+        MUSIC_NODE,
+        &["musicSwitchGroupCount", "musicSwitchTreeSize"],
     )
 }
 
 #[test]
 fn txtp_reports_both_switch_track_fades_on_their_rendered_paths() -> TestResult {
     let fixture = fixture()?;
-    for trigger in [TRACK_SOURCE_FADE, TRACK_DESTINATION_FADE] {
-        expect(
+    for (trigger, field) in [
+        (TRACK_SOURCE_FADE, "musicTrackSourceFadeOffsetBits"),
+        (TRACK_DESTINATION_FADE, "musicTrackDestinationFadeTimeBits"),
+    ] {
+        let report = expect(
             &fixture,
             trigger,
             &[CLIP_CODE, FADE_CODE, CONDITIONS_CODE, AUTOMATION_CODE],
         )?;
+        check_plain_fields(&report, FADE_CODE, TRACK, &[field])?;
     }
-    expect(
+    let report = expect(
         &fixture,
         TRACK_ZERO,
         &[CLIP_CODE, CONDITIONS_CODE, AUTOMATION_CODE],
+    )?;
+    check_plain_fields(
+        &report,
+        CONDITIONS_CODE,
+        TRACK,
+        &["musicTrackSwitchMemberCount"],
     )
 }
 
-fn expect(fixture: &Fixture, trigger: &str, codes: &[&str]) -> TestResult {
+fn expect(fixture: &Fixture, trigger: &str, codes: &[&str]) -> Result<Value, Box<dyn Error>> {
     let report = extract(fixture, trigger, &FLAGS, 0)?;
     assert_eq!(
         report.pointer("/txtp/files/0/approximations"),
@@ -121,7 +164,7 @@ fn expect(fixture: &Fixture, trigger: &str, codes: &[&str]) -> TestResult {
             .eq([playable.as_str()]),
         "the single playable command stays byte-identical for {trigger}"
     );
-    Ok(())
+    Ok(report)
 }
 
 fn fixture() -> Result<Fixture, Box<dyn Error>> {

@@ -6,8 +6,10 @@ use std::fs;
 use p4kx_testkit::{ArchiveBuilder, TestAtl, TestBank, TestEntry, TestHircObject, wwise_short_id};
 use serde_json::json;
 
+use super::txtp_origin_assertions::check_plain_fields;
 use super::{EMBEDDED, Fixture, PLAY, TestResult, extract, hirc_payload, pcm};
 
+const TRACK: &str = "bnkHircMusicTrack";
 const TIMED: &str = "Play_Timed_Clips";
 const ZERO: &str = "Play_Zero_Clip";
 const NONFINITE: &str = "Play_Nonfinite_Clip";
@@ -38,6 +40,14 @@ fn txtp_reports_music_clip_and_track_automation_omissions() -> TestResult {
         Some(&json!([TIMING_CODE, EVENT_CODE, AUTOMATION_CODE])),
         "the omitted clip and automation features are recorded",
     );
+    check_plain_fields(&report, TIMING_CODE, TRACK, &["musicTrackClipPlayAt"])?;
+    check_plain_fields(&report, EVENT_CODE, TRACK, &["musicTrackClipEventId"])?;
+    check_plain_fields(
+        &report,
+        AUTOMATION_CODE,
+        TRACK,
+        &["musicTrackAutomationPointCount"],
+    )?;
     let text = fs::read_to_string(fixture.out.join(format!("{TIMED}.txtp")))?;
     for code in [TIMING_CODE, EVENT_CODE, AUTOMATION_CODE] {
         let header = format!("# approximation: {code}");
@@ -77,6 +87,7 @@ fn txtp_keeps_zero_timing_music_bytes_and_distinguishes_nonfinite_words() -> Tes
         Some(&json!([NONFINITE_CODE])),
         "nonfinite authored timing has a specific diagnostic"
     );
+    check_plain_fields(&unknown, NONFINITE_CODE, TRACK, &["musicTrackClipPlayAt"])?;
     let text = fs::read_to_string(fixture.out.join(format!("{NONFINITE}.txtp")))?;
     let header = format!("# approximation: {NONFINITE_CODE}");
     assert!(
@@ -95,6 +106,12 @@ fn txtp_reports_an_authored_track_default_without_memberships() -> TestResult {
         Some(&json!([TIMING_CODE, CONDITIONS_CODE, AUTOMATION_CODE])),
         "the authored switch default is omitted even without explicit memberships",
     );
+    check_plain_fields(
+        &report,
+        CONDITIONS_CODE,
+        TRACK,
+        &["musicTrackDefaultSwitchId"],
+    )?;
     let text = fs::read_to_string(fixture.out.join(format!("{DEFAULT_SWITCH}.txtp")))?;
     assert!(
         text.lines()

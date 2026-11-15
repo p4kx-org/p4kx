@@ -943,10 +943,13 @@ These codes appear in both the JSON report and the TXTP header, including on
 single-child paths. The WEM's own loop marker remains part of the file command.
 An empty array means the writer emitted no reported approximation code.
 Each reported code has a `fieldOrigins` entry at `/approximations/{index}` on the file row.
-`sourceUsesRefs` index its `provenance` inventory. Container-transition and Blend-curve codes
-cite the first positive checked field reached in playback order and its BNK layout version.
-Codes without exact source evidence carry `containsEncryptedSource: null` and
-`sourceSetComplete: false`.
+`sourceUsesRefs` index its `provenance` inventory. Diagnoses for authored container and music
+controls cite the first triggering checked fields reached in playback order and their BNK layout
+version. This includes the exact loop control, switch default or membership, clip time or event,
+automation point count and transition fade or object segment. Evidence for a music switch tree
+includes the group count and tree size. A transition object also cites its allocation flag.
+`select-first-alternative` carries `containsEncryptedSource: null` and `sourceSetComplete: false`
+until the selected output group has exact topology evidence.
 
 `originReceipt` is the sibling `<file>.p4kx-origin.jsonl` for a newly published file. Its digest
 binds the exact TXTP bytes and `textBytes` addresses identify the code tokens in the header.

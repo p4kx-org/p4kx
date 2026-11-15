@@ -6,7 +6,7 @@ use std::ops::Range;
 use crate::bank_object_fields::ObjectFields;
 use crate::bank_reader::SectionReader;
 use crate::hirc_blend_container::{self, BankBlendContainerFields};
-use crate::hirc_node::{self, BankNodeParentFields, Container, ContainerKind, ContainerTiming};
+use crate::hirc_node::{self, BankNodeParentFields, Container, ContainerEvidence, ContainerKind};
 use crate::hirc_node_parameters::BankNodeParameters;
 use crate::hirc_random_sequence::{self, BankRandomSequenceFields};
 use crate::hirc_switch_container::{self, BankSwitchContainerFields};
@@ -71,36 +71,37 @@ pub(crate) fn container(
     let header = head(layout, fields, &mut original)?;
     let children = hirc_node::read_children(fields, header.count)?;
     tail(layout, fields, &mut original)?;
+    let evidence = evidence(original, bank_offset);
     Ok(Container {
         kind: header.kind,
         parent_id: header.parent_id,
         children,
-        has_authored_loops: original
-            .random_sequence
-            .as_ref()
-            .is_some_and(BankRandomSequenceFields::has_authored_loops),
-        has_switch_conditions: original
-            .switch
-            .as_ref()
-            .is_some_and(BankSwitchContainerFields::has_conditions),
-        timing: timing(original, bank_offset),
+        has_authored_loops: evidence.loop_evidence().is_some(),
+        has_switch_conditions: evidence.switch_condition_evidence().is_some(),
+        evidence,
     })
 }
 
-fn timing(original: BankContainerFields, bank_offset: u64) -> ContainerTiming {
-    if let Some(mode) = original
-        .random_sequence
-        .and_then(|fields| fields.transition_mode)
-        .filter(|mode| mode.value != 0)
-    {
-        ContainerTiming::Transition(mode.with_bank_offset(bank_offset))
-    } else if let Some(count) = original
-        .blend
-        .and_then(BankBlendContainerFields::into_first_crossfade_point_count)
-    {
-        ContainerTiming::BlendCurve(count.with_bank_offset(bank_offset))
+fn evidence(original: BankContainerFields, bank_offset: u64) -> ContainerEvidence {
+    if let Some(mut fields) = original.random_sequence {
+        let loop_field = fields.take_loop_evidence(bank_offset);
+        let transition_mode = fields
+            .transition_mode
+            .filter(|mode| mode.value != 0)
+            .map(|mode| mode.with_bank_offset(bank_offset));
+        ContainerEvidence::RandomSequence {
+            transition_mode,
+            loop_field,
+        }
+    } else if let Some(fields) = original.switch {
+        ContainerEvidence::Switch(fields.into_condition_evidence(bank_offset))
+    } else if let Some(fields) = original.blend {
+        let count = fields
+            .into_first_crossfade_point_count()
+            .map(|count| count.with_bank_offset(bank_offset));
+        ContainerEvidence::Blend(count)
     } else {
-        ContainerTiming::None
+        ContainerEvidence::None
     }
 }
 

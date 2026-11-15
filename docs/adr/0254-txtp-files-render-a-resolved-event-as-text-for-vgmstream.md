@@ -108,11 +108,14 @@ The render commands and the WEM loop marker retain their own meaning.
 The CLI records approximation origins in the portable companion specified by ADR-0357.
 `textBytes` addresses cover the code token alone. The file row and companion share the source
 inventory and the immediate encryption and completeness flag at `/approximations/{index}`.
-The first positive owner in render order accounts for a deduplicated code. A transition code uses
-the exact active mode word. A Blend code uses the first positive count of a fully validated
-association point table. Their decoded layout also uses the bank version word. The other codes
-carry unknown origin until their exact contributors are available. These receipts establish the
-source of the diagnostic text. They describe the declared controls that the exporter observed.
+The first positive owner in render order accounts for a deduplicated code. Its checked evidence
+contains the original transition mode, Blend or automation point count, non-neutral loop control,
+switch default or membership, clip time or event, or music transition word that triggered the
+code. A music decision tree requires the checked group count and tree size. An allocated
+transition segment or its fade cites the allocation flag as well as the original field. The bank
+version word establishes the decoded layout. The receipts describe declared controls observed on
+rendered paths. `select-first-alternative` has unknown provenance because the generated group's
+topology sources are unavailable in the receipt.
 
 A replacement binds the companion to the complete TXTP digest. A kept file preserves its
 existing companion. The current report exposes unknown origins for byte-verified retained text

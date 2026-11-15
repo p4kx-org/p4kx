@@ -4,6 +4,7 @@
 use std::ops::Range;
 
 use crate::bank_object_fields::{BankHircField, ObjectFields};
+use crate::hirc_node::ContainerSwitchEvidence;
 
 pub(crate) const WORD_LEN: u64 = size_of::<u32>() as u64;
 pub(crate) const CONFIGURATION_LEN: u64 = 3 * WORD_LEN + 1;
@@ -41,14 +42,21 @@ impl BankSwitchContainerFields {
         }
     }
 
-    pub(crate) fn has_conditions(&self) -> bool {
-        self.default_value_id
-            .as_ref()
-            .is_some_and(|id| id.value != 0)
-            || self
-                .groups
-                .as_ref()
-                .is_some_and(|groups| groups.is_complete() && groups.declared_count.value != 0)
+    pub(crate) fn into_condition_evidence(
+        self,
+        bank_offset: u64,
+    ) -> Option<ContainerSwitchEvidence> {
+        if let Some(id) = self.default_value_id.filter(|id| id.value != 0) {
+            return Some(ContainerSwitchEvidence::DefaultValue(
+                id.with_bank_offset(bank_offset),
+            ));
+        }
+        let groups = self
+            .groups
+            .filter(|groups| groups.is_complete() && groups.declared_count.value != 0)?;
+        Some(ContainerSwitchEvidence::MembershipGroupCount(
+            groups.declared_count.with_bank_offset(bank_offset),
+        ))
     }
 
     /// Returns the original decision extent when both declared lists fit.

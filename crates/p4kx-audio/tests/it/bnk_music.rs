@@ -4,6 +4,7 @@
 //! Music segments, tracks, switch containers and playlists of the `HIRC` section, and the soundbank
 //! a Play action names, decoded from synthetic banks.
 
+mod decisions;
 mod track;
 
 use p4kx_audio::{BankError, HircKind, HircValue, PlayBank, SectionId, Soundbank};

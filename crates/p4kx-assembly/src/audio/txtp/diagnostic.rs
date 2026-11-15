@@ -29,7 +29,7 @@ pub(super) fn collect<'a>(
             source: variants
                 .iter()
                 .flat_map(SoundVariant::path_sources)
-                .find(|source| source.diagnostic_bytes(approximation).is_some()),
+                .find(|source| source.diagnostic_site(approximation).is_some()),
         })
         .collect()
 }

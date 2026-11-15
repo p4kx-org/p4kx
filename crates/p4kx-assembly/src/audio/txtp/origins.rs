@@ -10,7 +10,6 @@ use p4kx_extraction::{
     SourceUseRole, SourceUses,
 };
 
-use super::TxtpApproximation;
 use super::diagnostic::TxtpDiagnostic;
 
 /// The immediate origins and contributing sources for the report's approximation codes.
@@ -76,20 +75,13 @@ fn diagnostic_origin(
     sources: &SourceUses,
     diagnostic: &TxtpDiagnostic<'_>,
 ) -> io::Result<FieldOrigin> {
-    let (namespace, field) = match diagnostic.approximation {
-        TxtpApproximation::OmitContainerTransitions => {
-            ("bnkHircRandomSequence", "randomSequenceTransitionMode")
-        }
-        TxtpApproximation::OmitBlendCurves => ("bnkHircBlendContainer", "blendPointCount"),
-        _ => return Ok(sources.origin(&[], false)),
-    };
     let (Some(archive), Some(source)) = (archive, diagnostic.source) else {
         return Ok(sources.origin(&[], false));
     };
     let Some(entry) = source.diagnostic_entry(archive) else {
         return Ok(sources.origin(&[], false));
     };
-    let Some(range) = source.diagnostic_bytes(diagnostic.approximation) else {
+    let Some(site) = source.diagnostic_site(diagnostic.approximation) else {
         return Ok(sources.origin(&[], false));
     };
 
@@ -97,13 +89,16 @@ fn diagnostic_origin(
     let scope = sources
         .observe(SourceInput::ArchiveView(entry), InputScope::Payload)
         .map_err(io::Error::other)?;
-    let mut actual = vec![source_use(
-        &scope,
-        namespace,
-        field,
-        range,
-        SourceUseRole::Conversion,
-    )?];
+    let mut actual = Vec::new();
+    for word in site.words() {
+        actual.push(source_use(
+            &scope,
+            word.namespace,
+            word.field,
+            word.bytes.clone(),
+            SourceUseRole::Conversion,
+        )?);
+    }
     let version = source.version_bytes();
     let complete = complete_ancestry && version.is_some();
     if let Some(range) = version {

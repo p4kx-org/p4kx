@@ -10,6 +10,7 @@ use p4kx_testkit::{
 };
 use serde_json::json;
 
+use super::txtp_origin_assertions::check_plain_fields;
 use super::{EMBEDDED, Fixture, PLAY, TestResult, extract, hirc_payload, pcm};
 
 const REPEAT: &str = "Play_Repeat_Container";
@@ -126,6 +127,14 @@ fn expect_txtp(fixture: &Fixture, event: &str, codes: &[&str], body: &str) -> Te
         expected + body,
         "metadata agrees with JSON and the playback commands are retained for {event}",
     );
+    if event == SWITCH {
+        check_plain_fields(
+            &report,
+            CONDITIONS,
+            "bnkHircSwitchContainer",
+            &["switchDefaultValueId"],
+        )?;
+    }
     Ok(())
 }
 

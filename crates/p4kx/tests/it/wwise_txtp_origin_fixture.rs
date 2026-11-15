@@ -21,7 +21,7 @@ const BLEND_SOUND: u32 = 21;
 const WEM: u32 = 101;
 const BLEND_WEM: u32 = 102;
 pub(super) const DELAY: u8 = 3;
-const PLAIN_NODE_LEN: usize = 31;
+pub(super) const PLAIN_NODE_LEN: usize = 31;
 pub(super) const MODE_OFFSET: usize = PLAIN_NODE_LEN + 4 * size_of::<u16>() + 3 * size_of::<f32>();
 
 pub(super) struct Fixture {

@@ -3,6 +3,9 @@
 
 //! Random, sequence, switch and blend containers of the `HIRC` section, decoded to their children.
 
+#[path = "bnk_container_control_sources.rs"]
+mod control_sources;
+
 use p4kx_audio::{BankError, ContainerKind, HircKind, HircValue, SectionId, Soundbank};
 use p4kx_testkit::{TestBank, TestContainerKind, TestHircObject, TestNodeBase};
 

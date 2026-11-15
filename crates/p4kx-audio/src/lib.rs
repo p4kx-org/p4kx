@@ -209,30 +209,40 @@ pub use hirc_event::BankEventCountEncoding;
 pub use hirc_layout::HircLayout;
 pub use hirc_music::{
     MusicClip, MusicGroupKind, MusicMarker, MusicMeter, MusicNode, MusicPlayMode, MusicPlaylist,
-    MusicPlaylistItem, MusicSegment, MusicStinger, MusicSwitch, MusicTrack, MusicTrackKind,
-    MusicTrackSwitch,
+    MusicPlaylistItem, MusicSegment, MusicStinger, MusicSwitch, MusicSwitchDecisionEvidence,
+    MusicTrack, MusicTrackKind, MusicTrackSwitch,
 };
-pub use hirc_music_fade::{BankMusicFadeFields, BankMusicFadeFields as BankMusicTrackFadeFields};
+pub use hirc_music_fade::{
+    BankMusicFadeFields, BankMusicFadeFields as BankMusicTrackFadeFields, MusicFadeTimingField,
+};
 pub use hirc_music_node::BankMusicNodeFields;
-pub use hirc_music_playlist::BankMusicPlaylistItem;
+pub use hirc_music_playlist::{
+    BankMusicPlaylistItem, MusicPlaylistLoopEvidence, MusicPlaylistLoopField,
+};
 pub use hirc_music_segment::BankMusicSegmentFields;
 pub use hirc_music_stinger::{BankMusicStinger, BankMusicStingerTail};
 pub use hirc_music_switch::{BankMusicSwitchFields, BankMusicSwitchGroup, BankMusicSwitchNode};
 pub use hirc_music_switch_traversal::{BankMusicSwitchBranch, BankMusicSwitchTarget};
 pub use hirc_music_track::{
     BankMusicTrackClip, BankMusicTrackFields, BankMusicTrackRow, BankMusicTrackSource,
-    BankMusicTrackSwitchFields,
+    BankMusicTrackSwitchFields, MusicTrackClipTimingKind, MusicTrackClipTimingWord,
+    MusicTrackEvidenceKind, MusicTrackEvidenceWord,
 };
 pub use hirc_music_track_automation::{
     BankTrackAutomationExtent, BankTrackAutomationFields, BankTrackAutomationPoints,
 };
 pub use hirc_music_track_transition::BankMusicTrackTransitionFields;
-pub use hirc_music_transition::{BankMusicTransitionFields, MusicTransitionFeatures};
+pub use hirc_music_transition::{
+    BankMusicTransitionFields, MusicTransitionFadeEvidence, MusicTransitionFadeSide,
+    MusicTransitionFeatures, MusicTransitionSegmentEvidence,
+};
 pub use hirc_music_transition_rule::{
     BankMusicTransitionDestinationFields, BankMusicTransitionIds, BankMusicTransitionObjectFields,
     BankMusicTransitionRuleFields, BankMusicTransitionSourceFields,
 };
-pub use hirc_node::{BankNodeParentFields, Container, ContainerKind};
+pub use hirc_node::{
+    BankNodeParentFields, Container, ContainerKind, ContainerLoopEvidence, ContainerSwitchEvidence,
+};
 pub use hirc_node_aux::{BankNodeAuxFields, BankNodeUserAuxBuses};
 pub use hirc_node_fx::{BankNodeFxFields, BankNodeFxKind, BankNodeFxList};
 pub use hirc_node_parameters::BankNodeParameters;

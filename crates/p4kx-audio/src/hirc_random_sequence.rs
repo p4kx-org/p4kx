@@ -4,6 +4,7 @@
 use std::ops::Range;
 
 use crate::bank_object_fields::{BankHircField, ObjectFields};
+use crate::hirc_node::ContainerLoopEvidence;
 
 pub(crate) const WORD_LEN: usize = size_of::<u32>();
 pub(crate) const ITEM_LEN: usize = 2 * WORD_LEN;
@@ -56,13 +57,25 @@ impl BankRandomSequenceFields {
         }
     }
 
-    pub(crate) const fn has_authored_loops(&self) -> bool {
-        let (Some(count), Some(minimum), Some(maximum)) =
-            (&self.loop_count, &self.loop_minimum, &self.loop_maximum)
-        else {
-            return false;
-        };
-        count.value != 1 || minimum.value != 0 || maximum.value != 0
+    pub(crate) fn take_loop_evidence(&mut self, bank_offset: u64) -> Option<ContainerLoopEvidence> {
+        let count = self.loop_count.take()?;
+        let minimum = self.loop_minimum.take()?;
+        let maximum = self.loop_maximum.take()?;
+        if count.value != 1 {
+            Some(ContainerLoopEvidence::Count(
+                count.with_bank_offset(bank_offset),
+            ))
+        } else if minimum.value != 0 {
+            Some(ContainerLoopEvidence::Minimum(
+                minimum.with_bank_offset(bank_offset),
+            ))
+        } else if maximum.value != 0 {
+            Some(ContainerLoopEvidence::Maximum(
+                maximum.with_bank_offset(bank_offset),
+            ))
+        } else {
+            None
+        }
     }
 
     /// Returns the decision extent once the original playlist fits.

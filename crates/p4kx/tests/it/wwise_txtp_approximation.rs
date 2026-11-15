@@ -9,6 +9,7 @@ use p4kx_testkit::{
 };
 use serde_json::{Value, json};
 
+use super::txtp_origin_assertions::check_unknown;
 use super::{EMBEDDED, Fixture, PLAY, TestResult, extract, pcm};
 
 const MULTIPLE: &str = "Play_Choice";
@@ -28,6 +29,11 @@ fn rendered_first_choice_is_reported_in_the_header_and_json() -> TestResult {
         Some(&json!([SELECTION])),
         "the report names the selection the writer actually emits",
     );
+    let origin = report
+        .pointer("/txtp/files/0/fieldOrigins")
+        .and_then(|fields| fields.get("/approximations/0"))
+        .ok_or("explicit unevidenced selection origin")?;
+    check_unknown(origin);
     assert!(
         generated
             .lines()

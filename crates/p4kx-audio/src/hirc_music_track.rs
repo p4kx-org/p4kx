@@ -12,9 +12,16 @@ use crate::hirc_music_track_automation::{self, BankTrackAutomationExtent};
 use crate::hirc_music_track_transition::{self, BankMusicTrackTransitionFields};
 use crate::hirc_node::{self, BankNodeParentFields};
 
+#[path = "hirc_music_track_evidence.rs"]
+mod evidence;
 #[path = "hirc_music_track_rows.rs"]
 mod rows;
 
+pub(crate) use evidence::MusicTrackEvidence;
+pub use evidence::{
+    MusicTrackClipTimingKind, MusicTrackClipTimingWord, MusicTrackEvidenceKind,
+    MusicTrackEvidenceWord,
+};
 pub use rows::{BankMusicTrackClip, BankMusicTrackSource};
 pub(crate) use rows::{clip, source};
 
@@ -111,40 +118,47 @@ pub(crate) struct TrackHeader {
     parent: u32,
     kind: MusicTrackKind,
     switch: Option<SwitchHeader>,
-    has_automation: bool,
+    automation_point_count: Option<BankHircField<u32>>,
 }
 
 struct SwitchHeader {
     group_type: u8,
     group_id: u32,
     default_switch: u32,
-    has_fade_timing: bool,
 }
 
-pub(crate) fn track(version: u32, input: &mut SectionReader<'_>) -> Result<MusicTrack, BankError> {
+pub(crate) fn track(
+    version: u32,
+    input: &mut SectionReader<'_>,
+    bank_offset: u64,
+) -> Result<MusicTrack, BankError> {
     let mut sources = Vec::new();
     let mut clips = Vec::new();
     let mut members = Vec::new();
-    let header = read(
-        version,
-        input,
-        &mut BankMusicTrackFields::default(),
-        |row| match row {
-            BankMusicTrackRow::Source { value, .. } => sources.push(value.value),
-            BankMusicTrackRow::Clip { value, .. } => clips.push(value.value()),
-            BankMusicTrackRow::Switch { id, .. } => members.push(id.value),
-        },
-    )?;
+    let mut fields = BankMusicTrackFields::default();
+    let mut evidence = MusicTrackEvidence::default();
+    let header = read(version, input, &mut fields, |row| match row {
+        BankMusicTrackRow::Source { value, .. } => sources.push(value.value),
+        BankMusicTrackRow::Clip { value, .. } => {
+            evidence.observe_clip(&value, bank_offset);
+            clips.push(value.value());
+        }
+        BankMusicTrackRow::Switch { id, .. } => members.push(id.value),
+    })?;
+    evidence.automation_point_count = header
+        .automation_point_count
+        .map(|count| count.with_bank_offset(bank_offset));
+    if let Some(switch) = &fields.switch {
+        evidence.observe_switch(switch, bank_offset);
+    }
     Ok(MusicTrack {
         parent_id: header.parent,
         sources,
         clips,
         kind: header.kind,
-        has_automation: header.has_automation,
-        has_switch_fades: header
-            .switch
-            .as_ref()
-            .is_some_and(|switch| switch.has_fade_timing),
+        has_automation: evidence.automation_point_count.is_some(),
+        has_switch_fades: evidence.switch_fade.is_some(),
+        evidence,
         switch: header.switch.map(|header| MusicTrackSwitch {
             group_type: header.group_type,
             group_id: header.group_id,
@@ -170,7 +184,7 @@ pub(crate) fn read<F: ObjectFields>(
     fields.controls_start = Some(input.offset());
     fields.flags = Some(input.read_u8()?);
     read_clips(version, input, fields, &mut emit)?;
-    let has_automation = automations(input, fields)?;
+    let automation_point_count = automations(input, fields)?;
     let start = input.offset();
     let parent = hirc_node::read_base_parameters(input, &mut fields.parent, &mut fields.parameters);
     fields.node_range = Some(start..input.offset());
@@ -190,7 +204,7 @@ pub(crate) fn read<F: ObjectFields>(
         parent,
         kind,
         switch,
-        has_automation,
+        automation_point_count,
     })
 }
 
@@ -226,7 +240,7 @@ fn count<F: ObjectFields>(
 fn automations<F: ObjectFields>(
     input: &mut F,
     fields: &mut BankMusicTrackFields,
-) -> Result<bool, F::Error> {
+) -> Result<Option<BankHircField<u32>>, F::Error> {
     let count = count(input, &mut fields.automation_count)?;
     let (extent, result) = hirc_music_track_automation::scan(input, count);
     if extent.is_complete() {
@@ -264,7 +278,6 @@ fn read_switch<F: ObjectFields>(
         group_type,
         group_id,
         default_switch,
-        has_fade_timing: transition.source.has_timing() || transition.destination.has_timing(),
     })
 }
 

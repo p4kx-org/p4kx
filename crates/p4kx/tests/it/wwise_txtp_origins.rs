@@ -12,11 +12,14 @@ use p4kx_testkit::test_key;
 use serde_json::{Value, json};
 
 use super::TestResult;
+use super::txtp_origin_assertions::check_unknown;
 
 #[path = "wwise_txtp_origin_fixture.rs"]
 mod fixture;
 
-use self::fixture::{BLEND, BLEND_BANK, DELAY, Fixture, MAIN_BANK, MODE_OFFSET, SEQUENCE};
+use self::fixture::{
+    BLEND, BLEND_BANK, DELAY, Fixture, MAIN_BANK, MODE_OFFSET, PLAIN_NODE_LEN, SEQUENCE,
+};
 
 const EVENT: &str = "Play_Origin";
 const TXTP: &str = "Play_Origin.txtp";
@@ -35,12 +38,26 @@ fn txtp_diagnostics_bind_exact_text_and_bnks_with_independent_markers() -> TestR
     assert_eq!(
         file["approximations"],
         json!(["omit-container-loops", TRANSITION_CODE, BLEND_CODE]),
-        "one output contains the three different contributor states"
+        "one output carries diagnostics from both physical banks"
     );
-    check_unknown(field(file, LOOPS_PATH)?);
-
-    let sequence =
-        hirc_extent(&fixture.main_bank, SEQUENCE)?.start + size_of::<u32>() + MODE_OFFSET;
+    let sequence_body = hirc_extent(&fixture.main_bank, SEQUENCE)?.start + size_of::<u32>();
+    let loop_count = sequence_body + PLAIN_NODE_LEN;
+    let sequence = sequence_body + MODE_OFFSET;
+    check_word(
+        file,
+        LOOPS_PATH,
+        MAIN_BANK,
+        false,
+        "randomSequenceLoopCount",
+        loop_count..loop_count + size_of::<u16>(),
+    )?;
+    assert_eq!(
+        fixture
+            .main_bank
+            .get(loop_count..loop_count + size_of::<u16>()),
+        Some(3_u16.to_le_bytes().as_slice()),
+        "the reported position is the original authored loop count"
+    );
     let blend_end = hirc_extent(&fixture.blend_bank, BLEND)?.end;
     let blend = blend_end - size_of::<u8>() - 4 * size_of::<u32>();
     check_word(
@@ -101,6 +118,11 @@ fn txtp_kept_identical_bytes_do_not_receive_current_archive_provenance() -> Test
     let report = extract(&fixture.alternate, &fixture.out, "overwrite")?;
     let file = txtp_file(&report)?;
     assert_eq!(
+        field(file, LOOPS_PATH)?["containsEncryptedSource"],
+        true,
+        "the loop count is also rebound to the encrypted replacement source"
+    );
+    assert_eq!(
         field(file, TRANSITION_PATH)?["containsEncryptedSource"],
         true,
         "the same mode now comes from an encrypted bank which supplied the replacement"
@@ -121,18 +143,6 @@ fn txtp_kept_identical_bytes_do_not_receive_current_archive_provenance() -> Test
         "replacement binds new sources"
     );
     Ok(())
-}
-
-fn check_unknown(origin: &Value) {
-    assert_eq!(
-        origin,
-        &json!({
-            "containsEncryptedSource": null,
-            "sourceUsesRefs": [],
-            "sourceSetComplete": false
-        }),
-        "no bound source proof remains explicitly unknown"
-    );
 }
 
 fn check_word(

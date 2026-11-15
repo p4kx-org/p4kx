@@ -38,7 +38,45 @@ pub struct BankMusicPlaylistItem {
     pub range: Range<u64>,
 }
 
+/// The original playlist item word that makes its loop controls non-neutral.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum MusicPlaylistLoopField {
+    /// Original loop count.
+    Count,
+    /// Original lower loop modifier.
+    Minimum,
+    /// Original upper loop modifier.
+    Maximum,
+}
+
+/// A non-neutral loop word from a complete playlist item.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct MusicPlaylistLoopEvidence {
+    /// Which original word establishes the non-neutral loop controls.
+    pub field: MusicPlaylistLoopField,
+    /// The word with its bank-relative byte range.
+    pub word: BankHircField<i16>,
+}
+
 impl BankMusicPlaylistItem {
+    pub(crate) fn loop_evidence(&self, bank_offset: u64) -> Option<MusicPlaylistLoopEvidence> {
+        let (field, word) = if self.loops.value != 1 {
+            (MusicPlaylistLoopField::Count, &self.loops)
+        } else if self.loop_min.value != 0 {
+            (MusicPlaylistLoopField::Minimum, &self.loop_min)
+        } else if self.loop_max.value != 0 {
+            (MusicPlaylistLoopField::Maximum, &self.loop_max)
+        } else {
+            return None;
+        };
+        Some(MusicPlaylistLoopEvidence {
+            field,
+            word: word.clone().with_bank_offset(bank_offset),
+        })
+    }
+
     /// Returns the playlist item with its legacy boolean flag interpretations.
     #[must_use]
     pub const fn value(&self) -> MusicPlaylistItem {

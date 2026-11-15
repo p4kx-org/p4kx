@@ -12,6 +12,7 @@ mod cache;
 mod entity;
 mod error;
 mod export;
+mod hirc_diagnostic_sites;
 mod hirc_path_source;
 mod index;
 mod index_read;

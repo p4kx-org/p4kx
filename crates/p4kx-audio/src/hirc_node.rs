@@ -46,7 +46,7 @@ pub struct Container {
     pub has_authored_loops: bool,
     /// The original Switch defines membership groups or a nonzero default value.
     pub has_switch_conditions: bool,
-    pub(crate) timing: ContainerTiming,
+    pub(crate) evidence: ContainerEvidence,
 }
 
 impl Container {
@@ -65,27 +65,88 @@ impl Container {
     /// Returns the nonzero Random/Sequence transition mode and its bank-relative range.
     #[must_use]
     pub const fn transition_mode_evidence(&self) -> Option<&BankHircField<u8>> {
-        match &self.timing {
-            ContainerTiming::Transition(mode) => Some(mode),
-            ContainerTiming::None | ContainerTiming::BlendCurve(_) => None,
+        if let ContainerEvidence::RandomSequence {
+            transition_mode, ..
+        } = &self.evidence
+        {
+            transition_mode.as_ref()
+        } else {
+            None
         }
     }
 
     /// Returns the first nonempty checked Blend curve's point count in physical order.
     #[must_use]
     pub const fn blend_point_count_evidence(&self) -> Option<&BankHircField<u32>> {
-        match &self.timing {
-            ContainerTiming::BlendCurve(count) => Some(count),
-            ContainerTiming::None | ContainerTiming::Transition(_) => None,
+        if let ContainerEvidence::Blend(count) = &self.evidence {
+            count.as_ref()
+        } else {
+            None
         }
+    }
+
+    /// Returns the first non-neutral original Random/Sequence loop word.
+    #[must_use]
+    pub const fn loop_evidence(&self) -> Option<&ContainerLoopEvidence> {
+        self.evidence.loop_evidence()
+    }
+
+    /// Returns the original nonzero Switch default or the checked nonempty group count.
+    #[must_use]
+    pub const fn switch_condition_evidence(&self) -> Option<&ContainerSwitchEvidence> {
+        self.evidence.switch_condition_evidence()
     }
 }
 
+/// The original Random/Sequence loop word that establishes authored loops.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub(crate) enum ContainerTiming {
+#[non_exhaustive]
+pub enum ContainerLoopEvidence {
+    /// Original count differs from one.
+    Count(BankHircField<u16>),
+    /// Original minimum modifier is nonzero.
+    Minimum(BankHircField<u16>),
+    /// Original maximum modifier is nonzero.
+    Maximum(BankHircField<u16>),
+}
+
+/// The original Switch word that establishes an authored condition.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum ContainerSwitchEvidence {
+    /// Original default value ID is nonzero.
+    DefaultValue(BankHircField<u32>),
+    /// Original membership group count is positive and its full table fits.
+    MembershipGroupCount(BankHircField<u32>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub(crate) enum ContainerEvidence {
     None,
-    Transition(BankHircField<u8>),
-    BlendCurve(BankHircField<u32>),
+    RandomSequence {
+        transition_mode: Option<BankHircField<u8>>,
+        loop_field: Option<ContainerLoopEvidence>,
+    },
+    Switch(Option<ContainerSwitchEvidence>),
+    Blend(Option<BankHircField<u32>>),
+}
+
+impl ContainerEvidence {
+    pub(crate) const fn loop_evidence(&self) -> Option<&ContainerLoopEvidence> {
+        if let Self::RandomSequence { loop_field, .. } = self {
+            loop_field.as_ref()
+        } else {
+            None
+        }
+    }
+
+    pub(crate) const fn switch_condition_evidence(&self) -> Option<&ContainerSwitchEvidence> {
+        if let Self::Switch(field) = self {
+            field.as_ref()
+        } else {
+            None
+        }
+    }
 }
 
 /// Original words that locate and supply the parent in a node base.

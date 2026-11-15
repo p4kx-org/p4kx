@@ -2,9 +2,12 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::ops::Range;
+use std::sync::Arc;
 
 use p4kx_archive::{Archive, ObservedEntry, ObservedEntryBinding};
 use p4kx_audio::{HircObject, HircValue};
+
+use super::hirc_diagnostic_sites::{self, DiagnosticSite};
 
 use super::txtp::TxtpApproximation;
 
@@ -17,7 +20,7 @@ pub struct HircPathSource {
     object: Range<usize>,
     id: Range<usize>,
     version: Option<Range<usize>>,
-    diagnostic: Option<DiagnosticSite>,
+    diagnostics: Option<Arc<BoundDiagnosticSites>>,
 }
 
 impl HircPathSource {
@@ -28,19 +31,26 @@ impl HircPathSource {
             object: object.byte_range(),
             id: object.id_byte_range(),
             version: owner.bank.version_byte_range(),
-            diagnostic: DiagnosticSite::of(archive, entry_position, &object.value),
+            diagnostics: BoundDiagnosticSites::of(archive, entry_position, &object.value)
+                .map(Arc::new),
         }
     }
 
-    pub(super) fn diagnostic_bytes(&self, approximation: TxtpApproximation) -> Option<Range<u64>> {
-        let site = self.diagnostic.as_ref()?;
-        (site.approximation == approximation).then(|| site.bytes.clone())
+    pub(super) fn diagnostic_site(
+        &self,
+        approximation: TxtpApproximation,
+    ) -> Option<&DiagnosticSite> {
+        self.diagnostics
+            .as_ref()?
+            .sites
+            .iter()
+            .find(|site| site.approximation == approximation)
     }
 
     pub(super) fn diagnostic_entry<'a>(&self, archive: &'a Archive) -> Option<ObservedEntry<'a>> {
-        let site = self.diagnostic.as_ref()?;
+        let sites = self.diagnostics.as_ref()?;
         let entry = archive.observed_entry(archive.entries().get(self.entry_position)?)?;
-        site.owner.is_same_entry(&entry.binding()).then_some(entry)
+        sites.owner.is_same_entry(&entry.binding()).then_some(entry)
     }
 
     /// Returns the bank's physical Entry position in the Archive.
@@ -69,28 +79,21 @@ impl HircPathSource {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct DiagnosticSite {
-    approximation: TxtpApproximation,
-    bytes: Range<u64>,
+struct BoundDiagnosticSites {
     owner: ObservedEntryBinding,
+    sites: Vec<DiagnosticSite>,
 }
 
-impl DiagnosticSite {
+impl BoundDiagnosticSites {
     fn of(archive: &Archive, entry_position: usize, value: &HircValue) -> Option<Self> {
-        let HircValue::Container(container) = value else {
+        let sites = hirc_diagnostic_sites::checked_sites(value);
+        if sites.is_empty() {
             return None;
-        };
-        let (approximation, bytes) = if let Some(mode) = container.transition_mode_evidence() {
-            (TxtpApproximation::OmitContainerTransitions, &mode.range)
-        } else {
-            let points = container.blend_point_count_evidence()?;
-            (TxtpApproximation::OmitBlendCurves, &points.range)
-        };
+        }
         let source = archive.observed_entry(archive.entries().get(entry_position)?)?;
         Some(Self {
-            approximation,
-            bytes: bytes.clone(),
             owner: source.binding(),
+            sites,
         })
     }
 }
