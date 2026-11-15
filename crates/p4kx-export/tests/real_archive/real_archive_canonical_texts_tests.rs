@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+#[path = "real_archive_faction_reputation_texts_tests.rs"]
+mod faction_reputation_texts;
+#[path = "real_archive_item_texts_tests.rs"]
+mod item_texts;
+
 #[path = "real_archive_text_forms_mutations.rs"]
 mod forms_mutations;
 #[path = "real_archive_mission_locale_tests.rs"]

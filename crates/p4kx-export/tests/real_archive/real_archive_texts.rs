@@ -336,6 +336,7 @@ fn check_coverage(
                     | Kind::Commodities
                     | Kind::ContractTemplates
                     | Kind::MissionBrokerEntries
+                    | Kind::FactionReputations
                     | Kind::ReputationScopes
                     | Kind::ReputationStandings
             )

@@ -160,7 +160,10 @@ fn checked_table<'catalog>(
     Ok(rows)
 }
 
-fn table<'catalog>(catalog: &'catalog Value, path: &str) -> TestResult<&'catalog Vec<Value>> {
+pub(crate) fn table<'catalog>(
+    catalog: &'catalog Value,
+    path: &str,
+) -> TestResult<&'catalog Vec<Value>> {
     let table = catalog
         .pointer(path)
         .ok_or_else(|| format!("required canonical table {path}"))?;

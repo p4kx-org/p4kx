@@ -112,13 +112,16 @@ impl<'catalog> TextIndex<'catalog> {
             return Ok(None);
         }
         let id = value.as_str().ok_or("canonical text reference string")?;
+        self.target(id, domain).map(Some)
+    }
+
+    fn target(&self, id: &str, domain: TextDomain) -> TestResult<&TextTarget<'catalog>> {
         let index = match domain {
             TextDomain::PublicName => &self.names,
             TextDomain::GameText => &self.protected,
         };
         index
             .get(id)
-            .map(Some)
             .ok_or_else(|| "present text reference has no domain target".into())
     }
 
@@ -239,6 +242,7 @@ pub(crate) fn kind_coverage(
             | Kind::ResourceGroups
             | Kind::GameplayProperties
             | Kind::Blueprints
+            | Kind::FactionReputations
             | Kind::ReputationScopes
             | Kind::ReputationStandings
             | Kind::StarmapObjects
@@ -253,6 +257,13 @@ pub(crate) fn kind_coverage(
     for (key, text) in found {
         english.count(english_oracle, key, text.get("en"));
         german.count(german_oracle, key, text.get("de"));
+    }
+    if kind == Kind::Items {
+        let mut canonical = CoverageCounters::new(english_oracle, german_oracle);
+        extras::items(catalog, &mut canonical)?;
+        let (extra_english, extra_german) = canonical.finish();
+        english = english.with_supplemental(extra_english);
+        german = german.with_supplemental(extra_german);
     }
     Ok((english, german))
 }
@@ -338,7 +349,7 @@ fn canonical_coverage(
             continue;
         }
         let (fields, shape) = match kind {
-            Kind::ReputationScopes | Kind::ReputationStandings => (
+            Kind::FactionReputations | Kind::ReputationScopes | Kind::ReputationStandings => (
                 REPUTATION_DISPLAY_FIELDS.as_slice(),
                 TextReferenceShape::Required,
             ),
