@@ -84,8 +84,10 @@ acceptance. Delivery requires the evidence below.
 
 ## Submit the native device receipt
 
-Download the signed macOS DMG from the tagged Release run. Run the device checks against those
-exact bytes and record the minimum and current stable macOS results in the receipt JSON. Use the
+Download the signed macOS DMG and Blender extension ZIP from the tagged Release run. Run the
+device checks against those exact files and record the minimum and current stable macOS results
+in the receipt JSON. Include the [installed Blender result](macos-desktop-verification.md#installed-blender-extension)
+from each OS. Use the
 same tag for the **Validate macOS device evidence** workflow. Give it the original Release run ID,
 the observed current stable version and the receipt. Keep the receipt to technical checks and
 digests. Keep local game data and paths out of it.

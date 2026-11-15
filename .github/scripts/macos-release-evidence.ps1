@@ -25,8 +25,20 @@ function Assert-P4kxMacosPackageSigning {
     }
 }
 
+function Get-P4kxReleaseBlenderExtension([string]$Assets, [string]$Version) {
+    $name = "p4kx_importer-$Version.zip"
+    $file = Get-Item -LiteralPath (Join-Path $Assets $name)
+    if ($file -isnot [IO.FileInfo] -or $file.Name -cne $name -or $file.Length -le 0 -or
+        ($file.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+        throw 'Expected the exact non-empty Blender extension ZIP.'
+    }
+    return $file.FullName
+}
+
 function Assert-P4kxMacosReleaseDevices {
-    param($Runtime, $Platform, [string]$CurrentVersion, [object[]]$DeviceRuns)
+    param($Runtime, $Platform, [string]$CurrentVersion, [object[]]$DeviceRuns, [string]$BlenderExtensionHash)
+
+    if ($BlenderExtensionHash -cnotmatch '^[0-9a-f]{64}$') { throw 'The release Blender extension digest is required.' }
 
     if ($CurrentVersion -cnotmatch '^[0-9]+\.[0-9]+(?:\.[0-9]+)?$' -or
         [version]$CurrentVersion -lt [version]$Platform.deployment_target) {
@@ -39,12 +51,13 @@ function Assert-P4kxMacosReleaseDevices {
     }
     foreach ($run in $deviceRuns) {
         Assert-P4kxMacosReleaseDevice -Run $run -Runtime $Runtime -Platform $Platform -Dmg $dmg -CurrentVersion $CurrentVersion
+        Assert-P4kxMacosBlenderDevice $run $BlenderExtensionHash
     }
     foreach ($check in @(
         'core_audio', 'no_audio_device', 'clipboard', 'open_save_dialogs', 'command_shortcuts',
         'cancelled_dialog', 'permission_denial', 'unicode_paths', 'case_sensitive_apfs',
         'case_insensitive_apfs', 'external_volume', 'wine_discovery', 'crossover_discovery',
-        'guard_running', 'guard_stopped', 'guard_unavailable', 'protected_aliases', 'blender_52_import'
+        'guard_running', 'guard_stopped', 'guard_unavailable', 'protected_aliases'
     )) {
         if (-not ($deviceRuns | Where-Object { $_.device_checks.$check -ceq 'success' })) {
             throw "Required macOS device check '$check' has no successful record."
@@ -79,5 +92,16 @@ function Assert-P4kxMacosReleaseDevice {
         'upgrade', 'uninstalled', 'profile_preserved', 'quarantine_gatekeeper'
     )) {
         if ($Run.lifecycle.$check -cne 'success') { throw "Required macOS device lifecycle check '$check' did not succeed." }
+    }
+}
+
+function Assert-P4kxMacosBlenderDevice($Run, [string]$ExtensionHash) {
+    $blender = $Run.blender
+    if ($null -eq $blender -or $blender.scope -cne 'native-blender-synthetic' -or
+        $blender.revision -cne $Run.revision -or $blender.os_version -cne $Run.host.os_version -or
+        $blender.cpu -cne $Run.host.architecture -or $blender.blender_version -cnotmatch '^5\.2\.[0-9]+$' -or
+        $blender.blender_sha256 -cnotmatch '^[0-9a-f]{64}$' -or $blender.extension_sha256 -cne $ExtensionHash -or
+        $blender.extension_install -cne 'success' -or $blender.installed_import -cne 'success') {
+        throw "The $($Run.role) macOS device needs a matching native Blender 5.2 install and import receipt for the release extension ZIP."
     }
 }

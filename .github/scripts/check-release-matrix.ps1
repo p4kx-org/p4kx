@@ -45,7 +45,9 @@ foreach ($row in $contract.targets) {
         if (-not $MacosDeviceEvidencePath) { throw 'Native macOS device evidence is required for publication.' }
         $deviceRuns = Get-Content -LiteralPath $MacosDeviceEvidencePath -Raw | ConvertFrom-Json -NoEnumerate
         if ($deviceRuns -isnot [array]) { throw 'Native macOS device evidence must be a JSON array.' }
-        Assert-P4kxMacosReleaseDevices $runtime $row $MacosCurrentVersion $deviceRuns
+        $extension = Get-P4kxReleaseBlenderExtension $AssetDirectory $Version
+        $extensionHash = (Get-FileHash -LiteralPath $extension -Algorithm SHA256).Hash.ToLowerInvariant()
+        Assert-P4kxMacosReleaseDevices $runtime $row $MacosCurrentVersion $deviceRuns $extensionHash
     }
 }
 $targetCount = @($contract.targets).Count

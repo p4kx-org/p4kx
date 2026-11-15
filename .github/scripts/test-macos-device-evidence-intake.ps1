@@ -35,10 +35,10 @@ function New-Run([long]$Id, [string]$Workflow, [string]$Conclusion, [string]$Eve
     }
 }
 
-function New-Artifact([long]$Id, [long]$RunId, [long]$RepositoryId) {
+function New-Artifact([long]$Id, [long]$RunId, [long]$RepositoryId, [string]$Name = "macos-device-evidence-candidate-$env:GITHUB_RUN_ID") {
     return @{
         id = $Id
-        name = "macos-device-evidence-candidate-$env:GITHUB_RUN_ID"
+        name = $Name
         expired = $false
         digest = 'sha256:' + ('e' * 64)
         workflow_run = @{ id = $RunId; repository_id = $RepositoryId; head_repository_id = $RepositoryId; head_sha = $env:GITHUB_SHA }
@@ -61,6 +61,19 @@ function Invoke-P4kxIntakeApi([string]$Resource, [switch]$Paginate) {
                 @{ artifacts = @((New-Artifact 997 47 314), (New-Artifact 996 46 314), (New-Artifact 995 45 314)) }
             )
         }
+        "$base/actions/runs/456" { return New-Run 456 'release.yml' 'failure' 'push' }
+        "$base/actions/runs/456/artifacts?name=release-aarch64-apple-darwin" {
+            return @{ total_count = 1; artifacts = @((New-Artifact 101 456 314 'release-aarch64-apple-darwin')) }
+        }
+        "$base/actions/runs/456/artifacts?name=attestations-aarch64-apple-darwin" {
+            return @{ total_count = 1; artifacts = @((New-Artifact 102 456 314 'attestations-aarch64-apple-darwin')) }
+        }
+        "$base/actions/runs/456/artifacts?name=release-addon" {
+            return @{ total_count = 1; artifacts = @((New-Artifact 103 456 314 'release-addon')) }
+        }
+        "$base/actions/runs/456/artifacts?name=attestations-addon" {
+            return @{ total_count = 1; artifacts = @((New-Artifact 104 456 314 'attestations-addon')) }
+        }
         "$base/actions/runs/48" { return New-Run 48 'ci.yml' 'success' 'workflow_dispatch' }
         "$base/actions/runs/47" { return New-Run 47 'macos-device-evidence.yml' 'failure' 'workflow_dispatch' }
         "$base/actions/runs/46" { return New-Run 46 'macos-device-evidence.yml' 'success' 'workflow_dispatch' }
@@ -81,17 +94,25 @@ $current = "$($minimum.Major).$($minimum.Minor + 1)"
 Assert-P4kxIntakeCurrentVersion $current $platform
 Assert-Rejected { Assert-P4kxIntakeCurrentVersion $older $platform } 'deployment target'
 
-$expected = New-P4kxIntakeBinding '456' '46' $current ('d' * 64) ('e' * 64) $platform
+$env:GITHUB_EVENT_NAME = 'workflow_dispatch'
+$candidate = Resolve-P4kxMacosIntakeCandidate '456' $current
+if ($candidate['packages-id'] -cne '101' -or $candidate['bundles-id'] -cne '102' -or
+    $candidate['extension-id'] -cne '103' -or $candidate['extension-bundle-id'] -cne '104') {
+    throw 'Intake must use the same tagged candidate for the DMG and Blender extension.'
+}
+$env:GITHUB_EVENT_NAME = 'push'
+
+$expected = New-P4kxIntakeBinding '456' '46' $current ('d' * 64) ('b' * 64) ('e' * 64) $platform
 $binding = $expected | ConvertTo-Json | ConvertFrom-Json
 Assert-P4kxIntakeBinding $binding $expected
-foreach ($field in @('candidate_run_id', 'intake_run_id', 'ref', 'revision', 'dmg_sha256', 'receipt_sha256')) {
+foreach ($field in @('candidate_run_id', 'intake_run_id', 'ref', 'revision', 'dmg_sha256', 'blender_extension_sha256', 'receipt_sha256')) {
     $changed = $expected | ConvertTo-Json | ConvertFrom-Json
     $changed.$field = 'different'
     Assert-Rejected { Assert-P4kxIntakeBinding $changed $expected } $field
 }
-$binding.schema = '1'
+$binding.schema = '2'
 Assert-Rejected { Assert-P4kxIntakeBinding $binding $expected } 'schema'
-$binding.schema = 1L
+$binding.schema = 2L
 $binding | Add-Member -NotePropertyName 'unknown' -NotePropertyValue $true
 Assert-Rejected { Assert-P4kxIntakeBinding $binding $expected } 'wrong field set'
 

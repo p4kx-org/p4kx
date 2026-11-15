@@ -99,6 +99,7 @@ def main() -> None:
         "revision": args.revision,
         "os_version": platform.mac_ver()[0],
         "cpu": "arm64",
+        "blender_version": (Path(environment[INSTALLED_ROOT]) / "blender-version.txt").read_text(encoding="ascii"),
         "blender_sha256": blender_hash,
         "extension_sha256": extension_hash,
         "extension_install": "success",

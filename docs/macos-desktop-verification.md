@@ -50,4 +50,7 @@ python3 blender_addon/tests/native_extension_smoke.py --blender "/Applications/B
 The launcher isolates Blender user resources, installs and enables the ZIP through Blender's
 extension command and opens a second process that loads the installed package. It checks the
 native architecture and Blender release, then runs the existing hierarchy, material, texture,
-rig and animation assertions. Retain the two logs and `result.json` with device evidence.
+rig and animation assertions. Retain the two logs and `result.json` from each OS. Embed the
+complete result as the `blender` object of the matching `minimum` or `current` device record.
+Intake verifies the source commit, OS version, Blender 5.2 version, install and import results,
+and the ZIP hash against the attested `release-addon` asset from the same tagged workflow run.

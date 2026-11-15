@@ -65,6 +65,22 @@ jobs:
           run-id: ${{ steps.candidate.outputs.run-id }}
           path: candidate/bundles
           digest-mismatch: error
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ steps.candidate.outputs.extension-id }}
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.candidate.outputs.run-id }}
+          path: candidate/extension
+          digest-mismatch: error
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ steps.candidate.outputs.extension-bundle-id }}
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.candidate.outputs.run-id }}
+          path: candidate/extension-bundle
+          digest-mismatch: error
       - name: Validate both device records against the candidate bytes
         env:
           GH_TOKEN: ${{ github.token }}
@@ -74,8 +90,8 @@ jobs:
         run: |
           . .github/scripts/macos-device-evidence-intake.ps1
           New-Item -ItemType Directory -Path 'device-intake' | Out-Null
-          Save-P4kxMacosDeviceIntake 'candidate/packages' 'candidate/bundles' 'device-intake' $env:VERSION $env:CANDIDATE_RUN_ID $env:MACOS_CURRENT_VERSION
-      - name: Attest the binding between the original DMG and the native receipt
+          Save-P4kxMacosDeviceIntake 'candidate/packages' 'candidate/bundles' 'candidate/extension' 'candidate/extension-bundle' 'device-intake' $env:VERSION $env:CANDIDATE_RUN_ID $env:MACOS_CURRENT_VERSION
+      - name: Attest the binding between the original DMG, extension ZIP and native receipt
         id: attestation
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:

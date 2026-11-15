@@ -221,6 +221,8 @@ def check_installed_extension() -> None:
     root = Path(INSTALLED_ROOT).resolve(strict=True)
     location = Path(extension.__file__).resolve(strict=True)
     check(location.is_relative_to(root), "loaded module belongs to the isolated extension installation")
+    version = ".".join(map(str, bpy.app.version))
+    (root / "blender-version.txt").write_text(version, encoding="ascii")
     print(f"native Blender {bpy.app.version_string} on arm64, extension installed and enabled")
 
 
