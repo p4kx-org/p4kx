@@ -45,6 +45,10 @@ fn phases_are_logged_with_redirected_stderr_without_changing_the_catalog() -> Te
         [
             "read-dataforge",
             "read-inputs",
+            "open-dataforge",
+            "read-localization",
+            "index-localization",
+            "initialize-origins",
             "crafting",
             "world-placements",
             "records",

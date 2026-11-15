@@ -148,7 +148,9 @@ For each Build, record the full Build identity, exporter revision and hash, and 
 and modification time before and after the export. Run the normal `p4kx catalog` writer with a
 fixed export time, default text selection, `--progress-phases` and one private `.json.zst` output.
 Capture stderr line by line to align process memory samples with preparation, health, provenance,
-JSON size measurement and writing. Record peak working set and peak private bytes separately.
+JSON size measurement and writing. Within input preparation, record `open-dataforge`,
+`read-localization`, `index-localization` and `initialize-origins` as separate phase starts.
+Record peak working set and peak private bytes separately.
 Sample host commit and paging counters alongside the process write counter to distinguish process
 writes from system memory pressure. Record the exit status, elapsed time, file length and decoded
 byte count from the text summary. Count section and decoded bytes by streaming the output through a Zstd

@@ -47,13 +47,7 @@ fn write_archive<'a>(
     compression: Compression,
     create: impl FnOnce() -> io::Result<CatalogFile<'a>>,
 ) -> Result<(CatalogSummary, CatalogFile<'a>), CatalogError> {
-    if run
-        .options
-        .cancel
-        .is_some_and(p4kx_extraction::CancelToken::is_cancelled)
-    {
-        return Err(CatalogError::Cancelled);
-    }
+    run.check_cancelled()?;
     run.begin(CatalogStage::ReadDataForge);
     let entry = DataForgeEntry::read(archive).map_err(CatalogError::Load)?;
     write_file_from(archive, &entry, run, compression, create)

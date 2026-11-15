@@ -7,6 +7,8 @@ use std::time::SystemTime;
 use p4kx_channels::PublicPatches;
 use p4kx_extraction::{CancelToken, Filter};
 
+use crate::CatalogError;
+
 /// The step of a catalog build that a [`CatalogProgress`] reports, in the order the steps run.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord)]
 #[non_exhaustive]
@@ -81,8 +83,16 @@ impl fmt::Debug for CatalogOptions<'_> {
 pub enum CatalogStage {
     /// Reads the original DataForge Entry from the Archive.
     ReadDataForge,
-    /// Opens the DataForge and reads the localization inputs.
+    /// Begins preparing the DataForge, localization and provenance inputs.
     ReadInputs,
+    /// Opens and validates the loaded DataForge.
+    OpenDataForge,
+    /// Reads and decodes the available localization Entries.
+    ReadLocalization,
+    /// Indexes the decoded localization inputs.
+    IndexLocalization,
+    /// Binds the original inputs to the catalog's provenance registry.
+    InitializeOrigins,
     /// Reads crafting Records and Blueprint reward sources.
     Crafting,
     /// Locates and walks the system containers.
@@ -108,6 +118,10 @@ impl CatalogStage {
         match self {
             Self::ReadDataForge => "read-dataforge",
             Self::ReadInputs => "read-inputs",
+            Self::OpenDataForge => "open-dataforge",
+            Self::ReadLocalization => "read-localization",
+            Self::IndexLocalization => "index-localization",
+            Self::InitializeOrigins => "initialize-origins",
             Self::Crafting => "crafting",
             Self::WorldPlacements => "world-placements",
             Self::Records => "records",
@@ -133,6 +147,13 @@ impl<'run, 'inputs> CatalogRun<'run, 'inputs> {
         report: Option<&'run dyn Fn(CatalogStage)>,
     ) -> Self {
         Self { options, report }
+    }
+
+    pub(crate) fn check_cancelled(self) -> Result<(), CatalogError> {
+        if self.options.cancel.is_some_and(CancelToken::is_cancelled) {
+            return Err(CatalogError::Cancelled);
+        }
+        Ok(())
     }
 
     pub(crate) fn begin(self, stage: CatalogStage) {

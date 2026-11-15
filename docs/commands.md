@@ -491,6 +491,10 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   `encryptedEntriesUnread`, the encrypted Entries the export could not read without a usable key.
   `--progress-phases` reports each phase as a `catalog phase: <identifier>` line on stderr,
   including when redirected. It works in both publication modes and leaves stdout for the summary.
+  After `read-dataforge` loads the original Entry, `read-inputs` marks the start of preparation.
+  `open-dataforge`, `read-localization`, `index-localization` and `initialize-origins` mark the starts
+  of database validation, reading and decoding language Entries, indexing translations and binding
+  the original input sources, respectively.
   `p4kx catalog schema` prints the catalog's JSON Schema.
 - `p4kx ships <archive> --out <file> [--format json|ndjson] [--filter <filter>]
   [--exported-at <seconds>]` writes the base data of every ship

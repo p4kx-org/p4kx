@@ -4,7 +4,7 @@
 use std::sync::Arc;
 
 use p4kx_assembly::{ArchiveFiles, Entities};
-use p4kx_extraction::{Archive, CancelToken, DataForgeEntry};
+use p4kx_extraction::{Archive, DataForgeEntry};
 
 use crate::archive_key_use::ArchiveKeyUse;
 use crate::build_derived::{add_contracts, add_loadouts, add_paints, add_tags, particle_library};
@@ -56,13 +56,15 @@ fn assemble<R>(
     emit: impl FnOnce(&Catalog<'_>) -> Result<R, CatalogError>,
 ) -> Result<(Parts, R), CatalogError> {
     let options = run.options;
-    if options.cancel.is_some_and(CancelToken::is_cancelled) {
-        return Err(CatalogError::Cancelled);
-    }
+    run.check_cancelled()?;
     run.begin(CatalogStage::ReadInputs);
+    run.begin(CatalogStage::OpenDataForge);
     let forge = entry.open().map_err(CatalogError::DataForge)?;
+    run.begin(CatalogStage::ReadLocalization);
     let sources = TextSources::read(archive)?;
+    run.begin(CatalogStage::IndexLocalization);
     let texts = Texts::parse(&sources)?;
+    run.begin(CatalogStage::InitializeOrigins);
     let origins = CatalogOrigins::new(archive, entry, &sources)?;
     let input = original_input::OriginalCatalogInput::new(&forge, &origins);
     let text_registry = CatalogTextRegistry::default();
