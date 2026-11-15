@@ -19,6 +19,8 @@ const RECORDS: &[(&str, &str, usize)] = &[
     (wire::LINK, "link", 2),
     (wire::NAMED_CAF, "named-caf", 2),
     (wire::WILDCARD, "wildcard", 2),
+    (wire::WILDCARD_EXPANSION, "wildcard-expansion", 2),
+    (wire::WILDCARD_CANDIDATE, "wildcard-candidate", 3),
     (wire::NAMED_DBA_BINDING, "named-dba-binding", 2),
     (wire::EVENT_TIMELINE, "event-timeline", 1),
     (wire::EVENT_BINDING, "event-binding", 7),

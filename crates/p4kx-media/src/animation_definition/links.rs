@@ -53,7 +53,7 @@ pub(super) fn kind(
         && name.eq_ignore_ascii_case("path")
     {
         let attributes = Selector::read(element).attributes?;
-        let kind = chrparams_database_kind(attributes.name.value())?;
+        let kind = chrparams_link_kind(attributes.name.value())?;
         return Some(LinkSelector {
             kind,
             name_position: Some(attributes.name.position().clone()),
@@ -82,11 +82,13 @@ pub(super) fn kind(
     None
 }
 
-pub(super) const fn chrparams_database_kind(name: &str) -> Option<LinkKind> {
+pub(super) const fn chrparams_link_kind(name: &str) -> Option<LinkKind> {
     if name.eq_ignore_ascii_case("$AnimEventDatabase") {
         Some(LinkKind::EventDatabase)
     } else if name.eq_ignore_ascii_case("$TracksDatabase") {
         Some(LinkKind::TracksDatabase)
+    } else if name.eq_ignore_ascii_case("$Include") {
+        Some(LinkKind::CharacterParametersInclude)
     } else {
         None
     }
@@ -333,9 +335,10 @@ impl LinkKind {
     const fn target_kind(self) -> Option<MediaKind> {
         match self {
             Self::TracksDatabase => Some(MediaKind::Animation),
-            Self::EventDatabase | Self::SubDatabase | Self::CombinedSpace => {
-                Some(MediaKind::AnimationDefinition)
-            }
+            Self::EventDatabase
+            | Self::SubDatabase
+            | Self::CombinedSpace
+            | Self::CharacterParametersInclude => Some(MediaKind::AnimationDefinition),
             Self::TagDefinition | Self::FragmentDefinition => None,
         }
     }
@@ -354,6 +357,7 @@ pub(super) fn target_path(kind: LinkKind, path: &str) -> Option<String> {
     let supported = match kind {
         LinkKind::TracksDatabase => extension.eq_ignore_ascii_case("dba"),
         LinkKind::EventDatabase => extension.eq_ignore_ascii_case("animevents"),
+        LinkKind::CharacterParametersInclude => extension.eq_ignore_ascii_case("chrparams"),
         LinkKind::SubDatabase => extension.eq_ignore_ascii_case("adb"),
         LinkKind::TagDefinition | LinkKind::FragmentDefinition => {
             extension.eq_ignore_ascii_case("xml")

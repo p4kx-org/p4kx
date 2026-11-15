@@ -10,6 +10,7 @@ use p4kx_testkit::{
     entity_schema, test_key, write_build_manifest,
 };
 
+use super::sources::Closure;
 use super::{Selection, TestResult, verify};
 
 const MODEL: &str = "Data/Objects/witness.cdf";
@@ -18,6 +19,9 @@ const CHILD: &str = "FixtureAttachment";
 const ROOT_ADB: &str = "Data/Animations/Mannequin/witness.adb";
 const ATTACHED_ADB: &str = "Data/Animations/Mannequin/attached.adb";
 const SUB_ADB: &str = "Data/Animations/Mannequin/sub.adb";
+const INCLUDE: &str = "Data/Objects/witness-shared.chrparams";
+const COMBINED: &str = "Data/Animations/Blend/locomotion/Run.comb";
+const BLEND_SPACE: &str = "Data/Animations/Blend/run.bspace";
 const MANNEQUIN: &[u8] = br#"<AnimDB><FragmentList><Idle><Fragment><AnimLayer>
     <Animation name="clip"/>
     <Animation name="clip"/>
@@ -43,45 +47,55 @@ fn synthetic_animation_scope_witness_checks_model_and_entity_publications() -> T
             expected.has_events(),
             "the synthetic scope contains an authored event database"
         );
+        for target in [INCLUDE, COMBINED, BLEND_SPACE] {
+            assert!(
+                expected
+                    .documents
+                    .values()
+                    .any(|source| source.entry.path() == target),
+                "the original scope independently reaches {target}"
+            );
+        }
         if matches!(selection, Selection::Entity(_)) {
-            assert_eq!(
-                expected.databases.len(),
-                3,
-                "one root and two attachment bindings"
-            );
-            assert_eq!(
-                expected
-                    .documents
-                    .values()
-                    .filter(|document| document.family() == "adb")
-                    .count(),
-                3,
-                "two authored roots and their one shared transitive database",
-            );
-            assert_eq!(
-                expected
-                    .documents
-                    .values()
-                    .map(|doc| doc.clips.remaining())
-                    .sum::<usize>(),
-                3,
-                "the selected database declares two repeated aliases and an empty selector",
-            );
-            let [_, left, right] = expected.placements.as_slice() else {
-                return Err("the original XML resolves both attachment occurrences".into());
-            };
-            for placement in [left, right] {
-                assert_eq!(placement.evidence.names.len(), 1, "one XML port name");
-                assert_eq!(
-                    placement.evidence.selection.len(),
-                    2,
-                    "the original Include and class selectors"
-                );
-            }
+            verify_entity_fixture(&expected)?;
         }
         verify(&archive, build, &selection, expected)?;
     }
     watch.check()?;
+    Ok(())
+}
+
+fn verify_entity_fixture(expected: &Closure<'_>) -> TestResult {
+    assert_eq!(
+        expected.databases.len(),
+        3,
+        "one root and two attachment bindings"
+    );
+    let adb = expected
+        .documents
+        .values()
+        .filter(|document| document.family() == "adb");
+    assert_eq!(
+        adb.clone().count(),
+        3,
+        "two authored roots and their one shared transitive database"
+    );
+    assert_eq!(
+        adb.map(|doc| doc.clips.remaining()).sum::<usize>(),
+        3,
+        "the selected database declares two repeated aliases and an empty selector"
+    );
+    let [_, left, right] = expected.placements.as_slice() else {
+        return Err("the original XML resolves both attachment occurrences".into());
+    };
+    for placement in [left, right] {
+        assert_eq!(placement.evidence.names.len(), 1, "one XML port name");
+        assert_eq!(
+            placement.evidence.selection.len(),
+            2,
+            "the original Include and class selectors"
+        );
+    }
     Ok(())
 }
 
@@ -139,7 +153,20 @@ fn archive(root: &Path) -> TestResult<Archive> {
             br#"<Params><AnimationList>
                 <Animation name="clip" path="Animations/clip.caf"/>
                 <Animation name="$AnimEventDatabase" path="Animations/witness.animevents"/>
+                <Animation name="$Include" path="Data/Objects/witness-shared.chrparams"/>
                 </AnimationList></Params>"#,
+        ))
+        .entry(TestEntry::stored(INCLUDE, shared_parameters()).encrypted())
+        .entry(TestEntry::stored(
+            COMBINED,
+            br#"<CombinedBlendSpace><BlendSpaces>
+                <BlendSpace AName="Animations/Blend/run.bspace"/>
+                <BlendSpace AName="Data/Animations/Blend/RUN.bspace"/>
+                </BlendSpaces></CombinedBlendSpace>"#,
+        ))
+        .entry(TestEntry::stored(
+            BLEND_SPACE,
+            br#"<ParaGroup><ExampleList><Example AName="clip"/></ExampleList></ParaGroup>"#,
         ))
         .entry(TestEntry::stored(
             "Data/Animations/witness.animevents",
@@ -166,6 +193,12 @@ fn archive(root: &Path) -> TestResult<Archive> {
 
 fn locator(component: &str, field: &str, path: &str) -> TestValue {
     TestValue::Struct(TestInstance::new(component).value(field, TestValue::text(path)))
+}
+
+const fn shared_parameters() -> &'static [u8] {
+    br##"<Params><AnimationList><Animation Name="#Filepath" Path="Animations/Blend"/>
+        <Animation Name="locomotion_*" Path="*/*.comb"/>
+        </AnimationList></Params>"##
 }
 
 fn parts() -> Vec<u8> {

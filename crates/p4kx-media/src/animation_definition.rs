@@ -11,6 +11,7 @@ mod chrparams_selectors;
 mod chrparams_witness;
 mod clip_reference;
 mod definition_scope;
+mod dependency_scope;
 mod entity_database_bindings;
 mod event_bindings;
 mod graph_field;
@@ -34,6 +35,8 @@ mod sub_database_selectors;
 mod sub_database_selectors_payload;
 mod timeline;
 mod timeline_payload;
+mod wildcard_expansion;
+pub(crate) mod wildcard_match;
 
 pub(crate) use definition_scope::DefinitionScope;
 pub(crate) use event_bindings::EventBindings;

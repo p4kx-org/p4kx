@@ -687,7 +687,7 @@ Parent and sibling positions reconstruct the source tree. Text XML positions are
 half-open byte ranges. CryXml positions address the original node, attribute or
 content slot. Unknown XML remains available with the same coordinates.
 
-File-link rows interpret authored track and event database paths, Mannequin
+File-link rows interpret authored character parameter includes, track and event database paths, Mannequin
 sub-database paths, root `AnimDB` tag/fragment definition paths and combined
 blend-space references. The XML tag and fragment definition targets are
 physical directory edges without a typed target provider. Directory matching is
@@ -700,7 +700,15 @@ Malformed documents are diagnosed with retained original bytes in diagnostic exp
 Use explicit `--kind animation-definition` with `--animation-entity <entity>`
 or `--animation-model <entry>` to select definitions from one root Archive
 Entity or an exact CDF/CHR Entry. A CDF uses its authored Model File. The scope
-selects the associated character parameters and their authored event databases.
+selects the associated character parameters, their authored event databases,
+and uniquely matched, rooted `$Include` character parameter files. An include
+uses the ordered AnimationList of its own file. Each list establishes its own
+`#Filepath` directives. Wildcard matches for BSPACE and COMB add physical
+definition sources to the scope. Verified COMB files also select uniquely
+matched targets of direct `BlendSpaces/BlendSpace@AName` declarations. Each
+physical definition remains a single scope member even when referenced more
+than once. Explicit exclusions
+apply to these dependencies.
 The Entity selector uses class, GUID or Record path in the preferred root
 DataForge. Explicit exclusions can leave a scope with no selected documents.
 An unavailable CDF or parameter payload can prevent a complete scoped index.
@@ -785,8 +793,28 @@ path contains an authored `*` or `?`. Each row shares the original path
 declaration's indices and keeps both attribute spellings, values and positions.
 `preceding_filepath` identifies the last same-list directive as `authored`,
 `reset`, `malformed` or `missing`, with its source position and original path
-where available. The state is `unexpanded`. Rows report no match count or
-runtime rule. The ordered XML still retains every original declaration.
+where available. The original declaration row has the state `unexpanded`.
+The ordered XML retains every declaration.
+
+Starting with animation-definition provider 1.11.0, `wildcard-expansion` rows
+report directory expansion for supported CAF, BSPACE and COMB patterns.
+The name template and filename stem each end in one `*`. The filename portion
+matched by that star replaces the name template's star, retaining the original
+case of the filename. Literal folder components match that directory. A `*`
+folder immediately before the filename includes the base directory and its
+descendants. Relative patterns use the latest usable `#Filepath` in the same
+list. Unsupported patterns, unavailable folders, repaired selector strings and
+incomplete directory inventories have explicit states. [Crytek CHRPARAMS](https://www.cryengine.com/docs/static/engines/cryengine-5/categories/23756816/pages/23307999) ·
+[Crytek alias example](https://www.cryengine.com/docs/static/engines/cryengine-3/categories/1114113/pages/1048712)
+
+`wildcard-candidate` rows use the original selector's indices plus a
+zero-based candidate ordinal. Each row retains the derived alias, original
+directory path, physical Entry index, file family and selection state. Results
+are ordered by folded directory path and original Entry order within each
+directory. Alias collisions retain each physical occurrence. Alias provenance
+includes the contributing selector, active folder and original directory path.
+Match rows describe loose Archive entries. The runtime alias choice and DBA
+clip inventory require their own evidence.
 
 Selecting both `animation-definition` and `animation`, or using scoped
 animation-definition selection, also writes

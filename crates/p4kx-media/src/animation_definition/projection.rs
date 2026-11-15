@@ -37,6 +37,7 @@ pub(super) struct DefinitionProjection<'a, 'source> {
     pub(super) context: &'a SourceContext<'source>,
     pub(super) input: &'a MediaOriginInput,
     pub(super) family: DefinitionFamily,
+    pub(super) repaired_strings: bool,
 }
 
 #[derive(Clone, Copy)]

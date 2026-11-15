@@ -33,8 +33,11 @@ mod adb;
 #[path = "animation_scope_adb_rows.rs"]
 mod adb_rows;
 
-#[path = "animation_scope_events.rs"]
-mod events;
+#[path = "animation_scope_dependencies.rs"]
+mod dependencies;
+
+#[path = "animation_scope_blend_wildcards.rs"]
+mod blend_wildcards;
 
 use self::sources::{Closure, Document, Placement};
 

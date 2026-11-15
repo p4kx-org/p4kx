@@ -20,7 +20,7 @@ use serde_json::{Map, Value, json};
 use super::adb::{self, Binding};
 use super::adb_rows::Graph;
 use super::clips::{Clips, Format, Scope};
-use super::events::targets as event_targets;
+use super::dependencies;
 use super::loadout::{Evidence, Files, Observations, unique};
 use super::{TestResult, manifests, require};
 
@@ -55,6 +55,8 @@ pub(super) enum Family {
     Params,
     Events,
     Adb,
+    BlendSpace,
+    CombinedSpace,
 }
 
 #[derive(Default, PartialEq, Eq)]
@@ -135,30 +137,8 @@ impl<'archive> Closure<'archive> {
             "a positive independently resolved parameter scope",
         )?;
         let mut documents = BTreeMap::new();
-        let mut event_entries = BTreeSet::new();
         let mut allowance = manifests::MAX_ARTIFACT_BYTES;
-        for index in parameters {
-            let entry = archive
-                .entries()
-                .get(index)
-                .ok_or("original physical parameter")?;
-            let document = Document::read(archive, entry, watch, &mut allowance, Family::Params)?;
-            let syntax = SourceDocument::parse(&document.bytes, SourceReadOptions::default())?;
-            for name in event_targets(syntax.root()) {
-                if let Some(entry) = unique(archive, &name) {
-                    event_entries.insert(entry.index());
-                }
-            }
-            documents.insert(index, document);
-        }
-        for index in event_entries {
-            let entry = archive
-                .entries()
-                .get(index)
-                .ok_or("original physical event database")?;
-            let document = Document::read(archive, entry, watch, &mut allowance, Family::Events)?;
-            documents.insert(index, document);
-        }
+        dependencies::read(archive, watch, parameters, &mut allowance, &mut documents)?;
         let graph = adb::read(archive, watch, &databases, &mut allowance, &mut documents)?;
         Ok(Self {
             input_entry,
@@ -265,6 +245,8 @@ impl<'archive> Document<'archive> {
             Family::Params => "chrparams",
             Family::Events => "animevents",
             Family::Adb => "adb",
+            Family::BlendSpace => "bspace",
+            Family::CombinedSpace => "comb",
         }
     }
 
@@ -284,7 +266,8 @@ impl<'archive> Document<'archive> {
         let expected = Counts::source(source.root(), matches!(family, Family::Events))?;
         let clips = match family {
             Family::Adb => Clips::read(&source, Format::Mannequin, Scope::Entity)?,
-            Family::Params | Family::Events => Clips::default(),
+            Family::BlendSpace => Clips::read(&source, Format::BlendSpace, Scope::Standalone)?,
+            Family::Params | Family::Events | Family::CombinedSpace => Clips::default(),
         };
         Ok(Self {
             entry,

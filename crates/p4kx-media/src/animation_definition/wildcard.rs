@@ -10,6 +10,8 @@ use super::super::chrparams_selectors::AnimationAttributes;
 use super::super::origins;
 use super::super::payload::{self as wire, DefinitionPayload};
 use super::super::projection::{DefinitionProjection, Failure};
+use super::super::wildcard_expansion;
+use super::super::wildcard_match::{Rule, Scope, Unexpanded};
 use super::{Directive, combine};
 use crate::audio_control_payload::AtlPosition;
 use crate::audio_record_origins as records;
@@ -83,6 +85,17 @@ enum FilepathScope<'source> {
     },
 }
 
+impl<'source> FilepathScope<'source> {
+    const fn matching_scope(&self) -> Scope<'source> {
+        match self {
+            Self::Missing { .. } => Scope::Missing,
+            Self::Malformed { .. } => Scope::Malformed,
+            Self::Reset { .. } => Scope::Reset,
+            Self::Authored { path, .. } => Scope::Authored(path.value),
+        }
+    }
+}
+
 pub(super) fn is_wildcard(name: &str, path: &str) -> bool {
     !name.is_empty()
         && !path.is_empty()
@@ -102,16 +115,19 @@ pub(super) fn write(
     let path = Attribute::from(&attributes.path)?;
     let name_proof = name.proof(projection, writer)?;
     let path_proof = path.proof(projection, writer)?;
+    let selector = combine([&name_proof, &path_proof], writer)?;
     let mut prepared = origins::record(projection.input, path_proof.clone(), writer)?;
     records::field(
         &mut prepared,
         "/data/payload/state",
-        combine([&name_proof, &path_proof], writer)?,
+        selector.clone(),
         writer,
     )?;
     records::subtree(&mut prepared, "/data/payload/name", name_proof, writer)?;
     records::subtree(&mut prepared, "/data/payload/path", path_proof, writer)?;
     let preceding_filepath = filepath(list, directive, projection, &mut prepared, writer)?;
+    let rule = Rule::parse(name.value, path.value, preceding_filepath.matching_scope());
+    let selection = expansion_selection(&rule, selector, list, directive, projection, writer)?;
     prepared.write(
         writer,
         &Subresource::new(wire::WILDCARD, indices.to_vec()),
@@ -124,7 +140,37 @@ pub(super) fn write(
         }),
         &[],
     )?;
+    wildcard_expansion::write(projection, rule, indices, &selection, writer)?;
     Ok(())
+}
+
+fn expansion_selection(
+    rule: &Result<Rule<'_>, Unexpanded>,
+    selector: OriginContributions,
+    list: SourceElement<'_>,
+    directive: Option<&Directive<'_>>,
+    projection: &DefinitionProjection<'_, '_>,
+    writer: &MediaWriter<'_>,
+) -> Result<OriginContributions, Failure> {
+    let scoped = match rule {
+        Ok(rule) => rule.uses_scope(),
+        Err(Unexpanded::UnsupportedPattern) => false,
+        Err(_) => true,
+    };
+    if !scoped {
+        return Ok(selector);
+    }
+    let scope = if let Some(directive) = directive {
+        directive.evidence(projection, writer)?.selection
+    } else {
+        origins::position(
+            projection.input,
+            element_position(&list.position())?,
+            SourceUseRole::Selector,
+            writer,
+        )?
+    };
+    combine([&selector, &scope], writer)
 }
 
 fn filepath<'source>(

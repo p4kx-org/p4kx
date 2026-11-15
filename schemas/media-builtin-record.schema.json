@@ -1096,6 +1096,40 @@
           "additionalProperties": false,
           "properties": {
             "payload": {
+              "$ref": "#/$defs/AnimationWildcardExpansion"
+            },
+            "record_type": {
+              "const": "wildcard-expansion",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/AnimationWildcardCandidate"
+            },
+            "record_type": {
+              "const": "wildcard-candidate",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
               "$ref": "#/$defs/Binding"
             },
             "record_type": {
@@ -3111,6 +3145,64 @@
         "additive"
       ],
       "type": "object"
+    },
+    "AnimationWildcardCandidate": {
+      "additionalProperties": false,
+      "properties": {
+        "alias": {
+          "type": "string"
+        },
+        "archive_path": {
+          "type": "string"
+        },
+        "entry_index": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "family": {
+          "$ref": "#/$defs/AnimationWildcardFamily"
+        },
+        "selection": {
+          "$ref": "#/$defs/Selection"
+        }
+      },
+      "required": [
+        "alias",
+        "archive_path",
+        "entry_index",
+        "family",
+        "selection"
+      ],
+      "type": "object"
+    },
+    "AnimationWildcardExpansion": {
+      "additionalProperties": false,
+      "properties": {
+        "state": {
+          "$ref": "#/$defs/State"
+        }
+      },
+      "required": [
+        "state"
+      ],
+      "type": "object"
+    },
+    "AnimationWildcardFamily": {
+      "enum": [
+        "caf",
+        "blend-space",
+        "combined-space"
+      ],
+      "type": "string"
+    },
+    "AnimationWildcardUnexpandedReason": {
+      "enum": [
+        "unsupported-pattern",
+        "missing-filepath",
+        "malformed-filepath",
+        "reset-filepath",
+        "invalid-filepath"
+      ],
+      "type": "string"
     },
     "AnnotationFailure": {
       "additionalProperties": false,
@@ -12297,6 +12389,7 @@
       "enum": [
         "tracks-database",
         "event-database",
+        "character-parameters-include",
         "sub-database",
         "tag-definition",
         "fragment-definition",
@@ -21461,6 +21554,14 @@
         }
       ]
     },
+    "Scan": {
+      "enum": [
+        "expanded",
+        "incomplete-inventory",
+        "repaired-source"
+      ],
+      "type": "string"
+    },
     "ScopeOutcome": {
       "oneOf": [
         {
@@ -21685,6 +21786,14 @@
         "marker_count"
       ],
       "type": "object"
+    },
+    "Selection": {
+      "enum": [
+        "included",
+        "excluded",
+        "unmatched"
+      ],
+      "type": "string"
     },
     "Severity": {
       "description": "Severity attached to a stable diagnostic.",
@@ -23538,6 +23647,16 @@
             "version"
           ],
           "type": "object"
+        }
+      ]
+    },
+    "State": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Scan"
+        },
+        {
+          "$ref": "#/$defs/AnimationWildcardUnexpandedReason"
         }
       ]
     },
@@ -47352,6 +47471,116 @@
               "indices": {
                 "maxItems": 2,
                 "minItems": 2
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation-definition"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-definition-wildcard-expansion"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationDefinitionPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "wildcard-expansion"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 2,
+                "minItems": 2
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation-definition"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-definition-wildcard-candidate"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationDefinitionPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "wildcard-candidate"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 3,
+                "minItems": 3
               }
             }
           }

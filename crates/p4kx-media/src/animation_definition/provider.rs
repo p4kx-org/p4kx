@@ -43,6 +43,10 @@ fn field_groups() -> Vec<FieldGroup> {
             "Positioned authored wildcard declarations and preceding folder scope.",
         ),
         FieldGroup::new(
+            "wildcard-candidates",
+            "Physical Archive matches for documented AnimationList wildcard forms.",
+        ),
+        FieldGroup::new(
             "named-dba-bindings",
             "Physical DBA metadata candidates for exact named CAF paths.",
         ),
@@ -82,7 +86,7 @@ impl Provider for AnimationDefinitionProvider {
         let mut capability = Capability::new(
             MediaKind::AnimationDefinition,
             "p4kx.animation-definition",
-            "1.10.0",
+            "1.11.0",
             "Original character parameters, animation event definitions and Mannequin XML source.",
         );
         capability.field_groups = field_groups();
@@ -127,11 +131,16 @@ impl Provider for AnimationDefinitionProvider {
             context,
             input: &input,
             family,
+            repaired_strings: false,
         };
         let bytes = required_reader::read_all(context, writer)?;
         let Ok(document) = SourceDocument::parse(&bytes, SourceReadOptions::default()) else {
             write_document(&projection, None, DocumentProjection::InvalidSource, writer)?;
             return Ok(Projection::Written);
+        };
+        let projection = DefinitionProjection {
+            repaired_strings: document.is_lossy(),
+            ..projection
         };
         writer.checkpoint()?;
         match projection.tree(&document, writer) {

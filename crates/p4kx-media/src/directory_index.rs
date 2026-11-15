@@ -15,6 +15,7 @@ use p4kx_extraction::{
 
 use p4kx_extraction::sound::wwise_path;
 
+use crate::animation_definition::wildcard_match::{self, Rule};
 use crate::lookup_work::LookupWork;
 use crate::{CandidateInventory, MediaError, ReferenceUnavailable};
 
@@ -27,6 +28,7 @@ pub(crate) struct DirectoryIndex<'a> {
     keys: OnceCell<PathKeys>,
     members: OnceCell<TextureMemberKeys>,
     loose_wems: OnceCell<LooseWemKeys>,
+    animation_wildcards: OnceCell<AnimationWildcardKeys>,
     model_companions: OnceCell<ModelCompanionKeys>,
     live_entries: &'a Cell<u64>,
     registered_entries: Cell<Option<u64>>,
@@ -50,6 +52,7 @@ impl<'a> DirectoryIndex<'a> {
             keys: OnceCell::new(),
             members: OnceCell::new(),
             loose_wems: OnceCell::new(),
+            animation_wildcards: OnceCell::new(),
             model_companions: OnceCell::new(),
             live_entries,
             registered_entries: Cell::new(None),
@@ -121,6 +124,22 @@ impl<'a> DirectoryIndex<'a> {
                 MediaError::Contract("model companion keys were not initialized".into())
             })?
             .matching(self.archive, model, work)
+    }
+
+    pub(crate) fn visit_animation_wildcard(
+        &self,
+        rule: &Rule<'_>,
+        work: &LookupWork<'_>,
+        visit: impl FnMut(&'a Entry, &'a str) -> Result<(), MediaError>,
+    ) -> Result<bool, MediaError> {
+        self.initialize(&self.animation_wildcards, work, || {
+            AnimationWildcardKeys::read(self.archive, work)
+        })?;
+        let keys = self.animation_wildcards.get().ok_or_else(|| {
+            MediaError::Contract("animation wildcard keys were not initialized".into())
+        })?;
+        keys.visit(self.archive, rule, work, visit)?;
+        Ok(keys.complete)
     }
 
     pub(crate) fn scan_inventory(
@@ -209,6 +228,78 @@ impl<'a> DirectoryIndex<'a> {
 
 struct LooseWemKeys {
     positions: HashMap<u32, Vec<usize>>,
+}
+
+struct AnimationWildcardKeys {
+    folders: Vec<(String, Vec<usize>)>,
+    complete: bool,
+}
+
+impl AnimationWildcardKeys {
+    fn read(archive: &Archive, work: &LookupWork<'_>) -> Result<Self, MediaError> {
+        let mut positions = HashMap::<String, Vec<usize>>::new();
+        let mut complete = true;
+        for entry in archive.entries() {
+            work.charge(1)?;
+            if archive.raw_path(entry.index()).is_some() {
+                complete = false;
+                continue;
+            }
+            let Some(folder) = wildcard_match::candidate_folder(entry.path()) else {
+                continue;
+            };
+            positions
+                .try_reserve(1)
+                .map_err(|error| animation_wildcard_allocation(&error))?;
+            let group = positions.entry(folder).or_default();
+            group
+                .try_reserve(1)
+                .map_err(|error| animation_wildcard_allocation(&error))?;
+            group.push(entry.index());
+        }
+        let mut folders = Vec::new();
+        folders
+            .try_reserve_exact(positions.len())
+            .map_err(|error| animation_wildcard_allocation(&error))?;
+        work.charge(positions.len() as u64)?;
+        folders.extend(positions);
+        folders.sort_unstable_by(|left, right| left.0.cmp(&right.0));
+        Ok(Self { folders, complete })
+    }
+
+    fn visit<'archive>(
+        &self,
+        archive: &'archive Archive,
+        rule: &Rule<'_>,
+        work: &LookupWork<'_>,
+        mut visit: impl FnMut(&'archive Entry, &'archive str) -> Result<(), MediaError>,
+    ) -> Result<(), MediaError> {
+        let start = self
+            .folders
+            .partition_point(|(folder, _)| folder.as_str() < rule.folder());
+        for (folder, positions) in self.folders.get(start..).unwrap_or_default() {
+            work.charge(1)?;
+            if !rule.includes_folder(folder) {
+                break;
+            }
+            for &position in positions {
+                work.charge(1)?;
+                let entry = archive.entries().get(position).ok_or_else(|| {
+                    MediaError::Contract("indexed animation Entry disappeared".into())
+                })?;
+                if let Some(captured) = rule.capture(entry.path()) {
+                    visit(entry, captured)?;
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+fn animation_wildcard_allocation(error: &TryReserveError) -> MediaError {
+    MediaError::Contract(format!(
+        "cannot allocate the animation wildcard index: {error}"
+    ))
 }
 
 impl LooseWemKeys {

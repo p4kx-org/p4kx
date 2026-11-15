@@ -19,6 +19,7 @@ use super::sub_database_selectors_payload::{
     Candidate as BranchCandidate, Selector as BranchSelector, Token as BranchToken,
 };
 use super::timeline_payload::{Event, EventAttribute, EventTimeline};
+use super::wildcard_expansion::{Candidate as WildcardCandidate, Expansion as WildcardExpansion};
 use crate::Reference;
 use crate::audio_control_payload::{
     AtlBinaryText, AtlContent, AtlDeclaration, AtlElement, AtlFormat,
@@ -34,6 +35,8 @@ pub(super) const BINARY_TEXT: &str = "animation-definition-binary-text";
 pub(super) const LINK: &str = "animation-definition-link";
 pub(super) const NAMED_CAF: &str = "animation-definition-named-caf";
 pub(super) const WILDCARD: &str = "animation-definition-wildcard";
+pub(super) const WILDCARD_EXPANSION: &str = "animation-definition-wildcard-expansion";
+pub(super) const WILDCARD_CANDIDATE: &str = "animation-definition-wildcard-candidate";
 pub(super) const NAMED_DBA_BINDING: &str = "animation-definition-named-dba-binding";
 pub(super) const EVENT_TIMELINE: &str = "animation-definition-event-timeline";
 pub(super) const EVENT_BINDING: &str = "animation-definition-event-binding";
@@ -101,6 +104,8 @@ pub(super) enum DefinitionPayload<'source> {
     Link(DefinitionLink<'source>),
     NamedCaf(NamedCaf<'source>),
     Wildcard(Wildcard<'source>),
+    WildcardExpansion(WildcardExpansion),
+    WildcardCandidate(WildcardCandidate<'source>),
     NamedDbaBinding(Binding<'source>),
     EventTimeline(EventTimeline<'source>),
     EventBinding(EventBinding),
@@ -152,6 +157,7 @@ pub(super) struct DefinitionLink<'source> {
 pub(super) enum LinkKind {
     TracksDatabase,
     EventDatabase,
+    CharacterParametersInclude,
     SubDatabase,
     TagDefinition,
     FragmentDefinition,

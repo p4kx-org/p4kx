@@ -5,13 +5,12 @@ use std::collections::HashSet;
 use std::io::{self, Read};
 
 use p4kx_assembly::{
-    ArchiveModels, RigFile, RigInput, RigInputs, RigParameter, discover_entity_rigs_using,
-    discover_model_rig_using,
+    ArchiveModels, RigInput, RigInputs, discover_entity_rigs_using, discover_model_rig_using,
 };
 use p4kx_extraction::{DataForge, DataForgeEntry, Entry};
 
 use super::adb_graph_scope;
-use super::chrparams_selectors::{self, Target};
+use super::dependency_scope::DependencyScope;
 use super::entity_database_bindings::Bindings;
 use super::payload::DefinitionFamily;
 use super::scope_health;
@@ -76,10 +75,11 @@ impl DefinitionScope {
         if excluded(lookup, entry) {
             return scope_receipt::excluded(lookup, entry, ScopePlacement::Model, writer);
         }
+        let mut dependencies = DependencyScope::new(&mut self.definitions, &mut self.references);
         let mut inputs = Inputs {
             lookup,
             writer,
-            targets: Vec::new(),
+            dependencies: &mut dependencies,
         };
         let models = ArchiveModels::from_path_index(lookup.index.index(&inputs.work()?)?);
         let rig = discover_model_rig_using(&models, path, &mut inputs)?;
@@ -88,8 +88,7 @@ impl DefinitionScope {
             rig.skeleton.as_ref(),
             rig.parameters.as_ref(),
         )?;
-        self.parameters(rig.parameters.as_ref(), writer)?;
-        self.targets(inputs.targets, lookup, writer)?;
+        dependencies.expand(lookup, writer)?;
         scope_receipt::model(lookup, entry, &rig, writer)
     }
 
@@ -124,10 +123,12 @@ impl DefinitionScope {
                         "incomplete animation definition scope: unresolved Entity Loadout: {issue}"
                     )));
                 }
+                let mut dependencies =
+                    DependencyScope::new(&mut self.definitions, &mut self.references);
                 let mut inputs = Inputs {
                     lookup,
                     writer,
-                    targets: Vec::new(),
+                    dependencies: &mut dependencies,
                 };
                 let models = ArchiveModels::from_path_index(lookup.index.index(&inputs.work()?)?);
                 let rigs = discover_entity_rigs_using(&models, tree, &mut inputs)?;
@@ -137,9 +138,8 @@ impl DefinitionScope {
                         rig.skeleton.as_ref(),
                         rig.parameters.as_ref(),
                     )?;
-                    self.parameters(rig.parameters.as_ref(), writer)?;
                 }
-                self.targets(inputs.targets, lookup, writer)?;
+                dependencies.expand(lookup, writer)?;
                 let bindings = Bindings::collect(&forge, &rigs, loadout, entry, lookup, writer)?;
                 adb_graph_scope::expand(
                     bindings.roots(lookup, writer)?,
@@ -152,40 +152,6 @@ impl DefinitionScope {
                 Ok(Some(bindings))
             },
         )
-    }
-
-    fn parameters(
-        &mut self,
-        file: Option<&RigFile<Vec<RigParameter>>>,
-        writer: &MediaWriter<'_>,
-    ) -> Result<(), MediaError> {
-        let Some(file) = file else { return Ok(()) };
-        let Some(origin) = file.source() else {
-            return Ok(());
-        };
-        let position = origin.entry().index();
-        reserve(&mut self.definitions, writer)?;
-        self.definitions.insert(position);
-        Ok(())
-    }
-
-    fn targets(
-        &mut self,
-        targets: Vec<Target>,
-        lookup: &DirectoryLookup<'_>,
-        writer: &mut MediaWriter<'_>,
-    ) -> Result<(), MediaError> {
-        for target in targets {
-            let (path, positions) = match target {
-                Target::Definition(path) => (path, &mut self.definitions),
-                Target::Reference(path) => (path, &mut self.references),
-            };
-            if let Some(entry) = selected_target(&path, lookup, writer)? {
-                reserve(positions, writer)?;
-                positions.insert(entry.index());
-            }
-        }
-        Ok(())
     }
 }
 
@@ -221,29 +187,23 @@ fn lookup_target<'lookup>(
         .and_then(|input| lookup.index.archive.entries().get(input.position)))
 }
 
-fn excluded(lookup: &DirectoryLookup<'_>, entry: &Entry) -> bool {
+pub(super) fn excluded(lookup: &DirectoryLookup<'_>, entry: &Entry) -> bool {
     lookup.selection.classify(lookup.chain, entry.path()) == EntrySelection::Excluded
 }
 
-struct Inputs<'lookup, 'directory, 'writer, 'run> {
+struct Inputs<'lookup, 'directory, 'writer, 'run, 'plan, 'scope> {
     lookup: &'lookup DirectoryLookup<'directory>,
-    writer: &'writer MediaWriter<'run>,
-    targets: Vec<Target>,
+    writer: &'writer mut MediaWriter<'run>,
+    dependencies: &'plan mut DependencyScope<'scope>,
 }
 
-impl Inputs<'_, '_, '_, '_> {
+impl Inputs<'_, '_, '_, '_, '_, '_> {
     fn work(&self) -> Result<LookupWork<'_>, MediaError> {
-        let limits = self.writer.limits();
-        Ok(LookupWork {
-            limits,
-            checkpoint: self.writer.checkpoint,
-            budget: self.lookup.budget,
-            source_allowance: self.lookup.allowance(limits.sources)?,
-        })
+        lookup_work(self.lookup, self.writer)
     }
 }
 
-impl RigInputs for Inputs<'_, '_, '_, '_> {
+impl RigInputs for Inputs<'_, '_, '_, '_, '_, '_> {
     type Error = MediaError;
 
     fn check(&mut self) -> Result<(), MediaError> {
@@ -252,12 +212,7 @@ impl RigInputs for Inputs<'_, '_, '_, '_> {
 
     fn read(&mut self, entry: &Entry) -> Result<RigInput, MediaError> {
         self.check()?;
-        if self
-            .lookup
-            .selection
-            .classify(self.lookup.chain, entry.path())
-            == EntrySelection::Excluded
-        {
+        if excluded(self.lookup, entry) {
             return Ok(RigInput::NotSelected);
         }
         if entry.is_encrypted() && !self.lookup.index.archive.has_key() {
@@ -268,22 +223,28 @@ impl RigInputs for Inputs<'_, '_, '_, '_> {
             DefinitionFamily::of(entry.path()),
             Some(DefinitionFamily::Chrparams)
         ) {
-            let budget = self.lookup.input_state()?.budget;
-            let writer = self.writer;
-            chrparams_selectors::visit_targets(
+            self.dependencies.observe_parameters(
+                entry.index(),
                 &bytes,
-                |count| budget.metadata(0, count, writer.limits(), writer.checkpoint),
-                |target| {
-                    self.targets
-                        .try_reserve(1)
-                        .map_err(|cause| allocation(writer, cause))?;
-                    self.targets.push(target);
-                    Ok(())
-                },
+                self.lookup,
+                self.writer,
             )?;
         }
         Ok(RigInput::Read(bytes))
     }
+}
+
+pub(super) fn lookup_work<'scope>(
+    lookup: &'scope DirectoryLookup<'_>,
+    writer: &'scope MediaWriter<'_>,
+) -> Result<LookupWork<'scope>, MediaError> {
+    let limits = writer.limits();
+    Ok(LookupWork {
+        limits,
+        checkpoint: writer.checkpoint,
+        budget: lookup.budget,
+        source_allowance: lookup.allowance(limits.sources)?,
+    })
 }
 
 pub(super) fn read_verified(
@@ -342,12 +303,6 @@ pub(super) fn read_verified(
         Ok(bytes)
     })();
     result.map_err(|cause| error::at(&declared, cause))
-}
-
-fn reserve(positions: &mut HashSet<usize>, writer: &MediaWriter<'_>) -> Result<(), MediaError> {
-    positions
-        .try_reserve(1)
-        .map_err(|cause| allocation(writer, cause))
 }
 
 pub(super) fn allocation(

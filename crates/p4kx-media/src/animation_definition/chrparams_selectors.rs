@@ -4,6 +4,7 @@
 use p4kx_extraction::NamedCafSelector;
 use p4kx_extraction::cryxml::{SourceAttribute, SourceDocument, SourceElement, SourceReadOptions};
 
+use super::wildcard_match::{Rule, Scope};
 use super::{links, payload::LinkKind};
 use crate::MediaError;
 
@@ -57,19 +58,32 @@ pub(super) fn named(element: SourceElement<'_>, name: &str) -> bool {
     element.namespace().is_none() && element.name().eq_ignore_ascii_case(name)
 }
 
-pub(super) enum Target {
+pub(super) enum Target<'source> {
     Definition(String),
     Reference(String),
+    Wildcard(Rule<'source>),
 }
 
 pub(super) fn visit_targets(
     bytes: &[u8],
-    mut charge: impl FnMut(u64) -> Result<(), MediaError>,
-    mut visit: impl FnMut(Target) -> Result<(), MediaError>,
+    charge: impl FnMut(u64) -> Result<(), MediaError>,
+    visit: impl FnMut(Target<'_>) -> Result<(), MediaError>,
 ) -> Result<(), MediaError> {
     let document = SourceDocument::parse(bytes, SourceReadOptions::default()).map_err(|cause| {
         MediaError::Contract(format!("invalid scoped character parameters: {cause}"))
     })?;
+    visit_document_targets(&document, charge, visit)
+}
+
+pub(super) fn visit_document_targets(
+    document: &SourceDocument<'_>,
+    mut charge: impl FnMut(u64) -> Result<(), MediaError>,
+    mut visit: impl FnMut(Target<'_>) -> Result<(), MediaError>,
+) -> Result<(), MediaError> {
+    charge(0)?;
+    if document.is_lossy() {
+        return Ok(());
+    }
     let root = document.root();
     if !named(root, "Params") {
         return Ok(());
@@ -79,7 +93,7 @@ pub(super) fn visit_targets(
         if !named(list, "AnimationList") {
             continue;
         }
-        let mut folder = None;
+        let mut folder = Scope::Missing;
         for animation in list.elements() {
             charge(1)?;
             if !named(animation, "Animation") {
@@ -88,10 +102,9 @@ pub(super) fn visit_targets(
             let selector = Selector::read(animation);
             charge(selector.work)?;
             if selector.filepath {
-                folder = selector.attributes.map(|attributes| attributes.path);
+                folder = preceding_folder(selector.attributes.as_ref());
             } else if let Some(attributes) = selector.attributes.as_ref()
-                && let Some(target) =
-                    target(attributes, folder.as_ref().map(SourceAttribute::value))
+                && let Some(target) = target(attributes, folder)
             {
                 visit(target)?;
             }
@@ -100,16 +113,37 @@ pub(super) fn visit_targets(
     Ok(())
 }
 
-fn target(attributes: &AnimationAttributes<'_>, folder: Option<&str>) -> Option<Target> {
+fn preceding_folder<'source>(attributes: Option<&AnimationAttributes<'source>>) -> Scope<'source> {
+    match attributes.map(|attributes| attributes.path.value()) {
+        None => Scope::Malformed,
+        Some(path) if path.trim_end_matches(['/', '\\']).is_empty() => Scope::Reset,
+        Some(path) => Scope::Authored(path),
+    }
+}
+
+fn target<'source>(
+    attributes: &AnimationAttributes<'source>,
+    folder: Scope<'_>,
+) -> Option<Target<'source>> {
     let name = attributes.name.value();
     let authored = attributes.path.value();
-    if let Some(kind) = links::chrparams_database_kind(name) {
+    if let Some(kind) = links::chrparams_link_kind(name) {
         let path = links::target_path(kind, authored)?;
         return Some(match kind {
-            LinkKind::EventDatabase => Target::Definition(path),
+            LinkKind::EventDatabase | LinkKind::CharacterParametersInclude => {
+                Target::Definition(path)
+            }
             _ => Target::Reference(path),
         });
     }
-    let archive_path = NamedCafSelector::new(name, authored)?.archive_path(folder)?;
-    Some(Target::Reference(archive_path))
+    if let Some(selector) = NamedCafSelector::new(name, authored) {
+        let folder = match folder {
+            Scope::Authored(path) => Some(path),
+            _ => None,
+        };
+        return selector.archive_path(folder).map(Target::Reference);
+    }
+    Rule::parse(name, authored, folder)
+        .ok()
+        .map(Target::Wildcard)
 }
