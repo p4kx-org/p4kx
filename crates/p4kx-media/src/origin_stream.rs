@@ -155,14 +155,14 @@ impl<'a> OriginTransport<'a> {
         let sources = inventory_stream(
             root,
             "origin-sources.jsonl",
-            inventory.sources(),
+            inventory.iter_sources(),
             self.destination,
             &mut self.row_buffer,
         )?;
         let uses = inventory_stream(
             root,
             "origin-uses.jsonl",
-            inventory.uses(),
+            inventory.iter_uses(),
             self.destination,
             &mut self.row_buffer,
         )?;
@@ -199,10 +199,10 @@ impl<'a> OriginTransport<'a> {
     }
 }
 
-fn inventory_stream<T: serde::Serialize>(
+fn inventory_stream<'row, T: serde::Serialize + 'row>(
     root: &Path,
     relative: &str,
-    rows: &[T],
+    rows: impl Iterator<Item = &'row T>,
     destination: StreamDestination<'_>,
     row_buffer: &mut Vec<u8>,
 ) -> Result<Artifact, MediaError> {
