@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::collections::BTreeSet;
 use std::error::Error;
 use std::fs;
 use std::path::Path;
@@ -83,6 +84,38 @@ impl Origins {
             "original contributing selectors retained"
         );
         Ok(receipt)
+    }
+
+    pub(super) fn entry_indices(
+        &self,
+        ordinal: usize,
+        field: &str,
+        encrypted: bool,
+    ) -> Result<BTreeSet<usize>, Box<dyn Error>> {
+        let references = self
+            .marker(ordinal, field, encrypted)?
+            .get("sourceUsesRefs")
+            .and_then(Value::as_array)
+            .ok_or("inline original source-use references")?;
+        references
+            .iter()
+            .map(|reference| {
+                let source = self
+                    .uses
+                    .iter()
+                    .find(|record| record.get("id") == Some(reference))
+                    .and_then(|record| record.get("source"))
+                    .ok_or("original contributing physical source")?;
+                let index = self
+                    .sources
+                    .iter()
+                    .find(|record| record.get("id") == Some(source))
+                    .and_then(|record| record.get("entryIndex"))
+                    .and_then(Value::as_u64)
+                    .ok_or("original contributing Entry index")?;
+                Ok(usize::try_from(index)?)
+            })
+            .collect()
     }
 }
 

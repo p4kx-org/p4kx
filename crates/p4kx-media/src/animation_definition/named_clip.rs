@@ -17,8 +17,10 @@ use crate::audio_control_payload::AtlPosition;
 use crate::audio_record_origins as records;
 use crate::origin_contributions::OriginContributions;
 use crate::xml_source_projection::declaration_position;
-use crate::{MediaKind, MediaWriter, Status, Subresource};
+use crate::{MediaError, MediaKind, MediaWriter, Reference, Status, Subresource};
 
+#[path = "named_caf_contributors.rs"]
+mod contributors;
 #[path = "wildcard.rs"]
 mod wildcard;
 
@@ -208,9 +210,21 @@ impl Link<'_, '_> {
             selector: &full,
         }
         .resolve(projection, &mut prepared, writer)?;
+        contributors::observe(
+            projection,
+            (self.name, indices),
+            &reference,
+            &prepared,
+            &full,
+            writer,
+        )?;
         if let Some(archive_path) = &archive_path {
             self.write_dba_binding(
                 &NamedSelection {
+                    name: self.name,
+                    name_proof: prepared
+                        .visit("/data/payload/name")
+                        .ok_or_else(crate::origin_error::foreign)?,
                     authored_path: self.path,
                     archive_path,
                     original: &path,
@@ -223,6 +237,18 @@ impl Link<'_, '_> {
             )?;
             self.observe_event_alias(projection, indices, archive_path, full, writer)?;
         }
+        self.write_record(prepared, archive_path, reference, indices, writer)?;
+        Ok(())
+    }
+
+    fn write_record(
+        &self,
+        prepared: crate::origin_prepared::PreparedRecordOrigins,
+        archive_path: Option<String>,
+        reference: Reference,
+        indices: [u64; 2],
+        writer: &mut MediaWriter<'_>,
+    ) -> Result<(), MediaError> {
         prepared.write(
             writer,
             &Subresource::new(wire::NAMED_CAF, indices.to_vec()),
@@ -235,8 +261,7 @@ impl Link<'_, '_> {
                 reference,
             }),
             &[],
-        )?;
-        Ok(())
+        )
     }
 
     fn write_dba_binding(

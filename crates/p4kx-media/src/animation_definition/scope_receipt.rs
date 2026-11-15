@@ -20,6 +20,9 @@ use crate::{
     CandidateInventory, DirectoryLookup, MediaError, MediaWriter, Status, Subresource, origin_error,
 };
 
+#[path = "scope_receipt_contributors.rs"]
+mod contributors;
+
 #[derive(Serialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(super) struct ScopeReceipt<'source> {
@@ -333,6 +336,7 @@ impl<'a, 'directory> Scope<'a, 'directory> {
             Some(evidence) => evidence.write(&mut prepared, writer)?,
             None => None,
         };
+        contributors::observe(self.lookup, ordinal, &outcome, &prepared, writer)?;
         prepared.write(
             writer,
             &Subresource::new(wire::SCOPE_RECEIPT, vec![ordinal]),

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{InputScope, SourceUseRole};
+use p4kx_extraction::{Entry, InputScope, SourceUseRole};
 
 use crate::audio_control_payload::AtlPosition;
 use crate::audio_record_origins as records;
@@ -10,7 +10,7 @@ use crate::origin_contract::OriginProfile;
 use crate::origin_contributions::OriginContributions;
 use crate::origin_input::MediaOriginInput;
 use crate::origin_prepared::PreparedRecordOrigins;
-use crate::{MediaError, MediaWriter};
+use crate::{DirectoryLookup, MediaError, MediaWriter};
 
 pub(super) fn record(
     input: &MediaOriginInput,
@@ -21,6 +21,23 @@ pub(super) fn record(
     records::indices(&mut prepared, evidence.clone(), writer)?;
     records::subtree(&mut prepared, "/data/payload", evidence, writer)?;
     Ok(prepared)
+}
+
+pub(super) fn physical_path(
+    directory: &DirectoryLookup<'_>,
+    entry: &Entry,
+    writer: &MediaWriter<'_>,
+) -> Result<OriginContributions, MediaError> {
+    let input = writer.origins.input(directory.index.archive, entry)?;
+    let mut proof = writer.capture_origins();
+    proof.add(
+        &input,
+        InputScope::ArchiveDirectoryMetadata,
+        OriginSite::new("archive-entry", &[entry.index() as u64], "path"),
+        SourceUseRole::Selector,
+        writer,
+    )?;
+    Ok(proof.finish())
 }
 
 pub(super) fn position(

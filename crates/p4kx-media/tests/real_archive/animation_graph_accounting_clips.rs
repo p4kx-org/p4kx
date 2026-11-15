@@ -24,7 +24,7 @@ pub(crate) enum Format {
 #[derive(Clone, Copy)]
 pub(crate) enum Scope {
     Standalone,
-    Entity,
+    Scoped,
 }
 
 #[derive(Default)]
@@ -196,7 +196,7 @@ impl Owner {
         let name = declaration.value();
         let reason = match (name.is_empty(), self, scope) {
             (true, _, _) => "empty-selector",
-            (_, Self::Fragment { .. }, Scope::Entity) => "source-join-unavailable",
+            (_, _, Scope::Scoped) => "placement-scoped",
             _ => "no-owning-scope",
         };
         let mut payload = Map::from_iter([

@@ -3,6 +3,8 @@
 
 use std::cell::RefCell;
 use std::collections::{HashMap, TryReserveError};
+
+use super::clip_candidates::{ArcKind, ClipCandidates, Fact};
 use std::io;
 
 use p4kx_extraction::{DecimalU64, SourceUseRole};
@@ -150,7 +152,15 @@ impl SubDatabaseCycles {
             }
         }
         let components = graph.components(&Work::new(budget, writer))?;
-        write_graph(&observed, &graph, &components, &edges, &owner, writer)
+        write_graph(
+            &observed,
+            &graph,
+            &components,
+            &edges,
+            &owner,
+            &context.lookup.index.animation_clip_candidates,
+            writer,
+        )
     }
 }
 
@@ -165,6 +175,7 @@ fn write_graph(
     components: &Components,
     edges: &[&Edge],
     owner: &MediaOriginInput,
+    candidates: &ClipCandidates,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
     let mut cycles = Vec::new();
@@ -175,6 +186,15 @@ fn write_graph(
     for (edge, adjacency) in edges.iter().zip(graph.edges()) {
         writer.checkpoint()?;
         let proof = write_edge(observed, edge, owner, writer)?;
+        candidates.observe(
+            Fact::Arc {
+                from: edge.source,
+                to: edge.target,
+                kind: ArcKind::Database,
+                proof: &proof,
+            },
+            writer,
+        )?;
         let Some(component) = components.cycle(adjacency)? else {
             continue;
         };

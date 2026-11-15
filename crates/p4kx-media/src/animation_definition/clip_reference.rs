@@ -5,6 +5,7 @@ use p4kx_extraction::{DecimalU64, SourceUseRole};
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use super::clip_candidates::{Fact, Site};
 use super::graph_source::GraphRole;
 use super::origins;
 use super::payload::{self as wire, DefinitionPayload};
@@ -94,6 +95,7 @@ impl ClipOwner {
         };
         let prepared =
             prepare_origins(projection, selector_position, (site, group, layer), writer)?;
+        observe(projection, indices, authored_name, &prepared, writer)?;
         let payload = ClipReference {
             owner: ClipReferenceOwner {
                 kind,
@@ -107,7 +109,7 @@ impl ClipOwner {
             selector_position,
             authored_name,
             resolution: ClipReferenceResolution::Unresolved {
-                reason: UnresolvedClipReason::of(kind, authored_name, projection, writer),
+                reason: UnresolvedClipReason::of(authored_name, projection, writer),
             },
         };
         prepared.write(
@@ -118,6 +120,33 @@ impl ClipOwner {
             &[],
         )
     }
+}
+
+fn observe(
+    projection: &DefinitionProjection<'_, '_>,
+    indices: [u64; 2],
+    authored: &str,
+    prepared: &PreparedRecordOrigins,
+    writer: &MediaWriter<'_>,
+) -> Result<(), MediaError> {
+    let directory = projection.context.directory;
+    if authored.is_empty() || !directory.uses_definition_scope() {
+        return Ok(());
+    }
+    let proof = prepared
+        .visit("/data/payload/authored_name")
+        .ok_or_else(crate::origin_error::foreign)?;
+    directory.index.animation_clip_candidates.observe(
+        Fact::Clip {
+            site: Site {
+                entry: projection.context.entry.index(),
+                indices,
+            },
+            authored,
+            proof,
+        },
+        writer,
+    )
 }
 
 fn prepare_origins(
@@ -206,12 +235,11 @@ enum ClipReferenceResolution {
 enum UnresolvedClipReason {
     EmptySelector,
     NoOwningScope,
-    SourceJoinUnavailable,
+    PlacementScoped,
 }
 
 impl UnresolvedClipReason {
     const fn of(
-        kind: ClipReferenceOwnerKind,
         name: &str,
         projection: &DefinitionProjection<'_, '_>,
         writer: &MediaWriter<'_>,
@@ -220,12 +248,11 @@ impl UnresolvedClipReason {
             return Self::EmptySelector;
         }
         let directory = projection.context.directory;
-        if matches!(kind, ClipReferenceOwnerKind::MannequinFragment)
-            && writer.animation_entity.is_some()
+        if (writer.animation_entity.is_some() || writer.animation_model.is_some())
             && directory.chain.is_empty()
             && directory.uses_definition_scope()
         {
-            Self::SourceJoinUnavailable
+            Self::PlacementScoped
         } else {
             Self::NoOwningScope
         }

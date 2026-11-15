@@ -8,7 +8,7 @@ use p4kx_extraction::cryxml::{
 };
 
 use super::chrparams_selectors::{self, Selector};
-use super::event_bindings;
+use super::clip_candidates::ArcKind;
 use super::graph_source::GraphRole;
 use super::origins;
 use super::payload::{self as wire, DefinitionFamily, DefinitionLink, DefinitionPayload, LinkKind};
@@ -25,10 +25,14 @@ use crate::{
     Subresource,
 };
 
+#[path = "link_observation.rs"]
+mod observation;
+
 pub(super) struct LinkSelector {
     pub(super) kind: LinkKind,
     name_position: Option<SourceAttributePosition>,
     character_list: Option<u64>,
+    contributor_arc: Option<ArcKind>,
 }
 
 pub(super) fn kind(
@@ -37,6 +41,7 @@ pub(super) fn kind(
     parent: Option<&str>,
     character_list: Option<u64>,
     attribute: &SourceDeclaration<'_>,
+    graph: Option<GraphRole>,
 ) -> Option<LinkSelector> {
     if element.namespace().is_some()
         || !matches!(
@@ -58,6 +63,8 @@ pub(super) fn kind(
             kind,
             name_position: Some(attributes.name.position().clone()),
             character_list,
+            contributor_arc: matches!(kind, LinkKind::CharacterParametersInclude)
+                .then_some(ArcKind::Parameters),
         });
     }
     if matches!(family, DefinitionFamily::Adb)
@@ -67,6 +74,7 @@ pub(super) fn kind(
             kind,
             name_position: None,
             character_list: None,
+            contributor_arc: None,
         });
     }
     if matches!(family, DefinitionFamily::Comb)
@@ -77,6 +85,9 @@ pub(super) fn kind(
             kind: LinkKind::CombinedSpace,
             name_position: None,
             character_list: None,
+            contributor_arc: (matches!(graph, Some(GraphRole::BlendSpaceInput))
+                && observation::unique_combined_path(element))
+            .then_some(ArcKind::Space),
         });
     }
     None
@@ -246,6 +257,7 @@ pub(super) fn write(
     }
     .resolve(projection, &mut prepared, writer)?;
     selector.observe_event_database(projection, indices, &reference, &prepared, writer)?;
+    selector.observe_contributor_arc(projection, &reference, &prepared, writer)?;
     if let Some(sub_database) = sub_database {
         sub_database.observe(projection, indices, &reference, &prepared, writer)?;
     }
@@ -280,37 +292,6 @@ impl ReferenceSelection<'_> {
 }
 
 impl LinkSelector {
-    fn observe_event_database(
-        &self,
-        projection: &DefinitionProjection<'_, '_>,
-        indices: [u64; 2],
-        reference: &Reference,
-        prepared: &PreparedRecordOrigins,
-        writer: &MediaWriter<'_>,
-    ) -> Result<(), MediaError> {
-        let Some(list) = self
-            .character_list
-            .filter(|_| matches!(self.kind, LinkKind::EventDatabase))
-        else {
-            return Ok(());
-        };
-        projection
-            .context
-            .directory
-            .index
-            .animation_event_bindings
-            .database(
-                event_bindings::List {
-                    entry: projection.context.entry.index(),
-                    element: list,
-                },
-                indices,
-                reference,
-                prepared,
-                writer,
-            )
-    }
-
     fn proof(
         &self,
         input: &crate::origin_input::MediaOriginInput,

@@ -5,6 +5,7 @@ use p4kx_extraction::{DecimalU64, Entry, InputScope, SourceUseRole};
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use super::clip_candidates::{AliasKind, AliasProofs, Fact, Site, Target};
 use super::origins;
 use super::payload::{self as wire, DefinitionPayload};
 use super::projection::DefinitionProjection;
@@ -71,12 +72,12 @@ pub(super) fn write(
     projection: &DefinitionProjection<'_, '_>,
     rule: Result<Rule<'_>, Unexpanded>,
     indices: [u64; 2],
-    selectors: &OriginContributions,
+    proofs: (&OriginContributions, &OriginContributions),
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
     let directory = projection.context.directory;
     let mut proof = writer.capture_origins();
-    proof.include_original(selectors)?;
+    proof.include_original(proofs.0)?;
     let state = match (projection.repaired_strings, rule) {
         (true, _) => State::Scan(Scan::RepairedSource),
         (false, Ok(rule)) => {
@@ -92,7 +93,7 @@ pub(super) fn write(
                 SourceUseRole::Selector,
                 writer,
             )?;
-            let exact_paths = write_matches(projection, &rule, indices, selectors, writer)?;
+            let exact_paths = write_matches(projection, &rule, indices, proofs, writer)?;
             State::Scan(
                 if exact_paths && matches!(inventory, CandidateInventory::Complete) {
                     Scan::Expanded
@@ -116,7 +117,7 @@ fn write_matches(
     projection: &DefinitionProjection<'_, '_>,
     rule: &Rule<'_>,
     indices: [u64; 2],
-    selectors: &OriginContributions,
+    proofs: (&OriginContributions, &OriginContributions),
     writer: &mut MediaWriter<'_>,
 ) -> Result<bool, MediaError> {
     let directory = projection.context.directory;
@@ -136,7 +137,7 @@ fn write_matches(
             ordinal = ordinal
                 .checked_add(1)
                 .ok_or_else(crate::origin_error::counter)?;
-            write_candidate(projection, rule, (entry, captured), site, selectors, writer)
+            write_candidate(projection, rule, (entry, captured), site, proofs, writer)
         })
 }
 
@@ -145,25 +146,17 @@ fn write_candidate(
     rule: &Rule<'_>,
     (entry, captured): (&Entry, &str),
     site: [u64; 3],
-    selectors: &OriginContributions,
+    (selectors, site_proof): (&OriginContributions, &OriginContributions),
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
     let directory = projection.context.directory;
     let index = entry.index() as u64;
-    let input = writer.origins.input(directory.index.archive, entry)?;
-    let mut path = writer.capture_origins();
-    path.add(
-        &input,
-        InputScope::ArchiveDirectoryMetadata,
-        OriginSite::new("archive-entry", &[index], "path"),
-        SourceUseRole::Selector,
-        writer,
-    )?;
-    let path = path.finish();
+    let path = origins::physical_path(directory, entry, writer)?;
     let mut evidence = writer.capture_origins();
     evidence.include_original(selectors)?;
     evidence.include_original(&path)?;
-    let mut prepared = origins::record(projection.input, evidence.finish(), writer)?;
+    let evidence = evidence.finish();
+    let mut prepared = origins::record(projection.input, evidence.clone(), writer)?;
     for field in [
         "/data/payload/archive_path",
         "/data/payload/entry_index",
@@ -171,17 +164,69 @@ fn write_candidate(
     ] {
         records::field(&mut prepared, field, path.clone(), writer)?;
     }
+    let alias = rule.alias(captured);
+    let selection = directory.reference_selection(entry);
+    if selection == EntrySelection::Included && directory.uses_definition_scope() {
+        observe_candidate(
+            projection,
+            (entry.index(), rule.family()),
+            site,
+            &alias,
+            AliasProofs {
+                occurrence: &evidence,
+                name: &evidence,
+                site: site_proof,
+                target: &path,
+                target_clip: None,
+            },
+            writer,
+        )?;
+    }
     prepared.write(
         writer,
         &Subresource::new(wire::WILDCARD_CANDIDATE, site.to_vec()),
         Status::Complete,
         &DefinitionPayload::WildcardCandidate(Candidate {
-            alias: rule.alias(captured),
+            alias,
             archive_path: entry.path(),
             entry_index: DecimalU64::new(index),
             family: rule.family(),
-            selection: directory.reference_selection(entry).into(),
+            selection: selection.into(),
         }),
         &[],
     )
+}
+
+fn observe_candidate(
+    projection: &DefinitionProjection<'_, '_>,
+    (entry, family): (usize, Family),
+    [element, declaration, ordinal]: [u64; 3],
+    name: &str,
+    origins: AliasProofs<'_>,
+    writer: &MediaWriter<'_>,
+) -> Result<(), MediaError> {
+    let target = match family {
+        Family::Caf => Target::Caf { entry },
+        Family::BlendSpace => Target::BlendSpace { entry },
+        Family::CombinedSpace => Target::CombinedSpace { entry },
+    };
+    projection
+        .context
+        .directory
+        .index
+        .animation_clip_candidates
+        .observe(
+            Fact::Alias {
+                site: Site {
+                    entry: projection.context.entry.index(),
+                    indices: [element, declaration],
+                },
+                ordinal,
+                kind: AliasKind::Wildcard,
+                name,
+                target,
+                origins,
+            },
+            writer,
+        )
 }

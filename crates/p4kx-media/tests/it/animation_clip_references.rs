@@ -361,7 +361,7 @@ pub(super) fn verify_scoped(rows: &[MediaRecord]) -> TestResult {
     );
     assert_eq!(
         clip.row.data.pointer("/payload/resolution"),
-        Some(&json!({"state": "unresolved", "reason": "source-join-unavailable"})),
+        Some(&json!({"state": "unresolved", "reason": "placement-scoped"})),
         "an admitted ADB has owning context without a proven clip target"
     );
     Ok(())

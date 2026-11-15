@@ -7,6 +7,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::adb_entity_selectors::{self, Selector};
+use super::clip_candidates::Fact;
 use super::definition_scope::{allocation, selected_target};
 use super::links::{self, ReferenceSelection};
 use super::origins;
@@ -17,7 +18,10 @@ use crate::audio_record_origins as records;
 use crate::origin_capture::OriginSite;
 use crate::origin_contributions::OriginContributions;
 use crate::origin_input::MediaOriginInput;
-use crate::{DirectoryLookup, MediaError, MediaKind, MediaWriter, Reference, Status, Subresource};
+use crate::{
+    DirectoryLookup, Identity, MediaError, MediaKind, MediaWriter, Reference, ReferenceResolution,
+    Status, Subresource,
+};
 
 #[derive(Serialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -40,6 +44,7 @@ pub(super) struct Bindings {
 
 struct Binding {
     record_index: u32,
+    rig_ordinal: u64,
     component: usize,
     field: &'static str,
     authored_path: String,
@@ -147,6 +152,7 @@ impl Binding {
         };
         Ok(Self {
             record_index: selector.record_index,
+            rig_ordinal: selector.rig_ordinal,
             component: selector.component,
             field: selector.field,
             authored_path: selector.authored.to_owned(),
@@ -188,6 +194,7 @@ impl Binding {
             selector: &self.original,
         }
         .resolve_at(lookup, "/data/payload/reference", &mut prepared, writer)?;
+        self.observe(ordinal, lookup, &reference, &prepared, writer)?;
         prepared.write(
             writer,
             &Subresource::new(wire::ENTITY_DATABASE_BINDING, vec![ordinal]),
@@ -202,6 +209,37 @@ impl Binding {
                 reference,
             }),
             &[],
+        )
+    }
+
+    fn observe(
+        &self,
+        ordinal: u64,
+        lookup: &DirectoryLookup<'_>,
+        reference: &Reference,
+        prepared: &crate::origin_prepared::PreparedRecordOrigins,
+        writer: &MediaWriter<'_>,
+    ) -> Result<(), MediaError> {
+        let ReferenceResolution::Resolved { target } = reference.resolution() else {
+            return Ok(());
+        };
+        let Identity::Entry { entry, .. } = &target.source else {
+            return Err(crate::origin_error::foreign());
+        };
+        let mut proof = writer.capture_origins();
+        prepared.include_known("/data/payload/reference", &mut proof)?;
+        proof.include_original(&self.owner)?;
+        if let Some(port) = &self.port {
+            proof.include_original(&port.original)?;
+        }
+        lookup.index.animation_clip_candidates.observe(
+            Fact::Binding {
+                ordinal,
+                placement: self.rig_ordinal,
+                root: entry.entry_index,
+                proof: &proof.finish(),
+            },
+            writer,
         )
     }
 }

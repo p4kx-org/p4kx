@@ -6,6 +6,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::blend_reference_payload::{BlendCandidate, BlendReference};
+use super::clip_candidates::ClipContributor;
 use super::clip_reference::ClipReference;
 use super::entity_database_bindings::EntityDatabaseBinding;
 use super::event_bindings::EventBinding;
@@ -44,6 +45,7 @@ pub(super) const EVENT: &str = "animation-definition-event";
 pub(super) const EVENT_ATTRIBUTE: &str = "animation-definition-event-attribute";
 pub(super) const GRAPH_NODE: &str = "animation-definition-graph-node";
 pub(super) const CLIP_REFERENCE: &str = "animation-definition-clip-reference";
+pub(super) const CLIP_CONTRIBUTOR: &str = "animation-definition-clip-contributor";
 pub(super) const SUB_DATABASE_EDGE: &str = "animation-definition-sub-database-edge";
 pub(super) const SUB_DATABASE_CYCLE: &str = "animation-definition-sub-database-cycle";
 pub(super) const SUB_DATABASE_ATTRIBUTE_FRONTIER: &str =
@@ -114,6 +116,7 @@ pub(super) enum DefinitionPayload<'source> {
     GraphNode(GraphNode<'source>),
     GraphAttribute(GraphAttribute<'source>),
     ClipReference(ClipReference<'source>),
+    ClipContributor(ClipContributor),
     SubDatabaseEdge(SubDatabaseEdge),
     SubDatabaseCycle(SubDatabaseCycle),
     SubDatabaseFrontier(Frontier),

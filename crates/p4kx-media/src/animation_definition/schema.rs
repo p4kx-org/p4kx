@@ -29,6 +29,7 @@ const RECORDS: &[(&str, &str, usize)] = &[
     (wire::GRAPH_NODE, "graph-node", 1),
     (wire::GRAPH_ATTRIBUTE, "graph-attribute", 2),
     (wire::CLIP_REFERENCE, "clip-reference", 2),
+    (wire::CLIP_CONTRIBUTOR, "clip-contributor", 2),
     (wire::BLEND_REFERENCE, "blend-space-reference", 2),
     (wire::BLEND_CANDIDATE, "blend-space-candidate", 3),
     (wire::SUB_DATABASE_EDGE, "sub-database-edge", 3),

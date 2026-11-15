@@ -1266,6 +1266,23 @@
           "additionalProperties": false,
           "properties": {
             "payload": {
+              "$ref": "#/$defs/ClipContributor"
+            },
+            "record_type": {
+              "const": "clip-contributor",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
               "$ref": "#/$defs/SubDatabaseEdge"
             },
             "record_type": {
@@ -8452,6 +8469,183 @@
         "metadata_range"
       ],
       "type": "object"
+    },
+    "ClipContributor": {
+      "additionalProperties": false,
+      "properties": {
+        "alias": {
+          "$ref": "#/$defs/ClipContributorAliasSite"
+        },
+        "clip": {
+          "$ref": "#/$defs/ClipContributorClipSite"
+        },
+        "database_binding_ordinal": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "match_basis": {
+          "$ref": "#/$defs/ClipContributorMatchBasis"
+        },
+        "placement_ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "target": {
+          "$ref": "#/$defs/ClipContributorTarget"
+        }
+      },
+      "required": [
+        "placement_ordinal",
+        "clip",
+        "alias",
+        "target",
+        "match_basis"
+      ],
+      "type": "object"
+    },
+    "ClipContributorAliasKind": {
+      "enum": [
+        "named-caf",
+        "named-dba",
+        "wildcard"
+      ],
+      "type": "string"
+    },
+    "ClipContributorAliasSite": {
+      "additionalProperties": false,
+      "properties": {
+        "candidate_ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "declaration_ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "element_ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "entry_index": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "kind": {
+          "$ref": "#/$defs/ClipContributorAliasKind"
+        }
+      },
+      "required": [
+        "entry_index",
+        "element_ordinal",
+        "declaration_ordinal",
+        "kind",
+        "candidate_ordinal"
+      ],
+      "type": "object"
+    },
+    "ClipContributorClipSite": {
+      "additionalProperties": false,
+      "properties": {
+        "declaration_ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "element_ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "entry_index": {
+          "$ref": "#/$defs/DecimalU64"
+        }
+      },
+      "required": [
+        "entry_index",
+        "element_ordinal",
+        "declaration_ordinal"
+      ],
+      "type": "object"
+    },
+    "ClipContributorMatchBasis": {
+      "enum": [
+        "exact",
+        "ascii-case-variant"
+      ],
+      "type": "string"
+    },
+    "ClipContributorTarget": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "entry_index": {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            "kind": {
+              "const": "caf",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "entry_index"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "clip_ordinal": {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            "entry_index": {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            "kind": {
+              "const": "dba",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "entry_index",
+            "clip_ordinal"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "entry_index": {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            "kind": {
+              "const": "blend-space",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "entry_index"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "entry_index": {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            "kind": {
+              "const": "combined-space",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "entry_index"
+          ],
+          "type": "object"
+        }
+      ]
     },
     "ClipReference": {
       "additionalProperties": false,
@@ -27258,7 +27452,7 @@
       "enum": [
         "empty-selector",
         "no-owning-scope",
-        "source-join-unavailable"
+        "placement-scoped"
       ],
       "type": "string"
     },
@@ -48008,6 +48202,61 @@
                 "properties": {
                   "record_type": {
                     "const": "clip-reference"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 2,
+                "minItems": 2
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation-definition"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-definition-clip-contributor"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationDefinitionPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "clip-contributor"
                   }
                 },
                 "required": [

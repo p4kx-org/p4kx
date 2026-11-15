@@ -39,7 +39,13 @@ mod dependencies;
 #[path = "animation_scope_blend_wildcards.rs"]
 mod blend_wildcards;
 
-use self::sources::{Closure, Document, Placement};
+#[path = "animation_scope_contributors.rs"]
+mod contributors;
+
+#[path = "animation_scope_rows.rs"]
+mod rows;
+
+use self::sources::{Closure, Placement};
 
 const MODEL_VAR: &str = "P4KX_ANIMATION_SCOPE_MODEL";
 const ENTITY_VAR: &str = "P4KX_ANIMATION_SCOPE_ENTITY";
@@ -166,7 +172,7 @@ fn verify(
     build: &Build,
     selection: &Selection,
     mut expected: Closure<'_>,
-) -> TestResult {
+) -> TestResult<BTreeMap<usize, usize>> {
     let output = tempfile::tempdir()?;
     let ExportOutcome::Published { index, .. } =
         p4kx_media::export(archive, output.path(), &selection.options()?)?
@@ -185,10 +191,11 @@ fn verify(
         .ok_or("definition stream")?;
     let root = output.path().join(&index.artifact_base);
     let stream = BufReader::new(File::open(root.join(&kind.artifact.path))?);
-    observe_rows(archive, &root, &index.source.digest, stream, &mut expected)?;
+    let blend_matches = observe_rows(archive, &root, &index.source.digest, stream, &mut expected)?;
     expected.verify()?;
     output.close()?;
-    expected.report()
+    expected.report()?;
+    Ok(blend_matches)
 }
 
 fn observe_rows(
@@ -197,11 +204,12 @@ fn observe_rows(
     digest: &Digest,
     stream: impl BufRead,
     expected: &mut Closure<'_>,
-) -> TestResult {
+) -> TestResult<BTreeMap<usize, usize>> {
     let mut placements = 0;
     let mut databases = expected.databases.iter().enumerate();
     let mut identities = BTreeSet::new();
     let mut fields = origins::Fields::default();
+    let mut joins = contributors::Joins::default();
     for (stream_ordinal, line) in stream.lines().enumerate() {
         let row: MediaRecord = serde_json::from_str(&line?)?;
         require(row.source.root == *digest, "one original archive root")?;
@@ -226,9 +234,12 @@ fn observe_rows(
                 "/data/payload/authored_path",
                 &binding.sites,
             );
-        } else if !expected.graph.observe(&row)? {
-            observe(root, &row, &mut expected.documents)?;
+        } else if !expected.graph.observe(&row)?
+            && row.subresource.namespace != contributors::NAMESPACE
+        {
+            rows::observe(root, &row, &mut expected.documents)?;
         }
+        joins.observe(&row)?;
     }
     require(
         placements == expected.placements.len(),
@@ -238,7 +249,9 @@ fn observe_rows(
         databases.next().is_none(),
         "every authored Entity database binding retained",
     )?;
-    fields.verify(root, archive)
+    let blend_matches = joins.verify(&expected.placements)?;
+    fields.verify(root, archive)?;
+    Ok(blend_matches)
 }
 
 fn record_key(row: &MediaRecord) -> TestResult<RecordKey> {
@@ -338,66 +351,4 @@ fn expect_origins<'a>(fields: &mut origins::Fields<'a>, ordinal: usize, placemen
 
 fn index_field(value: &Value, field: &str) -> Option<usize> {
     value.pointer(field)?.as_str()?.parse().ok()
-}
-
-fn observe(
-    base: &Path,
-    row: &MediaRecord,
-    documents: &mut BTreeMap<usize, Document<'_>>,
-) -> TestResult {
-    let Identity::Entry { entry, .. } = &row.source.identity else {
-        require(
-            row.subresource.namespace == "animation-definition-event-binding",
-            "recognized non-document animation row",
-        )?;
-        let payload = row.data.get("payload").ok_or("event binding payload")?;
-        for (field, family) in [
-            ("/parameter_entry_index", "chrparams"),
-            ("/event_database_entry_index", "animevents"),
-        ] {
-            let index = index_field(payload, field).ok_or("event binding physical input")?;
-            let input = documents
-                .get(&index)
-                .ok_or("binding source outside selected closure")?;
-            require(
-                input.family() == family,
-                "binding has exact selected source roles",
-            )?;
-        }
-        return Ok(());
-    };
-    let source = documents
-        .get_mut(&entry.entry_index)
-        .ok_or("unselected physical document")?;
-    require(
-        entry.path == source.entry.path(),
-        "original physical Entry path",
-    )?;
-    if row.subresource.namespace == clips::NAMESPACE {
-        return source.clips.observe(row);
-    }
-    source.actual.observe(&row.subresource.namespace);
-    if row.subresource.namespace == "animation-definition-document" {
-        require(
-            row.data.pointer("/payload/family").and_then(Value::as_str) == Some(source.family()),
-            "source extension and emitted definition family agree",
-        )?;
-        let raw = row
-            .source
-            .raw
-            .as_ref()
-            .ok_or("retained original definition")?;
-        let decoded = manifests::check_payload(
-            base,
-            &raw.path,
-            raw.size,
-            &raw.digest,
-            source.bytes.len() as u64,
-        )?;
-        require(
-            decoded == source.bytes,
-            "retained definition equals its verified original bytes",
-        )?;
-    }
-    Ok(())
 }

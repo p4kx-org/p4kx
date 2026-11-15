@@ -24,6 +24,7 @@ const FIELDS: [ComponentField; 2] = [
 
 pub(super) struct Selector<'a> {
     pub(super) rig: &'a EntityRig,
+    pub(super) rig_ordinal: u64,
     pub(super) authored: &'a str,
     pub(super) component: usize,
     pub(super) field: &'static str,
@@ -61,7 +62,7 @@ pub(super) fn visit<'source>(
         }
     }
     let mut owners = HashMap::<u32, Vec<Observed<'source>>>::new();
-    for rig in rigs {
+    for (rig_ordinal, rig) in rigs.iter().enumerate() {
         writer.checkpoint()?;
         if !matches!(
             rig.placement,
@@ -81,6 +82,7 @@ pub(super) fn visit<'source>(
             consume(
                 Selector {
                     rig,
+                    rig_ordinal: rig_ordinal as u64,
                     authored: value.authored,
                     component: value.component,
                     field: value.field,

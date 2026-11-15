@@ -9,6 +9,7 @@ mod blend_references;
 mod chrparams_selectors;
 #[cfg(test)]
 mod chrparams_witness;
+mod clip_candidates;
 mod clip_reference;
 mod definition_scope;
 mod dependency_scope;
@@ -38,6 +39,7 @@ mod timeline_payload;
 mod wildcard_expansion;
 pub(crate) mod wildcard_match;
 
+pub(crate) use clip_candidates::ClipCandidates;
 pub(crate) use definition_scope::DefinitionScope;
 pub(crate) use event_bindings::EventBindings;
 pub(crate) use provider::AnimationDefinitionProvider;

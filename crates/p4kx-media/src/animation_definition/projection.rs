@@ -265,7 +265,7 @@ impl DefinitionProjection<'_, '_> {
                 parent,
                 &declaration,
                 indices,
-                element.sub_database,
+                (element.sub_database, element.graph),
                 writer,
             )?;
             if let Some(selector) = &element.branch_selector {
@@ -322,7 +322,7 @@ impl DefinitionProjection<'_, '_> {
         parent: &mut Frame<'document>,
         declaration: &SourceDeclaration<'document>,
         indices: [u64; 2],
-        sub_database: Option<&SubDatabaseSelector>,
+        (sub_database, graph): (Option<&SubDatabaseSelector>, Option<GraphRole>),
         writer: &mut MediaWriter<'_>,
     ) -> Result<AtlPosition, Failure> {
         let position = declaration_position(declaration.position())?;
@@ -345,6 +345,7 @@ impl DefinitionProjection<'_, '_> {
             parent.parent_name,
             parent.filepath.as_ref().map(Filepath::list_index),
             declaration,
+            graph,
         ) {
             let sub_database = sub_database.filter(|selector| selector.matches(declaration));
             links::write(

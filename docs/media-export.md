@@ -920,11 +920,26 @@ Entry. Repeated names and empty declarations retain separate rows.
 
 The row's status describes the captured declaration. Its `resolution` reports
 `empty-selector` for an empty name, `no-owning-scope` for a standalone
-declaration or blend-space example, and `source-join-unavailable` for a
-Mannequin declaration processed in Entity mode before any proven clip join.
+declaration, and `placement-scoped` when candidates depend on a selected rig.
 Use the separate Entity database binding rows for original placement evidence.
 Each field retains the provenance of the original XML element or declaration
 that supplies it.
+
+In provider 1.12.0, `clip-contributor` rows link a declaration to each observed
+alias candidate in its rig placement. The root record's indices contain the
+`scope-receipt` ordinal and a zero-based sequence within the placement. An ADB
+row also names the original `entity-database-binding` ordinal. Physical source
+Entry, element and declaration ordinals identify the clip and CHRPARAMS alias.
+The alias kind and candidate ordinal identify the corresponding named CAF
+reference, DBA match or wildcard candidate. Loose CAFs and blend spaces carry
+physical Entry identities. A DBA target also carries the observed clip ordinal.
+
+ADB membership follows readable SubADB links. Alias membership follows readable
+CHRPARAMS includes from that placement. BSPACE examples inherit placement from
+an observed BSPACE alias target or a reachable COMB child. Exact spellings and
+ASCII case variants are reported separately. Repeated mounts and multiple alias
+declarations retain their distinct occurrences. The candidates are source
+observations. Runtime priority remains unspecified.
 
 `sub-database-selector` rows distinguish absent, empty, repeated and single
 attributes. A single nonempty `SubADB@Tags` is split on the original plus

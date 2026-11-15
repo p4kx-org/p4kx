@@ -265,8 +265,8 @@ impl<'archive> Document<'archive> {
         require(!source.is_lossy(), "complete original source strings")?;
         let expected = Counts::source(source.root(), matches!(family, Family::Events))?;
         let clips = match family {
-            Family::Adb => Clips::read(&source, Format::Mannequin, Scope::Entity)?,
-            Family::BlendSpace => Clips::read(&source, Format::BlendSpace, Scope::Standalone)?,
+            Family::Adb => Clips::read(&source, Format::Mannequin, Scope::Scoped)?,
+            Family::BlendSpace => Clips::read(&source, Format::BlendSpace, Scope::Scoped)?,
             Family::Params | Family::Events | Family::CombinedSpace => Clips::default(),
         };
         Ok(Self {

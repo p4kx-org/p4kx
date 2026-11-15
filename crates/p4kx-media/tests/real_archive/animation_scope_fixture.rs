@@ -59,7 +59,20 @@ fn synthetic_animation_scope_witness_checks_model_and_entity_publications() -> T
         if matches!(selection, Selection::Entity(_)) {
             verify_entity_fixture(&expected)?;
         }
-        verify(&archive, build, &selection, expected)?;
+        let blend_entry = expected
+            .documents
+            .values()
+            .find(|source| source.entry.path() == BLEND_SPACE)
+            .ok_or("independently reachable BlendSpace source")?
+            .entry
+            .index();
+        let placements = expected.placements.len();
+        let matches = verify(&archive, build, &selection, expected)?;
+        assert_eq!(
+            matches.get(&blend_entry),
+            Some(&placements),
+            "each placement in the model or Entity scope joins the reachable BlendSpace example"
+        );
     }
     watch.check()?;
     Ok(())

@@ -10,6 +10,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use self::sources::{Bank, ObservedMatch};
+use super::clip_candidates::{AliasKind, AliasProofs, Fact, Site, Target};
 use super::origins;
 use super::payload::{self as wire, DefinitionPayload};
 use super::projection::{DefinitionProjection, Failure};
@@ -24,6 +25,8 @@ pub(super) struct Databases {
 }
 
 pub(super) struct NamedSelection<'a> {
+    pub(super) name: &'a str,
+    pub(super) name_proof: &'a OriginContributions,
     pub(super) authored_path: &'a str,
     pub(super) archive_path: &'a str,
     pub(super) original: &'a OriginContributions,
@@ -70,6 +73,14 @@ impl Databases {
             projection,
             &mut projection_state,
             &mut prepared,
+            writer,
+        )?;
+        observe_contributors(
+            projection,
+            selection,
+            indices,
+            &projection_state.candidates,
+            &prepared,
             writer,
         )?;
         let binding = Binding {
@@ -122,6 +133,63 @@ impl Databases {
         }
         Ok(())
     }
+}
+
+fn observe_contributors(
+    projection: &DefinitionProjection<'_, '_>,
+    selection: &NamedSelection<'_>,
+    indices: [u64; 2],
+    candidates: &[ClipCandidate<'_>],
+    prepared: &PreparedRecordOrigins,
+    writer: &MediaWriter<'_>,
+) -> Result<(), MediaError> {
+    let directory = projection.context.directory;
+    if projection.repaired_strings || !directory.uses_definition_scope() {
+        return Ok(());
+    }
+    for (ordinal, candidate) in candidates.iter().enumerate() {
+        let crate::Identity::Entry { entry, .. } = candidate.entry else {
+            return Err(crate::origin_error::foreign());
+        };
+        let root = format!("/data/payload/candidates/{ordinal}");
+        let physical = directory
+            .index
+            .archive
+            .entries()
+            .get(entry.entry_index)
+            .ok_or_else(crate::origin_error::foreign)?;
+        let target_proof = origins::physical_path(directory, physical, writer)?;
+        let clip_proof = prepared
+            .visit(&format!("{root}/clip_ordinal"))
+            .ok_or_else(crate::origin_error::foreign)?;
+        let mut proof = writer.capture_origins();
+        proof.include_original(selection.selector)?;
+        prepared.include_known(&root, &mut proof)?;
+        directory.index.animation_clip_candidates.observe(
+            Fact::Alias {
+                site: Site {
+                    entry: projection.context.entry.index(),
+                    indices,
+                },
+                ordinal: ordinal as u64,
+                kind: AliasKind::NamedDba,
+                name: selection.name,
+                target: Target::Dba {
+                    entry: entry.entry_index,
+                    clip: candidate.clip_ordinal.get(),
+                },
+                origins: AliasProofs {
+                    occurrence: &proof.finish(),
+                    name: selection.name_proof,
+                    site: selection.original,
+                    target: &target_proof,
+                    target_clip: Some(clip_proof),
+                },
+            },
+            writer,
+        )?;
+    }
+    Ok(())
 }
 
 struct BindingProjection<'a> {

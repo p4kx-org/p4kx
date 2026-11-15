@@ -4,6 +4,8 @@
 use p4kx_extraction::DecimalU64;
 use p4kx_extraction::cryxml::{SourceDocument, SourceReadOptions};
 
+use super::chrparams_selectors;
+use super::clip_candidates::Fact;
 use super::definition_scope::DefinitionScope;
 use super::graph_source::GraphRole;
 use super::origins;
@@ -64,7 +66,7 @@ fn field_groups() -> Vec<FieldGroup> {
         ),
         FieldGroup::new(
             "clip-references",
-            "Original Mannequin and blend-space clip selectors with positioned ownership.",
+            "Positioned clip selectors and observed contributors for scoped rig occurrences.",
         ),
         FieldGroup::new(
             "sub-database-cycles",
@@ -86,7 +88,7 @@ impl Provider for AnimationDefinitionProvider {
         let mut capability = Capability::new(
             MediaKind::AnimationDefinition,
             "p4kx.animation-definition",
-            "1.11.0",
+            "1.12.0",
             "Original character parameters, animation event definitions and Mannequin XML source.",
         );
         capability.field_groups = field_groups();
@@ -115,6 +117,11 @@ impl Provider for AnimationDefinitionProvider {
             .lookup
             .index
             .animation_event_bindings
+            .write(context, writer)?;
+        context
+            .lookup
+            .index
+            .animation_clip_candidates
             .write(context, writer)
     }
 
@@ -216,31 +223,62 @@ fn observe_sub_database(
         )
 }
 
+fn observe_document(
+    projection: &DefinitionProjection<'_, '_>,
+    document: Option<&SourceDocument<'_>>,
+    state: &DocumentProjection,
+    writer: &MediaWriter<'_>,
+) -> Result<(), MediaError> {
+    observe_sub_database(projection, document, state, writer)?;
+    if !matches!(state, DocumentProjection::Readable) {
+        return Ok(());
+    }
+    let directory = projection.context.directory;
+    let entry = projection.context.entry.index();
+    if matches!(
+        projection.family,
+        DefinitionFamily::Chrparams | DefinitionFamily::Animevents
+    ) {
+        directory
+            .index
+            .animation_event_bindings
+            .complete(entry, writer)?;
+    }
+    if directory.uses_definition_scope()
+        && directory.chain.is_empty()
+        && document.is_some_and(|document| clip_source(projection.family, document))
+    {
+        directory
+            .index
+            .animation_clip_candidates
+            .observe(Fact::Readable { entry }, writer)?;
+    }
+    Ok(())
+}
+
+fn clip_source(family: DefinitionFamily, document: &SourceDocument<'_>) -> bool {
+    let root = document.root();
+    match family {
+        DefinitionFamily::Chrparams => chrparams_selectors::named(root, "Params"),
+        DefinitionFamily::Adb | DefinitionFamily::Bspace | DefinitionFamily::Comb => {
+            GraphRole::of(family, None, true, root).is_some()
+        }
+        DefinitionFamily::Animevents => false,
+    }
+}
+
 fn write_document(
     projection: &DefinitionProjection<'_, '_>,
     source: Option<(&SourceDocument<'_>, u64)>,
     state: DocumentProjection,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
-    observe_sub_database(
+    observe_document(
         projection,
         source.map(|(document, _)| document),
         &state,
         writer,
     )?;
-    if matches!(&state, DocumentProjection::Readable)
-        && matches!(
-            projection.family,
-            DefinitionFamily::Chrparams | DefinitionFamily::Animevents
-        )
-    {
-        projection
-            .context
-            .directory
-            .index
-            .animation_event_bindings
-            .complete(projection.context.entry.index(), writer)?;
-    }
     let (status, issue) = match state {
         DocumentProjection::Readable => (Status::Complete, None),
         DocumentProjection::RepairedStrings => (

@@ -124,7 +124,12 @@ pub(super) fn write(
         writer,
     )?;
     records::subtree(&mut prepared, "/data/payload/name", name_proof, writer)?;
-    records::subtree(&mut prepared, "/data/payload/path", path_proof, writer)?;
+    records::subtree(
+        &mut prepared,
+        "/data/payload/path",
+        path_proof.clone(),
+        writer,
+    )?;
     let preceding_filepath = filepath(list, directive, projection, &mut prepared, writer)?;
     let rule = Rule::parse(name.value, path.value, preceding_filepath.matching_scope());
     let selection = expansion_selection(&rule, selector, list, directive, projection, writer)?;
@@ -140,7 +145,7 @@ pub(super) fn write(
         }),
         &[],
     )?;
-    wildcard_expansion::write(projection, rule, indices, &selection, writer)?;
+    wildcard_expansion::write(projection, rule, indices, (&selection, &path_proof), writer)?;
     Ok(())
 }
 
