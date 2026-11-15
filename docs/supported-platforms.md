@@ -122,6 +122,61 @@ A full manual branch run records scan availability in its notes.
 All hosted checks use synthetic data. Real Archive tests stay ignored/local or explicitly
 private, and no game assets, keys or confidential values enter CI artifacts or releases.
 
+## Windows and Linux ARM64 desktop verification
+
+Run on a native ARM64 Windows or Linux desktop using the candidate's packaged GUI. Use an
+absolute `P4KX_FOLDERS_ROOT` for the application profile and separate fixture and export
+directories. Use a disposable desktop session if the current clipboard must be preserved.
+Launch the GUI normally so it remains open for interaction. For Flatpak, use the package's
+documented profile and portal grants. [Profile folders](profile-folders.md), [Linux packages](linux-packages.md)
+
+Generate the fixtures from the candidate's source revision. Use two new absolute directories.
+The examples write synthetic Archives and the text reference.
+
+```text
+cargo run --locked -p p4kx-testkit --example native_fixture -- <absolute-smoke-fixture-directory>
+cargo run --locked -p p4kx-testkit --example material_reference_fixture -- <absolute-model-fixture-directory>
+```
+
+1. **File dialogs.** Open `native-smoke.p4k` through the native Archive picker. Cancel a second
+   open and confirm the selected Archive stays open. Select `Data/hello.txt` for extraction,
+   cancel the first output-folder selection, and check that the export directory stays empty.
+   Complete the selection in a writable directory with a Unicode name. Compare the extracted
+   file's SHA-256 with the generated `hello.txt` and record both hashes.
+2. **Clipboard.** Copy `Data/hello.txt` using **Copy** in the Text preview and paste it into a
+   separate native text editor. Compare it with the generated `hello.txt`, checking Unicode,
+   the combining character, line breaks and tab. Record any editor newline conversion. In
+   `virtual-root.p4k`, use the multiline Query editor for the reverse direction. Copy from
+   the external editor, paste into P4KX and compare the resulting text without running the
+   Query. Exercise copying the empty `Data/empty.txt` preview and pasting with an empty
+   clipboard into the Query editor. Record the observed result of each operation.
+3. **Viewer and GPU.** Open `virtual-root.p4k` and select `Data/Objects/Test/cube.cgf`. Open
+   the Model tab and confirm that the cube draws and responds to orbit and zoom. Record
+   observed process-attributed GPU activity separately from the viewer outcome. On Windows,
+   Task Manager's GPU Engine column can identify the adapter and engine used by `p4kx-gui`.
+   On Linux, supported DRM drivers expose per-process engine counters in `/proc/<pid>/fdinfo/`.
+   Check the counters before and after moving the model. Record the desktop session, adapter,
+   driver and observation. [Windows GPU observation](https://devblogs.microsoft.com/directx/gpus-in-the-task-manager/), [Linux DRM counters](https://docs.kernel.org/gpu/drm-usage-stats.html)
+4. **Audio.** Run the packaged GUI procedure below on the native default audio output.
+   Include the result of `a_missing_device_is_reported_to_the_player_and_does_not_panic`
+   from the matching native CI run or a native execution of that test.
+   [Desktop audio verification](#desktop-audio-verification)
+
+Record one result per target and package tested and link it from the release audit. Keep the
+hosted runtime receipt as its own evidence.
+
+| Field | What to retain |
+| --- | --- |
+| Candidate | Version, full source revision from the target's runtime receipt, and native package workflow run and attempt. |
+| Package and GUI | Target, package filename and SHA-256, and SHA-256 of the executable actually launched. Match these against the corresponding package smoke receipt. |
+| Host | OS version and build or kernel, native CPU, desktop session, GPU and driver, and audio backend. |
+| Observations | Test date, fixture source revision, and per-check outcome for dialogs, clipboard, viewer, hardware GPU, audio start/pause/seek/stop, and no-device behavior. Retain the observed result, a log or comparison where available, or the reason a check could not run. |
+
+Record `success` only for an observed check. Use `failed` for a broken outcome, `unavailable`
+for a missing capability and `not_checked` for a deferred check. The release audit keeps
+any required check without successful evidence open. Publish structural results and synthetic
+comparisons. Keep personal paths and clipboard contents out of public evidence.
+
 ## Desktop audio verification
 
 On each matching native CPU, use a usable default audio output on the desktop under test.
@@ -141,7 +196,8 @@ cargo run --locked -p p4kx-testkit --example native_fixture -- <absolute-output-
 
 Launch the native candidate with an absolute `P4KX_FOLDERS_ROOT` to isolate its profile. Set
 a low preview volume, open `native-desktop-audio.p4k` and play `Data/Sounds/tone.wem` in
-the Audio tab. Seek to the middle and confirm that playback resumes. Select `Data/readme.txt`
+the Audio tab. Pause and confirm the sound and playhead stop. Resume, seek to the middle
+and confirm playback resumes from there. Select `Data/readme.txt`
 and confirm that closing the preview stops playback. Record the OS version, CPU, source
 commit, GUI binary and package hashes, audio device or session backend, and observed results.
 [Profile folders](profile-folders.md)
