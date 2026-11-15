@@ -525,6 +525,35 @@ separately from inline State.
 
     cargo test --release --locked -p p4kx-media --test real_archive original_shared_wwise_node_groups_reconcile -- --ignored --nocapture
 
+### Installed Wwise decision-family comparison
+
+The ignored `populated_wwise_decision_families_match_original_bytes_in_memory` test
+compares physical v154 BNK Entries with the source fields used by CLI JSON and MCP.
+It checks original row order, duplicate occurrences, selected field values, exact byte
+receipts and the per-value encryption marker. Compact MusicSwitch graphs are compared
+as original groups and nodes. DialogueEvent checks the admitted raw words and the
+`undetermined` link disposition.
+
+The test reads and verifies one root BNK at a time, including embedded data covered by
+the Entry checksum. It uses the ordinary soundbank input size limit. Other bank
+versions and larger Entries are counted separately. The comparison and JSON projection
+stay in memory. The test writes no Media artifacts. Its output contains the Build ID
+and aggregate bank and family counts.
+
+The scan stops after populated evidence for Random/Sequence, Switch, Blend, MusicTrack
+automation and switch transitions, MusicSwitch decisions and DialogueEvent, plus a stinger
+owner and a transition-rule owner. The report distinguishes witnessed facets, inspected
+owners without populated evidence, and facets outside the inspected sample. Synthetic
+fixtures cover the separate stinger and transition owners, Media publication and TXTP
+approximation.
+
+```powershell
+cargo test --release --locked -p p4kx-extraction --lib populated_wwise_decision_families_match_original_bytes_in_memory -- --ignored --nocapture
+```
+
+Set `P4KX_DATA_P4K` for the installed Archive and optionally `P4KX_DATA_P4K_B` for a
+second Build. The test requires the configured Archive key for encrypted BNKs.
+
 ## AudioBus and AuxiliaryBus
 
 The checked v154 source reader exports AudioBus and AuxiliaryBus declarations.

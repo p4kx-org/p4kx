@@ -94,6 +94,10 @@ pub use p4kx_audio::{
 };
 use rayon::prelude::*;
 
+#[cfg(test)]
+#[path = "bank_decision_witness.rs"]
+mod decision_witness;
+
 #[path = "bank_read.rs"]
 mod read;
 
