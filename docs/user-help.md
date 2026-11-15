@@ -34,7 +34,7 @@ the required visibility. Cleanup or restoration failures remain visible even aft
 The Channel picker searches native launcher logs and, on Linux, bounded Proton, Steam, Bottles
 and immediate `~/Games/*` prefixes. If automatic discovery or startup installation protection
 is incomplete, a warning names the manual fallback; its tooltip gives the first technical reason.
-Use **Add folder.** or **Add Archive.** for a missing installation. Existing manual entries remain
+Use **Add folder…** or **Add Archive…** for a missing installation. Existing manual entries remain
 listed. Adding a new entry stores and protects it immediately, then refreshes the automatic list
 in the background. The list updates when the current search completes; earlier results cannot
 replace a newer selection. A search failure appears in the existing warning notice. See [Channel discovery](channel-discovery.md)

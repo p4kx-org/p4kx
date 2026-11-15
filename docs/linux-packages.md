@@ -24,8 +24,9 @@ Programme stehen in der gemeinsamen Tabelle. [Installieren und starten](#install
 
 Die Basis für tar.gz, AppImage und deb ist Ubuntu 24.04 mit glibc 2.39. Flatpak nutzt
 Freedesktop Platform 25.08 und benötigt auf dem Host ein Documents-Portal ab API 5
-mit funktionierender, authentifizierter Hostpfadabfrage. Ein bereitgestelltes `Data.p4k`
-genügt, um P4KX nativ auf beiden CPUs zu verwenden.
+mit funktionierender, authentifizierter Hostpfadabfrage. P4KX kann ein vorhandenes `Data.p4k`
+auf beiden CPUs mit dem jeweils nativen Paket öffnen. Für Star Citizen und Wine gelten
+deren eigene Plattformanforderungen.
 
 ### Archiv und Wine-Präfix auswählen
 
@@ -85,13 +86,15 @@ Dateidialoge und Zwischenablage werden separat erfasst. [Native Prüfungen](#req
 Use `uname -m` to check the Linux host CPU. Select `x86_64-unknown-linux-gnu` for
 `x86_64` (AMD64 or Debian `amd64`) and `aarch64-unknown-linux-gnu` for `aarch64`
 (ARM64 or Debian `arm64`). Every package name starts with `P4KX-<version>-<target>`.
+P4KX can open an existing `Data.p4k` natively on either CPU. Star Citizen and Wine have
+their own platform requirements.
 
 | Suffix | Contents and start command |
 | --- | --- |
 | `.tar.gz` | Extract anywhere. Run `bin/p4kx-gui`, `bin/p4kx` or `bin/p4kx-mcp` inside the extracted directory. |
 | `.AppImage` | Make executable and run it for the GUI; add `--cli` or `--mcp` before application arguments for the CLI or MCP server. |
 | `.deb` | Install with `sudo apt install ./P4KX-<version>-<target>.deb`; run `p4kx-gui`, `p4kx` or `p4kx-mcp`. |
-| `.flatpak` | Install with `flatpak install --user ./P4KX-<version>-<target>.flatpak`; run `flatpak run io.github.p4kx_org.p4kx`. |
+| `.flatpak` | Install with `flatpak install --user --bundle ./P4KX-<version>-<target>.flatpak`; run `flatpak run io.github.p4kx_org.p4kx`. |
 
 For AppImage systems without usable FUSE, the same real runtime supports
 `./P4KX-<version>-<target>.AppImage --appimage-extract-and-run`. Add `--cli` or `--mcp`
@@ -100,6 +103,18 @@ after that runtime option. An installed AppImage is not required for this extrac
 The AppImage retains linuxdeploy's relative root desktop and icon links and adds the matching
 `.DirIcon` link. Packaging checks their installed targets and original bytes, preserves the exact
 three-command `AppRun`, and tests link resolution and dispatch after relocating a synthetic AppDir.
+
+The tar.gz GUI uses the host's window and graphics libraries, the desktop file chooser portal,
+and ALSA (`libasound2t64` on Ubuntu 24.04). The deb declares its shared-library and portal
+dependencies so `apt` can install them. [Ubuntu runner dependencies](../.github/scripts/install-linux-package-dependencies.ps1)
+
+The Flatpak bundle points to Flathub for Freedesktop Platform 25.08. To install that runtime
+separately in the same user installation, use the native Flatpak on the target CPU.
+
+```text
+flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+flatpak install --user flathub org.freedesktop.Platform//25.08
+```
 
 Flatpak CLI and MCP commands are selected before the application ID:
 
@@ -265,13 +280,19 @@ operation is written as a successful runtime proof. Portal-origin behavior remai
 the actual FUSE-grant check, and the release job produces no passing proof if it exposes an
 installation-alias bypass.
 
+At integration commit `2f091e52a`, both native Ubuntu jobs passed synthetic Archive listing,
+extraction and conversion, MCP initialisation and a read-only request, and the GUI frame
+check under Xvfb with lavapipe. The package lifecycle and desktop-device checks use their own
+evidence for the matching build. [AMD64 CI job](https://github.com/p4kx-org/p4kx/actions/runs/43709794954/job/132801209265) ·
+[ARM64 CI job](https://github.com/p4kx-org/p4kx/actions/runs/43709794954/job/132800778531)
+
 For a branch-only native Linux validation, dispatch the existing `release.yml` workflow with
-`linux-only=true`. It runs preparation and both Linux producer/consumer rows, skips Windows
-packages and external scans, and cannot assemble or publish a Release. Do not create a tag:
+`linux-only=true`. It runs preparation and both Linux producer/consumer rows. Use the branch
+dispatch for a validation run and a version tag for Release publication.
 
 ```powershell
 gh workflow run release.yml --repo p4kx-org/p4kx --ref codex/implement-v0.5.0 -f linux-only=true
 ```
 
-The normal pull-request trigger also validates Linux packages, together with the complete
-Windows matrix. Publication remains restricted to version tags and successful full-matrix gates.
+The Release workflow's pull-request trigger for packaging changes runs the Linux, Windows
+and macOS package checks. Publication requires a version tag and successful full-matrix gates.
