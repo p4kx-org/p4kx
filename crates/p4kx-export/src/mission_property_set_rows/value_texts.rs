@@ -39,14 +39,8 @@ impl<'source> PropertyValue<'source> {
                 projection,
                 cancel,
             ),
-            Self::AiName(name) => {
-                name.given_name.publish(projection)?;
-                name.given_last_name.publish(projection)?;
-                name.given_nick_name.publish(projection)
-            }
-            Self::Investigation(investigation) => {
-                investigation.publish_clue_texts(projection, cancel)
-            }
+            Self::AiName(name) => name.publish_texts(projection),
+            Self::Investigation(investigation) => investigation.publish_texts(projection, cancel),
             _ => Ok(()),
         }
     }

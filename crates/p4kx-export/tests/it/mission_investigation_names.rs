@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Investigation names retain original tokens without changing established presentation keys.
+//! Investigation names retain original tokens and provenance for their protected presentation.
 
 use crate::mission_values_fixture::{self as fixture, Owner, TestResult};
 use p4kx_export::CatalogPublicationMode;
@@ -113,7 +113,7 @@ fn original_name_tokens_and_dangling_targets_survive_both_investigation_position
                 "@LOC_UNINITIALIZED"
             );
             for text in ["givenName", "givenLastName", "givenNickName"] {
-                assert_eq!(value[text]["key"], Value::Null);
+                proof::cell(value, text, "absent")?;
             }
             let reference = &value["source"]["characterNameData"];
             assert_eq!(reference["status"], "dangling");
@@ -148,7 +148,15 @@ fn resolved_name_data_keeps_its_full_reference_and_the_legacy_guid() -> TestResu
         assert_eq!(reference["recordPath"], "synthetic/definition");
         assert_eq!(reference["targetType"], "Definition");
         assert_eq!(reference["guid"], value["nameDataGuid"]);
-        assert_eq!(value["givenName"]["key"], "@given");
+        let target = proof::present(value, "givenName", &json!("text:6:@given"), Some(false))?;
+        assert_eq!(
+            target["sourceSetComplete"], true,
+            "the exact original name field is covered"
+        );
+        assert_eq!(
+            value["source"]["characterGivenName"], "@given",
+            "the original Locale token remains available"
+        );
     }
     Ok(())
 }
@@ -328,6 +336,43 @@ fn ambiguous_generator_ai_name_is_quarantined_before_text_publication() -> TestR
             .all(|row| row.pointer("/key/value").and_then(Value::as_str) != Some("@discarded")),
         "the discarded handler cannot register a text",
     );
+    proof::closure(&catalog)
+}
+
+#[test]
+fn different_raw_investigation_name_tokens_keep_original_aliases_distinct() -> TestResult {
+    use crate::mission_property_sets_fixture::{generator, parameters};
+
+    let property = |key| {
+        fixture::property(
+            "Case",
+            investigation(
+                name(TestValue::text(key), fixture::TARGET, 0.25),
+                Position::Suspect,
+            ),
+        )
+    };
+    let database =
+        fixture::database(vec![property("first")], Owner::Generator).record(generator([
+            parameters(vec![property("second")]),
+            parameters(vec![property("first")]),
+            parameters(vec![property("first")]),
+        ]));
+    let catalog = fixture::build(&database, CatalogPublicationMode::DiagnosticPartial)?;
+    let sets = proof::rows(&catalog, "/missionPropertySets")?;
+    assert_eq!(sets.len(), 3, "three unambiguous source locations remain");
+    for set in sets {
+        assert_ne!(
+            set["level"], "handler",
+            "different raw keys quarantine the shared handler"
+        );
+        let name = fixture::field(set, "/properties/0/value/suspects/0/name")?;
+        assert_eq!(
+            name["source"]["characterGivenName"], "first",
+            "the retained alias supplies its original token"
+        );
+        proof::cell(name, "givenName", "absent")?;
+    }
     proof::closure(&catalog)
 }
 

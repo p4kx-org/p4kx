@@ -9,7 +9,6 @@ use p4kx_extraction::{
     TextSet, display_text, is_placeholder_key,
 };
 
-use crate::contract::LocalisedText;
 use crate::{CatalogError, TextSummary};
 
 /// The languages the catalog carries texts in, in the order its summary lists them.
@@ -33,9 +32,6 @@ impl TextSources {
 }
 
 /// Resolves localisation keys in every catalog language and counts what resolves.
-///
-/// Every kind turns its keys into [`LocalisedText`]s through [`Texts::localised`]; it may be
-/// called from any worker thread.
 pub(crate) struct Texts<'e> {
     set: TextSet<'e>,
     notes: Vec<LocalizationNote>,
@@ -79,31 +75,6 @@ impl<'e> Texts<'e> {
             languages: CATALOG_LANGUAGES.map(LanguageCount::new),
             placeholders: AtomicUsize::new(0),
         })
-    }
-
-    /// Returns the text with localisation `key` and its English and German texts, each
-    /// decoded (`\n` to a line feed) and trimmed; without a key every part is `None` and nothing is counted, and a
-    /// [placeholder key](crate::PLACEHOLDER_KEYS) keeps the key, has no texts and is counted as a
-    /// placeholder.
-    pub(crate) fn localised<'a>(&self, key: Option<&'a str>) -> LocalisedText<'a>
-    where
-        'e: 'a,
-    {
-        let Some(key) = key else {
-            return LocalisedText::default();
-        };
-        if is_placeholder_key(key) {
-            self.placeholders.fetch_add(1, Ordering::Relaxed);
-            return LocalisedText {
-                key: Some(key),
-                ..LocalisedText::default()
-            };
-        }
-        LocalisedText {
-            key: Some(key),
-            en: self.resolve(Language::English, key),
-            de: self.resolve(Language::German, key),
-        }
     }
 
     pub(crate) fn display(&self, language: Language, key: &str) -> Option<Cow<'e, str>> {
@@ -164,11 +135,5 @@ impl<'e> Texts<'e> {
 
     pub(crate) fn note_placeholder(&self) {
         self.placeholders.fetch_add(1, Ordering::Relaxed);
-    }
-
-    fn resolve(&self, language: Language, key: &str) -> Option<Cow<'e, str>> {
-        self.project(language, key)
-            .map(|text| text.display)
-            .filter(|text| !text.is_empty())
     }
 }

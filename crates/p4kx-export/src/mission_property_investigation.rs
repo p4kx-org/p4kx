@@ -27,7 +27,7 @@ pub(crate) struct Investigation<'f> {
 #[schemars(transform = crate::contract::every_field_required)]
 pub(crate) struct InvestigationSuspect<'f> {
     /// The authored name configuration.
-    pub(crate) name: Option<InvestigationName<'f>>,
+    pub(crate) name: Option<Box<InvestigationName<'f>>>,
     /// Whether this is an initial suspect.
     pub(crate) initial_suspect: Option<bool>,
     /// The authored guilt flag, without deriving a result.

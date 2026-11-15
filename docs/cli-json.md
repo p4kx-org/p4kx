@@ -1372,12 +1372,17 @@ carry the name) and the distinct location names without a link, up to 200; the n
 example are those of LIVE (Build 4.10.197). `playability` counts the
 items and the ships per value of their `playability`, and the ones no rule classifies
 (`unclassified`, `null` in the catalog). `variants` counts per kind the variant groups of at
-least two members (`groups`) and the entities with a `variantOf` (`variants`). `texts` lists per language whether the Archive holds its `global.ini` (`available`) and
-counts per text occurrence, so a key that several names or descriptions share counts once for
-each: `resolved` texts, `unresolved` texts (a key the file lacks or holds empty, or every key in a
-language that is not available; `null` in the catalog) and `placeholder` texts, whose key stands
-for no text (the same in every language, neither resolved nor unresolved). `unresolved` sums the
-unresolved texts of every language.
+least two members (`groups`) and the entities with a `variantOf` (`variants`).
+
+The summary's `texts` lists the available languages and also reports English and German when
+unavailable. For each language, `available` records whether the Archive holds its `global.ini`.
+The counters operate per lookup occurrence. `resolved` counts a nonempty display result and
+`unresolved` counts a lookup without one. `placeholder` counts original placeholder keys
+separately. The top-level `unresolved` sums the counts of the reported languages.
+
+These counters describe display lookup results. In the Catalog document, a missing key has absent
+text forms, a present empty value stays present and a missing language has no member in
+`translations.value`. See [TextForms](catalog-text-forms.md).
 
 ## `p4kx coverage <archive> [--format table|json] --json`
 

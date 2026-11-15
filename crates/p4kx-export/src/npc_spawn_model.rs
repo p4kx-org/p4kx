@@ -83,10 +83,9 @@ pub(crate) struct AutoSpawnSettings {
     pub(crate) faction_override_guid: Option<CatalogGuid>,
 }
 
-/// The name an NPC gets (`MissionPropertyValue_AIName`): drawn at random or given.
-#[derive(Debug, Clone, Serialize, JsonSchema)]
+/// The name settings and authored keys used to identify an NPC pool.
+#[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
 pub(crate) struct AiName<'a> {
     /// The `randomName` flag; `null` when absent.
     pub(crate) random_name: Option<bool>,
@@ -95,13 +94,10 @@ pub(crate) struct AiName<'a> {
     /// The `randomNickName` flag; `null` when absent.
     pub(crate) random_nick_name: Option<bool>,
     /// The `characterGivenName`.
-    #[schemars(extend("x-gameText" = true))]
     pub(crate) given_name: LocalisedText<'a>,
     /// The `characterGivenLastName`.
-    #[schemars(extend("x-gameText" = true))]
     pub(crate) given_last_name: LocalisedText<'a>,
     /// The `characterGivenNickName`.
-    #[schemars(extend("x-gameText" = true))]
     pub(crate) given_nick_name: LocalisedText<'a>,
     /// The `chanceOfNickName`, 0 to 1; `null` when absent.
     pub(crate) chance_of_nick_name: Option<f32>,

@@ -190,8 +190,8 @@ fn investigation_catalog() -> Value {
         },
         "missionPropertySets": [{
             "properties": [
-                {"value": {"type": "investigation", "locations": null}},
-                {"value": {"type": "investigation", "locations": [
+                {"value": {"type": "investigation", "suspects": null, "locations": null}},
+                {"value": {"type": "investigation", "suspects": null, "locations": [
                     null,
                     {"clueItems": null},
                     {"clueItems": [
@@ -202,7 +202,7 @@ fn investigation_catalog() -> Value {
                             {
                                 "objectiveLongDescription": present(&json!("bare")),
                                 "objectiveShortDescription": present(&json!("empty")),
-                                "details": {"type": "corpseScanInfo", "causeOfDeath": present(&json!("cause"))}
+                                "details": {"type": "corpseScanInfo", "causeOfDeath": present(&json!("cause")), "name": null}
                             },
                             {
                                 "objectiveLongDescription": present(&json!("bare")),
@@ -213,6 +213,101 @@ fn investigation_catalog() -> Value {
                     ]}
                 ]}}
             ]
+        }]
+    })
+}
+
+#[test]
+fn investigation_name_coverage_checks_each_original_key_and_language_occurrence() -> TestResult {
+    let english = Oracle::parse("shared=Shared name\nfamily=Family");
+    let german = Oracle::parse("shared=Gemeinsamer Name\nfamily=Familie");
+    let catalog = investigation_name_catalog();
+    let (en, de) = mission_coverage(&catalog, &english, &german)?;
+    assert_eq!(
+        [en.resolved, de.resolved],
+        [3, 3],
+        "the repeated suspect and corpse name each count alongside the family name",
+    );
+    assert_eq!(
+        [en.fallback, de.fallback],
+        [1, 1],
+        "a missing translation counts while bare and placeholder tokens do not",
+    );
+    assert_eq!(
+        [en.contradictions, de.contradictions],
+        [0, 0],
+        "both independent language forms agree",
+    );
+
+    let suspect = "/missionPropertySets/0/properties/0/value/suspects/2/name";
+    let corpse =
+        "/missionPropertySets/0/properties/0/value/locations/0/clueItems/0/clues/0/details/name";
+    for (path, value) in [
+        (format!("{suspect}/givenName"), present(&json!("family"))),
+        (format!("{corpse}/givenName"), absent()),
+        (format!("{corpse}/givenNickName"), present(&json!("shared"))),
+    ] {
+        let mut changed = catalog.clone();
+        replace_value(&mut changed, &path, value)?;
+        assert!(
+            mission_coverage(&changed, &english, &german).is_err(),
+            "a valid but wrong, missing or ineligible target cannot count for {path}",
+        );
+    }
+    let mut changed = catalog;
+    replace_value(
+        &mut changed,
+        "/texts/gameTexts/0/translations/value/de/sourceText",
+        present(&json!("Incorrect")),
+    )?;
+    let (en, de) = mission_coverage(&changed, &english, &german)?;
+    assert_eq!(
+        [en.contradictions, de.contradictions],
+        [0, 2],
+        "the source text mutation is counted separately for both German name occurrences",
+    );
+    Ok(())
+}
+
+fn investigation_name_catalog() -> Value {
+    let no_forms = json!({"sourceText": absent(), "displayText": absent()});
+    json!({
+        "texts": {
+            "publicNames": [],
+            "gameTexts": [
+                game_text("shared", "@Shared", &forms("Shared name"), &forms("Gemeinsamer Name")),
+                game_text("family", "@family", &forms("Family"), &forms("Familie")),
+                game_text("missing", "@missing", &no_forms, &no_forms)
+            ]
+        },
+        "missionPropertySets": [{
+            "properties": [{"value": {
+                "type": "investigation",
+                "suspects": [null, {"name": null}, {"name": {
+                    "givenName": present(&json!("shared")),
+                    "givenLastName": present(&json!("family")),
+                    "givenNickName": absent(),
+                    "source": {
+                        "characterGivenName": "@Shared",
+                        "characterGivenLastName": "@family",
+                        "characterGivenNickName": "bare"
+                    }
+                }}],
+                "locations": [{"clueItems": [{"clues": [{
+                    "objectiveLongDescription": absent(),
+                    "objectiveShortDescription": absent(),
+                    "details": {"type": "corpseScanInfo", "causeOfDeath": absent(), "name": {
+                        "givenName": present(&json!("shared")),
+                        "givenLastName": present(&json!("missing")),
+                        "givenNickName": absent(),
+                        "source": {
+                            "characterGivenName": "@Shared",
+                            "characterGivenLastName": "@missing",
+                            "characterGivenNickName": "@LOC_PLACEHOLDER"
+                        }
+                    }}
+                }]}]}]
+            }}]
         }]
     })
 }

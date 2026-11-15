@@ -28,13 +28,13 @@ fn investigation_keeps_all_clue_variants_and_owner_local_non_property_weak_links
             continue;
         }
         let case = fixture::generator_value(&document, "Case")?;
-        verify_investigation_fields(case)?;
+        verify_investigation_fields(&document, case)?;
         verify_items(&document, case)?;
     }
     Ok(())
 }
 
-fn verify_investigation_fields(case: &Value) -> TestResult {
+fn verify_investigation_fields(catalog: &Value, case: &Value) -> TestResult {
     assert_eq!(
         *fixture::field(case, "/type")?,
         "investigation",
@@ -60,7 +60,7 @@ fn verify_investigation_fields(case: &Value) -> TestResult {
         false,
         "false is preserved"
     );
-    verify_name(fixture::field(case, "/suspects/0/name")?)?;
+    verify_name(catalog, fixture::field(case, "/suspects/0/name")?)?;
     Ok(())
 }
 
@@ -113,7 +113,7 @@ fn verify_items(catalog: &Value, case: &Value) -> TestResult {
     Ok(())
 }
 
-fn verify_name(name: &Value) -> TestResult {
+fn verify_name(catalog: &Value, name: &Value) -> TestResult {
     assert_eq!(
         *fixture::field(name, "/randomName")?,
         false,
@@ -129,21 +129,20 @@ fn verify_name(name: &Value) -> TestResult {
         false,
         "the authored nickname flag survives"
     );
-    assert_eq!(
-        *fixture::field(name, "/givenName/key")?,
-        "@given",
-        "localisation keys survive"
-    );
-    assert_eq!(
-        *fixture::field(name, "/givenLastName/key")?,
-        "@family",
-        "surname keys survive"
-    );
-    assert_eq!(
-        *fixture::field(name, "/givenNickName/key")?,
-        "@nick",
-        "nickname keys survive"
-    );
+    for (field, raw_field, key) in [
+        ("/givenName", "characterGivenName", "@given"),
+        ("/givenLastName", "characterGivenLastName", "@family"),
+        ("/givenNickName", "characterGivenNickName", "@nick"),
+    ] {
+        assert_eq!(
+            name.get("source")
+                .and_then(|source| source.get(raw_field))
+                .and_then(Value::as_str),
+            Some(key),
+            "each raw name token remains available"
+        );
+        check_game_text_key(catalog, fixture::field(name, field)?, key)?;
+    }
     assert_eq!(
         *fixture::field(name, "/chanceOfNickName")?,
         0.375,
@@ -177,9 +176,9 @@ fn verify_clues(catalog: &Value, item: &Value) -> TestResult {
         ("/objectiveShortDescription", "@short"),
         ("/details/causeOfDeath", "@cause"),
     ] {
-        check_clue_key(catalog, fixture::field(scan, path)?, key)?;
+        check_game_text_key(catalog, fixture::field(scan, path)?, key)?;
     }
-    verify_name(fixture::field(scan, "/details/name")?)?;
+    verify_name(catalog, fixture::field(scan, "/details/name")?)?;
     assert_eq!(
         clues
             .get(3)
@@ -213,14 +212,14 @@ fn clue_texts_preserve_literal_empty_and_placeholder_locale_tokens() -> TestResu
         ("/details/causeOfDeath", "@LOC_PLACEHOLDER", None),
     ] {
         let cell = fixture::field(clue, path)?;
-        let registry = check_clue_key(&catalog, cell, key)?;
+        let registry = check_game_text_key(&catalog, cell, key)?;
         let translation = fixture::field(registry, "/translations/value/en/displayText/value")?;
         assert_eq!(
             translation.as_str(),
             display,
             "{path} has its original lookup policy"
         );
-        let position = clue_payload(&catalog, cell)?
+        let position = game_text_payload(&catalog, cell)?
             .pointer("/1")
             .and_then(Value::as_str)
             .ok_or("original Locale value position")?;
@@ -261,7 +260,7 @@ fn conflicting_clue_texts_leave_the_other_property_sets_and_no_orphan_text() -> 
             set,
             "/properties/0/value/locations/0/clueItems/0/clues/0/objectiveLongDescription",
         )?;
-        check_clue_key(&catalog, cell, "@kept")?;
+        check_game_text_key(&catalog, cell, "@kept")?;
     }
     assert!(
         proof::rows(&catalog, "/texts/gameTexts")?
@@ -272,7 +271,7 @@ fn conflicting_clue_texts_leave_the_other_property_sets_and_no_orphan_text() -> 
     Ok(())
 }
 
-fn check_clue_key<'catalog>(
+fn check_game_text_key<'catalog>(
     catalog: &'catalog Value,
     cell: &Value,
     key: &str,
@@ -289,13 +288,13 @@ fn check_clue_key<'catalog>(
     );
     assert_eq!(
         cell["containsEncryptedSource"], false,
-        "the clue field comes from the clear synthetic Archive entry",
+        "the name or clue field comes from the clear synthetic Archive entry",
     );
     assert_eq!(
         cell["sourceSetComplete"], true,
-        "the actual clue key field was observed",
+        "the actual key field was observed",
     );
-    let source = clue_payload(catalog, cell)?;
+    let source = game_text_payload(catalog, cell)?;
     assert!(
         proof::uses(catalog, &registry["key"])?
             .iter()
@@ -306,7 +305,7 @@ fn check_clue_key<'catalog>(
     Ok(registry)
 }
 
-fn clue_payload<'catalog>(
+fn game_text_payload<'catalog>(
     catalog: &'catalog Value,
     cell: &Value,
 ) -> Result<&'catalog Value, Box<dyn std::error::Error>> {
@@ -318,5 +317,5 @@ fn clue_payload<'catalog>(
                     == Some("dataforgeValue")
         })
         .and_then(|used| used.pointer("/location/indices"))
-        .ok_or_else(|| "clue text requires an original Locale payload".into())
+        .ok_or_else(|| "protected text requires an original Locale payload".into())
 }

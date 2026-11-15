@@ -238,13 +238,8 @@ fn project<'f>(
     let mut skipped = 0_usize;
     let mut grants = Grants::new(context.projection.origins());
     let spawns = RecordSpawns::new(context.index.tags(), tree, capture)?;
-    let property_sets = MissionPropertySetRegistry::new_observed(
-        admission,
-        tree,
-        context.index.tags(),
-        context.texts,
-        capture,
-    )?;
+    let property_sets =
+        MissionPropertySetRegistry::new_observed(admission, tree, context.index.tags(), capture)?;
     let source = ContractSource {
         tree,
         spawns: &spawns,

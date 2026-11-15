@@ -191,7 +191,6 @@ pub(crate) fn read<'f>(
     cancel: Option<&CancelToken>,
 ) -> Result<Missions<'f>, CatalogError> {
     let input = projection.original();
-    let texts = projection.legacy_texts();
     let mut grants = Grants::new(projection.origins());
     let records = selected_generators(forge, input, filter, cancel, &mut grants)?;
     let mut index = MissionIndex::read_captured(forge, input, filter, cancel, dependencies, tags)?;
@@ -215,7 +214,6 @@ pub(crate) fn read<'f>(
     let places = Places::new(starmap);
     let context = MissionEntryContext {
         index: &index,
-        texts,
         projection,
         places: &places,
         cancel,

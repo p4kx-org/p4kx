@@ -4,22 +4,18 @@
 use p4kx_extraction::StructValue;
 
 use crate::definition_reference::DefinitionStatus;
-use crate::mission_layers;
 use crate::mission_property_name::{InvestigationName, InvestigationNameSource};
-use crate::npc_spawn_model::AiName;
+use crate::mission_property_set::MissionPropertyText;
+use crate::npc_spawn_model::NpcSpawnName;
 use crate::record_read::ReadError;
 use crate::source_fields::{self, FieldCapture, FieldChecks, ReferenceShape};
-use crate::texts::Texts;
 
 pub(crate) fn read<'source>(
     source: Option<&StructValue<'source>>,
     path: &str,
-    texts: &Texts<'source>,
     capture: Option<&dyn FieldCapture<'source>>,
 ) -> Result<Option<InvestigationName<'source>>, ReadError> {
-    source
-        .map(|source| name(source, path, texts, capture))
-        .transpose()
+    source.map(|source| name(source, path, capture)).transpose()
 }
 
 /// Checks a nullable investigation-name configuration without locale lookup.
@@ -50,7 +46,6 @@ pub(crate) fn validate_context<'source>(
 fn name<'source>(
     source: &StructValue<'source>,
     path: &str,
-    texts: &Texts<'source>,
     capture: Option<&dyn FieldCapture<'source>>,
 ) -> Result<InvestigationName<'source>, ReadError> {
     let view = NameView::read(source, path, capture)?;
@@ -60,15 +55,13 @@ fn name<'source>(
         given_nick_name: view.given_nick_name()?,
         name_data: view.name_data()?.map(ReferenceShape::into_owned),
     };
-    let presentation = AiName {
+    let presentation = NpcSpawnName {
         random_name: view.random_name()?,
         random_last_name: view.random_last_name()?,
         random_nick_name: view.random_nick_name()?,
-        given_name: texts.localised(mission_layers::key(Some(source), "characterGivenName")),
-        given_last_name: texts
-            .localised(mission_layers::key(Some(source), "characterGivenLastName")),
-        given_nick_name: texts
-            .localised(mission_layers::key(Some(source), "characterGivenNickName")),
+        given_name: MissionPropertyText::read_key(source, "characterGivenName", capture)?,
+        given_last_name: MissionPropertyText::read_key(source, "characterGivenLastName", capture)?,
+        given_nick_name: MissionPropertyText::read_key(source, "characterGivenNickName", capture)?,
         chance_of_nick_name: view.chance()?,
         name_data_guid: original
             .name_data

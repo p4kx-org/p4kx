@@ -50,17 +50,65 @@ fn count_investigation(
     texts: &TextIndex<'_>,
     counters: &mut CoverageCounters<'_>,
 ) -> TestResult<()> {
+    for suspect in entries(investigation, "suspects")? {
+        count_investigation_name(suspect, texts, counters)?;
+    }
     for location in entries(investigation, "locations")? {
         for item in entries(location, "clueItems")? {
             for clue in entries(item, "clues")? {
                 for field in ["/objectiveLongDescription", "/objectiveShortDescription"] {
                     counters.count(required_reference(clue, field, texts)?)?;
                 }
-                if super::graph::text(clue, "/details/type")? == "corpseScanInfo" {
-                    counters.count(required_reference(clue, "/details/causeOfDeath", texts)?)?;
+                let details = clue
+                    .get("details")
+                    .ok_or("required Generator clue details")?;
+                if super::graph::text(details, "/type")? == "corpseScanInfo" {
+                    counters.count(required_reference(details, "/causeOfDeath", texts)?)?;
+                    count_investigation_name(details, texts, counters)?;
                 }
             }
         }
+    }
+    Ok(())
+}
+
+fn count_investigation_name(
+    owner: &Value,
+    texts: &TextIndex<'_>,
+    counters: &mut CoverageCounters<'_>,
+) -> TestResult<()> {
+    let name = owner
+        .get("name")
+        .ok_or("required nullable Investigation name")?;
+    if name.is_null() {
+        return Ok(());
+    }
+    let source = name
+        .get("source")
+        .ok_or("required original Investigation name source")?;
+    for (member, field) in [
+        ("characterGivenName", "givenName"),
+        ("characterGivenLastName", "givenLastName"),
+        ("characterGivenNickName", "givenNickName"),
+    ] {
+        let expected = match source.get(member) {
+            Some(Value::String(key)) => Some(key.as_str()).filter(|key| is_lookup_key(key)),
+            Some(Value::Null) => None,
+            _ => return Err(format!("invalid original Investigation name field {member}").into()),
+        };
+        let carrier = name
+            .get(field)
+            .ok_or_else(|| format!("required Investigation name field {field}"))?;
+        let target =
+            texts.reference(carrier, TextDomain::GameText, TextReferenceShape::Required)?;
+        if target.map(|target| target.key) != expected
+            || (expected.is_none() && carrier["state"] != "absent")
+        {
+            return Err(
+                format!("Investigation name {field} disagrees with its original key").into(),
+            );
+        }
+        counters.count(target)?;
     }
     Ok(())
 }

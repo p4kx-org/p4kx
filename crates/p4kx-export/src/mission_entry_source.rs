@@ -31,12 +31,10 @@ use crate::record_fields::{boolean, identity, reference, text};
 use crate::record_read::ReadError;
 use crate::selection::is_leftover;
 use crate::spawn_layers::HandlerSpawns;
-use crate::texts::Texts;
 
 /// Shared source context for deriving contract rows.
 pub(crate) struct MissionEntryContext<'x, 'f> {
     pub(crate) index: &'x MissionIndex<'f>,
-    pub(crate) texts: &'x Texts<'f>,
     pub(crate) projection: &'x CatalogProjection<'x, 'f>,
     pub(crate) places: &'x Places<'x, 'f>,
     pub(crate) cancel: Option<&'x CancelToken>,

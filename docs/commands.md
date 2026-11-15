@@ -463,7 +463,8 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   refining and loot, plus the full global Tag taxonomy, original root/child edges and selected
   Entity GUID tags ([Tag contract](catalog-tags.md)). Definition kinds are ordered by GUID, with test, template, dummy,
   debug, deprecated and dev Records left out and counted as skipped, and names and descriptions
-  resolved in English and German. Global Tag definitions retain all source Records, including
+  resolved in every supported language with an available original Entry. The canonical text tables
+  carry the original keys, language forms and source evidence. Global Tag definitions retain all source Records, including
   development-like names; their convenience paths retain tree order. `--filter` leaves that
   taxonomy complete and marks the owning Entity selection scope partial independently of
   read/projection health. It prints the counts per

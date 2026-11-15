@@ -3,6 +3,7 @@
 
 use std::error::Error;
 
+use p4kx_extraction::{SourceUses, SourceValue};
 use serde_json::{Value, json};
 
 use crate::catalog_schema_support;
@@ -211,11 +212,12 @@ fn investigation(name: &Value) -> Value {
 }
 
 fn investigation_name() -> Value {
+    let absent = SourceUses::new().value(SourceValue::<Value>::Absent, &[], false);
     json!({
         "randomName": false, "randomLastName": true, "randomNickName": false,
-        "givenName": {"key": null, "en": null, "de": null},
-        "givenLastName": {"key": null, "en": null, "de": null},
-        "givenNickName": {"key": null, "en": null, "de": null},
+        "givenName": absent,
+        "givenLastName": absent,
+        "givenNickName": absent,
         "chanceOfNickName": 0.125,
         "nameDataGuid": "a9000000-0000-4000-8000-000000000001",
         "source": {

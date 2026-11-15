@@ -6,6 +6,8 @@ use serde::{Serialize, Serializer};
 
 use crate::catalog_projection::{CatalogProjection, ProtectedKey};
 use crate::catalog_text_contract::GameTextRef;
+use crate::mission_layers;
+use crate::npc_spawn_model::NpcSpawnName;
 use crate::record_read::ReadError;
 use crate::source_fields::FieldCapture;
 use crate::{CatalogError, ExportAccountingError};
@@ -26,6 +28,17 @@ impl<'source> MissionPropertyText<'source> {
             token,
             key: Some(key),
         }
+    }
+
+    pub(crate) fn read_key(
+        source: &StructValue<'source>,
+        field: &str,
+        capture: Option<&dyn FieldCapture<'source>>,
+    ) -> Result<Self, ReadError> {
+        let key = capture
+            .ok_or(ExportAccountingError::ConflictingSourceDatum)?
+            .protected_key(source, field)?;
+        Ok(Self::pending(mission_layers::key(Some(source), field), key))
     }
 
     pub(crate) fn read_locale(
@@ -52,6 +65,17 @@ impl<'source> MissionPropertyText<'source> {
             .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
         *self = Self::Published(projection.finish_protected_key(key)?);
         Ok(())
+    }
+}
+
+impl<'source> NpcSpawnName<MissionPropertyText<'source>> {
+    pub(crate) fn publish_texts(
+        &mut self,
+        projection: &CatalogProjection<'_, 'source>,
+    ) -> Result<(), CatalogError> {
+        self.given_name.publish(projection)?;
+        self.given_last_name.publish(projection)?;
+        self.given_nick_name.publish(projection)
     }
 }
 

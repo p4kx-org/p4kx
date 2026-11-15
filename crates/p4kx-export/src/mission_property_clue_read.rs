@@ -13,13 +13,11 @@ use crate::owned_reference_read;
 use crate::record_read::ReadError;
 use crate::source_fields::{self, FieldCapture, FieldChecks, ReferenceShape};
 use crate::spawn_read::Reader;
-use crate::texts::Texts;
 
 pub(crate) fn item<'source>(
     reader: &Reader<'_, 'source>,
     source: &StructValue<'source>,
     path: &str,
-    texts: &Texts<'source>,
     capture: Option<&dyn FieldCapture<'source>>,
 ) -> Result<InvestigationClueItem<'source>, ReadError> {
     let view = ItemView::read(source, path, capture)?;
@@ -33,7 +31,7 @@ pub(crate) fn item<'source>(
             capture,
         )?,
         clues: mission_property_source::list(source, "clues", path, capture, |value, path| {
-            clue(value, path, texts, capture)
+            clue(value, path, capture)
         })?,
         details,
     })
@@ -98,20 +96,14 @@ pub(crate) fn validate_item_context<'source>(
 fn clue<'source>(
     source: &StructValue<'source>,
     path: &str,
-    texts: &Texts<'source>,
     capture: Option<&dyn FieldCapture<'source>>,
 ) -> Result<InvestigationClue<'source>, ReadError> {
     let view = ClueView::read(source, path, capture)?;
     let details = match view.kind {
         ClueKind::Base => ClueDetails::Base,
         ClueKind::CorpseScanInfo => ClueDetails::CorpseScanInfo {
-            name: mission_property_name_read::read(
-                view.name()?,
-                &format!("{path}.name"),
-                texts,
-                capture,
-            )?
-            .map(Box::new),
+            name: mission_property_name_read::read(view.name()?, &format!("{path}.name"), capture)?
+                .map(Box::new),
             cause_of_death: MissionPropertyText::read_locale(
                 source,
                 "causeOfDeath",

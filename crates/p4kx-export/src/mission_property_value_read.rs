@@ -13,12 +13,10 @@ use crate::source_fields::{FieldCapture, FieldChecks};
 use crate::spawn_read::Reader;
 use crate::template_property::PropertyValue;
 use crate::template_property_kind::PropertyValueKind;
-use crate::texts::Texts;
 
 pub(crate) fn read<'f>(
     reader: &Reader<'_, 'f>,
     source: &StructValue<'f>,
-    texts: &Texts<'f>,
     capture: Option<&dyn FieldCapture<'f>>,
 ) -> Result<Option<PropertyValue<'f>>, ReadError> {
     let value = match PropertyValueKind::read(source.type_name()) {
@@ -26,7 +24,7 @@ pub(crate) fn read<'f>(
             PropertyValue::AutoSpawns(Box::new(mission_property_auto_read::read(source, capture)?))
         }
         Some(PropertyValueKind::Investigation) => PropertyValue::Investigation(Box::new(
-            mission_property_investigation_read::read(reader, source, texts, capture)?,
+            mission_property_investigation_read::read(reader, source, capture)?,
         )),
         Some(PropertyValueKind::StringHash) => PropertyValue::StringHash {
             options: options(source, capture, |value, path| {

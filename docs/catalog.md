@@ -94,24 +94,14 @@ The rule is ADR-0054 (amending ADR-0002):
 
 ### Game texts
 
-Identifiers, short names and fact values may reach third parties; descriptions and lore may not.
-The game texts of the catalog are every `description` and every `displayType`, the `name` of a
-starmap object (a place name that comes from localisation, by the owner's decision for #321), and
-the `title`, `missionType`, `contractor`, the `displayName` of a contract's faction and the `place`
-of a pickup place of a contract, the `processName` of a refining process and the `depositName`
-of a mineable composition, the `displayName` of a faction, a reputation scope and a reputation
-standing, the `displayName` of each name variant of a mission location template and the
-`typeName` of a mission type. `name` of the other kinds, `role`, `career` and the other fields are
-identifiers, short names or fact values. Consumers apply the protected-text policy to descriptions,
-`displayType` and the other game text fields. Every such field carries
-`"x-gameText": true` in the JSON Schema, and no other field does; a test checks this.
-Display text is trimmed of leading and trailing white space; see Texts. Canonical text rows
-also retain their exact decoded source text. ResourceTypes, Commodities and Manufacturers use
-`texts.publicNames` and `texts.gameTexts` instead of inline `key`/`en`/`de` objects. Their description
-reference, GameTextRef type and complete gameTexts table protect both source and display forms
-through the reference. A shared key used as both a name and a description has separate rows in
-the two domains. Public short UI format templates use the existing public domain and stay inert.
-An unencrypted source marker does not remove `x-gameText` protection.
+Use each field's `x-gameText` annotation in the generated JSON Schema to identify protected game
+text. For a `GameTextRef`, this protection includes the referenced `texts.gameTexts` row and both
+forms of each translation. Public short names and UI format templates use `PublicNameRef` and
+`texts.publicNames`. One original key used in both domains has two separate references.
+
+Apply text protection independently of `containsEncryptedSource`. The encryption marker
+describes the actual Archive source of the datum. See [Texts](#texts) for language selection
+and [TextForms](catalog-text-forms.md) for exact values and provenance.
 
 An extensible source vocabulary derived from a Rust enum is a definition of `"type": "string"`
 with the known values in `x-values`, one `{"value", "description"}` entry per value (`description`
@@ -393,17 +383,17 @@ lower number than the last applied one.
 
 ### Entities
 
-The existing entity shapes below carry these fields. Manufacturers, ResourceTypes and Commodities
-use their canonical tables and sourced carriers instead of the inline text shape:
+Entity families expose the following information where it applies. Their sections below specify
+the owning tables and source carriers.
 
 | Field | Meaning |
 |-------|---------|
 | `guid` | The Record GUID as canonical lower-case UUID text; entities are ordered by it |
 | `className` | The Record name without its type, e.g. `ACAS` for `SCItemManufacturer.ACAS` |
 | `recordPath` | The record path, without `.xml` |
-| `name`, `description` | `key` (the localisation key), `en` and `de` (the resolved texts), each `null` while unknown |
+| `name`, `description` | Text references where documented for the family. The original key and language forms are in the canonical registry. |
 
-A resource group and a blueprint category carry `name` and no `description`.
+A resource group carries `name` and protected `description`. A blueprint category carries `name`.
 
 Manufacturers use [their canonical definition contract](catalog-manufacturer-types.md). The authored
 `Code` string and owned `Localization` retain their source states independently of resolved text.
@@ -1192,7 +1182,7 @@ replaced, in each language, by what the first layer (sub contract, contract, han
 - anything else, a token no layer states and a text the language lacks: the token in upper case in
   brackets, e.g. `[CARGO]`.
 
-Nested readable replacements are fully expanded for the selected language. An active localization
+Nested readable replacements are expanded independently in each available language. An active localization
 cycle leaves the bracketed token at the cyclic reference. Missing text and tokens supplied at
 mission start retain their placeholders. Leading and trailing blanks are removed from the result.
 The sourced key names the canonical GameText row. Each available language has its own derived
@@ -2721,60 +2711,31 @@ nested groups. The legacy and nested source generations can be checked in separa
 
 ### Texts
 
-The inline `key`/`en`/`de` rules below describe the existing non-migrated family shapes.
-Manufacturers, ResourceTypes and Commodity text fields use canonical `texts.publicNames`/`texts.gameTexts`
-rows and all supported languages whose Entries are available. Each row retains its authored key,
-even if empty. Each language has direct `sourceText` and `displayText` sourced values. The source
-form preserves the winning decoded RHS, including whitespace and literal backslash-n; the display
-form applies the existing line-break decoding and trimming. Both preserve present empty values.
-Placeholders retain their key and have two absent forms without locale contributions; missing keys
-retain their actual lookup selectors. Bare keys and plain/suffix winners keep the existing lookup
-rules. Provenance references the actual DataForge key selector and winning language Entry, without
-putting protected key text in global source-use IDs. See [TextForms](catalog-text-forms.md) for the
-direct origin rules and the unchanged display-based summary accounting.
+The catalog loads each available supported `global.ini` once. The canonical registry has a public
+table (`texts.publicNames`) and a protected table (`texts.gameTexts`). Follow an owner's typed
+reference to the registry row with the matching `id.value`. That row retains the exact authored key.
+A key used in both domains has a separate reference in each domain. Protected fields carry
+`x-gameText`. The encryption marker records source origin independently of the text domain.
 
-#### Inline family texts
+The supported language codes are `en`, `de`, `fr`, `it`, `es-ES`, `es-419`, `pt-BR`, `ja`, `ko`,
+`zh-Hans` and `zh-Hant`. Each available language has a member in `translations.value`. A missing
+language has no member. An available language without a matching key has absent text forms with
+lookup evidence. A present empty value keeps its present state. The catalog does not substitute
+text from another language.
 
-`key` is the localisation key as the Record holds it, e.g. `@manufacturer_NameACAS`; an empty key
-is `null`. `en` and `de` are its texts from the Archive's `global.ini` of that language:
+Each language has two sourced forms. `sourceText` preserves the winning decoded value after
+`=`, including any markup, spaces and literal backslash-n. `displayText` converts literal
+backslash-n to a line feed and trims edge whitespace. Lookup matches keys case-insensitively in
+ASCII, with an optional initial `@`. A plain key wins over its suffixed form unless the plain
+value is empty and the suffixed one is not. Admitted placeholder keys retain the key and have
+absent forms without consulting a language Entry. Individual owner fields can have stricter
+key admission rules, as documented for those fields.
 
-| Language | Entry |
-|----------|-------|
-| `en` | `Data\Localization\english\global.ini` |
-| `de` | `Data\Localization\german_(germany)\global.ini` |
-
-Each line `key=value` of a `global.ini` holds one text. Keys match without the leading `@` and
-ignoring case; a suffix after a comma (`ASD_01,P`) is not part of the key. When a `global.ini`
-holds both `key=` and `key,P=`, the lookup keeps both lines and uses the text of the plain key,
-unless that is empty and the suffixed one is not (the Archive's LIVE `global.ini` files hold no
-such pair; English has 13,504 `,P` keys, all without a plain twin). The text is the rest of
-the line as the game stores it, except that the escape `\n` becomes a line feed; markup, a lone
-carriage return and every other sequence stay as they are.
-
-A `global.ini` is read as UTF-8 with or without a byte order mark, or as UTF-16. Bytes that are no
-valid text become U+FFFD and lines without `=` are skipped, so a damaged line costs only itself;
-`p4kx catalog` names every such Entry in a `note:` line on stderr and the catalog stays as it is.
-Only a `global.ini` over 64 MiB or with more than 1,048,576 keys fails the catalog, with exit
-code 3.
-
-A key the language's `global.ini` lacks or holds with an empty text (`key=`), or a language the
-Archive holds no `global.ini` for, leaves that text `null` and keeps the key, so consumers can
-resolve it later; it counts as unresolved.
-
-The placeholder keys `@LOC_EMPTY`, `@LOC_PLACEHOLDER`, `@LOC_UNINITIALIZED` and `@blank_space`
-(the game's filler for an empty line, which Records use 372 times; ignoring case,
-`PLACEHOLDER_KEYS` in `crates/p4kx-localization/src/lookup.rs`) mean "no text": the key stays,
-`en` and `de` are `null` even where the `global.ini` holds a text for them such as
-`<= PLACEHOLDER =>`, and they count as placeholders, neither resolved nor unresolved.
-
-Leading and trailing white space, line breaks included, is removed from every text, after the
-`\n` escapes are decoded (`display_text` in `crates/p4kx-localization/src/lookup.rs`), so
-`Antium Arms Moss Camo ` becomes `Antium Arms Moss Camo`. A text that is white space only counts as
-unresolved. White space inside a text stays. The trim is the catalog's and the window's alone: Record
-XML and JSON, `p4kx loc` and `dcb export --lang` keep the text byte for byte as the `global.ini`
-stores it. It does not change the catalog's determinism: the same Archive gives the same bytes.
-
-`p4kx catalog` counts the resolved, unresolved and placeholder texts per language in its summary.
+The source uses identify the authored key, the actual lookup and the winning language Entry where
+applicable. A malformed encoding or skipped line is reported as a localization note. The catalog
+rejects a `global.ini` that exceeds 64 MiB or 1,048,576 keys. The summary uses the display result
+for resolved and unresolved counts and reports placeholders separately. See [TextForms](catalog-text-forms.md)
+for the wire structure, state rules and per-form source evidence.
 
 ## Selection
 
@@ -2988,11 +2949,11 @@ on `P4KX_DATA_P4K` and `P4KX_DATA_P4K_B`.
   to a `definitions.blueprintCategories.rows` entry. On LIVE the
   catalog holds 19 groups (8 of them nested) and 21 categories, 14 of which carry blueprints.
 - Texts that carry a key (placeholder keys excluded), checked per kind against the Archive's own
-  `global.ini` files (ADR-0270): a key a file holds resolves in the catalog, a key it lacks is
-  `null`. The verification prints the numbers per kind and
-  holds each kind to a baseline of the share it may lack: the share measured on LIVE, rounded up to
-  the hundredth. LIVE, every `name` and every game text
-  field (`x-gameText`) that carries a key, wherever it sits in an entry:
+  `global.ini` files (ADR-0270). An available language without the key has absent text forms.
+  The verification prints results per kind, checks the original source and display forms, and
+  compares the unresolved share with the historical English and German LIVE baselines below.
+  The baseline shares count each occurrence of a keyed name or game text and round up to
+  the hundredth.
 
   | Kind | Keyed texts | Missing in en | Missing in de |
   |------|------------:|--------------:|--------------:|

@@ -150,19 +150,15 @@ pub(crate) struct Catalog<'a> {
     pub(crate) ship_store_slugs: Vec<ShipStoreSlug<'a>>,
 }
 
-/// A text the game localises: its localisation key and the resolved English and German texts,
-/// as the language's `global.ini` stores them with the escape `\n` decoded to a line feed.
-#[derive(Debug, Clone, Default, Serialize, JsonSchema)]
+/// The serialized text-key shape in an NPC pool content identifier.
+#[derive(Debug, Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
 pub(crate) struct LocalisedText<'a> {
     /// The localisation key, e.g. `@manufacturer_NameACAS`, `null` when it is unknown.
     pub(crate) key: Option<&'a str>,
-    /// The English text, `null` for no key, a placeholder key, or a key the English `global.ini`
-    /// lacks or holds empty.
+    /// The required null English field.
     pub(crate) en: Option<Cow<'a, str>>,
-    /// The German text, `null` for no key, a placeholder key, or a key the German `global.ini`
-    /// lacks or holds empty.
+    /// The required null German field.
     pub(crate) de: Option<Cow<'a, str>>,
 }
 

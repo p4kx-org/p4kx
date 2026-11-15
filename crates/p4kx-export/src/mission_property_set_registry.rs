@@ -17,7 +17,6 @@ use crate::spawn_model::content_guid;
 use crate::spawn_pools::SpawnPools;
 use crate::spawn_read::Reader;
 use crate::template_property_read::PropertyReader;
-use crate::texts::Texts;
 
 /// Canonical property-set registration for one immutable owning Record.
 pub(crate) struct MissionPropertySetRegistry<'r, 'f> {
@@ -25,7 +24,6 @@ pub(crate) struct MissionPropertySetRegistry<'r, 'f> {
     subject: RecordSubject,
     index: MissionPropertySetIndex<'r, 'f>,
     reader: Reader<'r, 'f>,
-    texts: &'r Texts<'f>,
     capture: &'r dyn FieldCapture<'f>,
     spawns: RefCell<SpawnPools<'f>>,
     sets: RefCell<MissionPropertySets<'f>>,
@@ -36,19 +34,17 @@ impl<'r, 'f> MissionPropertySetRegistry<'r, 'f> {
         admission: &RecordObservation<'_, '_>,
         tree: &'r RecordTree<'f>,
         tags: &'r TagTree,
-        texts: &'r Texts<'f>,
         capture: &'r dyn FieldCapture<'f>,
     ) -> Result<Self, ReadError> {
         admission.check_tree(tree)?;
         capture.check_parent(tree.root())?;
-        Self::create(tree, admission.subject().clone(), tags, texts, capture)
+        Self::create(tree, admission.subject().clone(), tags, capture)
     }
 
     fn create(
         tree: &'r RecordTree<'f>,
         subject: RecordSubject,
         tags: &'r TagTree,
-        texts: &'r Texts<'f>,
         capture: &'r dyn FieldCapture<'f>,
     ) -> Result<Self, ReadError> {
         let registry = Self {
@@ -56,7 +52,6 @@ impl<'r, 'f> MissionPropertySetRegistry<'r, 'f> {
             subject,
             index: MissionPropertySetIndex::new(tree.root())?,
             reader: Reader::for_observed(tags, tree, capture)?,
-            texts,
             capture,
             spawns: RefCell::new(SpawnPools::default()),
             sets: RefCell::new(MissionPropertySets::default()),
@@ -133,7 +128,7 @@ impl<'r, 'f> MissionPropertySetRegistry<'r, 'f> {
                 self.capture,
             ));
         };
-        let reader = PropertyReader::new(&self.reader, self.texts, &self.spawns);
+        let reader = PropertyReader::new(&self.reader, &self.spawns);
         let properties = reader.source_properties(params, values)?;
         let body = self.capture.record_field(params, value, &source_location)?;
         self.sets.borrow_mut().insert_subject(

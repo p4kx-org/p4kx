@@ -18,7 +18,6 @@ use crate::spawn_pools::{Registered, SpawnPools, Target};
 use crate::spawn_read::Reader;
 use crate::template_property::PropertyValue;
 use crate::template_property_kind::PropertyValueKind;
-use crate::texts::Texts;
 use crate::{CatalogError, ExportAccountingError};
 
 const VALUE_PREFIX: &str = "MissionPropertyValue_";
@@ -26,7 +25,6 @@ const VALUE_PREFIX: &str = "MissionPropertyValue_";
 /// Reads the authored Generator property-set values through their original guards.
 pub(crate) struct PropertyReader<'r, 'x, 'f> {
     reader: &'r Reader<'x, 'f>,
-    texts: &'r Texts<'f>,
     pools: &'r RefCell<SpawnPools<'f>>,
 }
 
@@ -40,14 +38,9 @@ impl<'r, 'x, 'f> PropertyReader<'r, 'x, 'f> {
     /// Creates the reader of the Record `reader` belongs to.
     pub(crate) const fn new(
         reader: &'r Reader<'x, 'f>,
-        texts: &'r Texts<'f>,
         pools: &'r RefCell<SpawnPools<'f>>,
     ) -> Self {
-        Self {
-            reader,
-            texts,
-            pools,
-        }
+        Self { reader, pools }
     }
 }
 
@@ -88,9 +81,7 @@ impl<'f> PropertyReader<'_, '_, 'f> {
 
     fn value(&self, value: &StructValue<'f>) -> Result<PropertyValue<'f>, ReadError> {
         let capture = self.reader.capture();
-        if let Some(value) =
-            mission_property_value_read::read(self.reader, value, self.texts, capture)?
-        {
+        if let Some(value) = mission_property_value_read::read(self.reader, value, capture)? {
             return Ok(value);
         }
         let parent = Some(value);

@@ -84,6 +84,10 @@ fn exactly_the_game_text_fields_carry_the_game_text_annotation() {
         .get("$defs")
         .and_then(Value::as_object)
         .expect("catalog definitions");
+    assert!(
+        !definitions.contains_key("LocalisedText"),
+        "schema v3 publishes no inline key/en/de text object",
+    );
     let name_variant = schema
         .pointer("/$defs/PropertyValue/oneOf")
         .and_then(Value::as_array)

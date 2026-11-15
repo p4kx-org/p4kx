@@ -159,10 +159,9 @@ pub struct TextSummary {
     pub language: Language,
     /// Whether the Archive holds the language's `global.ini`.
     pub available: bool,
-    /// The texts whose key the language resolved.
+    /// Lookup occurrences with a nonempty display result.
     pub resolved: usize,
-    /// The texts whose key the language lacks, or every text with a key when it is not available;
-    /// their text in this language is `null`. A key whose text is empty counts here.
+    /// Lookup occurrences without a nonempty display result.
     pub unresolved: usize,
     /// The texts with a [placeholder key](crate::PLACEHOLDER_KEYS), the same in every language;
     /// they are neither resolved nor unresolved.

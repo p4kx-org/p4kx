@@ -12,7 +12,6 @@ use crate::mission_property_source;
 use crate::record_read::ReadError;
 use crate::source_fields::{FieldCapture, FieldChecks};
 use crate::spawn_read::Reader;
-use crate::texts::Texts;
 
 fn check<'source>(
     source: &StructValue<'source>,
@@ -28,7 +27,6 @@ fn check<'source>(
 pub(crate) fn read<'source>(
     reader: &Reader<'_, 'source>,
     source: &StructValue<'source>,
-    texts: &Texts<'source>,
     capture: Option<&dyn FieldCapture<'source>>,
 ) -> Result<Investigation<'source>, ReadError> {
     check(source, capture)?;
@@ -36,14 +34,14 @@ pub(crate) fn read<'source>(
         starting_journal_entries: FieldChecks::for_context(source, "", capture)?
             .references("startingJournalEntries")?,
         suspects: mission_property_source::list(source, "suspects", "", capture, |value, path| {
-            suspect(value, path, texts, capture)
+            suspect(value, path, capture)
         })?,
         locations: mission_property_source::list(
             source,
             "locations",
             "",
             capture,
-            |value, path| location(reader, value, path, texts, capture),
+            |value, path| location(reader, value, path, capture),
         )?,
     })
 }
@@ -105,17 +103,12 @@ fn validate_context<'source>(
 fn suspect<'source>(
     source: &StructValue<'source>,
     path: &str,
-    texts: &Texts<'source>,
     capture: Option<&dyn FieldCapture<'source>>,
 ) -> Result<InvestigationSuspect<'source>, ReadError> {
     let view = SuspectView::read(source, path, capture)?;
     Ok(InvestigationSuspect {
-        name: mission_property_name_read::read(
-            view.name()?,
-            &format!("{path}.name"),
-            texts,
-            capture,
-        )?,
+        name: mission_property_name_read::read(view.name()?, &format!("{path}.name"), capture)?
+            .map(Box::new),
         initial_suspect: view.initial()?,
         is_guilty: view.guilty()?,
     })
@@ -133,7 +126,6 @@ fn location<'source>(
     reader: &Reader<'_, 'source>,
     source: &StructValue<'source>,
     path: &str,
-    texts: &Texts<'source>,
     capture: Option<&dyn FieldCapture<'source>>,
 ) -> Result<InvestigationLocation<'source>, ReadError> {
     check_location(source, path, capture)?;
@@ -143,7 +135,7 @@ fn location<'source>(
             "clueItems",
             path,
             capture,
-            |value, path| mission_property_clue_read::item(reader, value, path, texts, capture),
+            |value, path| mission_property_clue_read::item(reader, value, path, capture),
         )?,
     })
 }

@@ -138,12 +138,17 @@ mod tests {
             chance_of_nick_name: Some(0.25),
             name_data_guid: None,
         };
-        let fingerprint = serde_json::to_vec(&legacy)?;
         let pending = PendingNpcName { legacy, keys: None };
         assert_eq!(
-            serde_json::to_vec(&pending)?,
-            fingerprint,
-            "the content identifier still sees the exact key-only name bytes",
+            serde_json::to_string(&pending)?,
+            concat!(
+                r#"{"randomName":false,"randomLastName":null,"randomNickName":true,"#,
+                r#""givenName":{"key":"@fixture_given","en":null,"de":null},"#,
+                r#""givenLastName":{"key":null,"en":null,"de":null},"#,
+                r#""givenNickName":{"key":null,"en":null,"de":null},"#,
+                r#""chanceOfNickName":0.25,"nameDataGuid":null}"#,
+            ),
+            "the content identifier uses the exact key-only name bytes",
         );
         Ok(())
     }

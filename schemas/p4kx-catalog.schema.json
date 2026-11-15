@@ -23125,7 +23125,6 @@
       "description": "An investigation name with its established presentation and original source identities.",
       "properties": {
         "chanceOfNickName": {
-          "description": "The `chanceOfNickName`, 0 to 1; `null` when absent.",
           "format": "float",
           "type": [
             "number",
@@ -23133,18 +23132,18 @@
           ]
         },
         "givenLastName": {
-          "$ref": "#/$defs/LocalisedText",
-          "description": "The `characterGivenLastName`.",
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "description": "The original `characterGivenLastName`.",
           "x-gameText": true
         },
         "givenName": {
-          "$ref": "#/$defs/LocalisedText",
-          "description": "The `characterGivenName`.",
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "description": "The original `characterGivenName`.",
           "x-gameText": true
         },
         "givenNickName": {
-          "$ref": "#/$defs/LocalisedText",
-          "description": "The `characterGivenNickName`.",
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "description": "The original `characterGivenNickName`.",
           "x-gameText": true
         },
         "nameDataGuid": {
@@ -23155,25 +23154,21 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The `characterNameData` Record (`CharacterRandomNameParams`), `null` when absent."
+          ]
         },
         "randomLastName": {
-          "description": "The `randomLastName` flag; `null` when absent.",
           "type": [
             "boolean",
             "null"
           ]
         },
         "randomName": {
-          "description": "The `randomName` flag; `null` when absent.",
           "type": [
             "boolean",
             "null"
           ]
         },
         "randomNickName": {
-          "description": "The `randomNickName` flag; `null` when absent.",
           "type": [
             "boolean",
             "null"
@@ -26073,38 +26068,6 @@
         "handler",
         "inputRef",
         "recordIndex"
-      ],
-      "type": "object"
-    },
-    "LocalisedText": {
-      "description": "A text the game localises: its localisation key and the resolved English and German texts,\nas the language's `global.ini` stores them with the escape `\\n` decoded to a line feed.",
-      "properties": {
-        "de": {
-          "description": "The German text, `null` for no key, a placeholder key, or a key the German `global.ini`\nlacks or holds empty.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "en": {
-          "description": "The English text, `null` for no key, a placeholder key, or a key the English `global.ini`\nlacks or holds empty.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "key": {
-          "description": "The localisation key, e.g. `@manufacturer_NameACAS`, `null` when it is unknown.",
-          "type": [
-            "string",
-            "null"
-          ]
-        }
-      },
-      "required": [
-        "de",
-        "en",
-        "key"
       ],
       "type": "object"
     },

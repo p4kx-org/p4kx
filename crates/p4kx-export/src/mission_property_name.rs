@@ -5,16 +5,18 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::definition_reference::DefinitionReference;
-use crate::npc_spawn_model::AiName;
+use crate::mission_property_set::MissionPropertyText;
+use crate::npc_spawn_model::NpcSpawnName;
 
 /// An investigation name with its established presentation and original source identities.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = crate::contract::every_field_required)]
 pub(crate) struct InvestigationName<'source> {
-    /// The established AI-name presentation fields.
+    /// The name settings and sourced text references.
     #[serde(flatten)]
-    pub(crate) name: AiName<'source>,
+    #[schemars(with = "NpcSpawnName")]
+    pub(crate) name: NpcSpawnName<MissionPropertyText<'source>>,
     /// The raw Locale tokens and complete name-data Reference.
     pub(crate) source: InvestigationNameSource<'source>,
 }
