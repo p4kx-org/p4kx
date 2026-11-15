@@ -14,11 +14,11 @@ mod mission_type;
 
 pub(super) fn count(
     catalog: &Value,
+    index: &TextIndex<'_>,
     contracts: &[Value],
     counters: &mut CoverageCounters<'_>,
 ) -> TestResult<()> {
-    let index = TextIndex::new(catalog)?;
-    mission_type::count(catalog, contracts, &index, counters)?;
+    mission_type::count(catalog, contracts, index, counters)?;
     let mut objects = HashMap::<&str, Vec<&Value>>::new();
     for row in catalog_v3_consumer::rows(catalog, Kind::StarmapObjects)? {
         let guid = row
@@ -31,7 +31,7 @@ pub(super) fn count(
             .push(row.get("name").ok_or("canonical starmap name cell")?);
     }
     for contract in contracts {
-        count_faction_names(contract, &index, counters)?;
+        count_faction_names(contract, index, counters)?;
         let contractor = contract.get("contractor").ok_or("contractor text cell")?;
         counters.count(index.reference(
             contractor,

@@ -11,11 +11,12 @@ use p4kx_extraction::{
 use serde_json::Value;
 
 use super::{
-    ItemPresentationIndex, Oracle, TestResult, TextDomain, TextIndex, TextReferenceShape,
-    localization, record_index,
+    ItemPresentationIndex, TestResult, TextDomain, TextIndex, TextReferenceShape, localization,
+    record_index,
 };
 use crate::catalog_v3_consumer;
 use crate::real_archive_shop_inventory_v3::verify_build;
+use crate::real_archive_text_oracle::Oracle;
 use crate::real_archive_verification::print_line;
 
 #[test]

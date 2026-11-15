@@ -231,17 +231,19 @@ pub(crate) fn manufacturer_text<'catalog>(
 
 pub(crate) fn kind_coverage(
     catalog: &Value,
+    index: &TextIndex<'_>,
     kind: Kind,
     fields: &[String],
     english_oracle: &Oracle,
     german_oracle: &Oracle,
 ) -> TestResult<(Coverage, Coverage)> {
+    let mut counters = CoverageCounters::new(english_oracle, german_oracle);
     match kind {
         Kind::ContractTemplates => {
-            mission_coverage(catalog, Family::Template, english_oracle, german_oracle)
+            mission_coverage(catalog, index, Family::Template, &mut counters)?;
         }
         Kind::MissionBrokerEntries => {
-            mission_coverage(catalog, Family::Broker, english_oracle, german_oracle)
+            mission_coverage(catalog, index, Family::Broker, &mut counters)?;
         }
         Kind::Manufacturers
         | Kind::Ships
@@ -257,44 +259,38 @@ pub(crate) fn kind_coverage(
         | Kind::MissionTypes
         | Kind::RefiningProcesses
         | Kind::MineableCompositions => {
-            canonical_coverage(catalog, kind, english_oracle, german_oracle)
+            canonical_coverage(catalog, index, kind, &mut counters)?;
         }
         Kind::MissionLocationTemplates => {
-            extras::location_templates(catalog, english_oracle, german_oracle)
+            extras::location_templates(catalog, index, &mut counters)?;
         }
-        Kind::ContractNpcSpawns => extras::npc_names(catalog, english_oracle, german_oracle),
-        Kind::Items => {
-            let mut counters = CoverageCounters::new(english_oracle, german_oracle);
-            extras::items(catalog, &mut counters)?;
-            Ok(counters.finish())
-        }
+        Kind::ContractNpcSpawns => extras::npc_names(catalog, index, &mut counters)?,
+        Kind::Items => extras::items(catalog, index, &mut counters)?,
         _ => {
-            let mut counters = CoverageCounters::new(english_oracle, german_oracle);
             let rows = catalog_v3_consumer::rows(catalog, kind)?;
-            mission_property_texts::count(catalog, kind, rows, &mut counters)?;
+            mission_property_texts::count(index, kind, rows, &mut counters)?;
             if kind == Kind::Contracts && !rows.is_empty() {
-                contract_places::count(catalog, rows, &mut counters)?;
+                contract_places::count(catalog, index, rows, &mut counters)?;
             }
             let mut found = Vec::new();
             for row in rows {
                 keyed_texts(row, fields, &mut found);
+                for &(key, text) in &found {
+                    counters.count_legacy(key, text);
+                }
+                found.clear();
             }
-            for (key, text) in found {
-                counters.count_legacy(key, text);
-            }
-            Ok(counters.finish())
         }
     }
+    Ok(counters.finish())
 }
 
 fn mission_coverage(
     catalog: &Value,
+    index: &TextIndex<'_>,
     family: Family,
-    english_oracle: &Oracle,
-    german_oracle: &Oracle,
-) -> TestResult<(Coverage, Coverage)> {
-    let mut counters = CoverageCounters::new(english_oracle, german_oracle);
-    let index = TextIndex::new(catalog)?;
+    counters: &mut CoverageCounters<'_>,
+) -> TestResult<()> {
     for mission in graph::contexts(catalog, family)? {
         for lookup in graph::array(mission.projection, "localizations")? {
             let source = lookup.get("source").ok_or("mission localization source")?;
@@ -321,7 +317,7 @@ fn mission_coverage(
             }
         }
     }
-    Ok(counters.finish())
+    Ok(())
 }
 
 fn mission_text_key(node: &Value) -> TestResult<Option<&str>> {
@@ -338,12 +334,10 @@ fn mission_text_key(node: &Value) -> TestResult<Option<&str>> {
 
 fn canonical_coverage(
     catalog: &Value,
+    index: &TextIndex<'_>,
     kind: Kind,
-    english_oracle: &Oracle,
-    german_oracle: &Oracle,
-) -> TestResult<(Coverage, Coverage)> {
-    let mut counters = CoverageCounters::new(english_oracle, german_oracle);
-    let index = TextIndex::new(catalog)?;
+    counters: &mut CoverageCounters<'_>,
+) -> TestResult<()> {
     if kind == Kind::Blueprints {
         let blueprints = crate::real_archive_blueprints::Blueprints::read(catalog)?;
         for blueprint in blueprints.rows() {
@@ -353,7 +347,7 @@ fn canonical_coverage(
                 TextReferenceShape::Nullable,
             )?)?;
         }
-        return Ok(counters.finish());
+        return Ok(());
     }
     let rows = if kind == Kind::Commodities {
         catalog_v3_consumer::presentations(catalog)?
@@ -395,7 +389,7 @@ fn canonical_coverage(
             };
             counters.count(target)?;
         }
-        extras::compare(&mut counters, &index, kind, row)?;
+        extras::compare(counters, index, kind, row)?;
     }
-    Ok(counters.finish())
+    Ok(())
 }

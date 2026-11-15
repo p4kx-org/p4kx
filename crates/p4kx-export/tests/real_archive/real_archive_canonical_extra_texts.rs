@@ -6,10 +6,7 @@ use std::collections::{HashMap, HashSet};
 use p4kx_export::Kind;
 use serde_json::Value;
 
-use super::{
-    Coverage, CoverageCounters, Oracle, TestResult, TextDomain, TextIndex, TextReferenceShape,
-    TextTarget,
-};
+use super::{CoverageCounters, TestResult, TextDomain, TextIndex, TextReferenceShape, TextTarget};
 use crate::catalog_v3_consumer;
 
 #[path = "real_archive_live_item_texts.rs"]
@@ -17,11 +14,9 @@ mod installed_items;
 
 pub(super) fn location_templates(
     catalog: &Value,
-    english: &Oracle,
-    german: &Oracle,
-) -> TestResult<(Coverage, Coverage)> {
-    let index = TextIndex::new(catalog)?;
-    let mut counters = CoverageCounters::new(english, german);
+    index: &TextIndex<'_>,
+    counters: &mut CoverageCounters<'_>,
+) -> TestResult<()> {
     for template in catalog_v3_consumer::rows(catalog, Kind::MissionLocationTemplates)? {
         let names = template
             .get("names")
@@ -36,16 +31,14 @@ pub(super) fn location_templates(
             counters.count(target)?;
         }
     }
-    Ok(counters.finish())
+    Ok(())
 }
 
 pub(super) fn npc_names(
     catalog: &Value,
-    english: &Oracle,
-    german: &Oracle,
-) -> TestResult<(Coverage, Coverage)> {
-    let index = TextIndex::new(catalog)?;
-    let mut counters = CoverageCounters::new(english, german);
+    index: &TextIndex<'_>,
+    counters: &mut CoverageCounters<'_>,
+) -> TestResult<()> {
     for pool in catalog_v3_consumer::rows(catalog, Kind::ContractNpcSpawns)? {
         for group in super::graph::array(pool, "groups")? {
             for option in super::graph::array(group, "options")? {
@@ -53,11 +46,11 @@ pub(super) fn npc_names(
                 if name.is_null() {
                     continue;
                 }
-                count_npc_name(&index, &mut counters, name)?;
+                count_npc_name(index, counters, name)?;
             }
         }
     }
-    Ok(counters.finish())
+    Ok(())
 }
 
 fn count_npc_name(
@@ -252,15 +245,18 @@ fn localization(component: &Value) -> TestResult<Option<&Value>> {
     catalog_v3_consumer::source_value(carrier)
 }
 
-pub(super) fn items(catalog: &Value, counters: &mut CoverageCounters<'_>) -> TestResult<()> {
-    let index = TextIndex::new(catalog)?;
+pub(super) fn items(
+    catalog: &Value,
+    index: &TextIndex<'_>,
+    counters: &mut CoverageCounters<'_>,
+) -> TestResult<()> {
     let presentations = ItemPresentationIndex::new(catalog)?;
     let mut selected = HashSet::new();
     for item in catalog_v3_consumer::rows(catalog, Kind::Items)? {
         if !selected.insert(record_index(item)?) {
             return Err("duplicate physical Item projection".into());
         }
-        compare_item_slots(counters, &index, presentations.components(item)?)?;
+        compare_item_slots(counters, index, presentations.components(item)?)?;
     }
     if selected.len() != presentations.definitions.len() {
         return Err("selected Item projections and physical definitions differ".into());

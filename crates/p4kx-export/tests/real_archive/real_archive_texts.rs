@@ -14,8 +14,8 @@ use p4kx_export::{Kind, Language, catalog_schema};
 use p4kx_extraction::{Archive, LocalizationSet, is_placeholder_key};
 use serde_json::Value;
 
-use crate::real_archive_canonical_texts::kind_coverage;
 pub(crate) use crate::real_archive_canonical_texts::manufacturer_text;
+use crate::real_archive_canonical_texts::{TextIndex, kind_coverage};
 use crate::real_archive_text_oracle::Oracle;
 use crate::real_archive_verification::{TestResult, list, print_line};
 
@@ -260,10 +260,17 @@ pub(crate) fn check_texts(archive: &Archive, catalog: &Value, baselined: bool) -
         Oracle::of(&set, Language::German)?,
     );
     let fields = text_fields();
+    let index = TextIndex::new(catalog)?;
     let mut failures: Vec<String> = Vec::new();
     for kind in Kind::ALL {
-        let (english, german) =
-            kind_coverage(catalog, kind, &fields, &english_oracle, &german_oracle)?;
+        let (english, german) = kind_coverage(
+            catalog,
+            &index,
+            kind,
+            &fields,
+            &english_oracle,
+            &german_oracle,
+        )?;
         check_coverage(
             kind,
             &english,
@@ -355,7 +362,7 @@ fn check_coverage(
     }
     let baseline = baseline(kind);
     print_line(&format!(
-        "{kind}: {keyed} keyed texts, en {} resolved / {} unresolved ({:.3}, baseline {:.2}, e.g. {:?}), de {} resolved / {} fall back to en ({:.3}, baseline {:.2})",
+        "{kind}: {keyed} keyed texts, en {} resolved / {} unresolved ({:.3}, baseline {:.2}, e.g. {:?}), de {} resolved / {} unresolved ({:.3}, baseline {:.2})",
         english.resolved,
         english.fallback,
         share(english.fallback, keyed),

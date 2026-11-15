@@ -327,6 +327,7 @@ fn mission_coverage(
 ) -> Result<(Coverage, Coverage), Box<dyn Error>> {
     real_archive_canonical_texts::kind_coverage(
         catalog,
+        &real_archive_canonical_texts::TextIndex::new(catalog)?,
         Kind::MissionPropertySets,
         &[],
         english,

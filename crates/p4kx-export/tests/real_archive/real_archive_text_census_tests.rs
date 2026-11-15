@@ -10,7 +10,7 @@ use serde_json::{Value, json};
 use super::{TestResult, TextPaths, pipe, write_catalog};
 use crate::catalog_v3_consumer;
 use crate::commodity_v3_fixture::{self as fixture, DcbOrigin};
-use crate::real_archive_canonical_texts::kind_coverage;
+use crate::real_archive_canonical_texts::{TextIndex, kind_coverage};
 use crate::real_archive_text_oracle::Oracle;
 use crate::real_archive_texts::{Coverage, check_coverage, text_fields};
 
@@ -78,7 +78,8 @@ fn compare(
     german: &Oracle,
 ) -> Result<CheckedKind, String> {
     let rows = catalog_v3_consumer::rows(document, kind).map_err(|error| error.to_string())?;
-    let (english, german) = kind_coverage(document, kind, fields, english, german)
+    let index = TextIndex::new(document).map_err(|error| error.to_string())?;
+    let (english, german) = kind_coverage(document, &index, kind, fields, english, german)
         .map_err(|error| error.to_string())?;
     let mut failures = Vec::new();
     check_coverage(kind, &english, &german, false, rows.len(), &mut failures);

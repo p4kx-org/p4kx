@@ -62,7 +62,15 @@ impl Fixture {
     }
 
     fn coverage(&self, catalog: &Value, kind: Kind) -> TestResult<(Coverage, Coverage)> {
-        real_archive_canonical_texts::kind_coverage(catalog, kind, &[], &self.english, &self.german)
+        let index = real_archive_canonical_texts::TextIndex::new(catalog)?;
+        real_archive_canonical_texts::kind_coverage(
+            catalog,
+            &index,
+            kind,
+            &[],
+            &self.english,
+            &self.german,
+        )
     }
 }
 

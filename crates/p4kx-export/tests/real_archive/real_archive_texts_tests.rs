@@ -189,7 +189,8 @@ fn assert_original_locales(archive: &Archive) -> Result<(), Box<dyn Error>> {
 
 fn canonical_coverage(catalog: &Value) -> Result<(Coverage, Coverage), Box<dyn Error>> {
     let oracle = Oracle::parse("name=Correct\ndescription=  \n");
-    super::kind_coverage(catalog, Kind::Manufacturers, &[], &oracle, &oracle)
+    let index = super::TextIndex::new(catalog)?;
+    super::kind_coverage(catalog, &index, Kind::Manufacturers, &[], &oracle, &oracle)
 }
 
 #[test]

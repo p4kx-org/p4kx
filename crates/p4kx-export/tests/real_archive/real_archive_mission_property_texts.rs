@@ -7,7 +7,7 @@ use serde_json::Value;
 use super::{CoverageCounters, TestResult, TextDomain, TextIndex, TextReferenceShape, TextTarget};
 
 pub(super) fn count(
-    catalog: &Value,
+    texts: &TextIndex<'_>,
     kind: Kind,
     sets: &[Value],
     counters: &mut CoverageCounters<'_>,
@@ -15,7 +15,6 @@ pub(super) fn count(
     if kind != Kind::MissionPropertySets || sets.is_empty() {
         return Ok(());
     }
-    let texts = TextIndex::new(catalog)?;
     for set in sets {
         for property in super::graph::array(set, "properties")? {
             if property.is_null() {
@@ -25,19 +24,19 @@ pub(super) fn count(
             match value.get("type").and_then(Value::as_str) {
                 Some("stringHash" | "integer" | "float" | "tags") => {
                     for option in entries(value, "options")? {
-                        count_option(option, &texts, counters)?;
+                        count_option(option, texts, counters)?;
                     }
                 }
                 Some("aiName") => {
                     for field in ["/givenName", "/givenLastName", "/givenNickName"] {
-                        let target = required_reference(value, field, &texts)?;
+                        let target = required_reference(value, field, texts)?;
                         if target.is_some_and(|target| !is_lookup_key(target.key)) {
                             return Err(format!("invalid direct Generator name at {field}").into());
                         }
                         counters.count(target)?;
                     }
                 }
-                Some("investigation") => count_investigation(value, &texts, counters)?,
+                Some("investigation") => count_investigation(value, texts, counters)?,
                 _ => {}
             }
         }
