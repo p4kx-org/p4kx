@@ -81,7 +81,7 @@ const MISSION_TOKEN: &str = "~mission(";
 const SAMPLE: usize = 3;
 
 /// What the catalog holds for the keyed texts of one kind in one language.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub(crate) struct Coverage {
     /// Texts the file holds and the catalog has, equal.
     resolved: usize,

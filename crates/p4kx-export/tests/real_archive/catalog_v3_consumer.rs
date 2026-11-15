@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::borrow::Cow;
 use std::collections::HashSet;
 use std::error::Error;
 
@@ -39,8 +40,24 @@ pub(crate) fn named_rows<'catalog>(
 }
 
 fn rows_of_kind(catalog: &Value, kind: Kind) -> TestResult<&Vec<Value>> {
+    if kind == Kind::Commodities {
+        presentations(catalog)?;
+        return table(catalog, &row_location(kind));
+    }
+    let path = row_location(kind);
+    if path.starts_with('/') {
+        return checked_table(catalog, kind, &path);
+    }
+    catalog
+        .get(path.as_ref())
+        .and_then(Value::as_array)
+        .ok_or_else(|| format!("required {} rows are missing", kind.name()).into())
+}
+
+/// Returns a plain top-level field or the JSON pointer of the canonical table that owns a Kind.
+pub(crate) fn row_location(kind: Kind) -> Cow<'static, str> {
     if uses_named_definition_table(kind) {
-        return checked_table(catalog, kind, &format!("/definitions/{}", kind.name()));
+        return Cow::Owned(format!("/definitions/{}", kind.name()));
     }
     let path = match kind {
         Kind::GameplayProperties => "/definitions/gameplayProperties",
@@ -86,18 +103,10 @@ fn rows_of_kind(catalog: &Value, kind: Kind) -> TestResult<&Vec<Value>> {
         Kind::StarmapPresets => "/definitions/starmapPresets",
         Kind::StarmapAmenities => "/definitions/starmapAmenities",
         Kind::StarmapObjects => "/definitions/starmapObjects",
-        Kind::Commodities => {
-            presentations(catalog)?;
-            return table(catalog, "/definitions/commodities");
-        }
-        _ => {
-            return catalog
-                .get(kind.name())
-                .and_then(Value::as_array)
-                .ok_or_else(|| format!("required {} rows are missing", kind.name()).into());
-        }
+        Kind::Commodities => "/definitions/commodities",
+        _ => kind.name(),
     };
-    checked_table(catalog, kind, path)
+    Cow::Borrowed(path)
 }
 
 fn checked_table<'catalog>(

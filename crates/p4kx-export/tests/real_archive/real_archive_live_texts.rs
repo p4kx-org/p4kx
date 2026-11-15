@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::io::{BufReader, Seek as _};
 use std::time::UNIX_EPOCH;
 
 use p4kx_export::{
-    CatalogOptions, CatalogPublicationMode, CatalogSummary, Compression, ExportStageStatus, Kind,
-    Language,
+    CatalogOptions, CatalogPublicationMode, CatalogSummary, ExportStageStatus, Kind, Language,
 };
 use p4kx_extraction::{Archive, ArchiveWatch};
-use serde_json::Value;
 
 use super::{BASELINES, TestResult, check_texts};
 use crate::real_archive_shop_inventory_v3::verify_build;
+
+#[path = "real_archive_text_census.rs"]
+mod census;
 
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
@@ -25,16 +25,15 @@ fn installed_live_catalog_texts_match_the_independent_source_oracle() -> TestRes
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(UNIX_EPOCH)
     };
-    let (summary, mut file) =
-        p4kx_export::write_catalog(&archive, &options, Compression::None, tempfile::tempfile)
-            .map_err(|_| "write current catalog for LIVE text verification")?;
+    let (summary, catalog) = census::write_catalog(&archive, &options)?;
     complete_text_scope(&summary)?;
     drop(summary);
     watch.check().map_err(|_| "Archive changed during write")?;
-    file.rewind()?;
-    let catalog: Value =
-        serde_json::from_reader(BufReader::new(file)).map_err(|_| "read current catalog JSON")?;
-    if catalog.pointer("/source/channel").and_then(Value::as_str) != Some("LIVE") {
+    if catalog
+        .pointer("/source/channel")
+        .and_then(serde_json::Value::as_str)
+        != Some("LIVE")
+    {
         return Err("per-kind baselines require the installed LIVE Channel".into());
     }
     verify_build(&archive, &catalog)?;

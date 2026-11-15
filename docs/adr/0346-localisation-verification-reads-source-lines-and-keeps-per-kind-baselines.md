@@ -57,9 +57,10 @@ cargo test --locked -p p4kx-export --test real_archive -- installed_live_catalog
 ~~~
 
 Set the installed LIVE Archive through `P4KX_DATA_P4K` and use the configured testkit key source
-and task-local `TMP` and `TEMP`. The test streams into a temporary file bounded by the catalog's
-decompressed limit, then parses the JSON for the existing consumer oracle. The DOM and the
-canonical producer can each need several gigabytes on a large Build. This targeted check
-requires complete reads and projections for the text families with baselines. It allows
-unrelated diagnostic partial publication. Keep raw output private. The final milestone's
-full installed-Archive suite is a separate run.
+and task-local `TMP` and `TEMP`. The ordinary catalog writer sends JSON through an anonymous
+pipe to the text verification reader. The reader keeps the schema-v3 sections needed by the
+existing per-kind comparisons, including original mission graphs and the shared language tables.
+It discards unrelated sections as it consumes the stream and checks the exact written byte count.
+This check writes no catalog file. It requires complete reads and projections for the text
+families with baselines and allows unrelated diagnostic partial publication. The full
+installed-Archive suite verifies the normal publication, size and schema separately.
