@@ -183,7 +183,12 @@ impl<'context, 'source> ReadMode<'context, 'source> {
         if selected.role == ExportSourceRole::Dependency {
             return Ok(Some(GameplayPropertyInput::Dependency));
         }
-        let found = gameplay::read(tree, projection, admission, cancel)?;
+        let found = gameplay::read(
+            tree,
+            &projection.for_kind(crate::Kind::GameplayProperties),
+            admission,
+            cancel,
+        )?;
         crate::source_projection_notes::record(
             crate::Kind::GameplayProperties,
             selected.role,

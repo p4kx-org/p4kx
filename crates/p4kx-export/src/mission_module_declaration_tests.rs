@@ -31,7 +31,8 @@ fn module_declaration_preserves_authored_slots_and_link_identity() -> TestResult
             .ok_or("the original ModuleDeclaration Record")?;
         let tree = record.tree()?;
         let admission = RecordObservation::capture(projection.original(), &record)?;
-        let (prepared, notes) = super::read(&tree, projection, &admission, None)?;
+        let projection = projection.for_kind(crate::Kind::MissionModuleDeclarations);
+        let (prepared, notes) = super::read(&tree, &projection, &admission, None)?;
         let table = PreparedDefinition::table(forge, SOURCE_TYPE, vec![prepared]);
         let row = serde_json::to_value(table.rows.first().ok_or("projected module")?)?;
         assert_eq!(

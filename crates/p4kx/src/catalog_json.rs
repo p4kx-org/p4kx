@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+#[path = "catalog_json_text_kind.rs"]
+mod text_kind;
+use text_kind::TextKindJson;
+
 use std::path::Path;
 
 use p4kx_export::{
@@ -45,6 +49,7 @@ pub(super) struct SummaryJson<'a> {
     variants: VariantsJson,
     quantizations: QuantizationsJson,
     texts: Vec<TextJson>,
+    text_kind_coverage: Vec<TextKindJson>,
     unresolved: usize,
 }
 
@@ -344,6 +349,11 @@ pub(super) fn summary_json<'a>(
                 unresolved: text.unresolved,
                 placeholder: text.placeholder,
             })
+            .collect(),
+        text_kind_coverage: summary
+            .text_kind_coverage()
+            .iter()
+            .map(TextKindJson::from)
             .collect(),
         unresolved: summary.unresolved(),
     }

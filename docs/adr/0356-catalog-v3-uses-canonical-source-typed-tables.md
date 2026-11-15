@@ -107,6 +107,12 @@ markers. A source set for absence is complete only when the root directory surve
 complete. Incomplete directory evidence retains the observed paths and marks the absence
 proof incomplete.
 
+The summary counts canonical registrations by the dataset that owns the stored field
+and by supported language. Missing language source, missing key, empty raw value,
+display-only emptiness, placeholder and nonempty display have distinct counts. The CLI
+diagnostic exposes counts. Per-key forms and their provenance stay in the canonical
+text domains.
+
 Both forms carry direct actual origins: sourceText uses its authored key, winning language payload
 and justified original Entry-decoding contributions; displayText also uses the actual display
 Conversion. Whole-Entry decoding facts do not claim a particular winning value was altered.

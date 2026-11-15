@@ -109,7 +109,7 @@ fn alpha(name: &str, description: &str) -> TestRecord {
     )
 }
 
-fn resource(guid: u128, name: &str, key: &str) -> TestRecord {
+pub(crate) fn resource(guid: u128, name: &str, key: &str) -> TestRecord {
     TestRecord::new(
         guid,
         "ResourceType",
@@ -159,7 +159,7 @@ fn quantization() -> TestRecord {
     )
 }
 
-fn entity(
+pub(crate) fn entity(
     guid: u128,
     name: &str,
     components: Vec<TestValue>,
@@ -192,14 +192,14 @@ fn display(description: &str) -> TestValue {
     )
 }
 
-fn container(composition: Vec<TestValue>) -> TestValue {
+pub(crate) fn container(composition: Vec<TestValue>) -> TestValue {
     owned(
         "ResourceContainer",
         [("defaultComposition", TestValue::Array(composition))],
     )
 }
 
-fn composition(resource: Option<u128>) -> TestValue {
+pub(crate) fn composition(resource: Option<u128>) -> TestValue {
     owned(
         "FixtureComposition",
         [(

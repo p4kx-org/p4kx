@@ -3,13 +3,18 @@
 
 //! English and German names and descriptions in the P4KX catalog, through the public API.
 
+#[path = "catalog_text_kind_coverage.rs"]
+mod kind_coverage;
+
 #[path = "catalog_text_values.rs"]
 mod values;
 
 use std::error::Error;
 use std::time::{Duration, UNIX_EPOCH};
 
-use p4kx_export::{CatalogOptions, Language, TextSummary, build_catalog, build_catalog_from};
+use p4kx_export::{
+    BuiltCatalog, CatalogOptions, Language, TextSummary, build_catalog, build_catalog_from,
+};
 use p4kx_extraction::{
     Archive, DataForgeEntry, IniText, LanguageTexts, Resolution, TextResolver, TextSet,
 };
@@ -103,6 +108,12 @@ fn german() -> TestEntry {
 }
 
 fn catalog(entries: Vec<TestEntry>) -> Result<(Value, Vec<TextSummary>), Box<dyn Error>> {
+    let built = build_fixture(entries)?;
+    let json = serde_json::from_slice(built.json())?;
+    Ok((json, built.summary().texts().to_vec()))
+}
+
+fn build_fixture(entries: Vec<TestEntry>) -> Result<BuiltCatalog, Box<dyn Error>> {
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("Data.p4k");
     entries
@@ -113,9 +124,10 @@ fn catalog(entries: Vec<TestEntry>) -> Result<(Value, Vec<TextSummary>), Box<dyn
         )
         .write_to(&path)?;
     let archive = Archive::open_with_key(&path, Some(p4kx_testkit::test_key()))?;
-    let built = build_catalog(&archive, &CatalogOptions::new(UNIX_EPOCH + EXPORTED_AT))?;
-    let json = serde_json::from_slice(built.json())?;
-    Ok((json, built.summary().texts().to_vec()))
+    Ok(build_catalog(
+        &archive,
+        &CatalogOptions::new(UNIX_EPOCH + EXPORTED_AT),
+    )?)
 }
 
 fn text<'c>(catalog: &'c Value, index: usize, field: &str) -> Result<&'c Value, Box<dyn Error>> {

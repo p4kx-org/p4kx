@@ -10,7 +10,7 @@ use p4kx_testkit::{ArchiveBuilder, TestEntry};
 
 use super::OriginalCatalogInput;
 use crate::catalog_origins::CatalogOrigins;
-use crate::catalog_projection::CatalogProjection;
+use crate::catalog_projection::{CatalogProjection, CatalogTextRegistry};
 use crate::texts::TextSources;
 
 pub(crate) type TestResult<T = ()> = Result<T, Box<dyn Error>>;
@@ -31,7 +31,8 @@ pub(crate) fn with_projection(
 ) -> TestResult {
     with_sources(bytes, |forge, input, sources| {
         let texts = crate::texts::Texts::parse(sources)?;
-        let projection = CatalogProjection::new(&texts, input);
+        let text_registry = CatalogTextRegistry::default();
+        let projection = CatalogProjection::new(&texts, input, &text_registry);
         check(forge, &projection)
     })
 }

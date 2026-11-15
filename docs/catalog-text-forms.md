@@ -97,6 +97,14 @@ Placeholders count once per original registration, not per form or language. Rep
 one canonical row retain their original occurrence accounting. Independent legacy library display
 results stay unchanged; the catalog emits no legacy language-cell alias or schema-2 adapter.
 
+`CatalogSummary::text_kind_coverage()` and CLI JSON `text_kind_coverage` give one set of counts
+per owning dataset and supported language. Each canonical registration contributes one
+outcome in each language. The counted dataset owns the selected output field, even when that
+field takes its key from a different source Record. A shared canonical row can account for
+multiple registrations. Internal display and render lookups continue to use the legacy
+counters. The new diagnostic carries counts. The exact keys and per-language forms remain in
+the catalog's public or protected text registries. [CLI summary contract](cli-json.md#p4kx-catalog-archive---out-file---json)
+
 ## Wire size and version
 
 Each language has two independently sourced values rather than one, adding one carrier and a

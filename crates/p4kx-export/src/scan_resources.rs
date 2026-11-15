@@ -5,33 +5,44 @@ use std::collections::{BTreeSet, HashSet};
 
 use p4kx_extraction::{CancelToken, Guid, Record, RecordTree, TreeBuilder};
 
+use super::projection::SelectedProjection;
 use super::{RESOURCE_TYPE, Scan};
 use crate::blueprint_catalog_rows::BlueprintRow;
 use crate::catalog_crafting::CraftingKinds;
 use crate::catalog_v3::catalog_entity_configurations::EntityConfigurationRows;
 use crate::catalog_v3::catalog_resource_network_read::resource_network_global;
 use crate::commodity;
-use crate::export_diagnostic::ExportSourceRole;
-use crate::export_ledger::{ExportLedger, SourceDisposition};
+use crate::commodity_resource::{self, CommodityResource};
+use crate::export_diagnostic::{ExportDiagnosticCode, ExportSourceRole};
+use crate::export_ledger::{DerivedFailure, ExportLedger, SourceDiagnosis, SourceDisposition};
 use crate::picked::Picked;
 use crate::record_observation::RecordObservation;
 use crate::scan_health::{ScanError, ScanRead, SourceTrace};
 use crate::source_fields::FieldError;
-use crate::{CatalogError, Kind};
+use crate::{CatalogError, ExportAccountingError, Kind};
+
+struct ResourceRead<'source> {
+    record: Record<'source>,
+    tree: RecordTree<'source>,
+}
 
 struct BackfillContext<'context, 'source> {
     picked: &'context [Picked<'source>],
     crafting: &'context CraftingKinds<'source>,
     scanned: &'context ExportLedger,
 }
-impl<'f> Scan<'_, '_, 'f> {
+impl<'f> SelectedProjection<'_, '_, '_, 'f> {
     pub(super) fn resource_network_global(
         &self,
         admission: &RecordObservation<'_, 'f>,
         tree: &RecordTree<'f>,
     ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
-        let (value, notes) =
-            resource_network_global::read(tree, self.projection, admission, self.options.cancel)?;
+        let (value, notes) = resource_network_global::read(
+            tree,
+            &self.projection,
+            admission,
+            self.scan.options.cancel,
+        )?;
         Ok((Picked::ResourceNetworkGlobal(Box::new(value)), notes))
     }
 
@@ -41,18 +52,117 @@ impl<'f> Scan<'_, '_, 'f> {
         tree: &RecordTree<'f>,
     ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
         let parent = self
+            .scan
             .groups
-            .parent_choice(&tree.guid(), self.options.cancel)?;
+            .parent_choice(&tree.guid(), self.scan.options.cancel)?;
         let read = crate::resource_group_read::read(
             tree,
-            self.projection,
+            &self.projection,
             parent,
             admission,
-            self.options.cancel,
+            self.scan.options.cancel,
         )?;
         Ok((Picked::ResourceGroup(read.value), read.notes))
     }
 
+    pub(super) fn commodity(
+        &self,
+        trees: &mut TreeBuilder<'f>,
+        admission: &RecordObservation<'_, 'f>,
+        tree: &RecordTree<'f>,
+        ledger: &mut ExportLedger,
+    ) -> Result<Picked<'f>, ScanError> {
+        let selected = commodity_resource::first(tree)?;
+        let resource_type = selected
+            .link
+            .as_ref()
+            .map(|link| self.resource_type(trees, admission, tree, link, ledger))
+            .transpose()?
+            .flatten();
+        let read = commodity::commodity(
+            tree,
+            &self.projection,
+            resource_type.as_ref().map(|resource| &resource.tree),
+            &self.scan.groups,
+            &selected,
+        )?;
+        crate::source_projection_notes::record(
+            Kind::Commodities,
+            ExportSourceRole::Selected,
+            admission,
+            tree,
+            read.notes,
+            ledger,
+        )?;
+        if let Some(resource) = &resource_type {
+            crate::source_projection_notes::record(
+                Kind::Commodities,
+                ExportSourceRole::Dependency,
+                &RecordObservation::capture(self.projection.original(), &resource.record)?,
+                &resource.tree,
+                read.resource_notes,
+                ledger,
+            )?;
+        }
+        Ok(Picked::Commodity(Box::new(read.value)))
+    }
+    fn resource_type(
+        &self,
+        trees: &mut TreeBuilder<'f>,
+        commodity: &RecordObservation<'_, 'f>,
+        commodity_tree: &RecordTree<'f>,
+        link: &CommodityResource<'_, 'f>,
+        ledger: &mut ExportLedger,
+    ) -> Result<Option<ResourceRead<'f>>, ScanError> {
+        if link.reference.target_type.as_deref() != Some("ResourceType") {
+            return Ok(None);
+        }
+        let Some(index) = link.reference.target_record_index else {
+            return Ok(None);
+        };
+        let record = self
+            .scan
+            .forge
+            .record(index)
+            .ok_or(CatalogError::Accounting(
+                ExportAccountingError::MissingPhysicalReferenceTarget { index },
+            ))?;
+        match trees.build(&record) {
+            Ok(tree) => {
+                self.projection.original().record_scope(&record, &tree)?;
+                Ok(Some(ResourceRead { record, tree }))
+            }
+            Err(error) => {
+                let failure = crate::export_source_failure::diagnosis(&error);
+                let body = link.failure_body(
+                    self.projection.original(),
+                    commodity,
+                    commodity_tree,
+                    self.scan.options.cancel,
+                )?;
+                let diagnosis = SourceDiagnosis::from_body(
+                    failure
+                        .code
+                        .unwrap_or(ExportDiagnosticCode::SourceReadFailure),
+                    body,
+                )?;
+                ledger.derived_failure(
+                    DerivedFailure::of_subject(
+                        commodity.subject().clone(),
+                        Kind::Commodities,
+                        Kind::Commodities,
+                        ExportSourceRole::Selected,
+                        diagnosis,
+                    )
+                    .map_err(CatalogError::from)?,
+                );
+                Ok(None)
+            }
+        }
+    }
+}
+
+impl<'f> Scan<'_, '_, 'f> {
     /// Reads the used additional resource definitions at their actual projection boundary.
     pub(super) fn resource_commodities(
         &self,
@@ -99,7 +209,7 @@ impl<'f> Scan<'_, '_, 'f> {
                 return Err(CatalogError::Cancelled);
             }
             let record = self.forge.record(index).ok_or(CatalogError::Accounting(
-                crate::ExportAccountingError::MissingPhysicalReferenceTarget { index },
+                ExportAccountingError::MissingPhysicalReferenceTarget { index },
             ))?;
             let mut trace = SourceTrace::new(&record);
             trace.candidate(Kind::Commodities);
@@ -161,7 +271,8 @@ impl<'f> Scan<'_, '_, 'f> {
             context.scanned,
             self.projection.origins(),
         )?;
-        let read = commodity::resource_commodity(&tree, self.projection, &self.groups, &evidence)?;
+        let projection = self.projection.for_kind(Kind::Commodities);
+        let read = commodity::resource_commodity(&tree, &projection, &self.groups, &evidence)?;
         crate::source_projection_notes::record(
             Kind::Commodities,
             ExportSourceRole::Selected,

@@ -175,6 +175,7 @@ pub struct CatalogSummary {
     pub(crate) provenance: CatalogProvenance,
     pub(crate) kinds: Vec<KindSummary>,
     pub(crate) texts: Vec<TextSummary>,
+    pub(crate) text_kind_coverage: Vec<crate::KindTextSummary>,
     pub(crate) notes: Vec<LocalizationNote>,
     pub(crate) item_classes: ItemClassSummary,
     pub(crate) paints: PaintSummary,
@@ -298,6 +299,12 @@ impl CatalogSummary {
             .iter()
             .copied()
             .find(|summary| summary.language == language)
+    }
+
+    /// Returns canonical registration counts for each text-owning dataset and language.
+    #[must_use]
+    pub fn text_kind_coverage(&self) -> &[crate::KindTextSummary] {
+        &self.text_kind_coverage
     }
 
     /// Returns a note for every `global.ini` Entry that was read lossily or had lines skipped.

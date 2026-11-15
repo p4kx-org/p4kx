@@ -212,9 +212,10 @@ pub(crate) fn read<'f>(
         return Ok(missions);
     }
     let places = Places::new(starmap);
+    let contract_projection = projection.for_kind(Kind::Contracts);
     let context = MissionEntryContext {
         index: &index,
-        projection,
+        projection: &contract_projection,
         places: &places,
         cancel,
     };

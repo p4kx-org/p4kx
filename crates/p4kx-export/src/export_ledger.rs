@@ -173,6 +173,9 @@ pub enum ExportAccountingError {
     /// Retained original source facts contradict their actual occurrence or value.
     #[error("conflicting original source datum")]
     ConflictingSourceDatum,
+    /// A canonical text registration has no owning catalog dataset.
+    #[error("canonical text registered without an owning catalog dataset")]
+    UnscopedCatalogText,
     /// A retained catalog subject has no matching original input binding.
     #[error("catalog health subject is not bound to its original input")]
     UnboundHealthSubject,

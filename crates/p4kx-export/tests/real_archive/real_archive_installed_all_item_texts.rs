@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_export::{CatalogSummary, Language};
+use std::collections::BTreeMap;
+
+use p4kx_export::{CatalogSummary, Kind, KindTextSummary, Language, TextOwner};
 use p4kx_extraction::{
     Archive, ArchiveWatch, DataForgeEntry, DataForgeOrigin, Filter, LocalizationEntry,
-    LocalizationSet, RecordTree, is_placeholder_key,
+    LocalizationSet, RecordTree, Value as Original, is_placeholder_key,
 };
 use serde_json::Value;
 
@@ -19,6 +21,8 @@ mod language_sources;
 mod origins;
 
 use origins::{Lookup, TextOrigins};
+
+const ITEM_REGISTRATIONS: usize = 3;
 
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and P4KX_CATALOG_ITEM_TEXT_RECORD and pass --ignored"]
@@ -49,7 +53,7 @@ fn installed_item_texts_match_every_available_archive_language() -> TestResult<(
     let languages = original_languages(&archive, &locales, &summary)?;
     language_sources::verify(&catalog, &locales, &evidence, archive.entries().len())?;
     compare_item(
-        &original, &catalog, &locales, &languages, &evidence, channel,
+        &original, &catalog, &summary, &locales, &languages, &evidence, channel,
     )?;
     watch
         .check()
@@ -98,12 +102,30 @@ fn original_languages(
 fn compare_item(
     original: &RecordTree<'_>,
     catalog: &Value,
+    summary: &CatalogSummary,
     locales: &LocalizationSet,
     languages: &[Language],
     evidence: &TextOrigins<'_>,
     channel: &str,
 ) -> TestResult<()> {
+    verify_item_registration_scope(original)?;
+    let mut reported = BTreeMap::new();
+    for row in summary
+        .text_kind_coverage()
+        .iter()
+        .filter(|row| row.owner == TextOwner::Catalog(Kind::Items))
+    {
+        if reported.insert(row.language, row).is_some() {
+            return Err("duplicate Item coverage for a supported language".into());
+        }
+    }
+    if reported.len() != Language::ALL.len() {
+        return Err("Item coverage must contain every supported language".into());
+    }
     with_item_texts(original, catalog, |targets| {
+        if targets.len() != ITEM_REGISTRATIONS {
+            return Err("three original Item Locale registrations are required".into());
+        }
         for target in targets {
             if target.translations.len() != languages.len()
                 || languages
@@ -116,13 +138,22 @@ fn compare_item(
                 );
             }
         }
-        for &language in languages {
-            let counts = compare_language(targets, locales, language, evidence)?;
+        for language in Language::ALL {
+            let counts = if languages.contains(&language) {
+                compare_language(targets, locales, language, evidence)?
+            } else {
+                Coverage::without_language(targets)
+            };
+            let reported = reported.get(&language).ok_or("reported Item coverage")?;
+            counts.verify(reported)?;
             print_line(&format!(
-                "{channel} Item text language={}: present={} missing={} placeholder={}",
+                "{channel} Item text language={}: resolved={} missingLanguage={} missingKey={} emptySource={} emptyDisplay={} placeholder={}",
                 language.code(),
-                counts.present,
-                counts.missing,
+                counts.resolved,
+                counts.missing_language,
+                counts.missing_key,
+                counts.empty_source,
+                counts.empty_display,
                 counts.placeholder,
             ));
         }
@@ -130,11 +161,63 @@ fn compare_item(
     })
 }
 
-#[derive(Default)]
+fn verify_item_registration_scope(original: &RecordTree<'_>) -> TestResult<()> {
+    let Some(Original::Array(components)) = original.field("Components") else {
+        return Err("the selected original Item must have a Components array".into());
+    };
+    for required in ["SAttachableComponentParams", "SCItemPurchasableParams"] {
+        let occurrences = components
+            .iter()
+            .filter(|value| matches!(value, Original::Struct(component) if component.type_name() == required))
+            .count();
+        if occurrences != 1 {
+            return Err(format!("select an Item with exactly one physical {required}").into());
+        }
+    }
+    Ok(())
+}
+
+#[derive(Debug, Default, PartialEq, Eq)]
 struct Coverage {
-    present: usize,
-    missing: usize,
+    resolved: usize,
+    missing_language: usize,
+    missing_key: usize,
+    empty_source: usize,
+    empty_display: usize,
     placeholder: usize,
+}
+
+impl Coverage {
+    fn without_language(targets: &[&TextTarget<'_>]) -> Self {
+        let placeholder = targets
+            .iter()
+            .filter(|target| is_placeholder_key(target.key))
+            .count();
+        Self {
+            missing_language: targets.len() - placeholder,
+            placeholder,
+            ..Self::default()
+        }
+    }
+
+    fn verify(&self, actual: &KindTextSummary) -> TestResult<()> {
+        let reported = Self {
+            resolved: actual.resolved,
+            missing_language: actual.missing_language,
+            missing_key: actual.missing_key,
+            empty_source: actual.empty_source,
+            empty_display: actual.empty_display,
+            placeholder: actual.placeholder,
+        };
+        if *self != reported {
+            return Err(format!(
+                "{}: Item coverage differs from the three original Locale registrations, expected {self:?}, reported {reported:?}",
+                actual.language,
+            )
+            .into());
+        }
+        Ok(())
+    }
 }
 
 fn compare_language(
@@ -162,15 +245,28 @@ fn compare_language(
             .translations
             .get(code)
             .ok_or("actual language forms")?;
-        let outcome = if placeholder {
-            coverage.placeholder += 1;
-            Lookup::Skipped
-        } else if raw.is_some() {
-            coverage.present += 1;
-            Lookup::Resolved
-        } else {
-            coverage.missing += 1;
-            Lookup::Missing
+        let outcome = match (placeholder, raw, display) {
+            (true, _, _) => {
+                coverage.placeholder += 1;
+                Lookup::Skipped
+            }
+            (false, None, None) => {
+                coverage.missing_key += 1;
+                Lookup::Missing
+            }
+            (false, Some(""), Some("")) => {
+                coverage.empty_source += 1;
+                Lookup::Resolved
+            }
+            (false, Some(_), Some("")) => {
+                coverage.empty_display += 1;
+                Lookup::Resolved
+            }
+            (false, Some(_), Some(_)) => {
+                coverage.resolved += 1;
+                Lookup::Resolved
+            }
+            _ => return Err("original source and display text disagree on lookup presence".into()),
         };
         for form in ["sourceText", "displayText"] {
             let carrier = forms.get(form).ok_or("direct translation carrier")?;

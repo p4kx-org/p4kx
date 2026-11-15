@@ -47,6 +47,7 @@ pub(crate) use domain::ScanDomain;
 mod groups;
 #[path = "scan_projection.rs"]
 mod projection;
+use self::projection::SelectedProjection;
 #[path = "scan_resources.rs"]
 mod resources;
 
@@ -291,6 +292,7 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
             ExportSourceRole::Selected,
             self.options.cancel,
         )?);
+        let selected = SelectedProjection::new(self, kind);
         if tree.type_name() == "EntityClassDefinition" {
             let input = self.projection.original();
             let cancel = self.options.cancel;
@@ -298,7 +300,7 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
                 crate::catalog_v3::tag_catalog::entity(&tree, input, &admission, cancel)?;
             let (configurations, configuration_notes) = catalog_entity_configurations::read(
                 &tree,
-                self.projection,
+                &selected.projection,
                 &admission,
                 &self.alignment_options,
                 cancel,
@@ -315,7 +317,7 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
             entity.tags = Some(tags);
             entity.configurations = configurations;
         }
-        self.project(kind, trees, &admission, &tree, ledger)
+        selected.project(trees, &admission, &tree, ledger)
     }
 
     /// Returns whether the Components of `record` hold a crafter component, read without building

@@ -50,10 +50,11 @@ impl<'f> Collected<'f> {
         pools: SpawnPools<'f>,
         projection: &CatalogProjection<'_, 'f>,
     ) -> Result<(), CatalogError> {
+        let npc_projection = projection.for_kind(Kind::ContractNpcSpawns);
         self.contract_npc_spawns = pools
             .npcs
             .into_values()
-            .map(|pool| pool.finish(projection))
+            .map(|pool| pool.finish(&npc_projection))
             .collect::<Result<_, _>>()?;
         self.ledger.merge(templates.ledger);
         self.mission_location_templates = templates.items;

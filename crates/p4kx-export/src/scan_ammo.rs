@@ -253,8 +253,13 @@ impl<'options, 'input, 'source> AmmoReads<'options, 'input, 'source> {
         admission: &RecordObservation<'_, 'source>,
         selection: AmmoSelection,
     ) -> Result<CanonicalAmmo<'source>, CatalogError> {
-        let (definition, notes) =
-            ammo_definition::read(self.projection, tree, admission, self.cancel, selection)?;
+        let (definition, notes) = ammo_definition::read(
+            &self.projection.for_kind(Kind::AmmoDefinitions),
+            tree,
+            admission,
+            self.cancel,
+            selection,
+        )?;
         let mut projection = ExportLedger::default();
         crate::source_projection_notes::record(
             Kind::AmmoDefinitions,

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_export::{build_catalog, catalog_schema};
+use p4kx_export::{BuiltCatalog, Language, TextOwner, build_catalog, catalog_schema};
 use p4kx_extraction::Filter;
 use serde_json::{Value, json};
 
@@ -17,7 +17,7 @@ const SUBTYPES: &str = "/definitions/consumableSubtypes/rows";
 
 #[test]
 fn filtered_consumable_keeps_ordered_subtypes_and_raw_volume() -> TestResult {
-    let catalog = catalog("*/consumable/drink")?;
+    let (built, catalog) = catalog("*/consumable/drink")?;
     let [item] = proof::rows(&catalog, CONFIGS)? else {
         return Err("one selected physical component".into());
     };
@@ -63,12 +63,13 @@ fn filtered_consumable_keeps_ordered_subtypes_and_raw_volume() -> TestResult {
                 row.pointer("/name/value").and_then(Value::as_str) == Some("consumeFragmentId")
             })
     );
+    check_localization(&built)?;
     proof::closure(&catalog)
 }
 
 #[test]
 fn original_effects_keep_storage_and_opaque_future_types() -> TestResult {
-    let catalog = catalog("*/consumable/medicine")?;
+    let (_, catalog) = catalog("*/consumable/medicine")?;
     let [item] = proof::rows(&catalog, CONFIGS)? else {
         return Err("one medicine component".into());
     };
@@ -122,7 +123,7 @@ fn original_effects_keep_storage_and_opaque_future_types() -> TestResult {
 
 #[test]
 fn type_dependencies_and_dangling_items_keep_separate_scopes() -> TestResult {
-    let by_type = catalog("*/type/group")?;
+    let (_, by_type) = catalog("*/type/group")?;
     assert_eq!(
         proof::rows(&by_type, CONFIGS)?,
         &[] as &[Value],
@@ -143,7 +144,7 @@ fn type_dependencies_and_dangling_items_keep_separate_scopes() -> TestResult {
         proof::at(kind, "/recordIndex/value")?,
         "the original back reference resolves to the same physical type without duplicating rows"
     );
-    let food = catalog("*/consumable/food")?;
+    let (_, food) = catalog("*/consumable/food")?;
     assert_eq!(
         proof::rows(&food, SUBTYPES)?,
         &[] as &[Value],
@@ -176,7 +177,31 @@ fn bits(row: &Value, field: &str, raw: &str) -> TestResult {
     Ok(())
 }
 
-fn catalog(filter: &str) -> TestResult<Value> {
+fn check_localization(built: &BuiltCatalog) -> TestResult {
+    let coverage = built.summary().text_kind_coverage();
+    assert_eq!(
+        coverage.len(),
+        Language::ALL.len(),
+        "one owner per supported language"
+    );
+    assert!(
+        coverage
+            .iter()
+            .all(|row| row.owner == TextOwner::ConsumableSubtypes),
+        "linked subtype definitions own their registrations"
+    );
+    let english = coverage
+        .iter()
+        .find(|row| row.language == Language::English)
+        .ok_or("missing English consumable coverage")?;
+    assert_eq!(
+        english.resolved, 3,
+        "two subtypes share one name key and one has a resolved effect description"
+    );
+    Ok(())
+}
+
+fn catalog(filter: &str) -> TestResult<(BuiltCatalog, Value)> {
     let (_temp, archive) = common::open(&fixture::database(), DcbOrigin::Encrypted)?;
     let filter = Filter::new(filter);
     let mut options = common::options();
@@ -193,5 +218,5 @@ fn catalog(filter: &str) -> TestResult<Value> {
         build_catalog(&archive, &options)?.json(),
         "same source and selection reproduce exact catalog bytes"
     );
-    Ok(value)
+    Ok((catalog, value))
 }

@@ -16,7 +16,7 @@ use crate::archive_key_use::ArchiveKeyUse;
 use crate::build::{original_input::OriginalCatalogInput, parts, scanning, source};
 use crate::catalog_crafting;
 use crate::catalog_origins::CatalogOrigins;
-use crate::catalog_projection::CatalogProjection;
+use crate::catalog_projection::{CatalogProjection, CatalogTextRegistry};
 use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::resource_group_catalog;
 use crate::collected::Collected;
@@ -53,7 +53,8 @@ pub(super) fn read(
     let texts = Texts::parse(&sources)?;
     let origins = CatalogOrigins::new(archive, entry, &sources)?;
     let input = OriginalCatalogInput::new(&forge, &origins);
-    let projection = CatalogProjection::new(&texts, &input);
+    let text_registry = CatalogTextRegistry::default();
+    let projection = CatalogProjection::new(&texts, &input, &text_registry);
     let crafting = catalog_crafting::kinds(
         ledger::read_catalog(
             &forge,
@@ -87,7 +88,7 @@ pub(super) fn read(
         options.public_patches,
         ArchiveKeyUse::of(archive),
     );
-    let texts = json_value(&projection.finish()?)?;
+    let texts = json_value(&projection.finish()?.texts)?;
     let provenance = CatalogProvenance::new(origins.uses.freeze()?);
     let catalog = json!({
         "schemaVersion": SCHEMA_VERSION,

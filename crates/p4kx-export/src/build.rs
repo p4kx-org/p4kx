@@ -13,7 +13,7 @@ use crate::build_loot::add_loot_containers;
 use crate::build_starmap::add_starmap;
 use crate::catalog_definitions::CatalogDefinitions;
 use crate::catalog_origins::CatalogOrigins;
-use crate::catalog_projection::CatalogProjection;
+use crate::catalog_projection::{CatalogProjection, CatalogTextRegistry};
 use crate::catalog_projections::CatalogProjections;
 use crate::catalog_read::original::EntryCapture;
 use crate::catalog_table::CatalogTable;
@@ -65,7 +65,8 @@ fn assemble<R>(
     let texts = Texts::parse(&sources)?;
     let origins = CatalogOrigins::new(archive, entry, &sources)?;
     let input = original_input::OriginalCatalogInput::new(&forge, &origins);
-    let projection = CatalogProjection::new(&texts, &input);
+    let text_registry = CatalogTextRegistry::default();
+    let projection = CatalogProjection::new(&texts, &input, &text_registry);
     let entry_capture = EntryCapture::for_input(&input);
     run.begin(CatalogStage::Crafting);
     let crafting = catalog_crafting::read(&forge, options, &projection)?;
@@ -126,13 +127,7 @@ fn assemble<R>(
         independent.recovery_numbers,
         independent.configuration_numbers,
     );
-    let blueprints = crate::blueprint_catalog_rows::tables(
-        std::mem::take(&mut collected.blueprints),
-        &collected.missing_blueprint_categories,
-        &collected.ledger.sources,
-        &forge,
-        &origins,
-    )?;
+    let blueprints = parts::blueprint_tables(&mut collected, &forge, &origins)?;
     let (catalog_placements, resource_declarations) = collected.catalog_placements(
         archive,
         &forge,
@@ -168,6 +163,7 @@ fn assemble<R>(
         collected.ammo_definitions,
         options.cancel,
     )?;
+    let finished_texts = projection.finish()?;
     let catalog = Catalog {
         schema_version: SCHEMA_VERSION,
         source: source(
@@ -343,7 +339,7 @@ fn assemble<R>(
                 collected.template_configurations.properties,
             ),
         },
-        texts: projection.finish()?,
+        texts: finished_texts.texts,
         provenance: parts::freeze_provenance(&origins.uses, run)?,
         blueprint_pools: collected.blueprint_pools,
         dismantle_processes: collected.dismantle_processes,
@@ -384,6 +380,7 @@ fn assemble<R>(
             provenance: catalog.provenance,
             kinds,
             texts: texts.summary(),
+            text_kind_coverage: finished_texts.kind_coverage,
             notes: texts.notes().to_vec(),
             item_classes: collected.item_classes,
             paints: paint_summary,

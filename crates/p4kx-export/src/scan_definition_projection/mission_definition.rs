@@ -3,14 +3,14 @@
 
 use p4kx_extraction::RecordTree;
 
-use super::Scan;
+use super::SelectedProjection;
 use crate::mission_kinds::MissionPick;
 use crate::picked::Picked;
 use crate::record_observation::RecordObservation;
 use crate::scan_health::ScanError;
 use crate::source_fields::FieldError;
 
-impl<'f> Scan<'_, '_, 'f> {
+impl<'f> SelectedProjection<'_, '_, '_, 'f> {
     pub(super) fn mission_type_definition(
         &self,
         admission: &RecordObservation<'_, 'f>,
@@ -18,9 +18,9 @@ impl<'f> Scan<'_, '_, 'f> {
     ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
         let definition = crate::mission_data::mission_type(
             tree,
-            self.projection,
+            &self.projection,
             admission,
-            self.options.cancel,
+            self.scan.options.cancel,
         )?;
         Ok((Picked::Mission(MissionPick::Type(definition)), Vec::new()))
     }
@@ -32,9 +32,9 @@ impl<'f> Scan<'_, '_, 'f> {
     ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
         let (definition, notes) = crate::catalog_v3::mission_sources::item_definition::read(
             tree,
-            self.projection,
+            &self.projection,
             admission,
-            self.options.cancel,
+            self.scan.options.cancel,
         )?;
         Ok((
             Picked::Mission(MissionPick::Item(Box::new(definition))),
@@ -49,9 +49,9 @@ impl<'f> Scan<'_, '_, 'f> {
     ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
         let (definition, notes) = crate::catalog_v3::mission_sources::module_declaration::read(
             tree,
-            self.projection,
+            &self.projection,
             admission,
-            self.options.cancel,
+            self.scan.options.cancel,
         )?;
         Ok((
             Picked::Mission(MissionPick::ModuleDeclaration(Box::new(definition))),

@@ -3,13 +3,13 @@
 
 use p4kx_extraction::{CancelToken, DataForge, Filter};
 
-use crate::CatalogError;
 use crate::broker_entry_read::{self, BrokerEntries};
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_v3::tag_catalog::CapturedTags;
 use crate::contract_template_read::{self, ContractTemplates};
 use crate::location_template::{self, LocationTemplates};
 use crate::mission_index::MissionIndex;
+use crate::{CatalogError, Kind};
 
 /// The kinds read beside the contracts: the mission location templates, the contract templates
 /// and the mission broker entries.
@@ -34,17 +34,28 @@ pub(crate) fn read<'f>(
     cancel: Option<&CancelToken>,
 ) -> Result<Siblings<'f>, CatalogError> {
     let tags = index.tags();
-    let contract_templates =
-        contract_template_read::read(forge, projection, captured_tags, filter, cancel)?;
+    let contract_templates = contract_template_read::read(
+        forge,
+        &projection.for_kind(Kind::ContractTemplates),
+        captured_tags,
+        filter,
+        cancel,
+    )?;
     let broker_entries = broker_entry_read::read(
         forge,
-        projection,
+        &projection.for_kind(Kind::MissionBrokerEntries),
         (captured_tags, index, &contract_templates.unknowns),
         filter,
         cancel,
     )?;
     Ok(Siblings {
-        location_templates: location_template::read(forge, projection, tags, filter, cancel)?,
+        location_templates: location_template::read(
+            forge,
+            &projection.for_kind(Kind::MissionLocationTemplates),
+            tags,
+            filter,
+            cancel,
+        )?,
         contract_templates,
         broker_entries,
     })

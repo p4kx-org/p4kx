@@ -19,7 +19,7 @@ use crate::crafting_warning::CraftingWarning;
 use crate::loadout::{Wanted, loadouts};
 use crate::missions;
 use crate::paint::paints;
-use crate::{CatalogError, CatalogOptions, LoadoutSummary, PaintSummary};
+use crate::{CatalogError, CatalogOptions, Kind, LoadoutSummary, PaintSummary};
 
 /// The captured tag inputs used by the mission projection.
 pub(crate) struct MissionTags<'context, 'source> {
@@ -73,7 +73,10 @@ pub(crate) fn add_contracts<'f>(
             missions.local_generators,
         );
     collected.contract_scenario_requirements = missions.scenario_requirements;
-    collected.mission_property_sets = missions.property_sets.publish(projection, options.cancel)?;
+    collected.mission_property_sets = missions.property_sets.publish(
+        &projection.for_kind(Kind::MissionPropertySets),
+        options.cancel,
+    )?;
     let ContractTemplates {
         read,
         pools: template_pools,

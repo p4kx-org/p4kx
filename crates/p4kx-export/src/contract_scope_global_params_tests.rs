@@ -105,7 +105,7 @@ fn project(bytes: &[u8], verify: impl FnOnce(&Value, &Value, usize) -> TestResul
         let admission = RecordObservation::capture(projection.original(), &record)?;
         let (prepared, notes) = PreparedDefinition::read(
             &tree,
-            projection,
+            &projection.for_kind(crate::Kind::ContractScopes),
             &admission,
             None,
             ContractScopeGlobalParams::read,
@@ -117,7 +117,7 @@ fn project(bytes: &[u8], verify: impl FnOnce(&Value, &Value, usize) -> TestResul
                 .first()
                 .ok_or("projected physical scope Record")?,
         )?;
-        let texts = serde_json::to_value(projection.finish()?)?;
+        let texts = serde_json::to_value(projection.finish()?.texts)?;
         verify(&row, &texts, notes.len())
     })
 }

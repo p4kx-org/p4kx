@@ -3,9 +3,61 @@
 
 use std::collections::BTreeSet;
 
+use p4kx_export::{Kind, Language, TextOwner};
+use p4kx_testkit::DataForgeBuilder;
+
 use crate::commodity_v3_fixture::{self as fixture, TestResult};
+use crate::commodity_v3_fixture_records as records;
+use crate::commodity_v3_fixture_schema;
 use crate::commodity_v3_source;
 use crate::commodity_v3_source_inventory::{body, header};
+
+#[test]
+fn resource_fallback_counts_once_in_each_owning_kind() -> TestResult {
+    let (built, catalog) = fixture::build(&resource_text_fallback())?;
+    let commodity = fixture::presentation(&catalog, fixture::BETA)?;
+    let resource = catalog
+        .pointer("/definitions/resourceTypes/rows/0")
+        .ok_or("physical ResourceType")?;
+    for field in ["name", "description"] {
+        let path = format!("/{field}/value");
+        let reference = resource
+            .pointer(&path)
+            .ok_or("physical ResourceType text reference")?;
+        assert_eq!(
+            commodity.pointer(&path),
+            Some(reference),
+            "Commodity presentation reuses the canonical ResourceType {field} reference"
+        );
+    }
+
+    let coverage = built.summary().text_kind_coverage();
+    for kind in [Kind::Commodities, Kind::ResourceTypes] {
+        let english = coverage
+            .iter()
+            .find(|row| row.owner == TextOwner::Catalog(kind) && row.language == Language::English)
+            .ok_or("missing English coverage for consumer or physical owner")?;
+        assert_eq!(
+            (english.resolved, english.missing_key, english.placeholder),
+            (2, 0, 0),
+            "the shared name and description both count for {kind}"
+        );
+    }
+    Ok(())
+}
+
+fn resource_text_fallback() -> DataForgeBuilder {
+    let resource = records::resource(fixture::RESOURCE, "Readable", "@resource_name");
+    let composition = records::composition(Some(fixture::RESOURCE));
+    commodity_v3_fixture_schema::database()
+        .record(resource)
+        .record(records::entity(
+            fixture::BETA,
+            "Beta",
+            vec![records::container(vec![composition])],
+            Vec::new(),
+        ))
+}
 
 #[test]
 fn untranslated_own_names_win_before_lookup_and_unused_resource_inputs_do_not_leak() -> TestResult {

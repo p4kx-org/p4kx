@@ -4,12 +4,15 @@
 use p4kx_assembly::Entities;
 use p4kx_extraction::{Archive, DataForge, SourceUses};
 
+use crate::blueprint_catalog_rows::{self, BlueprintTables};
+use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projections::weapon_reload::{self, WeaponAnimation};
 use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::catalog_item_components::item_definition::ItemDefinition;
 use crate::catalog_v3::faction_identity_definition::{
     self, FactionIdentityDefinition, PreparedFactionIdentity,
 };
+use crate::collected::Collected;
 use crate::options::{CatalogRun, CatalogStage};
 use crate::starmap_report::StarmapReport;
 use crate::{
@@ -22,6 +25,7 @@ pub(super) struct Parts {
     pub(super) provenance: CatalogProvenance,
     pub(super) kinds: Vec<crate::KindSummary>,
     pub(super) texts: Vec<crate::TextSummary>,
+    pub(super) text_kind_coverage: Vec<crate::KindTextSummary>,
     pub(super) notes: Vec<p4kx_extraction::LocalizationNote>,
     pub(super) item_classes: crate::ItemClassSummary,
     pub(super) paints: PaintSummary,
@@ -44,6 +48,7 @@ impl Parts {
             provenance: self.provenance,
             kinds: self.kinds,
             texts: self.texts,
+            text_kind_coverage: self.text_kind_coverage,
             notes: self.notes,
             item_classes: self.item_classes,
             paints: self.paints,
@@ -61,6 +66,20 @@ impl Parts {
             compressed_size,
         }
     }
+}
+
+pub(super) fn blueprint_tables<'source>(
+    collected: &mut Collected<'source>,
+    forge: &DataForge<'_>,
+    origins: &CatalogOrigins,
+) -> Result<BlueprintTables<'source>, crate::CatalogError> {
+    blueprint_catalog_rows::tables(
+        std::mem::take(&mut collected.blueprints),
+        &collected.missing_blueprint_categories,
+        &collected.ledger.sources,
+        forge,
+        origins,
+    )
 }
 
 pub(super) fn item_definitions<'source>(
@@ -82,7 +101,7 @@ pub(super) fn capture_weapon_animation<'source>(
     entities: &Entities<'source>,
     input: &super::original_input::OriginalCatalogInput<'_, 'source>,
     options: &crate::CatalogOptions<'_>,
-    collected: &mut crate::collected::Collected<'source>,
+    collected: &mut Collected<'source>,
 ) -> Result<WeaponAnimation<'source>, crate::CatalogError> {
     weapon_reload::read(
         archive,
@@ -95,7 +114,7 @@ pub(super) fn capture_weapon_animation<'source>(
 }
 
 pub(super) fn capture_rows(
-    collected: &mut crate::collected::Collected<'_>,
+    collected: &mut Collected<'_>,
     filter: Option<&p4kx_extraction::Filter>,
     recovery_numbers: Vec<crate::catalog_number_capture::CapturedNumber>,
     configuration_numbers: Vec<crate::catalog_number_capture::CapturedNumber>,
@@ -109,7 +128,7 @@ pub(super) fn capture_rows(
 }
 
 pub(super) fn require_publishable(
-    collected: &mut crate::collected::Collected<'_>,
+    collected: &mut Collected<'_>,
     kinds: &[crate::KindSummary],
     input: &super::original_input::OriginalCatalogInput<'_, '_>,
     run: CatalogRun<'_, '_>,

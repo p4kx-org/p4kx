@@ -3,6 +3,7 @@
 
 use std::error::Error;
 
+use p4kx_export::{Language, TextOwner};
 use p4kx_testkit::{DataForgeBuilder, TestInstance, TestRecord, TestStruct, TestType, TestValue};
 use serde_json::{Value, json};
 
@@ -45,7 +46,7 @@ const ENTITY: u128 = 0x2468;
 
 #[test]
 fn recovery_policy_retains_all_authored_conditions_and_protected_notifications() -> TestResult {
-    let (_, catalog) = build_from(&fixture(false), None)?;
+    let (built, catalog) = build_from(&fixture(false), None)?;
     assert_eq!(
         catalog["exportHealth"]["status"], "complete",
         "known source siblings publish"
@@ -62,6 +63,29 @@ fn recovery_policy_retains_all_authored_conditions_and_protected_notifications()
     );
     check_conditions(&catalog, policy)?;
     check_notifications(&catalog, policy)?;
+    let coverage = built.summary().text_kind_coverage();
+    assert_eq!(
+        coverage.len(),
+        Language::ALL.len(),
+        "one owner per supported language"
+    );
+    for row in coverage {
+        assert_eq!(
+            row.owner,
+            TextOwner::ItemRecoveryPolicy,
+            "notification owner"
+        );
+        assert_eq!(
+            (
+                row.resolved,
+                row.missing_language,
+                row.missing_key,
+                row.placeholder
+            ),
+            (0, NOTIFICATIONS.len(), 0, 0),
+            "each protected notification is registered even without a language file"
+        );
+    }
     let validator = jsonschema::validator_for(&p4kx_export::catalog_schema())?;
     assert!(
         validator.is_valid(&catalog),

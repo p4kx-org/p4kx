@@ -1452,6 +1452,21 @@ The counters operate per lookup occurrence. `resolved` counts a nonempty display
 `unresolved` counts a lookup without one. `placeholder` counts original placeholder keys
 separately. The top-level `unresolved` sums the counts of the reported languages.
 
+`text_kind_coverage` records successful canonical key registrations by owning catalog dataset and
+supported language. Each row has an `owner` identifier and a language code. Its mutually exclusive
+counts are `resolved` for nonempty display text, `missing_language` when no language source
+was loaded,
+`missing_key` for an absent lookup result in a present language, `empty_source` for a winning
+empty source string, `empty_display` for source text that becomes empty after display conversion,
+and `placeholder` for a recognized token that bypasses lookup. Placeholders count separately even
+for missing languages. Repeated registration of the same key counts each time, and internal-only
+mission render lookups remain in the legacy counters. The order is catalog Kind order, then
+`configurations.itemRecoveryPolicy` and `definitions.consumableSubtypes`, with supported language
+order within each dataset. Each dataset with registrations has a row for every supported
+language. Language-source decoding and malformed-line notes are separate file observations.
+A recovered directory can leave absence uncertain. See the `sourceSetComplete` value in
+`texts.languageSources` for the directory evidence.
+
 These counters describe display lookup results. In the Catalog document, a missing key has absent
 text forms, a present empty value stays present and a missing language has no member in
 `translations.value`. See [TextForms](catalog-text-forms.md).

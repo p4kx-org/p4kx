@@ -13,7 +13,7 @@ use super::super::referenced_definition_read::{self, Selection};
 use super::{ComponentKind, PhysicalComponents};
 use crate::CatalogError;
 use crate::canonical_record_header::CanonicalRecordHeader;
-use crate::catalog_projection::CatalogProjection;
+use crate::catalog_projection::{CatalogProjection, TextOwner};
 use crate::catalog_record_reference::CatalogRecordReference;
 use crate::catalog_table::CatalogTable;
 use crate::catalog_text_contract::PublicNameRef;
@@ -90,6 +90,9 @@ impl<'source> ConsumableTables<'source> {
                 .iter()
                 .flat_map(ConsumableType::subtype_indices),
         );
+        let projection = components
+            .projection
+            .for_text_owner(TextOwner::ConsumableSubtypes);
         let subtypes = referenced_definition_read::read(
             components.forge,
             components.projection.original(),
@@ -99,9 +102,7 @@ impl<'source> ConsumableTables<'source> {
                 ..selection
             },
             components.options.cancel,
-            |_, header, source, notes| {
-                ConsumableSubtype::read(header, source, components.projection, notes)
-            },
+            |_, header, source, notes| ConsumableSubtype::read(header, source, &projection, notes),
         )?;
         let consumable_subtypes = CatalogTable::new(
             components.forge,

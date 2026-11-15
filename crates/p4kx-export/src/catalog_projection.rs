@@ -5,8 +5,7 @@ use std::collections::BTreeMap;
 use std::sync::Mutex;
 
 use p4kx_extraction::{
-    Language, SourceLocation, SourceUse, SourceUseRole, SourceValue, SourcedValue,
-    is_placeholder_key,
+    SourceLocation, SourceUse, SourceUseRole, SourceValue, SourcedValue, is_placeholder_key,
 };
 
 #[path = "catalog_protected_key.rs"]
@@ -14,7 +13,6 @@ mod protected_key;
 pub(crate) use protected_key::ProtectedKey;
 
 use super::catalog_text_forms;
-use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_read::original::{OriginalFlowFields, OriginalValueFact};
@@ -23,9 +21,14 @@ use crate::catalog_text_contract::{
     language_sources,
 };
 use crate::mission_text_inputs::{MissionKey, SelectedKey};
-use crate::texts::{CATALOG_LANGUAGES, TextProjection, Texts};
+use crate::texts::{CATALOG_LANGUAGES, Texts};
+use crate::{CatalogError, ExportAccountingError, Kind};
 
-type Translations<'source> = BTreeMap<Language, Option<TextProjection<'source>>>;
+#[path = "kind_text_coverage.rs"]
+mod kind_text_coverage;
+
+use self::kind_text_coverage::{KindTextCoverage, Lookup, Translations};
+pub use self::kind_text_coverage::{KindTextSummary, TextOwner};
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum Domain {
@@ -41,22 +44,54 @@ struct Pending<'source> {
     looked_up: bool,
 }
 
+#[derive(Default)]
+struct RegistryState<'source> {
+    pending: BTreeMap<(Domain, &'source str), Pending<'source>>,
+    coverage: KindTextCoverage,
+}
+
+/// Canonical text registrations shared by the scopes of one catalog run.
+#[derive(Default)]
+pub(crate) struct CatalogTextRegistry<'source> {
+    state: Mutex<RegistryState<'source>>,
+}
+
+/// Canonical texts and coverage from the same registrations.
+pub(crate) struct FinishedTexts<'source> {
+    pub(crate) texts: CatalogTexts<'source>,
+    pub(crate) kind_coverage: Vec<KindTextSummary>,
+}
+
 /// Per-catalog projection inputs and canonical text rows with precise source uses.
 pub(crate) struct CatalogProjection<'context, 'source> {
     texts: &'context Texts<'source>,
     original: &'context OriginalCatalogInput<'context, 'source>,
-    pending: Mutex<BTreeMap<(Domain, &'source str), Pending<'source>>>,
+    registry: &'context CatalogTextRegistry<'source>,
+    owner: Option<TextOwner>,
 }
 
 impl<'context, 'source> CatalogProjection<'context, 'source> {
     pub(crate) const fn new(
         texts: &'context Texts<'source>,
         original: &'context OriginalCatalogInput<'context, 'source>,
+        registry: &'context CatalogTextRegistry<'source>,
     ) -> Self {
         Self {
             texts,
             original,
-            pending: Mutex::new(BTreeMap::new()),
+            registry,
+            owner: None,
+        }
+    }
+
+    pub(crate) const fn for_kind(&self, kind: Kind) -> Self {
+        self.for_text_owner(TextOwner::Catalog(kind))
+    }
+
+    pub(crate) const fn for_text_owner(&self, owner: TextOwner) -> Self {
+        Self {
+            owner: Some(owner),
+            ..*self
         }
     }
 
@@ -110,7 +145,7 @@ impl<'context, 'source> CatalogProjection<'context, 'source> {
         use p4kx_extraction::Value;
         fact.check_input(self.original)?;
         let &Value::Locale(key) = fact.value() else {
-            return Err(crate::ExportAccountingError::ConflictingSourceDatum.into());
+            return Err(ExportAccountingError::ConflictingSourceDatum.into());
         };
         let payload = fact.observe(OriginalValuePart::Value, SourceUseRole::Payload)?;
         let selector = fact.observe(OriginalValuePart::Value, SourceUseRole::Selector)?;
@@ -248,22 +283,39 @@ impl<'context, 'source> CatalogProjection<'context, 'source> {
         translations: Translations<'source>,
         looked_up: bool,
     ) -> Result<(), CatalogError> {
-        let mut pending = crate::export_evidence_lock::lock(&self.pending)?;
-        let row = pending.entry((domain, key)).or_insert_with(|| Pending {
-            key,
-            payloads: Vec::new(),
-            selectors: Vec::new(),
-            translations,
-            looked_up,
-        });
+        let mut state = crate::export_evidence_lock::lock(&self.registry.state)?;
+        let owner = self
+            .owner
+            .ok_or(ExportAccountingError::UnscopedCatalogText)?;
+        let lookup = if looked_up {
+            Lookup::Projected(&translations)
+        } else {
+            Lookup::Placeholder
+        };
+        state.coverage.record(owner, lookup);
+        let row = state
+            .pending
+            .entry((domain, key))
+            .or_insert_with(|| Pending {
+                key,
+                payloads: Vec::new(),
+                selectors: Vec::new(),
+                translations,
+                looked_up,
+            });
         row.payloads.push(payload);
         row.selectors.push(selector);
-        drop(pending);
+        drop(state);
         Ok(())
     }
 
-    pub(crate) fn finish(&self) -> Result<CatalogTexts<'source>, CatalogError> {
-        let rows = std::mem::take(&mut *crate::export_evidence_lock::lock(&self.pending)?);
+    pub(crate) fn finish(&self) -> Result<FinishedTexts<'source>, CatalogError> {
+        let RegistryState {
+            pending: rows,
+            coverage,
+        } = std::mem::take(&mut *crate::export_evidence_lock::lock(
+            &self.registry.state,
+        )?);
         let mut public_names = Vec::new();
         let mut game_texts = Vec::new();
         for ((domain, key), row) in rows {
@@ -276,11 +328,14 @@ impl<'context, 'source> CatalogProjection<'context, 'source> {
                 }
             }
         }
-        Ok(CatalogTexts {
-            language_policy: CatalogLanguagePolicy::AVAILABLE_SUPPORTED,
-            language_sources: language_sources(self.texts, self.origins())?,
-            public_names,
-            game_texts,
+        Ok(FinishedTexts {
+            texts: CatalogTexts {
+                language_policy: CatalogLanguagePolicy::AVAILABLE_SUPPORTED,
+                language_sources: language_sources(self.texts, self.origins())?,
+                public_names,
+                game_texts,
+            },
+            kind_coverage: coverage.finish(),
         })
     }
 

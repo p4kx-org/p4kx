@@ -173,7 +173,12 @@ fn read_blueprint<'source>(
     ledger: &mut ExportLedger,
     cancel: Option<&CancelToken>,
 ) -> Result<Piece<'source>, CatalogError> {
-    let found = crate::blueprint_catalog_read::read(tree, projection, admission, cancel)?;
+    let found = crate::blueprint_catalog_read::read(
+        tree,
+        &projection.for_kind(Kind::Blueprints),
+        admission,
+        cancel,
+    )?;
     crate::source_projection_notes::record(
         Kind::Blueprints,
         role,

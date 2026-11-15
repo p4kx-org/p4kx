@@ -3,7 +3,7 @@
 
 use p4kx_extraction::RecordTree;
 
-use super::Scan;
+use super::projection::SelectedProjection;
 use crate::Kind;
 use crate::catalog_v3::cargo_globals;
 use crate::catalog_v3::law_kinds::LawPick;
@@ -21,7 +21,7 @@ use crate::source_fields::FieldError;
 #[path = "scan_definition_projection/mission_definition.rs"]
 mod mission_definition;
 
-impl<'f> Scan<'_, '_, 'f> {
+impl<'f> SelectedProjection<'_, '_, '_, 'f> {
     pub(super) fn read_definition(
         &self,
         kind: Kind,
@@ -34,9 +34,13 @@ impl<'f> Scan<'_, '_, 'f> {
             Kind::MedicalItemTierConfigs => self.medical_definition(admission, tree)?,
             Kind::ProceduralPlanetAudio => self.planet_audio(admission, tree)?,
             Kind::ResourceNetworkGlobals => self.resource_network_global(admission, tree)?,
-            Kind::CargoLoadingGlobals | Kind::ShopCommodityGlobals => {
-                cargo_globals::read(kind, tree, self.projection, admission, self.options.cancel)?
-            }
+            Kind::CargoLoadingGlobals | Kind::ShopCommodityGlobals => cargo_globals::read(
+                kind,
+                tree,
+                &self.projection,
+                admission,
+                self.scan.options.cancel,
+            )?,
             Kind::Factions => self.faction_definition(admission, tree)?,
             Kind::StarmapTypes | Kind::StarmapPresets | Kind::StarmapAmenities => {
                 self.starmap_definition(kind, admission, tree)?
@@ -50,18 +54,18 @@ impl<'f> Scan<'_, '_, 'f> {
             Kind::BlueprintCategories => {
                 let read = crate::blueprint_category::read(
                     tree,
-                    self.projection,
+                    &self.projection,
                     admission,
-                    self.options.cancel,
+                    self.scan.options.cancel,
                 )?;
                 (Picked::BlueprintCategory(read.value), read.notes)
             }
             Kind::Manufacturers => {
                 let read = crate::manufacturer::read(
                     tree,
-                    self.projection,
+                    &self.projection,
                     admission,
-                    self.options.cancel,
+                    self.scan.options.cancel,
                 )?;
                 (Picked::Manufacturer(Box::new(read.value)), read.notes)
             }
@@ -71,9 +75,9 @@ impl<'f> Scan<'_, '_, 'f> {
                 crate::mining::named_definition(
                     kind,
                     tree,
-                    self.projection,
+                    &self.projection,
                     admission,
-                    self.options.cancel,
+                    self.scan.options.cancel,
                 )?
             }
             Kind::MissionModuleDeclarations => self.module_declaration(admission, tree)?,
@@ -90,9 +94,9 @@ impl<'f> Scan<'_, '_, 'f> {
     ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
         let read = crate::catalog_v3::blueprint_category_list_read::read(
             tree,
-            self.projection,
+            &self.projection,
             admission,
-            self.options.cancel,
+            self.scan.options.cancel,
         )?;
         Ok((Picked::BlueprintCategoryList(read.value), read.notes))
     }
@@ -104,10 +108,10 @@ impl<'f> Scan<'_, '_, 'f> {
     ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
         let read = crate::resource_read::read(
             tree,
-            self.projection,
-            self.groups.all_of_resource(&tree.guid()),
+            &self.projection,
+            self.scan.groups.all_of_resource(&tree.guid()),
             admission,
-            self.options.cancel,
+            self.scan.options.cancel,
         )?;
         Ok((Picked::ResourceType(Box::new(read.value)), read.notes))
     }
@@ -119,9 +123,9 @@ impl<'f> Scan<'_, '_, 'f> {
     ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
         let (value, notes) = crate::catalog_v3::faction_identity_definition::read(
             tree,
-            self.projection,
+            &self.projection,
             admission,
-            self.options.cancel,
+            self.scan.options.cancel,
         )?;
         Ok((Picked::FactionIdentity(Box::new(value)), notes))
     }
@@ -134,9 +138,9 @@ impl<'f> Scan<'_, '_, 'f> {
         let (value, notes) = NpcSpawnDefinitionsPick::read(
             kind,
             tree,
-            self.projection,
+            &self.projection,
             admission,
-            self.options.cancel,
+            self.scan.options.cancel,
         )?;
         Ok((Picked::NpcSpawnDefinitions(value), notes))
     }
@@ -146,8 +150,12 @@ impl<'f> Scan<'_, '_, 'f> {
         admission: &RecordObservation<'_, 'f>,
         tree: &RecordTree<'f>,
     ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
-        let (value, notes) =
-            procedural_planet_audio::read(tree, self.projection, admission, self.options.cancel)?;
+        let (value, notes) = procedural_planet_audio::read(
+            tree,
+            &self.projection,
+            admission,
+            self.scan.options.cancel,
+        )?;
         Ok((Picked::ProceduralPlanetAudio(Box::new(value)), notes))
     }
 
@@ -157,7 +165,7 @@ impl<'f> Scan<'_, '_, 'f> {
         tree: &RecordTree<'f>,
     ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
         let (value, notes) =
-            medical_tier_config::read(tree, self.projection, admission, self.options.cancel)?;
+            medical_tier_config::read(tree, &self.projection, admission, self.scan.options.cancel)?;
         Ok((Picked::MedicalItemTierConfig(Box::new(value)), notes))
     }
 
@@ -182,9 +190,9 @@ impl<'f> Scan<'_, '_, 'f> {
             Kind::ReputationTriggerRecords => {
                 let read = crate::catalog_v3::sandbox_trigger_record_definition::read(
                     tree,
-                    self.projection,
+                    &self.projection,
                     admission,
-                    self.options.cancel,
+                    self.scan.options.cancel,
                 )?;
                 let picked = MissionPick::SandboxTriggerRecord(Box::new(read.value));
                 (Picked::Mission(picked), read.notes)
@@ -192,9 +200,9 @@ impl<'f> Scan<'_, '_, 'f> {
             Kind::ReputationRewardAmounts => {
                 let read = crate::catalog_v3::reputation_reward_amount_definition::read(
                     tree,
-                    self.projection,
+                    &self.projection,
                     admission,
-                    self.options.cancel,
+                    self.scan.options.cancel,
                 )?;
                 let picked = MissionPick::RewardAmount(Box::new(read.value));
                 (Picked::Mission(picked), read.notes)
@@ -202,9 +210,9 @@ impl<'f> Scan<'_, '_, 'f> {
             Kind::MissionScenarios => {
                 let (definition, notes) = crate::catalog_v3::mission_scenario_definition::read(
                     tree,
-                    self.projection,
+                    &self.projection,
                     admission,
-                    self.options.cancel,
+                    self.scan.options.cancel,
                 )?;
                 (
                     Picked::Mission(MissionPick::ScenarioDefinition(Box::new(definition))),
@@ -215,9 +223,9 @@ impl<'f> Scan<'_, '_, 'f> {
                 let (value, notes) = LocationVocabularyPick::read(
                     kind,
                     tree,
-                    self.projection,
+                    &self.projection,
                     admission,
-                    self.options.cancel,
+                    self.scan.options.cancel,
                 )?;
                 (Picked::LocationVocabulary(value), notes)
             }
@@ -235,9 +243,9 @@ impl<'f> Scan<'_, '_, 'f> {
         let (value, notes) = StarmapDefinitionPick::read(
             kind,
             tree,
-            self.projection,
+            &self.projection,
             admission,
-            self.options.cancel,
+            self.scan.options.cancel,
         )?;
         Ok((Picked::StarmapDefinition(value), notes))
     }
@@ -248,8 +256,13 @@ impl<'f> Scan<'_, '_, 'f> {
         admission: &RecordObservation<'_, 'f>,
         tree: &RecordTree<'f>,
     ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
-        let (value, notes) =
-            LawPick::read(kind, tree, self.projection, admission, self.options.cancel)?;
+        let (value, notes) = LawPick::read(
+            kind,
+            tree,
+            &self.projection,
+            admission,
+            self.scan.options.cancel,
+        )?;
         Ok((Picked::Law(value), notes))
     }
 
@@ -260,9 +273,9 @@ impl<'f> Scan<'_, '_, 'f> {
     ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
         let read = crate::catalog_v3::explosion_definition::read(
             tree,
-            self.projection,
+            &self.projection,
             admission,
-            self.options.cancel,
+            self.scan.options.cancel,
         )?;
         Ok((
             Picked::ExplosionDefinition(Box::new(read.value)),
@@ -277,9 +290,9 @@ impl<'f> Scan<'_, '_, 'f> {
     ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
         let (value, notes) = crate::catalog_v3::inventory_container_definition::read(
             tree,
-            self.projection,
+            &self.projection,
             admission,
-            self.options.cancel,
+            self.scan.options.cancel,
         )?;
         Ok((Picked::InventoryContainer(Box::new(value)), notes))
     }
@@ -291,9 +304,9 @@ impl<'f> Scan<'_, '_, 'f> {
     ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
         let read = crate::catalog_v3::faction_definition::read(
             tree,
-            self.projection,
+            &self.projection,
             admission,
-            self.options.cancel,
+            self.scan.options.cancel,
         )?;
         Ok((Picked::Faction(Box::new(read.value)), read.notes))
     }
@@ -305,9 +318,9 @@ impl<'f> Scan<'_, '_, 'f> {
     ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
         let read = crate::catalog_v3::reputation_context_definition::read(
             tree,
-            self.projection,
+            &self.projection,
             admission,
-            self.options.cancel,
+            self.scan.options.cancel,
         )?;
         let picked = MissionPick::Context(Box::new(read.value));
         Ok((Picked::Mission(picked), read.notes))
@@ -320,9 +333,9 @@ impl<'f> Scan<'_, '_, 'f> {
     ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
         let read = crate::catalog_v3::reputation_scope_definition::read(
             tree,
-            self.projection,
+            &self.projection,
             admission,
-            self.options.cancel,
+            self.scan.options.cancel,
         )?;
         let picked = MissionPick::Scope(Box::new(read.value));
         Ok((Picked::Mission(picked), read.notes))
@@ -335,9 +348,9 @@ impl<'f> Scan<'_, '_, 'f> {
     ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
         let read = crate::catalog_v3::reputation_standing_definition::read(
             tree,
-            self.projection,
+            &self.projection,
             admission,
-            self.options.cancel,
+            self.scan.options.cancel,
         )?;
         let picked = MissionPick::Standing(Box::new(read.value));
         Ok((Picked::Mission(picked), read.notes))
@@ -350,9 +363,9 @@ impl<'f> Scan<'_, '_, 'f> {
     ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
         let read = crate::catalog_v3::reputation_perk_list::read(
             tree,
-            self.projection,
+            &self.projection,
             admission,
-            self.options.cancel,
+            self.scan.options.cancel,
         )?;
         let picked = MissionPick::Perks(Box::new(read.value));
         Ok((Picked::Mission(picked), read.notes))
@@ -365,9 +378,9 @@ impl<'f> Scan<'_, '_, 'f> {
     ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
         let read = crate::catalog_v3::reputation_faction_definition::read(
             tree,
-            self.projection,
+            &self.projection,
             admission,
-            self.options.cancel,
+            self.scan.options.cancel,
         )?;
         let picked = MissionPick::Faction(Box::new(read.value));
         Ok((Picked::Mission(picked), read.notes))

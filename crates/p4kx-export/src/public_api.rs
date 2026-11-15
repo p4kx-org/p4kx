@@ -21,6 +21,7 @@ pub use crate::catalog_file_write::{
     write_catalog_file, write_catalog_file_from, write_catalog_file_with_phases,
 };
 pub use crate::catalog_output::{Compression, ZSTD_LEVEL, ZSTD_WINDOW_LOG};
+pub use crate::catalog_projection::{KindTextSummary, TextOwner};
 pub use crate::contract::{SCHEMA_VERSION, catalog_schema};
 pub use crate::crafting::{Crafting, read_crafting};
 pub use crate::crafting_research::{Research, ResearchBlock, ResearchMember, ResearchValue};

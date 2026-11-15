@@ -7,7 +7,7 @@ use p4kx_extraction::{
 
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_number_capture::CapturedNumber;
-use crate::catalog_projection::CatalogProjection;
+use crate::catalog_projection::{CatalogProjection, TextOwner};
 use crate::catalog_table::CatalogTable;
 use crate::contract_recovery::{ItemRecoveryEconomy, ItemRecoveryOverrides};
 use crate::export_diagnostic::ExportSourceRole;
@@ -125,7 +125,12 @@ fn finish<'f>(
         });
     };
     let admission = RecordObservation::capture(projection.original(), &record)?;
-    let selected = projection::read(&tree, projection, &admission, cancel)?;
+    let selected = projection::read(
+        &tree,
+        &projection.for_text_owner(TextOwner::ItemRecoveryPolicy),
+        &admission,
+        cancel,
+    )?;
     source_projection_notes::record_dependency(&admission, &tree, selected.notes, &mut ledger)?;
     for source in &mut ledger.sources {
         if source.record_index == record.index() {
