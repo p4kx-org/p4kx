@@ -42,6 +42,10 @@ pub struct Container {
     pub parent_id: u32,
     /// The IDs of the child nodes, in bank order.
     pub children: Vec<u32>,
+    /// The checked Random/Sequence loop words differ from one play with zero modifiers.
+    pub has_authored_loops: bool,
+    /// The original Switch defines membership groups or a nonzero default value.
+    pub has_switch_conditions: bool,
 }
 
 /// Original words that locate and supply the parent in a node base.

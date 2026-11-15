@@ -53,8 +53,9 @@ pub(crate) fn switch(fields: &mut SectionReader<'_>) -> Result<MusicSwitch, Bank
     let size = usize::try_from(tree.byte_len).unwrap_or(usize::MAX);
     let original = fields.bytes(size)?;
     let mut expanded_targets = Vec::new();
+    let nodes = tree.checked_nodes()?;
     let graph = hirc_music_switch_graph::inspect(
-        tree.checked_nodes()?,
+        nodes,
         tree.depth,
         RouteOutput::Ids,
         |index| slice_node(original, index),
@@ -76,6 +77,7 @@ pub(crate) fn switch(fields: &mut SectionReader<'_>) -> Result<MusicSwitch, Bank
         group_ids,
         targets,
         targets_compact: graph.targets_compact,
+        has_decision_conditions: nodes > 0 && tree.depth > 0,
     })
 }
 
@@ -97,8 +99,11 @@ pub(crate) fn playlist(fields: &mut SectionReader<'_>) -> Result<MusicPlaylist, 
     } = transition_node(fields)?;
     let count = fields.u32()?;
     let mut items = Vec::with_capacity(capacity(fields, count, PLAYLIST_ITEM_LEN));
+    let mut has_authored_loops = false;
     for _ in 0..count {
-        items.push(hirc_music_playlist::item(fields)?.value());
+        let item = hirc_music_playlist::item(fields)?.value();
+        has_authored_loops |= item.loops != 1 || item.loop_min != 0 || item.loop_max != 0;
+        items.push(item);
     }
     finish(fields)?;
     Ok(MusicPlaylist {
@@ -106,6 +111,7 @@ pub(crate) fn playlist(fields: &mut SectionReader<'_>) -> Result<MusicPlaylist, 
         rule_count,
         transition_features,
         items,
+        has_authored_loops,
     })
 }
 

@@ -216,6 +216,8 @@ fn a_music_track_layers_its_sources_below_a_playlist_and_segment() -> TestResult
             read(folder, "Play_X.txtp")?,
             "# P4KX: event Play_X of trigger Play_X\n\
              # approximation: omit-music-clip-timing\n\
+             # approximation: omit-container-loops\n\
+             # approximation: omit-music-track-automation\n\
              \x20 Play_X_7001.wav\n  Play_X_7002.wav\n\
              # music_track 32\n\
              group = -L2 #@layer-v\n"

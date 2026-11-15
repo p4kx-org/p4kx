@@ -19,6 +19,7 @@ mod language;
 mod locate;
 mod media;
 mod music_clip_features;
+mod playback_features;
 mod read;
 mod references;
 mod resolve;

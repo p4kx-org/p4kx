@@ -56,6 +56,15 @@ impl BankRandomSequenceFields {
         }
     }
 
+    pub(crate) const fn has_authored_loops(&self) -> bool {
+        let (Some(count), Some(minimum), Some(maximum)) =
+            (&self.loop_count, &self.loop_minimum, &self.loop_maximum)
+        else {
+            return false;
+        };
+        count.value != 1 || minimum.value != 0 || maximum.value != 0
+    }
+
     /// Returns the decision extent once the original playlist fits.
     #[must_use]
     pub fn complete_range(&self) -> Option<Range<u64>> {

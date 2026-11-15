@@ -48,7 +48,7 @@ pub struct BankTrackAutomationFields {
 pub(crate) fn scan<F: ObjectFields>(
     input: &mut F,
     count: u32,
-) -> (BankTrackAutomationExtent, Result<(), F::Error>) {
+) -> (BankTrackAutomationExtent, Result<bool, F::Error>) {
     let start = input.offset();
     let read = scan_rows(input, count);
     let end = if read.is_ok() {
@@ -65,12 +65,17 @@ pub(crate) fn scan<F: ObjectFields>(
     )
 }
 
-fn scan_rows<F: ObjectFields>(input: &mut F, count: u32) -> Result<(), F::Error> {
+fn scan_rows<F: ObjectFields>(input: &mut F, count: u32) -> Result<bool, F::Error> {
+    let mut has_points = false;
     for _ in 0..count {
         let index = input.read_u32()?;
-        read_row(input, index).1?;
+        let (row, result) = read_row(input, index);
+        result?;
+        has_points |= row
+            .points
+            .is_some_and(|points| points.declared_count.value != 0);
     }
-    Ok(())
+    Ok(has_points)
 }
 
 pub(crate) fn read_row<F: ObjectFields>(
@@ -103,4 +108,30 @@ fn points<F: ObjectFields>(
         },
     });
     input.skip_bytes(required)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::bank_reader::SectionReader;
+    use crate::{BankError, SectionId};
+
+    use super::scan;
+
+    #[test]
+    fn a_checked_automation_row_requires_points_to_report_automation() -> Result<(), BankError> {
+        for (source, has_points) in [
+            ([0_u32, 7, 0].as_slice(), false),
+            ([0, 7, 1, 0, 0, 0].as_slice(), true),
+        ] {
+            let bytes: Vec<_> = source.iter().flat_map(|word| word.to_le_bytes()).collect();
+            let mut reader = SectionReader::new(SectionId::HIRC, &bytes);
+            let (extent, result) = scan(&mut reader, 1);
+            assert!(extent.is_complete(), "one fully checked original row");
+            assert_eq!(
+                result?, has_points,
+                "actual point presence determines automation"
+            );
+        }
+        Ok(())
+    }
 }

@@ -3,11 +3,12 @@
 
 use std::rc::Rc;
 
-use p4kx_audio::{HircKind, HircObject, HircValue, MusicTransitionFeatures, SoundSource};
+use p4kx_audio::{HircKind, HircObject, HircValue, SoundSource};
 
 use super::hirc_path_source::PathSourceMode;
 use super::locate::locate;
 use super::music_clip_features::MusicClipFeatures;
+use super::playback_features::PlaybackFeatures;
 use super::walk_banks::{Banks, Loaded, Via, find_object, select_holders};
 use super::{
     AudioIndex, BreakReason, BrokenLink, HircPathSource, IndexedSoundbank, LanguageChoice,
@@ -57,7 +58,7 @@ struct ResolvedPathStep<'index> {
     owner: Loaded<'index>,
     step: PathStep,
     source: Option<HircPathSource>,
-    transition_features: MusicTransitionFeatures,
+    playback_features: PlaybackFeatures,
 }
 
 struct Walk<'w, 'i> {
@@ -150,12 +151,9 @@ impl<'i> Walk<'_, 'i> {
     }
 
     fn enter(&mut self, object: &HircObject) {
-        let authored = match &object.value {
-            HircValue::MusicPlaylist(playlist) => playlist.transition_features,
-            HircValue::MusicSwitch(switch) => switch.transition_features,
-            _ => MusicTransitionFeatures::default(),
-        };
-        let transition_features = self.transition_features().combine(authored);
+        let playback_features = self
+            .playback_features()
+            .combine(PlaybackFeatures::observe(&object.value));
         self.path.push(ResolvedPathStep {
             owner: self.current.clone(),
             step: PathStep {
@@ -166,14 +164,14 @@ impl<'i> Walk<'_, 'i> {
                 PathSourceMode::Omit => None,
                 PathSourceMode::Retain => Some(HircPathSource::of(&self.current, object)),
             },
-            transition_features,
+            playback_features,
         });
     }
 
-    fn transition_features(&self) -> MusicTransitionFeatures {
+    fn playback_features(&self) -> PlaybackFeatures {
         self.path
             .last()
-            .map_or_default(|step| step.transition_features)
+            .map_or_default(|step| step.playback_features)
     }
 
     fn leave(&mut self, previous: Option<Loaded<'i>>) {
@@ -340,7 +338,7 @@ impl<'i> Walk<'_, 'i> {
             path_sources: self.path_sources(),
             shared_path_prefix: self.shared_path_prefix,
             music_clip_features,
-            music_transition_features: self.transition_features(),
+            playback_features: self.playback_features(),
             source,
             location: located.location,
             selection: located.selection,

@@ -111,6 +111,7 @@ pub(crate) struct TrackHeader {
     parent: u32,
     kind: MusicTrackKind,
     switch: Option<SwitchHeader>,
+    has_automation: bool,
 }
 
 struct SwitchHeader {
@@ -138,6 +139,7 @@ pub(crate) fn track(version: u32, input: &mut SectionReader<'_>) -> Result<Music
         sources,
         clips,
         kind: header.kind,
+        has_automation: header.has_automation,
         switch: header.switch.map(|header| MusicTrackSwitch {
             group_type: header.group_type,
             group_id: header.group_id,
@@ -163,7 +165,7 @@ pub(crate) fn read<F: ObjectFields>(
     fields.controls_start = Some(input.offset());
     fields.flags = Some(input.read_u8()?);
     read_clips(version, input, fields, &mut emit)?;
-    automations(input, fields)?;
+    let has_automation = automations(input, fields)?;
     let start = input.offset();
     let parent = hirc_node::read_base_parameters(input, &mut fields.parent, &mut fields.parameters);
     fields.node_range = Some(start..input.offset());
@@ -183,6 +185,7 @@ pub(crate) fn read<F: ObjectFields>(
         parent,
         kind,
         switch,
+        has_automation,
     })
 }
 
@@ -218,7 +221,7 @@ fn count<F: ObjectFields>(
 fn automations<F: ObjectFields>(
     input: &mut F,
     fields: &mut BankMusicTrackFields,
-) -> Result<(), F::Error> {
+) -> Result<bool, F::Error> {
     let count = count(input, &mut fields.automation_count)?;
     let (extent, result) = hirc_music_track_automation::scan(input, count);
     if extent.is_complete() {

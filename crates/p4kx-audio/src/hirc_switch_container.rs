@@ -41,6 +41,16 @@ impl BankSwitchContainerFields {
         }
     }
 
+    pub(crate) fn has_conditions(&self) -> bool {
+        self.default_value_id
+            .as_ref()
+            .is_some_and(|id| id.value != 0)
+            || self
+                .groups
+                .as_ref()
+                .is_some_and(|groups| groups.is_complete() && groups.declared_count.value != 0)
+    }
+
     /// Returns the original decision extent when both declared lists fit.
     #[must_use]
     pub fn complete_range(&self) -> Option<Range<u64>> {

@@ -6,36 +6,40 @@ use std::fs;
 use p4kx_testkit::{ArchiveBuilder, TestAtl, TestBank, TestEntry, TestHircObject, wwise_short_id};
 use serde_json::json;
 
-use super::{EMBEDDED, Fixture, PLAY, TestResult, extract, pcm};
+use super::{EMBEDDED, Fixture, PLAY, TestResult, extract, hirc_payload, pcm};
 
 const TIMED: &str = "Play_Timed_Clips";
 const ZERO: &str = "Play_Zero_Clip";
 const NONFINITE: &str = "Play_Nonfinite_Clip";
+const DEFAULT_SWITCH: &str = "Play_Default_Track_Switch";
 const FLAGS: [&str; 3] = ["--format", "wav", "--txtp"];
 const TIMING_CODE: &str = "omit-music-clip-timing";
 const EVENT_CODE: &str = "omit-music-clip-events";
+const AUTOMATION_CODE: &str = "omit-music-track-automation";
+const CONDITIONS_CODE: &str = "omit-container-conditions";
 const NONFINITE_CODE: &str = "nonfinite-music-clip-timing";
 const FIRST_WEM: u32 = 201;
 const SECOND_WEM: u32 = 202;
 const ZERO_WEM: u32 = 203;
 const NONFINITE_WEM: u32 = 204;
 const POSTED_WEM: u32 = 205;
+const DEFAULT_SWITCH_WEM: u32 = 206;
 const TRACK_CACHE_MASK: u32 = 0x5A5A_5A5A;
 const ID_BYTES: usize = size_of::<u32>();
 const TIMING_BYTES: usize = 4 * size_of::<f64>();
 const PCM_DURATION_MS: f64 = 10.0;
 
 #[test]
-fn txtp_reports_real_timing_and_posted_event_omissions() -> TestResult {
+fn txtp_reports_music_clip_and_track_automation_omissions() -> TestResult {
     let fixture = fixture()?;
     let report = extract(&fixture, TIMED, &FLAGS, 0)?;
     assert_eq!(
         report.pointer("/txtp/files/0/approximations"),
-        Some(&json!([TIMING_CODE, EVENT_CODE])),
-        "both omitted source features are recorded",
+        Some(&json!([TIMING_CODE, EVENT_CODE, AUTOMATION_CODE])),
+        "the omitted clip and automation features are recorded",
     );
     let text = fs::read_to_string(fixture.out.join(format!("{TIMED}.txtp")))?;
-    for code in [TIMING_CODE, EVENT_CODE] {
+    for code in [TIMING_CODE, EVENT_CODE, AUTOMATION_CODE] {
         let header = format!("# approximation: {code}");
         assert!(
             text.lines().any(|line| line == header),
@@ -60,7 +64,7 @@ fn txtp_keeps_zero_timing_music_bytes_and_distinguishes_nonfinite_words() -> Tes
     assert_eq!(
         zero.pointer("/txtp/files/0/approximations"),
         Some(&json!([])),
-        "authored zero timing and source duration need no omission code"
+        "neutral clip timing and an empty automation curve need no omission code"
     );
     assert_eq!(
         fs::read_to_string(fixture.out.join(format!("{ZERO}.txtp")))?,
@@ -82,12 +86,30 @@ fn txtp_keeps_zero_timing_music_bytes_and_distinguishes_nonfinite_words() -> Tes
     Ok(())
 }
 
+#[test]
+fn txtp_reports_an_authored_track_default_without_memberships() -> TestResult {
+    let fixture = fixture()?;
+    let report = extract(&fixture, DEFAULT_SWITCH, &FLAGS, 0)?;
+    assert_eq!(
+        report.pointer("/txtp/files/0/approximations"),
+        Some(&json!([TIMING_CODE, CONDITIONS_CODE, AUTOMATION_CODE])),
+        "the authored switch default is omitted even without explicit memberships",
+    );
+    let text = fs::read_to_string(fixture.out.join(format!("{DEFAULT_SWITCH}.txtp")))?;
+    assert!(
+        text.lines()
+            .any(|line| line == "# approximation: omit-container-conditions"),
+        "the TXTP header reports the same omission",
+    );
+    Ok(())
+}
+
 fn fixture() -> Result<Fixture, Box<dyn std::error::Error>> {
     let dir = tempfile::tempdir()?;
     let archive = dir.path().join("Data.p4k");
     let out = dir.path().join("out");
     let mut atl = TestAtl::new("Music");
-    for event in [TIMED, ZERO, NONFINITE] {
+    for event in [TIMED, ZERO, NONFINITE, DEFAULT_SWITCH] {
         atl = atl.trigger(event, &[event]);
     }
     let mut builder = ArchiveBuilder::new()
@@ -96,7 +118,13 @@ fn fixture() -> Result<Fixture, Box<dyn std::error::Error>> {
             atl.to_cryxml(),
         ))
         .entry(TestEntry::stored("Data/Sounds/wwise/Music.bnk", bank()?));
-    for id in [FIRST_WEM, SECOND_WEM, ZERO_WEM, NONFINITE_WEM] {
+    for id in [
+        FIRST_WEM,
+        SECOND_WEM,
+        ZERO_WEM,
+        NONFINITE_WEM,
+        DEFAULT_SWITCH_WEM,
+    ] {
         builder = builder.entry(TestEntry::stored(
             format!("Data/Sounds/wwise/Media/{id}.wem"),
             pcm(),
@@ -122,11 +150,17 @@ fn bank() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
         (TIMED, 1, 10, &[FIRST_WEM, SECOND_WEM][..]),
         (ZERO, 2, 11, &[ZERO_WEM][..]),
         (NONFINITE, 3, 12, &[NONFINITE_WEM][..]),
+        (DEFAULT_SWITCH, 5, 13, &[DEFAULT_SWITCH_WEM][..]),
     ] {
+        let object = match event {
+            TIMED => TestHircObject::music_track(track, sources),
+            DEFAULT_SWITCH => music_track_with_default_switch(track, sources)?,
+            _ => music_track_with_empty_automation(track, sources)?,
+        };
         bank = bank
             .object(TestHircObject::event(wwise_short_id(event), &[action]))
             .object(TestHircObject::action(action, PLAY, track))
-            .object(TestHircObject::music_track(track, sources));
+            .object(object);
     }
     let mut bytes = bank.bytes();
     for (ordinal, media, event, words) in [
@@ -138,6 +172,53 @@ fn bank() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
         clip_words(&mut bytes, ordinal, media, event, words)?;
     }
     Ok(bytes)
+}
+
+fn music_track_with_default_switch(
+    id: u32,
+    sources: &[u32],
+) -> Result<TestHircObject, Box<dyn std::error::Error>> {
+    const GROUP: u32 = 0x4200_0001;
+    const DEFAULT: u32 = 0x4200_0002;
+    let mut payload = hirc_payload(TestHircObject::music_switch_track(id, sources, GROUP, &[]))?;
+    let group = payload
+        .windows(ID_BYTES)
+        .position(|word| word == GROUP.to_le_bytes())
+        .ok_or("original switch group ID")?;
+    let default = payload
+        .get_mut(group + ID_BYTES..group + 2 * ID_BYTES)
+        .ok_or("default switch follows the group ID")?;
+    assert_eq!(
+        default,
+        0_u32.to_le_bytes(),
+        "the synthetic switch starts with no default"
+    );
+    default.copy_from_slice(&DEFAULT.to_le_bytes());
+    Ok(TestHircObject::raw(11, id, payload))
+}
+
+fn music_track_with_empty_automation(
+    id: u32,
+    sources: &[u32],
+) -> Result<TestHircObject, Box<dyn std::error::Error>> {
+    const TRACK_TAIL_LEN: usize = 31 + size_of::<u8>() + size_of::<i32>();
+    let mut body = hirc_payload(TestHircObject::music_track(id, sources))?;
+    let authored = [1_u32, 0, 0, 2, 0, 0, 0, 0, 0, 0].map(u32::to_le_bytes);
+    let end = body
+        .len()
+        .checked_sub(TRACK_TAIL_LEN)
+        .ok_or("original plain node and track type after the automation")?;
+    let start = end
+        .checked_sub(size_of_val(&authored))
+        .ok_or("original automation with two points")?;
+    assert_eq!(
+        body.get(start..end),
+        Some(authored.as_flattened()),
+        "replace the original two-point automation row"
+    );
+    let empty = [1_u32, 0, 0, 0];
+    drop(body.splice(start..end, empty.into_iter().flat_map(u32::to_le_bytes)));
+    Ok(TestHircObject::raw(11, id, body))
 }
 
 fn clip_words(

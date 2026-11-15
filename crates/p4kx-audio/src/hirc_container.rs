@@ -74,6 +74,14 @@ pub(crate) fn container(
         kind: header.kind,
         parent_id: header.parent_id,
         children,
+        has_authored_loops: original
+            .random_sequence
+            .as_ref()
+            .is_some_and(BankRandomSequenceFields::has_authored_loops),
+        has_switch_conditions: original
+            .switch
+            .as_ref()
+            .is_some_and(BankSwitchContainerFields::has_conditions),
     })
 }
 

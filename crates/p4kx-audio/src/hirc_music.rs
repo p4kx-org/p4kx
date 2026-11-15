@@ -130,6 +130,8 @@ pub struct MusicTrack {
     pub kind: MusicTrackKind,
     /// The switch group of a switch track.
     pub switch: Option<MusicTrackSwitch>,
+    /// At least one original automation row contains checked points.
+    pub has_automation: bool,
 }
 
 /// A music switch container: plays the child that matches the current states or switches.
@@ -148,6 +150,8 @@ pub struct MusicSwitch {
     pub targets: Vec<u32>,
     /// Whether the original decision block is required to recover the target routes.
     pub targets_compact: bool,
+    /// The checked tree is nonempty and declares state or switch groups.
+    pub has_decision_conditions: bool,
 }
 
 /// One item of a music playlist.
@@ -272,6 +276,8 @@ pub struct MusicPlaylist {
     pub transition_features: MusicTransitionFeatures,
     /// The playlist items in bank order, children after their parent.
     pub items: Vec<MusicPlaylistItem>,
+    /// At least one checked item differs from one play with zero loop modifiers.
+    pub has_authored_loops: bool,
 }
 
 impl MusicPlaylist {

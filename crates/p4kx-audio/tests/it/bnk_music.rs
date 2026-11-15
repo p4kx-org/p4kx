@@ -90,6 +90,7 @@ fn a_music_track_is_decoded_with_its_sources_clips_and_kind() -> TestResult {
     assert_eq!(track.parent_id, PARENT, "parent");
     assert_eq!(track.kind, MusicTrackKind::Normal, "kind");
     assert_eq!(track.switch, None, "no switch group");
+    assert!(track.has_automation, "two checked original points");
     assert_eq!(
         track
             .sources
@@ -140,6 +141,23 @@ fn a_music_switch_container_lists_its_children_and_the_targets_of_its_decision_t
     assert_eq!(switch.rule_count, 2, "transition rules");
     assert_eq!(switch.group_ids, [0x4000], "groups");
     assert_eq!(switch.targets, [41, 42], "leaves, 0 left out");
+    assert!(
+        switch.has_decision_conditions,
+        "nonempty original graph and arguments"
+    );
+    Ok(())
+}
+
+#[test]
+fn an_empty_music_switch_tree_does_not_apply_decision_conditions() -> TestResult {
+    let object = TestHircObject::music_switch_with_tree(7, &[], &[(0x4000, 0)], &[]);
+    let HircValue::MusicSwitch(switch) = decoded(object, 154)?.1 else {
+        return Err("checked empty MusicSwitch".into());
+    };
+    assert!(
+        !switch.has_decision_conditions,
+        "an argument without any node is insufficient"
+    );
     Ok(())
 }
 
@@ -151,6 +169,10 @@ fn a_music_playlist_keeps_its_items_with_their_loop_counts() -> TestResult {
     };
     assert_eq!(playlist.node.children, [40, 41], "segments");
     assert_eq!(playlist.rule_count, 2, "transition rules");
+    assert!(
+        playlist.has_authored_loops,
+        "original item count and modifiers"
+    );
     assert_eq!(
         playlist
             .items

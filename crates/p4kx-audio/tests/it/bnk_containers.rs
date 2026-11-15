@@ -66,6 +66,18 @@ fn every_container_kind_is_decoded_with_its_children_in_order() -> TestResult {
             Some((expected_kind, 0x2C21_1B2E, vec![30, 10, 20])),
             "{kind:?} with a {base:?} node base"
         );
+        let HircValue::Container(container) = value else {
+            return Err("eager container".into());
+        };
+        assert!(
+            !container.has_authored_loops,
+            "neutral loop control for {kind:?}"
+        );
+        assert_eq!(
+            container.has_switch_conditions,
+            kind == TestContainerKind::Switch,
+            "only Switch fixtures author membership and a default value",
+        );
     }
     Ok(())
 }

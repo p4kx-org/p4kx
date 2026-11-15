@@ -10,6 +10,7 @@ use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
 use lewton::inside_ogg::OggStreamReader;
+use p4kx_extraction::Soundbank;
 use p4kx_testkit::{
     ArchiveBuilder, DataForgeBuilder, TestAtl, TestBank, TestCodec, TestEntity, TestEntry,
     TestHircObject, TestVorbis, TestWem, audio_schema, entity_schema, test_signal, wwise_short_id,
@@ -20,6 +21,8 @@ use serde_json::Value;
 mod txtp_approximation;
 #[path = "wwise_txtp_clip_omissions.rs"]
 mod txtp_clip_omissions;
+#[path = "wwise_txtp_container_omissions.rs"]
+mod txtp_container_omissions;
 #[path = "wwise_txtp_transition_omissions.rs"]
 mod txtp_transition_omissions;
 
@@ -37,6 +40,16 @@ fn vorbis() -> Vec<u8> {
 
 fn pcm() -> Vec<u8> {
     TestWem::pcm(TestCodec::WwisePcm, 1, 48_000, &test_signal(480, 1)).bytes()
+}
+
+fn hirc_payload(object: TestHircObject) -> Result<Vec<u8>, Box<dyn Error>> {
+    let bank = Soundbank::parse(TestBank::new(1).version(154).object(object).bytes())?;
+    let object = bank.objects().first().ok_or("original synthetic object")?;
+    let payload = bank
+        .object_body(object)
+        .get(size_of::<u32>()..)
+        .ok_or("synthetic payload after the object ID")?;
+    Ok(payload.to_vec())
 }
 
 fn xma() -> Vec<u8> {

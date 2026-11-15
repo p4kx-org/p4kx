@@ -17,6 +17,9 @@ const FLAGS: [&str; 3] = ["--format", "wav", "--txtp"];
 const CLIP_CODE: &str = "omit-music-clip-timing";
 const FADE_CODE: &str = "omit-music-transition-fades";
 const SEGMENT_CODE: &str = "omit-music-transition-segments";
+const LOOPS_CODE: &str = "omit-container-loops";
+const CONDITIONS_CODE: &str = "omit-container-conditions";
+const AUTOMATION_CODE: &str = "omit-music-track-automation";
 const CONTAINER_ID: u32 = 10;
 const PLAYED_SEGMENT: u32 = 11;
 const PLAYED_TRACK: u32 = 12;
@@ -42,16 +45,35 @@ enum AuthoredRule {
 #[test]
 fn txtp_reports_each_proven_music_transition_fade_on_the_rendered_owner() -> TestResult {
     let fixture = fixture()?;
-    expect(&fixture, SOURCE_FADE, &[CLIP_CODE, FADE_CODE])?;
-    expect(&fixture, DESTINATION_FADE, &[CLIP_CODE, FADE_CODE])?;
-    expect(&fixture, OBJECT_FADE, &[CLIP_CODE, FADE_CODE, SEGMENT_CODE])?;
-    expect(&fixture, ZERO, &[CLIP_CODE])
+    for trigger in [SOURCE_FADE, DESTINATION_FADE] {
+        expect(
+            &fixture,
+            trigger,
+            &[CLIP_CODE, FADE_CODE, LOOPS_CODE, AUTOMATION_CODE],
+        )?;
+    }
+    expect(
+        &fixture,
+        OBJECT_FADE,
+        &[
+            CLIP_CODE,
+            FADE_CODE,
+            SEGMENT_CODE,
+            CONDITIONS_CODE,
+            AUTOMATION_CODE,
+        ],
+    )?;
+    expect(&fixture, ZERO, &[CLIP_CODE, LOOPS_CODE, AUTOMATION_CODE])
 }
 
 #[test]
 fn txtp_reports_an_allocated_transition_segment_independently_of_fades() -> TestResult {
     let fixture = fixture()?;
-    expect(&fixture, SEGMENT, &[CLIP_CODE, SEGMENT_CODE])
+    expect(
+        &fixture,
+        SEGMENT,
+        &[CLIP_CODE, SEGMENT_CODE, CONDITIONS_CODE, AUTOMATION_CODE],
+    )
 }
 
 fn expect(fixture: &Fixture, trigger: &str, codes: &[&str]) -> TestResult {

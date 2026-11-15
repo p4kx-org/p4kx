@@ -4,9 +4,10 @@
 use std::collections::HashMap;
 use std::fmt::Write;
 
-use p4kx_audio::{Loop, MusicTransitionFeatures};
+use p4kx_audio::Loop;
 
 use crate::audio::music_clip_features::MusicClipFeatures;
+use crate::audio::playback_features::PlaybackFeatures;
 
 use super::TxtpApproximation;
 use super::tree::{Combine, Group, Leaf, Node};
@@ -61,12 +62,29 @@ impl RenderedTxtp {
         }
     }
 
-    fn note_music_transitions(&mut self, transitions: MusicTransitionFeatures) {
-        if transitions.has_fade_timing() {
-            self.note(TxtpApproximation::OmitMusicTransitionFades);
-        }
-        if transitions.has_transition_segment() {
-            self.note(TxtpApproximation::OmitMusicTransitionSegments);
+    fn note_playback_features(&mut self, features: PlaybackFeatures) {
+        for (omitted, code) in [
+            (
+                features.music_transitions.has_fade_timing(),
+                TxtpApproximation::OmitMusicTransitionFades,
+            ),
+            (
+                features.music_transitions.has_transition_segment(),
+                TxtpApproximation::OmitMusicTransitionSegments,
+            ),
+            (features.loops, TxtpApproximation::OmitContainerLoops),
+            (
+                features.conditions,
+                TxtpApproximation::OmitContainerConditions,
+            ),
+            (
+                features.automation,
+                TxtpApproximation::OmitMusicTrackAutomation,
+            ),
+        ] {
+            if omitted {
+                self.note(code);
+            }
         }
     }
 
@@ -148,7 +166,7 @@ fn leaf_line(
         ));
     }
     rendered.note_music_clips(leaf.music_clip_features);
-    rendered.note_music_transitions(leaf.music_transition_features);
+    rendered.note_playback_features(leaf.playback_features);
     let text = &mut rendered.text;
     let _ = write!(text, "{:indent$}{}", "", file.name, indent = depth * INDENT);
     if let Some(points) = file.loop_points {
@@ -209,7 +227,7 @@ mod tests {
             source_id: wem_id,
             kind: SourceKind::Embedded,
             music_clip_features: MusicClipFeatures::default(),
-            music_transition_features: MusicTransitionFeatures::default(),
+            playback_features: PlaybackFeatures::default(),
         })
     }
 

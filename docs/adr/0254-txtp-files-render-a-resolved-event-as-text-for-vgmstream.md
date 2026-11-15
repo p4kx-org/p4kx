@@ -86,3 +86,14 @@ source duration is a separate authored value.
 A rendered path carries observed fade and transition-segment features
 from its actual MusicPlaylist and MusicSwitch ancestors. The writer
 reports each omitted feature in the header and JSON.
+
+Each resolved path carries omissions from its checked owners. The report adds
+`omit-container-loops` for Random/Sequence and MusicPlaylist loop controls when
+the count differs from one or an authored range bound is nonzero.
+`omit-container-conditions` covers checked Switch membership, a default
+selection, MusicSwitch decision data and MusicTrack switch membership or default.
+`omit-music-track-automation` reports a nonempty original point table.
+Playlist loop and automation evidence is scoped to the owning playlist or
+track along that path. An automation clip index remains an authored field.
+The codes are emitted once per generated file in JSON and the TXTP header.
+The render commands and the WEM loop marker retain their own meaning.
