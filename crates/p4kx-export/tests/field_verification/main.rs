@@ -31,6 +31,8 @@ mod path;
 mod published;
 mod published_io;
 mod published_model;
+mod published_projection_tests;
+mod published_projections;
 mod published_validate;
 mod real_archive;
 mod resource_declarations;

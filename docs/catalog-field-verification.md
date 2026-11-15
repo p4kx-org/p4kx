@@ -27,7 +27,7 @@ fixtures incrementally. The infrastructure does not wait for every export expans
 
 The initial [inventory](../crates/p4kx-export/tests/field_verification/baseline.rs) covers existing
 shield and quantum-drive projections. New fields found in these owners and their relevant targets
-require review. Initial published mappings cover an owning shield field and tagged rapid-fire rate.
+require review. Initial published mappings cover an owning shield field and a direct rapid-fire rate.
 This is a baseline contribution, not a claim of exhaustive gameplay coverage.
 The canonical routing checks also cover the global `tags` kind and sourced Tag GUID joins;
 [Tag contract tests](catalog-tags.md#verification-scope) exercise the actual source fields,
@@ -77,7 +77,7 @@ catalog kinds reuse public `Kind::rule` selection. Set `P4KX_FIELD_RECORD_FILTER
 Record path or a catalog Filter pattern for a scoped survey. The same Filter applies to the
 producer and raw observation walk. Declaration review still covers the inventory's full type
 closure, and the test checks selected GUIDs for aliases outside the Filter. An empty selection
-fails. The offline published comparison uses its independent snapshot selection.
+fails. The offline published comparison also uses its snapshot selection.
 Development leftovers are separately accounted
 for. The check reads canonical source trees and the actual catalog. Missing mapped
 projections, typed rejection, new population, changed targets and unreviewed declarations fail the
@@ -143,11 +143,12 @@ they do not establish which values are populated or exported.
 Published input has a separate provenance contract from [controlled producer runs](differential-verification.md).
 Do not fabricate a producer receipt, DCB hash or generator revision for third-party published data.
 
-The reviewed publication is
-[scunpacked-data 1340c830](https://github.com/StarCitizenWiki/scunpacked-data/commit/1340c8303709904165e2da0fa7060bce0624260b),
-whose commit states `4.10.2-LIVE.12881860`. Separately inspected
-[ScDataDumper 120a7286](https://github.com/octfx/ScDataDumper/commit/120a728639bdd1b06525a0f8574cb0e91d0fbf8d)
-does not establish the exact generator revision used for that data commit.
+The reviewed publications identify themselves as `4.10.2-LIVE.12881860` and
+`4.10.3-LIVE.13165946`. [scunpacked-data 1340c830](https://github.com/StarCitizenWiki/scunpacked-data/commit/1340c8303709904165e2da0fa7060bce0624260b) ·
+[scunpacked-data f182b7f1](https://github.com/StarCitizenWiki/scunpacked-data/commit/f182b7f111279c9193df81927c9b4dbc8c4f3291)
+
+Exact generator revisions for these published snapshots remain unverified. The inspected
+ScDataDumper revision provides reference field shapes. [ScDataDumper 120a7286](https://github.com/octfx/ScDataDumper/commit/120a728639bdd1b06525a0f8574cb0e91d0fbf8d)
 
 Prepare an offline snapshot outside tracked files with selected individual JSON files and
 `.p4kx-scunpacked.json`. Preserve published bytes. The version-1 metadata records:
@@ -176,6 +177,16 @@ Owning raw components are under `Raw/Entity/Components/<OwnerType>`. `Item/stdIt
 normalized, rounded, derived and sometimes curated values. Nested magazine/manufacturer/ammunition
 GUIDs are different identities.
 
+Item mappings can select a canonical component projection with `catalogTarget`.
+`{"kind":"shieldGenerators"}` uses `configurations.shieldGenerators.rows`, with the field path
+relative to the component row. For finite `MaxShieldHealth` from an authored `f32`, the path is
+`maxHealth.value.finite`. `{"kind":"weaponFireActions","sourceType":"SWeaponActionFireRapidParams"}`
+uses ordered authored `fireActions` slots in `configurations.weaponActions.rows`, with the path
+relative to the selected action node. Both join by `ownerGuid.value` while keeping Item membership
+separate. Each direct action occurrence is retained, including repeated types. A nested action in
+`actionNodes` participates when its index is referenced by a direct slot. Missing canonical
+tables, unreadable slots and invalid indices fail the comparison.
+
 Catalog-v3 verification reads Commodity definitions from `definitions.commodities.rows`, using
 `guid.value` as the owner identity, and presentation recipes from
 `projections.commodityPresentation.rows`, using `commodityGuid.value`. Each family is required and
@@ -192,13 +203,26 @@ $env:P4KX_REF_SCUNPACKED = '<private offline snapshot root>'
 cargo test --release -p p4kx-export --test field_verification --locked real_archive::published_scunpacked_raw_fields_match_only_an_established_same_build -- --ignored --exact --nocapture
 ~~~
 
-An unset reference variable skips before opening an Archive. A configured empty/malformed root
-fails. Numerical assertions require an exact reviewed Channel, public game-version and change
-number. Mismatches and unknown publications are reported with zero agreement and no numerical
-assertions. Add publications only after reviewing the pinned primary commit and wrong-Build tests.
+An unset reference variable skips before opening an Archive. A configured empty or malformed root
+fails. Numerical assertions require an exact reviewed Channel, public game version and change
+number. A matching launcher patch entry or a reviewed RSI deployment record supplies the public
+version for the manifest's Channel and change number. Conflicting evidence fails. The manifest's
+internal branch and version remain separate. Mismatches and unknown publications are reported with
+zero agreement and no numerical assertions. Review the pinned primary commit and add wrong-Build
+tests when registering a publication. [RSI deployment history](https://status.robertsspaceindustries.com/issues/)
 
-The published Build differs from the installed LIVE baseline recorded in [the audit](scunpacked-data-audit.md).
-No same-Build numerical result is claimed here.
+For a scoped comparison, set `P4KX_FIELD_RECORD_FILTER` to an original Record path or catalog
+Filter pattern. The same filter scopes the source Record audit and the catalog writer. Prepare
+the offline snapshot selection for the same GUID scope.
+
+The older publication differs from the installed LIVE baseline at the time of the original
+[audit](scunpacked-data-audit.md). The later publication cites change 13165946, which was also
+observed in the installed LIVE manifest.
+
+Two scoped comparisons on `4.10.3-LIVE.13165946` each matched one published Item owner. The
+finite `SCItemShieldGeneratorParams.MaxShieldHealth` and the direct
+`SWeaponActionFireRapidParams.fireRate` each compared equal. The weapon filter admitted two
+other Records outside the snapshot selection. Both catalog excerpts stayed in memory.
 
 ## Outcomes, units and bounds
 

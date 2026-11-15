@@ -11,7 +11,8 @@ use super::inventory::FieldKey;
 use super::path::{Path, Step};
 use super::published_io::Dataset;
 use super::published_model::{
-    Availability, Build, Family, Field, File, METADATA, Provenance, Publication, Snapshot,
+    Availability, Build, CatalogTarget, Family, Field, File, METADATA, Provenance, Publication,
+    Snapshot,
 };
 use super::units::Unit;
 
@@ -75,6 +76,7 @@ pub(crate) fn field() -> Field {
         source: FieldKey::new("SyntheticParams", "value"),
         family: Family::Items,
         reference: Path::fields(&["Raw", "Entity", "Components", "SyntheticParams", "value"]),
+        catalog_target: CatalogTarget::Family,
         catalog: Path::fields(&["stats", "probe", "value"]),
         reference_unit: Unit::Dimensionless,
         catalog_unit: Unit::Dimensionless,

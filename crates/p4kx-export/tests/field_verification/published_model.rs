@@ -106,12 +106,36 @@ pub(crate) struct ResourceJoin {
     pub(crate) catalog: Path,
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    deny_unknown_fields
+)]
+pub(crate) enum CatalogTarget {
+    #[default]
+    Family,
+    ShieldGenerators,
+    WeaponFireActions {
+        source_type: String,
+    },
+}
+
+impl CatalogTarget {
+    pub(crate) const fn is_family(&self) -> bool {
+        matches!(self, Self::Family)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct Field {
     pub(crate) source: FieldKey,
     pub(crate) family: Family,
     pub(crate) reference: Path,
+    #[serde(default, skip_serializing_if = "CatalogTarget::is_family")]
+    pub(crate) catalog_target: CatalogTarget,
     pub(crate) catalog: Path,
     pub(crate) reference_unit: Unit,
     pub(crate) catalog_unit: Unit,
@@ -137,12 +161,20 @@ pub(crate) struct Publication {
     pub(crate) change_number: &'static str,
 }
 
-pub(crate) const PUBLICATIONS: &[Publication] = &[Publication {
-    revision: "1340c8303709904165e2da0fa7060bce0624260b",
-    game_version: "4.10.2",
-    channel: "LIVE",
-    change_number: "12881860",
-}];
+pub(crate) const PUBLICATIONS: &[Publication] = &[
+    Publication {
+        revision: "1340c8303709904165e2da0fa7060bce0624260b",
+        game_version: "4.10.2",
+        channel: "LIVE",
+        change_number: "12881860",
+    },
+    Publication {
+        revision: "f182b7f111279c9193df81927c9b4dbc8c4f3291",
+        game_version: "4.10.3",
+        channel: "LIVE",
+        change_number: "13165946",
+    },
+];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum BuildGate {

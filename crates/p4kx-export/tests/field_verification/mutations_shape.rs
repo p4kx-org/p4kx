@@ -10,55 +10,6 @@ use super::path::Path;
 use super::published_model::Family;
 
 #[test]
-fn reviewed_baseline_paths_retain_the_published_raw_shape_and_tagged_typed_projection()
--> super::Result<()> {
-    let raw = json!({
-        "Item": { "reference": GUID },
-        "Raw": { "Entity": { "Components": {
-            "SCItemShieldGeneratorParams": { "MaxShieldHealth": 20 },
-            "SCItemWeaponComponentParams": { "fireActions": {
-                "SWeaponActionFireRapidParams": { "fireRate": 60 }
-            }}
-        }}}
-    });
-    let mut fixture = PublishedFixture::new(vec![raw])?;
-    fixture.snapshot.fields = super::baseline::raw_mappings();
-    fixture.save()?;
-    let catalog = json!({ "items": [{
-        "guid": GUID, "stats": {
-            "shield": { "maxHealth": 20 },
-            "weapon": { "fireActions": [{ "kind": "SWeaponActionFireRapidParams", "fireRate": 60 }] }
-        }
-    }] });
-    let report = super::published::verify(
-        &fixture.load()?,
-        &catalog,
-        &fixtures::build(),
-        &[fixtures::PUBLICATION],
-        &|| false,
-    )?;
-    assert_eq!(
-        report.fields.len(),
-        2,
-        "both reviewed owning field mappings are exercised"
-    );
-    assert_eq!(
-        report
-            .fields
-            .values()
-            .map(super::compare::Summary::compared)
-            .sum::<u64>(),
-        2,
-        "raw wrapper paths and typed tagged selectors each compare one source fact"
-    );
-    assert!(
-        report.succeeds(),
-        "baseline source-to-export paths agree on synthetic primary-source shape"
-    );
-    Ok(())
-}
-
-#[test]
 fn repeated_placements_preserve_every_occurrence_and_each_changed_raw_value() -> super::Result<()> {
     let mut fixture = PublishedFixture::new(vec![
         fixtures::row(GUID, json!(1)),

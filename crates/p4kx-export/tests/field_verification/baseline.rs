@@ -4,7 +4,7 @@
 use super::compare::Rule;
 use super::inventory::{Disposition, FieldKey, Inventory, Mapping};
 use super::path::{Path, Step};
-use super::published_model::{Family, Field};
+use super::published_model::{CatalogTarget, Family, Field};
 use super::units::Unit;
 
 fn shield_mappings() -> impl Iterator<Item = Mapping> {
@@ -289,7 +289,8 @@ pub(crate) fn raw_mappings() -> Vec<Field> {
                 "SCItemShieldGeneratorParams",
                 "MaxShieldHealth",
             ]),
-            catalog: Path::fields(&["stats", "shield", "maxHealth"]),
+            catalog_target: CatalogTarget::ShieldGenerators,
+            catalog: Path::fields(&["maxHealth", "value", "finite"]),
             reference_unit: Unit::Dimensionless,
             catalog_unit: Unit::Dimensionless,
             rule: Rule::F32RoundTrip,
@@ -307,27 +308,13 @@ pub(crate) fn raw_mappings() -> Vec<Field> {
                 "SWeaponActionFireRapidParams",
                 "fireRate",
             ]),
-            catalog: Path(vec![
-                Step::Field {
-                    name: "stats".to_owned(),
-                },
-                Step::Field {
-                    name: "weapon".to_owned(),
-                },
-                Step::Field {
-                    name: "fireActions".to_owned(),
-                },
-                Step::Matching {
-                    field: "kind".to_owned(),
-                    value: "SWeaponActionFireRapidParams".to_owned(),
-                },
-                Step::Field {
-                    name: "fireRate".to_owned(),
-                },
-            ]),
+            catalog_target: CatalogTarget::WeaponFireActions {
+                source_type: "SWeaponActionFireRapidParams".to_owned(),
+            },
+            catalog: Path::fields(&["kind", "value", "fireRate", "value"]),
             reference_unit: Unit::RoundsPerMinute,
             catalog_unit: Unit::RoundsPerMinute,
-            rule: Rule::F32RoundTrip,
+            rule: Rule::Exact,
             resource_join: None,
         },
     ]

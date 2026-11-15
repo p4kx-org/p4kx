@@ -13,6 +13,7 @@ use super::joins::{self, Index, Multiplicity};
 use super::path::Path;
 use super::published_io::Dataset;
 use super::published_model::{Build, BuildGate, Family, Field, Publication, gate};
+use super::published_projections;
 
 pub(crate) struct Report {
     pub(crate) gate: BuildGate,
@@ -25,6 +26,18 @@ pub(crate) struct Report {
 }
 
 impl Report {
+    const fn with_gate(gate: BuildGate) -> Self {
+        Self {
+            gate,
+            fields: BTreeMap::new(),
+            matched_guids: 0,
+            reference_only_guids: 0,
+            catalog_only_guids: 0,
+            excluded_guids: 0,
+            missing_both_guids: 0,
+        }
+    }
+
     pub(crate) fn succeeds(&self) -> bool {
         self.gate == BuildGate::SamePublishedBuild
             && self.missing_both_guids == 0
@@ -78,9 +91,15 @@ fn catalog<'a>(
 ) -> super::Result<Index<'a>> {
     let rows = catalog
         .pointer(family.rows_pointer())
-        .and_then(Value::as_array);
+        .and_then(Value::as_array)
+        .ok_or_else(|| {
+            Error::new(
+                Kind::Input,
+                format!("missing catalog rows at {}", family.rows_pointer()),
+            )
+        })?;
     joins::index(
-        rows.into_iter().flatten(),
+        rows,
         &Path::fields(family.identity_fields()),
         if family == Family::Placements {
             Multiplicity::Many
@@ -115,12 +134,13 @@ const fn missing_rows(reference: bool, catalog: bool) -> Option<Class> {
 
 fn compare_rows(
     reference: Option<&Vec<&Value>>,
+    catalog_owner_exists: bool,
     catalog: Option<&Vec<&Value>>,
     field: &Field,
     cancelled: &impl Fn() -> bool,
     summary: &mut Summary,
 ) -> super::Result<()> {
-    if let Some(class) = missing_rows(reference.is_some(), catalog.is_some()) {
+    if let Some(class) = missing_rows(reference.is_some(), catalog_owner_exists) {
         summary.record(class);
         return Ok(());
     }
@@ -225,17 +245,8 @@ pub(crate) fn verify(
     publications: &[Publication],
     cancelled: &impl Fn() -> bool,
 ) -> super::Result<Report> {
-    let gate = gate(&dataset.snapshot.provenance, actual, publications);
-    let mut report = Report {
-        gate,
-        fields: BTreeMap::new(),
-        matched_guids: 0,
-        reference_only_guids: 0,
-        catalog_only_guids: 0,
-        excluded_guids: 0,
-        missing_both_guids: 0,
-    };
-    if gate != BuildGate::SamePublishedBuild {
+    let mut report = Report::with_gate(gate(&dataset.snapshot.provenance, actual, publications));
+    if report.gate != BuildGate::SamePublishedBuild {
         return Ok(report);
     }
     let (selected, excluded) = scope(dataset)?;
@@ -245,6 +256,8 @@ pub(crate) fn verify(
         error::check(cancelled)?;
         let left = reference(dataset, field.family, cancelled)?;
         let right = catalog(catalog_value, field.family, cancelled)?;
+        let projected =
+            published_projections::index(catalog_value, &field.catalog_target, &right, cancelled)?;
         if counted.insert(field.family) {
             observed_guids.extend(joins::union(&left, &right));
             membership(&mut report, &left, &right, &selected, &excluded);
@@ -274,7 +287,16 @@ pub(crate) fn verify(
                 summary.record(Class::Excluded);
                 continue;
             }
-            compare_rows(left.get(&guid), right.get(&guid), field, cancelled, summary)?;
+            let owner = right.get(&guid);
+            let rows = projected.as_ref().map_or(owner, |rows| rows.get(&guid));
+            compare_rows(
+                left.get(&guid),
+                owner.is_some(),
+                rows,
+                field,
+                cancelled,
+                summary,
+            )?;
         }
     }
     report.missing_both_guids = selected.difference(&observed_guids).count() as u64;

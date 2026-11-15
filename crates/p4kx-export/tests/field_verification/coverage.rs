@@ -109,7 +109,7 @@ pub(super) fn projections<'a>(
     Ok(projections)
 }
 
-fn component_projections<'a>(
+pub(super) fn component_projections<'a>(
     catalog: &'a Value,
     group: &str,
     cancelled: &impl Fn() -> bool,

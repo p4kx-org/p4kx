@@ -5,7 +5,7 @@ use std::collections::BTreeSet;
 
 use super::compare::Rule;
 use super::error::{Error, Kind};
-use super::published_model::{Availability, Field, Provenance, Snapshot};
+use super::published_model::{Availability, CatalogTarget, Family, Field, Provenance, Snapshot};
 
 fn provenance(provenance: &Provenance) -> super::Result<()> {
     let revision = &provenance.data_revision;
@@ -75,6 +75,7 @@ fn fields(fields: &[Field]) -> super::Result<()> {
             join.reference.validate()?;
             join.catalog.validate()?;
         }
+        catalog_target(field)?;
         for unit in [&field.reference_unit, &field.catalog_unit] {
             if let super::units::Unit::Resource { guid, .. } = unit {
                 super::joins::guid(guid)?;
@@ -95,6 +96,24 @@ fn fields(fields: &[Field]) -> super::Result<()> {
             )
             .into());
         }
+    }
+    Ok(())
+}
+
+fn catalog_target(field: &Field) -> super::Result<()> {
+    if !field.catalog_target.is_family()
+        && (field.family != Family::Items || field.resource_join.is_some())
+    {
+        return Err(
+            Error::new(Kind::Mapping, "component targets require an Item GUID join").into(),
+        );
+    }
+    if let CatalogTarget::WeaponFireActions { source_type } = &field.catalog_target
+        && (source_type.trim().is_empty()
+            || source_type.len() > 4096
+            || source_type.chars().any(char::is_control))
+    {
+        return Err(Error::new(Kind::Mapping, "invalid weapon action source type").into());
     }
     Ok(())
 }
