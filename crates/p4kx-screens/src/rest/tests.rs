@@ -285,7 +285,7 @@ fn a_branch_without_a_tag_gives_none() {
     let operations = graph(vec![flag(), choice], vec![state_tag(1)]);
     let state = at_rest(&operations, &[], &[]);
     assert_eq!(state.state_tags(0).first(), None);
-    assert!(state.omissions().is_empty());
+    assert_eq!(state.omissions(), [], "an authored tagless branch is valid");
 }
 
 #[test]
