@@ -7,13 +7,13 @@ use std::sync::Arc;
 use p4kx_dataforge::Guid;
 use p4kx_extraction::{DataForgeOrigin, SourceLocation};
 
-use crate::gear_params::catalogue_parameters;
 use crate::{ArchiveModels, Attachment, EntityNode, GearPlacementSource, LandingGear};
+use files::RigPath;
 
 #[path = "entity_rig_files.rs"]
 mod files;
 pub(crate) use files::{ArchiveRigInputs, RigEntry, read_rig_entry};
-pub use files::{RigDefinition, RigFile, RigFileRead, RigInput, RigInputs};
+pub use files::{ModelRig, RigDefinition, RigFile, RigFileRead, RigInput, RigInputs};
 
 pub use crate::gear_params::RigParameter;
 
@@ -83,7 +83,11 @@ pub fn discover_entity_rigs(models: &ArchiveModels<'_>, root: &EntityNode) -> Ve
     }
 }
 
-pub(crate) fn discover_entity_rigs_using<I: RigInputs>(
+/// Discovers original Entity rig inputs with caller-controlled admission and reads.
+///
+/// # Errors
+/// Returns the caller's terminal input or checkpoint error.
+pub fn discover_entity_rigs_using<I: RigInputs>(
     models: &ArchiveModels<'_>,
     root: &EntityNode,
     inputs: &mut I,
@@ -116,6 +120,21 @@ pub(crate) fn discover_entity_rigs_using<I: RigInputs>(
         Ok(())
     })?;
     Ok(catalogue.rigs)
+}
+
+/// Discovers definition, skeleton and parameters for a model in its owning Archive.
+///
+/// The model path selects an exact physical candidate. A CDF's Model File uses the
+/// Archive provider's authored path forms.
+///
+/// # Errors
+/// Returns the caller's terminal input or checkpoint error.
+pub fn discover_model_rig_using<I: RigInputs>(
+    models: &ArchiveModels<'_>,
+    path: &str,
+    inputs: &mut I,
+) -> Result<ModelRig, I::Error> {
+    files::RigFiles::default().model(models, RigPath::Exact(path), inputs)
 }
 
 struct Catalogue<'model, 'archive> {
@@ -207,45 +226,17 @@ impl Catalogue<'_, '_> {
         geometry_selectors: Vec<SourceLocation>,
         inputs: &mut I,
     ) -> Result<EntityRig, I::Error> {
-        let definition = geometry
-            .filter(|path| crate::cdf::is_character_definition(path))
+        let rig = geometry
             .map(|path| {
-                files::read(
-                    self.models,
-                    path,
-                    &mut self.files.definitions,
-                    files::definition,
-                    inputs,
-                )
+                self.files
+                    .model(self.models, RigPath::Authored(path), inputs)
             })
             .transpose()?;
-        let skeleton_path = definition.as_ref().map_or(geometry, |definition| {
-            definition
-                .value()
-                .and_then(|value| value.skeleton.as_deref())
-        });
-        let skeleton = skeleton_path
-            .map(|path| {
-                files::read(
-                    self.models,
-                    path,
-                    &mut self.files.skeletons,
-                    files::skeleton,
-                    inputs,
-                )
-            })
-            .transpose()?;
-        let parameters = skeleton_path
-            .map(|path| {
-                files::read(
-                    self.models,
-                    &crate::gear_clip::params_path(path),
-                    &mut self.files.parameters,
-                    catalogue_parameters,
-                    inputs,
-                )
-            })
-            .transpose()?;
+        let ModelRig {
+            definition,
+            skeleton,
+            parameters,
+        } = rig.unwrap_or_default();
         Ok(EntityRig {
             placement,
             record_index: node.record_index(),

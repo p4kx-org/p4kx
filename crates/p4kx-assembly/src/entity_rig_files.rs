@@ -158,22 +158,98 @@ pub(crate) enum RigEntry<'archive> {
 
 type InputCache<T> = HashMap<usize, Arc<RigFileRead<T>>>;
 
-#[derive(Default)]
-pub(super) struct RigFiles {
-    pub(super) definitions: InputCache<RigDefinition>,
-    pub(super) skeletons: InputCache<Option<SkeletonSource>>,
-    pub(super) parameters: InputCache<Vec<super::RigParameter>>,
+/// Definition, skeleton and parameters selected by one model path.
+#[derive(Debug, Default)]
+#[non_exhaustive]
+pub struct ModelRig {
+    /// Authored character definition when the model path selects one.
+    pub definition: Option<RigFile<RigDefinition>>,
+    /// Skeleton selected by the model or its definition.
+    pub skeleton: Option<RigFile<Option<SkeletonSource>>>,
+    /// Parameter file associated with the selected skeleton.
+    pub parameters: Option<RigFile<Vec<super::RigParameter>>>,
 }
 
-pub(super) fn read<T, I: RigInputs>(
+#[derive(Default)]
+pub(super) struct RigFiles {
+    definitions: InputCache<RigDefinition>,
+    skeletons: InputCache<Option<SkeletonSource>>,
+    parameters: InputCache<Vec<super::RigParameter>>,
+}
+
+#[derive(Clone, Copy)]
+pub(super) enum RigPath<'a> {
+    Authored(&'a str),
+    Exact(&'a str),
+}
+
+impl<'path> RigPath<'path> {
+    const fn as_str(self) -> &'path str {
+        match self {
+            Self::Authored(path) | Self::Exact(path) => path,
+        }
+    }
+
+    const fn companion(self, path: &str) -> RigPath<'_> {
+        match self {
+            Self::Authored(_) => RigPath::Authored(path),
+            Self::Exact(_) => RigPath::Exact(path),
+        }
+    }
+}
+
+impl RigFiles {
+    pub(super) fn model<I: RigInputs>(
+        &mut self,
+        models: &ArchiveModels<'_>,
+        path: RigPath<'_>,
+        inputs: &mut I,
+    ) -> Result<ModelRig, I::Error> {
+        let definition = crate::cdf::is_character_definition(path.as_str())
+            .then(|| read(models, path, &mut self.definitions, definition, inputs))
+            .transpose()?;
+        let skeleton_path = definition.as_ref().map_or(Some(path), |file| {
+            file.value()
+                .and_then(|value| value.skeleton.as_deref())
+                .map(RigPath::Authored)
+        });
+        let skeleton = skeleton_path
+            .map(|path| read(models, path, &mut self.skeletons, skeleton, inputs))
+            .transpose()?;
+        let parameters = skeleton_path
+            .map(|path| {
+                let companion = crate::gear_clip::params_path(path.as_str());
+                read(
+                    models,
+                    path.companion(&companion),
+                    &mut self.parameters,
+                    crate::gear_params::catalogue_parameters,
+                    inputs,
+                )
+            })
+            .transpose()?;
+        Ok(ModelRig {
+            definition,
+            skeleton,
+            parameters,
+        })
+    }
+}
+
+fn read<T, I: RigInputs>(
     models: &ArchiveModels<'_>,
-    path: &str,
+    path: RigPath<'_>,
     cache: &mut InputCache<T>,
     parse: impl FnOnce(&[u8]) -> Result<T, String>,
     inputs: &mut I,
 ) -> Result<RigFile<T>, I::Error> {
     inputs.check()?;
-    let read = match models.rig_entry(path, &mut || inputs.check())? {
+    let mut check = || inputs.check();
+    let entry = match path {
+        RigPath::Authored(path) => models.rig_entry(path, &mut check)?,
+        RigPath::Exact(path) => models.exact_rig_entry(path, &mut check)?,
+    };
+    let read = match entry {
         RigEntry::Missing => Arc::new(RigFileRead::Missing),
         RigEntry::Ambiguous => Arc::new(RigFileRead::Ambiguous),
         RigEntry::Unreadable(reason) => Arc::new(RigFileRead::Unreadable { reason }),
@@ -188,7 +264,7 @@ pub(super) fn read<T, I: RigInputs>(
         },
     };
     Ok(RigFile {
-        path: path.to_owned(),
+        path: path.as_str().to_owned(),
         read,
     })
 }

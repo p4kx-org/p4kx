@@ -256,3 +256,55 @@ fn cdf_selection_retains_its_origin_when_the_declared_skeleton_is_ambiguous() ->
     );
     Ok(())
 }
+
+#[test]
+fn selected_model_uses_exact_entry_and_cdf_uses_its_authored_skeleton() -> TestResult {
+    use std::convert::Infallible;
+
+    const DEFINITION: &str = "Data/Objects/Test/setup.cdf";
+    let directory = tempfile::tempdir()?;
+    let path = directory.path().join("rigs.p4k");
+    ArchiveBuilder::new()
+        .entry(TestEntry::stored(
+            DEFINITION,
+            r#"<CharacterDefinition><Model File="Objects/Test/shared.chr"/></CharacterDefinition>"#,
+        ))
+        .entry(TestEntry::stored(
+            "Data/Data/Objects/Test/setup.cdf",
+            b"decoy",
+        ))
+        .entry(TestEntry::stored(SHARED, TestModel::cube().cgf()))
+        .entry(TestEntry::stored(PARAMETERS, parameters()?))
+        .entry(TestEntry::stored(
+            "Data/Data/Objects/Test/shared.chrparams",
+            b"decoy",
+        ))
+        .write_to(&path)?;
+    let archive = Archive::open(path)?;
+    let models = ArchiveModels::new(&archive);
+    let mut inputs = super::ArchiveRigInputs {
+        models: &models,
+        check: || Ok::<_, Infallible>(()),
+    };
+    let cdf = super::discover_model_rig_using(&models, DEFINITION, &mut inputs)?;
+    let direct = super::discover_model_rig_using(&models, SHARED, &mut inputs)?;
+    let definition = cdf.definition.as_ref().and_then(RigFile::value);
+    assert_eq!(
+        definition.and_then(|value| value.skeleton.as_deref()),
+        Some("Objects/Test/shared.chr"),
+        "CDF uses the exact Model File"
+    );
+    assert!(
+        direct.definition.is_none(),
+        "direct CHR has no CDF selection"
+    );
+    for rig in [cdf.parameters, direct.parameters] {
+        let params = rig.ok_or("selected parameter file")?;
+        assert_eq!(
+            params.source().map(|source| source.entry().path()),
+            Some(PARAMETERS)
+        );
+        assert_eq!(params.value().map(Vec::len), Some(71));
+    }
+    Ok(())
+}

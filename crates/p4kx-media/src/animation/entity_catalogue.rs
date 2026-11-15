@@ -2,10 +2,10 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_assembly::{
-    ArchiveModels, LoadoutChanges, LoadoutResolver, RigInput, RigInputs,
+    ArchiveModels, EntityNode, LoadoutChanges, LoadoutResolver, RigInput, RigInputs,
     discover_entity_clips_using,
 };
-use p4kx_extraction::{DataForge, DataForgeEntry, Entry};
+use p4kx_extraction::{DataForge, DataForgeEntry, Entry, Record};
 
 use crate::lookup_work::LookupWork;
 use crate::source_selection::EntrySelection;
@@ -65,8 +65,34 @@ fn project(
     lookup: &DirectoryLookup<'_>,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
-    let work = Work { lookup, writer };
-    work.charge(forge.records().len() as u64)?;
+    with_resolved_entity(selector, forge, lookup, writer, |owner, tree, writer| {
+        let state = if rows::incomplete_loadout(tree, writer)? {
+            rows::CatalogueState::IncompleteLoadout
+        } else {
+            rows::CatalogueState::Available
+        };
+        let mut inputs = Inputs { lookup, writer };
+        let index = lookup.index.index(
+            &Work {
+                lookup,
+                writer: inputs.writer,
+            }
+            .lookup_work(),
+        )?;
+        let models = ArchiveModels::from_path_index(index);
+        let catalogue = discover_entity_clips_using(&models, tree, &mut inputs)?;
+        rows::write(selector, state, owner, origin, lookup, &catalogue, writer)
+    })
+}
+
+pub(crate) fn with_resolved_entity<T>(
+    selector: &str,
+    forge: &DataForge<'_>,
+    lookup: &DirectoryLookup<'_>,
+    writer: &mut MediaWriter<'_>,
+    consume: impl FnOnce(&Record<'_>, &EntityNode, &mut MediaWriter<'_>) -> Result<T, MediaError>,
+) -> Result<T, MediaError> {
+    Work { lookup, writer }.charge(forge.records().len() as u64)?;
     let cancel = writer.checkpoint.cancel.clone();
     let stop = || cancel.is_cancelled();
     writer.checkpoint()?;
@@ -79,22 +105,7 @@ fn project(
     let tree = resolver.resolve_with(&owner, &LoadoutChanges::new());
     writer.checkpoint()?;
     let tree = tree.map_err(|error| MediaError::Contract(error.to_string()))?;
-    let state = if rows::incomplete_loadout(&tree, writer)? {
-        rows::CatalogueState::IncompleteLoadout
-    } else {
-        rows::CatalogueState::Available
-    };
-    let mut inputs = Inputs { lookup, writer };
-    let index = lookup.index.index(
-        &Work {
-            lookup,
-            writer: inputs.writer,
-        }
-        .lookup_work(),
-    )?;
-    let models = ArchiveModels::from_path_index(index);
-    let catalogue = discover_entity_clips_using(&models, &tree, &mut inputs)?;
-    rows::write(selector, state, &owner, origin, lookup, &catalogue, writer)
+    consume(&owner, &tree, writer)
 }
 
 struct Inputs<'a, 'dir, 'writer> {

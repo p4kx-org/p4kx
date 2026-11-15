@@ -223,8 +223,8 @@ pub use entity_glow::{
 };
 pub use entity_interior::{EntityContainer, EntityInterior, INTERIOR_NODE};
 pub use entity_rig_catalogue::{
-    EntityRig, RigDefinition, RigFile, RigFileRead, RigInput, RigInputs, RigParameter,
-    RigPlacement, discover_entity_rigs,
+    EntityRig, ModelRig, RigDefinition, RigFile, RigFileRead, RigInput, RigInputs, RigParameter,
+    RigPlacement, discover_entity_rigs, discover_entity_rigs_using, discover_model_rig_using,
 };
 pub use error::{AssemblyError, EntityLookupError, LoadoutError};
 pub use files::{ArchiveFiles, LoadoutFileError, LoadoutFiles, MAX_XML_LOADOUT_LEN};
