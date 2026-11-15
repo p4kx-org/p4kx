@@ -98,8 +98,8 @@ fn the_wayland_window_draws_hidpi_frames_and_exits() -> TestResult {
     let output = std::fs::read_to_string(stdout)?;
     let scale = output
         .lines()
-        .filter_map(|line| line.strip_prefix("P4KX_GUI_NATIVE_SCALE="))
-        .last();
+        .rev()
+        .find_map(|line| line.strip_prefix("P4KX_GUI_NATIVE_SCALE="));
     assert_eq!(
         scale,
         Some("2"),
