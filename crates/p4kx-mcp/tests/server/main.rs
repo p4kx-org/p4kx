@@ -23,6 +23,7 @@ mod audio_music_switch_source_fields;
 mod audio_music_track_source_fields;
 mod audio_music_transition_source_fields;
 mod audio_objects;
+mod audio_objects_origins;
 mod audio_origin_assertions;
 mod audio_random_sequence_source_fields;
 mod audio_shared_node_fields;

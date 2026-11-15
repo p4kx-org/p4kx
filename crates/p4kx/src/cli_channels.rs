@@ -12,7 +12,7 @@ pub(crate) struct ChannelsArgs {
     #[command(subcommand)]
     pub(crate) action: Option<ChannelsAction>,
     /// Folder containing settings.toml. Defaults to the active P4KX profile, normally
-    /// $XDG_CONFIG_HOME/P4KX (~/.config/P4KX) on Linux.
+    /// `$XDG_CONFIG_HOME/P4KX` (`~/.config/P4KX`) on Linux.
     #[arg(long, global = true, env = "P4KX_CONFIG_DIR", value_name = "FOLDER")]
     pub(crate) config_dir: Option<PathBuf>,
     /// Overrides the native RSI Launcher application-data folder. Discovered Wine launcher
@@ -21,7 +21,7 @@ pub(crate) struct ChannelsArgs {
     pub(crate) launcher_dir: Option<PathBuf>,
     /// Overrides the native Star Citizen library folder. Linux still searches Wine, Proton,
     /// Steam, Bottles and immediate ~/Games prefixes for Lutris or custom installations.
-    /// macOS still searches configured Wine and CrossOver locations.
+    /// macOS still searches configured Wine and `CrossOver` locations.
     #[arg(
         long,
         global = true,

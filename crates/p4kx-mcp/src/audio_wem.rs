@@ -18,7 +18,7 @@ mod list;
 pub(crate) use list::soundbank_wems;
 
 #[path = "audio_wem_payload_origins.rs"]
-mod payload_origins;
+pub(crate) mod payload_origins;
 pub(crate) use payload_origins::EvidenceError;
 
 /// A WEM that cannot be parsed as a sound.

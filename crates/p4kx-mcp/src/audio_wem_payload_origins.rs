@@ -268,7 +268,7 @@ fn incomplete(scope: &SourceScope) -> Result<SourceUse> {
     )?)
 }
 
-pub(super) fn metadata(scope: &SourceScope, field: &str, role: SourceUseRole) -> Result<SourceUse> {
+pub(crate) fn metadata(scope: &SourceScope, field: &str, role: SourceUseRole) -> Result<SourceUse> {
     Ok(scope.for_scope(InputScope::ArchiveDirectoryMetadata).at(
         SourceLocation::Metadata {
             field: field.into(),
@@ -277,7 +277,7 @@ pub(super) fn metadata(scope: &SourceScope, field: &str, role: SourceUseRole) ->
     )?)
 }
 
-pub(super) fn range_use(
+pub(crate) fn range_use(
     scope: &SourceScope,
     namespace: &str,
     field: &str,
@@ -294,7 +294,7 @@ pub(super) fn range_use(
     )?)
 }
 
-pub(super) fn put(
+pub(crate) fn put(
     fields: &mut FieldOrigins,
     parent: &str,
     field: &str,

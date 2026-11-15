@@ -1010,6 +1010,15 @@ results retain the original controls for their disposition. When a malformed WEM
 field coordinates, its source and the missing coordinates are reported. Origin records count toward
 the response budget. The cursor continues at the first unreturned WEM.
 
+For `list_soundbank_objects`, `fieldOrigins` addresses the bank fields, counts, page navigation
+and returned HIRC object fields. The bank version and ID cite the original BKHD words.
+HIRC membership and filters cite the admitted section and the original version-aware type and ID
+scans. Returned object IDs, type codes, and Event action IDs cite their decoded soundbank
+byte ranges. The existing nested source fields retain their type-specific receipts. Legacy
+values whose decoder does not supply exact field coordinates report incomplete contributor
+sets. The page budget includes both the object data and provenance. The cursor resumes at the
+first matching object outside the returned page.
+
 For `get_wem_info`, the origins of `locations` describe the individual indexed locations. The
 codec, channel count and other decoded fields identify the WEM that supplied their values. The
 tool keeps the same preferred description across location pages, and the page budget includes

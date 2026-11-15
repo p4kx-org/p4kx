@@ -123,6 +123,9 @@ pub(crate) enum ToolError {
     /// A WEM result's original input or field addresses could not be retained.
     #[error("cannot retain WEM source evidence")]
     WemEvidence(#[from] crate::audio_wem::EvidenceError),
+    /// A HIRC listing's original input or field addresses could not be retained.
+    #[error("cannot retain soundbank object source evidence")]
+    HircEvidence(#[source] crate::audio_wem::EvidenceError),
     /// A DataForge field's original input or address could not be retained.
     #[error("cannot retain the DataForge field evidence")]
     ForgeEvidence(#[from] crate::forge_origins::EvidenceError),
