@@ -147,6 +147,8 @@ the GUI, CLI and MCP server. Native tar.gz/AppImage/deb require Ubuntu 24.04 / g
 Flatpak uses Freedesktop Platform 25.08 and additionally requires host Documents-portal API 5
 with authenticated host-path lookup. See [Linux packages](docs/linux-packages.md) for
 installation, AppImage CLI/MCP dispatch, sandbox grants, source notices and native verification.
+[Linux-Hilfe auf Deutsch](docs/linux-packages.md#linux-hilfe-auf-deutsch)
+explains setup, archive discovery and profile folders in German.
 
 For macOS 26 or later on Apple Silicon, open `P4KX-<version>-aarch64-apple-darwin.dmg` and drag
 `P4KX.app` to Applications. Launch the window from Finder. With the app in Applications, run

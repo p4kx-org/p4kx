@@ -126,14 +126,14 @@ AppImage runtime source builds and fresh native package consumers. Run
 `test-linux-package-contract.ps1` and the source-collector tests when changing their boundaries;
 the [Linux package guide](docs/linux-packages.md) describes the complete evidence and source contract.
 
-On Linux the audio preview builds against the ALSA headers: `sudo apt-get install
-libasound2-dev` (Debian and Ubuntu; CI installs the same package). PipeWire and PulseAudio need
-nothing extra at build time; at run time they serve the ALSA `default` device through
-`pipewire-alsa` or `pulseaudio-alsa`, which desktop distributions install.
-The [native test workflow](.github/workflows/tests.yml) lists the Ubuntu 24.04 runtime
-libraries used for the Linux Xvfb and lavapipe checks on both CPUs. The
-[platform guide](docs/supported-platforms.md#build-and-test-contract) explains how CI records
-those results and the separate device checks.
+On native Linux AMD64 and ARM64, install the ALSA headers with
+`sudo apt-get install libasound2-dev`. Audio preview needs a working ALSA `default` device,
+which can use `pipewire-alsa` or `pulseaudio-alsa` on those desktops.
+The Ubuntu 24.04 software-rendered GUI smoke uses `xvfb`, `mesa-vulkan-drivers`,
+`libvulkan1`, `libasound2t64` and the X11/EGL libraries listed in
+[the native test workflow](.github/workflows/tests.yml).
+The [platform guide](docs/supported-platforms.md#build-and-test-contract) explains how
+CI records those results and the separate device checks.
 
 ```powershell
 cargo build --release
@@ -154,40 +154,43 @@ The tests against a real Archive are ignored by default; see
 
 ### Real-Archive suite
 
-A second suite checks a real `Data.p4k`: opening and listing it, its Build, reading Entries of
-every compression method and encryption state present, extracting a small subset, comparing two
-Archives on both levels, and the conversions of the formats P4KX reads. Its tests are
-`#[ignore]`d, so `cargo test` and CI report them as ignored. Point `P4KX_DATA_P4K` to an Archive
-and `P4KX_DATA_P4K_B` to a second one for the Comparison, and pass `--ignored`; without
-`P4KX_DATA_P4K` the suite fails and says so, and the tests over two Archives return early without
-`P4KX_DATA_P4K_B`. Tests that read encrypted Entries use the Archive key from `P4KX_ARCHIVE_KEY`,
-else the file named by `P4KX_KEY_FILE`, else the file of `p4kx key set`.
+Real-Archive tests use the owner's read-only `Data.p4k` and are ignored by ordinary local
+and hosted runs. Select the exact test name and verify its scope and output path before
+running it. Media checks can publish large temporary exports. See the
+[Archive test setup](CLAUDE.md#real-test-data) and the [verification guide](docs/verify.md#real-archive-tests)
+for named checks and their input scope.
+
+Set `P4KX_DATA_P4K` to the Archive under test. The selected check reports a missing input.
+Set `P4KX_DATA_P4K_B` when a Comparison needs a second Archive. Tests requiring a pair skip
+without the second path. Encrypted Entries use the key from `P4KX_ARCHIVE_KEY`, the file
+named by `P4KX_KEY_FILE` or the stored key from `p4kx key set`, in that order.
+The stored key follows the [platform profile](docs/profile-folders.md), including an explicit
+`P4KX_FOLDERS_ROOT`.
+
+The Windows example below verifies a sample of the Archive without publishing an export.
+Point `TMP` and `TEMP` at an absolute private scratch directory.
 
 ```powershell
 $env:P4KX_DATA_P4K = 'C:\Program Files\Roberts Space Industries\StarCitizen\LIVE\Data.p4k'
-$env:P4KX_DATA_P4K_B = 'C:\Program Files\Roberts Space Industries\StarCitizen\PTU\Data.p4k'
-cargo test --release --workspace --locked -- --ignored
+$env:TMP = 'D:\path\to\private\test-scratch'
+$env:TEMP = $env:TMP
+New-Item -ItemType Directory -Force -Path $env:TMP | Out-Null
+cargo test --release --locked -p p4kx-extraction --test real_archive -- verify::a_sample_of_a_real_archive_verifies_without_a_mismatch --ignored --exact
 ```
 
-On Linux, set the Archive path to the actual host path of `Data.p4k`, including any Wine or
-Proton prefix components. Use an absolute private directory for temporary files. This PowerShell
-example runs the Extraction crate's ignored Archive suite on the native Linux host.
+On native Linux AMD64 or ARM64, use the actual host path, including Wine or Proton prefix
+components, and set an absolute private `TMPDIR`. An owner-supplied Archive is sufficient
+for this check.
 
 ```powershell
 $env:P4KX_DATA_P4K = '/path/to/prefix/drive_c/Games/StarCitizen/LIVE/Data.p4k'
 $env:TMPDIR = '/absolute/path/to/private/test-scratch'
 New-Item -ItemType Directory -Force -Path $env:TMPDIR | Out-Null
-cargo test --release --locked -p p4kx-extraction --test real_archive -- --ignored
+cargo test --release --locked -p p4kx-extraction --test real_archive -- verify::a_sample_of_a_real_archive_verifies_without_a_mismatch --ignored --exact
 ```
 
-The stored key follows the [platform profile](docs/profile-folders.md), including an explicit
-`P4KX_FOLDERS_ROOT`. This command also accepts the named key-file and key environment sources
-described above.
-
-The Archive is only read. The extracted subset goes below `TMP` on Windows or `TMPDIR` on Linux
-and is removed afterwards. `CLAUDE.md` describes the test layout, the differential tests against unp4k,
-unforge and StarBreaker ([docs/differential-verification.md](docs/differential-verification.md))
-and how to run a single real-Archive test.
+The [differential verification guide](docs/differential-verification.md) covers unp4k, unforge
+and StarBreaker inputs for separate comparisons. Hosted CI uses synthetic data.
 
 ## Pull requests
 

@@ -8,9 +8,9 @@ P4KX discovers installed Channels and public patch labels from one shared launch
 
 On Linux, standard candidates include, in this order:
 
-1. The absolute nonempty `WINEPREFIX`, `~/Games/star-citizen`, and `STEAM_COMPAT_DATA_PATH/pfx`.
-2. Configured Steam installations, `$XDG_DATA_HOME/Steam` (default `~/.local/share/Steam`), `~/.steam/steam`, `~/.steam/root`, and both known Flatpak Steam data aliases below `~/.var/app/com.valvesoftware.Steam/` (`data/Steam` and `.local/share/Steam`). Only `steamapps/libraryfolders.vdf` and `config/libraryfolders.vdf` are parsed, in that order. Both the numeric-path and numeric-object `path` layouts are accepted. Every configured/external library is examined at `steamapps/compatdata/<numeric-appid>/pfx`.
-3. Explicit Steam libraries, then explicit Bottles roots, `$XDG_DATA_HOME/bottles/bottles`, the Flatpak `~/.var/app/com.usebottles.bottles/data/bottles/bottles` root, and immediate `~/Games/*` candidates for Lutris/custom installations.
+1. The absolute nonempty `WINEPREFIX`, explicit and saved Wine prefixes in their supplied order, `~/Games/star-citizen`, and `STEAM_COMPAT_DATA_PATH/pfx`.
+2. Configured Steam installations, `$XDG_DATA_HOME/Steam` (default `~/.local/share/Steam`), `~/.steam/steam`, `~/.steam/root`, `~/.local/share/Steam`, and both known Flatpak Steam data aliases below `~/.var/app/com.valvesoftware.Steam/` (`data/Steam` and `.local/share/Steam`). Only `steamapps/libraryfolders.vdf` and `config/libraryfolders.vdf` are parsed, in that order. Both the numeric-path and numeric-object `path` layouts are accepted. Every configured/external library is examined at `steamapps/compatdata/<numeric-appid>/pfx`.
+3. Explicit Steam libraries, then explicit Bottles roots and `$XDG_DATA_HOME/bottles/bottles`. Explicit and saved CrossOver bottle roots are next. The remaining roots are Flatpak Bottles at `~/.var/app/com.usebottles.bottles/data/bottles/bottles` and immediate `~/Games/*` candidates for Lutris or custom installations.
 
 On macOS, direct candidates are the absolute nonempty WINEPREFIX, explicitly configured Wine
 prefixes, then ~/.wine. Configured CrossOver bottle roots follow, then the [standard CrossOver locations](https://support.codeweavers.com/advanced-crossover-mac-configuration) in the user's

@@ -12,6 +12,74 @@ Ubuntu/glibc baseline while still lacking this separate Flatpak prerequisite. Th
 requirements. Native results are established by the source-bound runtime artifacts of the
 corresponding GitHub run, rather than by a successful local Windows build.
 
+## Linux-Hilfe auf Deutsch
+
+### Paket wählen
+
+Prüfe die CPU mit `uname -m`. Wähle für `x86_64` (AMD64, Debian `amd64`) das Ziel
+`x86_64-unknown-linux-gnu` und für `aarch64` (ARM64, Debian `arm64`) das Ziel
+`aarch64-unknown-linux-gnu`. Der Release-Vertrag sieht auf beiden CPUs GUI, CLI und MCP
+als tar.gz, AppImage, deb und Flatpak vor. Die Installation und die Aufrufe für alle drei
+Programme stehen in der gemeinsamen Tabelle. [Installieren und starten](#install-and-start)
+
+Die Basis für tar.gz, AppImage und deb ist Ubuntu 24.04 mit glibc 2.39. Flatpak nutzt
+Freedesktop Platform 25.08 und benötigt auf dem Host ein Documents-Portal ab API 5
+mit funktionierender, authentifizierter Hostpfadabfrage. Ein bereitgestelltes `Data.p4k`
+genügt, um P4KX nativ auf beiden CPUs zu verwenden.
+
+### Archiv und Wine-Präfix auswählen
+
+Wähle **Archiv hinzufügen …** für eine `Data.p4k` oder **Ordner hinzufügen …** für den
+Kanalordner mit der `Data.p4k` oder für die Star-Citizen-Bibliothek. Nutze den
+tatsächlichen Linux-Dateipfad, etwa unter `drive_c` im Wine-Präfix.
+
+Für ein eigenes Präfix setze `WINEPREFIX` vor dem Start auf dessen absoluten Pfad
+oder ergänze den Pfad im aktiven Profil:
+
+```toml
+[wine]
+prefixes = ["/pfad/zum/StarCitizen-Praefix"]
+```
+
+Die Suche beginnt mit `WINEPREFIX` und den konfigurierten Präfixen in ihrer Reihenfolge.
+Danach prüft P4KX `~/Games/star-citizen` und `STEAM_COMPAT_DATA_PATH/pfx`. Steam wird
+unter `$XDG_DATA_HOME/Steam`, `~/.steam/steam`, `~/.steam/root`, `~/.local/share/Steam`
+sowie unter `data/Steam` und `.local/share/Steam` im Profil `~/.var/app/com.valvesoftware.Steam/`
+gesucht. Aus `steamapps/libraryfolders.vdf` und
+`config/libraryfolders.vdf` ermittelte Bibliotheken tragen ihre Proton-Präfixe unter
+`steamapps/compatdata/<numerische App-ID>/pfx` bei.
+
+P4KX sucht Bottles-Präfixe direkt unter `$XDG_DATA_HOME/bottles/bottles` (Standard
+`~/.local/share/bottles/bottles`) oder unter
+`~/.var/app/com.usebottles.bottles/data/bottles/bottles`. Ausdrücklich konfigurierte
+CrossOver-Wurzeln werden zwischen diesen beiden Orten geprüft. Für Lutris oder eigene
+Installationen prüft P4KX anschließend direkte Unterordner von `~/Games`. P4KX prüft die
+exakte Schreibweise jedes Pfadbestandteils zuerst und akzeptiert andernfalls nur einen
+eindeutigen Treffer ohne Beachtung der ASCII-Groß- und Kleinschreibung. Eine mehrdeutige
+oder unvollständige Suche wird gemeldet. [Suchpfade und Prioritäten](channel-discovery.md#inputs-and-priority)
+
+### Profil und Flatpak-Dateizugriff
+
+| Inhalt | XDG-Pfad bei nativen Paketen | Standard |
+| --- | --- | --- |
+| Einstellungen und gespeicherter Archivschlüssel | `$XDG_CONFIG_HOME/P4KX` | `~/.config/P4KX` |
+| Cache | `$XDG_CACHE_HOME/P4KX` | `~/.cache/P4KX` |
+| Anwendungsdaten | `$XDG_DATA_HOME/P4KX` | `~/.local/share/P4KX` |
+
+Ist eine XDG-Variable leer, ungesetzt oder relativ, gilt der Standardpfad. Einstellungen
+stehen in `settings.toml`, der gespeicherte Schlüssel in `archive.key`. Flatpak verwendet sein eigenes XDG-Profil. [Profilordner und expliziter Profilpfad](profile-folders.md)
+
+P4KX öffnet das Spielarchiv lesend. Flatpak hat Lesezugriff auf `~/Games/star-citizen`.
+Für andere Präfixe kannst du den konkreten Pfad mit `:ro` freigeben. Alternativ
+erteilst du in der Dateiauswahl eine Lesefreigabe für das Archiv. Wähle den separaten
+Exportordner mit Lese- und Schreibzugriff. Dateiexporte verwenden diesen Ordner auch
+für temporäre Dateien. Die Installation bleibt durch die Prüfung der Hostpfade
+geschützt. [Flatpak-Freigaben und Befehle](#profiles-audio-and-sandbox-access)
+
+Die Paketprüfung protokolliert CLI, MCP und GUI je CPU. Die synthetische GUI-Prüfung
+zeichnet Frames mit Xvfb und lavapipe. Nachweise für Hardware-GPU, Audiowiedergabe,
+Dateidialoge und Zwischenablage werden separat erfasst. [Native Prüfungen](#required-native-checks)
+
 ## Install and start
 
 Use `uname -m` to check the Linux host CPU. Select `x86_64-unknown-linux-gnu` for
