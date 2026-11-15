@@ -4,11 +4,11 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use p4kx_model::{PrefabLibrary, PrefabRef};
+use p4kx_model::{PrefabLibrary, PrefabParseMode, PrefabRef};
 
 use super::{Failure, GuidIndex, PrefabFile, PrefabSet};
 use crate::prefab::resolution_source::OwnedPrefabLocation;
-use crate::prefab::{PrefabError, PrefabLinkSource, PrefabLookupRoute};
+use crate::prefab::{PrefabError, PrefabLinkSource, PrefabLookupRoute, PrefabUnreadableEvidence};
 
 const GUID_INDEX_THREADS: usize = 4;
 
@@ -24,8 +24,10 @@ pub(in crate::prefab) struct NestedLookup {
 
 #[derive(Default)]
 struct LookupObservations {
+    searched_directory: bool,
     surveyed_names: Vec<Arc<PrefabFile>>,
     failed_entry_indices: Vec<usize>,
+    unreadable: Option<PrefabUnreadableEvidence>,
 }
 
 impl PrefabSet<'_> {
@@ -40,6 +42,7 @@ impl PrefabSet<'_> {
                 continue;
             };
             let prefab = rest.trim_start_matches('.');
+            observations.searched_directory |= !prefab.is_empty();
             let Some(slot) = self.slot_of(library) else {
                 continue;
             };
@@ -57,7 +60,10 @@ impl PrefabSet<'_> {
                 }
                 Err(PrefabError::Unreadable { library, reason }) => {
                     self.observe_failed(slot, observations);
-                    unreadable.get_or_insert((library, reason));
+                    if unreadable.is_none() {
+                        self.observe_unreadable(slot, observations);
+                        unreadable = Some((library, reason));
+                    }
                 }
                 Err(error) => return Err(error),
             }
@@ -73,8 +79,10 @@ impl PrefabSet<'_> {
                 Some(file) => Ok(ids(file.library())),
                 None if self.failed.contains_key(&slot) => Ok(Vec::new()),
                 None => self
-                    .read(slot, PrefabLibrary::parse)
-                    .map(|library| ids(&library)),
+                    .read(slot, |bytes| {
+                        PrefabLibrary::parse_observed(bytes, PrefabParseMode::ValuesOnly)
+                    })
+                    .map(|parsed| ids(&parsed.library)),
             };
             let count = self.slots.len();
             let pool = rayon::ThreadPoolBuilder::new()
@@ -178,6 +186,19 @@ impl PrefabSet<'_> {
         }
     }
 
+    fn observe_unreadable(&self, slot: usize, observations: &mut LookupObservations) {
+        if self.captures_objects() {
+            observations.unreadable =
+                self.slots
+                    .get(slot)
+                    .zip(self.failed.get(&slot))
+                    .map(|(found, failure)| PrefabUnreadableEvidence {
+                        entry_index: found.entry.index(),
+                        source: failure.source.clone(),
+                    });
+        }
+    }
+
     fn finish_lookup(
         &self,
         outcome: Lookup,
@@ -190,8 +211,10 @@ impl PrefabSet<'_> {
                 route,
                 target: located(&outcome),
                 compared_name,
+                searched_directory: observations.searched_directory,
                 surveyed_names: observations.surveyed_names,
                 failed_entry_indices: observations.failed_entry_indices,
+                unreadable: observations.unreadable,
             })
         });
         NestedLookup { outcome, source }

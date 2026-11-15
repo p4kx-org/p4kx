@@ -9,6 +9,9 @@ use std::path::{Path, PathBuf};
 use p4kx_testkit::{ArchiveBuilder, TestEntry, TestPrefabLibrary, TestPrefabObject};
 use serde_json::Value;
 
+#[path = "prefab_dump_origins.rs"]
+mod dump_origins;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 const IDENTITY: [f64; 4] = [1.0, 0.0, 0.0, 0.0];

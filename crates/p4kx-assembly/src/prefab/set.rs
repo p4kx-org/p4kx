@@ -7,10 +7,11 @@ use std::sync::Arc;
 
 use p4kx_archive::{Archive, Entry};
 use p4kx_model::{
-    PositionedPrefabLibrary, PrefabError as LibraryReadError, PrefabLibrary, PrefabLibrarySource,
+    PositionedPrefabLibrary, PrefabLibrary, PrefabLibrarySource, PrefabParseFailure,
+    PrefabParseMode,
 };
 
-use super::{MAX_PREFAB_LIBRARY_LEN, PrefabError};
+use super::{MAX_PREFAB_LIBRARY_LEN, PrefabError, PrefabUnreadableSource};
 
 mod nested;
 pub(super) use nested::Lookup;
@@ -80,7 +81,7 @@ pub struct PrefabSet<'a> {
     slots: Vec<Slot<'a>>,
     files: HashMap<String, usize>,
     loaded: HashMap<usize, Arc<PrefabFile>>,
-    failed: HashMap<usize, String>,
+    failed: HashMap<usize, FailedRead>,
     guids: Option<GuidIndex>,
     capture: PrefabCapture,
 }
@@ -106,7 +107,28 @@ fn normalised(path: &str) -> String {
 
 enum Failure {
     Fatal(Box<dyn std::error::Error + Send + Sync>),
-    Unreadable(String),
+    Unreadable(FailedRead),
+}
+
+#[derive(Debug)]
+struct FailedRead {
+    reason: String,
+    source: Option<PrefabUnreadableSource>,
+}
+
+impl Failure {
+    fn unreadable(reason: impl Into<String>, source: Option<PrefabUnreadableSource>) -> Self {
+        Self::Unreadable(FailedRead {
+            reason: reason.into(),
+            source,
+        })
+    }
+
+    fn parsed(error: PrefabParseFailure) -> Self {
+        let reason = error.to_string();
+        let source = error.into_diagnostic().map(PrefabUnreadableSource::Payload);
+        Self::unreadable(reason, source)
+    }
 }
 
 impl<'a> PrefabSet<'a> {
@@ -224,25 +246,26 @@ impl<'a> PrefabSet<'a> {
         if let Some(file) = self.loaded.get(&slot) {
             return Ok(Arc::clone(file));
         }
-        if let Some(reason) = self.failed.get(&slot) {
+        if let Some(failure) = self.failed.get(&slot) {
             return Err(PrefabError::Unreadable {
                 library: self.shown(slot),
-                reason: reason.clone(),
+                reason: failure.reason.clone(),
             });
         }
-        let parse = match self.capture {
-            PrefabCapture::Library => PrefabLibrary::parse_positioned,
-            PrefabCapture::Objects => PrefabLibrary::parse_positioned_objects,
+        let mode = match self.capture {
+            PrefabCapture::Library => PrefabParseMode::Positions,
+            PrefabCapture::Objects => PrefabParseMode::Objects,
         };
-        match self.read(slot, parse) {
+        match self.read(slot, |bytes| PrefabLibrary::parse_observed(bytes, mode)) {
             Ok(parsed) => {
                 let file = Arc::new(file_of(slot, self.shown(slot), parsed));
                 self.loaded.insert(slot, Arc::clone(&file));
                 Ok(file)
             }
             Err(Failure::Fatal(error)) => Err(PrefabError::Archive(error)),
-            Err(Failure::Unreadable(reason)) => {
-                self.failed.insert(slot, reason.clone());
+            Err(Failure::Unreadable(failure)) => {
+                let reason = failure.reason.clone();
+                self.failed.insert(slot, failure);
                 Err(PrefabError::Unreadable {
                     library: self.shown(slot),
                     reason,
@@ -254,32 +277,40 @@ impl<'a> PrefabSet<'a> {
     fn read<T>(
         &self,
         slot: usize,
-        parse: fn(&[u8]) -> Result<T, LibraryReadError>,
+        parse: impl FnOnce(&[u8]) -> Result<T, PrefabParseFailure>,
     ) -> Result<T, Failure> {
         let entry = self
             .slots
             .get(slot)
             .map(|found| found.entry)
-            .ok_or_else(|| Failure::Unreadable("the Entry is gone".to_owned()))?;
+            .ok_or_else(|| {
+                Failure::unreadable(
+                    "the Entry is gone",
+                    Some(PrefabUnreadableSource::Unavailable),
+                )
+            })?;
         let size = entry.uncompressed_size();
         if size > MAX_PREFAB_LIBRARY_LEN {
-            return Err(Failure::Unreadable(format!(
-                "it holds {size} bytes, more than the limit of {MAX_PREFAB_LIBRARY_LEN}"
-            )));
+            return Err(Failure::unreadable(
+                format!("it holds {size} bytes, more than the limit of {MAX_PREFAB_LIBRARY_LEN}"),
+                Some(PrefabUnreadableSource::EntrySize),
+            ));
         }
         let reader = self.archive.open_entry(entry).map_err(|error| {
             if error.is_key_required() || error.is_wrong_key() {
                 Failure::Fatal(Box::new(error))
             } else {
-                Failure::Unreadable(error.to_string())
+                Failure::unreadable(error.to_string(), Some(PrefabUnreadableSource::Unavailable))
             }
         })?;
         let mut bytes = Vec::with_capacity(usize::try_from(size).unwrap_or_default());
         reader
             .take(MAX_PREFAB_LIBRARY_LEN)
             .read_to_end(&mut bytes)
-            .map_err(|error| Failure::Unreadable(error.to_string()))?;
-        parse(&bytes).map_err(|error| Failure::Unreadable(error.to_string()))
+            .map_err(|error| {
+                Failure::unreadable(error.to_string(), Some(PrefabUnreadableSource::Unavailable))
+            })?;
+        parse(&bytes).map_err(Failure::parsed)
     }
 }
 

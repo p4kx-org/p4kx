@@ -6,6 +6,7 @@
 use p4kx_cryxml::SourceAttributePosition;
 use p4kx_model::{
     PrefabAttributeObservation, PrefabLibrary, PrefabModelSource, PrefabObjectSource,
+    PrefabResourceEnd,
 };
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -45,7 +46,11 @@ fn object_sources_follow_geometry_selection_and_the_actual_group_operands() -> T
     let [resource, brush] = positions else {
         return Err("expected two flattened objects".into());
     };
-    let PrefabModelSource::Resource { geometry, path, .. } = &resource.model else {
+    let PrefabModelSource::Resource {
+        geometry,
+        end: PrefabResourceEnd::Path { position: path, .. },
+    } = &resource.model
+    else {
         return Err("expected entity resource geometry".into());
     };
     assert_eq!(attribute(text, geometry.as_ref())?, "Geometry=' '");

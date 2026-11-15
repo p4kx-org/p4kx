@@ -8,6 +8,7 @@ use thiserror::Error;
 
 use crate::Transform;
 use crate::mtl_xml::XmlElement;
+use crate::prefab_diagnostic::PrefabParseFailure;
 use crate::prefab_objects;
 use crate::prefab_source::{PositionedPrefabLibrary, PrefabLibrarySource, PrefabSource};
 
@@ -122,7 +123,9 @@ impl PrefabLibrary {
     /// Returns [`PrefabError`] when the file is neither, its root is no `PrefabsLibrary` or it
     /// lists more prefabs or objects than are read.
     pub fn parse(bytes: &[u8]) -> Result<Self, PrefabError> {
-        Ok(parse_library(bytes, SourceCapture::ValuesOnly)?.library)
+        parse_library(bytes, PrefabParseMode::ValuesOnly)
+            .map(|parsed| parsed.library)
+            .map_err(PrefabParseFailure::into_error)
     }
 
     /// Reads the library and the positions of its original fields.
@@ -131,7 +134,7 @@ impl PrefabLibrary {
     ///
     /// Returns the same errors as [`Self::parse`].
     pub fn parse_positioned(bytes: &[u8]) -> Result<PositionedPrefabLibrary, PrefabError> {
-        parse_library(bytes, SourceCapture::Positions)
+        parse_library(bytes, PrefabParseMode::Positions).map_err(PrefabParseFailure::into_error)
     }
 
     /// Reads the library with original field and flattened object coordinates.
@@ -140,7 +143,19 @@ impl PrefabLibrary {
     ///
     /// Returns the same errors as [`Self::parse`].
     pub fn parse_positioned_objects(bytes: &[u8]) -> Result<PositionedPrefabLibrary, PrefabError> {
-        parse_library(bytes, SourceCapture::Objects)
+        parse_library(bytes, PrefabParseMode::Objects).map_err(PrefabParseFailure::into_error)
+    }
+
+    /// Reads a library and retains original values used by a failed-read diagnostic.
+    ///
+    /// # Errors
+    ///
+    /// Returns the original Prefab parse error and any retained diagnostic source.
+    pub fn parse_observed(
+        bytes: &[u8],
+        mode: PrefabParseMode,
+    ) -> Result<PositionedPrefabLibrary, PrefabParseFailure> {
+        parse_library(bytes, mode)
     }
 
     /// Returns the first prefab named `name`, ignoring case.
@@ -152,14 +167,19 @@ impl PrefabLibrary {
     }
 }
 
-#[derive(Clone, Copy)]
-enum SourceCapture {
+/// Selects the original position data kept for a successful Prefab parse.
+#[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
+pub enum PrefabParseMode {
+    /// Keep the parsed values.
     ValuesOnly,
+    /// Keep library and Prefab row positions.
     Positions,
+    /// Keep those positions and the surviving objects' original fields.
     Objects,
 }
 
-impl SourceCapture {
+impl PrefabParseMode {
     const fn omit_if_repaired(self, repaired: bool) -> Self {
         if repaired { Self::ValuesOnly } else { self }
     }
@@ -167,20 +187,18 @@ impl SourceCapture {
 
 fn parse_library(
     bytes: &[u8],
-    capture: SourceCapture,
-) -> Result<PositionedPrefabLibrary, PrefabError> {
-    match p4kx_cryxml::read(bytes)? {
-        Xml::CryXml(document) => library(
-            document.root(),
-            capture.omit_if_repaired(document.is_lossy()),
-        ),
+    capture: PrefabParseMode,
+) -> Result<PositionedPrefabLibrary, PrefabParseFailure> {
+    match p4kx_cryxml::read(bytes).map_err(PrefabError::from)? {
+        Xml::CryXml(document) => library(document.root(), capture, document.is_lossy()),
         Xml::Text(text) => {
             let text = String::from_utf8_lossy(text);
-            p4kx_cryxml::check_text_depth(&text)?;
-            let document = roxmltree::Document::parse(&text)?;
+            p4kx_cryxml::check_text_depth(&text).map_err(PrefabError::from)?;
+            let document = roxmltree::Document::parse(&text).map_err(PrefabError::from)?;
             library(
                 document.root_element(),
-                capture.omit_if_repaired(matches!(text, Cow::Owned(_))),
+                capture,
+                matches!(text, Cow::Owned(_)),
             )
         }
     }
@@ -188,17 +206,20 @@ fn parse_library(
 
 fn library<'a>(
     root: impl XmlElement<'a>,
-    capture: SourceCapture,
-) -> Result<PositionedPrefabLibrary, PrefabError> {
+    capture: PrefabParseMode,
+    repaired: bool,
+) -> Result<PositionedPrefabLibrary, PrefabParseFailure> {
     let is_library = root.name().eq_ignore_ascii_case("PrefabsLibrary")
         || root
             .children()
             .any(|element| element.name().eq_ignore_ascii_case("Prefab"));
     if !is_library {
-        return Err(PrefabError::NotLibrary {
-            found: root.name().to_owned(),
-        });
+        return Err(PrefabParseFailure::root_name(
+            root.name(),
+            (!repaired).then(|| root.position()),
+        ));
     }
+    let capture = capture.omit_if_repaired(repaired);
     let authored_name = root
         .attribute("Name")
         .map(str::trim)
@@ -208,10 +229,10 @@ fn library<'a>(
         prefabs: Vec::new(),
     };
     let mut source = match capture {
-        SourceCapture::Positions | SourceCapture::Objects => {
+        PrefabParseMode::Positions | PrefabParseMode::Objects => {
             PrefabLibrarySource::new(root, authored_name)
         }
-        SourceCapture::ValuesOnly => None,
+        PrefabParseMode::ValuesOnly => None,
     };
     let mut total_objects = 0_usize;
     for element in root.children() {
@@ -222,15 +243,16 @@ fn library<'a>(
             return Err(PrefabError::TooMany {
                 what: "prefabs",
                 limit: MAX_LIBRARY_PREFABS,
-            });
+            }
+            .into());
         }
         let objects = prefab_objects::child(element, "Objects");
         let mut row = source.as_ref().map(|_| PrefabSource::new(element, objects));
         let object_sources = match capture {
-            SourceCapture::Objects => row
+            PrefabParseMode::Objects => row
                 .as_mut()
                 .map(|row| row.object_sources.insert(Vec::new())),
-            SourceCapture::ValuesOnly | SourceCapture::Positions => None,
+            PrefabParseMode::ValuesOnly | PrefabParseMode::Positions => None,
         };
         library.prefabs.push(prefab_objects::read(
             element,

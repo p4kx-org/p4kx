@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 
-use p4kx_model::{PrefabObjectSource, PrefabSource};
+use p4kx_model::{PrefabDiagnostic, PrefabObjectSource, PrefabSource};
 
 use super::PrefabFile;
 
@@ -86,8 +86,10 @@ pub struct PrefabLinkSource {
     pub(super) route: PrefabLookupRoute,
     pub(super) target: Option<OwnedPrefabLocation>,
     pub(super) compared_name: Option<OwnedPrefabLocation>,
+    pub(super) searched_directory: bool,
     pub(super) surveyed_names: Vec<Arc<PrefabFile>>,
     pub(super) failed_entry_indices: Vec<usize>,
+    pub(super) unreadable: Option<PrefabUnreadableEvidence>,
 }
 
 impl PrefabLinkSource {
@@ -111,6 +113,12 @@ impl PrefabLinkSource {
             .map(OwnedPrefabLocation::location)
     }
 
+    /// Returns whether a library prefix was looked up for a nonempty prefab name.
+    #[must_use]
+    pub const fn searched_directory(&self) -> bool {
+        self.searched_directory
+    }
+
     /// Returns readable libraries searched for the authored name without a matching row.
     pub fn surveyed_names(&self) -> impl ExactSizeIterator<Item = &PrefabFile> {
         self.surveyed_names.iter().map(Arc::as_ref)
@@ -121,6 +129,34 @@ impl PrefabLinkSource {
     pub fn failed_entry_indices(&self) -> &[usize] {
         &self.failed_entry_indices
     }
+
+    /// Returns the failed named Entry whose diagnostic the resolver kept.
+    #[must_use]
+    pub const fn unreadable(&self) -> Option<&PrefabUnreadableEvidence> {
+        self.unreadable.as_ref()
+    }
+}
+
+/// Original inputs retained in an unreadable Prefab library's diagnostic.
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub enum PrefabUnreadableSource {
+    /// The Entry's declared uncompressed size was reported before reading.
+    EntrySize,
+    /// An XML value or derived fact was retained by the parser.
+    Payload(PrefabDiagnostic),
+    /// The read error did not retain enough evidence to attribute its message.
+    Unavailable,
+}
+
+/// The original failed Entry behind one reported problem.
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct PrefabUnreadableEvidence {
+    /// The physical Entry ordinal in the owning Archive.
+    pub entry_index: usize,
+    /// The retained diagnostic contribution, absent for fixed diagnostic text.
+    pub source: Option<PrefabUnreadableSource>,
 }
 
 /// One authored instance selection and its evaluated lookup.

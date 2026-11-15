@@ -10,7 +10,8 @@ mod set;
 
 pub use resolution_source::{
     PrefabInstanceSource, PrefabIssueSource, PrefabLinkSource, PrefabLocation, PrefabLookupRoute,
-    PrefabObjectLocation, PrefabResolutionSource, PrefabSelectionSource,
+    PrefabObjectLocation, PrefabResolutionSource, PrefabSelectionSource, PrefabUnreadableEvidence,
+    PrefabUnreadableSource,
 };
 pub use resolved::{ResolvedObject, ResolvedPrefab};
 pub use set::{PrefabFile, PrefabSet};

@@ -13,8 +13,8 @@ use serde::Serialize;
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct Origins {
-    field_origins: FieldOrigins,
-    provenance: SourceInventory,
+    pub(super) field_origins: FieldOrigins,
+    pub(super) provenance: SourceInventory,
 }
 
 pub(super) fn index<'set>(
@@ -88,16 +88,7 @@ impl Detail {
             source.is_none_or(|source| source.prefabs.len() == file.library().prefabs.len()),
             "prefab source positions differ from the parsed rows"
         );
-        let name = source.and_then(|source| match &source.name {
-            PrefabLibraryNameSource::Attribute(position) => {
-                SourceLocation::xml_attribute(position, "Name")
-            }
-            PrefabLibraryNameSource::Element(position) => {
-                SourceLocation::xml_element(position, "name")
-            }
-            _ => None,
-        });
-        self.put("/library", name, SourceUseRole::Payload)?;
+        self.put("/library", library_name(file), SourceUseRole::Payload)?;
         self.put(
             "/prefabs",
             source.and_then(|source| SourceLocation::xml_element(&source.root, "Prefab")),
@@ -159,7 +150,11 @@ fn name_origin(archive: &Archive, entry: &Entry, uses: &SourceUses) -> Result<Fi
     directory_name(&scope, complete, uses)
 }
 
-fn input(archive: &Archive, entry: &Entry, uses: &SourceUses) -> Result<(SourceScope, bool)> {
+pub(super) fn input(
+    archive: &Archive,
+    entry: &Entry,
+    uses: &SourceUses,
+) -> Result<(SourceScope, bool)> {
     let observed = archive
         .observed_entry(entry)
         .context("physical prefab library Entry")?;
@@ -168,7 +163,11 @@ fn input(archive: &Archive, entry: &Entry, uses: &SourceUses) -> Result<(SourceS
     Ok((scope, complete))
 }
 
-fn directory_name(scope: &SourceScope, complete: bool, uses: &SourceUses) -> Result<FieldOrigin> {
+pub(super) fn directory_name(
+    scope: &SourceScope,
+    complete: bool,
+    uses: &SourceUses,
+) -> Result<FieldOrigin> {
     let path = scope.for_scope(InputScope::ArchiveDirectoryMetadata).at(
         SourceLocation::Metadata {
             field: "path".to_owned(),
@@ -176,4 +175,14 @@ fn directory_name(scope: &SourceScope, complete: bool, uses: &SourceUses) -> Res
         SourceUseRole::Conversion,
     )?;
     Ok(uses.origin(&[path], complete))
+}
+
+pub(super) fn library_name(file: &PrefabFile) -> Option<SourceLocation> {
+    match &file.source()?.name {
+        PrefabLibraryNameSource::Attribute(position) => {
+            SourceLocation::xml_attribute(position, "Name")
+        }
+        PrefabLibraryNameSource::Element(position) => SourceLocation::xml_element(position, "name"),
+        _ => None,
+    }
 }

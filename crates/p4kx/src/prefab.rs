@@ -12,6 +12,8 @@ use crate::cli_prefab::{PrefabAction, PrefabArgs, PrefabDumpArgs, PrefabListArgs
 use crate::json;
 use crate::query_table::one_line;
 
+#[path = "prefab_dump_origins.rs"]
+mod dump_origins;
 #[path = "prefab_origins.rs"]
 mod origins;
 
@@ -107,6 +109,8 @@ struct DumpJson<'a> {
     prefabs_entered: usize,
     objects: Vec<ObjectJson<'a>>,
     issues: Vec<IssueJson<'a>>,
+    #[serde(flatten)]
+    origins: origins::Origins,
 }
 
 /// Returns the error as `anyhow` does, with the Archive error of a missing key at the top so that
@@ -225,7 +229,11 @@ fn print_prefabs(out: &mut impl Write, rows: &[PrefabRowJson<'_>]) -> io::Result
 
 fn dump_command(args: &PrefabDumpArgs, as_json: bool) -> Result<()> {
     let archive = crate::key::open(&args.archive)?;
-    let mut set = PrefabSet::new(&archive);
+    let mut set = if as_json {
+        PrefabSet::with_object_sources(&archive)
+    } else {
+        PrefabSet::new(&archive)
+    };
     let resolved = set.resolve(&args.library, &args.prefab).map_err(lift)?;
     if as_json {
         json::print(&DumpJson {
@@ -236,6 +244,7 @@ fn dump_command(args: &PrefabDumpArgs, as_json: bool) -> Result<()> {
             prefabs_entered: resolved.prefabs,
             objects: resolved.objects.iter().map(ObjectJson::from).collect(),
             issues: resolved.issues.iter().map(IssueJson::from).collect(),
+            origins: dump_origins::collect(&archive, &set, &resolved)?,
         })?;
         return Ok(());
     }

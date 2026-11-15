@@ -700,6 +700,20 @@ library holds that one), `objects_left_out`, `attached`, `too_many_issues` (more
 objects) and `too_many_visits` (more than 4194304 objects looked at). A library or prefab the
 Archive lacks is exit code 2, a library that cannot be read 3; issues leave the exit code 0.
 
+The dump includes `fieldOrigins` and `provenance`. Origin keys are JSON Pointers from the
+document root. They cover the selected library, prefab, collections, object fields and
+resolution issues. Source uses retain the original XML or CryXml positions and the physical
+Archive Entries. For a nested object, its origins include the selectors used along its
+instance route. Each vector component and matrix cell has its own origin path. The matrix's
+last column uses the same origin as the position. For the other columns, position attributes
+are selectors for accepting the local transforms. The position treats leaf rotation and scale
+as selectors and retains outer rotations and scales as conversion inputs.
+
+Failed lookups appear as attempts in the inventory. A diagnostic that incorporates content
+from the failed input also retains that content's origin on its reason. A global GUID lookup whose
+candidate survey could not be established leaves the affected contributor set incomplete. Inspect
+`containsEncryptedSource`, `sourceSetComplete` and `sourceUsesRefs` together.
+
 ## `p4kx armour bodies --json`
 
 ```json

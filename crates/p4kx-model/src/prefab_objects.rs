@@ -8,7 +8,8 @@ use crate::soc_entities::entity_transform;
 use crate::{
     MAX_GROUP_DEPTH, MAX_LIBRARY_OBJECTS, Prefab, PrefabAttachmentSource,
     PrefabAttributeObservation, PrefabError, PrefabModelSource, PrefabObject, PrefabObjectSource,
-    PrefabRef, PrefabReferenceSource, PrefabTransformAncestor, PrefabTransformInputs, Transform,
+    PrefabRef, PrefabReferenceSource, PrefabResourceChild, PrefabResourceEnd,
+    PrefabTransformAncestor, PrefabTransformInputs, Transform,
 };
 
 fn attribute<'a>(element: impl XmlElement<'a>, name: &str) -> String {
@@ -211,7 +212,10 @@ fn read_object<'a, E: XmlElement<'a>>(
 enum GeometrySelection<E> {
     Brush,
     Direct,
-    Resource { element: E, terminal: bool },
+    Resource {
+        element: E,
+        missing: Option<PrefabResourceChild>,
+    },
 }
 
 struct Geometry<'a, E> {
@@ -221,6 +225,8 @@ struct Geometry<'a, E> {
 
 impl<'a, E: XmlElement<'a>> Geometry<'a, E> {
     fn read(element: E, kind: &str) -> Self {
+        use PrefabResourceChild::{EntityGeometryResource, Geometry, PropertiesDataCore};
+
         if kind.eq_ignore_ascii_case("Brush") {
             return Self {
                 path: nonempty(attribute_text(element, "Prefab")),
@@ -235,18 +241,18 @@ impl<'a, E: XmlElement<'a>> Geometry<'a, E> {
         }
         let mut node = element;
         for key in [
-            "PropertiesDataCore",
-            "EntityGeometryResource",
-            "Geometry",
-            "Geometry",
-            "Geometry",
+            PropertiesDataCore,
+            EntityGeometryResource,
+            Geometry,
+            Geometry,
+            Geometry,
         ] {
-            let Some(child) = child(node, key) else {
+            let Some(child) = child(node, key.tag()) else {
                 return Self {
                     path: None,
                     selection: GeometrySelection::Resource {
                         element: node,
-                        terminal: false,
+                        missing: Some(key),
                     },
                 };
             };
@@ -256,7 +262,7 @@ impl<'a, E: XmlElement<'a>> Geometry<'a, E> {
             path: nonempty(attribute_text(node, "path")),
             selection: GeometrySelection::Resource {
                 element: node,
-                terminal: true,
+                missing: None,
             },
         }
     }
@@ -269,14 +275,18 @@ impl<'a, E: XmlElement<'a>> Geometry<'a, E> {
             GeometrySelection::Direct => {
                 PrefabModelSource::Geometry(object.attribute_position("Geometry"))
             }
-            GeometrySelection::Resource { element, terminal } => PrefabModelSource::Resource {
+            GeometrySelection::Resource { element, missing } => PrefabModelSource::Resource {
                 geometry: object.attribute_position("Geometry"),
-                scope: element.position(),
-                path: if terminal {
-                    element.attribute_position("path")
-                } else {
-                    None
-                },
+                end: missing.map_or_else(
+                    || PrefabResourceEnd::Path {
+                        element: element.position(),
+                        position: element.attribute_position("path"),
+                    },
+                    |child| PrefabResourceEnd::MissingChild {
+                        parent: element.position(),
+                        child,
+                    },
+                ),
             },
         }
     }

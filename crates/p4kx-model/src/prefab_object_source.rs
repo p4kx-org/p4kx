@@ -56,11 +56,53 @@ pub enum PrefabModelSource {
     Resource {
         /// The direct `Geometry` selector that was absent or empty.
         geometry: Option<SourceAttributePosition>,
-        /// The final resource element or the scope of the first missing child.
-        scope: SourceElementPosition,
-        /// The resource `path` when that attribute was consulted and authored.
-        path: Option<SourceAttributePosition>,
+        /// The last inspected resource element and its selector.
+        end: PrefabResourceEnd,
     },
+}
+
+/// The final observed step in an Entity's resource geometry lookup.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum PrefabResourceEnd {
+    /// The terminal Geometry element and its authored path, if present.
+    Path {
+        /// The terminal Geometry element.
+        element: SourceElementPosition,
+        /// The original `path` attribute when authored.
+        position: Option<SourceAttributePosition>,
+    },
+    /// A required child was absent from the observed resource element.
+    MissingChild {
+        /// The element searched for the missing child.
+        parent: SourceElementPosition,
+        /// The child sought in that element.
+        child: PrefabResourceChild,
+    },
+}
+
+/// A child sought along the Entity resource geometry route.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum PrefabResourceChild {
+    /// The Entity's `PropertiesDataCore` child.
+    PropertiesDataCore,
+    /// The properties' `EntityGeometryResource` child.
+    EntityGeometryResource,
+    /// A child in the nested `Geometry` chain.
+    Geometry,
+}
+
+impl PrefabResourceChild {
+    /// Returns the original child tag consulted by the geometry lookup.
+    #[must_use]
+    pub const fn tag(self) -> &'static str {
+        match self {
+            Self::PropertiesDataCore => "PropertiesDataCore",
+            Self::EntityGeometryResource => "EntityGeometryResource",
+            Self::Geometry => "Geometry",
+        }
+    }
 }
 
 /// Original selectors for an object that instances a prefab.
