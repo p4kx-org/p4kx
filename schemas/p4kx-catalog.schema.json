@@ -23341,16 +23341,6 @@
           "description": "The Record name without its type, e.g. `POWR_ACAS_S01_Lumen`.",
           "type": "string"
         },
-        "description": {
-          "$ref": "#/$defs/LocalisedText",
-          "description": "The description, from `AttachDef.Localization.Description`.",
-          "x-gameText": true
-        },
-        "displayType": {
-          "$ref": "#/$defs/LocalisedText",
-          "description": "The display type of the purchasable parameters, e.g. `@item_DisplayType_PowerPlant`.",
-          "x-gameText": true
-        },
         "grade": {
           "description": "The grade of `AttachDef.Grade`, `null` without one.",
           "format": "int64",
@@ -23389,16 +23379,16 @@
             "null"
           ]
         },
-        "name": {
-          "$ref": "#/$defs/LocalisedText",
-          "description": "The name, from `AttachDef.Localization.Name`."
-        },
         "playability": {
           "description": "Who the item is for, `null` when no rule applies. Today one of `player`, `mission` and\n`special`; the schema keeps a string, as a new value is additive.",
           "type": [
             "string",
             "null"
           ]
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32",
+          "description": "The physical Record position that identifies this Item's canonical definition."
         },
         "recordPath": {
           "description": "The record path, without `.xml`.",
@@ -23447,15 +23437,13 @@
       },
       "required": [
         "className",
-        "description",
-        "displayType",
         "grade",
         "guid",
         "itemClass",
         "manufacturerGuid",
         "mass",
-        "name",
         "playability",
+        "recordIndex",
         "recordPath",
         "size",
         "subType",

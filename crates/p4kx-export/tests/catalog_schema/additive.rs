@@ -13,7 +13,7 @@ pub(super) fn assert_unknown_nested_fields(validator: &Validator, catalog: Value
         ("/completeness", "starmap", json!({"status": "complete"})),
         ("/source", "extra", json!(true)),
         ("/completeness/items", "extra", json!(true)),
-        ("/items/0/name", "extra", json!(true)),
+        ("/items/0/recordIndex", "extra", json!(true)),
     ] {
         let object = unknown_kind
             .pointer_mut(path)

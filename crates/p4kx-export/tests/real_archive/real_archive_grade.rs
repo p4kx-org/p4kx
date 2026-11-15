@@ -13,6 +13,10 @@ use p4kx_extraction::Archive;
 use p4kx_testkit::real_archive_path;
 use serde_json::Value;
 
+use crate::real_archive_canonical_texts::{
+    ItemPresentationIndex, TextDomain, TextIndex, TextReferenceShape,
+};
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 const LETTER_TYPES: [&str; 5] = ["Cooler", "PowerPlant", "QuantumDrive", "Radar", "Shield"];
@@ -42,6 +46,8 @@ fn the_grade_letter_of_ship_components_follows_the_integer() -> TestResult {
     let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let items = catalog["items"].as_array().ok_or("the items array")?;
+    let presentation = ItemPresentationIndex::new(&catalog)?;
+    let texts = TextIndex::new(&catalog)?;
     let mut counts: BTreeMap<&str, (usize, usize)> = BTreeMap::new();
     for item in items {
         let grade = &item["grade"];
@@ -55,7 +61,16 @@ fn the_grade_letter_of_ship_components_follows_the_integer() -> TestResult {
         else {
             continue;
         };
-        let Some(expected) = item["description"]["en"]
+        let Some(carrier) = presentation.description(item)? else {
+            continue;
+        };
+        let Some(text) =
+            texts.reference(carrier, TextDomain::GameText, TextReferenceShape::Required)?
+        else {
+            continue;
+        };
+        let Some(expected) = text
+            .shown("en")?
             .as_str()
             .and_then(letter_of)
             .and_then(integer_of)

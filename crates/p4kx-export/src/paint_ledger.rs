@@ -20,8 +20,13 @@ pub(crate) fn inputs(
 ) -> Result<ExportLedger, crate::CatalogError> {
     let paints: BTreeSet<_> = candidates
         .iter()
-        .map(|item| item.source_record_index)
-        .collect();
+        .map(|item| {
+            item.record_index
+                .value()
+                .copied()
+                .ok_or(crate::ExportAccountingError::MissingFieldInspection)
+        })
+        .collect::<Result<_, _>>()?;
     let ships: BTreeSet<_> = vehicles
         .iter()
         .map(|vehicle| {

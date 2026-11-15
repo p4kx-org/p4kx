@@ -160,9 +160,12 @@ fn items_are_entity_class_definitions_under_scitem_and_legacyitems_ordered_by_gu
 #[test]
 fn an_item_carries_its_definition_mass_display_type_and_class() -> TestResult {
     let (_, catalog) = catalog_with(&options())?;
-    let mut actual = entity(&catalog, "items", "POWR_ACAS_S01")?.clone();
+    let projection = entity(&catalog, "items", "POWR_ACAS_S01")?;
+    let definition = item_definition(&catalog, projection)?;
+    let mut actual = projection.clone();
     if let Some(fields) = actual.as_object_mut() {
         fields.remove("variantOf");
+        fields.remove("recordIndex");
     }
     assert_eq!(
         &actual,
@@ -170,12 +173,6 @@ fn an_item_carries_its_definition_mass_display_type_and_class() -> TestResult {
             "guid": "30000000-0000-4000-8000-000000000001",
             "className": "POWR_ACAS_S01",
             "recordPath": "libs/foundry/records/entities/scitem/ships/powerplant/powr_acas_s01",
-            "name": {"key": "@item_NamePOWR_ACAS_S01", "en": "Lumen", "de": null},
-            "description": {
-                "key": "@item_DescPOWR_ACAS_S01",
-                "en": "Item Type: Power Plant\nClass:\u{a0}Military \n\nSteady power.",
-                "de": null
-            },
             "type": "PowerPlant",
             "subType": "Power",
             "size": 1,
@@ -183,12 +180,78 @@ fn an_item_carries_its_definition_mass_display_type_and_class() -> TestResult {
             "mass": 125.5,
             "manufacturerGuid": "10000000-0000-4000-8000-000000000001",
             "tags": ["flightReady", "$Small"],
-            "displayType": {"key": "@item_DisplayType_PowerPlant", "en": "Power Plant", "de": null},
             "itemClass": "Military",
             "playability": null,
         }),
-        "the item fields"
+        "the remaining item projection fields"
     );
+    check_item_texts(&catalog, definition)
+}
+
+fn item_definition<'a>(
+    catalog: &'a Value,
+    projection: &Value,
+) -> Result<&'a Value, Box<dyn Error>> {
+    let index = projection
+        .get("recordIndex")
+        .ok_or("sourced physical item index")?;
+    crate::health_origin_assertions::rows(catalog, "/definitions/items/rows")?
+        .iter()
+        .find(|definition| definition.get("recordIndex") == Some(index))
+        .ok_or_else(|| "exact Item definition".into())
+}
+
+fn check_item_texts(catalog: &Value, definition: &Value) -> TestResult {
+    let components = crate::health_origin_assertions::rows(definition, "/components/value")?;
+    let attachment = components
+        .iter()
+        .find(|component| component["kind"] == "attachment")
+        .ok_or("first attachment")?;
+    let purchase = components
+        .iter()
+        .find(|component| component["kind"] == "purchasable")
+        .ok_or("first purchasable component")?;
+    for (carrier, table, key, english) in [
+        (
+            attachment.pointer("/value/value/localization/value/name/value"),
+            "publicNames",
+            "@item_NamePOWR_ACAS_S01",
+            "Lumen",
+        ),
+        (
+            attachment.pointer("/value/value/localization/value/description/value"),
+            "gameTexts",
+            "@item_DescPOWR_ACAS_S01",
+            "Item Type: Power Plant\nClass:\u{a0}Military \n\nSteady power.",
+        ),
+        (
+            purchase.pointer("/value/displayType/value"),
+            "gameTexts",
+            "@item_DisplayType_PowerPlant",
+            "Power Plant",
+        ),
+    ] {
+        let id = carrier.ok_or("selected Item text reference")?;
+        let texts = crate::health_origin_assertions::rows(catalog, &format!("/texts/{table}"))?;
+        let text = texts
+            .iter()
+            .find(|row| row.pointer("/id/value") == Some(id))
+            .ok_or("canonical Item text target")?;
+        assert_eq!(
+            text.pointer("/key/value"),
+            Some(&json!(key)),
+            "original Item text key"
+        );
+        assert_eq!(
+            text.pointer("/translations/value/en/displayText/value"),
+            Some(&json!(english)),
+            "normalized English Item display text"
+        );
+        assert!(
+            text.pointer("/translations/value/de").is_none(),
+            "German was not loaded"
+        );
+    }
     Ok(())
 }
 
@@ -208,10 +271,15 @@ fn an_item_without_an_item_definition_keeps_its_identity_and_null_fields() -> Te
         assert_eq!(counter[field], Value::Null, "{field} is null");
     }
     assert_eq!(counter["tags"], json!([]), "no tags");
-    assert_eq!(
-        counter["name"],
-        json!({"key": null, "en": null, "de": null}),
-        "no name"
+    let definition = item_definition(&catalog, counter)?;
+    let mut components = definition
+        .pointer("/components/value")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten();
+    assert!(
+        components.all(|entry| entry["kind"] != "attachment"),
+        "the Item has no attachment name carrier"
     );
     Ok(())
 }

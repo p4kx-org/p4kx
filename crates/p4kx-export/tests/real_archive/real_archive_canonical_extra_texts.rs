@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::collections::{HashMap, HashSet};
+
 use p4kx_export::Kind;
 use serde_json::Value;
 
-use super::{CoverageCounters, TestResult, TextDomain, TextIndex, TextReferenceShape};
+use super::{CoverageCounters, TestResult, TextDomain, TextIndex, TextReferenceShape, TextTarget};
 use crate::catalog_v3_consumer;
 
 pub(super) fn compare(
@@ -88,59 +90,165 @@ fn compare_overrides(
     Ok(())
 }
 
-pub(super) fn items(catalog: &Value, counters: &mut CoverageCounters<'_>) -> TestResult<()> {
-    let index = TextIndex::new(catalog)?;
-    for item in catalog_v3_consumer::table(catalog, "/definitions/items")? {
-        let components = item.get("components").ok_or("Item component carrier")?;
-        let Some(components) = catalog_v3_consumer::source_value(components)? else {
-            continue;
-        };
-        for component in components.as_array().ok_or("ordered Item components")? {
-            let body = component.get("value").ok_or("Item component body")?;
-            match component.get("kind").and_then(Value::as_str) {
-                Some("attachment") => compare_item_attachment(counters, &index, body)?,
-                Some("purchasable") => {
-                    let target = index.reference(
-                        body.get("displayType").ok_or("Item display type carrier")?,
-                        TextDomain::GameText,
-                        TextReferenceShape::Required,
-                    )?;
-                    counters.count(target)?;
-                }
-                Some("physics") => {}
-                _ => return Err("unknown Item component kind".into()),
+pub(crate) struct ItemPresentationIndex<'catalog> {
+    definitions: HashMap<u64, &'catalog Value>,
+}
+
+impl<'catalog> ItemPresentationIndex<'catalog> {
+    pub(crate) fn new(catalog: &'catalog Value) -> TestResult<Self> {
+        let rows = catalog_v3_consumer::table(catalog, "/definitions/items")?;
+        let mut definitions = HashMap::with_capacity(rows.len());
+        for row in rows {
+            if definitions.insert(record_index(row)?, row).is_some() {
+                return Err("duplicate physical Item definition".into());
             }
         }
+        Ok(Self { definitions })
+    }
+
+    fn components(&self, item: &Value) -> TestResult<&'catalog [Value]> {
+        let row = self
+            .definitions
+            .get(&record_index(item)?)
+            .ok_or("Item projection has no exact physical definition")?;
+        if item.get("recordIndex") != row.get("recordIndex")
+            || [("guid", "/guid/value"), ("recordPath", "/recordPath/value")]
+                .into_iter()
+                .any(|(field, path)| item.get(field) != row.pointer(path))
+        {
+            return Err("Item projection and physical definition disagree".into());
+        }
+        let carrier = row.get("components").ok_or("Item component carrier")?;
+        catalog_v3_consumer::source_value(carrier)?.map_or_else(
+            || Ok(&[][..]),
+            |components| {
+                components
+                    .as_array()
+                    .map(Vec::as_slice)
+                    .ok_or_else(|| "ordered Item components".into())
+            },
+        )
+    }
+
+    pub(crate) fn description(&self, item: &Value) -> TestResult<Option<&'catalog Value>> {
+        let Some(component) = self
+            .components(item)?
+            .iter()
+            .find(|component| component.get("kind").and_then(Value::as_str) == Some("attachment"))
+        else {
+            return Ok(None);
+        };
+        localization(component)?.map_or(Ok(None), |localization| {
+            Ok(Some(
+                localization
+                    .get("description")
+                    .ok_or("Item description carrier")?,
+            ))
+        })
+    }
+}
+
+fn record_index(row: &Value) -> TestResult<u64> {
+    let carrier = row
+        .get("recordIndex")
+        .ok_or("Item physical Record carrier")?;
+    catalog_v3_consumer::source_value(carrier)?
+        .and_then(Value::as_u64)
+        .ok_or_else(|| "present Item physical Record index".into())
+}
+
+fn localization(component: &Value) -> TestResult<Option<&Value>> {
+    let carrier = component.get("value").ok_or("Item attachment carrier")?;
+    let Some(attachment) = catalog_v3_consumer::source_value(carrier)? else {
+        return Ok(None);
+    };
+    let carrier = attachment
+        .get("localization")
+        .ok_or("Item localization carrier")?;
+    catalog_v3_consumer::source_value(carrier)
+}
+
+pub(super) fn items(catalog: &Value, counters: &mut CoverageCounters<'_>) -> TestResult<()> {
+    let index = TextIndex::new(catalog)?;
+    let presentations = ItemPresentationIndex::new(catalog)?;
+    let mut selected = HashSet::new();
+    for item in catalog_v3_consumer::rows(catalog, Kind::Items)? {
+        if !selected.insert(record_index(item)?) {
+            return Err("duplicate physical Item projection".into());
+        }
+        compare_item_slots(counters, &index, presentations.components(item)?)?;
+    }
+    if selected.len() != presentations.definitions.len() {
+        return Err("selected Item projections and physical definitions differ".into());
     }
     Ok(())
 }
 
-fn compare_item_attachment(
+#[derive(Default)]
+enum Slot {
+    #[default]
+    First,
+    Additional,
+}
+
+impl Slot {
+    const fn next(&mut self) -> Self {
+        std::mem::replace(self, Self::Additional)
+    }
+
+    fn count(
+        &self,
+        counters: &mut CoverageCounters<'_>,
+        target: Option<&TextTarget<'_>>,
+    ) -> TestResult<()> {
+        match self {
+            Self::First => counters.count(target.filter(|target| !target.key.is_empty())),
+            Self::Additional => counters.count_supplemental(target),
+        }
+    }
+}
+
+fn compare_item_slots(
     counters: &mut CoverageCounters<'_>,
     index: &TextIndex<'_>,
-    attachment: &Value,
+    components: &[Value],
 ) -> TestResult<()> {
-    let Some(attachment) = catalog_v3_consumer::source_value(attachment)? else {
-        return Ok(());
-    };
-    let localization = attachment
-        .get("localization")
-        .ok_or("Item localization carrier")?;
-    let Some(localization) = catalog_v3_consumer::source_value(localization)? else {
-        return Ok(());
-    };
-    for (field, domain) in [
-        ("name", TextDomain::PublicName),
-        ("description", TextDomain::GameText),
-    ] {
-        let target = index.reference(
-            localization
-                .get(field)
-                .ok_or("localized Item text carrier")?,
-            domain,
-            TextReferenceShape::Required,
-        )?;
-        counters.count(target)?;
+    let mut attachment = Slot::default();
+    let mut purchasable = Slot::default();
+    for component in components {
+        match component.get("kind").and_then(Value::as_str) {
+            Some("attachment") => {
+                let slot = attachment.next();
+                let Some(localization) = localization(component)? else {
+                    continue;
+                };
+                for (field, domain) in [
+                    ("name", TextDomain::PublicName),
+                    ("description", TextDomain::GameText),
+                ] {
+                    let target = index.reference(
+                        localization
+                            .get(field)
+                            .ok_or("localized Item text carrier")?,
+                        domain,
+                        TextReferenceShape::Required,
+                    )?;
+                    slot.count(counters, target)?;
+                }
+            }
+            Some("purchasable") => {
+                let target = index.reference(
+                    component
+                        .pointer("/value/displayType")
+                        .ok_or("Item display type carrier")?,
+                    TextDomain::GameText,
+                    TextReferenceShape::Required,
+                )?;
+                purchasable.next().count(counters, target)?;
+            }
+            Some("physics") => {}
+            _ => return Err("unknown Item component kind".into()),
+        }
     }
     Ok(())
 }

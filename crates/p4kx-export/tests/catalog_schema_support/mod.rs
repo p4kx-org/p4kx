@@ -128,11 +128,10 @@ pub(crate) fn minimal_catalog() -> Value {
             "shipStoreSlugs": {"status": "complete"}
         },
         "items": [{
+            "recordIndex": source_values::present(json!(1)),
             "guid": "30000000-0000-4000-8000-000000000001",
             "className": "POWR_ACAS_S01",
             "recordPath": "libs/foundry/records/entities/scitem/ships/powerplant/powr_acas_s01",
-            "name": {"key": "@item_NamePOWR_ACAS_S01", "en": "Lumen", "de": null},
-            "description": {"key": null, "en": null, "de": null},
             "type": "PowerPlant",
             "subType": "Power",
             "size": 1,
@@ -140,7 +139,6 @@ pub(crate) fn minimal_catalog() -> Value {
             "mass": 125.5,
             "manufacturerGuid": "cfc0122d-5275-415a-a656-3dcb3346feb5",
             "tags": ["flightReady"],
-            "displayType": {"key": null, "en": null, "de": null},
             "itemClass": "Military",
             "playability": "player",
             "variantOf": null

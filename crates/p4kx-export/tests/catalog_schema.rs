@@ -193,10 +193,13 @@ fn items_publish_canonical_component_tables_without_a_flat_stat_field() -> TestR
     let item = schema
         .pointer("/$defs/Item")
         .ok_or("catalog Item definition")?;
-    assert!(
-        item.pointer("/properties/stats").is_none(),
-        "the Item schema lists identity and presentation fields"
-    );
+    for field in ["stats", "name", "description", "displayType"] {
+        assert!(
+            item.pointer(&format!("/properties/{field}")).is_none(),
+            "the Item projection omits canonical data {field}"
+        );
+    }
+    assert!(item.pointer("/properties/recordIndex").is_some());
     let validator = jsonschema::validator_for(&p4kx_export::catalog_schema())?;
     assert!(
         validator.is_valid(&minimal_catalog()),

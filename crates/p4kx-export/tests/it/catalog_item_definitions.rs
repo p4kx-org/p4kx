@@ -38,6 +38,19 @@ fn item_definition_keeps_duplicate_guid_and_each_authored_component_slot() -> Te
     }
     proof::present(a, "recordIndex", &json!(0), Some(true))?;
     proof::present(b, "recordIndex", &json!(1), Some(true))?;
+    let [first, second] = proof::rows(&catalog, "/items")? else {
+        return Err("distinct Item projections with the same GUID and path".into());
+    };
+    for original in [a, b] {
+        assert_eq!(
+            [first, second]
+                .into_iter()
+                .filter(|row| row.get("recordIndex") == original.get("recordIndex"))
+                .count(),
+            1,
+            "the sourced physical ordinal joins exactly one projection and definition"
+        );
+    }
     let [first, mass, second, purchase] = proof::rows(a, "/components/value")? else {
         return Err(
             "the original attachment, mass, repeated attachment and purchasable slots".into(),

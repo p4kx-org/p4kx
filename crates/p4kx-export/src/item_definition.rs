@@ -114,6 +114,10 @@ pub(crate) struct WeaponAttachment<'item, 'source> {
 }
 
 impl<'source> ItemDefinition<'source> {
+    pub(crate) const fn record_index(&self) -> &SourcedValue<u32> {
+        &self.header.record_index
+    }
+
     pub(crate) fn weapon_attachments(&self) -> impl Iterator<Item = WeaponAttachment<'_, 'source>> {
         self.components
             .value()

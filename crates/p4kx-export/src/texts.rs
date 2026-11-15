@@ -106,25 +106,10 @@ impl<'e> Texts<'e> {
         }
     }
 
-    pub(crate) fn legacy_item_view<'a>(&self, key: Option<&'a str>) -> LocalisedText<'a>
-    where
-        'e: 'a,
-    {
-        LocalisedText {
-            key,
-            en: key
-                .and_then(|key| {
-                    self.lookup_forms(Language::English, key)
-                        .map(|text| text.display)
-                })
-                .filter(|value| !value.is_empty()),
-            de: key
-                .and_then(|key| {
-                    self.lookup_forms(Language::German, key)
-                        .map(|text| text.display)
-                })
-                .filter(|value| !value.is_empty()),
-        }
+    pub(crate) fn display(&self, language: Language, key: &str) -> Option<Cow<'e, str>> {
+        self.lookup_forms(language, key)
+            .map(|text| text.display)
+            .filter(|value| !value.is_empty())
     }
 
     /// Returns a note for every `global.ini` that was read lossily or had lines skipped.

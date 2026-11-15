@@ -5,8 +5,7 @@ use p4kx_export::Kind;
 use p4kx_testkit::{DataForgeBuilder, TestInstance, TestRecord, TestStruct, TestType, TestValue};
 use serde_json::{Value, json};
 
-use super::{Coverage, Fixture, TestResult, check_coverage, replace_value};
-use crate::real_archive_canonical_texts;
+use super::{Fixture, TestResult, check_coverage, replace_value};
 
 const OWNER: &str = "EntityClassDefinition";
 const BASE: &str = "DataForgeComponentParams";
@@ -14,46 +13,59 @@ const ATTACHMENT: &str = "SAttachableComponentParams";
 const ATTACH_DEFINITION: &str = "SItemDefinition";
 const LOCALIZATION: &str = "SCItemLocalization";
 const PURCHASE: &str = "SCItemPurchasableParams";
+const COMPONENTS: &str = "/definitions/items/rows/0/components/value";
 
 #[test]
 fn item_translation_mutations_fail_without_changing_historical_baselines() -> TestResult {
     let fixture = Fixture::from_database(&database())?;
-    let (english, german) = coverage(&fixture, &fixture.catalog)?;
+    let (english, german) = fixture.coverage(&fixture.catalog, Kind::Items)?;
     assert_eq!(
         english.total(),
         3,
-        "legacy English baseline selects the original fields"
+        "the original selections enter the English baseline"
     );
     assert_eq!(german.resolved, 3, "the original German texts resolve");
-    assert_eq!(
-        german.supplemental_contradictions, 0,
-        "canonical Item texts agree with the INI"
-    );
+    assert_eq!(german.supplemental_contradictions, 0);
 
-    for (path, domain, form) in [
+    for (path, domain, form, expected) in [
         (
             "0/value/value/localization/value/name/value",
             "publicNames",
             "displayText",
+            (1, 0),
         ),
         (
             "0/value/value/localization/value/description/value",
             "gameTexts",
             "sourceText",
+            (1, 0),
         ),
-        ("1/value/displayType/value", "gameTexts", "displayText"),
+        (
+            "1/value/displayType/value",
+            "gameTexts",
+            "displayText",
+            (1, 0),
+        ),
+        (
+            "2/value/value/localization/value/name/value",
+            "publicNames",
+            "sourceText",
+            (0, 1),
+        ),
+        (
+            "3/value/displayType/value",
+            "gameTexts",
+            "displayText",
+            (0, 1),
+        ),
     ] {
         let catalog = mutate_german(&fixture, path, domain, form)?;
-        let (english, german) = coverage(&fixture, &catalog)?;
+        let (english, german) = fixture.coverage(&catalog, Kind::Items)?;
         assert_eq!(english.total(), 3, "English denominator is preserved");
         assert_eq!(german.total(), 3, "German denominator is preserved");
         assert_eq!(
-            german.resolved, 3,
-            "original legacy German rows still resolve"
-        );
-        assert_eq!(
-            german.supplemental_contradictions, 1,
-            "the canonical mutation disagrees with its source"
+            (german.contradictions, german.supplemental_contradictions),
+            expected
         );
         let mut failures = Vec::new();
         check_coverage(Kind::Items, &english, &german, true, 1, &mut failures);
@@ -63,6 +75,41 @@ fn item_translation_mutations_fail_without_changing_historical_baselines() -> Te
             "the contradiction independently fails the kind"
         );
     }
+    Ok(())
+}
+
+#[test]
+fn the_first_item_slot_controls_presentation_even_if_its_text_is_absent() -> TestResult {
+    let fixture = Fixture::from_database(&database())?;
+    let mut catalog = fixture.catalog.clone();
+    for path in ["0/value/value/localization", "1/value/displayType"] {
+        replace_value(
+            &mut catalog,
+            &format!("{COMPONENTS}/{path}/state"),
+            json!("absent"),
+        )?;
+        replace_value(
+            &mut catalog,
+            &format!("{COMPONENTS}/{path}/value"),
+            Value::Null,
+        )?;
+    }
+    let (english, german) = fixture.coverage(&catalog, Kind::Items)?;
+    assert_eq!(
+        english.total(),
+        0,
+        "later slots cannot change the presentation selection"
+    );
+    assert_eq!(german.total(), 0);
+
+    let record = catalog
+        .pointer_mut("/items/0/recordIndex/value")
+        .ok_or("physical Item position")?;
+    *record = json!(1);
+    assert!(
+        fixture.coverage(&catalog, Kind::Items).is_err(),
+        "the physical owner cannot be guessed"
+    );
     Ok(())
 }
 
@@ -89,27 +136,7 @@ fn mutate_german(fixture: &Fixture, path: &str, domain: &str, form: &str) -> Tes
     Ok(catalog)
 }
 
-fn coverage(fixture: &Fixture, catalog: &Value) -> TestResult<(Coverage, Coverage)> {
-    let fields = ["name", "description", "displayType"].map(str::to_owned);
-    real_archive_canonical_texts::kind_coverage(
-        catalog,
-        Kind::Items,
-        &fields,
-        &fixture.english,
-        &fixture.german,
-    )
-}
-
 fn database() -> DataForgeBuilder {
-    let localization = TestInstance::new(LOCALIZATION)
-        .value("Name", TestValue::text("@shared"))
-        .value("Description", TestValue::text("@resource_description"));
-    let definition =
-        TestInstance::new(ATTACH_DEFINITION).value("Localization", TestValue::Struct(localization));
-    let attachment =
-        TestInstance::new(ATTACHMENT).value("AttachDef", TestValue::Struct(definition));
-    let purchasable =
-        TestInstance::new(PURCHASE).value("displayType", TestValue::text("@own_type"));
     let item = TestRecord::new(
         1,
         OWNER,
@@ -119,8 +146,10 @@ fn database() -> DataForgeBuilder {
     .value(
         "Components",
         TestValue::Array(vec![
-            TestValue::Struct(attachment),
-            TestValue::Struct(purchasable),
+            attachment("@shared", "@resource_description"),
+            purchasable("@own_type"),
+            attachment("@resource_name", "@own_description"),
+            purchasable("@fallback_resource_name"),
         ]),
     );
 
@@ -148,4 +177,19 @@ fn database() -> DataForgeBuilder {
                 .field("displayType", TestType::Locale),
         )
         .record(item)
+}
+
+fn attachment(name: &str, description: &str) -> TestValue {
+    let localization = TestInstance::new(LOCALIZATION)
+        .value("Name", TestValue::text(name))
+        .value("Description", TestValue::text(description));
+    let definition =
+        TestInstance::new(ATTACH_DEFINITION).value("Localization", TestValue::Struct(localization));
+    TestValue::Struct(
+        TestInstance::new(ATTACHMENT).value("AttachDef", TestValue::Struct(definition)),
+    )
+}
+
+fn purchasable(key: &str) -> TestValue {
+    TestValue::Struct(TestInstance::new(PURCHASE).value("displayType", TestValue::text(key)))
 }

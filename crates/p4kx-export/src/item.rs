@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::RecordTree;
+use p4kx_extraction::{Language, RecordTree, SourcedValue};
 
 use crate::Playability;
 use crate::contract::Item;
@@ -26,26 +26,27 @@ pub(crate) fn is_paint(tree: &RecordTree<'_>) -> bool {
     text(definition, "Type").is_some_and(crate::paint::is_paint_type)
 }
 
-/// Returns the item the Record tree `tree` describes and the `Class:` line of its English
-/// description, its texts resolved by `texts`.
-pub(crate) fn item<'f>(tree: &RecordTree<'f>, texts: &Texts<'f>) -> (Item<'f>, ClassLine) {
+/// Projects the Item and its classified English description line.
+pub(crate) fn item<'f>(
+    tree: &RecordTree<'f>,
+    record_index: SourcedValue<u32>,
+    texts: &Texts<'f>,
+) -> (Item<'f>, ClassLine) {
     let definition = structure(component(tree, "SAttachableComponentParams"), "AttachDef");
     let localization = structure(definition, "Localization");
-    let description = texts.legacy_item_view(locale_key(localization, "Description"));
-    let line = ClassLine::read(description.en.as_deref());
+    let description = locale_key(localization, "Description")
+        .and_then(|key| texts.display(Language::English, key));
+    let line = ClassLine::read(description.as_deref());
     let physics = structure(
         component(tree, "SEntityPhysicsControllerParams"),
         "PhysType",
     );
-    let name_key = locale_key(localization, "Name");
     let r#type = text(definition, "Type");
     let item = Item {
-        source_record_index: tree.record_index(),
+        record_index,
         guid: CatalogGuid(tree.guid()),
         class_name: class_name(tree),
         record_path: tree.record_path(),
-        name: texts.legacy_item_view(name_key),
-        description,
         r#type,
         sub_type: text(definition, "SubType"),
         size: integer(definition, "Size"),
@@ -53,10 +54,6 @@ pub(crate) fn item<'f>(tree: &RecordTree<'f>, texts: &Texts<'f>) -> (Item<'f>, C
         mass: single(physics, "Mass"),
         manufacturer_guid: reference(definition, "Manufacturer"),
         tags: words(text(definition, "Tags")),
-        display_type: texts.legacy_item_view(locale_key(
-            component(tree, "SCItemPurchasableParams"),
-            "displayType",
-        )),
         class: line.class(),
         playability: playability(tree),
         variant_of: None,

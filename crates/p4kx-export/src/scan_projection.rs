@@ -62,13 +62,19 @@ impl<'f> Scan<'_, '_, 'f> {
         }
         if kind == Kind::Items {
             let (definition, read, stats) = self.item_components(tree, trees, admission, ledger)?;
-            let (mut item, line) = crate::item::item(tree, self.texts);
+            let (mut item, line) =
+                crate::item::item(tree, definition.record_index().clone(), self.texts);
             item.variant_key = item_variant::key(tree, stats.as_ref());
+            let ports = crate::loadout::carries_ports(tree).then_some(crate::loadout::Wanted {
+                guid: item.guid,
+                kind: crate::contract_loadout::EntityKind::Item,
+                record_index: tree.record_index(),
+            });
             return Ok(Some(
                 Picked::Item {
                     entity: item,
                     line,
-                    ports: crate::loadout::carries_ports(tree),
+                    ports,
                     components: read.rows,
                     definition: Box::new(definition),
                 }

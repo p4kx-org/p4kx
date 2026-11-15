@@ -280,13 +280,7 @@ impl<'f> Collected<'f> {
                 definition,
             } => {
                 self.item_classes.count(line);
-                if ports {
-                    self.port_items.push(crate::loadout::Wanted {
-                        guid: entity.guid,
-                        kind: crate::contract_loadout::EntityKind::Item,
-                        record_index: entity.source_record_index,
-                    });
-                }
+                self.port_items.extend(ports);
                 self.playability.items.count(entity.playability);
                 self.items.push(entity);
                 self.item_definitions.push(*definition);

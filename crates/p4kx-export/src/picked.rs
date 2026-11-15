@@ -48,7 +48,7 @@ pub(crate) enum Picked<'f> {
     Item {
         entity: Item<'f>,
         line: ClassLine,
-        ports: bool,
+        ports: Option<crate::loadout::Wanted>,
         components: crate::catalog_v3::catalog_item_components::ItemComponentRows<'f>,
         definition:
             Box<crate::catalog_v3::catalog_item_components::item_definition::ItemDefinition<'f>>,

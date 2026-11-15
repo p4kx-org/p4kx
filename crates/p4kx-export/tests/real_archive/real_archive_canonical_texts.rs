@@ -20,6 +20,8 @@ mod counters;
 
 use counters::CoverageCounters;
 
+pub(crate) use extras::ItemPresentationIndex;
+
 type TestResult<T> = Result<T, Box<dyn Error>>;
 
 /// Canonical protection domain of an owning text reference.
@@ -249,6 +251,11 @@ pub(crate) fn kind_coverage(
     ) {
         return canonical_coverage(catalog, kind, english_oracle, german_oracle);
     }
+    if kind == Kind::Items {
+        let mut counters = CoverageCounters::new(english_oracle, german_oracle);
+        extras::items(catalog, &mut counters)?;
+        return Ok(counters.finish());
+    }
     let (mut english, mut german) = (Coverage::default(), Coverage::default());
     let mut found = Vec::new();
     for row in catalog_v3_consumer::rows(catalog, kind)? {
@@ -258,13 +265,7 @@ pub(crate) fn kind_coverage(
         english.count(english_oracle, key, text.get("en"));
         german.count(german_oracle, key, text.get("de"));
     }
-    if kind == Kind::Items {
-        let mut canonical = CoverageCounters::new(english_oracle, german_oracle);
-        extras::items(catalog, &mut canonical)?;
-        let (extra_english, extra_german) = canonical.finish();
-        english = english.with_supplemental(extra_english);
-        german = german.with_supplemental(extra_german);
-    }
+
     Ok((english, german))
 }
 

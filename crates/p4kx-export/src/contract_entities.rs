@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::SourcedValue;
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -15,21 +16,14 @@ use crate::{ItemClass, MassBasis, Playability, VehicleKind};
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct Item<'a> {
-    /// The original physical Record position within the source Build.
-    #[serde(skip)]
-    #[schemars(skip)]
-    pub(crate) source_record_index: u32,
+    /// The physical Record position that identifies this Item's canonical definition.
+    pub(crate) record_index: SourcedValue<u32>,
     /// The GUID of the Record.
     pub(crate) guid: CatalogGuid,
     /// The Record name without its type, e.g. `POWR_ACAS_S01_Lumen`.
     pub(crate) class_name: &'a str,
     /// The record path, without `.xml`.
     pub(crate) record_path: &'a str,
-    /// The name, from `AttachDef.Localization.Name`.
-    pub(crate) name: LocalisedText<'a>,
-    /// The description, from `AttachDef.Localization.Description`.
-    #[schemars(extend("x-gameText" = true))]
-    pub(crate) description: LocalisedText<'a>,
     /// The item type of `AttachDef.Type`, e.g. `PowerPlant`, `null` without one.
     pub(crate) r#type: Option<&'a str>,
     /// The item subtype of `AttachDef.SubType`, e.g. `Power`, `null` without one.
@@ -45,9 +39,6 @@ pub(crate) struct Item<'a> {
     pub(crate) manufacturer_guid: Option<CatalogGuid>,
     /// The words of `AttachDef.Tags`, in stored order.
     pub(crate) tags: Vec<&'a str>,
-    /// The display type of the purchasable parameters, e.g. `@item_DisplayType_PowerPlant`.
-    #[schemars(extend("x-gameText" = true))]
-    pub(crate) display_type: LocalisedText<'a>,
     /// The item class from the `Class:` line of the English description, `null` for another
     /// value or without that line. Today one of `Civilian`, `Competition`, `Industrial`,
     /// `Military` and `Stealth`; the schema keeps a string, as a new value is additive.

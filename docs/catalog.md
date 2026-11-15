@@ -409,17 +409,18 @@ A resource group and a blueprint category carry `name` and no `description`.
 Manufacturers use [their canonical definition contract](catalog-manufacturer-types.md). The authored
 `Code` string and owned `Localization` retain their source states independently of resolved text.
 
-An item takes its fields from the components of its `EntityClassDefinition`:
+An item takes its fields from the components of its `EntityClassDefinition`.
+[Item definitions](catalog-item-definitions.md#item-presentation) documents the physical
+`recordIndex` join from the Item projection to its sourced name, description and display type.
 
 | Field | Source |
 |-------|--------|
-| `name`, `description` | `SAttachableComponentParams.AttachDef.Localization.Name` and `.Description` |
+| `recordIndex` | Sourced physical Record ordinal used to join the corresponding Item definition |
 | `type`, `subType` | `AttachDef.Type` and `AttachDef.SubType`, e.g. `PowerPlant` and `Power` |
 | `size`, `grade` | `AttachDef.Size` and `AttachDef.Grade`, integers; see "Semantics of `grade`" below |
 | `mass` | `SEntityPhysicsControllerParams.PhysType.Mass`, a number |
 | `manufacturerGuid` | The GUID the Reference `AttachDef.Manufacturer` links to, `null` for a null Reference |
 | `tags` | The words of `AttachDef.Tags`, split at white space |
-| `displayType` | A text: `SCItemPurchasableParams.displayType`, e.g. `@item_displayType_Pants` |
 | `itemClass` | `Civilian`, `Competition`, `Industrial`, `Military` or `Stealth`, or `null` |
 | `playability` | `player`, `mission` or `special`, or `null`; see "Playability" below |
 | `variantOf` | The `guid` of the base of the item's variant group, `null` for a base and an ungrouped item; see "Variant groups" below |

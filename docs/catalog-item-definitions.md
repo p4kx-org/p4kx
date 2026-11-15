@@ -25,6 +25,23 @@ value representation. A readable manufacturer target outside the export filter
 remains a reference while `definitions.manufacturers` follows its own selection.
 See `exportHealth` for the separately measured target materialization.
 
+## Item presentation
+
+Join `items[].recordIndex.value` to `definitions.items.rows[].recordIndex.value` in the
+same Catalog. The sourced index carries the same physical origin on both sides. GUID and Record
+path can both repeat. Follow the first stored `attachment` entry for
+`value.value.localization.value.name` and `value.value.localization.value.description`.
+Follow the first stored `purchasable` entry for `value.displayType`. A missing or unreadable
+value in the first matching entry stays missing or unreadable. Later entries supply their own
+authored values.
+
+Resolve `name.value` through `texts.publicNames`, and `description.value` and
+`displayType.value` through `texts.gameTexts`. The original key is `key.value` in that row.
+For a given language use `translations.value[language].displayText.value`; the exact decoded
+text is in `sourceText.value`. A language map entry can be absent. An authored empty key or
+translation remains distinguishable from a missing value. The three inline `key/en/de` objects
+of the released v2 Item shape are replaced by these references in schema v3.
+
 The Item projection carries `itemClass`, `playability` and `variantOf`. Item class is
 a projection of the English description. Variant grouping uses private comparison
 inputs. [Item stats](catalog.md#item-stats) describes the canonical component tables.
