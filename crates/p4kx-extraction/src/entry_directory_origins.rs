@@ -288,6 +288,27 @@ impl EntryDirectoryOrigins {
         &self.facts.path
     }
 
+    /// Returns the original directory size of the decoded Entry.
+    ///
+    /// # Errors
+    /// Returns an error when its original metadata use cannot be registered.
+    pub fn size_origin(&self) -> Result<FieldOrigin, SourceEvidenceError> {
+        self.fact_origin("uncompressed_size")
+    }
+
+    /// Returns the original directory checksum declaration.
+    ///
+    /// # Errors
+    /// Returns an error when its original metadata use cannot be registered.
+    pub fn checksum_origin(&self) -> Result<FieldOrigin, SourceEvidenceError> {
+        self.fact_origin("checksum")
+    }
+
+    fn fact_origin(&self, field: &str) -> Result<FieldOrigin, SourceEvidenceError> {
+        let usage = self.facts.directory_fact(field, SourceUseRole::Payload)?;
+        Ok(self.origin(&[usage]))
+    }
+
     /// Returns whether the observed Entry and all container ancestors were bound.
     #[must_use]
     pub const fn complete(&self) -> bool {

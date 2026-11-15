@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::fmt;
 use std::io::{self, Write};
 use std::path::Path;
 use std::sync::atomic::AtomicBool;
@@ -18,9 +19,10 @@ use crate::{
 };
 
 /// One of the two Archives of a Comparison.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone)]
 pub struct Side<'a> {
     archive: &'a Path,
+    owner: &'a Archive,
     channel: Option<String>,
     build: Option<&'a Build>,
     public_patch: Option<String>,
@@ -32,6 +34,7 @@ impl<'a> Side<'a> {
     pub fn of(archive: &'a Archive) -> Self {
         Self {
             archive: archive.path(),
+            owner: archive,
             channel: p4kx_channels::channel_name(archive.path()),
             build: archive.build(),
             public_patch: None,
@@ -60,6 +63,10 @@ impl<'a> Side<'a> {
         self.archive
     }
 
+    pub(crate) const fn owner(&self) -> &'a Archive {
+        self.owner
+    }
+
     /// Returns the Channel: the name of the folder holding the Archive.
     #[must_use]
     pub fn channel(&self) -> Option<&str> {
@@ -70,6 +77,29 @@ impl<'a> Side<'a> {
     #[must_use]
     pub const fn build(&self) -> Option<&'a Build> {
         self.build
+    }
+}
+
+impl PartialEq for Side<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.archive == other.archive
+            && self.channel == other.channel
+            && self.build == other.build
+            && self.public_patch == other.public_patch
+    }
+}
+
+impl Eq for Side<'_> {}
+
+impl fmt::Debug for Side<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Side")
+            .field("archive", &self.archive)
+            .field("channel", &self.channel)
+            .field("build", &self.build)
+            .field("public_patch", &self.public_patch)
+            .finish_non_exhaustive()
     }
 }
 

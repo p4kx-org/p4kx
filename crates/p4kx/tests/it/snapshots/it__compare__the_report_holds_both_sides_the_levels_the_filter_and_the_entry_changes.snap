@@ -1,5 +1,6 @@
 ---
 source: crates/p4kx/tests/it/compare.rs
+assertion_line: 121
 expression: report
 ---
 {
@@ -81,6 +82,1212 @@ expression: report
           "crc32c": 1729407474
         }
       }
-    ]
+    ],
+    "fieldOrigins": {
+      "/entries/changes/0/new/crc32c": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u8"
+        ],
+        "sourceSetComplete": true
+      },
+      "/entries/changes/0/new/size": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u7"
+        ],
+        "sourceSetComplete": true
+      },
+      "/entries/changes/0/path": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u0"
+        ],
+        "sourceSetComplete": true
+      },
+      "/entries/changes/1/new/crc32c": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u26"
+        ],
+        "sourceSetComplete": true
+      },
+      "/entries/changes/1/new/size": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u25"
+        ],
+        "sourceSetComplete": true
+      },
+      "/entries/changes/1/old/crc32c": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u17"
+        ],
+        "sourceSetComplete": true
+      },
+      "/entries/changes/1/old/size": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u16"
+        ],
+        "sourceSetComplete": true
+      },
+      "/entries/changes/1/path": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u18"
+        ],
+        "sourceSetComplete": true
+      },
+      "/entries/changes/2/new/crc32c": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u44"
+        ],
+        "sourceSetComplete": true
+      },
+      "/entries/changes/2/new/size": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u43"
+        ],
+        "sourceSetComplete": true
+      },
+      "/entries/changes/2/old/crc32c": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u35"
+        ],
+        "sourceSetComplete": true
+      },
+      "/entries/changes/2/old/size": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u34"
+        ],
+        "sourceSetComplete": true
+      },
+      "/entries/changes/2/path": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u36"
+        ],
+        "sourceSetComplete": true
+      },
+      "/entries/changes/3/old/crc32c": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u53"
+        ],
+        "sourceSetComplete": true
+      },
+      "/entries/changes/3/old/size": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u52"
+        ],
+        "sourceSetComplete": true
+      },
+      "/entries/changes/3/path": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u45"
+        ],
+        "sourceSetComplete": true
+      }
+    },
+    "provenance": {
+      "sources": [
+        {
+          "id": "a0.2",
+          "ancestors": [],
+          "storedEncryption": "unencrypted",
+          "kind": "archiveEntry",
+          "entryIndex": 2,
+          "path": {
+            "state": "present",
+            "value": "DATA\\LIBS\\CRC.xml",
+            "containsEncryptedSource": false,
+            "sourceUsesRefs": [
+              "u18"
+            ],
+            "sourceSetComplete": true
+          },
+          "recordFormat": "p4kV2",
+          "recordRange": {
+            "offset": "617",
+            "length": "204"
+          },
+          "zipFlags": {
+            "state": "absent",
+            "value": null,
+            "containsEncryptedSource": false,
+            "sourceUsesRefs": [
+              "u19"
+            ],
+            "sourceSetComplete": true
+          },
+          "declarations": {
+            "state": "present",
+            "value": [
+              {
+                "state": "present",
+                "value": {
+                  "kind": "p4kV2Field",
+                  "valueOffset": "787",
+                  "declaredBlockLength": {
+                    "state": "absent",
+                    "value": null,
+                    "containsEncryptedSource": false,
+                    "sourceUsesRefs": [
+                      "u20"
+                    ],
+                    "sourceSetComplete": true
+                  },
+                  "rawWord": {
+                    "state": "present",
+                    "value": 0,
+                    "containsEncryptedSource": false,
+                    "sourceUsesRefs": [
+                      "u21"
+                    ],
+                    "sourceSetComplete": true
+                  },
+                  "rawBytes": {
+                    "state": "present",
+                    "value": [
+                      0,
+                      0
+                    ],
+                    "containsEncryptedSource": false,
+                    "sourceUsesRefs": [
+                      "u22"
+                    ],
+                    "sourceSetComplete": true
+                  }
+                },
+                "containsEncryptedSource": false,
+                "sourceUsesRefs": [
+                  "u23"
+                ],
+                "sourceSetComplete": true
+              }
+            ],
+            "containsEncryptedSource": false,
+            "sourceUsesRefs": [
+              "u24"
+            ],
+            "sourceSetComplete": true
+          }
+        },
+        {
+          "id": "a0.3",
+          "ancestors": [],
+          "storedEncryption": "unencrypted",
+          "kind": "archiveEntry",
+          "entryIndex": 3,
+          "path": {
+            "state": "present",
+            "value": "Data\\Libs\\size.xml",
+            "containsEncryptedSource": false,
+            "sourceUsesRefs": [
+              "u36"
+            ],
+            "sourceSetComplete": true
+          },
+          "recordFormat": "p4kV2",
+          "recordRange": {
+            "offset": "821",
+            "length": "204"
+          },
+          "zipFlags": {
+            "state": "absent",
+            "value": null,
+            "containsEncryptedSource": false,
+            "sourceUsesRefs": [
+              "u37"
+            ],
+            "sourceSetComplete": true
+          },
+          "declarations": {
+            "state": "present",
+            "value": [
+              {
+                "state": "present",
+                "value": {
+                  "kind": "p4kV2Field",
+                  "valueOffset": "991",
+                  "declaredBlockLength": {
+                    "state": "absent",
+                    "value": null,
+                    "containsEncryptedSource": false,
+                    "sourceUsesRefs": [
+                      "u38"
+                    ],
+                    "sourceSetComplete": true
+                  },
+                  "rawWord": {
+                    "state": "present",
+                    "value": 0,
+                    "containsEncryptedSource": false,
+                    "sourceUsesRefs": [
+                      "u39"
+                    ],
+                    "sourceSetComplete": true
+                  },
+                  "rawBytes": {
+                    "state": "present",
+                    "value": [
+                      0,
+                      0
+                    ],
+                    "containsEncryptedSource": false,
+                    "sourceUsesRefs": [
+                      "u40"
+                    ],
+                    "sourceSetComplete": true
+                  }
+                },
+                "containsEncryptedSource": false,
+                "sourceUsesRefs": [
+                  "u41"
+                ],
+                "sourceSetComplete": true
+              }
+            ],
+            "containsEncryptedSource": false,
+            "sourceUsesRefs": [
+              "u42"
+            ],
+            "sourceSetComplete": true
+          }
+        },
+        {
+          "id": "a0.4",
+          "ancestors": [],
+          "storedEncryption": "unencrypted",
+          "kind": "archiveEntry",
+          "entryIndex": 4,
+          "path": {
+            "state": "present",
+            "value": "Data\\added.txt",
+            "containsEncryptedSource": false,
+            "sourceUsesRefs": [
+              "u0"
+            ],
+            "sourceSetComplete": true
+          },
+          "recordFormat": "p4kV2",
+          "recordRange": {
+            "offset": "1025",
+            "length": "204"
+          },
+          "zipFlags": {
+            "state": "absent",
+            "value": null,
+            "containsEncryptedSource": false,
+            "sourceUsesRefs": [
+              "u1"
+            ],
+            "sourceSetComplete": true
+          },
+          "declarations": {
+            "state": "present",
+            "value": [
+              {
+                "state": "present",
+                "value": {
+                  "kind": "p4kV2Field",
+                  "valueOffset": "1195",
+                  "declaredBlockLength": {
+                    "state": "absent",
+                    "value": null,
+                    "containsEncryptedSource": false,
+                    "sourceUsesRefs": [
+                      "u2"
+                    ],
+                    "sourceSetComplete": true
+                  },
+                  "rawWord": {
+                    "state": "present",
+                    "value": 0,
+                    "containsEncryptedSource": false,
+                    "sourceUsesRefs": [
+                      "u3"
+                    ],
+                    "sourceSetComplete": true
+                  },
+                  "rawBytes": {
+                    "state": "present",
+                    "value": [
+                      0,
+                      0
+                    ],
+                    "containsEncryptedSource": false,
+                    "sourceUsesRefs": [
+                      "u4"
+                    ],
+                    "sourceSetComplete": true
+                  }
+                },
+                "containsEncryptedSource": false,
+                "sourceUsesRefs": [
+                  "u5"
+                ],
+                "sourceSetComplete": true
+              }
+            ],
+            "containsEncryptedSource": false,
+            "sourceUsesRefs": [
+              "u6"
+            ],
+            "sourceSetComplete": true
+          }
+        },
+        {
+          "id": "a1.2",
+          "ancestors": [],
+          "storedEncryption": "unencrypted",
+          "kind": "archiveEntry",
+          "entryIndex": 2,
+          "path": {
+            "state": "present",
+            "value": "Data\\removed.txt",
+            "containsEncryptedSource": false,
+            "sourceUsesRefs": [
+              "u45"
+            ],
+            "sourceSetComplete": true
+          },
+          "recordFormat": "zipCentralDirectory",
+          "recordRange": {
+            "offset": "953",
+            "length": "268"
+          },
+          "zipFlags": {
+            "state": "present",
+            "value": 0,
+            "containsEncryptedSource": false,
+            "sourceUsesRefs": [
+              "u46"
+            ],
+            "sourceSetComplete": true
+          },
+          "declarations": {
+            "state": "present",
+            "value": [
+              {
+                "state": "present",
+                "value": {
+                  "kind": "cigExtraBlock",
+                  "valueOffset": "1183",
+                  "declaredBlockLength": {
+                    "state": "present",
+                    "value": 6,
+                    "containsEncryptedSource": false,
+                    "sourceUsesRefs": [
+                      "u47"
+                    ],
+                    "sourceSetComplete": true
+                  },
+                  "rawWord": {
+                    "state": "present",
+                    "value": 0,
+                    "containsEncryptedSource": false,
+                    "sourceUsesRefs": [
+                      "u48"
+                    ],
+                    "sourceSetComplete": true
+                  },
+                  "rawBytes": {
+                    "state": "present",
+                    "value": [
+                      0,
+                      0
+                    ],
+                    "containsEncryptedSource": false,
+                    "sourceUsesRefs": [
+                      "u49"
+                    ],
+                    "sourceSetComplete": true
+                  }
+                },
+                "containsEncryptedSource": false,
+                "sourceUsesRefs": [
+                  "u50"
+                ],
+                "sourceSetComplete": true
+              }
+            ],
+            "containsEncryptedSource": false,
+            "sourceUsesRefs": [
+              "u51"
+            ],
+            "sourceSetComplete": true
+          }
+        },
+        {
+          "id": "a1.3",
+          "ancestors": [],
+          "storedEncryption": "unencrypted",
+          "kind": "archiveEntry",
+          "entryIndex": 3,
+          "path": {
+            "state": "present",
+            "value": "Data\\Libs\\size.xml",
+            "containsEncryptedSource": false,
+            "sourceUsesRefs": [
+              "u27"
+            ],
+            "sourceSetComplete": true
+          },
+          "recordFormat": "zipCentralDirectory",
+          "recordRange": {
+            "offset": "1221",
+            "length": "270"
+          },
+          "zipFlags": {
+            "state": "present",
+            "value": 0,
+            "containsEncryptedSource": false,
+            "sourceUsesRefs": [
+              "u28"
+            ],
+            "sourceSetComplete": true
+          },
+          "declarations": {
+            "state": "present",
+            "value": [
+              {
+                "state": "present",
+                "value": {
+                  "kind": "cigExtraBlock",
+                  "valueOffset": "1453",
+                  "declaredBlockLength": {
+                    "state": "present",
+                    "value": 6,
+                    "containsEncryptedSource": false,
+                    "sourceUsesRefs": [
+                      "u29"
+                    ],
+                    "sourceSetComplete": true
+                  },
+                  "rawWord": {
+                    "state": "present",
+                    "value": 0,
+                    "containsEncryptedSource": false,
+                    "sourceUsesRefs": [
+                      "u30"
+                    ],
+                    "sourceSetComplete": true
+                  },
+                  "rawBytes": {
+                    "state": "present",
+                    "value": [
+                      0,
+                      0
+                    ],
+                    "containsEncryptedSource": false,
+                    "sourceUsesRefs": [
+                      "u31"
+                    ],
+                    "sourceSetComplete": true
+                  }
+                },
+                "containsEncryptedSource": false,
+                "sourceUsesRefs": [
+                  "u32"
+                ],
+                "sourceSetComplete": true
+              }
+            ],
+            "containsEncryptedSource": false,
+            "sourceUsesRefs": [
+              "u33"
+            ],
+            "sourceSetComplete": true
+          }
+        },
+        {
+          "id": "a1.4",
+          "ancestors": [],
+          "storedEncryption": "unencrypted",
+          "kind": "archiveEntry",
+          "entryIndex": 4,
+          "path": {
+            "state": "present",
+            "value": "Data\\Libs\\crc.xml",
+            "containsEncryptedSource": false,
+            "sourceUsesRefs": [
+              "u9"
+            ],
+            "sourceSetComplete": true
+          },
+          "recordFormat": "zipCentralDirectory",
+          "recordRange": {
+            "offset": "1491",
+            "length": "269"
+          },
+          "zipFlags": {
+            "state": "present",
+            "value": 0,
+            "containsEncryptedSource": false,
+            "sourceUsesRefs": [
+              "u10"
+            ],
+            "sourceSetComplete": true
+          },
+          "declarations": {
+            "state": "present",
+            "value": [
+              {
+                "state": "present",
+                "value": {
+                  "kind": "cigExtraBlock",
+                  "valueOffset": "1722",
+                  "declaredBlockLength": {
+                    "state": "present",
+                    "value": 6,
+                    "containsEncryptedSource": false,
+                    "sourceUsesRefs": [
+                      "u11"
+                    ],
+                    "sourceSetComplete": true
+                  },
+                  "rawWord": {
+                    "state": "present",
+                    "value": 0,
+                    "containsEncryptedSource": false,
+                    "sourceUsesRefs": [
+                      "u12"
+                    ],
+                    "sourceSetComplete": true
+                  },
+                  "rawBytes": {
+                    "state": "present",
+                    "value": [
+                      0,
+                      0
+                    ],
+                    "containsEncryptedSource": false,
+                    "sourceUsesRefs": [
+                      "u13"
+                    ],
+                    "sourceSetComplete": true
+                  }
+                },
+                "containsEncryptedSource": false,
+                "sourceUsesRefs": [
+                  "u14"
+                ],
+                "sourceSetComplete": true
+              }
+            ],
+            "containsEncryptedSource": false,
+            "sourceUsesRefs": [
+              "u15"
+            ],
+            "sourceSetComplete": true
+          }
+        }
+      ],
+      "uses": [
+        {
+          "id": "u0",
+          "source": "a0.4",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "path"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u1",
+          "source": "a0.4",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "generalPurposeFlags"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u10",
+          "source": "a1.4",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "generalPurposeFlags"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u11",
+          "source": "a1.4",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations[0].declaredBlockLength"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u12",
+          "source": "a1.4",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations[0].rawWord"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u13",
+          "source": "a1.4",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations[0].rawBytes"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u14",
+          "source": "a1.4",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations[0]"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u15",
+          "source": "a1.4",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u16",
+          "source": "a1.4",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "uncompressed_size"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u17",
+          "source": "a1.4",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "checksum"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u18",
+          "source": "a0.2",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "path"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u19",
+          "source": "a0.2",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "generalPurposeFlags"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u2",
+          "source": "a0.4",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations[0].declaredBlockLength"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u20",
+          "source": "a0.2",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations[0].declaredBlockLength"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u21",
+          "source": "a0.2",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations[0].rawWord"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u22",
+          "source": "a0.2",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations[0].rawBytes"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u23",
+          "source": "a0.2",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations[0]"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u24",
+          "source": "a0.2",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u25",
+          "source": "a0.2",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "uncompressed_size"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u26",
+          "source": "a0.2",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "checksum"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u27",
+          "source": "a1.3",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "path"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u28",
+          "source": "a1.3",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "generalPurposeFlags"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u29",
+          "source": "a1.3",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations[0].declaredBlockLength"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u3",
+          "source": "a0.4",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations[0].rawWord"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u30",
+          "source": "a1.3",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations[0].rawWord"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u31",
+          "source": "a1.3",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations[0].rawBytes"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u32",
+          "source": "a1.3",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations[0]"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u33",
+          "source": "a1.3",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u34",
+          "source": "a1.3",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "uncompressed_size"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u35",
+          "source": "a1.3",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "checksum"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u36",
+          "source": "a0.3",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "path"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u37",
+          "source": "a0.3",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "generalPurposeFlags"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u38",
+          "source": "a0.3",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations[0].declaredBlockLength"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u39",
+          "source": "a0.3",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations[0].rawWord"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u4",
+          "source": "a0.4",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations[0].rawBytes"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u40",
+          "source": "a0.3",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations[0].rawBytes"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u41",
+          "source": "a0.3",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations[0]"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u42",
+          "source": "a0.3",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u43",
+          "source": "a0.3",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "uncompressed_size"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u44",
+          "source": "a0.3",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "checksum"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u45",
+          "source": "a1.2",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "path"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u46",
+          "source": "a1.2",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "generalPurposeFlags"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u47",
+          "source": "a1.2",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations[0].declaredBlockLength"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u48",
+          "source": "a1.2",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations[0].rawWord"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u49",
+          "source": "a1.2",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations[0].rawBytes"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u5",
+          "source": "a0.4",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations[0]"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u50",
+          "source": "a1.2",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations[0]"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u51",
+          "source": "a1.2",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u52",
+          "source": "a1.2",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "uncompressed_size"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u53",
+          "source": "a1.2",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "checksum"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u6",
+          "source": "a0.4",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u7",
+          "source": "a0.4",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "uncompressed_size"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u8",
+          "source": "a0.4",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "checksum"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u9",
+          "source": "a1.4",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "path"
+          },
+          "effectiveEncryption": "unencrypted"
+        }
+      ]
+    }
   }
 }

@@ -7,6 +7,10 @@ use p4kx_archive::Checksum;
 use schemars::JsonSchema;
 use serde::Serialize;
 
+#[path = "report_entry_origins.rs"]
+mod entry_origins;
+
+use self::entry_origins::{EntryOriginFields, EntryOrigins};
 use crate::record_report::{RecordLevel, record_level};
 use crate::{
     Build, ChangeKind, Comparison, DirectoryCounts, Entry, EntryChange, EntryCounts, Level, Side,
@@ -85,6 +89,9 @@ struct EntryLevel<'a> {
     directories: Vec<DirectoryCounts<'a>>,
     /// Every added, removed or changed Entry, ordered by path ignoring case and separator kind.
     changes: Vec<EntryChangeReport<'a>>,
+    #[serde(flatten)]
+    #[schemars(with = "EntryOriginFields")]
+    origins: EntryOrigins,
 }
 
 /// One added, removed or changed Entry.
@@ -124,6 +131,16 @@ enum ChecksumReport {
     /// The SHA-256 as 64 lower-case hex digits; an Entry's checksum is never one, the arm keeps
     /// the report total.
     Sha256(String),
+}
+
+impl ChecksumReport {
+    const fn field_name(&self) -> &'static str {
+        match self {
+            Self::Crc32c(_) => "crc32c",
+            Self::Crc32(_) => "crc32",
+            Self::Sha256(_) => "sha256",
+        }
+    }
 }
 
 impl From<&Entry> for EntryState {
@@ -189,19 +206,26 @@ pub(crate) fn to_report<'a>(comparison: &'a Comparison<'_>) -> Report<'a> {
         source: sources(comparison.old_side(), comparison.new_side()),
         levels: comparison.levels().selected().collect(),
         filter: comparison.filter(),
-        entries: comparison.levels().entries.then(|| EntryLevel {
-            counts: comparison.entry_counts(),
-            directories: comparison.directory_counts(),
-            changes: comparison
-                .entry_changes()
-                .iter()
-                .map(EntryChangeReport::from)
-                .collect(),
-        }),
+        entries: comparison.levels().entries.then(|| entry_level(comparison)),
         records: comparison
             .levels()
             .records
             .then(|| record_level(comparison)),
+    }
+}
+
+fn entry_level<'a>(comparison: &'a Comparison<'_>) -> EntryLevel<'a> {
+    let changes: Vec<_> = comparison
+        .entry_changes()
+        .iter()
+        .map(EntryChangeReport::from)
+        .collect();
+    let origins = EntryOrigins::capture(comparison, &changes);
+    EntryLevel {
+        counts: comparison.entry_counts(),
+        directories: comparison.directory_counts(),
+        changes,
+        origins,
     }
 }
 
