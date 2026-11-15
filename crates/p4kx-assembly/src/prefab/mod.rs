@@ -3,10 +3,15 @@
 
 use thiserror::Error;
 
+mod resolution_source;
 mod resolve;
 mod resolved;
 mod set;
 
+pub use resolution_source::{
+    PrefabInstanceSource, PrefabIssueSource, PrefabLinkSource, PrefabLocation, PrefabLookupRoute,
+    PrefabObjectLocation, PrefabResolutionSource, PrefabSelectionSource,
+};
 pub use resolved::{ResolvedObject, ResolvedPrefab};
 pub use set::{PrefabFile, PrefabSet};
 

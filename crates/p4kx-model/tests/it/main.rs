@@ -38,6 +38,7 @@ mod model_chunk_layout;
 mod model_node_sources;
 mod palettes;
 mod prefab;
+mod prefab_object_source;
 mod relief_decals;
 mod render_to_texture;
 mod rig_logic_chunk;

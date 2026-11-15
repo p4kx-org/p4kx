@@ -3,8 +3,8 @@
 
 use p4kx_cryxml::{SourceAttributePosition, SourceElementPosition};
 
-use crate::PrefabLibrary;
 use crate::mtl_xml::XmlElement;
+use crate::{PrefabLibrary, PrefabObjectSource};
 
 /// A Prefab library and its original source coordinates.
 #[derive(Debug, Clone, PartialEq)]
@@ -66,6 +66,8 @@ pub struct PrefabSource {
     pub id: Option<SourceAttributePosition>,
     /// The selected `Objects` subtree used for object, nested Prefab and omitted counts.
     pub objects: Option<SourceElementPosition>,
+    /// Object positions in flattened semantic order when requested.
+    pub object_sources: Option<Vec<PrefabObjectSource>>,
 }
 
 impl PrefabSource {
@@ -75,6 +77,7 @@ impl PrefabSource {
             name: element.attribute_position("Name"),
             id: element.attribute_position("Id"),
             objects: objects.map(XmlElement::position),
+            object_sources: None,
         }
     }
 }

@@ -8,16 +8,15 @@ use std::sync::Arc;
 use p4kx_archive::{Archive, Entry};
 use p4kx_model::{
     PositionedPrefabLibrary, PrefabError as LibraryReadError, PrefabLibrary, PrefabLibrarySource,
-    PrefabRef,
 };
-use rayon::prelude::*;
 
 use super::{MAX_PREFAB_LIBRARY_LEN, PrefabError};
 
+mod nested;
+pub(super) use nested::Lookup;
+
 const FOLDER: &str = "data/prefabs/";
 const EXTENSION: &str = ".xml";
-
-const GUID_INDEX_THREADS: usize = 4;
 
 /// A prefab library read from the Archive.
 #[derive(Debug)]
@@ -58,11 +57,6 @@ impl PrefabFile {
     }
 }
 
-pub(super) enum Lookup {
-    Found(Arc<PrefabFile>, usize),
-    Missing(Option<(String, String)>),
-}
-
 #[derive(Debug)]
 struct Slot<'archive> {
     key: String,
@@ -88,6 +82,13 @@ pub struct PrefabSet<'a> {
     loaded: HashMap<usize, Arc<PrefabFile>>,
     failed: HashMap<usize, String>,
     guids: Option<GuidIndex>,
+    capture: PrefabCapture,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PrefabCapture {
+    Library,
+    Objects,
 }
 
 fn normalised(path: &str) -> String {
@@ -112,6 +113,20 @@ impl<'a> PrefabSet<'a> {
     /// Indexes the libraries of `archive`; none is read yet.
     #[must_use]
     pub fn new(archive: &'a Archive) -> Self {
+        Self::build(archive, PrefabCapture::Library)
+    }
+
+    /// Indexes the Archive and retains object source positions when a library is read.
+    #[must_use]
+    pub fn with_object_sources(archive: &'a Archive) -> Self {
+        Self::build(archive, PrefabCapture::Objects)
+    }
+
+    pub(super) fn captures_objects(&self) -> bool {
+        self.capture == PrefabCapture::Objects
+    }
+
+    fn build(archive: &'a Archive, capture: PrefabCapture) -> Self {
         let mut slots: Vec<Slot<'_>> = archive
             .entries()
             .iter()
@@ -143,6 +158,7 @@ impl<'a> PrefabSet<'a> {
             loaded: HashMap::new(),
             failed: HashMap::new(),
             guids: None,
+            capture,
         }
     }
 
@@ -214,7 +230,11 @@ impl<'a> PrefabSet<'a> {
                 reason: reason.clone(),
             });
         }
-        match self.read(slot, PrefabLibrary::parse_positioned) {
+        let parse = match self.capture {
+            PrefabCapture::Library => PrefabLibrary::parse_positioned,
+            PrefabCapture::Objects => PrefabLibrary::parse_positioned_objects,
+        };
+        match self.read(slot, parse) {
             Ok(parsed) => {
                 let file = Arc::new(file_of(slot, self.shown(slot), parsed));
                 self.loaded.insert(slot, Arc::clone(&file));
@@ -261,117 +281,6 @@ impl<'a> PrefabSet<'a> {
             .map_err(|error| Failure::Unreadable(error.to_string()))?;
         parse(&bytes).map_err(|error| Failure::Unreadable(error.to_string()))
     }
-
-    fn by_name(&mut self, reference: &PrefabRef) -> Result<Lookup, PrefabError> {
-        let mut unreadable = None;
-        for (at, _) in reference.name.match_indices('.') {
-            let Some((library, rest)) = reference.name.split_at_checked(at) else {
-                continue;
-            };
-            let prefab = rest.trim_start_matches('.');
-            let Some(slot) = self.slot_of(library) else {
-                continue;
-            };
-            if prefab.is_empty() {
-                continue;
-            }
-            match self.load(slot) {
-                Ok(file) => {
-                    if let Some(index) = file.find(prefab) {
-                        return Ok(Lookup::Found(file, index));
-                    }
-                }
-                Err(PrefabError::Unreadable { library, reason }) => {
-                    unreadable.get_or_insert((library, reason));
-                }
-                Err(error) => return Err(error),
-            }
-        }
-        Ok(Lookup::Missing(unreadable))
-    }
-
-    fn guid_index(&mut self) -> Result<&GuidIndex, PrefabError> {
-        if self.guids.is_none() {
-            let ids_of = |slot: usize| match self.loaded.get(&slot) {
-                Some(file) => Ok(ids(file.library())),
-                None if self.failed.contains_key(&slot) => Ok(Vec::new()),
-                None => self
-                    .read(slot, PrefabLibrary::parse)
-                    .map(|library| ids(&library)),
-            };
-            let count = self.slots.len();
-            let pool = rayon::ThreadPoolBuilder::new()
-                .num_threads(GUID_INDEX_THREADS)
-                .build();
-            let read: Vec<Result<Vec<String>, Failure>> = pool.map_or_else(
-                |_| (0..count).map(ids_of).collect(),
-                |pool| pool.install(|| (0..count).into_par_iter().map(ids_of).collect()),
-            );
-            let mut index: GuidIndex = HashMap::new();
-            for (slot, result) in read.into_iter().enumerate() {
-                match result {
-                    Ok(found) => {
-                        for (prefab, id) in found.into_iter().enumerate() {
-                            if !id.is_empty() {
-                                index.entry(id).or_default().push((slot, prefab));
-                            }
-                        }
-                    }
-                    Err(Failure::Fatal(error)) => return Err(PrefabError::Archive(error)),
-                    Err(Failure::Unreadable(reason)) => {
-                        self.failed.insert(slot, reason);
-                    }
-                }
-            }
-            self.guids = Some(index);
-        }
-        Ok(self.guids.get_or_insert_with(HashMap::new))
-    }
-
-    /// Finds the prefab an object instances: the one of its `PrefabName` when that has the
-    /// object's `PrefabGUID` or the object names no GUID, else the one with the GUID, else the
-    /// one of the name.
-    pub(super) fn find_nested(&mut self, reference: &PrefabRef) -> Result<Lookup, PrefabError> {
-        let named = self.by_name(reference)?;
-        let guid = reference.guid.to_ascii_lowercase();
-        if guid.is_empty() {
-            return Ok(named);
-        }
-        if let Lookup::Found(file, index) = &named
-            && file
-                .library()
-                .prefabs
-                .get(*index)
-                .is_some_and(|prefab| prefab.id.eq_ignore_ascii_case(&guid))
-        {
-            return Ok(named);
-        }
-        let candidates = self.guid_index()?.get(&guid).cloned().unwrap_or_default();
-        let preferred = match &named {
-            Lookup::Found(file, _) => candidates
-                .iter()
-                .copied()
-                .find(|(slot, _)| *slot == file.slot()),
-            Lookup::Missing(_) => None,
-        };
-        let others = candidates
-            .into_iter()
-            .filter(|candidate| Some(*candidate) != preferred);
-        for (slot, index) in preferred.into_iter().chain(others) {
-            if let Ok(file) = self.load(slot) {
-                return Ok(Lookup::Found(file, index));
-            }
-        }
-        Ok(named)
-    }
-}
-
-fn ids(library: &PrefabLibrary) -> Vec<String> {
-    library
-        .prefabs
-        .iter()
-        .map(|prefab| prefab.id.to_ascii_lowercase())
-        .collect()
 }
 
 fn file_of(slot: usize, name: String, parsed: PositionedPrefabLibrary) -> PrefabFile {

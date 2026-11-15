@@ -2,15 +2,14 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::borrow::Cow;
-use std::sync::Arc;
 
 use p4kx_cryxml::{CryXmlError, Xml};
 use thiserror::Error;
 
 use crate::Transform;
 use crate::mtl_xml::XmlElement;
+use crate::prefab_objects;
 use crate::prefab_source::{PositionedPrefabLibrary, PrefabLibrarySource, PrefabSource};
-use crate::soc_entities::entity_transform;
 
 /// The most prefabs one library lists.
 pub const MAX_LIBRARY_PREFABS: usize = 1 << 16;
@@ -135,6 +134,15 @@ impl PrefabLibrary {
         parse_library(bytes, SourceCapture::Positions)
     }
 
+    /// Reads the library with original field and flattened object coordinates.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::parse`].
+    pub fn parse_positioned_objects(bytes: &[u8]) -> Result<PositionedPrefabLibrary, PrefabError> {
+        parse_library(bytes, SourceCapture::Objects)
+    }
+
     /// Returns the first prefab named `name`, ignoring case.
     #[must_use]
     pub fn find(&self, name: &str) -> Option<&Prefab> {
@@ -148,6 +156,7 @@ impl PrefabLibrary {
 enum SourceCapture {
     ValuesOnly,
     Positions,
+    Objects,
 }
 
 impl SourceCapture {
@@ -199,7 +208,9 @@ fn library<'a>(
         prefabs: Vec::new(),
     };
     let mut source = match capture {
-        SourceCapture::Positions => PrefabLibrarySource::new(root, authored_name),
+        SourceCapture::Positions | SourceCapture::Objects => {
+            PrefabLibrarySource::new(root, authored_name)
+        }
         SourceCapture::ValuesOnly => None,
     };
     let mut total_objects = 0_usize;
@@ -213,185 +224,23 @@ fn library<'a>(
                 limit: MAX_LIBRARY_PREFABS,
             });
         }
-        let objects = child(element, "Objects");
-        library
-            .prefabs
-            .push(read_prefab(element, objects, &mut total_objects)?);
-        if let Some(source) = &mut source {
-            source.prefabs.push(PrefabSource::new(element, objects));
+        let objects = prefab_objects::child(element, "Objects");
+        let mut row = source.as_ref().map(|_| PrefabSource::new(element, objects));
+        let object_sources = match capture {
+            SourceCapture::Objects => row
+                .as_mut()
+                .map(|row| row.object_sources.insert(Vec::new())),
+            SourceCapture::ValuesOnly | SourceCapture::Positions => None,
+        };
+        library.prefabs.push(prefab_objects::read(
+            element,
+            objects,
+            &mut total_objects,
+            object_sources,
+        )?);
+        if let (Some(source), Some(row)) = (&mut source, row) {
+            source.prefabs.push(row);
         }
     }
     Ok(PositionedPrefabLibrary { library, source })
-}
-
-fn attribute<'a>(element: impl XmlElement<'a>, name: &str) -> String {
-    element
-        .attribute(name)
-        .unwrap_or_default()
-        .trim()
-        .to_owned()
-}
-
-fn child<'a, E: XmlElement<'a>>(parent: E, name: &str) -> Option<E> {
-    parent
-        .children()
-        .find(|element| element.name().eq_ignore_ascii_case(name))
-}
-
-fn is_object<'a>(element: impl XmlElement<'a>) -> bool {
-    element.name().eq_ignore_ascii_case("Object")
-}
-
-struct Pending<E> {
-    element: E,
-    group: Transform,
-    group_id: Arc<str>,
-    depth: usize,
-}
-
-fn push_members<'a, E: XmlElement<'a>>(
-    stack: &mut Vec<Pending<E>>,
-    parent: E,
-    group: Transform,
-    group_id: &Arc<str>,
-    depth: usize,
-) {
-    let at = stack.len();
-    stack.extend(
-        parent
-            .children()
-            .filter(|member| is_object(*member))
-            .map(|element| Pending {
-                element,
-                group,
-                group_id: Arc::clone(group_id),
-                depth,
-            }),
-    );
-    if let Some(added) = stack.get_mut(at..) {
-        added.reverse();
-    }
-}
-
-fn read_prefab<'a, E: XmlElement<'a>>(
-    element: E,
-    objects: Option<E>,
-    total: &mut usize,
-) -> Result<Prefab, PrefabError> {
-    let mut prefab = Prefab {
-        name: attribute(element, "Name"),
-        id: attribute(element, "Id"),
-        library: attribute(element, "Library"),
-        objects: Vec::new(),
-        invalid: 0,
-    };
-    let Some(objects) = objects else {
-        return Ok(prefab);
-    };
-    let mut stack = Vec::new();
-    push_members(&mut stack, objects, Transform::IDENTITY, &Arc::from(""), 0);
-    while let Some(pending) = stack.pop() {
-        *total += 1;
-        if *total > MAX_LIBRARY_OBJECTS {
-            return Err(PrefabError::TooMany {
-                what: "objects",
-                limit: MAX_LIBRARY_OBJECTS,
-            });
-        }
-        let Some(local) = entity_transform(pending.element) else {
-            prefab.invalid += 1 + count_below(pending.element);
-            continue;
-        };
-        let world = pending.group.then(&local);
-        let kind = attribute(pending.element, "Type");
-        let id: Arc<str> = Arc::from(attribute(pending.element, "Id"));
-        if let Some(members) = child(pending.element, "Objects") {
-            if pending.depth + 1 >= MAX_GROUP_DEPTH {
-                prefab.invalid += count_below(pending.element);
-            } else {
-                push_members(&mut stack, members, world, &id, pending.depth + 1);
-            }
-        }
-        if !kind.eq_ignore_ascii_case("Group") {
-            prefab.objects.push(read_object(
-                pending.element,
-                kind,
-                &id,
-                world,
-                &pending.group_id,
-            ));
-        }
-    }
-    Ok(prefab)
-}
-
-fn count_below<'a>(element: impl XmlElement<'a>) -> usize {
-    let mut count = 0;
-    let mut stack = vec![element];
-    while let Some(parent) = stack.pop() {
-        for members in parent
-            .children()
-            .filter(|node| node.name().eq_ignore_ascii_case("Objects"))
-        {
-            for member in members.children().filter(|node| is_object(*node)) {
-                count += 1;
-                stack.push(member);
-            }
-        }
-    }
-    count
-}
-
-fn read_object<'a>(
-    element: impl XmlElement<'a>,
-    kind: String,
-    id: &str,
-    transform: Transform,
-    group_id: &str,
-) -> PrefabObject {
-    let nested = kind.eq_ignore_ascii_case("Prefab").then(|| PrefabRef {
-        guid: attribute(element, "PrefabGUID"),
-        name: attribute(element, "PrefabName"),
-    });
-    let parent = attribute(element, "Parent");
-    let attached = (!parent.is_empty() && !parent.eq_ignore_ascii_case(group_id))
-        || !attribute(element, "AttachmentTarget").is_empty();
-    PrefabObject {
-        name: attribute(element, "Name"),
-        model: model(element, &kind),
-        kind,
-        id: id.to_owned(),
-        class: attribute(element, "EntityClass"),
-        transform,
-        nested,
-        attached,
-    }
-}
-
-fn model<'a>(element: impl XmlElement<'a>, kind: &str) -> Option<String> {
-    let named = |name: &str| {
-        element
-            .attribute(name)
-            .map(str::trim)
-            .filter(|path| !path.is_empty())
-            .map(str::to_owned)
-    };
-    if kind.eq_ignore_ascii_case("Brush") {
-        return named("Prefab");
-    }
-    named("Geometry").or_else(|| resource_geometry(element))
-}
-
-fn resource_geometry<'a, E: XmlElement<'a>>(element: E) -> Option<String> {
-    let mut node = child(
-        child(element, "PropertiesDataCore")?,
-        "EntityGeometryResource",
-    )?;
-    for _ in 0..3 {
-        node = child(node, "Geometry")?;
-    }
-    node.attribute("path")
-        .map(str::trim)
-        .filter(|path| !path.is_empty())
-        .map(str::to_owned)
 }
