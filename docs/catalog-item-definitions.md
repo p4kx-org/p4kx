@@ -61,3 +61,14 @@ the LIVE per-kind baselines.
 ```text
 cargo test --release --locked -p p4kx-export --test real_archive -- --ignored --exact --nocapture real_archive_canonical_texts::extras::installed_items::installed_live_item_texts_match_original_record_and_languages
 ```
+
+For the all-language check, repeat the following command with `P4KX_DATA_P4K` set to
+each installed LIVE and PTU Archive and with a suitable original Item Record in
+that Build. It compares the catalog to the actual language Entry inventory, checks
+the original and displayed forms in both text domains, and resolves each translation's
+origin back to the corresponding language Entry. The result reports counts per
+language.
+
+```text
+cargo test --release --locked -p p4kx-export --test real_archive -- --ignored --exact --nocapture real_archive_canonical_texts::extras::installed_items::all_languages::installed_item_texts_match_every_available_archive_language
+```

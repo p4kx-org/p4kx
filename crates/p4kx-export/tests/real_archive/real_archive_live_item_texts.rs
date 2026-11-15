@@ -3,7 +3,9 @@
 
 use std::time::UNIX_EPOCH;
 
-use p4kx_export::{CatalogOptions, CatalogPublicationMode, Compression, Kind, Language};
+use p4kx_export::{
+    CatalogOptions, CatalogPublicationMode, CatalogSummary, Compression, Kind, Language,
+};
 use p4kx_extraction::{
     Archive, ArchiveWatch, DataForge, DataForgeEntry, Filter, LocalizationSet, RecordTree,
     StructValue, Value as Original, is_placeholder_key,
@@ -11,13 +13,16 @@ use p4kx_extraction::{
 use serde_json::Value;
 
 use super::{
-    ItemPresentationIndex, TestResult, TextDomain, TextIndex, TextReferenceShape, localization,
-    record_index,
+    ItemPresentationIndex, TestResult, TextDomain, TextIndex, TextReferenceShape, TextTarget,
+    localization, record_index,
 };
 use crate::catalog_v3_consumer;
 use crate::real_archive_shop_inventory_v3::verify_build;
 use crate::real_archive_text_oracle::Oracle;
 use crate::real_archive_verification::print_line;
+
+#[path = "real_archive_installed_all_item_texts.rs"]
+mod all_languages;
 
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
@@ -33,17 +38,7 @@ fn installed_live_item_texts_match_original_record_and_languages() -> TestResult
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;
     let original = selected_item(&forge, &filter, &path)?;
-    let options = CatalogOptions {
-        filter: Some(&filter),
-        publication_mode: CatalogPublicationMode::DiagnosticPartial,
-        ..CatalogOptions::new(UNIX_EPOCH)
-    };
-    let (_, payload) =
-        p4kx_export::write_catalog_from(&archive, &entry, &options, Compression::None, || {
-            Ok(Vec::new())
-        })?;
-    let catalog: Value = serde_json::from_slice(&payload)?;
-    drop(payload);
+    let (_, catalog) = selected_catalog(&archive, &entry, &filter)?;
     if catalog.pointer("/source/channel").and_then(Value::as_str) != Some("LIVE") {
         return Err("select the installed LIVE Channel".into());
     }
@@ -53,7 +48,18 @@ fn installed_live_item_texts_match_original_record_and_languages() -> TestResult
         ("en", Oracle::of(&locales, Language::English)?),
         ("de", Oracle::of(&locales, Language::German)?),
     ];
-    let keys = compare_item(&original, &catalog, &oracles)?;
+    let keys = with_item_texts(&original, &catalog, |targets| {
+        let mut german_resolved = false;
+        for target in targets {
+            german_resolved |= compare_locale(target, &oracles)?;
+        }
+        if !german_resolved {
+            return Err(
+                "select an Item with at least one nonempty original German translation".into(),
+            );
+        }
+        Ok(targets.len())
+    })?;
     watch
         .check()
         .map_err(|_| "LIVE Archive changed during Item text comparison")?;
@@ -61,6 +67,24 @@ fn installed_live_item_texts_match_original_record_and_languages() -> TestResult
         "LIVE Item text witness: {keys} original keys, en/de source and display forms"
     ));
     Ok(())
+}
+
+fn selected_catalog(
+    archive: &Archive,
+    entry: &DataForgeEntry,
+    filter: &Filter,
+) -> TestResult<(CatalogSummary, Value)> {
+    let options = CatalogOptions {
+        filter: Some(filter),
+        publication_mode: CatalogPublicationMode::DiagnosticPartial,
+        ..CatalogOptions::new(UNIX_EPOCH)
+    };
+    let (summary, payload) =
+        p4kx_export::write_catalog_from(archive, entry, &options, Compression::None, || {
+            Ok(Vec::new())
+        })?;
+    let catalog = serde_json::from_slice(&payload)?;
+    Ok((summary, catalog))
 }
 
 fn selected_item<'f>(
@@ -81,11 +105,11 @@ fn selected_item<'f>(
     Ok(record.tree()?)
 }
 
-fn compare_item(
+fn with_item_texts<T>(
     original: &RecordTree<'_>,
     catalog: &Value,
-    oracles: &[(&str, Oracle)],
-) -> TestResult<usize> {
+    inspect: impl FnOnce(&[&TextTarget<'_>]) -> TestResult<T>,
+) -> TestResult<T> {
     let [item] = catalog_v3_consumer::rows(catalog, Kind::Items)?.as_slice() else {
         return Err("the selected original Record must produce one Item".into());
     };
@@ -112,20 +136,17 @@ fn compare_item(
         return Err("the selected Item needs authored attachment Localization".into());
     };
     let catalog_locale = localization(wire)?.ok_or("the authored Item localization was omitted")?;
-    let mut keys = 0;
-    let mut german_resolved = false;
+    let mut targets = Vec::new();
     for (field, carrier, domain) in [
         ("Name", "name", TextDomain::PublicName),
         ("Description", "description", TextDomain::GameText),
     ] {
-        german_resolved |= compare_locale(
+        targets.push(item_text_target(
             original_locale.field(field),
             catalog_locale.get(carrier),
             &texts,
-            oracles,
             domain,
-        )?;
-        keys += 1;
+        )?);
     }
     if let Some((source, wire)) = first_slot(
         source_components,
@@ -133,19 +154,14 @@ fn compare_item(
         "SCItemPurchasableParams",
         "purchasable",
     )? {
-        german_resolved |= compare_locale(
+        targets.push(item_text_target(
             source.field("displayType"),
             wire.pointer("/value/displayType"),
             &texts,
-            oracles,
             TextDomain::GameText,
-        )?;
-        keys += 1;
+        )?);
     }
-    if !german_resolved {
-        return Err("select an Item with at least one nonempty original German translation".into());
-    }
-    Ok(keys)
+    inspect(&targets)
 }
 
 fn first_slot<'a, 'f>(
@@ -184,13 +200,12 @@ fn first_slot<'a, 'f>(
     }
 }
 
-fn compare_locale(
+fn item_text_target<'index, 'catalog>(
     original: Option<&Original<'_>>,
     carrier: Option<&Value>,
-    texts: &TextIndex<'_>,
-    oracles: &[(&str, Oracle)],
+    texts: &'index TextIndex<'catalog>,
     domain: TextDomain,
-) -> TestResult<bool> {
+) -> TestResult<&'index TextTarget<'catalog>> {
     let Some(Original::Locale(key)) = original else {
         return Err("select an Item with original Locale fields".into());
     };
@@ -204,7 +219,11 @@ fn compare_locale(
     if target.key != *key {
         return Err("the text reference changed the original Locale key".into());
     }
-    let lookup = (!is_placeholder_key(key)).then_some(*key);
+    Ok(target)
+}
+
+fn compare_locale(target: &TextTarget<'_>, oracles: &[(&str, Oracle)]) -> TestResult<bool> {
+    let lookup = (!is_placeholder_key(target.key)).then_some(target.key);
     let mut german_resolved = false;
     for (language, oracle) in oracles {
         let expected_source = lookup.and_then(|key| oracle.source_text(key));
