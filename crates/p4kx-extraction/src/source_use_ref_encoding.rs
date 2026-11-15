@@ -76,6 +76,9 @@ fn append_location(key: &mut String, location: &SourceLocation) {
             indices,
             field,
         } => {
+            if namespace == "xml" && append_xml_location(key, indices, field) {
+                return;
+            }
             key.push('s');
             append_namespace(key, namespace);
             for index in indices {
@@ -89,6 +92,45 @@ fn append_location(key: &mut String, location: &SourceLocation) {
             key.push_str(field);
         }
     }
+}
+
+fn append_xml_location(key: &mut String, indices: &[u64], field: &str) -> bool {
+    let tag = match field {
+        "$name" => 'n',
+        "@pos" => 'p',
+        "@rot" => 'r',
+        "$absent:@pos" => 'a',
+        "$absent:@rot" => 'b',
+        _ => return false,
+    };
+    key.push('x');
+    key.push(tag);
+    if let Some((&first, rest)) = indices.split_first() {
+        append_coordinate(key, first);
+        for &index in rest {
+            key.push('.');
+            append_coordinate(key, index);
+        }
+    }
+    true
+}
+
+fn append_coordinate(key: &mut String, index: u64) {
+    const DIGIT_BITS: u32 = 6;
+    const DIGIT_MASK: u8 = (1 << DIGIT_BITS) - 1;
+    let higher = index >> DIGIT_BITS;
+    if higher != 0 {
+        append_coordinate(key, higher);
+    }
+    let [least_significant_byte, ..] = index.to_le_bytes();
+    let character = match least_significant_byte & DIGIT_MASK {
+        digit @ 0..=25 => b'A' + digit,
+        digit @ 26..=51 => b'a' + (digit - 26),
+        digit @ 52..=61 => b'0' + (digit - 52),
+        62 => b'-',
+        _ => b'_',
+    };
+    key.push(char::from(character));
 }
 
 fn append_counted(key: &mut String, value: &str) {

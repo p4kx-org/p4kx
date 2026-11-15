@@ -6,7 +6,7 @@ use std::collections::BTreeSet;
 use crate::source_details::SourceCoordinateOmission;
 use crate::source_inventory::PhysicalSourceRef;
 use crate::{DecimalU64, InputScope, Language, SourceEvidenceError, SourceInput, SourceLocation};
-use crate::{SourceScope, SourceUse, SourceUseRef, SourceUseRole, SourceUses};
+use crate::{SourceScope, SourceUse, SourceUseRef, SourceUseRole, SourceUses, SourceValue};
 
 use super::encode;
 
@@ -87,9 +87,8 @@ fn locations_with_distinct_coordinates() -> Vec<SourceLocation> {
         }
     }
 
-    let selectors = ["c2:épsd1:name", "d:.", "🌑"];
     for language in Language::ALL {
-        for selector in selectors {
+        for selector in ["c2:épsd1:name", "d:.", "🌑"] {
             locations.push(SourceLocation::LocalizationLookup {
                 language,
                 selector: SourceUseRef::registered(selector.into()),
@@ -97,7 +96,136 @@ fn locations_with_distinct_coordinates() -> Vec<SourceLocation> {
         }
     }
 
+    for field in ["$name", "@pos", "@rot", "$absent:@pos", "$absent:@rot"] {
+        for indices in [vec![], vec![0], vec![64], vec![1, 0], vec![u64::MAX, 63]] {
+            locations.push(xml_location(&indices, field));
+        }
+    }
     locations
+}
+
+#[test]
+fn common_xml_locations_use_shorter_ids_and_preserve_exact_spelling() {
+    let source = PhysicalSourceRef::new("a0.1.2");
+    let authored = xml_location(&[273_907, 13], "@pos");
+    let encoded = encode(
+        &source,
+        InputScope::Payload,
+        SourceUseRole::Conversion,
+        &authored,
+    );
+    let old = "c6:a0.1.2pcsx273907.13.:@pos";
+    assert_eq!(
+        encoded.as_str(),
+        "c6:a0.1.2pcxpBC3z.N",
+        "the full XML occurrence has a stable compact key"
+    );
+    assert_eq!(
+        encoded.as_str().len() + 9,
+        old.len(),
+        "the common token saves exactly nine bytes"
+    );
+
+    let uppercase = xml_location(&[273_907, 13], "@Pos");
+    let encoded = encode(
+        &source,
+        InputScope::Payload,
+        SourceUseRole::Conversion,
+        &uppercase,
+    );
+    assert_eq!(
+        encoded.as_str(),
+        "c6:a0.1.2pcsx273907.13.:@Pos",
+        "unknown spellings retain their original representation"
+    );
+}
+
+#[test]
+fn xml_use_ids_and_cell_origins_are_stable_across_worker_counts() -> Result<(), XmlInventoryError> {
+    use rayon::ThreadPoolBuilder;
+
+    let one = ThreadPoolBuilder::new().num_threads(1).build()?;
+    let four = ThreadPoolBuilder::new().num_threads(4).build()?;
+    assert_eq!(
+        one.install(|| xml_inventory(false))?,
+        four.install(|| xml_inventory(true))?,
+        "the completed cell and inventory serialize equally after reordered parallel registration"
+    );
+    Ok(())
+}
+
+fn xml_inventory(reverse: bool) -> Result<Vec<u8>, XmlInventoryError> {
+    use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+
+    let inventory = SourceUses::with_compact_coordinates();
+    let scope = inventory.observe(SourceInput::Unknown, InputScope::Payload)?;
+    let mut locations = vec![
+        xml_location(&[0], "$name"),
+        xml_location(&[64, 0], "@pos"),
+        xml_location(&[0, 64], "@rot"),
+        xml_location(&[4_096], "$absent:@pos"),
+        xml_location(&[u64::MAX], "$absent:@rot"),
+        xml_location(&[64, 0], "@Pos"),
+    ];
+    if reverse {
+        locations.reverse();
+    }
+    let uses = locations
+        .par_iter()
+        .map(|location| scope.at(location.clone(), SourceUseRole::Conversion))
+        .collect::<Result<Vec<_>, _>>()?;
+    for (location, observed) in locations.iter().zip(&uses) {
+        assert_eq!(
+            observed.description().location(),
+            location,
+            "an opaque ID retains its original XML coordinate"
+        );
+        assert_eq!(
+            observed.description().scope(),
+            InputScope::Payload,
+            "the use retains the original byte scope"
+        );
+        assert_eq!(
+            observed.role(),
+            SourceUseRole::Conversion,
+            "the contributor role survives"
+        );
+    }
+    let cell = inventory.value(SourceValue::Present(true), &uses, true);
+    assert_eq!(
+        cell.origin().contains_encrypted_source(),
+        None,
+        "unknown source proof stays unknown"
+    );
+    assert!(
+        cell.origin().source_set_complete(),
+        "an observed set may be complete with unknown encryption"
+    );
+    let frozen = inventory.freeze()?;
+    assert_eq!(
+        frozen.use_count(),
+        locations.len(),
+        "one inventory row per original coordinate"
+    );
+    for reference in cell.origin().source_uses_refs() {
+        assert!(
+            frozen
+                .iter_uses()
+                .any(|description| description.id() == reference),
+            "the immediate references close over the frozen inventory"
+        );
+    }
+    Ok(serde_json::to_vec(&(cell, frozen))?)
+}
+
+type XmlInventoryError = Box<dyn std::error::Error + Send + Sync>;
+
+fn xml_location(indices: &[u64], field: &str) -> SourceLocation {
+    SourceLocation::Subresource {
+        namespace: "xml".to_owned(),
+        indices: indices.to_vec(),
+        field: field.to_owned(),
+    }
 }
 
 #[test]
