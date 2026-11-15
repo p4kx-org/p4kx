@@ -3,9 +3,10 @@
 
 use std::ops::Range;
 
-use p4kx_extraction::{Archive, Language, LocalizationEntry};
+use p4kx_extraction::{Archive, EntryOrigin, Language, LocalizationEntry};
 
 use crate::excerpt::Excerpt;
+use crate::observed_search::LocatedLocalizationHit;
 use crate::waves::{Chunk, collect};
 use crate::{Found, LocalizationHit, Needle, SearchOptions, SearchStats};
 
@@ -26,6 +27,22 @@ pub fn search_localization(
     options: &SearchOptions,
     stop: &(dyn Fn() -> bool + Sync),
 ) -> Option<Found<LocalizationHit>> {
+    observed(archive, needle, options, stop)
+        .map(|result| result.found.map_hits(|located| located.hit))
+}
+
+pub(crate) struct ObservedLocalization {
+    pub(crate) found: Found<LocatedLocalizationHit>,
+    pub(crate) origins: Vec<(Language, EntryOrigin)>,
+}
+
+pub(crate) fn observed(
+    archive: &Archive,
+    needle: &Needle,
+    options: &SearchOptions,
+    stop: &(dyn Fn() -> bool + Sync),
+) -> Option<ObservedLocalization> {
+    let mut origins = Vec::new();
     let held = LocalizationEntry::languages(archive);
     let mut found = Found {
         hits: Vec::new(),
@@ -53,9 +70,12 @@ pub fn search_localization(
             limit.saturating_sub(found.hits.len()),
             stop,
             |task| {
-                let range = ranges.get(task).cloned().unwrap_or_default();
+                let Some(part) = ranges.get(task) else {
+                    return Chunk::default();
+                };
                 scan(
-                    text.get(range).unwrap_or_default(),
+                    text.get(part.range.clone()).unwrap_or_default(),
+                    part.first_line,
                     language,
                     needle,
                     options,
@@ -64,28 +84,35 @@ pub fn search_localization(
             },
         )?;
         found.stats.merge(&part.stats);
+        if !part.hits.is_empty()
+            && let Some(origin) = entry.origin()
+        {
+            origins.push((language, origin.clone()));
+        }
         found.hits.extend(part.hits);
         if part.has_more {
             found.has_more = true;
             break;
         }
     }
-    Some(found)
+    Some(ObservedLocalization { found, origins })
 }
 
 fn scan(
     lines: &str,
+    first_line: u64,
     language: Language,
     needle: &Needle,
     options: &SearchOptions,
     stop: &(dyn Fn() -> bool + Sync),
-) -> Chunk<LocalizationHit> {
+) -> Chunk<LocatedLocalizationHit> {
     let mut chunk = Chunk::default();
     let limit = options.hit_limit();
     if stop() {
         return chunk;
     }
-    for line in lines.split('\n') {
+    for (position, line) in lines.split('\n').enumerate() {
+        let line_index = first_line + position as u64;
         let line = line.strip_suffix('\r').unwrap_or(line);
         let Some((key, value)) = line.split_once('=') else {
             continue;
@@ -96,10 +123,13 @@ fn scan(
         }
         chunk.stats.texts_scanned += 1;
         if let Some(matched) = needle.find(value) {
-            chunk.hits.push(LocalizationHit {
-                language,
-                key: key.to_owned(),
-                excerpt: Excerpt::around(value, matched),
+            chunk.hits.push(LocatedLocalizationHit {
+                hit: LocalizationHit {
+                    language,
+                    key: key.to_owned(),
+                    excerpt: Excerpt::around(value, matched),
+                },
+                line_index,
             });
             if chunk.hits.len() > limit {
                 break;
@@ -109,17 +139,28 @@ fn scan(
     chunk
 }
 
-fn split(text: &str) -> Vec<Range<usize>> {
+struct LineChunk {
+    range: Range<usize>,
+    first_line: u64,
+}
+
+fn split(text: &str) -> Vec<LineChunk> {
     let bytes = text.as_bytes();
     let mut ranges = Vec::with_capacity(text.len() / CHUNK_LEN + 1);
     let mut start = 0;
+    let mut first_line = 0;
     while start < bytes.len() {
         let target = bytes.len().min(start + CHUNK_LEN);
         let end = bytes
             .get(target..)
             .and_then(|rest| rest.iter().position(|&byte| byte == b'\n'))
             .map_or(bytes.len(), |newline| target + newline + 1);
-        ranges.push(start..end);
+        let range = start..end;
+        ranges.push(LineChunk {
+            range: range.clone(),
+            first_line,
+        });
+        first_line += text.get(range).unwrap_or_default().matches('\n').count() as u64;
         start = end;
     }
     ranges

@@ -5,8 +5,8 @@ use p4kx_extraction::{Archive, DataForge, DataForgeEntry, DataForgeError, DataFo
 use thiserror::Error;
 
 use crate::{
-    Found, Needle, SearchOptions, SearchReport, Source, Unavailable, search_entries,
-    search_localization, search_records,
+    Found, Needle, ObservedSearch, SearchOptions, SearchReport, Source, Unavailable, entries,
+    localization, search_records,
 };
 
 /// A search that could not run.
@@ -37,17 +37,70 @@ pub fn search(
     options: &SearchOptions,
     stop: &(dyn Fn() -> bool + Sync),
 ) -> Result<Option<SearchReport>, SearchError> {
-    if !options.sources.contains(Source::Records) {
-        return Ok(search_in(archive, None, needle, options, stop));
-    }
-    match DataForgeEntry::read(archive) {
-        Ok(entry) => {
-            let forge = entry.open().map_err(SearchError::DataForgeOpen)?;
-            Ok(search_in(archive, Some(&forge), needle, options, stop))
+    search_observed(archive, needle, options, stop)
+        .map(|result| result.map(|observed| observed.report))
+}
+
+/// Searches an Archive and keeps its actual returned hit origins.
+///
+/// # Errors
+///
+/// Returns the same DataForge read or open errors as [`search`].
+pub fn search_observed<'archive>(
+    archive: &'archive Archive,
+    needle: &Needle,
+    options: &SearchOptions,
+    stop: &(dyn Fn() -> bool + Sync),
+) -> Result<Option<ObservedSearch<'archive>>, SearchError> {
+    let entry = if options.sources.contains(Source::Records) {
+        match DataForgeEntry::read(archive) {
+            Ok(entry) => Some(entry),
+            Err(DataForgeLoadError::Missing) => None,
+            Err(error) => return Err(error.into()),
         }
-        Err(DataForgeLoadError::Missing) => Ok(search_in(archive, None, needle, options, stop)),
-        Err(error) => Err(error.into()),
+    } else {
+        None
+    };
+    search_observed_with_dataforge(archive, entry.as_ref(), needle, options, stop)
+}
+
+/// Searches using the supplied physical DataForge read and the Archive’s other sources.
+///
+/// # Errors
+///
+/// Returns a DataForge open error when a selected supplied database cannot be opened.
+pub fn search_observed_with_dataforge<'archive>(
+    archive: &'archive Archive,
+    entry: Option<&DataForgeEntry>,
+    needle: &Needle,
+    options: &SearchOptions,
+    stop: &(dyn Fn() -> bool + Sync),
+) -> Result<Option<ObservedSearch<'archive>>, SearchError> {
+    let entry = entry.filter(|_| options.sources.contains(Source::Records));
+    let forge = entry
+        .map(DataForgeEntry::open)
+        .transpose()
+        .map_err(SearchError::DataForgeOpen)?;
+    let Some(mut result) = search_sources(archive, forge.as_ref(), needle, options, stop) else {
+        return Ok(None);
+    };
+    if !result.report.records.is_empty()
+        && let (Some(owner), Some(forge)) = (entry, forge.as_ref())
+    {
+        result.record_origin = owner.origin_of(forge).cloned();
+        result.record_structures = result
+            .report
+            .records
+            .iter()
+            .map(|hit| {
+                forge
+                    .record(hit.record_index)
+                    .and_then(|record| record.struct_type().ok())
+                    .map(|structure| structure.index())
+            })
+            .collect();
     }
+    Ok(Some(result))
 }
 
 /// Searches `archive` like [`search`] with a DataForge the caller already holds.
@@ -62,14 +115,23 @@ pub fn search_in<'f>(
     options: &SearchOptions,
     stop: &(dyn Fn() -> bool + Sync),
 ) -> Option<SearchReport> {
-    let mut report = SearchReport::default();
+    search_sources(archive, forge, needle, options, stop).map(|result| result.report)
+}
+
+fn search_sources<'archive, 'forge>(
+    archive: &'archive Archive,
+    forge: Option<&'forge DataForge<'forge>>,
+    needle: &Needle,
+    options: &SearchOptions,
+    stop: &(dyn Fn() -> bool + Sync),
+) -> Option<ObservedSearch<'archive>> {
+    let mut result = ObservedSearch::default();
+    let report = &mut result.report;
     if options.sources.contains(Source::Records) {
         match forge {
             Some(forge) => {
                 let found = search_records(forge, needle, options, stop)?;
-                take(&mut report, Source::Records, found, |report| {
-                    &mut report.records
-                });
+                take(report, Source::Records, found, |report| &mut report.records);
             }
             None => report.unavailable.push(Unavailable {
                 source: Source::Records,
@@ -78,18 +140,32 @@ pub fn search_in<'f>(
         }
     }
     if options.sources.contains(Source::Localization) {
-        let found = search_localization(archive, needle, options, stop)?;
-        take(&mut report, Source::Localization, found, |report| {
-            &mut report.localization
-        });
+        let localized = localization::observed(archive, needle, options, stop)?;
+        result.localization_origins = localized.origins;
+        result.localization_lines = localized
+            .found
+            .hits
+            .iter()
+            .map(|hit| hit.line_index)
+            .collect();
+        take(
+            report,
+            Source::Localization,
+            localized.found.map_hits(|located| located.hit),
+            |report| &mut report.localization,
+        );
     }
     if options.sources.contains(Source::Entries) {
-        let found = search_entries(archive, needle, options, stop)?;
-        take(&mut report, Source::Entries, found, |report| {
-            &mut report.entries
-        });
+        let found = entries::observed(archive, needle, options, stop)?;
+        result.entry_origins = found.hits.iter().map(|hit| hit.source).collect();
+        take(
+            report,
+            Source::Entries,
+            found.map_hits(|located| located.hit),
+            |report| &mut report.entries,
+        );
     }
-    Some(report)
+    Some(result)
 }
 
 fn take<T>(

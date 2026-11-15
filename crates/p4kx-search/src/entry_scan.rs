@@ -4,7 +4,7 @@
 use std::io::{self, Read, Write};
 
 use p4kx_extraction::cryxml::{self, Format};
-use p4kx_extraction::{Archive, ArchiveError, Entry};
+use p4kx_extraction::{Archive, ArchiveError, Entry, TextEncoding};
 
 use crate::gate::Gate;
 use crate::line_match::LineMatch;
@@ -21,7 +21,10 @@ const UTF8_BOM: &[u8] = &[0xEF, 0xBB, 0xBF];
 /// What the search of one Entry came to.
 #[derive(Debug)]
 pub(crate) enum Outcome {
-    Scanned(Vec<EntryHit>),
+    Scanned {
+        hits: Vec<EntryHit>,
+        encoding: TextEncoding,
+    },
     Binary,
     TooLarge,
     KeyRequired,
@@ -52,6 +55,15 @@ impl Form {
             [0xFE, 0xFF, ..] => Self::Utf16 { big_endian: true },
             start if matches!(cryxml::detect(start), Some(Format::CryXml(_))) => Self::CryXml,
             _ => Self::Utf8,
+        }
+    }
+
+    const fn encoding(&self) -> TextEncoding {
+        match self {
+            Self::Utf8 => TextEncoding::Utf8,
+            Self::Utf16 { big_endian: false } => TextEncoding::Utf16Le,
+            Self::Utf16 { big_endian: true } => TextEncoding::Utf16Be,
+            Self::CryXml => TextEncoding::CryXml,
         }
     }
 
@@ -107,6 +119,7 @@ pub(crate) fn scan(
         .saturating_add(LineMatch::memory(context.needle.folded_len()));
     let _permit = context.gate.acquire(memory);
     let sink = LineSink::new(context.needle, entry.path(), context.per_item, context.stop);
+    let encoding = form.encoding();
     let result = match form {
         Form::Utf8 => stream(&mut reader, head, buffer, sink),
         Form::Utf16 { big_endian } => {
@@ -115,7 +128,7 @@ pub(crate) fn scan(
         Form::CryXml => whole(&mut reader, head, size).and_then(|data| cryxml_lines(&data, sink)),
     };
     match result {
-        Ok((hits, None | Some(Halt::Done))) => Outcome::Scanned(hits),
+        Ok((hits, None | Some(Halt::Done))) => Outcome::Scanned { hits, encoding },
         Ok((_, Some(Halt::Binary))) | Err(Failure::Binary) => Outcome::Binary,
         Ok((_, Some(Halt::Cancelled))) => Outcome::Cancelled,
         Ok((_, Some(Halt::Unreadable))) | Err(Failure::Read) => Outcome::Unreadable,

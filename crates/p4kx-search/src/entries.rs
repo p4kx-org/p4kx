@@ -9,6 +9,7 @@ use rayon::prelude::*;
 
 use crate::entry_scan::{Context, Outcome, scan};
 use crate::gate::Gate;
+use crate::observed_search::{EntryMatchSource, LocatedEntryHit};
 use crate::waves::{Chunk, collect};
 use crate::{EntryHit, Found, Needle, SearchOptions, Source};
 
@@ -54,6 +55,15 @@ pub fn search_entries(
     options: &SearchOptions,
     stop: &(dyn Fn() -> bool + Sync),
 ) -> Option<Found<EntryHit>> {
+    observed(archive, needle, options, stop).map(|found| found.map_hits(|located| located.hit))
+}
+
+pub(crate) fn observed<'archive>(
+    archive: &'archive Archive,
+    needle: &Needle,
+    options: &SearchOptions,
+    stop: &(dyn Fn() -> bool + Sync),
+) -> Option<Found<LocatedEntryHit<'archive>>> {
     let cancelled = AtomicBool::new(false);
     let stopped = || {
         if cancelled.load(AtomicOrdering::Relaxed) {
@@ -84,14 +94,22 @@ pub fn search_entries(
             .unwrap_or_default();
         let mut chunk = Chunk::default();
         let mut buffer = Vec::new();
-        for entry in slice {
+        for &entry in slice {
             if stop() || chunk.hits.len() > limit {
                 break;
             }
             match scan(archive, entry, &context, &mut buffer) {
-                Outcome::Scanned(hits) => {
+                Outcome::Scanned { hits, encoding } => {
                     chunk.stats.entries_scanned += 1;
-                    chunk.hits.extend(hits);
+                    if !hits.is_empty() {
+                        let source = EntryMatchSource {
+                            origin: archive.observed_entry(entry),
+                            encoding,
+                        };
+                        chunk
+                            .hits
+                            .extend(hits.into_iter().map(|hit| LocatedEntryHit { hit, source }));
+                    }
                 }
                 Outcome::Binary => chunk.stats.entries_binary += 1,
                 Outcome::TooLarge => chunk.stats.entries_too_large += 1,

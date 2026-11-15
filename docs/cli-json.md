@@ -1238,6 +1238,30 @@ data, Entries above `--max-entry-size` (64 MiB by default), encrypted Entries th
 does not open and Entries that cannot be read are skipped and counted, and the same counts are
 printed as a note on stderr. An encrypted DataForge without the key is exit code 7.
 
+JSON adds a `fieldOrigins` map and the shared `provenance` inventory. Paths such
+as `/records/0/text`, `/loc/0/key`, `/entries/0/path` and
+`/entries/0/match/0` address the existing values directly. Each entry contains
+the immediate `containsEncryptedSource` flag, the actual `sourceUsesRefs` and
+`sourceSetComplete`.
+
+Record hits identify the DataForge read and original Record position. The
+original record field supplies its excerpt. The type name also uses the
+referenced structure definition. A localization hit identifies its language
+Entry and authored logical INI line. Distinct physical Entry hits retain their
+own identities even when their paths repeat. A path or language label uses
+directory metadata. Excerpts and match coordinates use the actual searched
+payload. The original UTF-8 line is a logical source coordinate.
+
+For UTF-16 and CryXml, the wire `offset` refers to the searched UTF-8
+representation. Their conversions bind the actual Entry and omit unproved
+original coordinates. A proven encrypted contribution still yields
+`containsEncryptedSource: true`. The `sourceSetComplete` marker is false at
+these incomplete coordinates. A keyless discarded search supplies no hit
+contributor. The `more`, `unavailable` and `stats` sections describe search
+accounting separately from returned data values.
+
+Plain table output retains its existing fields and formatting.
+
 ## `p4kx catalog <archive> --out <file> --json`
 
 The following excerpt shows the publication contract; other summary fields and the per-kind

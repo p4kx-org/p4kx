@@ -9,7 +9,7 @@ use anyhow::Result;
 use p4kx_extraction::{Exclusion, Filter};
 use p4kx_search::{
     EmptyNeedle, Needle, SearchError, SearchOptions, SearchReport, SearchStats, Source, Sources,
-    search,
+    search, search_observed,
 };
 use thiserror::Error;
 
@@ -32,14 +32,21 @@ pub(crate) fn run(args: &GrepArgs, as_json: bool) -> Result<ExitCode> {
     let options = options(args)?;
     let archive = crate::key::open(&args.archive)?;
     let started = Instant::now();
-    let report = search(&archive, &needle, &options, &|| false).map_err(failure)?;
-    let elapsed = started.elapsed();
-    let report = report.unwrap_or_default();
-    if json {
-        grep_json::print(&args.archive, &args.text, &report, elapsed)?;
+    let (report, elapsed) = if json {
+        let observed = search_observed(&archive, &needle, &options, &|| false)
+            .map_err(failure)?
+            .unwrap_or_default();
+        let elapsed = started.elapsed();
+        grep_json::print(&args.archive, &args.text, &observed, elapsed)?;
+        (observed.into_report(), elapsed)
     } else {
+        let report = search(&archive, &needle, &options, &|| false)
+            .map_err(failure)?
+            .unwrap_or_default();
+        let elapsed = started.elapsed();
         grep_table::print(&report)?;
-    }
+        (report, elapsed)
+    };
     notes(&report, elapsed, &options)?;
     Ok(ExitCode::from(exit::SUCCESS))
 }
