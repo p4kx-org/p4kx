@@ -92,7 +92,7 @@ their own platform requirements.
 | Suffix | Contents and start command |
 | --- | --- |
 | `.tar.gz` | Extract anywhere. Run `bin/p4kx-gui`, `bin/p4kx` or `bin/p4kx-mcp` inside the extracted directory. |
-| `.AppImage` | Make executable and run it for the GUI; add `--cli` or `--mcp` before application arguments for the CLI or MCP server. |
+| `.AppImage` | Run `chmod +x ./P4KX-<version>-<target>.AppImage` and launch it for the GUI. Put `--cli` or `--mcp` before the application's arguments to start the CLI or MCP server. |
 | `.deb` | Install with `sudo apt install ./P4KX-<version>-<target>.deb`; run `p4kx-gui`, `p4kx` or `p4kx-mcp`. |
 | `.flatpak` | Install with `flatpak install --user --bundle ./P4KX-<version>-<target>.flatpak`; run `flatpak run io.github.p4kx_org.p4kx`. |
 
@@ -138,6 +138,37 @@ Native synthetic-package checks require that this rule is active and unrelated e
 
 The Linux window, desktop file, icons and Flatpak use the same reverse-DNS identity
 `io.github.p4kx_org.p4kx`. The existing theme, typefaces and rendering behavior are retained.
+
+## Find an Archive
+
+In the GUI, use **Add Archive…** to register a `Data.p4k`, or **Add folder…** to register the
+Channel folder containing it or the Star Citizen library. Use the Linux host path, such as a path
+below `drive_c` in a Wine prefix. A manual entry remains available if automatic discovery cannot
+identify the installation. For the native CLI, use `p4kx channels add` with that same host path.
+
+```sh
+p4kx channels add '/absolute/path/to/prefix/drive_c/Games/StarCitizen/LIVE/Data.p4k'
+p4kx channels
+```
+
+For tar.gz, substitute `bin/p4kx` from the extracted package. For AppImage, pass `--cli`
+before `channels`. For Flatpak, use `flatpak run --command=p4kx io.github.p4kx_org.p4kx`
+with a path visible in the sandbox. [Flatpak file grants](#profiles-audio-and-sandbox-access)
+
+For a custom Wine prefix, set `WINEPREFIX` to its absolute path before starting P4KX, or add
+it to the active profile's `settings.toml`.
+
+```toml
+[wine]
+prefixes = ["/absolute/path/to/prefix"]
+```
+
+P4KX checks `WINEPREFIX` and configured prefixes first, followed by `~/Games/star-citizen`
+and `STEAM_COMPAT_DATA_PATH/pfx`. It searches Steam compatibility data, including libraries
+listed in Steam's `libraryfolders.vdf`, native and Flatpak Bottles roots, and immediate
+`~/Games` children for Lutris or custom installs. Each component uses an exact spelling first,
+then a unique ASCII case-insensitive match. Ambiguous or incomplete discovery is reported.
+[Search roots and priority](channel-discovery.md#inputs-and-priority), [Profile folders](profile-folders.md)
 
 ## Upgrade and remove installed packages
 
@@ -284,9 +315,15 @@ installation-alias bypass.
 
 At integration commit `2f091e52a`, both native Ubuntu jobs passed synthetic Archive listing,
 extraction and conversion, MCP initialisation and a read-only request, and the GUI frame
-check under Xvfb with lavapipe. The package lifecycle and desktop-device checks use their own
-evidence for the matching build. [AMD64 CI job](https://github.com/p4kx-org/p4kx/actions/runs/43709794954/job/132801209265) ·
+check under Xvfb with lavapipe. Both runner jobs record physical audio, clipboard, file chooser
+and hardware GPU as `not_checked`. Package lifecycle and desktop-device results each require
+evidence from the matching build. [AMD64 CI job](https://github.com/p4kx-org/p4kx/actions/runs/43709794954/job/132801209265) ·
 [ARM64 CI job](https://github.com/p4kx-org/p4kx/actions/runs/43709794954/job/132800778531)
+
+At integration commit `4d536b4a8`, both native package consumers passed the checks for all
+four package formats, including the Documents-portal sessions and deb and Flatpak lifecycle.
+These job results apply to the packages built in that run. [AMD64 package job](https://github.com/p4kx-org/p4kx/actions/runs/43093045183/job/130918688724) ·
+[ARM64 package job](https://github.com/p4kx-org/p4kx/actions/runs/43093045183/job/130918688710)
 
 For a branch-only native Linux validation, dispatch the existing `release.yml` workflow with
 `linux-only=true`. It runs preparation and both Linux producer/consumer rows. Use the branch

@@ -505,17 +505,19 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   `EntityClassDefinition` component and vehicle folder exists, how many it has and whether it
   reads, exports and converts. Exit code 1 when something listed fails.
 - `p4kx channels` lists the installed Channels with Build version, source and Archive path. It
-  looks below `C:\Program Files\Roberts Space Industries\StarCitizen`, below the library folders
-  named in the RSI Launcher log (`%APPDATA%\rsilauncher\logs`, see
-  [ADR-0005](adr/0005-library-folders-from-the-launcher-log.md)) and in manually added
-  folders and Archives. `p4kx channels add <path>` and `p4kx channels remove <path>` manage the
-  manual entries in `settings.toml` in `%APPDATA%\P4KX` (the platform config directory
-  elsewhere). `--config-dir`, `--launcher-dir` and `--default-library` (or `P4KX_CONFIG_DIR`,
-  `P4KX_LAUNCHER_DIR`, `P4KX_DEFAULT_LIBRARY`) override these locations. Launcher credential
-  files and the launcher's settings store are never opened. On Linux, Proton/Steam external
-  libraries, Bottles and immediate `~/Games/*` prefixes are searched with bounded exact/unique-case
-  resolution. Incomplete automatic discovery is reported on stderr; manual entries remain usable.
-  See [Channel discovery](channel-discovery.md) for roots, priority, limits and cache behavior.
+  reads the native launcher logs and the library locations for the running platform. On Linux it
+  searches Wine prefixes, Proton compatibility data, Steam and external libraries, Bottles, and
+  immediate `~/Games/*` prefixes for Lutris or custom installations. Incomplete discovery is
+  reported on stderr. Add a Channel folder, library folder or Archive by its host path with
+  `p4kx channels add '/absolute/path/to/LIVE/Data.p4k'`. Pass the same path to `p4kx channels remove`
+  to remove that entry from `settings.toml`. [Channel discovery](channel-discovery.md), [Linux Archive setup](linux-packages.md#find-an-archive)
+
+  `--config-dir` (`P4KX_CONFIG_DIR`) selects the folder containing `settings.toml`. Without it,
+  P4KX uses the active profile. `--launcher-dir` (`P4KX_LAUNCHER_DIR`) and `--default-library`
+  (`P4KX_DEFAULT_LIBRARY`) replace the respective native locations while keeping Wine discovery.
+  The Windows defaults are `%APPDATA%\rsilauncher` and
+  `C:\Program Files\Roberts Space Industries\StarCitizen`. P4KX reads `log.log` and `log.old.log`
+  below each launcher's `logs` directory. [Profile folders](profile-folders.md), [Launcher log contract](adr/0005-library-folders-from-the-launcher-log.md)
 - `p4kx cryxml <file> [--out <file>]` converts a CryXml file on disk, e.g. an Entry extracted
   earlier, to UTF-8 XML on stdout or in `--out`. All three signatures (`CryXmlB`, `CryXml`,
   `CRY3SDK`) and both byte orders are read; the XML is indented by two spaces with LF line

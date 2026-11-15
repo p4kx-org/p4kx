@@ -104,8 +104,9 @@ link or a hard link to the selected Archive is refused. See [Apple's path guidan
 Synthetic tests own their directories, logs/configurations and injected filesystem. They cover candidate families, multi-library VDF, exact/unique/ambiguous case, duplicate prefixes and physical logs, A/C/A precedence, Wine interpretation, work cuts, real read errors, cache creation/removal/replacement/retry and monotone protection. Frontend tests exercise the same measured reports used by the product. They never require installed game data or credentials.
 
 The target matrix covers Windows and Linux on AMD64 and ARM64, plus Apple Silicon on macOS.
-Linux packages retain Ubuntu 24.04 / glibc 2.39 as minimum. Flatpak additionally requires
-Documents API 5. macOS acceptance includes actual Wine and CrossOver game-process observations,
+Linux tar.gz, AppImage and deb packages require Ubuntu 24.04 / glibc 2.39. Flatpak uses
+Freedesktop Platform 25.08 and requires host Documents API 5 or later with authenticated
+`GetHostPaths`. macOS acceptance includes actual Wine and CrossOver game-process observations,
 and protected-path checks on case-sensitive and case-insensitive APFS and external volumes.
 See [Native macOS support](macos-support.md).
 
