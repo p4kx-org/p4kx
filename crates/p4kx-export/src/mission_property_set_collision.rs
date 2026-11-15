@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::Guid;
+
 use crate::Kind;
 use crate::contract_missions::ContractBase;
 use crate::export_diagnostic::{
@@ -12,6 +14,7 @@ use crate::health_diagnostic_observation::{
     DiagnosticObservation as ExportDiagnostic, ExampleObservation,
 };
 use crate::mission_property_set::{MissionPropertySets, SetOwner};
+use crate::record_derived_observation::DerivedOperation;
 
 const CODE: &str = "ambiguous_mission_property_set";
 
@@ -21,7 +24,7 @@ pub(super) fn finalize<'read, 'source: 'read>(
     contracts: impl IntoIterator<Item = &'read mut ContractBase<'source>>,
     ledger: &mut ExportLedger,
 ) -> Result<(), ExportAccountingError> {
-    for owner in sets.ambiguous_owners() {
+    for (_, owner) in sets.ambiguous_owners() {
         if !ledger.sources.iter().any(|source| {
             source.record_index == owner.record_index
                 && source.kind == Some(Kind::MissionPropertySets)
@@ -36,13 +39,17 @@ pub(super) fn finalize<'read, 'source: 'read>(
             .property_set_guids
             .retain(|guid| !sets.is_ambiguous(*guid));
     }
-    for owner in sets.ambiguous_owners() {
-        failure(owner, ledger)?;
+    for (guid, owner) in sets.ambiguous_owners() {
+        failure(guid, owner, ledger)?;
     }
     Ok(())
 }
 
-fn failure(owner: &SetOwner<'_>, ledger: &mut ExportLedger) -> Result<(), ExportAccountingError> {
+fn failure(
+    guid: Guid,
+    owner: &SetOwner<'_>,
+    ledger: &mut ExportLedger,
+) -> Result<(), ExportAccountingError> {
     let body = owner.body()?;
     let diagnosis = SourceDiagnosis {
         code: Some(ExportDiagnosticCode::AmbiguousIdentity),
@@ -55,11 +62,12 @@ fn failure(owner: &SetOwner<'_>, ledger: &mut ExportLedger) -> Result<(), Export
         (Kind::Contracts, ExportSourceRole::Selected),
         (Kind::MissionPropertySets, ExportSourceRole::DerivedInput),
     ] {
-        ledger.derived_failure(DerivedFailure::of_subject(
+        ledger.derived_failure(DerivedFailure::of_operation(
             owner.subject().clone(),
             affected_kind,
             Kind::MissionPropertySets,
             role,
+            DerivedOperation::MissionPropertySet(guid),
             diagnosis.clone(),
         )?);
     }

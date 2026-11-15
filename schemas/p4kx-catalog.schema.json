@@ -17007,8 +17007,8 @@
           ]
         },
         "displayName": {
-          "$ref": "#/$defs/LocalisedText",
-          "description": "The established normalised display key and its resolved text.",
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "description": "The protected text reference derived from this option's original key.",
           "x-gameText": true
         },
         "textId": {
@@ -21493,8 +21493,8 @@
           ]
         },
         "displayName": {
-          "$ref": "#/$defs/LocalisedText",
-          "description": "The established normalised display key and its resolved text.",
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "description": "The protected text reference derived from this option's original key.",
           "x-gameText": true
         },
         "textId": {
@@ -124047,8 +124047,8 @@
           ]
         },
         "displayName": {
-          "$ref": "#/$defs/LocalisedText",
-          "description": "The established normalised display key and its resolved text.",
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "description": "The protected text reference derived from this option's original key.",
           "x-gameText": true
         },
         "textId": {
@@ -124452,8 +124452,8 @@
           ]
         },
         "displayName": {
-          "$ref": "#/$defs/LocalisedText",
-          "description": "The established normalised display key and its resolved text.",
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "description": "The protected text reference derived from this option's original key.",
           "x-gameText": true
         },
         "negativeTags": {

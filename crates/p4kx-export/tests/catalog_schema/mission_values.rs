@@ -7,6 +7,9 @@ use serde_json::{Value, json};
 
 use crate::catalog_schema_support;
 
+#[path = "mission_option_names.rs"]
+mod option_names;
+
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 const CONTRACT_PROPERTY: &str = "/missionPropertySets/0/properties/1";
@@ -25,7 +28,10 @@ fn with_value(value: &Value) -> TestResult<Value> {
 
 fn option(value: &Value, variation: &Value) -> Value {
     json!({
-        "displayName": {"key": null, "en": null, "de": null},
+        "displayName": {
+            "state": "absent", "value": null, "containsEncryptedSource": null,
+            "sourceUsesRefs": [], "sourceSetComplete": false
+        },
         "textId": null, "value": value, "variation": variation, "weighting": 0.125,
         "debugForceChooseThisOption": false,
         "dependentProperties": [null, {"property": null, "values": [null]}]
@@ -144,7 +150,7 @@ fn newly_nullable_payload_fields_are_required_even_when_unknown() -> TestResult 
             "a typed source variant cannot silently omit its new fields"
         );
     }
-    for field in ["debugForceChooseThisOption", "textId"] {
+    for field in ["debugForceChooseThisOption", "textId", "displayName"] {
         let mut missing = option(&json!(1), &json!(0));
         missing
             .as_object_mut()
@@ -155,22 +161,6 @@ fn newly_nullable_payload_fields_are_required_even_when_unknown() -> TestResult 
                 &json!({"type": "integer", "options": [missing]})
             )?),
             "nullable option metadata and raw textId stay required"
-        );
-    }
-    Ok(())
-}
-
-#[test]
-fn raw_option_text_ids_preserve_empty_placeholder_and_null_tokens() -> TestResult {
-    let validator = jsonschema::validator_for(&p4kx_export::catalog_schema())?;
-    for text_id in [Value::Null, json!(""), json!("@LOC_UNINITIALIZED")] {
-        let mut value = option(&json!(1), &json!(0));
-        replace(&mut value, "textId", text_id)?;
-        assert!(
-            validator.is_valid(&with_value(
-                &json!({"type": "integer", "options": [value]})
-            )?),
-            "raw option textId availability does not depend on presentation filtering"
         );
     }
     Ok(())

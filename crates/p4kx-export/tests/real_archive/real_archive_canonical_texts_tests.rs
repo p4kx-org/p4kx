@@ -14,6 +14,8 @@ mod location_template_texts;
 mod mining_texts;
 #[path = "real_archive_mission_locale_tests.rs"]
 mod mission_locales;
+#[path = "real_archive_mission_option_texts_tests.rs"]
+mod mission_option_texts;
 #[path = "real_archive_ship_texts_tests.rs"]
 mod ship_texts;
 

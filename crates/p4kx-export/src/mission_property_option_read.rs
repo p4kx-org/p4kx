@@ -11,7 +11,6 @@ use crate::spawn_read::Reader;
 use crate::template_property_kind::{
     FLOAT_OPTION_TYPE, INTEGER_OPTION_TYPE, STRING_OPTION_TYPE, TAGS_OPTION_TYPE,
 };
-use crate::texts::Texts;
 
 #[path = "mission_property_option_metadata.rs"]
 mod option_metadata;
@@ -113,12 +112,11 @@ pub(crate) fn string<'source>(
     reader: &Reader<'_, 'source>,
     source: &StructValue<'source>,
     path: &str,
-    texts: &Texts<'source>,
     capture: Option<&dyn FieldCapture<'source>>,
 ) -> Result<StringOption<'source>, ReadError> {
     check_string(source, capture)?;
     Ok(StringOption {
-        metadata: metadata(reader, source, path, texts, capture)?,
+        metadata: metadata(reader, source, path, capture)?,
         value: string_value(source, path, capture)?.map(str::to_owned),
     })
 }
@@ -127,11 +125,10 @@ pub(crate) fn integer<'source>(
     reader: &Reader<'_, 'source>,
     source: &StructValue<'source>,
     path: &str,
-    texts: &Texts<'source>,
     capture: Option<&dyn FieldCapture<'source>>,
 ) -> Result<IntegerOption<'source>, ReadError> {
     check_integer(source, capture)?;
-    let metadata = metadata(reader, source, path, texts, capture)?;
+    let metadata = metadata(reader, source, path, capture)?;
     let values = integer_values(source, path, capture)?;
     Ok(IntegerOption {
         metadata,
@@ -144,11 +141,10 @@ pub(crate) fn float<'source>(
     reader: &Reader<'_, 'source>,
     source: &StructValue<'source>,
     path: &str,
-    texts: &Texts<'source>,
     capture: Option<&dyn FieldCapture<'source>>,
 ) -> Result<FloatOption<'source>, ReadError> {
     check_float(source, capture)?;
-    let metadata = metadata(reader, source, path, texts, capture)?;
+    let metadata = metadata(reader, source, path, capture)?;
     let values = float_values(source, path, capture)?;
     Ok(FloatOption {
         metadata,
@@ -161,13 +157,12 @@ pub(crate) fn tags<'source>(
     reader: &Reader<'_, 'source>,
     source: &StructValue<'source>,
     path: &str,
-    texts: &Texts<'source>,
     capture: Option<&dyn FieldCapture<'source>>,
 ) -> Result<TagOption<'source>, ReadError> {
     check_tags(source, capture)?;
     let fields = FieldChecks::for_context(source, path, capture)?;
     Ok(TagOption {
-        metadata: metadata(reader, source, path, texts, capture)?,
+        metadata: metadata(reader, source, path, capture)?,
         tags: reader.tag_list(Some(source), "tags"),
         negative_tags: reader.tag_list(Some(source), "negativeTags"),
         source_tags: mission_property_source::tags_context(

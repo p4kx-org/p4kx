@@ -10,6 +10,9 @@ use crate::loot_v3_graph as raw;
 use crate::mission_canonical_text as canonical;
 use crate::mission_template_graph::{self as source, Property};
 
+#[path = "mission_values_option_aliases.rs"]
+mod aliases;
+
 #[path = "mission_values_option_targets.rs"]
 mod targets;
 
@@ -300,17 +303,61 @@ fn option_display_keys_keep_their_established_meaning_and_raw_text_ids_survive()
                 token,
                 "the original Locale token survives unchanged"
             );
-            let expected = if token == "@option" {
-                json!(token)
-            } else {
-                Value::Null
-            };
-            assert_eq!(
-                *fixture::field(option, "/displayName/key")?,
-                expected,
-                "existing GameText normalisation remains independent of raw source preservation"
-            );
+            verify_generator_display(&document, option, token)?;
         }
+    }
+    Ok(())
+}
+
+fn verify_generator_display(document: &Value, option: &Value, token: &str) -> TestResult {
+    let display = fixture::field(option, "/displayName")?;
+    assert_eq!(
+        display["containsEncryptedSource"], false,
+        "the option's original key is stored in the clear synthetic DataForge",
+    );
+    assert_eq!(
+        display["sourceSetComplete"], true,
+        "the actual option was observed"
+    );
+    let uses = fixture::field(display, "/sourceUsesRefs")?
+        .as_array()
+        .ok_or("the option display source uses")?;
+    let inventory = fixture::field(document, "/provenance/uses")?
+        .as_array()
+        .ok_or("the source-use inventory")?;
+    assert!(
+        inventory.iter().any(|usage| {
+            usage.get("id").is_some_and(|id| uses.contains(id))
+                && usage.pointer("/location/namespace") == Some(&json!("dataforgeValue"))
+                && usage.pointer("/location/indices/0").is_some()
+                && usage.pointer("/location/field") == Some(&json!("$value"))
+        }),
+        "the display name cites an admitted physical Generator value",
+    );
+    if token.starts_with('@') && token != "@LOC_UNINITIALIZED" {
+        let id = raw::present(display)?;
+        let declared = fixture::field(document, "/texts/gameTexts")?
+            .as_array()
+            .ok_or("the protected text rows")?;
+        let row = declared
+            .iter()
+            .find(|row| row.pointer("/id/value") == Some(id))
+            .ok_or("the canonical option text reference resolves")?;
+        assert_eq!(
+            row.pointer("/key/value"),
+            Some(&json!(token)),
+            "the protected text row retains the exact option key"
+        );
+    } else {
+        assert_eq!(
+            display["state"], "absent",
+            "empty, placeholder and bare tokens select no display name",
+        );
+        assert_eq!(
+            display["value"],
+            Value::Null,
+            "a filtered option key carries no reference"
+        );
     }
     Ok(())
 }

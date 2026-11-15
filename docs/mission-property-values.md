@@ -72,10 +72,11 @@ concrete `details`:
 ## Options, dependencies and race splits
 
 The `stringHash`, `integer`, `float` and `tags` variants retain ordered `options`. Every option
-contains raw nullable `textId`, localised `displayName`, source `Single` `weighting`, `debugForceChooseThisOption` and
-ordered `dependentProperties`. `textId` keeps empty and placeholder tokens exactly; `displayName`
-retains its established key normalisation, excluding placeholder and non-`@` tokens. Fractional
-weights and explicit false flags remain unchanged.
+contains raw nullable `textId`, a protected `displayName` reference, source `Single` `weighting`,
+`debugForceChooseThisOption` and ordered `dependentProperties`. `textId` retains the exact token.
+`displayName` carries the source state and origin of the physical option, and its present value
+joins `texts.gameTexts` for every available language. Empty, placeholder and non-`@` tokens carry
+an absent display reference. Fractional weights and explicit false flags remain unchanged.
 String values retain empty strings. Integer `value` and `variation` are exact signed `Int32`
 values, including values that a 32-bit float cannot represent exactly. Float values and variations
 retain finite source numbers. Tag options retain resolved `tags`/`negativeTags` and authored

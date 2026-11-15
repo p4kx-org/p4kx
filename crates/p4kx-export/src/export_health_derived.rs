@@ -22,6 +22,7 @@ pub(crate) fn failures(
             failure.record_index,
             failure.output_kind.index(),
             failure.role,
+            failure.operation,
         );
         if let Some(retained) = distinct.get_mut(&key) {
             retained.merge(failure)?;

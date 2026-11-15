@@ -1,14 +1,18 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::{CancelToken, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::contract::LocalisedText;
+use crate::catalog_projection::{CatalogProjection, ProtectedKey};
+use crate::catalog_text_contract::GameTextRef;
 use crate::mission_property_source::SourceTagList;
 use crate::owned_reference::OwnedReference;
 use crate::scoped_location_link::PropertyReference;
 use crate::spawn_model::TagPaths;
+use crate::template_property::PropertyValue;
+use crate::{CatalogError, ExportAccountingError};
 
 /// Metadata inherited from `BaseMissionPropertyValueOption`.
 #[derive(Debug, Default, Serialize, JsonSchema)]
@@ -17,9 +21,13 @@ use crate::spawn_model::TagPaths;
 pub(crate) struct OptionMetadata<'f> {
     /// The original nullable `textId`, retaining empty and placeholder tokens.
     pub(crate) text_id: Option<&'f str>,
-    /// The established normalised display key and its resolved text.
-    #[schemars(extend("x-gameText" = true))]
-    pub(crate) display_name: LocalisedText<'f>,
+    /// The protected text reference derived from this option's original key.
+    // The unprojected metadata compares authored payloads before choosing an exact source owner.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "SourcedValue<GameTextRef>", extend("x-gameText" = true))]
+    pub(crate) display_name: Option<SourcedValue<GameTextRef>>,
+    #[serde(skip)]
+    pub(crate) pending_name: Option<ProtectedKey<'f>>,
     /// The source `Single` weighting, including fractional values.
     pub(crate) weighting: Option<f32>,
     /// The authored `DEBUG_forceChooseThisOption` flag.
@@ -93,4 +101,63 @@ pub(crate) struct TagOption<'f> {
     pub(crate) source_tags: Option<SourceTagList>,
     /// The source negative tag list with raw identities.
     pub(crate) source_negative_tags: Option<SourceTagList>,
+}
+
+impl<'source> PropertyValue<'source> {
+    pub(crate) fn publish_option_names(
+        &mut self,
+        projection: &CatalogProjection<'_, 'source>,
+        cancel: Option<&CancelToken>,
+    ) -> Result<(), CatalogError> {
+        match self {
+            Self::StringHash { options } => publish_options(
+                options.as_deref_mut(),
+                |option| &mut option.metadata,
+                projection,
+                cancel,
+            ),
+            Self::Integer { options } => publish_options(
+                options.as_deref_mut(),
+                |option| &mut option.metadata,
+                projection,
+                cancel,
+            ),
+            Self::Float { options } => publish_options(
+                options.as_deref_mut(),
+                |option| &mut option.metadata,
+                projection,
+                cancel,
+            ),
+            Self::Tags { options, .. } => publish_options(
+                options.as_deref_mut(),
+                |option| &mut option.metadata,
+                projection,
+                cancel,
+            ),
+            _ => Ok(()),
+        }
+    }
+}
+
+fn publish_options<'source, T>(
+    options: Option<&mut [Option<T>]>,
+    mut metadata: impl FnMut(&mut T) -> &mut OptionMetadata<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    cancel: Option<&CancelToken>,
+) -> Result<(), CatalogError> {
+    let Some(options) = options else {
+        return Ok(());
+    };
+    for option in options.iter_mut().flatten() {
+        if cancel.is_some_and(CancelToken::is_cancelled) {
+            return Err(CatalogError::Cancelled);
+        }
+        let metadata = metadata(option);
+        let key = metadata
+            .pending_name
+            .take()
+            .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+        metadata.display_name = Some(projection.finish_protected_key(key)?);
+    }
+    Ok(())
 }

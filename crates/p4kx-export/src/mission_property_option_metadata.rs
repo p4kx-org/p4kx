@@ -3,7 +3,7 @@
 
 use p4kx_extraction::{StructValue, Value};
 
-use crate::mission_layers;
+use crate::ExportAccountingError;
 use crate::mission_property_option::{DependentProperty, OptionMetadata};
 use crate::mission_property_source;
 use crate::owned_reference_read;
@@ -11,7 +11,6 @@ use crate::record_read::ReadError;
 use crate::scoped_location_weak;
 use crate::source_fields::{FieldCapture, FieldChecks};
 use crate::spawn_read::Reader;
-use crate::texts::Texts;
 
 struct MetadataView<'capture, 'view, 'source> {
     fields: FieldChecks<'capture, 'view, 'source>,
@@ -42,13 +41,17 @@ pub(super) fn metadata<'source>(
     reader: &Reader<'_, 'source>,
     source: &StructValue<'source>,
     path: &str,
-    texts: &Texts<'source>,
     capture: Option<&dyn FieldCapture<'source>>,
 ) -> Result<OptionMetadata<'source>, ReadError> {
     let view = MetadataView::new(source, path, capture)?;
     Ok(OptionMetadata {
         text_id: view.text_id()?,
-        display_name: texts.localised(mission_layers::key(Some(source), "textId")),
+        display_name: None,
+        pending_name: Some(
+            capture
+                .ok_or(ExportAccountingError::ConflictingSourceDatum)?
+                .protected_key(source, "textId")?,
+        ),
         weighting: view.weighting()?,
         debug_force_choose_this_option: view.forced()?,
         dependent_properties: mission_property_source::list(

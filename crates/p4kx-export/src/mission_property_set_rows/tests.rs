@@ -79,7 +79,7 @@ fn incompatible_aliases_quarantine_all_owners_without_losing_other_sets() -> Tes
     first.insert(2, boolean(1, false))?;
     let owners: Vec<_> = first
         .ambiguous_owners()
-        .map(|owner| owner.record_index)
+        .map(|(_, owner)| owner.record_index)
         .collect();
     assert_eq!(
         owners,

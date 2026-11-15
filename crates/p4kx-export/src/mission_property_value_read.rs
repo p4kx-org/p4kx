@@ -30,20 +30,20 @@ pub(crate) fn read<'f>(
         )),
         Some(PropertyValueKind::StringHash) => PropertyValue::StringHash {
             options: options(source, capture, |value, path| {
-                mission_property_option_read::string(reader, value, path, texts, capture)
+                mission_property_option_read::string(reader, value, path, capture)
             })?,
         },
         Some(PropertyValueKind::Integer) => PropertyValue::Integer {
             options: options(source, capture, |value, path| {
-                mission_property_option_read::integer(reader, value, path, texts, capture)
+                mission_property_option_read::integer(reader, value, path, capture)
             })?,
         },
         Some(PropertyValueKind::Float) => PropertyValue::Float {
             options: options(source, capture, |value, path| {
-                mission_property_option_read::float(reader, value, path, texts, capture)
+                mission_property_option_read::float(reader, value, path, capture)
             })?,
         },
-        Some(PropertyValueKind::Tags) => tags(reader, source, texts, capture)?,
+        Some(PropertyValueKind::Tags) => tags(reader, source, capture)?,
         Some(PropertyValueKind::TimeTrialRace) => PropertyValue::TimeTrialRace {
             target_splits: mission_property_race::read(source, capture)?,
         },
@@ -64,7 +64,6 @@ fn options<'f, T>(
 fn tags<'f>(
     reader: &Reader<'_, 'f>,
     source: &StructValue<'f>,
-    texts: &Texts<'f>,
     capture: Option<&dyn FieldCapture<'f>>,
 ) -> Result<PropertyValue<'f>, ReadError> {
     mission_property_source::check_context(
@@ -88,7 +87,7 @@ fn tags<'f>(
             capture,
         )?,
         options: mission_property_source::list(source, "options", "", capture, |value, path| {
-            mission_property_option_read::tags(reader, value, path, texts, capture)
+            mission_property_option_read::tags(reader, value, path, capture)
         })?,
     })
 }

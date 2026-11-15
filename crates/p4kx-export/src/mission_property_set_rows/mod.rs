@@ -5,10 +5,11 @@ mod compare;
 #[cfg(test)]
 mod tests;
 
-use p4kx_extraction::Guid;
+use p4kx_extraction::{CancelToken, Guid};
 use std::collections::BTreeMap;
 
 use super::MissionPropertySet;
+use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::original::{ExampleBodyReceipt, RecordSubject};
 use crate::guid_text::{self, CatalogGuid};
 use crate::{CatalogError, ExportAccountingError};
@@ -194,9 +195,30 @@ impl<'source> MissionPropertySets<'source> {
         }
         Ok(())
     }
-    pub(crate) fn ambiguous_owners(&self) -> impl Iterator<Item = &SetOwner<'source>> {
-        self.conflicts.values().flat_map(BTreeMap::values)
+    pub(crate) fn ambiguous_owners(&self) -> impl Iterator<Item = (Guid, &SetOwner<'source>)> {
+        self.conflicts
+            .iter()
+            .flat_map(|(&guid, owners)| owners.values().map(move |owner| (guid, owner)))
     }
+    pub(crate) fn publish(
+        self,
+        projection: &CatalogProjection<'_, 'source>,
+        cancel: Option<&CancelToken>,
+    ) -> Result<Vec<MissionPropertySet<'source>>, CatalogError> {
+        let mut rows = self.into_rows();
+        for row in &mut rows {
+            if cancel.is_some_and(CancelToken::is_cancelled) {
+                return Err(CatalogError::Cancelled);
+            }
+            for property in row.properties.iter_mut().flatten() {
+                if let Some(value) = &mut property.value {
+                    value.publish_option_names(projection, cancel)?;
+                }
+            }
+        }
+        Ok(rows)
+    }
+
     pub(crate) fn into_rows(self) -> Vec<MissionPropertySet<'source>> {
         let mut rows: Vec<_> = self.rows.into_values().map(|row| row.set).collect();
         guid_text::sort_by_guid(&mut rows, |set| set.guid);

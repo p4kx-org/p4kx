@@ -10,6 +10,12 @@ use crate::record_source_status::SourceDiagnosis;
 use crate::selection::Kind;
 use crate::{ExportAccountingError, HealthText};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum DerivedOperation {
+    Record,
+    MissionPropertySet(Guid),
+}
+
 /// One failed derived operation forwarding its already paired original source.
 #[derive(Debug, Clone)]
 pub(crate) struct DerivedFailure {
@@ -20,6 +26,7 @@ pub(crate) struct DerivedFailure {
     pub(crate) guid: Guid,
     pub(crate) record_path: Option<HealthText>,
     pub(crate) diagnosis: SourceDiagnosis,
+    pub(crate) operation: DerivedOperation,
     subject: RecordSubject,
 }
 
@@ -48,6 +55,24 @@ impl DerivedFailure {
         role: ExportSourceRole,
         diagnosis: SourceDiagnosis,
     ) -> Result<Self, ExportAccountingError> {
+        Self::of_operation(
+            subject,
+            affected_kind,
+            output_kind,
+            role,
+            DerivedOperation::Record,
+            diagnosis,
+        )
+    }
+
+    pub(crate) fn of_operation(
+        subject: RecordSubject,
+        affected_kind: Kind,
+        output_kind: Kind,
+        role: ExportSourceRole,
+        operation: DerivedOperation,
+        diagnosis: SourceDiagnosis,
+    ) -> Result<Self, ExportAccountingError> {
         let key = subject
             .key()
             .ok_or(ExportAccountingError::UnboundHealthSubject)?;
@@ -59,6 +84,7 @@ impl DerivedFailure {
             guid: key.guid(),
             record_path: key.path_text().cloned(),
             diagnosis,
+            operation,
             subject,
         })
     }
@@ -100,6 +126,7 @@ impl PartialEq for DerivedFailure {
             && self.role == other.role
             && self.guid == other.guid
             && self.record_path == other.record_path
+            && self.operation == other.operation
             && self.diagnosis == other.diagnosis
     }
 }

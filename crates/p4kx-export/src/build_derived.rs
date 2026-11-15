@@ -73,7 +73,7 @@ pub(crate) fn add_contracts<'f>(
             missions.local_generators,
         );
     collected.contract_scenario_requirements = missions.scenario_requirements;
-    collected.mission_property_sets = missions.property_sets.into_rows();
+    collected.mission_property_sets = missions.property_sets.publish(projection, options.cancel)?;
     let ContractTemplates {
         read,
         pools: template_pools,
