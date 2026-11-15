@@ -13,6 +13,8 @@ mod entity_catalogue;
 pub(crate) mod entity_loadout_evidence;
 mod image_payload;
 mod image_projection;
+#[cfg(test)]
+mod installed_accounting;
 mod origin;
 mod payload;
 mod projection;

@@ -135,9 +135,12 @@ file-backed export. Run it with
 `cargo test --locked -p p4kx-media --lib observed_animation_matches_published_source_rows_and_key_chunks`.
 
 The opt-in Media census selects every CAF, DBA and AIM Entry across the root and nested
-containers. Each family uses a separate temporary generation. It verifies physical selection,
-raw bytes, chunk and clip order, original controller words, declared and decoded key counts,
-and the typed sample bytes and source ranges. It reconciles the counts with the header reader
+containers. The test hashes the verified root Archive once and visits each family with its own
+production budgets. It observes original source receipts, clip/controller rows and the typed
+chunk receipts without writing payloads or generated streams. It verifies physical selection,
+raw sizes and hashes, chunk and clip order, original controller words, declared and decoded key
+counts, and source ranges. Each typed receipt is compared with a hash and size of the exact
+decoded sample bytes from the independent parser. It reconciles the counts with the header reader
 where that reader covers the selected source. Legacy header-budget refusals are counted
 separately. The streaming source reader still checks the complete available declarations.
 Diagnostic rows are verified and an incomplete census fails the check.
@@ -147,12 +150,12 @@ excludes nested containers. It compares the retained SHA-256 artifacts byte-for-
 verified original Entries, checks the CAF prefix, record and trailer extents, and reconciles
 the directional path spans with the original chunk and count.
 
-Configure the Archive paths and temporary directory as described in [CLAUDE.md](../CLAUDE.md).
+Configure the Archive paths as described in [CLAUDE.md](../CLAUDE.md).
 The test uses `P4KX_DATA_P4K` and the optional `P4KX_DATA_P4K_B`, then reports aggregate
 counts without recording asset names or payloads.
 
 ```powershell
-cargo test --locked -p p4kx-media --test real_archive all_selected_animation_entries_clips_and_keys_reconcile -- --ignored
+cargo test --release --locked -p p4kx-media --lib all_selected_animation_entries_clips_and_keys_reconcile -- --ignored --nocapture
 cargo test --locked -p p4kx-media --test real_archive global_animation_images_match_verified_physical_sources -- --ignored
 cargo test --locked -p p4kx-media --test real_archive global_animation_image_export_matches_original_path_fields -- --ignored
 ```

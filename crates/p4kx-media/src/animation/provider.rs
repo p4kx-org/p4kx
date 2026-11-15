@@ -84,10 +84,10 @@ impl Provider for AnimationProvider {
     }
 }
 
-pub(super) fn project_with(
+pub(super) fn project_with<B: AsRef<[u8]>>(
     context: &SourceContext<'_>,
     writer: &mut MediaWriter<'_>,
-    read: impl FnOnce(&SourceContext<'_>, &MediaWriter<'_>) -> Result<Vec<u8>, MediaError>,
+    read: impl FnOnce(&SourceContext<'_>, &MediaWriter<'_>) -> Result<B, MediaError>,
 ) -> Result<Projection, MediaError> {
     let name = context.entry.path();
     let Some(family) = Family::of(name) else {
@@ -99,13 +99,14 @@ pub(super) fn project_with(
         entry: context.entry.index(),
     };
     let bytes = read(context, writer)?;
-    let size = bytes.len() as u64;
+    let contents = bytes.as_ref();
+    let size = contents.len() as u64;
     if size != context.source.size {
         return Err(MediaError::Contract(
             "animation payload length differs from the verified source".into(),
         ));
     }
-    let file = match ChunkFile::parse(bytes) {
+    let file = match ChunkFile::parse(contents) {
         Ok(file) => file,
         Err(error) => {
             entry(family, None, Some(&error), size, &origins, writer)?;
@@ -142,7 +143,7 @@ pub(super) fn project_with(
 fn clips(
     name: &str,
     family: Family,
-    file: &ChunkFile<Vec<u8>>,
+    file: &ChunkFile<&[u8]>,
     origins: &AnimationOrigins<'_>,
     skeleton: Option<&SelectedSkeleton>,
     writer: &mut MediaWriter<'_>,

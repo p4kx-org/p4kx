@@ -37,7 +37,7 @@ const DIRECTIONAL_IMAGE_VERSION: u32 = 0x901;
 const FIELD: &str = "/data/payload/";
 
 pub(super) fn write(
-    file: &ChunkFile<Vec<u8>>,
+    file: &ChunkFile<&[u8]>,
     family: Family,
     context: &SourceContext<'_>,
     origins: &AnimationOrigins<'_>,
@@ -221,7 +221,7 @@ impl ImageSource<'_, '_> {
 
     fn write_index(
         &self,
-        file: &ChunkFile<Vec<u8>>,
+        file: &ChunkFile<&[u8]>,
         index: usize,
         range: Range<u64>,
         layout: &Layout<'_>,

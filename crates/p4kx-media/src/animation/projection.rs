@@ -14,10 +14,10 @@ use super::skeleton_selection::SelectedSkeleton;
 use crate::origin_prepared::PreparedRecordOrigins;
 use crate::{ByteOrder, MediaError, MediaIssue, MediaWriter, Severity, Status, Subresource};
 
-type ParsedFile = ChunkFile<Vec<u8>>;
+type ParsedFile<'input> = ChunkFile<&'input [u8]>;
 
 pub(crate) fn table(
-    file: &ParsedFile,
+    file: &ParsedFile<'_>,
     origins: &AnimationOrigins<'_>,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
@@ -29,7 +29,7 @@ pub(crate) fn table(
 }
 
 fn chunk_row(
-    file: &ParsedFile,
+    file: &ParsedFile<'_>,
     index: usize,
     chunk: &Chunk,
     origins: &AnimationOrigins<'_>,
@@ -85,7 +85,7 @@ fn chunk_row(
 }
 
 pub(crate) fn clip(
-    file: &ParsedFile,
+    file: &ParsedFile<'_>,
     clip: AnimationSource<'_>,
     origins: &AnimationOrigins<'_>,
     skeleton: Option<&SelectedSkeleton>,
@@ -149,7 +149,7 @@ pub(super) fn database_name(name: DbaAnimationName<'_>) -> DatabaseName<'_> {
 }
 
 fn controller_block(
-    file: &ParsedFile,
+    file: &ParsedFile<'_>,
     clip: &AnimationSource<'_>,
     origins: &AnimationOrigins<'_>,
     prepared: &mut PreparedRecordOrigins,
@@ -175,7 +175,7 @@ fn controller_block(
 }
 
 pub(super) fn clip_metadata(
-    file: &ParsedFile,
+    file: &ParsedFile<'_>,
     metadata: AnimationMetadata<'_>,
     name: Option<DbaAnimationName<'_>>,
     origins: &AnimationOrigins<'_>,

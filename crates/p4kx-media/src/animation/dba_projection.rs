@@ -12,11 +12,11 @@ use super::projection;
 use super::skeleton_selection::SelectedSkeleton;
 use crate::{MediaError, MediaIssue, MediaWriter, Severity, Status, Subresource};
 
-type ParsedFile = ChunkFile<Vec<u8>>;
+type ParsedFile<'input> = ChunkFile<&'input [u8]>;
 
 pub(super) fn clips(
     name: &str,
-    file: &ParsedFile,
+    file: &ParsedFile<'_>,
     origins: &AnimationOrigins<'_>,
     skeleton: Option<&SelectedSkeleton>,
     writer: &mut MediaWriter<'_>,
@@ -49,7 +49,7 @@ pub(super) fn clips(
 
 fn metadata_tail(
     name: &str,
-    file: &ParsedFile,
+    file: &ParsedFile<'_>,
     first_uncovered: usize,
     origins: &AnimationOrigins<'_>,
     writer: &mut MediaWriter<'_>,
@@ -70,7 +70,7 @@ fn metadata_tail(
 }
 
 fn metadata_row(
-    file: &ParsedFile,
+    file: &ParsedFile<'_>,
     record: DbaMetadataRecord<'_>,
     origins: &AnimationOrigins<'_>,
     writer: &mut MediaWriter<'_>,

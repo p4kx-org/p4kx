@@ -2,20 +2,44 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::ops::Range;
-use std::path::Path;
 
 use p4kx_extraction::chunks::ChunkFile;
 use p4kx_extraction::model::{
-    AnimationController, AnimationError, AnimationHeader, AnimationMetadata, AnimationSource,
-    CorruptAnimation, DbaAnimationName, DbaAnimationSources, DbaHeaders, DbaMetadataRecords,
-    DecodedAnimationChannel,
+    AnimationController, AnimationError, AnimationHeader, AnimationSource, CorruptAnimation,
+    DbaAnimationSources, DbaHeaders, DbaMetadataRecords, DecodedAnimationChannel,
 };
-use p4kx_media::{MediaRecord, Source, Status};
 use serde_json::{Value, json};
 
-use super::super::TestResult;
-use super::super::shader_accounting::require;
-use super::{Family, Lines};
+use super::{
+    Artifact, ByteOrder, ChunkReference, DataType, MediaRecord, OffsetBasis, Source, Status,
+    TestResult, require,
+};
+
+#[path = "animation_fields.rs"]
+mod fields;
+
+#[derive(Clone, Copy)]
+pub(super) enum Family {
+    Caf,
+    Dba,
+    Aim,
+}
+
+impl Family {
+    pub(super) const fn suffix(self) -> &'static str {
+        match self {
+            Self::Caf => "caf",
+            Self::Dba => "dba",
+            Self::Aim => "aim",
+        }
+    }
+}
+
+pub(super) trait Evidence {
+    fn record(&mut self) -> TestResult<Option<MediaRecord>>;
+
+    fn sample(&mut self, artifact: &Artifact, expected: &[u8]) -> TestResult;
+}
 
 #[derive(Default)]
 pub(super) struct Totals {
@@ -27,13 +51,13 @@ pub(super) struct Totals {
     pub(super) controllers: u64,
     pub(super) declared: u64,
     pub(super) decoded: u64,
+    pub(super) sample_artifacts: u64,
     pub(super) partial: u64,
     pub(super) header_budget_refusals: u64,
 }
 
 pub(super) struct AnimationRows<'a> {
-    pub(super) base: &'a Path,
-    pub(super) records: &'a mut Lines,
+    pub(super) evidence: &'a mut dyn Evidence,
     pub(super) source: &'a Source,
     pub(super) schema: &'a jsonschema::Validator,
     pub(super) totals: &'a mut Totals,
@@ -114,7 +138,7 @@ impl AnimationRows<'_> {
                         &[record.ordinal as u64],
                         Status::Partial,
                     )?;
-                    check_metadata(&row, record.metadata, Some(record.name))?;
+                    fields::metadata(&row, record.metadata, Some(record.name))?;
                     check(
                         &row.data,
                         "/payload/controller_disposition",
@@ -184,7 +208,7 @@ impl AnimationRows<'_> {
             Status::Partial
         };
         let row = self.next("animation-clip", &[ordinal], status)?;
-        check_metadata(&row, metadata, clip.database_name())?;
+        fields::metadata(&row, metadata, clip.database_name())?;
         check(
             &row.data,
             "/payload/data_chunk_version",
@@ -281,23 +305,12 @@ impl AnimationRows<'_> {
             .flatten()
             .flat_map(f32::to_le_bytes)
             .collect::<Vec<_>>();
-        super::super::animation_samples::compare(
-            self.base,
-            samples,
-            "frames",
-            &frames,
-            count,
-            decoded.frame_range,
-        )?;
-        super::super::animation_samples::compare(
-            self.base,
-            samples,
-            "values",
-            &values,
-            count * N,
-            decoded.value_range,
-        )?;
+        let frame_artifact = fields::reference(samples, "frames", count, decoded.frame_range)?;
+        self.evidence.sample(&frame_artifact, &frames)?;
+        let value_artifact = fields::reference(samples, "values", count * N, decoded.value_range)?;
+        self.evidence.sample(&value_artifact, &values)?;
         self.totals.decoded += count as u64;
+        self.totals.sample_artifacts += 2;
         Ok(())
     }
 
@@ -320,7 +333,7 @@ impl AnimationRows<'_> {
         indices: &[u64],
         status: Status,
     ) -> TestResult<MediaRecord> {
-        let row: MediaRecord = self.records.next()?.ok_or("missing animation row")?;
+        let row = self.evidence.record()?.ok_or("missing animation row")?;
         require(
             row.source.identity == self.source.identity
                 && row.source.root == self.source.root
@@ -342,40 +355,6 @@ impl AnimationRows<'_> {
         self.totals.partial += u64::from(status != Status::Complete);
         Ok(row)
     }
-}
-
-fn check_metadata(
-    row: &MediaRecord,
-    metadata: AnimationMetadata<'_>,
-    name: Option<DbaAnimationName<'_>>,
-) -> TestResult {
-    let database_name = name.map(|name| {
-        json!({
-            "utf8": std::str::from_utf8(name.bytes()).ok(),
-            "range": range(&name.range())
-        })
-    });
-    let timing = metadata.timing().ok().map(|timing| {
-        json!({
-            "frames_per_second": timing.frames_per_second,
-            "end_frame": timing.end_frame,
-            "additive": timing.additive
-        })
-    });
-    for (field, expected) in [
-        (
-            "/payload/metadata_bytes",
-            json!(metadata.bytes().as_slice()),
-        ),
-        ("/payload/flags", json!(metadata.flags())),
-        ("/payload/metadata_chunk_version", json!(metadata.version())),
-        ("/payload/metadata_range", range(&metadata.range())),
-        ("/payload/database_name", json!(database_name)),
-        ("/payload/timing", json!(timing)),
-    ] {
-        check(&row.data, field, &expected)?;
-    }
-    Ok(())
 }
 
 fn check(actual: &Value, field: &str, expected: &Value) -> TestResult {

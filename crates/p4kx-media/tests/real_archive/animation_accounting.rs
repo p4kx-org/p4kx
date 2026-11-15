@@ -5,65 +5,20 @@ use std::path::Path;
 
 use p4kx_extraction::{Archive, ArchiveWatch, Entry, Filter};
 use p4kx_media::{
-    ContainerIdentity, Digest, ExportOptions, Identity, Index, MediaKind, MediaRecord, Source,
+    Artifact, ByteOrder, ChunkReference, ContainerIdentity, DataType, Digest, ExportOptions,
+    Identity, Index, MediaKind, MediaRecord, OffsetBasis, Source, Status,
 };
 
 use super::archive_replay::{Lines, compare_original, generation};
 use super::shader_accounting::require;
-use super::{TestResult, manifests, privacy};
+use super::{TestResult, manifests};
 
+#[path = "animation_fixture.rs"]
+mod fixture;
 #[path = "animation_rows.rs"]
 mod rows;
 
-use self::rows::{AnimationRows, Totals};
-
-#[derive(Clone, Copy)]
-enum Family {
-    Caf,
-    Dba,
-    Aim,
-}
-
-impl Family {
-    const fn suffix(self) -> &'static str {
-        match self {
-            Self::Caf => "caf",
-            Self::Dba => "dba",
-            Self::Aim => "aim",
-        }
-    }
-}
-
-#[test]
-#[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
-fn all_selected_animation_entries_clips_and_keys_reconcile()
--> Result<(), privacy::VerificationFailure> {
-    privacy::redact(verify_configured())
-}
-
-fn verify_configured() -> TestResult {
-    verify_archive(&p4kx_testkit::real_archive_path()?)?;
-    if let Some(second) = p4kx_testkit::real_archive_b_path() {
-        verify_archive(&second)?;
-    }
-    Ok(())
-}
-
-fn verify_archive(path: &Path) -> TestResult {
-    let archive = Archive::open_with_key(path, Some(p4kx_testkit::real_archive_key()?))?;
-    let mut complete = true;
-    let mut any_clips = false;
-    for family in [Family::Caf, Family::Dba, Family::Aim] {
-        let totals = verify_family(&archive, family)?;
-        report(family, &totals);
-        any_clips |= totals.clips > 0;
-        complete &= totals.complete && totals.partial == 0;
-    }
-    require(
-        any_clips && complete,
-        "selected animation inventory is empty or incomplete",
-    )
-}
+use self::rows::{AnimationRows, Evidence, Family, Totals};
 
 fn verify_family(archive: &Archive, family: Family) -> TestResult<Totals> {
     let watch = ArchiveWatch::new(archive);
@@ -189,9 +144,12 @@ impl Census<'_> {
         let bytes =
             manifests::check_payload(self.base, &raw.path, raw.size, &raw.digest, raw.size)?;
         compare_original(archive, entry, &bytes)?;
-        let mut rows = AnimationRows {
+        let mut evidence = FileEvidence {
             base: self.base,
             records: &mut self.records,
+        };
+        let mut rows = AnimationRows {
+            evidence: &mut evidence,
             source: &source,
             schema: self.schema,
             totals: &mut self.totals,
@@ -203,75 +161,37 @@ impl Census<'_> {
     }
 }
 
-#[expect(
-    clippy::print_stderr,
-    reason = "the opt-in census reports only anonymous aggregate counts"
-)]
-fn report(family: Family, totals: &Totals) {
-    eprintln!(
-        "animation {} entries={} chunks={} clips={} metadata_only={} controllers={} declared_keys={} decoded_keys={} partial_rows={} header_budget_refusals={}",
-        family.suffix(),
-        totals.entries,
-        totals.chunks,
-        totals.clips,
-        totals.metadata_only_clips,
-        totals.controllers,
-        totals.declared,
-        totals.decoded,
-        totals.partial,
-        totals.header_budget_refusals
-    );
+struct FileEvidence<'a> {
+    base: &'a Path,
+    records: &'a mut Lines,
+}
+
+impl Evidence for FileEvidence<'_> {
+    fn record(&mut self) -> TestResult<Option<MediaRecord>> {
+        self.records.next()
+    }
+
+    fn sample(&mut self, artifact: &Artifact, expected: &[u8]) -> TestResult {
+        let bytes = manifests::check_payload(
+            self.base,
+            &artifact.path,
+            artifact.size,
+            &artifact.digest,
+            expected.len() as u64,
+        )?;
+        require(
+            bytes == expected,
+            "every decoded element agrees with the original parser",
+        )
+    }
 }
 
 #[test]
 fn animation_accounting_checks_every_selected_entry_including_nested_duplicates() -> TestResult {
-    use p4kx_testkit::{
-        ArchiveBuilder, TestAnimation, TestChunkFile, TestContainer, TestDba, TestEntry, TestTrack,
-    };
-
     let temporary = tempfile::tempdir()?;
-    let path = temporary.path().join("Data.p4k");
-    let clip = TestAnimation::new("duplicate.caf", 30)
-        .track(TestTrack::new(7).positions(&[(1, [0.0; 3]), (7, [1.0, 2.0, 3.0])]));
-    let caf = clip.caf();
-    let dba = TestDba::new()
-        .animation(clip.clone())
-        .animation(clip)
-        .bytes();
-    let nested = TestContainer::new()
-        .entry(TestEntry::stored("duplicate.caf", caf.as_slice()))
-        .entry(TestEntry::stored("pair.dba", dba))
-        .build();
-    let aim = TestChunkFile::ivo()
-        .chunk(0x0BAD_BEEF, 0x900, b"opaque")
-        .bytes();
-    ArchiveBuilder::new()
-        .entry(TestEntry::stored("duplicate.caf", caf))
-        .entry(TestEntry::stored("nested.pak", nested))
-        .entry(TestEntry::stored("opaque.aim", aim))
-        .write_to(&path)?;
-    let archive = Archive::open(path)?;
-    for (family, entries, clips, keys) in [
-        (Family::Caf, 2, 2, 4),
-        (Family::Dba, 1, 2, 4),
-        (Family::Aim, 1, 0, 0),
-    ] {
-        let totals = verify_family(&archive, family)?;
-        assert!(
-            totals.complete,
-            "complete generation for each synthetic family"
-        );
-        assert_eq!(
-            (
-                totals.entries,
-                totals.clips,
-                totals.declared,
-                totals.decoded,
-                totals.partial
-            ),
-            (entries, clips, keys, keys, 0),
-            "census reconciles every selected physical source"
-        );
+    let archive = fixture::complete(&temporary.path().join("Data.p4k"))?;
+    for expected in fixture::EXPECTED {
+        expected.check(&verify_family(&archive, expected.family)?)?;
     }
     Ok(())
 }
