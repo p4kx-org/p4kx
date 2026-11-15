@@ -774,6 +774,24 @@ checks emitted records and field origins.
 cargo test -p p4kx-media --lib installed_chrparams_source_census_reconciles_ordered_declarations_and_scope_targets -- --ignored --nocapture
 ```
 
+The installed scope publication witness takes one local exact model Entry in
+`P4KX_ANIMATION_SCOPE_MODEL` and one Entity selector in `P4KX_ANIMATION_SCOPE_ENTITY`.
+Set `P4KX_DATA_P4K` and the normal real-Archive key configuration. Both scopes must
+select parameter data and at least one scope must have an authored event
+database with timelines. Set the process temporary directory to the approved
+scratch location. Both selectors refer to the root Archive. The fixture excludes
+PAK and SOCPAK traversal and limits counted artifact writes to the real-Archive
+test allowance for each generation. The index and field-origin companion streams
+are outside that allowance. Each generation is removed after inspection. The
+exporter hashes the root Archive for each generation. The witness shares Assembly
+rig discovery and checks the Media publication against verified source bytes,
+independently derived event-file references and source-local record identities.
+Omitting both selectors skips the fixture without an installed scope receipt.
+
+```powershell
+cargo test -p p4kx-media --test real_archive installed_animation_scopes_match_verified_source_and_placement_closures -- --ignored --nocapture
+```
+
 The `graph-node` and `graph-attribute` rows identify Mannequin fragment
 alternatives, transitions, layers, sub-databases, blend-space examples,
 parameters, pseudo examples and blend faces. Source element ordinals identify
