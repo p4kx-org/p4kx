@@ -47,9 +47,16 @@ pub struct BankDialogueTree {
     /// Coverage of the declared physical table.
     pub coverage: BankDialogueTreeCoverage,
     length: u32,
+    declared_length: u32,
 }
 
 impl BankDialogueTree {
+    /// Returns the number of whole physical nodes represented by the declared byte count.
+    #[must_use]
+    pub const fn declared_nodes(&self) -> u32 {
+        self.declared_length / NODE_LEN
+    }
+
     /// Returns the number of complete physical node rows.
     #[must_use]
     pub const fn complete_nodes(&self) -> u32 {
@@ -102,6 +109,7 @@ pub(crate) fn scan<F: ObjectFields>(
     fields.tree = Some(BankDialogueTree {
         range: start..start + u64::from(admitted),
         length: admitted,
+        declared_length: declared,
         coverage,
     });
 

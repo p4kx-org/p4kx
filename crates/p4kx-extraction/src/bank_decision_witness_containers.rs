@@ -1,13 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_audio::{
-    BankDialogueEventRow, BankHircContainerNode, BankHircDialogueEvent, BankNodePropertyKind,
-    BankNodePropertyValue, BankSwitchMembership,
-};
+use p4kx_audio::{BankHircContainerNode, BankSwitchMembership};
 use serde_json::json;
 
-use super::values::{Projection, Rows};
+use super::values::Projection;
 use super::{Input, TestResult};
 
 #[path = "bank_decision_witness_blend.rs"]
@@ -116,98 +113,6 @@ pub(super) fn switch(
     }
     rows.finish()?;
     Ok(member_observed && configuration_observed)
-}
-
-pub(super) fn dialogue(
-    node: &mut BankHircDialogueEvent<'_, Input<'_>>,
-    projection: &Projection<'_>,
-) -> TestResult<bool> {
-    let fields = node.fields();
-    let header = projection
-        .document
-        .get("fields")
-        .ok_or("DialogueEvent header")?;
-    projection.optional(header, "/probability", fields.probability.as_ref())?;
-    projection.optional(header, "/argument_count", fields.argument_count.as_ref())?;
-    projection.optional(header, "/tree_size", fields.tree_size.as_ref())?;
-    projection.optional(header, "/mode_code", fields.mode_code.as_ref())?;
-    if let Some(tree) = &fields.tree {
-        projection.at(
-            header,
-            "/tree/complete_nodes",
-            &json!(tree.complete_nodes()),
-        )?;
-    }
-
-    let mut rows = projection.rows("/rows")?;
-    let mut argument = false;
-    let mut physical = false;
-    for original in node.rows() {
-        match original? {
-            BankDialogueEventRow::Argument {
-                ordinal,
-                group_id,
-                group_type_code,
-            } => {
-                let row = rows.kind("argument")?;
-                projection.at(row, "/ordinal", &json!(ordinal))?;
-                projection.field(row, "/group_id", &group_id)?;
-                projection.optional(row, "/group_type_code", group_type_code.as_ref())?;
-                argument = true;
-            }
-            BankDialogueEventRow::Node { ordinal, value } => {
-                let row = rows.kind("node")?;
-                projection.at(row, "/ordinal", &json!(ordinal))?;
-                projection.field(row, "/key", &value.key)?;
-                projection.optional(row, "/link_word", value.link_word.as_ref())?;
-                projection.optional(row, "/weight", value.weight.as_ref())?;
-                projection.optional(row, "/probability", value.probability.as_ref())?;
-                if value.link_word.is_some() {
-                    projection.at(row, "/link_interpretation", &json!("undetermined"))?;
-                    physical = true;
-                }
-            }
-            _ => return Err("known physical DialogueEvent row".into()),
-        }
-    }
-    dialogue_properties(node, projection, &mut rows)?;
-    rows.finish()?;
-    Ok(argument && physical)
-}
-
-fn dialogue_properties(
-    node: &mut BankHircDialogueEvent<'_, Input<'_>>,
-    projection: &Projection<'_>,
-    rows: &mut Rows<'_>,
-) -> TestResult {
-    for (kind, name) in [
-        (BankNodePropertyKind::Properties, "properties"),
-        (BankNodePropertyKind::RangedModifiers, "ranged-modifiers"),
-    ] {
-        let Some(properties) = node.properties(kind) else {
-            continue;
-        };
-        for property in properties {
-            let property = property?;
-            let row = rows.kind("property")?;
-            projection.at(row, "/list", &json!(name))?;
-            projection.at(row, "/ordinal", &json!(property.ordinal))?;
-            projection.field(row, "/property_id", &property.id)?;
-            match property.value {
-                BankNodePropertyValue::Scalar(bits) => {
-                    projection.optional(row, "/scalar_bits", bits.as_ref())?;
-                }
-                BankNodePropertyValue::Ranged {
-                    minimum, maximum, ..
-                } => {
-                    projection.optional(row, "/minimum_bits", minimum.as_ref())?;
-                    projection.optional(row, "/maximum_bits", maximum.as_ref())?;
-                }
-                _ => return Err("known DialogueEvent property disposition".into()),
-            }
-        }
-    }
-    Ok(())
 }
 
 fn switch_header(

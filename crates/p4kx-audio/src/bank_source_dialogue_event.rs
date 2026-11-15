@@ -15,7 +15,9 @@ use crate::{BankError, BankHircObject, BankNodePropertyKind, BankReadError};
 #[path = "bank_source_dialogue_event_rows.rs"]
 mod rows;
 
-pub use self::rows::{BankDialogueEventRow, BankDialogueEventRows, BankDialogueNode};
+pub use self::rows::{
+    BankDialogueEventRow, BankDialogueEventRows, BankDialogueKeyRole, BankDialogueNode,
+};
 
 /// A `DialogueEvent` and the owner-bound replay of its checked original fields.
 pub struct BankHircDialogueEvent<'input, R> {

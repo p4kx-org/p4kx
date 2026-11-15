@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::ops::Range;
+
 use p4kx_extraction::bank::{
     BankDialogueTree, BankDialogueTreeCoverage, BankHircDialogueEvent, BankNodePropertyExtents,
-    BankNodePropertyKind,
+    BankNodePropertyKind, DialogueDecisionMode,
 };
 
 use crate::MediaError;
-use crate::audio_bank_dialogue_payload::{
-    DialogueDecisionMode, DialogueEventObservations, DialogueTreeCoverage,
-};
+use crate::audio_bank_dialogue_payload::{DialogueEventObservations, DialogueTreeCoverage};
 use crate::audio_bank_node_origins::NodeSites;
 use crate::audio_bank_node_property_payload::NodePropertyListRecord;
 use crate::audio_bank_origins::BankOrigins;
@@ -64,6 +64,7 @@ pub(super) fn observed<R>(
         mode,
         tree_range: None,
         tree_coverage: None,
+        declared_nodes: None,
         complete_nodes: None,
         partial_node_bytes: None,
         partial_node_range: None,
@@ -71,7 +72,7 @@ pub(super) fn observed<R>(
         ranged_modifiers,
     };
     if let (Some(size), Some(tree)) = (&fields.tree_size, &fields.tree) {
-        tree_extent(&mut observed, sites, origins, size.range.start, tree)?;
+        tree_extent(&mut observed, sites, origins, &size.range, tree)?;
     }
     Ok(observed)
 }
@@ -143,11 +144,12 @@ fn tree_extent(
     observed: &mut DialogueEventObservations,
     sites: &NodeSites,
     origins: &mut BankOrigins<'_, '_, '_>,
-    size_start: u64,
+    size: &Range<u64>,
     tree: &BankDialogueTree,
 ) -> Result<(), MediaError> {
     sites.range(origins, "observed/tree_range", &tree.range)?;
-    let inspected = size_start..tree.range.end;
+    let inspected = size.start..tree.range.end;
+    sites.converted(origins, "observed/declared_nodes", size, "dialogueTreeSize")?;
     sites.converted(
         origins,
         "observed/tree_coverage",
@@ -182,6 +184,7 @@ fn tree_extent(
     }
     observed.tree_range = Some((&tree.range).into());
     observed.tree_coverage = Some(coverage);
+    observed.declared_nodes = Some(tree.declared_nodes());
     observed.complete_nodes = Some(tree.complete_nodes());
     observed.partial_node_bytes = Some(tree.partial_node_bytes());
     observed.partial_node_range = tail.as_ref().map(Into::into);

@@ -598,6 +598,7 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   ActorMixers list the original ordered child IDs and parent. Their JSON detail records the
   bank-relative spans of the shared node base, child count and child list. DialogueEvent JSON
   includes checked original argument, node and property rows with their per-value source evidence.
+  It exposes possible child windows and targets alongside the original decision-node words.
   Random/Sequence JSON exposes original controls and playlist words with the same field receipts.
   Switch JSON includes original membership groups, ordered members and per-child fade words.
   Blend JSON includes original child IDs, Layer RTPC curves and crossfade graph words.

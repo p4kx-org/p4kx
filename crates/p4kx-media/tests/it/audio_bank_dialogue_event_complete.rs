@@ -69,6 +69,17 @@ fn check_summary(rows: &[MediaRecord], evidence: &Evidence<'_>) -> TestResult {
         Some(&json!(5)),
         "all authored physical node words fit",
     );
+    assert_eq!(
+        summary.1.data.pointer("/payload/observed/declared_nodes"),
+        Some(&json!(5)),
+        "the size word declares five whole node slots",
+    );
+    evidence.conversion(
+        summary,
+        "observed/declared_nodes",
+        "observed/tree_size",
+        "dialogueTreeSize",
+    )?;
     Ok(())
 }
 
@@ -124,7 +135,52 @@ fn check_nodes(rows: &[MediaRecord], evidence: &Evidence<'_>) -> TestResult {
             "link_word",
             "dialogueNodeLinkWord",
         )?;
+        evidence.word(original, "target_candidate", "dialogueNodeLinkWord", link)?;
     }
+    check_candidates(rows, evidence)
+}
+
+fn check_candidates(rows: &[MediaRecord], evidence: &Evidence<'_>) -> TestResult {
+    let root = row(rows, NODE, &[1, 0, 0])?;
+    evidence.halfword(root, "child_candidate/first", "dialogueNodeChildFirst", 1)?;
+    evidence.halfword(root, "child_candidate/count", "dialogueNodeChildCount", 2)?;
+    for (field, value) in [
+        ("child_candidate/admitted_count", json!(2)),
+        ("child_candidate/coverage", json!("complete")),
+        ("key_role", json!("root")),
+    ] {
+        assert_eq!(
+            root.1.data.pointer(&format!("/payload/{field}")),
+            Some(&value),
+            "the root preserves its viable child range and alternate target",
+        );
+    }
+    for field in ["child_candidate/admitted_count", "child_candidate/coverage"] {
+        evidence.conversion(
+            root,
+            field,
+            "child_candidate/first",
+            "dialogueNodeChildFirst",
+        )?;
+        evidence.conversion(
+            root,
+            field,
+            "child_candidate/count",
+            "dialogueNodeChildCount",
+        )?;
+    }
+    evidence.conversion(root, "key_role", "key", "dialogueNodeKey")?;
+    let default = row(rows, NODE, &[1, 0, 2])?;
+    assert_eq!(
+        default.1.data.pointer("/payload/key_role"),
+        Some(&json!("default-candidate")),
+        "a nonroot zero key may match an argument default",
+    );
+    assert_eq!(
+        default.1.data.pointer("/payload/child_candidate/coverage"),
+        Some(&json!("outside-declared")),
+        "the raw target remains available when the child range is outside the table",
+    );
     Ok(())
 }
 

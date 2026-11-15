@@ -9,6 +9,7 @@
 
 mod adpcm;
 mod bank_blend_rows;
+mod bank_dialogue_child_candidate;
 mod bank_error;
 mod bank_graph_point_rows;
 mod bank_inline_state_rows;
@@ -130,6 +131,7 @@ pub use hirc_modulator::{BankModulatorFields, BankModulatorKind};
 pub use hirc_plugin_family::BankPluginKind;
 pub use hirc_plugin_parameters::{BankPluginDataReference, BankPluginFields, BankPluginParameters};
 
+pub use bank_dialogue_child_candidate::{BankDialogueChildCandidate, BankDialogueChildCoverage};
 pub use bank_inline_state_rows::{BankInlineStateRow, BankInlineStateRows};
 pub use bank_media_source_table::BankMediaSourceTable;
 pub use bank_music_track_automation_rows::{
@@ -160,7 +162,8 @@ pub use bank_source_container::{
     BankHircContainerNode,
 };
 pub use bank_source_dialogue_event::{
-    BankDialogueEventRow, BankDialogueEventRows, BankDialogueNode, BankHircDialogueEvent,
+    BankDialogueEventRow, BankDialogueEventRows, BankDialogueKeyRole, BankDialogueNode,
+    BankHircDialogueEvent,
 };
 pub use bank_source_didx::{BankDidx, BankDidxEntry, BankMediaInfo};
 pub use bank_source_event::{BankEvent, BankEventAction, BankEventRead, BankHircEvent};

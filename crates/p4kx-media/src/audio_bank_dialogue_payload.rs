@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::bank::{
+    DialogueChildCoverage, DialogueDecisionMode, DialogueGroupType, DialogueKeyRole,
+    DialogueLinkInterpretation,
+};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -45,6 +49,8 @@ pub(crate) struct DialogueEventObservations {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) tree_coverage: Option<DialogueTreeCoverage>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) declared_nodes: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) complete_nodes: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) partial_node_bytes: Option<u32>,
@@ -54,24 +60,6 @@ pub(crate) struct DialogueEventObservations {
     pub(crate) properties: Option<NodePropertyListRecord>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) ranged_modifiers: Option<NodePropertyListRecord>,
-}
-
-#[derive(Serialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-pub(crate) enum DialogueDecisionMode {
-    BestMatch,
-    Weighted,
-    Unknown,
-}
-
-impl From<u8> for DialogueDecisionMode {
-    fn from(code: u8) -> Self {
-        match code {
-            0 => Self::BestMatch,
-            1 => Self::Weighted,
-            _ => Self::Unknown,
-        }
-    }
 }
 
 #[derive(Serialize, JsonSchema)]
@@ -94,33 +82,21 @@ pub(crate) struct DialogueArgumentRecord {
 }
 
 #[derive(Serialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-pub(crate) enum DialogueGroupType {
-    Switch,
-    State,
-    Unknown,
-}
-
-impl From<u8> for DialogueGroupType {
-    fn from(code: u8) -> Self {
-        match code {
-            0 => Self::Switch,
-            1 => Self::State,
-            _ => Self::Unknown,
-        }
-    }
-}
-
-#[derive(Serialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct DialogueNodeRecord {
     pub(crate) layout: DialogueNodeLayout,
     pub(crate) range: BankEntryRange,
     pub(crate) key: BankField<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) key_role: Option<DialogueKeyRole>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) link_word: Option<BankField<u32>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) link_interpretation: Option<DialogueLinkInterpretation>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) child_candidate: Option<DialogueNodeChildren>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) target_candidate: Option<BankField<u32>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) weight: Option<BankField<u16>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -128,14 +104,17 @@ pub(crate) struct DialogueNodeRecord {
 }
 
 #[derive(Serialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-pub(crate) enum DialogueNodeLayout {
-    Decoded,
-    Malformed,
+#[serde(deny_unknown_fields)]
+pub(crate) struct DialogueNodeChildren {
+    pub(crate) first: BankField<u16>,
+    pub(crate) count: BankField<u16>,
+    pub(crate) admitted_count: u16,
+    pub(crate) coverage: DialogueChildCoverage,
 }
 
 #[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
-pub(crate) enum DialogueLinkInterpretation {
-    Undetermined,
+pub(crate) enum DialogueNodeLayout {
+    Decoded,
+    Malformed,
 }

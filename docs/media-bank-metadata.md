@@ -477,9 +477,16 @@ code stays visible alongside its raw value.
 Physical node rows preserve each readable key, raw link word, weight and
 probability in file order. A complete key identifies a truncated final node,
 and the summary also locates any unreadable final word bytes. A readable link
-has `link_interpretation: undetermined`. The raw word can encode a target ID
-or a child index/count pair. The export preserves repeated words and all
-physical nodes. The generic HIRC node property rows preserve scalar values and
+has an `undetermined` interpretation. Its `child_candidate` retains the
+two original halfwords, the number of complete nodes in the candidate window
+and its coverage. Coverage is `complete`, `truncated`, `outside-declared`
+or `empty`. The summary's `declared_nodes` and `complete_nodes` establish
+the two bounds. Each nonzero full word also appears as `target_candidate`.
+The key role distinguishes `root`, `default-candidate` and
+`value-candidate`. A branch at depth `d > 0` on a proven route takes its
+argument from planar ordinal `d - 1`. The graph keeps alternative readings,
+including repeated words and shared physical nodes. The generic HIRC node
+property rows preserve scalar values and
 ranged modifier bounds as original words. The DialogueEvent summary reports
 the independent property list coverage. A misaligned tree with a readable
 declared boundary can still locate the following property lists. Other
@@ -510,8 +517,14 @@ The source coverage depends on the HIRC owner and the observed bank version.
 
 | Owner | Media records | CLI JSON and MCP |
 | --- | --- | --- |
-| v154 Sound, ActorMixer, Random/Sequence, Switch, Blend | Shared properties, priority, effects, Aux, positioning, advanced settings, inline State and RTPC | node_fields plus type-specific source_fields where available |
-| v154 MusicSegment, MusicTrack, MusicSwitch, MusicPlaylist | The same shared groups, alongside music decisions and timing | `node_fields` plus `source_fields` for track details, stinger schedules, transition rules and MusicSwitch decisions |
+| v154 Sound and ActorMixer | Shared properties, priority, effects, Aux, positioning, advanced settings, inline State and RTPC | `node_fields` with the shared controls and child entries |
+| v154 Random/Sequence | Shared controls, loops, transition settings, avoid-repeat and ordered play IDs and weights | `node_fields` and Random/Sequence `source_fields` |
+| v154 Switch | Shared controls, group type, default, ordered membership and per-child fade words | `node_fields` and Switch `source_fields` |
+| v154 Blend | Shared controls, ordered children, Layer RTPC and crossfade curves | `node_fields` and Blend `source_fields` |
+| v154 MusicTrack | Sources, clips, automation graph and switch-transition words | `node_fields` and MusicTrack `source_fields` |
+| v154 MusicSegment, MusicSwitch and MusicPlaylist | Authored stinger schedules, transition rule fields and MusicSwitch decision nodes and groups | `node_fields` and `source_fields` for the applicable groups |
+| v154 DialogueEvent | Argument codes and labels, physical nodes, candidate child windows and targets, and original properties | `source_fields` with the same candidates and their source uses |
+| TXTP playback approximation | Authored controls remain in their source records | JSON export diagnostics and TXTP headers identify omitted loops, conditions, scheduling, fades and transition segments |
 | v154 AudioBus, AuxiliaryBus | Bus routing, settings, duck targets and shared source groups | `node_fields` and its `bus` extension |
 | v154 Play Action | Separate property summary and scalar/ranged rows | source_fields with type, target, PlayBank and property declarations |
 | Standalone State v128–145 | Standalone property summary and ordered raw words | source_fields with the original bundle and raw range |
@@ -531,8 +544,8 @@ The ignored `populated_wwise_decision_families_match_original_bytes_in_memory` t
 compares physical v154 BNK Entries with the source fields used by CLI JSON and MCP.
 It checks original row order, duplicate occurrences, selected field values, exact byte
 receipts and the per-value encryption marker. Compact MusicSwitch graphs are compared
-as original groups and nodes. DialogueEvent checks the admitted raw words and the
-`undetermined` link disposition.
+as original groups and nodes. DialogueEvent independently checks the admitted raw words,
+the candidate windows and target IDs, the key roles and the `undetermined` link disposition.
 
 The test reads and verifies one root BNK at a time, including embedded data covered by
 the Entry checksum. It uses the ordinary soundbank input size limit. Other bank

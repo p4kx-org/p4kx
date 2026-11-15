@@ -3,9 +3,15 @@
 
 //! Bounded soundbank reads, source inspection, and extraction.
 
+#[path = "bank_dialogue_labels.rs"]
+mod dialogue_labels;
 #[path = "voice_property.rs"]
 mod voice_property;
 
+pub use self::dialogue_labels::{
+    DialogueChildCoverage, DialogueDecisionMode, DialogueGroupType, DialogueKeyRole,
+    DialogueLinkInterpretation,
+};
 pub use self::voice_property::{VoiceProperty, VoicePropertyName};
 
 use std::fs;
@@ -44,7 +50,8 @@ pub use p4kx_audio::{
 };
 pub use p4kx_audio::{
     BankAttenuationCone, BankAttenuationCurve, BankAttenuationFields, BankAttenuationPoints,
-    BankDialogueEventFields, BankDialogueEventRow, BankDialogueEventRows, BankDialogueNode,
+    BankDialogueChildCandidate, BankDialogueChildCoverage, BankDialogueEventFields,
+    BankDialogueEventRow, BankDialogueEventRows, BankDialogueKeyRole, BankDialogueNode,
     BankDialogueTree, BankDialogueTreeCoverage, BankHircAttenuation, BankHircDialogueEvent,
     BankHircMusicSwitch, BankMusicSwitchBranch, BankMusicSwitchFields, BankMusicSwitchGroup,
     BankMusicSwitchNode, BankMusicSwitchRead, BankMusicSwitchRow, BankMusicSwitchRows,

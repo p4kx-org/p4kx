@@ -6,16 +6,20 @@ use std::io::{Read, Seek};
 use std::ops::Range;
 
 use p4kx_audio::{
-    BankDialogueEventRow, BankDialogueNode, BankHircDialogueEvent, BankHircField,
-    BankNodePropertyKind, BankNodePropertyRow,
+    BankDialogueChildCandidate, BankDialogueEventRow, BankDialogueNode, BankHircDialogueEvent,
+    BankHircField, BankNodePropertyKind, BankNodePropertyRow,
 };
 use serde::ser::{Error as _, SerializeSeq};
 use serde::{Serialize, Serializer};
 
+use crate::bank::{
+    DialogueChildCoverage, DialogueGroupType, DialogueKeyRole, DialogueLinkInterpretation,
+};
 use crate::hirc_view::node_property::PropertyWords;
 use crate::source_evidence_error::SourceEvidenceError;
+use crate::source_use::{SourceUse, SourceUseRole};
 
-use super::dto::{DialogueLinkInterpretation, DialoguePropertyKind, DialogueSourceRow};
+use super::dto::{DialogueChildCandidate, DialoguePropertyKind, DialogueSourceRow};
 use super::origins::ObjectOrigins;
 
 pub(super) struct DialogueRows<'view, 'input, R> {
@@ -38,6 +42,7 @@ impl<'view, 'input, R> DialogueRows<'view, 'input, R> {
 impl<R: Read + Seek> Serialize for DialogueRows<'_, '_, R> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut dialogue = self.dialogue.try_borrow_mut().map_err(S::Error::custom)?;
+        let tree = TreeEvidence::of(&dialogue);
         let mut sequence = serializer.serialize_seq(None)?;
         for row in dialogue.rows() {
             let row = match row.map_err(S::Error::custom)? {
@@ -45,13 +50,16 @@ impl<R: Read + Seek> Serialize for DialogueRows<'_, '_, R> {
                     ordinal,
                     group_id,
                     group_type_code,
-                } => argument(self.origins, ordinal, &group_id, group_type_code.as_ref()),
+                } => argument(self.origins, ordinal, &group_id, group_type_code.as_ref())
+                    .map_err(S::Error::custom)?,
                 BankDialogueEventRow::Node { ordinal, value } => {
-                    node(self.origins, ordinal, &value)
+                    let extent = tree.as_ref().ok_or_else(|| {
+                        S::Error::custom("physical DialogueEvent node lacks its tree extent")
+                    })?;
+                    node::<S::Error>(self.origins, extent, ordinal, &value)?
                 }
                 _ => return Err(S::Error::custom("unexpected physical DialogueEvent row")),
-            }
-            .map_err(S::Error::custom)?;
+            };
             sequence.serialize_element(&row)?;
         }
         self.properties(&mut dialogue, &mut sequence)?;
@@ -99,14 +107,43 @@ fn argument(
         ordinal: origins.derived(ordinal, &id.range, "dialogueArgumentPosition")?,
         group_id: origins.field(id, "dialogueGroupId")?,
         group_type_code: origins.optional(kind, "dialogueGroupTypeCode")?,
+        group_type: kind
+            .map(|code| {
+                origins.derived(
+                    DialogueGroupType::from(code.value),
+                    &code.range,
+                    "dialogueGroupTypeCode",
+                )
+            })
+            .transpose()?,
     })
 }
 
-fn node(
+struct TreeEvidence {
+    size: Range<u64>,
+    prefix: Range<u64>,
+}
+
+impl TreeEvidence {
+    fn of<R>(dialogue: &BankHircDialogueEvent<'_, R>) -> Option<Self> {
+        let fields = dialogue.fields();
+        Some(Self {
+            size: fields.tree_size.as_ref()?.range.clone(),
+            prefix: fields.tree.as_ref()?.range.clone(),
+        })
+    }
+
+    fn prefix(&self, origins: &ObjectOrigins) -> Result<SourceUse, SourceEvidenceError> {
+        origins.reference("dialogueTreeExtent", &self.prefix, SourceUseRole::Selector)
+    }
+}
+
+fn node<E: serde::ser::Error>(
     origins: &ObjectOrigins,
+    extent: &TreeEvidence,
     ordinal: u32,
     node: &BankDialogueNode,
-) -> Result<DialogueSourceRow, SourceEvidenceError> {
+) -> Result<DialogueSourceRow, E> {
     let link_interpretation = node
         .link_word
         .as_ref()
@@ -117,15 +154,78 @@ fn node(
                 "dialogueNodeLinkWord",
             )
         })
+        .transpose()
+        .map_err(E::custom)?;
+    let key_role = DialogueKeyRole::try_from(node.key_role).map_err(E::custom)?;
+    let key_source = origins
+        .reference(
+            "dialogueNodeKey",
+            &node.key.range,
+            SourceUseRole::Conversion,
+        )
+        .map_err(E::custom)?;
+    let prefix = extent.prefix(origins).map_err(E::custom)?;
+    let child_candidate = node
+        .child_candidate
+        .as_ref()
+        .map(|candidate| child_candidate::<E>(origins, extent, candidate, &prefix))
         .transpose()?;
+    let target_candidate = node
+        .target_candidate
+        .as_ref()
+        .map(|target| origins.derived(target.value, &target.range, "dialogueNodeLinkWord"))
+        .transpose()
+        .map_err(E::custom)?;
     Ok(DialogueSourceRow::Node {
-        ordinal: origins.derived(ordinal, &node.key.range, "dialogueNodePosition")?,
-        range: origins.range(&node.range, "dialogueNodeExtent")?,
-        key: origins.field(&node.key, "dialogueNodeKey")?,
-        link_word: origins.optional(node.link_word.as_ref(), "dialogueNodeLinkWord")?,
+        ordinal: origins
+            .derived(ordinal, &node.key.range, "dialogueNodePosition")
+            .map_err(E::custom)?,
+        range: origins
+            .range(&node.range, "dialogueNodeExtent")
+            .map_err(E::custom)?,
+        key: origins
+            .field(&node.key, "dialogueNodeKey")
+            .map_err(E::custom)?,
+        key_role: origins.value(key_role, &[key_source, prefix]),
+        link_word: origins
+            .optional(node.link_word.as_ref(), "dialogueNodeLinkWord")
+            .map_err(E::custom)?,
         link_interpretation,
-        weight: origins.optional(node.weight.as_ref(), "dialogueNodeWeight")?,
-        probability: origins.optional(node.probability.as_ref(), "dialogueNodeProbability")?,
+        child_candidate,
+        target_candidate,
+        weight: origins
+            .optional(node.weight.as_ref(), "dialogueNodeWeight")
+            .map_err(E::custom)?,
+        probability: origins
+            .optional(node.probability.as_ref(), "dialogueNodeProbability")
+            .map_err(E::custom)?,
+    })
+}
+
+fn child_candidate<E: serde::ser::Error>(
+    origins: &ObjectOrigins,
+    extent: &TreeEvidence,
+    candidate: &BankDialogueChildCandidate,
+    prefix: &SourceUse,
+) -> Result<DialogueChildCandidate, E> {
+    let link = candidate.first.range.start..candidate.count.range.end;
+    let link = origins
+        .reference("dialogueNodeLinkWord", &link, SourceUseRole::Conversion)
+        .map_err(E::custom)?;
+    let size = origins
+        .reference("dialogueTreeSize", &extent.size, SourceUseRole::Selector)
+        .map_err(E::custom)?;
+    let uses = [link, size, prefix.clone()];
+    let coverage = DialogueChildCoverage::try_from(candidate.coverage).map_err(E::custom)?;
+    Ok(DialogueChildCandidate {
+        first: origins
+            .field(&candidate.first, "dialogueNodeChildFirst")
+            .map_err(E::custom)?,
+        count: origins
+            .field(&candidate.count, "dialogueNodeChildCount")
+            .map_err(E::custom)?,
+        admitted_count: origins.value(candidate.admitted_count, &uses),
+        coverage: origins.value(coverage, &uses),
     })
 }
 

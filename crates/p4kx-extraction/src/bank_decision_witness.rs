@@ -17,6 +17,8 @@ use super::{Bank, BankReadOrigin, MAX_SOUNDBANK_LEN, SourceProtection};
 
 #[path = "bank_decision_witness_containers.rs"]
 mod containers;
+#[path = "bank_decision_witness_dialogue.rs"]
+mod dialogue;
 #[path = "bank_decision_witness_music.rs"]
 mod music;
 #[path = "bank_decision_witness_synthetic.rs"]
@@ -323,7 +325,7 @@ fn compare(
             }
         }
         BankHircSemantic::DialogueEvent(mut node) => {
-            if containers::dialogue(&mut node, projection)? {
+            if dialogue::dialogue(&mut node, projection)? {
                 missing.remove(&Family::Dialogue);
             }
         }

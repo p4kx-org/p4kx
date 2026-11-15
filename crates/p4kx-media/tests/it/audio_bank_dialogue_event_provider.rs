@@ -86,6 +86,17 @@ fn impossible_tree_length_retains_checked_node_prefix_without_properties() -> Te
         layout(partial.1, "malformed", Status::Partial);
         evidence.word(partial, "key", "dialogueNodeKey", 0xBCAD_0001)?;
         evidence.word(partial, "link_word", "dialogueNodeLinkWord", 0xCA00_5544)?;
+        assert_eq!(
+            partial.1.data.pointer("/payload/child_candidate/coverage"),
+            Some(&json!("truncated")),
+        );
+        assert_eq!(
+            partial
+                .1
+                .data
+                .pointer("/payload/child_candidate/admitted_count"),
+            Some(&json!(0)),
+        );
         assert!(partial.1.data.pointer("/payload/weight").is_none());
         assert!(rows.iter().all(|row| row.subresource.namespace != PROPERTY));
         Ok(())

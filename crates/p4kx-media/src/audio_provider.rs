@@ -174,7 +174,7 @@ fn bank_node_field_groups() -> [FieldGroup; 2] {
 fn dialogue_event_fields() -> FieldGroup {
     FieldGroup::new(
         "bank-dialogue-event-fields",
-        "Original version-154 DialogueEvent argument, tree and property fields, with checked physical node prefixes and exact source ranges.",
+        "Original version-154 DialogueEvent arguments, physical nodes, possible child windows and targets, and property fields with exact source ranges.",
     )
 }
 

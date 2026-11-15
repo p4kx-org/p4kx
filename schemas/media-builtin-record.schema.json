@@ -10275,13 +10275,50 @@
       ],
       "type": "object"
     },
+    "DialogueChildCoverage": {
+      "description": "Checked relationship between a potential child range and the original node table.",
+      "oneOf": [
+        {
+          "const": "complete",
+          "description": "All candidate children fit in the readable complete prefix.",
+          "type": "string"
+        },
+        {
+          "const": "truncated",
+          "description": "The declared range fits but extends beyond readable complete nodes.",
+          "type": "string"
+        },
+        {
+          "const": "outside-declared",
+          "description": "The raw range exceeds the declared table of whole nodes.",
+          "type": "string"
+        },
+        {
+          "const": "empty",
+          "description": "The original candidate child count is zero.",
+          "type": "string"
+        }
+      ]
+    },
     "DialogueDecisionMode": {
-      "enum": [
-        "best-match",
-        "weighted",
-        "unknown"
-      ],
-      "type": "string"
+      "description": "Interpretation of the original `DialogueEvent` mode byte.",
+      "oneOf": [
+        {
+          "const": "best-match",
+          "description": "Best-match selection mode.",
+          "type": "string"
+        },
+        {
+          "const": "weighted",
+          "description": "Weighted selection mode.",
+          "type": "string"
+        },
+        {
+          "const": "unknown",
+          "description": "The raw mode code has no established label.",
+          "type": "string"
+        }
+      ]
     },
     "DialogueEventObservations": {
       "additionalProperties": false,
@@ -10313,6 +10350,14 @@
           ]
         },
         "complete_nodes": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "declared_nodes": {
           "format": "uint32",
           "minimum": 0,
           "type": [
@@ -10478,18 +10523,81 @@
       "title": "DialogueEventPayload"
     },
     "DialogueGroupType": {
-      "enum": [
-        "switch",
-        "state",
-        "unknown"
-      ],
-      "type": "string"
+      "description": "Interpretation of an original `DialogueEvent` argument type byte.",
+      "oneOf": [
+        {
+          "const": "switch",
+          "description": "The argument selects a switch value.",
+          "type": "string"
+        },
+        {
+          "const": "state",
+          "description": "The argument selects a state value.",
+          "type": "string"
+        },
+        {
+          "const": "unknown",
+          "description": "The raw group type code has no established label.",
+          "type": "string"
+        }
+      ]
+    },
+    "DialogueKeyRole": {
+      "description": "Role suggested by the original key and physical node position.",
+      "oneOf": [
+        {
+          "const": "root",
+          "description": "The physical root has no argument condition.",
+          "type": "string"
+        },
+        {
+          "const": "default-candidate",
+          "description": "A non-root zero key can match the default condition on a route.",
+          "type": "string"
+        },
+        {
+          "const": "value-candidate",
+          "description": "A non-root key can identify an argument value on a route.",
+          "type": "string"
+        }
+      ]
     },
     "DialogueLinkInterpretation": {
-      "enum": [
-        "undetermined"
+      "description": "Disposition of the unclassified target or child-range word.",
+      "oneOf": [
+        {
+          "const": "undetermined",
+          "description": "Both readings remain candidates, with no selected interpretation.",
+          "type": "string"
+        }
+      ]
+    },
+    "DialogueNodeChildren": {
+      "additionalProperties": false,
+      "properties": {
+        "admitted_count": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "count": {
+          "$ref": "#/$defs/BankField_uint16"
+        },
+        "coverage": {
+          "$ref": "#/$defs/DialogueChildCoverage"
+        },
+        "first": {
+          "$ref": "#/$defs/BankField_uint16"
+        }
+      },
+      "required": [
+        "first",
+        "count",
+        "admitted_count",
+        "coverage"
       ],
-      "type": "string"
+      "type": "object"
     },
     "DialogueNodeLayout": {
       "enum": [
@@ -10501,8 +10609,28 @@
     "DialogueNodeRecord": {
       "additionalProperties": false,
       "properties": {
+        "child_candidate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DialogueNodeChildren"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "key": {
           "$ref": "#/$defs/BankField_uint32"
+        },
+        "key_role": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DialogueKeyRole"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "layout": {
           "$ref": "#/$defs/DialogueNodeLayout"
@@ -10539,6 +10667,16 @@
         },
         "range": {
           "$ref": "#/$defs/BankEntryRange"
+        },
+        "target_candidate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint32"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "weight": {
           "anyOf": [

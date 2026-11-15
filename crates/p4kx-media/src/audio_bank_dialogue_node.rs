@@ -1,26 +1,48 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::bank::BankDialogueNode;
+use std::ops::Range;
+
+use p4kx_extraction::bank::{
+    BankDialogueEventFields, BankDialogueNode, DialogueLinkInterpretation,
+};
 
 use crate::audio_bank_dialogue_payload::{
-    DialogueEventPayload, DialogueLinkInterpretation, DialogueNodeLayout, DialogueNodeRecord, NODE,
+    DialogueEventPayload, DialogueNodeLayout, DialogueNodeRecord, NODE,
 };
 use crate::audio_bank_node_origins::NodeSites;
 use crate::audio_bank_origins::BankOrigins;
 use crate::audio_bank_projection::BankProjection;
 use crate::{MediaError, MediaIssue, MediaWriter, Severity, Status, Subresource};
 
+#[path = "audio_bank_dialogue_node_candidates.rs"]
+mod candidates;
+
+pub(super) struct TreeEvidence {
+    size: Range<u64>,
+    admitted: Range<u64>,
+}
+
+impl TreeEvidence {
+    pub(super) fn observe(fields: &BankDialogueEventFields) -> Option<Self> {
+        Some(Self {
+            size: fields.tree_size.as_ref()?.range.clone(),
+            admitted: fields.tree.as_ref()?.range.clone(),
+        })
+    }
+}
+
 pub(super) fn project(
     bank: &BankProjection<'_>,
     sites: &NodeSites,
     ordinal: u32,
     value: &BankDialogueNode,
+    tree: &TreeEvidence,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
     let mut origins = sites.record(bank.input, writer, Some(&value.key.range))?;
     sites.index(&mut origins, 2, &value.key.range, "dialogueNodePosition")?;
-    let data = observe(sites, &mut origins, value)?;
+    let data = observe(sites, &mut origins, value, tree)?;
     let (status, issue) = if matches!(data.layout, DialogueNodeLayout::Decoded) {
         (Status::Complete, None)
     } else {
@@ -47,6 +69,7 @@ fn observe(
     sites: &NodeSites,
     origins: &mut BankOrigins<'_, '_, '_>,
     value: &BankDialogueNode,
+    tree: &TreeEvidence,
 ) -> Result<DialogueNodeRecord, MediaError> {
     sites.range(origins, "range", &value.range)?;
     sites.converted(origins, "layout", &value.range, "dialogueNodeCoverage")?;
@@ -85,12 +108,16 @@ fn observe(
     } else {
         DialogueNodeLayout::Malformed
     };
+    let candidates = candidates::observe(sites, origins, value, tree)?;
     Ok(DialogueNodeRecord {
         layout,
         range: (&value.range).into(),
         key: (&value.key).into(),
+        key_role: Some(candidates.key_role),
         link_word,
         link_interpretation,
+        child_candidate: candidates.child,
+        target_candidate: candidates.target,
         weight,
         probability,
     })

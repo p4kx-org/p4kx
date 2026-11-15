@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_testkit::{TestBank, TestEntry, TestHircObject};
-use serde_json::json;
+use serde_json::{Value, json};
 
 use crate::audio::serve;
 use crate::support::{Install, TestResult};
@@ -52,6 +52,7 @@ fn encrypted_dialogue_mcp_binds_original_fields_to_the_actual_bank() -> TestResu
         source["version"]["containsEncryptedSource"], true,
         "actual BKHD payload"
     );
+    assert_encrypted_candidates(&source["rows"][0], uses)?;
     let tool = server
         .tools()?
         .into_iter()
@@ -61,6 +62,87 @@ fn encrypted_dialogue_mcp_binds_original_fields_to_the_actual_bank() -> TestResu
         tool.pointer("/outputSchema/$defs/DialogueObjectSourceFields/properties/rows/type"),
         Some(&json!("array")),
         "the MCP tool describes the shared streamed source row array",
+    );
+    Ok(())
+}
+
+fn assert_encrypted_candidates(node: &Value, uses: &[Value]) -> TestResult {
+    assert_eq!(
+        node.pointer("/key_role/value").and_then(Value::as_str),
+        Some("root"),
+        "root has no argument condition"
+    );
+    assert_eq!(
+        node.pointer("/target_candidate/value")
+            .and_then(Value::as_u64),
+        Some(0xA152_1010),
+        "possible target"
+    );
+    let child = node
+        .get("child_candidate")
+        .ok_or("original child candidate")?;
+    assert_eq!(
+        child.pointer("/first/value").and_then(Value::as_u64),
+        Some(0x1010),
+        "candidate child start"
+    );
+    assert_eq!(
+        child.pointer("/count/value").and_then(Value::as_u64),
+        Some(0xA152),
+        "candidate child count"
+    );
+    assert_eq!(
+        child
+            .pointer("/admitted_count/value")
+            .and_then(Value::as_u64),
+        Some(0),
+        "candidate outside physical table"
+    );
+    let coverage = child.get("coverage").ok_or("checked child coverage")?;
+    assert_encrypted_coverage(coverage, uses)
+}
+
+fn assert_encrypted_coverage(coverage: &Value, uses: &[Value]) -> TestResult {
+    assert_eq!(
+        coverage.get("value").and_then(Value::as_str),
+        Some("outside-declared"),
+        "declared table boundary"
+    );
+    assert_eq!(
+        coverage
+            .get("containsEncryptedSource")
+            .and_then(Value::as_bool),
+        Some(true),
+        "actual encrypted source"
+    );
+    assert_eq!(
+        coverage.get("sourceSetComplete").and_then(Value::as_bool),
+        Some(true),
+        "all coverage inputs are observed"
+    );
+    let refs = coverage
+        .get("sourceUsesRefs")
+        .and_then(Value::as_array)
+        .ok_or("coverage source uses")?;
+    let mut labels = refs
+        .iter()
+        .map(|id| {
+            uses.iter()
+                .find(|source| source.get("id") == Some(id))
+                .and_then(|source| source.pointer("/location/field"))
+                .and_then(Value::as_str)
+                .ok_or("original coverage field")
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    labels.sort_unstable();
+    assert_eq!(
+        labels,
+        [
+            "dialogueNodeLinkWord",
+            "dialogueTreeExtent",
+            "dialogueTreeSize"
+        ],
+        "the checked coverage refers to the link and both tree bounds",
     );
     Ok(())
 }

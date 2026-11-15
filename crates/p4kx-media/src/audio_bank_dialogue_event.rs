@@ -5,12 +5,11 @@ use std::io::{Read, Seek};
 
 use p4kx_extraction::bank::{
     BankDialogueEventRow, BankHircDialogueEvent, BankHircField, BankHircObject,
-    BankNodePropertyKind,
+    BankNodePropertyKind, DialogueGroupType,
 };
 
 use crate::audio_bank_dialogue_payload::{
-    ARGUMENT, DialogueArgumentRecord, DialogueEventObservations, DialogueEventPayload,
-    DialogueGroupType, SUMMARY,
+    ARGUMENT, DialogueArgumentRecord, DialogueEventObservations, DialogueEventPayload, SUMMARY,
 };
 use crate::audio_bank_inventory::VersionSite;
 use crate::audio_bank_node_declaration_payload::NodeDeclaration;
@@ -78,6 +77,7 @@ fn original_rows<R: Read + Seek>(
     dialogue: &mut BankHircDialogueEvent<'_, R>,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
+    let tree = node::TreeEvidence::observe(dialogue.fields());
     for row in dialogue.rows() {
         match row.map_err(|cause| bank.replay_failure(cause))? {
             BankDialogueEventRow::Argument {
@@ -95,7 +95,10 @@ fn original_rows<R: Read + Seek>(
                 )?;
             }
             BankDialogueEventRow::Node { ordinal, value } => {
-                node::project(bank, sites, ordinal, &value, writer)?;
+                let tree = tree.as_ref().ok_or_else(|| {
+                    MediaError::Contract("DialogueEvent node lacks its tree extent".into())
+                })?;
+                node::project(bank, sites, ordinal, &value, tree, writer)?;
             }
             _ => return Err(MediaError::Contract("unexpected DialogueEvent row".into())),
         }

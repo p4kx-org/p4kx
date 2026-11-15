@@ -24,6 +24,7 @@ mod bnk_source;
 mod bnk_source_action;
 mod bnk_source_bus;
 mod bnk_source_container;
+mod bnk_source_dialogue_event;
 mod bnk_source_event;
 mod bnk_source_music_playlist;
 mod bnk_source_music_segment;

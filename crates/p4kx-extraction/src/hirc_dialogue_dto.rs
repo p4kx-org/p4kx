@@ -4,6 +4,10 @@
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use crate::bank::{
+    DialogueChildCoverage, DialogueDecisionMode, DialogueGroupType, DialogueKeyRole,
+    DialogueLinkInterpretation,
+};
 use crate::hirc_view::StateRange;
 use crate::hirc_view::node_property::PropertyExtent;
 use crate::source_inventory::SourceInventory;
@@ -58,6 +62,8 @@ pub(crate) struct DialogueSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) mode_code: Option<SourcedValue<u8>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) mode: Option<SourcedValue<DialogueDecisionMode>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) tree: Option<DialogueTreeSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) properties: Option<PropertyExtent>,
@@ -70,6 +76,7 @@ pub(crate) struct DialogueSummary {
 pub(crate) struct DialogueTreeSummary {
     pub(crate) range: SourcedValue<StateRange>,
     pub(crate) coverage: SourcedValue<DialogueTreeStatus>,
+    pub(crate) declared_nodes: SourcedValue<u32>,
     pub(crate) complete_nodes: SourcedValue<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) partial_node_range: Option<SourcedValue<StateRange>>,
@@ -92,15 +99,22 @@ pub(crate) enum DialogueSourceRow {
         group_id: SourcedValue<u32>,
         #[serde(skip_serializing_if = "Option::is_none")]
         group_type_code: Option<SourcedValue<u8>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        group_type: Option<SourcedValue<DialogueGroupType>>,
     },
     Node {
         ordinal: SourcedValue<u32>,
         range: SourcedValue<StateRange>,
         key: SourcedValue<u32>,
+        key_role: SourcedValue<DialogueKeyRole>,
         #[serde(skip_serializing_if = "Option::is_none")]
         link_word: Option<SourcedValue<u32>>,
         #[serde(skip_serializing_if = "Option::is_none")]
         link_interpretation: Option<SourcedValue<DialogueLinkInterpretation>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        child_candidate: Option<DialogueChildCandidate>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        target_candidate: Option<SourcedValue<u32>>,
         #[serde(skip_serializing_if = "Option::is_none")]
         weight: Option<SourcedValue<u16>>,
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -120,9 +134,12 @@ pub(crate) enum DialogueSourceRow {
 }
 
 #[derive(Serialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-pub(crate) enum DialogueLinkInterpretation {
-    Undetermined,
+#[serde(deny_unknown_fields)]
+pub(crate) struct DialogueChildCandidate {
+    pub(crate) first: SourcedValue<u16>,
+    pub(crate) count: SourcedValue<u16>,
+    pub(crate) admitted_count: SourcedValue<u16>,
+    pub(crate) coverage: SourcedValue<DialogueChildCoverage>,
 }
 
 #[derive(Clone, Copy, Serialize, JsonSchema)]

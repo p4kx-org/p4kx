@@ -1854,7 +1854,11 @@ DialogueEvent objects include `source_fields` with the checked original declarat
 describes the playback reader's coverage. The `fields` member includes authored header words and
 checked table extents. `rows` keeps original argument, node and property occurrences in order.
 A malformed declaration keeps every readable row prefix. A readable link word carries an
-`undetermined` interpretation. An unsupported layout reports its version and an empty row list.
+`undetermined` interpretation, a child-window candidate and, for a nonzero word, a
+target candidate. The child window keeps both halfwords, its admitted count and coverage.
+The key role distinguishes the root from default and value candidates. Known decision mode
+and argument type names accompany their original codes. An unsupported layout reports
+its version and an empty row list.
 
 Source values carry `containsEncryptedSource`, `sourceUsesRefs` and `sourceSetComplete`. The
 object-local `source_inventory` resolves each reference to its physical input and exact half-open

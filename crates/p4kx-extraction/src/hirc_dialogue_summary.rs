@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::ops::Range;
+
 use p4kx_audio::{
     BankDialogueTree, BankDialogueTreeCoverage, BankHircDialogueEvent, BankNodePropertyKind,
 };
 
+use crate::bank::DialogueDecisionMode;
 use crate::hirc_view::node_property::PropertyExtent;
 use crate::source_evidence_error::SourceEvidenceError;
 
@@ -33,7 +36,7 @@ pub(super) fn collect<R>(
         .map(|(extent, count)| origins.derived(count, &extent, "dialogueCheckedArgumentTypes"))
         .transpose()?;
     let tree = if let (Some(tree), Some(size)) = (&fields.tree, &fields.tree_size) {
-        Some(tree_summary(tree, size.range.start, origins)?)
+        Some(tree_summary(tree, &size.range, origins)?)
     } else {
         None
     };
@@ -45,6 +48,17 @@ pub(super) fn collect<R>(
         checked_argument_types,
         tree_size: origins.optional(fields.tree_size.as_ref(), "dialogueTreeSize")?,
         mode_code: origins.optional(fields.mode_code.as_ref(), "dialogueModeCode")?,
+        mode: fields
+            .mode_code
+            .as_ref()
+            .map(|code| {
+                origins.derived(
+                    DialogueDecisionMode::from(code.value),
+                    &code.range,
+                    "dialogueModeCode",
+                )
+            })
+            .transpose()?,
         tree,
         properties: fields
             .properties
@@ -61,10 +75,10 @@ pub(super) fn collect<R>(
 
 fn tree_summary(
     tree: &BankDialogueTree,
-    size_start: u64,
+    size: &Range<u64>,
     origins: &ObjectOrigins,
 ) -> Result<DialogueTreeSummary, SourceEvidenceError> {
-    let extent = size_start..tree.range.end;
+    let extent = size.start..tree.range.end;
     let coverage = match tree.coverage {
         BankDialogueTreeCoverage::Complete => DialogueTreeStatus::Complete,
         BankDialogueTreeCoverage::Truncated => DialogueTreeStatus::Truncated,
@@ -75,6 +89,7 @@ fn tree_summary(
     Ok(DialogueTreeSummary {
         range: origins.range(&tree.range, "dialogueTreeExtent")?,
         coverage: origins.derived(coverage, &extent, "dialogueTreeCoverage")?,
+        declared_nodes: origins.derived(tree.declared_nodes(), size, "dialogueTreeSize")?,
         complete_nodes: origins.derived(tree.complete_nodes(), &extent, "dialogueCompleteNodes")?,
         partial_node_range: tail
             .as_ref()

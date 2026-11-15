@@ -138,10 +138,13 @@ pub(crate) fn node<F: ObjectFields>(input: &mut F) -> Result<BankMusicSwitchNode
     })
 }
 
-pub(crate) fn child_range(link: u32, nodes: u32) -> Result<Range<u32>, BankError> {
+pub(crate) const fn child_link_words(link: u32) -> [u16; 2] {
     let [a, b, c, d] = link.to_le_bytes();
-    let first = u32::from(u16::from_le_bytes([a, b]));
-    let count = u32::from(u16::from_le_bytes([c, d]));
+    [u16::from_le_bytes([a, b]), u16::from_le_bytes([c, d])]
+}
+
+pub(crate) fn child_range(link: u32, nodes: u32) -> Result<Range<u32>, BankError> {
+    let [first, count] = child_link_words(link).map(u32::from);
     let end = first + count;
     if end > nodes {
         return Err(invalid(
