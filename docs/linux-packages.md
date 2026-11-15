@@ -198,6 +198,8 @@ Audio previews use ALSA. A native desktop needs a configured default ALSA device
 PipeWire/PulseAudio ALSA bridge. Flatpak uses its runtime and PulseAudio socket. Physical playback,
 clipboard exchange, chooser interactions and hardware GPU behavior have separate evidence states;
 the bounded software-rendered GUI check does not claim those tests passed.
+Use the shared procedure on native AMD64 and ARM64 desktops.
+[Desktop audio verification](supported-platforms.md#desktop-audio-verification)
 
 ## Source, licensing and package identity
 

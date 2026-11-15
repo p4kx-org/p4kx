@@ -21,8 +21,8 @@ const SETTLE: Duration = Duration::from_millis(80);
 const DEADLINE: Duration = Duration::from_secs(8);
 
 #[test]
-#[ignore = "requires an Apple Silicon Mac with a usable CoreAudio output device"]
-fn coreaudio_consumes_samples_after_start_and_seek_and_stops_when_closed() -> TestResult {
+#[ignore = "requires a native host with a usable default audio output device"]
+fn native_output_consumes_samples_after_start_and_seek_and_stops_when_closed() -> TestResult {
     let pcm = Pcm::new(test_signal(RATE * SAMPLE_SECONDS, 1), 1, RATE);
     let mut player = Player::new(pcm, 0.04);
     let output = DeviceOutput;
@@ -36,7 +36,7 @@ fn coreaudio_consumes_samples_after_start_and_seek_and_stops_when_closed() -> Te
     assert_eq!(
         player.position(),
         paused,
-        "paused CoreAudio stream holds the source position"
+        "paused native stream holds the source position"
     );
 
     player.seek(0.5);
@@ -67,7 +67,7 @@ fn wait_for_position(player: &mut Player, minimum: Duration) -> TestResult {
     while start.elapsed() < DEADLINE {
         if player.poll() {
             return Err(format!(
-                "CoreAudio playback failed: {}",
+                "Native playback failed: {}",
                 player.failure().unwrap_or("unspecified device error")
             )
             .into());
@@ -77,5 +77,5 @@ fn wait_for_position(player: &mut Player, minimum: Duration) -> TestResult {
         }
         sleep(POLL);
     }
-    Err("CoreAudio did not consume the expected source frames".into())
+    Err("Native output did not consume the expected source frames".into())
 }

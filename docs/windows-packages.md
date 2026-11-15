@@ -81,6 +81,8 @@ assembly rejects missing, skipped or mismatched package evidence and requires th
 [five-target release matrix](supported-platforms.md). Native hardware GPU, dialogs, clipboard and
 audio evidence remains part of the final integration verification; hosted frame success does not
 assert those capabilities. Native CI/device run URLs must be retained with the final release audit.
+Use the shared procedure with WASAPI on native AMD64 and ARM64 desktops.
+[Desktop audio verification](supported-platforms.md#desktop-audio-verification)
 
 ## Release integration
 

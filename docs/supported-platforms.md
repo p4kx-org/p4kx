@@ -121,3 +121,30 @@ A full manual branch run records scan availability in its notes.
 
 All hosted checks use synthetic data. Real Archive tests stay ignored/local or explicitly
 private, and no game assets, keys or confidential values enter CI artifacts or releases.
+
+## Desktop audio verification
+
+On each matching native CPU, use a usable default audio output on the desktop under test.
+The same ignored test opens the production audio output and checks sample consumption after
+start and seek, the position while paused, and consumption stopping when the player closes.
+It plays a quiet synthetic signal through WASAPI on Windows, ALSA on Linux, or CoreAudio on macOS.
+
+```text
+cargo test --locked -p p4kx-gui --lib -- audio::player::native_tests::native_output_consumes_samples_after_start_and_seek_and_stops_when_closed --ignored --exact
+```
+
+For the packaged GUI verification, generate the fixture in a disposable absolute directory.
+
+```text
+cargo run --locked -p p4kx-testkit --example native_fixture -- <absolute-output-directory>
+```
+
+Launch the native candidate with an absolute `P4KX_FOLDERS_ROOT` to isolate its profile. Set
+a low preview volume, open `native-desktop-audio.p4k` and play `Data/Sounds/tone.wem` in
+the Audio tab. Seek to the middle and confirm that playback resumes. Select `Data/readme.txt`
+and confirm that closing the preview stops playback. Record the OS version, CPU, source
+commit, GUI binary and package hashes, audio device or session backend, and observed results.
+[Profile folders](profile-folders.md)
+
+An unavailable output is recorded separately. The ordinary synthetic test injects
+`NoDevice` and verifies that the player reports the failure and stops.

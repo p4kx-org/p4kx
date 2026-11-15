@@ -35,12 +35,8 @@ example in `p4kx-testkit`. Keep the fixture and any exports in a disposable user
 - In an isolated profile, change a user setting, exit and relaunch. Confirm that the setting is
   retained and the configuration, cache and data paths match [Profile folders](profile-folders.md).
   The clean-host installation and upgrade checks record the installed bundle and profile behavior.
-- Run `cargo test -p p4kx-gui --lib coreaudio_consumes_samples_after_start_and_seek_and_stops_when_closed -- --ignored`
-  on a Mac with an available output device. The test uses the production output and a quiet
-  synthetic tone. In the installed app, open `native-desktop-audio.p4k` from the same fixture
-  generator and play `Data/Sounds/tone.wem` in the Audio tab. Seek to the middle and confirm
-  playback resumes. Select `Data/readme.txt` to close the preview and confirm playback stops.
-  Record an actual unavailable-device observation separately from the synthetic no-device test.
+- Run the shared procedure using CoreAudio and the installed app.
+  [Desktop audio verification](supported-platforms.md#desktop-audio-verification)
 
 ## Installed Blender extension
 
