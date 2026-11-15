@@ -5,6 +5,7 @@ use std::cmp::Ordering;
 
 use rayon::prelude::*;
 
+use crate::entry_change::EntryDecision;
 use crate::path_key::cmp_normalised;
 use crate::record_compare::compare_records;
 use crate::{
@@ -19,6 +20,7 @@ const PROGRESS_STEP: usize = 1 << 16;
 pub(crate) struct Joined {
     pub(crate) old: Option<usize>,
     pub(crate) new: Option<usize>,
+    decision: EntryDecision,
 }
 
 impl Joined {
@@ -34,9 +36,9 @@ impl Joined {
             None => None,
         };
         match (before, after) {
-            (Some(before), Some(after)) => Some(EntryChange::changed(before, after)),
-            (Some(before), None) => Some(EntryChange::removed(before)),
-            (None, Some(after)) => Some(EntryChange::added(after)),
+            (Some(before), Some(after)) => Some(EntryChange::changed(before, after, self.decision)),
+            (Some(before), None) => Some(EntryChange::removed(before, self.decision)),
+            (None, Some(after)) => Some(EntryChange::added(after, self.decision)),
             (None, None) => None,
         }
     }
@@ -117,17 +119,27 @@ pub(crate) fn join(
     }
 }
 
-const fn removed(position: usize) -> Joined {
+const fn removed(position: usize, decision: EntryDecision) -> Joined {
     Joined {
         old: Some(position),
         new: None,
+        decision,
     }
 }
 
-const fn added(position: usize) -> Joined {
+const fn added(position: usize, decision: EntryDecision) -> Joined {
     Joined {
         old: None,
         new: Some(position),
+        decision,
+    }
+}
+
+const fn changed(before: usize, after: usize, decision: EntryDecision) -> Joined {
+    Joined {
+        old: Some(before),
+        new: Some(after),
+        decision,
     }
 }
 
@@ -160,29 +172,27 @@ fn join_entries(
             (None, None) => break,
             (Some(&(before, _)), None) => {
                 i += 1;
-                Some(removed(before))
+                Some(removed(before, EntryDecision::OppositeExhausted))
             }
             (None, Some(&(after, _))) => {
                 j += 1;
-                Some(added(after))
+                Some(added(after, EntryDecision::OppositeExhausted))
             }
             (Some(&(before, old_entry)), Some(&(after, new_entry))) => {
                 match cmp_normalised(old_entry.path(), new_entry.path()) {
                     Ordering::Less => {
                         i += 1;
-                        Some(removed(before))
+                        Some(removed(before, EntryDecision::OrderedAgainst(after)))
                     }
                     Ordering::Greater => {
                         j += 1;
-                        Some(added(after))
+                        Some(added(after, EntryDecision::OrderedAgainst(before)))
                     }
                     Ordering::Equal => {
                         i += 1;
                         j += 1;
-                        differs(old_entry, new_entry).then_some(Joined {
-                            old: Some(before),
-                            new: Some(after),
-                        })
+                        difference(old_entry, new_entry)
+                            .map(|decision| changed(before, after, decision))
                     }
                 }
             }
@@ -219,8 +229,14 @@ fn sorted_selection<'a>(
     entries
 }
 
-fn differs(old: &Entry, new: &Entry) -> bool {
-    old.uncompressed_size() != new.uncompressed_size() || old.checksum() != new.checksum()
+fn difference(old: &Entry, new: &Entry) -> Option<EntryDecision> {
+    if old.uncompressed_size() != new.uncompressed_size() {
+        Some(EntryDecision::SizeDiffers)
+    } else if old.checksum() != new.checksum() {
+        Some(EntryDecision::ChecksumDiffers)
+    } else {
+        None
+    }
 }
 
 pub(crate) fn check_cancel(options: &CompareOptions<'_>) -> Result<(), ComparisonError> {

@@ -2816,7 +2816,7 @@ code is 0 without and 1 with differences on any compared level.
 | `filter` | string or `null` | The Filter that selected the Entries by path and the Records by the record path of either side |
 | `entries.counts` | object | `added`, `removed` and `changed` Entry counts |
 | `entries.directories` | array | The same counts per top-level directory (`directory`, empty for the root), ordered ignoring case |
-| `entries.fieldOrigins`, `entries.provenance` | objects | Immediate origins for the emitted Entry path and each physical old or new side's size and checksum, with a shared source and use inventory. Paths are JSON Pointers from the report root. Historical v1 reports may omit these members. |
+| `entries.fieldOrigins`, `entries.provenance` | objects | Immediate origins for the emitted Entry path, change decision and each physical old or new side's size and checksum, with a shared source and use inventory. Paths are JSON Pointers from the report root. Historical v1 reports may omit these members. |
 | `entries.changes` | array | One object per Entry: `path` (as the new side stores it, the old side for a removed Entry), `change` (`added`, `removed` or `changed`), and `old` and `new` with `size` and the checksum for the sides that have it: `crc32c` for an Archive Entry, `crc32` for an Entry of a plain ZIP archive (a SHA-256 would be `sha256` as 64 hex digits; no Entry states one) |
 | `records.counts` | object | `added`, `removed`, `moved`, `changed` and `unreadable` Record counts |
 | `records.changes` | array | One object per Record: `guid`, `change` (`added`, `removed`, `moved`, `changed` or `unreadable`), `old` and `new` with `record_path`, `name`, `tag` (version 8 only, absent without one) and `type` for the sides that have it and can be read, `fields`, and `errors` for an unreadable Record |
@@ -2827,7 +2827,13 @@ code is 0 without and 1 with differences on any compared level.
 not compared.
 The Entry field markers describe the directory metadata used by the report. The source inventory
 records the Entry's payload encryption and its container ancestry separately. A missing comparison
-side has no stored fields to attach an origin to.
+side has no stored fields to attach an origin to. Each `change` carries the direct join evidence.
+A matched pair retains both path selectors and both compared sizes. The checksum is also retained
+when equal sizes required the checksum comparison. A one-sided row retains its original observed
+entry and its compared opposing path when available. A source used only as an opposing selector
+retains its physical Entry identity and encryption proof with compact source details. The
+one-sided contributor set is incomplete because
+the earlier join decisions do not form part of that receipt.
 
 Records are joined by GUID. A Record is `moved` when its record path differs, ignoring case and
 separator kind; its changed fields are listed as well. It is `changed` when its name, its type

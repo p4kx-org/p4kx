@@ -74,7 +74,7 @@ pub use default_material_receipt::{
     DefaultMaterialContainer, DefaultMaterialReceipt, DefaultMaterialSource, DefaultMaterialState,
 };
 pub use entry_directory_origins::{
-    EntryDirectoryOrigins, EntryDirectoryOriginsError, directory_path_uses,
+    EntryDirectoryFact, EntryDirectoryOrigins, EntryDirectoryOriginsError, directory_path_uses,
 };
 pub use model_archive_source::{ArchiveModelRead, ModelArchiveSource};
 pub use model_material_origins::{

@@ -10,6 +10,9 @@ use schemars::JsonSchema;
 use serde::ser::Error as _;
 use serde::{Serialize, Serializer};
 
+#[path = "report_entry_decision.rs"]
+mod decision;
+
 use crate::Comparison;
 use crate::report::{ChecksumReport, EntryChangeReport};
 
@@ -55,30 +58,49 @@ fn capture(
     let mut fields = FieldOrigins::new();
     for (index, (change, row)) in comparison.entry_changes().iter().zip(changes).enumerate() {
         let path = format!("/entries/changes/{index}");
-        if let Some((entry, state)) = change.old_entry().zip(row.old.as_ref()) {
-            let origin = observe(
-                old,
-                entry,
-                state.checksum.as_ref(),
-                &uses,
+        let before = change
+            .old_entry()
+            .zip(row.old.as_ref())
+            .map(|(entry, state)| {
+                observe(
+                    old,
+                    entry,
+                    state.checksum.as_ref(),
+                    &uses,
+                    &mut fields,
+                    &format!("{path}/old"),
+                )
+            })
+            .transpose()?;
+        let after = change
+            .new_entry()
+            .zip(row.new.as_ref())
+            .map(|(entry, state)| {
+                observe(
+                    new,
+                    entry,
+                    state.checksum.as_ref(),
+                    &uses,
+                    &mut fields,
+                    &format!("{path}/new"),
+                )
+            })
+            .transpose()?;
+        if let Some(selected) = after.as_ref().or(before.as_ref()) {
+            put(
                 &mut fields,
-                &format!("{path}/old"),
+                &format!("{path}/path"),
+                selected.path_origin().clone(),
             )?;
-            if change.new_entry().is_none() {
-                put(&mut fields, &format!("{path}/path"), origin)?;
-            }
         }
-        if let Some((entry, state)) = change.new_entry().zip(row.new.as_ref()) {
-            let origin = observe(
-                new,
-                entry,
-                state.checksum.as_ref(),
-                &uses,
-                &mut fields,
-                &format!("{path}/new"),
-            )?;
-            put(&mut fields, &format!("{path}/path"), origin)?;
-        }
+        let origin = decision::capture(
+            change.decision(),
+            before.as_ref(),
+            after.as_ref(),
+            comparison,
+            &uses,
+        )?;
+        put(&mut fields, &format!("{path}/change"), origin)?;
     }
     Ok(EntryOriginFields {
         field_origins: fields,
@@ -93,7 +115,7 @@ fn observe(
     uses: &SourceUses,
     fields: &mut FieldOrigins,
     side: &str,
-) -> Result<FieldOrigin, EntryDirectoryOriginsError> {
+) -> Result<EntryDirectoryOrigins, EntryDirectoryOriginsError> {
     let observed = EntryDirectoryOrigins::observe(owner, entry, uses.clone())?;
     put(fields, &format!("{side}/size"), observed.size_origin()?)?;
     if let Some(checksum) = checksum {
@@ -104,7 +126,7 @@ fn observe(
             observed.checksum_origin()?,
         )?;
     }
-    Ok(observed.path_origin().clone())
+    Ok(observed)
 }
 
 fn put(

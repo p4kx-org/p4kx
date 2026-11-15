@@ -4,8 +4,8 @@
 use p4kx_archive::{Archive, Entry};
 
 use crate::{
-    FieldOrigin, InputScope, SourceEvidenceError, SourceInput, SourceLocation, SourceScope,
-    SourceUse, SourceUseRole, SourceUses,
+    FieldOrigin, InputScope, SourceDetails, SourceEvidenceError, SourceInput, SourceLocation,
+    SourceScope, SourceUse, SourceUseRole, SourceUses,
 };
 
 pub(crate) struct EntryDirectorySource {
@@ -21,12 +21,14 @@ impl EntryDirectorySource {
         archive: &Archive,
         entry: &Entry,
         uses: SourceUses,
+        details: SourceDetails,
     ) -> Result<Self, SourceEvidenceError> {
         let observed = archive.observed_entry(entry);
         let input = observed.map_or(SourceInput::Unknown, SourceInput::ArchiveView);
         let ancestors = observed.map_or(0, |entry| entry.ancestors().len());
         let complete = observed.is_some_and(|entry| entry.ancestors().all(|step| step.is_some()));
-        let directory = uses.observe(input, InputScope::ArchiveDirectoryMetadata)?;
+        let directory =
+            uses.observe_with_details(input, InputScope::ArchiveDirectoryMetadata, details)?;
         let (path_uses, complete_path) = directory_path_uses(&directory, ancestors, complete)?;
         let path = uses.origin(&path_uses, complete_path);
         Ok(Self {

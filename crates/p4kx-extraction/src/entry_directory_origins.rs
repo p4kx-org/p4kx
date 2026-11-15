@@ -9,7 +9,8 @@ mod source;
 
 use crate::{
     DosCalendarInfo, EntryMetadataInfo, FieldOrigin, FieldOrigins, FieldOriginsError, FieldPath,
-    FieldPathError, SourceEvidenceError, SourceLocation, SourceUse, SourceUseRole, SourceUses,
+    FieldPathError, SourceDetails, SourceEvidenceError, SourceLocation, SourceUse, SourceUseRole,
+    SourceUses,
 };
 use source::EntryDirectorySource;
 pub use source::directory_path_uses;
@@ -29,6 +30,20 @@ pub enum EntryDirectoryOriginsError {
     Duplicate(#[from] FieldOriginsError),
 }
 
+/// A stored Entry-directory fact read by a caller.
+#[derive(Clone, Copy)]
+#[non_exhaustive]
+pub enum EntryDirectoryFact {
+    /// The admitted physical Entry's index.
+    Position,
+    /// The Entry's original path.
+    Path,
+    /// The decoded Entry length declared in its directory.
+    Size,
+    /// The checksum declared in its directory.
+    Checksum,
+}
+
 /// Field-level origins for an admitted physical Entry directory row.
 pub struct EntryDirectoryOrigins {
     facts: EntryDirectorySource,
@@ -45,8 +60,21 @@ impl EntryDirectoryOrigins {
         entry: &Entry,
         uses: SourceUses,
     ) -> Result<Self, EntryDirectoryOriginsError> {
+        Self::observe_with_details(archive, entry, uses, SourceDetails::Full)
+    }
+
+    /// Binds an Entry with the selected source detail retention.
+    ///
+    /// # Errors
+    /// Returns an error when the source registry cannot bind the original Entry.
+    pub fn observe_with_details(
+        archive: &Archive,
+        entry: &Entry,
+        uses: SourceUses,
+        details: SourceDetails,
+    ) -> Result<Self, EntryDirectoryOriginsError> {
         Ok(Self {
-            facts: EntryDirectorySource::observe(archive, entry, uses)?,
+            facts: EntryDirectorySource::observe(archive, entry, uses, details)?,
             range: entry.metadata().record_range(),
         })
     }
@@ -293,7 +321,7 @@ impl EntryDirectoryOrigins {
     /// # Errors
     /// Returns an error when its original metadata use cannot be registered.
     pub fn size_origin(&self) -> Result<FieldOrigin, SourceEvidenceError> {
-        self.fact_origin("uncompressed_size")
+        self.fact_origin(EntryDirectoryFact::Size)
     }
 
     /// Returns the original directory checksum declaration.
@@ -301,12 +329,29 @@ impl EntryDirectoryOrigins {
     /// # Errors
     /// Returns an error when its original metadata use cannot be registered.
     pub fn checksum_origin(&self) -> Result<FieldOrigin, SourceEvidenceError> {
-        self.fact_origin("checksum")
+        self.fact_origin(EntryDirectoryFact::Checksum)
     }
 
-    fn fact_origin(&self, field: &str) -> Result<FieldOrigin, SourceEvidenceError> {
-        let usage = self.facts.directory_fact(field, SourceUseRole::Payload)?;
-        Ok(self.origin(&[usage]))
+    /// Retains one observed Entry-directory fact with its actual role in the result.
+    ///
+    /// # Errors
+    /// Returns an error when the original metadata use cannot be registered.
+    pub fn use_fact(
+        &self,
+        fact: EntryDirectoryFact,
+        role: SourceUseRole,
+    ) -> Result<SourceUse, SourceEvidenceError> {
+        let field = match fact {
+            EntryDirectoryFact::Position => "owner_entry_index",
+            EntryDirectoryFact::Path => "path",
+            EntryDirectoryFact::Size => "uncompressed_size",
+            EntryDirectoryFact::Checksum => "checksum",
+        };
+        self.facts.directory_fact(field, role)
+    }
+
+    fn fact_origin(&self, fact: EntryDirectoryFact) -> Result<FieldOrigin, SourceEvidenceError> {
+        Ok(self.origin(&[self.use_fact(fact, SourceUseRole::Payload)?]))
     }
 
     /// Returns whether the observed Entry and all container ancestors were bound.

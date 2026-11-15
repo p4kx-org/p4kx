@@ -19,33 +19,57 @@ pub enum ChangeKind {
     Changed,
 }
 
-/// One Entry that was added, removed or changed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum EntryDecision {
+    SizeDiffers,
+    ChecksumDiffers,
+    OrderedAgainst(usize),
+    OppositeExhausted,
+}
+
+/// One Entry that was added, removed or changed.
+#[derive(Debug, Clone, Copy)]
 pub struct EntryChange<'a> {
     old: Option<&'a Entry>,
     new: Option<&'a Entry>,
+    decision: EntryDecision,
 }
 
+impl PartialEq for EntryChange<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.old == other.old && self.new == other.new
+    }
+}
+
+impl Eq for EntryChange<'_> {}
+
 impl<'a> EntryChange<'a> {
-    pub(crate) const fn added(new: &'a Entry) -> Self {
+    pub(crate) const fn added(new: &'a Entry, decision: EntryDecision) -> Self {
         Self {
             old: None,
             new: Some(new),
+            decision,
         }
     }
 
-    pub(crate) const fn removed(old: &'a Entry) -> Self {
+    pub(crate) const fn removed(old: &'a Entry, decision: EntryDecision) -> Self {
         Self {
             old: Some(old),
             new: None,
+            decision,
         }
     }
 
-    pub(crate) const fn changed(old: &'a Entry, new: &'a Entry) -> Self {
+    pub(crate) const fn changed(old: &'a Entry, new: &'a Entry, decision: EntryDecision) -> Self {
         Self {
             old: Some(old),
             new: Some(new),
+            decision,
         }
+    }
+
+    pub(crate) const fn decision(&self) -> EntryDecision {
+        self.decision
     }
 
     /// Returns how the Entry differs.
