@@ -6,7 +6,7 @@ use p4kx_extraction::cryxml::{SourceDocument, SourceReadError, SourceReadOptions
 use p4kx_extraction::sound::wwise_path;
 
 use crate::audio_control_origin as origins;
-use crate::audio_control_payload::{self as wire, AtlDocument, AtlFailure, AtlPayload};
+use crate::audio_control_payload::{self as wire, AtlFailure, AtlPayload};
 use crate::audio_control_projection::{Failure, Projection as AtlProjection};
 use crate::audio_record_origins as records;
 use crate::required_reader;
@@ -18,6 +18,10 @@ use crate::{
 #[cfg(test)]
 #[path = "audio_control_witness.rs"]
 mod witness;
+
+#[cfg(test)]
+#[path = "audio_control_accounting.rs"]
+mod audio_control_accounting;
 
 pub(crate) struct AudioControlProvider;
 
@@ -76,8 +80,7 @@ impl Provider for AudioControlProvider {
             }
         };
         writer.checkpoint()?;
-        document(&projection, &source, context.source.size, writer)?;
-        match projection.tree(&source, writer) {
+        match projection.project(&source, context.source.size, writer) {
             Ok(()) => {
                 projection.document_observed(context.source.size, !source.is_lossy(), writer)?;
             }
@@ -94,47 +97,6 @@ impl Provider for AudioControlProvider {
         }
         Ok(Projection::Written)
     }
-}
-
-fn document(
-    projection: &AtlProjection<'_, '_>,
-    source: &SourceDocument<'_>,
-    size: u64,
-    writer: &mut MediaWriter<'_>,
-) -> Result<(), MediaError> {
-    let repaired = source.is_lossy();
-    let status = if repaired {
-        Status::Partial
-    } else {
-        Status::Complete
-    };
-    let mut prepared = origins::document(projection.input, size, SourceUseRole::Payload, writer)?;
-    let mut issues = Vec::new();
-    if repaired {
-        issues.push(MediaIssue::new(
-            "audio-control.repaired-strings",
-            "document",
-            Severity::Warning,
-            "CryXml string decoding repaired bytes in the retained source.",
-        ));
-        records::subtree(
-            &mut prepared,
-            "/issues",
-            origins::file(projection.input, size, SourceUseRole::Conversion, writer)?,
-            writer,
-        )?;
-    }
-    prepared.write(
-        writer,
-        &Subresource::new(wire::DOCUMENT, Vec::new()),
-        status,
-        &AtlPayload::Document(AtlDocument {
-            format: source.format().into(),
-            root_is_atl_config: source.root().name() == "ATLConfig",
-            repaired_string_bytes: repaired,
-        }),
-        &issues,
-    )
 }
 
 fn failure(

@@ -5,6 +5,7 @@
 //! to Wwise events and the soundbanks that hold those events.
 
 mod atl;
+mod atl_definitions;
 mod banks;
 mod breaks;
 mod cache;
@@ -32,6 +33,7 @@ mod wem_selection;
 pub use p4kx_extraction::sound::wwise_path::ATL_FOLDER;
 
 pub use atl::{AtlTrigger, WwiseEvent};
+pub use atl_definitions::AtlDefinitions;
 pub use banks::IndexedSoundbank;
 pub use breaks::{BreakReason, BrokenLink};
 pub use cache::ArchiveAudio;

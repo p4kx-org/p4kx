@@ -9,10 +9,10 @@ use std::path::Path;
 
 use p4kx_assembly::Entities;
 use p4kx_assembly::audio::{
-    ArchiveAudio, AudioFileError, AudioIndex, AudioIssue, EntityAudio, EntityTrigger, Unmatched,
-    WwiseEvent, trigger_references, wwise_id,
+    ArchiveAudio, AtlDefinitions, AudioFileError, AudioIndex, AudioIssue, EntityAudio,
+    EntityTrigger, Unmatched, WwiseEvent, trigger_references, wwise_id,
 };
-use p4kx_extraction::{Archive, DataForgeEntry};
+use p4kx_extraction::{Archive, CancelToken, DataForgeEntry};
 use p4kx_testkit::{
     ArchiveBuilder, DataForgeBuilder, TestAtl, TestBank, TestEntity, TestEntry, TestHircObject,
     audio_schema, entity_schema, wwise_short_id,
@@ -205,6 +205,54 @@ fn atl_definitions_in_cryxml_and_text_map_triggers_to_wwise_events() -> TestResu
             index.triggers().len(),
             5,
             "triggers outside GameAudio are not read"
+        );
+        Ok(())
+    })
+}
+
+#[test]
+fn atl_definitions_share_lookup_and_issue_prefix_without_opening_soundbanks() -> TestResult {
+    with_archive(|archive| {
+        let definitions = AtlDefinitions::build(archive);
+        let audio = AudioIndex::build(archive);
+        assert_eq!(
+            definitions.triggers(),
+            audio.triggers(),
+            "same authored order, event names, IDs and localisation",
+        );
+        for trigger in definitions.triggers() {
+            let from_audio = audio.trigger(trigger.name()).ok_or("full index trigger")?;
+            assert_eq!(
+                definitions.definition_path(trigger),
+                audio.definition_path(from_audio),
+                "same winning path for {trigger:?}",
+            );
+            assert_eq!(
+                definitions.definition_entry_position(trigger),
+                audio.definition_entry_position(from_audio),
+                "same original Entry position for {trigger:?}",
+            );
+        }
+
+        let (bank_issue, atl_issues) = audio
+            .issues()
+            .split_last()
+            .ok_or("full index reports the malformed BNK")?;
+        assert_eq!(
+            definitions.issues(),
+            atl_issues,
+            "same original ATL failures"
+        );
+        assert!(
+            matches!(bank_issue.error(), AudioFileError::Soundbank(_)),
+            "only the full index opens the malformed BNK",
+        );
+
+        let cancel = CancelToken::new();
+        cancel.cancel();
+        assert!(
+            AtlDefinitions::build_until(archive, &cancel).is_none(),
+            "a cancelled read returns no trigger index",
         );
         Ok(())
     })

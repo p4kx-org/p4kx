@@ -1,21 +1,18 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::hash_map::Entry as Slot;
 use std::collections::{HashMap, HashSet};
 
 use p4kx_archive::{Archive, Entry};
 use p4kx_audio::MusicStinger;
 use p4kx_extraction::CancelToken;
-use p4kx_extraction::sound::wwise_path;
 
-use super::index_read::{BankRead, DefinitionRead, read_definitions, read_soundbanks};
+use super::index_read::{self, BankRead};
 use super::language::SOUND_FOLDER;
 use super::media::{BankPath, Limits, LooseMedia, WemSource};
 use super::read::{folded_order, has_extension, starts_with_folder};
 use super::{
-    AtlTrigger, AudioFileError, AudioIssue, DEFAULT_LANGUAGE, IndexedSoundbank, MAX_AUDIO_TRIGGERS,
-    WemLocation,
+    AtlDefinitions, AtlTrigger, AudioIssue, DEFAULT_LANGUAGE, IndexedSoundbank, WemLocation,
 };
 
 /// The audio data of one Archive: every ATL trigger with its Wwise events, and for every Wwise
@@ -27,9 +24,7 @@ use super::{
 /// name the same trigger, the first by Entry path wins.
 #[derive(Debug, Default)]
 pub struct AudioIndex {
-    atl_files: Vec<DefinitionEntry>,
-    triggers: Vec<AtlTrigger>,
-    by_name: HashMap<Box<str>, usize>,
+    definitions: AtlDefinitions,
     soundbanks: Vec<IndexedSoundbank>,
     events: HashMap<u32, Box<[u32]>>,
     bank_ids: HashMap<u32, Box<[u32]>>,
@@ -37,12 +32,6 @@ pub struct AudioIndex {
     media: HashMap<u32, Box<[MediaSpot]>>,
     loose: LooseMedia,
     issues: Vec<AudioIssue>,
-}
-
-#[derive(Debug)]
-struct DefinitionEntry {
-    path: Box<str>,
-    position: usize,
 }
 
 impl AudioIndex {
@@ -57,12 +46,6 @@ impl AudioIndex {
     /// then.
     #[must_use]
     pub fn build_until(archive: &Archive, cancel: &CancelToken) -> Option<Self> {
-        let mut atl_entries: Vec<(usize, &Entry)> = archive
-            .entries()
-            .iter()
-            .enumerate()
-            .filter(|(_, entry)| wwise_path::is_atl_definition(entry.path()))
-            .collect();
         let mut bank_entries: Vec<(usize, &Entry)> = archive
             .entries()
             .iter()
@@ -82,13 +65,16 @@ impl AudioIndex {
                 len: entry.uncompressed_size(),
             })
             .collect();
-        atl_entries.sort_by(|(_, a), (_, b)| folded_order(a.path(), b.path()));
         bank_entries.sort_by(|(_, a), (_, b)| folded_order(a.path(), b.path()));
         wem_entries.sort_by(|a, b| folded_order(a.path, b.path));
-        let definitions = read_definitions(archive, &atl_entries, cancel)?;
-        let soundbanks = read_soundbanks(archive, &bank_entries, cancel)?;
-        let mut index = Self::default();
-        index.add_definitions(&atl_entries, definitions);
+        let mut definitions = AtlDefinitions::build_until(archive, cancel)?;
+        let soundbanks = index_read::read_soundbanks(archive, &bank_entries, cancel)?;
+        let issues = definitions.take_issues();
+        let mut index = Self {
+            definitions,
+            issues,
+            ..Self::default()
+        };
         index.add_soundbanks(&bank_entries, soundbanks);
         let (loose, failures) = LooseMedia::collect(
             wem_entries.iter().copied(),
@@ -105,42 +91,6 @@ impl AudioIndex {
                 .map(|(path, error)| AudioIssue { path, error }),
         );
         Some(index)
-    }
-
-    fn add_definitions(&mut self, entries: &[(usize, &Entry)], definitions: Vec<DefinitionRead>) {
-        self.atl_files = entries
-            .iter()
-            .map(|&(position, entry)| DefinitionEntry {
-                path: entry.path().into(),
-                position,
-            })
-            .collect();
-        for ((_, entry), definition) in entries.iter().zip(definitions) {
-            let error = match definition {
-                Ok(triggers) => self.add_triggers(triggers).err(),
-                Err(error) => Some(error),
-            };
-            if let Some(error) = error {
-                self.issues.push(AudioIssue {
-                    path: entry.path().into(),
-                    error,
-                });
-            }
-        }
-    }
-
-    fn add_triggers(&mut self, triggers: Vec<AtlTrigger>) -> Result<(), AudioFileError> {
-        for trigger in triggers {
-            if let Slot::Vacant(slot) = self.by_name.entry(trigger.name.to_ascii_lowercase().into())
-            {
-                if self.triggers.len() >= MAX_AUDIO_TRIGGERS {
-                    return Err(AudioFileError::TooManyTriggers);
-                }
-                slot.insert(self.triggers.len());
-                self.triggers.push(trigger);
-            }
-        }
-        Ok(())
     }
 
     fn add_soundbanks(&mut self, entries: &[(usize, &Entry)], soundbanks: Vec<BankRead>) {
@@ -188,36 +138,30 @@ impl AudioIndex {
     /// has it.
     #[must_use]
     pub fn trigger(&self, name: &str) -> Option<&AtlTrigger> {
-        self.by_name
-            .get(name.to_ascii_lowercase().as_str())
-            .and_then(|&position| self.triggers.get(position))
+        self.definitions.trigger(name)
     }
 
     /// Returns every trigger, in the order of their definitions' Entry paths.
     #[must_use]
     pub fn triggers(&self) -> &[AtlTrigger] {
-        &self.triggers
+        self.definitions.triggers()
     }
 
     /// Returns the path of the ATL definition Entry that defines `trigger`, or `None` for a
     /// trigger of another index.
     #[must_use]
     pub fn definition_path(&self, trigger: &AtlTrigger) -> Option<&str> {
-        self.definition_file(trigger).map(|(path, _)| path)
+        self.definitions.definition_path(trigger)
     }
 
     /// Returns the Archive position of the Entry that defines this admitted trigger.
     #[must_use]
     pub fn definition_entry_position(&self, trigger: &AtlTrigger) -> Option<usize> {
-        self.definition_file(trigger).map(|(_, position)| position)
+        self.definitions.definition_entry_position(trigger)
     }
 
     pub(super) fn definition_file(&self, trigger: &AtlTrigger) -> Option<(&str, usize)> {
-        if !std::ptr::eq(self.trigger(trigger.name())?, trigger) {
-            return None;
-        }
-        let file = self.atl_files.get(usize::try_from(trigger.file).ok()?)?;
-        Some((&file.path, file.position))
+        self.definitions.definition_file(trigger)
     }
 
     /// Returns every soundbank that was parsed, in path order.

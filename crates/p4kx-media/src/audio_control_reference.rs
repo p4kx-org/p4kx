@@ -144,77 +144,81 @@ pub(crate) struct NameDeclaration<'document> {
     pub(crate) preload: Option<u64>,
 }
 
+enum NameAction {
+    Wwise,
+    File(paths::AtlFileKind),
+    Target(NamedKind),
+    NamedEdge(NamedKind),
+    Ignore,
+}
+
+impl NameAction {
+    const fn classify(declaration: NameDeclaration<'_>) -> Self {
+        match (declaration.family, declaration.field) {
+            (_, AtlField::ExternalFilename)
+            | (AtlFamily::WwiseExternalSource, AtlField::WwiseName) => {
+                Self::File(paths::AtlFileKind::ExternalMedia)
+            }
+            (AtlFamily::WwiseFile, AtlField::WwiseName) => Self::File(paths::AtlFileKind::Bank),
+            (_, AtlField::WwiseName) => Self::Wwise,
+            (AtlFamily::PreloadRequest, AtlField::Name) => Self::Target(NamedKind::PreloadRequest),
+            (AtlFamily::Rtpc, AtlField::Name) => Self::Target(NamedKind::Rtpc),
+            (AtlFamily::ConfigGroup, AtlField::Name) => Self::Target(NamedKind::ConfigGroup),
+            (AtlFamily::Preload, AtlField::Name) => Self::NamedEdge(NamedKind::PreloadRequest),
+            (AtlFamily::RtpcDependee, AtlField::Name) => Self::NamedEdge(NamedKind::Rtpc),
+            (AtlFamily::Platform, AtlField::ConfigGroupName) => {
+                Self::NamedEdge(NamedKind::ConfigGroup)
+            }
+            _ => Self::Ignore,
+        }
+    }
+}
+
+#[cfg(test)]
+pub(crate) const fn emits_reference(declaration: NameDeclaration<'_>) -> bool {
+    matches!(
+        NameAction::classify(declaration),
+        NameAction::Wwise | NameAction::File(_) | NameAction::NamedEdge(_)
+    )
+}
+
 pub(crate) fn authored_name(
     directory: &DirectoryLookup<'_>,
     input: &MediaOriginInput,
     declaration: NameDeclaration<'_>,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
-    if matches!(declaration.field, AtlField::ExternalFilename) {
-        return paths::project(
-            directory,
-            input,
-            declaration,
-            paths::AtlFileKind::ExternalMedia,
-            writer,
-        );
+    match NameAction::classify(declaration) {
+        NameAction::Wwise => wwise(directory, input, declaration, writer),
+        NameAction::File(kind) => paths::project(directory, input, declaration, kind, writer),
+        NameAction::NamedEdge(kind) => named_edge(directory, input, declaration, kind, writer),
+        NameAction::Target(kind) => {
+            if !declaration.name.is_empty()
+                && let Some(scope) = name_scope(kind, declaration)
+            {
+                directory.index.atl_controls.target(
+                    Named {
+                        kind,
+                        scope,
+                        name: declaration.name,
+                    },
+                    declaration.site,
+                    input,
+                )?;
+            }
+            Ok(())
+        }
+        NameAction::Ignore => Ok(()),
     }
-    if matches!(declaration.field, AtlField::WwiseName) {
-        return match declaration.family {
-            AtlFamily::WwiseFile => paths::project(
-                directory,
-                input,
-                declaration,
-                paths::AtlFileKind::Bank,
-                writer,
-            ),
-            AtlFamily::WwiseExternalSource => paths::project(
-                directory,
-                input,
-                declaration,
-                paths::AtlFileKind::ExternalMedia,
-                writer,
-            ),
-            _ => wwise(directory, input, declaration, writer),
-        };
-    }
-    if declaration.name.is_empty() {
-        return named_edge(directory, input, declaration, writer);
-    }
-    let kind = match (declaration.family, declaration.field) {
-        (AtlFamily::PreloadRequest, AtlField::Name) => Some(NamedKind::PreloadRequest),
-        (AtlFamily::Rtpc, AtlField::Name) => Some(NamedKind::Rtpc),
-        (AtlFamily::ConfigGroup, AtlField::Name) => Some(NamedKind::ConfigGroup),
-        _ => None,
-    };
-    if let Some(kind) = kind
-        && let Some(scope) = name_scope(kind, declaration)
-    {
-        directory.index.atl_controls.target(
-            Named {
-                kind,
-                scope,
-                name: declaration.name,
-            },
-            declaration.site,
-            input,
-        )?;
-    }
-    named_edge(directory, input, declaration, writer)
 }
 
 fn named_edge(
     directory: &DirectoryLookup<'_>,
     input: &MediaOriginInput,
     declaration: NameDeclaration<'_>,
+    kind: NamedKind,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
-    let kind = match (declaration.family, declaration.field) {
-        (AtlFamily::Preload, AtlField::Name) => NamedKind::PreloadRequest,
-        (AtlFamily::RtpcDependee, AtlField::Name) => NamedKind::Rtpc,
-        (AtlFamily::Platform, AtlField::ConfigGroupName) => NamedKind::ConfigGroup,
-        _ => return Ok(()),
-    };
     writer.start_reference()?;
     let evidence = origins::capture(
         input,

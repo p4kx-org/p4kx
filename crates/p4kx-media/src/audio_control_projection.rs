@@ -1,27 +1,30 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::io;
+use std::path::Path;
 
-use p4kx_extraction::cryxml::{
-    SourceContent, SourceContents, SourceDeclaration, SourceDocument, SourceElement,
-    SourceSpanError, SourceSyntax,
-};
-use p4kx_extraction::{DecimalU64, SourceUseRole};
+use p4kx_extraction::SourceUseRole;
+use p4kx_extraction::cryxml::{SourceDocument, SourceSpanError};
 
-use crate::audio_control_fields::{AtlFamily, AtlScalar};
-use crate::audio_control_graph::Site;
 use crate::audio_control_origin as origins;
 use crate::audio_control_payload::{self as wire, AtlPayload, AtlPosition};
-use crate::audio_control_reference as references;
+use crate::audio_control_reference::{self as references, NameDeclaration};
+use crate::audio_record_origins as records;
 use crate::input_budget::InputBudget;
 use crate::origin_input::MediaOriginInput;
-use crate::xml_source_projection::{content_position, element_position, source_content};
-use crate::{DirectoryLookup, MediaError, MediaWriter, Status, Subresource, origin_error};
+use crate::{DirectoryLookup, MediaError, MediaIssue, MediaWriter, Severity, Status, Subresource};
 
+#[cfg(test)]
+#[path = "audio_control_projection_census.rs"]
+mod census;
 #[path = "audio_control_declaration.rs"]
 pub(crate) mod declaration;
-use self::declaration::ObservedDeclaration;
+#[path = "audio_control_projection_walk.rs"]
+mod walk;
+
+#[cfg(test)]
+pub(crate) use self::census::census;
+use self::walk::Sink;
 
 pub(crate) struct Projection<'source, 'directory> {
     pub(crate) input: &'source MediaOriginInput,
@@ -47,244 +50,21 @@ impl From<MediaError> for Failure {
     }
 }
 
-struct Frame<'document> {
-    parent: Option<u64>,
-    children: SourceContents<'document>,
-    sibling: u64,
-    preload: Option<u64>,
-}
-
-struct ElementRoute {
-    location: wire::AtlLocation,
-    index: u64,
-    preload: Option<u64>,
-}
-
-#[derive(Clone, Copy)]
-struct Definition {
-    family: Option<AtlFamily>,
-    preload: Option<u64>,
-}
-
 impl Projection<'_, '_> {
-    pub(crate) fn tree(
+    pub(crate) fn project(
         &self,
         source: &SourceDocument<'_>,
+        size: u64,
         writer: &mut MediaWriter<'_>,
     ) -> Result<(), Failure> {
-        let typed = source.root().name() == "ATLConfig";
-        let mut stack = Vec::new();
-        reserve(&mut stack, writer)?;
-        stack.push(Frame {
-            parent: None,
-            children: source.content(),
-            sibling: 0,
-            preload: None,
-        });
-        let mut next = 0_u64;
-        while let Some(frame) = stack.last_mut() {
-            let Some(item) = frame.children.next() else {
-                stack.pop();
-                continue;
-            };
-            self.work(writer)?;
-            let location = wire::AtlLocation {
-                parent: frame.parent.map(DecimalU64::new),
-                sibling_ordinal: DecimalU64::new(frame.sibling),
-            };
-            frame.sibling = advance(frame.sibling)?;
-            let index = next;
-            next = advance(next)?;
-            match item? {
-                SourceContent::Element(element) => {
-                    let route = ElementRoute {
-                        location,
-                        index,
-                        preload: frame.preload,
-                    };
-                    let child = self.element(element, route, typed, writer)?;
-                    reserve(&mut stack, writer)?;
-                    stack.push(child);
-                }
-                other => self.content(&other, location, index, writer)?,
-            }
-        }
-        Ok(())
-    }
-
-    fn element<'document>(
-        &self,
-        element: SourceElement<'document>,
-        route: ElementRoute,
-        typed: bool,
-        writer: &mut MediaWriter<'_>,
-    ) -> Result<Frame<'document>, Failure> {
-        let ElementRoute {
-            location,
-            index,
-            preload,
-        } = route;
-        let syntax = element.syntax()?;
-        let position = element_position(&element.position())?;
-        self.write(
-            position,
-            "element",
-            &Subresource::new(wire::ELEMENT, vec![index]),
-            &AtlPayload::Element(wire::AtlElement {
-                qualified_name: syntax.qualified_name(),
-                namespace: element.namespace(),
-                location,
-                position,
-            }),
+        let mut sink = WriterSink {
+            input: self.input,
+            budget: self.budget,
+            directory: self.directory,
             writer,
-        )?;
-        let family = if typed {
-            AtlFamily::from_tag(element.name())
-        } else {
-            None
+            size,
         };
-        let preload = if family == Some(AtlFamily::PreloadRequest) {
-            Some(index)
-        } else {
-            preload
-        };
-        let definition = Definition { family, preload };
-        self.declarations(&syntax, definition, position, index, writer)?;
-        if let Some(text) = syntax.binary_text() {
-            let position = content_position(text.position())?;
-            self.write(
-                position,
-                "content",
-                &Subresource::new(wire::BINARY_TEXT, vec![index]),
-                &AtlPayload::BinaryText(wire::AtlBinaryText {
-                    position,
-                    value: text.value(),
-                }),
-                writer,
-            )?;
-        }
-        Ok(Frame {
-            parent: Some(index),
-            children: syntax.content()?,
-            sibling: 0,
-            preload,
-        })
-    }
-
-    fn declarations(
-        &self,
-        syntax: &SourceSyntax<'_>,
-        definition: Definition,
-        position: AtlPosition,
-        index: u64,
-        writer: &mut MediaWriter<'_>,
-    ) -> Result<(), Failure> {
-        if let Some(family) = definition.family {
-            self.write(
-                position,
-                "element",
-                &Subresource::new(wire::DEFINITION, vec![index]),
-                &AtlPayload::Definition(wire::AtlDefinition { family }),
-                writer,
-            )?;
-        }
-        for (ordinal, declaration) in syntax.declarations().enumerate() {
-            self.work(writer)?;
-            self.declaration(&declaration?, definition, [index, ordinal as u64], writer)?;
-        }
-        Ok(())
-    }
-
-    fn declaration(
-        &self,
-        declaration: &SourceDeclaration<'_>,
-        definition: Definition,
-        indices: [u64; 2],
-        writer: &mut MediaWriter<'_>,
-    ) -> Result<(), Failure> {
-        let observed = ObservedDeclaration::read(declaration, definition.family)?;
-        let position = observed.original.position;
-        self.write(
-            position,
-            "declaration",
-            &Subresource::new(wire::DECLARATION, indices.to_vec()),
-            &AtlPayload::Declaration(observed.original),
-            writer,
-        )?;
-        if let Some(typed) = observed.typed {
-            let short_id = match &typed.record.typed_value {
-                AtlScalar::WwiseEvent { id, .. } => Some(*id),
-                _ => None,
-            };
-            let site = Site {
-                entry: self.entry,
-                indices,
-                position,
-            };
-            references::authored_name(
-                self.directory,
-                self.input,
-                references::NameDeclaration {
-                    family: typed.family,
-                    field: typed.record.field,
-                    name: declaration.value(),
-                    short_id,
-                    site,
-                    preload: definition.preload,
-                },
-                writer,
-            )?;
-            let prepared = origins::observation(
-                self.input,
-                position,
-                "declaration",
-                SourceUseRole::Conversion,
-                writer,
-            )?;
-            prepared.write(
-                writer,
-                &Subresource::new(wire::FIELD, indices.to_vec()),
-                Status::Complete,
-                &AtlPayload::Field(typed.record),
-                &[],
-            )?;
-        }
-        Ok(())
-    }
-
-    fn content(
-        &self,
-        content: &SourceContent<'_>,
-        location: wire::AtlLocation,
-        index: u64,
-        writer: &mut MediaWriter<'_>,
-    ) -> Result<(), Failure> {
-        let (position, content) = source_content(content)?;
-        self.write(
-            position,
-            "content",
-            &Subresource::new(wire::CONTENT, vec![index]),
-            &AtlPayload::Content(wire::AtlContent {
-                location,
-                position,
-                content,
-            }),
-            writer,
-        )?;
-        Ok(())
-    }
-
-    fn write(
-        &self,
-        position: AtlPosition,
-        field: &str,
-        subresource: &Subresource,
-        payload: &AtlPayload<'_>,
-        writer: &mut MediaWriter<'_>,
-    ) -> Result<(), MediaError> {
-        let prepared =
-            origins::observation(self.input, position, field, SourceUseRole::Payload, writer)?;
-        prepared.write(writer, subresource, Status::Complete, payload, &[])
+        walk::project(source, self.entry, &mut sink)
     }
 
     pub(crate) fn document_observed(
@@ -299,20 +79,72 @@ impl Projection<'_, '_> {
             .atl_controls
             .document(self.entry, complete, evidence)
     }
+}
 
-    fn work(&self, writer: &MediaWriter<'_>) -> Result<(), MediaError> {
+struct WriterSink<'source, 'directory, 'run> {
+    input: &'source MediaOriginInput,
+    budget: &'source InputBudget,
+    directory: &'source DirectoryLookup<'directory>,
+    writer: &'source mut MediaWriter<'run>,
+    size: u64,
+}
+
+impl Sink for WriterSink<'_, '_, '_> {
+    fn work(&mut self) -> Result<(), MediaError> {
         self.budget
-            .metadata(0, 1, writer.limits(), writer.checkpoint)
+            .metadata(0, 1, self.writer.limits(), self.writer.checkpoint)
     }
-}
 
-fn reserve<T>(stack: &mut Vec<T>, writer: &MediaWriter<'_>) -> Result<(), MediaError> {
-    stack.try_reserve(1).map_err(|cause| MediaError::Io {
-        path: writer.root.clone(),
-        source: io::Error::new(io::ErrorKind::OutOfMemory, cause),
-    })
-}
+    fn path(&self) -> &Path {
+        &self.writer.root
+    }
 
-fn advance(value: u64) -> Result<u64, MediaError> {
-    value.checked_add(1).ok_or_else(origin_error::counter)
+    fn document(&mut self, payload: wire::AtlDocument) -> Result<(), MediaError> {
+        let writer = &mut *self.writer;
+        let status = if payload.repaired_string_bytes {
+            Status::Partial
+        } else {
+            Status::Complete
+        };
+        let mut prepared =
+            origins::document(self.input, self.size, SourceUseRole::Payload, writer)?;
+        let mut issues = Vec::new();
+        if payload.repaired_string_bytes {
+            issues.push(MediaIssue::new(
+                "audio-control.repaired-strings",
+                "document",
+                Severity::Warning,
+                "CryXml string decoding repaired bytes in the retained source.",
+            ));
+            records::subtree(
+                &mut prepared,
+                "/issues",
+                origins::file(self.input, self.size, SourceUseRole::Conversion, writer)?,
+                writer,
+            )?;
+        }
+        prepared.write(
+            writer,
+            &Subresource::new(wire::DOCUMENT, Vec::new()),
+            status,
+            &AtlPayload::Document(payload),
+            &issues,
+        )
+    }
+
+    fn record(
+        &mut self,
+        position: AtlPosition,
+        field: &'static str,
+        role: SourceUseRole,
+        subresource: &Subresource,
+        payload: &AtlPayload<'_>,
+    ) -> Result<(), MediaError> {
+        let prepared = origins::observation(self.input, position, field, role, self.writer)?;
+        prepared.write(self.writer, subresource, Status::Complete, payload, &[])
+    }
+
+    fn name(&mut self, declaration: NameDeclaration<'_>) -> Result<(), MediaError> {
+        references::authored_name(self.directory, self.input, declaration, self.writer)
+    }
 }

@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 
-use p4kx_assembly::audio::AudioIndex;
+use p4kx_assembly::audio::AtlDefinitions;
 use p4kx_extraction::Archive;
 use p4kx_extraction::cryxml::SourceElement;
 use p4kx_extraction::sound::wwise_id;
@@ -57,7 +57,7 @@ impl Triggers {
         }
     }
 
-    pub(super) fn verify(&self, archive: &Archive, index: &AudioIndex) -> TestResult {
+    pub(super) fn verify(&self, archive: &Archive, index: &AtlDefinitions) -> TestResult {
         require(
             !self.by_name.is_empty(),
             "positive installed root trigger coverage",

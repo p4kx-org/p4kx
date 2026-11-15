@@ -5,8 +5,8 @@ use std::fs;
 use std::io::Read;
 use std::path::{Component, Path};
 
+use crate::{Algorithm, ByteScope, RawReference};
 use p4kx_extraction::{Archive, Checksum, Entry};
-use p4kx_media::{Algorithm, ByteScope, RawReference};
 use sha2::{Digest as _, Sha256};
 
 use super::TestResult;

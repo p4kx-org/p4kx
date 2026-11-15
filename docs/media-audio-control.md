@@ -61,24 +61,31 @@ requested with `--diagnostic`. The original raw source remains separately recove
 
 ## Installed ATL checks
 
-Both checks use the standard `P4KX_DATA_P4K` and Archive key settings. The
-authored-field witness reports the opened Build and walks root ATL XML Entries
-in physical order. It skips other XML roots after verification and stops once
-all required declaration groups are observed. An exhausted source scope
-reports the missing groups by name.
+Both checks use `P4KX_DATA_P4K` and the configured Archive key. The census also
+accepts an optional second Build through `P4KX_DATA_P4K_B`.
 
 ```powershell
 cargo test --locked -p p4kx-media --lib sampled_original_atl_families_keep_their_exact_authored_values_and_origins -- --ignored --nocapture
-cargo test --locked -p p4kx-media --test audio_control_accounting original_atl_source_counts_reconcile_with_assembly -- --ignored --nocapture
+cargo test --locked -p p4kx-media --lib original_atl_census_reconciles_media_and_assembly_without_exports -- --ignored --nocapture
 ```
 
-The sample verifies each selected source checksum, the original spelling and
-typed values for all six ATL families, and per-value origins down to the actual
-Entry and XML byte or CryXml table position. It serializes values and binds
-origins in memory. The whole-root census reads original ATL XML and reconciles
-original trigger winners, event order, IDs and localisation with Assembly
-AudioIndex. Both installed checks perform zero Media artifact writes.
+The sample verifies each selected Entry checksum, original spelling, typed
+values from all six ATL families, and per-value origins down to the XML byte or
+CryXml table position. It walks root Entries in physical order and stops after
+all required declaration groups are represented. An exhausted scan reports
+missing groups by name.
 
-The synthetic Media replay compares complete exported records and their raw
-sidecars. Whole-root Media publication and record-count reconciliation against
-an installed Build require separate scale evidence.
+The whole-root census compares an independent XML count of documents, elements,
+declarations, definitions and authored references with the same row projection
+used by the Media writer, separately for each physical Entry. The comparison
+runs in memory. It reads one verified XML Entry at a time, binds the Build
+before and after the scan, and requires complete original XML spans. Assembly's
+`AtlDefinitions` uses the same trigger projection as `AudioIndex` to reconcile
+winning definitions, event order, IDs and localisation. It reads ATL definitions
+only.
+
+Both installed checks perform zero Media artifact writes. A small synthetic
+export compares the same counts with published records and verifies raw
+sidecars. Directory target resolution, candidate rows and on-disk publication
+are checked by synthetic fixtures. Installed on-disk publication requires
+separate scale evidence.

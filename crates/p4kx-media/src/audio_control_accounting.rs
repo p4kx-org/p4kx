@@ -1,30 +1,35 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Compares original ATL definitions, Assembly triggers and synthetic Media rows.
+//! Compares independent ATL source counts with the Media projection and Assembly triggers.
 
 use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
-use std::io::{self, BufRead, BufReader, Read, Write as _};
+use std::io::{BufRead, BufReader, Read};
 use std::path::Path;
 
-use p4kx_assembly::audio::AudioIndex;
+use p4kx_assembly::audio::AtlDefinitions;
 use p4kx_extraction::cryxml::{SourceDocument, SourceElement, SourceReadOptions};
 use p4kx_extraction::sound::wwise_path;
 use p4kx_extraction::{Archive, ArchiveWatch, Exclusion, Filter};
-use p4kx_media::{
-    ContainerIdentity, ExportOptions, ExportOutcome, Identity, MediaKind, MediaRecord, Status,
-};
-use p4kx_testkit::{real_archive_key, real_archive_path};
 
-#[path = "privacy.rs"]
+use crate::audio_control_projection::{self, Failure};
+use crate::{
+    ContainerIdentity, ExportOptions, ExportOutcome, Identity, MediaError, MediaKind, MediaRecord,
+    Status,
+};
+
+#[path = "../tests/real_archive/privacy.rs"]
 mod privacy;
-#[path = "audio_control_support.rs"]
+#[path = "audio_control_accounting_support.rs"]
 mod support;
 
 use support::require;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
+
+#[path = "audio_control_accounting_installed.rs"]
+mod installed;
 
 #[path = "audio_control_trigger_oracle.rs"]
 mod trigger_oracle;
@@ -40,91 +45,6 @@ struct Census {
     edges: u64,
 }
 
-#[derive(Debug)]
-enum Phase {
-    OpenArchive,
-    ReadOriginal,
-    ComparePlaybackIndex,
-    CheckArchive,
-}
-
-struct Verification {
-    input: usize,
-    phase: Phase,
-}
-
-impl Verification {
-    fn enter(&mut self, phase: Phase) -> TestResult {
-        self.phase = phase;
-        let mut output = io::stdout().lock();
-        writeln!(
-            output,
-            "Running ATL archive input {}: {:?}",
-            self.input, self.phase
-        )?;
-        output.flush()?;
-        Ok(())
-    }
-}
-
-#[test]
-#[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
-fn original_atl_source_counts_reconcile_with_assembly() -> Result<(), String> {
-    let first = real_archive_path().map_err(|_| "missing configured ATL archive".to_owned())?;
-    verify_installed(&first, 1)?;
-    if let Some(second) = p4kx_testkit::real_archive_b_path() {
-        verify_installed(&second, 2)?;
-    }
-    Ok(())
-}
-
-fn verify_installed(path: &Path, input: usize) -> Result<(), String> {
-    let mut verification = Verification {
-        input,
-        phase: Phase::OpenArchive,
-    };
-    let result = (|| {
-        verification.enter(Phase::OpenArchive)?;
-        let archive = Archive::open_with_key(path, Some(real_archive_key()?))?;
-        verify_original_and_assembly(&archive, &mut verification)
-    })();
-    privacy::redact(result).map_err(|_| {
-        format!(
-            "ATL archive input {input} failed during {:?}",
-            verification.phase
-        )
-    })
-}
-
-fn verify_original_and_assembly(archive: &Archive, verification: &mut Verification) -> TestResult {
-    verification.enter(Phase::ReadOriginal)?;
-    let watch = ArchiveWatch::new(archive);
-    let (expected, triggers) = source_counts(archive, &watch)?;
-    require(!expected.is_empty(), "root definitions present")?;
-
-    report_census(&expected)?;
-    verification.enter(Phase::ComparePlaybackIndex)?;
-    triggers.verify(archive, &AudioIndex::build(archive))?;
-    verification.enter(Phase::CheckArchive)?;
-    watch.check()?;
-    Ok(())
-}
-
-fn report_census(expected: &BTreeMap<usize, Census>) -> TestResult {
-    let mut sum = Census::default();
-    for source in expected.values() {
-        sum.documents += source.documents;
-        sum.elements += source.elements;
-        sum.declarations += source.declarations;
-        sum.definitions += source.definitions;
-        sum.edges += source.edges;
-    }
-    let mut output = io::stdout().lock();
-    writeln!(output, "Original root ATL census: {sum:?}")?;
-    output.flush()?;
-    Ok(())
-}
-
 fn verify_synthetic_export(archive: &Archive) -> TestResult {
     let watch = ArchiveWatch::new(archive);
     let (expected, triggers) = source_counts(archive, &watch)?;
@@ -136,8 +56,7 @@ fn verify_synthetic_export(archive: &Archive) -> TestResult {
         exclude: Exclusion::parse(["*.pak", "*.socpak"])?,
         ..ExportOptions::default()
     };
-    let ExportOutcome::Published { index, .. } =
-        p4kx_media::export(archive, scratch.path(), &options)?
+    let ExportOutcome::Published { index, .. } = crate::export(archive, scratch.path(), &options)?
     else {
         return Err("root audio-control generation incomplete".into());
     };
@@ -154,7 +73,7 @@ fn verify_synthetic_export(archive: &Archive) -> TestResult {
         "physical ATL occurrence and edge counts agree",
     )?;
 
-    triggers.verify(archive, &AudioIndex::build(archive))?;
+    triggers.verify(archive, &AtlDefinitions::build(archive))?;
     watch.check()?;
     scratch.close()?;
     Ok(())
@@ -183,12 +102,39 @@ fn source_counts(
             ..Default::default()
         };
         tally(root, typed, &mut census)?;
+        compare_projection(&source, position, watch, &census)?;
         if typed {
             triggers.observe(entry.path(), position, root);
         }
         counts.insert(position, census);
     }
     Ok((counts, triggers))
+}
+
+fn compare_projection(
+    source: &SourceDocument<'_>,
+    position: usize,
+    watch: &ArchiveWatch,
+    expected: &Census,
+) -> TestResult {
+    let projected = match audio_control_projection::census(source, position, || {
+        watch.poll().map_err(MediaError::from)
+    }) {
+        Ok(projected) => projected,
+        Err(Failure::Span) => return Err("Media row projection requires exact ATL spans".into()),
+        Err(Failure::Fatal(cause)) => return Err(cause.into()),
+    };
+    let actual = Census {
+        documents: projected.documents,
+        elements: projected.elements,
+        declarations: projected.declarations,
+        definitions: projected.definitions,
+        edges: projected.edges,
+    };
+    require(
+        &actual == expected,
+        "ATL source and Media projection rows agree",
+    )
 }
 
 fn tally(root: SourceElement<'_>, typed: bool, census: &mut Census) -> TestResult {
@@ -346,7 +292,16 @@ fn root_atl_accounts_for_physical_documents_and_index_precedence() -> TestResult
         .entry(TestEntry::stored("Data/Libs/GameAudio/z.xml", br#"<ATLConfig>
           <AudioTriggers><ATLTrigger atl_name="WINNER"><WwiseEvent wwise_name="shadow"/></ATLTrigger>
           <ATLTrigger atl_name="one"><WwiseEvent wwise_name="sole"/></ATLTrigger></AudioTriggers>
-          <AudioPreloads><ATLPreloadRequest atl_name="source"><ATLPreload atl_name="missing"/></ATLPreloadRequest></AudioPreloads>
+          <AudioRTPCs><ATLRtpc atl_name="rate"><WwiseRtpc wwise_name="speed"/></ATLRtpc></AudioRTPCs>
+          <AudioPreloads><ATLPreloadRequest atl_name="source">
+            <ATLPreload atl_name="missing"/><ATLPreload atl_name=""/>
+            <RTPCDependees><ATLRTPCDependee atl_name="rate"/></RTPCDependees>
+            <ATLPlatforms><Platform atl_config_group_name="desktop"/></ATLPlatforms>
+            <ATLConfigGroup atl_name="desktop"><WwiseFile wwise_name="Data/Sounds/wwise/synthetic.bnk"/></ATLConfigGroup>
+          </ATLPreloadRequest></AudioPreloads>
+          <AudioExternalSources><ATLExternalSource atl_name="external"><ATLExternalSourceEntry>
+            <WwiseExternalSource wwise_name="" wwise_filename="sample.wem"/>
+          </ATLExternalSourceEntry></ATLExternalSource></AudioExternalSources>
         </ATLConfig>"#))
         .entry(TestEntry::stored("Data/Libs/GameAudio/A.xml", first.to_cryxml(CryXmlSignature::CryXmlB, CryXmlByteOrder::Little)).encrypted())
         .entry(TestEntry::stored("Data/Libs/GameAudio/settings.xml", b"<Settings><NotAControl/></Settings>"))
@@ -354,4 +309,18 @@ fn root_atl_accounts_for_physical_documents_and_index_precedence() -> TestResult
         .write_to(&path)?;
     let archive = Archive::open_with_key(path, Some(test_key()))?;
     verify_synthetic_export(&archive)
+}
+
+#[test]
+fn atl_census_propagates_cancellation_before_counting_rows() -> TestResult {
+    let source = SourceDocument::parse(
+        b"<ATLConfig><AudioTriggers/></ATLConfig>",
+        SourceReadOptions::default(),
+    )?;
+    let result = audio_control_projection::census(&source, 0, || Err(MediaError::Cancelled));
+    assert!(
+        matches!(result, Err(Failure::Fatal(MediaError::Cancelled))),
+        "census preserves the production checkpoint error",
+    );
+    Ok(())
 }
