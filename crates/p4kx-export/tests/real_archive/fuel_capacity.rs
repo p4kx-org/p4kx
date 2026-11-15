@@ -200,7 +200,7 @@ fn compare_container(source: &StructValue<'_>, row: &Value) -> TestResult {
     Ok(())
 }
 
-fn compare_capacity(original: Option<&Original<'_>>, cell: &Value) -> TestResult {
+pub(super) fn compare_capacity(original: Option<&Original<'_>>, cell: &Value) -> TestResult {
     let unit = match original {
         None => return require_state(cell, "absent"),
         Some(Original::Null) => return require_state(cell, "null"),
