@@ -12,6 +12,7 @@
 
 mod approximation;
 mod diagnostic;
+mod loop_origin;
 mod origins;
 mod output;
 mod render;
@@ -24,11 +25,15 @@ use std::collections::HashMap;
 use std::io;
 use std::path::{Path, PathBuf};
 
+use p4kx_audio::Loop;
 use p4kx_extraction::{Archive, ArchiveWatch, ArchiveWriteProtection, CancelToken, ConflictPolicy};
 
+use self::origins::OriginInputs;
 use self::render::{RenderedTxtp, SoundFile, comment_text, render};
 use super::export::name::{StemSet, portable_stem};
-use super::{ExportReport, ExportState, ExportedSound, SoundVariant, TriggerSounds};
+use super::{
+    ExportLoopOrigins, ExportReport, ExportState, ExportedSound, SoundVariant, TriggerSounds,
+};
 
 /// The extension of a TXTP file, without the dot.
 const EXTENSION: &str = "txtp";
@@ -55,7 +60,9 @@ pub struct TxtpFile {
     pub breaks: usize,
     /// Approximation codes for written or byte-verified content, or `None` when unchecked.
     pub approximations: Option<Vec<TxtpApproximation>>,
-    /// Field-addressed origin of the emitted approximation codes when reported.
+    /// Loop frames of the rendered sound commands, in file-line order, when any loop exists.
+    pub command_loops: Option<Vec<Option<Loop>>>,
+    /// Field-addressed origin of the diagnosed and rendered values when reported.
     pub origins: Option<TxtpOrigins>,
     /// Companion path for a file committed by this export.
     pub origin_receipt: Option<PathBuf>,
@@ -151,6 +158,42 @@ pub fn write_txtp_with_origins(
     policy: ConflictPolicy,
     cancel: &CancelToken,
 ) -> io::Result<TxtpReport> {
+    write_with_evidence(archive, triggers, exported, folder, policy, cancel, None)
+}
+
+/// Writes TXTP origins using loop evidence from the same sound export.
+///
+/// # Errors
+/// Returns an error when the archive changed or cannot be protected from output writes.
+pub fn write_txtp_with_loop_origins(
+    archive: &Archive,
+    triggers: &[&TriggerSounds<'_>],
+    exported: &ExportReport,
+    folder: &Path,
+    policy: ConflictPolicy,
+    cancel: &CancelToken,
+    loop_origins: &ExportLoopOrigins,
+) -> io::Result<TxtpReport> {
+    write_with_evidence(
+        archive,
+        triggers,
+        exported,
+        folder,
+        policy,
+        cancel,
+        Some(loop_origins),
+    )
+}
+
+fn write_with_evidence(
+    archive: &Archive,
+    triggers: &[&TriggerSounds<'_>],
+    exported: &ExportReport,
+    folder: &Path,
+    policy: ConflictPolicy,
+    cancel: &CancelToken,
+    loop_origins: Option<&ExportLoopOrigins>,
+) -> io::Result<TxtpReport> {
     ArchiveWatch::new(archive)
         .check()
         .map_err(io::Error::other)?;
@@ -160,6 +203,7 @@ pub fn write_txtp_with_origins(
         archive,
         protection: &protection,
         cancel,
+        loop_origins,
     };
     Ok(write_files(
         triggers,
@@ -188,6 +232,10 @@ fn write_files(
         .iter()
         .map(|sound| ((sound.trigger.as_str(), sound.wem_id), sound))
         .collect();
+    let loop_origins = destination
+        .origins
+        .as_ref()
+        .and_then(|context| context.loop_origins);
     let mut report = TxtpReport::default();
     let mut stems = StemSet::default();
     for trigger in triggers {
@@ -205,7 +253,7 @@ fn write_files(
                 .iter()
                 .filter(|broken| std::ptr::eq(broken.event(), event))
                 .count();
-            let files = files_of(name, variants, &sounds);
+            let files = files_of(name, variants, &sounds, loop_origins);
             let written =
                 event_text(name, event.name(), variants, &files, breaks).and_then(|rendered| {
                     let path = folder.join(format!(
@@ -240,7 +288,7 @@ fn publish_event(
     trigger: &str,
     event: &str,
     breaks: usize,
-    rendered: RenderedTxtp,
+    rendered: RenderedTxtp<'_>,
     variants: &[SoundVariant<'_>],
     destination: &Destination<'_>,
 ) -> Result<TxtpFile, String> {
@@ -251,10 +299,18 @@ fn publish_event(
             &rendered.text,
             destination.policy,
             context,
-            &diagnostics,
+            &OriginInputs {
+                diagnostics: &diagnostics,
+                loops: &rendered.loops,
+            },
         )?
     } else {
         output::write(&path, &rendered.text, destination.policy)?
+    };
+    let command_loops = if publication.verified_content {
+        rendered.command_loops()
+    } else {
+        None
     };
     Ok(TxtpFile {
         trigger: trigger.to_owned(),
@@ -266,19 +322,20 @@ fn publish_event(
         approximations: publication
             .verified_content
             .then_some(rendered.approximations),
+        command_loops,
         origins: publication.origins,
         origin_receipt: publication.origin_receipt,
     })
 }
 
 /// Returns the TXTP text of one event, or why it cannot be written.
-fn event_text(
+fn event_text<'a>(
     trigger: &str,
     event: &str,
     variants: &[SoundVariant<'_>],
-    files: &HashMap<u32, SoundFile<'_>>,
+    files: &HashMap<u32, SoundFile<'a>>,
     breaks: usize,
-) -> Result<RenderedTxtp, String> {
+) -> Result<RenderedTxtp<'a>, String> {
     let tree = tree::build(variants).ok_or_else(|| "the event has no object path".to_owned())?;
     let mut header = vec![format!("P4KX: event {event} of trigger {trigger}")];
     if breaks > 0 {
@@ -294,6 +351,7 @@ fn files_of<'a>(
     trigger: &str,
     variants: &[SoundVariant<'_>],
     sounds: &HashMap<(&str, u32), &'a ExportedSound>,
+    loop_origins: Option<&'a ExportLoopOrigins>,
 ) -> HashMap<u32, SoundFile<'a>> {
     variants
         .iter()
@@ -306,6 +364,7 @@ fn files_of<'a>(
                 SoundFile {
                     name,
                     loop_points: sound.loop_points,
+                    loop_origin: loop_origins.and_then(|origins| origins.for_sound(sound)),
                     prefetch_only: sound.prefetch_only,
                 },
             ))

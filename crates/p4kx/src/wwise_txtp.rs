@@ -5,8 +5,8 @@ use std::io::{self, Write};
 use std::path::Path;
 
 use p4kx_assembly::audio::{
-    ExportReport, ExportState, TriggerSounds, TxtpApproximation, TxtpReport,
-    write_txtp_with_origins,
+    ExportLoopOrigins, ExportReport, ExportState, TriggerSounds, TxtpApproximation, TxtpReport,
+    write_txtp_with_loop_origins,
 };
 use p4kx_extraction::{Archive, CancelToken, FieldOrigins, SourceInventory};
 use serde::Serialize;
@@ -34,12 +34,26 @@ struct TxtpFileJson<'a> {
     kept: bool,
     breaks: usize,
     approximations: Option<Vec<&'static str>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    commands: Option<Vec<SoundCommandJson>>,
     #[serde(rename = "fieldOrigins", skip_serializing_if = "Option::is_none")]
     field_origins: Option<&'a FieldOrigins>,
     #[serde(skip_serializing_if = "Option::is_none")]
     provenance: Option<&'a SourceInventory>,
     #[serde(rename = "originReceipt")]
     origin_receipt: Option<String>,
+}
+
+#[derive(Serialize)]
+struct SoundCommandJson {
+    #[serde(rename = "loop", skip_serializing_if = "Option::is_none")]
+    loop_points: Option<LoopJson>,
+}
+
+#[derive(Serialize)]
+struct LoopJson {
+    start: u64,
+    end: u64,
 }
 
 #[derive(Serialize)]
@@ -56,14 +70,16 @@ pub(crate) fn write(
     args: &WwiseExtractArgs,
     archive: &Archive,
     cancel: &CancelToken,
+    loop_origins: &ExportLoopOrigins,
 ) -> io::Result<TxtpReport> {
-    write_txtp_with_origins(
+    write_txtp_with_loop_origins(
         archive,
         &[sounds],
         exported,
         &args.out,
         policy(args.export.conflict),
         cancel,
+        loop_origins,
     )
 }
 
@@ -88,6 +104,17 @@ pub(crate) fn to_json(report: &TxtpReport) -> TxtpJson<'_> {
                         .iter()
                         .copied()
                         .map(TxtpApproximation::code)
+                        .collect()
+                }),
+                commands: file.command_loops.as_ref().map(|commands| {
+                    commands
+                        .iter()
+                        .map(|points| SoundCommandJson {
+                            loop_points: points.map(|points| LoopJson {
+                                start: points.start,
+                                end: points.end,
+                            }),
+                        })
                         .collect()
                 }),
                 field_origins: file.origins.as_ref().map(|origins| &origins.field_origins),

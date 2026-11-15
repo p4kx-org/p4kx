@@ -10,15 +10,16 @@ use p4kx_extraction::{
     FileReceipt, check_path_length, write_replacing_counted,
 };
 
-use crate::audio::ExportState;
+use crate::audio::{ExportLoopOrigins, ExportState};
 
 use super::TxtpOrigins;
-use super::diagnostic::TxtpDiagnostic;
+use super::origins::OriginInputs;
 
 pub(super) struct OriginContext<'a> {
     pub(super) archive: &'a Archive,
     pub(super) protection: &'a ArchiveWriteProtection,
     pub(super) cancel: &'a CancelToken,
+    pub(super) loop_origins: Option<&'a ExportLoopOrigins>,
 }
 
 pub(super) struct PublishedFile {
@@ -68,14 +69,13 @@ pub(super) fn write_with_origins(
     text: &str,
     policy: ConflictPolicy,
     context: &OriginContext<'_>,
-    diagnostics: &[TxtpDiagnostic<'_>],
+    inputs: &OriginInputs<'_>,
 ) -> Result<PublishedFile, String> {
     check_length(path)?;
     if let Some(kept) = skip_existing(path, policy) {
         return Ok(kept);
     }
-    publish_with_origins(path, text, policy, context, diagnostics)
-        .map_err(|error| error.to_string())
+    publish_with_origins(path, text, policy, context, inputs).map_err(|error| error.to_string())
 }
 
 fn publish_with_origins(
@@ -83,7 +83,7 @@ fn publish_with_origins(
     text: &str,
     policy: ConflictPolicy,
     context: &OriginContext<'_>,
-    diagnostics: &[TxtpDiagnostic<'_>],
+    inputs: &OriginInputs<'_>,
 ) -> io::Result<PublishedFile> {
     let receipt = FileReceipt::new_with_cancel(
         path,
@@ -91,7 +91,7 @@ fn publish_with_origins(
         Some(context.protection),
         context.cancel.clone(),
     )?;
-    let origins = TxtpOrigins::capture(Some(context.archive), diagnostics)?;
+    let origins = TxtpOrigins::capture(Some(context.archive), inputs)?;
     match receipt.publish_bytes(text.as_bytes(), policy, |writer, binding| {
         origins.write_companion(writer, binding)
     })? {
@@ -110,7 +110,7 @@ fn publish_with_origins(
             state: ExportState::Kept,
             verified_content,
             origins: verified_content
-                .then(|| TxtpOrigins::capture(None, diagnostics))
+                .then(|| TxtpOrigins::capture(None, inputs))
                 .transpose()?,
             origin_receipt: None,
         }),

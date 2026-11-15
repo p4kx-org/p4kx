@@ -23,6 +23,8 @@ mod txtp_approximation;
 mod txtp_clip_omissions;
 #[path = "wwise_txtp_container_omissions.rs"]
 mod txtp_container_omissions;
+#[path = "wwise_txtp_loop_origins.rs"]
+mod txtp_loop_origins;
 #[path = "wwise_txtp_origin_assertions.rs"]
 mod txtp_origin_assertions;
 #[path = "wwise_txtp_origins.rs"]

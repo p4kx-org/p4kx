@@ -6,7 +6,8 @@ use std::ops::Range;
 #[path = "soundbank_source_fields.rs"]
 mod source_fields;
 
-use crate::bank_parse::{self, MediaRange, SectionRange};
+use crate::bank_parse::{self, MediaRange, MediaSections, MediaTable, SectionRange};
+use crate::bank_structure::DIDX_ENTRY_LEN;
 use crate::media_class;
 use crate::{AudioError, BankError, BankWarning, HircObject, MediaClass, SectionId, Wem};
 
@@ -45,31 +46,103 @@ pub struct Section<'a> {
     pub body: &'a [u8],
 }
 
-/// A WEM embedded in a soundbank: its ID and its bytes, a slice of the bank.
+/// The physical DIDX triplet and checked DATA placement of an embedded WEM.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EmbeddedWemSource {
+    sections: MediaSections,
+    entry_ordinal: u64,
+    start: u64,
+    end: u64,
+}
+
+impl EmbeddedWemSource {
+    /// Returns the zero-based position of DIDX in the bank section directory.
+    #[must_use]
+    pub const fn section_ordinal(&self) -> u64 {
+        self.sections.didx.ordinal
+    }
+
+    /// Returns the zero-based physical triplet position within DIDX.
+    #[must_use]
+    pub const fn entry_ordinal(&self) -> u64 {
+        self.entry_ordinal
+    }
+
+    /// Returns the bank-relative start of the selected twelve-byte DIDX triplet.
+    #[must_use]
+    pub const fn triplet_offset(&self) -> u64 {
+        self.sections.didx.body_offset + self.entry_ordinal * DIDX_ENTRY_LEN as u64
+    }
+
+    /// Returns the zero-based position of the selected DATA section in the directory.
+    #[must_use]
+    pub const fn data_section_ordinal(&self) -> u64 {
+        self.sections.data.ordinal
+    }
+
+    /// Returns the bank-relative start of the selected DATA body.
+    #[must_use]
+    pub const fn data_body_offset(&self) -> u64 {
+        self.sections.data.body_offset
+    }
+
+    /// Returns the checked length of the selected DATA body in bytes.
+    #[must_use]
+    pub const fn data_body_length(&self) -> u64 {
+        self.sections.data.body_length
+    }
+
+    /// Returns the checked half-open WEM payload range relative to the decoded bank.
+    #[must_use]
+    pub const fn byte_range(&self) -> Range<u64> {
+        self.start..self.end
+    }
+}
+
+/// A WEM embedded in a soundbank: its ID and its bytes, a slice of the bank.
+#[derive(Debug, Clone, Copy)]
 pub struct EmbeddedWem<'a> {
-    id: u32,
-    offset: u64,
+    media: &'a MediaRange,
+    sections: &'a MediaSections,
     bytes: &'a [u8],
 }
+
+impl PartialEq for EmbeddedWem<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.id() == other.id() && self.offset() == other.offset() && self.bytes == other.bytes
+    }
+}
+
+impl Eq for EmbeddedWem<'_> {}
 
 impl<'a> EmbeddedWem<'a> {
     /// Returns the WEM ID.
     #[must_use]
     pub const fn id(&self) -> u32 {
-        self.id
+        self.media.id
     }
 
     /// Returns the offset of the WEM in the `DATA` section.
     #[must_use]
     pub const fn offset(&self) -> u64 {
-        self.offset
+        self.media.offset as u64
     }
 
     /// Returns the bytes of the WEM, as a loose WEM file holds them.
     #[must_use]
     pub const fn bytes(&self) -> &'a [u8] {
         self.bytes
+    }
+
+    /// Returns the physical placement of the WEM selected by the decoded reader.
+    #[must_use]
+    pub const fn source(&self) -> EmbeddedWemSource {
+        EmbeddedWemSource {
+            sections: *self.sections,
+            entry_ordinal: self.media.ordinal,
+            start: self.media.range.start as u64,
+            end: self.media.range.end as u64,
+        }
     }
 
     /// Returns what the media holds: a WEM, MIDI, plug-in data or something unknown.
@@ -109,7 +182,7 @@ pub struct Soundbank<B> {
     bytes: B,
     header: BankHeader,
     sections: Vec<SectionRange>,
-    media: Vec<MediaRange>,
+    media: MediaTable,
     objects: Vec<HircObject>,
     object_index: Vec<(u32, usize)>,
     names: Vec<(u32, Range<usize>)>,
@@ -164,17 +237,15 @@ impl<B: AsRef<[u8]>> Soundbank<B> {
 
     /// Returns the embedded WEMs in ascending ID order.
     pub fn wems(&self) -> impl ExactSizeIterator<Item = EmbeddedWem<'_>> {
-        self.media.iter().map(|media| self.embedded(media))
+        self.media.entries.iter().map(|media| self.embedded(media))
     }
 
     /// Returns the embedded WEM `id`.
     #[must_use]
     pub fn wem(&self, id: u32) -> Option<EmbeddedWem<'_>> {
-        let index = self
-            .media
-            .binary_search_by_key(&id, |media| media.id)
-            .ok()?;
-        self.media.get(index).map(|media| self.embedded(media))
+        let entries = &self.media.entries;
+        let index = entries.binary_search_by_key(&id, |media| media.id).ok()?;
+        entries.get(index).map(|media| self.embedded(media))
     }
 
     /// Returns the raw body of a `HIRC` object of this bank, its ID included.
@@ -198,10 +269,10 @@ impl<B: AsRef<[u8]>> Soundbank<B> {
         self.bytes
     }
 
-    fn embedded(&self, media: &MediaRange) -> EmbeddedWem<'_> {
+    fn embedded<'a>(&'a self, media: &'a MediaRange) -> EmbeddedWem<'a> {
         EmbeddedWem {
-            id: media.id,
-            offset: media.offset,
+            media,
+            sections: &self.media.sections,
             bytes: self.slice(&media.range),
         }
     }

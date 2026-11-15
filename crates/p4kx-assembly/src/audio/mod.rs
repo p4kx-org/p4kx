@@ -42,8 +42,8 @@ pub use cache::ArchiveAudio;
 pub use entity::{EntityAudio, EntityTrigger, EventMatch, Unmatched};
 pub use error::{AudioFileError, AudioIssue};
 pub use export::{
-    ExportFailure, ExportOptions, ExportReport, ExportState, ExportWatch, ExportedSound,
-    SoundFormat,
+    ExportFailure, ExportLoopOrigin, ExportLoopOrigins, ExportOptions, ExportReport, ExportState,
+    ExportWatch, ExportedSound, SoundFormat,
 };
 pub use hirc_path_source::HircPathSource;
 pub use index::AudioIndex;
@@ -54,7 +54,7 @@ pub use search::{MAX_SEARCH_PAGE, SearchPage, TriggerHit};
 pub use sounds::{NodeKind, PathStep, SoundVariant, SourceKind, TriggerSounds, WemLocation};
 pub use txtp::{
     TxtpApproximation, TxtpFile, TxtpOrigins, TxtpReport, TxtpSkip, write_txtp,
-    write_txtp_with_origins,
+    write_txtp_with_loop_origins, write_txtp_with_origins,
 };
 pub use users::TriggerUsers;
 pub use wem_selection::WemSelection;

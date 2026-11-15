@@ -268,7 +268,7 @@ pub use media_class::{BankDeclaredLengthSource, BankMediaClassSource, MediaClass
 pub use ogg::OggWriter;
 pub use opus::{OpusError, WemOpusOgg, WemOpusRanges, WemOpusWav, WemOpusWriteError};
 pub use riff::{ByteOrder, WemSourceChunk};
-pub use soundbank::{BankHeader, EmbeddedWem, Section, Soundbank};
+pub use soundbank::{BankHeader, EmbeddedWem, EmbeddedWemSource, Section, Soundbank};
 pub use vorbis::{
     Codebooks, OggReport, VorbisError, WemVorbisOgg, WemVorbisRanges, WemVorbisWav,
     WemVorbisWriteError,

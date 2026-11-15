@@ -117,6 +117,13 @@ version word establishes the decoded layout. The receipts describe declared cont
 rendered paths. `select-first-alternative` has unknown provenance because the generated group's
 topology sources are unavailable in the receipt.
 
+The decimal `#I` tokens have separate `textBytes` addresses at `/commands/{index}/loop/start`
+and `/commands/{index}/loop/end`. The index counts rendered file lines. The evidence reuses the
+selected WEM parse's separate start and end plans. An embedded source uses the exact written
+WEM's DIDX and DATA routing and prefixes WEM coordinates with its physical DIDX occurrence.
+An authored zero end word selects the parsed frame count. A retained sound has unknown loop
+origins in a newly generated TXTP, since its audio has no verified contributor binding.
+
 A replacement binds the companion to the complete TXTP digest. A kept file preserves its
 existing companion. The current report exposes unknown origins for byte-verified retained text
 without a verified contributor binding for that occurrence.

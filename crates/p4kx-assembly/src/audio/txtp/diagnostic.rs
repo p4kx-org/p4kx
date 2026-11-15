@@ -15,7 +15,7 @@ pub(super) struct TxtpDiagnostic<'a> {
 }
 
 pub(super) fn collect<'a>(
-    rendered: &RenderedTxtp,
+    rendered: &RenderedTxtp<'_>,
     variants: &'a [SoundVariant<'_>],
 ) -> Vec<TxtpDiagnostic<'a>> {
     rendered

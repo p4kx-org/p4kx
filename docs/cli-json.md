@@ -953,9 +953,22 @@ until the selected output group has exact topology evidence.
 
 `originReceipt` is the sibling `<file>.p4kx-origin.jsonl` for a newly published file. Its digest
 binds the exact TXTP bytes and `textBytes` addresses identify the code tokens in the header.
-The companion covers the diagnosed fields. A kept file preserves any existing companion and has
-`originReceipt: null` in the current report. A byte-verified retained code has unknown provenance
-in this report because equality of the TXTP bytes establishes only the code value.
+The companion covers the diagnosed fields and the start and end tokens of each `#I` command.
+When any sound line has a loop, `commands` lists every rendered sound line in order, excluding
+headers and group lines. A row with a rendered loop has frame values at `loop.start`
+and `loop.end`. Their immediate field origins are addressed as `/commands/{index}/loop/start`
+and `/commands/{index}/loop/end`. The end is exclusive. The sidecar addresses each numeric token
+by its exact emitted byte range.
+
+Loop origins use the WEM that supplied the written audio. For embedded WEMs its local coordinates
+are prefixed by the physical DIDX section and triplet ordinals. The evidence also includes the
+used DIDX triplet fields and checked DATA section routing. When the authored last-frame word is
+zero, the end uses that sentinel and the source frame count. A kept audio file leaves both loop
+origins unknown in a new TXTP receipt.
+
+A kept TXTP preserves any existing companion and has `originReceipt: null` in the current report.
+The current report gives byte-verified retained fields unknown provenance. Text equality proves
+their values only.
 
 A retained file has `"approximations": null` when its text was unverified or differed from the
 generated text. The sound export determines the exit code and reports missing audio files in

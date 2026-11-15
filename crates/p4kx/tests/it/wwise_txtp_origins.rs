@@ -12,7 +12,7 @@ use p4kx_testkit::test_key;
 use serde_json::{Value, json};
 
 use super::TestResult;
-use super::txtp_origin_assertions::check_unknown;
+use super::txtp_origin_assertions::{check_address, check_unknown};
 
 #[path = "wwise_txtp_origin_fixture.rs"]
 mod fixture;
@@ -269,36 +269,7 @@ fn check_companion(fixture: &Fixture, file: &Value) -> TestResult {
             .iter()
             .find(|row| row.pointer("/address/field").and_then(Value::as_str) == Some(path))
             .ok_or("addressed TXTP diagnostic")?;
-        check_address(row, &bytes, code, field(file, path)?)?;
-    }
-    Ok(())
-}
-
-fn check_address(row: &Value, bytes: &[u8], code: &str, origin: &Value) -> TestResult {
-    let address = &row["address"];
-    assert_eq!(
-        address["type"], "textBytes",
-        "address uses the actual text span"
-    );
-    let start = address["start"]
-        .as_str()
-        .ok_or("start byte")?
-        .parse::<usize>()?;
-    let end = address["endExclusive"]
-        .as_str()
-        .ok_or("end byte")?
-        .parse::<usize>()?;
-    assert_eq!(
-        bytes.get(start..end),
-        Some(code.as_bytes()),
-        "exact code bytes"
-    );
-    for key in [
-        "containsEncryptedSource",
-        "sourceSetComplete",
-        "sourceUsesRefs",
-    ] {
-        assert_eq!(&row[key], &origin[key], "report and sidecar share {key}");
+        let _span = check_address(row, &bytes, code, field(file, path)?)?;
     }
     Ok(())
 }

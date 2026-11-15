@@ -3,6 +3,7 @@
 
 //! Exports the sounds of audio triggers as files named after the trigger.
 
+mod loop_origins;
 pub(super) mod name;
 mod plan;
 mod write;
@@ -14,6 +15,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use p4kx_audio::Loop;
 use p4kx_extraction::{ArchiveWriteProtection, CancelToken, ConflictPolicy, ConversionError};
 
+use self::loop_origins::CaptureLoopOrigins;
+pub use self::loop_origins::{ExportLoopOrigin, ExportLoopOrigins};
 use self::write::Target;
 use super::{ArchiveAudio, TriggerSounds};
 
@@ -236,7 +239,34 @@ impl ArchiveAudio<'_> {
         options: ExportOptions,
         watch: &ExportWatch,
     ) -> Result<ExportReport, ConversionError> {
+        self.export_sounds_with(triggers, folder, options, watch, CaptureLoopOrigins::Omit)
+            .map(|(report, _)| report)
+    }
+
+    /// Exports the sounds and their original WEM loop inputs for newly written files.
+    ///
+    /// # Errors
+    /// Returns the same output errors as [`Self::export_sounds_watched`].
+    pub fn export_sounds_watched_with_loop_origins(
+        &self,
+        triggers: &[&TriggerSounds<'_>],
+        folder: &Path,
+        options: ExportOptions,
+        watch: &ExportWatch,
+    ) -> Result<(ExportReport, ExportLoopOrigins), ConversionError> {
+        self.export_sounds_with(triggers, folder, options, watch, CaptureLoopOrigins::Retain)
+    }
+
+    fn export_sounds_with(
+        &self,
+        triggers: &[&TriggerSounds<'_>],
+        folder: &Path,
+        options: ExportOptions,
+        watch: &ExportWatch,
+        capture: CaptureLoopOrigins,
+    ) -> Result<(ExportReport, ExportLoopOrigins), ConversionError> {
         let plan = plan::build(triggers);
+        let mut origins = ExportLoopOrigins::default();
         watch.plan(plan.jobs.len());
         let mut report = ExportReport {
             failures: plan.failures,
@@ -244,12 +274,12 @@ impl ArchiveAudio<'_> {
         };
         if watch.is_cancelled() {
             report.cancelled = !plan.jobs.is_empty();
-            return Ok(report);
+            return Ok((report, origins));
         }
         let protection = ArchiveWriteProtection::new(self.archive().path(), watch.token.flag())?;
         protection.ensure_writable(folder, watch.token.flag())?;
         if plan.jobs.is_empty() {
-            return Ok(report);
+            return Ok((report, origins));
         }
         fs::create_dir_all(folder).map_err(|source| ConversionError::Write {
             path: folder.to_path_buf(),
@@ -264,13 +294,18 @@ impl ArchiveAudio<'_> {
             absolute: &absolute,
             protection: &protection,
         };
-        for outcome in write::run(self, &plan.jobs, target, options, watch) {
+        for outcome in write::run(self, &plan.jobs, target, options, watch, capture) {
             match outcome {
-                Ok(sound) => report.sounds.push(sound),
+                Ok(written) => {
+                    if let Some(origin) = written.loop_origin {
+                        origins.insert(&written.sound, origin);
+                    }
+                    report.sounds.push(written.sound);
+                }
                 Err(failure) => report.failures.push(failure),
             }
         }
         report.cancelled = watch.is_cancelled() && watch.done() < plan.jobs.len();
-        Ok(report)
+        Ok((report, origins))
     }
 }

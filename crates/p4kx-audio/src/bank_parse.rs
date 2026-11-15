@@ -20,14 +20,44 @@ pub(crate) struct SectionRange {
 #[derive(Debug, Clone)]
 pub(crate) struct MediaRange {
     pub(crate) id: u32,
-    pub(crate) offset: u64,
+    pub(crate) offset: u32,
+    pub(crate) ordinal: u64,
     pub(crate) range: Range<usize>,
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct MediaSection {
+    pub(crate) ordinal: u64,
+    pub(crate) body_offset: u64,
+    pub(crate) body_length: u64,
+}
+
+impl MediaSection {
+    const fn of(ordinal: usize, section: &SectionRange) -> Self {
+        Self {
+            ordinal: ordinal as u64,
+            body_offset: section.body.start as u64,
+            body_length: section.body.end as u64 - section.body.start as u64,
+        }
+    }
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct MediaSections {
+    pub(crate) didx: MediaSection,
+    pub(crate) data: MediaSection,
+}
+
+#[derive(Debug, Default, Clone)]
+pub(crate) struct MediaTable {
+    pub(crate) sections: MediaSections,
+    pub(crate) entries: Vec<MediaRange>,
 }
 
 pub(crate) struct Parsed {
     pub(crate) header: BankHeader,
     pub(crate) sections: Vec<SectionRange>,
-    pub(crate) media: Vec<MediaRange>,
+    pub(crate) media: MediaTable,
     pub(crate) objects: Vec<HircObject>,
     pub(crate) names: Vec<(u32, Range<usize>)>,
     pub(crate) warnings: Vec<BankWarning>,
@@ -52,16 +82,7 @@ pub(crate) fn parse(bytes: &[u8]) -> Result<Parsed, BankError> {
     let (_, header) = body(SectionId::BKHD).ok_or(BankError::NotSoundbank)?;
     let header = parse_header(header)?;
     let mut warnings = Vec::new();
-    let media = match (body(SectionId::DIDX), body(SectionId::DATA)) {
-        (Some((_, index)), Some((data, _))) => media(index, data, &mut warnings)?,
-        (Some((_, index)), None) => {
-            warnings.push(BankWarning::MediaWithoutData {
-                entries: (index.len() / DIDX_ENTRY_LEN) as u64,
-            });
-            Vec::new()
-        }
-        (None, _) => Vec::new(),
-    };
+    let media = media_table(bytes, &sections, &mut warnings)?;
     let objects = match body(SectionId::HIRC) {
         Some((range, hirc)) => {
             let hirc = hirc::parse(header.version, hirc, range.start)?;
@@ -146,9 +167,41 @@ fn header_with(
     })
 }
 
-fn media(
+fn media_table(
+    bytes: &[u8],
+    sections: &[SectionRange],
+    warnings: &mut Vec<BankWarning>,
+) -> Result<MediaTable, BankError> {
+    let section = |id| {
+        sections
+            .iter()
+            .enumerate()
+            .find(|(_, section)| section.id == id)
+    };
+    let Some((index_ordinal, index)) = section(SectionId::DIDX) else {
+        return Ok(MediaTable::default());
+    };
+    let Some((data_ordinal, data)) = section(SectionId::DATA) else {
+        warnings.push(BankWarning::MediaWithoutData {
+            entries: (index.body.len() / DIDX_ENTRY_LEN) as u64,
+        });
+        return Ok(MediaTable::default());
+    };
+    let sections = MediaSections {
+        didx: MediaSection::of(index_ordinal, index),
+        data: MediaSection::of(data_ordinal, data),
+    };
+    let entries = media_entries(
+        bytes.get(index.body.clone()).unwrap_or_default(),
+        sections.data,
+        warnings,
+    )?;
+    Ok(MediaTable { sections, entries })
+}
+
+fn media_entries(
     index: &[u8],
-    data: Range<usize>,
+    data: MediaSection,
     warnings: &mut Vec<BankWarning>,
 ) -> Result<Vec<MediaRange>, BankError> {
     if !index.len().is_multiple_of(DIDX_ENTRY_LEN) {
@@ -157,17 +210,18 @@ fn media(
             "its size is not a multiple of 12 bytes",
         ));
     }
-    let data_len = data.len() as u64;
+    let data_len = data.body_length;
     let mut reader = SectionReader::new(SectionId::DIDX, index);
     let mut media = Vec::with_capacity(index.len() / DIDX_ENTRY_LEN);
     while reader.remaining() > 0 {
         let triplet = MediaTriplet::read(&mut reader)?;
-        let range = triplet.range_in(data.start as u64, data_len)?;
+        let range = triplet.range_in(data.body_offset, data_len)?;
         let start = usize::try_from(range.start).map_err(|_| triplet.outside_data(data_len))?;
         let end = usize::try_from(range.end).map_err(|_| triplet.outside_data(data_len))?;
         media.push(MediaRange {
             id: triplet.id,
-            offset: u64::from(triplet.offset),
+            offset: triplet.offset,
+            ordinal: media.len() as u64,
             range: start..end,
         });
     }

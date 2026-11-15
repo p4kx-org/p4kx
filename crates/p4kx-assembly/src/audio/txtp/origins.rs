@@ -10,13 +10,22 @@ use p4kx_extraction::{
     SourceUseRole, SourceUses,
 };
 
-use super::diagnostic::TxtpDiagnostic;
+use crate::audio::ExportLoopOrigin;
 
-/// The immediate origins and contributing sources for the report's approximation codes.
+use super::diagnostic::TxtpDiagnostic;
+use super::loop_origin;
+use super::render::RenderedLoop;
+
+pub(super) struct OriginInputs<'a> {
+    pub(super) diagnostics: &'a [TxtpDiagnostic<'a>],
+    pub(super) loops: &'a [RenderedLoop<'a>],
+}
+
+/// The immediate origins and contributing sources for diagnosed and rendered TXTP values.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct TxtpOrigins {
-    /// Code origins addressed relative to the report's file row.
+    /// Field origins addressed relative to the report's file row.
     pub field_origins: FieldOrigins,
     /// Shared physical sources and observed source uses for these origins.
     pub provenance: SourceInventory,
@@ -26,25 +35,38 @@ pub struct TxtpOrigins {
 impl TxtpOrigins {
     pub(super) fn capture(
         archive: Option<&Archive>,
-        diagnostics: &[TxtpDiagnostic<'_>],
+        inputs: &OriginInputs<'_>,
     ) -> io::Result<Self> {
         let sources = SourceUses::with_compact_use_refs();
         let mut field_origins = FieldOrigins::new();
-        let mut addresses = Vec::with_capacity(diagnostics.len());
-
-        for (index, diagnostic) in diagnostics.iter().enumerate() {
-            let path =
-                FieldPath::parse(&format!("/approximations/{index}")).map_err(io::Error::other)?;
-            let origin = diagnostic_origin(archive, &sources, diagnostic)?;
-            field_origins
-                .insert(path.clone(), origin.clone())
-                .map_err(io::Error::other)?;
-            let address = OriginOutputAddress::TextBytes {
-                start: DecimalU64::new(offset(diagnostic.header_bytes.start)?),
-                end_exclusive: DecimalU64::new(offset(diagnostic.header_bytes.end)?),
-                field: path,
-            };
-            addresses.push((address, origin));
+        let mut addresses = Vec::with_capacity(inputs.diagnostics.len());
+        for (index, diagnostic) in inputs.diagnostics.iter().enumerate() {
+            add_field(
+                &mut field_origins,
+                &mut addresses,
+                &format!("/approximations/{index}"),
+                &diagnostic.header_bytes,
+                diagnostic_origin(archive, &sources, diagnostic)?,
+            )?;
+        }
+        for markers in inputs.loops {
+            let source = markers.source;
+            for (field, bytes, sites) in [
+                (
+                    "start",
+                    &markers.start,
+                    source.and_then(ExportLoopOrigin::start),
+                ),
+                ("end", &markers.end, source.and_then(ExportLoopOrigin::end)),
+            ] {
+                add_field(
+                    &mut field_origins,
+                    &mut addresses,
+                    &format!("/commands/{}/loop/{field}", markers.command),
+                    bytes,
+                    loop_origin::field(archive, &sources, source, sites)?,
+                )?;
+            }
         }
 
         Ok(Self {
@@ -68,6 +90,26 @@ impl TxtpOrigins {
                 .map(|(address, origin)| (address, origin)),
         )
     }
+}
+
+fn add_field(
+    fields: &mut FieldOrigins,
+    addresses: &mut Vec<(OriginOutputAddress, FieldOrigin)>,
+    path: &str,
+    bytes: &Range<usize>,
+    origin: FieldOrigin,
+) -> io::Result<()> {
+    let path = FieldPath::parse(path).map_err(io::Error::other)?;
+    fields
+        .insert(path.clone(), origin.clone())
+        .map_err(io::Error::other)?;
+    let address = OriginOutputAddress::TextBytes {
+        start: DecimalU64::new(offset(bytes.start)?),
+        end_exclusive: DecimalU64::new(offset(bytes.end)?),
+        field: path,
+    };
+    addresses.push((address, origin));
+    Ok(())
 }
 
 fn diagnostic_origin(

@@ -2,6 +2,8 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::collections::BTreeSet;
+use std::error::Error;
+use std::ops::Range;
 
 use serde_json::{Value, json};
 
@@ -100,4 +102,38 @@ fn check_fields(uses: &[Value], refs: &[Value], namespace: &str, expected: &[&st
     );
     assert_eq!(layout_selectors, 1, "one exact layout selector");
     Ok(())
+}
+
+pub(super) fn check_address(
+    row: &Value,
+    bytes: &[u8],
+    value: &str,
+    origin: &Value,
+) -> Result<Range<usize>, Box<dyn Error>> {
+    let address = &row["address"];
+    assert_eq!(
+        address["type"], "textBytes",
+        "address uses the actual text span"
+    );
+    let start = address["start"]
+        .as_str()
+        .ok_or("start byte")?
+        .parse::<usize>()?;
+    let end = address["endExclusive"]
+        .as_str()
+        .ok_or("end byte")?
+        .parse::<usize>()?;
+    assert_eq!(
+        bytes.get(start..end),
+        Some(value.as_bytes()),
+        "exact field bytes"
+    );
+    for key in [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+    ] {
+        assert_eq!(&row[key], &origin[key], "report and sidecar share {key}");
+    }
+    Ok(start..end)
 }

@@ -7,6 +7,7 @@ use std::ops::Range;
 
 use p4kx_audio::Loop;
 
+use crate::audio::ExportLoopOrigin;
 use crate::audio::music_clip_features::MusicClipFeatures;
 use crate::audio::playback_features::{PlaybackFeature, PlaybackFeatures};
 
@@ -20,12 +21,13 @@ const MAX_COMMENT_LEN: usize = 160;
 const INDENT: usize = 2;
 
 /// The file a WEM was exported as, as the TXTP names it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy)]
 pub(super) struct SoundFile<'a> {
     /// The file name in the export folder.
     pub(super) name: &'a str,
     /// The loop of the WEM in frames, written as `#I`.
     pub(super) loop_points: Option<Loop>,
+    pub(super) loop_origin: Option<&'a ExportLoopOrigin>,
     /// Whether the file holds only the prefetched start of a streamed WEM.
     pub(super) prefetch_only: bool,
 }
@@ -39,13 +41,38 @@ pub(super) fn comment_text(text: &str) -> String {
         .collect()
 }
 
-pub(super) struct RenderedTxtp {
+pub(super) struct RenderedLoop<'a> {
+    pub(super) command: usize,
+    pub(super) points: Loop,
+    pub(super) start: Range<usize>,
+    pub(super) end: Range<usize>,
+    pub(super) source: Option<&'a ExportLoopOrigin>,
+}
+
+pub(super) struct RenderedTxtp<'a> {
     pub(super) text: String,
     pub(super) approximations: Vec<TxtpApproximation>,
     pub(super) approximation_ranges: Vec<Range<usize>>,
+    pub(super) loops: Vec<RenderedLoop<'a>>,
+    sound_count: usize,
 }
 
-impl RenderedTxtp {
+impl RenderedTxtp<'_> {
+    pub(super) fn command_loops(&self) -> Option<Vec<Option<Loop>>> {
+        if self.loops.is_empty() {
+            return None;
+        }
+        let mut markers = self.loops.iter().peekable();
+        Some(
+            (0..self.sound_count)
+                .map(|command| {
+                    markers
+                        .next_if(|entry| entry.command == command)
+                        .map(|entry| entry.points)
+                })
+                .collect(),
+        )
+    }
     fn note(&mut self, approximation: TxtpApproximation) {
         if !self.approximations.contains(&approximation) {
             self.approximations.push(approximation);
@@ -114,6 +141,10 @@ impl RenderedTxtp {
             notes.push('\n');
         }
         self.text.insert_str(offset, &notes);
+        for markers in &mut self.loops {
+            markers.start = markers.start.start + notes.len()..markers.start.end + notes.len();
+            markers.end = markers.end.start + notes.len()..markers.end.end + notes.len();
+        }
     }
 }
 
@@ -123,15 +154,17 @@ impl RenderedTxtp {
 /// # Errors
 ///
 /// Returns why the TXTP cannot be written: a sound has no usable file in `files`.
-pub(super) fn render(
+pub(super) fn render<'a>(
     tree: &Group,
     header: &[String],
-    files: &HashMap<u32, SoundFile<'_>>,
-) -> Result<RenderedTxtp, String> {
+    files: &HashMap<u32, SoundFile<'a>>,
+) -> Result<RenderedTxtp<'a>, String> {
     let mut rendered = RenderedTxtp {
         text: String::new(),
         approximations: Vec::new(),
         approximation_ranges: Vec::new(),
+        loops: Vec::new(),
+        sound_count: 0,
     };
     for line in header {
         let _ = writeln!(rendered.text, "# {}", comment_text(line));
@@ -142,11 +175,11 @@ pub(super) fn render(
     Ok(rendered)
 }
 
-fn group_lines(
-    rendered: &mut RenderedTxtp,
+fn group_lines<'a>(
+    rendered: &mut RenderedTxtp<'a>,
     group: &Group,
     depth: usize,
-    files: &HashMap<u32, SoundFile<'_>>,
+    files: &HashMap<u32, SoundFile<'a>>,
 ) -> Result<(), String> {
     let [only] = group.children.as_slice() else {
         for child in &group.children {
@@ -164,11 +197,11 @@ fn group_lines(
     }
 }
 
-fn leaf_line(
-    rendered: &mut RenderedTxtp,
+fn leaf_line<'a>(
+    rendered: &mut RenderedTxtp<'a>,
     leaf: &Leaf,
     depth: usize,
-    files: &HashMap<u32, SoundFile<'_>>,
+    files: &HashMap<u32, SoundFile<'a>>,
 ) -> Result<(), String> {
     let file = leaf
         .wem_id
@@ -186,13 +219,30 @@ fn leaf_line(
     let text = &mut rendered.text;
     let _ = write!(text, "{:indent$}{}", "", file.name, indent = depth * INDENT);
     if let Some(points) = file.loop_points {
-        let _ = write!(text, " #I {} {}", points.start, points.end);
+        text.push_str(" #I ");
+        let start = number(text, points.start);
+        text.push(' ');
+        let end = number(text, points.end);
+        rendered.loops.push(RenderedLoop {
+            command: rendered.sound_count,
+            points,
+            start,
+            end,
+            source: file.loop_origin,
+        });
     }
+    rendered.sound_count += 1;
     text.push('\n');
     Ok(())
 }
 
-fn group_line(rendered: &mut RenderedTxtp, group: &Group, depth: usize) {
+fn number(text: &mut String, value: u64) -> Range<usize> {
+    let start = text.len();
+    let _ = write!(text, "{value}");
+    start..text.len()
+}
+
+fn group_line(rendered: &mut RenderedTxtp<'_>, group: &Group, depth: usize) {
     let count = group.children.len();
     let (kind, selection, mix) = match group.combine {
         Combine::Layers => ('L', "", " #@layer-v"),
@@ -266,6 +316,7 @@ mod tests {
                 SoundFile {
                     name: "a.ogg",
                     loop_points: None,
+                    loop_origin: None,
                     prefetch_only: false,
                 },
             ),
@@ -274,6 +325,7 @@ mod tests {
                 SoundFile {
                     name: "b.ogg",
                     loop_points: Some(Loop { start: 10, end: 90 }),
+                    loop_origin: None,
                     prefetch_only: false,
                 },
             ),
