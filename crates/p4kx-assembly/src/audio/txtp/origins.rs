@@ -4,6 +4,7 @@
 use std::io::{self, Write};
 use std::ops::Range;
 
+use p4kx_audio::HircKind;
 use p4kx_extraction::{
     Archive, DecimalU64, FieldOrigin, FieldOrigins, FieldPath, InputScope, OriginArtifactBinding,
     OriginOutputAddress, SourceInput, SourceInventory, SourceLocation, SourceScope, SourceUse,
@@ -11,10 +12,12 @@ use p4kx_extraction::{
 };
 
 use crate::audio::ExportLoopOrigin;
+use crate::audio::hirc_path_source::HircSelectionChild;
 
-use super::diagnostic::TxtpDiagnostic;
+use super::diagnostic::{DiagnosticSource, TxtpDiagnostic};
 use super::loop_origin;
 use super::render::RenderedLoop;
+use super::selection::SelectionDiagnostic;
 
 pub(super) struct OriginInputs<'a> {
     pub(super) diagnostics: &'a [TxtpDiagnostic<'a>],
@@ -117,8 +120,14 @@ fn diagnostic_origin(
     sources: &SourceUses,
     diagnostic: &TxtpDiagnostic<'_>,
 ) -> io::Result<FieldOrigin> {
-    let (Some(archive), Some(source)) = (archive, diagnostic.source) else {
+    let (Some(archive), Some(source)) = (archive, &diagnostic.source) else {
         return Ok(sources.origin(&[], false));
+    };
+    let source = match source {
+        DiagnosticSource::Authored(source) => source,
+        DiagnosticSource::Selection(selection) => {
+            return selection_origin(archive, sources, selection);
+        }
     };
     let Some(entry) = source.diagnostic_entry(archive) else {
         return Ok(sources.origin(&[], false));
@@ -154,6 +163,88 @@ fn diagnostic_origin(
         )?);
     }
     Ok(sources.origin(&actual, complete))
+}
+
+fn selection_origin(
+    archive: &Archive,
+    sources: &SourceUses,
+    selection: &SelectionDiagnostic<'_>,
+) -> io::Result<FieldOrigin> {
+    use SourceUseRole::Selector;
+
+    let owner = selection.owner;
+    let Some(entry) = owner.entry(archive) else {
+        return Ok(sources.origin(&[], false));
+    };
+    let (namespace, count, id) = match owner.kind() {
+        HircKind::RandomSequenceContainer => (
+            "bnkHircRandomSequence",
+            "containerChildCount",
+            "containerChildId",
+        ),
+        HircKind::SwitchContainer => (
+            "bnkHircSwitchContainer",
+            "containerChildCount",
+            "containerChildId",
+        ),
+        HircKind::MusicSwitch => ("bnkHircMusicNode", "musicChildCount", "musicChildId"),
+        _ => return Ok(sources.origin(&[], false)),
+    };
+    let scope = sources
+        .observe(SourceInput::ArchiveView(entry), InputScope::Payload)
+        .map_err(io::Error::other)?;
+    let mut actual = vec![
+        source_use(
+            &scope,
+            "bnkHircObject",
+            "typeCode",
+            owner.kind_bytes(),
+            Selector,
+        )?,
+        source_use(
+            &scope,
+            namespace,
+            count,
+            owner.child_count_bytes(),
+            Selector,
+        )?,
+    ];
+    if let Some(range) = owner.version_bytes() {
+        let range = offset(range.start)?..offset(range.end)?;
+        actual.push(source_use(&scope, "bnkBkhd", "version", range, Selector)?);
+    }
+    if let Some(range) = owner.random_mode_bytes() {
+        actual.push(source_use(
+            &scope,
+            namespace,
+            "randomSequenceMode",
+            range,
+            Selector,
+        )?);
+    }
+    for child in &selection.children {
+        actual.push(child_use(&scope, namespace, id, child)?);
+    }
+    Ok(sources.origin(&actual, false))
+}
+
+fn child_use(
+    scope: &SourceScope,
+    namespace: &str,
+    field: &str,
+    child: &HircSelectionChild,
+) -> io::Result<SourceUse> {
+    let bytes = child.id_bytes();
+    scope
+        .at(
+            SourceLocation::Subresource {
+                namespace: namespace.to_owned(),
+                indices: vec![bytes.start, bytes.end, offset(child.ordinal())?],
+                field: field.to_owned(),
+            },
+            SourceUseRole::Selector,
+        )
+        .map_err(io::Error::other)
 }
 
 fn source_use(

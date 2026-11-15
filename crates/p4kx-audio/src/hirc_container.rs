@@ -71,6 +71,14 @@ pub(crate) fn container(
     let header = head(layout, fields, &mut original)?;
     let children = hirc_node::read_children(fields, header.count)?;
     tail(layout, fields, &mut original)?;
+    let child_count = original
+        .child_count
+        .take()
+        .map(|count| count.with_bank_offset(bank_offset));
+    let random_sequence_mode = original
+        .mode
+        .take()
+        .map(|mode| mode.with_bank_offset(bank_offset));
     let evidence = evidence(original, bank_offset);
     Ok(Container {
         kind: header.kind,
@@ -79,6 +87,8 @@ pub(crate) fn container(
         has_authored_loops: evidence.loop_evidence().is_some(),
         has_switch_conditions: evidence.switch_condition_evidence().is_some(),
         evidence,
+        child_count,
+        random_sequence_mode,
     })
 }
 

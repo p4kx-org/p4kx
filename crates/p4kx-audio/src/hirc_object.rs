@@ -26,6 +26,13 @@ impl HircObject {
         self.body.start - OBJECT_HEADER_LEN..self.body.end
     }
 
+    /// Returns the original object type byte in the decoded bank.
+    #[must_use]
+    pub const fn kind_byte_range(&self) -> Range<usize> {
+        let start = self.body.start - OBJECT_HEADER_LEN;
+        start..start + 1
+    }
+
     /// Returns the four bytes of the object ID in the decoded bank.
     #[must_use]
     pub const fn id_byte_range(&self) -> Range<usize> {

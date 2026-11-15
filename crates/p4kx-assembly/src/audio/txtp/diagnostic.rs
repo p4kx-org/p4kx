@@ -7,11 +7,17 @@ use crate::audio::{HircPathSource, SoundVariant};
 
 use super::TxtpApproximation;
 use super::render::RenderedTxtp;
+use super::selection::SelectionDiagnostic;
 
 pub(super) struct TxtpDiagnostic<'a> {
     pub(super) approximation: TxtpApproximation,
     pub(super) header_bytes: Range<usize>,
-    pub(super) source: Option<&'a HircPathSource>,
+    pub(super) source: Option<DiagnosticSource<'a>>,
+}
+
+pub(super) enum DiagnosticSource<'a> {
+    Authored(&'a HircPathSource),
+    Selection(SelectionDiagnostic<'a>),
 }
 
 pub(super) fn collect<'a>(
@@ -26,10 +32,18 @@ pub(super) fn collect<'a>(
         .map(|(approximation, bytes)| TxtpDiagnostic {
             approximation,
             header_bytes: bytes.clone(),
-            source: variants
-                .iter()
-                .flat_map(SoundVariant::path_sources)
-                .find(|source| source.diagnostic_site(approximation).is_some()),
+            source: match approximation {
+                TxtpApproximation::SelectFirstAlternative => rendered
+                    .selection
+                    .as_ref()
+                    .and_then(|selection| selection.resolve(variants))
+                    .map(DiagnosticSource::Selection),
+                _ => variants
+                    .iter()
+                    .flat_map(SoundVariant::path_sources)
+                    .find(|source| source.diagnostic_site(approximation).is_some())
+                    .map(DiagnosticSource::Authored),
+            },
         })
         .collect()
 }

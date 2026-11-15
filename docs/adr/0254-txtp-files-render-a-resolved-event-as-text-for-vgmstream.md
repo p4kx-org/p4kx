@@ -114,8 +114,14 @@ switch default or membership, clip time or event, or music transition word that 
 code. A music decision tree requires the checked group count and tree size. An allocated
 transition segment or its fade cites the allocation flag as well as the original field. The bank
 version word establishes the decoded layout. The receipts describe declared controls observed on
-rendered paths. `select-first-alternative` has unknown provenance because the generated group's
-topology sources are unavailable in the receipt.
+rendered paths.
+
+`select-first-alternative` describes the first rendered multi-child choice in postorder. Its
+selector evidence includes the original object type, bank version, child count, Random mode
+when used and the original ID words of the rendered direct children. Each child use retains its
+physical ordinal and range. Broken or unrendered child occurrences supply no ID use. The remaining
+sources of routing and media eligibility keep the contributor set incomplete. The direct marker
+still reports any proven encrypted contributor.
 
 The decimal `#I` tokens have separate `textBytes` addresses at `/commands/{index}/loop/start`
 and `/commands/{index}/loop/end`. The index counts rendered file lines. The evidence reuses the

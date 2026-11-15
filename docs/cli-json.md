@@ -948,8 +948,13 @@ controls cite the first triggering checked fields reached in playback order and 
 version. This includes the exact loop control, switch default or membership, clip time or event,
 automation point count and transition fade or object segment. Evidence for a music switch tree
 includes the group count and tree size. A transition object also cites its allocation flag.
-`select-first-alternative` carries `containsEncryptedSource: null` and `sourceSetComplete: false`
-until the selected output group has exact topology evidence.
+`select-first-alternative` cites the original type, layout version, child count and Random mode
+where applicable for the first rendered selection group. It also cites each directly rendered
+child ID word at `[start, endExclusive, physicalChildOrdinal]`. Two occurrences of the same ID
+retain separate positions. Nested groups are considered before their containing group.
+The routing and media decisions that made these children playable are only partially covered.
+`sourceSetComplete` is `false` and `containsEncryptedSource` is `true` for a proved encrypted
+contributor or `null` while no encrypted contributor has been proved.
 
 `originReceipt` is the sibling `<file>.p4kx-origin.jsonl` for a newly published file. Its digest
 binds the exact TXTP bytes and `textBytes` addresses identify the code tokens in the header.

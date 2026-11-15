@@ -5,7 +5,7 @@ use std::rc::Rc;
 
 use p4kx_audio::{HircKind, HircObject, HircValue, SoundSource};
 
-use super::hirc_path_source::PathSourceMode;
+use super::hirc_path_source::{HircSelectionChild, PathSourceMode};
 use super::locate::locate;
 use super::music_clip_features::MusicClipFeatures;
 use super::playback_features::PlaybackFeatures;
@@ -15,6 +15,9 @@ use super::{
     MAX_ACTION_CHAIN, MAX_CONTAINER_CHILDREN, MAX_PATH_DEPTH, NodeKind, PathStep, SoundVariant,
     WwiseEvent,
 };
+
+#[path = "walk_children.rs"]
+mod children;
 
 /// The variants and broken links one Wwise event leads to in one soundbank.
 #[derive(Debug, Default)]
@@ -50,7 +53,7 @@ pub(super) fn event<'i>(
         exhausted: false,
         found: Found::default(),
     };
-    walk.follow(event.id());
+    walk.reach(event.id(), None, Via::Local, None);
     walk.found
 }
 
@@ -77,10 +80,6 @@ struct Walk<'w, 'i> {
 }
 
 impl<'i> Walk<'_, 'i> {
-    fn follow(&mut self, id: u32) {
-        self.reach(id, None, Via::Local);
-    }
-
     fn spend(&mut self) -> bool {
         if self.objects >= self.options.budget {
             if !self.exhausted {
@@ -95,7 +94,13 @@ impl<'i> Walk<'_, 'i> {
         true
     }
 
-    fn reach(&mut self, id: u32, wanted: Option<HircKind>, via: Via) {
+    fn reach(
+        &mut self,
+        id: u32,
+        wanted: Option<HircKind>,
+        via: Via,
+        inbound: Option<HircSelectionChild>,
+    ) {
         if !self.spend() {
             return;
         }
@@ -145,12 +150,12 @@ impl<'i> Walk<'_, 'i> {
             return;
         }
         let left = entered.map(|next| std::mem::replace(&mut self.current, next));
-        self.enter(object);
+        self.enter(object, inbound);
         self.visit(object);
         self.leave(left);
     }
 
-    fn enter(&mut self, object: &HircObject) {
+    fn enter(&mut self, object: &HircObject, inbound: Option<HircSelectionChild>) {
         let playback_features = self
             .playback_features()
             .combine(PlaybackFeatures::observe(&object.value));
@@ -166,6 +171,7 @@ impl<'i> Walk<'_, 'i> {
                     self.banks.archive(),
                     &self.current,
                     object,
+                    inbound,
                 )),
             },
             playback_features,
@@ -188,25 +194,34 @@ impl<'i> Walk<'_, 'i> {
 
     fn visit(&mut self, object: &HircObject) {
         match &object.value {
-            HircValue::Event(actions) => self.children(actions),
+            HircValue::Event(actions) => self.children(actions, None),
             HircValue::Action(action) => {
                 if action.is_play() {
                     let via = action
                         .bank
                         .map_or(Via::Local, |bank| Via::Bank(bank.bank_id));
-                    self.reach(action.target_id, None, via);
+                    self.reach(action.target_id, None, via, None);
                 } else if action.is_play_event() {
                     self.chained(|walk| {
-                        walk.reach(action.target_id, Some(HircKind::Event), Via::PlayEvent);
+                        walk.reach(
+                            action.target_id,
+                            Some(HircKind::Event),
+                            Via::PlayEvent,
+                            None,
+                        );
                     });
                 } else if action.is_trigger() {
                     self.chained(|walk| walk.stingers(action.target_id));
                 }
             }
-            HircValue::Container(container) => self.children(&container.children),
-            HircValue::MusicSegment(segment) => self.children(&segment.node.children),
-            HircValue::MusicSwitch(switch) => self.children(&switch.node.children),
-            HircValue::MusicPlaylist(playlist) => self.children(&playlist.node.children),
+            HircValue::Container(container) => {
+                self.children(&container.children, Some(&object.value));
+            }
+            HircValue::MusicSegment(segment) => self.children(&segment.node.children, None),
+            HircValue::MusicSwitch(switch) => {
+                self.children(&switch.node.children, Some(&object.value));
+            }
+            HircValue::MusicPlaylist(playlist) => self.children(&playlist.node.children, None),
             HircValue::MusicTrack(track) => {
                 let music_clips = MusicClipFeatures::observe(track);
                 for source in track.sources.iter().take(MAX_CONTAINER_CHILDREN) {
@@ -307,23 +322,11 @@ impl<'i> Walk<'_, 'i> {
             .filter(|stinger| chosen.contains(&stinger.bank))
             .collect();
         for stinger in wanted.iter().take(MAX_CONTAINER_CHILDREN) {
-            self.reach(stinger.segment_id, None, Via::At(stinger.bank));
+            self.reach(stinger.segment_id, None, Via::At(stinger.bank), None);
         }
         if wanted.len() > MAX_CONTAINER_CHILDREN {
             self.broke(BreakReason::TooManyChildren {
                 count: wanted.len(),
-                limit: MAX_CONTAINER_CHILDREN,
-            });
-        }
-    }
-
-    fn children(&mut self, ids: &[u32]) {
-        for &id in ids.iter().take(MAX_CONTAINER_CHILDREN) {
-            self.follow(id);
-        }
-        if ids.len() > MAX_CONTAINER_CHILDREN {
-            self.broke(BreakReason::TooManyChildren {
-                count: ids.len(),
                 limit: MAX_CONTAINER_CHILDREN,
             });
         }

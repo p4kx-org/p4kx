@@ -4,6 +4,7 @@
 //! The music objects of the `HIRC` section, decoded in bank version 154.
 
 use std::fmt;
+use std::ops::Range;
 
 use crate::bank_object_fields::BankHircField;
 use crate::hirc::SoundSource;
@@ -14,6 +15,7 @@ use crate::hirc_music_transition::{
     MusicTransitionEvidence, MusicTransitionFadeEvidence, MusicTransitionFeatures,
     MusicTransitionSegmentEvidence,
 };
+use crate::hirc_node;
 
 /// The tempo and time signature of a music node.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -162,10 +164,23 @@ pub struct MusicSwitch {
     /// The checked tree is nonempty and declares state or switch groups.
     pub has_decision_conditions: bool,
     pub(crate) decision_evidence: Option<MusicSwitchDecisionEvidence>,
+    pub(crate) child_count: Option<BankHircField<u32>>,
     pub(crate) transition_evidence: MusicTransitionEvidence,
 }
 
 impl MusicSwitch {
+    /// Returns the original checked child count and its bank-relative range.
+    #[must_use]
+    pub const fn child_count_evidence(&self) -> Option<&BankHircField<u32>> {
+        self.child_count.as_ref()
+    }
+
+    /// Returns the bank-relative range of the child ID at its original physical ordinal.
+    #[must_use]
+    pub fn child_id_byte_range(&self, ordinal: usize) -> Option<Range<u64>> {
+        hirc_node::child_id_byte_range(self.child_count_evidence()?, ordinal)
+    }
+
     /// Returns the original group count and tree size of a checked conditional tree.
     #[must_use]
     pub const fn decision_conditions_evidence(&self) -> Option<&MusicSwitchDecisionEvidence> {

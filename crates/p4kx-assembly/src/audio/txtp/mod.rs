@@ -16,6 +16,7 @@ mod loop_origin;
 mod origins;
 mod output;
 mod render;
+mod selection;
 mod tree;
 
 pub use self::approximation::TxtpApproximation;

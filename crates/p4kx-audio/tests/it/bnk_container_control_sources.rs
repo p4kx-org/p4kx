@@ -3,7 +3,9 @@
 
 use std::ops::Range;
 
-use p4kx_audio::{Container, ContainerLoopEvidence, ContainerSwitchEvidence, HircValue, Soundbank};
+use p4kx_audio::{
+    BankHircField, Container, ContainerLoopEvidence, ContainerSwitchEvidence, HircValue, Soundbank,
+};
 use p4kx_testkit::{TestBank, TestContainerKind, TestHircObject, TestNodeBase};
 
 use super::{TestResult, body_of, decoded};
@@ -82,6 +84,137 @@ fn a_switch_without_a_default_cites_the_checked_nonempty_membership_count() -> T
             HircValue::Malformed(_)
         ),
         "an incomplete group table cannot supply a positioned condition",
+    );
+    Ok(())
+}
+
+#[test]
+fn eager_children_keep_their_physical_words_even_when_ids_repeat() -> TestResult {
+    const FIRST: u32 = 0x8412_abda;
+    const LAST: u32 = 0x0acc_e55c;
+    let children = [FIRST, FIRST, LAST];
+    for (kind, original) in [
+        (
+            5,
+            TestHircObject::container(
+                TestContainerKind::Random,
+                20,
+                &children,
+                TestNodeBase::Plain,
+            ),
+        ),
+        (
+            6,
+            TestHircObject::container(
+                TestContainerKind::Switch,
+                20,
+                &children,
+                TestNodeBase::Plain,
+            ),
+        ),
+        (
+            12,
+            TestHircObject::music_switch(20, &children, 0x42, &[FIRST, LAST]),
+        ),
+    ] {
+        let bytes = TestBank::new(1)
+            .object(TestHircObject::raw(0xa0, 91, [0; 13]))
+            .object(original)
+            .bytes();
+        let bank = Soundbank::parse(bytes.as_slice())?;
+        let object = bank.object(20).ok_or("original owner")?;
+        assert_eq!(
+            bytes.get(object.kind_byte_range()),
+            Some(&[kind][..]),
+            "physical discriminator"
+        );
+        match &object.value {
+            HircValue::Container(container) => {
+                check_eager_container(&bytes, container, kind, children)?;
+            }
+            HircValue::MusicSwitch(switch) => check_child_words(
+                &bytes,
+                switch
+                    .child_count_evidence()
+                    .ok_or("music switch child count")?,
+                children,
+                |ordinal| switch.child_id_byte_range(ordinal),
+            )?,
+            _ => return Err("a decoded container or music switch".into()),
+        }
+    }
+    Ok(())
+}
+
+fn check_eager_container(
+    bytes: &[u8],
+    container: &Container,
+    kind: u8,
+    children: [u32; 3],
+) -> TestResult {
+    let count = container
+        .child_count_evidence()
+        .ok_or("container child count")?;
+    if kind == 5 {
+        let mode = container
+            .random_sequence_mode_evidence()
+            .ok_or("original zero mode")?;
+        check_random_mode(mode, count, bytes);
+    }
+    check_child_words(bytes, count, children, |ordinal| {
+        container.child_id_byte_range(ordinal)
+    })
+}
+
+fn check_random_mode(mode: &BankHircField<u8>, count: &BankHircField<u32>, bytes: &[u8]) {
+    let offset = count.range.start - 2;
+    assert_eq!(
+        mode.range,
+        offset..offset + 1,
+        "mode precedes flags and child count"
+    );
+    assert_eq!(mode.value, 0, "zero is a retained original mode");
+    assert_eq!(
+        usize::try_from(offset)
+            .ok()
+            .and_then(|index| bytes.get(index))
+            .copied(),
+        Some(0),
+        "original mode byte"
+    );
+}
+
+fn check_child_words(
+    bytes: &[u8],
+    count: &BankHircField<u32>,
+    [first, duplicate, last]: [u32; 3],
+    range_at: impl Fn(usize) -> Option<Range<u64>>,
+) -> TestResult {
+    const WORD: usize = size_of::<u32>();
+    let words = [3_u32, first, duplicate, last].map(u32::to_le_bytes);
+    let start = bytes
+        .windows(size_of_val(&words))
+        .position(|candidate| candidate == words.as_flattened())
+        .ok_or("independent original count followed by all physical IDs")?;
+    assert_eq!(count.value, 3, "original child count");
+    assert_eq!(
+        count.range,
+        start as u64..(start + WORD) as u64,
+        "count span"
+    );
+    for ordinal in 0..3 {
+        let offset = start + (ordinal + 1) * WORD;
+        assert_eq!(
+            range_at(ordinal),
+            Some(offset as u64..(offset + WORD) as u64),
+            "separate physical child ordinal {ordinal}"
+        );
+    }
+    assert_eq!(range_at(3), None, "outside the original table");
+    assert_eq!(
+        range_at(usize::MAX),
+        None,
+        "an excessive ordinal is unproved"
     );
     Ok(())
 }

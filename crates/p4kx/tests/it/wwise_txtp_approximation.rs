@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::error::Error;
 use std::fs;
 
 use p4kx_testkit::{
@@ -12,11 +13,15 @@ use serde_json::{Value, json};
 use super::txtp_origin_assertions::check_unknown;
 use super::{EMBEDDED, Fixture, PLAY, TestResult, extract, pcm};
 
+#[path = "wwise_txtp_selection_topology.rs"]
+mod topology;
+
 const MULTIPLE: &str = "Play_Choice";
 const SINGLE: &str = "Play_Only_Choice";
 const TXTP_PATH: &str = "Play_Choice.txtp";
 const TXTP_FILE: &str = "/txtp/files/0";
 const SELECTION: &str = "select-first-alternative";
+const SELECTION_FIELD: &str = "/approximations/0";
 const FLAGS: [&str; 3] = ["--format", "wav", "--txtp"];
 
 #[test]
@@ -29,11 +34,10 @@ fn rendered_first_choice_is_reported_in_the_header_and_json() -> TestResult {
         Some(&json!([SELECTION])),
         "the report names the selection the writer actually emits",
     );
-    let origin = report
-        .pointer("/txtp/files/0/fieldOrigins")
-        .and_then(|fields| fields.get("/approximations/0"))
-        .ok_or("explicit unevidenced selection origin")?;
-    check_unknown(origin);
+    let file = report
+        .pointer(TXTP_FILE)
+        .ok_or("generated TXTP file report")?;
+    check_partial_selection_origin(selection_origin(file)?);
     assert!(
         generated
             .lines()
@@ -63,6 +67,7 @@ fn rendered_first_choice_is_reported_in_the_header_and_json() -> TestResult {
         Some(&json!([SELECTION])),
         "a byte-identical TXTP still has verified generated diagnostics",
     );
+    check_unknown(selection_origin(file)?);
     assert_eq!(
         fs::read_to_string(fixture.out.join(TXTP_PATH))?,
         generated,
@@ -117,7 +122,31 @@ fn unchecked_skip_keeps_existing_bytes_and_reports_unknown_diagnostics() -> Test
     Ok(())
 }
 
-fn fixture() -> Result<Fixture, Box<dyn std::error::Error>> {
+fn selection_origin(file: &Value) -> Result<&Value, Box<dyn Error>> {
+    file.get("fieldOrigins")
+        .and_then(|fields| fields.get(SELECTION_FIELD))
+        .ok_or_else(|| "explicit selection origin".into())
+}
+
+fn check_partial_selection_origin(origin: &Value) {
+    assert_eq!(
+        origin["containsEncryptedSource"],
+        Value::Null,
+        "plain topology with incomplete routing remains unknown"
+    );
+    assert_eq!(
+        origin["sourceSetComplete"], false,
+        "routing evidence remains incomplete"
+    );
+    assert!(
+        origin["sourceUsesRefs"]
+            .as_array()
+            .is_some_and(|refs| !refs.is_empty()),
+        "the generated choice has exact topology references"
+    );
+}
+
+fn fixture() -> Result<Fixture, Box<dyn Error>> {
     let dir = tempfile::tempdir()?;
     let archive = dir.path().join("Data.p4k");
     let out = dir.path().join("out");

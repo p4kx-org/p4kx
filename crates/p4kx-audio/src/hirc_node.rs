@@ -47,9 +47,29 @@ pub struct Container {
     /// The original Switch defines membership groups or a nonzero default value.
     pub has_switch_conditions: bool,
     pub(crate) evidence: ContainerEvidence,
+    pub(crate) child_count: Option<BankHircField<u32>>,
+    pub(crate) random_sequence_mode: Option<BankHircField<u8>>,
 }
 
 impl Container {
+    /// Returns the original checked child count and its bank-relative range.
+    #[must_use]
+    pub const fn child_count_evidence(&self) -> Option<&BankHircField<u32>> {
+        self.child_count.as_ref()
+    }
+
+    /// Returns the bank-relative range of the child ID at its original physical ordinal.
+    #[must_use]
+    pub fn child_id_byte_range(&self, ordinal: usize) -> Option<Range<u64>> {
+        child_id_byte_range(self.child_count_evidence()?, ordinal)
+    }
+
+    /// Returns the original Random/Sequence mode byte, including zero or an unknown mode.
+    #[must_use]
+    pub const fn random_sequence_mode_evidence(&self) -> Option<&BankHircField<u8>> {
+        self.random_sequence_mode.as_ref()
+    }
+
     /// Returns whether the checked Random/Sequence transition mode is nonzero.
     #[must_use]
     pub const fn has_authored_transitions(&self) -> bool {
@@ -249,6 +269,17 @@ fn read_parent<F: ObjectFields>(
     let id = parent.value;
     observed.parent_id = Some(parent);
     Ok(id)
+}
+
+pub(crate) fn child_id_byte_range(
+    count: &BankHircField<u32>,
+    ordinal: usize,
+) -> Option<Range<u64>> {
+    let index = u32::try_from(ordinal)
+        .ok()
+        .filter(|&index| index < count.value)?;
+    let start = count.range.end + u64::from(index) * ID_LEN as u64;
+    Some(start..start + ID_LEN as u64)
 }
 
 pub(crate) fn checked_child_bytes(count: u32, available: u64) -> Result<u64, BankError> {
