@@ -40,7 +40,6 @@ pub(crate) struct SystemRead {
     pub(crate) missing: usize,
     pub(crate) malformed: usize,
     pub(crate) named: usize,
-    pub(crate) opened: Vec<usize>,
     pub(crate) deepest: usize,
     pub(crate) report: StarmapReport,
     pub(crate) containers: Vec<Opened>,
@@ -204,7 +203,6 @@ impl<'a> System<'a> {
     /// Notes that the container at `entry`, `external` containers below the system container,
     /// was opened and hangs below the record `under`.
     fn opened(&mut self, entry: usize, under: Option<Guid>, external: usize) {
-        self.read.opened.push(entry);
         self.read.containers.push(Opened {
             system: Arc::clone(&self.name),
             entry,

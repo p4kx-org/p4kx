@@ -178,7 +178,7 @@ fn assemble<R>(
             key_use,
         ),
         completeness: Completeness::of_every_kind(KindCompleteness::for_filter(options.filter)),
-        export_health: health.clone(),
+        export_health: health,
         items: collected.items,
         ships: collected.ships,
         declarations: crate::catalog_v3::catalog_declarations::CatalogDeclarations {
@@ -380,7 +380,7 @@ fn assemble<R>(
     let output = emit(&catalog)?;
     Ok((
         Parts {
-            export_health: health,
+            export_health: catalog.export_health,
             provenance: catalog.provenance,
             kinds,
             texts: texts.summary(),

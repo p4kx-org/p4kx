@@ -5,10 +5,12 @@ use std::error::Error;
 use std::ptr;
 use std::sync::Arc;
 
+use p4kx_extraction::Guid;
 use p4kx_testkit::TestElement;
 use serde_json::json;
 
-use super::{Limits, external_at, read, root, system};
+use super::{Limits, external_at, guid, read, root, system};
+use crate::starmap_containers::Placements;
 
 #[test]
 fn repeated_container_occurrences_share_only_source_owned_data() -> Result<(), Box<dyn Error>> {
@@ -17,9 +19,11 @@ fn repeated_container_occurrences_share_only_source_owned_data() -> Result<(), B
         external_at("tile", "10,0,0"),
         external_at("tile", "20,0,0"),
     ]);
+    let record = guid(1);
     let tile = root(vec![
         TestElement::new("Child")
             .attribute("pos", "1,0,0")
+            .attribute("starMapRecord", record.to_string())
             .attribute("locationType", "2")
             .attribute("label", "Storage canary"),
     ]);
@@ -28,6 +32,7 @@ fn repeated_container_occurrences_share_only_source_owned_data() -> Result<(), B
         system(&system_xml, &[("tile", tile)]),
         Limits::default(),
     );
+    verify_lookup_release(&mut placements, record);
     let containers = placements.take_instances();
     let [_, first, second] = containers.rows.as_slice() else {
         return Err("expected the system and two physical occurrences of one tile".into());
@@ -69,6 +74,18 @@ fn repeated_container_occurrences_share_only_source_owned_data() -> Result<(), B
         "identical reference text retains its distinct authored slots"
     );
     verify_occurring_locations(&placements.take_locations().rows)
+}
+
+fn verify_lookup_release(placements: &mut Placements, record: Guid) {
+    assert!(
+        placements.ambiguity_proof(record).is_some(),
+        "both actual record placements were indexed"
+    );
+    placements.release_record_lookup();
+    assert!(
+        placements.ambiguity_proof(record).is_none(),
+        "lookup data is released before writing"
+    );
 }
 
 fn verify_occurring_locations(

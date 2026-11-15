@@ -14,7 +14,6 @@ use crate::catalog_read::original::EntryCapture;
 use crate::catalog_table::{CatalogTable, DatasetAvailability};
 use crate::export_ledger::ExportLedger;
 use crate::starmap_index::{Index, unreferenced};
-
 use crate::starmap_parse::Read;
 use crate::starmap_report::{ContainerCounts, Placement, StarmapReport, apart, clip};
 use crate::starmap_walk::{Opened, System, SystemRead};
@@ -54,6 +53,10 @@ mod installed_witness;
 #[cfg(test)]
 #[path = "starmap_installed_jump_endpoints.rs"]
 mod installed_jump_endpoints;
+
+#[cfg(test)]
+#[path = "starmap_collect_tests.rs"]
+mod collect_tests;
 
 /// What bounds the walk through a star system.
 #[derive(Debug, Clone, Copy)]
@@ -102,6 +105,11 @@ pub(crate) struct Placements {
 }
 
 impl Placements {
+    pub(crate) fn release_record_lookup(&mut self) {
+        self.by_record = HashMap::new();
+        self.ambiguous = HashMap::new();
+    }
+
     pub(crate) fn take_instances(&mut self) -> CatalogTable<ContainerInstance> {
         CatalogTable {
             availability: self
@@ -261,6 +269,7 @@ impl Placements {
                 )
             })
             .collect::<Result<Vec<_>, _>>()?;
+        drop(bodies);
         if cancel.is_some_and(CancelToken::is_cancelled) {
             return Err(CatalogError::Cancelled);
         }
@@ -295,7 +304,7 @@ impl Placements {
             DatasetAvailability::Available
         });
         let mut opened = HashSet::new();
-        let named = self.merge_systems(read, &mut opened);
+        let named = self.merge_systems(read, &mut opened, scope);
         self.counts.ambiguous = self.ambiguous.len();
         self.report
             .containers
@@ -306,15 +315,18 @@ impl Placements {
         self.report.unreferenced = unreferenced(index, &opened);
         if matches!(scope, PlacementScope::RecordSelection) {
             self.add_unreached(index, &opened);
-        } else {
-            self.opened.clear();
         }
     }
 
-    fn merge_systems(&mut self, systems: Vec<SystemRead>, opened: &mut HashSet<usize>) -> usize {
+    fn merge_systems(
+        &mut self,
+        systems: Vec<SystemRead>,
+        opened: &mut HashSet<usize>,
+        scope: PlacementScope,
+    ) -> usize {
         let mut named = 0;
         for system in systems {
-            opened.extend(system.opened.iter().copied());
+            opened.extend(system.containers.iter().map(|container| container.entry));
             self.report.deepest_external = self.report.deepest_external.max(system.deepest);
             named += system.named;
             self.counts.unreadable += system.unreadable;
@@ -322,10 +334,12 @@ impl Placements {
             self.counts.malformed += system.malformed;
             self.report.containers.extend(system.report.containers);
             self.report.issues.extend(system.report.issues);
-            self.opened.extend(system.containers);
-            self.instances.extend(system.instances);
-            self.locations.extend(system.locations);
-            self.jump_endpoints.extend(system.jump_endpoints);
+            if matches!(scope, PlacementScope::RecordSelection) {
+                append_owned(&mut self.opened, system.containers);
+            }
+            append_owned(&mut self.instances, system.instances);
+            append_owned(&mut self.locations, system.locations);
+            append_owned(&mut self.jump_endpoints, system.jump_endpoints);
             for (record, placement) in system.placed {
                 self.add(record, placement);
             }
@@ -377,5 +391,13 @@ impl Placements {
                 placement.position
             ));
         }
+    }
+}
+
+fn append_owned<T>(rows: &mut Vec<T>, added: Vec<T>) {
+    if rows.is_empty() {
+        *rows = added;
+    } else {
+        rows.extend(added);
     }
 }

@@ -56,6 +56,7 @@ pub(super) fn scan<'f>(
     if options.cancel.is_some_and(CancelToken::is_cancelled) {
         return Err(CatalogError::Cancelled);
     }
+    placements.release_record_lookup();
     run.begin(CatalogStage::Projections);
     let mut collected = collect(crafting, scanned);
     let entry_ledger = if matches!(scope, Some(PlacementScope::RecordSelection)) {
