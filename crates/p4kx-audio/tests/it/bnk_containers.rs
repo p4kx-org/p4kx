@@ -19,6 +19,17 @@ fn decoded(object: TestHircObject, version: u32) -> Result<(HircKind, HircValue)
         }))
 }
 
+fn body_of(object: TestHircObject) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    let bytes = TestBank::new(1).object(object).bytes();
+    let bank = Soundbank::parse(&bytes)?;
+    let object = bank.objects().first().ok_or("original container")?;
+    Ok(bank
+        .object_body(object)
+        .get(size_of::<u32>()..)
+        .ok_or("object body after ID")?
+        .to_vec())
+}
+
 fn parts(value: &HircValue) -> Option<(ContainerKind, u32, Vec<u32>)> {
     match value {
         HircValue::Container(container) => Some((
@@ -78,7 +89,65 @@ fn every_container_kind_is_decoded_with_its_children_in_order() -> TestResult {
             kind == TestContainerKind::Switch,
             "only Switch fixtures author membership and a default value",
         );
+        assert!(
+            !container.has_authored_transitions(),
+            "a disabled mode leaves nonzero timing words inactive"
+        );
+        assert_eq!(
+            container.has_blend_curves(),
+            kind == TestContainerKind::Blend,
+            "all-zero point values still form an authored Blend curve"
+        );
     }
+    Ok(())
+}
+
+#[test]
+fn each_nonzero_random_sequence_transition_mode_is_observed() -> TestResult {
+    const PLAIN_NODE_BYTES: usize = 31;
+    const TRANSITION_MODE: usize = PLAIN_NODE_BYTES + 4 * size_of::<u16>() + 3 * size_of::<u32>();
+    let object =
+        TestHircObject::container(TestContainerKind::Sequence, 5, &[1], TestNodeBase::Plain);
+    let original = body_of(object)?;
+    for mode in [3, u8::MAX] {
+        let mut body = original.clone();
+        let field = body
+            .get_mut(TRANSITION_MODE)
+            .ok_or("checked transition mode byte")?;
+        assert_eq!(*field, 0, "synthetic base mode is disabled");
+        *field = mode;
+        let (_, value) = decoded(TestHircObject::raw(5, 5, body), 154)?;
+        let HircValue::Container(container) = value else {
+            return Err("expected a checked Random/Sequence transition mode".into());
+        };
+        assert!(container.has_authored_transitions(), "nonzero mode {mode}");
+    }
+    Ok(())
+}
+
+#[test]
+fn a_blend_controller_with_an_empty_association_curve_is_neutral() -> TestResult {
+    let object = TestHircObject::container(TestContainerKind::Blend, 5, &[1], TestNodeBase::Plain);
+    let mut body = body_of(object)?;
+    let original = [1_u32, 0, 0, 0].map(u32::to_le_bytes);
+    let end = body
+        .len()
+        .checked_sub(1)
+        .ok_or("continuous-validation byte")?;
+    let start = end
+        .checked_sub(size_of_val(&original))
+        .ok_or("original association point count and point")?;
+    assert_eq!(
+        body.get(start..end),
+        Some(original.as_flattened()),
+        "the one association has a checked all-zero point"
+    );
+    drop(body.splice(start..end, 0_u32.to_le_bytes()));
+    let (_, value) = decoded(TestHircObject::raw(9, 5, body), 154)?;
+    let HircValue::Container(container) = value else {
+        return Err("expected a checked Layer with a controller and empty curve".into());
+    };
+    assert!(!container.has_blend_curves(), "no original curve points");
     Ok(())
 }
 
@@ -107,18 +176,7 @@ fn a_container_of_another_bank_version_stays_raw() -> TestResult {
 #[test]
 fn a_truncated_or_overlong_container_is_malformed_and_the_bank_still_parses() -> TestResult {
     let full = TestHircObject::container(TestContainerKind::Blend, 5, &[1, 2], TestNodeBase::Full);
-    let bytes = TestBank::new(1).object(full).bytes();
-    let bank = Soundbank::parse(bytes.as_slice())?;
-    let body = bank
-        .objects()
-        .first()
-        .map(|object| {
-            bank.object_body(object)
-                .get(4..)
-                .unwrap_or_default()
-                .to_vec()
-        })
-        .ok_or("one object")?;
+    let body = body_of(full)?;
     for (name, cut) in [
         (
             "truncated",

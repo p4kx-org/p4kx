@@ -16,6 +16,7 @@ pub struct BankBlendContainerFields {
     pub layers: Option<BankBlendExtent>,
     /// Original continuous-validation byte, including unknown bits.
     pub continuous_validation: Option<BankHircField<u8>>,
+    has_crossfade_points: bool,
 }
 
 impl BankBlendContainerFields {
@@ -24,7 +25,12 @@ impl BankBlendContainerFields {
             start,
             layers: None,
             continuous_validation: None,
+            has_crossfade_points: false,
         }
+    }
+
+    pub(crate) const fn has_crossfade_points(&self) -> bool {
+        self.has_crossfade_points
     }
 
     /// Returns the extent when all declared Layers and the final byte fit.
@@ -69,6 +75,7 @@ pub struct BankBlendLayerFields {
     pub crossfade_rtpc_type: Option<BankHircField<u8>>,
     /// Original association count and checked prefix when reached.
     pub associations: Option<BankBlendExtent>,
+    has_crossfade_points: bool,
 }
 
 impl BankBlendLayerFields {
@@ -79,6 +86,7 @@ impl BankBlendLayerFields {
             crossfade_rtpc_id: None,
             crossfade_rtpc_type: None,
             associations: None,
+            has_crossfade_points: false,
         }
     }
 }
@@ -97,14 +105,18 @@ pub(crate) fn tail<F: ObjectFields>(
     input: &mut F,
     observed: &mut BankBlendContainerFields,
 ) -> Result<(), F::Error> {
+    let mut has_crossfade_points = false;
     scan_table(input, &mut observed.layers, |fields, count| {
         for _ in 0..count {
             let id = fields.read_u32()?;
-            scan_layer(fields, id).1?;
+            let (layer, read) = scan_layer(fields, id);
+            read?;
+            has_crossfade_points |= layer.has_crossfade_points;
         }
         Ok(())
     })?;
     observed.continuous_validation = Some(input.read_u8()?);
+    observed.has_crossfade_points = has_crossfade_points;
     Ok(())
 }
 
@@ -124,13 +136,20 @@ fn layer<F: ObjectFields>(
     hirc_rtpc::scan(input, &mut observed.rtpc)?;
     observed.crossfade_rtpc_id = Some(input.read_u32()?);
     observed.crossfade_rtpc_type = Some(input.read_u8()?);
+    let mut has_crossfade_points = false;
     scan_table(input, &mut observed.associations, |fields, count| {
         for _ in 0..count {
             let child_id = fields.read_u32()?;
-            scan_association(fields, child_id).1?;
+            let (association, read) = scan_association(fields, child_id);
+            read?;
+            has_crossfade_points |= association
+                .points
+                .is_some_and(|points| points.declared_count.value != 0);
         }
         Ok(())
-    })
+    })?;
+    observed.has_crossfade_points = has_crossfade_points;
+    Ok(())
 }
 
 pub(crate) fn scan_association<F: ObjectFields>(

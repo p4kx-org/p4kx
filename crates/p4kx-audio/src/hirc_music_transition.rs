@@ -4,7 +4,6 @@
 use std::ops::Range;
 
 use crate::bank_object_fields::{BankHircField, ObjectFields};
-use crate::hirc_music_fade::BankMusicFadeFields;
 use crate::hirc_music_transition_rule::{self, BankMusicTransitionRuleFields};
 
 /// Compact observations from the original rules of one music node.
@@ -38,22 +37,14 @@ impl MusicTransitionFeatures {
 
     fn observe(&mut self, rule: &BankMusicTransitionRuleFields) {
         let object = rule.transition_object.as_ref();
-        self.fades |= fade_timing(&rule.source.fade)
-            || fade_timing(&rule.destination.fade)
-            || object.is_some_and(|object| {
-                fade_timing(&object.fade_in) || fade_timing(&object.fade_out)
-            });
+        self.fades |= rule.source.fade.has_timing()
+            || rule.destination.fade.has_timing()
+            || object
+                .is_some_and(|object| object.fade_in.has_timing() || object.fade_out.has_timing());
         self.segments |= object
             .and_then(|object| object.segment_id.as_ref())
             .is_some_and(|id| id.value != 0);
     }
-}
-
-fn fade_timing(fade: &BankMusicFadeFields) -> bool {
-    [&fade.time_bits, &fade.offset_bits]
-        .into_iter()
-        .flatten()
-        .any(|word| word.value != 0)
 }
 
 /// Original transition count and checked physical rule extents.

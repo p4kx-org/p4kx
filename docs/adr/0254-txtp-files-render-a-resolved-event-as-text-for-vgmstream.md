@@ -84,8 +84,15 @@ in milliseconds, omitted posted Events and nonfinite timing words. The
 source duration is a separate authored value.
 
 A rendered path carries observed fade and transition-segment features
-from its actual MusicPlaylist and MusicSwitch ancestors. The writer
-reports each omitted feature in the header and JSON.
+from its MusicPlaylist and MusicSwitch ancestors. A Switch MusicTrack
+contributes its source or destination fade timing when time or offset is nonzero.
+Random/Sequence transition modes other than zero produce `omit-container-transitions`,
+including an unrecognised nonzero mode. Mode zero leaves the timing words inactive.
+[wwiser transition mode table](https://github.com/bnnm/wwiser/blob/6d4b5bfb45afc52cda9d68fbbe0cbd97de0e26a3/wwiser/parser/wdefs.py)
+
+A Blend owner with original checked association curve points produces `omit-blend-curves`,
+even when the authored points have zero values. The writer reports each omitted
+feature in the header and JSON.
 
 Each resolved path carries omissions from its checked owners. The report adds
 `omit-container-loops` for Random/Sequence and MusicPlaylist loop controls when

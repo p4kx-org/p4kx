@@ -118,6 +118,7 @@ struct SwitchHeader {
     group_type: u8,
     group_id: u32,
     default_switch: u32,
+    has_fade_timing: bool,
 }
 
 pub(crate) fn track(version: u32, input: &mut SectionReader<'_>) -> Result<MusicTrack, BankError> {
@@ -140,6 +141,10 @@ pub(crate) fn track(version: u32, input: &mut SectionReader<'_>) -> Result<Music
         clips,
         kind: header.kind,
         has_automation: header.has_automation,
+        has_switch_fades: header
+            .switch
+            .as_ref()
+            .is_some_and(|switch| switch.has_fade_timing),
         switch: header.switch.map(|header| MusicTrackSwitch {
             group_type: header.group_type,
             group_id: header.group_id,
@@ -259,6 +264,7 @@ fn read_switch<F: ObjectFields>(
         group_type,
         group_id,
         default_switch,
+        has_fade_timing: transition.source.has_timing() || transition.destination.has_timing(),
     })
 }
 

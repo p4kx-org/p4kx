@@ -46,6 +46,28 @@ pub struct Container {
     pub has_authored_loops: bool,
     /// The original Switch defines membership groups or a nonzero default value.
     pub has_switch_conditions: bool,
+    pub(crate) timing: ContainerTiming,
+}
+
+impl Container {
+    /// Returns whether the checked Random/Sequence transition mode is nonzero.
+    #[must_use]
+    pub const fn has_authored_transitions(&self) -> bool {
+        matches!(self.timing, ContainerTiming::Transition)
+    }
+
+    /// Returns whether an original Blend child association contains checked crossfade points.
+    #[must_use]
+    pub const fn has_blend_curves(&self) -> bool {
+        matches!(self.timing, ContainerTiming::BlendCurve)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum ContainerTiming {
+    None,
+    Transition,
+    BlendCurve,
 }
 
 /// Original words that locate and supply the parent in a node base.

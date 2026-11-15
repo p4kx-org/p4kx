@@ -4,9 +4,9 @@
 //! Music segments, tracks, switch containers and playlists of the `HIRC` section, and the soundbank
 //! a Play action names, decoded from synthetic banks.
 
-use p4kx_audio::{
-    BankError, HircKind, HircValue, MediaStorage, MusicTrackKind, PlayBank, SectionId, Soundbank,
-};
+mod track;
+
+use p4kx_audio::{BankError, HircKind, HircValue, PlayBank, SectionId, Soundbank};
 use p4kx_testkit::{TestBank, TestHircObject};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -77,55 +77,6 @@ fn a_music_segment_is_decoded_with_its_tracks_meter_stingers_and_markers() -> Te
             .collect::<Vec<_>>(),
         [(0x100, "Entry"), (0x101, "Exit")],
         "marker names"
-    );
-    Ok(())
-}
-
-#[test]
-fn a_music_track_is_decoded_with_its_sources_clips_and_kind() -> TestResult {
-    let object = TestHircObject::music_track(6, &[700, 800]);
-    let HircValue::MusicTrack(track) = decoded(object, 154)?.1 else {
-        return Err("a music track".into());
-    };
-    assert_eq!(track.parent_id, PARENT, "parent");
-    assert_eq!(track.kind, MusicTrackKind::Normal, "kind");
-    assert_eq!(track.switch, None, "no switch group");
-    assert!(track.has_automation, "two checked original points");
-    assert_eq!(
-        track
-            .sources
-            .iter()
-            .map(|source| (source.source_id, source.storage, source.in_memory_size))
-            .collect::<Vec<_>>(),
-        [
-            (700, MediaStorage::Streamed, 4096),
-            (800, MediaStorage::Streamed, 4096)
-        ],
-        "sources"
-    );
-    assert_eq!(
-        track
-            .clips
-            .iter()
-            .map(|clip| (clip.source_id, clip.begin_trim.to_bits()))
-            .collect::<Vec<_>>(),
-        [(700, 0.5_f64.to_bits()), (800, 0.5_f64.to_bits())],
-        "clips"
-    );
-    Ok(())
-}
-
-#[test]
-fn a_switch_track_keeps_its_group_and_switches() -> TestResult {
-    let object = TestHircObject::music_switch_track(6, &[700], 0x4000, &[0x61, 0x62]);
-    let HircValue::MusicTrack(track) = decoded(object, 154)?.1 else {
-        return Err("a music track".into());
-    };
-    assert_eq!(track.kind, MusicTrackKind::Switch);
-    let switch = track.switch.ok_or("a switch group")?;
-    assert_eq!(
-        (switch.group_id, switch.default_switch, switch.switches),
-        (0x4000, 0, vec![0x61, 0x62])
     );
     Ok(())
 }

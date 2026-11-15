@@ -6,7 +6,7 @@ use std::ops::Range;
 use crate::bank_object_fields::ObjectFields;
 use crate::bank_reader::SectionReader;
 use crate::hirc_blend_container::{self, BankBlendContainerFields};
-use crate::hirc_node::{self, BankNodeParentFields, Container, ContainerKind};
+use crate::hirc_node::{self, BankNodeParentFields, Container, ContainerKind, ContainerTiming};
 use crate::hirc_node_parameters::BankNodeParameters;
 use crate::hirc_random_sequence::{self, BankRandomSequenceFields};
 use crate::hirc_switch_container::{self, BankSwitchContainerFields};
@@ -82,7 +82,27 @@ pub(crate) fn container(
             .switch
             .as_ref()
             .is_some_and(BankSwitchContainerFields::has_conditions),
+        timing: timing(&original),
     })
+}
+
+fn timing(original: &BankContainerFields) -> ContainerTiming {
+    if original
+        .random_sequence
+        .as_ref()
+        .and_then(|fields| fields.transition_mode.as_ref())
+        .is_some_and(|mode| mode.value != 0)
+    {
+        ContainerTiming::Transition
+    } else if original
+        .blend
+        .as_ref()
+        .is_some_and(BankBlendContainerFields::has_crossfade_points)
+    {
+        ContainerTiming::BlendCurve
+    } else {
+        ContainerTiming::None
+    }
 }
 
 pub(crate) struct Head {

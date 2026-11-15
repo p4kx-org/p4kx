@@ -15,6 +15,15 @@ pub struct BankMusicFadeFields {
     pub offset_bits: Option<BankHircField<u32>>,
 }
 
+impl BankMusicFadeFields {
+    pub(crate) fn has_timing(&self) -> bool {
+        [&self.time_bits, &self.offset_bits]
+            .into_iter()
+            .flatten()
+            .any(|word| word.value != 0)
+    }
+}
+
 pub(crate) fn read<F: ObjectFields>(
     input: &mut F,
     observed: &mut BankMusicFadeFields,

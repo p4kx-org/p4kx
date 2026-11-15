@@ -7,7 +7,7 @@ use std::fmt::Write;
 use p4kx_audio::Loop;
 
 use crate::audio::music_clip_features::MusicClipFeatures;
-use crate::audio::playback_features::PlaybackFeatures;
+use crate::audio::playback_features::{PlaybackFeature, PlaybackFeatures};
 
 use super::TxtpApproximation;
 use super::tree::{Combine, Group, Leaf, Node};
@@ -63,26 +63,37 @@ impl RenderedTxtp {
     }
 
     fn note_playback_features(&mut self, features: PlaybackFeatures) {
-        for (omitted, code) in [
+        for (feature, code) in [
             (
-                features.music_transitions.has_fade_timing(),
+                PlaybackFeature::MusicFades,
                 TxtpApproximation::OmitMusicTransitionFades,
             ),
             (
-                features.music_transitions.has_transition_segment(),
+                PlaybackFeature::MusicTransitionSegments,
                 TxtpApproximation::OmitMusicTransitionSegments,
             ),
-            (features.loops, TxtpApproximation::OmitContainerLoops),
             (
-                features.conditions,
+                PlaybackFeature::Loops,
+                TxtpApproximation::OmitContainerLoops,
+            ),
+            (
+                PlaybackFeature::Conditions,
                 TxtpApproximation::OmitContainerConditions,
             ),
             (
-                features.automation,
+                PlaybackFeature::Automation,
                 TxtpApproximation::OmitMusicTrackAutomation,
             ),
+            (
+                PlaybackFeature::ContainerTransitions,
+                TxtpApproximation::OmitContainerTransitions,
+            ),
+            (
+                PlaybackFeature::BlendCurves,
+                TxtpApproximation::OmitBlendCurves,
+            ),
         ] {
-            if omitted {
+            if features.contains(feature) {
                 self.note(code);
             }
         }

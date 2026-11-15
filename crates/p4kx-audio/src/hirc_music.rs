@@ -132,6 +132,8 @@ pub struct MusicTrack {
     pub switch: Option<MusicTrackSwitch>,
     /// At least one original automation row contains checked points.
     pub has_automation: bool,
+    /// An original switch transition fade has a nonzero time or offset.
+    pub has_switch_fades: bool,
 }
 
 /// A music switch container: plays the child that matches the current states or switches.

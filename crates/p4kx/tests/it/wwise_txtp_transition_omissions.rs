@@ -1,18 +1,22 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::error::Error;
 use std::fs;
 
 use p4kx_testkit::{ArchiveBuilder, TestAtl, TestBank, TestEntry, TestHircObject, wwise_short_id};
 use serde_json::json;
 
-use super::{Fixture, PLAY, TestResult, extract, pcm};
+use super::{Fixture, PLAY, TestResult, extract, hirc_payload, pcm};
 
 const SOURCE_FADE: &str = "Play_Source_Transition_Fade";
 const DESTINATION_FADE: &str = "Play_Destination_Transition_Fade";
 const OBJECT_FADE: &str = "Play_Object_Transition_Fade";
 const SEGMENT: &str = "Play_Transition_Segment";
 const ZERO: &str = "Play_Default_Transitions";
+const TRACK_SOURCE_FADE: &str = "Play_Track_Source_Fade";
+const TRACK_DESTINATION_FADE: &str = "Play_Track_Destination_Fade";
+const TRACK_ZERO: &str = "Play_Track_Zero_Fades";
 const FLAGS: [&str; 3] = ["--format", "wav", "--txtp"];
 const CLIP_CODE: &str = "omit-music-clip-timing";
 const FADE_CODE: &str = "omit-music-transition-fades";
@@ -26,6 +30,9 @@ const PLAYED_TRACK: u32 = 12;
 const TRANSITION_SEGMENT: u32 = 13;
 const TRANSITION_TRACK: u32 = 14;
 const TRANSITION_WEM: u32 = 2_506;
+const SWITCH_TRACK_WEM: u32 = 2_507;
+const TRACK_SWITCH_GROUP: u32 = 0x4400_0000;
+const TRACK_SWITCH_MEMBER: u32 = 0x4400_0001;
 const WORD: usize = size_of::<u32>();
 const FADE_LEN: usize = 3 * WORD;
 const FADE_OFFSET: usize = 2 * WORD;
@@ -76,6 +83,23 @@ fn txtp_reports_an_allocated_transition_segment_independently_of_fades() -> Test
     )
 }
 
+#[test]
+fn txtp_reports_both_switch_track_fades_on_their_rendered_paths() -> TestResult {
+    let fixture = fixture()?;
+    for trigger in [TRACK_SOURCE_FADE, TRACK_DESTINATION_FADE] {
+        expect(
+            &fixture,
+            trigger,
+            &[CLIP_CODE, FADE_CODE, CONDITIONS_CODE, AUTOMATION_CODE],
+        )?;
+    }
+    expect(
+        &fixture,
+        TRACK_ZERO,
+        &[CLIP_CODE, CONDITIONS_CODE, AUTOMATION_CODE],
+    )
+}
+
 fn expect(fixture: &Fixture, trigger: &str, codes: &[&str]) -> TestResult {
     let report = extract(fixture, trigger, &FLAGS, 0)?;
     assert_eq!(
@@ -92,13 +116,15 @@ fn expect(fixture: &Fixture, trigger: &str, codes: &[&str]) -> TestResult {
     assert_eq!(header, codes, "header agrees with JSON for {trigger}");
     let playable = format!("{trigger}.wav");
     assert!(
-        text.lines().any(|line| line == playable),
-        "the original playable file stays in the TXTP"
+        text.lines()
+            .filter(|line| !line.starts_with('#'))
+            .eq([playable.as_str()]),
+        "the single playable command stays byte-identical for {trigger}"
     );
     Ok(())
 }
 
-fn fixture() -> Result<Fixture, Box<dyn std::error::Error>> {
+fn fixture() -> Result<Fixture, Box<dyn Error>> {
     let dir = tempfile::tempdir()?;
     let archive = dir.path().join("Data.p4k");
     let out = dir.path().join("out");
@@ -122,7 +148,18 @@ fn fixture() -> Result<Fixture, Box<dyn std::error::Error>> {
                 pcm(),
             ));
     }
+    for trigger in [TRACK_SOURCE_FADE, TRACK_DESTINATION_FADE, TRACK_ZERO] {
+        atl = atl.trigger(trigger, &[trigger]);
+    }
     builder
+        .entry(TestEntry::stored(
+            "Data/Sounds/wwise/SwitchTrack.bnk",
+            switch_track_bank()?,
+        ))
+        .entry(TestEntry::stored(
+            format!("Data/Sounds/wwise/Media/{SWITCH_TRACK_WEM}.wem"),
+            pcm(),
+        ))
         .entry(TestEntry::stored(
             format!("Data/Sounds/wwise/Media/{TRANSITION_WEM}.wem"),
             pcm(),
@@ -139,11 +176,7 @@ fn fixture() -> Result<Fixture, Box<dyn std::error::Error>> {
     })
 }
 
-fn bank(
-    event: &str,
-    media: u32,
-    authored: AuthoredRule,
-) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+fn bank(event: &str, media: u32, authored: AuthoredRule) -> Result<Vec<u8>, Box<dyn Error>> {
     let container = match authored {
         AuthoredRule::Segment | AuthoredRule::ObjectFade => {
             TestHircObject::music_switch(CONTAINER_ID, &[PLAYED_SEGMENT], 0x42, &[PLAYED_SEGMENT])
@@ -173,6 +206,57 @@ fn bank(
         .bytes();
     authored.apply(&mut bytes)?;
     Ok(bytes)
+}
+
+fn switch_track_bank() -> Result<Vec<u8>, Box<dyn Error>> {
+    let mut bank = TestBank::new(wwise_short_id("SwitchTrack")).version(154);
+    for (action, (event, track, source_offset, destination_time)) in (1..).zip([
+        (TRACK_SOURCE_FADE, 20, -15, 0),
+        (TRACK_DESTINATION_FADE, 21, 0, 18),
+        (TRACK_ZERO, 22, 0, 0),
+    ]) {
+        bank = bank
+            .object(TestHircObject::event(wwise_short_id(event), &[action]))
+            .object(TestHircObject::action(action, PLAY, track))
+            .object(switch_track(track, source_offset, destination_time)?);
+    }
+    Ok(bank.bytes())
+}
+
+fn switch_track(
+    id: u32,
+    source_offset: i32,
+    destination_time: i32,
+) -> Result<TestHircObject, Box<dyn Error>> {
+    const SYNC_WORDS_LEN: usize = 2 * WORD;
+    const TRANSITION_LEN: usize = 2 * FADE_LEN + SYNC_WORDS_LEN;
+
+    let mut payload = hirc_payload(TestHircObject::music_switch_track(
+        id,
+        &[SWITCH_TRACK_WEM],
+        TRACK_SWITCH_GROUP,
+        &[TRACK_SWITCH_MEMBER],
+    ))?;
+    let start = payload
+        .len()
+        .checked_sub(TRANSITION_LEN + WORD)
+        .ok_or("original switch track transition before the look-ahead word")?;
+    assert_eq!(
+        payload.get(start..start + TRANSITION_LEN),
+        Some([0_u8; TRANSITION_LEN].as_slice()),
+        "the synthetic track starts with two neutral fades and zero sync fields"
+    );
+    word(
+        &mut payload,
+        start + FADE_OFFSET,
+        source_offset.to_le_bytes(),
+    )?;
+    word(
+        &mut payload,
+        start + FADE_LEN + SYNC_WORDS_LEN,
+        destination_time.to_le_bytes(),
+    )?;
+    Ok(TestHircObject::raw(11, id, payload))
 }
 
 impl AuthoredRule {

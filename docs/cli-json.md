@@ -928,9 +928,13 @@ Each `files` row includes an `approximations` array for written or verified reta
 A choice with several rendered alternatives includes `"select-first-alternative"`, also written
 in the TXTP header. Rendered MusicTrack sources can add `omit-music-clip-timing`,
 `omit-music-clip-events` or `nonfinite-music-clip-timing` from their owning track's clip fields.
-A rendered path through a MusicPlaylist or MusicSwitch can add `omit-music-transition-fades`
-for nonzero original fade timing or `omit-music-transition-segments` for an allocated
-transition object with a nonzero segment ID. The same rendered paths can add
+A rendered path through a MusicPlaylist, MusicSwitch or Switch MusicTrack can add
+`omit-music-transition-fades` for nonzero original fade time or offset. An allocated
+transition object with a nonzero segment ID adds `omit-music-transition-segments`.
+Rendered paths can also add `omit-container-transitions` for a nonzero declared
+Random/Sequence transition mode and `omit-blend-curves` for original checked
+Blend association curve points. Mode zero does not activate stored timing words.
+The same rendered paths can add
 `omit-container-loops` for authored Random/Sequence or MusicPlaylist loop controls
 beyond a single play, `omit-container-conditions` for checked switch, state or music
 decision data, and `omit-music-track-automation` for original track automation points.

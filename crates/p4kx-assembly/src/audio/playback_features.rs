@@ -3,49 +3,74 @@
 
 use p4kx_audio::{HircValue, MusicTransitionFeatures};
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub(super) struct PlaybackFeatures {
-    pub(super) loops: bool,
-    pub(super) conditions: bool,
-    pub(super) automation: bool,
-    pub(super) music_transitions: MusicTransitionFeatures,
+#[derive(Clone, Copy)]
+#[repr(u8)]
+pub(super) enum PlaybackFeature {
+    MusicFades = 1 << 0,
+    MusicTransitionSegments = 1 << 1,
+    Loops = 1 << 2,
+    Conditions = 1 << 3,
+    Automation = 1 << 4,
+    ContainerTransitions = 1 << 5,
+    BlendCurves = 1 << 6,
 }
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub(super) struct PlaybackFeatures(u8);
 
 impl PlaybackFeatures {
     pub(super) fn observe(value: &HircValue) -> Self {
+        let mut features = Self::default();
         match value {
-            HircValue::Container(container) => Self {
-                loops: container.has_authored_loops,
-                conditions: container.has_switch_conditions,
-                ..Self::default()
-            },
-            HircValue::MusicPlaylist(playlist) => Self {
-                loops: playlist.has_authored_loops,
-                music_transitions: playlist.transition_features,
-                ..Self::default()
-            },
-            HircValue::MusicSwitch(switch) => Self {
-                conditions: switch.has_decision_conditions,
-                music_transitions: switch.transition_features,
-                ..Self::default()
-            },
-            HircValue::MusicTrack(track) => Self {
-                conditions: track.switch.as_ref().is_some_and(|switch| {
+            HircValue::Container(container) => {
+                features.observe_flag(PlaybackFeature::Loops, container.has_authored_loops);
+                features.observe_flag(PlaybackFeature::Conditions, container.has_switch_conditions);
+                features.observe_flag(
+                    PlaybackFeature::ContainerTransitions,
+                    container.has_authored_transitions(),
+                );
+                features.observe_flag(PlaybackFeature::BlendCurves, container.has_blend_curves());
+            }
+            HircValue::MusicPlaylist(playlist) => {
+                features.observe_flag(PlaybackFeature::Loops, playlist.has_authored_loops);
+                features.observe_music_transitions(playlist.transition_features);
+            }
+            HircValue::MusicSwitch(switch) => {
+                features.observe_flag(PlaybackFeature::Conditions, switch.has_decision_conditions);
+                features.observe_music_transitions(switch.transition_features);
+            }
+            HircValue::MusicTrack(track) => {
+                let has_conditions = track.switch.as_ref().is_some_and(|switch| {
                     switch.default_switch != 0 || !switch.switches.is_empty()
-                }),
-                automation: track.has_automation,
-                ..Self::default()
-            },
-            _ => Self::default(),
+                });
+                features.observe_flag(PlaybackFeature::Conditions, has_conditions);
+                features.observe_flag(PlaybackFeature::Automation, track.has_automation);
+                features.observe_flag(PlaybackFeature::MusicFades, track.has_switch_fades);
+            }
+            _ => {}
         }
+        features
     }
 
     pub(super) const fn combine(self, other: Self) -> Self {
-        Self {
-            loops: self.loops || other.loops,
-            conditions: self.conditions || other.conditions,
-            automation: self.automation || other.automation,
-            music_transitions: self.music_transitions.combine(other.music_transitions),
+        Self(self.0 | other.0)
+    }
+
+    pub(super) const fn contains(self, feature: PlaybackFeature) -> bool {
+        self.0 & feature as u8 != 0
+    }
+
+    const fn observe_flag(&mut self, feature: PlaybackFeature, present: bool) {
+        if present {
+            self.0 |= feature as u8;
         }
+    }
+
+    const fn observe_music_transitions(&mut self, transitions: MusicTransitionFeatures) {
+        self.observe_flag(PlaybackFeature::MusicFades, transitions.has_fade_timing());
+        self.observe_flag(
+            PlaybackFeature::MusicTransitionSegments,
+            transitions.has_transition_segment(),
+        );
     }
 }

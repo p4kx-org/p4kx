@@ -105,7 +105,7 @@ impl TxtpReport {
 /// as follows: an Event's actions, blend containers, music segments and music tracks as layers;
 /// sequence containers and music playlists as segments; random and switch containers and music
 /// switches as a choice. The report identifies observed timing, conditions, authored
-/// container loops and `MusicTrack` automation omitted by the generated commands.
+/// container loops, Blend curves and `MusicTrack` automation omitted by the generated commands.
 ///
 /// An event with broken links is written with a header comment that says it is incomplete, and
 /// [`TxtpFile::breaks`] counts them. A file that cannot be written, e.g. because its path is too
