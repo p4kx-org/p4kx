@@ -131,8 +131,21 @@ pub(super) fn mission_types() -> serde_json::Value {
         "guid": "50000000-0000-4000-8000-000000000001",
         "className": "missiontype.job",
         "recordPath": "libs/foundry/records/missiontype/missiontype.job",
-        "typeName": {"key": "@type_job", "en": "Job", "de": null}
+        "typeName": values::present(json!("text:9:@type_job"))
     }])
+}
+
+pub(super) fn mission_type_text() -> serde_json::Value {
+    json!({
+        "id": values::present(json!("text:9:@type_job")),
+        "key": values::present(json!("@type_job")),
+        "translations": values::present(json!({
+            "en": {
+                "sourceText": values::present(json!("Job")),
+                "displayText": values::present(json!("Job"))
+            }
+        }))
+    })
 }
 
 pub(super) fn localities() -> serde_json::Value {

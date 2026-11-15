@@ -286,14 +286,27 @@ fn location_template(guid: u128, name: &str, disabled: bool) -> TestRecord {
                 .value("aiSpawnTags", tag_list(&[TAG_SHIP]))
                 .value(
                     "stringVariants",
-                    TestValue::Struct(TestInstance::new("MissionStringVariants").value(
-                        "variants",
-                        array(vec![TestValue::Struct(
-                            TestInstance::new("MissionStringVariant")
-                                .value("tag", reference(TAG_HIJACKED))
-                                .value("string", TestValue::text("@place_name")),
-                        )]),
-                    )),
+                    TestValue::Struct(
+                        TestInstance::new("MissionStringVariants").value(
+                            "variants",
+                            array(
+                                [
+                                    (TAG_HIJACKED, "@place_name"),
+                                    (TAG_SHIP, "@place_name"),
+                                    (TAG_SHIP, "@LOC_PLACEHOLDER"),
+                                ]
+                                .into_iter()
+                                .map(|(tag, key)| {
+                                    TestValue::Struct(
+                                        TestInstance::new("MissionStringVariant")
+                                            .value("tag", reference(tag))
+                                            .value("string", TestValue::text(key)),
+                                    )
+                                })
+                                .collect(),
+                            ),
+                        ),
+                    ),
                 ),
         ),
     )
@@ -363,6 +376,12 @@ pub(crate) fn write_archive(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
     ArchiveBuilder::new()
         .entry(TestEntry::zstd("Data\\Game2.dcb", database().build()).encrypted())
         .entry(english())
+        .entry(TestEntry::zstd(
+            p4kx_extraction::Language::French.global_ini_path(),
+            GlobalIniBuilder::new()
+                .text("place_name", "Site de mission")
+                .build(),
+        ))
         .write_to(&path)?;
     Ok(path)
 }

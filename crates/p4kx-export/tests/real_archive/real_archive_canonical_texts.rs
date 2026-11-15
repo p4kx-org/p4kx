@@ -47,6 +47,7 @@ const NAME: [(&str, TextDomain); 1] = [("name", TextDomain::PublicName)];
 const PROPERTY_NAME: [(&str, TextDomain); 1] = [("propertyName", TextDomain::PublicName)];
 const REPUTATION_DISPLAY_FIELDS: [(&str, TextDomain); 1] = [("displayName", TextDomain::GameText)];
 const STARMAP_NAME: [(&str, TextDomain); 1] = [("name", TextDomain::GameText)];
+const MISSION_TYPE_NAME: [(&str, TextDomain); 1] = [("typeName", TextDomain::GameText)];
 const PROCESS_NAME: [(&str, TextDomain); 1] = [("processName", TextDomain::GameText)];
 const DEPOSIT_NAME: [(&str, TextDomain); 1] = [("depositName", TextDomain::GameText)];
 
@@ -251,10 +252,14 @@ pub(crate) fn kind_coverage(
             | Kind::ReputationScopes
             | Kind::ReputationStandings
             | Kind::StarmapObjects
+            | Kind::MissionTypes
             | Kind::RefiningProcesses
             | Kind::MineableCompositions
     ) {
         return canonical_coverage(catalog, kind, english_oracle, german_oracle);
+    }
+    if kind == Kind::MissionLocationTemplates {
+        return extras::location_templates(catalog, english_oracle, german_oracle);
     }
     if kind == Kind::Items {
         let mut counters = CoverageCounters::new(english_oracle, german_oracle);
@@ -363,6 +368,7 @@ fn canonical_coverage(
             Kind::GameplayProperties => (PROPERTY_NAME.as_slice(), TextReferenceShape::Required),
             Kind::Commodities => (PRESENTATION_FIELDS.as_slice(), TextReferenceShape::Nullable),
             Kind::StarmapObjects => (STARMAP_NAME.as_slice(), TextReferenceShape::Required),
+            Kind::MissionTypes => (MISSION_TYPE_NAME.as_slice(), TextReferenceShape::Required),
             Kind::RefiningProcesses => (PROCESS_NAME.as_slice(), TextReferenceShape::Required),
             Kind::MineableCompositions => (DEPOSIT_NAME.as_slice(), TextReferenceShape::Required),
             _ => (FIELDS.as_slice(), TextReferenceShape::Required),

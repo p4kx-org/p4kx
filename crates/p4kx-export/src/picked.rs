@@ -35,7 +35,6 @@ use crate::mining_params::mining_global_params;
 use crate::mission_kinds::MissionPick;
 use crate::paint_port::VehicleFacts;
 use crate::ship_base::ShipRead;
-use crate::texts::Texts;
 use crate::{CatalogError, Kind};
 
 /// A Record a kind selected: its entity, or a development leftover of the kind.
@@ -119,22 +118,18 @@ pub(crate) enum Picked<'f> {
 }
 
 impl<'f> Picked<'f> {
-    /// Returns the entity of `kind` the Record tree `tree` describes, its texts resolved by
-    /// `texts`. `None` for a kind whose dedicated reader supplies its rows.
+    /// Returns the entity of `kind` the Record tree describes when no dedicated reader owns it.
     #[expect(
         clippy::too_many_lines,
         reason = "one exhaustive dispatch for the catalog kinds"
     )]
-    pub(crate) fn entity(kind: Kind, tree: &RecordTree<'f>, texts: &Texts<'f>) -> Option<Self> {
+    pub(crate) fn entity(kind: Kind, tree: &RecordTree<'f>) -> Option<Self> {
         Some(match kind {
             Kind::Crafters => return crafter(tree).map(Self::Crafter),
             Kind::MineableElements => Self::Mineable(mineable_element(tree)),
             Kind::MiningGlobalParams => Self::MiningParams(mining_global_params(tree)),
-            Kind::MissionTypes
-            | Kind::MissionLocalities
-            | Kind::ContractScenarios
-            | Kind::CargoManifests => {
-                return MissionPick::entity(kind, tree, texts).map(Self::Mission);
+            Kind::MissionLocalities | Kind::ContractScenarios | Kind::CargoManifests => {
+                return MissionPick::entity(kind, tree).map(Self::Mission);
             }
             Kind::LootTables
             | Kind::LootArchetypes
@@ -181,6 +176,7 @@ impl<'f> Picked<'f> {
             | Kind::Jurisdictions
             | Kind::SecurityNetworkManifests
             | Kind::MissionScenarios
+            | Kind::MissionTypes
             | Kind::MissionModuleDeclarations
             | Kind::MissionItems
             | Kind::LocationClasses

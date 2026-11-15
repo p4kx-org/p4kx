@@ -335,6 +335,8 @@ fn check_coverage(
                     | Kind::GameplayProperties
                     | Kind::Commodities
                     | Kind::ContractTemplates
+                    | Kind::MissionTypes
+                    | Kind::MissionLocationTemplates
                     | Kind::MissionBrokerEntries
                     | Kind::FactionReputations
                     | Kind::ReputationScopes

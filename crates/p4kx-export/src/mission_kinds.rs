@@ -33,8 +33,7 @@ use crate::catalog_v3::sandbox_trigger_record_definition::{
 };
 use crate::contract::{CargoManifest, ContractScenario, MissionLocality, MissionType};
 use crate::guid_text::{CatalogGuid, sort_by_guid};
-use crate::mission_data::{contract_scenario, mission_locality, mission_type};
-use crate::texts::Texts;
+use crate::mission_data::{contract_scenario, mission_locality};
 
 /// An entity of one of the mission and reputation kinds.
 pub(crate) enum MissionPick<'f> {
@@ -71,9 +70,8 @@ pub(crate) enum MissionPick<'f> {
 impl<'f> MissionPick<'f> {
     /// Returns the entity of `kind` the Record tree `tree` describes, `None` for a kind that is
     /// not a mission or reputation kind.
-    pub(crate) fn entity(kind: Kind, tree: &RecordTree<'f>, texts: &Texts<'f>) -> Option<Self> {
+    pub(crate) fn entity(kind: Kind, tree: &RecordTree<'f>) -> Option<Self> {
         Some(match kind {
-            Kind::MissionTypes => Self::Type(mission_type(tree, texts)),
             Kind::MissionLocalities => Self::Locality(mission_locality(tree)),
             Kind::ContractScenarios => Self::Scenario(contract_scenario(tree)),
             Kind::CargoManifests => Self::Manifest(cargo_manifest(tree)),

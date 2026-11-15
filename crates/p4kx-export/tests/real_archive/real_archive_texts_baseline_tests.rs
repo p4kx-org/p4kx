@@ -6,7 +6,7 @@ use std::error::Error;
 use p4kx_export::Kind;
 use serde_json::{Value, json};
 
-use super::super::check_coverage;
+use super::super::{Coverage, check_coverage};
 use super::{canonical_catalog, canonical_coverage};
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
@@ -108,4 +108,18 @@ fn a_positive_manufacturer_baseline_cannot_skip_all_source_texts() -> TestResult
         "an actual zero-row family has no invented text"
     );
     Ok(())
+}
+
+#[test]
+fn positive_mission_baselines_require_verifiable_references() {
+    let empty = Coverage::default();
+    for kind in [Kind::MissionTypes, Kind::MissionLocationTemplates] {
+        let mut failures = Vec::new();
+        check_coverage(kind, &empty, &empty, true, 1, &mut failures);
+        assert_eq!(
+            failures.len(),
+            1,
+            "{kind} has one row and no verifiable text references"
+        );
+    }
 }

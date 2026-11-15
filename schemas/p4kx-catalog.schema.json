@@ -26829,7 +26829,7 @@
       "description": "A string variant of a location template.",
       "properties": {
         "displayName": {
-          "$ref": "#/$defs/LocalisedText",
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
           "description": "The text of the variant.",
           "x-gameText": true
         },
@@ -30159,7 +30159,7 @@
           "type": "string"
         },
         "typeName": {
-          "$ref": "#/$defs/LocalisedText",
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
           "description": "The localised name of the type (`LocalisedTypeName`).",
           "x-gameText": true
         }

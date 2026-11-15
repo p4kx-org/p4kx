@@ -13,6 +13,7 @@ use super::catalog_text_forms;
 use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_origins::CatalogOrigins;
+use crate::catalog_read::original::{OriginalFlowFields, OriginalValueFact};
 use crate::catalog_text_contract::{CanonicalText, CatalogTexts, GameTextRef, PublicNameRef};
 use crate::mission_text_inputs::MissionKey;
 use crate::texts::{CATALOG_LANGUAGES, TextProjection, Texts};
@@ -79,7 +80,7 @@ impl<'context, 'source> CatalogProjection<'context, 'source> {
     /// Retains the exact authored Locale occurrence in the public short-name domain.
     pub(crate) fn public_name_fact(
         &self,
-        fact: &crate::catalog_read::original::OriginalValueFact<'_, '_, 'source>,
+        fact: &OriginalValueFact<'_, '_, 'source>,
     ) -> Result<PublicNameRef, CatalogError> {
         self.locale_fact(Domain::PublicName, fact)
             .map(PublicNameRef)
@@ -88,7 +89,7 @@ impl<'context, 'source> CatalogProjection<'context, 'source> {
     /// Retains an authored Locale occurrence in the protected text domain.
     pub(crate) fn protected_locale_fact(
         &self,
-        fact: &crate::catalog_read::original::OriginalValueFact<'_, '_, 'source>,
+        fact: &OriginalValueFact<'_, '_, 'source>,
     ) -> Result<GameTextRef, CatalogError> {
         self.locale_fact(Domain::GameText, fact).map(GameTextRef)
     }
@@ -96,7 +97,7 @@ impl<'context, 'source> CatalogProjection<'context, 'source> {
     fn locale_fact(
         &self,
         domain: Domain,
-        fact: &crate::catalog_read::original::OriginalValueFact<'_, '_, 'source>,
+        fact: &OriginalValueFact<'_, '_, 'source>,
     ) -> Result<String, CatalogError> {
         use crate::catalog_read::original::OriginalValuePart;
         use p4kx_extraction::Value;
@@ -122,10 +123,25 @@ impl<'context, 'source> CatalogProjection<'context, 'source> {
         })
     }
 
+    /// Reads a protected key at an exact original Struct field.
+    pub(crate) fn protected_key_field<'scope, 'read>(
+        &self,
+        fields: &OriginalFlowFields<'scope, 'read, 'source>,
+        owner: Option<&OriginalValueFact<'scope, 'read, 'source>>,
+        name: &str,
+    ) -> Result<SourcedValue<GameTextRef>, CatalogError> {
+        match fields.field(owner, name)? {
+            Some((_, fact)) => self.description_fact(fact),
+            None => Ok(fields
+                .sources()
+                .value(SourceValue::Absent, &[fields.survey(owner)?], true)),
+        }
+    }
+
     /// Projects one actual original key through the existing canonical `GameText` registry.
     pub(crate) fn description_fact(
         &self,
-        fact: &crate::catalog_read::original::OriginalValueFact<'_, '_, 'source>,
+        fact: &OriginalValueFact<'_, '_, 'source>,
     ) -> Result<SourcedValue<GameTextRef>, CatalogError> {
         use crate::catalog_read::original::OriginalValuePart;
         use p4kx_extraction::Value;

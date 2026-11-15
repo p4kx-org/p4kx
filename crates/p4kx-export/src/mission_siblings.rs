@@ -33,8 +33,6 @@ pub(crate) fn read<'f>(
     filter: Option<&Filter>,
     cancel: Option<&CancelToken>,
 ) -> Result<Siblings<'f>, CatalogError> {
-    let input = projection.original();
-    let texts = projection.legacy_texts();
     let tags = index.tags();
     let contract_templates =
         contract_template_read::read(forge, projection, captured_tags, filter, cancel)?;
@@ -46,7 +44,7 @@ pub(crate) fn read<'f>(
         cancel,
     )?;
     Ok(Siblings {
-        location_templates: location_template::read(forge, input, texts, tags, filter, cancel)?,
+        location_templates: location_template::read(forge, projection, tags, filter, cancel)?,
         contract_templates,
         broker_entries,
     })

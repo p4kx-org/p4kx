@@ -1,32 +1,48 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{DataForge, RecordTree, StructValue, TreeBuilder, Value, ValueError};
+use p4kx_extraction::{
+    CancelToken, DataForge, RecordTree, StructValue, TreeBuilder, Value, ValueError,
+};
+
+use crate::CatalogError;
+use crate::catalog_projection::CatalogProjection;
+use crate::catalog_read::original::OriginalFlowFields;
 
 use crate::contract_mission_data::{
     ContractScenario, MissionLocality, MissionType, ScenarioFactionTiers, ScenarioProgression,
     ScenarioTier,
 };
 use crate::guid_text::CatalogGuid;
-use crate::mission_layers::{key, one};
+use crate::mission_layers::one;
 use crate::record_fields::{
     boolean, class_name, integer, number, reference, references, structs, text,
 };
-use crate::texts::Texts;
+use crate::record_observation::RecordObservation;
 
 const FACTION_REPUTATION: &str = "factionReputationRef";
 
 /// The `badgeToAward` the game stores for a tier without a badge.
 const NO_BADGE: &str = "None";
 
-/// Returns the mission type the Record tree `tree` describes, its name resolved by `texts`.
-pub(crate) fn mission_type<'f>(tree: &RecordTree<'f>, texts: &Texts<'f>) -> MissionType<'f> {
-    MissionType {
+/// Reads the mission type and the protected reference from its original name field.
+pub(crate) fn mission_type<'source>(
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    cancel: Option<&CancelToken>,
+) -> Result<MissionType<'source>, CatalogError> {
+    let scope = projection
+        .original()
+        .record_scope(admission.record(), tree)?;
+    let fields = OriginalFlowFields::read(&scope, cancel)?;
+    let type_name = projection.protected_key_field(&fields, None, "LocalisedTypeName")?;
+    Ok(MissionType {
         guid: CatalogGuid(tree.guid()),
         class_name: class_name(tree),
         record_path: tree.record_path(),
-        type_name: texts.localised(key(Some(tree.root()), "LocalisedTypeName")),
-    }
+        type_name,
+    })
 }
 
 /// Returns the mission locality the Record tree `tree` describes.
@@ -98,8 +114,8 @@ pub(crate) fn link_scenario_factions<'f>(
     forge: &'f DataForge<'f>,
     scenarios: &mut [ContractScenario<'f>],
     input: &'f crate::build::original_input::OriginalCatalogInput<'f, 'f>,
-    cancel: Option<&p4kx_extraction::CancelToken>,
-) -> Result<crate::export_ledger::ExportLedger, crate::CatalogError> {
+    cancel: Option<&CancelToken>,
+) -> Result<crate::export_ledger::ExportLedger, CatalogError> {
     let capture = std::sync::Arc::new(
         crate::export_builder_capture::BuilderCapture::for_input_record_field(
             input,

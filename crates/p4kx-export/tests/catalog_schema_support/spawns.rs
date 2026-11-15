@@ -5,6 +5,8 @@
 
 use serde_json::json;
 
+use super::source_values;
+
 pub(super) fn location_templates() -> serde_json::Value {
     json!([{
         "guid": "e3000000-0000-4000-8000-000000000001",
@@ -26,10 +28,23 @@ pub(super) fn location_templates() -> serde_json::Value {
         "aiSpawnTags": [],
         "names": [{
             "tag": "Missions.Text.Name",
-            "displayName": {"key": "@vehicle_NameAEGS_Reclaimer", "en": "Aegis Reclaimer", "de": null}
+            "displayName": source_values::present(json!("text:23:@fixture_location_title"))
         }],
         "entityClusterMemberGuid": null
     }])
+}
+
+pub(super) fn location_name_text() -> serde_json::Value {
+    json!({
+        "id": source_values::present(json!("text:23:@fixture_location_title")),
+        "key": source_values::present(json!("@fixture_location_title")),
+        "translations": source_values::present(json!({
+            "en": {
+                "sourceText": source_values::present(json!("Fixture outpost")),
+                "displayText": source_values::present(json!("Fixture outpost"))
+            }
+        }))
+    })
 }
 
 pub(super) fn ship_spawns() -> serde_json::Value {

@@ -101,8 +101,7 @@ the `title`, `missionType`, `contractor`, the `displayName` of a contract's fact
 of a pickup place of a contract, the `processName` of a refining process and the `depositName`
 of a mineable composition, the `displayName` of a faction, a reputation scope and a reputation
 standing, the `displayName` of each name variant of a mission location template and the
-`typeName` of a mission type, each with
-its `key`, `en` and `de`. `name` of the other kinds, `role`, `career` and the other fields are
+`typeName` of a mission type. `name` of the other kinds, `role`, `career` and the other fields are
 identifiers, short names or fact values. Consumers apply the protected-text policy to descriptions,
 `displayType` and the other game text fields. Every such field carries
 `"x-gameText": true` in the JSON Schema, and no other field does; a test checks this.
@@ -1488,8 +1487,10 @@ configuration from the installed DataForge. Its Record Filter is
 `libs/foundry/records/*reputation/*`. The test compares physical identity, authored order,
 field states, original values and selected source coordinates in one diagnostic export.
 
-**Mission types (`missionTypes`).** `typeName` is the `LocalisedTypeName`, a game text (41 of 42
-have an English one). Every `missionTypeGuid` of `contracts` (26 types on LIVE) is an entry.
+**Mission types (`missionTypes`).** `typeName` is a sourced protected reference from
+`LocalisedTypeName`. Join its `value` to `texts.gameTexts[].id.value` to read the original key and
+the available source and display forms. A missing, placeholder or literal name provides no
+reference. Every `missionTypeGuid` of `contracts` points to a mission type.
 
 **Mission localities (`missionLocalities`).** `starmapObjectGuids` are the `availableLocations` in
 stored order (218 on LIVE, all in `starmapObjects`). The game does not localise the name of a
@@ -1576,9 +1577,11 @@ object only through the pickup `MissionLocality` Records (see "Contracts").
 `missiondata/pu_locations` (one more of the type lies outside that folder, a test platform, and is
 not part of the kind): `guid`, `className`, `recordPath`, `disabled`, `isSecurityNetworkHost`, the
 `tags` (`generalTags`) a query matches, `producesTags`, `consumesTags` (`positiveTags` and
-`negativeTags`), `aiSpawnTags`, `names` (the `stringVariants`: `tag` and `displayName`, a game
-text; the German file lacks 3,246 of the 3,297 variants on LIVE, so `de` is `null`) and
-`entityClusterMemberGuid`. The sourced `classification` holds the three
+`negativeTags`), `aiSpawnTags`, `names` and `entityClusterMemberGuid`. Each `names` entry keeps
+its `tag` and a sourced protected `displayName` reference from that original string variant.
+Join its `value` to `texts.gameTexts[].id.value` to read the original key and the available
+source and display forms. Repeated keys share a text row and retain their individual occurrences.
+The sourced `classification` holds the three
 original location class, function and size References. See [the location vocabulary contract](catalog-location-vocabulary.md).
 The sourced location configuration retains authored NPC auto-spawn settings, mission limits and
 the default Reference to [security network manifests](catalog-security-network-manifests.md),

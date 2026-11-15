@@ -17,6 +17,9 @@ use crate::record_observation::RecordObservation;
 use crate::scan_health::ScanError;
 use crate::source_fields::FieldError;
 
+#[path = "scan_definition_projection/mission_definition.rs"]
+mod mission_definition;
+
 impl<'f> Scan<'_, '_, 'f> {
     pub(super) fn read_definition(
         &self,
@@ -99,40 +102,6 @@ impl<'f> Scan<'_, '_, 'f> {
         Ok((Picked::ResourceType(Box::new(read.value)), read.notes))
     }
 
-    fn mission_item_definition(
-        &self,
-        admission: &RecordObservation<'_, 'f>,
-        tree: &RecordTree<'f>,
-    ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
-        let (definition, notes) = crate::catalog_v3::mission_sources::item_definition::read(
-            tree,
-            self.projection,
-            admission,
-            self.options.cancel,
-        )?;
-        Ok((
-            Picked::Mission(MissionPick::Item(Box::new(definition))),
-            notes,
-        ))
-    }
-
-    fn module_declaration(
-        &self,
-        admission: &RecordObservation<'_, 'f>,
-        tree: &RecordTree<'f>,
-    ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
-        let (definition, notes) = crate::catalog_v3::mission_sources::module_declaration::read(
-            tree,
-            self.projection,
-            admission,
-            self.options.cancel,
-        )?;
-        Ok((
-            Picked::Mission(MissionPick::ModuleDeclaration(Box::new(definition))),
-            notes,
-        ))
-    }
-
     fn faction_identity_definition(
         &self,
         admission: &RecordObservation<'_, 'f>,
@@ -189,6 +158,7 @@ impl<'f> Scan<'_, '_, 'f> {
         tree: &RecordTree<'f>,
     ) -> Result<Option<(Picked<'f>, Vec<FieldError>)>, ScanError> {
         let projection = match kind {
+            Kind::MissionTypes => self.mission_type_definition(admission, tree)?,
             Kind::FactionReputations => self.faction_reputation_definition(admission, tree)?,
             Kind::FactionIdentities => self.faction_identity_definition(admission, tree)?,
             Kind::Infractions

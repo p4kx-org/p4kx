@@ -173,6 +173,85 @@ fn location_prerequisites_are_listed_per_level_as_stored() -> TestResult {
     Ok(())
 }
 
+fn check_location_template_names(catalog: &Value, template: &Value) -> TestResult {
+    use crate::health_origin_assertions as proof;
+    use crate::text_forms_assertions::direct;
+
+    let [first, second, placeholder] = proof::rows(template, "/names")? else {
+        return Err("expected two named variants and one placeholder".into());
+    };
+    assert_eq!(
+        proof::at(first, "/tag")?.as_str(),
+        Some("Missions.Hijacked"),
+        "the first variant keeps its original tag",
+    );
+    assert_eq!(
+        proof::at(second, "/tag")?.as_str(),
+        Some("ShipModel"),
+        "the repeated key keeps its own tag",
+    );
+    let first = proof::at(first, "/displayName")?;
+    let second = proof::at(second, "/displayName")?;
+    let placeholder = proof::at(placeholder, "/displayName")?;
+    for reference in [first, second, placeholder] {
+        direct(reference)?;
+        assert_eq!(
+            proof::at(reference, "/containsEncryptedSource")?.as_bool(),
+            Some(true),
+            "each reference comes from the encrypted template",
+        );
+    }
+    assert_eq!(
+        proof::at(first, "/state")?.as_str(),
+        Some("present"),
+        "resolved name"
+    );
+    let identifier = proof::at(first, "/value")?;
+    assert_eq!(
+        identifier,
+        proof::at(second, "/value")?,
+        "repeated key shares a text row"
+    );
+    assert_ne!(
+        proof::at(first, "/sourceUsesRefs")?,
+        proof::at(second, "/sourceUsesRefs")?,
+        "the repeated key cites its distinct authored occurrence",
+    );
+    assert_eq!(
+        proof::at(placeholder, "/state")?.as_str(),
+        Some("absent"),
+        "placeholder state"
+    );
+    assert!(
+        proof::at(placeholder, "/value")?.is_null(),
+        "placeholder has no reference"
+    );
+    check_location_name_forms(catalog, identifier)?;
+    proof::closure(catalog)
+}
+
+fn check_location_name_forms(catalog: &Value, identifier: &Value) -> TestResult {
+    use crate::health_origin_assertions as proof;
+    use crate::text_forms_assertions::{forms, present};
+
+    let row = proof::rows(catalog, "/texts/gameTexts")?
+        .iter()
+        .find(|row| row.pointer("/id/value") == Some(identifier))
+        .ok_or("protected location name")?;
+    assert_eq!(
+        proof::at(row, "/key/value")?.as_str(),
+        Some("@place_name"),
+        "original key"
+    );
+    present(forms(row, "en")?, "displayText", "Hijacked Ship")?;
+    present(forms(row, "fr")?, "displayText", "Site de mission")?;
+    assert!(
+        row.pointer("/translations/value/de").is_none(),
+        "German has no source entry"
+    );
+    Ok(())
+}
+
 #[test]
 fn location_templates_carry_their_tags_and_leave_out_leftovers() -> TestResult {
     let catalog = build()?;
@@ -196,7 +275,8 @@ fn location_templates_carry_their_tags_and_leave_out_leftovers() -> TestResult {
         templates[0]["aiSpawnTags"],
         serde_json::json!(["ShipModel"])
     );
-    assert_eq!(templates[0]["names"][0]["tag"], "Missions.Hijacked");
+    let first = templates.first().ok_or("first location template")?;
+    check_location_template_names(&catalog, first)?;
     assert!(
         templates
             .iter()

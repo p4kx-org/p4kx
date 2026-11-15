@@ -12,6 +12,8 @@ mod faction_modifier;
 mod faction_reputation_owner;
 #[path = "catalog_scenario_faction_scope.rs"]
 mod faction_scope;
+#[path = "mission_type_texts_tests.rs"]
+mod mission_type_texts;
 #[path = "catalog_reputation_context.rs"]
 mod reputation_context;
 #[path = "reputation_perks.rs"]
@@ -240,14 +242,22 @@ fn a_context_names_its_primary_and_listed_scopes() -> TestResult {
 #[test]
 fn a_mission_type_and_a_locality_keep_their_links() -> TestResult {
     let (_, catalog) = build(None)?;
+    let mission_type = entry(&catalog, "missionTypes", MISSION_TYPE)?;
     assert_eq!(
-        *entry(&catalog, "missionTypes", MISSION_TYPE)?,
+        *mission_type,
         json!({
             "guid": guid(MISSION_TYPE),
             "className": "missiontype.job",
             "recordPath": "libs/foundry/records/missiontype/missiontype.job",
-            "typeName": {"key": "@type_job", "en": "Job", "de": null}
+            "typeName": mission_type.get("typeName").ok_or("type name")?
         })
+    );
+    let reference = proof::cell(mission_type, "typeName", "present")?;
+    let row = mission_type_texts::protected(&catalog, reference)?;
+    assert_eq!(row.pointer("/key/value"), Some(&json!("@type_job")));
+    assert_eq!(
+        row.pointer("/translations/value/en/displayText/value"),
+        Some(&json!("Job")),
     );
     assert_eq!(
         entry(&catalog, "missionLocalities", LOCALITY)?["starmapObjectGuids"],

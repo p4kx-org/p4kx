@@ -84,7 +84,7 @@ impl<'f> Scan<'_, '_, 'f> {
                 .crafted(tree),
             ));
         }
-        Ok(Picked::entity(kind, tree, self.texts).map(|picked| picked.crafted(tree)))
+        Ok(Picked::entity(kind, tree).map(|picked| picked.crafted(tree)))
     }
 
     fn starmap(

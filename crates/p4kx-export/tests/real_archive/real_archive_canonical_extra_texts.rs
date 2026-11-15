@@ -6,8 +6,35 @@ use std::collections::{HashMap, HashSet};
 use p4kx_export::Kind;
 use serde_json::Value;
 
-use super::{CoverageCounters, TestResult, TextDomain, TextIndex, TextReferenceShape, TextTarget};
+use super::{
+    Coverage, CoverageCounters, Oracle, TestResult, TextDomain, TextIndex, TextReferenceShape,
+    TextTarget,
+};
 use crate::catalog_v3_consumer;
+
+pub(super) fn location_templates(
+    catalog: &Value,
+    english: &Oracle,
+    german: &Oracle,
+) -> TestResult<(Coverage, Coverage)> {
+    let index = TextIndex::new(catalog)?;
+    let mut counters = CoverageCounters::new(english, german);
+    for template in catalog_v3_consumer::rows(catalog, Kind::MissionLocationTemplates)? {
+        let names = template
+            .get("names")
+            .and_then(Value::as_array)
+            .ok_or("location names")?;
+        for name in names {
+            let target = index.reference(
+                name.get("displayName").ok_or("location name reference")?,
+                TextDomain::GameText,
+                TextReferenceShape::Required,
+            )?;
+            counters.count(target)?;
+        }
+    }
+    Ok(counters.finish())
+}
 
 pub(super) fn compare(
     counters: &mut CoverageCounters<'_>,

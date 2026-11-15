@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::SourcedValue;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::contract::{LocalisedText, every_field_required};
+use crate::catalog_text_contract::GameTextRef;
+use crate::contract::every_field_required;
 use crate::guid_text::CatalogGuid;
 
 /// A mission type: a `MissionType` Record under `missiontype`.
@@ -20,7 +22,7 @@ pub(crate) struct MissionType<'a> {
     pub(crate) record_path: &'a str,
     /// The localised name of the type (`LocalisedTypeName`).
     #[schemars(extend("x-gameText" = true))]
-    pub(crate) type_name: LocalisedText<'a>,
+    pub(crate) type_name: SourcedValue<GameTextRef>,
 }
 
 /// A mission locality: a `MissionLocality` Record under `missiondata/pu_missionlocality`, a named
