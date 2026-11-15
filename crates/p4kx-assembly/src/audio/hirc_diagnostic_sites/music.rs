@@ -3,7 +3,8 @@
 
 use p4kx_audio::{
     MusicFadeTimingField, MusicPlaylist, MusicPlaylistLoopField, MusicSwitch,
-    MusicTransitionFadeEvidence, MusicTransitionFadeSide, MusicTransitionSegmentEvidence,
+    MusicTransitionFadeEvidence, MusicTransitionFadeSide, MusicTransitionSchedulingEvidence,
+    MusicTransitionSchedulingField, MusicTransitionSegmentEvidence,
 };
 
 use super::{DiagnosticSite, DiagnosticWord, TxtpApproximation};
@@ -30,6 +31,7 @@ pub(super) fn playlist_sites(sites: &mut Vec<DiagnosticSite>, playlist: &MusicPl
         sites,
         playlist.transition_fade_evidence(),
         playlist.transition_segment_evidence(),
+        playlist.transition_scheduling_evidence(),
     );
 }
 
@@ -55,6 +57,7 @@ pub(super) fn switch_sites(sites: &mut Vec<DiagnosticSite>, switch: &MusicSwitch
         sites,
         switch.transition_fade_evidence(),
         switch.transition_segment_evidence(),
+        switch.transition_scheduling_evidence(),
     );
 }
 
@@ -62,6 +65,7 @@ fn transitions(
     sites: &mut Vec<DiagnosticSite>,
     fade: Option<&MusicTransitionFadeEvidence>,
     segment: Option<&MusicTransitionSegmentEvidence>,
+    scheduling: Option<&MusicTransitionSchedulingEvidence>,
 ) {
     if let Some(fade) = fade.and_then(fade_site) {
         sites.push(fade);
@@ -83,6 +87,26 @@ fn transitions(
             )),
         );
     }
+    if let Some(scheduling) = scheduling.and_then(scheduling_site) {
+        sites.push(scheduling);
+    }
+}
+
+fn scheduling_site(evidence: &MusicTransitionSchedulingEvidence) -> Option<DiagnosticSite> {
+    let field = match evidence.field {
+        MusicTransitionSchedulingField::SourcePlayPostExit => "musicTransitionSourcePlayPostExit",
+        MusicTransitionSchedulingField::DestinationPlayPreEntry => {
+            "musicTransitionDestinationPlayPreEntry"
+        }
+        MusicTransitionSchedulingField::DestinationMatchSourceCueName => {
+            "musicTransitionDestinationMatchSourceCueName"
+        }
+        _ => return None,
+    };
+    Some(DiagnosticSite::one(
+        TxtpApproximation::OmitMusicTransitionScheduling,
+        DiagnosticWord::new(MUSIC_NODE, field, &evidence.flag.range),
+    ))
 }
 
 fn fade_site(evidence: &MusicTransitionFadeEvidence) -> Option<DiagnosticSite> {

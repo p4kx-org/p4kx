@@ -17,6 +17,8 @@ pub enum TxtpApproximation {
     OmitMusicTransitionFades,
     /// The rendered path omits an authored transition-object segment.
     OmitMusicTransitionSegments,
+    /// The rendered path omits an enabled music transition scheduling flag.
+    OmitMusicTransitionScheduling,
     /// The rendered path omits authored container or playlist loop controls.
     OmitContainerLoops,
     /// The rendered path omits authored switch or state selection.
@@ -40,6 +42,7 @@ impl TxtpApproximation {
             Self::NonfiniteMusicClipTiming => "nonfinite-music-clip-timing",
             Self::OmitMusicTransitionFades => "omit-music-transition-fades",
             Self::OmitMusicTransitionSegments => "omit-music-transition-segments",
+            Self::OmitMusicTransitionScheduling => "omit-music-transition-scheduling",
             Self::OmitContainerLoops => "omit-container-loops",
             Self::OmitContainerConditions => "omit-container-conditions",
             Self::OmitMusicTrackAutomation => "omit-music-track-automation",

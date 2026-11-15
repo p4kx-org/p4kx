@@ -12,6 +12,7 @@ use crate::hirc_music_transition_rule::{self, BankMusicTransitionRuleFields};
 pub struct MusicTransitionFeatures {
     fades: bool,
     segments: bool,
+    scheduling: bool,
 }
 
 impl MusicTransitionFeatures {
@@ -27,12 +28,19 @@ impl MusicTransitionFeatures {
         self.segments
     }
 
+    /// Returns whether a checked rule explicitly enables a scheduling control.
+    #[must_use]
+    pub const fn has_scheduling(self) -> bool {
+        self.scheduling
+    }
+
     /// Returns the combined observations of two resolved source nodes.
     #[must_use]
     pub const fn combine(self, other: Self) -> Self {
         Self {
             fades: self.fades || other.fades,
             segments: self.segments || other.segments,
+            scheduling: self.scheduling || other.scheduling,
         }
     }
 }
@@ -124,10 +132,61 @@ impl MusicTransitionSegmentEvidence {
     }
 }
 
+/// The authored transition scheduling flag that is enabled.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum MusicTransitionSchedulingField {
+    /// Plays the source segment's post-exit region.
+    SourcePlayPostExit,
+    /// Plays the destination segment's pre-entry region.
+    DestinationPlayPreEntry,
+    /// Matches the destination cue to the source cue name.
+    DestinationMatchSourceCueName,
+}
+
+/// The first explicit scheduling flag and its original byte range.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct MusicTransitionSchedulingEvidence {
+    /// The scheduling field enabled by the rule.
+    pub field: MusicTransitionSchedulingField,
+    /// The original enabled flag and its byte range.
+    pub flag: BankHircField<u8>,
+}
+
+impl MusicTransitionSchedulingEvidence {
+    fn of(rule: &BankMusicTransitionRuleFields) -> Option<Self> {
+        use MusicTransitionSchedulingField::{
+            DestinationMatchSourceCueName, DestinationPlayPreEntry, SourcePlayPostExit,
+        };
+
+        [
+            (SourcePlayPostExit, rule.source.play_post_exit.as_ref()),
+            (
+                DestinationPlayPreEntry,
+                rule.destination.play_pre_entry.as_ref(),
+            ),
+            (
+                DestinationMatchSourceCueName,
+                rule.destination.match_source_cue_name.as_ref(),
+            ),
+        ]
+        .into_iter()
+        .find_map(|(field, flag)| {
+            let flag = flag.filter(|flag| flag.value == 1)?;
+            Some(Self {
+                field,
+                flag: flag.clone(),
+            })
+        })
+    }
+}
+
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub(crate) struct MusicTransitionEvidence {
     pub(crate) fade: Option<MusicTransitionFadeEvidence>,
     pub(crate) segment: Option<MusicTransitionSegmentEvidence>,
+    pub(crate) scheduling: Option<MusicTransitionSchedulingEvidence>,
 }
 
 impl MusicTransitionEvidence {
@@ -138,9 +197,13 @@ impl MusicTransitionEvidence {
         if self.segment.is_none() {
             self.segment = MusicTransitionSegmentEvidence::of(rule);
         }
+        if self.scheduling.is_none() {
+            self.scheduling = MusicTransitionSchedulingEvidence::of(rule);
+        }
         MusicTransitionFeatures {
             fades: self.fade.is_some(),
             segments: self.segment.is_some(),
+            scheduling: self.scheduling.is_some(),
         }
     }
 
@@ -157,6 +220,12 @@ impl MusicTransitionEvidence {
                 allocation_flag: segment.allocation_flag.with_bank_offset(bank_offset),
                 segment_id: segment.segment_id.with_bank_offset(bank_offset),
             }),
+            scheduling: self
+                .scheduling
+                .map(|value| MusicTransitionSchedulingEvidence {
+                    flag: value.flag.with_bank_offset(bank_offset),
+                    ..value
+                }),
         }
     }
 }
@@ -173,7 +242,7 @@ pub struct BankMusicTransitionFields {
     pub checked_range: Option<Range<u64>>,
     /// Number of complete original rules.
     pub complete_rules: u32,
-    /// Timing and segment features found in readable original rule fields.
+    /// Timing, segment and scheduling features found in readable original rule fields.
     pub features: MusicTransitionFeatures,
     pub(crate) evidence: MusicTransitionEvidence,
 }

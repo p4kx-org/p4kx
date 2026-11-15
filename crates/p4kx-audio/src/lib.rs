@@ -236,7 +236,8 @@ pub use hirc_music_track_automation::{
 pub use hirc_music_track_transition::BankMusicTrackTransitionFields;
 pub use hirc_music_transition::{
     BankMusicTransitionFields, MusicTransitionFadeEvidence, MusicTransitionFadeSide,
-    MusicTransitionFeatures, MusicTransitionSegmentEvidence,
+    MusicTransitionFeatures, MusicTransitionSchedulingEvidence, MusicTransitionSchedulingField,
+    MusicTransitionSegmentEvidence,
 };
 pub use hirc_music_transition_rule::{
     BankMusicTransitionDestinationFields, BankMusicTransitionIds, BankMusicTransitionObjectFields,

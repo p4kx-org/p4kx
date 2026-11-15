@@ -16,6 +16,7 @@ const SOURCE_FADE: &str = "Play_Source_Transition_Fade";
 const DESTINATION_FADE: &str = "Play_Destination_Transition_Fade";
 const OBJECT_FADE: &str = "Play_Object_Transition_Fade";
 const SEGMENT: &str = "Play_Transition_Segment";
+const MATCH_SOURCE_CUE: &str = "Play_Transition_Match_Source_Cue";
 const ZERO: &str = "Play_Default_Transitions";
 const TRACK_SOURCE_FADE: &str = "Play_Track_Source_Fade";
 const TRACK_DESTINATION_FADE: &str = "Play_Track_Destination_Fade";
@@ -24,6 +25,7 @@ const FLAGS: [&str; 3] = ["--format", "wav", "--txtp"];
 const CLIP_CODE: &str = "omit-music-clip-timing";
 const FADE_CODE: &str = "omit-music-transition-fades";
 const SEGMENT_CODE: &str = "omit-music-transition-segments";
+const SCHEDULING_CODE: &str = "omit-music-transition-scheduling";
 const LOOPS_CODE: &str = "omit-container-loops";
 const CONDITIONS_CODE: &str = "omit-container-conditions";
 const AUTOMATION_CODE: &str = "omit-music-track-automation";
@@ -49,6 +51,7 @@ enum AuthoredRule {
     DestinationFade,
     ObjectFade,
     Segment,
+    MatchSourceCue,
     Default,
 }
 
@@ -117,6 +120,24 @@ fn txtp_reports_an_allocated_transition_segment_independently_of_fades() -> Test
 }
 
 #[test]
+fn txtp_reports_a_transition_cue_condition_without_a_fade_or_segment() -> TestResult {
+    let fixture = fixture()?;
+    let report = expect(
+        &fixture,
+        MATCH_SOURCE_CUE,
+        &[CLIP_CODE, SCHEDULING_CODE, LOOPS_CODE, AUTOMATION_CODE],
+    )?;
+    check_plain_fields(
+        &report,
+        SCHEDULING_CODE,
+        MUSIC_NODE,
+        &["musicTransitionDestinationMatchSourceCueName"],
+    )?;
+    expect(&fixture, ZERO, &[CLIP_CODE, LOOPS_CODE, AUTOMATION_CODE])?;
+    Ok(())
+}
+
+#[test]
 fn txtp_reports_both_switch_track_fades_on_their_rendered_paths() -> TestResult {
     let fixture = fixture()?;
     for (trigger, field) in [
@@ -179,6 +200,7 @@ fn fixture() -> Result<Fixture, Box<dyn Error>> {
         (OBJECT_FADE, 2_503, AuthoredRule::ObjectFade),
         (SEGMENT, 2_504, AuthoredRule::Segment),
         (ZERO, 2_505, AuthoredRule::Default),
+        (MATCH_SOURCE_CUE, 2_508, AuthoredRule::MatchSourceCue),
     ] {
         atl = atl.trigger(event, &[event]);
         builder = builder
@@ -333,6 +355,13 @@ impl AuthoredRule {
                     allocated + ALLOCATED_OBJECT + WORD + FADE_LEN + FADE_OFFSET,
                     (-31_i32).to_le_bytes(),
                 )?;
+            }
+            Self::MatchSourceCue => {
+                let flag = bytes
+                    .get_mut(ordinary + SOURCE_RULE_LEN + DESTINATION_RULE_LEN - 1)
+                    .ok_or("original match-source-cue flag")?;
+                assert_eq!(*flag, 0, "the baseline rule has the field disabled");
+                *flag = 1;
             }
             Self::Default => {}
         }

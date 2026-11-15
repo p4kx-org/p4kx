@@ -13,6 +13,7 @@ pub(super) enum PlaybackFeature {
     Automation = 1 << 4,
     ContainerTransitions = 1 << 5,
     BlendCurves = 1 << 6,
+    MusicTransitionScheduling = 1 << 7,
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -71,6 +72,10 @@ impl PlaybackFeatures {
         self.observe_flag(
             PlaybackFeature::MusicTransitionSegments,
             transitions.has_transition_segment(),
+        );
+        self.observe_flag(
+            PlaybackFeature::MusicTransitionScheduling,
+            transitions.has_scheduling(),
         );
     }
 }

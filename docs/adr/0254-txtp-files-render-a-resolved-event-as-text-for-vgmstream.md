@@ -115,6 +115,10 @@ track along that path. An automation clip index remains an authored field.
 The codes are emitted once per generated file in JSON and the TXTP header.
 The render commands and the WEM loop marker retain their own meaning.
 
+`omit-music-transition-scheduling` reports a MusicPlaylist or MusicSwitch rule
+with an enabled source post-exit, destination pre-entry or match-source-cue
+flag. The same rule can have zero fade timing and no transition segment.
+
 The CLI records approximation origins in the portable companion specified by ADR-0357.
 `textBytes` addresses cover the code token alone. The file row and companion share the source
 inventory and the immediate encryption and completeness flag at `/approximations/{index}`.

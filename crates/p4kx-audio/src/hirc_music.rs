@@ -14,7 +14,7 @@ use crate::hirc_music_playlist_depth::PlaylistDepth;
 use crate::hirc_music_track::MusicTrackEvidence;
 use crate::hirc_music_transition::{
     MusicTransitionEvidence, MusicTransitionFadeEvidence, MusicTransitionFeatures,
-    MusicTransitionSegmentEvidence,
+    MusicTransitionSchedulingEvidence, MusicTransitionSegmentEvidence,
 };
 
 /// The tempo and time signature of a music node.
@@ -212,6 +212,14 @@ impl MusicSwitch {
     pub const fn transition_segment_evidence(&self) -> Option<&MusicTransitionSegmentEvidence> {
         self.transition_evidence.segment.as_ref()
     }
+
+    /// Returns the first enabled scheduling flag in the transition rules.
+    #[must_use]
+    pub const fn transition_scheduling_evidence(
+        &self,
+    ) -> Option<&MusicTransitionSchedulingEvidence> {
+        self.transition_evidence.scheduling.as_ref()
+    }
 }
 
 /// The original header words proving a nonempty conditional tree.
@@ -369,6 +377,14 @@ impl MusicPlaylist {
     #[must_use]
     pub const fn transition_segment_evidence(&self) -> Option<&MusicTransitionSegmentEvidence> {
         self.transition_evidence.segment.as_ref()
+    }
+
+    /// Returns the first enabled scheduling flag in the transition rules.
+    #[must_use]
+    pub const fn transition_scheduling_evidence(
+        &self,
+    ) -> Option<&MusicTransitionSchedulingEvidence> {
+        self.transition_evidence.scheduling.as_ref()
     }
 
     /// Returns the nesting depth of every item, 0 for an item of the top group: an item with

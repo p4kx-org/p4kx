@@ -547,6 +547,10 @@ owners without populated evidence, and facets outside the inspected sample. Synt
 fixtures cover the separate stinger and transition owners, Media publication and TXTP
 approximation.
 
+The installed comparison verified all twelve family probes on LIVE change 13165946
+and PTU change 13189690. The run checked 2,381 and 2,382 original v154 Banks,
+respectively.
+
 ```powershell
 cargo test --release --locked -p p4kx-extraction --lib populated_wwise_decision_families_match_original_bytes_in_memory -- --ignored --nocapture
 ```

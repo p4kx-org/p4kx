@@ -398,6 +398,8 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   Rendered MusicPlaylist and MusicSwitch paths also report `omit-music-transition-fades`
   for nonzero transition fade time or offset and `omit-music-transition-segments`
   for an allocated transition object with an authored segment ID.
+  An enabled source post-exit, destination pre-entry or match-source-cue flag
+  also reports `omit-music-transition-scheduling`.
   `p4kx entity audio --extract <folder>` does the same for every trigger of an Entity.
   `wwise resolve`, `wwise extract` and `entity audio` accept an optional `--max-visits <count>`
   per trigger. The count includes each attempted HIRC object and MusicTrack source in authored
