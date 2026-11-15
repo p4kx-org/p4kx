@@ -2,9 +2,12 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::borrow::Cow;
+use std::str;
 
-use crate::LocalizationError;
-use crate::global_ini::{GlobalIni, MAX_GLOBAL_INI_SIZE};
+use crate::{GlobalIni, LocalizationError, LocalizationLimits};
+
+#[path = "ini_text_decoder.rs"]
+mod decoder;
 
 const UTF8_BOM: &[u8] = b"\xef\xbb\xbf";
 const UTF16_LE_BOM: &[u8] = b"\xff\xfe";
@@ -24,12 +27,18 @@ pub enum IniEncoding {
     Utf16Be,
 }
 
+impl IniEncoding {
+    const fn is_utf8(self) -> bool {
+        matches!(self, Self::Utf8 | Self::Utf8Bom)
+    }
+}
+
 /// The text of a `global.ini` decoded to UTF-8, borrowed from the bytes where they already are.
 ///
 /// UTF-8 with or without a byte order mark and UTF-16 of either byte order, with a byte order
 /// mark or, when the first byte is non-zero and the second zero (or the reverse), without, are
-/// read. Bytes that are no valid text become U+FFFD instead of ending the read, so one malformed
-/// line costs only itself.
+/// read. Invalid sequences become U+FFFD. A trailing partial UTF-16 code unit marks the text
+/// as lossy.
 #[derive(Debug, Clone)]
 pub struct IniText<'a> {
     text: Cow<'a, str>,
@@ -42,26 +51,34 @@ impl<'a> IniText<'a> {
     ///
     /// # Errors
     ///
-    /// Returns [`LocalizationError::TooLarge`] when `bytes` exceed [`MAX_GLOBAL_INI_SIZE`] and
-    /// [`LocalizationError::DecodeOutOfMemory`] when the decoded text cannot be reserved.
+    /// Returns [`LocalizationError::DecodeOutOfMemory`] when decoded text cannot be reserved.
     pub fn decode(bytes: &'a [u8]) -> Result<Self, LocalizationError> {
-        check_size(bytes.len())?;
+        Self::decode_with_limits(bytes, LocalizationLimits::UNLIMITED)
+    }
+
+    /// Decodes `bytes` with the caller's source and decoded byte budgets.
+    ///
+    /// # Errors
+    ///
+    /// Returns a budget error when a configured byte budget is exceeded or
+    /// [`LocalizationError::DecodeOutOfMemory`] when decoded text cannot be reserved.
+    pub fn decode_with_limits(
+        bytes: &'a [u8],
+        limits: LocalizationLimits,
+    ) -> Result<Self, LocalizationError> {
+        limits.check_source_bytes(bytes.len())?;
         let (encoding, body) = detect(bytes);
-        if matches!(encoding, IniEncoding::Utf16Le | IniEncoding::Utf16Be) {
-            let (text, lossy) = decode_utf16(body, encoding == IniEncoding::Utf16Be)?;
+        if encoding.is_utf8()
+            && let Ok(text) = str::from_utf8(body)
+        {
+            limits.check_decoded_bytes(text.len())?;
             return Ok(Self {
-                text: Cow::Owned(text),
+                text: Cow::Borrowed(text),
                 encoding,
-                lossy,
+                lossy: false,
             });
         }
-        let text = String::from_utf8_lossy(body);
-        let lossy = matches!(text, Cow::Owned(_));
-        Ok(Self {
-            text,
-            encoding,
-            lossy,
-        })
+        decoder::decode(body, encoding, limits)
     }
 
     /// Decodes the owned `bytes`, reusing their allocation when they are valid UTF-8.
@@ -70,31 +87,39 @@ impl<'a> IniText<'a> {
     ///
     /// Returns the same errors as [`IniText::decode`].
     pub fn decode_vec(bytes: Vec<u8>) -> Result<IniText<'static>, LocalizationError> {
-        check_size(bytes.len())?;
+        Self::decode_vec_with_limits(bytes, LocalizationLimits::UNLIMITED)
+    }
+
+    /// Decodes owned `bytes` with the caller's source and decoded byte budgets.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`IniText::decode_with_limits`].
+    pub fn decode_vec_with_limits(
+        bytes: Vec<u8>,
+        limits: LocalizationLimits,
+    ) -> Result<IniText<'static>, LocalizationError> {
+        limits.check_source_bytes(bytes.len())?;
         let (encoding, body) = detect(&bytes);
-        let prefix = bytes.len() - body.len();
-        if matches!(encoding, IniEncoding::Utf8 | IniEncoding::Utf8Bom) {
-            match String::from_utf8(bytes) {
+        if encoding.is_utf8() {
+            let prefix = bytes.len() - body.len();
+            return match String::from_utf8(bytes) {
                 Ok(mut text) => {
+                    limits.check_decoded_bytes(text.len() - prefix)?;
                     text.replace_range(..prefix, "");
-                    return Ok(IniText {
+                    Ok(IniText {
                         text: Cow::Owned(text),
                         encoding,
                         lossy: false,
-                    });
+                    })
                 }
-                Err(error) => return IniText::decode(error.as_bytes()).map(IniText::into_owned),
-            }
+                Err(error) => {
+                    let (encoding, body) = detect(error.as_bytes());
+                    decoder::decode(body, encoding, limits)
+                }
+            };
         }
-        IniText::decode(&bytes).map(IniText::into_owned)
-    }
-
-    fn into_owned(self) -> IniText<'static> {
-        IniText {
-            text: Cow::Owned(self.text.into_owned()),
-            encoding: self.encoding,
-            lossy: self.lossy,
-        }
+        decoder::decode(body, encoding, limits)
     }
 
     /// Returns the decoded text, without the byte order mark.
@@ -119,22 +144,22 @@ impl<'a> IniText<'a> {
     ///
     /// # Errors
     ///
-    /// Returns a [`LocalizationError`] when the file holds more keys than the limit or the index
-    /// cannot be reserved.
+    /// Returns [`LocalizationError::OutOfMemory`] when index storage cannot be reserved.
     pub fn index(&self) -> Result<GlobalIni<'_>, LocalizationError> {
         GlobalIni::parse(&self.text)
     }
-}
 
-fn check_size(len: usize) -> Result<(), LocalizationError> {
-    let size = u64::try_from(len).unwrap_or(u64::MAX);
-    if size > MAX_GLOBAL_INI_SIZE {
-        return Err(LocalizationError::TooLarge {
-            size,
-            limit: MAX_GLOBAL_INI_SIZE,
-        });
+    /// Indexes the texts with the caller's decoded byte and distinct key budgets.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`GlobalIni::parse_with_limits`].
+    pub fn index_with_limits(
+        &self,
+        limits: LocalizationLimits,
+    ) -> Result<GlobalIni<'_>, LocalizationError> {
+        GlobalIni::parse_with_limits(&self.text, limits)
     }
-    Ok(())
 }
 
 fn detect(bytes: &[u8]) -> (IniEncoding, &[u8]) {
@@ -153,27 +178,4 @@ fn detect(bytes: &[u8]) -> (IniEncoding, &[u8]) {
         [0, second, ..] if *second != 0 => (IniEncoding::Utf16Be, bytes),
         _ => (IniEncoding::Utf8, bytes),
     }
-}
-fn decode_utf16(body: &[u8], big_endian: bool) -> Result<(String, bool), LocalizationError> {
-    let (pairs, rest) = body.as_chunks::<2>();
-    let mut text = String::new();
-    text.try_reserve(pairs.len().saturating_mul(3))
-        .map_err(|_| LocalizationError::DecodeOutOfMemory {
-            size: u64::try_from(body.len()).unwrap_or(u64::MAX),
-        })?;
-    let units = pairs.iter().map(|&pair| {
-        if big_endian {
-            u16::from_be_bytes(pair)
-        } else {
-            u16::from_le_bytes(pair)
-        }
-    });
-    let mut lossy = !rest.is_empty();
-    for unit in char::decode_utf16(units) {
-        text.push(unit.unwrap_or_else(|_| {
-            lossy = true;
-            char::REPLACEMENT_CHARACTER
-        }));
-    }
-    Ok((text, lossy))
 }

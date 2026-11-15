@@ -2734,7 +2734,8 @@ key admission rules, as documented for those fields.
 
 The source uses identify the authored key, the actual lookup and the winning language Entry where
 applicable. A malformed encoding or skipped line is reported as a localization note. The catalog
-rejects a `global.ini` that exceeds 64 MiB or 1,048,576 keys. The summary uses the display result
+reads and indexes each available `global.ini` in full, subject to Archive integrity checks and
+available memory. See [ADR-0394](adr/0394-localization-is-complete-by-default.md). The summary uses the display result
 for resolved and unresolved counts and reports placeholders separately. See [TextForms](catalog-text-forms.md)
 for the wire structure, state rules and per-form source evidence.
 

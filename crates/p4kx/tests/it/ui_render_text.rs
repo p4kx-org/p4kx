@@ -185,27 +185,28 @@ fn keys_resolve_in_the_language_of_the_archive_and_unknown_ones_are_listed() -> 
 }
 
 #[test]
-fn a_global_ini_that_cannot_be_indexed_fails_with_the_archive_exit_code() -> TestResult {
+fn a_truncated_global_ini_fails_before_writing_the_image() -> TestResult {
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("Data.p4k");
-    let ini = (0..=p4kx_extraction::MAX_GLOBAL_INI_KEYS)
-        .fold(GlobalIniBuilder::new(), |ini, at| {
-            ini.text(format!("k{at}"), "v")
-        });
+    let out = dir.path().join("x.png");
+    let ini = GlobalIniBuilder::new().text("ui_a", "A").build();
+    let declared_size = u64::try_from(ini.len())? + 1;
     ArchiveBuilder::new()
-        .entry(TestEntry::zstd(MOVIE, text_movie("@k1")))
-        .entry(TestEntry::zstd(INI, ini.build()))
+        .entry(TestEntry::zstd(MOVIE, text_movie("@ui_a")))
+        .entry(TestEntry::stored(INI, ini).with_uncompressed_size(declared_size))
         .write_to(&path)?;
     p4kx_testkit::p4kx()?
         .args(["ui", "render"])
         .arg(&path)
         .arg(MOVIE)
         .arg("--out")
-        .arg(dir.path().join("x.png"))
+        .arg(&out)
         .args(["--lang", "en"])
         .assert()
         .code(3)
-        .stderr(predicate::str::contains("cannot index the texts"));
+        .stderr(predicate::str::contains("cannot read the Entry"))
+        .stderr(predicate::str::contains("global.ini"));
+    assert!(!out.exists(), "a failed input produces no image");
     Ok(())
 }
 

@@ -5,7 +5,7 @@
 
 use std::error::Error;
 
-use p4kx_localization::{IniText, Language, Lookup, TextSet, decode_line_breaks};
+use p4kx_localization::{GlobalIni, IniText, Language, Lookup, TextSet, decode_line_breaks};
 use p4kx_testkit::GlobalIniBuilder;
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -254,6 +254,36 @@ fn an_owned_set_lists_the_texts_of_a_language_sorted_ignoring_case() -> TestResu
         "sorted, empty kept"
     );
     assert_eq!(owned.iter(Language::French).count(), 0, "no French file");
+    Ok(())
+}
+
+#[test]
+fn fallible_key_union_and_owned_rows_preserve_source_text() -> TestResult {
+    let owned = {
+        let english = String::from("MiXeD,P=Draft\nMiXeD=Définitif\nEmpty=\n界=A\\n界\n");
+        let german = String::from("mixed=Deutsch\nLocal=Nur Deutsch\n");
+        let set = TextSet::new([
+            (Language::German, GlobalIni::parse(&german)?),
+            (Language::English, GlobalIni::parse(&english)?),
+        ]);
+        assert_eq!(
+            set.try_keys()?,
+            ["Empty", "Local", "MiXeD", "界"],
+            "canonical spelling and order of the complete union"
+        );
+        set.try_to_owned_set()?
+    };
+    assert_eq!(
+        owned.iter(Language::English).collect::<Vec<_>>(),
+        [("Empty", ""), ("MiXeD", "Définitif"), ("界", "A\\n界")],
+        "packed rows keep exact UTF-8 spans after their source is dropped"
+    );
+    assert_eq!(
+        owned.text("@MIXED", Language::German),
+        Some("Deutsch"),
+        "other languages retain independent values"
+    );
+    assert_eq!(owned.text("Local", Language::English), None, "absent key");
     Ok(())
 }
 

@@ -4,7 +4,7 @@
 use std::fmt;
 
 use p4kx_archive::{Archive, Entry};
-use p4kx_localization::{Language, TextSet};
+use p4kx_localization::{Language, LocalizationLimits, TextSet};
 use rayon::prelude::*;
 
 use crate::localization::{LocalizationEntry, LocalizationLoadError};
@@ -68,6 +68,20 @@ impl LocalizationSet {
     ///
     /// Returns the first [`LocalizationLoadError`] of an Entry that cannot be read.
     pub fn read(archive: &Archive, wanted: &[Language]) -> Result<Self, LocalizationLoadError> {
+        Self::read_with_limits(archive, wanted, LocalizationLimits::UNLIMITED)
+    }
+
+    /// Reads each present wanted language with an independent application of `limits`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`LocalizationLoadError`] if any selected Entry cannot be read within the
+    /// source and decoded byte limits.
+    pub fn read_with_limits(
+        archive: &Archive,
+        wanted: &[Language],
+        limits: LocalizationLimits,
+    ) -> Result<Self, LocalizationLoadError> {
         let located: Vec<(Language, &Entry)> = archive
             .entries()
             .par_iter()
@@ -86,7 +100,9 @@ impl LocalizationSet {
         first_of_each.sort_by_key(|(language, _)| *language);
         let entries = first_of_each
             .into_par_iter()
-            .map(|(language, entry)| LocalizationEntry::read_entry(archive, language, entry))
+            .map(|(language, entry)| {
+                LocalizationEntry::read_entry_with_limits(archive, language, entry, limits)
+            })
             .collect::<Result<_, _>>()?;
         Ok(Self { entries })
     }
@@ -98,6 +114,18 @@ impl LocalizationSet {
     /// Returns the first [`LocalizationLoadError`] of an Entry that cannot be read.
     pub fn read_all(archive: &Archive) -> Result<Self, LocalizationLoadError> {
         Self::read(archive, &Language::ALL)
+    }
+
+    /// Reads all available supported languages with `limits` applied independently to each Entry.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::read_with_limits`].
+    pub fn read_all_with_limits(
+        archive: &Archive,
+        limits: LocalizationLimits,
+    ) -> Result<Self, LocalizationLoadError> {
+        Self::read_with_limits(archive, &Language::ALL, limits)
     }
 
     /// Returns the languages that were read, in the order of [`Language::ALL`].
@@ -143,7 +171,8 @@ impl LocalizationSet {
     ///
     /// # Errors
     ///
-    /// Returns [`LocalizationLoadError::Index`] for the first Entry that exceeds a limit.
+    /// Returns [`LocalizationLoadError::Index`] if any Entry cannot be indexed within its
+    /// retained limits or the index cannot be allocated.
     pub fn index(&self) -> Result<TextSet<'_>, LocalizationLoadError> {
         let files = self
             .entries

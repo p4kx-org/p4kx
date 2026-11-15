@@ -54,7 +54,8 @@ pub enum LocalizationTableDatum<'text> {
 /// Writes the sorted localisation table, retaining the difference between empty and missing JSON cells.
 ///
 /// # Errors
-/// Returns the first output error.
+/// Returns the first output error or [`io::ErrorKind::OutOfMemory`] if key storage cannot be
+/// reserved.
 pub fn write_localization_table(
     texts: &TextSet<'_>,
     languages: &[Language],
@@ -67,7 +68,8 @@ pub fn write_localization_table(
 /// Writes the table and reports each emitted datum with its half-open output byte range.
 ///
 /// # Errors
-/// Returns the first output or observation error.
+/// Returns the first output or observation error, or [`io::ErrorKind::OutOfMemory`] if key
+/// storage cannot be reserved.
 pub fn write_observed_localization_table(
     texts: &TextSet<'_>,
     languages: &[Language],
@@ -75,7 +77,10 @@ pub fn write_observed_localization_table(
     out: &mut dyn Write,
     observe: impl FnMut(LocalizationTableDatum<'_>, Range<u64>) -> io::Result<()>,
 ) -> io::Result<usize> {
-    let rows = texts.keys().into_iter().filter(|key| {
+    let keys = texts
+        .try_keys()
+        .map_err(|error| io::Error::new(io::ErrorKind::OutOfMemory, error))?;
+    let rows = keys.into_iter().filter(|key| {
         languages
             .iter()
             .any(|&language| texts.text(key, language).is_some())

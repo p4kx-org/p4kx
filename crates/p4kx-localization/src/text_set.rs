@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::cmp::Ordering;
+use std::collections::TryReserveError;
 
 use crate::lookup::{Lookup, resolve};
 use crate::{GlobalIni, Language, OwnedTextSet};
@@ -63,12 +64,28 @@ impl<'a> TextSet<'a> {
     }
 
     /// Copies the texts into a set that borrows nothing, to keep after the files are dropped.
+    ///
+    /// # Panics
+    /// Panics if storage cannot be reserved. Use [`Self::try_to_owned_set`] to handle the error.
+    #[expect(
+        clippy::expect_used,
+        reason = "the convenience API returns the owned set directly"
+    )]
     #[must_use]
     pub fn to_owned_set(&self) -> OwnedTextSet {
-        OwnedTextSet::from_files(
+        self.try_to_owned_set()
+            .expect("owned localisation storage can be reserved")
+    }
+
+    /// Copies the texts into an owned set with fallible storage growth.
+    ///
+    /// # Errors
+    /// Returns a reservation error when owned storage cannot be allocated.
+    pub fn try_to_owned_set(&self) -> Result<OwnedTextSet, TryReserveError> {
+        OwnedTextSet::try_from_files(
             self.languages
                 .iter()
-                .map(|(language, ini)| (*language, ini.iter().collect())),
+                .map(|(language, ini)| (*language, ini.iter())),
         )
     }
 
@@ -89,19 +106,36 @@ impl<'a> TextSet<'a> {
 
     /// Returns every key any file holds once, ignoring ASCII case, spelled as the first file in
     /// the order of [`Language::ALL`] that holds it spells it, sorted ignoring ASCII case.
+    ///
+    /// # Panics
+    /// Panics if storage cannot be reserved. Use [`Self::try_keys`] to handle the error.
+    #[expect(
+        clippy::expect_used,
+        reason = "the convenience API returns the key vector directly"
+    )]
     #[must_use]
     pub fn keys(&self) -> Vec<&'a str> {
+        self.try_keys()
+            .expect("localisation key storage can be reserved")
+    }
+
+    /// Returns the same ordered union as [`Self::keys`] with fallible storage growth.
+    ///
+    /// # Errors
+    /// Returns a reservation error when storage for the keys cannot be allocated.
+    pub fn try_keys(&self) -> Result<Vec<&'a str>, TryReserveError> {
         let mut keys: Vec<&'a str> = Vec::new();
         for (position, (_, ini)) in self.languages.iter().enumerate() {
             let earlier = self.languages.get(..position).unwrap_or_default();
-            keys.extend(
-                ini.iter()
-                    .map(|(key, _)| key)
-                    .filter(|key| !earlier.iter().any(|(_, other)| other.contains_key(key))),
-            );
+            for (key, _) in ini.iter() {
+                if !earlier.iter().any(|(_, other)| other.contains_key(key)) {
+                    keys.try_reserve(1)?;
+                    keys.push(key);
+                }
+            }
         }
         keys.sort_unstable_by(|a, b| fold_cmp(a, b));
-        keys
+        Ok(keys)
     }
 }
 

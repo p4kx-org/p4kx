@@ -187,8 +187,12 @@ fn read(
                 view.language = Some(language);
                 view
             }
-            Err(TextFailure::ArchiveChanged) => return Err(Unread::ArchiveChanged),
-            Err(TextFailure::Unreadable(reason)) => {
+            Err(error) => {
+                let reason = match error {
+                    TextFailure::ArchiveChanged => return Err(Unread::ArchiveChanged),
+                    TextFailure::Unreadable(reason) => reason,
+                    TextFailure::Reserve(error) => describe(&error),
+                };
                 failure = Some((language, reason.into_boxed_str()));
                 lines::view(forge, &tree, None, tags)
             }

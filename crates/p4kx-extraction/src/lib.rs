@@ -333,9 +333,9 @@ pub use p4kx_guard::{
     remove_owned_output, remove_owned_output_target_only, validated_output_directory,
 };
 pub use p4kx_localization::{
-    GlobalIni, IniEncoding, IniText, Language, LocalizationError, Lookup, MAX_GLOBAL_INI_KEYS,
-    MAX_GLOBAL_INI_SIZE, OwnedTextSet, PLACEHOLDER_KEYS, ParseLanguageError, TextSet,
-    decode_line_breaks, display_text, is_placeholder_key,
+    GlobalIni, IniEncoding, IniText, Language, LocalizationError, LocalizationLimits, Lookup,
+    OwnedTextSet, PLACEHOLDER_KEYS, ParseLanguageError, TextSet, decode_line_breaks, display_text,
+    is_placeholder_key,
 };
 pub use p4kx_model as model;
 pub use p4kx_texture::MAX_HEADER_LEN as MAX_DDS_HEADER_LEN;
