@@ -71,32 +71,36 @@ impl Provider for AudioControlProvider {
             entry: context.entry.index(),
         };
         let bytes = required_reader::read_all(context, writer)?;
-        let source = match SourceDocument::parse(&bytes, SourceReadOptions::default()) {
-            Ok(source) => source,
-            Err(cause) => {
-                projection.document_observed(context.source.size, false, writer)?;
-                failure(&projection, context.source.size, reason(&cause), writer)?;
-                return Ok(Projection::Written);
-            }
-        };
-        writer.checkpoint()?;
-        match projection.project(&source, context.source.size, writer) {
-            Ok(()) => {
-                projection.document_observed(context.source.size, !source.is_lossy(), writer)?;
-            }
-            Err(Failure::Span) => {
-                projection.document_observed(context.source.size, false, writer)?;
-                failure(
-                    &projection,
-                    context.source.size,
-                    AtlFailure::SourceSpan,
-                    writer,
-                )?;
-            }
-            Err(Failure::Fatal(cause)) => return Err(cause),
-        }
-        Ok(Projection::Written)
+        project_bytes(&projection, &bytes, writer)
     }
+}
+
+fn project_bytes(
+    projection: &AtlProjection<'_, '_>,
+    bytes: &[u8],
+    writer: &mut MediaWriter<'_>,
+) -> Result<Projection, MediaError> {
+    let size = bytes.len() as u64;
+    let source = match SourceDocument::parse(bytes, SourceReadOptions::default()) {
+        Ok(source) => source,
+        Err(cause) => {
+            projection.document_observed(size, false, writer)?;
+            failure(projection, size, reason(&cause), writer)?;
+            return Ok(Projection::Written);
+        }
+    };
+    writer.checkpoint()?;
+    match projection.project(&source, size, writer) {
+        Ok(()) => {
+            projection.document_observed(size, !source.is_lossy(), writer)?;
+        }
+        Err(Failure::Span) => {
+            projection.document_observed(size, false, writer)?;
+            failure(projection, size, AtlFailure::SourceSpan, writer)?;
+        }
+        Err(Failure::Fatal(cause)) => return Err(cause),
+    }
+    Ok(Projection::Written)
 }
 
 fn failure(

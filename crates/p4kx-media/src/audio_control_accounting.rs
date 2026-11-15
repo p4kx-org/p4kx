@@ -11,12 +11,14 @@ use std::path::Path;
 use p4kx_assembly::audio::AtlDefinitions;
 use p4kx_extraction::cryxml::{SourceDocument, SourceElement, SourceReadOptions};
 use p4kx_extraction::sound::wwise_path;
-use p4kx_extraction::{Archive, ArchiveWatch, Exclusion, Filter};
+use p4kx_extraction::{Archive, ArchiveWatch, Checksum, Exclusion, Filter};
+use sha2::{Digest as _, Sha256};
 
 use crate::audio_control_projection::{self, Failure};
+use crate::media_writer::Finished;
 use crate::{
-    ContainerIdentity, ExportOptions, ExportOutcome, Identity, MediaError, MediaKind, MediaRecord,
-    Status,
+    Artifact, ContainerIdentity, ExportOptions, ExportOutcome, Identity, Index, MediaError,
+    MediaKind, MediaRecord, Status,
 };
 
 #[path = "../tests/real_archive/privacy.rs"]
@@ -30,6 +32,10 @@ type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
 #[path = "audio_control_accounting_installed.rs"]
 mod installed;
+#[path = "audio_control_accounting_observer.rs"]
+mod observer;
+#[path = "audio_control_production_harness.rs"]
+mod production_harness;
 
 #[path = "audio_control_trigger_oracle.rs"]
 mod trigger_oracle;
@@ -47,8 +53,9 @@ struct Census {
 
 fn verify_synthetic_export(archive: &Archive) -> TestResult {
     let watch = ArchiveWatch::new(archive);
-    let (expected, triggers) = source_counts(archive, &watch)?;
-    require(!expected.is_empty(), "root definitions present")?;
+    let original = source_counts(archive, &watch)?;
+    require(!original.rows.is_empty(), "root definitions present")?;
+    let streamed = verify_production_stream(archive, &original)?;
     let scratch = tempfile::tempdir()?;
     let options = ExportOptions {
         kinds: vec![MediaKind::AudioControl],
@@ -69,22 +76,104 @@ fn verify_synthetic_export(archive: &Archive) -> TestResult {
         .ok_or("root audio control stream")?;
     let actual = media_counts(archive, &base, &base.join(&stream.artifact.path))?;
     require(
-        actual == expected,
+        actual == original.rows,
         "physical ATL occurrence and edge counts agree",
     )?;
 
-    triggers.verify(archive, &AtlDefinitions::build(archive))?;
+    verify_receipts(&streamed, &index, &stream.artifact)?;
+    original
+        .triggers
+        .verify(archive, &AtlDefinitions::build(archive))?;
     watch.check()?;
     scratch.close()?;
     Ok(())
 }
 
-fn source_counts(
-    archive: &Archive,
-    watch: &ArchiveWatch,
-) -> TestResult<(BTreeMap<usize, Census>, Triggers)> {
-    let mut counts = BTreeMap::new();
-    let mut triggers = Triggers::default();
+fn verify_receipts(observed: &Finished, index: &Index, records: &Artifact) -> TestResult {
+    let observed_records = observed
+        .kinds
+        .iter()
+        .find(|kind| kind.provider.kind == MediaKind::AudioControl)
+        .ok_or("observed ATL Media stream")?;
+    let published = index
+        .field_origins
+        .as_ref()
+        .ok_or("published origin receipts")?;
+    for (streamed, file, message) in [
+        (&observed_records.artifact, records, "ATL record bytes"),
+        (
+            &observed.sources,
+            &index.source_manifest,
+            "source manifest bytes",
+        ),
+        (
+            &observed.artifacts,
+            &index.artifact_manifest,
+            "artifact manifest bytes",
+        ),
+        (
+            &observed.origins.fields,
+            &published.fields,
+            "field origin bytes",
+        ),
+        (
+            &observed.origins.sources,
+            &published.sources,
+            "physical source bytes",
+        ),
+        (&observed.origins.uses, &published.uses, "source use bytes"),
+        (
+            &observed.origins.sets,
+            &published.sets,
+            "source use set bytes",
+        ),
+    ] {
+        require(
+            streamed.path == file.path
+                && streamed.size == file.size
+                && streamed.digest == file.digest,
+            message,
+        )?;
+    }
+    Ok(())
+}
+
+impl Census {
+    fn observe(&mut self, namespace: &str) {
+        use crate::audio_control_payload as wire;
+        match namespace {
+            wire::DOCUMENT => self.documents += 1,
+            wire::ELEMENT => self.elements += 1,
+            wire::DECLARATION => self.declarations += 1,
+            wire::DEFINITION => self.definitions += 1,
+            wire::REFERENCE => self.edges += 1,
+            _ => {}
+        }
+    }
+}
+
+struct SourceCensus {
+    rows: BTreeMap<usize, Census>,
+    digests: BTreeMap<usize, String>,
+    triggers: Triggers,
+}
+
+fn verify_production_stream(archive: &Archive, original: &SourceCensus) -> TestResult<Finished> {
+    let observer = observer::Observer::new(archive, &original.digests);
+    let streamed = production_harness::observe(archive, &observer)?;
+    require(
+        observer.counts()? == original.rows,
+        "production ATL serialised rows match the original occurrence counts",
+    )?;
+    Ok(streamed)
+}
+
+fn source_counts(archive: &Archive, watch: &ArchiveWatch) -> TestResult<SourceCensus> {
+    let mut result = SourceCensus {
+        rows: BTreeMap::new(),
+        digests: BTreeMap::new(),
+        triggers: Triggers::default(),
+    };
     for (position, entry) in archive.entries().iter().enumerate() {
         watch.poll()?;
         if !wwise_path::is_atl_definition(entry.path()) {
@@ -102,39 +191,16 @@ fn source_counts(
             ..Default::default()
         };
         tally(root, typed, &mut census)?;
-        compare_projection(&source, position, watch, &census)?;
         if typed {
-            triggers.observe(entry.path(), position, root);
+            result.triggers.observe(entry.path(), position, root);
         }
-        counts.insert(position, census);
+        result.rows.insert(position, census);
+        result.digests.insert(
+            position,
+            Checksum::Sha256(Sha256::digest(&bytes).into()).hex(),
+        );
     }
-    Ok((counts, triggers))
-}
-
-fn compare_projection(
-    source: &SourceDocument<'_>,
-    position: usize,
-    watch: &ArchiveWatch,
-    expected: &Census,
-) -> TestResult {
-    let projected = match audio_control_projection::census(source, position, || {
-        watch.poll().map_err(MediaError::from)
-    }) {
-        Ok(projected) => projected,
-        Err(Failure::Span) => return Err("Media row projection requires exact ATL spans".into()),
-        Err(Failure::Fatal(cause)) => return Err(cause.into()),
-    };
-    let actual = Census {
-        documents: projected.documents,
-        elements: projected.elements,
-        declarations: projected.declarations,
-        definitions: projected.definitions,
-        edges: projected.edges,
-    };
-    require(
-        &actual == expected,
-        "ATL source and Media projection rows agree",
-    )
+    Ok(result)
 }
 
 fn tally(root: SourceElement<'_>, typed: bool, census: &mut Census) -> TestResult {
@@ -255,15 +321,10 @@ fn media_counts(
             row.source.raw.as_ref() == originals.get(&entry.entry_index),
             "all ATL rows retain the same original body",
         )?;
-        let census = counts.entry(entry.entry_index).or_default();
-        match row.subresource.namespace.as_str() {
-            "audio-control-document" => census.documents += 1,
-            "audio-control-element" => census.elements += 1,
-            "audio-control-declaration" => census.declarations += 1,
-            "audio-control-definition" => census.definitions += 1,
-            "audio-control-reference" => census.edges += 1,
-            _ => {}
-        }
+        counts
+            .entry(entry.entry_index)
+            .or_default()
+            .observe(&row.subresource.namespace);
     }
     Ok(counts)
 }
@@ -306,6 +367,7 @@ fn root_atl_accounts_for_physical_documents_and_index_precedence() -> TestResult
         .entry(TestEntry::stored("Data/Libs/GameAudio/A.xml", first.to_cryxml(CryXmlSignature::CryXmlB, CryXmlByteOrder::Little)).encrypted())
         .entry(TestEntry::stored("Data/Libs/GameAudio/settings.xml", b"<Settings><NotAControl/></Settings>"))
         .entry(TestEntry::stored("Data/Objects/malformed.socpak", b"excluded nested archive"))
+        .entry(TestEntry::stored("Data/Sounds/wwise/synthetic.bnk", b"directory-only target"))
         .write_to(&path)?;
     let archive = Archive::open_with_key(path, Some(test_key()))?;
     verify_synthetic_export(&archive)

@@ -18,7 +18,7 @@ pub(crate) fn temporary<'job>(
     writer.checkpoint()?;
     let result = (|| {
         writer
-            .namespace
+            .file_namespace()?
             .ensure_namespace_writable(directory, writer.checkpoint.cancel.flag())?;
         if !output_path::directory(directory)? {
             return Err(MediaError::Destination(missing.into()));
@@ -52,9 +52,8 @@ fn place_checked(
     collision: &'static str,
 ) -> Result<bool, MediaError> {
     let path = writer.root.join(&artifact.path);
-    writer
-        .namespace
-        .ensure_namespace_writable(&path, writer.checkpoint.cancel.flag())?;
+    let namespace = writer.file_namespace()?;
+    namespace.ensure_namespace_writable(&path, writer.checkpoint.cancel.flag())?;
     if output_path::file(&path)? {
         let (digest, actual) = hashing::file(
             &path,
@@ -67,7 +66,7 @@ fn place_checked(
         }
         Ok(false)
     } else {
-        temporary.persist(&path, Publication::Namespace(writer.namespace))?;
+        temporary.persist(&path, Publication::Namespace(namespace))?;
         Ok(true)
     }
 }

@@ -27,11 +27,10 @@ pub(crate) fn place(
             "retained source payload is missing".into(),
         ));
     }
-    let relative = format!("raw/{}", digest.hex);
-    let retained = writer.root.join(&relative);
-    writer
-        .namespace
-        .ensure_namespace_writable(&retained, writer.checkpoint.cancel.flag())?;
+    let receipt = receipt(digest, size);
+    let retained = writer.root.join(&receipt.path);
+    let namespace = writer.file_namespace()?;
+    namespace.ensure_namespace_writable(&retained, writer.checkpoint.cancel.flag())?;
     if output_path::file(&retained)? {
         let (existing, length) = hashing::file(
             &retained,
@@ -39,7 +38,7 @@ pub(crate) fn place(
             size,
             &writer.checkpoint,
         )?;
-        if length != size || existing != digest {
+        if length != size || existing != receipt.digest {
             return Err(MediaError::Contract(
                 "raw content-address collision or corruption".into(),
             ));
@@ -47,29 +46,37 @@ pub(crate) fn place(
     } else {
         source_namespace.ensure_namespace_writable(payload, writer.checkpoint.cancel.flag())?;
         fs::rename(payload, &retained).map_err(|source| error::io(&retained, source))?;
-        writer
-            .namespace
+        namespace
             .ensure_namespace_writable(&retained, writer.checkpoint.cancel.flag())
             .map_err(|cause| MediaError::RetainedOutput {
                 path: retained.clone(),
                 cause: Box::new(cause.into()),
             })?;
     }
+    record(&receipt, origin, writer)?;
+    Ok((receipt, retained))
+}
+
+pub(crate) fn receipt(digest: Digest, size: u64) -> RawReference {
+    RawReference {
+        path: format!("raw/{}", digest.hex),
+        size,
+        digest,
+    }
+}
+
+pub(crate) fn record(
+    raw: &RawReference,
+    origin: &MediaOriginInput,
+    writer: &mut MediaWriter<'_>,
+) -> Result<(), MediaError> {
     writer.artifact_with_input(
         &Artifact {
-            path: relative.clone(),
-            size,
-            digest: digest.clone(),
+            path: raw.path.clone(),
+            size: raw.size,
+            digest: raw.digest.clone(),
         },
         origin,
         InputScope::Payload,
-    )?;
-    Ok((
-        RawReference {
-            path: relative,
-            size,
-            digest,
-        },
-        retained,
-    ))
+    )
 }

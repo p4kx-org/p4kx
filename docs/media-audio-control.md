@@ -75,17 +75,21 @@ CryXml table position. It walks root Entries in physical order and stops after
 all required declaration groups are represented. An exhausted scan reports
 missing groups by name.
 
-The whole-root census compares an independent XML count of documents, elements,
-declarations, definitions and authored references with the same row projection
-used by the Media writer, separately for each physical Entry. The comparison
-runs in memory. It reads one verified XML Entry at a time, binds the Build
-before and after the scan, and requires complete original XML spans. Assembly's
-`AtlDefinitions` uses the same trigger projection as `AudioIndex` to reconcile
-winning definitions, event order, IDs and localisation. It reads ATL definitions
-only.
+The whole-root census compares independent XML counts of documents, elements,
+declarations, definitions and authored references with serialized Media records,
+separately for each physical Entry. The production writer also emits the
+directory resolution and candidate rows and their JSONL provenance. The test
+matches ATL record digests and field addresses, verifies ordered candidate
+rows, and resolves a format-field origin for each document against the physical
+source and use inventories. It discards the emitted bytes.
 
-Both installed checks perform zero Media artifact writes. A small synthetic
-export compares the same counts with published records and verifies raw
-sidecars. Directory target resolution, candidate rows and on-disk publication
-are checked by synthetic fixtures. Installed on-disk publication requires
-separate scale evidence.
+The census hashes the root Archive for the source receipt and checks the Build
+before and after the scan. It processes verified XML one Entry at a time and
+requires complete original spans. Assembly's `AtlDefinitions` uses the same
+trigger projection as `AudioIndex` to reconcile winning definitions, event
+order, IDs and localisation. It reads ATL definitions only.
+
+Both installed checks perform zero Media artifact writes. The census has no
+file placement permit. It computes raw sidecar digests from the verified Entry
+bytes in memory. A small synthetic export checks the actual file publication
+and verifies the raw sidecars.

@@ -14,14 +14,82 @@ use crate::hashing;
 use crate::output_path;
 use crate::{Algorithm, Artifact, ByteScope, Digest, MediaError};
 
+#[cfg(test)]
+pub(crate) trait StreamObserver {
+    fn write(&self, relative: &str, bytes: &[u8]) -> io::Result<()>;
+
+    fn finish(&self, _relative: &str) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+#[derive(Clone, Copy)]
+pub(crate) struct StreamDestination<'a> {
+    checkpoint: Checkpoint<'a>,
+    #[cfg(test)]
+    observer: Option<&'a dyn StreamObserver>,
+}
+
+impl<'a> StreamDestination<'a> {
+    pub(crate) const fn file(checkpoint: Checkpoint<'a>) -> Self {
+        Self {
+            checkpoint,
+            #[cfg(test)]
+            observer: None,
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) const fn observed(
+        checkpoint: Checkpoint<'a>,
+        observer: &'a dyn StreamObserver,
+    ) -> Self {
+        Self {
+            checkpoint,
+            observer: Some(observer),
+        }
+    }
+
+    pub(crate) const fn checkpoint(self) -> Checkpoint<'a> {
+        self.checkpoint
+    }
+
+    pub(crate) fn create(self, root: &Path, relative: String) -> Result<Stream<'a>, MediaError> {
+        #[cfg(test)]
+        if let Some(observer) = self.observer {
+            self.checkpoint.check()?;
+            return Ok(Stream::new(
+                root.join(&relative),
+                relative,
+                StreamBackend::Observed {
+                    observer,
+                    checkpoint: self.checkpoint,
+                },
+            ));
+        }
+        Stream::create(root, relative, &self.checkpoint)
+    }
+}
+
+enum StreamBackend<'a> {
+    File {
+        file: BufWriter<File>,
+        token: OwnedFileToken,
+        checkpoint: Checkpoint<'a>,
+    },
+    #[cfg(test)]
+    Observed {
+        observer: &'a dyn StreamObserver,
+        checkpoint: Checkpoint<'a>,
+    },
+}
+
 pub(crate) struct Stream<'a> {
     path: PathBuf,
     relative: String,
-    file: BufWriter<File>,
+    backend: StreamBackend<'a>,
     hash: Sha256,
     size: u64,
-    token: OwnedFileToken,
-    checkpoint: Checkpoint<'a>,
 }
 
 impl<'a> Stream<'a> {
@@ -39,31 +107,57 @@ impl<'a> Stream<'a> {
             checkpoint.cancel.flag(),
         )?
         .into_parts();
-        Ok(Self {
+        Ok(Self::new(
             path,
             relative,
-            file: BufWriter::new(file),
+            StreamBackend::File {
+                file: BufWriter::new(file),
+                token,
+                checkpoint: *checkpoint,
+            },
+        ))
+    }
+
+    fn new(path: PathBuf, relative: String, backend: StreamBackend<'a>) -> Self {
+        Self {
+            path,
+            relative,
+            backend,
             hash: Sha256::new(),
             size: 0,
-            token,
-            checkpoint: *checkpoint,
-        })
+        }
     }
 
     pub(crate) fn path(&self) -> &Path {
         &self.path
     }
+
     pub(crate) fn finish(mut self) -> Result<Artifact, MediaError> {
-        self.checkpoint.check()?;
-        self.token
-            .ensure_writable(&self.path, self.checkpoint.cancel.flag())?;
-        self.file
-            .flush()
-            .map_err(|source| error::io(&self.path, source))?;
-        self.file
-            .get_ref()
-            .sync_all()
-            .map_err(|source| error::io(&self.path, source))?;
+        match &mut self.backend {
+            StreamBackend::File {
+                file,
+                token,
+                checkpoint,
+            } => {
+                checkpoint.check()?;
+                token.ensure_writable(&self.path, checkpoint.cancel.flag())?;
+                file.flush()
+                    .map_err(|source| error::io(&self.path, source))?;
+                file.get_ref()
+                    .sync_all()
+                    .map_err(|source| error::io(&self.path, source))?;
+            }
+            #[cfg(test)]
+            StreamBackend::Observed {
+                observer,
+                checkpoint,
+            } => {
+                checkpoint.check()?;
+                observer
+                    .finish(&self.relative)
+                    .map_err(|source| error::io(&self.path, source))?;
+            }
+        }
         Ok(Artifact {
             path: self.relative,
             size: self.size,
@@ -78,7 +172,14 @@ impl<'a> Stream<'a> {
 
 impl Write for Stream<'_> {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-        let written = self.file.write(bytes)?;
+        let written = match &mut self.backend {
+            StreamBackend::File { file, .. } => file.write(bytes)?,
+            #[cfg(test)]
+            StreamBackend::Observed { observer, .. } => {
+                observer.write(&self.relative, bytes)?;
+                bytes.len()
+            }
+        };
         self.hash.update(
             bytes.get(..written).ok_or_else(|| {
                 io::Error::other("artifact writer reported an invalid byte count")
@@ -92,7 +193,11 @@ impl Write for Stream<'_> {
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        self.file.flush()
+        match &mut self.backend {
+            StreamBackend::File { file, .. } => file.flush(),
+            #[cfg(test)]
+            StreamBackend::Observed { .. } => Ok(()),
+        }
     }
 }
 

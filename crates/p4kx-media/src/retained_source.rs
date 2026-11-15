@@ -72,7 +72,7 @@ fn materialize<T>(
     }
     writer.reserve_output(size)?;
     writer
-        .namespace
+        .file_namespace()?
         .ensure_namespace_writable(&writer.root, writer.checkpoint.cancel.flag())?;
     if !output_path::directory(&writer.root)? {
         return Err(MediaError::Destination(

@@ -9,11 +9,12 @@ use p4kx_assembly::audio::AtlDefinitions;
 use p4kx_extraction::{Archive, ArchiveWatch, Build};
 use p4kx_testkit::{real_archive_b_path, real_archive_key, real_archive_path};
 
-use super::{Census, TestResult, privacy, require, source_counts};
+use super::{Census, TestResult, privacy, require, source_counts, verify_production_stream};
 
 #[derive(Debug)]
 enum Phase {
     OpenArchive,
+    ReadSources,
     ReconcileMedia,
     ComparePlaybackDefinitions,
     CheckArchive,
@@ -71,13 +72,18 @@ fn verify_installed(path: &Path, input: usize) -> Result<(), String> {
 
 fn verify(archive: &Archive, build: &Build, verification: &mut Verification) -> TestResult {
     let watch = ArchiveWatch::new(archive);
+    verification.enter(Phase::ReadSources)?;
+    let original = source_counts(archive, &watch)?;
+    require(!original.rows.is_empty(), "root ATL documents present")?;
+
     verification.enter(Phase::ReconcileMedia)?;
-    let (original, triggers) = source_counts(archive, &watch)?;
-    require(!original.is_empty(), "root ATL documents present")?;
-    report_census(&original)?;
+    let _streamed = verify_production_stream(archive, &original)?;
+    report_census(&original.rows)?;
 
     verification.enter(Phase::ComparePlaybackDefinitions)?;
-    triggers.verify(archive, &AtlDefinitions::build(archive))?;
+    original
+        .triggers
+        .verify(archive, &AtlDefinitions::build(archive))?;
     verification.enter(Phase::CheckArchive)?;
     watch.check()?;
     let directory = archive
@@ -114,7 +120,10 @@ fn report_census(original: &BTreeMap<usize, Census>) -> TestResult {
         sum.edges += source.edges;
     }
     let mut out = io::stdout().lock();
-    writeln!(out, "Original root ATL and projected Media census: {sum:?}")?;
+    writeln!(
+        out,
+        "Original root ATL and serialised Media census: {sum:?}"
+    )?;
     out.flush()?;
     Ok(())
 }

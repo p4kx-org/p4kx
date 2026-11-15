@@ -6,11 +6,13 @@ use crate::origin_input::MediaOriginInput;
 use crate::origin_state::OriginState;
 use crate::origin_stream::OriginTransport;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use p4kx_extraction::OwnedDirectoryPermit;
 
-use crate::artifact::Stream;
+#[cfg(test)]
+use crate::artifact::StreamObserver;
+use crate::artifact::{Stream, StreamDestination};
 use crate::checkpoint::Checkpoint;
 use crate::contract::Tally;
 use crate::{
@@ -35,7 +37,7 @@ pub(crate) struct Finished {
 pub struct MediaWriter<'a> {
     pub(crate) root: PathBuf,
     pub(crate) checkpoint: Checkpoint<'a>,
-    pub(crate) namespace: &'a OwnedDirectoryPermit,
+    namespace: Option<&'a OwnedDirectoryPermit>,
     pub(crate) limits: Limits,
     pub(crate) kinds: Vec<KindStream<'a>>,
     pub(crate) manifest: Stream<'a>,
@@ -67,16 +69,52 @@ impl<'a> MediaWriter<'a> {
         checkpoint: Checkpoint<'a>,
         diagnostic: bool,
     ) -> Result<Self, MediaError> {
-        let root = namespace.path();
+        Self::with_destination(
+            namespace.path(),
+            Some(namespace),
+            capabilities,
+            limits,
+            diagnostic,
+            StreamDestination::file(checkpoint),
+        )
+    }
+
+    #[cfg(test)]
+    pub(crate) fn observed(
+        root: &Path,
+        capabilities: Vec<Capability>,
+        limits: Limits,
+        checkpoint: Checkpoint<'a>,
+        diagnostic: bool,
+        observer: &'a dyn StreamObserver,
+    ) -> Result<Self, MediaError> {
+        Self::with_destination(
+            root,
+            None,
+            capabilities,
+            limits,
+            diagnostic,
+            StreamDestination::observed(checkpoint, observer),
+        )
+    }
+
+    fn with_destination(
+        root: &Path,
+        namespace: Option<&'a OwnedDirectoryPermit>,
+        capabilities: Vec<Capability>,
+        limits: Limits,
+        diagnostic: bool,
+        destination: StreamDestination<'a>,
+    ) -> Result<Self, MediaError> {
         let origin_transport = OriginTransport::create(
             root,
             capabilities.iter().map(|capability| capability.kind),
-            checkpoint,
+            destination,
             limits.value_depth,
         )?;
         let mut kinds = Vec::new();
         for capability in capabilities {
-            let stream = Stream::create(root, format!("{}.jsonl", capability.kind), &checkpoint)?;
+            let stream = destination.create(root, format!("{}.jsonl", capability.kind))?;
             kinds.push(KindStream {
                 capability,
                 counts: Counts::default(),
@@ -85,12 +123,12 @@ impl<'a> MediaWriter<'a> {
         }
         Ok(Self {
             root: root.into(),
-            checkpoint,
+            checkpoint: destination.checkpoint(),
             namespace,
             limits,
             kinds,
-            manifest: Stream::create(root, "artifacts.jsonl".into(), &checkpoint)?,
-            sources: Stream::create(root, "sources.jsonl".into(), &checkpoint)?,
+            manifest: destination.create(root, "artifacts.jsonl".into())?,
+            sources: destination.create(root, "sources.jsonl".into())?,
             active: None,
             source: None,
             terminal: None,
@@ -108,6 +146,12 @@ impl<'a> MediaWriter<'a> {
             origins: OriginState::new(limits.record_bytes),
             origin_transport,
             source_origin: None,
+        })
+    }
+
+    pub(crate) fn file_namespace(&self) -> Result<&'a OwnedDirectoryPermit, MediaError> {
+        self.namespace.ok_or_else(|| {
+            MediaError::Contract("file placement requires a file-backed Media writer".into())
         })
     }
 

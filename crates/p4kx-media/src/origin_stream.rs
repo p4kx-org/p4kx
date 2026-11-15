@@ -10,7 +10,7 @@ use std::path::Path;
 use p4kx_extraction::{DecimalU64, SourceUses};
 use sha2::{Digest as _, Sha256};
 
-use crate::artifact::Stream;
+use crate::artifact::{Stream, StreamDestination};
 use crate::checkpoint::Checkpoint;
 use crate::origin_contract::use_sets::Sets;
 use crate::origin_contract::{
@@ -30,7 +30,7 @@ pub(crate) struct OriginTransport<'a> {
     fields: Stream<'a>,
     sets: Sets,
     summaries: Vec<OriginStreamSummary>,
-    checkpoint: Checkpoint<'a>,
+    destination: StreamDestination<'a>,
     max_depth: u32,
 }
 
@@ -38,7 +38,7 @@ impl<'a> OriginTransport<'a> {
     pub(crate) fn create(
         root: &Path,
         kinds: impl IntoIterator<Item = MediaKind>,
-        checkpoint: Checkpoint<'a>,
+        destination: StreamDestination<'a>,
         max_depth: u32,
     ) -> Result<Self, MediaError> {
         let mut summaries: Vec<_> = kinds
@@ -49,10 +49,10 @@ impl<'a> OriginTransport<'a> {
         summaries.push(summary(OriginStream::Artifacts));
         summaries.push(summary(OriginStream::IndexBuild));
         Ok(Self {
-            fields: Stream::create(root, "field-origins.jsonl".into(), &checkpoint)?,
+            fields: destination.create(root, "field-origins.jsonl".into())?,
             sets: Sets::default(),
             summaries,
-            checkpoint,
+            destination,
             max_depth,
         })
     }
@@ -90,7 +90,7 @@ impl<'a> OriginTransport<'a> {
             payload,
             payload_depth(stream, self.max_depth),
             &mut |field| {
-                self.checkpoint.check()?;
+                self.destination.checkpoint().check()?;
                 let address = address(stream, field);
                 let field = address.as_ref();
                 let contribution = resolver.resolve(field, prepared)?;
@@ -152,23 +152,31 @@ impl<'a> OriginTransport<'a> {
         owner: &SourceUses,
     ) -> Result<OriginReceipts, MediaError> {
         let inventory = owner.freeze().map_err(origin_error::evidence)?;
+        let checkpoint = self.destination.checkpoint();
         let sources = inventory_stream(
             root,
             "origin-sources.jsonl",
             inventory.sources(),
-            self.checkpoint,
+            self.destination,
         )?;
-        let uses = inventory_stream(root, "origin-uses.jsonl", inventory.uses(), self.checkpoint)?;
+        let uses = inventory_stream(
+            root,
+            "origin-uses.jsonl",
+            inventory.uses(),
+            self.destination,
+        )?;
         write_row(
             &mut self.fields,
             &OriginRow::Eof {
                 streams: &self.summaries,
             },
-            self.checkpoint,
+            checkpoint,
         )?;
-        let mut sets = Stream::create(root, "origin-use-sets.jsonl".into(), &self.checkpoint)?;
+        let mut sets = self
+            .destination
+            .create(root, "origin-use-sets.jsonl".into())?;
         self.sets
-            .visit(|row| write_row(&mut sets, &row, self.checkpoint))?;
+            .visit(|row| write_row(&mut sets, &row, checkpoint))?;
         Ok(OriginReceipts {
             protocol: OriginProtocol::V2,
             sets: sets.finish()?,
@@ -180,7 +188,7 @@ impl<'a> OriginTransport<'a> {
     }
 
     fn write(&mut self, row: &OriginRow<'_>) -> Result<(), MediaError> {
-        write_row(&mut self.fields, row, self.checkpoint)
+        write_row(&mut self.fields, row, self.destination.checkpoint())
     }
 }
 
@@ -188,11 +196,11 @@ fn inventory_stream<T: serde::Serialize>(
     root: &Path,
     relative: &str,
     rows: &[T],
-    checkpoint: Checkpoint<'_>,
+    destination: StreamDestination<'_>,
 ) -> Result<Artifact, MediaError> {
-    let mut stream = Stream::create(root, relative.into(), &checkpoint)?;
+    let mut stream = destination.create(root, relative.into())?;
     for row in rows {
-        write_row(&mut stream, row, checkpoint)?;
+        write_row(&mut stream, row, destination.checkpoint())?;
     }
     stream.finish()
 }
