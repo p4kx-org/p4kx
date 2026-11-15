@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::{BTreeMap, BTreeSet};
-use std::env;
+use std::collections::BTreeSet;
 use std::fs::File;
-use std::io::{self, BufRead, BufReader, Write as _};
+use std::io::{BufRead, BufReader};
 use std::path::Path;
 
 use p4kx_extraction::{Archive, ArchiveWatch, Build, Exclusion};
@@ -45,10 +44,11 @@ mod contributors;
 #[path = "animation_scope_rows.rs"]
 mod rows;
 
+#[path = "animation_scope_installed.rs"]
+mod installed;
+
 use self::sources::{Closure, Placement};
 
-const MODEL_VAR: &str = "P4KX_ANIMATION_SCOPE_MODEL";
-const ENTITY_VAR: &str = "P4KX_ANIMATION_SCOPE_ENTITY";
 const RECEIPT: &str = "animation-definition-scope-receipt";
 
 type RecordKey = (Option<usize>, String, Vec<u64>);
@@ -62,82 +62,7 @@ enum Selection {
 #[ignore = "real Archive: set P4KX_DATA_P4K and both P4KX_ANIMATION_SCOPE selectors"]
 fn installed_animation_scopes_match_verified_source_and_placement_closures()
 -> Result<(), privacy::VerificationFailure> {
-    privacy::redact(verify_configured())
-}
-
-fn verify_configured() -> TestResult {
-    let Some((model, entity)) = configured_selectors()? else {
-        return Ok(());
-    };
-    let key = p4kx_testkit::real_archive_key()?;
-    let archive = Archive::open_with_key(p4kx_testkit::real_archive_path()?, Some(key))?;
-    let build = archive.build().ok_or("authoritative installed Build")?;
-    let watch = ArchiveWatch::new(&archive);
-    watch.check()?;
-    writeln!(
-        io::stdout(),
-        "verifying the installed model scope from original sources"
-    )?;
-    let model_sources = model.discover(&archive, &watch)?;
-    writeln!(
-        io::stdout(),
-        "verifying the installed Entity scope from original sources"
-    )?;
-    let entity_sources = entity.discover(&archive, &watch)?;
-    require(
-        model_sources.has_events() || entity_sources.has_events(),
-        "an authored physical event database in the verified scopes",
-    )?;
-    writeln!(io::stdout(), "checking the selected model publication")?;
-    verify(&archive, build, &model, model_sources)?;
-    writeln!(io::stdout(), "checking the selected Entity publication")?;
-    verify(&archive, build, &entity, entity_sources)?;
-    watch.check()?;
-    let directory = archive
-        .path()
-        .parent()
-        .ok_or("installed channel directory")?;
-    require(
-        Build::read_from(directory)?.as_ref() == Some(build),
-        "unchanged Build",
-    )?;
-    writeln!(
-        io::stdout(),
-        "animation scope witness Build {} {} {} {}",
-        build.branch(),
-        build.version(),
-        build.change_number(),
-        build.build_id(),
-    )?;
-    Ok(())
-}
-
-fn configured_selectors() -> TestResult<Option<(Selection, Selection)>> {
-    let (model, entity) = match (env::var(MODEL_VAR), env::var(ENTITY_VAR)) {
-        (Ok(model), Ok(entity)) => (model, entity),
-        (Err(env::VarError::NotPresent), Err(env::VarError::NotPresent)) => {
-            writeln!(
-                io::stdout(),
-                "installed animation scope witness skipped: selectors unspecified"
-            )?;
-            return Ok(None);
-        }
-        _ => return Err("both installed animation scope selectors are required".into()),
-    };
-    require(
-        !entity.trim().is_empty()
-            && !model.contains(['*', '?', ':', '!', '\0'])
-            && !model
-                .split(['/', '\\'])
-                .any(|part| matches!(part, "" | "." | ".."))
-            && model.rsplit_once('.').is_some_and(|(stem, extension)| {
-                !stem.is_empty()
-                    && (extension.eq_ignore_ascii_case("cdf")
-                        || extension.eq_ignore_ascii_case("chr"))
-            }),
-        "one exact CDF/CHR and one Entity selector are required",
-    )?;
-    Ok(Some((Selection::Model(model), Selection::Entity(entity))))
+    privacy::redact(installed::verify_configured())
 }
 
 impl Selection {
@@ -172,7 +97,7 @@ fn verify(
     build: &Build,
     selection: &Selection,
     mut expected: Closure<'_>,
-) -> TestResult<BTreeMap<usize, usize>> {
+) -> TestResult<contributors::Verified> {
     let output = tempfile::tempdir()?;
     let ExportOutcome::Published { index, .. } =
         p4kx_media::export(archive, output.path(), &selection.options()?)?
@@ -191,11 +116,11 @@ fn verify(
         .ok_or("definition stream")?;
     let root = output.path().join(&index.artifact_base);
     let stream = BufReader::new(File::open(root.join(&kind.artifact.path))?);
-    let blend_matches = observe_rows(archive, &root, &index.source.digest, stream, &mut expected)?;
+    let contributors = observe_rows(archive, &root, &index.source.digest, stream, &mut expected)?;
     expected.verify()?;
     output.close()?;
     expected.report()?;
-    Ok(blend_matches)
+    Ok(contributors)
 }
 
 fn observe_rows(
@@ -204,7 +129,7 @@ fn observe_rows(
     digest: &Digest,
     stream: impl BufRead,
     expected: &mut Closure<'_>,
-) -> TestResult<BTreeMap<usize, usize>> {
+) -> TestResult<contributors::Verified> {
     let mut placements = 0;
     let mut databases = expected.databases.iter().enumerate();
     let mut identities = BTreeSet::new();
@@ -249,9 +174,9 @@ fn observe_rows(
         databases.next().is_none(),
         "every authored Entity database binding retained",
     )?;
-    let blend_matches = joins.verify(&expected.placements)?;
+    let contributors = joins.verify(&expected.placements)?;
     fields.verify(root, archive)?;
-    Ok(blend_matches)
+    Ok(contributors)
 }
 
 fn record_key(row: &MediaRecord) -> TestResult<RecordKey> {

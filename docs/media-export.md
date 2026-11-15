@@ -875,11 +875,29 @@ cargo test -p p4kx-media --lib installed_chrparams_source_census_reconciles_orde
 
 The installed scope publication witness takes one local exact model Entry in
 `P4KX_ANIMATION_SCOPE_MODEL` and one Entity selector in `P4KX_ANIMATION_SCOPE_ENTITY`.
-Set `P4KX_DATA_P4K` and the normal real-Archive key configuration. Both scopes must
-select parameter data and at least one scope must have an authored event
-database with timelines. Set the process temporary directory to the approved
-scratch location. Both selectors refer to the root Archive. The fixture excludes
-PAK and SOCPAK traversal and limits counted artifact writes to the real-Archive
+Set `P4KX_DATA_P4K` and the normal real-Archive key configuration. Both selectors
+refer to the root Archive and both scopes must select parameter data.
+
+With `P4KX_ANIMATION_SCOPE_PREFLIGHT=1`, the witness resolves both scopes,
+including the original Entity Loadout, and verifies their definition closures.
+It reports the selected Entry counts by definition family, placement and
+database binding counts, verified decoded definition bytes, event timeline
+availability and Build identity. The preflight returns before creating an
+export generation or hashing the Archive.
+
+```powershell
+$env:P4KX_ANIMATION_SCOPE_PREFLIGHT = '1'
+cargo test --locked -p p4kx-media --test real_archive -- animation_scope_accounting::installed_animation_scopes_match_verified_source_and_placement_closures --ignored --exact --nocapture
+```
+
+Unset `P4KX_ANIMATION_SCOPE_PREFLIGHT` to run the same command for publication
+verification. Set the process temporary directory to the approved scratch
+location. At least one scope must have an authored event database with
+timelines. The Entity scope must produce a verified clip-contributor tied to
+an ADB binding. The witness reports verified contributor counts for both
+scopes, the Entity count tied to an ADB binding and the Build identity.
+The fixture excludes PAK and SOCPAK traversal and limits counted artifact
+writes to the real-Archive
 test allowance for each generation. The index and field-origin companion streams
 are outside that allowance. Each generation is removed after inspection. The
 exporter hashes the root Archive for each generation. The witness shares Assembly
@@ -889,10 +907,17 @@ For XML Loadouts it also matches placement fields to the physical port, class
 and Include attributes and checks their direct encryption markers.
 For Mannequin it checks the positioned root and attachment selectors against
 the original DataForge components and reconciles the reachable ADB documents.
-Omitting both selectors skips the fixture without an installed scope receipt.
+With preflight unset, omitting both selectors skips the fixture.
+
+The Assembly witness can obtain the root model selector from the same exact
+`P4KX_ANIMATION_SCOPE_ENTITY`. In preflight mode, set
+`P4KX_ANIMATION_SCOPE_MODEL_OUT` to a new absolute file in the task's scratch
+directory. The verifier checks the Archive, Loadout and model and writes one
+private selector line for `P4KX_ANIMATION_SCOPE_MODEL`. In regular mode the
+same test checks the animated GLB in memory and requires positive clip counts.
 
 ```powershell
-cargo test -p p4kx-media --test real_archive installed_animation_scopes_match_verified_source_and_placement_closures -- --ignored --nocapture
+cargo test -p p4kx-assembly --test real_archive -- real_creature_animations::selected_creature_writes_an_observed_animated_glb --ignored --exact --nocapture
 ```
 
 The `graph-node` and `graph-attribute` rows identify Mannequin fragment

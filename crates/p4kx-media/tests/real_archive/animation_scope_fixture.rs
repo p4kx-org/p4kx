@@ -56,7 +56,8 @@ fn synthetic_animation_scope_witness_checks_model_and_entity_publications() -> T
                 "the original scope independently reaches {target}"
             );
         }
-        if matches!(selection, Selection::Entity(_)) {
+        let entity = matches!(selection, Selection::Entity(_));
+        if entity {
             verify_entity_fixture(&expected)?;
         }
         let blend_entry = expected
@@ -69,9 +70,14 @@ fn synthetic_animation_scope_witness_checks_model_and_entity_publications() -> T
         let placements = expected.placements.len();
         let matches = verify(&archive, build, &selection, expected)?;
         assert_eq!(
-            matches.get(&blend_entry),
+            matches.blend_matches.get(&blend_entry),
             Some(&placements),
             "each placement in the model or Entity scope joins the reachable BlendSpace example"
+        );
+        assert_eq!(
+            matches.database_matches,
+            if entity { 6 } else { 0 },
+            "the two authored ADB clip occurrences join on each of the three Entity placements"
         );
     }
     watch.check()?;

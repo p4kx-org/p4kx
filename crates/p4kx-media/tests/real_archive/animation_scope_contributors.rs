@@ -89,6 +89,13 @@ struct Join {
     basis: String,
 }
 
+#[derive(Default)]
+pub(super) struct Verified {
+    pub(super) total: usize,
+    pub(super) database_matches: usize,
+    pub(super) blend_matches: BTreeMap<usize, usize>,
+}
+
 impl Joins {
     pub(super) fn observe(&mut self, row: &MediaRecord) -> TestResult {
         let value = row.data.get("payload").unwrap_or(&Value::Null);
@@ -210,11 +217,11 @@ impl Joins {
         Ok(())
     }
 
-    pub(super) fn verify(&self, placements: &[Placement]) -> TestResult<BTreeMap<usize, usize>> {
+    pub(super) fn verify(&self, placements: &[Placement]) -> TestResult<Verified> {
         let mut sequences = BTreeMap::new();
         let mut databases = BTreeMap::new();
         let mut scopes = BTreeMap::new();
-        let mut blend_matches = BTreeMap::new();
+        let mut verified = Verified::default();
         for join in &self.rows {
             let sequence = sequences.entry(join.placement).or_insert(0);
             require(
@@ -235,11 +242,14 @@ impl Joins {
             )?;
             self.verify_binding(join, placement, spaces, &mut databases)?;
             self.verify_match(join)?;
-            if join.binding.is_none() {
-                *blend_matches.entry(join.clip.entry).or_default() += 1;
+            verified.total += 1;
+            if join.binding.is_some() {
+                verified.database_matches += 1;
+            } else {
+                *verified.blend_matches.entry(join.clip.entry).or_default() += 1;
             }
         }
-        Ok(blend_matches)
+        Ok(verified)
     }
 
     fn rig(&self, root: usize) -> (BTreeSet<usize>, BTreeSet<usize>) {
