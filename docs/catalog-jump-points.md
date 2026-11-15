@@ -53,3 +53,25 @@ dependencies of the placement. Competing source candidates record invalid resolu
 grammar. Unresolved source coverage makes it unavailable. Both states currently carry
 empty rows. The inspected grammar establishes endpoint facts, while route pairing needs
 an authored target relation and direction.
+
+## Installed LIVE survey
+
+The survey of LIVE build 13165946 read 5,060 original container descriptors reachable from
+the three system roots. A second traversal covered 216 additional physical descriptors,
+starting from the 180 remaining system-container paths and following their authored
+references. It also inspected all 118,499 DataForge Record bodies and the original main,
+metadata and editor XML for the six marked gates.
+
+The reachable graph had eight endpoint declarations. All eight local container targets
+resolved to a unique physical Entry. The original XML attributes and element texts
+supplied no cross-system partner or travel direction. The 14 DataForge references to
+recognized endpoint Records occurred in the Starmap parent hierarchy and the mission
+location exclusion list. There was no additional endpoint declaration in the
+supplemental descriptors.
+
+The survey records its coverage gaps separately. Three reachable and 26 supplemental
+references had no matching external container Entry. The DataForge pass recorded 1,042
+unreadable values, with none in the relation-named fields of the selected Record
+families. The finding applies to the inspected LIVE sources. No connections are
+projected from them. If the placement traversal skips a route, both jump tables report
+unavailable coverage and retain any endpoint rows already read.

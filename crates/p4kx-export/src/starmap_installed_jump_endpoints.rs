@@ -20,6 +20,9 @@ use crate::starmap_parse::{Body, Level};
 use crate::starmap_walk::System;
 use crate::{CatalogError, CatalogOptions};
 
+#[path = "starmap_installed_jump_survey.rs"]
+mod survey;
+
 const COMPONENT: &str = "SJumpPointParams";
 
 #[test]

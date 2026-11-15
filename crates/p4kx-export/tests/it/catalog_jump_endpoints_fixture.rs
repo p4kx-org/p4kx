@@ -13,6 +13,9 @@ use super::{ANOMALY, ANOMALY_TYPE, JUMP_TYPE, LIVE, LOCAL, LOGICAL, OWNER};
 use crate::commodity_v3_fixture::{self as common, TestResult};
 use crate::starmap_fixture;
 
+const SYSTEM: &str = r"Data\ObjectContainers\PU\system\syn\synsystem.socpak";
+const LONG_CHAIN_CONTAINERS: usize = 33;
+
 #[derive(Clone, Copy)]
 pub(super) enum Scenario {
     Operational,
@@ -20,6 +23,10 @@ pub(super) enum Scenario {
     BadCrc,
     DuplicateOuter,
     DuplicateMetadata,
+    ContainerCycle,
+    InvalidAncestorPose,
+    InvalidEndpointPose,
+    WalkDepth,
 }
 
 pub(super) fn build(filter: Option<&Filter>, scenario: Scenario) -> TestResult<Value> {
@@ -28,8 +35,8 @@ pub(super) fn build(filter: Option<&Filter>, scenario: Scenario) -> TestResult<V
     let archive = ArchiveBuilder::new()
         .entry(TestEntry::stored("Data/Game2.dcb", database().build()))
         .entry(TestEntry::stored(
-            r"Data\ObjectContainers\PU\system\syn\synsystem.socpak",
-            starmap_fixture::socpak("synsystem.xml", system().to_xml()),
+            SYSTEM,
+            starmap_fixture::socpak("synsystem.xml", system(scenario).to_xml()),
         ))
         .entry(gate("actual", true, scenario))
         .entry(gate("logical", false, scenario))
@@ -37,6 +44,11 @@ pub(super) fn build(filter: Option<&Filter>, scenario: Scenario) -> TestResult<V
         .entry(gate("untagged", false, scenario));
     let archive = if matches!(scenario, Scenario::DuplicateOuter) {
         archive.entry(gate("actual", true, Scenario::Operational))
+    } else {
+        archive
+    };
+    let archive = if matches!(scenario, Scenario::WalkDepth) {
+        with_long_chain(archive)
     } else {
         archive
     };
@@ -50,14 +62,59 @@ pub(super) fn build(filter: Option<&Filter>, scenario: Scenario) -> TestResult<V
     )?)
 }
 
-fn system() -> TestElement {
-    TestElement::new("ObjectContainer").child(starmap_fixture::children(vec![
+fn system(scenario: Scenario) -> TestElement {
+    let mut children = vec![
         child("actual", LIVE, "jumppoint_a_b"),
         child("actual", LIVE, "jumppoint_a_b_twice"),
         child("logical", LOGICAL, "jumppoint_b_a"),
         child("anomaly", ANOMALY, "marked_anomaly"),
         child("untagged", ANOMALY, "ordinary_anomaly"),
-    ]))
+    ];
+    match scenario {
+        Scenario::ContainerCycle => children.push(external_child(SYSTEM)),
+        Scenario::InvalidAncestorPose => {
+            children.push(TestElement::new("Child").attribute("pos", "invalid").child(
+                starmap_fixture::children(vec![child("actual", LIVE, "hidden")]),
+            ));
+        }
+        Scenario::InvalidEndpointPose => children.push(
+            TestElement::new("Child")
+                .attribute("pos", "invalid")
+                .attribute("starMapRecord", common::guid(LOGICAL)),
+        ),
+        Scenario::WalkDepth => {
+            children.push(external_child(&chain_path(0)));
+            children.push(external_child(&chain_path(LONG_CHAIN_CONTAINERS - 1)));
+        }
+        _ => {}
+    }
+    TestElement::new("ObjectContainer").child(starmap_fixture::children(children))
+}
+
+fn external_child(path: &str) -> TestElement {
+    TestElement::new("Child")
+        .attribute("external", "1")
+        .attribute("name", path)
+}
+
+fn chain_path(index: usize) -> String {
+    path_for(&format!("chain{index}"))
+}
+
+fn with_long_chain(archive: ArchiveBuilder) -> ArchiveBuilder {
+    (0..LONG_CHAIN_CONTAINERS).fold(archive, |archive, index| {
+        let mut xml = TestElement::new("ObjectContainer");
+        if index + 1 < LONG_CHAIN_CONTAINERS {
+            xml = xml.child(starmap_fixture::children(vec![external_child(
+                &chain_path(index + 1),
+            )]));
+        }
+        let descriptor = format!("chain{index}.xml");
+        archive.entry(TestEntry::stored(
+            chain_path(index),
+            starmap_fixture::socpak(&descriptor, xml.to_xml()),
+        ))
+    })
 }
 
 fn child(name: &str, record: u128, label: &str) -> TestElement {

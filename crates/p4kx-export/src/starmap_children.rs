@@ -46,16 +46,7 @@ impl<'a, 'read, 'capture, 'input, 'archive, 'cancel>
     /// Reads direct Child lists in source order, with the legacy wrapped-list fallback.
     pub(super) fn level(&mut self, node: Root<'_>, depth: usize) -> Result<Level, CatalogError> {
         let xml = self.xml;
-        let mut direct = node
-            .children()
-            .filter(|section| section.name().eq_ignore_ascii_case(CHILDREN))
-            .peekable();
-        let fallback = if direct.peek().is_none() {
-            first_below(node, CHILDREN)
-        } else {
-            None
-        };
-        let mut lists = direct.chain(fallback);
+        let mut lists = child_lists(node);
         let mut level = Level::default();
         if depth >= self.bounds.depth {
             level.capped = lists.any(|list| {
@@ -149,7 +140,20 @@ pub(super) fn source_loss(
     Ok(loss)
 }
 
-fn external(
+pub(super) fn child_lists(node: Root<'_>) -> impl Iterator<Item = Root<'_>> {
+    let mut direct = node
+        .children()
+        .filter(|section| section.name().eq_ignore_ascii_case(CHILDREN))
+        .peekable();
+    let fallback = if direct.peek().is_none() {
+        first_below(node, CHILDREN)
+    } else {
+        None
+    };
+    direct.chain(fallback)
+}
+
+pub(super) fn external(
     child: Root<'_>,
     node_name: &AuthoredEntryPath,
     xml: &EntryXml<'_, '_, '_>,

@@ -111,6 +111,18 @@ fn selected_xml<'archive>(
     container: &'archive Archive,
     socpak: &Entry,
 ) -> Result<(&'archive Entry, Option<String>), String> {
+    let named = named_descriptors(container, socpak)?.next();
+    let xml = match named {
+        Some(xml) => xml,
+        None => first_xml(container.entries())?,
+    };
+    Ok((xml, named.is_none().then(|| xml.path().to_owned())))
+}
+
+fn named_descriptors<'archive>(
+    container: &'archive Archive,
+    socpak: &Entry,
+) -> Result<impl Iterator<Item = &'archive Entry>, String> {
     let stem = key(socpak.path());
     let stem = stem
         .rsplit('\\')
@@ -118,15 +130,20 @@ fn selected_xml<'archive>(
         .and_then(|name| name.strip_suffix(SOCPAK))
         .ok_or("not a socpak name")?;
     let main = format!("{stem}.xml");
-    let named = container.entries().iter().find(|inner| {
+    Ok(container.entries().iter().filter(move |inner| {
         placement_xml_path(inner)
             .is_some_and(|path| path.rsplit('\\').next() == Some(main.as_str()))
-    });
-    let xml = match named {
-        Some(xml) => xml,
-        None => first_xml(container.entries())?,
-    };
-    Ok((xml, named.is_none().then(|| xml.path().to_owned())))
+    }))
+}
+
+#[cfg(test)]
+pub(crate) fn named_descriptor_count(
+    container: &Archive,
+    socpak: &Entry,
+) -> Result<usize, CatalogError> {
+    Ok(named_descriptors(container, socpak)
+        .map_err(|_| crate::ExportAccountingError::ConflictingSourceDatum)?
+        .count())
 }
 
 fn read_failure(xml: &Entry, error: EntryReadError) -> String {

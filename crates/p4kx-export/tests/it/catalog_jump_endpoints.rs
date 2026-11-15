@@ -67,6 +67,59 @@ fn jump_endpoint_occurrences_keep_same_position_and_do_not_pair_reversed_names()
 }
 
 #[test]
+fn skipped_routes_make_jump_inventory_unavailable_without_discarding_rows() -> TestResult {
+    let filter = Filter::new("jump_");
+    for (scenario, reason) in [
+        (Scenario::ContainerCycle, "cycle"),
+        (Scenario::InvalidAncestorPose, "invalid ancestor pose"),
+        (Scenario::WalkDepth, "walk depth only"),
+    ] {
+        let catalog = build(Some(&filter), scenario)?;
+        assert_eq!(
+            receipt::at(&catalog, "/placements/jumpEndpoints/availability")?,
+            "unavailable",
+            "{reason} leaves endpoint scope incomplete"
+        );
+        assert_eq!(
+            receipt::at(&catalog, "/projections/jumpConnections/availability")?,
+            "unavailable",
+            "{reason} cannot prove absence"
+        );
+        let endpoints = receipt::rows(&catalog, ROWS)?;
+        assert_eq!(endpoints.len(), 4, "{reason} keeps every admitted endpoint");
+        for row in endpoints {
+            receipt::cell(row, "declaredPartner", "absent")?;
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn invalid_terminal_pose_still_keeps_complete_partner_evidence() -> TestResult {
+    let catalog = build(Some(&Filter::new("jump_")), Scenario::InvalidEndpointPose)?;
+    let endpoints = receipt::rows(&catalog, ROWS)?;
+    let leaf = endpoints.last().ok_or("terminal endpoint")?;
+    assert_eq!(
+        endpoints.len(),
+        5,
+        "the invalid terminal transform does not omit its endpoint"
+    );
+    receipt::cell(leaf, "worldPosition", "invalid")?;
+    receipt::cell(leaf, "declaredPartner", "absent")?;
+    assert_eq!(
+        receipt::at(&catalog, "/placements/jumpEndpoints/availability")?,
+        "available",
+        "there is no skipped declaration below the terminal endpoint"
+    );
+    assert_eq!(
+        receipt::at(&catalog, "/projections/jumpConnections/availability")?,
+        "absent",
+        "the readable endpoint grammar may establish absence"
+    );
+    Ok(())
+}
+
+#[test]
 fn jump_endpoint_local_duplicates_and_failed_reads_remain_explicit() -> TestResult {
     let duplicated = build(Some(&Filter::new("jump_live")), Scenario::Duplicate)?;
     let first = live_row(&duplicated)?;

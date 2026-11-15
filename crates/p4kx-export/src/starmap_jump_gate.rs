@@ -23,6 +23,10 @@ use crate::{CatalogError, ExportAccountingError, Kind};
 #[path = "starmap_jump_gate_objects.rs"]
 mod objects;
 
+#[cfg(test)]
+#[path = "starmap_jump_gate_survey.rs"]
+pub(crate) mod survey;
+
 use super::jump_operating::{OperatingConfiguration, OperatingEntity, OperatingResolver};
 use objects::{entities, objects};
 
@@ -154,9 +158,7 @@ impl GateFiles<'_, '_> {
             });
         }
 
-        let stem = container_stem(self.outer)?;
-        let nested_meta = format!("{stem}\\{META_PATH}");
-        let editor_path = format!("{stem}_editor.xml");
+        let (nested_meta, editor_path) = self.member_paths()?;
         let (metadata, occurrences) = self.member(&[META_PATH, &nested_meta], ledger, |xml| {
             entities(xml, self.cancel)
         })?;
@@ -178,6 +180,11 @@ impl GateFiles<'_, '_> {
             entities,
             partner_inputs,
         })
+    }
+
+    fn member_paths(&self) -> Result<(String, String), CatalogError> {
+        let stem = container_stem(self.outer)?;
+        Ok((format!("{stem}\\{META_PATH}"), format!("{stem}_editor.xml")))
     }
 
     fn member<T>(

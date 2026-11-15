@@ -21,17 +21,14 @@ use crate::starmap_transform::Transform;
 use crate::starmap_xml::AuthoredPose;
 use crate::{CatalogError, ExportAccountingError, HealthText};
 
-/// The most lines the report keeps per star system of the containers read, and of the issues.
-const REPORT_LINES: usize = 300;
-
-/// The longest line the report keeps.
-const LINE_LEN: usize = 300;
-
 #[path = "starmap_walk_location.rs"]
 mod location;
 
 #[path = "starmap_walk_jump.rs"]
 mod jump;
+
+#[path = "starmap_walk_report.rs"]
+mod report;
 
 #[derive(Default)]
 pub(crate) struct SystemRead {
@@ -39,6 +36,7 @@ pub(crate) struct SystemRead {
     pub(crate) unreadable: usize,
     pub(crate) missing: usize,
     pub(crate) malformed: usize,
+    pub(crate) routes_incomplete: bool,
     pub(crate) named: usize,
     pub(crate) deepest: usize,
     pub(crate) report: StarmapReport,
@@ -184,20 +182,22 @@ impl<'a> System<'a> {
         Ok(system.read)
     }
 
-    /// Keeps `line` in the report of the issues while there is room.
-    fn issue(&mut self, line: &str) {
-        if self.read.report.issues.len() < REPORT_LINES {
-            self.read
-                .report
-                .issues
-                .push(line.chars().take(LINE_LEN).collect());
-        }
-    }
-
     /// Counts a Child, or a limit, that left objects without a position, and reports it.
     fn skipped(&mut self, line: &str) {
         self.read.malformed += 1;
         self.issue(line);
+    }
+
+    fn skip_route(&mut self, line: &str) {
+        self.read.routes_incomplete = true;
+        self.skipped(line);
+    }
+
+    const fn note_blocked_descendants(&mut self, child: &Child) {
+        self.read.routes_incomplete |= child.external.is_some()
+            || !child.below.children.is_empty()
+            || child.below.capped
+            || child.below.truncated;
     }
 
     /// Notes that the container at `entry`, `external` containers below the system container,
@@ -222,7 +222,7 @@ impl<'a> System<'a> {
             .get(entry)
             .map_or_else(String::new, |socpak| socpak.path().to_owned());
         if self.open.contains(&entry) {
-            self.skipped(&format!("{label}: names a container that is open above it"));
+            self.skip_route(&format!("{label}: names a container that is open above it"));
             return Ok(());
         }
         let bodies = self.bodies;
@@ -267,20 +267,6 @@ impl<'a> System<'a> {
         Ok(())
     }
 
-    fn report_placements(&mut self, before: [usize; 3], label: &str) {
-        if self.seen[1] > before[1] {
-            self.read.named += 1;
-            if self.read.report.containers.len() < REPORT_LINES {
-                self.read.report.containers.push(format!(
-                    "{label}: {} children, {} name a record, {} external",
-                    self.seen[0] - before[0],
-                    self.seen[1] - before[1],
-                    self.seen[2] - before[2]
-                ));
-            }
-        }
-    }
-
     fn children(
         &mut self,
         level: &Level,
@@ -290,13 +276,13 @@ impl<'a> System<'a> {
     ) -> Result<(), CatalogError> {
         if level.capped {
             let limit = self.limits.depth;
-            self.skipped(&format!("{label}: Children nested deeper than {limit}"));
+            self.skip_route(&format!("{label}: Children nested deeper than {limit}"));
             return Ok(());
         }
         for child in &level.children {
             if self.budget == 0 {
                 let limit = self.limits.children;
-                self.skipped(&format!("{label}: more than {limit} Children in a system"));
+                self.skip_route(&format!("{label}: more than {limit} Children in a system"));
                 return Ok(());
             }
             self.budget -= 1;
@@ -306,6 +292,7 @@ impl<'a> System<'a> {
                 Pose::Malformed { pos, rot, entity } => {
                     let occurrence = parent.child(child, None, parent.transform);
                     self.record_jump(child, &occurrence, file, None)?;
+                    self.note_blocked_descendants(child);
                     self.skipped(&format!(
                         "{label}: malformed pos {pos} rot {rot} of {entity}"
                     ));
@@ -318,6 +305,7 @@ impl<'a> System<'a> {
             let sane = world.is_sane();
             self.record_jump(child, &child_path, file, sane.then_some(world))?;
             if !sane {
+                self.note_blocked_descendants(child);
                 self.skipped(&format!(
                     "{label}: out of range: pos {:?} places {:?} of {}",
                     local.position,
@@ -335,7 +323,7 @@ impl<'a> System<'a> {
         }
         if level.truncated {
             let limit = self.limits.children;
-            self.skipped(&format!(
+            self.skip_route(&format!(
                 "{label}: more than {limit} Children in the containers of the Archive"
             ));
         }
@@ -352,7 +340,7 @@ impl<'a> System<'a> {
         let declared = path.as_str();
         if parent.external >= self.limits.external {
             let limit = self.limits.external;
-            self.skipped(&format!(
+            self.skip_route(&format!(
                 "{label}: external containers nested deeper than {limit}: {}",
                 clip(declared)
             ));

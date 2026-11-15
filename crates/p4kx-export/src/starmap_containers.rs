@@ -273,16 +273,16 @@ impl Placements {
         if cancel.is_some_and(CancelToken::is_cancelled) {
             return Err(CatalogError::Cancelled);
         }
+        let endpoint_scope_complete = !ledger
+            .incomplete_inventories
+            .contains(&crate::Kind::StarmapObjects)
+            && read.iter().all(|system| !system.routes_incomplete);
         let mut placements = Self {
             ledger,
             ..Self::default()
         };
-        let endpoint_reads_complete = !placements
-            .ledger
-            .incomplete_inventories
-            .contains(&crate::Kind::StarmapObjects);
         placements.finish(&index, systems.len(), read, scope);
-        placements.endpoint_inventory_complete = endpoint_reads_complete
+        placements.endpoint_inventory_complete = endpoint_scope_complete
             && endpoints.is_some_and(|records| records.complete)
             && placements.counts.unreadable == 0
             && placements.counts.missing == 0;
