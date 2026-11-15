@@ -17,7 +17,7 @@ impl System<'_> {
         file: &ContainerFile,
     ) -> Result<(), CatalogError> {
         let instance = ContainerOccurrence {
-            system: &self.name,
+            system: &self.name_cell,
             root_entry: self.root_entry,
             root_inputs: &self.root,
             route: path.route.as_deref(),

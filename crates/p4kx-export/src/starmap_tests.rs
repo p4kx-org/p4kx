@@ -12,6 +12,9 @@ use crate::starmap_parse::read_all;
 
 const FOLDER: &str = "Data\\ObjectContainers\\PU\\system\\t\\";
 
+#[path = "starmap_placement_storage_tests.rs"]
+mod placement_storage;
+
 fn guid(value: u128) -> Guid {
     let text = format!("{value:032x}");
     format!(

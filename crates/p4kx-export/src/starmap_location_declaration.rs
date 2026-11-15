@@ -20,7 +20,7 @@ const LOCATION_TYPE: &str = "locationType";
 const METADATA: &str = "InstanceMetadata";
 
 /// The authored fields and component declarations of a typed location Child.
-#[derive(Clone, Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct ChildLocation {
@@ -49,7 +49,7 @@ impl ChildLocation {
         xml: &EntryXml<'_, '_, '_>,
         child: Root<'_>,
         capture: &EntryCapture<'_>,
-    ) -> Result<Option<Box<Self>>, CatalogError> {
+    ) -> Result<Option<Self>, CatalogError> {
         if attribute(child, LOCATION_TYPE).is_none() {
             return Ok(None);
         }
@@ -66,7 +66,7 @@ impl ChildLocation {
         let class_guid = fields.typed("classGuid", parse_guid)?;
         let has_hierarchical_context_data = fields.typed("hasHierarchicalContextData", boolean)?;
         let tags = fields.tags()?;
-        Ok(Some(Box::new(Self {
+        Ok(Some(Self {
             location_type,
             streaming_root,
             guid,
@@ -81,7 +81,7 @@ impl ChildLocation {
             ent_xml: None,
             instance_metadata: read_metadata(xml, child, capture)?,
             invalid_attributes: fields.invalid_attributes,
-        })))
+        }))
     }
 
     pub(crate) fn request_entity(

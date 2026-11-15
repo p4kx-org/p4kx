@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::sync::Arc;
+
 use p4kx_extraction::{SourceUse, SourceUseRole, SourceValue, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -28,10 +30,16 @@ pub(crate) struct LocationInstance {
     local_rotation: SourcedValue<[f64; 4]>,
     world_position: SourcedValue<[f64; 3]>,
     world_rotation: SourcedValue<[f64; 4]>,
-    declaration: ChildLocation,
+    #[serde(serialize_with = "ChildLocation::serialize")]
+    #[schemars(with = "ChildLocation")]
+    declaration: Arc<ChildLocation>,
 }
 
 impl LocationInstance {
+    #[cfg(test)]
+    pub(crate) const fn declaration_for_test(&self) -> &Arc<ChildLocation> {
+        &self.declaration
+    }
     #[cfg(test)]
     pub(crate) fn matches_route(&self, root: u32, parent: &[u32], child: u32) -> bool {
         self.instance_id
@@ -53,7 +61,7 @@ pub(crate) struct LocationOccurrence<'route> {
 impl LocationOccurrence<'_> {
     pub(crate) fn project(
         self,
-        location: &ChildLocation,
+        location: &Arc<ChildLocation>,
         file: &ContainerFile,
         capture: &EntryCapture<'_>,
     ) -> Result<LocationInstance, CatalogError> {
@@ -108,7 +116,7 @@ impl LocationOccurrence<'_> {
                 &world_rotations,
                 true,
             )?,
-            declaration: location.clone(),
+            declaration: Arc::clone(location),
         })
     }
 }

@@ -6,7 +6,6 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::proof::{ChildNames, PlacementStep};
-use crate::CatalogError;
 use crate::catalog_read::original::{
     AuthoredEntryPath, EntryCapture, EntryXml, PhysicalEntryRef, XmlNodeSource,
 };
@@ -14,11 +13,12 @@ use crate::schema_fields::every_field_required;
 use crate::starmap::millimetres;
 use crate::starmap_transform::Transform;
 use crate::starmap_xml::AuthoredPose;
+use crate::{CatalogError, HealthText};
 
 /// The physical file selected and read by the container XML parser.
 pub(crate) struct ContainerFile {
     reference: SourcedValue<PhysicalEntryRef>,
-    path: SourcedValue<String>,
+    path: SourcedValue<HealthText>,
     root: XmlNodeSource,
 }
 
@@ -35,10 +35,7 @@ impl ContainerFile {
         let sources = capture.source_uses();
         Ok(Self {
             reference: receipt.physical_reference(capture)?.into_cell(sources),
-            path: receipt
-                .physical_path()?
-                .into_cell(sources)
-                .map(|value| value.as_str().to_owned()),
+            path: receipt.physical_path()?.into_cell(sources),
             root: xml.node_source(xml.root())?,
         })
     }
@@ -46,7 +43,7 @@ impl ContainerFile {
 
 /// A route to a single physical container occurrence within one system.
 pub(crate) struct ContainerOccurrence<'route> {
-    pub(crate) system: &'route str,
+    pub(crate) system: &'route SourcedValue<HealthText>,
     pub(crate) root_entry: u32,
     pub(crate) root_inputs: &'route [SourceUse],
     pub(crate) route: Option<&'route PlacementStep>,
@@ -95,9 +92,12 @@ pub(crate) struct ContainerInstance {
     instance_id: SourcedValue<ContainerInstanceKey>,
     parent_instance_id: SourcedValue<ContainerInstanceKey>,
     container: SourcedValue<PhysicalEntryRef>,
-    system: SourcedValue<String>,
-    source_path: SourcedValue<String>,
-    declared_path: SourcedValue<String>,
+    #[schemars(with = "SourcedValue<String>")]
+    system: SourcedValue<HealthText>,
+    #[schemars(with = "SourcedValue<String>")]
+    source_path: SourcedValue<HealthText>,
+    #[schemars(with = "SourcedValue<String>")]
+    declared_path: SourcedValue<HealthText>,
     #[schemars(extend("x-gameText" = true))]
     declared_label: SourcedValue<String>,
     declared_entity_name: SourcedValue<String>,
@@ -110,7 +110,11 @@ pub(crate) struct ContainerInstance {
 #[cfg(test)]
 impl ContainerInstance {
     pub(crate) fn source_path_for_test(&self) -> Option<&str> {
-        self.source_path.value().map(String::as_str)
+        self.source_path.value().map(HealthText::as_str)
+    }
+
+    pub(crate) const fn text_cells_for_test(&self) -> [&SourcedValue<HealthText>; 3] {
+        [&self.system, &self.source_path, &self.declared_path]
     }
 }
 
@@ -126,10 +130,7 @@ impl ContainerOccurrence<'_> {
         let local_pos = self.local.and_then(|pose| pose.position);
         let local_rot = self.local.and_then(|pose| pose.rotation);
         let declared_path = match self.declared {
-            Some(path) => path
-                .retain_in(capture)?
-                .into_cell(sources)
-                .map(|value| value.as_str().to_owned()),
+            Some(path) => path.retain_in(capture)?.into_cell(sources),
             None => sources.value(SourceValue::Absent, &inputs, complete),
         };
         let parent = self
@@ -155,11 +156,7 @@ impl ContainerOccurrence<'_> {
                 true,
             )?,
             container: file.reference.clone(),
-            system: sources.value(
-                SourceValue::Present(self.system.to_owned()),
-                self.root_inputs,
-                true,
-            ),
+            system: self.system.clone(),
             source_path: file.path.clone(),
             declared_path,
             declared_label: names.label,

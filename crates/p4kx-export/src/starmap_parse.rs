@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use p4kx_extraction::{Archive, CancelToken, Guid, SourceUses};
+use p4kx_extraction::{Archive, CancelToken, Guid};
 use rayon::prelude::*;
 
 use crate::catalog_read::original::{AuthoredEntryPath, EntryCapture, EntryRead, EntryXml};
@@ -49,7 +49,7 @@ pub(crate) struct Child {
     /// The path of the external container the Child names.
     pub(crate) external: Option<AuthoredEntryPath>,
     pub(crate) origins: Option<Arc<ChildOrigins>>,
-    pub(crate) location: Option<Box<ChildLocation>>,
+    pub(crate) location: Option<Arc<ChildLocation>>,
     pub(crate) below: Level,
 }
 
@@ -158,7 +158,7 @@ fn parse_body(
         );
         return Ok(Body::Unparsed);
     };
-    let loss = source_loss(&mut root, &entities, capture.source_uses());
+    let loss = children::source_loss(&mut root, &entities, capture.source_uses())?;
     if loss.inventory {
         ledger.incomplete_inventory(Kind::StarmapObjects);
     }
@@ -230,28 +230,6 @@ fn parsed_root(
         gate_proof,
     }))
 }
-struct SourceLoss {
-    projection: bool,
-    inventory: bool,
-}
-
-fn source_loss(level: &mut Level, entities: &entxml::EntXmlIndex, uses: &SourceUses) -> SourceLoss {
-    let inventory = level.capped || level.truncated;
-    let mut loss = SourceLoss {
-        projection: inventory,
-        inventory,
-    };
-    for child in &mut level.children {
-        if let Some(location) = &mut child.location {
-            location.attach_entity(entities, uses);
-        }
-        let below = source_loss(&mut child.below, entities, uses);
-        loss.projection |= matches!(&child.pose, Pose::Malformed { .. }) || below.projection;
-        loss.inventory |= below.inventory;
-    }
-    loss
-}
-
 fn externals<'level>(level: &'level Level, out: &mut Vec<&'level AuthoredEntryPath>) {
     for child in &level.children {
         out.extend(child.external.as_ref());

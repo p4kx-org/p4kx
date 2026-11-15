@@ -5,16 +5,17 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use p4kx_assembly::is_external_child_value;
-use p4kx_extraction::Guid;
+use p4kx_extraction::{Guid, SourceUses};
 
+use super::entxml::EntXmlIndex;
 use super::{Bounds, CHILD, CHILDREN, Child, Level, Pose, hcd::HcdReader};
-use crate::CatalogError;
 use crate::catalog_read::original::{AuthoredEntryPath, EntryXml, XmlNodeSource};
 use crate::export_ledger::ExportLedger;
 use crate::starmap_containers::location_declaration::ChildLocation;
 use crate::starmap_containers::proof::ChildOrigins;
 use crate::starmap_report::clip;
 use crate::starmap_xml::{Node, Root, attribute, first_below, pose};
+use crate::{CatalogError, ExportAccountingError};
 
 pub(super) struct ChildReader<'a, 'read, 'capture, 'input, 'archive, 'cancel> {
     bounds: &'a Bounds<'cancel>,
@@ -114,10 +115,38 @@ impl<'a, 'read, 'capture, 'input, 'archive, 'cancel>
             record,
             external,
             origins,
-            location,
+            location: location.map(Arc::new),
             below,
         })
     }
+}
+
+pub(super) struct SourceLoss {
+    pub(super) projection: bool,
+    pub(super) inventory: bool,
+}
+
+pub(super) fn source_loss(
+    level: &mut Level,
+    entities: &EntXmlIndex,
+    uses: &SourceUses,
+) -> Result<SourceLoss, CatalogError> {
+    let inventory = level.capped || level.truncated;
+    let mut loss = SourceLoss {
+        projection: inventory,
+        inventory,
+    };
+    for child in &mut level.children {
+        if let Some(location) = &mut child.location {
+            Arc::get_mut(location)
+                .ok_or(ExportAccountingError::ConflictingSourceDatum)?
+                .attach_entity(entities, uses);
+        }
+        let below = source_loss(&mut child.below, entities, uses)?;
+        loss.projection |= matches!(&child.pose, Pose::Malformed { .. }) || below.projection;
+        loss.inventory |= below.inventory;
+    }
+    Ok(loss)
 }
 
 fn external(

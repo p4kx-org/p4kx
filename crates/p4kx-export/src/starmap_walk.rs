@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use p4kx_extraction::{Archive, CancelToken, Guid, SourceUse, SourceValue};
+use p4kx_extraction::{Archive, CancelToken, Guid, SourceUse, SourceValue, SourcedValue};
 
 use crate::catalog_read::original::{AuthoredEntryPath, EntryCapture};
 use crate::entry_source::EntrySource;
@@ -19,7 +19,7 @@ use crate::starmap_parse::{Body, Child, Level, Pose};
 use crate::starmap_report::{Placement, StarmapReport, clip};
 use crate::starmap_transform::Transform;
 use crate::starmap_xml::AuthoredPose;
-use crate::{CatalogError, ExportAccountingError};
+use crate::{CatalogError, ExportAccountingError, HealthText};
 
 /// The most lines the report keeps per star system of the containers read, and of the issues.
 const REPORT_LINES: usize = 300;
@@ -125,6 +125,7 @@ pub(crate) struct System<'a> {
     bodies: &'a HashMap<usize, Body>,
     cancel: Option<&'a CancelToken>,
     name: Arc<str>,
+    name_cell: SourcedValue<HealthText>,
     root: Arc<[SourceUse]>,
     root_entry: u32,
     capture: &'a EntryCapture<'a>,
@@ -165,6 +166,11 @@ impl<'a> System<'a> {
             bodies,
             cancel,
             name: Arc::clone(name),
+            name_cell: capture.source_uses().value(
+                SourceValue::Present(HealthText::new(name)),
+                directory.contributions().0,
+                true,
+            ),
             root: Arc::from(directory.contributions().0),
             root_entry: reference.entry_index,
             capture,
