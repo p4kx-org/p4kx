@@ -170,38 +170,34 @@ impl SourceRegistry {
         let mut path = String::new();
         let mut effective = SourceEncryptionState::Unencrypted;
         let mut metadata = effective;
-        let mut id = PhysicalSourceRef(String::new());
         let leaf = binding.ancestor_count();
         for (position, step) in steps.enumerate() {
             metadata = effective;
             if let Some(step) = step {
                 let _formatted = write!(path, ".{}", step.index());
-                let original = if position == leaf {
-                    Some(binding.clone())
-                } else {
-                    binding.ancestor(position)
-                };
+                let original = (position == leaf)
+                    .then(|| binding.clone())
+                    .or_else(|| binding.ancestor(position));
                 let existing = original
                     .as_ref()
                     .filter(|_| position != leaf || registration.may_reuse())
                     .and_then(|original| self.archive_prefix(input, original));
                 let was_indexed = existing.is_some();
-                let step_nonce;
-                if let Some((reference, prefix, chosen)) = existing {
-                    id = reference;
+                let (id, step_nonce) = if let Some((reference, prefix, chosen)) = existing {
                     ancestors = prefix;
                     pending.clear();
-                    step_nonce = chosen;
+                    (reference, chosen)
                 } else {
-                    step_nonce = if position == leaf {
+                    let step_nonce = if position == leaf {
                         nonce
                     } else {
                         self.ancestor_nonce(input, original.as_ref(), details, policy, nonce)
                     };
                     let key = step_nonce.key();
                     self.unknown_prefixes(input, &key, &mut pending, &mut ancestors);
-                    id = PhysicalSourceRef(format!("a{input}{key}{path}"));
-                }
+                    let id = PhysicalSourceRef::new(format!("a{input}{key}{path}"));
+                    (id, step_nonce)
+                };
                 let original = original.map(|original| ArchiveSourceBinding {
                     original,
                     nonce: step_nonce,
@@ -211,13 +207,16 @@ impl SourceRegistry {
                     self.index_archive_source(input, &id);
                 }
                 effective = effective.combine(SourceEncryptionState::of(step.encryption()));
-                ancestors.push(id.clone());
+                ancestors.push(id);
             } else {
                 let _formatted = write!(path, ".?{position}");
                 pending.push(path.clone());
                 effective = effective.combine(SourceEncryptionState::Unknown);
             }
         }
+        let id = ancestors
+            .pop()
+            .unwrap_or_else(|| PhysicalSourceRef::new(""));
         RegisteredSource {
             id,
             payload: effective,
@@ -233,7 +232,7 @@ impl SourceRegistry {
         ancestors: &mut Vec<PhysicalSourceRef>,
     ) {
         for prefix in pending.iter() {
-            let unknown = PhysicalSourceRef(format!("a{input}{key}{prefix}"));
+            let unknown = PhysicalSourceRef::new(format!("a{input}{key}{prefix}"));
             self.unknown(unknown.clone(), ancestors.clone());
             ancestors.push(unknown);
         }

@@ -15,7 +15,7 @@ fn compact_coordinates_distinguish_source_use_keys() {
     let locations = locations_with_distinct_coordinates();
     let mut observed = BTreeSet::new();
     for source in ["a0.1", "a0.1.2", "a0.12", ":1é", "é:", "🌑"] {
-        let source = PhysicalSourceRef(source.into());
+        let source = PhysicalSourceRef::new(source);
         for scope in [
             InputScope::Payload,
             InputScope::ArchiveDirectoryMetadata,

@@ -7,7 +7,7 @@ use p4kx_archive::{
     DeclaredEncryption, EncryptionDeclarationSource, EntryRecordFormat, SourceEncryption,
 };
 use schemars::{JsonSchema, Schema, SchemaGenerator};
-use serde::Serialize;
+use serde::{Serialize, Serializer};
 
 #[path = "source_inventory_rows.rs"]
 mod rows;
@@ -23,13 +23,25 @@ use crate::{ArchiveByteRange, DecimalU64};
 /// A document-local physical-source reference, without a machine address.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, JsonSchema)]
 #[serde(transparent)]
-pub struct PhysicalSourceRef(pub(crate) String);
+pub struct PhysicalSourceRef(
+    #[serde(serialize_with = "PhysicalSourceRef::serialize_text")]
+    #[schemars(with = "String")]
+    Arc<str>,
+);
 
 impl PhysicalSourceRef {
+    pub(crate) fn new(text: impl Into<Arc<str>>) -> Self {
+        Self(text.into())
+    }
+
     /// Returns the stable document-local reference text.
     #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+
+    fn serialize_text<S: Serializer>(text: &str, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(text)
     }
 }
 

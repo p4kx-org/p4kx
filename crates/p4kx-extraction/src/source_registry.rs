@@ -69,10 +69,10 @@ impl UseReferences {
         if matches!(self, Self::CompactCoordinates) {
             return source_use_ref_encoding::encode(source, scope, role, location);
         }
+        let source = source.as_str();
         let id = SourceUseRef::registered(format!(
-            "u{}:{}:{}:{}:{}",
-            source.0.len(),
-            source.0,
+            "u{}:{source}:{}:{}:{}",
+            source.len(),
             scope.key(),
             role.key(),
             location.key()
@@ -159,11 +159,14 @@ impl SourceRegistry {
             SourceInput::ArchiveView(observed) => self.archive_view(observed, details),
             SourceInput::ArchiveFile { input, byte_length } => {
                 let index = self.archive_input(input);
-                let id = PhysicalSourceRef(format!("a{index}:file"));
-                if !self.sources.contains_key(&id) {
+                let id = PhysicalSourceRef::new(format!("a{index}:file"));
+                let id = if let Some(source) = self.sources.get(&id) {
+                    source.id.clone()
+                } else {
                     let source = source_registration::archive_file(self, id.clone(), byte_length);
                     self.sources.insert(id.clone(), Arc::new(source));
-                }
+                    id
+                };
                 RegisteredSource {
                     id,
                     payload: SourceEncryptionState::Unknown,
@@ -174,7 +177,7 @@ impl SourceRegistry {
             SourceInput::File(origin) => self.file(FileInputRef::Observed(origin)),
             SourceInput::BuildManifest(origin) => self.file(FileInputRef::BuildManifest(origin)),
             SourceInput::Unknown => {
-                let id = PhysicalSourceRef(format!("u{}", self.sources.len()));
+                let id = PhysicalSourceRef::new(format!("u{}", self.sources.len()));
                 self.unknown(id.clone(), Vec::new());
                 RegisteredSource {
                     id,
@@ -191,19 +194,22 @@ impl SourceRegistry {
         admitted_entry_count: DecimalU64,
     ) -> PhysicalSourceRef {
         let input = self.archive_input(origin);
-        let id = PhysicalSourceRef(format!("a{input}:directory"));
-        self.sources.entry(id.clone()).or_insert_with(|| {
-            Arc::new(PhysicalSource {
-                id: id.clone(),
-                ancestors: Vec::new(),
-                stored_encryption: SourceEncryptionState::Unencrypted,
-                binding: None,
-                source: PhysicalSourceKind::ArchiveDirectory(ArchiveDirectorySource {
-                    admitted_entry_count,
-                }),
+        let id = PhysicalSourceRef::new(format!("a{input}:directory"));
+        self.sources
+            .entry(id.clone())
+            .or_insert_with(|| {
+                Arc::new(PhysicalSource {
+                    id,
+                    ancestors: Vec::new(),
+                    stored_encryption: SourceEncryptionState::Unencrypted,
+                    binding: None,
+                    source: PhysicalSourceKind::ArchiveDirectory(ArchiveDirectorySource {
+                        admitted_entry_count,
+                    }),
+                })
             })
-        });
-        id
+            .id
+            .clone()
     }
 
     pub(crate) fn archive_input(&mut self, origin: &ArchiveInputOrigin) -> usize {
@@ -222,11 +228,14 @@ impl SourceRegistry {
 
     fn file(&mut self, origin: FileInputRef<'_>) -> RegisteredSource {
         let index = self.file_input(origin);
-        let id = PhysicalSourceRef(format!("f{index}"));
-        if !self.sources.contains_key(&id) {
+        let id = PhysicalSourceRef::new(format!("f{index}"));
+        let id = if let Some(source) = self.sources.get(&id) {
+            source.id.clone()
+        } else {
             let source = source_registration::file(self, id.clone(), origin);
             self.sources.insert(id.clone(), Arc::new(source));
-        }
+            id
+        };
         RegisteredSource {
             id,
             payload: SourceEncryptionState::Unknown,

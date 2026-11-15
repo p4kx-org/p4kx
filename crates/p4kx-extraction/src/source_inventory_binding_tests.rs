@@ -9,11 +9,57 @@ use serde::Serialize;
 
 use super::SourceUses;
 use crate::{
-    Archive, InputScope, PhysicalSource, SourceInput, SourceInventory, SourceLocation,
-    SourceUseDescription, SourceUseRole, source_evidence_error,
+    Archive, InputScope, PhysicalSource, PhysicalSourceRef, SourceInput, SourceInventory,
+    SourceLocation, SourceUseDescription, SourceUseRole, source_evidence_error,
 };
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
+
+#[test]
+fn many_uses_share_the_physical_reference_and_keep_its_wire_string() -> TestResult {
+    let uses = SourceUses::with_compact_coordinates();
+    let scope = uses.observe(SourceInput::Unknown, InputScope::Payload)?;
+    for record_index in 0..64 {
+        scope.at(
+            SourceLocation::DataForge {
+                record_index,
+                field: "/value".into(),
+            },
+            SourceUseRole::Payload,
+        )?;
+    }
+    let inventory = uses.freeze()?;
+    assert_eq!(inventory.source_count(), 1, "one registered input");
+    assert_eq!(inventory.use_count(), 64, "all distinct coordinates remain");
+    let physical = inventory.iter_sources().next().ok_or("frozen input")?;
+    for used in inventory.iter_uses() {
+        assert!(
+            ptr::eq(used.source().as_str(), physical.id().as_str()),
+            "all uses share the physical identity's string allocation"
+        );
+    }
+    assert_eq!(
+        serde_json::to_string(physical.id())?,
+        "\"u0\"",
+        "the physical identity retains the transparent string wire format"
+    );
+    let schema = schemars::schema_for!(PhysicalSourceRef).to_value();
+    assert_eq!(
+        schema.get("type").and_then(serde_json::Value::as_str),
+        Some("string"),
+        "the physical source reference keeps its JSON schema type"
+    );
+    assert_eq!(
+        PhysicalSourceRef::new("u0"),
+        *physical.id(),
+        "text equality"
+    );
+    assert!(
+        PhysicalSourceRef::new("u10") < PhysicalSourceRef::new("u2"),
+        "lexical ordering"
+    );
+    Ok(())
+}
 
 #[test]
 fn attaching_original_binding_preserves_frozen_source_and_registered_use_rows() -> TestResult {
