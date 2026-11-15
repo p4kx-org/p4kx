@@ -10,6 +10,10 @@ use crate::options::CatalogRun;
 use crate::{BuiltCatalog, CatalogError, CatalogOptions, CatalogSummary};
 
 #[cfg(test)]
+#[path = "build_catalog_size_witness.rs"]
+mod size_witness;
+
+#[cfg(test)]
 #[path = "../tests/real_archive/real_archive_resource_oracles.rs"]
 mod resource_oracle;
 #[cfg(test)]

@@ -154,6 +154,14 @@ The test checks the source Build and Archive stamp, measures the same encoder wi
 and normal health policy, and discards the frame as it is written. Capture the exact producer
 revision and binary hash separately.
 
+The sink-only library witness also reports the channel, Build change number and producer
+phase on stderr. Use those events to align process memory samples with the producer stages.
+It reports the decoded and encoded sizes on stdout without creating a catalog file.
+
+```text
+cargo test --release --locked -p p4kx-export --lib -- build::api::size_witness::normal_catalog_size_phases_for_installed_pair --ignored --exact --nocapture
+```
+
 Set `P4KX_CATALOG_SECTION_CENSUS=1` for section sizes and provenance counts in the same run.
 The writer sends the finished Zstd stream through a bounded pipe. The reader checks the
 encoded and decoded lengths, counts rows in both provenance inventories, and reports the exact
