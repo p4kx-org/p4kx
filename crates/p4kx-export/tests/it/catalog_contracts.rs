@@ -32,6 +32,11 @@ use p4kx_export::{
 use p4kx_extraction::Archive;
 use serde_json::{Value, json};
 
+#[path = "catalog_contract_pickup_places.rs"]
+mod pickup_places;
+
+pub(crate) use pickup_places::places;
+
 #[path = "catalog_contract_scenarios.rs"]
 mod scenarios;
 #[path = "catalog_contract_success_rewards.rs"]
@@ -218,7 +223,11 @@ fn a_contract_without_a_template_takes_title_type_and_place_from_its_broker_entr
     assert_eq!(brokered["templateGuid"], Value::Null);
     assert_eq!(text(&catalog, brokered, "title")?.en, Some("Broker Haul"));
     assert_eq!(brokered["missionType"]["en"], "Delivery");
-    assert_eq!(places(brokered), [("Planet", "Hurston")]);
+    assert_eq!(
+        places(&catalog, &brokered["pickupPlaces"])?,
+        [("Planet", "Hurston")],
+        "broker location resolves its canonical name"
+    );
     Ok(())
 }
 
@@ -234,55 +243,6 @@ fn the_faction_of_the_handler_is_exported_as_stored() -> TestResult {
         })
     );
     assert_eq!(entry(&catalog, C, None)?["faction"], Value::Null);
-    Ok(())
-}
-
-fn places(entry: &Value) -> Vec<(&str, &str)> {
-    entry["pickupPlaces"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .map(|place| {
-            (
-                place["objectType"].as_str().unwrap_or_default(),
-                place
-                    .get("place")
-                    .and_then(|name| name.get("en"))
-                    .and_then(Value::as_str)
-                    .unwrap_or_default(),
-            )
-        })
-        .collect()
-}
-
-#[test]
-fn the_pickup_places_put_the_system_and_planets_first_and_keep_every_non_star() -> TestResult {
-    let (_, catalog) = build(None)?;
-    assert_eq!(
-        places(entry(&catalog, A, None)?),
-        [
-            ("SolarSystem", "Stanton"),
-            ("Planet", "Hurston"),
-            ("Station", "Everus"),
-        ],
-        "the star is skipped, the system comes first, then the planet, then the rest"
-    );
-    assert_eq!(
-        places(entry(&catalog, A, Some(SUB_ONE))?),
-        [("Planet", "Hurston")],
-        "a sub contract's own location replaces the contract's"
-    );
-    assert_eq!(
-        entry(&catalog, A, Some(SUB_TWO))?["pickupPlaces"],
-        entry(&catalog, A, None)?["pickupPlaces"],
-        "a sub contract without places takes the contract's"
-    );
-    assert_eq!(
-        places(entry(&catalog, B, None)?).len(),
-        7,
-        "every eligible original place"
-    );
-    assert_eq!(places(entry(&catalog, C, None)?), [], "none named");
     Ok(())
 }
 

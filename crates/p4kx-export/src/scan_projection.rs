@@ -94,20 +94,21 @@ impl<'f> Scan<'_, '_, 'f> {
         tree: &RecordTree<'f>,
         ledger: &mut ExportLedger,
     ) -> Result<Picked<'f>, ScanError> {
-        let object = starmap_object(
-            trees,
-            tree,
-            self.texts,
-            self.forge,
-            &self.types,
-            self.domain.placements,
-        );
         let (read, notes) = starmap_object_definition::read(
             tree,
             self.projection,
             admission,
             self.options.cancel,
-            object,
+            |name| {
+                starmap_object(
+                    trees,
+                    tree,
+                    name,
+                    self.forge,
+                    &self.types,
+                    self.domain.placements,
+                )
+            },
         )?;
         crate::source_projection_notes::record(
             Kind::StarmapObjects,

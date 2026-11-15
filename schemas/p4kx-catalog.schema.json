@@ -32720,8 +32720,15 @@
           ]
         },
         "place": {
-          "$ref": "#/$defs/LocalisedText",
-          "description": "The name of the place, as the starmap object states it.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourcedValueOfGameTextRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The selected starmap object's canonical name cell, or null if the object is unavailable.",
           "x-gameText": true
         },
         "starmapObjectGuid": {

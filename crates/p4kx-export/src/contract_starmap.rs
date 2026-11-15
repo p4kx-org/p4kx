@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use crate::contract::LocalisedText;
+use p4kx_extraction::SourcedValue;
+
+use crate::catalog_text_contract::GameTextRef;
 use crate::guid_text::CatalogGuid;
 use crate::starmap_containers::proof::PlacementEvidence;
 
@@ -11,7 +13,7 @@ pub(crate) struct StarmapObject<'source> {
     pub(crate) guid: CatalogGuid,
     pub(crate) record_index: u32,
     pub(crate) class_name: &'source str,
-    pub(crate) name: LocalisedText<'source>,
+    pub(crate) name: SourcedValue<GameTextRef>,
     pub(crate) r#type: Option<&'source str>,
     pub(crate) system: Option<String>,
     pub(crate) entity_name: Option<String>,

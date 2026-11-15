@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use serde_json::Value;
+
 use super::{Coverage, Oracle, TestResult, TextTarget};
 
 pub(super) struct CoverageCounters<'oracle> {
@@ -27,6 +29,11 @@ impl<'oracle> CoverageCounters<'oracle> {
     pub(super) fn count(&mut self, target: Option<&TextTarget<'_>>) -> TestResult<()> {
         self.oracles()
             .count(target, &mut self.english, &mut self.german)
+    }
+
+    pub(super) fn count_legacy(&mut self, key: &str, text: &Value) {
+        self.english.count(self.english_oracle, key, text.get("en"));
+        self.german.count(self.german_oracle, key, text.get("de"));
     }
 
     pub(super) fn count_supplemental(&mut self, target: Option<&TextTarget<'_>>) -> TestResult<()> {

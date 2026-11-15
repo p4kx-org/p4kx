@@ -139,7 +139,7 @@ fn places() -> Value {
     json!([{
         "starmapObjectGuid": "a2000000-0000-4000-8000-000000000001",
         "objectType": "Planet",
-        "place": {"key": "@Stanton1_Name", "en": "Hurston", "de": null}
+        "place": present(json!("text:14:@Stanton1_Name"))
     }])
 }
 

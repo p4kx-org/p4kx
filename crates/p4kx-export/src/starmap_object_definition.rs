@@ -36,7 +36,7 @@ pub(crate) fn read<'source>(
     projection: &CatalogProjection<'_, 'source>,
     admission: &RecordObservation<'_, 'source>,
     cancel: Option<&CancelToken>,
-    object: StarmapObject<'source>,
+    project_object: impl FnOnce(SourcedValue<GameTextRef>) -> StarmapObject<'source>,
 ) -> Result<(StarmapObjectRead<'source>, Vec<FieldError>), CatalogError> {
     if tree.type_name() != SOURCE_TYPE {
         return Err(ExportAccountingError::ConflictingSourceDatum.into());
@@ -48,6 +48,7 @@ pub(crate) fn read<'source>(
         cancel,
         StarmapObjectDefinition::read,
     )?;
+    let object = project_object(definition.definition().text.name.clone());
     Ok((StarmapObjectRead { definition, object }, notes))
 }
 

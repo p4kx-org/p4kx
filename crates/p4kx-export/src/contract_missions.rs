@@ -5,6 +5,7 @@ use p4kx_extraction::SourcedValue;
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use crate::catalog_text_contract::GameTextRef;
 use crate::contract::{LocalisedText, every_field_required};
 use crate::contract_facts::{ContractFacts, RequiredIntro};
 use crate::contract_hauling::HaulingOrder;
@@ -200,9 +201,9 @@ pub(crate) struct PickupPlace<'a> {
     pub(crate) starmap_object_guid: CatalogGuid,
     /// The type of the starmap object, e.g. `Planet`.
     pub(crate) object_type: Option<&'a str>,
-    /// The name of the place, as the starmap object states it.
+    /// The selected starmap object's canonical name cell, or null if the object is unavailable.
     #[schemars(extend("x-gameText" = true))]
-    pub(crate) place: LocalisedText<'a>,
+    pub(crate) place: Option<SourcedValue<GameTextRef>>,
 }
 
 /// One reputation amount a contract grants on success.

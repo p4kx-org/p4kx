@@ -5,7 +5,6 @@ use std::collections::{HashMap, HashSet};
 
 use p4kx_extraction::{Guid, StructValue};
 
-use crate::contract::LocalisedText;
 use crate::contract_missions::PickupPlace;
 use crate::contract_offer::OfferedAt;
 use crate::contract_starmap::StarmapObject;
@@ -188,10 +187,6 @@ fn describe<'f>(guid: Guid, object: Option<&StarmapObject<'f>>) -> PickupPlace<'
     PickupPlace {
         starmap_object_guid: CatalogGuid(guid),
         object_type: object.and_then(|object| object.r#type),
-        place: object.map_or_else(LocalisedText::default, |object| LocalisedText {
-            key: object.name.key,
-            en: object.name.en.clone(),
-            de: object.name.de.clone(),
-        }),
+        place: object.map(|object| object.name.clone()),
     }
 }

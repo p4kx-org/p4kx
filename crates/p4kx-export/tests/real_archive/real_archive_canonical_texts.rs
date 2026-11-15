@@ -12,6 +12,9 @@ use crate::real_archive_contract_templates::mission_graph::{self as graph, Famil
 use crate::real_archive_text_oracle::Oracle;
 use crate::real_archive_texts::{Coverage, keyed_texts};
 
+#[path = "real_archive_contract_place_texts.rs"]
+mod contract_places;
+
 #[path = "real_archive_canonical_extra_texts.rs"]
 mod extras;
 
@@ -231,58 +234,54 @@ pub(crate) fn kind_coverage(
     english_oracle: &Oracle,
     german_oracle: &Oracle,
 ) -> TestResult<(Coverage, Coverage)> {
-    let mission_family = match kind {
-        Kind::ContractTemplates => Some(Family::Template),
-        Kind::MissionBrokerEntries => Some(Family::Broker),
-        _ => None,
-    };
-    if let Some(family) = mission_family {
-        return mission_coverage(catalog, family, english_oracle, german_oracle);
-    }
-    if matches!(
-        kind,
-        Kind::Manufacturers
-            | Kind::Ships
-            | Kind::Commodities
-            | Kind::ResourceTypes
-            | Kind::ResourceGroups
-            | Kind::GameplayProperties
-            | Kind::Blueprints
-            | Kind::FactionReputations
-            | Kind::ReputationScopes
-            | Kind::ReputationStandings
-            | Kind::StarmapObjects
-            | Kind::MissionTypes
-            | Kind::RefiningProcesses
-            | Kind::MineableCompositions
-    ) {
-        return canonical_coverage(catalog, kind, english_oracle, german_oracle);
-    }
     match kind {
+        Kind::ContractTemplates => {
+            mission_coverage(catalog, Family::Template, english_oracle, german_oracle)
+        }
+        Kind::MissionBrokerEntries => {
+            mission_coverage(catalog, Family::Broker, english_oracle, german_oracle)
+        }
+        Kind::Manufacturers
+        | Kind::Ships
+        | Kind::Commodities
+        | Kind::ResourceTypes
+        | Kind::ResourceGroups
+        | Kind::GameplayProperties
+        | Kind::Blueprints
+        | Kind::FactionReputations
+        | Kind::ReputationScopes
+        | Kind::ReputationStandings
+        | Kind::StarmapObjects
+        | Kind::MissionTypes
+        | Kind::RefiningProcesses
+        | Kind::MineableCompositions => {
+            canonical_coverage(catalog, kind, english_oracle, german_oracle)
+        }
         Kind::MissionLocationTemplates => {
-            return extras::location_templates(catalog, english_oracle, german_oracle);
+            extras::location_templates(catalog, english_oracle, german_oracle)
         }
-        Kind::ContractNpcSpawns => {
-            return extras::npc_names(catalog, english_oracle, german_oracle);
+        Kind::ContractNpcSpawns => extras::npc_names(catalog, english_oracle, german_oracle),
+        Kind::Items => {
+            let mut counters = CoverageCounters::new(english_oracle, german_oracle);
+            extras::items(catalog, &mut counters)?;
+            Ok(counters.finish())
         }
-        _ => {}
+        _ => {
+            let mut counters = CoverageCounters::new(english_oracle, german_oracle);
+            let rows = catalog_v3_consumer::rows(catalog, kind)?;
+            if kind == Kind::Contracts && !rows.is_empty() {
+                contract_places::count(catalog, rows, &mut counters)?;
+            }
+            let mut found = Vec::new();
+            for row in rows {
+                keyed_texts(row, fields, &mut found);
+            }
+            for (key, text) in found {
+                counters.count_legacy(key, text);
+            }
+            Ok(counters.finish())
+        }
     }
-    if kind == Kind::Items {
-        let mut counters = CoverageCounters::new(english_oracle, german_oracle);
-        extras::items(catalog, &mut counters)?;
-        return Ok(counters.finish());
-    }
-    let (mut english, mut german) = (Coverage::default(), Coverage::default());
-    let mut found = Vec::new();
-    for row in catalog_v3_consumer::rows(catalog, kind)? {
-        keyed_texts(row, fields, &mut found);
-    }
-    for (key, text) in found {
-        english.count(english_oracle, key, text.get("en"));
-        german.count(german_oracle, key, text.get("de"));
-    }
-
-    Ok((english, german))
 }
 
 fn mission_coverage(

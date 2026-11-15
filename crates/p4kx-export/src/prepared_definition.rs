@@ -61,6 +61,11 @@ impl<'source, T> PreparedDefinition<'source, T> {
         ))
     }
 
+    /// Borrows the canonical definition used by dependent projections.
+    pub(super) const fn definition(&self) -> &T {
+        &self.definition
+    }
+
     pub(super) fn order(rows: &mut [Self]) {
         rows.sort_by_cached_key(|row| (CatalogGuid(row.guid).text(), row.index));
     }

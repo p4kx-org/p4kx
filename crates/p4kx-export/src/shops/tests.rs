@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 
-use p4kx_extraction::Guid;
+use p4kx_extraction::{Guid, SourceUses, SourceValue};
 
 use super::{RegistryShop, ShopSummary, list};
 use crate::contract::StarmapObject;
@@ -20,7 +20,7 @@ fn object(id: u8, class_name: &'static str, entity_name: Option<&str>) -> Starma
         guid: CatalogGuid(Guid::from_stored([id; 16])),
         record_index: u32::from(id),
         class_name,
-        name: crate::contract::LocalisedText::default(),
+        name: SourceUses::new().value(SourceValue::Absent, &[], true),
         r#type: None,
         system: None,
         entity_name: entity_name.map(str::to_owned),
