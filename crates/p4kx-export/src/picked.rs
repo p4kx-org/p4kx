@@ -31,7 +31,7 @@ use crate::crafting_warning::CraftingWarning;
 use crate::item_class::ClassLine;
 use crate::loot_kinds::LootPick;
 use crate::manufacturer::Manufacturer;
-use crate::mining::{mineable_composition, mineable_element, refining_process};
+use crate::mining::mineable_element;
 use crate::mining_params::mining_global_params;
 use crate::mission_kinds::MissionPick;
 use crate::paint_port::VehicleFacts;
@@ -129,8 +129,6 @@ impl<'f> Picked<'f> {
         Some(match kind {
             Kind::Crafters => return crafter(tree).map(Self::Crafter),
             Kind::MineableElements => Self::Mineable(mineable_element(tree)),
-            Kind::RefiningProcesses => Self::Refining(refining_process(tree, texts)),
-            Kind::MineableCompositions => Self::Composition(mineable_composition(tree, texts)),
             Kind::MiningGlobalParams => Self::MiningParams(mining_global_params(tree)),
             Kind::MissionTypes
             | Kind::MissionLocalities
@@ -145,6 +143,8 @@ impl<'f> Picked<'f> {
                 return LootPick::entity(kind, tree).map(Self::Loot);
             }
             Kind::Items
+            | Kind::RefiningProcesses
+            | Kind::MineableCompositions
             | Kind::LootPoolFilters
             | Kind::LootSecondaryChoiceSingleLayers
             | Kind::LootSecondaryChoiceMultiLayers

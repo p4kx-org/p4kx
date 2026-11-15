@@ -139,18 +139,30 @@ fn a_mineable_element_carries_the_plain_facts_of_its_record() -> TestResult {
 #[test]
 fn a_refining_process_carries_its_name_speed_and_quality() -> TestResult {
     let (built, catalog) = build(None)?;
+    let mut rows = catalog["refiningProcesses"].clone();
+    let Some([slow, fast]) = rows.as_array_mut().map(Vec::as_mut_slice) else {
+        return Err("two selected refining processes".into());
+    };
+    for (row, key, english) in [
+        (slow, "@refinery_ui_ProcessingType_SlowWasteful", None),
+        (
+            fast,
+            "@refinery_ui_ProcessingType_FastCareful",
+            Some("Fast, Careful"),
+        ),
+    ] {
+        verify_name(&catalog, row, "processName", key, english)?;
+        row.as_object_mut()
+            .ok_or("refining process row")?
+            .remove("processName");
+    }
     assert_eq!(
-        catalog["refiningProcesses"],
+        rows,
         json!([
             {
                 "guid": guid(SLOW_WASTEFUL),
                 "className": "processingtype-slowwasteful",
                 "recordPath": "libs/foundry/records/refiningprocess/processingtype-slowwasteful",
-                "processName": {
-                    "key": "@refinery_ui_ProcessingType_SlowWasteful",
-                    "en": null,
-                    "de": null
-                },
                 "refiningSpeed": "Slow",
                 "refiningQuality": "Wasteful",
             },
@@ -158,11 +170,6 @@ fn a_refining_process_carries_its_name_speed_and_quality() -> TestResult {
                 "guid": guid(FAST_CAREFUL),
                 "className": "processingtype-fastcareful",
                 "recordPath": "libs/foundry/records/refiningprocess/processingtype-fastcareful",
-                "processName": {
-                    "key": "@refinery_ui_ProcessingType_FastCareful",
-                    "en": "Fast, Careful",
-                    "de": null
-                },
                 "refiningSpeed": "Fast",
                 "refiningQuality": "Careful",
             },
@@ -197,5 +204,37 @@ fn a_filter_marks_both_kinds_partial_and_selects_by_record_path() -> TestResult 
             "{kind}"
         );
     }
+    Ok(())
+}
+
+pub(super) fn verify_name(
+    catalog: &Value,
+    owner: &Value,
+    field: &str,
+    key: &str,
+    english: Option<&str>,
+) -> TestResult {
+    use crate::health_origin_assertions as proof;
+
+    let id = proof::at(owner, &format!("/{field}/value"))?;
+    proof::present(owner, field, id, Some(true))?;
+    let row = proof::rows(catalog, "/texts/gameTexts")?
+        .iter()
+        .find(|text| text.pointer("/id/value") == Some(id))
+        .ok_or("protected mining text target")?;
+    assert_eq!(
+        row.pointer("/key/value"),
+        Some(&json!(key)),
+        "the original mining text key"
+    );
+    assert_eq!(
+        row.pointer("/translations/value/en/displayText/value"),
+        Some(&json!(english)),
+        "English mining display text"
+    );
+    assert!(
+        row.pointer("/translations/value/de").is_none(),
+        "German was not loaded"
+    );
     Ok(())
 }

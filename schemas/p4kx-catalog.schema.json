@@ -28248,7 +28248,7 @@
           "type": "string"
         },
         "depositName": {
-          "$ref": "#/$defs/LocalisedText",
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
           "description": "The HUD label of the deposit, from `depositName`. The localisation key and the texts are\ngame texts.",
           "x-gameText": true
         },
@@ -36979,7 +36979,7 @@
           "description": "The GUID of the Record."
         },
         "processName": {
-          "$ref": "#/$defs/LocalisedText",
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
           "description": "The name of the method, from `processName`. The localisation key and the texts are game\ntexts.",
           "x-gameText": true
         },

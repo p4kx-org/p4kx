@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::SourcedValue;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::contract::{LocalisedText, every_field_required};
+use crate::catalog_text_contract::GameTextRef;
+use crate::contract::every_field_required;
 use crate::guid_text::CatalogGuid;
 
 /// A mineable element: a `MineableElement` Record under `mining/mineableelements`. Several
@@ -54,7 +56,7 @@ pub(crate) struct RefiningProcess<'a> {
     /// The name of the method, from `processName`. The localisation key and the texts are game
     /// texts.
     #[schemars(extend("x-gameText" = true))]
-    pub(crate) process_name: LocalisedText<'a>,
+    pub(crate) process_name: SourcedValue<GameTextRef>,
     /// `refiningSpeed`, one of `Slow`, `Normal` and `Fast` on LIVE; `null` when the Record states
     /// none. The schema keeps a string, as a new value is additive.
     pub(crate) refining_speed: Option<&'a str>,
@@ -78,7 +80,7 @@ pub(crate) struct MineableComposition<'a> {
     /// The HUD label of the deposit, from `depositName`. The localisation key and the texts are
     /// game texts.
     #[schemars(extend("x-gameText" = true))]
-    pub(crate) deposit_name: LocalisedText<'a>,
+    pub(crate) deposit_name: SourcedValue<GameTextRef>,
     /// `minimumDistinctElements`, from 1 to 4 on LIVE; `null` when the Record states none.
     pub(crate) minimum_distinct_elements: Option<i64>,
     /// The parts, from `compositionArray` in stored order.

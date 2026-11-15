@@ -2034,8 +2034,9 @@ entries on LIVE:
 A refining process (`refiningProcesses`) is a `RefiningProcess` Record under `refiningprocess`
 (9 on LIVE, one per pair of speed and quality). `refiningSpeed` (`Slow`, `Normal`, `Fast`) and
 `refiningQuality` (`Wasteful`, `Normal`, `Careful`) are closed sets kept as strings, so a new value
-is additive; `processName` is the localised label of the method, a game text. On LIVE (2026-10-22)
-the English `global.ini` holds all 9 keys and the German one none, so `de` is `null` there. The
+is additive. `processName` is a sourced reference to the localised method label in
+`texts.gameTexts`. On LIVE (2026-10-22) the English `global.ini` holds all nine keys and the German
+one none, leaving German display values absent for those keys. The
 DataForge holds no yield per commodity and method: yields are not in the Archive and stay with
 other sources.
 
@@ -2050,7 +2051,11 @@ are not exported and no media. The loot of a slot is its `lootConfig` (see "Loot
 
 **Compositions (`mineableCompositions`).** A `MineableComposition` Record under
 `mining/rockcompositionpresets` (249 on LIVE 4.10, 231 entries; the leftover rule skips the rest).
-`depositName` is the HUD label of the deposit, a game text. `minimumDistinctElements` and each part
+`depositName` is a sourced reference to the deposit's HUD label in `texts.gameTexts`. For both
+mining labels, the carrier's `value` matches the text row's `id.value`. The row holds the original
+`key.value` and per-language `sourceText` and `displayText` in `translations.value`. These
+references replace the inline `key/en/de` values of the v2 catalog.
+`minimumDistinctElements` and each part
 of `compositionArray` are as stored: `mineableElementGuid` (the element of `mineableElements`;
 `null` for a null or dangling Reference), `minPercentage`, `maxPercentage`, `probability`,
 `curveExponent` and `qualityScale`, in stored order.

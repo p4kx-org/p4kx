@@ -16,6 +16,9 @@ use serde_json::Value;
 
 use crate::catalog_v3_consumer;
 
+#[path = "real_archive_mining_names.rs"]
+mod names;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 #[expect(
@@ -111,22 +114,7 @@ fn verify(path: &Path) -> TestResult {
             ))
         })
         .collect();
-    let german = processes
-        .iter()
-        .filter(|process| {
-            process
-                .pointer("/processName/de")
-                .is_some_and(Value::is_string)
-        })
-        .count();
-    let english = processes
-        .iter()
-        .filter(|process| {
-            process
-                .pointer("/processName/en")
-                .is_some_and(Value::is_string)
-        })
-        .count();
+    let (english, german) = names::count(&catalog, processes, built.summary())?;
     let skipped_count = built
         .summary()
         .kind(Kind::MineableElements)

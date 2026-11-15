@@ -10,7 +10,7 @@ pub(super) fn compositions() -> serde_json::Value {
         "guid": "a5000000-0000-4000-8000-000000000001",
         "className": "Asteroid_CType_Iron",
         "recordPath": "libs/foundry/records/mining/rockcompositionpresets/asteroid_ctype_iron",
-        "depositName": {"key": "@hud_mining_asteroid_name_5", "en": null, "de": null},
+        "depositName": super::source_values::present(json!("text:fixture:deposit")),
         "minimumDistinctElements": 2,
         "parts": [{
             "mineableElementGuid": "a3000000-0000-4000-8000-000000000001",

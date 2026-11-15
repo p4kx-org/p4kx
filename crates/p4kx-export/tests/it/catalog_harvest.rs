@@ -57,17 +57,24 @@ fn entry<'a>(catalog: &'a Value, kind: &str, record: u128) -> Result<&'a Value, 
 #[test]
 fn a_composition_lists_its_parts_and_leaves_a_dangling_element_null() -> TestResult {
     let (built, catalog) = build(None)?;
+    let source = entry(&catalog, "mineableCompositions", COMPOSITION)?;
+    crate::catalog_mining::verify_name(
+        &catalog,
+        source,
+        "depositName",
+        "@hud_mining_asteroid_name_5",
+        Some("Iron Deposit"),
+    )?;
+    let mut row = source.clone();
+    row.as_object_mut()
+        .ok_or("composition row")?
+        .remove("depositName");
     assert_eq!(
-        *entry(&catalog, "mineableCompositions", COMPOSITION)?,
+        row,
         json!({
             "guid": guid(COMPOSITION),
             "className": "Asteroid_CType_Iron",
             "recordPath": "libs/foundry/records/mining/rockcompositionpresets/asteroid_ctype_iron",
-            "depositName": {
-                "key": "@hud_mining_asteroid_name_5",
-                "en": "Iron Deposit",
-                "de": null
-            },
             "minimumDistinctElements": 2,
             "parts": [
                 {

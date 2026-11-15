@@ -8,6 +8,8 @@ mod item_texts;
 
 #[path = "real_archive_text_forms_mutations.rs"]
 mod forms_mutations;
+#[path = "real_archive_mining_texts_tests.rs"]
+mod mining_texts;
 #[path = "real_archive_mission_locale_tests.rs"]
 mod mission_locales;
 

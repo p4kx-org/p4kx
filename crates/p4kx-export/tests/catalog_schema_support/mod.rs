@@ -327,11 +327,7 @@ pub(crate) fn minimal_catalog() -> Value {
             "guid": "a4000000-0000-4000-8000-000000000001",
             "className": "processingtype-fastcareful",
             "recordPath": "libs/foundry/records/refiningprocess/processingtype-fastcareful",
-            "processName": {
-                "key": "@refinery_ui_ProcessingType_FastCareful",
-                "en": null,
-                "de": null
-            },
+            "processName": source_values::present(json!("text:fixture:refining-process")),
             "refiningSpeed": "Fast",
             "refiningQuality": "Careful"
         }],

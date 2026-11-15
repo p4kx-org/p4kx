@@ -66,22 +66,37 @@ impl<'f> Scan<'_, '_, 'f> {
                 )?;
                 (Picked::Manufacturer(Box::new(read.value)), read.notes)
             }
-            Kind::ResourceTypes => {
-                let read = crate::resource_read::read(
+            Kind::ResourceTypes => self.resource_type_definition(admission, tree)?,
+            Kind::ResourceGroups => self.resource_group(admission, tree)?,
+            Kind::RefiningProcesses | Kind::MineableCompositions => {
+                crate::mining::named_definition(
+                    kind,
                     tree,
                     self.projection,
-                    self.groups.all_of_resource(&tree.guid()),
                     admission,
                     self.options.cancel,
-                )?;
-                (Picked::ResourceType(Box::new(read.value)), read.notes)
+                )?
             }
-            Kind::ResourceGroups => self.resource_group(admission, tree)?,
             Kind::MissionModuleDeclarations => self.module_declaration(admission, tree)?,
             Kind::MissionItems => self.mission_item_definition(admission, tree)?,
             _ => return self.read_mission_definition(kind, admission, tree),
         };
         Ok(Some(projection))
+    }
+
+    fn resource_type_definition(
+        &self,
+        admission: &RecordObservation<'_, 'f>,
+        tree: &RecordTree<'f>,
+    ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
+        let read = crate::resource_read::read(
+            tree,
+            self.projection,
+            self.groups.all_of_resource(&tree.guid()),
+            admission,
+            self.options.cancel,
+        )?;
+        Ok((Picked::ResourceType(Box::new(read.value)), read.notes))
     }
 
     fn mission_item_definition(

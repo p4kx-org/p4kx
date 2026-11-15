@@ -47,6 +47,8 @@ const NAME: [(&str, TextDomain); 1] = [("name", TextDomain::PublicName)];
 const PROPERTY_NAME: [(&str, TextDomain); 1] = [("propertyName", TextDomain::PublicName)];
 const REPUTATION_DISPLAY_FIELDS: [(&str, TextDomain); 1] = [("displayName", TextDomain::GameText)];
 const STARMAP_NAME: [(&str, TextDomain); 1] = [("name", TextDomain::GameText)];
+const PROCESS_NAME: [(&str, TextDomain); 1] = [("processName", TextDomain::GameText)];
+const DEPOSIT_NAME: [(&str, TextDomain); 1] = [("depositName", TextDomain::GameText)];
 
 const PRESENTATION_FIELDS: [(&str, TextDomain); 3] = [
     ("name", TextDomain::PublicName),
@@ -248,6 +250,8 @@ pub(crate) fn kind_coverage(
             | Kind::ReputationScopes
             | Kind::ReputationStandings
             | Kind::StarmapObjects
+            | Kind::RefiningProcesses
+            | Kind::MineableCompositions
     ) {
         return canonical_coverage(catalog, kind, english_oracle, german_oracle);
     }
@@ -358,14 +362,23 @@ fn canonical_coverage(
             Kind::GameplayProperties => (PROPERTY_NAME.as_slice(), TextReferenceShape::Required),
             Kind::Commodities => (PRESENTATION_FIELDS.as_slice(), TextReferenceShape::Nullable),
             Kind::StarmapObjects => (STARMAP_NAME.as_slice(), TextReferenceShape::Required),
+            Kind::RefiningProcesses => (PROCESS_NAME.as_slice(), TextReferenceShape::Required),
+            Kind::MineableCompositions => (DEPOSIT_NAME.as_slice(), TextReferenceShape::Required),
             _ => (FIELDS.as_slice(), TextReferenceShape::Required),
         };
         for &(field, domain) in fields {
-            counters.count(index.reference(
+            let target = index.reference(
                 row.get(field).ok_or("required canonical text reference")?,
                 domain,
                 shape,
-            )?)?;
+            )?;
+            let target = match kind {
+                Kind::RefiningProcesses | Kind::MineableCompositions => {
+                    target.filter(|target| !target.key.is_empty())
+                }
+                _ => target,
+            };
+            counters.count(target)?;
         }
         extras::compare(&mut counters, &index, kind, row)?;
     }

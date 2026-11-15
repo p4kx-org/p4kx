@@ -20,7 +20,7 @@ mod authored_damage;
 #[path = "authored_explosion.rs"]
 mod authored_explosion;
 #[path = "durability_observed.rs"]
-mod authored_fields;
+pub(crate) mod authored_fields;
 #[path = "durability_link.rs"]
 mod authored_link;
 #[path = "authored_nodes.rs"]
