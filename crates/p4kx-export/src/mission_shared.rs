@@ -4,7 +4,7 @@
 use p4kx_extraction::{SourcedValue, StructValue};
 
 use crate::CatalogError;
-use crate::build::original_input::OriginalCatalogInput;
+use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::original::OriginalFlowFields;
 use crate::catalog_text_contract::GameTextRef;
 use crate::contract_facts::ContractFacts;
@@ -21,7 +21,6 @@ use crate::mission_layers::one;
 use crate::mission_results::{entry_results, gains};
 use crate::mission_standing::{Standing, required_faction};
 use crate::spawn_layers::Resolved;
-use crate::texts::Texts;
 
 /// What an entry is resolved to besides its layers: its places, facts and spawn descriptions.
 pub(crate) struct Found<'f> {
@@ -69,20 +68,18 @@ impl<'f> Rewards<'f> {
     pub(crate) fn read(
         (handler, contract, sub): (&StructValue<'f>, &StructValue<'f>, Option<&StructValue<'f>>),
         handler_faction: Option<&ContractFaction<'f>>,
-        (index, texts): (&MissionIndex<'f>, &Texts<'f>),
-        (fields, input): (
-            &OriginalFlowFields<'_, '_, 'f>,
-            &OriginalCatalogInput<'_, 'f>,
-        ),
+        index: &MissionIndex<'f>,
+        (fields, projection): (&OriginalFlowFields<'_, '_, 'f>, &CatalogProjection<'_, 'f>),
     ) -> Result<Self, CatalogError> {
         let block = entry_results(contract, sub);
-        let gains = gains(fields, input, index, contract, sub)?;
+        let gains = gains(fields, projection.original(), index, contract, sub)?;
         let giver_faction = giver(
             handler_faction,
             gains.value().map_or(&[], Vec::as_slice),
             required_faction(handler, contract, sub),
-            (index, texts),
-        );
+            index,
+            projection,
+        )?;
         let overrides = Overrides {
             sub: sub.and_then(|sub| one(Some(sub), "paramOverrides").or(Some(sub))),
             contract: one(Some(contract), "paramOverrides"),

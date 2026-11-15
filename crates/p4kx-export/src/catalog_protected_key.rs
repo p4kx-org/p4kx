@@ -4,7 +4,7 @@
 use p4kx_extraction::{SourceUse, SourceUseRole, SourceUses, SourceValue, SourcedValue, Value};
 
 use crate::catalog_read::original::{
-    OriginalDatum, OriginalFlowFields, OriginalValueFact, OriginalValuePart,
+    OriginalDatum, OriginalFlowFields, OriginalRecordScope, OriginalValueFact, OriginalValuePart,
 };
 use crate::{CatalogError, ExportAccountingError};
 
@@ -33,7 +33,17 @@ impl<'source> ProtectedKey<'source> {
         }
     }
 
-    pub(super) fn from_fact(
+    /// Records the absence of a field in the admitted original root.
+    pub(crate) fn absent_from_root(
+        scope: &OriginalRecordScope<'_, 'source>,
+    ) -> Result<Self, CatalogError> {
+        let survey = scope
+            .dataforge()
+            .at(scope.root_declaration_location(), SourceUseRole::Selector)?;
+        Ok(Self(Evidence::Absent(survey)))
+    }
+
+    pub(crate) fn from_fact(
         fact: &OriginalValueFact<'_, '_, 'source>,
     ) -> Result<Self, CatalogError> {
         use SourceUseRole::{Attempted, Conversion, Payload, Selector};

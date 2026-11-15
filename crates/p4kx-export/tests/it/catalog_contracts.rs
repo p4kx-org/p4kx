@@ -34,7 +34,7 @@ use p4kx_export::{
     BuiltCatalog, CatalogOptions, CatalogPublicationMode, Filter, Kind, build_catalog,
 };
 use p4kx_extraction::Archive;
-use serde_json::{Value, json};
+use serde_json::Value;
 
 #[path = "catalog_contract_pickup_places.rs"]
 mod pickup_places;
@@ -234,13 +234,14 @@ fn a_contract_without_a_template_takes_title_type_and_place_from_its_broker_entr
 #[test]
 fn the_faction_of_the_handler_is_exported_as_stored() -> TestResult {
     let (_, catalog) = build(None)?;
+    let faction = &entry(&catalog, A, None)?["faction"];
+    assert_eq!(faction["guid"], "60000000-0000-4000-8000-000000000001");
+    assert_eq!(faction["name"], "acme");
+    let id = v3::cell(faction, "displayName")?.ok_or("protected faction name identifier")?;
+    let texts = crate::commodity_v3_fixture::text_row(&catalog, "gameTexts", id)?;
     assert_eq!(
-        entry(&catalog, A, None)?["faction"],
-        json!({
-            "guid": "60000000-0000-4000-8000-000000000001",
-            "name": "acme",
-            "displayName": {"key": "@faction_acme", "en": "Acme Emporium", "de": null},
-        })
+        texts.pointer("/key/value").and_then(Value::as_str),
+        Some("@faction_acme")
     );
     assert_eq!(entry(&catalog, C, None)?["faction"], Value::Null);
     Ok(())

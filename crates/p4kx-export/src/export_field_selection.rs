@@ -6,6 +6,7 @@ use std::ops::Range;
 use p4kx_extraction::{CancelToken, RecordTree, Value};
 
 use crate::build::original_input::OriginalCatalogInput;
+use crate::catalog_projection::ProtectedKey;
 use crate::catalog_read::original::OriginalValueSite;
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_field_inspection::ConfigurationInspection;
@@ -24,6 +25,39 @@ pub(crate) fn inspect_record_field<'source>(
     name: &'static str,
     cancel: Option<&CancelToken>,
 ) -> Result<ExportLedger, CatalogError> {
+    inspect_one_field(input, tree, admission, kind, name, cancel, None)
+}
+
+/// Inspects a protected key and retains the exact same selected source occurrence.
+pub(crate) fn inspect_protected_key<'source>(
+    input: &OriginalCatalogInput<'_, '_>,
+    tree: &RecordTree<'source>,
+    admission: &RecordObservation<'_, 'source>,
+    kind: Kind,
+    name: &'static str,
+    cancel: Option<&CancelToken>,
+) -> Result<(ExportLedger, ProtectedKey<'source>), CatalogError> {
+    let mut key = None;
+    let ledger = inspect_one_field(input, tree, admission, kind, name, cancel, Some(&mut key))?;
+    let key = match (tree.field(name), key) {
+        (Some(_), Some(key)) => key,
+        (None, None) => {
+            ProtectedKey::absent_from_root(&input.record_scope(admission.record(), tree)?)?
+        }
+        _ => return Err(ExportAccountingError::ConflictingSourceDatum.into()),
+    };
+    Ok((ledger, key))
+}
+
+fn inspect_one_field<'source>(
+    input: &OriginalCatalogInput<'_, '_>,
+    tree: &RecordTree<'source>,
+    admission: &RecordObservation<'_, 'source>,
+    kind: Kind,
+    name: &'static str,
+    cancel: Option<&CancelToken>,
+    key: Option<&mut Option<ProtectedKey<'source>>>,
+) -> Result<ExportLedger, CatalogError> {
     inspect_values(
         Some(input),
         tree,
@@ -31,9 +65,10 @@ pub(crate) fn inspect_record_field<'source>(
         Some(kind),
         ExportSourceRole::Dependency,
         cancel,
-        &FieldSelection::RecordField {
+        &mut FieldSelection::RecordField {
             name,
             value: tree.field(name),
+            key,
         },
     )
 }
@@ -47,14 +82,15 @@ pub(super) enum FieldSelection<'read, 'source> {
     RecordField {
         name: &'static str,
         value: Option<&'read Value<'source>>,
+        key: Option<&'read mut Option<ProtectedKey<'source>>>,
     },
 }
 
-impl FieldSelection<'_, '_> {
-    pub(super) fn includes(
-        &self,
-        site: &OriginalValueSite<'_, '_, '_, '_>,
-    ) -> Result<bool, ExportAccountingError> {
+impl<'source> FieldSelection<'_, 'source> {
+    pub(super) fn select(
+        &mut self,
+        site: &OriginalValueSite<'_, '_, '_, 'source>,
+    ) -> Result<bool, CatalogError> {
         match self {
             Self::All => Ok(true),
             Self::RecordField { value: None, .. } => Ok(false),
@@ -67,8 +103,16 @@ impl FieldSelection<'_, '_> {
                     .is_some_and(|span| span.contains(&index)))
             }
             Self::RecordField {
-                value: Some(value), ..
-            } => Ok(std::ptr::eq(*value, site.value())),
+                value: Some(value),
+                key,
+                ..
+            } => {
+                let selected = std::ptr::eq(*value, site.value());
+                if selected && let Some(key) = key {
+                    **key = Some(ProtectedKey::from_fact(&site.fact())?);
+                }
+                Ok(selected)
+            }
         }
     }
 

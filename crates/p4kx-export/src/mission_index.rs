@@ -85,7 +85,7 @@ enum Piece<'f> {
     UnusableRewardCandidate(CatalogReadFailure<'f>, RewardDependency),
     Locality(Guid, Vec<Guid>),
     Broker(Guid, Broker<'f>),
-    Faction(Guid, Option<&'f str>),
+    Faction(Guid, ProtectedKey<'f>),
 }
 
 /// The Records a contract refers to, read once: templates, mission types, mission
@@ -102,7 +102,7 @@ pub(crate) struct MissionIndex<'f> {
     rewards: BTreeMap<(Guid, u32), RewardDependency>,
     localities: HashMap<Guid, Vec<Guid>>,
     brokers: HashMap<Guid, Broker<'f>>,
-    factions: HashMap<Guid, Option<&'f str>>,
+    factions: HashMap<Guid, ProtectedKey<'f>>,
     tags: Tags,
     pools: SpawnPools<'f>,
     failures: Vec<CatalogReadFailure<'f>>,
@@ -340,9 +340,9 @@ impl<'f> MissionIndex<'f> {
         self.brokers.get(&guid)
     }
 
-    /// Returns the localisation key of the display name of the `FactionReputation` Record `guid`.
-    pub(crate) fn faction_name(&self, guid: Guid) -> Option<&'f str> {
-        self.factions.get(&guid).copied().flatten()
+    /// Returns the original protected display name of the admitted faction Record.
+    pub(crate) fn faction_name(&self, guid: Guid) -> Option<&ProtectedKey<'f>> {
+        self.factions.get(&guid)
     }
 
     /// Returns the starmap objects the `MissionLocality` Record `guid` lists as available

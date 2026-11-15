@@ -31,6 +31,7 @@ pub(super) fn count(
             .push(row.get("name").ok_or("canonical starmap name cell")?);
     }
     for contract in contracts {
+        count_faction_names(contract, &index, counters)?;
         let contractor = contract.get("contractor").ok_or("contractor text cell")?;
         counters.count(index.reference(
             contractor,
@@ -55,6 +56,33 @@ pub(super) fn count(
                 }
                 _ => return Err("contract place name differs from the corresponding object".into()),
             }
+        }
+    }
+    Ok(())
+}
+
+fn count_faction_names(
+    contract: &Value,
+    index: &TextIndex<'_>,
+    counters: &mut CoverageCounters<'_>,
+) -> TestResult<()> {
+    for faction in [
+        contract.get("faction"),
+        contract.pointer("/giverFaction/faction"),
+    ]
+    .into_iter()
+    .flatten()
+    .filter(|faction| !faction.is_null())
+    {
+        let name = faction
+            .get("displayName")
+            .ok_or("faction display-name cell")?;
+        if !name.is_null() {
+            counters.count(index.reference(
+                name,
+                TextDomain::GameText,
+                TextReferenceShape::Required,
+            )?)?;
         }
     }
     Ok(())

@@ -10,6 +10,7 @@ use p4kx_extraction::DataForge;
 use p4kx_extraction::{CancelToken, Record, TagTree, TreeBuilder};
 
 use crate::build::original_input::OriginalCatalogInput;
+use crate::catalog_projection::ProtectedKey;
 use crate::catalog_read::original::{OriginalFlowFields, RewardRead};
 use crate::catalog_v3::tag_catalog::CapturedTags;
 use crate::export_diagnostic::ExportSourceRole;
@@ -168,15 +169,20 @@ pub(super) fn read<'f>(
             .map(Some);
         }
     };
-    let ledger = inspect_dependency(action, input, &tree, &admission, cancel)?;
-    let projected = project(
-        action,
-        &admission,
-        &tree,
-        tags,
-        input,
-        captured_tags,
-        cancel,
+    let (ledger, name) = inspect_dependency(action, input, &tree, &admission, cancel)?;
+    let projected = name.map_or_else(
+        || {
+            project(
+                action,
+                &admission,
+                &tree,
+                tags,
+                input,
+                captured_tags,
+                cancel,
+            )
+        },
+        |name| Ok(Some(Piece::Faction(tree.guid(), name))),
     );
     finish_projection(projected, ledger, action, &admission, input).map(Some)
 }
@@ -187,26 +193,27 @@ fn inspect_dependency<'source>(
     tree: &p4kx_extraction::RecordTree<'source>,
     admission: &RecordObservation<'_, 'source>,
     cancel: Option<&CancelToken>,
-) -> Result<ExportLedger, CatalogError> {
+) -> Result<(ExportLedger, Option<ProtectedKey<'source>>), CatalogError> {
     if let (Action::Faction, Some(input)) = (action, input) {
-        crate::export_field_walk::inspect_record_field(
+        let (ledger, name) = crate::export_field_walk::inspect_protected_key(
             input,
             tree,
             admission,
             Kind::Contracts,
-            projection::FACTION_DISPLAY_NAME,
+            "displayName",
             cancel,
-        )
-    } else {
-        crate::export_field_walk::inspect_observed(
-            input,
-            tree,
-            admission,
-            Some(Kind::Contracts),
-            ExportSourceRole::Dependency,
-            cancel,
-        )
+        )?;
+        return Ok((ledger, Some(name)));
     }
+    let ledger = crate::export_field_walk::inspect_observed(
+        input,
+        tree,
+        admission,
+        Some(Kind::Contracts),
+        ExportSourceRole::Dependency,
+        cancel,
+    )?;
+    Ok((ledger, None))
 }
 
 fn finish_projection<'source>(

@@ -14,6 +14,7 @@ use crate::guid_text::CatalogGuid;
 use crate::mission_cooldown::PreparedCooldown;
 use crate::mission_facts::{Levels, PreparedFacts};
 use crate::mission_generator::{ContractOccurrence, ContractOwner, ContractSelection};
+use crate::mission_giver;
 use crate::mission_hauling_levels::HaulingLevels;
 use crate::mission_index::{Broker, MissionIndex, Template};
 use crate::mission_intros::PendingContract;
@@ -203,13 +204,13 @@ impl<'t, 'f> MissionEntrySource<'t, 'f> {
             spawns,
             property_set_guids,
         } = found;
-        let (index, texts) = (context.index, context.texts);
-        let faction = self.faction(context);
+        let index = context.index;
+        let faction = self.faction(context)?;
         let rewards = Rewards::read(
             (self.handler, self.contract, sub),
             faction.as_ref(),
-            (index, texts),
-            (fields, context.projection.original()),
+            index,
+            (fields, context.projection),
         )?;
         let mission_type = selected_mission_type(levels, template_data, broker);
         Ok(ContractBase {
@@ -252,12 +253,13 @@ impl<'t, 'f> MissionEntrySource<'t, 'f> {
     }
 
     /// Returns the `factionReputation` of the handler with its display name.
-    fn faction(&self, context: &MissionEntryContext<'_, 'f>) -> Option<ContractFaction<'f>> {
-        link(self.handler, "factionReputation").map(|(guid, name)| ContractFaction {
-            guid,
-            name,
-            display_name: context.texts.localised(context.index.faction_name(guid.0)),
-        })
+    fn faction(
+        &self,
+        context: &MissionEntryContext<'_, 'f>,
+    ) -> Result<Option<ContractFaction<'f>>, CatalogError> {
+        link(self.handler, "factionReputation")
+            .map(|link| mission_giver::faction(link, context.index, context.projection))
+            .transpose()
     }
 }
 

@@ -7,6 +7,8 @@ use crate::catalog_contracts::{A, B, C, E, SUB_ONE, TestResult, build, entry, pl
 
 use p4kx_export::Filter;
 
+use crate::commodity_v3_fixture::text_row;
+
 use serde_json::{Value, json};
 
 const D: &str = "20000000-0000-4000-8000-000000000005";
@@ -163,9 +165,55 @@ fn without_a_handler_faction_a_positive_amount_names_the_giver_and_a_rival_does_
     assert_eq!(contract["giverFaction"]["source"], "reputationResult");
     assert_eq!(contract["giverFaction"]["faction"]["guid"], ACME);
     assert_eq!(contract["giverFaction"]["faction"]["name"], "acme");
+    let display = &contract["giverFaction"]["faction"]["displayName"];
+    let original = &entry(&catalog, A, None)?["faction"]["displayName"];
     assert_eq!(
-        contract["giverFaction"]["faction"]["displayName"]["en"],
-        "Acme Emporium"
+        display, original,
+        "both uses retain the same original name cell"
+    );
+    let factions = catalog
+        .pointer("/definitions/factionReputations/rows")
+        .and_then(Value::as_array)
+        .ok_or("canonical faction reputation rows")?;
+    let definition = factions
+        .iter()
+        .find(|row| row.pointer("/guid/value").and_then(Value::as_str) == Some(ACME))
+        .ok_or("original faction definition")?;
+    let canonical = &definition["displayName"];
+    assert_eq!(
+        display.get("value"),
+        canonical.get("value"),
+        "same protected text"
+    );
+    assert_eq!(
+        display.get("containsEncryptedSource"),
+        canonical.get("containsEncryptedSource"),
+        "same original encryption state"
+    );
+    check_faction_name_source(&catalog, display, canonical)?;
+    let text = text_row(&catalog, "gameTexts", &display["value"])?;
+    assert_eq!(
+        text.pointer("/translations/value/en/displayText/value")
+            .and_then(Value::as_str),
+        Some("Acme Emporium")
+    );
+    Ok(())
+}
+
+fn check_faction_name_source(catalog: &Value, display: &Value, canonical: &Value) -> TestResult {
+    use crate::health_origin_assertions as origin;
+
+    let name = origin::uses(catalog, display)?
+        .into_iter()
+        .find(|row| row.get("role").and_then(Value::as_str) == Some("payload"))
+        .ok_or("original name payload")?;
+    assert!(
+        origin::uses(catalog, canonical)?.iter().any(|use_row| {
+            use_row.get("source") == name.get("source")
+                && use_row.get("location") == name.get("location")
+                && use_row.get("scope").and_then(Value::as_str) == Some("payload")
+        }),
+        "the dependency and canonical text use the same original name field"
     );
     Ok(())
 }
@@ -184,7 +232,7 @@ fn a_rival_with_a_negative_amount_falls_through_to_the_prerequisite() -> TestRes
         faction["name"], "odd",
         "the name comes from the reference path"
     );
-    assert_eq!(faction["displayName"]["en"], Value::Null);
+    assert_eq!(faction["displayName"], Value::Null);
     Ok(())
 }
 

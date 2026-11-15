@@ -11737,8 +11737,15 @@
       "description": "The faction a handler names for its contracts.",
       "properties": {
         "displayName": {
-          "$ref": "#/$defs/LocalisedText",
-          "description": "The `displayName` of the faction reputation, e.g. `Wikelo Emporium`.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourcedValueOfGameTextRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The faction reputation's protected display-name cell, or null if the target is unavailable.",
           "x-gameText": true
         },
         "guid": {

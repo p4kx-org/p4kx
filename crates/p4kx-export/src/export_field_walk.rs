@@ -26,7 +26,7 @@ use crate::selection::Kind;
 mod selection;
 
 use selection::FieldSelection;
-pub(crate) use selection::inspect_record_field;
+pub(crate) use selection::{inspect_protected_key, inspect_record_field};
 
 /// Inspects only materialized owned values, retaining field failures independently of row mapping.
 #[cfg(test)]
@@ -63,7 +63,7 @@ pub(crate) fn inspect_observed<'source>(
         kind,
         role,
         cancel,
-        &FieldSelection::All,
+        &mut FieldSelection::All,
     )
 }
 
@@ -90,7 +90,7 @@ pub(crate) fn inspect_configuration<'source>(
         None,
         ExportSourceRole::Dependency,
         cancel,
-        &FieldSelection::Subtrees {
+        &mut FieldSelection::Subtrees {
             spans,
             configuration,
         },
@@ -104,7 +104,7 @@ fn inspect_values<'source>(
     kind: Option<Kind>,
     role: ExportSourceRole,
     cancel: Option<&CancelToken>,
-    selection: &FieldSelection<'_, '_>,
+    selection: &mut FieldSelection<'_, 'source>,
 ) -> Result<ExportLedger, CatalogError> {
     admission.check_tree(tree)?;
     if cancel.is_some_and(CancelToken::is_cancelled) {
@@ -135,12 +135,12 @@ struct Inspector<'tree, 'source> {
 }
 
 impl Inspector<'_, '_> {
-    fn observed(
+    fn observed<'source>(
         &mut self,
-        scope: &OriginalRecordScope<'_, '_>,
+        scope: &OriginalRecordScope<'_, 'source>,
         capture: &mut ReferenceCapture<'_, '_, '_>,
         cancel: Option<&CancelToken>,
-        selection: &FieldSelection<'_, '_>,
+        selection: &mut FieldSelection<'_, 'source>,
     ) -> Result<(), CatalogError> {
         if selection.is_empty() {
             return Ok(());
@@ -152,7 +152,7 @@ impl Inspector<'_, '_> {
                     self.visit(
                         site.neutral(),
                         Some((capture, &site)),
-                        selection.includes(&site)?,
+                        selection.select(&site)?,
                     )?;
                     if matches!(site.value(), Value::Struct(_) | Value::Array(_)) {
                         capture.enter(&site)?;

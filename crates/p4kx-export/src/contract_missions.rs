@@ -6,7 +6,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::catalog_text_contract::GameTextRef;
-use crate::contract::{LocalisedText, every_field_required};
+use crate::contract::every_field_required;
 use crate::contract_facts::{ContractFacts, RequiredIntro};
 use crate::contract_hauling::HaulingOrder;
 use crate::contract_offer::{BlueprintReward, GiverFaction, OfferedAt};
@@ -187,9 +187,9 @@ pub(crate) struct ContractFaction<'a> {
     pub(crate) guid: CatalogGuid,
     /// The Record name of the faction reputation, e.g. `factionreputation_wikelo`.
     pub(crate) name: &'a str,
-    /// The `displayName` of the faction reputation, e.g. `Wikelo Emporium`.
+    /// The faction reputation's protected display-name cell, or null if the target is unavailable.
     #[schemars(extend("x-gameText" = true))]
-    pub(crate) display_name: LocalisedText<'a>,
+    pub(crate) display_name: Option<SourcedValue<GameTextRef>>,
 }
 
 /// A place a contract is picked up at: an object of the starmap.

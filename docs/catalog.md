@@ -1267,8 +1267,12 @@ states a faction for the contracts whose handler names none, together with the p
 first success amount of `reputationGains` with a positive `amount`; else `reputationPrerequisite`,
 the faction of the first reputation prerequisite (order of `standingRequirements`) that is not an
 exclusion (`exclude` is not `true`); its name is the last part of the Reference's record path, as
-for `reputationGains`, so a faction Record outside the faction folder stays with a `null`
-`displayName`. A negative amount names a rival that loses standing and never counts. The catalog
+for `reputationGains`. The `displayName` on both `faction` and `giverFaction.faction` carries the
+sourced reference for the original faction reputation display-name field. A present
+`displayName.value` references `texts.gameTexts[].id.value`. An unavailable faction Record or
+one outside the faction folder has a null display-name cell while retaining its GUID and name.
+An admitted Record without a usable key carries its source state with a null value. A negative
+amount names a rival that loses standing and never counts. The catalog
 picks the first stated faction and does not weigh several against each other; on LIVE no
 `reputationResult` entry has more than one positive faction. The gains are those of the entry's own
 resolved results (see "Blueprint rewards"), like `reputationGains`.

@@ -22,7 +22,7 @@ fn gaps() -> Value {
             "faction": {
                 "guid": "60000000-0000-4000-8000-000000000001",
                 "name": "acme",
-                "displayName": {"key": "@faction_acme", "en": "Acme Emporium", "de": null}
+                "displayName": present(json!("text:13:@faction_acme"))
             }
         },
         "blueprintRewards": [{
@@ -58,7 +58,7 @@ pub(super) fn contracts() -> Value {
         "faction": {
             "guid": "60000000-0000-4000-8000-000000000001",
             "name": "acme",
-            "displayName": {"key": "@faction_acme", "en": "Acme Emporium", "de": null}
+            "displayName": present(json!("text:13:@faction_acme"))
         },
         "pickupPlaces": places(),
         "reputationGains": gains,
