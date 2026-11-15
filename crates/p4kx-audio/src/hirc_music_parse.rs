@@ -11,7 +11,7 @@ use crate::hirc_music_segment::{self, BankMusicSegmentFields, finish};
 use crate::hirc_music_switch::{
     self, BankMusicSwitchFields, BankMusicSwitchNode, NODE_LEN, SwitchGroups,
 };
-use crate::hirc_music_switch_traversal::Traversal;
+use crate::hirc_music_switch_graph::{self, RouteOutput};
 use crate::hirc_music_transition::{self, BankMusicTransitionFields, MusicTransitionFeatures};
 use crate::hirc_node::{self, ID_LEN};
 use crate::{BankError, SectionId};
@@ -52,11 +52,22 @@ pub(crate) fn switch(fields: &mut SectionReader<'_>) -> Result<MusicSwitch, Bank
     })?;
     let size = usize::try_from(tree.byte_len).unwrap_or(usize::MAX);
     let original = fields.bytes(size)?;
-    let mut traversal = Traversal::new(tree.checked_nodes()?, tree.depth);
-    let mut targets = Vec::new();
-    while let Some(target) = traversal.next_target(|index| slice_node(original, index))? {
-        targets.push(target.id.value);
+    let mut expanded_targets = Vec::new();
+    let graph = hirc_music_switch_graph::inspect(
+        tree.checked_nodes()?,
+        tree.depth,
+        RouteOutput::Ids,
+        |index| slice_node(original, index),
+        |target| expanded_targets.push(target.id.value),
+    )?;
+    if let Some(error) = graph.error {
+        return Err(error);
     }
+    let targets = if graph.targets_compact {
+        Vec::new()
+    } else {
+        expanded_targets
+    };
     finish(fields)?;
     Ok(MusicSwitch {
         node,
@@ -64,6 +75,7 @@ pub(crate) fn switch(fields: &mut SectionReader<'_>) -> Result<MusicSwitch, Bank
         transition_features,
         group_ids,
         targets,
+        targets_compact: graph.targets_compact,
     })
 }
 

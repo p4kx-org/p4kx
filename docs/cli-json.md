@@ -1887,13 +1887,23 @@ This describes authored rules without computing a transition or choosing a playa
 Music switches expose `source_fields.decisions` with the sourced playback byte,
 group count, tree size, mode byte and checked tree range. Its layout distinguishes
 `decoded`, `malformed`, `unavailable` and `unsupported` decision blocks independently of
-the stingers and transition table. Its rows retain original argument groups, every
-complete physical node and each checked nonzero target occurrence in traversal
-order. A physical node preserves its raw key, link, weight and probability, even
-outside the traversed tree. Target rows identify the original node, level and
-ancestor nodes. The target ID cites the leaf word and selecting branch links.
-Unknown codes, duplicate targets and incomplete checked prefixes remain distinct.
-These rows describe the authored decision graph without evaluating its runtime state.
+the stingers and transition table. Its rows retain original argument groups and every
+complete physical node, including unvisited nodes. Each node preserves its raw key,
+link, weight and probability. Target rows list the checked nonzero occurrences in
+traversal order with the physical node, level and ancestors. The target ID cites
+the leaf word and selecting branch links.
+
+When derived route replay would exceed the input-proportional allowance,
+`decisions.targets_compact.value` is `true`. The rows retain the original physical
+graph and omit expanded target occurrences. The layout still reports whether
+the graph is decoded or malformed.
+The detailed rows account for ancestor references as well as visits. The summary
+can still list target IDs when the detailed rows use a compact projection.
+To follow a decoded graph, start at node ordinal 0 at level 0 if a node is present.
+Below `group_count`, the low 16 bits of `link_word` give the first child ordinal
+and the high 16 bits give the child count. Each child is one level deeper. At
+`group_count`, the whole `link_word` is the target ID, with zero denoting no target.
+This representation preserves shared nodes and duplicate target IDs.
 
 Other object details:
 
@@ -1916,7 +1926,8 @@ Other object details:
   `source_duration_ms`) and, for a switch track, `switch` (`group_type` 0 for a switch group and
   1 for a state group, `group_id`, `default_switch`, `switches` in clip order).
 - `music-switch`: `rule_count`, `group_ids` (the groups the decision tree tests, outermost first)
-  and `targets` (the nodes its leaves play, in tree order).
+  and `targets` (the nodes its leaves play, in tree order). When the ID projection
+  uses the compact graph, the detail omits `targets` and reports `targets_compact: true`.
 - `music-playlist`: `rule_count` and `items` in bank order. An item with `children` of N is
   followed by its N child items, and `depth` is the nesting that gives; the bank does not
   validate the counts, so `depth` may be any value (the text output draws at most 8 levels of

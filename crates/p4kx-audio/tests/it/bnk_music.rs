@@ -255,12 +255,21 @@ fn a_decision_tree_that_lies_outside_the_tree_is_malformed() -> TestResult {
 }
 
 #[test]
-fn a_decision_tree_that_reaches_a_node_twice_or_fans_out_past_its_nodes_is_malformed() -> TestResult
-{
+fn an_ancestor_cycle_or_out_of_bounds_children_are_malformed() -> TestResult {
     for (name, targets, first, count) in [
-        ("a leaf reached twice", vec![40], 1_u16, 2_u16),
-        ("every node listed as a child", vec![40, 41, 42], 0, 4),
-        ("the same children listed again", vec![40, 41, 42], 1, 4),
+        (
+            "a child interval spilling past its only leaf",
+            vec![40],
+            1_u16,
+            2_u16,
+        ),
+        ("the root listed as its own child", vec![40, 41, 42], 0, 4),
+        (
+            "a child interval one past the node extent",
+            vec![40, 41, 42],
+            1,
+            4,
+        ),
     ] {
         let body = body_of(TestHircObject::music_switch(7, &[40], 0x4000, &targets))?;
         let tree_start = body.len() - 12 * (targets.len() + 1);

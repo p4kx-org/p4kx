@@ -62,6 +62,8 @@ pub(crate) struct SwitchRecord {
     tree_size: Option<u32>,
     tree_mode_code: Option<u8>,
     tree_range: Option<BankEntryRange>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    targets_compact: Option<bool>,
 }
 
 impl SwitchRecord {
@@ -100,6 +102,7 @@ impl SwitchRecord {
             tree_size: fields.tree_size.as_ref().map(|word| word.value),
             tree_mode_code: fields.tree_mode_code.as_ref().map(|word| word.value),
             tree_range: fields.tree_range.as_ref().map(entry_range),
+            targets_compact: fields.targets_compact.then_some(true),
         }
     }
 }

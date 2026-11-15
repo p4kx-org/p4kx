@@ -4,7 +4,7 @@
 use p4kx_testkit::{TestBank, TestHircObject};
 use serde_json::{Value, json};
 
-use super::{Error, TestResult, json as list_json, write_bank};
+use super::{Error, TestResult, json as list_json, text as list_text, write_bank};
 
 const OWNER: u32 = 11;
 const TARGET: u32 = 0xe7d0_80f1;
@@ -37,6 +37,10 @@ fn shared_target_keeps_both_paths_and_every_original_music_switch_node() -> Test
             "original field {path}"
         );
     }
+    assert!(
+        decisions.get("targets_compact").is_none(),
+        "expanded occurrences keep their existing wire shape"
+    );
     check_targets(decisions, &[1, 2])
 }
 
@@ -65,6 +69,51 @@ fn malformed_branch_keeps_original_words_and_the_prior_decision_path() -> TestRe
         "preceding stinger remains visible"
     );
     check_targets(decisions, &[1])
+}
+
+#[test]
+fn layered_music_switch_keeps_complete_physical_graph_without_expanding_routes() -> TestResult {
+    const DEPTH: u8 = 16;
+    let group_count = usize::from(DEPTH);
+    let node_count = 1 + 2 * group_count;
+    let directory = tempfile::tempdir()?;
+    let switch = TestHircObject::music_switch_with_shared_layers(OWNER, DEPTH, TARGET);
+    let bank = TestBank::new(21).version(154).object(switch);
+    let path = write_bank(directory.path(), &bank)?;
+    let report = list_json(&[], &path)?;
+    let object = report.pointer("/objects/0").ok_or("MusicSwitch")?;
+    assert_eq!(object["status"], "decoded", "shared graph is valid");
+    let detail = object.get("detail").ok_or("MusicSwitch detail")?;
+    assert_eq!(detail["targets_compact"], true, "compact target projection");
+    assert!(detail.get("targets").is_none(), "no expanded eager list");
+
+    let decisions = object
+        .pointer("/source_fields/decisions")
+        .ok_or("original MusicSwitch decisions")?;
+    assert_eq!(decisions["layout"]["value"], "decoded", "complete graph");
+    assert_eq!(
+        decisions["targets_compact"]["value"], true,
+        "source fields mark the target projection"
+    );
+    let rows = decisions["rows"].as_array().ok_or("decision rows")?;
+    assert_eq!(
+        rows.len(),
+        group_count + node_count,
+        "all groups and physical nodes, without path occurrences"
+    );
+    for (ordinal, node) in rows.iter().skip(group_count).enumerate() {
+        assert_eq!(node["kind"], "node", "physical decision node {ordinal}");
+        assert_eq!(node["ordinal"]["value"], ordinal, "physical node order");
+    }
+    let root = rows.get(group_count).ok_or("root node")?;
+    let leaf = rows.last().ok_or("last leaf")?;
+    assert_eq!(root["link_word"]["value"], 0x0002_0001_u32, "root link");
+    assert_eq!(leaf["link_word"]["value"], TARGET, "original target ID");
+    assert!(
+        list_text(&[], &path)?.contains("targets in the compact decision graph (--json)"),
+        "text identifies where to find the original graph"
+    );
+    Ok(())
 }
 
 #[test]

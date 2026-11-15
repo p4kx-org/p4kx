@@ -451,9 +451,22 @@ continue-playback and decision mode bytes, argument group IDs and type codes, an
 transition rule extent. Physical node rows expose the original key, packed link word, weight
 and probability in file order, including unvisited nodes. Target rows follow the checked
 nonzero-target traversal in order, with physical node indices, levels and ancestor indices.
-Repeated visits to a physical node remain separate. A malformed path retains its preceding
-checked targets and available physical nodes. The original tree extent refers to the retained
-bank and can be shorter than its declared size for a truncated tree.
+Repeated visits in expanded target rows remain separate. An expanded malformed graph retains
+the checked target prefix. Both projections retain the available physical nodes. The tree
+extent refers to the retained bank and can be shorter than its declared size for a truncated tree.
+
+A switch summary with `targets_compact: true` represents paths through the physical node
+rows. The marker has a field origin and the derived target rows are omitted. The selection
+uses four units per reachable physical node, corresponding to its four scalar words, and
+two units per argument up to the number of reachable nodes, corresponding to its ID and
+type. One node visit or one ancestor citation on an emitted route consumes a unit. When
+replay would exceed those units, the compact representation keeps the physical graph with
+its explicit layout status.
+
+Start at node ordinal 0. At each level below `group_count`, the low 16 bits of `link_word`
+give the first child index and the high 16 bits give the contiguous child count in traversal
+order. At level `group_count`, the entire word is the target ID. Zero means there is no target
+on that path. The physical node rows include unvisited nodes.
 
 Version-154 DialogueEvent summaries retain the original probability, argument
 count, tree length, decision mode byte and checked tree extent. Argument rows

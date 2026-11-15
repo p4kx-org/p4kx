@@ -223,8 +223,12 @@ pub struct SwitchDetail<'a> {
     pub rule_count: u32,
     /// The IDs of the state or switch groups the decision tree tests, outermost first.
     pub group_ids: &'a [u32],
-    /// The IDs of the nodes the leaves of the decision tree play, in tree order, 0 left out.
-    pub targets: &'a [u32],
+    /// The nonzero target IDs in decision traversal order when expanded.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub targets: Option<&'a [u32]>,
+    /// Indicates that the original graph replaces the expanded list.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub targets_compact: Option<bool>,
 }
 
 /// A music playlist.

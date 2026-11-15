@@ -10,7 +10,7 @@ use crate::hirc::CONTAINER_VERSION;
 use crate::hirc_music_node::{self, MusicNodeLists};
 use crate::hirc_music_segment;
 use crate::hirc_music_switch::{self, BankMusicSwitchFields, DecisionTree, SwitchGroups};
-use crate::hirc_music_switch_traversal::Traversal;
+use crate::hirc_music_switch_graph::{self, RouteOutput};
 use crate::hirc_music_transition;
 use crate::read_at::SeekSource;
 use crate::{BankError, BankHircObject, BankReadError, HircKind};
@@ -132,12 +132,17 @@ fn scan<R: Read + Seek>(
     lists.tree = Some(admitted);
     reader.skip_bytes(u64::from(tree.byte_len))?;
     let finish = hirc_music_segment::finish(&reader);
-    let mut traversal = Traversal::new(tree.checked_nodes()?, tree.depth);
-    while traversal
-        .next_target(|index| rows::tree_node(input, tree, index))?
-        .is_some()
-    {
-        lists.targets += 1;
+    let graph = hirc_music_switch_graph::inspect(
+        tree.checked_nodes()?,
+        tree.depth,
+        RouteOutput::WithAncestors,
+        |index| rows::tree_node(input, tree, index),
+        |_| {},
+    )?;
+    lists.targets = graph.target_prefix;
+    fields.targets_compact = graph.targets_compact;
+    if let Some(error) = graph.error {
+        return Err(error.into());
     }
     fields.tree_complete = true;
     finish

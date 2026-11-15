@@ -25,23 +25,8 @@ const NODE_COUNT: usize = 4;
 
 #[test]
 fn music_switch_export_keeps_original_tree_and_exact_target_sources() -> TestResult {
-    let folder = tempfile::tempdir()?;
     let bank = fixture();
-    let path = folder.path().join("Data.p4k");
-    ArchiveBuilder::new()
-        .entry(TestEntry::stored("plain.txt", b"fixture".as_slice()))
-        .entry(TestEntry::zstd("music.bnk", bank.as_slice()).encrypted())
-        .write_to(&path)?;
-    let archive = Archive::open_with(path, OpenOptions::new().key(Some(test_key())))?;
-    let out = folder.path().join("out");
-    let options = ExportOptions {
-        kinds: vec![MediaKind::Audio],
-        ..ExportOptions::default()
-    };
-    let index = support::published(p4kx_media::export(&archive, &out, &options)?)?;
-    let base = out.join(&index.artifact_base);
-    let rows = support::records(&out, &index, "audio.jsonl")?;
-    let evidence = Origins::read(&base)?;
+    let ExportedSwitch { rows, evidence } = export_bank(&bank)?;
     let tree = bank.len() - NODE_COUNT * NODE_BYTES;
     let (_, switch) = row(&rows, SWITCH, &[1, 0])?;
     assert_eq!(
@@ -69,22 +54,141 @@ fn music_switch_export_keeps_original_tree_and_exact_target_sources() -> TestRes
         Some(&json!(2)),
         "the authored transition count survives"
     );
+    assert!(
+        switch.data.pointer("/payload/targets_compact").is_none(),
+        "an ordinary traversal has its original target rows"
+    );
+    check_groups_and_nodes(&rows, &evidence, tree)?;
+    check_targets(&rows, &evidence, tree)
+}
+
+#[test]
+fn music_switch_export_preserves_amplifying_paths_as_an_exact_source_graph() -> TestResult {
+    const DEPTH: u8 = 8;
+    let bank = TestBank::new(1)
+        .object(TestHircObject::music_switch_with_shared_layers(
+            81, DEPTH, TARGET_ID,
+        ))
+        .bytes();
+    let ExportedSwitch { rows, evidence } = export_bank(&bank)?;
+    let (ordinal, switch) = row(&rows, SWITCH, &[1, 0])?;
+    assert_eq!(switch.status, Status::Complete, "a valid overlapping graph");
+    for (field, expected) in [
+        ("/payload/layout", json!("decoded")),
+        ("/payload/group_count", json!(DEPTH)),
+        ("/payload/targets_compact", json!(true)),
+    ] {
+        assert_eq!(switch.data.pointer(field), Some(&expected), "{field}");
+    }
+    assert!(
+        rows.iter().all(|row| row.subresource.namespace != TARGET),
+        "the export uses the compact source graph instead of duplicating target paths"
+    );
+    let group_count = rows
+        .iter()
+        .filter(|row| row.subresource.namespace == GROUP)
+        .count();
+    assert_eq!(group_count, usize::from(DEPTH), "every original group");
+    let nodes = rows.iter().filter(|row| row.subresource.namespace == NODE);
+    let node_count = 1 + 2 * usize::from(DEPTH);
+    assert_eq!(nodes.clone().count(), node_count, "every original node");
+    let start = bank.len() - node_count * NODE_BYTES;
+    let tree = bank.get(start..).ok_or("original decision tree")?;
+    check_compact_nodes(nodes, tree)?;
+    check_compact_origin(&evidence, ordinal, DEPTH, start, bank.len())
+}
+
+fn check_compact_nodes<'a>(
+    nodes: impl Iterator<Item = &'a MediaRecord>,
+    tree: &[u8],
+) -> TestResult {
+    let (original_nodes, remainder) = tree.as_chunks::<NODE_BYTES>();
+    assert!(
+        remainder.is_empty(),
+        "the fixture contains whole physical nodes"
+    );
+    for (ordinal, (node, original)) in (0_u64..).zip(nodes.zip(original_nodes)) {
+        let link = original.get(4..8).ok_or("original packed link or target")?;
+        let link = u32::from_le_bytes(link.try_into()?);
+        assert_eq!(
+            node.subresource.indices,
+            [1, 0, ordinal],
+            "the original physical ordinal"
+        );
+        assert_eq!(
+            node.data.pointer("/payload/link_word"),
+            Some(&json!(link)),
+            "physical link or target at node {ordinal}"
+        );
+    }
+    Ok(())
+}
+
+fn check_compact_origin(
+    evidence: &Origins,
+    ordinal: usize,
+    depth: u8,
+    tree_start: usize,
+    tree_end: usize,
+) -> TestResult {
+    const WORD_BYTES: usize = size_of::<u32>();
+    const CODE_BYTES: usize = size_of::<u8>();
+    let tree_size = tree_start - (WORD_BYTES + CODE_BYTES);
+    let group_count = tree_size - usize::from(depth) * (WORD_BYTES + CODE_BYTES) - WORD_BYTES;
+    let uses = evidence.uses(ordinal, 1, "/data/payload/targets_compact")?;
+    for (field, range) in [
+        (
+            "musicSwitchGroupCount",
+            group_count..group_count + WORD_BYTES,
+        ),
+        ("musicSwitchTreeSize", tree_size..tree_size + WORD_BYTES),
+        ("musicSwitchTreeExtent", tree_start..tree_end),
+    ] {
+        assert!(
+            origins::has_exact(&uses, field, "selector", &range),
+            "the compact representation cites {field}"
+        );
+    }
+    Ok(())
+}
+
+struct ExportedSwitch {
+    rows: Vec<MediaRecord>,
+    evidence: Origins,
+}
+
+fn export_bank(bank: &[u8]) -> TestResult<ExportedSwitch> {
+    let folder = tempfile::tempdir()?;
+    let path = folder.path().join("Data.p4k");
+    ArchiveBuilder::new()
+        .entry(TestEntry::stored("plain.txt", b"fixture".as_slice()))
+        .entry(TestEntry::zstd("music.bnk", bank).encrypted())
+        .write_to(&path)?;
+    let archive = Archive::open_with(path, OpenOptions::new().key(Some(test_key())))?;
+    let out = folder.path().join("out");
+    let options = ExportOptions {
+        kinds: vec![MediaKind::Audio],
+        ..ExportOptions::default()
+    };
+    let index = support::published(p4kx_media::export(&archive, &out, &options)?)?;
+    let base = out.join(&index.artifact_base);
+    let rows = support::records(&out, &index, "audio.jsonl")?;
+    let evidence = Origins::read(&base)?;
+    let (_, switch) = row(&rows, SWITCH, &[1, 0])?;
     let raw = switch.source.raw.as_ref().ok_or("retained original bank")?;
     assert_eq!(
         fs::read(base.join(&raw.path))?,
         bank,
         "the complete original bank is retained"
     );
-    check_groups_and_nodes(&rows, &evidence, tree)?;
-    check_targets(&rows, &evidence, tree)?;
     let schema = jsonschema::validator_for(&p4kx_media::builtin_record_schema()?)?;
-    for record in rows {
+    for record in &rows {
         assert!(
             schema.is_valid(&serde_json::to_value(record)?),
             "the record satisfies the built-in schema"
         );
     }
-    Ok(())
+    Ok(ExportedSwitch { rows, evidence })
 }
 
 fn check_groups_and_nodes(rows: &[MediaRecord], evidence: &Origins, tree: usize) -> TestResult {

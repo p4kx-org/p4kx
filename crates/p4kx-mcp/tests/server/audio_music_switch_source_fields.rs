@@ -5,7 +5,7 @@ use p4kx_testkit::{TestBank, TestEntry, TestHircObject};
 use serde_json::{Value, json};
 
 use crate::audio::serve;
-use crate::support::{Install, TestResult};
+use crate::support::{Install, Server, TestResult};
 
 const PATH: &str = "Data/Sounds/wwise/TestSwitchDecisions.bnk";
 const TOOL: &str = "list_soundbank_objects";
@@ -33,6 +33,65 @@ fn music_switch_decisions_mcp_keep_encrypted_target_occurrences() -> TestResult 
     let install = Install::new(vec![TestEntry::zstd(PATH, original).encrypted()])?;
     let mut server = serve(&install)?;
     let report = server.ok(TOOL, &json!({"soundbank": PATH, "id": OWNER}))?;
+    validate_schema(&mut server, &report)?;
+    check_decisions(&report, tree_start, &tree)
+}
+
+#[test]
+fn compact_music_switch_graph_keeps_encrypted_projection_evidence() -> TestResult {
+    const DEPTH: u8 = 16;
+    let groups = usize::from(DEPTH);
+    let nodes = 1 + 2 * groups;
+    let original = TestBank::new(21)
+        .version(154)
+        .object(TestHircObject::music_switch_with_shared_layers(
+            OWNER, DEPTH, TARGET,
+        ))
+        .bytes();
+    let header_bytes = 2 * size_of::<u32>() + 2 * size_of::<u8>();
+    let group_bytes = groups * (size_of::<u32>() + size_of::<u8>());
+    let decision_start = original.len() - (header_bytes + group_bytes + nodes * NODE_BYTES);
+    let decision_range = json!([decision_start.to_string(), original.len().to_string()]);
+    let install = Install::new(vec![TestEntry::zstd(PATH, original).encrypted()])?;
+    let mut server = serve(&install)?;
+    let report = server.ok(TOOL, &json!({"soundbank": PATH, "id": OWNER}))?;
+    validate_schema(&mut server, &report)?;
+    let source = report
+        .pointer("/objects/0/source_fields")
+        .ok_or("original MusicSwitch")?;
+    let marker = source
+        .pointer("/decisions/targets_compact")
+        .ok_or("sourced compact projection")?;
+    assert_eq!(marker["value"], true, "compact graph retained");
+    assert_eq!(marker["containsEncryptedSource"], true, "encrypted BNK");
+    assert_eq!(marker["sourceSetComplete"], true, "checked decision block");
+    let references = marker["sourceUsesRefs"]
+        .as_array()
+        .ok_or("compact projection source reference")?;
+    let inventory = source
+        .pointer("/source_inventory/uses")
+        .and_then(Value::as_array)
+        .ok_or("MusicSwitch source inventory")?;
+    assert!(
+        inventory.iter().any(|receipt| {
+            receipt.get("id").is_some_and(|id| references.contains(id))
+                && receipt["role"] == "conversion"
+                && receipt.pointer("/location/field").and_then(Value::as_str)
+                    == Some("musicSwitchTargetsCompact")
+                && receipt.pointer("/location/indices") == Some(&decision_range)
+        }),
+        "compact projection cites the checked original inputs"
+    );
+    assert!(
+        report.pointer("/objects/0/detail/targets").is_none(),
+        "the expanded eager list is absent"
+    );
+    let rows = source["decisions"]["rows"].as_array().ok_or("graph rows")?;
+    assert_eq!(rows.len(), groups + nodes, "physical graph");
+    Ok(())
+}
+
+fn validate_schema(server: &mut Server, report: &Value) -> TestResult {
     let tool = server
         .tools()?
         .into_iter()
@@ -46,10 +105,9 @@ fn music_switch_decisions_mcp_keep_encrypted_target_occurrences() -> TestResult 
         "decision tree property in the advertised output schema",
     );
     jsonschema::validator_for(schema)?
-        .validate(&report)
+        .validate(report)
         .map_err(|error| error.to_string())?;
-
-    check_decisions(&report, tree_start, &tree)
+    Ok(())
 }
 
 fn check_decisions(report: &Value, tree_start: usize, tree: &[u8]) -> TestResult {

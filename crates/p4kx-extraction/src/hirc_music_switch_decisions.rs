@@ -34,6 +34,8 @@ pub(in crate::hirc_view) struct Decisions<Rows> {
     tree_mode_code: Option<SourcedValue<u8>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     tree_range: Option<SourcedValue<StateRange>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    targets_compact: Option<SourcedValue<bool>>,
     #[schemars(with = "Vec<DecisionRow<'static>>")]
     rows: Rows,
 }
@@ -79,6 +81,10 @@ pub(super) fn observed<'view, 'input, R>(
             .as_ref()
             .map(|range| origins.range(range, "musicSwitchTreeExtent"))
             .transpose()?,
+        targets_compact: fields
+            .targets_compact
+            .then(|| origins.derived(true, &extent, "musicSwitchTargetsCompact"))
+            .transpose()?,
         rows,
     })
 }
@@ -100,6 +106,7 @@ fn unobserved<Rows>(
         tree_size: None,
         tree_mode_code: None,
         tree_range: None,
+        targets_compact: None,
         rows,
     })
 }

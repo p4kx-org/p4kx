@@ -30,6 +30,8 @@ pub struct BankMusicSwitchFields {
     pub tree_range: Option<Range<u64>>,
     /// Whether the declared tree and its traversal were checked completely.
     pub tree_complete: bool,
+    /// Whether target routes are represented by the original groups and nodes.
+    pub targets_compact: bool,
 }
 
 /// Original group ID and its independently checked type byte.
@@ -134,6 +136,23 @@ pub(crate) fn node<F: ObjectFields>(input: &mut F) -> Result<BankMusicSwitchNode
         probability: input.read_u16()?,
         range: start..input.offset(),
     })
+}
+
+pub(crate) fn child_range(link: u32, nodes: u32) -> Result<Range<u32>, BankError> {
+    let [a, b, c, d] = link.to_le_bytes();
+    let first = u32::from(u16::from_le_bytes([a, b]));
+    let count = u32::from(u16::from_le_bytes([c, d]));
+    let end = first + count;
+    if end > nodes {
+        return Err(invalid(
+            "a decision tree node lists children outside the tree",
+        ));
+    }
+    Ok(first..end)
+}
+
+pub(crate) const fn cyclic() -> BankError {
+    invalid("a decision tree child refers to an ancestor")
 }
 
 pub(crate) const fn invalid(reason: &'static str) -> BankError {

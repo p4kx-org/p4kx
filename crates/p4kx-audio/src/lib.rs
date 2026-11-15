@@ -68,6 +68,7 @@ mod hirc_music_playlist_depth;
 mod hirc_music_segment;
 mod hirc_music_stinger;
 mod hirc_music_switch;
+mod hirc_music_switch_graph;
 mod hirc_music_switch_traversal;
 mod hirc_music_track;
 mod hirc_music_track_automation;

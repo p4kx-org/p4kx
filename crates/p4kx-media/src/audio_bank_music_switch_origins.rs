@@ -32,6 +32,7 @@ pub(super) struct SwitchSites<'a> {
     tree_size: Option<[u64; 2]>,
     tree_mode: Option<[u64; 2]>,
     tree_range: Option<[u64; 2]>,
+    targets_compact: bool,
 }
 
 impl<'a> SwitchSites<'a> {
@@ -57,6 +58,7 @@ impl<'a> SwitchSites<'a> {
             tree_size: fields.tree_size.as_ref().map(|word| span(&word.range)),
             tree_mode: fields.tree_mode_code.as_ref().map(|word| span(&word.range)),
             tree_range: fields.tree_range.as_ref().map(span),
+            targets_compact: fields.targets_compact,
         }
     }
 
@@ -78,6 +80,10 @@ impl<'a> SwitchSites<'a> {
         let layout =
             prepared.capture(self.tree().chain([route(&indices, "decisionTreeLayout")]))?;
         prepared.field("/data/payload/layout", layout.clone())?;
+        if self.targets_compact {
+            let coverage = prepared.capture(self.tree())?;
+            prepared.field("/data/payload/targets_compact", coverage)?;
+        }
         if has_issue {
             prepared.subtree("/issues", layout)?;
         }

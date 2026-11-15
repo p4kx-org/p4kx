@@ -121,6 +121,31 @@ impl TestHircObject {
         Self::raw(12, id, body)
     }
 
+    /// A music switch with two nodes per argument layer sharing the next layer.
+    #[must_use]
+    pub fn music_switch_with_shared_layers(id: u32, depth: u8, target_id: u32) -> Self {
+        let depth = u32::from(depth);
+        let groups: Vec<_> = (1..=depth).map(|group_id| (group_id, 0)).collect();
+        let node_count = 1 + 2 * depth;
+        let mut tree = Vec::new();
+        for index in 0..node_count {
+            let level = index.div_ceil(2);
+            let key = if index == 0 { 0 } else { 2 - index % 2 };
+            let link = if level == depth {
+                target_id
+            } else {
+                let first_child = 2 * level + 1;
+                let child_count = 2;
+                (child_count << u16::BITS) | first_child
+            };
+            put_u32(&mut tree, key);
+            put_u32(&mut tree, link);
+            put_u16(&mut tree, 50);
+            put_u16(&mut tree, 100);
+        }
+        Self::music_switch_with_tree(id, &[target_id], &groups, &tree)
+    }
+
     /// A music playlist container with one item per child segment, two transition rules, the
     /// second with a transition object.
     #[must_use]

@@ -40,3 +40,31 @@ when a route fails. Each target ID cites the leaf payload and the branch
 selectors. These fields record the checked source graph without choosing
 runtime conditions. A malformed object suffix leaves the checked decision block
 decoded.
+
+### Shared physical decision nodes
+
+A MusicSwitch child interval refers to absolute physical ordinals. Paths may
+share a child or a subtree. The complete structure is checked from the root
+using the earliest reachable argument level of each physical node. That is
+sufficient to check whether its packed word can act as a branch. Out-of-range
+intervals and cycles among these branches report a malformed graph. The
+physical node rows preserve even invalid or unreachable source words.
+
+The standard projection contains the whole physical graph. The ordered target
+rows and the eager ID list are derived projections. Their replay uses four
+work units per reachable physical node and two per authored argument up to the
+number of reachable nodes. This counts the original scalar words. One visit
+consumes one unit, including visits that end in a zero or a dead branch. A
+target row with per-ancestor source evidence also consumes one unit per
+ancestor. The ID list has no ancestor cost. A projection that would exceed
+its input-proportional replay allowance reports `targets_compact: true`.
+Unreachable physical nodes have no effect on this decision.
+
+Structure validation covers later reachable branches even when a preceding
+subtree would expand beyond the allowance. Expanded output retains the checked
+target prefix before the first malformed visit. Compact output carries the
+structure and malformed status without expanded target rows. From the graph,
+a consumer can walk from ordinal zero, following the low-word child start and
+high-word child count at each argument level. At the final level the whole word
+is the target ID. This permits exact traversal without any fixed path-count
+quota in the source representation.

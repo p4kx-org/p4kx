@@ -76,13 +76,16 @@ fn write_detail(out: &mut impl Write, detail: Option<&Detail<'_>>) -> io::Result
         Some(Detail::Segment(segment)) => segment_lines(out, segment),
         Some(Detail::Track(track)) => track_lines(out, track),
         Some(Detail::Switch(switch)) => {
-            writeln!(
+            write!(
                 out,
-                "{INDENT}{} transition rules, groups [{}], targets [{}]",
+                "{INDENT}{} transition rules, groups [{}], ",
                 switch.rule_count,
-                Ids(switch.group_ids),
-                Ids(switch.targets)
-            )
+                Ids(switch.group_ids)
+            )?;
+            let Some(targets) = switch.targets else {
+                return writeln!(out, "targets in the compact decision graph (--json)");
+            };
+            writeln!(out, "targets [{}]", Ids(targets))
         }
         Some(Detail::Playlist(playlist)) => {
             writeln!(out, "{INDENT}{} transition rules", playlist.rule_count)?;

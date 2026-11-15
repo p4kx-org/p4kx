@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::collections::BTreeSet;
+
 use crate::BankError;
 use crate::bank_object_fields::BankHircField;
 use crate::hirc_music_switch::{self, BankMusicSwitchNode};
@@ -42,9 +44,8 @@ struct Frame {
 pub(crate) struct Traversal {
     nodes: u32,
     depth: u32,
-    pending: u32,
-    visited: u32,
     stack: Vec<Frame>,
+    active: BTreeSet<u32>,
 }
 
 impl Traversal {
@@ -61,9 +62,8 @@ impl Traversal {
         Self {
             nodes,
             depth,
-            pending: u32::from(nodes > 0),
-            visited: 0,
             stack,
+            active: BTreeSet::new(),
         }
     }
 
@@ -72,6 +72,9 @@ impl Traversal {
         mut read: impl FnMut(u32) -> Result<BankMusicSwitchNode, E>,
     ) -> Result<Option<BankMusicSwitchTarget>, E> {
         while let Some(visit) = self.next_visit() {
+            if self.active.contains(&visit.index) {
+                return Err(hirc_music_switch::cyclic().into());
+            }
             let node = read(visit.index)?;
             if visit.level < self.depth {
                 self.branch(&visit, node.link)?;
@@ -93,6 +96,9 @@ impl Traversal {
     fn next_visit(&mut self) -> Option<Visit> {
         while let Some(frame) = self.stack.last_mut() {
             if frame.next == frame.end {
+                if let Some(branch) = &frame.branch {
+                    self.active.remove(&branch.node_index);
+                }
                 self.stack.pop();
                 continue;
             }
@@ -101,39 +107,24 @@ impl Traversal {
                 level: frame.level,
             };
             frame.next += 1;
-            self.visited += 1;
-            self.pending -= 1;
             return Some(visit);
         }
         None
     }
 
     fn branch(&mut self, visit: &Visit, link: BankHircField<u32>) -> Result<(), BankError> {
-        let [a, b, c, d] = link.value.to_le_bytes();
-        let first = u32::from(u16::from_le_bytes([a, b]));
-        let count = u32::from(u16::from_le_bytes([c, d]));
-        let end = first + count;
-        if end > self.nodes {
-            return Err(hirc_music_switch::invalid(
-                "a decision tree node lists children outside the tree",
-            ));
-        }
-        if self.pending + count > self.nodes - self.visited {
-            return Err(hirc_music_switch::invalid(
-                "a decision tree lists more children than it has nodes left",
-            ));
-        }
-        if count != 0 {
+        let children = hirc_music_switch::child_range(link.value, self.nodes)?;
+        if !children.is_empty() {
+            self.active.insert(visit.index);
             self.stack.push(Frame {
-                next: first,
-                end,
+                next: children.start,
+                end: children.end,
                 level: visit.level + 1,
                 branch: Some(BankMusicSwitchBranch {
                     node_index: visit.index,
                     link,
                 }),
             });
-            self.pending += count;
         }
         Ok(())
     }

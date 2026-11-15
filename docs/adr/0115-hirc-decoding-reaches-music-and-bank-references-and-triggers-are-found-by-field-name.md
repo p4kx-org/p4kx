@@ -25,12 +25,10 @@ the same rule as for containers. A body that does not is kept raw as
 `HircObject` stays that of a Sound. Floats in the music objects make `HircValue` and `HircObject`
 lose `Eq` and `Hash`.
 
-All counts and offsets are untrusted: a list is never allocated beyond what the remaining body can
-hold, every skip is checked arithmetic, a decision tree is walked with an explicit stack whose
-entries plus the nodes already visited never exceed the number of nodes (a node listed as a child
-twice, or a node listing more children than nodes are left, ends the object as malformed before
-anything is pushed), and a name that has no terminator ends the object as truncated. The Sound `cacheID` rule is `hirc::has_cache_id`, also used for the clips and sources of
-a music track.
+All counts and offsets are untrusted. The remaining body bounds each physical list and checked
+skip. A name without a terminator ends the object as truncated. The Sound `cacheID` rule is
+`hirc::has_cache_id`, also used for the clips and sources of a music track. MusicSwitch decision
+graphs follow the structural and projection rules in ADR-0386.
 
 ## Resolution
 

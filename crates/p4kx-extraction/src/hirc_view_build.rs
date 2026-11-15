@@ -140,7 +140,8 @@ fn switch_detail(switch: &MusicSwitch) -> SwitchDetail<'_> {
     SwitchDetail {
         rule_count: switch.rule_count,
         group_ids: &switch.group_ids,
-        targets: &switch.targets,
+        targets: (!switch.targets_compact).then_some(switch.targets.as_slice()),
+        targets_compact: switch.targets_compact.then_some(true),
     }
 }
 

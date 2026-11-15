@@ -10,6 +10,9 @@ use p4kx_audio::{
 };
 use p4kx_testkit::{TestBank, TestHircObject};
 
+#[path = "bnk_music_switch_graph.rs"]
+mod graph;
+
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 const SWITCH: u32 = 81;
@@ -59,7 +62,72 @@ fn music_switch_keeps_physical_nodes_and_repeated_target_paths() -> TestResult {
             .map(|count| count.value),
         Some(2)
     );
-    check_rows(switch.rows, tree_start, &[[0, 1], [0, 2]])?;
+    check_rows(
+        switch.rows,
+        tree_start,
+        u32::try_from(NODE_COUNT)?,
+        &[[0, 1], [0, 2]],
+    )?;
+    Ok(())
+}
+
+#[test]
+fn shared_music_switch_leaf_does_not_depend_on_unreachable_nodes() -> TestResult {
+    let nodes = [
+        (0, 0x0002_0001, 50, 100),
+        (11, 0x0001_0003, 51, 101),
+        (12, 0x0001_0003, 52, 102),
+        (21, TARGET, 61, 111),
+        (22, 0, 62, 112),
+    ];
+    let required = nodes
+        .get(..4)
+        .ok_or("root, two branches and a shared leaf")?;
+    for nodes in [nodes.as_slice(), required] {
+        let bank = bank_with_nodes(154, nodes);
+        let eager = Soundbank::parse(bank.as_slice())?;
+        let object = eager.objects().first().ok_or("eager MusicSwitch")?;
+        let HircValue::MusicSwitch(switch) = &object.value else {
+            return Err(format!(
+                "eager MusicSwitch with {} nodes: {:?}",
+                nodes.len(),
+                object.value
+            )
+            .into());
+        };
+        assert_eq!(
+            switch.targets,
+            [TARGET, TARGET],
+            "eager traversal with {} nodes",
+            nodes.len()
+        );
+
+        let mut source = open(&bank)?;
+        let (header, mut hirc) = parts(&mut source)?;
+        let Some(BankHircSemantic::MusicSwitch(switch)) =
+            hirc.next_semantic(&header).transpose()?
+        else {
+            return Err("positioned MusicSwitch".into());
+        };
+        assert!(
+            matches!(switch.status, BankMusicSwitchRead::Decoded),
+            "positioned traversal with {} nodes: {:?}",
+            nodes.len(),
+            switch.status
+        );
+        let tree_start = u64::try_from(bank.len() - nodes.len() * NODE_BYTES)?;
+        assert_eq!(
+            switch.fields.tree_range,
+            Some(tree_start..u64::try_from(bank.len())?),
+            "the physical extent depends on the authored node count"
+        );
+        check_rows(
+            switch.rows,
+            tree_start,
+            u32::try_from(nodes.len())?,
+            &[[0, 1], [0, 2]],
+        )?;
+    }
     Ok(())
 }
 
@@ -74,7 +142,12 @@ fn music_switch_keeps_raw_nodes_when_a_later_path_is_invalid() -> TestResult {
     };
     assert!(matches!(switch.status, BankMusicSwitchRead::Malformed(_)));
     let tree_start = u64::try_from(bank.len() - NODE_COUNT * NODE_BYTES)?;
-    check_rows(switch.rows, tree_start, &[[0, 1]])
+    check_rows(
+        switch.rows,
+        tree_start,
+        u32::try_from(NODE_COUNT)?,
+        &[[0, 1]],
+    )
 }
 
 #[test]
@@ -103,6 +176,7 @@ fn music_switch_keeps_other_bank_layouts_raw_or_unsupported() -> TestResult {
 fn check_rows(
     mut rows: BankMusicSwitchRows<'_, Cursor<&[u8]>>,
     tree_start: u64,
+    node_count: u32,
     expected: &[[u32; 2]],
 ) -> TestResult {
     let mut groups = Vec::new();
@@ -160,7 +234,7 @@ fn check_rows(
         }
     }
     assert_eq!(groups, GROUPS, "original ordered group IDs and raw types");
-    assert_eq!(physical, [0, 1, 2, 3, 4, 5, 6], "all physical nodes");
+    assert!(physical.into_iter().eq(0..node_count), "all physical nodes");
     assert_eq!(paths, expected, "complete readable traversal prefix");
     Ok(())
 }
@@ -176,8 +250,12 @@ fn fixture(version: u32, bad_branch: bool) -> Vec<u8> {
         (23, 0, 63, 113),
         (24, 0x0112_2334, 0xfedc, 0xbeef),
     ];
-    let mut tree = Vec::new();
-    for (key, link, weight, probability) in nodes {
+    bank_with_nodes(version, &nodes)
+}
+
+fn bank_with_nodes(version: u32, nodes: &[(u32, u32, u16, u16)]) -> Vec<u8> {
+    let mut tree = Vec::with_capacity(nodes.len() * NODE_BYTES);
+    for &(key, link, weight, probability) in nodes {
         tree.extend(key.to_le_bytes());
         tree.extend(link.to_le_bytes());
         tree.extend(weight.to_le_bytes());

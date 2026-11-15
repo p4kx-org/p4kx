@@ -144,8 +144,10 @@ pub struct MusicSwitch {
     pub transition_features: MusicTransitionFeatures,
     /// The IDs of the state or switch groups the decision tree tests, outermost first.
     pub group_ids: Vec<u32>,
-    /// The IDs of the nodes the leaves of the decision tree play, in tree order, 0 left out.
+    /// Expanded nonzero target IDs in route order, or an empty vector for a compact graph.
     pub targets: Vec<u32>,
+    /// Whether the original decision block is required to recover the target routes.
+    pub targets_compact: bool,
 }
 
 /// One item of a music playlist.
