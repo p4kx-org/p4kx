@@ -17,7 +17,9 @@ pub use crate::archive_key_use::{ArchiveKeyState, ArchiveKeyUse};
 pub use crate::build::{build_catalog, build_catalog_from, write_catalog, write_catalog_from};
 pub use crate::built_catalog::BuiltCatalog;
 pub use crate::catalog_file::CatalogFile;
-pub use crate::catalog_file_write::{write_catalog_file, write_catalog_file_from};
+pub use crate::catalog_file_write::{
+    write_catalog_file, write_catalog_file_from, write_catalog_file_with_phases,
+};
 pub use crate::catalog_output::{Compression, ZSTD_LEVEL, ZSTD_WINDOW_LOG};
 pub use crate::contract::{SCHEMA_VERSION, catalog_schema};
 pub use crate::crafting::{Crafting, read_crafting};
@@ -37,6 +39,7 @@ pub use crate::localization_table::{
     LocalizationTableDatum, TableFormat, write_localization_table,
     write_observed_localization_table,
 };
+pub use crate::options::CatalogStage;
 pub use crate::options::{CatalogOptions, CatalogPhase, CatalogProgress};
 pub use crate::playability::{Playability, PlayabilityCounts, PlayabilitySummary};
 pub use crate::quantization_summary::QuantizationSummary;

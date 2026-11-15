@@ -451,7 +451,7 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   `p4kx media schema` prints the index schema; mutually exclusive `--record`, `--reference` and
   `--source` select the JSONL record, common reference and retained-source schemas.
 - `p4kx catalog <archive> --out <file> [--filter <filter>] [--diagnostic-partial]
-  [--exported-at <seconds>]` writes the
+  [--exported-at <seconds>] [--progress-phases]` writes the
   P4KX catalog ([docs/catalog.md](catalog.md)):
   schema version (3), Channel and Build, Filter selection scope per kind, read/projection health
   and the kinds of the catalog:
@@ -477,6 +477,8 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   `exportHealth` and selection scope before treating missing rows as removals.
   The `source` block states `archiveKey` (`given`, `missing` or `wrong`) and
   `encryptedEntriesUnread`, the encrypted Entries the export could not read without a usable key.
+  `--progress-phases` reports each phase as a `catalog phase: <identifier>` line on stderr,
+  including when redirected. It works in both publication modes and leaves stdout for the summary.
   `p4kx catalog schema` prints the catalog's JSON Schema.
 - `p4kx ships <archive> --out <file> [--format json|ndjson] [--filter <filter>]
   [--exported-at <seconds>]` writes the base data of every ship

@@ -6,6 +6,9 @@
 
 use crate::catalog_support;
 
+#[path = "catalog_phase_reporting.rs"]
+mod phase_reporting;
+
 use std::error::Error;
 use std::fs;
 use std::io::Read;

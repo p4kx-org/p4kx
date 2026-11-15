@@ -10,6 +10,7 @@ use crate::catalog_crafting::CraftingKinds;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::original::EntryCapture;
 use crate::collected::Collected;
+use crate::options::{CatalogRun, CatalogStage};
 use crate::scan::{Scan, ScanDomain};
 use crate::scan_health::ScanRead;
 use crate::starmap_containers::jump_class::JumpEndpointRecords;
@@ -22,10 +23,12 @@ pub(super) fn scan<'f>(
     forge: &'f DataForge<'f>,
     files: &'f ArchiveFiles<'f>,
     entities: &Arc<Entities<'f>>,
-    options: &CatalogOptions<'_>,
+    run: CatalogRun<'_, '_>,
     projection: &'f CatalogProjection<'f, 'f>,
     crafting: CraftingKinds<'f>,
 ) -> Result<(Collected<'f>, Placements), CatalogError> {
+    run.begin(CatalogStage::WorldPlacements);
+    let options = run.options;
     let scope = placement_scope(forge, options);
     let mut placements = match scope {
         Some(scope) => {
@@ -40,6 +43,7 @@ pub(super) fn scan<'f>(
         }
         None => Placements::default(),
     };
+    run.begin(CatalogStage::Records);
     let scanned = Scan::run(
         forge,
         files,
@@ -52,6 +56,7 @@ pub(super) fn scan<'f>(
     if options.cancel.is_some_and(CancelToken::is_cancelled) {
         return Err(CatalogError::Cancelled);
     }
+    run.begin(CatalogStage::Projections);
     let mut collected = collect(crafting, scanned);
     let entry_ledger = if matches!(scope, Some(PlacementScope::RecordSelection)) {
         placements.ledger.clone()

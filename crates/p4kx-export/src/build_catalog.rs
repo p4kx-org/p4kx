@@ -6,6 +6,7 @@ use std::io::{self, Write};
 use p4kx_extraction::{Archive, CancelToken, DataForgeEntry};
 
 use crate::catalog_output::{Compression, emit};
+use crate::options::CatalogRun;
 use crate::{BuiltCatalog, CatalogError, CatalogOptions, CatalogSummary};
 
 #[cfg(test)]
@@ -64,8 +65,9 @@ pub fn build_catalog_from(
     entry: &DataForgeEntry,
     options: &CatalogOptions<'_>,
 ) -> Result<BuiltCatalog, CatalogError> {
-    let (parts, written) = super::assemble(archive, entry, options, |catalog| {
-        emit(catalog, Vec::new(), Compression::None, options.cancel)
+    let run = CatalogRun::new(options, None);
+    let (parts, written) = super::assemble(archive, entry, run, |catalog| {
+        emit(catalog, Vec::new(), Compression::None, run)
     })?;
     Ok(BuiltCatalog {
         summary: parts.summary(written.size, written.compressed),
@@ -97,9 +99,25 @@ pub fn write_catalog_from<W: Write>(
     compression: Compression,
     create: impl FnOnce() -> io::Result<W>,
 ) -> Result<(CatalogSummary, W), CatalogError> {
-    let (parts, written) = super::assemble(archive, entry, options, |catalog| {
+    write_catalog_from_with_run(
+        archive,
+        entry,
+        CatalogRun::new(options, None),
+        compression,
+        create,
+    )
+}
+
+pub(crate) fn write_catalog_from_with_run<W: Write>(
+    archive: &Archive,
+    entry: &DataForgeEntry,
+    run: CatalogRun<'_, '_>,
+    compression: Compression,
+    create: impl FnOnce() -> io::Result<W>,
+) -> Result<(CatalogSummary, W), CatalogError> {
+    let (parts, written) = super::assemble(archive, entry, run, |catalog| {
         let out = create().map_err(CatalogError::Write)?;
-        emit(catalog, out, compression, options.cancel)
+        emit(catalog, out, compression, run)
     })?;
     Ok((
         parts.summary(written.size, written.compressed),

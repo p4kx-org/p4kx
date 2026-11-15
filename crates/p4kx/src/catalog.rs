@@ -9,7 +9,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use anyhow::{Context, Result};
 use p4kx_export::{
     CatalogError, CatalogFailures, CatalogFile, CatalogOptions, CatalogPublicationMode,
-    CatalogSummary, Compression, CraftingWarning, Filter, catalog_schema, write_catalog_file,
+    CatalogStage, CatalogSummary, Compression, CraftingWarning, Filter, catalog_schema,
+    write_catalog_file_with_phases,
 };
 use p4kx_extraction::Archive;
 
@@ -50,7 +51,11 @@ pub(crate) fn run(args: &CatalogArgs, as_json: bool) -> Result<ExitCode> {
         filter: filter.as_ref(),
         exported_at,
         cancel: Some(&cancel),
-        progress: Some(&show),
+        progress: if args.progress_phases {
+            None
+        } else {
+            Some(&show)
+        },
         public_patches: Some(&patches),
         publication_mode: if args.diagnostic_partial {
             CatalogPublicationMode::DiagnosticPartial
@@ -59,8 +64,15 @@ pub(crate) fn run(args: &CatalogArgs, as_json: bool) -> Result<ExitCode> {
         },
     };
     crate::guard::ensure_writable(out)?;
-    let written = write_file(&archive, &options, out);
-    line.finish();
+    let phase = |stage: CatalogStage| {
+        if args.progress_phases {
+            let _ignored = writeln!(io::stderr().lock(), "catalog phase: {}", stage.as_str());
+        }
+    };
+    let written = write_file(&archive, &options, out, &phase);
+    if !args.progress_phases {
+        line.finish();
+    }
     let summary = &written?;
     print_result(&archive, out, summary, as_json)?;
     Ok(ExitCode::from(if summary.is_complete() {
@@ -105,13 +117,15 @@ fn write_file(
     archive: &Archive,
     options: &CatalogOptions<'_>,
     out: &Path,
+    phase: &dyn Fn(CatalogStage),
 ) -> Result<CatalogSummary> {
     let uncancelled = p4kx_extraction::CancelToken::new();
     let cancel = options.cancel.unwrap_or(&uncancelled);
     let protection = p4kx_extraction::ArchiveWriteProtection::new(archive.path(), cancel.flag())?;
-    let written = write_catalog_file(archive, options, Compression::for_path(out), || {
-        CatalogFile::create_protected(out, &protection, cancel)
-    });
+    let written =
+        write_catalog_file_with_phases(archive, options, Compression::for_path(out), phase, || {
+            CatalogFile::create_protected(out, &protection, cancel)
+        });
     let (summary, file) = written.map_err(into_anyhow)?;
     file.commit()
         .with_context(|| format!("cannot write {}", out.display()))?;

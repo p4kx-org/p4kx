@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_assembly::Entities;
-use p4kx_extraction::{Archive, DataForge};
+use p4kx_extraction::{Archive, DataForge, SourceUses};
 
 use crate::catalog_projections::weapon_reload::{self, WeaponAnimation};
 use crate::catalog_table::CatalogTable;
@@ -10,6 +10,7 @@ use crate::catalog_v3::catalog_item_components::item_definition::ItemDefinition;
 use crate::catalog_v3::faction_identity_definition::{
     self, FactionIdentityDefinition, PreparedFactionIdentity,
 };
+use crate::options::{CatalogRun, CatalogStage};
 use crate::starmap_report::StarmapReport;
 use crate::{
     CatalogProvenance, CatalogSummary, CraftingWarning, LoadoutSummary, PaintSummary, ShopSummary,
@@ -111,8 +112,10 @@ pub(super) fn require_publishable(
     collected: &mut crate::collected::Collected<'_>,
     kinds: &[crate::KindSummary],
     input: &super::original_input::OriginalCatalogInput<'_, '_>,
-    options: &crate::CatalogOptions<'_>,
+    run: CatalogRun<'_, '_>,
 ) -> Result<crate::ExportHealth, crate::CatalogError> {
+    run.begin(CatalogStage::ExportHealth);
+    let options = run.options;
     let health = crate::export_health_prepare::compile_captured(
         std::mem::take(&mut collected.ledger),
         kinds,
@@ -128,7 +131,15 @@ pub(super) fn require_publishable(
     Err(crate::CatalogError::IncompleteExport(
         super::refusal::CatalogRefusal::new(
             Box::new(health),
-            CatalogProvenance::new(input.origins().uses.freeze()?),
+            freeze_provenance(&input.origins().uses, run)?,
         ),
     ))
+}
+
+pub(super) fn freeze_provenance(
+    uses: &SourceUses,
+    run: CatalogRun<'_, '_>,
+) -> Result<CatalogProvenance, crate::CatalogError> {
+    run.begin(CatalogStage::Provenance);
+    Ok(CatalogProvenance::new(uses.freeze()?))
 }

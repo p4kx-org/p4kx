@@ -9,6 +9,7 @@ use zstd::Encoder;
 
 use crate::CatalogError;
 use crate::contract::Catalog;
+use crate::options::{CatalogRun, CatalogStage};
 
 /// The zstd level a compressed catalog is written at.
 pub const ZSTD_LEVEL: i32 = 19;
@@ -64,10 +65,12 @@ pub(crate) fn emit<W: Write>(
     catalog: &Catalog<'_>,
     out: W,
     compression: Compression,
-    cancel: Option<&CancelToken>,
+    run: CatalogRun<'_, '_>,
 ) -> Result<Written<W>, CatalogError> {
+    let cancel = run.options.cancel;
     match compression {
         Compression::None => {
+            run.begin(CatalogStage::WriteJson);
             let mut counted = Counting::new(out, cancel);
             write_json(catalog, &mut counted, cancel)?;
             Ok(Written {
@@ -77,7 +80,9 @@ pub(crate) fn emit<W: Write>(
             })
         }
         Compression::Zstd { level } => {
+            run.begin(CatalogStage::MeasureJson);
             let length = measure(catalog, cancel)?;
+            run.begin(CatalogStage::WriteJson);
             let encoder =
                 encoder(Counting::new(out, None), level, length).map_err(CatalogError::Write)?;
             let mut counted = Counting::new(encoder, cancel);

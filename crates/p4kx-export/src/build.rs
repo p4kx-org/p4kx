@@ -6,6 +6,7 @@ use std::sync::Arc;
 use p4kx_assembly::{ArchiveFiles, Entities};
 use p4kx_extraction::{Archive, CancelToken, DataForgeEntry};
 
+use crate::CatalogError;
 use crate::archive_key_use::ArchiveKeyUse;
 use crate::build_derived::{add_contracts, add_loadouts, add_paints, add_tags, particle_library};
 use crate::build_harvest::add_harvest_locations;
@@ -16,6 +17,7 @@ use crate::catalog_definitions::CatalogDefinitions;
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_projections::CatalogProjections;
+use crate::catalog_read::original::EntryCapture;
 use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::catalog_independent_configurations;
 use crate::catalog_v3::catalog_resource_network_read::resource_network_global;
@@ -25,20 +27,19 @@ use crate::catalog_v3::procedural_planet_audio;
 use crate::catalog_v3::weapon_combat_base;
 use crate::contract::{Catalog, Completeness, KindCompleteness, SCHEMA_VERSION};
 use crate::mission_data::link_scenario_factions;
+use crate::options::{CatalogRun, CatalogStage};
 use crate::ship_store_slugs::StoreSlugs;
 use crate::shops::add_shops;
 use crate::texts::{TextSources, Texts};
-use crate::{CatalogError, CatalogOptions, CatalogProvenance};
 #[path = "build_catalog.rs"]
-mod api;
+pub(crate) mod api;
 pub use api::{build_catalog, build_catalog_from, write_catalog, write_catalog_from};
 #[path = "original_catalog_inputs.rs"]
 pub(crate) mod original_input;
-#[path = "catalog_refusal.rs"]
-pub(crate) mod refusal;
-use crate::catalog_read::original::EntryCapture;
 #[path = "build_parts.rs"]
 mod parts;
+#[path = "catalog_refusal.rs"]
+pub(crate) mod refusal;
 use parts::Parts;
 #[path = "build_source.rs"]
 mod metadata;
@@ -52,12 +53,14 @@ mod scanning;
 fn assemble<R>(
     archive: &Archive,
     entry: &DataForgeEntry,
-    options: &CatalogOptions<'_>,
+    run: CatalogRun<'_, '_>,
     emit: impl FnOnce(&Catalog<'_>) -> Result<R, CatalogError>,
 ) -> Result<(Parts, R), CatalogError> {
+    let options = run.options;
     if options.cancel.is_some_and(CancelToken::is_cancelled) {
         return Err(CatalogError::Cancelled);
     }
+    run.begin(CatalogStage::ReadInputs);
     let forge = entry.open().map_err(CatalogError::DataForge)?;
     let sources = TextSources::read(archive)?;
     let texts = Texts::parse(&sources)?;
@@ -65,6 +68,7 @@ fn assemble<R>(
     let input = original_input::OriginalCatalogInput::new(&forge, &origins);
     let projection = CatalogProjection::new(&texts, &input);
     let entry_capture = EntryCapture::for_input(&input);
+    run.begin(CatalogStage::Crafting);
     let crafting = catalog_crafting::read(&forge, options, &projection)?;
     let files = ArchiveFiles::new(archive);
     let entities = Arc::new(Entities::new(&forge));
@@ -73,7 +77,7 @@ fn assemble<R>(
         &forge,
         &files,
         &entities,
-        options,
+        run,
         &projection,
         crafting,
     )?;
@@ -138,7 +142,7 @@ fn assemble<R>(
         &independent.tables.flight,
         options.cancel,
     )?;
-    let health = parts::require_publishable(&mut collected, &kinds, &input, options)?;
+    let health = parts::require_publishable(&mut collected, &kinds, &input, run)?;
     let key_use = ArchiveKeyUse::of(archive);
     let store_slugs = StoreSlugs::embedded()?;
     let resolved = store_slugs.resolve(
@@ -340,7 +344,7 @@ fn assemble<R>(
             ),
         },
         texts: projection.finish()?,
-        provenance: CatalogProvenance::new(origins.uses.freeze()?),
+        provenance: parts::freeze_provenance(&origins.uses, run)?,
         blueprint_pools: collected.blueprint_pools,
         dismantle_processes: collected.dismantle_processes,
         crafting_global: collected.crafting_global,

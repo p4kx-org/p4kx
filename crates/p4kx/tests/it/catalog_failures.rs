@@ -73,7 +73,7 @@ fn run(archive: &Path, out: &Path, args: &[&str]) -> Result<std::process::Output
 
 #[test]
 fn an_unreadable_record_refuses_normal_publication_before_creating_a_file() -> TestResult {
-    let (output, out, _dir) = catalog(&[])?;
+    let (output, out, _dir) = catalog(&["--progress-phases"])?;
 
     assert_eq!(output.status.code(), Some(1), "partial failure: {output:?}");
     let stderr = String::from_utf8(output.stderr)?;
@@ -82,6 +82,14 @@ fn an_unreadable_record_refuses_normal_publication_before_creating_a_file() -> T
         "the refusal explains the explicit diagnostic option: {stderr}"
     );
     assert!(output.stdout.is_empty(), "no success summary is printed");
+    assert!(
+        stderr.contains("catalog phase: export-health"),
+        "health was checked"
+    );
+    assert!(
+        !stderr.contains("catalog phase: write-json"),
+        "write was refused"
+    );
     assert!(!out.exists(), "no normal snapshot is created");
     Ok(())
 }

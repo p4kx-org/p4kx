@@ -74,3 +74,70 @@ impl fmt::Debug for CatalogOptions<'_> {
             .finish()
     }
 }
+
+/// A stage boundary in the catalog file writer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum CatalogStage {
+    /// Reads the original DataForge Entry from the Archive.
+    ReadDataForge,
+    /// Opens the DataForge and reads the localization inputs.
+    ReadInputs,
+    /// Reads crafting Records and Blueprint reward sources.
+    Crafting,
+    /// Locates and walks the system containers.
+    WorldPlacements,
+    /// Inspects the Records and prepares selected rows.
+    Records,
+    /// Resolves contextual and derived data.
+    Projections,
+    /// Compiles the publication health and checks the publication policy.
+    ExportHealth,
+    /// Freezes the source and contribution inventory.
+    Provenance,
+    /// Measures the JSON size for the Zstd frame header.
+    MeasureJson,
+    /// Writes the JSON to the chosen output sink.
+    WriteJson,
+}
+
+impl CatalogStage {
+    /// Returns the stable identifier printed in catalog phase logs.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::ReadDataForge => "read-dataforge",
+            Self::ReadInputs => "read-inputs",
+            Self::Crafting => "crafting",
+            Self::WorldPlacements => "world-placements",
+            Self::Records => "records",
+            Self::Projections => "projections",
+            Self::ExportHealth => "export-health",
+            Self::Provenance => "provenance",
+            Self::MeasureJson => "measure-json",
+            Self::WriteJson => "write-json",
+        }
+    }
+}
+
+/// Options and observation for one preparation and write.
+#[derive(Clone, Copy)]
+pub(crate) struct CatalogRun<'run, 'inputs> {
+    pub(crate) options: &'run CatalogOptions<'inputs>,
+    report: Option<&'run dyn Fn(CatalogStage)>,
+}
+
+impl<'run, 'inputs> CatalogRun<'run, 'inputs> {
+    pub(crate) const fn new(
+        options: &'run CatalogOptions<'inputs>,
+        report: Option<&'run dyn Fn(CatalogStage)>,
+    ) -> Self {
+        Self { options, report }
+    }
+
+    pub(crate) fn begin(self, stage: CatalogStage) {
+        if let Some(report) = self.report {
+            report(stage);
+        }
+    }
+}

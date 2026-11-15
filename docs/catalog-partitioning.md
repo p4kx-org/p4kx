@@ -127,9 +127,12 @@ work. Keep those measurements distinct from the package reader and the transfer 
 
 For each Build, record the full Build identity, exporter revision and hash, and archive length
 and modification time before and after the export. Run the normal `p4kx catalog` writer with a
-fixed export time, default text selection and one private `.json.zst` output. Record the exit
-status, elapsed time, peak process memory, file length and decoded byte count from the text
-summary. Count section and decoded bytes by streaming the compressed output through a Zstd
+fixed export time, default text selection, `--progress-phases` and one private `.json.zst` output.
+Capture stderr line by line to align process memory samples with preparation, health, provenance,
+JSON size measurement and writing. Record peak working set and peak private bytes separately.
+Sample host commit and paging counters alongside the process write counter to distinguish process
+writes from system memory pressure. Record the exit status, elapsed time, file length and decoded
+byte count from the text summary. Count section and decoded bytes by streaming the output through a Zstd
 decoder. Reconcile section totals and JSON framing with the writer's byte count. Measure reader
 memory in a separate process. Diagnostic results and build or source changes invalidate the
 complete measurements.
