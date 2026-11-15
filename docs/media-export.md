@@ -925,6 +925,22 @@ same test checks the animated GLB in memory and requires positive clip counts.
 cargo test -p p4kx-assembly --test real_archive -- real_creature_animations::selected_creature_writes_an_observed_animated_glb --ignored --exact --nocapture
 ```
 
+The standalone graph witness accepts a narrow Media Include filter in
+`P4KX_ANIMATION_GRAPH_FILTER` with ADB, BSPACE and COMB Entries in the root
+Archive. It reports the Entry counts and verifies the size of all selected raw
+payloads before publication.
+It reconciles the original Entries with the schema-validated graph and checks that
+physical file targets outside the selection keep their `not-selected` disposition.
+Use `P4KX_DATA_P4K` and the normal real-Archive key configuration. The filtered
+witness excludes PAK and SOCPAK traversal and AIM, CAF and DBA payloads.
+The retained inputs must fit the installed test write allowance. The exporter
+hashes the root Archive once per selected Build. Unset
+`P4KX_ANIMATION_GRAPH_FILTER` to verify graphs recursively across the Archive.
+
+```powershell
+cargo test --locked -p p4kx-media --test real_archive -- animation_graph_accounting::standalone_animation_graphs_reconcile_with_original_archive_sources --ignored --exact --nocapture
+```
+
 The `graph-node` and `graph-attribute` rows identify Mannequin fragment
 alternatives, transitions, layers, sub-databases, blend-space examples,
 parameters, pseudo examples and blend faces. Source element ordinals identify

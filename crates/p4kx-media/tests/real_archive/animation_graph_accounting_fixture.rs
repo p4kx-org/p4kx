@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::Archive;
+use p4kx_extraction::{Archive, Filter};
 use p4kx_testkit::{
     ArchiveBuilder, CryXmlByteOrder, CryXmlSignature, TestElement, TestEntry, test_key,
 };
@@ -60,5 +60,43 @@ fn standalone_definition_graph_replays_text_and_binary_in_physical_archive_scope
     archive
         .entry(TestEntry::stored("Data/Animations/graph.pak", nested))
         .write_to(&path)?;
-    verify(&Archive::open_with_key(path, Some(test_key()))?, true)
+    verify(&Archive::open_with_key(path, Some(test_key()))?, None, true)
+}
+
+#[test]
+fn filtered_root_graph_retains_unselected_physical_targets() -> TestResult {
+    let folder = tempfile::tempdir()?;
+    let path = folder.path().join("graph.p4k");
+    ArchiveBuilder::new()
+        .entry(TestEntry::stored(
+            "Data/Animations/selected/root.adb",
+            br#"<AnimDB><SubADBs><SubADB File="Animations/other.adb"/></SubADBs></AnimDB>"#,
+        ))
+        .entry(TestEntry::stored(
+            "Data/Animations/selected/one.bspace",
+            b"<ParaGroup/>",
+        ))
+        .entry(TestEntry::stored(
+            "Data/Animations/selected/one.comb",
+            br#"<CombinedBlendSpace><BlendSpaces>
+                <BlendSpace AName="Animations/selected/one.bspace"/>
+                </BlendSpaces></CombinedBlendSpace>"#,
+        ))
+        .entry(TestEntry::stored(
+            "Data/Animations/selected/nested.pak",
+            b"unreadable archive payload",
+        ))
+        .entry(
+            TestEntry::stored("Data/Animations/selected/unreadable.caf", b"invalid CRC")
+                .with_crc32(0),
+        )
+        .entry(
+            TestEntry::stored("Data/Animations/selected/unreadable.caf", b"invalid CRC")
+                .with_crc32(0),
+        )
+        .entry(TestEntry::stored("Data/Animations/other.adb", b"<AnimDB/>"))
+        .write_to(&path)?;
+    let archive = Archive::open_with_key(path, Some(test_key()))?;
+    let filter = Filter::parse("Data/Animations/selected/*")?;
+    verify(&archive, Some(&filter), true)
 }

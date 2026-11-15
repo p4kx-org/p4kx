@@ -4,10 +4,10 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use p4kx_extraction::cryxml::{SourceDeclaration, SourceDeclarationKind, SourceElement};
-use p4kx_extraction::{Archive, PathIndex};
+use p4kx_extraction::{Archive, Filter, PathIndex};
 use p4kx_media::{
-    ContainerIdentity, Identity, MediaKind, MediaRecord, Reference, ReferenceResolution,
-    ReferenceTarget,
+    ContainerIdentity, Identity, MediaKind, MediaRecord, NotSelectedReason, Reference,
+    ReferenceResolution, ReferenceTarget,
 };
 use serde_json::Value;
 
@@ -91,7 +91,7 @@ impl<'a> Selector<'a> {
             _ => None,
         };
         let possible = paths.targets(&canonical)?;
-        verify_resolution(&possible, reference.resolution(), chain, kind)
+        verify_resolution(&possible, reference.resolution(), chain, kind, paths)
     }
 
     fn path(&self) -> Option<String> {
@@ -132,14 +132,25 @@ fn verify_resolution(
     resolution: &ReferenceResolution,
     chain: &[ContainerIdentity],
     kind: Option<MediaKind>,
+    paths: &Paths<'_>,
 ) -> TestResult<Option<usize>> {
     match (possible, resolution) {
         ([], ReferenceResolution::Missing) => Ok(None),
         ([entry], ReferenceResolution::Resolved { target }) => {
+            require(
+                paths.includes(&entry.path),
+                "resolved target matches the filter",
+            )?;
             target_of(target, entry, chain, kind)?;
             Ok(Some(entry.entry_index))
         }
-        ([entry], ReferenceResolution::NotSelected { target, .. }) => {
+        ([entry], ReferenceResolution::NotSelected { target, reason }) => {
+            if paths.filter.is_some() {
+                require(
+                    !paths.includes(&entry.path) && matches!(reason, NotSelectedReason::Filter),
+                    "an unselected physical target stays explicit without projecting it",
+                )?;
+            }
             target_of(target, entry, chain, kind)?;
             Ok(None)
         }
@@ -177,15 +188,21 @@ fn verify_resolution(
 
 pub(super) struct Paths<'a> {
     archive: &'a Archive,
+    filter: Option<&'a Filter>,
     index: std::cell::OnceCell<PathIndex<'a>>,
 }
 
 impl<'a> Paths<'a> {
-    pub(super) const fn new(archive: &'a Archive) -> Self {
+    pub(super) const fn new(archive: &'a Archive, filter: Option<&'a Filter>) -> Self {
         Self {
             archive,
+            filter,
             index: std::cell::OnceCell::new(),
         }
+    }
+
+    pub(super) fn includes(&self, path: &str) -> bool {
+        self.filter.is_none_or(|filter| filter.matches(path))
     }
 
     fn targets(&self, path: &str) -> TestResult<Vec<ContainerIdentity>> {

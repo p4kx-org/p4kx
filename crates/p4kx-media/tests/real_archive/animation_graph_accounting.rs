@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::io::Read;
+use std::env;
+use std::io::{self, Read, Write as _};
 use std::path::Path;
 
 use p4kx_extraction::cryxml::{SourceDocument, SourceReadOptions};
-use p4kx_extraction::{Archive, ArchiveWatch, Entry, Exclusion};
+use p4kx_extraction::{Archive, ArchiveWatch, Build, Entry, Exclusion, Filter};
 use p4kx_media::{
     ContainerIdentity, ExportOptions, ExportOutcome, Identity, MediaKind, MediaRecord, Status,
 };
@@ -13,6 +14,8 @@ use p4kx_media::{
 use super::archive_replay::Lines;
 use super::shader_accounting::require;
 use super::{TestResult, manifests, privacy};
+
+const FILTER_VAR: &str = "P4KX_ANIMATION_GRAPH_FILTER";
 
 #[path = "animation_graph_accounting_clips.rs"]
 pub(crate) mod clips;
@@ -36,23 +39,46 @@ fn standalone_animation_graphs_reconcile_with_original_archive_sources()
 }
 
 fn verify_configured() -> TestResult {
+    let filter = match env::var(FILTER_VAR) {
+        Ok(value) if !value.trim().is_empty() => Some(Filter::parse(&value)?),
+        Err(env::VarError::NotPresent) => None,
+        _ => return Err("set a non-blank animation graph filter or leave it unset".into()),
+    };
     let key = p4kx_testkit::real_archive_key()?;
     for path in std::iter::once(p4kx_testkit::real_archive_path()?)
         .chain(p4kx_testkit::real_archive_b_path())
     {
-        verify(&Archive::open_with_key(path, Some(key.clone()))?, false)?;
+        let archive = Archive::open_with_key(path, Some(key.clone()))?;
+        if let Some(filter) = &filter {
+            let build = archive.build().ok_or("authoritative installed Build")?;
+            let directory = archive
+                .path()
+                .parent()
+                .ok_or("installed channel directory")?;
+            verify(&archive, Some(filter), true)?;
+            require(
+                Build::read_from(directory)?.as_ref() == Some(build),
+                "unchanged installed Build",
+            )?;
+            writeln!(
+                io::stdout(),
+                "standalone graph witness Build {} {} {} {}",
+                build.branch(),
+                build.version(),
+                build.change_number(),
+                build.build_id(),
+            )?;
+        } else {
+            verify(&archive, None, false)?;
+        }
     }
     Ok(())
 }
 
-fn verify(archive: &Archive, validate_schema: bool) -> TestResult {
+fn verify(archive: &Archive, root_filter: Option<&Filter>, validate_schema: bool) -> TestResult {
     let watch = ArchiveWatch::new(archive);
+    let options = graph_export_options(archive, root_filter)?;
     let output = tempfile::tempdir()?;
-    let options = ExportOptions {
-        kinds: vec![MediaKind::AnimationDefinition],
-        exclude: Exclusion::parse(["*.animevents", "*.chrparams"])?,
-        ..ExportOptions::default()
-    };
     let ExportOutcome::Published { index, .. } =
         p4kx_media::export(archive, output.path(), &options)?
     else {
@@ -80,6 +106,7 @@ fn verify(archive: &Archive, validate_schema: bool) -> TestResult {
         counts: [0; 3],
         base: &base,
         watch: &watch,
+        root_filter,
         validator: validator.as_ref(),
     };
     census.advance()?;
@@ -96,13 +123,81 @@ fn verify(archive: &Archive, validate_schema: bool) -> TestResult {
         census.counts.iter().sum::<u64>() == stream.counts.source_entries.written,
         "every standalone source is counted once",
     )?;
-    require(
-        census.counts.iter().all(|&count| count > 0),
-        "all three graph definition families have a witness",
-    )?;
+    require_all_families(census.counts)?;
     watch.check()?;
     output.close()?;
     Ok(())
+}
+
+fn graph_export_options(
+    archive: &Archive,
+    root_filter: Option<&Filter>,
+) -> TestResult<ExportOptions> {
+    let exclusions = if let Some(filter) = root_filter {
+        let exclusions = Exclusion::parse([
+            "*.animevents",
+            "*.chrparams",
+            "*.pak",
+            "*.socpak",
+            "*.aim",
+            "*.caf",
+            "*.dba",
+        ])?;
+        check_root_selection(archive, filter, &exclusions)?;
+        exclusions
+    } else {
+        Exclusion::parse(["*.animevents", "*.chrparams"])?
+    };
+    let mut options = ExportOptions {
+        kinds: vec![MediaKind::AnimationDefinition],
+        include: root_filter.cloned(),
+        exclude: exclusions,
+        ..ExportOptions::default()
+    };
+    if root_filter.is_some() {
+        options.limits.output_bytes = manifests::MAX_ARTIFACT_BYTES;
+    }
+    Ok(options)
+}
+
+fn check_root_selection(archive: &Archive, filter: &Filter, exclude: &Exclusion) -> TestResult {
+    let mut counts = [0; 3];
+    let mut bytes = 0_u64;
+    for entry in archive
+        .entries()
+        .iter()
+        .filter(|entry| filter.matches(entry.path()) && !exclude.leaves_out(entry.path()))
+    {
+        bytes = bytes
+            .checked_add(entry.uncompressed_size())
+            .ok_or("selected raw byte count overflow")?;
+        if let Some(family) = Family::of(entry.path()) {
+            let count = counts
+                .get_mut(family as usize)
+                .ok_or("invalid definition family")?;
+            *count += 1;
+        }
+    }
+    require_all_families(counts)?;
+    require(
+        bytes <= manifests::MAX_ARTIFACT_BYTES,
+        "all selected raw Entries fit the installed test write allowance",
+    )?;
+    writeln!(
+        io::stdout(),
+        "selected root graph sources: {} ADB, {} BSPACE, {} COMB, {bytes} total retained raw bytes",
+        counts[0],
+        counts[1],
+        counts[2],
+    )?;
+    Ok(())
+}
+
+fn require_all_families(counts: [u64; 3]) -> TestResult {
+    require(
+        counts.into_iter().all(|count| count > 0),
+        "all three graph definition families have a witness",
+    )
 }
 
 struct Census<'a> {
@@ -112,26 +207,30 @@ struct Census<'a> {
     counts: [u64; 3],
     base: &'a Path,
     watch: &'a ArchiveWatch,
+    root_filter: Option<&'a Filter>,
     validator: Option<&'a jsonschema::Validator>,
 }
 
 impl Census<'_> {
     fn directory(&mut self, archive: &Archive, chain: &mut Vec<ContainerIdentity>) -> TestResult {
-        let paths = links::Paths::new(archive);
+        let paths = links::Paths::new(archive, self.root_filter);
         let mut edges = links::Edges::default();
         for entry in archive.entries() {
             self.watch.poll()?;
-            if let Some(family) = Family::of(entry.path()) {
+            if let Some(family) = Family::of(entry.path()).filter(|_| paths.includes(entry.path()))
+            {
                 self.entry(archive, entry, chain, family, &paths, &mut edges)?;
                 let Some(count) = self.counts.get_mut(family as usize) else {
                     return Err("invalid definition family".into());
                 };
                 *count += 1;
-            } else if extension(entry.path()).is_some_and(|ext| {
-                ["pak", "socpak"]
-                    .iter()
-                    .any(|value| ext.eq_ignore_ascii_case(value))
-            }) {
+            } else if self.root_filter.is_none()
+                && extension(entry.path()).is_some_and(|ext| {
+                    ["pak", "socpak"]
+                        .iter()
+                        .any(|value| ext.eq_ignore_ascii_case(value))
+                })
+            {
                 let identity = ContainerIdentity::try_new_with_entry(archive, entry)?;
                 let nested = archive.open_container(entry)?;
                 chain.push(identity);
