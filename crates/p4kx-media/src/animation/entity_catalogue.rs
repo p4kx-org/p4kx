@@ -1,21 +1,28 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::sync::Arc;
+
 use p4kx_assembly::{
-    ArchiveModels, EntityNode, LoadoutChanges, LoadoutResolver, RigInput, RigInputs,
+    ArchiveModels, Entities, EntityNode, LoadoutChanges, LoadoutResolver, RigInput, RigInputs,
     discover_entity_clips_using,
 };
 use p4kx_extraction::{DataForge, DataForgeEntry, Entry, Record};
 
+use super::entity_loadout_evidence::EntityLoadoutEvidence;
 use crate::lookup_work::LookupWork;
 use crate::source_selection::EntrySelection;
 use crate::{DirectoryLookup, MediaError, MediaWriter, Subresource, required_input};
 
+#[path = "entity_loadout_files.rs"]
+mod loadout_files;
 #[path = "entity_catalogue_rows.rs"]
 mod rows;
 
+use self::loadout_files::EntityLoadoutFiles;
+
 pub(super) use rows::bind_schema;
-pub(crate) use rows::incomplete_loadout;
+pub(crate) use rows::loadout_issue;
 
 pub(super) fn emit(
     lookup: &DirectoryLookup<'_>,
@@ -66,47 +73,85 @@ fn project(
     lookup: &DirectoryLookup<'_>,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
-    with_resolved_entity(selector, forge, lookup, writer, |owner, tree, writer| {
-        let state = if incomplete_loadout(tree, writer)? {
-            rows::CatalogueState::IncompleteLoadout
-        } else {
-            rows::CatalogueState::Available
-        };
-        let mut inputs = Inputs { lookup, writer };
-        let index = lookup.index.index(
-            &Work {
-                lookup,
-                writer: inputs.writer,
-            }
-            .lookup_work(),
-        )?;
-        let models = ArchiveModels::from_path_index(index);
-        let catalogue = discover_entity_clips_using(&models, tree, &mut inputs)?;
-        rows::write(selector, state, owner, origin, lookup, &catalogue, writer)
-    })
+    with_resolved_entity(
+        selector,
+        forge,
+        lookup,
+        false,
+        writer,
+        |owner, tree, _, writer| {
+            let state = if loadout_issue(tree, writer)?.is_some() {
+                rows::CatalogueState::IncompleteLoadout
+            } else {
+                rows::CatalogueState::Available
+            };
+            let mut inputs = Inputs { lookup, writer };
+            let index = lookup.index.index(
+                &Work {
+                    lookup,
+                    writer: inputs.writer,
+                }
+                .lookup_work()?,
+            )?;
+            let models = ArchiveModels::from_path_index(index);
+            let catalogue = discover_entity_clips_using(&models, tree, &mut inputs)?;
+            rows::write(selector, state, owner, origin, lookup, &catalogue, writer)
+        },
+    )
 }
 
 pub(crate) fn with_resolved_entity<T>(
     selector: &str,
     forge: &DataForge<'_>,
     lookup: &DirectoryLookup<'_>,
+    scoped: bool,
     writer: &mut MediaWriter<'_>,
-    consume: impl FnOnce(&Record<'_>, &EntityNode, &mut MediaWriter<'_>) -> Result<T, MediaError>,
+    consume: impl FnOnce(
+        &Record<'_>,
+        &EntityNode,
+        &EntityLoadoutEvidence,
+        &mut MediaWriter<'_>,
+    ) -> Result<T, MediaError>,
 ) -> Result<T, MediaError> {
     Work { lookup, writer }.charge(forge.records().len() as u64)?;
     let cancel = writer.checkpoint.cancel.clone();
     let stop = || cancel.is_cancelled();
     writer.checkpoint()?;
-    let mut resolver = LoadoutResolver::new(forge).with_stop(&stop);
-    writer.checkpoint()?;
-    let owner = resolver
-        .entities()
-        .find(selector)
-        .map_err(|error| MediaError::Contract(error.to_string()))?;
-    let tree = resolver.resolve_with(&owner, &LoadoutChanges::new());
-    writer.checkpoint()?;
-    let tree = tree.map_err(|error| MediaError::Contract(error.to_string()))?;
-    consume(&owner, &tree, writer)
+    let evidence = Arc::new(EntityLoadoutEvidence::default());
+    let (owner_index, tree) = {
+        let files = scoped
+            .then(|| EntityLoadoutFiles::new(lookup, writer))
+            .transpose()?;
+        let mut resolver = files
+            .as_ref()
+            .map_or_else(
+                || LoadoutResolver::new(forge),
+                |files| {
+                    LoadoutResolver::with_observed_entities(
+                        Arc::new(Entities::new(forge)),
+                        evidence.clone(),
+                    )
+                    .with_files(files)
+                },
+            )
+            .with_stop(&stop);
+        writer.checkpoint()?;
+        let owner = resolver
+            .entities()
+            .find(selector)
+            .map_err(|error| MediaError::Contract(error.to_string()))?;
+        let tree = resolver.resolve_with(&owner, &LoadoutChanges::new());
+        if let Some(files) = &files {
+            files.check()?;
+        }
+        writer.checkpoint()?;
+        let tree = tree.map_err(|error| MediaError::Contract(error.to_string()))?;
+        (owner.index(), tree)
+    };
+    let owner = forge.record(owner_index).ok_or_else(|| {
+        MediaError::Contract("animation scope lost its physical Entity Record".into())
+    })?;
+    consume(&owner, &tree, &evidence, writer)
 }
 
 struct Inputs<'a, 'dir, 'writer> {
@@ -121,17 +166,17 @@ struct Work<'a, 'dir, 'writer> {
 
 impl Work<'_, '_, '_> {
     fn charge(&self, units: u64) -> Result<(), MediaError> {
-        self.lookup_work().charge(units)
+        self.lookup_work()?.charge(units)
     }
 
-    fn lookup_work(&self) -> LookupWork<'_> {
+    fn lookup_work(&self) -> Result<LookupWork<'_>, MediaError> {
         let limits = self.writer.limits();
-        LookupWork {
+        Ok(LookupWork {
             limits,
             checkpoint: self.writer.checkpoint,
-            current: self.lookup.work,
-            source_allowance: self.lookup.allowance(limits.sources),
-        }
+            budget: self.lookup.budget,
+            source_allowance: self.lookup.allowance(limits.sources)?,
+        })
     }
 }
 

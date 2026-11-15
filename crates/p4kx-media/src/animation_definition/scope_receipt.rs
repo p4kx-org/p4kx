@@ -11,6 +11,7 @@ use serde::Serialize;
 use super::origins;
 use super::payload::{self as wire, DefinitionPayload};
 use super::scope_placement::{PlacementDetail, PlacementEvidence};
+use crate::animation::entity_loadout_evidence::EntityLoadoutEvidence;
 use crate::audio_record_origins as records;
 use crate::origin_capture::OriginSite;
 use crate::origin_contributions::OriginContributions;
@@ -142,6 +143,7 @@ pub(super) fn entity(
     lookup: &DirectoryLookup<'_>,
     entry: &Entry,
     rigs: &[EntityRig],
+    loadout: &EntityLoadoutEvidence,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
     let mut scope = Scope::new(lookup, entry, writer)?;
@@ -159,11 +161,15 @@ pub(super) fn entity(
             rig.parameters.as_ref(),
             lookup.index.inventory(),
         )?;
-        let proof = scope.decision(&outcome, rig.definition.as_ref(), &scope.placement, writer)?;
+        let evidence = PlacementEvidence::new(rig, &input, loadout, writer)?;
+        let mut basis = writer.capture_origins();
+        basis.include_original(&scope.placement)?;
+        basis.include_original(&evidence.owner)?;
+        let proof = scope.decision(&outcome, rig.definition.as_ref(), &basis.finish(), writer)?;
         scope.write(
             ordinal as u64,
             placement,
-            Some(PlacementEvidence { rig, input: &input }),
+            Some(evidence),
             outcome,
             proof,
             writer,
@@ -291,10 +297,15 @@ impl<'a, 'directory> Scope<'a, 'directory> {
         )?;
         records::subtree(&mut prepared, "/data/payload/outcome", proof, writer)?;
         if let Some(index) = outcome.entry() {
+            let mut selected = writer.capture_origins();
+            selected.include_original(&origins::directory_entry(&self.owner, index, writer)?)?;
+            if let Some(evidence) = &evidence {
+                selected.include_original(&evidence.owner)?;
+            }
             records::field(
                 &mut prepared,
                 "/data/payload/outcome/entry_index",
-                origins::directory_entry(&self.owner, index, writer)?,
+                selected.finish(),
                 writer,
             )?;
         }
@@ -303,6 +314,7 @@ impl<'a, 'directory> Scope<'a, 'directory> {
             .and_then(|evidence| evidence.rig.record_index);
         if let Some((evidence, record)) = evidence.as_ref().zip(owner_record_index) {
             let mut proof = writer.capture_origins();
+            proof.include_original(&evidence.owner)?;
             proof.add(
                 evidence.input,
                 InputScope::Payload,

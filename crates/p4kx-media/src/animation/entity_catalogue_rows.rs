@@ -16,22 +16,22 @@ use wire::{Payload, Scope};
 
 pub(crate) use wire::{CATALOGUE, CatalogueState, bind_schema};
 
-pub(crate) fn incomplete_loadout(
+pub(crate) fn loadout_issue(
     root: &EntityNode,
     writer: &MediaWriter<'_>,
-) -> Result<bool, MediaError> {
+) -> Result<Option<String>, MediaError> {
     writer.checkpoint()?;
-    let mut result = Ok(!root.issues().is_empty());
+    let mut result = Ok(root.issues().first().map(ToString::to_string));
     root.visit_ports(|_, route| {
-        if !matches!(result, Ok(false)) {
+        if !matches!(result, Ok(None)) {
             return;
         }
         result = writer
             .checkpoint()
             .map(|()| match route.last().map(|port| port.attachment()) {
-                Some(Attachment::Entity(child)) => !child.issues().is_empty(),
-                Some(Attachment::Unresolved(_)) => true,
-                _ => false,
+                Some(Attachment::Entity(child)) => child.issues().first().map(ToString::to_string),
+                Some(Attachment::Unresolved(child)) => Some(child.error().to_string()),
+                _ => None,
             });
     });
     result

@@ -18,7 +18,7 @@ fn the_public_family_visitor_keeps_selection_identity_and_does_not_read_targets(
         &Exclusion::parse(["*owner.dds.3"])?,
         |context, writer, _, _| {
             let budget = context.directory.input_state()?.budget;
-            let remaining = budget.remaining_bytes(writer.limits());
+            let remaining = budget.remaining_bytes(writer.limits())?;
             let mut seen = Vec::new();
             let inventory = context.directory.visit_texture_family(
                 "owner.dds",
@@ -58,12 +58,12 @@ fn the_public_family_visitor_keeps_selection_identity_and_does_not_read_targets(
                 ]
             );
             assert_eq!(
-                budget.sources.get(),
+                budget.source_count()?,
                 1,
                 "only the selected fixture owner was retained"
             );
             assert_eq!(
-                budget.remaining_bytes(writer.limits()),
+                budget.remaining_bytes(writer.limits())?,
                 remaining,
                 "inventory does not read payloads"
             );
@@ -120,7 +120,7 @@ fn the_public_visitor_keeps_raw_loss_and_recovered_inventory_unproved() -> TestR
                 assert_eq!(absent_seen, 0);
                 assert_inventory(inventory, completeness);
                 assert_inventory(inventory, absent);
-                assert_eq!(context.directory.input_state()?.budget.sources.get(), 1);
+                assert_eq!(context.directory.input_state()?.budget.source_count()?, 1);
                 Ok(())
             },
         )?;
@@ -146,7 +146,7 @@ fn a_visitor_refusal_is_returned_without_visiting_later_members() -> TestResult 
                 matches!(result, Err(MediaError::Contract(detail)) if detail == "visitor refusal")
             );
             assert_eq!(seen, 1);
-            assert_eq!(context.directory.input_state()?.budget.sources.get(), 1);
+            assert_eq!(context.directory.input_state()?.budget.source_count()?, 1);
             Ok(())
         },
     )

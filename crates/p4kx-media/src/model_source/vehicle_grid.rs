@@ -99,7 +99,7 @@ impl Dispatch<'_, '_> {
         let budget = &self.context.directory.input_state()?.budget;
         let limits = writer.limits();
         budget.metadata(0, 1, limits, writer.checkpoint)?;
-        let limit = usize::try_from(budget.remaining_metadata_work(limits)).unwrap_or(usize::MAX);
+        let limit = usize::try_from(budget.remaining_metadata_work(limits)?).unwrap_or(usize::MAX);
         let Some(row) = compiled.physical_row_observed(record.index(), limit) else {
             return Ok(());
         };

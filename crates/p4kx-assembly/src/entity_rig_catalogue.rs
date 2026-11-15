@@ -8,7 +8,8 @@ use p4kx_dataforge::Guid;
 use p4kx_extraction::{DataForgeOrigin, SourceLocation};
 
 use crate::{
-    ArchiveModels, Attachment, EntityNode, GearPlacementSource, LandingGear, PortNode, PortSource,
+    ArchiveModels, Attachment, EntityNode, GearPlacementSource, LandingGear, LoadoutPath,
+    LoadoutTargetGuid, PortNode, PortSource,
 };
 use files::RigPath;
 
@@ -67,7 +68,8 @@ pub struct EntityRig {
     pub skeleton: Option<RigFile<Option<p4kx_model::SkeletonSource>>>,
     /// Authored parameter rows associated with the declared skeleton.
     pub parameters: Option<RigFile<Vec<RigParameter>>>,
-    port_selectors: Arc<[Option<SourceLocation>]>,
+    port_route: PortRoute,
+    attachment_target: Option<LoadoutTargetGuid>,
     gear_source: Option<GearPlacementSource>,
 }
 
@@ -77,7 +79,19 @@ impl EntityRig {
     /// A missing source means the segment's original name has no retained coordinate.
     #[must_use]
     pub fn port_selectors(&self) -> &[Option<SourceLocation>] {
-        &self.port_selectors
+        &self.port_route.selectors
+    }
+
+    /// Returns the observed port-name operation for each segment in the owning route.
+    #[must_use]
+    pub fn port_name_paths(&self) -> &[Option<LoadoutPath>] {
+        &self.port_route.names
+    }
+
+    /// Returns the exact selection of the owning Entity when attached through a port.
+    #[must_use]
+    pub const fn attachment_target(&self) -> Option<&LoadoutTargetGuid> {
+        self.attachment_target.as_ref()
     }
 
     /// Returns the observed declaration of a landing gear placement.
@@ -159,15 +173,21 @@ struct Catalogue<'model, 'archive> {
 
 struct Placement {
     value: RigPlacement,
-    port_selectors: Arc<[Option<SourceLocation>]>,
+    port_route: PortRoute,
     gear_source: Option<GearPlacementSource>,
+}
+
+#[derive(Debug, Clone, Default)]
+struct PortRoute {
+    selectors: Arc<[Option<SourceLocation>]>,
+    names: Arc<[Option<LoadoutPath>]>,
 }
 
 impl Placement {
     fn root() -> Self {
         Self {
             value: RigPlacement::Root,
-            port_selectors: Arc::from([]),
+            port_route: PortRoute::default(),
             gear_source: None,
         }
     }
@@ -177,7 +197,13 @@ impl Placement {
             value: RigPlacement::Attachment {
                 port_path: path.to_owned(),
             },
-            port_selectors: route.iter().map(|port| port_selector(port)).collect(),
+            port_route: PortRoute {
+                selectors: route.iter().map(|port| port_selector(port)).collect(),
+                names: route
+                    .iter()
+                    .map(|port| port.name_proof().cloned())
+                    .collect(),
+            },
             gear_source: None,
         }
     }
@@ -214,7 +240,7 @@ impl Catalogue<'_, '_> {
                 .map(|skin| &skin.geometry)
                 .or_else(|| node.geometry())
         };
-        let port_selectors = Arc::clone(&placement.port_selectors);
+        let port_route = placement.port_route.clone();
         self.append_rig(
             node,
             placement,
@@ -230,7 +256,7 @@ impl Catalogue<'_, '_> {
         }
         for gear in node.landing_gear() {
             inputs.check()?;
-            self.append_gear(node, path, &port_selectors, gear, inputs)?;
+            self.append_gear(node, path, &port_route, gear, inputs)?;
         }
         Ok(())
     }
@@ -239,7 +265,7 @@ impl Catalogue<'_, '_> {
         &mut self,
         node: &EntityNode,
         path: &str,
-        port_selectors: &Arc<[Option<SourceLocation>]>,
+        port_route: &PortRoute,
         gear: &LandingGear,
         inputs: &mut I,
     ) -> Result<(), I::Error> {
@@ -253,7 +279,7 @@ impl Catalogue<'_, '_> {
                     ordinal: gear.source.ordinal,
                     bone: gear.source.authored_bone.then(|| gear.bone().to_owned()),
                 },
-                port_selectors: Arc::clone(port_selectors),
+                port_route: port_route.clone(),
                 gear_source: Some(source),
             },
             geometry,
@@ -310,7 +336,8 @@ impl Catalogue<'_, '_> {
             definition,
             skeleton,
             parameters,
-            port_selectors: placement.port_selectors,
+            port_route: placement.port_route,
+            attachment_target: node.attachment_target().cloned(),
             gear_source: placement.gear_source,
         })
     }

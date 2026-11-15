@@ -6,6 +6,7 @@ use p4kx_extraction::{InputScope, SourceLocation, SourceUseRole};
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use crate::animation::entity_loadout_evidence::EntityLoadoutEvidence;
 use crate::audio_record_origins as records;
 use crate::origin_capture::{OriginCapture, OriginSite};
 use crate::origin_contributions::OriginContributions;
@@ -30,9 +31,29 @@ pub(super) enum PlacementDetail<'source> {
 pub(super) struct PlacementEvidence<'source> {
     pub(super) rig: &'source EntityRig,
     pub(super) input: &'source MediaOriginInput,
+    loadout: &'source EntityLoadoutEvidence,
+    pub(super) owner: OriginContributions,
 }
 
 impl<'source> PlacementEvidence<'source> {
+    pub(super) fn new(
+        rig: &'source EntityRig,
+        input: &'source MediaOriginInput,
+        loadout: &'source EntityLoadoutEvidence,
+        writer: &MediaWriter<'_>,
+    ) -> Result<Self, MediaError> {
+        let owner = rig.attachment_target().map_or_else(
+            || Ok(OriginContributions::independent(&writer.origins.owner)),
+            |target| loadout.class(target, writer),
+        )?;
+        Ok(Self {
+            rig,
+            input,
+            loadout,
+            owner,
+        })
+    }
+
     pub(super) fn write(
         self,
         prepared: &mut PreparedRecordOrigins,
@@ -109,9 +130,26 @@ impl<'source> PlacementEvidence<'source> {
         Ok(())
     }
 
-    fn route(&self, writer: &MediaWriter<'_>) -> Result<OriginContributions, MediaError> {
+    pub(super) fn route(
+        &self,
+        writer: &MediaWriter<'_>,
+    ) -> Result<OriginContributions, MediaError> {
         let mut capture = writer.capture_origins();
-        for selector in self.rig.port_selectors() {
+        let selectors = self.rig.port_selectors();
+        let paths = self.rig.port_name_paths();
+        if selectors.len() != paths.len() {
+            return Err(MediaError::Contract(
+                "animation port route lost a physical selector".into(),
+            ));
+        }
+        for (selector, path) in selectors.iter().zip(paths) {
+            writer.checkpoint()?;
+            if selector.is_none()
+                && let Some(path) = path
+                && self.loadout.path(path, &mut capture, writer)?
+            {
+                continue;
+            }
             self.add(&mut capture, selector.as_ref(), writer)?;
         }
         Ok(capture.finish())

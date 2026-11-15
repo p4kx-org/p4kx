@@ -1,38 +1,62 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::cell::Cell;
+use std::sync::{Mutex, MutexGuard};
 
 use crate::checkpoint::Checkpoint;
 use crate::{Limits, MediaError};
 
 #[derive(Default)]
 pub(crate) struct InputBudget {
-    pub(crate) sources: Cell<u64>,
-    pub(crate) work: Cell<u64>,
-    bytes: Cell<u64>,
+    counts: Mutex<Counts>,
+}
+
+#[derive(Default)]
+struct Counts {
+    sources: u64,
+    work: u64,
+    bytes: u64,
 }
 
 impl InputBudget {
-    pub(crate) const fn check_source(&self, limits: Limits) -> Result<(), MediaError> {
-        check(self.sources.get(), 1, limits.sources, "sources")
+    fn counts(&self) -> Result<MutexGuard<'_, Counts>, MediaError> {
+        self.counts
+            .lock()
+            .map_err(|_| MediaError::Contract("input budget mutex is poisoned".into()))
+    }
+
+    pub(crate) fn source_count(&self) -> Result<u64, MediaError> {
+        Ok(self.counts()?.sources)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn work_count(&self) -> Result<u64, MediaError> {
+        Ok(self.counts()?.work)
+    }
+
+    pub(crate) fn check_source(&self, limits: Limits) -> Result<(), MediaError> {
+        check(self.source_count()?, 1, limits.sources, "sources")
     }
 
     pub(crate) fn admit_source(&self, limits: Limits) -> Result<(), MediaError> {
-        admit(&self.sources, 1, limits.sources, "sources")
+        admit(&mut self.counts()?.sources, 1, limits.sources, "sources")
     }
 
     pub(crate) fn bytes(&self, count: u64, limits: Limits) -> Result<(), MediaError> {
-        admit(&self.bytes, count, limits.source_bytes, "source_bytes")
+        admit(
+            &mut self.counts()?.bytes,
+            count,
+            limits.source_bytes,
+            "source_bytes",
+        )
     }
 
-    #[must_use]
-    pub(crate) const fn remaining_bytes(&self, limits: Limits) -> u64 {
-        limits.source_bytes.saturating_sub(self.bytes.get())
+    pub(crate) fn remaining_bytes(&self, limits: Limits) -> Result<u64, MediaError> {
+        Ok(limits.source_bytes.saturating_sub(self.counts()?.bytes))
     }
 
-    pub(crate) const fn remaining_metadata_work(&self, limits: Limits) -> u64 {
-        limits.metadata_work.saturating_sub(self.work.get())
+    pub(crate) fn remaining_metadata_work(&self, limits: Limits) -> Result<u64, MediaError> {
+        Ok(limits.metadata_work.saturating_sub(self.counts()?.work))
     }
 
     pub(crate) fn metadata(
@@ -43,22 +67,20 @@ impl InputBudget {
         checkpoint: Checkpoint<'_>,
     ) -> Result<(), MediaError> {
         checkpoint.check()?;
-        check(self.bytes.get(), bytes, limits.source_bytes, "source_bytes")?;
-        check(self.work.get(), work, limits.metadata_work, "metadata_work")?;
-        self.bytes.set(self.bytes.get() + bytes);
-        self.work.set(self.work.get() + work);
+        {
+            let mut counts = self.counts()?;
+            check(counts.bytes, bytes, limits.source_bytes, "source_bytes")?;
+            check(counts.work, work, limits.metadata_work, "metadata_work")?;
+            counts.bytes += bytes;
+            counts.work += work;
+        }
         checkpoint.check()
     }
 }
 
-fn admit(
-    current: &Cell<u64>,
-    added: u64,
-    limit: u64,
-    name: &'static str,
-) -> Result<(), MediaError> {
-    check(current.get(), added, limit, name)?;
-    current.set(current.get() + added);
+fn admit(current: &mut u64, added: u64, limit: u64, name: &'static str) -> Result<(), MediaError> {
+    check(*current, added, limit, name)?;
+    *current += added;
     Ok(())
 }
 

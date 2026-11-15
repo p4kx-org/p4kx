@@ -59,7 +59,7 @@ fn distinct_private_inputs_can_be_nested_without_holding_a_cache_borrow() -> Tes
             )?;
             assert_eq!(outer, b"first");
             assert_eq!(
-                context.directory.input_state()?.budget.sources.get(),
+                context.directory.input_state()?.budget.source_count()?,
                 3,
                 "one admission per actual physical source"
             );
@@ -136,7 +136,7 @@ fn cached_damage(damage: Damage) -> TestResult {
                 }
             ));
             assert_eq!(
-                context.directory.input_state()?.budget.sources.get(),
+                context.directory.input_state()?.budget.source_count()?,
                 2,
                 "failed cache reuse does not readmit a source"
             );

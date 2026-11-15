@@ -10,6 +10,7 @@ mod directional_paths;
 mod directional_pose_blocks;
 mod directional_records;
 mod entity_catalogue;
+pub(crate) mod entity_loadout_evidence;
 mod image_payload;
 mod image_projection;
 mod origin;
@@ -20,7 +21,7 @@ mod schema;
 pub(crate) mod selection_path;
 mod skeleton_selection;
 
-pub(crate) use entity_catalogue::{incomplete_loadout, with_resolved_entity};
+pub(crate) use entity_catalogue::{loadout_issue, with_resolved_entity};
 pub(crate) use provider::AnimationProvider;
 pub(crate) use schema::bind_record_schema;
 pub(crate) use skeleton_selection::{SkeletonSelection, validate_skeleton_path};

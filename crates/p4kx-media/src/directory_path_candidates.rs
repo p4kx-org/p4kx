@@ -19,8 +19,8 @@ impl DirectoryLookup<'_> {
         let work = LookupWork {
             checkpoint: writer.checkpoint,
             limits: writer.limits(),
-            current: self.work,
-            source_allowance: self.allowance(writer.limits().sources),
+            budget: self.budget,
+            source_allowance: self.allowance(writer.limits().sources)?,
         };
         let paths = self.index.index(&work)?;
         let requested = kind.is_none_or(|kind| writer.has_kind(kind));

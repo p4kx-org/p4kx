@@ -41,7 +41,7 @@ fn payload_buffer(
     limits: Limits,
     name: &str,
 ) -> Result<Vec<u8>, MediaError> {
-    if size > budget.remaining_bytes(limits) {
+    if size > budget.remaining_bytes(limits)? {
         return Err(MediaError::Limit {
             budget: "source_bytes",
             limit: limits.source_bytes,
@@ -179,7 +179,7 @@ impl<'input> RequiredReader<'input> {
         if count == 0 {
             return Ok(0);
         }
-        let available = self.budget.remaining_bytes(self.limits);
+        let available = self.budget.remaining_bytes(self.limits)?;
         let count_u64 = u64::try_from(count)
             .map_err(|_| MediaError::Contract("input read count exceeds u64".into()))?;
         if count_u64 > available {

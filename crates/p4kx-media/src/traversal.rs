@@ -107,7 +107,7 @@ impl Traversal<'_> {
     ) -> Result<(), MediaError> {
         if counts_sources {
             inputs.admit(position, writer)?;
-            self.entries.enumerated = self.budget.sources.get();
+            self.entries.enumerated = self.budget.source_count()?;
         } else {
             if self.entries.enumerated >= writer.limits().sources {
                 return Err(MediaError::Limit {

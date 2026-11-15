@@ -8,6 +8,7 @@ use p4kx_testkit::{ArchiveBuilder, TestEntry};
 
 use super::DirectoryLookup;
 use crate::directory_index::DirectoryIndex;
+use crate::input_budget::InputBudget;
 use crate::source_selection::SourceSelection;
 use crate::{
     Algorithm, ByteScope, CandidateState, Digest, Identity, MediaKind, NotSelectedReason,
@@ -96,8 +97,8 @@ fn candidate(
         include: &include,
         exclude: &exclude,
     };
-    let work = Cell::new(0);
-    let lookup = DirectoryLookup::new(&index, &root, &[], selection, &work, 1);
+    let budget = InputBudget::default();
+    let lookup = DirectoryLookup::new(&index, &root, &[], selection, &budget, 1);
     Ok(lookup.candidate(
         archive.entries().first().ok_or("synthetic entry")?,
         Some(MediaKind::Material),

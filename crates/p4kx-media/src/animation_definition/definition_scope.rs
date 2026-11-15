@@ -70,7 +70,7 @@ impl DefinitionScope {
             writer,
             targets: Vec::new(),
         };
-        let models = ArchiveModels::from_path_index(lookup.index.index(&inputs.work())?);
+        let models = ArchiveModels::from_path_index(lookup.index.index(&inputs.work()?)?);
         let rig = discover_model_rig_using(&models, path, &mut inputs)?;
         scope_health::verify(
             rig.definition.as_ref(),
@@ -105,30 +105,37 @@ impl DefinitionScope {
         let forge = DataForge::open(&bytes).map_err(|cause| {
             MediaError::Contract(format!("selected animation Entity DataForge: {cause}"))
         })?;
-        animation::with_resolved_entity(selector, &forge, lookup, writer, |_, tree, writer| {
-            if animation::incomplete_loadout(tree, writer)? {
-                return Err(MediaError::Contract(
-                    "incomplete animation definition scope: unresolved Entity Loadout".into(),
-                ));
-            }
-            let mut inputs = Inputs {
-                lookup,
-                writer,
-                targets: Vec::new(),
-            };
-            let models = ArchiveModels::from_path_index(lookup.index.index(&inputs.work())?);
-            let rigs = discover_entity_rigs_using(&models, tree, &mut inputs)?;
-            for rig in &rigs {
-                scope_health::verify(
-                    rig.definition.as_ref(),
-                    rig.skeleton.as_ref(),
-                    rig.parameters.as_ref(),
-                )?;
-                self.parameters(rig.parameters.as_ref(), writer)?;
-            }
-            self.targets(inputs.targets, lookup, writer)?;
-            scope_receipt::entity(lookup, entry, &rigs, writer)
-        })
+        animation::with_resolved_entity(
+            selector,
+            &forge,
+            lookup,
+            true,
+            writer,
+            |_, tree, loadout, writer| {
+                if let Some(issue) = animation::loadout_issue(tree, writer)? {
+                    return Err(MediaError::Contract(format!(
+                        "incomplete animation definition scope: unresolved Entity Loadout: {issue}"
+                    )));
+                }
+                let mut inputs = Inputs {
+                    lookup,
+                    writer,
+                    targets: Vec::new(),
+                };
+                let models = ArchiveModels::from_path_index(lookup.index.index(&inputs.work()?)?);
+                let rigs = discover_entity_rigs_using(&models, tree, &mut inputs)?;
+                for rig in &rigs {
+                    scope_health::verify(
+                        rig.definition.as_ref(),
+                        rig.skeleton.as_ref(),
+                        rig.parameters.as_ref(),
+                    )?;
+                    self.parameters(rig.parameters.as_ref(), writer)?;
+                }
+                self.targets(inputs.targets, lookup, writer)?;
+                scope_receipt::entity(lookup, entry, &rigs, loadout, writer)
+            },
+        )
     }
 
     fn parameters(
@@ -209,14 +216,14 @@ struct Inputs<'lookup, 'directory, 'writer, 'run> {
 }
 
 impl Inputs<'_, '_, '_, '_> {
-    fn work(&self) -> LookupWork<'_> {
+    fn work(&self) -> Result<LookupWork<'_>, MediaError> {
         let limits = self.writer.limits();
-        LookupWork {
+        Ok(LookupWork {
             limits,
             checkpoint: self.writer.checkpoint,
-            current: self.lookup.work,
-            source_allowance: self.lookup.allowance(limits.sources),
-        }
+            budget: self.lookup.budget,
+            source_allowance: self.lookup.allowance(limits.sources)?,
+        })
     }
 }
 
@@ -224,7 +231,7 @@ impl RigInputs for Inputs<'_, '_, '_, '_> {
     type Error = MediaError;
 
     fn check(&mut self) -> Result<(), MediaError> {
-        self.work().charge(1)
+        self.work()?.charge(1)
     }
 
     fn read(&mut self, entry: &Entry) -> Result<RigInput, MediaError> {

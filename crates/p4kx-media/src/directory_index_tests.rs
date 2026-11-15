@@ -37,7 +37,7 @@ fn actual_cancellation_stops_before_index_storage_and_keeps_the_original_categor
         );
         assert_eq!(slots.get(), 0, "cancelled index reserves no live slots");
         assert_eq!(
-            work.current.get(),
+            work.budget.work_count()?,
             0,
             "cancelled work is not charged as completed work"
         );
@@ -108,18 +108,18 @@ fn either_build_order_registers_one_directory_without_source_admission() -> Test
                 "two views share physical-directory registration"
             );
             assert_eq!(
-                budget.sources.get(),
+                budget.source_count()?,
                 0,
                 "index cells are not source admissions"
             );
             assert_eq!(index.registered_entries.get(), Some(2));
             assert!(index.keys.get().is_some());
             assert!(index.members.get().is_some());
-            let charged = work.current.get();
+            let charged = work.budget.work_count()?;
             index.index(work)?;
             index.texture_members(work)?;
             assert_eq!(
-                work.current.get(),
+                work.budget.work_count()?,
                 charged,
                 "cached access does not rebuild"
             );
@@ -140,7 +140,7 @@ fn nested_frames_bound_both_views_and_release_only_their_own_registration() -> T
                 ..work.limits
             },
             checkpoint: work.checkpoint,
-            current: work.current,
+            budget: work.budget,
             source_allowance: 4,
         };
         let outer = DirectoryIndex::new(archive, slots);
@@ -152,7 +152,7 @@ fn nested_frames_bound_both_views_and_release_only_their_own_registration() -> T
             inner.texture_members(&expanded)?;
             outer.index(&expanded)?;
             assert_eq!(slots.get(), 4, "a second view is not another source frame");
-            assert_eq!(budget.sources.get(), 0);
+            assert_eq!(budget.source_count()?, 0);
         }
         assert_eq!(slots.get(), 2);
         outer.texture_members(&expanded)?;
@@ -168,7 +168,7 @@ fn a_pending_family_build_is_included_in_the_shared_source_bound() -> TestResult
         let outer = DirectoryIndex::new(archive, slots);
         outer.index(work)?;
         let pending = DirectoryIndex::new(archive, slots);
-        let charged = work.current.get();
+        let charged = work.budget.work_count()?;
 
         let failure = pending
             .texture_members(work)
@@ -183,7 +183,7 @@ fn a_pending_family_build_is_included_in_the_shared_source_bound() -> TestResult
             }
         ));
         assert_eq!(
-            work.current.get(),
+            work.budget.work_count()?,
             charged,
             "no directory control work is precharged"
         );
@@ -201,7 +201,7 @@ fn insufficient_actual_source_allowance_never_publishes_an_inventory() -> TestRe
             source_allowance: 1,
             checkpoint: work.checkpoint,
             limits: work.limits,
-            current: work.current,
+            budget: work.budget,
         };
         let index = DirectoryIndex::new(archive, slots);
         assert!(matches!(
@@ -214,7 +214,7 @@ fn insufficient_actual_source_allowance_never_publishes_an_inventory() -> TestRe
         assert!(index.members.get().is_none());
         assert_eq!(index.registered_entries.get(), None);
         assert_eq!(slots.get(), 0);
-        assert_eq!(budget.sources.get(), 0);
+        assert_eq!(budget.source_count()?, 0);
         Ok(())
     })
 }
@@ -228,7 +228,7 @@ fn a_mid_build_work_failure_registers_neither_index_nor_complete_inventory() -> 
                 ..work.limits
             },
             checkpoint: work.checkpoint,
-            current: work.current,
+            budget: work.budget,
             source_allowance: work.source_allowance,
         };
         let index = DirectoryIndex::new(archive, slots);
@@ -243,7 +243,7 @@ fn a_mid_build_work_failure_registers_neither_index_nor_complete_inventory() -> 
         assert!(index.members.get().is_none());
         assert_eq!(index.registered_entries.get(), None);
         assert_eq!(slots.get(), 0);
-        assert_eq!(budget.sources.get(), 0);
+        assert_eq!(budget.source_count()?, 0);
         assert!(matches!(
             index.inventory(),
             crate::CandidateInventory::Unavailable(crate::ReferenceUnavailable::TargetNotRead)
@@ -263,14 +263,14 @@ fn a_failed_second_view_keeps_only_the_first_view_registration() -> TestResult {
     with_source(|archive, _, work, slots, budget| {
         let index = DirectoryIndex::new(archive, slots);
         index.index(work)?;
-        let limit = work.current.get() + 1;
+        let limit = work.budget.work_count()? + 1;
         let limited = LookupWork {
             limits: Limits {
                 metadata_work: limit,
                 ..work.limits
             },
             checkpoint: work.checkpoint,
-            current: work.current,
+            budget: work.budget,
             source_allowance: work.source_allowance,
         };
         assert!(matches!(
@@ -284,7 +284,7 @@ fn a_failed_second_view_keeps_only_the_first_view_registration() -> TestResult {
         assert!(index.members.get().is_none());
         assert_eq!(index.registered_entries.get(), Some(2));
         assert_eq!(slots.get(), 2);
-        assert_eq!(budget.sources.get(), 0);
+        assert_eq!(budget.source_count()?, 0);
         index.texture_members(work)?;
         assert_eq!(slots.get(), 2);
         Ok(())
@@ -341,7 +341,7 @@ fn with_source(
             protection: &protection,
         },
         limits,
-        current: &budget.work,
+        budget: &budget,
         source_allowance: 3,
     };
     run(&archive, &cancel, &work, &slots, &budget)

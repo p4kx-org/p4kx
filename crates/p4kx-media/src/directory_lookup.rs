@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::cell::Cell;
-
 #[path = "directory_animation_banks.rs"]
 pub(crate) mod animation_banks;
 #[path = "directory_definition_scope.rs"]
@@ -15,6 +13,7 @@ use p4kx_extraction::{Archive, Entry, TextureMemberCandidate};
 
 use crate::directory_index::{self, DirectoryIndex, LooseWemMatches};
 use crate::directory_inputs::DirectoryInputs;
+use crate::input_budget::InputBudget;
 use crate::lookup_work::LookupWork;
 use crate::source;
 use crate::source_selection::{EntrySelection, SourceSelection};
@@ -40,7 +39,7 @@ pub struct DirectoryLookup<'a> {
     pub(crate) root: &'a Digest,
     pub(crate) chain: &'a [ContainerIdentity],
     pub(crate) selection: SourceSelection<'a>,
-    pub(crate) work: &'a Cell<u64>,
+    pub(crate) budget: &'a InputBudget,
     pub(crate) source_allowance: u64,
     inputs: Option<&'a DirectoryInputs<'a>>,
     definition_scope: bool,
@@ -54,7 +53,7 @@ impl<'a> DirectoryLookup<'a> {
         root: &'a Digest,
         chain: &'a [ContainerIdentity],
         selection: SourceSelection<'a>,
-        work: &'a Cell<u64>,
+        budget: &'a InputBudget,
         source_allowance: u64,
     ) -> Self {
         Self {
@@ -62,7 +61,7 @@ impl<'a> DirectoryLookup<'a> {
             root,
             chain,
             selection,
-            work,
+            budget,
             source_allowance,
             inputs: None,
             definition_scope: false,
@@ -81,7 +80,7 @@ impl<'a> DirectoryLookup<'a> {
             root,
             chain,
             selection,
-            work: &inputs.budget.work,
+            budget: inputs.budget,
             source_allowance: 0,
             inputs: Some(inputs),
             definition_scope: false,
@@ -174,11 +173,11 @@ impl<'a> DirectoryLookup<'a> {
         ),
         MediaError,
     > {
-        let source_allowance = self.allowance(writer.limits().sources);
+        let source_allowance = self.allowance(writer.limits().sources)?;
         let work = LookupWork {
             checkpoint: writer.checkpoint,
             limits: writer.limits(),
-            current: self.work,
+            budget: self.budget,
             source_allowance,
         };
         let index = self.index.index(&work)?;
@@ -235,8 +234,8 @@ impl<'a> DirectoryLookup<'a> {
         let work = LookupWork {
             checkpoint: writer.checkpoint,
             limits: writer.limits(),
-            current: self.work,
-            source_allowance: self.allowance(writer.limits().sources),
+            budget: self.budget,
+            source_allowance: self.allowance(writer.limits().sources)?,
         };
         let index = self.index.texture_members(&work)?;
         work.charge(1)?;
@@ -261,8 +260,8 @@ impl<'a> DirectoryLookup<'a> {
         let work = LookupWork {
             checkpoint: writer.checkpoint,
             limits: writer.limits(),
-            current: self.work,
-            source_allowance: self.allowance(writer.limits().sources),
+            budget: self.budget,
+            source_allowance: self.allowance(writer.limits().sources)?,
         };
         self.index.model_companions(model, &work)
     }
@@ -274,8 +273,8 @@ impl<'a> DirectoryLookup<'a> {
         let work = LookupWork {
             checkpoint: writer.checkpoint,
             limits: writer.limits(),
-            current: self.work,
-            source_allowance: self.allowance(writer.limits().sources),
+            budget: self.budget,
+            source_allowance: self.allowance(writer.limits().sources)?,
         };
         self.index.scan_inventory(&work)
     }
@@ -288,8 +287,8 @@ impl<'a> DirectoryLookup<'a> {
         let work = LookupWork {
             checkpoint: writer.checkpoint,
             limits: writer.limits(),
-            current: self.work,
-            source_allowance: self.allowance(writer.limits().sources),
+            budget: self.budget,
+            source_allowance: self.allowance(writer.limits().sources)?,
         };
         self.index.loose_wems(media_id, &work)
     }
@@ -302,8 +301,8 @@ impl<'a> DirectoryLookup<'a> {
         let work = LookupWork {
             checkpoint: writer.checkpoint,
             limits: writer.limits(),
-            current: self.work,
-            source_allowance: self.allowance(writer.limits().sources),
+            budget: self.budget,
+            source_allowance: self.allowance(writer.limits().sources)?,
         };
         let inventory = self.index.scan_inventory(&work)?;
         let archive = self.index.archive;
@@ -329,8 +328,8 @@ impl<'a> DirectoryLookup<'a> {
         Ok(inventory)
     }
 
-    pub(crate) fn allowance(&self, limit: u64) -> u64 {
-        self.inputs.map_or(self.source_allowance, |inputs| {
+    pub(crate) fn allowance(&self, limit: u64) -> Result<u64, MediaError> {
+        self.inputs.map_or(Ok(self.source_allowance), |inputs| {
             inputs.source_allowance(limit)
         })
     }

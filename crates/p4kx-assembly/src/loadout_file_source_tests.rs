@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_archive::Archive;
+use p4kx_archive::{Archive, Entry};
 use p4kx_testkit::{ArchiveBuilder, TestEntry};
 
 use super::LoadoutFileSource;
-use crate::{ArchiveFiles, LoadoutFileRead, LoadoutFiles};
+use crate::{ArchiveFiles, LoadoutFileError, LoadoutFileRead, LoadoutFiles};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -120,5 +120,47 @@ fn equal_entry_coordinates_in_separate_archives_remain_foreign() -> TestResult {
         !foreign.is_same_admission(&first),
         "foreign ownership is rejected in either direction"
     );
+    Ok(())
+}
+
+#[test]
+fn verified_archive_read_only_binds_complete_owned_bytes() -> TestResult {
+    let directory = tempfile::tempdir()?;
+    let path = directory.path().join("Data.p4k");
+    let xml = b"<Loadout/>".as_slice();
+    ArchiveBuilder::new()
+        .entry(TestEntry::stored(r"Data\good.xml", xml))
+        .entry(TestEntry::stored(r"Data\bad.xml", xml).with_payload(b"<Unbound/>".as_slice()))
+        .write_to(&path)?;
+    let archive = Archive::open(path)?;
+    let entry = |name| archive.entries().iter().find(|entry| entry.path() == name);
+    let good = entry(r"Data\good.xml").ok_or("valid XML entry")?;
+    let bad = entry(r"Data\bad.xml").ok_or("corrupt XML entry")?;
+    let read = LoadoutFileRead::read_archive(&archive, good, &|| false);
+    assert_eq!(read.outcome(), Ok(xml));
+    let origin = read.source().entry_origin().ok_or("verified admission")?;
+    assert!(archive.owns_origin(origin));
+
+    let cancelled = LoadoutFileRead::read_archive(&archive, good, &|| true);
+    assert_eq!(
+        cancelled.outcome(),
+        Err(&LoadoutFileError::ObservationStopped)
+    );
+    assert!(cancelled.source().entry_origin().is_none());
+
+    let detached = Entry::clone(good);
+    let unowned = LoadoutFileRead::read_archive(&archive, &detached, &|| false);
+    assert_eq!(
+        unowned.outcome(),
+        Err(&LoadoutFileError::SourceEvidenceUnavailable)
+    );
+    assert!(unowned.source().entry_origin().is_none());
+
+    let corrupt = LoadoutFileRead::read_archive(&archive, bad, &|| false);
+    assert!(matches!(
+        corrupt.outcome(),
+        Err(LoadoutFileError::Unreadable { .. })
+    ));
+    assert!(corrupt.source().entry_origin().is_none());
     Ok(())
 }

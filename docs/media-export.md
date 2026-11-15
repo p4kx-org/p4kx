@@ -708,6 +708,18 @@ The other requested providers
 retain their own Entry filters. An Animation-only export with
 `--animation-entity` uses the independent clip inventory selection.
 
+The scoped Entity export follows external XML and CryXml Loadouts and their
+authored Includes in the root Archive. A required dependency can fall outside
+`--include`. An explicit `--exclude` still blocks the read. Each required path
+must match one physical Entry in a complete directory inventory. A successful
+read verifies the declared decoded length and available CRC. Missing, ambiguous,
+excluded and unreadable targets have distinct errors. An unresolved required
+dependency prevents publication of a complete index.
+
+The Assembly Loadout parser applies a 16 MiB limit per XML document, a maximum
+of eight documents on the active Include chain, and a maximum of 256 files per
+Loadout resolution. Media input limits also apply.
+
 Scoped exports write one directory `scope-receipt` record per resolved rig
 occurrence using its ordinal in loadout traversal order. The receipt identifies
 the physical model or DataForge Entry and, for an observed Entity placement,
@@ -731,6 +743,13 @@ lacks its original coordinate, its path has `sourceSetComplete: false` and can
 still cite other observed segments. If there is no known contributor, the path's
 `containsEncryptedSource` is `null`. The gear ordinal and bone cite the original
 array element and bone field in the DataForge respectively.
+
+The existing receipt schema and field-origin streams carry external Loadout
+evidence. Each observed XML port-name selector cites its physical Entry, original
+decoder node index, attribute ordinal and attribute name. The `port_path` uses
+that name evidence. The owner and selection outcome carry the observed class and
+Include selectors separately and mark an incomplete source set when additional
+coordinates are unavailable.
 
 Within a character parameter `AnimationList`, `named-caf` link rows keep each
 concrete animation declaration at the original path attribute's coordinates,

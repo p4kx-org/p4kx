@@ -56,7 +56,7 @@ fn a_genuine_token_from_another_root_is_refused_before_input_admission() -> Test
                     );
                     assert!(!called.get(), "no foreign input callback");
                     assert_eq!(
-                        outer.directory.input_state()?.budget.sources.get(),
+                        outer.directory.input_state()?.budget.source_count()?,
                         1,
                         "refusal precedes input admission"
                     );
@@ -117,7 +117,7 @@ fn a_genuine_token_from_another_container_is_refused_before_input_admission() ->
                 .ok_or("foreign container input accepted")?;
             assert!(matches!(failure, MediaError::Contract(_)));
             assert_eq!(
-                context.directory.input_state()?.budget.sources.get(),
+                context.directory.input_state()?.budget.source_count()?,
                 1,
                 "scope refusal precedes source work"
             );
@@ -159,7 +159,7 @@ fn a_lossy_display_match_has_no_read_token_or_admission() -> TestResult {
                 "raw path loss precedes unrequested-kind classification"
             );
             assert_eq!(
-                context.directory.input_state()?.budget.sources.get(),
+                context.directory.input_state()?.budget.source_count()?,
                 1,
                 "bad payload was never admitted or read"
             );
@@ -206,7 +206,7 @@ fn a_recovered_inventory_cannot_prove_a_present_or_missing_input() -> TestResult
                     "neither unique nor missing can be claimed"
                 );
             }
-            assert_eq!(context.directory.input_state()?.budget.sources.get(), 1);
+            assert_eq!(context.directory.input_state()?.budget.source_count()?, 1);
             Ok(())
         },
     )

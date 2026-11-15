@@ -20,6 +20,7 @@ mod animation_provider;
 mod animation_sub_database_cycles;
 mod animation_sub_database_selectors;
 mod animation_wildcard_selector;
+mod animation_xml_loadout_scope;
 mod archive;
 mod archive_layout;
 mod audio_bank_action_properties_provider;
