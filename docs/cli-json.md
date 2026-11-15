@@ -1884,6 +1884,17 @@ and the allocated object's segment, fade and playback fields. Signed fade words 
 their original bits and signed value. Each value carries its original field origin.
 This describes authored rules without computing a transition or choosing a playable sequence.
 
+Music switches expose `source_fields.decisions` with the sourced playback byte,
+group count, tree size, mode byte and checked tree range. Its layout distinguishes
+`decoded`, `malformed`, `unavailable` and `unsupported` decision blocks independently of
+the stingers and transition table. Its rows retain original argument groups, every
+complete physical node and each checked nonzero target occurrence in traversal
+order. A physical node preserves its raw key, link, weight and probability, even
+outside the traversed tree. Target rows identify the original node, level and
+ancestor nodes. The target ID cites the leaf word and selecting branch links.
+Unknown codes, duplicate targets and incomplete checked prefixes remain distinct.
+These rows describe the authored decision graph without evaluating its runtime state.
+
 Other object details:
 
 - `state`: standalone State versions 128 through 145 expose `property_count`, `count_range`,

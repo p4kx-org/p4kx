@@ -20,6 +20,8 @@ mod blend_source_fields;
 mod dialogue_source_fields;
 #[path = "bnk_music_playlist_source_fields.rs"]
 mod music_playlist_source_fields;
+#[path = "bnk_music_switch_decision_source_fields.rs"]
+mod music_switch_decision_source_fields;
 #[path = "bnk_music_track_source_fields.rs"]
 mod music_track_source_fields;
 #[path = "bnk_music_transition_source_fields.rs"]

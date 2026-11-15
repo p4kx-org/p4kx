@@ -135,6 +135,13 @@ impl<'input, R> BankMusicSwitchRows<'input, R> {
         }
     }
 
+    pub(super) fn decisions(&mut self) -> BankMusicSwitchRows<'_, R> {
+        BankMusicSwitchRows {
+            kind: Some(Kind::Groups),
+            ..BankMusicSwitchRows::new(self.input, self.stopped, self.lists)
+        }
+    }
+
     /// Returns the exact ancestor branch links of the current target, from the root down.
     pub fn current_target_route(&self) -> impl Iterator<Item = &BankMusicSwitchBranch> {
         self.traversal

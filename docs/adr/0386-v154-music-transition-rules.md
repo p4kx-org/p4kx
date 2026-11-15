@@ -29,3 +29,14 @@ The CLI and MCP expose this table in the owning music node's
 `source_fields.transition_rules`. Rule and ID rows share the source inventory
 with the stingers and use the same checked bank cursor. Table coverage
 describes only the transition bytes, independently of later owner fields.
+
+Version-154 MusicSwitch also exposes its decision block under
+`source_fields.decisions`. It shares the positioned reader with Media and
+uses an independent cursor for original group, node and checked target rows.
+Group and node ordinals are physical positions. Target ordinals count
+individual routes in traversal order, so two routes to the same original
+leaf stay distinct. Raw node words and argument types remain available even
+when a route fails. Each target ID cites the leaf payload and the branch
+selectors. These fields record the checked source graph without choosing
+runtime conditions. A malformed object suffix leaves the checked decision block
+decoded.

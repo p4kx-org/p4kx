@@ -28,6 +28,8 @@ pub struct BankMusicSwitchFields {
     pub tree_mode_code: Option<BankHircField<u8>>,
     /// Admitted original decision tree extent.
     pub tree_range: Option<Range<u64>>,
+    /// Whether the declared tree and its traversal were checked completely.
+    pub tree_complete: bool,
 }
 
 /// Original group ID and its independently checked type byte.
@@ -56,7 +58,7 @@ pub struct BankMusicSwitchNode {
     pub range: Range<u64>,
 }
 
-#[derive(Default)]
+#[derive(Clone, Copy, Default)]
 pub(crate) struct SwitchGroups {
     pub(crate) ids: MusicList,
     pub(crate) types: MusicList,

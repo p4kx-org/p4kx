@@ -48,6 +48,11 @@ impl<R> BankHircMusicSwitch<'_, R> {
     pub fn transition_rules(&mut self) -> Option<BankMusicTransitionRows<'_, R>> {
         self.rows.transition_rules(&self.fields.transitions)
     }
+
+    /// Borrows an independent cursor over the original groups, nodes and traversal targets.
+    pub fn decision_rows(&mut self) -> BankMusicSwitchRows<'_, R> {
+        self.rows.decisions()
+    }
 }
 
 /// Interpretation status of a physical music switch.
@@ -62,7 +67,7 @@ pub enum BankMusicSwitchRead {
     Unsupported(BankError),
 }
 
-#[derive(Default)]
+#[derive(Clone, Copy, Default)]
 struct SwitchLists {
     node: MusicNodeLists,
     groups: SwitchGroups,
@@ -134,5 +139,6 @@ fn scan<R: Read + Seek>(
     {
         lists.targets += 1;
     }
+    fields.tree_complete = true;
     finish
 }

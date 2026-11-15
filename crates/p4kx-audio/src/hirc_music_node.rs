@@ -55,7 +55,7 @@ impl MusicList {
     }
 }
 
-#[derive(Default)]
+#[derive(Clone, Copy, Default)]
 pub(crate) struct MusicNodeLists {
     pub(crate) children: MusicList,
     pub(crate) stingers: MusicList,

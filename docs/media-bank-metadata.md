@@ -498,7 +498,7 @@ The source coverage depends on the HIRC owner and the observed bank version.
 | Owner | Media records | CLI JSON and MCP |
 | --- | --- | --- |
 | v154 Sound, ActorMixer, Random/Sequence, Switch, Blend | Shared properties, priority, effects, Aux, positioning, advanced settings, inline State and RTPC | node_fields plus type-specific source_fields where available |
-| v154 MusicSegment, MusicTrack, MusicSwitch, MusicPlaylist | The same shared groups, alongside music decisions and timing | node_fields plus MusicTrack source_fields |
+| v154 MusicSegment, MusicTrack, MusicSwitch, MusicPlaylist | The same shared groups, alongside music decisions and timing | `node_fields` plus `source_fields` for track details, stinger schedules, transition rules and MusicSwitch decisions |
 | v154 AudioBus, AuxiliaryBus | Bus routing, settings, duck targets and shared source groups | `node_fields` and its `bus` extension |
 | v154 Play Action | Separate property summary and scalar/ranged rows | source_fields with type, target, PlayBank and property declarations |
 | Standalone State v128–145 | Standalone property summary and ordered raw words | source_fields with the original bundle and raw range |

@@ -16,22 +16,29 @@ use serde::{Serialize, Serializer};
 use crate::source_inventory::SourceInventory;
 use crate::source_value::SourcedValue;
 
+#[path = "hirc_music_switch_decisions.rs"]
+mod decisions;
 #[path = "hirc_music_stingers.rs"]
 mod stingers;
 #[path = "hirc_music_transition_source.rs"]
 mod transitions;
 
+use self::decisions::MusicSwitchDecisionsSchema;
 use self::stingers::{Observation, Stinger, Stingers};
 use self::transitions::{Owner, SharedStingers, TransitionRulesSchema};
 use super::origins::ObjectOrigins;
 
-pub(in crate::hirc_view) type MusicNodeSourceSchema =
-    MusicNodeSourceDocument<Vec<Stinger>, TransitionRulesSchema, SourceInventory>;
+pub(in crate::hirc_view) type MusicNodeSourceSchema = MusicNodeSourceDocument<
+    Vec<Stinger>,
+    TransitionRulesSchema,
+    MusicSwitchDecisionsSchema,
+    SourceInventory,
+>;
 
 #[derive(Serialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 #[schemars(rename = "MusicNodeObjectSourceFields")]
-pub(in crate::hirc_view) struct MusicNodeSourceDocument<Rows, Transitions, Inventory> {
+pub(in crate::hirc_view) struct MusicNodeSourceDocument<Rows, Transitions, Decisions, Inventory> {
     kind: SourceKind,
     layout: SourcedValue<Layout>,
     version: SourcedValue<u32>,
@@ -44,6 +51,9 @@ pub(in crate::hirc_view) struct MusicNodeSourceDocument<Rows, Transitions, Inven
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schemars(with = "Option<TransitionRulesSchema>")]
     transition_rules: Option<Transitions>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<MusicSwitchDecisionsSchema>")]
+    decisions: Option<Decisions>,
     #[schemars(with = "SourceInventory")]
     source_inventory: Inventory,
 }
@@ -195,7 +205,7 @@ fn observed_transitions<R: Read + Seek, S: Serializer>(
     node: Owner<'_, R>,
 ) -> Result<S::Ok, S::Error> {
     let owner = RefCell::new(node);
-    let (stinger_count, rules) = {
+    let (stinger_count, rules, decisions) = {
         let current = owner.try_borrow().map_err(S::Error::custom)?;
         let (node, rules) = current.fields();
         let stinger_count = site
@@ -204,15 +214,22 @@ fn observed_transitions<R: Read + Seek, S: Serializer>(
             .map_err(S::Error::custom)?;
         let rules =
             transitions::observed(site, &layout, rules, &owner).map_err(S::Error::custom)?;
-        (stinger_count, rules)
+        let decisions = match &*current {
+            Owner::Switch(node) => Some(
+                decisions::observed(site, &layout, &node.fields, &owner)
+                    .map_err(S::Error::custom)?,
+            ),
+            Owner::Playlist(_) => None,
+        };
+        (stinger_count, rules, decisions)
     };
     site.write(
         serializer,
-        layout,
-        error,
+        (layout, error),
         stinger_count,
         SharedStingers::new(&owner, site.origins),
         Some(rules),
+        decisions,
     )
 }
 
@@ -236,11 +253,11 @@ where
     let rows = Stingers::new(input, select, fields.stinger_tail, site.origins);
     site.write(
         serializer,
-        layout,
-        error,
+        (layout, error),
         stinger_count,
         rows,
         None::<TransitionRulesSchema>,
+        None::<MusicSwitchDecisionsSchema>,
     )
 }
 
@@ -268,13 +285,18 @@ pub(super) fn unsupported<S: Serializer>(
     } else {
         Some(transitions::unsupported(&site).map_err(S::Error::custom)?)
     };
+    let decisions = if matches!(kind, SourceKind::Switch) {
+        Some(decisions::unsupported(&site).map_err(S::Error::custom)?)
+    } else {
+        None
+    };
     site.write(
         serializer,
-        Layout::Unsupported,
-        None,
+        (Layout::Unsupported, None),
         None,
         [] as [Stinger; 0],
         rules,
+        decisions,
     )
 }
 
@@ -286,14 +308,14 @@ struct DocumentSite<'source> {
 }
 
 impl DocumentSite<'_> {
-    fn write<S: Serializer, Rows: Serialize, Transitions: Serialize>(
+    fn write<S: Serializer, Rows: Serialize, Transitions: Serialize, Decisions: Serialize>(
         &self,
         serializer: S,
-        layout: Layout,
-        error: Option<String>,
+        (layout, error): (Layout, Option<String>),
         stinger_count: Option<SourcedValue<u32>>,
         stingers: Rows,
         transition_rules: Option<Transitions>,
+        decisions: Option<Decisions>,
     ) -> Result<S::Ok, S::Error> {
         MusicNodeSourceDocument {
             kind: self.kind,
@@ -312,6 +334,7 @@ impl DocumentSite<'_> {
             stinger_count,
             stingers,
             transition_rules,
+            decisions,
             source_inventory: self.origins,
         }
         .serialize(serializer)

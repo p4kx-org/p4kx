@@ -222,7 +222,16 @@ impl ObjectOrigins {
         )
     }
 
-    fn value<T>(&self, value: T, uses: &[SourceUse]) -> SourcedValue<T> {
+    pub(in crate::hirc_view) fn reference(
+        &self,
+        label: &'static str,
+        extent: &Range<u64>,
+        role: SourceUseRole,
+    ) -> Result<SourceUse, SourceEvidenceError> {
+        self.site(self.namespace, label, extent, role)
+    }
+
+    pub(in crate::hirc_view) fn value<T>(&self, value: T, uses: &[SourceUse]) -> SourcedValue<T> {
         self.uses
             .value(SourceValue::Present(value), uses, self.complete)
     }
