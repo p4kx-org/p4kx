@@ -37,6 +37,13 @@ pub(crate) fn capture(
         if let Some(origin) = end {
             capture.fields.insert(field(&row, "sound_id")?, origin.id)?;
         }
+        let terminal = variant.terminal_media_origins(archive, &capture.uses)?;
+        capture
+            .fields
+            .insert(field(&row, "wem_id")?, terminal.wem_id)?;
+        capture
+            .fields
+            .insert(field(&row, "source")?, terminal.source_kind)?;
     }
     for (index, link) in sounds.breaks().iter().enumerate() {
         let row = row_path("breaks", index)?;

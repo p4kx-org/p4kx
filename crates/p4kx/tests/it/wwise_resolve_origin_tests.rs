@@ -11,6 +11,9 @@ use serde_json::{Value, json};
 
 use super::{PLAY, TestResult};
 
+#[path = "wwise_resolve_media_origin_tests.rs"]
+mod media;
+
 const HOME: &str = "Data\\Sounds\\wwise\\Home.bnk";
 const TARGET: &str = "Data\\Sounds\\wwise\\Target.bnk";
 const DECOY: &str = "Data\\Sounds\\wwise\\Decoy.bnk";
@@ -63,17 +66,8 @@ fn wwise_path_origins_hold_exact_object_bytes_across_banks() -> TestResult {
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("Data.p4k");
     let banks = fixture(&path)?;
-    let key = p4kx_testkit::test_key();
-    let hex = key.to_hex();
-    let archive = Archive::open_with_key(&path, Some(key))?;
-    let output = p4kx_testkit::p4kx()?
-        .env("P4KX_ARCHIVE_KEY", hex)
-        .args(["--json", "wwise", "resolve"])
-        .arg(&path)
-        .arg("Probe")
-        .output()?;
-    assert!(output.status.success(), "the fixture resolves: {output:?}");
-    let result: Value = serde_json::from_slice(&output.stdout)?;
+    let archive = Archive::open_with_key(&path, Some(p4kx_testkit::test_key()))?;
+    let result = probe(&path, "Probe")?;
     let proof = Proof {
         result: &result,
         archive: &archive,
@@ -101,6 +95,17 @@ fn wwise_path_origins_hold_exact_object_bytes_across_banks() -> TestResult {
         "sound_id aliases the exact last object ID",
     );
     Ok(())
+}
+
+fn probe(path: &Path, trigger: &str) -> Result<Value, Box<dyn Error>> {
+    let output = p4kx_testkit::p4kx()?
+        .env("P4KX_ARCHIVE_KEY", p4kx_testkit::test_key().to_hex())
+        .args(["--json", "wwise", "resolve"])
+        .arg(path)
+        .arg(trigger)
+        .output()?;
+    assert!(output.status.success(), "the fixture resolves: {output:?}");
+    Ok(serde_json::from_slice(&output.stdout)?)
 }
 
 struct Proof<'a> {
@@ -165,6 +170,19 @@ impl Proof<'_> {
         name: &str,
         span: Range<usize>,
     ) -> TestResult {
+        let indices = [span.start.to_string(), span.end.to_string()];
+        self.site_at(field, bank, namespace, name, &indices)?;
+        Ok(())
+    }
+
+    fn site_at(
+        &self,
+        field: &Value,
+        bank: &str,
+        namespace: &str,
+        name: &str,
+        indices: &[String],
+    ) -> Result<&Value, Box<dyn Error>> {
         let uses = self
             .result
             .pointer("/provenance/uses")
@@ -185,7 +203,7 @@ impl Proof<'_> {
         );
         assert_eq!(
             site.pointer("/location/indices"),
-            Some(&json!([span.start.to_string(), span.end.to_string()])),
+            Some(&json!(indices)),
             "bank-relative byte bounds are exact",
         );
         let sources = self
@@ -208,7 +226,7 @@ impl Proof<'_> {
             Some(u64::try_from(index)?),
             "equal short IDs retain their physical bank identity"
         );
-        Ok(())
+        Ok(site)
     }
 
     fn check_breaks(&self, home: &[u8]) -> TestResult {

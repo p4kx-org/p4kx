@@ -17,7 +17,7 @@ use super::{FollowedEdge, Target};
 pub(super) enum Visit {
     Follow(Target),
     Sound(SoundSource),
-    Track(SoundSource, MusicClipFeatures),
+    Track(SoundSource, usize, MusicClipFeatures),
     Break(BreakReason),
 }
 
@@ -123,9 +123,14 @@ fn track(object: &HircObject, next: &mut usize) -> Option<Visit> {
     let HircValue::MusicTrack(track) = &object.value else {
         return None;
     };
-    let &source = track.sources.get(*next)?;
+    let ordinal = *next;
+    let &source = track.sources.get(ordinal)?;
     *next += 1;
-    Some(Visit::Track(source, MusicClipFeatures::observe(track)))
+    Some(Visit::Track(
+        source,
+        ordinal,
+        MusicClipFeatures::observe(track),
+    ))
 }
 
 struct StingerCursor<'i> {

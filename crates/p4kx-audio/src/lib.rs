@@ -12,6 +12,7 @@ mod bank_blend_rows;
 mod bank_error;
 mod bank_graph_point_rows;
 mod bank_inline_state_rows;
+mod bank_media_source_table;
 mod bank_music_track_automation_rows;
 mod bank_music_transition_rows;
 mod bank_node_fx_slots;
@@ -130,6 +131,7 @@ pub use hirc_plugin_family::BankPluginKind;
 pub use hirc_plugin_parameters::{BankPluginDataReference, BankPluginFields, BankPluginParameters};
 
 pub use bank_inline_state_rows::{BankInlineStateRow, BankInlineStateRows};
+pub use bank_media_source_table::BankMediaSourceTable;
 pub use bank_music_track_automation_rows::{
     BankMusicTrackAutomation, BankMusicTrackAutomationRows,
 };

@@ -10,6 +10,7 @@ use p4kx_audio::{ContainerKind, HircKind, HircObject, HircValue};
 use super::hirc_diagnostic_sites::{self, DiagnosticSite};
 pub(super) use super::hirc_route_source::HircRouteSource;
 
+use super::terminal_media_origin::TerminalSourceTable;
 use super::txtp::TxtpApproximation;
 
 use super::walk_banks::Loaded;
@@ -24,6 +25,7 @@ pub struct HircPathSource {
     diagnostics: Option<Arc<BoundDiagnosticSites>>,
     child_owner: Option<Arc<HircChildOwner>>,
     inbound: Option<HircInboundSource>,
+    pub(super) terminal: Option<Arc<TerminalSourceTable>>,
 }
 
 impl HircPathSource {
@@ -46,6 +48,7 @@ impl HircPathSource {
                 .map(Arc::new),
             child_owner,
             inbound,
+            terminal: TerminalSourceTable::capture(archive, owner, object).map(Arc::new),
         }
     }
 

@@ -215,6 +215,7 @@ pub struct SoundVariant<'i> {
     pub(super) music_clip_features: MusicClipFeatures,
     pub(super) playback_features: PlaybackFeatures,
     pub(crate) source: SoundSource,
+    pub(super) source_ordinal: usize,
     pub(crate) location: Option<WemLocation<'i>>,
     pub(crate) selection: WemSelection,
     pub(crate) localised: bool,

@@ -30,6 +30,7 @@ mod resolve_bounded;
 mod resolve_options;
 mod search;
 mod sounds;
+mod terminal_media_origin;
 mod txtp;
 mod users;
 mod walk;
@@ -58,6 +59,7 @@ pub use references::{TriggerReference, TriggerScope, trigger_references, trigger
 pub use resolve_options::ResolveOptions;
 pub use search::{MAX_SEARCH_PAGE, SearchPage, TriggerHit};
 pub use sounds::{NodeKind, PathStep, SoundVariant, SourceKind, TriggerSounds, WemLocation};
+pub use terminal_media_origin::TerminalMediaOrigins;
 pub use txtp::{
     TxtpApproximation, TxtpFile, TxtpOrigins, TxtpReport, TxtpSkip, write_txtp,
     write_txtp_with_loop_origins, write_txtp_with_origins,

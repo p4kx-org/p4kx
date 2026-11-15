@@ -1067,11 +1067,18 @@ in the fallback language).
 New kinds may be added in later versions.
 
 The `fieldOrigins` object uses JSON Pointers for every path step's `kind` and `id`, the
-variant's `sound_id` and the break's copy of its final `object`. Each present origin references
+variant's `sound_id`, `wem_id` and `source`, and the break's copy of its final `object`. Each present origin references
 the original bank through the `provenance` inventory. HIRC coordinates are half-open byte spans
 in the decoded bank. Kind evidence includes the decoded bank-version selector and the HIRC
 object. A synthetic Event step has an unknown marker and an incomplete source set. A break
 may name a different bank than the bank that supplied its last observed path step.
+
+For `wem_id`, the terminal's original plug-in selector determines whether the variant has a file,
+and the original media ID supplies its value when present. For `source`, the plug-in selector
+identifies plug-in, external and MIDI kinds. The original storage code supplies the remaining
+kinds. A MusicTrack source records the authored source count and the physical row ordinal as the
+third index of each source word. These fields describe the terminal HIRC declaration. The located
+WEM can reside in another Entry with independent encryption status.
 
 ## `p4kx dcb query <archive> <query> --json`
 

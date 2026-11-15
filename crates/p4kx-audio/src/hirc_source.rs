@@ -17,7 +17,7 @@ const FIRST_SOUND_VERSION: u32 = 150;
 pub(crate) const NODE_BASE_VERSION: u32 = 154;
 
 /// Original scalar reads shared by Sound and `MusicTrack` media sources.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct BankMediaSourceFields {
     /// Original plug-in ID.

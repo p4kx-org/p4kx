@@ -118,10 +118,10 @@ impl<'i> Walk<'_, 'i> {
             let object = frame.owner.bank.objects().get(frame.object_number);
             match frame.cursor.next(object, work)? {
                 Some(Visit::Follow(target)) => self.reach(target, work)?,
-                Some(Visit::Sound(source)) => self.sound(source, MusicClipFeatures::default()),
-                Some(Visit::Track(source, features)) => {
+                Some(Visit::Sound(source)) => self.sound(source, 0, MusicClipFeatures::default()),
+                Some(Visit::Track(source, ordinal, features)) => {
                     work.spend()?;
-                    self.sound(source, features);
+                    self.sound(source, ordinal, features);
                 }
                 Some(Visit::Break(reason)) => self.broke(reason),
                 None => self.leave(),
@@ -253,7 +253,12 @@ impl<'i> Walk<'_, 'i> {
         self.shared_path_prefix = self.shared_path_prefix.min(self.path.len());
     }
 
-    fn sound(&mut self, source: SoundSource, music_clip_features: MusicClipFeatures) {
+    fn sound(
+        &mut self,
+        source: SoundSource,
+        source_ordinal: usize,
+        music_clip_features: MusicClipFeatures,
+    ) {
         let bank = self.current().soundbank;
         let located = locate(self.banks.index, bank, self.banks.choice, &source);
         if located.missing_localisation {
@@ -269,6 +274,7 @@ impl<'i> Walk<'_, 'i> {
             music_clip_features,
             playback_features: self.playback_features(),
             source,
+            source_ordinal,
             location: located.location,
             selection: located.selection,
             localised: located.localised,

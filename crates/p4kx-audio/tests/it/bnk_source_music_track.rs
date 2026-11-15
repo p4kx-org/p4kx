@@ -5,9 +5,9 @@ use std::error::Error;
 use std::io::{Cursor, Read, Seek};
 
 use p4kx_audio::{
-    BankHirc, BankHircField, BankHircSemantic, BankMusicTrackRead, BankMusicTrackRow,
-    BankMusicTrackRows, BankMusicTrackSource, BankObservedHeader, BankSource, HircValue,
-    MediaStorage, MusicTrackKind, SoundSource, Soundbank,
+    BankHirc, BankHircField, BankHircSemantic, BankMediaSourceFields, BankMusicTrackRead,
+    BankMusicTrackRow, BankMusicTrackRows, BankMusicTrackSource, BankObservedHeader, BankSource,
+    HircValue, MediaStorage, MusicTrackKind, SoundSource, Soundbank,
 };
 use p4kx_testkit::{TestBank, TestHircObject};
 
@@ -28,10 +28,13 @@ const MEMBERS: [u32; 2] = [0x5200_004a, 0x5200_004a];
 fn music_track_replays_original_source_and_clip_words_and_unknown_kind() -> TestResult {
     let bytes = source_fixture()?;
     let legacy = Soundbank::parse(bytes.as_slice())?;
-    let HircValue::MusicTrack(expected) = &legacy.objects().first().ok_or("original track")?.value
-    else {
+    let object = legacy.objects().first().ok_or("original track")?;
+    let HircValue::MusicTrack(expected) = &object.value else {
         return Err("slice reader decoded the MusicTrack".into());
     };
+    let fields = legacy
+        .media_source_fields(object)?
+        .ok_or("resident track media fields")?;
     let mut bank = open(&bytes)?;
     let (header, mut hirc) = parts(&mut bank)?;
     let Some(BankHircSemantic::MusicTrack(track)) = hirc.next_semantic(&header).transpose()? else {
@@ -72,19 +75,31 @@ fn music_track_replays_original_source_and_clip_words_and_unknown_kind() -> Test
         "non-switch code selects no switch block"
     );
 
-    check_rows(&bytes, track.rows, &expected.sources)
+    assert_eq!(
+        fields.source_count, track.fields.source_count,
+        "bank-relative source count"
+    );
+    check_rows(&bytes, track.rows, &expected.sources, &fields.sources)
 }
 
 fn check_rows<R: Read + Seek>(
     bytes: &[u8],
     rows: BankMusicTrackRows<'_, R>,
     expected_sources: &[SoundSource],
+    resident: &[BankMediaSourceFields],
 ) -> TestResult {
     let mut sources = Vec::new();
     let mut clips = Vec::new();
     for row in rows {
         match row? {
             BankMusicTrackRow::Source { ordinal, value } => {
+                let observed = resident
+                    .get(usize::try_from(ordinal)?)
+                    .ok_or("resident source")?;
+                assert_eq!(
+                    observed, &value.fields,
+                    "exact source ranges at ordinal {ordinal}"
+                );
                 if ordinal == 0 {
                     check_source(bytes, &value)?;
                 }

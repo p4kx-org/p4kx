@@ -74,6 +74,20 @@ fn absent_sound_flags_remain_distinct_from_authored_zero() -> TestResult {
         let BankSoundRead::Decoded(source) = semantic.status else {
             return Err("optional flags and node are absent".into());
         };
+        let resident = Soundbank::parse(bytes.as_slice())?;
+        let object = resident.object(SOUND_ID).ok_or("physical Sound")?;
+        let table = resident
+            .media_source_fields(object)?
+            .ok_or("resident media fields")?;
+        let [row] = table.sources.as_slice() else {
+            return Err("a Sound holds exactly one source occurrence".into());
+        };
+        assert!(table.source_count.is_none(), "a Sound authors no count");
+        assert_eq!(
+            row.source_bits.as_ref(),
+            semantic.fields.source_bits.as_ref(),
+            "optional bits have the same bank-relative extent as the seek reader"
+        );
         assert_eq!(source.source_bits, 0, "legacy default");
         assert_eq!(
             semantic.fields.source_bits.map(|word| word.value),
@@ -85,6 +99,22 @@ fn absent_sound_flags_remain_distinct_from_authored_zero() -> TestResult {
             "no node is authored"
         );
     }
+    Ok(())
+}
+
+#[test]
+fn terminal_media_source_fields_reject_an_object_from_an_identical_bank() -> TestResult {
+    let bytes = bank(
+        154,
+        TestHircObject::raw(SOUND_TAG, SOUND_ID, source_body(None)),
+    );
+    let input = Soundbank::parse(bytes.as_slice())?;
+    let another = Soundbank::parse(bytes.as_slice())?;
+    let foreign = another.object(SOUND_ID).ok_or("foreign Sound")?;
+    assert!(
+        input.media_source_fields(foreign).is_err(),
+        "the original byte position and object ID cannot substitute for residency"
+    );
     Ok(())
 }
 
