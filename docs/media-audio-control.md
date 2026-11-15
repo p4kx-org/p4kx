@@ -58,3 +58,27 @@ from a protected ATL source keeps that proof, and a reference to other bytes doe
 that those bytes contributed. Common generation budgets govern actual input and output work.
 Malformed XML and repaired CryXml string-table bytes produce diagnosed incomplete output when
 requested with `--diagnostic`. The original raw source remains separately recoverable.
+
+## Installed ATL checks
+
+Both checks use the standard `P4KX_DATA_P4K` and Archive key settings. The
+authored-field witness reports the opened Build and walks root ATL XML Entries
+in physical order. It skips other XML roots after verification and stops once
+all required declaration groups are observed. An exhausted source scope
+reports the missing groups by name.
+
+```powershell
+cargo test --locked -p p4kx-media --lib sampled_original_atl_families_keep_their_exact_authored_values_and_origins -- --ignored --nocapture
+cargo test --locked -p p4kx-media --test audio_control_accounting original_atl_source_counts_reconcile_with_assembly -- --ignored --nocapture
+```
+
+The sample verifies each selected source checksum, the original spelling and
+typed values for all six ATL families, and per-value origins down to the actual
+Entry and XML byte or CryXml table position. It serializes values and binds
+origins in memory. The whole-root census reads original ATL XML and reconciles
+original trigger winners, event order, IDs and localisation with Assembly
+AudioIndex. Both installed checks perform zero Media artifact writes.
+
+The synthetic Media replay compares complete exported records and their raw
+sidecars. Whole-root Media publication and record-count reconciliation against
+an installed Build require separate scale evidence.

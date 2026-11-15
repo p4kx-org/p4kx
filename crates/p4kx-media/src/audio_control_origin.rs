@@ -44,43 +44,40 @@ pub(crate) fn capture(
     role: SourceUseRole,
     writer: &MediaWriter<'_>,
 ) -> Result<OriginContributions, MediaError> {
+    with_site(position, field, |site| {
+        records::capture(input, [(site, role)], writer)
+    })
+}
+
+pub(crate) fn with_site<T>(
+    position: AtlPosition,
+    field: &str,
+    visit: impl FnOnce(OriginSite<'_>) -> T,
+) -> T {
     match position {
         AtlPosition::Text {
             start,
             end_exclusive,
-        } => records::capture(
-            input,
-            [(
-                OriginSite::new("atl-xml", &[start.get(), end_exclusive.get()], field),
-                role,
-            )],
-            writer,
-        ),
+        } => visit(OriginSite::new(
+            "atl-xml",
+            &[start.get(), end_exclusive.get()],
+            field,
+        )),
         AtlPosition::CryXmlNode { node_index } | AtlPosition::CryXmlContent { node_index } => {
-            records::capture(
-                input,
-                [(
-                    OriginSite::new("atl-cryxml-node", &[u64::from(node_index)], field),
-                    role,
-                )],
-                writer,
-            )
+            visit(OriginSite::new(
+                "atl-cryxml-node",
+                &[u64::from(node_index)],
+                field,
+            ))
         }
         AtlPosition::CryXmlAttribute {
             node_index,
             attribute_index,
-        } => records::capture(
-            input,
-            [(
-                OriginSite::new(
-                    "atl-cryxml-attribute",
-                    &[u64::from(node_index), u64::from(attribute_index)],
-                    field,
-                ),
-                role,
-            )],
-            writer,
-        ),
+        } => visit(OriginSite::new(
+            "atl-cryxml-attribute",
+            &[u64::from(node_index), u64::from(attribute_index)],
+            field,
+        )),
     }
 }
 

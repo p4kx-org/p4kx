@@ -15,6 +15,10 @@ use crate::{
     Projection, Provider, Severity, SourceContext, Status, Subresource,
 };
 
+#[cfg(test)]
+#[path = "audio_control_witness.rs"]
+mod witness;
+
 pub(crate) struct AudioControlProvider;
 
 impl Provider for AudioControlProvider {

@@ -9,17 +9,19 @@ use p4kx_extraction::cryxml::{
 };
 use p4kx_extraction::{DecimalU64, SourceUseRole};
 
-use crate::audio_control_fields::{AtlFamily, AtlField, AtlScalar};
+use crate::audio_control_fields::{AtlFamily, AtlScalar};
 use crate::audio_control_graph::Site;
 use crate::audio_control_origin as origins;
 use crate::audio_control_payload::{self as wire, AtlPayload, AtlPosition};
 use crate::audio_control_reference as references;
 use crate::input_budget::InputBudget;
 use crate::origin_input::MediaOriginInput;
-use crate::xml_source_projection::{
-    content_position, declaration_position, element_position, source_content,
-};
+use crate::xml_source_projection::{content_position, element_position, source_content};
 use crate::{DirectoryLookup, MediaError, MediaWriter, Status, Subresource, origin_error};
+
+#[path = "audio_control_declaration.rs"]
+pub(crate) mod declaration;
+use self::declaration::ObservedDeclaration;
 
 pub(crate) struct Projection<'source, 'directory> {
     pub(crate) input: &'source MediaOriginInput,
@@ -200,25 +202,17 @@ impl Projection<'_, '_> {
         indices: [u64; 2],
         writer: &mut MediaWriter<'_>,
     ) -> Result<(), Failure> {
-        let position = declaration_position(declaration.position())?;
+        let observed = ObservedDeclaration::read(declaration, definition.family)?;
+        let position = observed.original.position;
         self.write(
             position,
             "declaration",
             &Subresource::new(wire::DECLARATION, indices.to_vec()),
-            &AtlPayload::Declaration(wire::AtlDeclaration {
-                qualified_name: declaration.qualified_name(),
-                value: declaration.value(),
-                lexeme: declaration.lexeme(),
-                kind: wire::AtlDeclarationKind::try_from(declaration.kind())?,
-                position,
-            }),
+            &AtlPayload::Declaration(observed.original),
             writer,
         )?;
-        if let Some(family) = definition.family
-            && let Some(field) = AtlField::from_attribute(family, declaration.qualified_name())
-        {
-            let typed_value = field.value(family, declaration.value());
-            let short_id = match &typed_value {
+        if let Some(typed) = observed.typed {
+            let short_id = match &typed.record.typed_value {
                 AtlScalar::WwiseEvent { id, .. } => Some(*id),
                 _ => None,
             };
@@ -231,8 +225,8 @@ impl Projection<'_, '_> {
                 self.directory,
                 self.input,
                 references::NameDeclaration {
-                    family,
-                    field,
+                    family: typed.family,
+                    field: typed.record.field,
                     name: declaration.value(),
                     short_id,
                     site,
@@ -251,7 +245,7 @@ impl Projection<'_, '_> {
                 writer,
                 &Subresource::new(wire::FIELD, indices.to_vec()),
                 Status::Complete,
-                &AtlPayload::Field(wire::AtlFieldRecord { field, typed_value }),
+                &AtlPayload::Field(typed.record),
                 &[],
             )?;
         }

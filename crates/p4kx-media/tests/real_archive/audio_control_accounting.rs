@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Reconciles ATL exports with original scoped audio control definitions.
+//! Compares original ATL definitions, Assembly triggers and synthetic Media rows.
 
 use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
@@ -44,40 +44,32 @@ struct Census {
 enum Phase {
     OpenArchive,
     ReadOriginal,
-    PrepareExport,
-    Export,
-    FindControlStream,
-    ReadControlStream,
-    CompareCensus,
     ComparePlaybackIndex,
     CheckArchive,
-    CloseScratch,
 }
 
 struct Verification {
-    input: Option<usize>,
+    input: usize,
     phase: Phase,
 }
 
 impl Verification {
     fn enter(&mut self, phase: Phase) -> TestResult {
         self.phase = phase;
-        if let Some(input) = self.input {
-            let mut output = io::stdout().lock();
-            writeln!(
-                output,
-                "Running ATL archive input {input}: {:?}",
-                self.phase
-            )?;
-            output.flush()?;
-        }
+        let mut output = io::stdout().lock();
+        writeln!(
+            output,
+            "Running ATL archive input {}: {:?}",
+            self.input, self.phase
+        )?;
+        output.flush()?;
         Ok(())
     }
 }
 
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
-fn original_atl_source_counts_reconcile_with_media_and_assembly() -> Result<(), String> {
+fn original_atl_source_counts_reconcile_with_assembly() -> Result<(), String> {
     let first = real_archive_path().map_err(|_| "missing configured ATL archive".to_owned())?;
     verify_installed(&first, 1)?;
     if let Some(second) = p4kx_testkit::real_archive_b_path() {
@@ -88,13 +80,13 @@ fn original_atl_source_counts_reconcile_with_media_and_assembly() -> Result<(), 
 
 fn verify_installed(path: &Path, input: usize) -> Result<(), String> {
     let mut verification = Verification {
-        input: Some(input),
+        input,
         phase: Phase::OpenArchive,
     };
     let result = (|| {
         verification.enter(Phase::OpenArchive)?;
         let archive = Archive::open_with_key(path, Some(real_archive_key()?))?;
-        verify_root(&archive, &mut verification)
+        verify_original_and_assembly(&archive, &mut verification)
     })();
     privacy::redact(result).map_err(|_| {
         format!(
@@ -104,13 +96,39 @@ fn verify_installed(path: &Path, input: usize) -> Result<(), String> {
     })
 }
 
-fn verify_root(archive: &Archive, verification: &mut Verification) -> TestResult {
+fn verify_original_and_assembly(archive: &Archive, verification: &mut Verification) -> TestResult {
     verification.enter(Phase::ReadOriginal)?;
     let watch = ArchiveWatch::new(archive);
     let (expected, triggers) = source_counts(archive, &watch)?;
     require(!expected.is_empty(), "root definitions present")?;
 
-    verification.enter(Phase::PrepareExport)?;
+    report_census(&expected)?;
+    verification.enter(Phase::ComparePlaybackIndex)?;
+    triggers.verify(archive, &AudioIndex::build(archive))?;
+    verification.enter(Phase::CheckArchive)?;
+    watch.check()?;
+    Ok(())
+}
+
+fn report_census(expected: &BTreeMap<usize, Census>) -> TestResult {
+    let mut sum = Census::default();
+    for source in expected.values() {
+        sum.documents += source.documents;
+        sum.elements += source.elements;
+        sum.declarations += source.declarations;
+        sum.definitions += source.definitions;
+        sum.edges += source.edges;
+    }
+    let mut output = io::stdout().lock();
+    writeln!(output, "Original root ATL census: {sum:?}")?;
+    output.flush()?;
+    Ok(())
+}
+
+fn verify_synthetic_export(archive: &Archive) -> TestResult {
+    let watch = ArchiveWatch::new(archive);
+    let (expected, triggers) = source_counts(archive, &watch)?;
+    require(!expected.is_empty(), "root definitions present")?;
     let scratch = tempfile::tempdir()?;
     let options = ExportOptions {
         kinds: vec![MediaKind::AudioControl],
@@ -118,33 +136,26 @@ fn verify_root(archive: &Archive, verification: &mut Verification) -> TestResult
         exclude: Exclusion::parse(["*.pak", "*.socpak"])?,
         ..ExportOptions::default()
     };
-    verification.enter(Phase::Export)?;
     let ExportOutcome::Published { index, .. } =
         p4kx_media::export(archive, scratch.path(), &options)?
     else {
         return Err("root audio-control generation incomplete".into());
     };
 
-    verification.enter(Phase::FindControlStream)?;
     let base = scratch.path().join(&index.artifact_base);
     let stream = index
         .kinds
         .iter()
         .find(|kind| kind.provider.kind == MediaKind::AudioControl)
         .ok_or("root audio control stream")?;
-    verification.enter(Phase::ReadControlStream)?;
     let actual = media_counts(archive, &base, &base.join(&stream.artifact.path))?;
-    verification.enter(Phase::CompareCensus)?;
     require(
         actual == expected,
         "physical ATL occurrence and edge counts agree",
     )?;
 
-    verification.enter(Phase::ComparePlaybackIndex)?;
     triggers.verify(archive, &AudioIndex::build(archive))?;
-    verification.enter(Phase::CheckArchive)?;
     watch.check()?;
-    verification.enter(Phase::CloseScratch)?;
     scratch.close()?;
     Ok(())
 }
@@ -342,11 +353,5 @@ fn root_atl_accounts_for_physical_documents_and_index_precedence() -> TestResult
         .entry(TestEntry::stored("Data/Objects/malformed.socpak", b"excluded nested archive"))
         .write_to(&path)?;
     let archive = Archive::open_with_key(path, Some(test_key()))?;
-    verify_root(
-        &archive,
-        &mut Verification {
-            input: None,
-            phase: Phase::OpenArchive,
-        },
-    )
+    verify_synthetic_export(&archive)
 }
