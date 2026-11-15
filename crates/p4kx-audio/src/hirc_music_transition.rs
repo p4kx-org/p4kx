@@ -132,7 +132,7 @@ impl MusicTransitionSegmentEvidence {
     }
 }
 
-/// The authored transition scheduling flag that is enabled.
+/// The original field that establishes a transition scheduling control.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum MusicTransitionSchedulingField {
@@ -142,23 +142,35 @@ pub enum MusicTransitionSchedulingField {
     DestinationPlayPreEntry,
     /// Matches the destination cue to the source cue name.
     DestinationMatchSourceCueName,
+    /// Selects a source exit other than an immediate stop.
+    SourceSyncType,
+    /// Selects a destination entry other than its entry marker.
+    DestinationEntryType,
+    /// Selects a destination item other than the playlist start.
+    DestinationJumpToType,
 }
 
-/// The first explicit scheduling flag and its original byte range.
+/// The first checked scheduling control and its original byte range.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct MusicTransitionSchedulingEvidence {
-    /// The scheduling field enabled by the rule.
+    /// The scheduling field selected by the rule.
     pub field: MusicTransitionSchedulingField,
-    /// The original enabled flag and its byte range.
-    pub flag: BankHircField<u8>,
+    /// The checked value and its range in the field's original width.
+    pub word: BankHircField<u32>,
 }
 
 impl MusicTransitionSchedulingEvidence {
     fn of(rule: &BankMusicTransitionRuleFields) -> Option<Self> {
         use MusicTransitionSchedulingField::{
-            DestinationMatchSourceCueName, DestinationPlayPreEntry, SourcePlayPostExit,
+            DestinationEntryType, DestinationJumpToType, DestinationMatchSourceCueName,
+            DestinationPlayPreEntry, SourcePlayPostExit, SourceSyncType,
         };
+
+        const ENTRY_SAME_TIME: u16 = 0x1;
+        const ENTRY_LAST_EXIT_TIME: u16 = 0x4;
+        const JUMP_SPECIFIC_ITEM: u16 = 0x1;
+        const JUMP_NEXT_SEGMENT: u16 = 0x3;
 
         [
             (SourcePlayPostExit, rule.source.play_post_exit.as_ref()),
@@ -172,14 +184,50 @@ impl MusicTransitionSchedulingEvidence {
             ),
         ]
         .into_iter()
-        .find_map(|(field, flag)| {
-            let flag = flag.filter(|flag| flag.value == 1)?;
-            Some(Self {
-                field,
-                flag: flag.clone(),
-            })
+        .find_map(|(field, flag)| Self::checked(field, flag, |value| value == 1))
+        .or_else(|| {
+            Self::checked(
+                SourceSyncType,
+                rule.source.sync_type.as_ref(),
+                is_scheduled_music_sync,
+            )
+        })
+        .or_else(|| {
+            Self::checked(
+                DestinationEntryType,
+                rule.destination.entry_type.as_ref(),
+                |value| matches!(value, ENTRY_SAME_TIME..=ENTRY_LAST_EXIT_TIME),
+            )
+        })
+        .or_else(|| {
+            Self::checked(
+                DestinationJumpToType,
+                rule.destination.jump_to_type.as_ref(),
+                |value| matches!(value, JUMP_SPECIFIC_ITEM..=JUMP_NEXT_SEGMENT),
+            )
         })
     }
+
+    fn checked<T: Copy + Into<u32>>(
+        field: MusicTransitionSchedulingField,
+        original: Option<&BankHircField<T>>,
+        applies: impl FnOnce(T) -> bool,
+    ) -> Option<Self> {
+        let original = original.filter(|word| applies(word.value))?;
+        Some(Self {
+            field,
+            word: BankHircField {
+                value: original.value.into(),
+                range: original.range.clone(),
+            },
+        })
+    }
+}
+
+pub(crate) const fn is_scheduled_music_sync(value: u32) -> bool {
+    const SYNC_NEXT_GRID: u32 = 0x1;
+    const SYNC_LAST_EXIT_POSITION: u32 = 0x9;
+    matches!(value, SYNC_NEXT_GRID..=SYNC_LAST_EXIT_POSITION)
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -223,7 +271,7 @@ impl MusicTransitionEvidence {
             scheduling: self
                 .scheduling
                 .map(|value| MusicTransitionSchedulingEvidence {
-                    flag: value.flag.with_bank_offset(bank_offset),
+                    word: value.word.with_bank_offset(bank_offset),
                     ..value
                 }),
         }

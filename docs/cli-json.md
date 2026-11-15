@@ -931,8 +931,12 @@ in the TXTP header. Rendered MusicTrack sources can add `omit-music-clip-timing`
 A rendered path through a MusicPlaylist, MusicSwitch or Switch MusicTrack can add
 `omit-music-transition-fades` for nonzero original fade time or offset. An allocated
 transition object with a nonzero segment ID adds `omit-music-transition-segments`.
-An original source post-exit, destination pre-entry or match-source-cue flag with
-value 1 on a MusicPlaylist or MusicSwitch adds `omit-music-transition-scheduling`.
+A rendered path adds `omit-music-transition-scheduling` for a known scheduled
+source sync selector, destination entry or jump selector, or an enabled source
+post-exit, destination pre-entry or match-source-cue flag on a MusicPlaylist
+or MusicSwitch. A Switch MusicTrack can add the same code from its original
+transition sync selector. Immediate and unknown sync codes do not prove a
+scheduled transition.
 Rendered paths can also add `omit-container-transitions` for a nonzero declared
 Random/Sequence transition mode and `omit-blend-curves` for original checked
 Blend association curve points. Mode zero does not activate stored timing words.

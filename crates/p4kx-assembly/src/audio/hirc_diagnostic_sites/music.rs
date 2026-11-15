@@ -101,11 +101,14 @@ fn scheduling_site(evidence: &MusicTransitionSchedulingEvidence) -> Option<Diagn
         MusicTransitionSchedulingField::DestinationMatchSourceCueName => {
             "musicTransitionDestinationMatchSourceCueName"
         }
+        MusicTransitionSchedulingField::SourceSyncType => "musicTransitionSourceSyncType",
+        MusicTransitionSchedulingField::DestinationEntryType => "musicTransitionEntryType",
+        MusicTransitionSchedulingField::DestinationJumpToType => "musicTransitionJumpToType",
         _ => return None,
     };
     Some(DiagnosticSite::one(
         TxtpApproximation::OmitMusicTransitionScheduling,
-        DiagnosticWord::new(MUSIC_NODE, field, &evidence.flag.range),
+        DiagnosticWord::new(MUSIC_NODE, field, &evidence.word.range),
     ))
 }
 

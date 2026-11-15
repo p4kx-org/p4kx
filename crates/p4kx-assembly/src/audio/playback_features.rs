@@ -47,6 +47,10 @@ impl PlaybackFeatures {
                 features.observe_flag(PlaybackFeature::Conditions, has_conditions);
                 features.observe_flag(PlaybackFeature::Automation, track.has_automation);
                 features.observe_flag(PlaybackFeature::MusicFades, track.has_switch_fades);
+                features.observe_flag(
+                    PlaybackFeature::MusicTransitionScheduling,
+                    track.switch_sync_evidence().is_some(),
+                );
             }
             _ => {}
         }

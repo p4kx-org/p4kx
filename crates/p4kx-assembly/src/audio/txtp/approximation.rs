@@ -17,7 +17,7 @@ pub enum TxtpApproximation {
     OmitMusicTransitionFades,
     /// The rendered path omits an authored transition-object segment.
     OmitMusicTransitionSegments,
-    /// The rendered path omits an enabled music transition scheduling flag.
+    /// The rendered path omits an enabled music transition scheduling control.
     OmitMusicTransitionScheduling,
     /// The rendered path omits authored container or playlist loop controls.
     OmitContainerLoops,

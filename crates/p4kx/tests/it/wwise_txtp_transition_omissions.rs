@@ -4,11 +4,19 @@
 use std::error::Error;
 use std::fs;
 
-use p4kx_testkit::{ArchiveBuilder, TestAtl, TestBank, TestEntry, TestHircObject, wwise_short_id};
+use p4kx_testkit::{ArchiveBuilder, TestAtl, TestEntry};
 use serde_json::{Value, json};
 
 use super::txtp_origin_assertions::check_plain_fields;
-use super::{Fixture, PLAY, TestResult, extract, hirc_payload, pcm};
+use super::{Fixture, TestResult, extract, pcm};
+
+#[path = "wwise_txtp_transition_bank.rs"]
+mod transition_bank;
+
+use transition_bank::{
+    AuthoredRule, NEXT_BEAT, NEXT_SEGMENT, SAME_TIME, SWITCH_TRACK_WEM, TRANSITION_WEM, bank,
+    switch_track_bank,
+};
 
 const TRACK: &str = "bnkHircMusicTrack";
 const MUSIC_NODE: &str = "bnkHircMusicNode";
@@ -17,10 +25,16 @@ const DESTINATION_FADE: &str = "Play_Destination_Transition_Fade";
 const OBJECT_FADE: &str = "Play_Object_Transition_Fade";
 const SEGMENT: &str = "Play_Transition_Segment";
 const MATCH_SOURCE_CUE: &str = "Play_Transition_Match_Source_Cue";
+const SOURCE_SYNC: &str = "Play_Transition_Next_Beat";
+const DESTINATION_ENTRY: &str = "Play_Transition_Same_Time";
+const DESTINATION_JUMP: &str = "Play_Transition_Next_Segment";
+const INACTIVE_PARAMETERS: &str = "Play_Transition_Inactive_Parameters";
+const UNKNOWN_SELECTORS: &str = "Play_Transition_Unknown_Selectors";
 const ZERO: &str = "Play_Default_Transitions";
 const TRACK_SOURCE_FADE: &str = "Play_Track_Source_Fade";
 const TRACK_DESTINATION_FADE: &str = "Play_Track_Destination_Fade";
 const TRACK_ZERO: &str = "Play_Track_Zero_Fades";
+const TRACK_SYNC: &str = "Play_Track_Next_Beat";
 const FLAGS: [&str; 3] = ["--format", "wav", "--txtp"];
 const CLIP_CODE: &str = "omit-music-clip-timing";
 const FADE_CODE: &str = "omit-music-transition-fades";
@@ -29,31 +43,9 @@ const SCHEDULING_CODE: &str = "omit-music-transition-scheduling";
 const LOOPS_CODE: &str = "omit-container-loops";
 const CONDITIONS_CODE: &str = "omit-container-conditions";
 const AUTOMATION_CODE: &str = "omit-music-track-automation";
-const CONTAINER_ID: u32 = 10;
-const PLAYED_SEGMENT: u32 = 11;
-const PLAYED_TRACK: u32 = 12;
-const TRANSITION_SEGMENT: u32 = 13;
-const TRANSITION_TRACK: u32 = 14;
-const TRANSITION_WEM: u32 = 2_506;
-const SWITCH_TRACK_WEM: u32 = 2_507;
-const TRACK_SWITCH_GROUP: u32 = 0x4400_0000;
-const TRACK_SWITCH_MEMBER: u32 = 0x4400_0001;
-const WORD: usize = size_of::<u32>();
-const FADE_LEN: usize = 3 * WORD;
-const FADE_OFFSET: usize = 2 * WORD;
-const SOURCE_RULE_LEN: usize = FADE_LEN + 2 * WORD + 1;
-const DESTINATION_RULE_LEN: usize = FADE_LEN + 2 * WORD + 2 * size_of::<u16>() + 2;
-const ALLOCATED_OBJECT: usize = SOURCE_RULE_LEN + DESTINATION_RULE_LEN + 1;
-
-#[derive(Clone, Copy)]
-enum AuthoredRule {
-    SourceFade,
-    DestinationFade,
-    ObjectFade,
-    Segment,
-    MatchSourceCue,
-    Default,
-}
+const SOURCE_SYNC_MEDIA: u32 = 2_509;
+const DESTINATION_ENTRY_MEDIA: u32 = 2_510;
+const DESTINATION_JUMP_MEDIA: u32 = 2_511;
 
 #[test]
 fn txtp_reports_each_proven_music_transition_fade_on_the_rendered_owner() -> TestResult {
@@ -138,6 +130,92 @@ fn txtp_reports_a_transition_cue_condition_without_a_fade_or_segment() -> TestRe
 }
 
 #[test]
+fn txtp_reports_checked_transition_selectors_without_a_fade_or_segment() -> TestResult {
+    let fixture = fixture()?;
+    let next_beat = NEXT_BEAT.to_le_bytes();
+    let same_time = SAME_TIME.to_le_bytes();
+    let next_segment = NEXT_SEGMENT.to_le_bytes();
+    for (event, media, rule, extra, field, expected_bytes) in [
+        (
+            SOURCE_SYNC,
+            SOURCE_SYNC_MEDIA,
+            AuthoredRule::SourceSync,
+            LOOPS_CODE,
+            "musicTransitionSourceSyncType",
+            next_beat.as_slice(),
+        ),
+        (
+            DESTINATION_ENTRY,
+            DESTINATION_ENTRY_MEDIA,
+            AuthoredRule::DestinationEntry,
+            CONDITIONS_CODE,
+            "musicTransitionEntryType",
+            same_time.as_slice(),
+        ),
+        (
+            DESTINATION_JUMP,
+            DESTINATION_JUMP_MEDIA,
+            AuthoredRule::DestinationJump,
+            LOOPS_CODE,
+            "musicTransitionJumpToType",
+            next_segment.as_slice(),
+        ),
+    ] {
+        let report = expect(
+            &fixture,
+            event,
+            &[CLIP_CODE, SCHEDULING_CODE, extra, AUTOMATION_CODE],
+        )?;
+        check_plain_fields(&report, SCHEDULING_CODE, MUSIC_NODE, &[field])?;
+        let original = bank(event, media, rule)?;
+        check_selector_bytes(&report, field, &original, expected_bytes)?;
+    }
+    Ok(())
+}
+
+#[test]
+fn txtp_preserves_playback_for_inactive_and_unknown_transition_selectors() -> TestResult {
+    let fixture = fixture()?;
+    for event in [ZERO, INACTIVE_PARAMETERS, UNKNOWN_SELECTORS] {
+        expect(&fixture, event, &[CLIP_CODE, LOOPS_CODE, AUTOMATION_CODE])?;
+    }
+    Ok(())
+}
+
+fn check_selector_bytes(
+    report: &Value,
+    field: &str,
+    original: &[u8],
+    expected_bytes: &[u8],
+) -> TestResult {
+    let indices = report
+        .pointer("/txtp/files/0/provenance/uses")
+        .and_then(Value::as_array)
+        .and_then(|uses| {
+            uses.iter().find(|source| {
+                source.pointer("/location/field").and_then(Value::as_str) == Some(field)
+            })
+        })
+        .and_then(|source| source.pointer("/location/indices"))
+        .and_then(Value::as_array)
+        .ok_or("diagnostic selector byte coordinates")?;
+    let [start, end] = indices.as_slice() else {
+        return Err("selector uses exactly one original byte range".into());
+    };
+    let start = start
+        .as_str()
+        .ok_or("selector byte start")?
+        .parse::<usize>()?;
+    let end = end.as_str().ok_or("selector byte end")?.parse::<usize>()?;
+    assert_eq!(
+        original.get(start..end),
+        Some(expected_bytes),
+        "{field} cites every original selector byte"
+    );
+    Ok(())
+}
+
+#[test]
 fn txtp_reports_both_switch_track_fades_on_their_rendered_paths() -> TestResult {
     let fixture = fixture()?;
     for (trigger, field) in [
@@ -161,6 +239,24 @@ fn txtp_reports_both_switch_track_fades_on_their_rendered_paths() -> TestResult 
         CONDITIONS_CODE,
         TRACK,
         &["musicTrackSwitchMemberCount"],
+    )
+}
+
+#[test]
+fn txtp_reports_switch_track_sync_without_a_fade() -> TestResult {
+    let fixture = fixture()?;
+    let report = expect(
+        &fixture,
+        TRACK_SYNC,
+        &[CLIP_CODE, SCHEDULING_CODE, CONDITIONS_CODE, AUTOMATION_CODE],
+    )?;
+    let field = "musicTrackTransitionSyncType";
+    check_plain_fields(&report, SCHEDULING_CODE, TRACK, &[field])?;
+    check_selector_bytes(
+        &report,
+        field,
+        &switch_track_bank()?,
+        &NEXT_BEAT.to_le_bytes(),
     )
 }
 
@@ -201,6 +297,19 @@ fn fixture() -> Result<Fixture, Box<dyn Error>> {
         (SEGMENT, 2_504, AuthoredRule::Segment),
         (ZERO, 2_505, AuthoredRule::Default),
         (MATCH_SOURCE_CUE, 2_508, AuthoredRule::MatchSourceCue),
+        (SOURCE_SYNC, SOURCE_SYNC_MEDIA, AuthoredRule::SourceSync),
+        (
+            DESTINATION_ENTRY,
+            DESTINATION_ENTRY_MEDIA,
+            AuthoredRule::DestinationEntry,
+        ),
+        (
+            DESTINATION_JUMP,
+            DESTINATION_JUMP_MEDIA,
+            AuthoredRule::DestinationJump,
+        ),
+        (INACTIVE_PARAMETERS, 2_512, AuthoredRule::InactiveParameters),
+        (UNKNOWN_SELECTORS, 2_513, AuthoredRule::UnknownSelectors),
     ] {
         atl = atl.trigger(event, &[event]);
         builder = builder
@@ -213,7 +322,12 @@ fn fixture() -> Result<Fixture, Box<dyn Error>> {
                 pcm(),
             ));
     }
-    for trigger in [TRACK_SOURCE_FADE, TRACK_DESTINATION_FADE, TRACK_ZERO] {
+    for trigger in [
+        TRACK_SOURCE_FADE,
+        TRACK_DESTINATION_FADE,
+        TRACK_ZERO,
+        TRACK_SYNC,
+    ] {
         atl = atl.trigger(trigger, &[trigger]);
     }
     builder
@@ -239,140 +353,4 @@ fn fixture() -> Result<Fixture, Box<dyn Error>> {
         archive,
         out,
     })
-}
-
-fn bank(event: &str, media: u32, authored: AuthoredRule) -> Result<Vec<u8>, Box<dyn Error>> {
-    let container = match authored {
-        AuthoredRule::Segment | AuthoredRule::ObjectFade => {
-            TestHircObject::music_switch(CONTAINER_ID, &[PLAYED_SEGMENT], 0x42, &[PLAYED_SEGMENT])
-        }
-        _ => TestHircObject::music_playlist(CONTAINER_ID, &[PLAYED_SEGMENT]),
-    };
-    let mut bytes = TestBank::new(wwise_short_id(event))
-        .version(154)
-        .object(TestHircObject::event(wwise_short_id(event), &[1]))
-        .object(TestHircObject::action(1, PLAY, CONTAINER_ID))
-        .object(container)
-        .object(TestHircObject::music_segment(
-            PLAYED_SEGMENT,
-            &[PLAYED_TRACK],
-            &[],
-        ))
-        .object(TestHircObject::music_track(PLAYED_TRACK, &[media]))
-        .object(TestHircObject::music_segment(
-            TRANSITION_SEGMENT,
-            &[TRANSITION_TRACK],
-            &[],
-        ))
-        .object(TestHircObject::music_track(
-            TRANSITION_TRACK,
-            &[TRANSITION_WEM],
-        ))
-        .bytes();
-    authored.apply(&mut bytes)?;
-    Ok(bytes)
-}
-
-fn switch_track_bank() -> Result<Vec<u8>, Box<dyn Error>> {
-    let mut bank = TestBank::new(wwise_short_id("SwitchTrack")).version(154);
-    for (action, (event, track, source_offset, destination_time)) in (1..).zip([
-        (TRACK_SOURCE_FADE, 20, -15, 0),
-        (TRACK_DESTINATION_FADE, 21, 0, 18),
-        (TRACK_ZERO, 22, 0, 0),
-    ]) {
-        bank = bank
-            .object(TestHircObject::event(wwise_short_id(event), &[action]))
-            .object(TestHircObject::action(action, PLAY, track))
-            .object(switch_track(track, source_offset, destination_time)?);
-    }
-    Ok(bank.bytes())
-}
-
-fn switch_track(
-    id: u32,
-    source_offset: i32,
-    destination_time: i32,
-) -> Result<TestHircObject, Box<dyn Error>> {
-    const SYNC_WORDS_LEN: usize = 2 * WORD;
-    const TRANSITION_LEN: usize = 2 * FADE_LEN + SYNC_WORDS_LEN;
-
-    let mut payload = hirc_payload(TestHircObject::music_switch_track(
-        id,
-        &[SWITCH_TRACK_WEM],
-        TRACK_SWITCH_GROUP,
-        &[TRACK_SWITCH_MEMBER],
-    ))?;
-    let start = payload
-        .len()
-        .checked_sub(TRANSITION_LEN + WORD)
-        .ok_or("original switch track transition before the look-ahead word")?;
-    assert_eq!(
-        payload.get(start..start + TRANSITION_LEN),
-        Some([0_u8; TRANSITION_LEN].as_slice()),
-        "the synthetic track starts with two neutral fades and zero sync fields"
-    );
-    word(
-        &mut payload,
-        start + FADE_OFFSET,
-        source_offset.to_le_bytes(),
-    )?;
-    word(
-        &mut payload,
-        start + FADE_LEN + SYNC_WORDS_LEN,
-        destination_time.to_le_bytes(),
-    )?;
-    Ok(TestHircObject::raw(11, id, payload))
-}
-
-impl AuthoredRule {
-    fn apply(self, bytes: &mut [u8]) -> TestResult {
-        let rule_header = [1_u32, 0x5200_0001, 2, 0x5200_0002, 0x5200_0003].map(u32::to_le_bytes);
-        let header = rule_header.as_flattened();
-        let positions: Vec<_> = bytes
-            .windows(header.len())
-            .enumerate()
-            .filter_map(|(offset, value)| (value == header).then_some(offset + header.len()))
-            .collect();
-        let [ordinary, allocated] = positions.as_slice() else {
-            return Err("two original transition rules".into());
-        };
-        match self {
-            Self::SourceFade => word(bytes, ordinary + FADE_OFFSET, (-15_i32).to_le_bytes())?,
-            Self::DestinationFade => word(bytes, ordinary + SOURCE_RULE_LEN, 18_i32.to_le_bytes())?,
-            Self::Segment => word(
-                bytes,
-                allocated + ALLOCATED_OBJECT,
-                TRANSITION_SEGMENT.to_le_bytes(),
-            )?,
-            Self::ObjectFade => {
-                word(
-                    bytes,
-                    allocated + ALLOCATED_OBJECT,
-                    TRANSITION_SEGMENT.to_le_bytes(),
-                )?;
-                word(
-                    bytes,
-                    allocated + ALLOCATED_OBJECT + WORD + FADE_LEN + FADE_OFFSET,
-                    (-31_i32).to_le_bytes(),
-                )?;
-            }
-            Self::MatchSourceCue => {
-                let flag = bytes
-                    .get_mut(ordinary + SOURCE_RULE_LEN + DESTINATION_RULE_LEN - 1)
-                    .ok_or("original match-source-cue flag")?;
-                assert_eq!(*flag, 0, "the baseline rule has the field disabled");
-                *flag = 1;
-            }
-            Self::Default => {}
-        }
-        Ok(())
-    }
-}
-
-fn word(bytes: &mut [u8], offset: usize, value: [u8; WORD]) -> TestResult {
-    bytes
-        .get_mut(offset..offset + WORD)
-        .ok_or("original transition word")?
-        .copy_from_slice(&value);
-    Ok(())
 }

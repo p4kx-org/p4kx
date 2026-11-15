@@ -17,6 +17,9 @@ pub(super) fn append(sites: &mut Vec<DiagnosticSite>, track: &MusicTrack) {
     let posted = track
         .clip_event_evidence()
         .map(|word| DiagnosticWord::new(TRACK, "musicTrackClipEventId", &word.range));
+    let sync = track
+        .switch_sync_evidence()
+        .map(|word| DiagnosticWord::new(TRACK, "musicTrackTransitionSyncType", &word.range));
     for (approximation, word) in [
         (TxtpApproximation::OmitMusicTrackAutomation, automation),
         (TxtpApproximation::OmitMusicClipEvents, posted),
@@ -28,6 +31,7 @@ pub(super) fn append(sites: &mut Vec<DiagnosticSite>, track: &MusicTrack) {
             TxtpApproximation::OmitMusicTransitionFades,
             track.switch_fade_evidence().and_then(track_word),
         ),
+        (TxtpApproximation::OmitMusicTransitionScheduling, sync),
         (
             TxtpApproximation::OmitMusicClipTiming,
             track.clip_timing_evidence().and_then(clip_word),

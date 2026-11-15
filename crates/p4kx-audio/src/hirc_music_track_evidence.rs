@@ -4,6 +4,7 @@
 use crate::bank_object_fields::BankHircField;
 use crate::hirc_music::MusicTrack;
 use crate::hirc_music_fade::MusicFadeTimingField;
+use crate::hirc_music_transition::is_scheduled_music_sync;
 
 use super::{BankMusicTrackClip, BankMusicTrackSwitchFields};
 
@@ -61,6 +62,7 @@ pub enum MusicTrackClipTimingKind {
 pub(crate) struct MusicTrackEvidence {
     pub(super) automation_point_count: Option<BankHircField<u32>>,
     pub(super) switch_fade: Option<MusicTrackEvidenceWord>,
+    switch_sync: Option<BankHircField<u32>>,
     switch_condition: Option<MusicTrackEvidenceWord>,
     clip_timing: Option<MusicTrackClipTimingWord>,
     nonfinite_clip_timing: Option<MusicTrackClipTimingWord>,
@@ -84,6 +86,12 @@ impl MusicTrack {
     #[must_use]
     pub const fn switch_fade_evidence(&self) -> Option<&MusicTrackEvidenceWord> {
         self.evidence.switch_fade.as_ref()
+    }
+
+    /// Returns the original switch transition selector for a known scheduled sync mode.
+    #[must_use]
+    pub const fn switch_sync_evidence(&self) -> Option<&BankHircField<u32>> {
+        self.evidence.switch_sync.as_ref()
     }
 
     /// Returns the first finite nonzero clip timing word, in clip and field order.
@@ -143,6 +151,12 @@ impl MusicTrackEvidence {
             kind,
             original: word.clone().with_bank_offset(bank_offset),
         });
+        self.switch_sync = switch
+            .transition
+            .as_ref()
+            .and_then(|transition| transition.sync_type.as_ref())
+            .filter(|word| is_scheduled_music_sync(word.value))
+            .map(|word| word.clone().with_bank_offset(bank_offset));
     }
 }
 

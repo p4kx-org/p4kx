@@ -395,11 +395,12 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   A rendered MusicTrack reports `omit-music-clip-timing` for finite nonzero clip start or trim
   times, `omit-music-clip-events` for authored posted Events and
   `nonfinite-music-clip-timing` for nonfinite timing words.
-  Rendered MusicPlaylist and MusicSwitch paths also report `omit-music-transition-fades`
-  for nonzero transition fade time or offset and `omit-music-transition-segments`
-  for an allocated transition object with an authored segment ID.
-  An enabled source post-exit, destination pre-entry or match-source-cue flag
-  also reports `omit-music-transition-scheduling`.
+  Rendered MusicPlaylist, MusicSwitch and Switch MusicTrack paths also report
+  `omit-music-transition-fades` for nonzero transition fade time or offset.
+  MusicPlaylist and MusicSwitch report `omit-music-transition-segments` for an
+  allocated transition object with an authored segment ID. Known scheduled
+  sync selectors and active entry, jump and transition flags are reported as
+  `omit-music-transition-scheduling` where present on the rendered path.
   `p4kx entity audio --extract <folder>` does the same for every trigger of an Entity.
   `wwise resolve`, `wwise extract` and `entity audio` accept an optional `--max-visits <count>`
   per trigger. The count includes each attempted HIRC object and MusicTrack source in authored
