@@ -23,7 +23,9 @@ fn text_census_matches_a_published_synthetic_catalog() -> TestResult<()> {
         p4kx_export::write_catalog(&archive, &options, Compression::None, tempfile::tempfile)?;
     file.rewind()?;
     let catalog: Value = serde_json::from_reader(io::BufReader::new(file))?;
-    let (pipe_summary, projected) = write_catalog(&archive, &options)?;
+    let mut writing = false;
+    let (pipe_summary, projected) = write_catalog(&archive, &options, || writing = true)?;
+    assert!(writing, "the actual writer reached its sink");
     assert_eq!(pipe_summary.size(), file_summary.size());
     assert_eq!(projected["source"], catalog["source"]);
     assert_eq!(projected["texts"], catalog["texts"]);

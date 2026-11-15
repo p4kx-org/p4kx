@@ -1,15 +1,17 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::time::UNIX_EPOCH;
+use std::time::{Instant, UNIX_EPOCH};
 
 use p4kx_export::{
-    CatalogOptions, CatalogPublicationMode, CatalogSummary, ExportStageStatus, Kind, Language,
+    CatalogOptions, CatalogProgress, CatalogPublicationMode, CatalogSummary, ExportStageStatus,
+    Kind, Language,
 };
 use p4kx_extraction::{Archive, ArchiveWatch};
 
 use super::{BASELINES, TestResult, check_texts};
 use crate::real_archive_shop_inventory_v3::verify_build;
+use crate::real_archive_verification::print_line;
 
 #[path = "real_archive_text_census.rs"]
 mod census;
@@ -21,11 +23,33 @@ fn installed_live_catalog_texts_match_the_independent_source_oracle() -> TestRes
     let key = p4kx_testkit::real_archive_key().map_err(|_| "read configured Archive key")?;
     let archive = Archive::open_with_key(path, Some(key)).map_err(|_| "open the LIVE Archive")?;
     let watch = ArchiveWatch::new(&archive);
+    let start = Instant::now();
+    let progress = |progress: CatalogProgress| {
+        print_line(&format!(
+            "text census {:?} {}/{} after {:.1}s",
+            progress.phase,
+            progress.records_done,
+            progress.records_total,
+            start.elapsed().as_secs_f64()
+        ));
+    };
     let options = CatalogOptions {
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
+        progress: Some(&progress),
         ..CatalogOptions::new(UNIX_EPOCH)
     };
-    let (summary, catalog) = census::write_catalog(&archive, &options)?;
+    print_line("text census preparing catalog");
+    let (summary, catalog) = census::write_catalog(&archive, &options, || {
+        print_line(&format!(
+            "text census writing JSON after {:.1}s",
+            start.elapsed().as_secs_f64()
+        ));
+    })?;
+    print_line(&format!(
+        "text census decoded {} bytes after {:.1}s",
+        summary.size(),
+        start.elapsed().as_secs_f64()
+    ));
     complete_text_scope(&summary)?;
     drop(summary);
     watch.check().map_err(|_| "Archive changed during write")?;

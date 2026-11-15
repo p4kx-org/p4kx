@@ -85,7 +85,9 @@ source and use inventories. It discards the emitted bytes.
 
 The census hashes the root Archive for the source receipt and checks the Build
 before and after the scan. It processes verified XML one Entry at a time and
-requires complete original spans. Assembly's `AtlDefinitions` uses the same
+requires complete original spans. Its progress log times archive hashing,
+document projection, reference resolution and provenance finalization.
+Assembly's `AtlDefinitions` uses the same
 trigger projection as `AudioIndex` to reconcile winning definitions, event
 order, IDs and localisation. It reads ATL definitions only.
 

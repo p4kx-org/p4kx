@@ -29,7 +29,19 @@ use crate::{
 use super::super::{AudioControlProvider, project_bytes};
 use super::TestResult;
 
-pub(super) fn observe(archive: &Archive, observer: &dyn StreamObserver) -> TestResult<Finished> {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum StreamPhase {
+    HashArchive,
+    ProjectDocuments,
+    ResolveReferences,
+    FinalizeOrigins,
+}
+
+pub(super) fn observe(
+    archive: &Archive,
+    observer: &dyn StreamObserver,
+    report: &mut impl FnMut(StreamPhase) -> TestResult,
+) -> TestResult<Finished> {
     let cancel = CancelToken::default();
     let watch = ArchiveWatch::new(archive);
     let protection = ArchiveWriteProtection::new(archive.path(), cancel.flag())?;
@@ -39,6 +51,7 @@ pub(super) fn observe(archive: &Archive, observer: &dyn StreamObserver) -> TestR
         protection: &protection,
     };
     let limits = Limits::default();
+    report(StreamPhase::HashArchive)?;
     let (digest, size) = hashing::file(
         archive.path(),
         ByteScope::RootArchiveFile,
@@ -59,6 +72,7 @@ pub(super) fn observe(archive: &Archive, observer: &dyn StreamObserver) -> TestR
     writer.bind_build(archive, &mut root)?;
     let include = Filter::parse(r"Data\Libs\GameAudio\*.xml")?;
     let exclude = Exclusion::parse(["*.pak", "*.socpak"])?;
+    report(StreamPhase::ProjectDocuments)?;
     collect(
         archive,
         &root.digest,
@@ -67,7 +81,9 @@ pub(super) fn observe(archive: &Archive, observer: &dyn StreamObserver) -> TestR
             exclude: &exclude,
         },
         &mut writer,
+        report,
     )?;
+    report(StreamPhase::FinalizeOrigins)?;
     writer.index_build(&root)?;
     Ok(writer.finish()?)
 }
@@ -77,12 +93,14 @@ fn collect(
     root: &Digest,
     selection: SourceSelection<'_>,
     writer: &mut MediaWriter<'_>,
-) -> Result<(), MediaError> {
+    report: &mut impl FnMut(StreamPhase) -> TestResult,
+) -> TestResult {
     if archive.entries().len() as u64 > writer.limits().sources {
         return Err(MediaError::Limit {
             budget: "sources",
             limit: writer.limits().sources,
-        });
+        }
+        .into());
     }
     let budget = InputBudget::default();
     let index_keys = Cell::new(0);
@@ -101,6 +119,7 @@ fn collect(
         inputs.admit(entry.index(), writer)?;
         observe_entry(&lookup, &budget, entry, writer)?;
     }
+    report(StreamPhase::ResolveReferences)?;
     directory_run::run(
         archive,
         &lookup,
@@ -108,7 +127,8 @@ fn collect(
         &budget,
         Phase::Complete,
         writer,
-    )
+    )?;
+    Ok(())
 }
 
 fn observe_entry(

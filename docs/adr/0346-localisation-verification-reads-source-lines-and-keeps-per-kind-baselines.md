@@ -61,6 +61,8 @@ and task-local `TMP` and `TEMP`. The ordinary catalog writer sends JSON through 
 pipe to the text verification reader. The reader keeps the schema-v3 sections needed by the
 existing per-kind comparisons, including original mission graphs and the shared language tables.
 It discards unrelated sections as it consumes the stream and checks the exact written byte count.
+The test logs elapsed time for Record progress, opening the output sink and finishing JSON
+decoding. These milestones let a process-memory sample be assigned to preparation or output.
 This check writes no catalog file. It requires complete reads and projections for the text
 families with baselines and allows unrelated diagnostic partial publication. The full
 installed-Archive suite verifies the normal publication, size and schema separately.

@@ -25,7 +25,7 @@ use crate::{
 #[path = "audio_control_accounting_support.rs"]
 mod support;
 
-use support::require;
+use support::{require, require_stream_phases};
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
@@ -39,6 +39,7 @@ mod production_harness;
 #[path = "audio_control_trigger_oracle.rs"]
 mod trigger_oracle;
 
+use self::production_harness::StreamPhase;
 use self::trigger_oracle::Triggers;
 
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -54,7 +55,12 @@ fn verify_synthetic_export(archive: &Archive) -> TestResult {
     let watch = ArchiveWatch::new(archive);
     let original = source_counts(archive, &watch)?;
     require(!original.rows.is_empty(), "root definitions present")?;
-    let streamed = verify_production_stream(archive, &original)?;
+    let mut phases = Vec::new();
+    let streamed = verify_production_stream(archive, &original, |phase| {
+        phases.push(phase);
+        Ok(())
+    })?;
+    require_stream_phases(&phases)?;
     let scratch = tempfile::tempdir()?;
     let options = ExportOptions {
         kinds: vec![MediaKind::AudioControl],
@@ -157,9 +163,13 @@ struct SourceCensus {
     triggers: Triggers,
 }
 
-fn verify_production_stream(archive: &Archive, original: &SourceCensus) -> TestResult<Finished> {
+fn verify_production_stream(
+    archive: &Archive,
+    original: &SourceCensus,
+    mut report: impl FnMut(StreamPhase) -> TestResult,
+) -> TestResult<Finished> {
     let observer = observer::Observer::new(archive, &original.digests);
-    let streamed = production_harness::observe(archive, &observer)?;
+    let streamed = production_harness::observe(archive, &observer, &mut report)?;
     require(
         observer.counts()? == original.rows,
         "production ATL serialised rows match the original occurrence counts",

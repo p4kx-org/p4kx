@@ -25,10 +25,14 @@ type TestResult<T> = Result<T, Box<dyn std::error::Error>>;
 pub(super) fn write_catalog(
     archive: &Archive,
     options: &CatalogOptions<'_>,
+    before_write: impl FnOnce(),
 ) -> TestResult<(CatalogSummary, Value)> {
     let paths = TextPaths::catalog();
     let (summary, capture) = pipe::transfer(&paths, |sink| {
-        p4kx_export::write_catalog(archive, options, Compression::None, || Ok(sink))
+        p4kx_export::write_catalog(archive, options, Compression::None, || {
+            before_write();
+            Ok(sink)
+        })
     })?;
     if capture.bytes != summary.size() {
         return Err("text census byte count differs from the catalog writer".into());

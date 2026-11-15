@@ -9,7 +9,20 @@ use crate::{Algorithm, ByteScope, RawReference};
 use p4kx_extraction::{Archive, Checksum, Entry};
 use sha2::{Digest as _, Sha256};
 
-use super::TestResult;
+use super::{StreamPhase, TestResult};
+
+pub(super) fn require_stream_phases(phases: &[StreamPhase]) -> TestResult {
+    require(
+        phases
+            == [
+                StreamPhase::HashArchive,
+                StreamPhase::ProjectDocuments,
+                StreamPhase::ResolveReferences,
+                StreamPhase::FinalizeOrigins,
+            ],
+        "the observer reports the phases traversed by the export",
+    )
+}
 
 pub(super) fn require(condition: bool, message: &'static str) -> TestResult {
     if condition {
