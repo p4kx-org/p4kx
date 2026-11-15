@@ -733,6 +733,16 @@ Conventional rooted CAF paths resolve against the archive directory. Missing
 and repeated timeline names and unsupported paths have explicit states.
 The source strings carry no inferred timing units or coordinate conversions.
 
+`event-binding` rows pair a named CAF declaration with an equal rooted CAF
+path in a selected event database authored in the same `AnimationList`.
+Matching ignores case and slash direction. The row keeps the physical
+parameter and database Entry indices and the original CAF, database declaration
+and timeline coordinates. Each authored occurrence stays separate. The join
+uses complete projected documents in the owning Archive. The database file
+link and document rows retain selection and read outcomes. A binding is an
+authored path correspondence and carries no playback or clip precedence.
+The join does not read a separate event database payload.
+
 The optional installed Archive replay checks each event document against its original
 Entry and SHA-256 receipt. It independently compares timeline selectors, event and
 attribute coordinates, source order, decoded values and text XML lexemes. Both source

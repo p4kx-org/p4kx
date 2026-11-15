@@ -6,6 +6,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::blend_reference_payload::{BlendCandidate, BlendReference};
+use super::event_bindings::EventBinding;
 use super::graph_source::{GraphAttribute, GraphNode};
 use super::named_clip::Wildcard;
 use super::named_dba::Binding;
@@ -30,6 +31,7 @@ pub(super) const NAMED_CAF: &str = "animation-definition-named-caf";
 pub(super) const WILDCARD: &str = "animation-definition-wildcard";
 pub(super) const NAMED_DBA_BINDING: &str = "animation-definition-named-dba-binding";
 pub(super) const EVENT_TIMELINE: &str = "animation-definition-event-timeline";
+pub(super) const EVENT_BINDING: &str = "animation-definition-event-binding";
 pub(super) const EVENT: &str = "animation-definition-event";
 pub(super) const EVENT_ATTRIBUTE: &str = "animation-definition-event-attribute";
 pub(super) const GRAPH_NODE: &str = "animation-definition-graph-node";
@@ -93,6 +95,7 @@ pub(super) enum DefinitionPayload<'source> {
     Wildcard(Wildcard<'source>),
     NamedDbaBinding(Binding<'source>),
     EventTimeline(EventTimeline<'source>),
+    EventBinding(EventBinding),
     Event(Event),
     EventAttribute(EventAttribute<'source>),
     GraphNode(GraphNode<'source>),

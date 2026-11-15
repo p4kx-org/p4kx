@@ -151,7 +151,9 @@ fn write_animation(
         .filter(|attribute| attribute.namespace().is_none() && attribute.name() == "name");
     let first = names.next();
     let target = match (first, names.next()) {
-        (Some(attribute), None) => target_reference(projection, &attribute, &mut prepared, writer)?,
+        (Some(attribute), None) => {
+            target_reference(projection, &attribute, index, &mut prepared, writer)?
+        }
         (Some(_), Some(_)) => TimelineTarget::AmbiguousName,
         (None, _) => TimelineTarget::MissingName,
     };
@@ -168,6 +170,7 @@ fn write_animation(
 fn target_reference<'source>(
     projection: &DefinitionProjection<'_, '_>,
     attribute: &SourceAttribute<'source>,
+    index: u64,
     prepared: &mut crate::origin_prepared::PreparedRecordOrigins,
     writer: &mut MediaWriter<'_>,
 ) -> Result<TimelineTarget<'source>, Failure> {
@@ -189,7 +192,7 @@ fn target_reference<'source>(
     let reference = ReferenceSelection {
         authored_path,
         archive_path: archive_path.as_deref(),
-        kind: Some(MediaKind::Animation),
+        kind: links::reference_kind(projection, MediaKind::Animation, writer),
         original: &proof,
         selector: &proof,
     }
@@ -199,6 +202,14 @@ fn target_reference<'source>(
         prepared,
         writer,
     )?;
+    if let Some(path) = &archive_path {
+        projection
+            .context
+            .directory
+            .index
+            .animation_event_bindings
+            .timeline(projection.context.entry.index(), index, path, proof, writer)?;
+    }
     Ok(TimelineTarget::Path {
         authored_path,
         archive_path,

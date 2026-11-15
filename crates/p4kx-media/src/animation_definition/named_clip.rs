@@ -7,6 +7,7 @@ use p4kx_extraction::cryxml::{
 use p4kx_extraction::{NamedCafSelector, SourceUseRole};
 
 use super::chrparams_selectors::{self, AnimationAttributes, Selector};
+use super::event_bindings;
 use super::links::{self, ReferenceSelection};
 use super::named_dba::{Databases, NamedSelection};
 use super::origins;
@@ -25,6 +26,7 @@ pub(super) use wildcard::Wildcard;
 
 pub(super) struct Filepath<'document> {
     list: SourceElement<'document>,
+    list_index: u64,
     directive: Option<Directive<'document>>,
     databases: Databases,
 }
@@ -39,6 +41,7 @@ impl<'document> Filepath<'document> {
         projection: &DefinitionProjection<'_, '_>,
         element: SourceElement<'document>,
         parent_is_params_root: bool,
+        list_index: u64,
         writer: &mut MediaWriter<'_>,
     ) -> Result<Option<Self>, Failure> {
         let ordered_list = matches!(projection.family, DefinitionFamily::Chrparams)
@@ -49,9 +52,14 @@ impl<'document> Filepath<'document> {
         }
         Ok(Some(Self {
             list: element,
+            list_index,
             directive: None,
             databases: Databases::read(element, projection, writer)?,
         }))
+    }
+
+    pub(super) const fn list_index(&self) -> u64 {
+        self.list_index
     }
 
     pub(super) fn observe(
@@ -95,6 +103,7 @@ impl<'document> Filepath<'document> {
                 path,
                 path_position: position,
                 directive: self.directive.as_ref(),
+                list_index: self.list_index,
                 selector,
             };
             link.write(projection, &self.databases, indices, writer)?;
@@ -164,6 +173,7 @@ struct Link<'directive, 'document> {
     path: &'document str,
     path_position: AtlPosition,
     directive: Option<&'directive Directive<'document>>,
+    list_index: u64,
     selector: NamedCafSelector<'document>,
 }
 
@@ -219,6 +229,7 @@ impl Link<'_, '_> {
                 indices,
                 writer,
             )?;
+            self.observe_event_alias(projection, indices, archive_path, full, writer)?;
         }
         prepared.write(
             writer,
@@ -233,6 +244,32 @@ impl Link<'_, '_> {
             }),
             &[],
         )?;
+        Ok(())
+    }
+
+    fn observe_event_alias(
+        &self,
+        projection: &DefinitionProjection<'_, '_>,
+        indices: [u64; 2],
+        archive_path: &str,
+        proof: OriginContributions,
+        writer: &MediaWriter<'_>,
+    ) -> Result<(), Failure> {
+        projection
+            .context
+            .directory
+            .index
+            .animation_event_bindings
+            .alias(
+                event_bindings::List {
+                    entry: projection.context.entry.index(),
+                    element: self.list_index,
+                },
+                indices,
+                archive_path,
+                proof,
+                writer,
+            )?;
         Ok(())
     }
 

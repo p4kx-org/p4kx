@@ -1096,6 +1096,23 @@
           "additionalProperties": false,
           "properties": {
             "payload": {
+              "$ref": "#/$defs/EventBinding"
+            },
+            "record_type": {
+              "const": "event-binding",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
               "$ref": "#/$defs/Event"
             },
             "record_type": {
@@ -10498,6 +10515,42 @@
         "value",
         "lexeme",
         "position"
+      ],
+      "type": "object"
+    },
+    "EventBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "alias_declaration_ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "alias_element_index": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "database_declaration_ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "database_element_index": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "event_database_entry_index": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "parameter_entry_index": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "timeline_element_index": {
+          "$ref": "#/$defs/DecimalU64"
+        }
+      },
+      "required": [
+        "parameter_entry_index",
+        "alias_element_index",
+        "alias_declaration_ordinal",
+        "database_element_index",
+        "database_declaration_ordinal",
+        "event_database_entry_index",
+        "timeline_element_index"
       ],
       "type": "object"
     },
@@ -46825,6 +46878,61 @@
               "indices": {
                 "maxItems": 1,
                 "minItems": 1
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation-definition"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-definition-event-binding"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationDefinitionPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "event-binding"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 7,
+                "minItems": 7
               }
             }
           }

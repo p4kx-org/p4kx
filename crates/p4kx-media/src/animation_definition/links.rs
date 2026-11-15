@@ -7,6 +7,7 @@ use p4kx_extraction::cryxml::{
 };
 
 use super::chrparams_selectors::{self, Selector};
+use super::event_bindings;
 use super::graph_source::GraphRole;
 use super::origins;
 use super::payload::{self as wire, DefinitionFamily, DefinitionLink, DefinitionPayload, LinkKind};
@@ -26,13 +27,14 @@ use crate::{
 pub(super) struct LinkSelector {
     pub(super) kind: LinkKind,
     name_position: Option<SourceAttributePosition>,
+    character_list: Option<u64>,
 }
 
 pub(super) fn kind(
     family: DefinitionFamily,
     element: SourceElement<'_>,
     parent: Option<&str>,
-    character_list: bool,
+    character_list: Option<u64>,
     attribute: &SourceDeclaration<'_>,
 ) -> Option<LinkSelector> {
     if element.namespace().is_some()
@@ -45,7 +47,7 @@ pub(super) fn kind(
     }
     let tag = element.name();
     let name = attribute.qualified_name();
-    if character_list
+    if character_list.is_some()
         && chrparams_selectors::named(element, "Animation")
         && name.eq_ignore_ascii_case("path")
     {
@@ -54,6 +56,7 @@ pub(super) fn kind(
         return Some(LinkSelector {
             kind,
             name_position: Some(attributes.name.position().clone()),
+            character_list,
         });
     }
     if matches!(family, DefinitionFamily::Adb)
@@ -62,6 +65,7 @@ pub(super) fn kind(
         return Some(LinkSelector {
             kind,
             name_position: None,
+            character_list: None,
         });
     }
     if matches!(family, DefinitionFamily::Comb)
@@ -71,6 +75,7 @@ pub(super) fn kind(
         return Some(LinkSelector {
             kind: LinkKind::CombinedSpace,
             name_position: None,
+            character_list: None,
         });
     }
     None
@@ -231,6 +236,7 @@ pub(super) fn write(
         selector: &selection,
     }
     .resolve(projection, &mut prepared, writer)?;
+    selector.observe_event_database(projection, indices, &reference, &prepared, writer)?;
     if let Some(sub_database) = sub_database {
         sub_database.observe(projection, indices, &reference, &prepared, writer)?;
     }
@@ -265,6 +271,37 @@ impl ReferenceSelection<'_> {
 }
 
 impl LinkSelector {
+    fn observe_event_database(
+        &self,
+        projection: &DefinitionProjection<'_, '_>,
+        indices: [u64; 2],
+        reference: &Reference,
+        prepared: &PreparedRecordOrigins,
+        writer: &MediaWriter<'_>,
+    ) -> Result<(), MediaError> {
+        let Some(list) = self
+            .character_list
+            .filter(|_| matches!(self.kind, LinkKind::EventDatabase))
+        else {
+            return Ok(());
+        };
+        projection
+            .context
+            .directory
+            .index
+            .animation_event_bindings
+            .database(
+                event_bindings::List {
+                    entry: projection.context.entry.index(),
+                    element: list,
+                },
+                indices,
+                reference,
+                prepared,
+                writer,
+            )
+    }
+
     fn proof(
         &self,
         input: &crate::origin_input::MediaOriginInput,

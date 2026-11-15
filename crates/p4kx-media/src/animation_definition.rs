@@ -6,6 +6,7 @@ mod blend_reference_payload;
 mod blend_references;
 mod chrparams_selectors;
 mod definition_scope;
+mod event_bindings;
 mod graph_field;
 mod graph_source;
 mod links;
@@ -27,6 +28,7 @@ mod timeline;
 mod timeline_payload;
 
 pub(crate) use definition_scope::DefinitionScope;
+pub(crate) use event_bindings::EventBindings;
 pub(crate) use provider::AnimationDefinitionProvider;
 pub(crate) use schema::bind_record_schema;
 pub(crate) use sub_database_cycles::SubDatabaseCycles;

@@ -212,7 +212,7 @@ impl DefinitionProjection<'_, '_> {
             parent: Some(index),
             parent_name: element.namespace().is_none().then(|| element.name()),
             params_root: parent.parent.is_none() && chrparams_selectors::named(element, "Params"),
-            filepath: Filepath::for_list(self, element, parent.params_root, writer)?,
+            filepath: Filepath::for_list(self, element, parent.params_root, index, writer)?,
             timeline,
             graph: graph.map(|role| (role, site.position)),
             branch,
@@ -347,7 +347,7 @@ impl DefinitionProjection<'_, '_> {
             self.family,
             element,
             parent.parent_name,
-            parent.filepath.is_some(),
+            parent.filepath.as_ref().map(Filepath::list_index),
             declaration,
         ) {
             let sub_database = sub_database.filter(|selector| selector.matches(declaration));

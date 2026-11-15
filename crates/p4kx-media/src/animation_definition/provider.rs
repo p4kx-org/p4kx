@@ -25,7 +25,7 @@ impl Provider for AnimationDefinitionProvider {
         let mut capability = Capability::new(
             MediaKind::AnimationDefinition,
             "p4kx.animation-definition",
-            "1.6.0",
+            "1.7.0",
             "Original character parameters, animation event definitions and Mannequin XML source.",
         );
         capability.field_groups = vec![
@@ -44,6 +44,10 @@ impl Provider for AnimationDefinitionProvider {
             FieldGroup::new(
                 "named-dba-bindings",
                 "Physical DBA metadata candidates for exact named CAF paths.",
+            ),
+            FieldGroup::new(
+                "event-bindings",
+                "Exact CAF paths paired with timelines from the authored event database.",
             ),
             FieldGroup::new(
                 "event-timelines",
@@ -86,6 +90,11 @@ impl Provider for AnimationDefinitionProvider {
             .lookup
             .index
             .animation_sub_databases
+            .write(context, writer)?;
+        context
+            .lookup
+            .index
+            .animation_event_bindings
             .write(context, writer)
     }
 
@@ -194,6 +203,19 @@ fn write_document(
         &state,
         writer,
     )?;
+    if matches!(&state, DocumentProjection::Readable)
+        && matches!(
+            projection.family,
+            DefinitionFamily::Chrparams | DefinitionFamily::Animevents
+        )
+    {
+        projection
+            .context
+            .directory
+            .index
+            .animation_event_bindings
+            .complete(projection.context.entry.index(), writer)?;
+    }
     let (status, issue) = match state {
         DocumentProjection::Readable => (Status::Complete, None),
         DocumentProjection::RepairedStrings => (

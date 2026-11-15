@@ -29,6 +29,7 @@ pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
         (wire::WILDCARD, "wildcard", 2),
         (wire::NAMED_DBA_BINDING, "named-dba-binding", 2),
         (wire::EVENT_TIMELINE, "event-timeline", 1),
+        (wire::EVENT_BINDING, "event-binding", 7),
         (wire::EVENT, "event", 1),
         (wire::EVENT_ATTRIBUTE, "event-attribute", 2),
         (wire::GRAPH_NODE, "graph-node", 1),
