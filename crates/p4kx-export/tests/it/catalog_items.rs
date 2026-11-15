@@ -20,6 +20,8 @@ type TestResult = Result<(), Box<dyn Error>>;
 mod completeness;
 #[path = "catalog_item_definitions.rs"]
 mod definitions;
+#[path = "catalog_ship_texts.rs"]
+mod ship_texts;
 
 const EXPORTED_AT: Duration = Duration::from_secs(1_792_000_000);
 
@@ -350,18 +352,18 @@ fn ships_are_entity_class_definitions_under_spaceships_and_groundvehicles_withou
 }
 
 #[test]
-fn a_ship_carries_names_role_career_crew_manufacturer_and_vehicle_definition() -> TestResult {
+fn a_ship_carries_crew_manufacturer_and_vehicle_definition() -> TestResult {
     let (_, catalog) = catalog_with(&options())?;
+    let mut ship = catalog["ships"][0].as_object().ok_or("ship")?.clone();
+    for text in ["name", "description", "role", "career"] {
+        ship.remove(text);
+    }
     assert_eq!(
-        catalog["ships"][0],
+        Value::Object(ship),
         json!({
             "guid": "90000000-0000-4000-8000-000000000001",
             "className": "ACAS_Ship",
             "recordPath": "libs/foundry/records/entities/spaceships/acas_ship",
-            "name": {"key": "@vehicle_NameACAS_Ship", "en": "Ace Hauler", "de": null},
-            "description": {"key": "@vehicle_DescACAS_Ship", "en": null, "de": null},
-            "role": {"key": "@LOC_PLACEHOLDER", "en": null, "de": null},
-            "career": {"key": "@vehicle_focus_transporter", "en": "Transporter", "de": null},
             "crewSize": 2,
             "manufacturerGuid": "10000000-0000-4000-8000-000000000001",
             "vehicleDefinition": "scripts/entities/vehicles/implementations/xml/acas_ship.xml",

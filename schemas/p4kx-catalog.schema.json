@@ -41918,7 +41918,7 @@
       "description": "A ship or ground vehicle: an `EntityClassDefinition` Record under `entities/spaceships` or\n`entities/groundvehicles`.",
       "properties": {
         "career": {
-          "$ref": "#/$defs/LocalisedText",
+          "$ref": "#/$defs/SourcedValueOfPublicNameRef",
           "description": "The career, from `vehicleCareer`, e.g. `@vehicle_focus_transporter`."
         },
         "cargoGridsWithIssue": {
@@ -41948,7 +41948,7 @@
           ]
         },
         "description": {
-          "$ref": "#/$defs/LocalisedText",
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
           "description": "The description, from `vehicleDescription` of the vehicle parameters.",
           "x-gameText": true
         },
@@ -42002,7 +42002,7 @@
           ]
         },
         "name": {
-          "$ref": "#/$defs/LocalisedText",
+          "$ref": "#/$defs/SourcedValueOfPublicNameRef",
           "description": "The name, from `vehicleName` of the vehicle parameters."
         },
         "playability": {
@@ -42017,7 +42017,7 @@
           "type": "string"
         },
         "role": {
-          "$ref": "#/$defs/LocalisedText",
+          "$ref": "#/$defs/SourcedValueOfPublicNameRef",
           "description": "The role, from `vehicleRole`, e.g. `@vehicle_class_lightfreight`."
         },
         "size": {

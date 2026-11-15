@@ -3,20 +3,20 @@
 
 use p4kx_extraction::{RecordTree, StructValue, Value};
 
+use crate::catalog_v3::authored_fields::ship_texts::ShipTexts;
 use crate::contract::Ship;
 use crate::contract_insurance::ShipInsurance;
 use crate::guid_text::CatalogGuid;
 use crate::paint_port::{PaintPort, VehicleFacts};
 use crate::playability_rules::{self, Evidence};
 use crate::record_fields::{
-    boolean, class_name, component, element, elements, integer, locale_key, number, reference,
-    structure, text,
+    boolean, class_name, component, element, elements, integer, number, reference, structure, text,
 };
 use crate::ship_base::ShipRead;
-use crate::texts::Texts;
 use crate::variants::ShipKey;
 
 const PAINTS: &str = "Paints";
+pub(crate) const VEHICLE_COMPONENT: &str = "VehicleComponentParams";
 
 /// Returns the item ports of the Record tree `tree` that take paints: the `SItemPortDef` entries
 /// of its `SItemPortContainerComponentParams` with a type `Paints`.
@@ -58,22 +58,22 @@ fn takes_paints(port: &StructValue<'_>) -> bool {
 /// with the vehicle facts its paints and variant group are derived from.
 pub(crate) fn ship<'f>(
     tree: &RecordTree<'f>,
-    texts: &Texts<'f>,
+    vehicle: Option<&StructValue<'f>>,
+    texts: ShipTexts,
     evidence: &Evidence,
     read: &ShipRead,
 ) -> (Ship<'f>, VehicleFacts) {
     let base = &read.base;
-    let vehicle = component(tree, "VehicleComponentParams");
     let guid = CatalogGuid(tree.guid());
     let ship = Ship {
         source_record_index: tree.record_index(),
         guid,
         class_name: class_name(tree),
         record_path: tree.record_path(),
-        name: texts.localised(locale_key(vehicle, "vehicleName")),
-        description: texts.localised(locale_key(vehicle, "vehicleDescription")),
-        role: texts.localised(locale_key(vehicle, "vehicleRole")),
-        career: texts.localised(locale_key(vehicle, "vehicleCareer")),
+        name: texts.name,
+        description: texts.description,
+        role: texts.role,
+        career: texts.career,
         crew_size: integer(vehicle, "crewSize"),
         manufacturer_guid: reference(vehicle, "manufacturer"),
         vehicle_definition: text(vehicle, "vehicleDefinition"),
@@ -120,9 +120,6 @@ fn insurance<'f>(tree: &RecordTree<'f>) -> Option<ShipInsurance<'f>> {
 /// Returns what the ship `tree` shares with the ships of its variant group: its vehicle
 /// definition and the digest of its vehicle implementation, `None` when either is missing.
 pub(crate) fn variant_key(tree: &RecordTree<'_>, read: &ShipRead) -> Option<ShipKey> {
-    let definition = text(
-        component(tree, "VehicleComponentParams"),
-        "vehicleDefinition",
-    )?;
+    let definition = text(component(tree, VEHICLE_COMPONENT), "vehicleDefinition")?;
     Some(ShipKey::new(definition, read.implementation?))
 }

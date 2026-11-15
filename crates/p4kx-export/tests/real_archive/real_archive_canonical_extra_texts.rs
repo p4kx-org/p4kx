@@ -20,6 +20,7 @@ pub(super) fn compare(
         Kind::ReputationStandings => ("perkDescription", TextDomain::GameText),
         Kind::GameplayProperties => ("unitFormat", TextDomain::PublicName),
         Kind::FactionReputations => return compare_faction_description(counters, index, row),
+        Kind::Ships => return compare_ship_labels(counters, index, row),
         _ => return Ok(()),
     };
     let target = index.reference(
@@ -30,6 +31,22 @@ pub(super) fn compare(
     counters.count_supplemental(target)?;
     if kind == Kind::GameplayProperties {
         compare_overrides(counters, index, row)?;
+    }
+    Ok(())
+}
+
+fn compare_ship_labels(
+    counters: &mut CoverageCounters<'_>,
+    index: &TextIndex<'_>,
+    row: &Value,
+) -> TestResult<()> {
+    for label in ["role", "career"] {
+        let target = index.reference(
+            row.get(label).ok_or("ship text carrier")?,
+            TextDomain::PublicName,
+            TextReferenceShape::Required,
+        )?;
+        counters.count_supplemental(target)?;
     }
     Ok(())
 }

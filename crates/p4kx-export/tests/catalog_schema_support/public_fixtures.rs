@@ -38,5 +38,15 @@ pub(super) fn public_names() -> Vec<Value> {
             }
         }))
     }));
+    rows.push(json!({
+        "id": source_values::present(json!("name:27:@vehicle_class_lightfreight")),
+        "key": source_values::present(json!("@vehicle_class_lightfreight")),
+        "translations": source_values::present(json!({
+            "en": {
+                "sourceText": source_values::present(json!("Light Freight")),
+                "displayText": source_values::present(json!("Light Freight"))
+            }
+        }))
+    }));
     rows
 }

@@ -5,7 +5,8 @@ use p4kx_extraction::SourcedValue;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::contract::{LocalisedText, every_field_required};
+use crate::catalog_text_contract::{GameTextRef, PublicNameRef};
+use crate::contract::every_field_required;
 use crate::contract_insurance::ShipInsurance;
 use crate::guid_text::CatalogGuid;
 use crate::item_variant::ItemKey;
@@ -89,14 +90,14 @@ pub(crate) struct Ship<'a> {
     /// The record path, without `.xml`.
     pub(crate) record_path: &'a str,
     /// The name, from `vehicleName` of the vehicle parameters.
-    pub(crate) name: LocalisedText<'a>,
+    pub(crate) name: SourcedValue<PublicNameRef>,
     /// The description, from `vehicleDescription` of the vehicle parameters.
     #[schemars(extend("x-gameText" = true))]
-    pub(crate) description: LocalisedText<'a>,
+    pub(crate) description: SourcedValue<GameTextRef>,
     /// The role, from `vehicleRole`, e.g. `@vehicle_class_lightfreight`.
-    pub(crate) role: LocalisedText<'a>,
+    pub(crate) role: SourcedValue<PublicNameRef>,
     /// The career, from `vehicleCareer`, e.g. `@vehicle_focus_transporter`.
-    pub(crate) career: LocalisedText<'a>,
+    pub(crate) career: SourcedValue<PublicNameRef>,
     /// The crew size, `null` without one.
     pub(crate) crew_size: Option<i64>,
     /// The GUID of the manufacturer the Reference `manufacturer` links to, `null` for a null

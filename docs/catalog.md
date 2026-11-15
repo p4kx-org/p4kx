@@ -540,12 +540,16 @@ separate consumption and generation sides stay visible. The consumer can reprodu
 power or coolant summary by choosing the first applicable generation amount in original state and
 delta order. Match the resource identifier case-insensitively and keep the matching source unit.
 
-A ship takes its fields from `VehicleComponentParams`:
+A ship takes its text fields from the first exact `VehicleComponentParams` in the original
+`Components` array. Each field is a sourced reference. Use its `value` to join the matching
+`id.value` in the indicated text table. The table carries separate `sourceText` and `displayText`
+forms for every available language. An empty key yields an absent reference. A placeholder keeps
+its key and has absent translation forms.
 
 | Field | Source |
 |-------|--------|
-| `name`, `description` | `vehicleName` and `vehicleDescription` |
-| `role`, `career` | Texts: `vehicleRole` and `vehicleCareer`, e.g. `@vehicle_class_lightfreight` |
+| `name`, `role`, `career` | `vehicleName`, `vehicleRole`, `vehicleCareer` → `texts.publicNames` |
+| `description` | `vehicleDescription` → `texts.gameTexts` (`x-gameText`) |
 | `crewSize` | `crewSize`, an integer |
 | `manufacturerGuid` | The GUID the Reference `manufacturer` links to, `null` for a null Reference |
 | `vehicleDefinition` | `vehicleDefinition`, the path of the vehicle XML |

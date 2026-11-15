@@ -4,6 +4,7 @@
 use p4kx_extraction::{Record, RecordTree, TreeBuilder};
 
 use super::Scan;
+use crate::catalog_v3::authored_fields::ship_texts;
 use crate::catalog_v3::catalog_item_components::item_definition::ItemDefinition;
 use crate::catalog_v3::catalog_item_components::{self, ItemComponentsRead, resolution};
 use crate::catalog_v3::catalog_weapon_projectile_ammo::{self, LinkedAmmunitionReader};
@@ -18,8 +19,10 @@ use crate::harvest_preset::provider_preset;
 use crate::loot_kinds::LootPick;
 use crate::mining::mineable_entity;
 use crate::picked::Picked;
+use crate::record_fields;
 use crate::record_observation::RecordObservation;
 use crate::scan_health::ScanError;
+use crate::ship::{self, VEHICLE_COMPONENT};
 use crate::starmap::starmap_object;
 use crate::{CatalogError, ExportAccountingError, Kind, item_stats, item_variant};
 
@@ -275,8 +278,30 @@ impl<'f> Scan<'_, '_, 'f> {
         )?;
         ledger.merge(read.ledger);
         let mut picked = Picked::of_ship(read.read, |read| {
-            crate::ship::ship(tree, self.texts, &self.evidence, read)
-        });
+            let vehicle = record_fields::component_occurrence(tree, VEHICLE_COMPONENT);
+            let (texts, notes) = ship_texts::read(
+                tree,
+                self.projection,
+                admission,
+                self.options.cancel,
+                vehicle.map(|(value, _)| value),
+            )?;
+            crate::source_projection_notes::record(
+                Kind::Ships,
+                ExportSourceRole::Selected,
+                admission,
+                tree,
+                notes,
+                ledger,
+            )?;
+            Ok(ship::ship(
+                tree,
+                vehicle.map(|(_, fields)| fields),
+                texts,
+                &self.evidence,
+                read,
+            ))
+        })?;
         if let Picked::Ship(_, vehicle) = &mut picked {
             vehicle.source_record_index = Some(record.index());
         }

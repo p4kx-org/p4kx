@@ -31,6 +31,8 @@ mod owned_fields;
 #[path = "authored_room_offset.rs"]
 mod room_offset;
 pub(super) use room_offset::{RoomOffset, RoomTransformUnavailable};
+#[path = "ship_texts.rs"]
+pub(crate) mod ship_texts;
 #[path = "authored_text_fields.rs"]
 mod text_fields;
 pub(crate) use text_fields::read_root_locale;

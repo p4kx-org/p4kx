@@ -12,6 +12,8 @@ mod forms_mutations;
 mod mining_texts;
 #[path = "real_archive_mission_locale_tests.rs"]
 mod mission_locales;
+#[path = "real_archive_ship_texts_tests.rs"]
+mod ship_texts;
 
 #[path = "real_archive_text_baseline_migrations.rs"]
 mod baseline_migrations;

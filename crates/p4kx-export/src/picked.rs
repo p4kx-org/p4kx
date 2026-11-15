@@ -3,7 +3,6 @@
 
 use p4kx_extraction::{Guid, RecordTree};
 
-use crate::Kind;
 use crate::blueprint_category::BlueprintCategory;
 use crate::catalog_read_failure::CatalogReadFailure;
 use crate::catalog_v3::ammo_definition::PreparedAmmoDefinition;
@@ -37,6 +36,7 @@ use crate::mission_kinds::MissionPick;
 use crate::paint_port::VehicleFacts;
 use crate::ship_base::ShipRead;
 use crate::texts::Texts;
+use crate::{CatalogError, Kind};
 
 /// A Record a kind selected: its entity, or a development leftover of the kind.
 ///
@@ -256,14 +256,14 @@ impl<'f> Picked<'f> {
     /// could not be read: a ship is never left out without a trace.
     pub(crate) fn of_ship(
         read: Result<ShipRead, CatalogReadFailure<'f>>,
-        build: impl FnOnce(&ShipRead) -> (Ship<'f>, VehicleFacts),
-    ) -> Self {
-        match read {
+        build: impl FnOnce(&ShipRead) -> Result<(Ship<'f>, VehicleFacts), CatalogError>,
+    ) -> Result<Self, CatalogError> {
+        Ok(match read {
             Ok(read) => {
-                let (ship, vehicle) = build(&read);
+                let (ship, vehicle) = build(&read)?;
                 Self::Ship(ship, vehicle)
             }
             Err(failure) => Self::Failed(failure),
-        }
+        })
     }
 }

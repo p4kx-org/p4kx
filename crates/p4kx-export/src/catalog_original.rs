@@ -68,7 +68,9 @@ pub(crate) use crate::build::original_input::OriginalRecordScope;
 pub(crate) use original_datum::OriginalDatum;
 #[path = "original_reward_read.rs"]
 mod original_reward_read;
-pub(crate) use original_flow_fields::{OriginalFlowFields, OriginalMissingField};
+pub(crate) use original_flow_fields::{
+    ComponentSelection, OriginalFlowFields, OriginalMissingField,
+};
 pub(crate) use original_instance_location::OriginalInstanceLocation;
 pub(crate) use original_reference_capture::OriginalReferenceObservation;
 pub(crate) use original_reward_read::RewardRead;

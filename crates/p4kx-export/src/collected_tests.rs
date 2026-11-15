@@ -55,7 +55,7 @@ fn a_ship_whose_base_data_cannot_be_read_becomes_a_failure()
     );
     let picked = Picked::of_ship(Err(failure.clone()), |_| std::process::abort());
     assert!(
-        matches!(picked, Picked::Failed(found) if found == failure),
+        matches!(picked, Ok(Picked::Failed(found)) if found == failure),
         "a failed ship read keeps the same failure values",
     );
     Ok(())

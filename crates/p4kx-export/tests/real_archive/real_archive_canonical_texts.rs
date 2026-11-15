@@ -241,6 +241,7 @@ pub(crate) fn kind_coverage(
     if matches!(
         kind,
         Kind::Manufacturers
+            | Kind::Ships
             | Kind::Commodities
             | Kind::ResourceTypes
             | Kind::ResourceGroups
