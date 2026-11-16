@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use p4kx_extraction::{Archive, CancelToken, SourceValue};
 
-use super::{ContainerRows, System, SystemRead, WalkPath};
+use super::{PlacementRows, System, SystemRead, WalkPath};
 use crate::catalog_read::original::EntryCapture;
 use crate::entry_source::EntrySource;
 use crate::starmap_containers::Limits;
@@ -37,7 +37,7 @@ impl<'a> System<'a> {
             entry,
             cancel,
             limits,
-            (archive, capture, endpoints, ContainerRows::Typed),
+            (archive, capture, endpoints, PlacementRows::Typed),
         )
     }
 
@@ -48,11 +48,11 @@ impl<'a> System<'a> {
         entry: usize,
         cancel: Option<&'a CancelToken>,
         limits: Limits,
-        (archive, capture, endpoints, container_rows): (
+        (archive, capture, endpoints, rows): (
             &'a Archive,
             &'a EntryCapture<'a>,
             Option<&'a JumpEndpointRecords>,
-            ContainerRows<'a>,
+            PlacementRows<'a>,
         ),
     ) -> Result<SystemRead, CatalogError> {
         let root = index
@@ -80,7 +80,7 @@ impl<'a> System<'a> {
             capture,
             endpoints,
             read: SystemRead::default(),
-            container_rows,
+            rows,
             limits,
             budget: limits.children,
             open: Vec::new(),

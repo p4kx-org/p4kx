@@ -7,12 +7,15 @@ use std::fs;
 use std::ptr;
 use std::sync::Arc;
 
-use p4kx_extraction::{Guid, SourceInventory};
+use p4kx_extraction::{CancelToken, Guid, SourceInventory};
 use p4kx_testkit::{TestContainer, TestElement, TestEntry};
+use serde::Serialize;
 use serde_json::{Value, json};
 
 use super::{Limits, external_at, guid, open, read, root, system};
 use crate::catalog_read::original::with_entry_capture;
+use crate::catalog_rows::staged::StagedCatalogTable;
+use crate::catalog_table::CatalogTable;
 use crate::starmap_containers::jump_class::JumpEndpointRecords;
 use crate::starmap_containers::{PlacementScope, Placements};
 
@@ -178,39 +181,35 @@ fn catalog_spool_replays_the_original_order_and_every_row_origin() -> Result<(),
         Ok((spooled, typed, inventory))
     })?;
 
-    let expected = typed.take_instances();
-    let (availability, spool) = spooled.take_instance_spool();
-    let spool = spool.ok_or("the production path prepared a row spool")?;
+    let (availability, spools) = spooled.take_spools();
     assert_eq!(
-        spool.rows(),
+        spooled.take_instances().rows.len(),
+        0,
+        "no retained typed container rows"
+    );
+    assert_eq!(
+        spooled.take_locations().rows.len(),
+        0,
+        "no retained typed location rows"
+    );
+    let containers = StagedCatalogTable::new(availability, spools.containers, None);
+    let cancel = CancelToken::new();
+    let locations = StagedCatalogTable::new(availability, spools.locations, Some(&cancel));
+    assert_eq!(
+        containers.len(),
         REPEATED_TILES + 2,
         "both roots and every tile"
     );
     assert_eq!(
-        serde_json::to_vec(&availability)?,
-        serde_json::to_vec(&expected.availability)?,
-        "staged storage preserves the table availability"
+        locations.len(),
+        REPEATED_TILES,
+        "one source location per tile"
     );
-    assert_eq!(
-        spooled.take_instances().rows.len(),
-        0,
-        "no retained typed rows"
-    );
-    assert_eq!(
-        serde_json::to_vec(&spooled.take_locations())?,
-        serde_json::to_vec(&typed.take_locations())?,
-        "all location-to-container links survive staging"
-    );
-    let expected = serde_json::to_vec(&expected.rows)?;
-    for pass in 1..=2 {
-        assert_eq!(
-            serde_json::to_vec(&spool.serialize_rows(None))?,
-            expected,
-            "identical typed rows, including origins and order, on pass {pass}"
-        );
-    }
-    verify_spooled_origins(&expected, &inventory)?;
-    drop(spool);
+    let container_rows = verify_spooled_table(&containers, &typed.take_instances(), &inventory)?;
+    let location_rows = verify_spooled_table(&locations, &typed.take_locations(), &inventory)?;
+    verify_placement_links(&container_rows, &location_rows)?;
+    verify_location_cancel(&locations, &cancel);
+    drop((containers, locations));
     assert_eq!(
         fs::read_dir(scratch.path())?.count(),
         0,
@@ -219,28 +218,92 @@ fn catalog_spool_replays_the_original_order_and_every_row_origin() -> Result<(),
     Ok(())
 }
 
-fn verify_spooled_origins(bytes: &[u8], inventory: &SourceInventory) -> Result<(), Box<dyn Error>> {
-    let rows: Vec<Value> = serde_json::from_slice(bytes)?;
-    assert_eq!(rows[0]["system"]["value"], "a", "systems use folder order");
-    assert_eq!(rows[1]["system"]["value"], "t", "second system root");
+fn verify_spooled_table(
+    staged: &StagedCatalogTable,
+    typed: &CatalogTable<impl Serialize>,
+    inventory: &SourceInventory,
+) -> Result<Vec<Value>, Box<dyn Error>> {
+    let expected = serde_json::to_vec(typed)?;
+    for pass in 1..=2 {
+        assert_eq!(
+            serde_json::to_vec(staged)?,
+            expected,
+            "identical availability, row order and origins on pass {pass}"
+        );
+    }
+    let mut table: Value = serde_json::from_slice(&expected)?;
+    assert_eq!(
+        table["availability"], "available",
+        "spooled and typed roots are available"
+    );
     let known: HashSet<_> = inventory
         .uses()
         .iter()
         .map(|usage| usage.id().as_str())
         .collect();
+    let Value::Array(rows) = table["rows"].take() else {
+        return Err("expected staged rows".into());
+    };
     for row in &rows {
-        for cell in row.as_object().ok_or("expected a container row")?.values() {
-            let references = cell["sourceUsesRefs"]
-                .as_array()
-                .ok_or("expected a sourced cell")?;
-            for reference in references {
-                let reference = reference.as_str().ok_or("expected a source-use ID")?;
-                assert!(
-                    known.contains(reference),
-                    "each row use is present in the production inventory"
-                );
+        verify_spooled_origins(row, &known)?;
+    }
+    Ok(rows)
+}
+
+fn verify_spooled_origins(row: &Value, known: &HashSet<&str>) -> Result<(), Box<dyn Error>> {
+    match row {
+        Value::Object(fields) => {
+            for (name, value) in fields {
+                if name == "sourceUsesRefs" {
+                    for reference in value.as_array().ok_or("expected source-use references")? {
+                        let id = reference.as_str().ok_or("expected a source-use ID")?;
+                        assert!(known.contains(id), "source use in the production inventory");
+                    }
+                } else {
+                    verify_spooled_origins(value, known)?;
+                }
             }
         }
+        Value::Array(values) => {
+            for value in values {
+                verify_spooled_origins(value, known)?;
+            }
+        }
+        Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) => {}
     }
     Ok(())
+}
+
+fn verify_placement_links(containers: &[Value], locations: &[Value]) -> Result<(), Box<dyn Error>> {
+    assert_eq!(
+        containers[0]["system"]["value"], "a",
+        "systems use folder order"
+    );
+    assert_eq!(containers[1]["system"]["value"], "t", "second system root");
+    for (container, location) in containers[2..].iter().zip(locations) {
+        let id = container
+            .pointer("/instanceId/value")
+            .ok_or("expected a container ID")?;
+        assert_eq!(
+            location.pointer("/containerInstanceId/value"),
+            Some(id),
+            "each location links to its original physical occurrence"
+        );
+    }
+    Ok(())
+}
+
+fn verify_location_cancel(locations: &StagedCatalogTable, cancel: &CancelToken) {
+    cancel.cancel();
+    assert!(
+        serde_json::to_vec(locations).is_err(),
+        "cancelled location replay"
+    );
+    assert!(
+        matches!(
+            locations.take_failure().map(crate::CatalogError::from),
+            Some(crate::CatalogError::Cancelled)
+        ),
+        "location cancellation is recovered as the typed catalog error"
+    );
 }

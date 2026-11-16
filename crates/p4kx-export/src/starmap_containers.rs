@@ -19,6 +19,7 @@ use jump_operating::OperatingResolver;
 
 #[cfg(test)]
 use self::instance::ContainerInstance;
+#[cfg(test)]
 use self::location_instance::LocationInstance;
 use self::proof::{PlacementEvidence, PlacementProof};
 
@@ -85,6 +86,12 @@ pub(crate) enum PlacementScope {
     ArchiveInventory,
 }
 
+#[derive(Debug, Default)]
+pub(crate) struct PlacementSpools {
+    pub(crate) containers: Option<RowSpool>,
+    pub(crate) locations: Option<RowSpool>,
+}
+
 /// The placements of the Starmap Records in the system containers of an Archive.
 #[derive(Debug, Default)]
 pub(crate) struct Placements {
@@ -93,9 +100,10 @@ pub(crate) struct Placements {
     ambiguous: HashMap<Guid, Arc<[PlacementProof; 2]>>,
     pub(crate) counts: ContainerCounts,
     pub(crate) report: StarmapReport,
-    instance_spool: Option<RowSpool>,
+    spools: PlacementSpools,
     #[cfg(test)]
     instances: Vec<ContainerInstance>,
+    #[cfg(test)]
     locations: Vec<LocationInstance>,
     jump_endpoints: Vec<JumpEndpoint>,
     endpoint_inventory_complete: bool,
@@ -111,11 +119,11 @@ impl Placements {
         self.ambiguous = HashMap::new();
     }
 
-    pub(crate) fn take_instance_spool(&mut self) -> (DatasetAvailability, Option<RowSpool>) {
+    pub(crate) fn take_spools(&mut self) -> (DatasetAvailability, PlacementSpools) {
         (
             self.instance_availability
                 .unwrap_or(DatasetAvailability::Unavailable),
-            self.instance_spool.take(),
+            std::mem::take(&mut self.spools),
         )
     }
 
@@ -129,6 +137,7 @@ impl Placements {
         }
     }
 
+    #[cfg(test)]
     pub(crate) fn take_locations(&mut self) -> CatalogTable<LocationInstance> {
         CatalogTable {
             availability: self
@@ -236,6 +245,7 @@ impl Placements {
             }
             #[cfg(test)]
             append_owned(&mut self.instances, system.instances);
+            #[cfg(test)]
             append_owned(&mut self.locations, system.locations);
             append_owned(&mut self.jump_endpoints, system.jump_endpoints);
             for (record, placement) in system.placed {

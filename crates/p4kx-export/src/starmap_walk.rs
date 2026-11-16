@@ -14,6 +14,7 @@ use crate::starmap_containers::instance::ContainerFile;
 use crate::starmap_containers::instance::ContainerInstance;
 use crate::starmap_containers::jump_class::JumpEndpointRecords;
 use crate::starmap_containers::jump_endpoint::JumpEndpoint;
+#[cfg(test)]
 use crate::starmap_containers::location_instance::LocationInstance;
 use crate::starmap_containers::proof::{PlacementProof, PlacementStep};
 use crate::starmap_index::Index;
@@ -48,6 +49,7 @@ pub(crate) struct SystemRead {
     pub(crate) containers: Vec<Opened>,
     #[cfg(test)]
     pub(crate) instances: Vec<ContainerInstance>,
+    #[cfg(test)]
     pub(crate) locations: Vec<LocationInstance>,
     pub(crate) jump_endpoints: Vec<JumpEndpoint>,
 }
@@ -121,8 +123,11 @@ impl WalkPath {
     }
 }
 
-pub(crate) enum ContainerRows<'writer> {
-    Spool(&'writer mut RowSpoolWriter),
+pub(crate) enum PlacementRows<'writer> {
+    Spool {
+        containers: &'writer mut RowSpoolWriter,
+        locations: &'writer mut RowSpoolWriter,
+    },
     #[cfg(test)]
     Typed,
 }
@@ -140,7 +145,7 @@ pub(crate) struct System<'a> {
     capture: &'a EntryCapture<'a>,
     endpoints: Option<&'a JumpEndpointRecords>,
     read: SystemRead,
-    container_rows: ContainerRows<'a>,
+    rows: PlacementRows<'a>,
     limits: Limits,
     budget: usize,
     open: Vec<usize>,

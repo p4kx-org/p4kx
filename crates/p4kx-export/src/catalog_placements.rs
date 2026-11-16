@@ -38,13 +38,16 @@ pub(crate) struct CatalogPlacements {
     installed_configurations: CatalogTable<InstalledConfiguration>,
     #[schemars(with = "CatalogTable<ContainerInstance>")]
     container_instances: StagedCatalogTable,
-    location_instances: CatalogTable<LocationInstance>,
+    #[schemars(with = "CatalogTable<LocationInstance>")]
+    location_instances: StagedCatalogTable,
     jump_endpoints: CatalogTable<JumpEndpoint>,
 }
 
 impl CatalogPlacements {
     pub(crate) fn take_row_spool_failure(&self) -> Option<RowSpoolError> {
-        self.container_instances.take_failure()
+        self.container_instances
+            .take_failure()
+            .or_else(|| self.location_instances.take_failure())
     }
 }
 
@@ -84,15 +87,15 @@ impl<'source> Collected<'source> {
         )?;
         let topology = self.resource_topology(forge, &origins.uses, cancel)?;
         let starmap = std::mem::take(&mut self.starmap_objects);
-        let (availability, spool) = placements.take_instance_spool();
+        let (availability, spools) = placements.take_spools();
         let placements = CatalogPlacements {
             resource_network: topology.placements,
             starmap_placements: starmap_placement::table(forge, starmap, origins)?,
             facility_instances,
             facility_interior_coverage,
             installed_configurations,
-            container_instances: StagedCatalogTable::new(availability, spool, cancel),
-            location_instances: placements.take_locations(),
+            container_instances: StagedCatalogTable::new(availability, spools.containers, cancel),
+            location_instances: StagedCatalogTable::new(availability, spools.locations, cancel),
             jump_endpoints: placements.take_jump_endpoints(),
         };
         Ok((placements, topology.declarations))

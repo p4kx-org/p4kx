@@ -11,17 +11,17 @@ use p4kx_extraction::{Archive, CancelToken};
 use rayon::prelude::*;
 
 use super::jump_class::JumpEndpointRecords;
-use super::{Limits, PlacementScope, Placements};
+use super::{Limits, PlacementScope, PlacementSpools, Placements};
 use crate::catalog_read::original::EntryCapture;
-use crate::catalog_rows::spool::{RowSpool, RowSpoolWriter};
+use crate::catalog_rows::spool::RowSpoolWriter;
 use crate::catalog_table::DatasetAvailability;
 use crate::starmap_index::Index;
 use crate::starmap_parse::{Body, Read};
-use crate::starmap_walk::{ContainerRows, System, SystemRead};
+use crate::starmap_walk::{PlacementRows, System, SystemRead};
 use crate::{CatalogError, Kind};
 
 #[derive(Clone, Copy)]
-enum InstanceStorage<'directory> {
+enum PlacementStorage<'directory> {
     Spool(&'directory Path),
     #[cfg(test)]
     Typed,
@@ -53,7 +53,7 @@ impl Placements {
             capture,
             scope,
             Some(endpoints),
-            InstanceStorage::Spool(directory),
+            PlacementStorage::Spool(directory),
         )
     }
 
@@ -72,7 +72,7 @@ impl Placements {
             capture,
             scope,
             None,
-            InstanceStorage::Typed,
+            PlacementStorage::Typed,
         )
     }
 
@@ -83,7 +83,7 @@ impl Placements {
         capture: &EntryCapture<'_>,
         scope: PlacementScope,
         endpoints: Option<&JumpEndpointRecords>,
-        storage: InstanceStorage<'_>,
+        storage: PlacementStorage<'_>,
     ) -> Result<Self, CatalogError> {
         if cancel.is_some_and(CancelToken::is_cancelled) {
             return Err(CatalogError::Cancelled);
@@ -111,7 +111,7 @@ impl Placements {
         if cancel.is_some_and(CancelToken::is_cancelled) {
             return Err(CatalogError::Cancelled);
         }
-        let (read, instance_spool) = walk_systems(
+        let (read, spools) = walk_systems(
             &index,
             &bodies,
             &systems,
@@ -130,7 +130,7 @@ impl Placements {
             && read.iter().all(|system| !system.routes_incomplete);
         let mut placements = Self {
             ledger,
-            instance_spool,
+            spools,
             ..Self::default()
         };
         placements.finish(&index, systems.len(), read, scope);
@@ -150,14 +150,15 @@ fn walk_systems(
     cancel: Option<&CancelToken>,
     limits: Limits,
     (archive, capture, endpoints): (&Archive, &EntryCapture<'_>, Option<&JumpEndpointRecords>),
-    storage: InstanceStorage<'_>,
-) -> Result<(Vec<SystemRead>, Option<RowSpool>), CatalogError> {
+    storage: PlacementStorage<'_>,
+) -> Result<(Vec<SystemRead>, PlacementSpools), CatalogError> {
     if systems.is_empty() {
-        return Ok((Vec::new(), None));
+        return Ok((Vec::new(), PlacementSpools::default()));
     }
     match storage {
-        InstanceStorage::Spool(directory) => {
-            let mut writer = RowSpoolWriter::new(directory)?;
+        PlacementStorage::Spool(directory) => {
+            let mut containers = RowSpoolWriter::new(directory)?;
+            let mut locations = RowSpoolWriter::new(directory)?;
             let mut reads = Vec::with_capacity(systems.len());
             for (name, entry) in systems {
                 reads.push(System::run_with_output(
@@ -171,14 +172,21 @@ fn walk_systems(
                         archive,
                         capture,
                         endpoints,
-                        ContainerRows::Spool(&mut writer),
+                        PlacementRows::Spool {
+                            containers: &mut containers,
+                            locations: &mut locations,
+                        },
                     ),
                 )?);
             }
-            Ok((reads, Some(writer.finish(cancel)?)))
+            let spools = PlacementSpools {
+                containers: Some(containers.finish(cancel)?),
+                locations: Some(locations.finish(cancel)?),
+            };
+            Ok((reads, spools))
         }
         #[cfg(test)]
-        InstanceStorage::Typed => {
+        PlacementStorage::Typed => {
             let reads = systems
                 .par_iter()
                 .map(|(name, entry)| {
@@ -193,7 +201,7 @@ fn walk_systems(
                     )
                 })
                 .collect::<Result<_, _>>()?;
-            Ok((reads, None))
+            Ok((reads, PlacementSpools::default()))
         }
     }
 }
