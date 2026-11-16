@@ -219,3 +219,28 @@ Ubuntu 24.04 ARM64 Blender package is 4.0.2. The Flathub package currently targe
 The Debian check supplies ARM64 Blender 5.2 evidence in that userland. A native Blender 5.3
 consumer on Linux ARM64 and a supported native Blender runtime directly on Ubuntu 24.04 ARM64
 remain outside this CI coverage. [Ubuntu ARM64 package](https://packages.ubuntu.com/noble/arm64/blender) · [Blender 5.3 release files](https://download.blender.org/release/Blender5.3/) · [Flathub architecture manifest](https://github.com/flathub/org.blender.Blender/blob/master/flathub.json)
+
+## Stencil palette colour and coverage
+
+This fixture exports a textured GLB and a Blender package for each of two assemblies
+from one synthetic Archive. One assembly has three authored decal palette colours.
+The other has no palette and uses the material's own stencil colour and red mask.
+
+```powershell
+$env:P4KX_SYNTHETIC_STENCIL_PACKAGE = Join-Path $verificationRoot 'stencil'
+$env:P4KX_SOURCE_REVISION = (git rev-parse HEAD).Trim()
+cargo test --locked -p p4kx-blender --test it -- stencil_palette_colours_are_projected_into_glb_and_the_blender_package
+& 'C:\Program Files\Blender Foundation\Blender 5.3\blender.exe' --background --factory-startup --disable-autoexec --threads 1 --python-exit-code 23 --python blender_addon/tests/blender_stencil_package.py -- $env:P4KX_SYNTHETIC_STENCIL_PACKAGE
+```
+
+Use the isolated Blender profile above and a new output directory. The test measures
+three separate masks, two overlaps, and zero and fractional coverage. It compares
+GLB colour in sRGB bytes and coverage in raw alpha bytes, each within one byte.
+It measures the imported Blender colour and coverage sockets in two fixed-camera
+linear EXRs within 0.012. The one-thread Cycles probe uses fixed sampling and disables
+denoising. The script routes the imported sockets through emission on two copies of
+the material to measure each signal independently of lights and blend settings.
+It records the supplied source revision, Blender build, importer and package-file
+hashes, sample values and warnings in `stencil-report.json`. This checks the
+override-2 and missing-palette projections of ADR-0310 in both outputs. The ADR
+also records the remaining questions about in-game mask priority and stencil fields.

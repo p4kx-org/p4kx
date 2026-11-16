@@ -33,6 +33,7 @@ mod package_palette_gloss;
 mod package_palette_provenance;
 mod package_primitive_map;
 mod package_safety;
+mod package_stencil_palette;
 mod package_vertex_colours;
 mod package_vertex_map;
 mod package_write_context;
