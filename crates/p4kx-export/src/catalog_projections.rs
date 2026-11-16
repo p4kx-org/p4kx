@@ -4,6 +4,7 @@
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use crate::catalog_rows::staged::StagedCatalogTable;
 use crate::catalog_table::CatalogTable;
 use crate::commodity_contract::CommodityPresentation;
 use crate::contract_missions::ContractEntry;
@@ -43,8 +44,8 @@ pub(crate) struct CatalogProjections<'source> {
     pub(crate) jump_connections: CatalogTable<JumpConnection>,
     pub(crate) weapon_magazine_resolutions: CatalogTable<WeaponMagazineResolution>,
     pub(crate) weapon_projectile_ammo_selections: CatalogTable<WeaponProjectileAmmoSelection>,
-    pub(crate) weapon_player_animation_candidates:
-        CatalogTable<weapon_reload::WeaponPlayerAnimationCandidate>,
+    #[schemars(with = "CatalogTable<weapon_reload::WeaponPlayerAnimationCandidate>")]
+    pub(crate) weapon_player_animation_candidates: StagedCatalogTable,
     pub(crate) weapon_combat_bases: CatalogTable<WeaponCombatBase<'source>>,
     pub(crate) resource_group_parents:
         CatalogTable<super::resource_group_catalog::ResourceGroupParent>,

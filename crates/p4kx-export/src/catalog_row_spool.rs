@@ -334,7 +334,7 @@ impl<T: Write> Write for CheckedIo<'_, T> {
     }
 }
 
-fn checkpoint(cancel: Option<&CancelToken>) -> Result<(), RowSpoolError> {
+pub(super) fn checkpoint(cancel: Option<&CancelToken>) -> Result<(), RowSpoolError> {
     if cancel.is_some_and(CancelToken::is_cancelled) {
         return Err(RowSpoolError::Cancelled);
     }

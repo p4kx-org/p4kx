@@ -119,7 +119,13 @@ fn write_json(
             let failure = catalog
                 .placements
                 .take_row_spool_failure()
-                .or_else(|| catalog.definitions.particle_libraries.take_failure());
+                .or_else(|| catalog.definitions.particle_libraries.take_failure())
+                .or_else(|| {
+                    catalog
+                        .projections
+                        .weapon_player_animation_candidates
+                        .take_failure()
+                });
             if let Some(failure) = failure {
                 return CatalogError::from(failure);
             }

@@ -8,3 +8,5 @@
 - Fold contract generator results in original order per read window and report the active mission projection phase.
 - Reuse original Struct and array positions for mission source lookups instead of storing a second index of every occurrence.
 - Coalesce repeated whole-Record inspections during loadout resolution while retaining their source evidence.
+- Release duplicate field inspections as Record scan batches finish and index source uses with their existing IDs.
+- Stage particle libraries and weapon animation candidates as they are projected.

@@ -2,13 +2,54 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::cell::RefCell;
+use std::path::Path;
 
 use p4kx_extraction::CancelToken;
 use serde::ser::SerializeStruct;
 use serde::{Serialize, Serializer};
 
-use super::spool::{RowSpool, RowSpoolError};
+use super::spool::{RowSpool, RowSpoolError, RowSpoolWriter, checkpoint};
 use crate::catalog_table::DatasetAvailability;
+
+/// A lazily opened private spool for an ordered catalog table.
+pub(crate) struct StagedCatalogRows<'a> {
+    directory: &'a Path,
+    cancel: Option<&'a CancelToken>,
+    writer: Option<RowSpoolWriter>,
+}
+
+impl<'a> StagedCatalogRows<'a> {
+    pub(crate) const fn new(directory: &'a Path, cancel: Option<&'a CancelToken>) -> Self {
+        Self {
+            directory,
+            cancel,
+            writer: None,
+        }
+    }
+
+    pub(crate) fn append(&mut self, row: &impl Serialize) -> Result<(), RowSpoolError> {
+        let writer = if let Some(writer) = &mut self.writer {
+            writer
+        } else {
+            checkpoint(self.cancel)?;
+            self.writer.insert(RowSpoolWriter::new(self.directory)?)
+        };
+        writer.append(row, self.cancel)
+    }
+
+    pub(crate) fn finish(
+        self,
+        availability: DatasetAvailability,
+    ) -> Result<StagedCatalogTable, RowSpoolError> {
+        let spool = if let Some(writer) = self.writer {
+            Some(writer.finish(self.cancel)?)
+        } else {
+            checkpoint(self.cancel)?;
+            None
+        };
+        Ok(StagedCatalogTable::new(availability, spool, self.cancel))
+    }
+}
 
 /// One catalog table whose ordered rows are prepared in a private spool.
 #[derive(Debug)]

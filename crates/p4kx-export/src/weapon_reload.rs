@@ -11,7 +11,8 @@ use serde::Serialize;
 use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_read::original::{EntryCapture, PhysicalEntryRef};
-use crate::catalog_table::{CatalogTable, DatasetAvailability};
+use crate::catalog_rows::staged::{StagedCatalogRows, StagedCatalogTable};
+use crate::catalog_table::DatasetAvailability;
 use crate::catalog_v3::catalog_item_components::item_definition::{
     ItemDefinition, WeaponAttachment,
 };
@@ -67,7 +68,7 @@ struct ActorBinding {
 
 pub(crate) struct WeaponAnimation<'source> {
     pub(crate) sources: WeaponAnimationSources<'source>,
-    pub(crate) candidates: CatalogTable<WeaponPlayerAnimationCandidate>,
+    pub(crate) candidates: StagedCatalogTable,
 }
 
 pub(crate) fn read<'source>(
@@ -85,7 +86,7 @@ pub(crate) fn read<'source>(
     if weapons.is_empty() {
         return Ok(WeaponAnimation {
             sources: WeaponAnimationSources::default(),
-            candidates: CatalogTable::empty(DatasetAvailability::Absent),
+            candidates: StagedCatalogTable::empty(DatasetAvailability::Absent),
         });
     }
     let entry = EntryCapture::for_input(input);
@@ -99,20 +100,23 @@ pub(crate) fn read<'source>(
         .collect::<Vec<_>>();
     let branches = graph::walk(&mut assets, roots, sources, cancel)?;
     let scopes = scope::databases(&mut assets, sources, cancel)?;
-    let rows = build_rows(
+    let scratch = std::env::temp_dir();
+    let mut candidates = StagedCatalogRows::new(&scratch, cancel);
+    let fragments = build_rows(
         &actor_bindings,
         &branches,
         &scopes,
         &assets,
         &weapons,
-        sources,
-        cancel,
+        (sources, cancel),
+        &mut candidates,
     )?;
     let available = if assets.databases.is_empty() {
         DatasetAvailability::Unavailable
     } else {
         DatasetAvailability::Available
     };
+    let candidates = candidates.finish(available)?;
     ledger.merge(assets.ledger);
     Ok(WeaponAnimation {
         sources: WeaponAnimationSources {
@@ -123,12 +127,9 @@ pub(crate) fn read<'source>(
             tag_definitions: assets.definitions.into_values().collect(),
             scopes,
             branches,
-            fragment_selectors: rows.fragments,
+            fragment_selectors: fragments,
         },
-        candidates: CatalogTable {
-            availability: available,
-            rows: rows.candidates,
-        },
+        candidates,
     })
 }
 
@@ -156,29 +157,21 @@ fn bindings(
         .collect()
 }
 
-struct Rows {
-    fragments: Vec<FragmentMatch>,
-    candidates: Vec<WeaponPlayerAnimationCandidate>,
-}
-
 fn build_rows(
     actors: &[ActorBinding],
     branches: &[BranchLink],
     scopes: &[DatabaseScopes],
     assets: &Assets<'_, '_, '_>,
     weapons: &[WeaponAttachment<'_, '_>],
-    sources: &SourceUses,
-    cancel: Option<&CancelToken>,
-) -> Result<Rows, CatalogError> {
+    (sources, cancel): (&SourceUses, Option<&CancelToken>),
+    candidates: &mut StagedCatalogRows<'_>,
+) -> Result<Vec<FragmentMatch>, CatalogError> {
     let scope_by_entry = scopes
         .iter()
         .map(|scope| (&scope.database, scope))
         .collect::<BTreeMap<_, _>>();
     let branches_by_entry = graph::by_database(branches);
-    let mut rows = Rows {
-        fragments: Vec::new(),
-        candidates: Vec::new(),
-    };
+    let mut fragment_selectors = Vec::new();
     let indices = weapons_by_tag(weapons);
     for edge in branches {
         check_cancel(cancel)?;
@@ -220,14 +213,16 @@ fn build_rows(
                             option,
                             fragment_results: &fragments,
                         };
-                        rows.candidates.extend(input.project(sources)?);
+                        if let Some(candidate) = input.project(sources)? {
+                            candidates.append(&candidate)?;
+                        }
                     }
                 }
             }
         }
-        rows.fragments.extend(fragments);
+        fragment_selectors.extend(fragments);
     }
-    Ok(rows)
+    Ok(fragment_selectors)
 }
 
 fn reachable(

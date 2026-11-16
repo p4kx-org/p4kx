@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_export::{CatalogOptions, CatalogPublicationMode, Compression, write_catalog_from};
 use p4kx_testkit::{
     DataForgeBuilder, TestEntry, TestInstance, TestRecord, TestStruct, TestType, TestValue,
 };
@@ -12,7 +13,8 @@ use crate::health_origin_fixture::{Fixture, Input, TestResult};
 #[test]
 fn original_reload_options_join_only_through_their_physical_scopes() -> TestResult {
     let fixture = Fixture::open(&database(), Input::Encrypted, documents())?;
-    let (_, catalog) = fixture.diagnostic()?;
+    let (built, catalog) = fixture.diagnostic()?;
+    check_compressed_replay(&fixture, built.json())?;
     let schema = jsonschema::validator_for(&p4kx_export::catalog_schema())?;
     schema
         .validate(&catalog)
@@ -21,7 +23,7 @@ fn original_reload_options_join_only_through_their_physical_scopes() -> TestResu
         &catalog,
         "/projections/weaponPlayerAnimationCandidates/rows",
     )?;
-    let [first, second] = candidates else {
+    let [first, _] = candidates else {
         return Err("two distinct options for the same physical weapon and scoped fragment".into());
     };
     assert_eq!(
@@ -38,11 +40,7 @@ fn original_reload_options_join_only_through_their_physical_scopes() -> TestResu
         Some(0),
         "the join identifies the physical AttachDef component",
     );
-    assert_ne!(
-        first.pointer("/optionPosition/value"),
-        second.pointer("/optionPosition/value"),
-        "repeated options keep distinct original positions",
-    );
+    check_candidate_order(candidates)?;
     for row in candidates {
         let tag_evidence = origin::cell(row, "tagEvidence", "present")?;
         assert_eq!(
@@ -61,6 +59,48 @@ fn original_reload_options_join_only_through_their_physical_scopes() -> TestResu
     }
     check_sources(&catalog)?;
     origin::closure(&catalog)
+}
+
+fn check_candidate_order(candidates: &[Value]) -> TestResult {
+    let positions = candidates
+        .iter()
+        .map(|candidate| {
+            origin::at(candidate, "/optionPosition/value/indices/0")?
+                .as_str()
+                .ok_or("the original XML byte position")?
+                .parse::<usize>()
+                .map_err(Into::into)
+        })
+        .collect::<TestResult<Vec<_>>>()?;
+    let authored = CANDIDATE
+        .match_indices("<Fragment Tags=")
+        .map(|(offset, _)| offset)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        positions, authored,
+        "the candidates retain the two distinct authored positions in source order",
+    );
+    Ok(())
+}
+
+fn check_compressed_replay(fixture: &Fixture, expected: &[u8]) -> TestResult {
+    let options = CatalogOptions {
+        publication_mode: CatalogPublicationMode::DiagnosticPartial,
+        ..crate::health_origin_fixture::options()
+    };
+    let (_, packed) = write_catalog_from(
+        &fixture.archive,
+        &fixture.entry,
+        &options,
+        Compression::Zstd { level: 1 },
+        || Ok(Vec::new()),
+    )?;
+    let decoded = zstd::stream::decode_all(packed.as_slice())?;
+    assert_eq!(
+        decoded, expected,
+        "weapon candidates and their origins survive both compressed writer passes in source order",
+    );
+    Ok(())
 }
 
 fn check_sources(catalog: &Value) -> TestResult {

@@ -10,8 +10,7 @@ use serde::Serialize;
 use crate::catalog_read::original::{
     EntryCapture, EntryDiagnosis, EntryRead, EntryXml, PhysicalEntryIdentity,
 };
-use crate::catalog_rows::spool::RowSpoolWriter;
-use crate::catalog_rows::staged::StagedCatalogTable;
+use crate::catalog_rows::staged::{StagedCatalogRows, StagedCatalogTable};
 #[cfg(test)]
 use crate::catalog_table::CatalogTable;
 use crate::catalog_table::DatasetAvailability;
@@ -67,17 +66,11 @@ fn stage(
     cancel: Option<&CancelToken>,
     directory: &Path,
 ) -> Result<StagedCatalogTable, CatalogError> {
-    let mut spool = None::<RowSpoolWriter>;
+    let mut rows = StagedCatalogRows::new(directory, cancel);
     let availability = visit(archive, capture, ledger, filter, cancel, |row| {
-        let writer = match spool {
-            Some(ref mut writer) => writer,
-            None => spool.insert(RowSpoolWriter::new(directory)?),
-        };
-        writer.append(&row, cancel)?;
-        Ok(())
+        rows.append(&row).map_err(Into::into)
     })?;
-    let spool = spool.map(|writer| writer.finish(cancel)).transpose()?;
-    Ok(StagedCatalogTable::new(availability, spool, cancel))
+    rows.finish(availability).map_err(Into::into)
 }
 
 #[cfg(test)]
