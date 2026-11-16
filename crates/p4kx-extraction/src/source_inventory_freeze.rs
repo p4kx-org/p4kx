@@ -28,6 +28,14 @@ pub enum SourceInventoryFreezeError<E> {
 }
 
 impl SourceUses {
+    /// Counts the distinct uses still held in the capture registry.
+    ///
+    /// # Errors
+    /// Returns an error when the evidence registry is unavailable.
+    pub fn registered_use_count(&self) -> Result<usize, SourceEvidenceError> {
+        Ok(source_evidence_error::lock(&self.registry)?.uses.len())
+    }
+
     /// Freezes sorted source/use rows after projection for repeatable serialization passes.
     ///
     /// # Errors

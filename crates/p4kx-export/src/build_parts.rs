@@ -136,6 +136,12 @@ pub(super) fn export_health(
     run: CatalogRun<'_, '_>,
 ) -> Result<crate::ExportHealth, crate::CatalogError> {
     run.begin(CatalogStage::ExportHealth);
+    #[cfg(test)]
+    run.capture_retention(
+        CatalogStage::ExportHealth,
+        &input.origins().uses,
+        &[&collected.ledger],
+    )?;
     let options = run.options;
     crate::export_health_prepare::compile_captured(
         std::mem::take(&mut collected.ledger),

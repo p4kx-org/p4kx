@@ -2,8 +2,8 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use crate::{
-    InputScope, SourceEvidenceError, SourceInput, SourceLocation, SourceUse, SourceUseRole,
-    SourceUses, SourceValue,
+    InputScope, SourceEvidenceError, SourceInput, SourceLocation, SourceScope, SourceUse,
+    SourceUseRole, SourceUses, SourceValue,
 };
 
 use super::SourceInventoryFreezeError;
@@ -11,27 +11,45 @@ use super::SourceInventoryFreezeError;
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
 fn use_at(sources: &SourceUses, record_index: u32) -> Result<SourceUse, SourceEvidenceError> {
-    sources
-        .observe(SourceInput::Unknown, InputScope::Payload)?
-        .at(
-            SourceLocation::DataForge {
-                record_index,
-                field: "source".into(),
-            },
-            SourceUseRole::Payload,
-        )
+    observe_in(
+        &sources.observe(SourceInput::Unknown, InputScope::Payload)?,
+        record_index,
+    )
+}
+
+fn observe_in(scope: &SourceScope, record_index: u32) -> Result<SourceUse, SourceEvidenceError> {
+    scope.at(
+        SourceLocation::DataForge {
+            record_index,
+            field: "source".into(),
+        },
+        SourceUseRole::Payload,
+    )
 }
 
 #[test]
 fn finishing_moves_sorted_rows_and_preserves_captured_value_binding() -> TestResult {
     let sources = SourceUses::with_compact_coordinates();
     let same = sources.clone();
-    let first = use_at(&sources, 9)?;
+    assert_eq!(sources.registered_use_count()?, 0, "empty capture");
+    let scope = sources.observe(SourceInput::Unknown, InputScope::Payload)?;
+    let first = observe_in(&scope, 9)?;
     let second = use_at(&sources, 1)?;
+    observe_in(&scope, 9)?;
+    assert_eq!(
+        sources.registered_use_count()?,
+        2,
+        "repeat capture does not add a registered use",
+    );
     let foreign = use_at(&SourceUses::with_compact_coordinates(), 9)?;
     let own = [second.clone(), first];
     let mixed = [second.clone(), foreign];
     let previous = sources.freeze()?;
+    assert_eq!(
+        same.registered_use_count()?,
+        previous.use_count(),
+        "the in-flight count equals the frozen row count",
+    );
     let expected = sources.value(SourceValue::Present(42), &own, true);
     let expected_mixed = sources.value(SourceValue::Present(42), &mixed, true);
 

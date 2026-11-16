@@ -265,7 +265,11 @@ revision and binary hash separately.
 
 The sink-only library witness also reports the channel, Build change number and producer
 phase on stderr. Use those events to align process memory samples with the producer stages.
-It reports the decoded and encoded sizes on stdout without creating a catalog file.
+At the start of `records`, `projections` and `export-health`, a `catalog retained:` line
+reports distinct registered source uses, live field inspections, their capacity and reserved
+inline bytes. The inline bytes cover the inspection vectors. Each inspection's nested allocations
+and the source registry's own allocation footprint require separate measurements.
+The witness reports decoded and encoded sizes on stdout without creating a catalog file.
 
 ```text
 cargo test --release --locked -p p4kx-export --lib -- build::api::size_witness::normal_catalog_size_phases_for_installed_pair --ignored --exact --nocapture

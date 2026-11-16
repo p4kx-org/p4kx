@@ -35,21 +35,14 @@ pub(super) fn scan<'f>(
     let options = run.options;
     let forge = original.forge();
     let scope = placement_scope(forge, options);
-    let mut placements = match scope {
-        Some(scope) => {
-            let endpoints = JumpEndpointRecords::read(forge, projection.original(), options)?;
-            Placements::read_for_catalog(
-                archive,
-                options.cancel,
-                &EntryCapture::for_input(original),
-                scope,
-                &endpoints,
-                &std::env::temp_dir(),
-            )?
-        }
-        None => Placements::default(),
-    };
+    let mut placements = read_placements(archive, scope, original, options)?;
     run.begin(CatalogStage::Records);
+    #[cfg(test)]
+    run.capture_retention(
+        CatalogStage::Records,
+        &original.origins().uses,
+        &[&placements.ledger],
+    )?;
     let mut collected = Scan::run(
         original,
         files,
@@ -64,6 +57,12 @@ pub(super) fn scan<'f>(
     }
     placements.release_record_lookup();
     run.begin(CatalogStage::Projections);
+    #[cfg(test)]
+    run.capture_retention(
+        CatalogStage::Projections,
+        &original.origins().uses,
+        &[&placements.ledger, &collected.ledger],
+    )?;
     collected.finish_selection();
 
     // Harvest and loot consume placement dependencies in RecordSelection scope.
@@ -83,6 +82,26 @@ pub(super) fn scan<'f>(
         options,
     )?;
     Ok((collected, placements))
+}
+
+fn read_placements(
+    archive: &Archive,
+    scope: Option<PlacementScope>,
+    original: &OriginalCatalogInput<'_, '_>,
+    options: &CatalogOptions<'_>,
+) -> Result<Placements, CatalogError> {
+    let Some(scope) = scope else {
+        return Ok(Placements::default());
+    };
+    let endpoints = JumpEndpointRecords::read(original.forge(), original, options)?;
+    Placements::read_for_catalog(
+        archive,
+        options.cancel,
+        &EntryCapture::for_input(original),
+        scope,
+        &endpoints,
+        &std::env::temp_dir(),
+    )
 }
 
 pub(super) fn project_locations(

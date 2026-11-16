@@ -208,6 +208,18 @@ impl CatalogStage {
 pub(crate) struct CatalogRun<'run, 'inputs> {
     pub(crate) options: &'run CatalogOptions<'inputs>,
     report: Option<&'run dyn Fn(CatalogStage)>,
+    #[cfg(test)]
+    retention: Option<&'run dyn Fn(CatalogRetention)>,
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct CatalogRetention {
+    pub(crate) stage: CatalogStage,
+    pub(crate) source_uses: usize,
+    pub(crate) field_inspections: usize,
+    pub(crate) inspection_capacity: usize,
+    pub(crate) inline_inspection_bytes: usize,
 }
 
 impl<'run, 'inputs> CatalogRun<'run, 'inputs> {
@@ -215,7 +227,45 @@ impl<'run, 'inputs> CatalogRun<'run, 'inputs> {
         options: &'run CatalogOptions<'inputs>,
         report: Option<&'run dyn Fn(CatalogStage)>,
     ) -> Self {
-        Self { options, report }
+        Self {
+            options,
+            report,
+            #[cfg(test)]
+            retention: None,
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) const fn with_retention(mut self, report: &'run dyn Fn(CatalogRetention)) -> Self {
+        self.retention = Some(report);
+        self
+    }
+
+    #[cfg(test)]
+    pub(crate) fn capture_retention(
+        self,
+        stage: CatalogStage,
+        uses: &p4kx_extraction::SourceUses,
+        ledgers: &[&crate::export_ledger::ExportLedger],
+    ) -> Result<(), CatalogError> {
+        if let Some(report) = self.retention {
+            let source_uses = uses.registered_use_count()?;
+            let mut field_inspections = 0;
+            let mut inspection_capacity = 0;
+            for ledger in ledgers {
+                field_inspections += ledger.field_inspections.len();
+                inspection_capacity += ledger.field_inspections.capacity();
+            }
+            report(CatalogRetention {
+                stage,
+                source_uses,
+                field_inspections,
+                inspection_capacity,
+                inline_inspection_bytes: inspection_capacity
+                    * size_of::<crate::export_field_inspection::FieldInspection>(),
+            });
+        }
+        Ok(())
     }
 
     pub(crate) fn check_cancelled(self) -> Result<(), CatalogError> {
