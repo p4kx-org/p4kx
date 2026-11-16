@@ -101,11 +101,14 @@ impl<'scope, 'read, 'source> OriginalValueFact<'scope, 'read, 'source> {
         ])
     }
     pub(crate) fn location(&self, part: OriginalValuePart) -> SourceLocation {
-        let ordinal = if part.is_declaration() {
+        part.location(self.scope.record().index(), self.location_ordinal(part))
+    }
+
+    pub(crate) const fn location_ordinal(&self, part: OriginalValuePart) -> u64 {
+        if part.is_declaration() {
             self.declaration_ordinal
         } else {
             self.ordinal
-        };
-        part.location(self.scope.record().index(), ordinal)
+        }
     }
 }

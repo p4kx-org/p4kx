@@ -36,8 +36,9 @@ impl ReferencePath {
             frames: Vec::new(),
             owner_type: ReferenceDatum::captured(
                 SourceValue::Present(original_type),
-                vec![ReferenceUse::captured(
-                    RecordHeaderField::SourceType.location(scope.record().index()),
+                vec![ReferenceUse::header(
+                    scope.record().index(),
+                    RecordHeaderField::SourceType,
                     SourceUseRole::Selector,
                 )],
             ),
@@ -89,14 +90,16 @@ impl ReferencePath {
                 let text = texts.retain_text(value.type_name())?.text().clone();
                 self.owner_type = ReferenceDatum::captured(
                     SourceValue::Present(text),
-                    vec![ReferenceUse::captured(
-                        site.fact().location(OriginalValuePart::ConcreteType),
+                    vec![ReferenceUse::for_fact(
+                        &site.fact(),
+                        OriginalValuePart::ConcreteType,
                         SourceUseRole::Selector,
                     )],
                 );
             }
-            Value::Array(_) => self.inputs.push(ReferenceUse::captured(
-                site.fact().location(OriginalValuePart::Value),
+            Value::Array(_) => self.inputs.push(ReferenceUse::for_fact(
+                &site.fact(),
+                OriginalValuePart::Value,
                 SourceUseRole::Selector,
             )),
             _ => return Err(ExportAccountingError::ConflictingSourceDatum.into()),
@@ -129,8 +132,9 @@ impl ReferencePath {
 
 fn add_field(inputs: &mut Vec<ReferenceUse>, site: &OriginalValueSite<'_, '_, '_, '_>) {
     if matches!(site.edge(), OriginalValueEdge::Field { .. }) {
-        inputs.push(ReferenceUse::captured(
-            site.fact().location(OriginalValuePart::FieldName),
+        inputs.push(ReferenceUse::for_fact(
+            &site.fact(),
+            OriginalValuePart::FieldName,
             SourceUseRole::Conversion,
         ));
     }

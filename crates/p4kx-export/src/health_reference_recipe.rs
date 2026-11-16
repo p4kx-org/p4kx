@@ -26,10 +26,7 @@ impl ReferenceCaller {
     }
 
     pub(super) fn operand(self, role: SourceUseRole) -> ReferenceUse {
-        ReferenceUse::captured(
-            OriginalValuePart::Value.location(self.record, self.ordinal),
-            role,
-        )
+        ReferenceUse::positioned(self.record, self.ordinal, OriginalValuePart::Value, role)
     }
 }
 
@@ -126,5 +123,5 @@ fn target_value<T>(
 }
 
 fn header(index: u32, field: RecordHeaderField, role: SourceUseRole) -> ReferenceUse {
-    ReferenceUse::captured(field.location(index), role)
+    ReferenceUse::header(index, field, role)
 }

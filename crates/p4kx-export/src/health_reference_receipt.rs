@@ -5,10 +5,18 @@ use std::sync::Arc;
 
 use p4kx_extraction::{SourceLocation, SourceScope, SourceUseRole, SourceUses, SourceValue};
 
-use super::{OriginalDatum, OriginalRecordScope, RecordSubject};
+use super::{
+    OriginalDatum, OriginalRecordScope, OriginalValueFact, OriginalValuePart, RecordSubject,
+};
 use crate::build::original_input::OriginalCatalogInput;
+use crate::record_header_field::RecordHeaderField;
 use crate::record_observation::RecordObservation;
 use crate::{CatalogError, ExportAccountingError};
+
+#[path = "health_reference_coordinate.rs"]
+mod coordinate;
+
+use self::coordinate::{ReferenceCoordinate, ReferenceSite};
 
 /// The original read frame shared by one Record's retained Reference receipts.
 #[derive(Debug, Clone)]
@@ -97,13 +105,56 @@ pub(super) struct ReferenceUse(Arc<ReferenceOperand>);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct ReferenceOperand {
-    location: SourceLocation,
+    coordinate: ReferenceCoordinate,
     role: SourceUseRole,
 }
 
 impl ReferenceUse {
     pub(super) fn captured(location: SourceLocation, role: SourceUseRole) -> Self {
-        Self(Arc::new(ReferenceOperand { location, role }))
+        Self::new(ReferenceCoordinate::Other(Box::new(location)), role)
+    }
+
+    pub(super) fn for_fact(
+        fact: &OriginalValueFact<'_, '_, '_>,
+        part: OriginalValuePart,
+        role: SourceUseRole,
+    ) -> Self {
+        Self::positioned(
+            fact.scope().record().index(),
+            fact.location_ordinal(part),
+            part,
+            role,
+        )
+    }
+
+    pub(super) fn positioned(
+        record_index: u32,
+        ordinal: u64,
+        part: OriginalValuePart,
+        role: SourceUseRole,
+    ) -> Self {
+        Self::new(
+            ReferenceCoordinate::Site(ReferenceSite::Value {
+                record_index,
+                ordinal,
+                part,
+            }),
+            role,
+        )
+    }
+
+    pub(super) fn header(record_index: u32, field: RecordHeaderField, role: SourceUseRole) -> Self {
+        Self::new(
+            ReferenceCoordinate::Site(ReferenceSite::Header {
+                record_index,
+                field,
+            }),
+            role,
+        )
+    }
+
+    fn new(coordinate: ReferenceCoordinate, role: SourceUseRole) -> Self {
+        Self(Arc::new(ReferenceOperand { coordinate, role }))
     }
 }
 
@@ -173,8 +224,8 @@ impl<T> ReferenceDatum<T> {
             .inputs
             .into_iter()
             .map(|input| {
-                let ReferenceOperand { location, role } = Arc::unwrap_or_clone(input.0);
-                frame.at(location, role)
+                let ReferenceOperand { coordinate, role } = Arc::unwrap_or_clone(input.0);
+                frame.at(coordinate.into_location(), role)
             })
             .collect::<Result<Vec<_>, _>>()?;
         Ok(OriginalDatum::observed(self.value, inputs, self.complete))

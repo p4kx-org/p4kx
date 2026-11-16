@@ -73,7 +73,7 @@ fn parameter(
     let (part, role) = fact.pointer_error_input(parameter, value)?;
     Ok(ReferenceDatum::captured(
         SourceValue::Present(value),
-        vec![ReferenceUse::captured(fact.location(part), role)],
+        vec![ReferenceUse::for_fact(fact, part, role)],
     ))
 }
 
@@ -89,8 +89,9 @@ fn declaration(
     }
     Ok(ReferenceDatum::captured(
         SourceValue::Present(value),
-        vec![ReferenceUse::captured(
-            fact.location(OriginalValuePart::Target),
+        vec![ReferenceUse::for_fact(
+            fact,
+            OriginalValuePart::Target,
             SourceUseRole::Selector,
         )],
     ))
@@ -107,8 +108,9 @@ pub(super) fn dangling_guid(
     }
     Ok(ReferenceDatum::captured(
         SourceValue::Present(*guid),
-        vec![ReferenceUse::captured(
-            fact.location(OriginalValuePart::Error(OriginalErrorParameter::Guid)),
+        vec![ReferenceUse::for_fact(
+            fact,
+            OriginalValuePart::Error(OriginalErrorParameter::Guid),
             SourceUseRole::Payload,
         )],
     ))

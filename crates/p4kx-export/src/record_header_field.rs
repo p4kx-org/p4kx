@@ -3,10 +3,8 @@
 
 use p4kx_extraction::SourceLocation;
 
-const RECORD_HEADER_NAMESPACE: &str = "dataforgeRecordHeader";
-
 /// An actual original Record-header input, separate from literal body property names.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum RecordHeaderField {
     Guid,
     RecordName,
@@ -17,15 +15,17 @@ pub(crate) enum RecordHeaderField {
 }
 
 impl RecordHeaderField {
+    pub(crate) const NAMESPACE: &str = "dataforgeRecordHeader";
+
     pub(crate) fn location(self, record_index: u32) -> SourceLocation {
         SourceLocation::Subresource {
-            namespace: RECORD_HEADER_NAMESPACE.to_owned(),
+            namespace: Self::NAMESPACE.to_owned(),
             indices: vec![u64::from(record_index)],
             field: self.name().to_owned(),
         }
     }
 
-    const fn name(self) -> &'static str {
+    pub(crate) const fn name(self) -> &'static str {
         match self {
             Self::Guid => "guid",
             Self::RecordName => "recordName",

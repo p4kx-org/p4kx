@@ -18,7 +18,7 @@ pub(crate) enum OriginalContainerKind {
 }
 
 /// A distinct original logical fact observed at one actual value occurrence.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum OriginalValuePart {
     Value,
     FieldName,
@@ -30,7 +30,7 @@ pub(crate) enum OriginalValuePart {
 }
 
 /// A retained original error parameter, excluding fixed policy and label controls.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum OriginalErrorParameter {
     Offset,
     Byte,
@@ -43,6 +43,8 @@ pub(crate) enum OriginalErrorParameter {
 }
 
 impl OriginalValuePart {
+    pub(crate) const NAMESPACE: &str = "dataforgeValue";
+
     pub(super) const fn is_declaration(self) -> bool {
         matches!(
             self,
@@ -52,13 +54,13 @@ impl OriginalValuePart {
 
     pub(crate) fn location(self, record: u32, ordinal: u64) -> SourceLocation {
         SourceLocation::Subresource {
-            namespace: "dataforgeValue".to_owned(),
+            namespace: Self::NAMESPACE.to_owned(),
             indices: vec![u64::from(record), ordinal],
             field: self.label().to_owned(),
         }
     }
 
-    const fn label(self) -> &'static str {
+    pub(crate) const fn label(self) -> &'static str {
         match self {
             Self::Value => "$value",
             Self::FieldName => "$fieldName",
