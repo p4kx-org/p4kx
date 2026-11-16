@@ -127,6 +127,10 @@ impl Census {
         Ok(())
     }
 
+    pub(super) const fn counts(&self) -> &CensusCounts {
+        &self.counts
+    }
+
     pub(super) fn finish(self) -> Result<CensusCounts, MediaError> {
         if self.root_complete {
             Ok(self.counts)

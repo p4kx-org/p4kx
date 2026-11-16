@@ -12,7 +12,7 @@ use crate::source_selection::EntrySelection;
 use crate::{Artifact, ExportOutcome, Index, Limits, MediaError, export, hashing};
 
 use super::census::Census;
-use super::{Observed, Phase, TestResult, options, require, verify};
+use super::{Observed, ParserOracle, Phase, TestResult, options, require, verify};
 
 #[test]
 fn material_observer_matches_the_file_based_export_with_nested_sources_and_dependencies()
@@ -23,7 +23,12 @@ fn material_observer_matches_the_file_based_export_with_nested_sources_and_depen
     fixture(&input)?;
     let archive = Archive::open_with_key(input, Some(test_key()))?;
     let mut phases = Vec::new();
-    let observed = verify(&archive, Limits::default(), |phase| phases.push(phase))?;
+    let observed = verify(
+        &archive,
+        Limits::default(),
+        ParserOracle::AlsoUnobserved,
+        |phase| phases.push(phase),
+    )?;
     assert_eq!(
         phases,
         [
@@ -38,6 +43,11 @@ fn material_observer_matches_the_file_based_export_with_nested_sources_and_depen
     assert_eq!(observed.counts.nested, 2, "two nested sources");
     assert_eq!(observed.counts.complete, 3, "three valid libraries");
     assert_eq!(observed.counts.failed, 1, "one invalid nested library");
+    let single = verify(&archive, Limits::default(), ParserOracle::Observed, |_| {})?;
+    assert_eq!(
+        single.counts, observed.counts,
+        "both parser accounting routes reconcile the fixture"
+    );
     let ExportOutcome::Incomplete { index, diagnostic } =
         export(&archive, &output, &options(Limits::default())?)?
     else {
@@ -48,6 +58,7 @@ fn material_observer_matches_the_file_based_export_with_nested_sources_and_depen
         .ok_or("diagnostic generation path")?
         .join(&index.artifact_base);
     receipts(&observed, &index)?;
+    receipts(&single, &index)?;
     for line in fs::read_to_string(base.join(&index.artifact_manifest.path))?.lines() {
         let raw: Artifact = serde_json::from_str(line)?;
         let bytes = fs::read(base.join(&raw.path))?;

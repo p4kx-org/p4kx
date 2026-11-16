@@ -34,7 +34,7 @@ mod sink;
 
 use census::CensusCounts;
 use fields::Counts;
-use input::Visit;
+use input::{ParserOracle, Timings, Visit};
 use sink::Sink;
 
 #[test]
@@ -53,10 +53,16 @@ fn verify_configured() -> TestResult {
         let started = Instant::now();
         report_phase(archive_number, Phase::Open, started);
         let archive = Archive::open_with_key(path, Some(key.clone()))?;
-        let result = verify(&archive, Limits::default(), |phase| {
-            report_phase(archive_number, phase, started);
-        })?;
+        let result = verify(
+            &archive,
+            Limits::default(),
+            ParserOracle::Observed,
+            |phase| {
+                report_phase(archive_number, phase, started);
+            },
+        )?;
         report(archive_number, &result.counts);
+        report_timings(archive_number, &result.timings);
         require(
             result.counts.selected > 0,
             "selected material inventory is empty",
@@ -69,6 +75,7 @@ struct Observed {
     finished: Finished,
     counts: Counts,
     entries: Tally,
+    timings: Timings,
 }
 
 fn options(limits: Limits) -> TestResult<ExportOptions> {
@@ -90,7 +97,12 @@ enum Phase {
     VerifyTotals,
 }
 
-fn verify(archive: &Archive, limits: Limits, mut enter: impl FnMut(Phase)) -> TestResult<Observed> {
+fn verify(
+    archive: &Archive,
+    limits: Limits,
+    oracle: ParserOracle,
+    mut enter: impl FnMut(Phase),
+) -> TestResult<Observed> {
     let watch = ArchiveWatch::new(archive);
     let options = options(limits)?;
     options.limits.validate()?;
@@ -108,10 +120,9 @@ fn verify(archive: &Archive, limits: Limits, mut enter: impl FnMut(Phase)) -> Te
         &checkpoint,
     )?;
     let mut root = source::root(archive, digest, size);
-    require(
-        root.enumeration_complete,
-        "material root inventory incomplete",
-    )?;
+    if !root.enumeration_complete {
+        return Err("material root inventory incomplete".into());
+    }
     enter(Phase::ReconcileStream);
     let sink = Sink::new()?;
     let provider = MaterialProvider::default();
@@ -126,34 +137,38 @@ fn verify(archive: &Archive, limits: Limits, mut enter: impl FnMut(Phase)) -> Te
     )?;
     writer.origins.observe_root(archive, size)?;
     writer.bind_build(archive, &mut root)?;
-    let Traversed { entries, census } = collect(
+    let mut traversed = collect(
         archive,
         &options,
         &root.digest,
         &providers,
         &sink,
+        oracle,
         &mut writer,
     )?;
     enter(Phase::FinalizeStream);
     writer.index_build(&root)?;
     let finished = writer.finish()?;
     enter(Phase::VerifyTotals);
-    let counts = sink.finish(&census)?;
+    traversed.timings.schema_decode = sink.schema_decode();
+    let counts = sink.finish(&traversed.census)?;
     let [kind] = finished.kinds.as_slice() else {
         return Err("one material provider summary required".into());
     };
-    counts.check_totals(&entries, kind)?;
+    counts.check_totals(&traversed.entries, kind)?;
     watch.check()?;
     Ok(Observed {
         finished,
         counts,
-        entries,
+        entries: traversed.entries,
+        timings: traversed.timings,
     })
 }
 
 struct Traversed {
     entries: Tally,
     census: CensusCounts,
+    timings: Timings,
 }
 
 fn collect(
@@ -162,6 +177,7 @@ fn collect(
     root: &crate::Digest,
     providers: &[&dyn Provider],
     sink: &Sink,
+    oracle: ParserOracle,
     writer: &mut MediaWriter<'_>,
 ) -> TestResult<Traversed> {
     let include = options.include.as_ref().ok_or("material include filter")?;
@@ -178,11 +194,17 @@ fn collect(
         index_keys: &Cell::new(0),
         shaders: Some(&shaders),
     };
-    let mut visit = Visit::new(providers, &budget, sink);
+    let mut visit = Visit::new(providers, &budget, sink, oracle);
     traversal.visit(archive, &mut Vec::new(), writer, &mut visit)?;
+    let input::Survey {
+        census,
+        mut timings,
+    } = visit.complete()?;
+    timings.shader_index = shaders.index_time();
     Ok(Traversed {
         entries: traversal.entries,
-        census: visit.complete()?,
+        census,
+        timings,
     })
 }
 
@@ -219,5 +241,21 @@ fn report(archive: usize, counts: &Counts) {
         counts.partial,
         counts.failed,
         counts.materials,
+    );
+}
+
+#[expect(
+    clippy::print_stderr,
+    reason = "the opt-in test prints aggregate timings without source paths"
+)]
+fn report_timings(archive: usize, timings: &Timings) {
+    eprintln!(
+        "material-source-export archive={archive} verified_payload_ms={} parse_ms={} projection_ms={} compare_ms={} shader_index_ms={} material_schema_decode_ms={}",
+        timings.verified_payload.as_millis(),
+        timings.parse.as_millis(),
+        timings.projection.as_millis(),
+        timings.compare.as_millis(),
+        timings.shader_index.as_millis(),
+        timings.schema_decode.as_millis(),
     );
 }

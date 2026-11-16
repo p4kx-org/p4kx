@@ -62,12 +62,16 @@ exhaustive installed material accounting remains separate.
 Independent synthetic cases cover roots, unknown submaterial slots, ordered case-distinct/namespaced attributes, mixed text/CDATA/comments/PI including endtag-like data, layers/TexMod/placeholders, strict UTF8 and true CryXml repair, truncation, original ordinals, raw bytes/digests, cancellation/publication and schemas. The Extraction census compares retained root-Entry fields with the shared wire shape in memory.
 The opt-in Media replay runs the material projection and Media writer against a stream observer.
 It reconciles material records, decoded payload sizes and digests, original container and Entry
-identities, and coverage counts across all selected root and nested `.mtl` Entries. It reports
-elapsed time at the start of each phase and aggregate counts after verification. The progress output
-identifies an Archive by its input ordinal. The replay writes no installed-Archive export. A small synthetic fixture compares stream
-receipts with a file-backed export and checks the retained payload bytes.
-Set `P4KX_DATA_P4K` and optionally `P4KX_DATA_P4K_B`, then run
-`cargo test --locked -p p4kx-media --lib all_selected_material_libraries_and_raw_artifacts_reconcile -- --ignored --nocapture`.
+identities, and coverage counts across all selected root and nested `.mtl` Entries. The replay
+parses each verified payload once and compares the reconstructed wire records with that parser
+result. A synthetic fixture also uses an unobserved parse and compares both observer routes with
+a file-backed export and its retained payload bytes.
+
+The replay reports anonymous phase timings, periodical census counts and separate totals for
+payload verification, parsing, projection and comparison. Shader indexing and schema validation
+are included in projection time and reported on their own. The replay writes no installed-Archive
+export. Set `P4KX_DATA_P4K` and optionally `P4KX_DATA_P4K_B`, then run the optimized check:
+`cargo test --release --locked -p p4kx-media --lib all_selected_material_libraries_and_raw_artifacts_reconcile -- --ignored --nocapture`.
 Diagnosed structured failures or losses remain separately counted. A traversal or accounting
 failure cannot pass as a complete replay.
 

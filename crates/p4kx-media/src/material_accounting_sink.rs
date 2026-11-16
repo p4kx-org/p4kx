@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::io;
+use std::time::{Duration, Instant};
 
 use p4kx_extraction::model::{MaterialError, MaterialLibrary};
 use serde::de::DeserializeOwned;
@@ -21,6 +22,7 @@ use super::{TestResult, require};
 pub(super) struct Sink {
     schema: jsonschema::Validator,
     state: RefCell<State>,
+    schema_decode: Cell<Duration>,
 }
 
 struct State {
@@ -34,6 +36,7 @@ impl Sink {
     pub(super) fn new() -> TestResult<Self> {
         Ok(Self {
             schema: jsonschema::validator_for(&material_record_schema()?)?,
+            schema_decode: Cell::new(Duration::ZERO),
             state: RefCell::new(State {
                 counts: Counts::default(),
                 records: Rows::new(),
@@ -47,7 +50,7 @@ impl Sink {
         &self,
         identity: &Identity,
         expected: &Source,
-        library: &Result<MaterialLibrary, MaterialError>,
+        library: Result<&MaterialLibrary, &MaterialError>,
         size: u64,
     ) -> Result<(), MediaError> {
         self.state
@@ -55,6 +58,10 @@ impl Sink {
             .map_err(|error| MediaError::Contract(error.to_string()))?
             .check_entry(identity, expected, library, size)
             .map_err(|error| MediaError::Contract(error.to_string()))
+    }
+
+    pub(super) fn schema_decode(&self) -> Duration {
+        self.schema_decode.get()
     }
 
     pub(super) fn finish(self, census: &CensusCounts) -> TestResult<Counts> {
@@ -107,13 +114,17 @@ impl StreamObserver for Sink {
 
 impl Sink {
     fn record(&self, line: &[u8]) -> io::Result<MediaRecord> {
+        let started = Instant::now();
         let wire: Value = serde_json::from_slice(line)?;
         if !self.schema.is_valid(&wire) {
             return Err(io::Error::other(
                 "actual material record failed schema validation",
             ));
         }
-        Ok(serde_json::from_value(wire)?)
+        let decoded = serde_json::from_value(wire)?;
+        self.schema_decode
+            .set(self.schema_decode.get() + started.elapsed());
+        Ok(decoded)
     }
 }
 
@@ -122,7 +133,7 @@ impl State {
         &mut self,
         identity: &Identity,
         expected: &Source,
-        library: &Result<MaterialLibrary, MaterialError>,
+        library: Result<&MaterialLibrary, &MaterialError>,
         size: u64,
     ) -> TestResult {
         let [source] = self.sources.ready.as_slice() else {
@@ -145,7 +156,7 @@ impl State {
             fields::check_source(&row.source, source)?;
         }
         let combined = reconstruct_material_library(&self.records.ready)?;
-        self.counts.account(&combined, library.as_ref())?;
+        self.counts.account(&combined, library)?;
         self.counts.selected += 1;
         self.counts.nested += u64::from(
             matches!(identity, Identity::Entry { containers, .. } if !containers.is_empty()),

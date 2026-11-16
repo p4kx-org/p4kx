@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+#[cfg(test)]
+use std::cell::Cell;
 use std::cell::OnceCell;
+#[cfg(test)]
+use std::time::{Duration, Instant};
 
 use p4kx_extraction::Archive;
 
@@ -21,6 +25,8 @@ pub(crate) struct ShaderLookup<'run> {
     pub(crate) budget: &'run InputBudget,
     pub(crate) limits: p4kx_shader::Limits,
     index: OnceCell<ShaderIndex>,
+    #[cfg(test)]
+    index_time: Cell<Duration>,
 }
 
 pub(crate) struct ShaderBinding<'lookup> {
@@ -46,6 +52,8 @@ impl<'run> ShaderLookup<'run> {
             budget,
             limits: p4kx_shader::Limits::default(),
             index: OnceCell::new(),
+            #[cfg(test)]
+            index_time: Cell::new(Duration::ZERO),
         }
     }
 
@@ -58,9 +66,18 @@ impl<'run> ShaderLookup<'run> {
         )
     }
 
+    #[cfg(test)]
+    pub(crate) const fn index_time(&self) -> Duration {
+        self.index_time.get()
+    }
+
     fn index(&self, writer: &mut MediaWriter<'_>) -> Result<&ShaderIndex, MediaError> {
         if self.index.get().is_none() {
+            #[cfg(test)]
+            let started = Instant::now();
             let index = ShaderIndex::build(self, writer)?;
+            #[cfg(test)]
+            self.index_time.set(started.elapsed());
             self.index.set(index).map_err(|_| {
                 MediaError::Contract("shader index initialized during its own construction".into())
             })?;

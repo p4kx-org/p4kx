@@ -9,6 +9,7 @@ use p4kx_extraction::{MaterialAuthoredInfo, MaterialLibrarySourceInfo};
 
 use crate::material_payload::{MaterialFailureReason, MaterialPayload, MaterialProjectionFailure};
 
+use crate::material_read_origins::MaterialReadOrigins;
 use crate::retained_payload;
 use crate::{
     MediaError, MediaIssue, MediaWriter, Projection, Severity, SourceContext, Status, Subresource,
@@ -31,34 +32,53 @@ pub(crate) fn project_observed(
     writer: &mut MediaWriter<'_>,
     before_capture: impl FnMut(MaterialReadObservation<'_>) -> Result<(), MediaError>,
 ) -> Result<Projection, MediaError> {
-    project_with(
+    let mut parsed = read(
         context,
         limits,
         writer,
         retained_payload::read,
         before_capture,
-    )
+    )?;
+    write(context, &mut parsed, writer)
 }
 
-pub(crate) fn project_with(
+pub(crate) enum Parsed {
+    Library {
+        library: MaterialLibrary,
+        reads: MaterialReadOrigins,
+    },
+    Failed(MaterialError),
+    UnsupportedReader,
+}
+
+impl Parsed {
+    #[cfg(test)]
+    pub(crate) const fn original(&self) -> Option<Result<&MaterialLibrary, &MaterialError>> {
+        match self {
+            Self::Library { library, .. } => Some(Ok(library)),
+            Self::Failed(error) => Some(Err(error)),
+            Self::UnsupportedReader => None,
+        }
+    }
+}
+
+/// Parses the admitted input and captures original read observations.
+pub(crate) fn read(
     context: &SourceContext<'_>,
     limits: MaterialSourceLimits,
-    writer: &mut MediaWriter<'_>,
+    writer: &MediaWriter<'_>,
     read: impl FnOnce(&SourceContext<'_>, &MediaWriter<'_>) -> Result<Vec<u8>, MediaError>,
     mut before_capture: impl FnMut(MaterialReadObservation<'_>) -> Result<(), MediaError>,
-) -> Result<Projection, MediaError> {
-    let bound = count(limits.source_bytes)?;
-    if context.source.size > bound {
-        return failed(
-            context,
-            MaterialFailureReason::SourceBytes { limit: bound },
-            writer,
-        );
+) -> Result<Parsed, MediaError> {
+    if context.source.size > count(limits.source_bytes)? {
+        return Ok(Parsed::Failed(MaterialError::SourceBytes {
+            limit: limits.source_bytes,
+        }));
     }
     let bytes = read(context, writer)?;
-    let mut reads = crate::material_read_origins::MaterialReadOrigins::default();
+    let mut reads = MaterialReadOrigins::default();
     let detail_bytes = writer.limits().record_bytes;
-    let library = match MaterialLibrary::parse_with_observer(
+    let parsed = match MaterialLibrary::parse_with_observer(
         context.entry.path(),
         &bytes,
         limits,
@@ -70,18 +90,35 @@ pub(crate) fn project_with(
             Ok(())
         },
     ) {
-        Ok(library) => library,
+        Ok(library) => Parsed::Library { library, reads },
         Err(MaterialReadError::Interrupted(error)) => return Err(error),
-        Err(MaterialReadError::Material(error)) => return failed(context, reason(&error)?, writer),
-        Err(_) => return failed(context, MaterialFailureReason::UnsupportedReader, writer),
+        Err(MaterialReadError::Material(error)) => Parsed::Failed(error),
+        Err(_) => Parsed::UnsupportedReader,
     };
-    write_library(context, &library, reads, writer)
+    Ok(parsed)
+}
+
+/// Writes the projection of an observed material input.
+pub(crate) fn write(
+    context: &SourceContext<'_>,
+    parsed: &mut Parsed,
+    writer: &mut MediaWriter<'_>,
+) -> Result<Projection, MediaError> {
+    match parsed {
+        Parsed::Library { library, reads } => {
+            write_library(context, library, std::mem::take(reads), writer)
+        }
+        Parsed::Failed(error) => failed(context, reason(error)?, writer),
+        Parsed::UnsupportedReader => {
+            failed(context, MaterialFailureReason::UnsupportedReader, writer)
+        }
+    }
 }
 
 fn write_library(
     context: &SourceContext<'_>,
     library: &MaterialLibrary,
-    reads: crate::material_read_origins::MaterialReadOrigins,
+    reads: MaterialReadOrigins,
     writer: &mut MediaWriter<'_>,
 ) -> Result<Projection, MediaError> {
     let mut check = || writer.checkpoint();

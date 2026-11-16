@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::io::Read;
+use std::time::{Duration, Instant};
 
 use p4kx_extraction::model::{
     MaterialError, MaterialLibrary, MaterialReadError, MaterialSourceLimits,
@@ -23,12 +24,36 @@ use crate::{
 use super::census::{Census, CensusCounts};
 use super::sink::Sink;
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum ParserOracle {
+    Observed,
+    AlsoUnobserved,
+}
+
+#[derive(Default)]
+pub(super) struct Timings {
+    pub(super) verified_payload: Duration,
+    pub(super) parse: Duration,
+    pub(super) projection: Duration,
+    pub(super) compare: Duration,
+    pub(super) shader_index: Duration,
+    pub(super) schema_decode: Duration,
+}
+
+pub(super) struct Survey {
+    pub(super) census: CensusCounts,
+    pub(super) timings: Timings,
+}
+
 pub(super) struct Visit<'a> {
     providers: &'a [&'a dyn Provider],
     budget: &'a InputBudget,
     sink: &'a Sink,
     census: Census,
     read_buffer: Vec<u8>,
+    oracle: ParserOracle,
+    timings: Timings,
+    last_report: Instant,
 }
 
 impl<'a> Visit<'a> {
@@ -36,6 +61,7 @@ impl<'a> Visit<'a> {
         providers: &'a [&'a dyn Provider],
         budget: &'a InputBudget,
         sink: &'a Sink,
+        oracle: ParserOracle,
     ) -> Self {
         Self {
             providers,
@@ -43,11 +69,17 @@ impl<'a> Visit<'a> {
             sink,
             census: Census::default(),
             read_buffer: vec![0; IO_BLOCK_BYTES],
+            oracle,
+            timings: Timings::default(),
+            last_report: Instant::now(),
         }
     }
 
-    pub(super) fn complete(self) -> Result<CensusCounts, MediaError> {
-        self.census.finish()
+    pub(super) fn complete(self) -> Result<Survey, MediaError> {
+        Ok(Survey {
+            census: self.census.finish()?,
+            timings: self.timings,
+        })
     }
 }
 
@@ -97,6 +129,7 @@ impl TraversalVisit for Visit<'_> {
         lookup: &DirectoryLookup<'_>,
         writer: &mut MediaWriter<'_>,
     ) -> Result<bool, MediaError> {
+        self.report_progress();
         let Some(identity) = self.census.entry(lookup.index.archive, entry, selection)? else {
             return Ok(false);
         };
@@ -114,6 +147,29 @@ impl TraversalVisit for Visit<'_> {
 }
 
 impl Visit<'_> {
+    #[expect(
+        clippy::print_stderr,
+        reason = "the opt-in replay prints anonymous progress and timings"
+    )]
+    fn report_progress(&mut self) {
+        const REPORT_INTERVAL: Duration = Duration::from_secs(60);
+
+        if self.last_report.elapsed() < REPORT_INTERVAL {
+            return;
+        }
+        self.last_report = Instant::now();
+        let counts = self.census.counts();
+        eprintln!(
+            "material-source-export entries={} libraries={} verified_payload_ms={} parse_ms={} projection_ms={} compare_ms={}",
+            counts.enumerated,
+            counts.selected,
+            self.timings.verified_payload.as_millis(),
+            self.timings.parse.as_millis(),
+            self.timings.projection.as_millis(),
+            self.timings.compare.as_millis(),
+        );
+    }
+
     fn project(
         &mut self,
         entry: &Entry,
@@ -124,6 +180,7 @@ impl Visit<'_> {
     ) -> Result<crate::RawReference, MediaError> {
         let archive = lookup.index.archive;
         let limits = MaterialSourceLimits::default();
+        let started = Instant::now();
         let observed = Payload::read(
             archive,
             entry,
@@ -132,7 +189,10 @@ impl Visit<'_> {
             writer,
             &mut self.read_buffer,
         )?;
-        let expected = observed.parse(entry, limits, writer)?;
+        self.timings.verified_payload += started.elapsed();
+        let independent = (self.oracle == ParserOracle::AlsoUnobserved)
+            .then(|| observed.parse(entry, limits, writer))
+            .transpose()?;
         let raw = raw_output::receipt(observed.digest, source.size);
         let input = writer.origins.input(archive, entry)?;
         raw_output::record(&raw, &input, writer)?;
@@ -146,7 +206,8 @@ impl Visit<'_> {
             directory: lookup,
             payload: &payload,
         };
-        let projected = material_projection::project_with(
+        let started = Instant::now();
+        let mut parsed = material_projection::read(
             &context,
             limits,
             writer,
@@ -157,9 +218,19 @@ impl Visit<'_> {
             },
             |_| Ok(()),
         )?;
+        self.timings.parse += started.elapsed();
+        let started = Instant::now();
+        let projected = material_projection::write(&context, &mut parsed, writer)?;
         writer.end_source(projected)?;
+        self.timings.projection += started.elapsed();
+        let started = Instant::now();
+        let original = parsed
+            .original()
+            .ok_or_else(|| invalid("unsupported material reader outcome"))?;
+        let expected = independent.as_ref().map_or(original, Result::as_ref);
         self.sink
-            .check_entry(identity, &source, &expected, entry.uncompressed_size())?;
+            .check_entry(identity, &source, expected, entry.uncompressed_size())?;
+        self.timings.compare += started.elapsed();
         Ok(raw)
     }
 }
