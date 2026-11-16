@@ -64,6 +64,8 @@ the window stays responsive while it loads.
   Hover over the facts bar, mip selector or image to see whether its data came from an
   encrypted archive entry. The image tooltip reflects the colour and alpha data actually
   used by the selected mip. Uncertain source information is shown as unknown.
+- **Audio** opens for a WEM. Hover over the facts bar to see the original encryption
+  provenance of the codec, channel count, sample rate and duration.
 - **Info** appears next to Model for a model file and lists what the file holds: the nodes, the
   meshes and levels of detail with their vertices and triangles, the geometry file, the material
   library and the material IDs the submeshes use, the bones, and the chunks, counted as read,

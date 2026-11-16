@@ -1102,6 +1102,7 @@
     "labelColor": "color-gray-2-text",
     "background": "surface-panel",
     "facts": "factsBar without direction: codec, channels, sample rate, duration",
+    "originTooltip": "the existing tooltip on the facts bar shows original encryption provenance for each fact of a directly opened WEM",
     "toggle": "outline btn-xs, play or pause; Space while no other control has the focus",
     "pauses": "when the preview tab leaves Audio or the work tab leaves Browse",
     "messages": "unsupported codec, too long, decoding and output failure color-danger-text"

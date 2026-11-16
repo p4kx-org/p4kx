@@ -11,8 +11,8 @@ use std::sync::{Arc, Mutex, PoisonError};
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use p4kx_gui::{
-    AudioOutput, AudioPreview, Browser, Language, Model, Player, Preview, SoundSource, StreamGuard,
-    ui,
+    ArchiveKey, AudioOutput, AudioPreview, Browser, Language, Model, Player, Preview, SoundSource,
+    StreamGuard, ui,
 };
 use p4kx_testkit::{
     ArchiveBuilder, TestCodec, TestEntry, TestOpus, TestOpusFraming, TestVorbis, TestWem,
@@ -117,6 +117,15 @@ pub(crate) fn opened_with(
     output: &FakeOutput,
     extra: Vec<TestEntry>,
 ) -> Result<(TempDir, Harness<'static, Model>), Box<dyn Error>> {
+    opened_with_key(language, output, extra, None)
+}
+
+pub(crate) fn opened_with_key(
+    language: Language,
+    output: &FakeOutput,
+    extra: Vec<TestEntry>,
+    key: Option<ArchiveKey>,
+) -> Result<(TempDir, Harness<'static, Model>), Box<dyn Error>> {
     let folder = tempfile::tempdir()?;
     let path = folder.path().join("Data.p4k");
     sounds()?
@@ -125,6 +134,7 @@ pub(crate) fn opened_with(
         .fold(ArchiveBuilder::new(), ArchiveBuilder::entry)
         .write_to(&path)?;
     let mut model = Model::new(language);
+    model.set_archive_key(key);
     model.set_audio_output(output.clone());
     let mut harness = Harness::builder()
         .with_context_setup(p4kx_gui::theme::apply)

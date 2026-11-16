@@ -10,6 +10,7 @@ use fluent_bundle::FluentValue;
 use p4kx_extraction::FieldOrigin;
 
 use super::search::eyebrow;
+use super::source_origin;
 use crate::theme::desktop::{IMAGE_LABEL_GAP, IMAGE_SELECTOR_GAP, ROW_HEIGHT, SPINNER_INLINE};
 use crate::theme::palette;
 use crate::widgets::frames;
@@ -176,11 +177,7 @@ fn picture(
 }
 
 fn origin_text(texts: &Texts, origin: &FieldOrigin) -> String {
-    texts.get(match origin.contains_encrypted_source() {
-        Some(true) => ImageText::OriginEncrypted,
-        Some(false) => ImageText::OriginPlain,
-        None => ImageText::OriginUnknown,
-    })
+    texts.get(source_origin::label(Some(origin)))
 }
 
 fn origin_row(ui: &mut Ui, texts: &Texts, field: ImageText, origin: &FieldOrigin) {

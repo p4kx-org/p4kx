@@ -4,6 +4,7 @@
 #[cfg(test)]
 mod archive_change_tests;
 mod audio;
+mod audio_worker;
 mod bank_cache;
 #[cfg(test)]
 mod bank_cache_tests;
@@ -14,6 +15,7 @@ mod image_provenance;
 mod reading;
 mod soundbank;
 mod texture_info;
+mod wem_header_provenance;
 mod xml;
 mod xml_document;
 
@@ -33,6 +35,7 @@ use reading::read;
 use reading::{Spawned, spawn};
 pub use soundbank::{BankSound, SoundbankPreview, SoundbankStatus, is_bank_path};
 pub use texture_info::{MAX_PREVIEW_PIXELS, TextureInfo};
+pub use wem_header_provenance::{WemHeaderEvidenceError, WemHeaderProvenance};
 use xml::is_cryxml;
 pub use xml::{XML_SIZE_LIMIT, XmlPreview, XmlStatus};
 pub use xml_document::{XML_TEXT_LIMIT, XmlDocument};

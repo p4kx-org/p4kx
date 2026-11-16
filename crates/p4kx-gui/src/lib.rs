@@ -139,8 +139,8 @@ pub use preview::{
     AudioPreview, AudioStatus, BankSound, ImageHeaderProvenance, ImageMipProvenance, ImagePreview,
     ImageStatus, MAX_PREVIEW_PIXELS, MipStatus, PREVIEW_READ_LIMIT, PREVIEW_SIZE_LIMIT, Preview,
     PreviewContents, PreviewStatus, PreviewTab, SoundInfo, SoundStatus, SoundbankPreview,
-    SoundbankStatus, TextureInfo, XML_SIZE_LIMIT, XML_TEXT_LIMIT, XmlDocument, XmlPreview,
-    XmlStatus, is_bank_path, is_wem_path,
+    SoundbankStatus, TextureInfo, WemHeaderEvidenceError, WemHeaderProvenance, XML_SIZE_LIMIT,
+    XML_TEXT_LIMIT, XmlDocument, XmlPreview, XmlStatus, is_bank_path, is_wem_path,
 };
 pub use query::{
     CellLook, NameNote, QUERY_PAGE_ROWS, QueryExportFormat, QueryExportStatus, QueryInvalid,

@@ -270,7 +270,8 @@ oder pausiert, solange kein anderes Bedienelement den Fokus hat. Der Barrierefre
 Position ist die Zeit. Wechselt der Vorschau-Tab weg von „Audio" oder der Arbeitsbereich weg von
 „Durchsuchen", pausiert der Ton an seiner Stelle; „Abspielen" macht dort weiter. Ein Codec ohne
 Decoder, ein zu langer Ton und ein Fehler beim Dekodieren oder am Audiogerät stehen als Text in
-`color-danger-text` im Panel; Text und Hex bleiben erreichbar.
+`color-danger-text` im Panel; Text und Hex bleiben erreichbar. Der Tooltip der Faktenleiste zeigt
+bei einer direkt geöffneten WEM die ursprüngliche Verschlüsselungsherkunft zu jedem Wert.
 
 **D.19 CryXml im Tab „XML".** Ist der gewählte Eintrag CryXml (erkannt an der Signatur, nicht an
 der Endung), bietet die Vorschau den Tab „XML" hinter „Hex" an und öffnet ihn, sobald der Anfang

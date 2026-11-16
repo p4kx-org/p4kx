@@ -15,6 +15,7 @@ mod assembly_view_render;
 mod audio_device;
 mod audio_playback;
 mod audio_preview;
+mod audio_preview_origins;
 mod banking;
 mod catalog_location_configuration;
 mod catalog_model;

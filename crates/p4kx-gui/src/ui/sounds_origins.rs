@@ -3,10 +3,10 @@
 
 use egui::{Response, Ui};
 use fluent_bundle::FluentValue;
-use p4kx_extraction::FieldOrigin;
 
 use crate::ui::extraction_outcome::list_row_response;
 use crate::ui::record_export_outcome;
+use crate::ui::source_origin::row;
 use crate::widgets::tooltip;
 use crate::{
     BreakLine, ImageText, SoundList, SoundListProvenance, SoundsTab, SoundsText as T, Text, Texts,
@@ -120,18 +120,6 @@ fn break_line(texts: &Texts, link: &BreakLine) -> String {
         T::BreakLineIn
     });
     texts.format(text, &args)
-}
-
-fn row(ui: &mut Ui, texts: &Texts, label: impl Into<Text>, origin: Option<&FieldOrigin>) {
-    let state = match origin.and_then(FieldOrigin::contains_encrypted_source) {
-        Some(true) => ImageText::OriginEncrypted,
-        Some(false) => ImageText::OriginPlain,
-        None => ImageText::OriginUnknown,
-    };
-    ui.horizontal_wrapped(|ui| {
-        ui.strong(texts.get(label));
-        tooltip::line(ui, texts.get(state));
-    });
 }
 
 #[cfg(test)]
