@@ -10,6 +10,10 @@ use crate::theme::desktop::XML_ROW_HEIGHT;
 use crate::theme::tokens::SPACE_2;
 use crate::{Texts, UiText};
 
+#[cfg(test)]
+#[path = "ui_tab_omissions_tests.rs"]
+mod tests;
+
 const REASONS: [UiText; 7] = [
     UiText::ReportOmissionSourceMissing,
     UiText::ReportOmissionRuntimeTarget,
