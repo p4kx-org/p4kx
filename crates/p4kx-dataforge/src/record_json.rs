@@ -75,7 +75,7 @@ impl RecordJson {
         )
     }
 
-    /// Writes canonical JSON and observes the original input for each emitted value.
+    /// Writes canonical JSON and observes the original input and selection routes for each value.
     ///
     /// # Errors
     /// Returns the first output or observation error.
@@ -110,7 +110,6 @@ impl RecordJson {
         observer: &mut dyn RecordJsonObserver,
     ) -> io::Result<()> {
         let mut observation = Observation::new(input, observer);
-        observation.track_routes();
         let (value, slot) = selected_value(input, steps, &mut observation)?;
         self.write_tasks(
             Out {

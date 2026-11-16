@@ -21,6 +21,7 @@ const POINTER_ARRAY: usize = 3;
 const CLASS_ARRAY: usize = 4;
 const DIRECT_POINTER: usize = 5;
 const FRAME: usize = 6;
+const OUTSIDE: usize = 8;
 const LEAF_TYPE: u32 = 1;
 const FRAME_TYPE: u32 = 2;
 
@@ -44,29 +45,35 @@ fn database() -> Vec<u8> {
         .structure(
             TestStruct::new("Root")
                 .parent("RootBase")
-                .field("head", TestType::Int32),
+                .field("head", TestType::Int32)
+                .field("outside", TestType::Class("Leaf".to_owned())),
         )
         .instance("target", leaf(17))
         .instance("direct-target", leaf(29))
         .record(
-            TestRecord::new(42, "Root", "Root.One", "one.xml").value(
-                "frame",
-                TestValue::Struct(
-                    TestInstance::new("Frame")
-                        .value(
-                            "$routes",
-                            TestValue::Array(vec![TestValue::Null, TestValue::pointer("target")]),
-                        )
-                        .value(
-                            "classes",
-                            TestValue::Array(vec![
-                                TestValue::Struct(leaf(11)),
-                                TestValue::Struct(leaf(19)),
-                            ]),
-                        )
-                        .value("direct", TestValue::pointer("direct-target")),
+            TestRecord::new(42, "Root", "Root.One", "one.xml")
+                .value("outside", TestValue::Struct(leaf(31)))
+                .value(
+                    "frame",
+                    TestValue::Struct(
+                        TestInstance::new("Frame")
+                            .value(
+                                "$routes",
+                                TestValue::Array(vec![
+                                    TestValue::Null,
+                                    TestValue::pointer("target"),
+                                ]),
+                            )
+                            .value(
+                                "classes",
+                                TestValue::Array(vec![
+                                    TestValue::Struct(leaf(11)),
+                                    TestValue::Struct(leaf(19)),
+                                ]),
+                            )
+                            .value("direct", TestValue::pointer("direct-target")),
+                    ),
                 ),
-            ),
         )
         .build()
 }
@@ -345,4 +352,50 @@ fn nested_evidence(frame: PositionedValue<'_, '_>) -> TestResult<BTreeMap<&'stat
             ]),
         ),
     ]))
+}
+
+#[test]
+fn whole_record_json_keeps_nested_routes_and_releases_sibling_ancestors() -> TestResult {
+    let bytes = database();
+    let forge = DataForge::open(&bytes)?;
+    let input = position(&forge)?;
+    let root = input.root_fields()?;
+    let frame = root.get(0).ok_or("inherited Frame")?;
+    let outside = root.get(2).ok_or("separate root child")?;
+    let mut nested = nested_evidence(frame)?;
+    let mut fields = BTreeMap::new();
+    for (full, relative) in [
+        ("/frame/$0/name", "/$0/name"),
+        ("/frame/$0/value/1/same", "/$0/value/1/same"),
+        ("/frame/classes/1/$type", "/classes/1/$type"),
+        ("/frame/direct/$type", "/direct/$type"),
+    ] {
+        fields.insert(
+            full,
+            nested
+                .remove(relative)
+                .ok_or("independent subtree expectation")?,
+        );
+    }
+    fields.insert(
+        "/outside/same",
+        leaf_value(&[storage(OUTSIDE, true)], outside, 0, BASE_VALUE)?,
+    );
+    let mut expected = Expected(fields);
+    let mut output = Vec::new();
+    let mut writer = RecordJson::new(JsonLayout::Compact);
+    writer.write_observed(&input, &mut output, &mut expected)?;
+    assert!(
+        expected.0.is_empty(),
+        "each full-Record route was observed: {:?}",
+        expected.0
+    );
+
+    let mut canonical = Vec::new();
+    writer.write(input.tree(), &mut canonical)?;
+    assert_eq!(
+        output, canonical,
+        "full observed and unobserved JSON bytes match"
+    );
+    Ok(())
 }

@@ -100,11 +100,12 @@ Their Rust memory layout is target dependent. An output adapter must still pair 
 actual tree and owner, capture the same field's value and declaration, and register the
 actual payload/selector/conversion contributions before publishing an origin marker.
 
-## Selected JSON subtrees
+## Observed Record JSON
 
-Each observed value includes the declaration and selection path used to reach its original
-occurrence. An inline Class contributes its layout declaration and any array header to the
-path. A Strong Pointer contributes its stored struct and instance words as a selector.
+Each value in an observed Record or selected subtree includes the declaration and selection
+path used to reach its original occurrence. An inline Class contributes its layout declaration
+and any array header to the path. A Strong Pointer contributes its stored struct and instance
+words as a selector.
 The `dataforgeDecodedBytes` location `pointerSelector` gives the half-open range of those words.
 The selected scalar contributes its own storage bytes as payload. This distinction also
 applies to the storage facts for a structure's generated `$type` member.

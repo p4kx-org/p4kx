@@ -219,6 +219,7 @@ fn class_and_links() -> Vec<u8> {
         .structure(
             TestStruct::new("Holder")
                 .array("children", TestType::Class("Item".to_owned()))
+                .field("owned", TestType::StrongPointer("Item".to_owned()))
                 .field("selected", TestType::WeakPointer("Item".to_owned()))
                 .array("empty", TestType::Int32)
                 .field("invalid", TestType::Reference),
@@ -230,6 +231,7 @@ fn class_and_links() -> Vec<u8> {
                     "children",
                     TestValue::Array(vec![item("first", 17), item("second", 23)]),
                 )
+                .value("owned", item("owned", 31))
                 .value("selected", TestValue::pointer("second"))
                 .value("invalid", TestValue::Reference(0x77)),
         )
@@ -290,7 +292,44 @@ fn selected_weak_target_keeps_original_child_slot_without_the_other_child() -> T
     );
     marker(field(page, "records/0/invalid/error")?, false);
     marker(field(page, "records/0/invalid/guid")?, false);
+    assert_owned_pointer_origin(page, &fixture)?;
     assert_all_addresses(&response)
+}
+
+fn assert_owned_pointer_origin(page: &Value, fixture: &[u8]) -> TestResult {
+    const FIELD: &str = "records/0/owned/count";
+    assert_eq!(
+        page.pointer(&format!("/{FIELD}")),
+        Some(&json!(31)),
+        "the independent Strong Pointer instance is rendered"
+    );
+    assert_eq!(
+        source_bytes(page, FIELD, "slot", fixture)?,
+        31_i32.to_le_bytes(),
+        "the leaf counts exactly its original scalar storage"
+    );
+    assert_eq!(
+        source_bytes(page, FIELD, "pointerSelector", fixture)?,
+        [0, 0, 0, 0, 2, 0, 0, 0],
+        "the third indexed Item instance is followed using its original pointer words"
+    );
+    let sites = uses(page, FIELD)?;
+    assert_eq!(
+        sites
+            .iter()
+            .filter(|site| site["role"] == "payload")
+            .count(),
+        1,
+        "the pointer is not counted as a second payload"
+    );
+    assert!(
+        sites.iter().any(|site| {
+            site.pointer("/location/field") == Some(&json!("pointerSelector"))
+                && site["role"] == "selector"
+        }),
+        "the defining route is represented on the published leaf"
+    );
+    Ok(())
 }
 
 #[test]
