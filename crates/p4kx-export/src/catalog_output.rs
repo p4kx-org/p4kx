@@ -84,6 +84,13 @@ pub(crate) fn emit<W: Write>(
         )
         + u128::from(
             catalog
+                .configurations
+                .entity_configurations
+                .interactions
+                .stored_bytes(),
+        )
+        + u128::from(
+            catalog
                 .projections
                 .weapon_player_animation_candidates
                 .stored_bytes(),
@@ -151,6 +158,13 @@ fn write_json(
                         .entity_configurations
                         .alignment
                         .item_ports
+                        .take_failure()
+                })
+                .or_else(|| {
+                    catalog
+                        .configurations
+                        .entity_configurations
+                        .interactions
                         .take_failure()
                 })
                 .or_else(|| {

@@ -4,12 +4,13 @@
 use std::cell::RefCell;
 use std::path::Path;
 
-use p4kx_extraction::CancelToken;
+use p4kx_extraction::{CancelToken, DataForge};
 use serde::ser::SerializeStruct;
 use serde::{Serialize, Serializer};
 
 use super::spool::{RowSpool, RowSpoolError, RowSpoolWriter, checkpoint};
 use crate::catalog_table::DatasetAvailability;
+use crate::{CatalogError, ExportAccountingError};
 
 /// A lazily opened private spool for an ordered catalog table.
 pub(crate) struct StagedCatalogRows<'a> {
@@ -48,6 +49,49 @@ impl<'a> StagedCatalogRows<'a> {
             None
         };
         Ok(StagedCatalogTable::new(availability, spool, self.cancel))
+    }
+}
+
+/// An ordered spool for rows keyed by original Record and component positions.
+pub(crate) struct OrderedComponentRows<'stage> {
+    rows: StagedCatalogRows<'stage>,
+    last_key: Option<(Option<u32>, Option<u32>)>,
+}
+
+impl<'stage> OrderedComponentRows<'stage> {
+    pub(crate) const fn new(directory: &'stage Path, cancel: Option<&'stage CancelToken>) -> Self {
+        Self {
+            rows: StagedCatalogRows::new(directory, cancel),
+            last_key: None,
+        }
+    }
+
+    pub(crate) fn append(
+        &mut self,
+        key: (Option<u32>, Option<u32>),
+        row: &impl Serialize,
+    ) -> Result<(), CatalogError> {
+        if self.last_key.is_some_and(|previous| previous > key) {
+            return Err(ExportAccountingError::ConflictingSourceDatum.into());
+        }
+        self.rows.append(row)?;
+        self.last_key = Some(key);
+        Ok(())
+    }
+
+    pub(crate) fn finish(
+        self,
+        forge: &DataForge<'_>,
+        source_types: &[&str],
+    ) -> Result<StagedCatalogTable, CatalogError> {
+        let availability = if self.last_key.is_some() {
+            DatasetAvailability::Available
+        } else {
+            DatasetAvailability::from_source_declarations(forge, |name| {
+                source_types.contains(&name)
+            })
+        };
+        Ok(self.rows.finish(availability)?)
     }
 }
 

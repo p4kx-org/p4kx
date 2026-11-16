@@ -32,12 +32,13 @@ use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_number_capture::CapturedNumber;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::original::OriginalFlowFields;
+use crate::catalog_rows::staged::{OrderedComponentRows, StagedCatalogTable};
 use crate::catalog_table::CatalogTable;
 use crate::record_observation::RecordObservation;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 use crate::template_field_capture::TemplateFieldCapture;
-use crate::{CatalogError, CatalogOptions};
+use crate::{CatalogError, CatalogOptions, ExportAccountingError};
 
 #[derive(Default)]
 pub(crate) struct EntityConfigurationRows<'source> {
@@ -46,6 +47,7 @@ pub(crate) struct EntityConfigurationRows<'source> {
     fuel: FuelConfigurationRows<'source>,
     inventory: InventoryEntityRows<'source>,
     interactions: Vec<InteractionConfiguration<'source>>,
+    staged_interactions: Option<StagedCatalogTable>,
     facilities: Vec<Facility<'source>>,
     cargo_owners: Vec<OwnerComponents>,
     resources: Vec<ResourceComponent<'source>>,
@@ -140,6 +142,28 @@ impl<'source> EntityConfigurationRows<'source> {
         self.numbers.extend(other.numbers);
     }
 
+    pub(crate) fn stage_interactions(
+        &mut self,
+        staging: &mut OrderedComponentRows<'_>,
+    ) -> Result<(), CatalogError> {
+        for row in std::mem::take(&mut self.interactions) {
+            row.stage(staging)?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn install_staged_interactions(
+        &mut self,
+        staging: OrderedComponentRows<'_>,
+        forge: &DataForge<'_>,
+    ) -> Result<(), CatalogError> {
+        if !self.interactions.is_empty() || self.staged_interactions.is_some() {
+            return Err(ExportAccountingError::ConflictingSourceDatum.into());
+        }
+        self.staged_interactions = Some(staging.finish(forge, catalog_interactions::SOURCE_TYPES)?);
+        Ok(())
+    }
+
     pub(super) fn resolve_cargo_capacities(
         &mut self,
         forge: &DataForge<'_>,
@@ -162,6 +186,9 @@ impl<'source> EntityConfigurationRows<'source> {
         mut self,
         forge: &DataForge<'_>,
     ) -> Result<EntityConfigurationTables<'source>, CatalogError> {
+        if !self.interactions.is_empty() {
+            return Err(ExportAccountingError::ConflictingSourceDatum.into());
+        }
         self.facilities.sort_by_key(|row| row.owner().key());
         self.resources.sort_by_key(|row| row.owner().key());
         self.connections.sort_by_key(|row| row.owner().key());
@@ -170,7 +197,9 @@ impl<'source> EntityConfigurationRows<'source> {
             alignment: self.alignment.into_tables(forge)?,
             fuel: self.fuel.into_tables(forge),
             inventory: self.inventory.into_tables(forge),
-            interactions: catalog_interactions::table(forge, self.interactions),
+            interactions: self.staged_interactions.unwrap_or_else(|| {
+                StagedCatalogTable::empty(catalog_interactions::empty_availability(forge))
+            }),
             facilities: CatalogTable::new(forge, catalog_facility::SOURCE_TYPES, self.facilities),
             resource_components: CatalogTable::new(
                 forge,
@@ -201,7 +230,8 @@ pub(crate) struct EntityConfigurationTables<'source> {
     fuel: FuelConfigurationTables<'source>,
     #[serde(flatten)]
     inventory: InventoryEntityTables<'source>,
-    interactions: CatalogTable<InteractionConfiguration<'source>>,
+    #[schemars(with = "CatalogTable<InteractionConfiguration<'source>>")]
+    pub(crate) interactions: StagedCatalogTable,
     facilities: CatalogTable<Facility<'source>>,
     resource_components: CatalogTable<ResourceComponent<'source>>,
     resource_connections: CatalogTable<ResourceConnection<'source>>,

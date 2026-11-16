@@ -158,7 +158,7 @@ impl<'source> ItemAlignmentRows<'source> {
         self.attachments.sort_by_key(|row| row.owner.key());
         Ok(ItemAlignmentTables {
             item_ports: self.prepared_ports.map_or_else(
-                || StagedCatalogTable::empty(staging::availability(forge, 0)),
+                || StagedCatalogTable::empty(staging::empty_availability(forge)),
                 StagedItemPorts::into_table,
             ),
             item_attachment_constraints: CatalogTable::new(forge, &[ATTACHABLE], self.attachments),

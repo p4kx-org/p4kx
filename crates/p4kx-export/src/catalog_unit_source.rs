@@ -20,6 +20,17 @@ pub(super) struct UnitSource<'source> {
 }
 
 impl<'source> UnitSource<'source> {
+    #[cfg(test)]
+    pub(super) const fn fixture(source_type: SourcedValue<&'source str>) -> Self {
+        Self {
+            source_type,
+            additional_fields: SourceArenaOutput {
+                fields: Vec::new(),
+                values: Vec::new(),
+            },
+        }
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, 'source>,
         projected: impl IntoIterator<Item = (&'static str, SourceValueState)>,

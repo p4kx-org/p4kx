@@ -6,6 +6,7 @@ use rayon::prelude::{IndexedParallelIterator, IntoParallelRefIterator, ParallelI
 
 use crate::catalog_crafting::CraftingKinds;
 use crate::catalog_read_failure::CatalogReadFailure;
+use crate::catalog_rows::staged::OrderedComponentRows;
 use crate::catalog_v3::catalog_item_alignment::ItemPortStaging;
 use crate::collected::Collected;
 use crate::commodity_backfill::CommodityPresence;
@@ -32,17 +33,22 @@ impl<'f> Scan<'_, '_, 'f> {
         let mut collected = Collected::from_crafting(crafting);
         let scratch = std::env::temp_dir();
         let mut item_ports = ItemPortStaging::new(&scratch, self.options.cancel);
+        let mut interactions = OrderedComponentRows::new(&scratch, self.options.cancel);
         let evidence = self.collect_records(
             records,
             &mut collected,
             &mut ledger,
             &mut inspections,
             &mut item_ports,
+            &mut interactions,
         )?;
         collected
             .entity_configurations
             .alignment
             .install_staged_ports(item_ports, self.forge)?;
+        collected
+            .entity_configurations
+            .install_staged_interactions(interactions, self.forge)?;
         for failure in failures {
             collected.take(Picked::Failed(failure));
         }
@@ -82,6 +88,7 @@ impl<'f> Scan<'_, '_, 'f> {
         ledger: &mut ExportLedger,
         inspections: &mut ScanInspectionFold,
         item_ports: &mut ItemPortStaging<'_, 'f>,
+        interactions: &mut OrderedComponentRows<'_>,
     ) -> Result<RecordEvidence, CatalogError> {
         let mut evidence = RecordEvidence {
             commodities: CommodityPresence::new(),
@@ -107,6 +114,7 @@ impl<'f> Scan<'_, '_, 'f> {
                     collected.tags.entity_tags.extend(record.entity.tags);
                     let mut configurations = record.entity.configurations;
                     configurations.alignment.stage_ports(item_ports)?;
+                    configurations.stage_interactions(interactions)?;
                     collected.entity_configurations.extend(configurations);
                     inspections.merge(ledger, record.ledger);
                 }

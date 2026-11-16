@@ -13,12 +13,14 @@ use super::interaction_state_type::{self, InteractionStateType};
 use super::item_component_owner::ComponentOwner;
 use crate::CatalogError;
 use crate::catalog_projection::CatalogProjection;
-use crate::catalog_table::CatalogTable;
+use crate::catalog_rows::staged::OrderedComponentRows;
+use crate::catalog_table::DatasetAvailability;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 
 const INTERACTABLE: &str = "SEntityInteractableParams";
 const STATE_MACHINE: &str = "SInteractionStateMachineParams";
+pub(super) const SOURCE_TYPES: &[&str] = &[INTERACTABLE, STATE_MACHINE];
 
 #[derive(Clone, Copy)]
 pub(super) enum InteractionKind {
@@ -108,10 +110,16 @@ impl<'source> InteractionConfiguration<'source> {
     }
 }
 
-pub(super) fn table<'source>(
-    forge: &DataForge<'_>,
-    mut rows: Vec<InteractionConfiguration<'source>>,
-) -> CatalogTable<InteractionConfiguration<'source>> {
-    rows.sort_by_key(|row| row.owner.key());
-    CatalogTable::new(forge, &[INTERACTABLE, STATE_MACHINE], rows)
+impl InteractionConfiguration<'_> {
+    pub(super) fn stage(&self, rows: &mut OrderedComponentRows<'_>) -> Result<(), CatalogError> {
+        rows.append(self.owner.key(), self)
+    }
 }
+
+pub(super) fn empty_availability(forge: &DataForge<'_>) -> DatasetAvailability {
+    DatasetAvailability::from_source_declarations(forge, |name| SOURCE_TYPES.contains(&name))
+}
+
+#[cfg(test)]
+#[path = "interaction_staging_tests.rs"]
+mod staging_tests;

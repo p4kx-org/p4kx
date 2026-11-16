@@ -6,34 +6,27 @@ use std::path::Path;
 use p4kx_extraction::{CancelToken, DataForge, SourceUse, SourceValueState, SourcedValue};
 
 use super::{CONTAINER, ComponentOwner, ItemPortContainer};
-use crate::catalog_rows::staged::{StagedCatalogRows, StagedCatalogTable};
+use crate::CatalogError;
+use crate::catalog_rows::staged::{OrderedComponentRows, StagedCatalogTable};
 use crate::catalog_table::DatasetAvailability;
-use crate::{CatalogError, ExportAccountingError};
 
 /// Stages complete port rows and retains the original facts used by later joins.
 pub(crate) struct ItemPortStaging<'stage, 'source> {
-    rows: StagedCatalogRows<'stage>,
+    rows: OrderedComponentRows<'stage>,
     facts: Vec<PortContainerFacts<'source>>,
-    last_key: Option<(Option<u32>, Option<u32>)>,
 }
 
 impl<'stage, 'source> ItemPortStaging<'stage, 'source> {
     pub(crate) const fn new(directory: &'stage Path, cancel: Option<&'stage CancelToken>) -> Self {
         Self {
-            rows: StagedCatalogRows::new(directory, cancel),
+            rows: OrderedComponentRows::new(directory, cancel),
             facts: Vec::new(),
-            last_key: None,
         }
     }
 
     pub(super) fn append(&mut self, row: ItemPortContainer<'source>) -> Result<(), CatalogError> {
-        let key = row.owner.key();
-        if self.last_key.is_some_and(|previous| previous > key) {
-            return Err(ExportAccountingError::ConflictingSourceDatum.into());
-        }
-        self.rows.append(&row)?;
+        self.rows.append(row.owner.key(), &row)?;
         self.facts.push(PortContainerFacts::retain(row));
-        self.last_key = Some(key);
         Ok(())
     }
 
@@ -41,7 +34,7 @@ impl<'stage, 'source> ItemPortStaging<'stage, 'source> {
         self,
         forge: &DataForge<'_>,
     ) -> Result<StagedItemPorts<'source>, CatalogError> {
-        let table = self.rows.finish(availability(forge, self.facts.len()))?;
+        let table = self.rows.finish(forge, &[CONTAINER])?;
         Ok(StagedItemPorts {
             table,
             facts: self.facts,
@@ -49,12 +42,8 @@ impl<'stage, 'source> ItemPortStaging<'stage, 'source> {
     }
 }
 
-pub(super) fn availability(forge: &DataForge<'_>, rows: usize) -> DatasetAvailability {
-    if rows == 0 {
-        DatasetAvailability::from_source_declarations(forge, |name| name == CONTAINER)
-    } else {
-        DatasetAvailability::Available
-    }
+pub(super) fn empty_availability(forge: &DataForge<'_>) -> DatasetAvailability {
+    DatasetAvailability::from_source_declarations(forge, |name| name == CONTAINER)
 }
 
 pub(super) struct StagedItemPorts<'source> {
