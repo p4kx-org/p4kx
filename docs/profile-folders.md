@@ -15,8 +15,10 @@ uses the home-directory default.
 | Application data | `$XDG_DATA_HOME/P4KX` | `~/.local/share/P4KX` |
 
 The settings and key files are `settings.toml` and `archive.key`. Flatpak sets the XDG
-directories for its own application profile. [Linux packages](linux-packages.md) covers
-the profile, Archive read grants and selected export directories.
+directories to its own application profile under `~/.var/app/io.github.p4kx_org.p4kx`.
+Within that directory, `config/P4KX` holds settings and the stored key, `cache/P4KX` holds
+the cache, and `data/P4KX` holds application data. [Flatpak XDG locations](https://docs.flatpak.org/en/latest/conventions.html#xdg-base-directories) ·
+[Linux profiles and sandbox access](linux-packages.md#profiles-audio-and-sandbox-access)
 
 Set `P4KX_FOLDERS_ROOT` to an absolute directory before starting P4KX to isolate its application
 folders on any supported OS and CPU:

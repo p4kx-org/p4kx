@@ -68,7 +68,10 @@ oder unvollständige Suche wird gemeldet. [Suchpfade und Prioritäten](channel-d
 | Anwendungsdaten | `$XDG_DATA_HOME/P4KX` | `~/.local/share/P4KX` |
 
 Ist eine XDG-Variable leer, ungesetzt oder relativ, gilt der Standardpfad. Einstellungen
-stehen in `settings.toml`, der gespeicherte Schlüssel in `archive.key`. Flatpak verwendet sein eigenes XDG-Profil. [Profilordner und expliziter Profilpfad](profile-folders.md)
+stehen in `settings.toml`, der gespeicherte Schlüssel in `archive.key`. Unter Flatpak
+liegen diese Dateien in `~/.var/app/io.github.p4kx_org.p4kx/config/P4KX`. Cache und
+Anwendungsdaten liegen im selben Flatpak-Profil unter `cache/P4KX` und `data/P4KX`.
+[Profilordner und expliziter Profilpfad](profile-folders.md)
 
 P4KX öffnet das Spielarchiv lesend. Flatpak hat Lesezugriff auf `~/Games/star-citizen`.
 Für andere Präfixe kannst du den konkreten Pfad mit `:ro` freigeben. Alternativ
@@ -91,8 +94,8 @@ their own platform requirements.
 
 | Suffix | Contents and start command |
 | --- | --- |
-| `.tar.gz` | Extract anywhere. Run `bin/p4kx-gui`, `bin/p4kx` or `bin/p4kx-mcp` inside the extracted directory. |
-| `.AppImage` | Run `chmod +x ./P4KX-<version>-<target>.AppImage` and launch it for the GUI. Put `--cli` or `--mcp` before the application's arguments to start the CLI or MCP server. |
+| `.tar.gz` | Extract with `tar -xzf ./P4KX-<version>-<target>.tar.gz`. Open the extracted `P4KX-<version>-<target>` directory and run `./bin/p4kx-gui`, `./bin/p4kx` or `./bin/p4kx-mcp`. |
+| `.AppImage` | Run `chmod +x ./P4KX-<version>-<target>.AppImage`, then `./P4KX-<version>-<target>.AppImage` for the GUI. Put `--cli` or `--mcp` before the application's arguments to start the CLI or MCP server. |
 | `.deb` | Install with `sudo apt install ./P4KX-<version>-<target>.deb`; run `p4kx-gui`, `p4kx` or `p4kx-mcp`. |
 | `.flatpak` | Install with `flatpak install --user --bundle ./P4KX-<version>-<target>.flatpak`; run `flatpak run io.github.p4kx_org.p4kx`. |
 
@@ -164,10 +167,12 @@ prefixes = ["/absolute/path/to/prefix"]
 ```
 
 P4KX checks `WINEPREFIX` and configured prefixes first, followed by `~/Games/star-citizen`
-and `STEAM_COMPAT_DATA_PATH/pfx`. It searches Steam compatibility data, including libraries
-listed in Steam's `libraryfolders.vdf`, native and Flatpak Bottles roots, and immediate
-`~/Games` children for Lutris or custom installs. Each component uses an exact spelling first,
-then a unique ASCII case-insensitive match. Ambiguous or incomplete discovery is reported.
+and `STEAM_COMPAT_DATA_PATH/pfx`. It searches Steam compatibility data, including external
+libraries listed in `steamapps/libraryfolders.vdf` or `config/libraryfolders.vdf`.
+Native Bottles roots, configured CrossOver bottle roots and Flatpak Bottles roots follow.
+P4KX then checks immediate `~/Games` children for Lutris or custom installs. Each component
+uses an exact spelling first, then a unique ASCII case-insensitive match. Ambiguous or
+incomplete discovery is reported.
 [Search roots and priority](channel-discovery.md#inputs-and-priority), [Profile folders](profile-folders.md)
 
 ## Upgrade and remove installed packages
@@ -313,17 +318,20 @@ operation is written as a successful runtime proof. Portal-origin behavior remai
 the actual FUSE-grant check, and the release job produces no passing proof if it exposes an
 installation-alias bypass.
 
-At integration commit `2f091e52a`, both native Ubuntu jobs passed synthetic Archive listing,
-extraction and conversion, MCP initialisation and a read-only request, and the GUI frame
-check under Xvfb with lavapipe. Both runner jobs record physical audio, clipboard, file chooser
-and hardware GPU as `not_checked`. Package lifecycle and desktop-device results each require
-evidence from the matching build. [AMD64 CI job](https://github.com/p4kx-org/p4kx/actions/runs/43709794954/job/132801209265) ·
-[ARM64 CI job](https://github.com/p4kx-org/p4kx/actions/runs/43709794954/job/132800778531)
+At merge revision `8195275fda13f8176c48c77a91465249c9d3f8f7` for PR #1117 head `2f134fbfc`,
+both native Ubuntu CI rows passed the synthetic CLI and MCP checks and GUI frames under
+X11 and headless HiDPI Wayland with software rendering. Physical audio playback, clipboard
+exchange, interactive file chooser use and hardware GPU behavior remain unchecked by these
+runner jobs. [AMD64 CI job](https://github.com/p4kx-org/p4kx/actions/runs/43803352411/job/133091363724) ·
+[ARM64 CI job](https://github.com/p4kx-org/p4kx/actions/runs/43803352411/job/133091679587)
 
-At integration commit `4d536b4a8`, both native package consumers passed the checks for all
-four package formats, including the Documents-portal sessions and deb and Flatpak lifecycle.
-These job results apply to the packages built in that run. [AMD64 package job](https://github.com/p4kx-org/p4kx/actions/runs/43093045183/job/130918688710) ·
-[ARM64 package job](https://github.com/p4kx-org/p4kx/actions/runs/43093045183/job/130918688724)
+The native package consumers for merge revision `0e1da3f4a7cd5a46fb2594dd6a5fafa97f1fd28b`
+and PR #1117 head `b27bdac875` passed all four package formats on both CPUs. The successful jobs
+include real CLI, GUI and MCP launchers, the separate Documents API 4 and API 5 sessions and
+deb and Flatpak lifecycle checks. These results apply to the packages built in that run.
+The final release candidate requires its own matching package and desktop-device evidence.
+[AMD64 package job](https://github.com/p4kx-org/p4kx/actions/runs/43813424470/job/133132805619) ·
+[ARM64 package job](https://github.com/p4kx-org/p4kx/actions/runs/43813424470/job/133132805539)
 
 For a branch-only native Linux validation, dispatch the existing `release.yml` workflow with
 `linux-only=true`. It runs preparation and both Linux producer/consumer rows. Use the branch

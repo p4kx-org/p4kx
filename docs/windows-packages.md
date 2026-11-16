@@ -216,6 +216,16 @@ exact-limit inputs, incomplete journal rows and original writer output while rej
 UTF-8 and UTF-16 byte order marks.
 
 
+### Read-only MSI package evidence
+
+The AMD64 MSI from producer `0e1da3f4a` in Release run `43813424470` passed the
+native read-only MSI metadata and transport assertions. Its SHA-256 is
+`61f2ff3f48722db3da1e5cd2003ad1fb103977328a8573310ad2268fe47658ae`.
+The embedded helper digest matched the corresponding `windows-build-x86_64-pc-windows-msvc`
+payload. The local probe used the same metadata and helper-digest readers as the hosted
+installer step. Installation, rollback and profile preservation require the separate hosted
+lifecycle result. [Release producer](https://github.com/p4kx-org/p4kx/actions/runs/43813424470/job/133122281746)
+
 ### Dynamic parent-chain feedback experiment
 
 The separate `MSI dynamic parent-chain probe` workflow exercises the actual preparation output,
