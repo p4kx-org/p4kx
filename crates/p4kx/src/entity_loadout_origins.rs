@@ -98,6 +98,10 @@ impl LoadoutReadObserver for Capture<'_> {
         true
     }
 
+    fn observes_vehicle_visibility(&self) -> bool {
+        true
+    }
+
     fn with_record_paths(
         &self,
         record: &Record<'_>,

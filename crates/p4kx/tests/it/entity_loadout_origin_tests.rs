@@ -15,6 +15,8 @@ use super::TestResult;
 mod attachments;
 #[path = "entity_loadout_definition_origin_tests.rs"]
 mod definitions;
+#[path = "entity_loadout_vehicle_visibility_tests.rs"]
+mod vehicle_visibility;
 
 const BASE_PATH: &str = "Data\\Loadouts\\Base.xml";
 const LOCAL_PATH: &str = "Data\\Loadouts\\Root.xml";

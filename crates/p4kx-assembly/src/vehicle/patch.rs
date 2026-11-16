@@ -3,7 +3,7 @@
 
 use std::collections::{HashMap, HashSet, VecDeque};
 
-use super::{ElemOverride, ValueOrigin};
+use super::{ElemOverride, ValueOrigin, VehicleAttributeEvidence};
 use crate::markup::{Budget, Element};
 
 /// What applying a Modification did, to judge the patch rule of ADR-0050 on real data.
@@ -249,7 +249,7 @@ fn overlay_children(
             light_bone: source.light_bone.clone(),
             attributes: source.attributes.clone(),
             children: Vec::new(),
-            origins: Vec::new(),
+            origins: source.origins.clone(),
         };
         for (name, _) in &source.attributes {
             element.mark(name, ValueOrigin::Patch);
@@ -259,16 +259,17 @@ fn overlay_children(
                 for (name, value) in &partner.attributes {
                     if element.attribute(name).is_none() {
                         budget.charge_set(element.attributes.len(), name, value)?;
-                        element.set_attribute(name, value);
+                        element.set_attribute(
+                            name,
+                            value,
+                            partner.origin_of(name),
+                            partner.origins.evidence(name).cloned(),
+                        );
                         if name.eq_ignore_ascii_case("name") {
                             element.port_name.clone_from(&partner.port_name);
                         }
                         if name.eq_ignore_ascii_case("bone") {
                             element.light_bone.clone_from(&partner.light_bone);
-                        }
-                        match partner.origin_of(name) {
-                            ValueOrigin::Base => {}
-                            origin => element.mark(name, origin),
                         }
                     }
                 }
@@ -302,16 +303,20 @@ fn merge_by_id(
     for child in &mut element.children {
         if id_of(child) == Some(id) {
             matched = matched.saturating_add(1);
-            for (name, value) in &patch.attributes {
+            for (ordinal, (name, value)) in patch.attributes.iter().enumerate() {
                 budget.charge_set(child.attributes.len(), name, value)?;
-                child.set_attribute(name, value);
+                child.set_attribute(
+                    name,
+                    value,
+                    ValueOrigin::Patch,
+                    patch.origins.donor_evidence(name, ordinal).cloned(),
+                );
                 if name.eq_ignore_ascii_case("name") {
                     child.port_name.clone_from(&patch.port_name);
                 }
                 if name.eq_ignore_ascii_case("bone") {
                     child.light_bone.clone_from(&patch.light_bone);
                 }
-                child.mark(name, ValueOrigin::Patch);
             }
             let old = std::mem::take(&mut child.children);
             child.children = overlay_children(old, &patch.children, budget)?;
@@ -361,16 +366,19 @@ fn set_elems<'e>(
         && let Some((key, elems)) = by_id.get_key_value(id)
     {
         seen.insert(*key);
+        let target = element.origins.evidence("id").cloned();
         for elem in elems {
             budget.charge_set(element.attributes.len(), &elem.name, &elem.value)?;
-            element.set_attribute(&elem.name, &elem.value);
+            let evidence = elem.evidence.as_ref().map(|assignment| {
+                VehicleAttributeEvidence::with_target(assignment, target.as_ref())
+            });
+            element.set_attribute(&elem.name, &elem.value, ValueOrigin::Elem, evidence);
             if elem.name.eq_ignore_ascii_case("name") {
                 element.port_name.clone_from(&elem.port_name);
             }
             if elem.name.eq_ignore_ascii_case("bone") {
                 element.light_bone.clone_from(&elem.light_bone);
             }
-            element.mark(&elem.name, ValueOrigin::Elem);
         }
     }
     for child in &mut element.children {

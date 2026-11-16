@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use super::{PortVisibility, ValueOrigin};
+use super::{PortVisibility, ValueOrigin, VehicleAttributeEvidence};
+use crate::markup::AttributeOrigins;
 
 /// Returns whether `flags`, words separated by white space, contain `flag`, ignoring ASCII case
 /// and a leading `$`.
@@ -46,7 +47,7 @@ pub struct VehicleItemPort {
     pub(crate) types: Vec<String>,
     pub(crate) item_types: Vec<VehicleItemType>,
     pub(crate) light_attachments: Vec<super::VehicleLightAttachment>,
-    pub(crate) origins: Vec<(String, ValueOrigin)>,
+    pub(crate) origins: AttributeOrigins,
 }
 
 impl VehicleItemPort {
@@ -125,9 +126,12 @@ impl VehicleItemPort {
     /// Returns where the attribute `name` of the item port got its value, ignoring ASCII case.
     #[must_use]
     pub fn origin_of(&self, name: &str) -> ValueOrigin {
-        self.origins
-            .iter()
-            .find(|(key, _)| key.eq_ignore_ascii_case(name))
-            .map_or(ValueOrigin::Base, |(_, origin)| *origin)
+        self.origins.origin_of(name)
+    }
+
+    /// Returns the original attribute evidence supplying the effective flags.
+    #[must_use]
+    pub fn flags_evidence(&self) -> Option<&VehicleAttributeEvidence> {
+        self.origins.evidence("flags").map(std::sync::Arc::as_ref)
     }
 }

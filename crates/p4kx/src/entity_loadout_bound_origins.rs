@@ -91,7 +91,7 @@ impl Output<'_, '_> {
     ) -> Result<FieldOrigin> {
         match source {
             Some(Authored::Record(site)) => self.record_site(site, role),
-            Some(Authored::Xml(site)) => self.xml_site(site, role),
+            Some(Authored::Xml(site)) => self.xml_origin(&site.file, site.location.as_ref(), role),
             None => Ok(self.uses.origin(&[], false)),
         }
     }
@@ -129,14 +129,19 @@ impl Output<'_, '_> {
         Ok(self.uses.origin(&inputs, self.forge_complete && complete))
     }
 
-    fn xml_site(&self, source: &Xml, role: SourceUseRole) -> Result<FieldOrigin> {
-        let Some(entry) = source.file.source().entry_origin() else {
+    pub(super) fn xml_origin(
+        &self,
+        file: &LoadoutFileObservation,
+        location: Option<&SourceLocation>,
+        role: SourceUseRole,
+    ) -> Result<FieldOrigin> {
+        let Some(entry) = file.source().entry_origin() else {
             return Ok(self.uses.origin(&[], false));
         };
         let scope = self
             .uses
             .observe(SourceInput::Archive(entry), InputScope::Payload)?;
-        let Some(location) = &source.location else {
+        let Some(location) = location else {
             let opaque = scope.at_opaque(role, SourceCoordinateOmission::Unavailable)?;
             return Ok(self.uses.origin(&[opaque], false));
         };

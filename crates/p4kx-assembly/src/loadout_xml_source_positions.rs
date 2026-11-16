@@ -3,10 +3,17 @@
 
 use std::ptr;
 
-use p4kx_cryxml::SourceAttributePosition;
+use p4kx_cryxml::{SourceAttributePosition, SourceElementPosition};
 use p4kx_extraction::SourceLocation;
 
 use super::{Node, Owner, Scope};
+use crate::{LoadoutFileObservation, LoadoutXmlDecoding, VehicleXmlSite};
+
+#[derive(Clone, Copy)]
+pub(crate) enum MissingAttribute {
+    Omit,
+    Element,
+}
 
 pub(super) struct OriginalAttribute<'node> {
     pub(super) ordinal: usize,
@@ -31,11 +38,19 @@ impl Scope<'_, '_> {
         node: Node<'node, '_>,
         mut matches: impl FnMut(&str) -> bool,
     ) -> Option<OriginalAttribute<'node>> {
+        self.original_attribute_where(node, |_, name| matches(name))
+    }
+
+    fn original_attribute_where<'node>(
+        &self,
+        node: Node<'node, '_>,
+        mut matches: impl FnMut(usize, &str) -> bool,
+    ) -> Option<OriginalAttribute<'node>> {
         match node {
             Node::Cry(node) => node
                 .source_attributes()
                 .enumerate()
-                .find(|(_, attribute)| matches(attribute.name()))
+                .find(|(ordinal, attribute)| matches(*ordinal, attribute.name()))
                 .map(|(ordinal, attribute)| OriginalAttribute {
                     ordinal,
                     name: attribute.name(),
@@ -45,7 +60,7 @@ impl Scope<'_, '_> {
             Node::Text(node) => node
                 .attributes()
                 .enumerate()
-                .find(|(_, attribute)| matches(attribute.name()))
+                .find(|(ordinal, attribute)| matches(*ordinal, attribute.name()))
                 .map(|(ordinal, attribute)| {
                     let range = attribute.range();
                     OriginalAttribute {
@@ -58,6 +73,70 @@ impl Scope<'_, '_> {
                     }
                 }),
         }
+    }
+
+    pub(crate) fn vehicle_site(
+        &self,
+        node: Node<'_, '_>,
+        name: &str,
+        missing: MissingAttribute,
+    ) -> Option<VehicleXmlSite> {
+        let source = self.vehicle_source()?;
+        let index = self.original_node_index(node)?;
+        let attribute = self.original_attribute(node, |actual| actual.eq_ignore_ascii_case(name));
+        let location = match attribute {
+            Some(attribute) => SourceLocation::xml_attribute(&attribute.position, attribute.name),
+            None if matches!(missing, MissingAttribute::Element) => {
+                let element = match node {
+                    Node::Cry(_) => SourceElementPosition::CryXml(index),
+                    Node::Text(node) => {
+                        let range = node.range();
+                        SourceElementPosition::Text(
+                            range.start + self.text_prefix..range.end + self.text_prefix,
+                        )
+                    }
+                };
+                SourceLocation::xml_element(&element, name)
+            }
+            None => return None,
+        };
+        Some(self.vehicle_site_at_location(source, location))
+    }
+
+    pub(crate) fn vehicle_site_at(
+        &self,
+        node: Node<'_, '_>,
+        ordinal: usize,
+        name: &str,
+    ) -> Option<VehicleXmlSite> {
+        let source = self.vehicle_source()?;
+        self.original_node_index(node)?;
+        let attribute = self
+            .original_attribute_where(node, |index, actual| index == ordinal && actual == name)?;
+        let location = SourceLocation::xml_attribute(&attribute.position, attribute.name);
+        Some(self.vehicle_site_at_location(source, location))
+    }
+
+    fn vehicle_source(&self) -> Option<&LoadoutFileObservation> {
+        self.source.filter(|_| {
+            self.observation
+                .is_some_and(crate::resolver_observation::Observation::observes_vehicle_visibility)
+        })
+    }
+
+    fn vehicle_site_at_location(
+        &self,
+        source: &LoadoutFileObservation,
+        location: Option<SourceLocation>,
+    ) -> VehicleXmlSite {
+        let lossless = !matches!(
+            self.decoding,
+            LoadoutXmlDecoding::CryXml {
+                repaired_utf8: true,
+                ..
+            }
+        );
+        VehicleXmlSite::new(source.clone(), location.filter(|_| lossless))
     }
 
     pub(crate) fn attribute_ascii_position(

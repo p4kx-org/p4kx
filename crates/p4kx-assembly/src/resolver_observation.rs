@@ -106,6 +106,11 @@ pub trait LoadoutReadObserver: Send + Sync {
         false
     }
 
+    /// Enables exact XML evidence for effective vehicle visibility fields.
+    fn observes_vehicle_visibility(&self) -> bool {
+        false
+    }
+
     /// Runs the actual Record projection exactly once within a borrowed path scope.
     fn with_record_paths(
         &self,
@@ -169,6 +174,10 @@ impl<'f> Observation<'f> {
 
     pub(crate) fn observes_port_names(&self) -> bool {
         self.observer.observes_port_names()
+    }
+
+    pub(crate) fn observes_vehicle_visibility(&self) -> bool {
+        self.observer.observes_vehicle_visibility()
     }
 
     pub(crate) fn stopped(&self) -> bool {

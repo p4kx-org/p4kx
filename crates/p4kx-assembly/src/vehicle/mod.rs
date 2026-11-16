@@ -17,10 +17,12 @@ mod read;
 mod request;
 mod structure;
 mod totals;
+mod xml_evidence;
 
 use std::collections::HashMap;
 
 use crate::gear_placement_source::GearDeclaration;
+use crate::markup::AttributeOrigins;
 use crate::merge::port_key;
 use crate::{LoadoutError, LoadoutFiles};
 
@@ -33,6 +35,7 @@ pub(crate) use locate::{load, load_observed};
 pub use origin::ValueOrigin;
 pub use patch::ModificationReport;
 pub use totals::{OriginTally, PartThreshold, PartialValue, UnreadableValue, VehicleTotals};
+pub use xml_evidence::{VehicleAttributeEvidence, VehicleXmlSite};
 
 /// Whether a port shows its item: the vehicle implementation's part of that name decides, else
 /// the flags of the port definition.
@@ -86,7 +89,7 @@ pub struct VehiclePart {
     pub(crate) detach_ratio: Option<f64>,
     pub(crate) destroy_ratio: Option<f64>,
     pub(crate) attributes: Vec<(String, String)>,
-    pub(crate) origins: Vec<(String, ValueOrigin)>,
+    pub(crate) origins: AttributeOrigins,
     pub(crate) item_port: Option<VehicleItemPort>,
     pub(crate) tread_wheels: Vec<String>,
     pub(crate) children: Vec<Self>,
@@ -141,10 +144,13 @@ impl VehiclePart {
     /// [`ValueOrigin::Base`] unless the Modification's patch file or an `Elem` set it.
     #[must_use]
     pub fn origin_of(&self, name: &str) -> ValueOrigin {
-        self.origins
-            .iter()
-            .find(|(key, _)| key.eq_ignore_ascii_case(name))
-            .map_or(ValueOrigin::Base, |(_, origin)| *origin)
+        self.origins.origin_of(name)
+    }
+
+    /// Returns the original name selection retained for this effective part.
+    #[must_use]
+    pub const fn name_proof(&self) -> Option<&crate::LoadoutPath> {
+        self.name_proof.as_ref()
     }
 
     /// Returns the raw value of the part's attribute `name`, ignoring ASCII case, or `None`
@@ -385,7 +391,8 @@ impl VehicleImplementation {
     }
 
     /// Returns the first part named `name` that holds an item port, ignoring ASCII case.
-    pub(crate) fn port_part(&self, name: &str) -> Option<&VehiclePart> {
+    #[must_use]
+    pub fn port_part(&self, name: &str) -> Option<&VehiclePart> {
         let (first, rest) = self.port_paths.get(&port_key(name))?.split_first()?;
         let mut part = self.parts.get(*first)?;
         for index in rest {

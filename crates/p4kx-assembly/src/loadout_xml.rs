@@ -9,7 +9,7 @@ use p4kx_extraction::SourceLocation;
 #[path = "loadout_xml_source_positions.rs"]
 mod source_positions;
 
-pub(crate) use self::source_positions::AttributeNamespaces;
+pub(crate) use self::source_positions::{AttributeNamespaces, MissingAttribute};
 
 use crate::loadout_file_events::Document;
 use crate::loadout_xml_attribute::XmlLoadoutAttributeSite;

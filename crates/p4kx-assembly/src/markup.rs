@@ -1,9 +1,17 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::sync::Arc;
+
 use p4kx_cryxml::SourceAttributePosition;
 
-use crate::ValueOrigin;
+#[path = "markup_origins.rs"]
+mod origins;
+
+pub(crate) use origins::AttributeOrigins;
+
+use crate::loadout_xml::{MissingAttribute, Node, Scope};
+use crate::{ValueOrigin, VehicleAttributeEvidence};
 
 /// The deepest element nesting that is read.
 pub(crate) const MAX_ELEMENT_DEPTH: usize = p4kx_cryxml::MAX_TEXT_DEPTH;
@@ -16,7 +24,7 @@ pub(crate) const MAX_ELEMENTS: usize = 1 << 21;
 pub(crate) struct Element {
     pub(crate) name: String,
     pub(crate) attributes: Vec<(String, String)>,
-    pub(crate) origins: Vec<(String, ValueOrigin)>,
+    pub(crate) origins: AttributeOrigins,
     pub(crate) port_name: Option<crate::LoadoutPath>,
     pub(crate) light_bone: Option<SourceAttributePosition>,
     pub(crate) children: Vec<Self>,
@@ -25,7 +33,7 @@ pub(crate) struct Element {
 impl Element {
     /// Creates an element read from the base file: every attribute is [`ValueOrigin::Base`].
     #[cfg(test)]
-    pub(crate) const fn read(
+    pub(crate) fn read(
         name: String,
         attributes: Vec<(String, String)>,
         children: Vec<Self>,
@@ -33,7 +41,7 @@ impl Element {
         Self {
             name,
             attributes,
-            origins: Vec::new(),
+            origins: AttributeOrigins::default(),
             port_name: None,
             light_bone: None,
             children,
@@ -42,32 +50,19 @@ impl Element {
 
     /// Returns where the attribute `name` got its value, ignoring ASCII case.
     pub(crate) fn origin_of(&self, name: &str) -> ValueOrigin {
-        self.origins
-            .iter()
-            .find(|(key, _)| key.eq_ignore_ascii_case(name))
-            .map_or(ValueOrigin::Base, |(_, origin)| *origin)
+        self.origins.origin_of(name)
     }
 
     /// Records that the attribute `name` got its value from `origin`.
     pub(crate) fn mark(&mut self, name: &str, origin: ValueOrigin) {
-        if let Some((_, old)) = self
-            .origins
-            .iter_mut()
-            .find(|(key, _)| key.eq_ignore_ascii_case(name))
-        {
-            *old = origin;
-        } else {
-            self.origins.push((name.to_owned(), origin));
-        }
+        self.origins.mark(name, origin);
     }
 
     /// Records `origin` for every attribute of the element and of everything below it.
     pub(crate) fn mark_all(&mut self, origin: ValueOrigin) {
-        self.origins = self
-            .attributes
-            .iter()
-            .map(|(name, _)| (name.clone(), origin))
-            .collect();
+        for (name, _) in &self.attributes {
+            self.origins.mark(name, origin);
+        }
         for child in &mut self.children {
             child.mark_all(origin);
         }
@@ -82,7 +77,14 @@ impl Element {
     }
 
     /// Sets the attribute `name`, ignoring ASCII case, or appends it.
-    pub(crate) fn set_attribute(&mut self, name: &str, value: &str) {
+    pub(crate) fn set_attribute(
+        &mut self,
+        name: &str,
+        value: &str,
+        origin: ValueOrigin,
+        evidence: Option<Arc<VehicleAttributeEvidence>>,
+    ) {
+        self.origins.assign(name, origin, evidence);
         if let Some((_, old)) = self
             .attributes
             .iter_mut()
@@ -269,11 +271,7 @@ pub(crate) fn parse(bytes: &[u8], budget: &mut Budget) -> Result<Element, String
 pub(crate) fn parse_with_source<T>(
     bytes: &[u8],
     budget: &mut Budget,
-    project: impl FnOnce(
-        Element,
-        crate::loadout_xml::Node<'_, '_>,
-        &crate::loadout_xml::Scope<'_, '_>,
-    ) -> Result<T, String>,
+    project: impl FnOnce(Element, Node<'_, '_>, &Scope<'_, '_>) -> Result<T, String>,
 ) -> Result<T, String> {
     crate::loadout_xml::parse_unbound(bytes, |root, scope| {
         project(from_node(root, scope, 0, budget)?, root, scope)
@@ -284,11 +282,7 @@ pub(crate) fn parse_observed<T>(
     document: &crate::loadout_file_events::Document,
     budget: &mut Budget,
     observation: Option<&crate::resolver_observation::Observation<'_>>,
-    project: impl FnOnce(
-        Element,
-        crate::loadout_xml::Node<'_, '_>,
-        &crate::loadout_xml::Scope<'_, '_>,
-    ) -> Result<T, String>,
+    project: impl FnOnce(Element, Node<'_, '_>, &Scope<'_, '_>) -> Result<T, String>,
 ) -> Result<T, String> {
     crate::loadout_xml::parse(document, observation, |root, scope| {
         project(from_node(root, scope, 0, budget)?, root, scope)
@@ -296,8 +290,8 @@ pub(crate) fn parse_observed<T>(
 }
 
 fn from_node(
-    node: crate::loadout_xml::Node<'_, '_>,
-    scope: &crate::loadout_xml::Scope<'_, '_>,
+    node: Node<'_, '_>,
+    scope: &Scope<'_, '_>,
     depth: usize,
     budget: &mut Budget,
 ) -> Result<Element, String> {
@@ -331,12 +325,52 @@ fn from_node(
     } else {
         None
     };
+    let origins = original_sites(node, scope, &attributes);
     Ok(Element {
         port_name,
         light_bone,
         name: node.name().to_owned(),
         attributes,
         children,
-        origins: Vec::new(),
+        origins,
     })
+}
+
+fn original_sites(
+    node: Node<'_, '_>,
+    scope: &Scope<'_, '_>,
+    attributes: &[(String, String)],
+) -> AttributeOrigins {
+    let mut origins = AttributeOrigins::default();
+    for (name, missing) in [
+        ("id", MissingAttribute::Omit),
+        (
+            "flags",
+            if node.name().eq_ignore_ascii_case("ItemPort") {
+                MissingAttribute::Element
+            } else {
+                MissingAttribute::Omit
+            },
+        ),
+    ] {
+        if let Some(site) = scope.vehicle_site(node, name, missing) {
+            origins.assign(
+                name,
+                ValueOrigin::Base,
+                Some(Arc::new(VehicleAttributeEvidence::new(site, Vec::new()))),
+            );
+            for (ordinal, (raw_name, _)) in attributes
+                .iter()
+                .enumerate()
+                .filter(|(_, (raw_name, _))| raw_name.eq_ignore_ascii_case(name))
+                .skip(1)
+            {
+                let proof = scope
+                    .vehicle_site_at(node, ordinal, raw_name)
+                    .map(|site| Arc::new(VehicleAttributeEvidence::new(site, Vec::new())));
+                origins.retain_donor(raw_name, ordinal, proof);
+            }
+        }
+    }
+    origins
 }

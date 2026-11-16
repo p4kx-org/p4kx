@@ -307,8 +307,8 @@ pub use tree::{Attachment, EntityNode, PortNode, PortSource, Target, Unresolved}
 pub use vehicle::{
     ElemOverride, LandingGear, ModificationReport, OriginTally, PartKind, PartThreshold,
     PartialValue, PortVisibility, UnreadableValue, ValueOrigin, VehicleImplementation,
-    VehicleItemPort, VehicleItemType, VehicleLightAttachment, VehicleLightPort, VehiclePart,
-    VehicleTotals,
+    VehicleAttributeEvidence, VehicleItemPort, VehicleItemType, VehicleLightAttachment,
+    VehicleLightPort, VehiclePart, VehicleTotals, VehicleXmlSite,
 };
 pub use xml::{MAX_XML_INCLUDE_DEPTH, MAX_XML_INCLUDES};
 

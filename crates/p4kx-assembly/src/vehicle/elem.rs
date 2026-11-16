@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use crate::LoadoutPath;
-use crate::loadout_xml::{Node, Scope};
+use std::sync::Arc;
+
+use crate::loadout_xml::{MissingAttribute, Node, Scope};
+use crate::{LoadoutPath, VehicleAttributeEvidence};
 
 /// A Modification of the base implementation: its selected patch and Elem overrides.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -60,12 +62,29 @@ pub(super) fn find_modification(
             name: name.to_owned(),
             value: value.map_or("", |(_, value)| value).to_owned(),
             port_name,
+            evidence: assignment_evidence(node, scope, name),
             light_bone: value
                 .filter(|_| name.eq_ignore_ascii_case("bone"))
                 .and_then(|(attribute, _)| scope.attribute_ascii_position(node, attribute)),
         });
     }
     Ok(Some(Modification { patch, elems }))
+}
+
+fn assignment_evidence(
+    node: Node<'_, '_>,
+    scope: &Scope<'_, '_>,
+    name: &str,
+) -> Option<Arc<VehicleAttributeEvidence>> {
+    if !name.eq_ignore_ascii_case("flags") && !name.eq_ignore_ascii_case("id") {
+        return None;
+    }
+    let value = scope.vehicle_site(node, "value", MissingAttribute::Element)?;
+    let selectors = ["name", "idRef"]
+        .into_iter()
+        .filter_map(|name| scope.vehicle_site(node, name, MissingAttribute::Omit))
+        .collect();
+    Some(Arc::new(VehicleAttributeEvidence::new(value, selectors)))
 }
 
 fn select_modification<'document, 'input>(
@@ -100,14 +119,27 @@ fn named_children<'document, 'input>(
 
 /// One `Elem` of a Modification: the attribute `name` of every element with the `id` `id_ref`
 /// is set to `value`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct ElemOverride {
     pub(super) id_ref: String,
     pub(super) name: String,
     pub(super) value: String,
     pub(super) port_name: Option<LoadoutPath>,
     pub(super) light_bone: Option<p4kx_cryxml::SourceAttributePosition>,
+    pub(super) evidence: Option<Arc<VehicleAttributeEvidence>>,
 }
+
+impl PartialEq for ElemOverride {
+    fn eq(&self, other: &Self) -> bool {
+        self.id_ref == other.id_ref
+            && self.name == other.name
+            && self.value == other.value
+            && self.port_name == other.port_name
+            && self.light_bone == other.light_bone
+    }
+}
+
+impl Eq for ElemOverride {}
 
 impl ElemOverride {
     /// Returns the `id` of the elements the override addresses.

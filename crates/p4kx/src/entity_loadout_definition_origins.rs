@@ -2,7 +2,10 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use anyhow::Result;
-use p4kx_assembly::{EntityNode, LoadoutError, PortNode, PortVisibility, VehicleImplementation};
+use p4kx_assembly::{
+    EntityNode, LoadoutError, PortNode, PortVisibility, VehicleImplementation, VehicleItemPort,
+    VehiclePart,
+};
 use p4kx_extraction::{FieldOrigin, SourceLocation, SourceUseRole};
 
 use super::Output;
@@ -120,13 +123,43 @@ impl Output<'_, '_> {
         }
         let origin = match owner {
             VisibilityOwner::DataForge => self.uses.origin_with_origins(flags, flags.is_some())?,
-            VisibilityOwner::Vehicle(vehicle) if vehicle.item_port(port.name()).is_some() => {
-                self.uses.origin(&[], false)
-            }
-            VisibilityOwner::Vehicle(_) | VisibilityOwner::Unverified => {
-                self.uses.origin_with_origins(flags, false)?
-            }
+            VisibilityOwner::Vehicle(vehicle) => match vehicle.port_part(port.name()) {
+                Some(part) => self.vehicle_visibility(port, part)?,
+                None => self.uses.origin_with_origins(flags, false)?,
+            },
+            VisibilityOwner::Unverified => self.uses.origin_with_origins(flags, false)?,
         };
         self.put(&format!("{address}/visibility"), origin)
+    }
+
+    fn vehicle_visibility(&self, port: &PortNode, part: &VehiclePart) -> Result<FieldOrigin> {
+        let mut inputs = vec![
+            self.path_origin(
+                port.name_proof()
+                    .filter(|proof| proof.value() == port.name()),
+                SourceUseRole::Selector,
+            )?,
+            self.path_origin(
+                part.name_proof()
+                    .filter(|proof| proof.value() == part.name()),
+                SourceUseRole::Selector,
+            )?,
+        ];
+        if let Some(evidence) = part.item_port().and_then(VehicleItemPort::flags_evidence) {
+            let flags = evidence.original();
+            inputs.push(self.xml_origin(
+                flags.file(),
+                flags.location(),
+                SourceUseRole::Conversion,
+            )?);
+            for selector in evidence.selectors() {
+                inputs.push(self.xml_origin(
+                    selector.file(),
+                    selector.location(),
+                    SourceUseRole::Selector,
+                )?);
+            }
+        }
+        Ok(self.uses.origin_with_origins(&inputs, false)?)
     }
 }
