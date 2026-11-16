@@ -59,10 +59,23 @@ pub(crate) fn project(
             crate::material_part_batch::Band::Shader,
         ),
     };
-    for index in 0..library.materials.len() {
-        writer.checkpoint()?;
-        if let Some(node) = material_shader_tokens::node(library, index) {
-            project_node(index, node, context, &mut output, writer)?;
+    writer.checkpoint()?;
+    if library.single {
+        if let Some(node) = library.authored.root.as_ref()
+            && !library.materials.is_empty()
+        {
+            project_node(0, node, context, &mut output, writer)?;
+        }
+    } else {
+        let nodes = material_shader_tokens::selected_submaterials(library, || writer.checkpoint())?;
+        for node in nodes {
+            writer.checkpoint()?;
+            if let Some(index) = node.authored.ordinal
+                && index < library.materials.len()
+                && node.name.eq_ignore_ascii_case("Material")
+            {
+                project_node(index, node, context, &mut output, writer)?;
+            }
         }
     }
     output.batch.finish(writer)
@@ -81,7 +94,7 @@ impl ReferenceOutput<'_, '_> {
         context: &SourceContext<'_>,
         writer: &mut MediaWriter<'_>,
     ) -> Result<(), MediaError> {
-        let mut prepared = crate::material_parts_origins::prepared(context, writer)?;
+        let mut prepared = writer.record_origins();
         crate::material_shader_origins::write(
             &crate::material_parts_origins::payload()?,
             reference,

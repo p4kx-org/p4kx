@@ -274,14 +274,14 @@ impl Output<'_, '_> {
         role: Role,
         writer: &mut MediaWriter<'_>,
     ) -> Result<(), MediaError> {
-        let mut origins = self.part_origins(writer)?;
+        let mut origins = Self::part_origins(writer)?;
         let origin = capture(&self.input, InputScope::Payload, site, role, writer)?;
         origins.insert_subtree(&child(&payload()?, field)?, origin, writer)?;
         self.emit(part, origins, writer)
     }
 
-    fn part_origins(&self, writer: &MediaWriter<'_>) -> Result<PreparedRecordOrigins, MediaError> {
-        let mut origins = prepared(self.context, writer)?;
+    fn part_origins(writer: &MediaWriter<'_>) -> Result<PreparedRecordOrigins, MediaError> {
+        let mut origins = writer.record_origins();
         independent(&mut origins, &payload()?, writer)?;
         Ok(origins)
     }

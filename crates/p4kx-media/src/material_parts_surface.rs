@@ -27,7 +27,7 @@ impl Output<'_, '_> {
         self.attributes(index, Group::Other, &material.other_attributes, writer)?;
         self.attributes(index, Group::PublicParam, &material.public_params, writer)?;
         for (layer, value) in material.layers.iter().enumerate() {
-            let mut origins = self.part_origins(writer)?;
+            let mut origins = Self::part_origins(writer)?;
             self.observed(
                 &mut origins,
                 &payload()?,
@@ -88,7 +88,7 @@ impl Output<'_, '_> {
         material: &Material,
         writer: &mut MediaWriter<'_>,
     ) -> Result<(), MediaError> {
-        let mut origins = self.part_origins(writer)?;
+        let mut origins = Self::part_origins(writer)?;
         let path = payload()?;
         self.observed(
             &mut origins,
@@ -174,7 +174,7 @@ impl Output<'_, '_> {
         writer: &mut MediaWriter<'_>,
     ) -> Result<(), MediaError> {
         for (position, (name, value)) in attributes.iter().enumerate() {
-            let mut origins = self.part_origins(writer)?;
+            let mut origins = Self::part_origins(writer)?;
             let origin = match group {
                 Group::PublicParam => self.reads.take(
                     material,
@@ -231,7 +231,7 @@ impl Output<'_, '_> {
     ) -> Result<(), MediaError> {
         let field = Field::Texture { index: position };
         let indices = self.reads.positions(material, field).map(<[u64]>::to_vec);
-        let mut origins = self.part_origins(writer)?;
+        let mut origins = Self::part_origins(writer)?;
         let path = payload()?;
         self.observed(
             &mut origins,

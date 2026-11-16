@@ -4,7 +4,7 @@
 use p4kx_extraction::model::RawElement;
 use p4kx_extraction::{MaterialElementRow, MaterialElementWriteError};
 
-use super::{Output, prepared};
+use super::Output;
 use crate::material_parts::{MaterialPart, MaterialTree};
 use crate::material_parts_origins::ElementOrigins;
 use crate::{MediaError, MediaWriter};
@@ -30,7 +30,7 @@ impl Output<'_, '_> {
             } else {
                 None
             };
-            let mut origins = prepared(self.context, writer)?;
+            let mut origins = writer.record_origins();
             ElementOrigins {
                 input: &self.input,
                 original: actual,

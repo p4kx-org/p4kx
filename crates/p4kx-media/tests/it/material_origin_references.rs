@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_extraction::Filter;
+use p4kx_extraction::model::MaterialSourceLimits;
 use p4kx_testkit::{ArchiveBuilder, TestEntry};
 use serde_json::Value;
 
@@ -147,7 +148,7 @@ fn filtered_shader_target_keeps_its_original_metadata_without_payload_taint() ->
             support::shader(Storage::Encrypted),
         ],
         options,
-        p4kx_extraction::model::MaterialSourceLimits::default(),
+        MaterialSourceLimits::default(),
     )?;
     let pointer = format!("{LINKS}/0/reference/resolution/status");
     assert_eq!(
@@ -204,6 +205,81 @@ fn cached_shader_binding_uses_each_materials_current_original_selector() -> Test
         );
     }
     Ok(())
+}
+
+#[test]
+fn shader_links_use_the_original_submaterial_list_even_when_the_tree_is_partial() -> TestResult {
+    let padding = "a".repeat(4096);
+    let xml = format!(
+        "<Material><SubMaterials Padding='{padding}'>\
+         <Placeholder/><Material Shader='Actual' StringGenMask='%A'/>\
+         </SubMaterials><SubMaterials>\
+         <Placeholder/><Material Shader='Decoy' StringGenMask='%B'/>\
+         </SubMaterials></Material>"
+    );
+    let material = || support::material(MTL, xml.as_bytes(), Storage::Plain);
+    let complete = Fixture::new([material()])?;
+    let (_, record) = complete.record(MTL)?;
+    let links = record
+        .pointer(LINKS)
+        .and_then(Value::as_array)
+        .ok_or("complete shader links")?;
+    assert_eq!(
+        links.len(),
+        2,
+        "the selected list contributes one shader and flag"
+    );
+    for (link, token) in links.iter().zip(["Actual", "%A"]) {
+        assert_eq!(
+            link.get("material").and_then(Value::as_u64),
+            Some(1),
+            "the unknown slot keeps its original position"
+        );
+        assert_eq!(
+            link.pointer("/reference/original/value")
+                .and_then(Value::as_str),
+            Some(token),
+            "shader links follow the selected original list"
+        );
+    }
+
+    let mut limits = MaterialSourceLimits::default();
+    limits.text_bytes = 2048;
+    let partial = Fixture::with([material()], support::options(), limits)?;
+    let (_, record) = partial.record(MTL)?;
+    assert_partial_submaterials(record);
+    Ok(())
+}
+
+fn assert_partial_submaterials(record: &Value) {
+    assert_eq!(
+        record
+            .pointer("/data/payload/authored/losses/0/kind")
+            .and_then(Value::as_str),
+        Some("text-bytes"),
+        "the selected list exceeds the capture budget"
+    );
+    assert_eq!(
+        record
+            .pointer("/data/payload/authored/root/children/0/syntax/ordinal")
+            .and_then(Value::as_u64),
+        Some(1),
+        "the later list remains in the partial authored tree"
+    );
+    assert_eq!(
+        record
+            .pointer("/data/payload/materials/1/interpreted_surface/shader")
+            .and_then(Value::as_str),
+        Some("Actual"),
+        "the typed parser still selects the original list"
+    );
+    assert!(
+        record
+            .pointer(LINKS)
+            .and_then(Value::as_array)
+            .is_some_and(Vec::is_empty),
+        "the later list cannot supply shader links for the omitted original"
+    );
 }
 
 #[test]

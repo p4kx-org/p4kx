@@ -154,7 +154,7 @@ fn append(
         submaterial: declaration.submaterial.map(str::to_owned),
         reference: resolution.reference,
     };
-    let mut prepared = crate::material_parts_origins::prepared(context, writer)?;
+    let mut prepared = writer.record_origins();
     crate::material_reference_origins::write(
         &crate::material_parts_origins::payload()?,
         &reference,

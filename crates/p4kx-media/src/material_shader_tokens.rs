@@ -5,19 +5,27 @@ use p4kx_extraction::model::{
     AuthoredAttribute, AuthoredAttributeKind, MaterialLibrary, RawElement,
 };
 
-pub(crate) fn node(library: &MaterialLibrary, index: usize) -> Option<&RawElement> {
-    let root = library.authored.root.as_ref()?;
-    if library.single {
-        return (index == 0).then_some(root);
+pub(crate) fn selected_submaterials<Interrupted>(
+    library: &MaterialLibrary,
+    mut checkpoint: impl FnMut() -> Result<(), Interrupted>,
+) -> Result<&[RawElement], Interrupted> {
+    let Some((root, ordinal)) = library
+        .authored
+        .root
+        .as_ref()
+        .zip(library.authored.submaterial_list_ordinal)
+    else {
+        return Ok(&[]);
+    };
+    for child in &root.children {
+        checkpoint()?;
+        if child.authored.ordinal == Some(ordinal)
+            && child.name.eq_ignore_ascii_case("SubMaterials")
+        {
+            return Ok(&child.children);
+        }
     }
-    root.children
-        .iter()
-        .find(|child| child.name.eq_ignore_ascii_case("SubMaterials"))?
-        .children
-        .iter()
-        .find(|child| {
-            child.authored.ordinal == Some(index) && child.name.eq_ignore_ascii_case("Material")
-        })
+    Ok(&[])
 }
 
 pub(crate) fn attributes<'a>(
