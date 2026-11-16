@@ -8,11 +8,13 @@ use crate::blueprint_catalog_rows::{self, BlueprintTables};
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_output::Written;
 use crate::catalog_projections::weapon_reload::{self, WeaponAnimation};
+use crate::catalog_read::original::EntryCapture;
 use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::catalog_item_components::item_definition::ItemDefinition;
 use crate::catalog_v3::faction_identity_definition::{
     self, FactionIdentityDefinition, PreparedFactionIdentity,
 };
+use crate::client_profile_settings::{self, ClientProfileSettings};
 use crate::collected::Collected;
 use crate::options::{CatalogRun, CatalogStage};
 use crate::starmap_report::StarmapReport;
@@ -113,6 +115,25 @@ pub(super) fn capture_weapon_animation<'source>(
         options.cancel,
         &mut collected.ledger,
     )
+}
+
+pub(super) fn client_profiles(
+    archive: &Archive,
+    capture: &EntryCapture<'_>,
+    collected: &mut Collected<'_>,
+    run: CatalogRun<'_, '_>,
+) -> Result<ClientProfileSettings, crate::CatalogError> {
+    run.begin(CatalogStage::ProjectConfigurations);
+    let options = run.options;
+    let settings = client_profile_settings::read(
+        archive,
+        capture,
+        options.filter,
+        options.cancel,
+        &mut collected.ledger,
+    )?;
+    collected.client_profile_count = settings.decoded_documents();
+    Ok(settings)
 }
 
 pub(super) fn capture_rows(

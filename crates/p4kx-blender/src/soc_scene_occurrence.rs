@@ -1,17 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::BTreeMap;
-
 use p4kx_assembly::{
-    SocChildInput, SocChildState, SocContainerOccurrence, SocEntityIndex, SocMemberSelection,
-    SocMemberSelector, SocStreamInput,
+    SocChildInput, SocChildState, SocContainerOccurrence, SocMemberSelection, SocMemberSelector,
 };
 use p4kx_extraction::{
     CancelToken, EntryOrigin, InputScope, PhysicalSourceRef, SourceInput, SourceUses, SourceValue,
     SourcedValue,
 };
-use p4kx_model::{SocContainerDescriptor, SocEntityFile, SocRoomRegistry};
+use p4kx_model::{SocContainerDescriptor, SocRoomRegistry};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -26,6 +23,9 @@ use crate::soc_scene_xml::XmlDocuments;
 
 #[path = "soc_scene_room_companions.rs"]
 mod room_companions;
+
+#[path = "soc_scene_stream_index.rs"]
+mod stream_index;
 
 use room_companions::RoomCompanions;
 
@@ -135,7 +135,7 @@ fn read_streams(
     classes: &Classes,
     cancel: &CancelToken,
 ) -> Result<OccurrenceInputs, SocSceneError> {
-    let (index, admitted, complete) = index_streams(&occurrence.streams, cancel)?;
+    let (index, admitted, complete) = stream_index::read(&occurrence.streams, cancel)?;
     let room_index = room.map(|(registry, origin)| {
         (
             p4kx_assembly::SocRoomIndex::new(registry),
@@ -177,56 +177,6 @@ fn read_streams(
         streams,
         room_companions,
     })
-}
-
-fn index_streams<'a>(
-    declarations: &'a [SocStreamInput],
-    cancel: &CancelToken,
-) -> Result<(SocEntityIndex, BTreeMap<usize, &'a EntryOrigin>, bool), SocSceneError> {
-    let mut by_member = BTreeMap::new();
-    let mut complete = true;
-    for declaration in declarations {
-        if cancel.is_cancelled() {
-            return Err(SocSceneError::Cancelled);
-        }
-        let Some(member) = declaration
-            .member
-            .as_ref()
-            .and_then(SocMemberSelection::selected)
-        else {
-            complete = false;
-            continue;
-        };
-        let physical_index = member.origin().entry().index();
-        by_member.entry(physical_index).or_insert_with(|| {
-            member
-                .payload()
-                .ok()
-                .and_then(|bytes| SocEntityFile::parse(bytes).ok())
-                .map(|file| (member.origin(), file))
-        });
-    }
-    let mut index = SocEntityIndex::new();
-    let mut admitted = BTreeMap::new();
-    for (stream, parsed) in &by_member {
-        let Some((origin, file)) = parsed else {
-            complete = false;
-            continue;
-        };
-        for chunk in file.entity_chunks() {
-            if cancel.is_cancelled() {
-                return Err(SocSceneError::Cancelled);
-            }
-            let Ok(chunk) = chunk else {
-                complete = false;
-                continue;
-            };
-            complete &= !chunk.document().is_lossy();
-            index.add_chunk(*stream, &chunk);
-        }
-        admitted.insert(*stream, *origin);
-    }
-    Ok((index, admitted, complete))
 }
 
 #[derive(Debug, Serialize, JsonSchema)]

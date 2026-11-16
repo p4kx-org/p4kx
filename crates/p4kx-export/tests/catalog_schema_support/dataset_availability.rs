@@ -5,7 +5,7 @@ use serde_json::{Value, json};
 
 use super::absent_table;
 
-pub(super) fn add_empty_definitions(catalog: &mut Value) {
+fn add_empty_definitions(catalog: &mut Value) {
     for kind in [
         "factionIdentities",
         "securityNetworkManifests",
@@ -34,6 +34,33 @@ pub(super) fn add_empty_definitions(catalog: &mut Value) {
             if let Some(object) = catalog.get_mut(section).and_then(Value::as_object_mut) {
                 object.insert(kind.to_owned(), value);
             }
+        }
+    }
+}
+
+pub(super) fn add_defaults(catalog: &mut Value) {
+    if let Some(completeness) = catalog
+        .get_mut("completeness")
+        .and_then(Value::as_object_mut)
+    {
+        for name in ["cargoLoadingGlobals", "shopCommodityGlobals"] {
+            completeness.insert(name.to_owned(), json!({"status": "complete"}));
+        }
+    }
+    add_empty_definitions(catalog);
+    if let Some(configurations) = catalog
+        .get_mut("configurations")
+        .and_then(Value::as_object_mut)
+    {
+        for name in [
+            "radarOptions",
+            "flightControllers",
+            "ifcs",
+            "thrusters",
+            "cargoLoadingGlobals",
+            "shopCommodityGlobals",
+        ] {
+            configurations.insert(name.to_owned(), absent_table());
         }
     }
 }

@@ -374,4 +374,5 @@ fn contains(haystack: &[u8], needle: &[u8]) -> bool {
 }
 
 #[cfg(test)]
+#[path = "shop_soc/tests.rs"]
 mod tests;

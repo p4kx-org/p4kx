@@ -108,6 +108,7 @@ mod catalog_reference_health;
 mod catalog_reference_texts;
 mod catalog_row;
 mod catalog_rows;
+mod catalog_shop_modules;
 mod catalog_target_index;
 mod catalog_template_modules;
 mod catalog_v3;
@@ -300,25 +301,16 @@ mod ship;
 mod ship_base;
 mod ship_pool;
 mod ship_store_slugs;
-mod shop_container_scan;
-mod shop_containers;
-mod shop_entry_read;
-mod shop_inventories;
-mod shop_inventory_compatibility;
-mod shop_inventory_fields;
-mod shop_inventory_file;
-mod shop_inventory_observations;
-mod shop_inventory_resolution;
-mod shop_inventory_source;
-mod shop_inventory_source_read;
-mod shop_links;
 #[cfg(test)]
 mod shop_observation_tests;
-mod shop_prefabs;
-mod shop_registry;
-mod shop_soc;
-mod shop_summary;
 mod shops;
+pub(crate) use catalog_shop_modules::{
+    shop_container_scan, shop_container_xml, shop_containers, shop_entry_read, shop_inventories,
+    shop_inventory_compatibility, shop_inventory_fields, shop_inventory_file, shop_inventory_name,
+    shop_inventory_observations, shop_inventory_path, shop_inventory_resolution,
+    shop_inventory_source, shop_inventory_source_read, shop_links, shop_prefabs, shop_registry,
+    shop_soc, shop_summary,
+};
 mod soc_preset;
 mod source_fields;
 mod source_pointer;
@@ -401,7 +393,3 @@ pub(crate) use catalog_v3::{
 
 pub use export_health_api::*;
 pub use public_api::*;
-
-mod shop_container_xml;
-mod shop_inventory_name;
-mod shop_inventory_path;

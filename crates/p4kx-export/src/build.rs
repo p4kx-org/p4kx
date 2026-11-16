@@ -104,15 +104,8 @@ fn assemble<R>(
         &input,
         options.cancel,
     )?);
-    run.begin(CatalogStage::ProjectConfigurations);
-    let client_profile_settings = crate::client_profile_settings::read(
-        archive,
-        &entry_capture,
-        options.filter,
-        options.cancel,
-        &mut collected.ledger,
-    )?;
-    collected.client_profile_count = client_profile_settings.decoded_documents();
+    let client_profile_settings =
+        parts::client_profiles(archive, &entry_capture, &mut collected, run)?;
     run.begin(CatalogStage::ProjectShops);
     let shop_summary = add_shops(archive, &files, &mut collected, options, &entry_capture)?;
     run.begin(CatalogStage::ResolveJumpOperators);

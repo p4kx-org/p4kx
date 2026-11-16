@@ -16,7 +16,7 @@ pub(crate) struct InventoryStem {
 }
 
 impl InventoryStem {
-    pub(super) fn captured(
+    pub(crate) fn captured(
         capture: &EntryCapture<'_>,
         token: &AuthoredEntryPath,
         value: String,

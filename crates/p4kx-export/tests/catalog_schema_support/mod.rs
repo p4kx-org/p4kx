@@ -374,30 +374,7 @@ pub(crate) fn minimal_catalog() -> Value {
         "cargoManifests": contracts::manifests(),
         "shipStoreSlugs": slugs::ship_store_slugs()
     });
-    if let Some(completeness) = catalog
-        .get_mut("completeness")
-        .and_then(Value::as_object_mut)
-    {
-        for name in ["cargoLoadingGlobals", "shopCommodityGlobals"] {
-            completeness.insert(name.to_owned(), json!({"status": "complete"}));
-        }
-    }
-    dataset_availability::add_empty_definitions(&mut catalog);
-    if let Some(configurations) = catalog
-        .get_mut("configurations")
-        .and_then(Value::as_object_mut)
-    {
-        for name in [
-            "radarOptions",
-            "flightControllers",
-            "ifcs",
-            "thrusters",
-            "cargoLoadingGlobals",
-            "shopCommodityGlobals",
-        ] {
-            configurations.insert(name.to_owned(), absent_table());
-        }
-    }
+    dataset_availability::add_defaults(&mut catalog);
     loot::add_definition_tables(&mut catalog);
     let export_health = health::fixture(&catalog);
     let Value::Object(fields) = &mut catalog else {
