@@ -5,7 +5,6 @@ use std::collections::HashSet;
 
 use p4kx_audio::{HircKind, HircObject, HircValue, SoundSource};
 
-use super::hirc_diagnostic_sites::DiagnosticSite;
 use super::hirc_path_source::{HircInboundSource, PathSourceMode};
 use super::locate::locate;
 use super::music_clip_features::MusicClipFeatures;
@@ -19,6 +18,8 @@ use super::{SoundVariant, WwiseEvent};
 mod children;
 #[path = "walk_cursor.rs"]
 mod cursor;
+#[path = "walk_evidence.rs"]
+mod evidence;
 
 use self::children::FollowedEdge;
 use self::cursor::{Visit, WalkCursor};
@@ -61,6 +62,15 @@ struct Target {
     wanted: Option<HircKind>,
     via: Via,
     inbound: Option<FollowedEdge>,
+}
+
+impl Target {
+    const fn named_bank(self) -> Option<u32> {
+        match self.via {
+            Via::Bank(id) => Some(id),
+            Via::Local | Via::PlayEvent | Via::At(_) => None,
+        }
+    }
 }
 
 #[derive(PartialEq, Eq, Hash)]
@@ -124,7 +134,10 @@ impl<'i> Walk<'_, 'i> {
                     work.spend()?;
                     self.sound(source, ordinal, features);
                 }
-                Some(Visit::Break(reason)) => self.broke(reason),
+                Some(Visit::Break(reason, edge)) => {
+                    let failed_edge = edge.and_then(|edge| self.inbound_source(edge, None));
+                    self.broke_in(None, reason, failed_edge);
+                }
                 None => self.leave(),
             }
         }
@@ -139,9 +152,10 @@ impl<'i> Walk<'_, 'i> {
             Via::At(position) => position == from,
             Via::Local | Via::Bank(_) | Via::PlayEvent => true,
         };
-        let owner = if in_current && find_object(&current.bank, target.id, target.wanted).is_some()
+        let (owner, bank_id) = if in_current
+            && find_object(&current.bank, target.id, target.wanted).is_some()
         {
-            current.clone()
+            (current.clone(), None)
         } else {
             match self.banks.enter(
                 from,
@@ -149,24 +163,30 @@ impl<'i> Walk<'_, 'i> {
                 target.via,
                 self.path.iter().map(|frame| &frame.owner),
             ) {
-                Ok(owner) => owner,
+                Ok(owner) => (owner, target.named_bank()),
                 Err(refused) => {
-                    self.broke_in(refused.bank, refused.reason);
+                    self.broke_target(refused.bank, refused.reason, target, target.named_bank());
                     return Ok(());
                 }
             }
         };
-        self.enter(owner, target, work)
+        self.enter(owner, target, bank_id, work)
     }
 
     fn enter(
         &mut self,
         owner: Loaded<'i>,
         target: Target,
+        bank_id: Option<u32>,
         work: &ResolveWork<'_>,
     ) -> Result<(), WorkStop> {
         let Some(object) = find_object(&owner.bank, target.id, target.wanted) else {
-            self.broke(BreakReason::Missing { id: target.id });
+            self.broke_target(
+                None,
+                BreakReason::Missing { id: target.id },
+                target,
+                bank_id,
+            );
             return Ok(());
         };
         #[cfg(test)]
@@ -176,23 +196,14 @@ impl<'i> Walk<'_, 'i> {
             position: owner.position,
             id: target.id,
         }) {
-            self.broke(BreakReason::Cycle { id: target.id });
+            self.broke_target(None, BreakReason::Cycle { id: target.id }, target, bank_id);
             return Ok(());
         }
 
         let stinger = target
             .inbound
             .and_then(|edge| edge.stinger_scheduling(&owner, target.id));
-        let source = match self.path_sources {
-            PathSourceMode::Omit => None,
-            PathSourceMode::Retain => Some(HircPathSource::of(
-                self.banks.archive(),
-                &owner,
-                object,
-                self.inbound_source(target, owner.position),
-                stinger.and_then(|(owner, row)| DiagnosticSite::stinger(owner, row)),
-            )),
-        };
+        let source = self.path_source(&owner, object, target.inbound, bank_id, stinger);
         let cursor = WalkCursor::new(
             object,
             owner.bank.header().version,
@@ -231,21 +242,6 @@ impl<'i> Walk<'_, 'i> {
             .map_or(&self.banks.home, |frame| &frame.owner)
     }
 
-    fn inbound_source(&self, target: Target, position: u32) -> Option<HircInboundSource> {
-        let parent = self.path.last()?;
-        let bank_id = match target.via {
-            Via::Bank(id) if position != parent.owner.position => Some(id),
-            _ => None,
-        };
-        target.inbound?.source(
-            self.banks.archive(),
-            &parent.owner,
-            parent.object()?,
-            parent.source.as_ref(),
-            bank_id,
-        )
-    }
-
     fn playback_features(&self) -> PlaybackFeatures {
         self.path
             .last()
@@ -267,6 +263,12 @@ impl<'i> Walk<'_, 'i> {
     ) {
         let bank = self.current().soundbank;
         let located = locate(self.banks.index, bank, self.banks.choice, &source);
+        let location_source = match self.path_sources {
+            PathSourceMode::Omit => None,
+            PathSourceMode::Retain => located
+                .source(self.banks.index, self.banks.archive())
+                .map(Box::new),
+        };
         if located.missing_localisation {
             self.broke(self.banks.choice.no_localisation());
         }
@@ -282,6 +284,7 @@ impl<'i> Walk<'_, 'i> {
             source,
             source_ordinal,
             location: located.location,
+            location_source,
             selection: located.selection,
             localised: located.localised,
             language: located.language,
@@ -306,16 +309,39 @@ impl<'i> Walk<'_, 'i> {
     }
 
     fn broke(&mut self, reason: BreakReason) {
-        self.broke_in(None, reason);
+        self.broke_in(None, reason, None);
     }
 
-    fn broke_in(&mut self, soundbank: Option<&'i IndexedSoundbank>, reason: BreakReason) {
+    fn broke_target(
+        &mut self,
+        soundbank: Option<&'i IndexedSoundbank>,
+        reason: BreakReason,
+        target: Target,
+        bank_id: Option<u32>,
+    ) {
+        let edge = target
+            .inbound
+            .and_then(|edge| self.inbound_source(edge, bank_id));
+        self.broke_in(soundbank, reason, edge);
+    }
+
+    fn broke_in(
+        &mut self,
+        soundbank: Option<&'i IndexedSoundbank>,
+        reason: BreakReason,
+        failed_edge: Option<HircInboundSource>,
+    ) {
         let soundbank = soundbank.unwrap_or_else(|| self.current().soundbank);
+        let bank_source = self
+            .path_sources
+            .entry_binding(self.banks.archive(), soundbank.entry_position());
         self.found.breaks.push(BrokenLink {
             event: self.event,
             soundbank: Some(soundbank),
+            bank_source,
             path: self.public_path(),
             path_sources: self.path_sources(),
+            failed_edge,
             reason,
         });
     }

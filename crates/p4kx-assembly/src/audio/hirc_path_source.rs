@@ -15,16 +15,24 @@ use super::txtp::TxtpApproximation;
 
 use super::walk_banks::Loaded;
 
+#[path = "hirc_path_origins.rs"]
+mod origins;
+
+pub use self::origins::HircPathOrigins;
+
 /// The original bank and bank-relative byte spans of one resolved HIRC object.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HircPathSource {
     entry_position: usize,
+    binding: Option<ObservedEntryBinding>,
     object: Range<usize>,
     id: Range<usize>,
+    kind_code: Range<usize>,
+    kind_evidence: NodeKindEvidence,
     version: Option<Range<usize>>,
-    diagnostics: Option<Arc<BoundDiagnosticSites>>,
+    diagnostics: Option<Arc<[DiagnosticSite]>>,
     child_owner: Option<Arc<HircChildOwner>>,
-    inbound: Option<HircInboundSource>,
+    inbound: HircArrival,
     pub(super) terminal: Option<Arc<TerminalSourceTable>>,
 }
 
@@ -33,25 +41,29 @@ impl HircPathSource {
         archive: &Archive,
         owner: &Loaded<'_>,
         object: &HircObject,
-        inbound: Option<HircInboundSource>,
+        inbound: HircArrival,
         inbound_diagnostic: Option<DiagnosticSite>,
     ) -> Self {
         let entry_position = owner.soundbank.entry_position();
+        let binding = bind_entry(archive, entry_position);
         let version = owner.bank.version_byte_range();
-        let child_owner =
-            HircChildOwner::of(archive, entry_position, object, version.as_ref()).map(Arc::new);
+        let child_owner = binding
+            .as_ref()
+            .and_then(|binding| {
+                HircChildOwner::of(binding, entry_position, object, version.as_ref())
+            })
+            .map(Arc::new);
+        let mut diagnostics = hirc_diagnostic_sites::checked_sites(&object.value);
+        diagnostics.extend(inbound_diagnostic);
         Self {
             entry_position,
+            binding,
             object: object.byte_range(),
             id: object.id_byte_range(),
+            kind_code: object.kind_byte_range(),
+            kind_evidence: NodeKindEvidence::of(&object.value),
             version,
-            diagnostics: BoundDiagnosticSites::of(
-                archive,
-                entry_position,
-                &object.value,
-                inbound_diagnostic,
-            )
-            .map(Arc::new),
+            diagnostics: (!diagnostics.is_empty()).then(|| diagnostics.into()),
             child_owner,
             inbound,
             terminal: TerminalSourceTable::capture(archive, owner, object).map(Arc::new),
@@ -60,14 +72,16 @@ impl HircPathSource {
 
     pub(super) const fn inbound_child(&self) -> Option<&HircChildSource> {
         match &self.inbound {
-            Some(HircInboundSource::Child(child)) => Some(child),
+            HircArrival::Link(Some(HircInboundSource::Child(child))) => Some(child),
             _ => None,
         }
     }
 
     pub(super) fn inbound_route(&self) -> Option<&HircRouteSource> {
         match &self.inbound {
-            Some(HircInboundSource::Route(route)) => Some(route),
+            HircArrival::Link(Some(
+                HircInboundSource::Route(route) | HircInboundSource::Stinger { action: route, .. },
+            )) => Some(route),
             _ => None,
         }
     }
@@ -93,16 +107,19 @@ impl HircPathSource {
         approximation: TxtpApproximation,
     ) -> Option<&DiagnosticSite> {
         self.diagnostics
-            .as_ref()?
-            .sites
+            .as_deref()?
             .iter()
             .find(|site| site.approximation == approximation)
     }
 
-    pub(super) fn diagnostic_entry<'a>(&self, archive: &'a Archive) -> Option<ObservedEntry<'a>> {
-        let sites = self.diagnostics.as_ref()?;
+    /// Returns the exact observed soundbank Entry that held this object.
+    #[must_use]
+    pub fn entry<'a>(&self, archive: &'a Archive) -> Option<ObservedEntry<'a>> {
         let entry = archive.observed_entry(archive.entries().get(self.entry_position)?)?;
-        sites.owner.is_same_entry(&entry.binding()).then_some(entry)
+        self.binding
+            .as_ref()?
+            .is_same_entry(&entry.binding())
+            .then_some(entry)
     }
 
     /// Returns the bank's physical Entry position in the Archive.
@@ -134,32 +151,47 @@ impl HircPathSource {
 pub(super) enum HircInboundSource {
     Child(HircChildSource),
     Route(Arc<HircRouteSource>),
+    Stinger {
+        action: Arc<HircRouteSource>,
+        schedule: Option<Arc<HircRouteSource>>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct BoundDiagnosticSites {
-    owner: ObservedEntryBinding,
-    sites: Vec<DiagnosticSite>,
+pub(super) enum HircArrival {
+    Start,
+    Link(Option<HircInboundSource>),
 }
 
-impl BoundDiagnosticSites {
-    fn of(
-        archive: &Archive,
-        entry_position: usize,
-        value: &HircValue,
-        inbound_diagnostic: Option<DiagnosticSite>,
-    ) -> Option<Self> {
-        let mut sites = hirc_diagnostic_sites::checked_sites(value);
-        sites.extend(inbound_diagnostic);
-        if sites.is_empty() {
-            return None;
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum NodeKindEvidence {
+    TypeCode,
+    RandomSequence(Option<Range<u64>>),
+}
+
+impl NodeKindEvidence {
+    fn of(value: &HircValue) -> Self {
+        match value {
+            HircValue::Container(container)
+                if matches!(
+                    container.kind,
+                    ContainerKind::Random | ContainerKind::Sequence
+                ) =>
+            {
+                Self::RandomSequence(
+                    container
+                        .random_sequence_mode_evidence()
+                        .map(|word| word.range.clone()),
+                )
+            }
+            _ => Self::TypeCode,
         }
-        let source = archive.observed_entry(archive.entries().get(entry_position)?)?;
-        Some(Self {
-            owner: source.binding(),
-            sites,
-        })
     }
+}
+
+pub(super) fn bind_entry(archive: &Archive, entry_position: usize) -> Option<ObservedEntryBinding> {
+    let entry = archive.entries().get(entry_position)?;
+    Some(archive.observed_entry(entry)?.binding())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -175,7 +207,7 @@ pub(super) struct HircChildOwner {
 
 impl HircChildOwner {
     fn of(
-        archive: &Archive,
+        binding: &ObservedEntryBinding,
         entry_position: usize,
         object: &HircObject,
         version: Option<&Range<usize>>,
@@ -196,10 +228,9 @@ impl HircChildOwner {
             HircValue::MusicPlaylist(playlist) => (playlist.node.child_count_evidence()?, None),
             _ => return None,
         };
-        let source = archive.observed_entry(archive.entries().get(entry_position)?)?;
         let kind = object.kind_byte_range();
         Some(Self {
-            binding: source.binding(),
+            binding: binding.clone(),
             entry_position,
             kind: object.kind,
             kind_bytes: kind.start as u64..kind.end as u64,
@@ -293,4 +324,17 @@ impl HircChildFields {
 pub(super) enum PathSourceMode {
     Omit,
     Retain,
+}
+
+impl PathSourceMode {
+    pub(super) fn entry_binding(
+        self,
+        archive: &Archive,
+        position: usize,
+    ) -> Option<ObservedEntryBinding> {
+        match self {
+            Self::Omit => None,
+            Self::Retain => bind_entry(archive, position),
+        }
+    }
 }

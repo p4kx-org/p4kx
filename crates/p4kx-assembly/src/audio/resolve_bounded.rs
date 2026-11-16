@@ -8,8 +8,7 @@ use super::resolve_options::{ResolveWork, WorkStop};
 use super::walk;
 use super::walk_banks::{self, Banks, Loaded, Spare};
 use super::{
-    AudioFileError, AudioIndex, BreakReason, BrokenLink, IndexedSoundbank, LanguageChoice,
-    ResolveOptions, TriggerSounds, WwiseEvent,
+    AudioFileError, AudioIndex, BreakReason, LanguageChoice, ResolveOptions, TriggerSounds,
 };
 
 struct CachedHome<'i> {
@@ -65,8 +64,13 @@ pub(super) fn walk<'i>(
             };
             if let Err(stop) = work.admit() {
                 if let WorkStop::Budget { limit } = stop {
-                    let reason = BreakReason::TooManyObjects { limit };
-                    sounds.breaks.push(event_break(event, bank, reason));
+                    sounds.breaks.push(resolve::event_break(
+                        archive,
+                        event,
+                        bank,
+                        BreakReason::TooManyObjects { limit },
+                        options.path_sources,
+                    ));
                 }
                 return;
             }
@@ -85,25 +89,16 @@ pub(super) fn walk<'i>(
                     if work.spend().is_err() {
                         return;
                     }
-                    let reason = BreakReason::Unreadable(error.clone());
-                    sounds.breaks.push(event_break(event, bank, reason));
+                    sounds.breaks.push(resolve::event_break(
+                        archive,
+                        event,
+                        bank,
+                        BreakReason::Unreadable(error.clone()),
+                        options.path_sources,
+                    ));
                 }
             }
             cached = Some(home);
         }
-    }
-}
-
-fn event_break<'i>(
-    event: &'i WwiseEvent,
-    bank: &'i IndexedSoundbank,
-    reason: BreakReason,
-) -> BrokenLink<'i> {
-    BrokenLink {
-        event,
-        soundbank: Some(bank),
-        path: resolve::event_path(event),
-        path_sources: Box::default(),
-        reason,
     }
 }

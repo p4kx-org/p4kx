@@ -4,8 +4,9 @@
 use std::ops::Range;
 
 use p4kx_archive::{Archive, ObservedEntry, ObservedEntryBinding};
-use p4kx_audio::{BankPlayBankDecision, HircObject};
+use p4kx_audio::{BankMusicStinger, BankPlayBankDecision, HircObject};
 
+use super::hirc_path_source::bind_entry;
 use super::walk_banks::Loaded;
 
 const EVENT: &str = "bnkHircEvent";
@@ -86,11 +87,37 @@ impl HircRouteSource {
         Self::bound(archive, owner, words)
     }
 
+    pub(super) fn stinger(
+        archive: &Archive,
+        owner: &Loaded<'_>,
+        object: &HircObject,
+        row: &BankMusicStinger,
+        ordinal: usize,
+    ) -> Option<Self> {
+        const MUSIC_NODE: &str = "bnkHircMusicNode";
+        let id = object.id_byte_range();
+        let words = Box::new([
+            HircRouteWord::selector("bnkHircObject", "id", id.start as u64..id.end as u64),
+            HircRouteWord {
+                namespace: MUSIC_NODE,
+                field: "musicStingerScheduleTriggerId",
+                bytes: row.trigger_id.range.clone(),
+                ordinal: Some(ordinal),
+            },
+            HircRouteWord {
+                namespace: MUSIC_NODE,
+                field: "musicStingerScheduleSegmentId",
+                bytes: row.segment_id.range.clone(),
+                ordinal: Some(ordinal),
+            },
+        ]);
+        Self::bound(archive, owner, words)
+    }
+
     fn bound(archive: &Archive, owner: &Loaded<'_>, words: Box<[HircRouteWord]>) -> Option<Self> {
         let entry_position = owner.soundbank.entry_position();
-        let source = archive.observed_entry(archive.entries().get(entry_position)?)?;
         Some(Self {
-            binding: source.binding(),
+            binding: bind_entry(archive, entry_position)?,
             entry_position,
             version: owner.bank.version_byte_range(),
             words,

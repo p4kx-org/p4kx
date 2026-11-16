@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_archive::{Archive, ArchiveInputOrigin, Entry, ObservedEntry};
+use p4kx_archive::{Archive, ArchiveInputOrigin, Entry, ObservedEntry, ObservedEntryBinding};
 
 use super::{AudioFileError, AudioIndex};
 
@@ -130,9 +130,15 @@ impl Candidate {
     }
 }
 
+#[derive(Debug)]
+enum IndexOwner {
+    Root(ArchiveInputOrigin),
+    Container(ObservedEntryBinding),
+}
+
 #[derive(Debug, Default)]
 pub(super) struct AudioSurveys {
-    owner: Option<ArchiveInputOrigin>,
+    owner: Option<IndexOwner>,
     directory_complete: bool,
     pub(super) soundbanks: Vec<Candidate>,
 }
@@ -140,9 +146,7 @@ pub(super) struct AudioSurveys {
 impl AudioSurveys {
     pub(super) fn new(archive: &Archive) -> Self {
         Self {
-            owner: archive
-                .root_directory_entry_count()
-                .map(|_| archive.input_origin().clone()),
+            owner: IndexOwner::of(archive),
             directory_complete: !archive
                 .issues()
                 .iter()
@@ -152,7 +156,49 @@ impl AudioSurveys {
     }
 }
 
+impl IndexOwner {
+    fn of(archive: &Archive) -> Option<Self> {
+        if archive.root_directory_entry_count().is_some() {
+            return Some(Self::Root(archive.input_origin().clone()));
+        }
+        let first = archive.observed_entry(archive.entries().first()?)?;
+        Some(Self::Container(first.binding()))
+    }
+
+    fn owns_root(&self, archive: &Archive) -> bool {
+        let Self::Root(input) = self else {
+            return false;
+        };
+        archive.root_directory_entry_count().is_some()
+            && input.is_same_input(archive.input_origin())
+    }
+}
+
 impl AudioIndex {
+    pub(super) fn indexed_entry<'archive>(
+        &self,
+        archive: &'archive Archive,
+        position: usize,
+    ) -> Option<ObservedEntry<'archive>> {
+        let entry = archive.observed_entry(archive.entries().get(position)?)?;
+        let owner = self.surveys.owner.as_ref()?;
+        let matches_view = match owner {
+            IndexOwner::Root(_) => owner.owns_root(archive),
+            IndexOwner::Container(anchor) => anchor.is_same_view(&entry.binding()),
+        };
+        matches_view.then_some(entry)
+    }
+
+    /// Returns the original Entry supplying the indexed spelling of a language folder.
+    #[must_use]
+    pub fn language_source<'archive>(
+        &self,
+        archive: &'archive Archive,
+        name: &str,
+    ) -> Option<ObservedEntry<'archive>> {
+        self.indexed_entry(archive, self.language_entry_position(name)?)
+    }
+
     /// Returns the index's actual survey when supplied its original root Archive.
     #[must_use]
     pub fn survey<'index, 'archive>(
@@ -160,13 +206,7 @@ impl AudioIndex {
         archive: &'archive Archive,
         kind: AudioSurveyKind,
     ) -> Option<AudioSurvey<'index, 'archive>> {
-        archive.root_directory_entry_count()?;
-        if !self
-            .surveys
-            .owner
-            .as_ref()?
-            .is_same_input(archive.input_origin())
-        {
+        if !self.surveys.owner.as_ref()?.owns_root(archive) {
             return None;
         }
         let candidates = match kind {

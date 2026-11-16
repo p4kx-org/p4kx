@@ -6,14 +6,14 @@ use std::ops::Range;
 
 use p4kx_extraction::{
     Archive, DecimalU64, FieldOrigin, FieldOrigins, FieldPath, InputScope, OriginArtifactBinding,
-    OriginOutputAddress, SourceInput, SourceInventory, SourceUseRole, SourceUses,
+    OriginOutputAddress, SourceInput, SourceInventory, SourceUses,
 };
 
 use crate::audio::ExportLoopOrigin;
+use crate::audio::hirc_path_uses::{self, source_use};
 
 use super::diagnostic::{DiagnosticSource, TxtpDiagnostic};
 use super::loop_origin;
-use super::path_origin::{self, offset, source_use};
 use super::render::RenderedLoop;
 use super::selection::SelectionDiagnostic;
 use super::wem_origin;
@@ -106,8 +106,8 @@ fn add_field(
         .insert(path.clone(), origin.clone())
         .map_err(io::Error::other)?;
     let address = OriginOutputAddress::TextBytes {
-        start: DecimalU64::new(offset(bytes.start)?),
-        end_exclusive: DecimalU64::new(offset(bytes.end)?),
+        start: DecimalU64::new(u64::try_from(bytes.start).map_err(io::Error::other)?),
+        end_exclusive: DecimalU64::new(u64::try_from(bytes.end).map_err(io::Error::other)?),
         field: path,
     };
     addresses.push((address, origin));
@@ -128,7 +128,7 @@ fn diagnostic_origin(
             return selection_origin(archive, sources, selection);
         }
     };
-    let Some(entry) = source.diagnostic_entry(archive) else {
+    let Some(entry) = source.entry(archive) else {
         return Ok(sources.origin(&[], false));
     };
     let Some(site) = source.diagnostic_site(diagnostic.approximation) else {
@@ -141,27 +141,20 @@ fn diagnostic_origin(
         .map_err(io::Error::other)?;
     let mut actual = Vec::new();
     for word in site.words() {
-        actual.push(source_use(
-            &scope,
-            word.namespace,
-            word.field,
-            word.bytes.clone(),
-            word.role,
-        )?);
+        actual.push(
+            source_use(
+                &scope,
+                word.namespace,
+                word.field,
+                word.bytes.clone(),
+                word.role,
+            )
+            .map_err(io::Error::other)?,
+        );
     }
-    let version = source.version_bytes();
-    let complete = complete_ancestry && version.is_some();
-    if let Some(range) = version {
-        let range = offset(range.start)?..offset(range.end)?;
-        actual.push(source_use(
-            &scope,
-            "bnkBkhd",
-            "version",
-            range,
-            SourceUseRole::Selector,
-        )?);
-    }
-    Ok(sources.origin(&actual, complete))
+    let version = hirc_path_uses::version_use(&scope, source.version_bytes(), &mut actual)
+        .map_err(io::Error::other)?;
+    Ok(sources.origin(&actual, complete_ancestry && version))
 }
 
 fn selection_origin(
@@ -170,9 +163,10 @@ fn selection_origin(
     selection: &SelectionDiagnostic<'_>,
 ) -> io::Result<FieldOrigin> {
     let mut actual = Vec::new();
-    path_origin::children(archive, sources, &selection.children, &mut actual)?;
+    hirc_path_uses::children(archive, sources, &selection.children, &mut actual)
+        .map_err(io::Error::other)?;
     for route in &selection.routes {
-        path_origin::route(archive, sources, route, &mut actual)?;
+        hirc_path_uses::route(archive, sources, route, &mut actual).map_err(io::Error::other)?;
     }
     for media in selection
         .commands

@@ -17,6 +17,7 @@ pub struct IndexedSoundbank {
     language_id: u32,
     event_count: u32,
     pub(crate) entry: usize,
+    pub(super) media_data_body: Option<u64>,
 }
 
 impl IndexedSoundbank {
@@ -115,8 +116,9 @@ pub(crate) fn read(path: &str, entry: usize, bytes: &[u8]) -> Result<BankContent
         .filter(|(_, object)| object.kind == HircKind::Event)
         .map(|(ordinal, object)| EventDeclaration::of(ordinal, object))
         .collect();
-    let media = bank
-        .wems()
+    let mut wems = bank.wems().peekable();
+    let media_data_body = wems.peek().map(|wem| wem.source().data_body_offset());
+    let media = wems
         .map(|wem| EmbeddedMedia {
             id: wem.id(),
             offset: wem.offset(),
@@ -151,6 +153,7 @@ pub(crate) fn read(path: &str, entry: usize, bytes: &[u8]) -> Result<BankContent
             language_id: header.language_id,
             event_count: u32::try_from(events.len()).unwrap_or(u32::MAX),
             entry,
+            media_data_body,
         },
         events,
         event_version: bank.version_byte_range(),

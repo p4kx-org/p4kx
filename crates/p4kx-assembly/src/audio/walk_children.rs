@@ -8,6 +8,7 @@ use p4kx_audio::{BankMusicStinger, HircObject, HircValue};
 
 use crate::audio::HircPathSource;
 use crate::audio::banks::{StingerDeclaration, music_node};
+use crate::audio::hirc_diagnostic_sites::DiagnosticSite;
 use crate::audio::hirc_path_source::{HircInboundSource, HircRouteSource};
 use crate::audio::walk_banks::Loaded;
 
@@ -21,12 +22,33 @@ pub(super) enum FollowedEdge {
     },
 }
 
+#[derive(Clone, Copy)]
+pub(super) struct StingerSchedule<'bank> {
+    owner: &'bank HircObject,
+    row: &'bank BankMusicStinger,
+    ordinal: usize,
+}
+
+impl StingerSchedule<'_> {
+    pub(super) fn diagnostic(self) -> Option<DiagnosticSite> {
+        DiagnosticSite::stinger(self.owner, self.row)
+    }
+
+    pub(super) fn source(
+        self,
+        archive: &Archive,
+        bank: &Loaded<'_>,
+    ) -> Option<Arc<HircRouteSource>> {
+        HircRouteSource::stinger(archive, bank, self.owner, self.row, self.ordinal).map(Arc::new)
+    }
+}
+
 impl FollowedEdge {
     pub(super) fn stinger_scheduling<'bank>(
         self,
         bank: &'bank Loaded<'_>,
         segment: u32,
-    ) -> Option<(&'bank HircObject, &'bank BankMusicStinger)> {
+    ) -> Option<StingerSchedule<'bank>> {
         let Self::Stinger {
             trigger,
             declaration: Some(declaration),
@@ -37,7 +59,13 @@ impl FollowedEdge {
         let owner = bank.bank.objects().get(declaration.object)?;
         let node = music_node(&owner.value)?;
         let row = node.stinger_scheduling_evidence(declaration.row)?;
-        (row.trigger_id.value == trigger && row.segment_id.value == segment).then_some((owner, row))
+        (row.trigger_id.value == trigger && row.segment_id.value == segment).then_some(
+            StingerSchedule {
+                owner,
+                row,
+                ordinal: declaration.row,
+            },
+        )
     }
 
     pub(super) fn source(
@@ -61,6 +89,13 @@ impl FollowedEdge {
                 HircRouteSource::action(archive, bank, owner, bank_id)
             }
         }?;
-        Some(HircInboundSource::Route(Arc::new(route)))
+        let action = Arc::new(route);
+        Some(match self {
+            Self::Stinger { .. } => HircInboundSource::Stinger {
+                action,
+                schedule: None,
+            },
+            Self::Child(_) | Self::Action => HircInboundSource::Route(action),
+        })
     }
 }

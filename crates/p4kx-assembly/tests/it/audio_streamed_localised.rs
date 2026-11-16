@@ -12,6 +12,9 @@ use p4kx_assembly::audio::{
 use p4kx_extraction::Archive;
 use p4kx_testkit::{ArchiveBuilder, TestAtl, TestBank, TestEntry, TestHircObject, wwise_short_id};
 
+#[path = "audio_streamed_location_origins.rs"]
+mod location_origins;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 const PLAY: u16 = 0x0403;

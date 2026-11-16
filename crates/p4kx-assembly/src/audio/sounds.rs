@@ -217,6 +217,7 @@ pub struct SoundVariant<'i> {
     pub(crate) source: SoundSource,
     pub(super) source_ordinal: usize,
     pub(crate) location: Option<WemLocation<'i>>,
+    pub(super) location_source: Option<Box<super::wem_location_origin::WemLocationSource>>,
     pub(crate) selection: WemSelection,
     pub(crate) localised: bool,
     pub(crate) language: Option<&'i str>,

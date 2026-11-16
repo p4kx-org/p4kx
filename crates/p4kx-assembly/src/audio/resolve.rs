@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::ConversionError;
+use p4kx_extraction::{Archive, ConversionError};
 use rayon::prelude::*;
 
+use super::hirc_path_source::PathSourceMode;
 use super::resolve_bounded;
 use super::resolve_options::ResolveWork;
 use super::walk::{self, Found};
 use super::walk_banks::{self, Banks, Loaded, Spare};
 use super::{
-    ArchiveAudio, AudioFileError, AudioIndex, BreakReason, BrokenLink, LanguageChoice, NodeKind,
-    PathStep, ResolveOptions, TriggerSounds, WwiseEvent,
+    ArchiveAudio, AudioFileError, AudioIndex, BreakReason, BrokenLink, IndexedSoundbank,
+    LanguageChoice, NodeKind, PathStep, ResolveOptions, TriggerSounds, WwiseEvent,
 };
 
 type BankWalk<'i> = (u32, Result<Vec<(usize, Found<'i>)>, AudioFileError>);
@@ -130,9 +131,10 @@ impl ArchiveAudio<'_> {
             if options.cancelled() {
                 return;
             }
-            let path = event_path(event);
             if selected.is_empty() {
-                sounds.breaks.push(unselected(index, event, choice, path));
+                sounds
+                    .breaks
+                    .push(unselected(index, event, choice, event_path(event)));
                 continue;
             }
             for position in selected {
@@ -149,13 +151,13 @@ impl ArchiveAudio<'_> {
                             sounds.breaks.append(&mut found.breaks);
                         }
                     }
-                    Some(Err(error)) => sounds.breaks.push(BrokenLink {
+                    Some(Err(error)) => sounds.breaks.push(event_break(
+                        self.archive(),
                         event,
-                        soundbank: Some(soundbank),
-                        path: path.clone(),
-                        path_sources: Box::default(),
-                        reason: BreakReason::Unreadable(error.clone()),
-                    }),
+                        soundbank,
+                        BreakReason::Unreadable(error.clone()),
+                        options.path_sources,
+                    )),
                     None => {}
                 }
             }
@@ -223,6 +225,24 @@ pub(super) fn event_path(event: &WwiseEvent) -> Box<[PathStep]> {
     }])
 }
 
+pub(super) fn event_break<'i>(
+    archive: &Archive,
+    event: &'i WwiseEvent,
+    bank: &'i IndexedSoundbank,
+    reason: BreakReason,
+    path_sources: PathSourceMode,
+) -> BrokenLink<'i> {
+    BrokenLink {
+        event,
+        soundbank: Some(bank),
+        bank_source: path_sources.entry_binding(archive, bank.entry_position()),
+        path: event_path(event),
+        path_sources: Box::default(),
+        failed_edge: None,
+        reason,
+    }
+}
+
 pub(super) fn unselected<'i>(
     index: &AudioIndex,
     event: &'i WwiseEvent,
@@ -237,8 +257,10 @@ pub(super) fn unselected<'i>(
     BrokenLink {
         event,
         soundbank: None,
+        bank_source: None,
         path,
         path_sources: Box::default(),
+        failed_edge: None,
         reason,
     }
 }

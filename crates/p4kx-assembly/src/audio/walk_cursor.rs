@@ -18,7 +18,7 @@ pub(super) enum Visit {
     Follow(Target),
     Sound(SoundSource),
     Track(SoundSource, usize, MusicClipFeatures),
-    Break(BreakReason),
+    Break(BreakReason, Option<FollowedEdge>),
 }
 
 pub(super) struct WalkCursor<'i>(Continuation<'i>);
@@ -59,7 +59,9 @@ impl<'i> WalkCursor<'i> {
             | HircValue::Plugin
             | HircValue::Modulator
             | HircValue::Malformed(_)
-            | HircValue::Raw => Continuation::Once(Some(Visit::Break(unresolved(object, version)))),
+            | HircValue::Raw => {
+                Continuation::Once(Some(Visit::Break(unresolved(object, version), None)))
+            }
         };
         Ok(Self(continuation))
     }
@@ -149,6 +151,7 @@ fn stinger_continuation<'i>(
     if stingers.is_empty() {
         return Ok(Continuation::Once(Some(Visit::Break(
             BreakReason::Missing { id: trigger },
+            Some(FollowedEdge::Action),
         ))));
     }
     let mut banks = BTreeSet::new();
@@ -163,6 +166,7 @@ fn stinger_continuation<'i>(
     if chosen.is_empty() {
         return Ok(Continuation::Once(Some(Visit::Break(
             choice.no_localisation(),
+            Some(FollowedEdge::Action),
         ))));
     }
     Ok(Continuation::Stingers(StingerCursor {

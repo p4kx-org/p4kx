@@ -16,6 +16,7 @@ mod export;
 mod export_preflight;
 mod hirc_diagnostic_sites;
 mod hirc_path_source;
+mod hirc_path_uses;
 mod hirc_route_source;
 mod index;
 mod index_read;
@@ -37,6 +38,7 @@ mod txtp;
 mod users;
 mod walk;
 mod walk_banks;
+mod wem_location_origin;
 mod wem_selection;
 
 pub use p4kx_extraction::sound::wwise_path::ATL_FOLDER;
@@ -54,7 +56,7 @@ pub use export::{
     ExportFailure, ExportLoopOrigin, ExportLoopOrigins, ExportOptions, ExportReport, ExportState,
     ExportWatch, ExportedSound, SoundFormat,
 };
-pub use hirc_path_source::HircPathSource;
+pub use hirc_path_source::{HircPathOrigins, HircPathSource};
 pub use index::AudioIndex;
 pub use inventory::{AudioCandidate, AudioCandidateState, AudioSurvey, AudioSurveyKind};
 pub use language::LanguageChoice;
@@ -72,6 +74,7 @@ pub use txtp::{
     write_txtp_with_loop_origins, write_txtp_with_origins,
 };
 pub use users::TriggerUsers;
+pub use wem_location_origin::WemLocationOrigins;
 pub use wem_selection::WemSelection;
 
 /// The largest soundbank Entry that is read, 32 MiB: six times the largest live soundbank.
