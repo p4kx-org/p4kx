@@ -19,6 +19,8 @@ use crate::text_part::{field, field_entry};
 
 #[path = "standard_button_general.rs"]
 mod general;
+#[path = "standard_button_large.rs"]
+mod large;
 #[path = "standard_button_vector.rs"]
 mod vector;
 

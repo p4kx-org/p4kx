@@ -255,10 +255,10 @@ impl Walk<'_, '_, '_, '_> {
         };
         let widget = handover.widget;
         let proxy = if let Some(button) = widget.button.as_deref() {
-            let Some(proxy) = canvas.proxy_root else {
+            let Some(proxy) = button.template_root(&canvas) else {
                 self.cx.report.note(
                     &widget.type_name,
-                    "the button template has no valid proxy root",
+                    button.missing_root_reason(),
                     &widget.name,
                 );
                 return;

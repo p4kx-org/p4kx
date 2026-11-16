@@ -114,7 +114,7 @@ description.
   of the power page (`OUTPUT`) are far too large; the tab bar text is right.
 - **Labels on a pale-blue background** on the Aegis SHIELDS and the RSI power pages: the
   background belongs to the text widget in the Records; whether the game draws it is not known.
-- **Buttons.** The General and Secondary families have data-driven default rendering paths.
+- **Buttons.** The General, GeneralLarge and Secondary families have data-driven default rendering paths.
   Other button families and game-driven interaction states need separate evidence.
 - **Run-time pictures and numbers** (silhouette, readouts, rows, pips).
 
@@ -148,6 +148,20 @@ The instance transfers the label text and the two Boolean visibility inputs. The
 authored Integer switches supply the fill and icon-position state tags. The General template
 owns its remaining Integer and String defaults. The still renderer leaves icon-asset overrides
 and game-driven interaction to the original game.
+
+## Default GeneralLarge buttons
+
+The exact GeneralLarge class selects the separate standard Large component canvas when its
+original canvas field is empty. The template has an empty proxy field and one parentless
+DisplayWidget in its original scene. The still renderer mounts that root and preserves its
+label, icon and two frame children under their original parent. A present invalid canvas or
+proxy cannot select an implicit route.
+
+The selected RSI shared Style matches the `general-button-large` holder tag and the original
+tags of the frame children. The instance transfers the localized label, the Boolean visibility
+inputs and authored numeric anchor and scale parameters. The template evaluates its own
+geometry and defaults. This template has no matching fill or icon-position switches. A value
+for either setting stays an unevaluated input.
 
 ## Guesses, unverified against the game
 

@@ -25,6 +25,8 @@ use crate::{
 mod frame;
 #[path = "button_general_witness.rs"]
 mod general;
+#[path = "button_large_witness.rs"]
+mod large;
 #[path = "button_source_witness_tests.rs"]
 mod tests;
 

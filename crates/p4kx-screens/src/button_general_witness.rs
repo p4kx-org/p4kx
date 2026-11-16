@@ -24,13 +24,13 @@ use crate::reader::{as_struct, items, reference};
 use crate::{TextSources, WidgetInput};
 
 #[path = "button_general_owner.rs"]
-mod selection;
+pub(super) mod selection;
 
 use self::selection::Owner;
 use super::super::{Observation, TextPaintFailure};
 
 #[test]
-#[ignore = "real Archive: set P4KX_DATA_P4K to installed LIVE and pass --ignored"]
+#[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn a_live_general_button_draws_its_original_primary_frame_and_label() -> Check {
     let path = real_archive_path().map_err(|_| "configure the installed LIVE Archive")?;
     check_live(&path)?;
@@ -50,7 +50,7 @@ fn a_live_general_button_draws_its_original_primary_frame_and_label() -> Check {
     .map_err(|_| "cannot report the General witness")
 }
 
-fn check_live(path: &Path) -> Check {
+pub(super) fn check_live(path: &Path) -> Check {
     if !path
         .file_name()
         .and_then(|name| name.to_str())
@@ -61,7 +61,7 @@ fn check_live(path: &Path) -> Check {
             .and_then(|name| name.to_str())
             .is_some_and(|name| name.eq_ignore_ascii_case("LIVE"))
     {
-        return Err("the General witness requires the installed LIVE Data.p4k");
+        return Err("the button witness requires the installed LIVE Data.p4k");
     }
     Ok(())
 }
@@ -145,7 +145,7 @@ fn measure(archive: &Archive, forge: &DataForge<'_>, texts: TextSources<'_>) -> 
     }
 }
 
-fn label_source(template: &RecordTree<'_>, proxy: WidgetInput) -> Check<WidgetInput> {
+pub(super) fn label_source(template: &RecordTree<'_>, proxy: WidgetInput) -> Check<WidgetInput> {
     let mut labels = items(template.root(), "scene")
         .iter()
         .enumerate()
@@ -159,14 +159,14 @@ fn label_source(template: &RecordTree<'_>, proxy: WidgetInput) -> Check<WidgetIn
         });
     let first = labels
         .next()
-        .ok_or("the General proxy has no original label part")?;
+        .ok_or("the button template root has no original label part")?;
     if labels.next().is_some() {
-        return Err("the General proxy has several original label parts");
+        return Err("the button template root has several original label parts");
     }
     Ok(first)
 }
 
-fn verify_rsi_style(forge: &DataForge<'_>, template: &RecordTree<'_>) -> Check {
+pub(super) fn verify_rsi_style(forge: &DataForge<'_>, template: &RecordTree<'_>) -> Check {
     let authored = items(template.root(), "brandStyles")
         .iter()
         .filter_map(as_struct)
@@ -194,7 +194,7 @@ fn verify_rsi_style(forge: &DataForge<'_>, template: &RecordTree<'_>) -> Check {
     Ok(())
 }
 
-fn visit(
+pub(super) fn visit(
     trace: &Trace,
     input: WidgetInput,
     parent: Option<usize>,
@@ -205,7 +205,7 @@ fn visit(
     });
     let first = selected.next().ok_or_else(missing)?;
     if !first.1.in_scope || selected.next().is_some() {
-        return Err("the General button part does not have one exact mounted occurrence");
+        return Err("the button part does not have one exact mounted occurrence");
     }
     Ok(first)
 }

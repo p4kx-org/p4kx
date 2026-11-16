@@ -15,7 +15,7 @@ mod vector;
 
 pub(crate) use canvas::{is_canvas_widget, nested as nested_canvas};
 #[cfg(test)]
-pub(crate) use standard::{GENERAL_CANVAS, SECONDARY_CANVAS};
+pub(crate) use standard::{GENERAL_CANVAS, LARGE_CANVAS, SECONDARY_CANVAS};
 pub(crate) use standard::{canvas_of as standard_canvas, is_standard, tags_of as standard_tags};
 
 use crate::context::Context;

@@ -29,6 +29,7 @@ use crate::transform::Placement;
 use crate::variables::Variable;
 use crate::walk_instance::Override;
 use crate::walk_measure::{MeasureKey, Probe};
+use crate::widget::Widget;
 
 pub(crate) struct Walk<'s, 'a, 'f, 't> {
     pub(crate) store: &'s mut CanvasStore<'a, 'f>,
@@ -364,17 +365,8 @@ impl<'s, 'a, 'f, 't> Walk<'s, 'a, 'f, 't> {
                 alpha,
                 depth + 1,
             );
-        } else if elements::is_standard(&widget.type_name) {
-            self.cx.report.note(
-                &widget.type_name,
-                "the Archive has no canvas for this standard widget",
-                &widget.name,
-            );
-        } else if widget.canvas.is_unreadable() {
-            self.cx.report.missing_canvases.push(format!(
-                "{} (a reference that no Record answers)",
-                widget.name
-            ));
+        } else {
+            self.note_unavailable_canvas(widget);
         }
         if overridden {
             self.overrides.pop();
@@ -384,5 +376,25 @@ impl<'s, 'a, 'f, 't> Walk<'s, 'a, 'f, 't> {
         }
         self.above.pop();
         self.chain.pop();
+    }
+
+    fn note_unavailable_canvas(&mut self, widget: &Widget) {
+        if elements::is_standard(&widget.type_name) {
+            let reason = if widget
+                .button
+                .as_ref()
+                .is_some_and(|button| !button.uses_standard_canvas())
+            {
+                "the explicit button canvas is outside the standard template route"
+            } else {
+                "the Archive has no canvas for this standard widget"
+            };
+            self.cx.report.note(&widget.type_name, reason, &widget.name);
+        } else if widget.canvas.is_unreadable() {
+            self.cx.report.missing_canvases.push(format!(
+                "{} (a reference that no Record answers)",
+                widget.name
+            ));
+        }
     }
 }

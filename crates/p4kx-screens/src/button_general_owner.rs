@@ -11,6 +11,7 @@ use p4kx_dataforge::{
 use p4kx_gfx::{Localise, Localised, localise_text};
 
 use super::{CANVAS_TYPE, Check, GENERAL, WidgetInput, scene_input};
+use crate::button_component::LARGE;
 use crate::reader::{as_struct, child, flag, float, items, reference, text};
 use crate::text::{is_editor_label, is_placeholder};
 
@@ -69,6 +70,29 @@ pub(super) fn select_owner<'f>(
         }
     }
     selected.ok_or("no original General button with a default frame, localized label and active scene ancestry with a nonempty English translation")
+}
+
+pub(in crate::power_source_witness::button) fn large_owner(
+    canvas: &RecordTree<'_>,
+    localise: Localise<'_>,
+) -> Check<(WidgetInput, String)> {
+    let scene = items(canvas.root(), "scene");
+    let mut holders = scene.iter().enumerate().filter_map(|(slot, value)| {
+        let widget = as_struct(value)?;
+        (widget.type_name() == LARGE).then_some((slot, widget))
+    });
+    let (slot, holder) = holders.next().ok_or("no original Large scene holder")?;
+    if holders.next().is_some() || !matches!(holder.field("canvas"), Some(Value::Null) | None) {
+        return Err("the selected Canvas has no unique implicit Large scene holder");
+    }
+    active_ancestors(canvas, scene, &visibility_targets(canvas), slot)
+        .ok_or("the original Large holder does not have a static active scene ancestry")?;
+    let label = child(holder, "labelProperties")
+        .filter(|label| flag(label, "show") == Some(true))
+        .and_then(|label| text(label, "label"))
+        .and_then(|source| english_key(source, localise))
+        .ok_or("the original Large label is hidden or has no nonempty English translation")?;
+    Ok((scene_input(canvas, slot), label))
 }
 
 struct Candidate {

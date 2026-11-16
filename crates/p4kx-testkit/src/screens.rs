@@ -168,6 +168,7 @@ fn widget_kinds() -> Vec<TestStruct> {
     vec![
         button_structure("BuildingBlocks_ComponentGeneralButtonSecondary"),
         button_structure("BuildingBlocks_ComponentGeneralButton"),
+        button_structure("BuildingBlocks_ComponentGeneralButtonLarge"),
         TestStruct::new("BuildingBlocks_WidgetCard").parent("BuildingBlocks_DisplayWidget"),
         TestStruct::new("BuildingBlocks_WidgetCanvas")
             .parent("BuildingBlocks_DisplayWidget")
@@ -222,6 +223,7 @@ fn widget_kinds() -> Vec<TestStruct> {
 fn button_structure(kind: &str) -> TestStruct {
     TestStruct::new(kind)
         .parent("BuildingBlocks_DisplayWidget")
+        .field("canvas", reference("BuildingBlocks_Canvas"))
         .field("sizingMethod", TestType::String)
         .field("fillStyle", TestType::String)
         .field("iconPosition", TestType::String)

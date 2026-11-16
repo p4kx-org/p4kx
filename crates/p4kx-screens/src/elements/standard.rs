@@ -7,12 +7,13 @@ use crate::button_component::ButtonFamily;
 use crate::canvas::find_canvas;
 use crate::style::TagPaths;
 use crate::widget::Widget;
-use crate::widget_canvas_ref::WidgetCanvasRef;
 
 const FOLDER: &str = "libs/foundry/records/ui/buildingblocks/modularkit/standard/widgets/";
 const TAG_FOLDER: &str = "UI.Style._Standard.ModularKit.Widgets";
 const GENERAL_TAG: &str = "UI.Style._Standard.ModularKit.Components.General-Button-Primary";
 pub(crate) const GENERAL_CANVAS: &str = "libs/foundry/records/ui/buildingblocks/modularkit/standard/components/buttongeneralcomponentstandard";
+const LARGE_TAG: &str = "UI.Style._Standard.ModularKit.Components.general-button-large";
+pub(crate) const LARGE_CANVAS: &str = "libs/foundry/records/ui/buildingblocks/modularkit/standard/components/buttongenerallargecomponentstandard";
 const SECONDARY_TAG: &str = "UI.Style._Standard.ModularKit.Components.General-Button-Secondary";
 pub(crate) const SECONDARY_CANVAS: &str = "libs/foundry/records/ui/buildingblocks/modularkit/standard/components/buttongeneralsecondarycomponentstandard";
 
@@ -41,11 +42,12 @@ fn variant(widget: &Widget) -> Option<[String; 2]> {
 /// style, when the Archive has it.
 pub(crate) fn canvas_of(widget: &Widget, forge: &DataForge<'_>) -> Option<Guid> {
     if let Some(button) = &widget.button {
+        if !button.uses_standard_canvas() {
+            return None;
+        }
         let template = match button.family() {
-            ButtonFamily::General if matches!(widget.canvas, WidgetCanvasRef::Absent) => {
-                GENERAL_CANVAS
-            }
-            ButtonFamily::General => return None,
+            ButtonFamily::General => GENERAL_CANVAS,
+            ButtonFamily::Large => LARGE_CANVAS,
             ButtonFamily::Secondary => SECONDARY_CANVAS,
         };
         return find_canvas(forge, template).ok();
@@ -63,6 +65,7 @@ pub(crate) fn tags_of(widget: &Widget, paths: &TagPaths) -> Vec<Guid> {
     if let Some(button) = &widget.button {
         let name = match button.family() {
             ButtonFamily::General => GENERAL_TAG,
+            ButtonFamily::Large => LARGE_TAG,
             ButtonFamily::Secondary => SECONDARY_TAG,
         };
         return paths.guid_of(name).into_iter().collect();

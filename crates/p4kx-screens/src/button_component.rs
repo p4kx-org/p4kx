@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_dataforge::StructValue;
+use p4kx_dataforge::{StructValue, Value};
 
 use crate::canvas::Canvas;
 use crate::reader::{child, flag, float, text};
@@ -11,11 +11,13 @@ use crate::style::TagPaths;
 use crate::walk_rest::Handover;
 
 pub(crate) const GENERAL: &str = "BuildingBlocks_ComponentGeneralButton";
+pub(crate) const LARGE: &str = "BuildingBlocks_ComponentGeneralButtonLarge";
 pub(crate) const SECONDARY: &str = "BuildingBlocks_ComponentGeneralButtonSecondary";
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum ButtonFamily {
     General,
+    Large,
     Secondary,
 }
 
@@ -23,6 +25,7 @@ impl ButtonFamily {
     pub(crate) fn of_type(name: &str) -> Option<Self> {
         match name {
             GENERAL => Some(Self::General),
+            LARGE => Some(Self::Large),
             SECONDARY => Some(Self::Secondary),
             _ => None,
         }
@@ -36,6 +39,7 @@ pub(crate) struct ButtonComponent {
     icon: Part,
     text: Option<String>,
     has_icon_override: bool,
+    canvas_absent: bool,
     fill: Choice,
     position: Choice,
 }
@@ -100,6 +104,7 @@ impl ButtonComponent {
                 .and_then(|label| text(label, "label"))
                 .map(str::to_owned),
             has_icon_override,
+            canvas_absent: matches!(source.field("canvas"), Some(Value::Null) | None),
             fill: Choice::read(
                 source,
                 "fillStyle",
@@ -120,6 +125,26 @@ impl ButtonComponent {
 
     pub(crate) const fn family(&self) -> ButtonFamily {
         self.family
+    }
+
+    pub(crate) const fn uses_standard_canvas(&self) -> bool {
+        matches!(self.family, ButtonFamily::Secondary) || self.canvas_absent
+    }
+
+    pub(crate) fn template_root(&self, canvas: &Canvas) -> Option<usize> {
+        match self.family {
+            ButtonFamily::General | ButtonFamily::Secondary => canvas.proxy_root,
+            ButtonFamily::Large => canvas.proxy_root.or(canvas.implicit_button_root),
+        }
+    }
+
+    pub(crate) const fn missing_root_reason(&self) -> &'static str {
+        match self.family {
+            ButtonFamily::General | ButtonFamily::Secondary => {
+                "the button template has no valid proxy root"
+            }
+            ButtonFamily::Large => "the Large button template has no valid original scene root",
+        }
     }
 
     pub(crate) fn transfer(
@@ -150,10 +175,10 @@ impl ButtonComponent {
             ("PrimaryStateTag", self.fill, "fill style"),
             ("SecondaryStateTag", self.position, "icon position"),
         ] {
-            let selected = match setting {
-                Choice::Absent => continue,
-                Choice::Unrecognised => None,
-                Choice::Known(leaf) => {
+            let selected = match (self.family, setting) {
+                (_, Choice::Absent) => continue,
+                (ButtonFamily::Large, _) | (_, Choice::Unrecognised) => None,
+                (_, Choice::Known(leaf)) => {
                     parameter_for_tag(&canvas.operations, (proxy, field), |tag| {
                         tags.name_of(tag)
                             .is_some_and(|name| leaf_matches(name, leaf))
@@ -182,7 +207,9 @@ impl ButtonComponent {
 
     fn part_values(&self) -> [(&'static str, Option<Rest>); 8] {
         let number = |value: Option<f32>| match self.family {
-            ButtonFamily::Secondary => value.map(|value| Rest::Num(f64::from(value))),
+            ButtonFamily::Large | ButtonFamily::Secondary => {
+                value.map(|value| Rest::Num(f64::from(value)))
+            }
             ButtonFamily::General => None,
         };
         [

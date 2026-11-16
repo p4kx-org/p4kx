@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use p4kx_dataforge::{DataForge, Guid, RecordTree, Reference, StructValue};
+use p4kx_dataforge::{DataForge, Guid, RecordTree, Reference, StructValue, Value};
 
 use crate::bindings::{TextBinding, index_at, text_bindings};
 use crate::error::ScreenError;
@@ -48,6 +48,7 @@ pub(crate) struct Canvas {
     pub(crate) size_fields: [bool; 2],
     pub(crate) world_root: Option<[f32; 2]>,
     pub(crate) proxy_root: Option<usize>,
+    pub(crate) implicit_button_root: Option<usize>,
     pub(crate) widgets: Vec<Widget>,
     pub(crate) scene_len: usize,
     pub(crate) roots: Vec<usize>,
@@ -100,7 +101,6 @@ impl Canvas {
         let guid = tree.guid();
         let size_fields =
             child(root, "size").map_or([None; 2], |size| [float(size, "x"), float(size, "y")]);
-        let size = size_fields.map(|axis| axis.unwrap_or(0.0));
         let raw = text(root, "coordinateMethod") == Some("useRaw");
         let record_index = tree.record_index();
         let widgets_in = |field, section| {
@@ -141,10 +141,11 @@ impl Canvas {
             arrays: static_arrays(root),
             world_root: raw.then(|| world_root(&widgets, &roots)).flatten(),
             proxy_root,
+            implicit_button_root: implicit_button_root(root, &roots, &widgets),
             guid,
             record_index,
             record_path: tree.record_path().to_owned(),
-            size,
+            size: size_fields.map(|axis| axis.unwrap_or(0.0)),
             size_fields: size_fields.map(|axis| axis.is_some()),
             roots,
             children,
@@ -157,6 +158,27 @@ impl Canvas {
             embedded: parse_entries(items(root, "embeddedStyles")).into(),
         }
     }
+}
+
+fn implicit_button_root(
+    root: &StructValue<'_>,
+    roots: &[usize],
+    widgets: &[Widget],
+) -> Option<usize> {
+    let [index] = roots else {
+        return None;
+    };
+    if !matches!(root.field("proxyRootNode"), Some(Value::Null) | None) {
+        return None;
+    }
+    let widget = widgets.get(*index)?;
+    if widget.type_name != "BuildingBlocks_DisplayWidget" {
+        return None;
+    }
+    let source = items(root, "scene")
+        .get(widget.input.slot)
+        .and_then(as_struct)?;
+    matches!(source.field("parent"), Some(Value::Null) | None).then_some(*index)
 }
 
 fn widget_at(widgets: &[Widget], scene_len: usize, target: Target) -> Option<usize> {
