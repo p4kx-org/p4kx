@@ -9,8 +9,9 @@ use crate::catalog_v3::medical::medical_tier_config;
 use crate::catalog_v3::procedural_planet_audio;
 use crate::collected::Collected;
 use crate::selection::Kind;
-use crate::template_number_capture::TemplateNumbers;
 
+#[path = "mission_definition_output.rs"]
+pub(crate) mod mission_definitions;
 #[path = "catalog_row_numbers.rs"]
 mod row_numbers;
 #[path = "catalog_row_spool.rs"]
@@ -57,8 +58,11 @@ pub(crate) fn snapshot(collected: &mut Collected<'_>, filter: Option<&Filter>) -
             .map(|row| (row.definition.physical_guid.0, row.definition.physical_path)),
     );
     append_missions(&mut emitted, collected);
-    let mut template_numbers = template_numbers(collected);
-    for receipt in std::mem::take(&mut collected.broker_definitions.proof) {
+    let mut template_numbers = Vec::new();
+    let definitions = std::mem::take(&mut collected.contract_templates.proof)
+        .into_iter()
+        .chain(std::mem::take(&mut collected.broker_definitions.proof));
+    for receipt in definitions {
         emitted.push(receipt.row);
         template_numbers.push(receipt.numbers);
     }
@@ -142,14 +146,6 @@ fn append_gameplay_definitions(emitted: &mut Vec<CatalogRow>, collected: &Collec
     );
 }
 
-fn template_numbers(collected: &Collected<'_>) -> Vec<TemplateNumbers> {
-    collected
-        .contract_templates
-        .iter()
-        .map(|row| row.numbers.clone())
-        .collect()
-}
-
 fn append_reputation_definitions(
     emitted: &mut Vec<CatalogRow>,
     missions: &crate::mission_kinds::MissionKinds<'_>,
@@ -216,14 +212,6 @@ fn append_missions(emitted: &mut Vec<CatalogRow>, collected: &Collected<'_>) {
             .map(|row| (row.physical_guid, row.physical_path)),
     );
     append_reputation_definitions(emitted, &collected.mission_kinds);
-    append(
-        emitted,
-        Kind::ContractTemplates,
-        collected
-            .contract_templates
-            .iter()
-            .map(|row| (row.physical_guid.0, row.physical_path)),
-    );
 }
 
 fn append_resources(emitted: &mut Vec<CatalogRow>, collected: &Collected<'_>) {

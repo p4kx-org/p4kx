@@ -72,6 +72,7 @@ pub(crate) fn emit<W: Write>(
     let staged_row_bytes = catalog.placements.staged_row_bytes()
         + u128::from(catalog.definitions.particle_libraries.stored_bytes())
         + u128::from(catalog.definitions.contract_generators.stored_bytes())
+        + u128::from(catalog.definitions.contract_templates.stored_bytes())
         + u128::from(catalog.definitions.mission_broker_entries.stored_bytes())
         + u128::from(
             catalog
@@ -133,6 +134,7 @@ fn write_json(
                 .placements
                 .take_row_spool_failure()
                 .or_else(|| catalog.definitions.contract_generators.take_failure())
+                .or_else(|| catalog.definitions.contract_templates.take_failure())
                 .or_else(|| catalog.definitions.mission_broker_entries.take_failure())
                 .or_else(|| catalog.definitions.particle_libraries.take_failure())
                 .or_else(|| {

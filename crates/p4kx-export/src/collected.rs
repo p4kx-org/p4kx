@@ -8,10 +8,10 @@ use p4kx_extraction::Guid;
 use crate::blueprint_catalog_rows::BlueprintRow;
 use crate::blueprint_category::BlueprintCategory;
 use crate::broker_entry::BrokerProjection;
-use crate::broker_entry_read::BrokerDefinitions;
 use crate::catalog_crafting::CraftingKinds;
 use crate::catalog_definitions::planet_tech_definitions::PlanetTechDefinitions;
 use crate::catalog_read_failure::CatalogReadFailure;
+use crate::catalog_rows::mission_definitions::MissionDefinitionOutput;
 use crate::catalog_rows::staged::StagedCatalogTable;
 use crate::catalog_table::{CatalogTable, DatasetAvailability};
 use crate::catalog_v3::ammo_definition::PreparedAmmoDefinition;
@@ -58,7 +58,6 @@ use crate::quality_catalog::QualityRows;
 use crate::shop_inventories::ShopInventoryTable;
 use crate::shop_inventory_resolution::ShopInventoryResolution;
 use crate::spawn_model::{LocationQuery, ShipSpawnPool};
-use crate::template_definition::TemplateDefinition;
 use crate::template_rows::TemplateConfigurations;
 use crate::{ItemClassSummary, Kind, KindSummary};
 
@@ -116,10 +115,10 @@ pub(crate) struct Collected<'f> {
     pub(crate) mission_location_templates: Vec<MissionLocationTemplate<'f>>,
     pub(crate) contract_ship_spawns: Vec<ShipSpawnPool>,
     pub(crate) contract_location_queries: Vec<LocationQuery>,
-    pub(crate) contract_templates: Vec<TemplateDefinition<'f>>,
+    pub(crate) contract_templates: MissionDefinitionOutput,
     pub(crate) template_configurations: TemplateConfigurations<'f>,
     pub(crate) broker_projections: Vec<BrokerProjection<'f>>,
-    pub(crate) broker_definitions: BrokerDefinitions,
+    pub(crate) broker_definitions: MissionDefinitionOutput,
     pub(crate) contract_npc_spawns: Vec<PublishedNpcPool>,
     pub(crate) contract_entity_spawns: Vec<EntitySpawnPool>,
     pub(crate) mission_property_sets: Vec<MissionPropertySet<'f>>,
@@ -231,10 +230,10 @@ impl<'f> Collected<'f> {
             mission_location_templates: Vec::new(),
             contract_ship_spawns: Vec::new(),
             contract_location_queries: Vec::new(),
-            contract_templates: Vec::new(),
+            contract_templates: MissionDefinitionOutput::empty(),
             template_configurations: TemplateConfigurations::default(),
             broker_projections: Vec::new(),
-            broker_definitions: BrokerDefinitions::empty(),
+            broker_definitions: MissionDefinitionOutput::empty(),
             contract_npc_spawns: Vec::new(),
             contract_entity_spawns: Vec::new(),
             mission_property_sets: Vec::new(),

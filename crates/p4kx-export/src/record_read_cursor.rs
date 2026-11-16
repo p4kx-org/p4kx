@@ -15,9 +15,9 @@ use crate::{CatalogError, CatalogReadFailure, Kind};
 /// Read accounting retained independently of the successful projections.
 #[derive(Default)]
 pub(crate) struct KindReadAccounting<'source> {
-    skipped: usize,
-    failures: Vec<CatalogReadFailure<'source>>,
-    ledger: ExportLedger,
+    pub(crate) skipped: usize,
+    pub(crate) failures: Vec<CatalogReadFailure<'source>>,
+    pub(crate) ledger: ExportLedger,
 }
 
 impl<'source> KindReadAccounting<'source> {

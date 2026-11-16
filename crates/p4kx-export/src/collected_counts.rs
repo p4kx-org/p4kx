@@ -64,7 +64,7 @@ impl Collected<'_> {
             Kind::MissionLocationTemplates => self.mission_location_templates.len(),
             Kind::ContractShipSpawns => self.contract_ship_spawns.len(),
             Kind::ContractLocationQueries => self.contract_location_queries.len(),
-            Kind::ContractTemplates => self.contract_templates.len(),
+            Kind::ContractTemplates => self.contract_templates.table.len(),
             Kind::MissionBrokerEntries => self.broker_definitions.table.len(),
             Kind::ContractNpcSpawns => self.contract_npc_spawns.len(),
             Kind::ContractEntitySpawns => self.contract_entity_spawns.len(),

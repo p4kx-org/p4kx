@@ -115,7 +115,8 @@ pub(crate) struct CatalogDefinitions<'source> {
     >,
     pub(crate) mission_scenarios:
         CatalogTable<super::mission_scenario_definition::MissionScenarioDefinition<'source>>,
-    pub(crate) contract_templates: CatalogTable<TemplateDefinition<'source>>,
+    #[schemars(with = "CatalogTable<TemplateDefinition<'source>>")]
+    pub(crate) contract_templates: StagedCatalogTable,
     #[schemars(with = "CatalogTable<BrokerDefinition<'source>>")]
     pub(crate) mission_broker_entries: StagedCatalogTable,
     #[serde(flatten)]

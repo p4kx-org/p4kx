@@ -93,6 +93,7 @@ pub(crate) fn add_contracts<'f>(
     )?;
     let ContractTemplates {
         read,
+        definitions,
         pools: template_pools,
         mut configurations,
         unknowns,
@@ -111,7 +112,7 @@ pub(crate) fn add_contracts<'f>(
     collected.add_broker_entries(broker_read, broker_definitions);
     configurations.flows.extend(broker_flows);
     configurations.properties.extend(broker_properties);
-    collected.add_contract_templates(read, configurations, unknowns)
+    collected.add_contract_templates(read, definitions, configurations, unknowns)
 }
 
 /// Derives the paints of `collected`, warns about unreadable vehicle files and returns the counts.

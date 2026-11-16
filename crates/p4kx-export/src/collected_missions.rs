@@ -2,15 +2,14 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use crate::broker_entry::BrokerProjection;
-use crate::broker_entry_read::BrokerDefinitions;
 use crate::catalog_number_capture::CapturedNumber;
 use crate::catalog_projection::CatalogProjection;
+use crate::catalog_rows::mission_definitions::MissionDefinitionOutput;
 use crate::contract_missions::ContractWithTitles;
 use crate::crafting_warning::CraftingWarning;
 use crate::location_template::LocationTemplates;
-use crate::record_read::KindRead;
+use crate::record_read::{KindRead, KindReadAccounting};
 use crate::spawn_pools::SpawnPools;
-use crate::template_definition::TemplateDefinition;
 use crate::template_issues::{UnknownVocabularyReport, Unknowns};
 use crate::template_rows::TemplateConfigurations;
 use crate::{CatalogError, CatalogReadFailure, Kind};
@@ -71,12 +70,13 @@ impl<'f> Collected<'f> {
     /// Collects contract templates, configurations and source warnings.
     pub(crate) fn add_contract_templates(
         &mut self,
-        templates: KindRead<'f, TemplateDefinition<'f>>,
+        templates: KindReadAccounting<'f>,
+        definitions: MissionDefinitionOutput,
         configurations: TemplateConfigurations<'f>,
         unknowns: Unknowns,
     ) -> Result<(), CatalogError> {
         self.ledger.merge(templates.ledger);
-        self.contract_templates = templates.items;
+        self.contract_templates = definitions;
         self.template_configurations = configurations;
         if let Some(slot) = self.skipped.get_mut(Kind::ContractTemplates.index()) {
             *slot = templates.skipped;
@@ -101,7 +101,7 @@ impl<'f> Collected<'f> {
     pub(crate) fn add_broker_entries(
         &mut self,
         entries: KindRead<'f, BrokerProjection<'f>>,
-        definitions: BrokerDefinitions,
+        definitions: MissionDefinitionOutput,
     ) {
         self.ledger.merge(entries.ledger);
         self.broker_projections = entries.items;

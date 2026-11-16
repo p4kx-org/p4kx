@@ -6,9 +6,9 @@ use p4kx_extraction::{CancelToken, DataForge, Filter};
 use crate::broker_canonical_read::{self, BrokerEmission, CanonicalBroker, Sources};
 use crate::broker_entry::BrokerProjection;
 use crate::catalog_projection::CatalogProjection;
-use crate::catalog_row::CatalogRow;
-use crate::catalog_rows::staged::{StagedCatalogRows, StagedCatalogTable};
-use crate::catalog_table::DatasetAvailability;
+use crate::catalog_rows::mission_definitions::{
+    DefinitionSource, MissionDefinitionOutput, MissionDefinitionWriter,
+};
 use crate::catalog_v3::tag_catalog::CapturedTags;
 use crate::export_field_inspection::WholeInspectionFold;
 use crate::export_ledger::ExportLedger;
@@ -18,41 +18,19 @@ use crate::selection::Kind;
 use crate::spawn_pools::SpawnPools;
 use crate::template_configuration::{MissionFlowConfiguration, MissionPropertyConfiguration};
 use crate::template_issues::Unknowns;
-use crate::template_number_capture::TemplateNumbers;
 use crate::{CatalogError, CatalogReadFailure};
 
 /// Source definitions, contextual rows, and the associated mission content.
 pub(crate) struct BrokerEntries<'source> {
     pub(crate) read: KindRead<'source, BrokerProjection<'source>>,
     pub(crate) pools: SpawnPools<'source>,
-    pub(crate) definitions: BrokerDefinitions,
+    pub(crate) definitions: MissionDefinitionOutput,
     pub(crate) flows: Vec<MissionFlowConfiguration>,
     pub(crate) properties: Vec<MissionPropertyConfiguration>,
 }
 
-/// Proof retained from a successfully staged canonical Broker owner.
-pub(crate) struct BrokerDefinitionReceipt {
-    pub(crate) row: CatalogRow,
-    pub(crate) numbers: TemplateNumbers,
-}
-
-pub(crate) struct BrokerDefinitions {
-    pub(crate) table: StagedCatalogTable,
-    pub(crate) proof: Vec<BrokerDefinitionReceipt>,
-}
-
-impl BrokerDefinitions {
-    pub(crate) const fn empty() -> Self {
-        Self {
-            table: StagedCatalogTable::empty(DatasetAvailability::Absent),
-            proof: Vec::new(),
-        }
-    }
-}
-
 struct BrokerRows<'stage, 'source> {
-    definitions: StagedCatalogRows<'stage>,
-    proof: Vec<BrokerDefinitionReceipt>,
+    definitions: MissionDefinitionWriter<'stage>,
     projections: Vec<BrokerProjection<'source>>,
     flows: Vec<MissionFlowConfiguration>,
     properties: Vec<MissionPropertyConfiguration>,
@@ -82,8 +60,7 @@ pub(crate) fn read<'source>(
     };
     let scratch = std::env::temp_dir();
     let mut rows = BrokerRows {
-        definitions: StagedCatalogRows::new(&scratch, cancel),
-        proof: Vec::new(),
+        definitions: MissionDefinitionWriter::new(Kind::MissionBrokerEntries, &scratch, cancel),
         projections: Vec::new(),
         flows: Vec::new(),
         properties: Vec::new(),
@@ -107,16 +84,12 @@ pub(crate) fn read<'source>(
 
 impl<'source> BrokerRows<'_, 'source> {
     fn append(&mut self, piece: CanonicalBroker<'source>) -> Result<(), CatalogError> {
-        let definition = piece.definition;
-        self.definitions.append(&definition)?;
-        self.proof.push(BrokerDefinitionReceipt {
-            row: CatalogRow {
-                kind: Kind::MissionBrokerEntries,
+        self.definitions
+            .append(piece.definition, |definition| DefinitionSource {
                 guid: definition.physical_guid.0,
-                record_path: definition.physical_path.to_owned(),
-            },
-            numbers: definition.numbers,
-        });
+                path: definition.physical_path,
+                numbers: definition.numbers,
+            })?;
         self.flows.extend(piece.flows);
         self.properties.extend(piece.properties);
         match piece.projection {
@@ -144,17 +117,7 @@ impl<'source> BrokerRows<'_, 'source> {
         forge: &DataForge<'_>,
         accounting: KindReadAccounting<'source>,
     ) -> Result<BrokerEntries<'source>, CatalogError> {
-        let availability = if self.proof.is_empty() {
-            DatasetAvailability::from_source_declarations(forge, |name| {
-                name == Kind::MissionBrokerEntries.records().type_name
-            })
-        } else {
-            DatasetAvailability::Available
-        };
-        let definitions = BrokerDefinitions {
-            table: self.definitions.finish(availability)?,
-            proof: self.proof,
-        };
+        let definitions = self.definitions.finish(forge)?;
         let mut read = accounting.into_read(self.projections);
         crate::mission_pool_ledger::broker(&mut read.ledger);
         read.ledger.merge(self.ledger);

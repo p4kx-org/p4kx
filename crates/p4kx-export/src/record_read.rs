@@ -75,6 +75,7 @@ struct Observed<'f, T> {
 ///
 /// Returns [`CatalogError::Cancelled`] once `cancel` is cancelled, or a source-evidence error
 /// when the Forge or canonical read does not belong to the admitted input.
+#[cfg(test)]
 pub(crate) fn read_kind<'f, T: Send>(
     forge: &'f DataForge<'f>,
     input: &OriginalCatalogInput<'_, '_>,

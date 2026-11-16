@@ -243,11 +243,7 @@ fn assemble<R>(
             mission_scenarios: collected.mission_kinds.take_scenario_definitions(&forge),
             mission_module_declarations: collected.mission_kinds.take_module_declarations(&forge),
             mission_items: collected.mission_kinds.take_items(&forge),
-            contract_templates: CatalogTable::new(
-                &forge,
-                &["ContractTemplate"],
-                collected.contract_templates,
-            ),
+            contract_templates: collected.contract_templates.table,
             mission_broker_entries: collected.broker_definitions.table,
             loot: collected.loot_kinds.definitions.tables(&forge),
             gameplay_properties: crate::catalog_v3::gameplay_property_catalog::table(

@@ -29,6 +29,7 @@ fn a_failed_template_fallback_is_unreadable_and_a_readable_duplicate_wins() -> T
         check_original(&fixture.entry.open()?)?;
         let (_, catalog) = fixture.diagnostic()?;
         check_missing_values(&catalog, input)?;
+        check_canonical_duplicates(&catalog, input)?;
         check_readable_duplicate(&catalog, input)?;
         check_attempts(&catalog)?;
         origin::closure(&catalog)?;
@@ -216,6 +217,30 @@ fn check_missing_values(catalog: &Json, input: Input) -> TestResult {
             }
         }
     }
+    Ok(())
+}
+
+fn check_canonical_duplicates(catalog: &Json, input: Input) -> TestResult {
+    let guid = health_origin_fixture::guid(TEMPLATE);
+    let rows = origin::rows(catalog, "/definitions/contractTemplates/rows")?;
+    let mut indices = Vec::new();
+    for row in rows
+        .iter()
+        .filter(|row| row.pointer("/guid/value").and_then(Json::as_str) == Some(guid.as_str()))
+    {
+        origin::present(
+            row,
+            "sourceType",
+            &json!("ContractTemplate"),
+            input.marker(),
+        )?;
+        indices.push(origin::at(row, "/recordIndex/value")?.as_u64());
+    }
+    assert_eq!(
+        indices,
+        [Some(0), Some(u64::from(LAST_READABLE))],
+        "the successful exact-type owners keep physical order across a failed duplicate"
+    );
     Ok(())
 }
 

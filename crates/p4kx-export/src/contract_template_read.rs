@@ -4,19 +4,23 @@
 use p4kx_extraction::{CancelToken, DataForge, Filter};
 
 use crate::catalog_projection::CatalogProjection;
+use crate::catalog_rows::mission_definitions::{
+    DefinitionSource, MissionDefinitionOutput, MissionDefinitionWriter,
+};
 use crate::catalog_v3::tag_catalog::CapturedTags;
 use crate::export_field_inspection::WholeInspectionFold;
-use crate::record_read::{KindRead, read_kind};
+use crate::export_ledger::ExportLedger;
+use crate::record_read::{KindReadAccounting, visit_kind_by_record_guid};
 use crate::spawn_pools::SpawnPools;
 use crate::template_canonical_read;
-use crate::template_definition::TemplateDefinition;
 use crate::template_issues::Unknowns;
 use crate::template_rows::TemplateConfigurations;
 use crate::{CatalogError, Kind};
 
 /// Physical Template definitions and their required context rows from the same original reads.
 pub(crate) struct ContractTemplates<'source> {
-    pub(crate) read: KindRead<'source, TemplateDefinition<'source>>,
+    pub(crate) read: KindReadAccounting<'source>,
+    pub(crate) definitions: MissionDefinitionOutput,
     pub(crate) configurations: TemplateConfigurations<'source>,
     pub(crate) pools: SpawnPools<'source>,
     pub(crate) unknowns: Unknowns,
@@ -35,7 +39,13 @@ pub(crate) fn read<'source>(
     inspections: &mut WholeInspectionFold<'_>,
 ) -> Result<ContractTemplates<'source>, CatalogError> {
     let unknowns = Unknowns::default();
-    let read = read_kind(
+    let scratch = std::env::temp_dir();
+    let mut definitions = MissionDefinitionWriter::new(Kind::ContractTemplates, &scratch, cancel);
+    let mut configurations = TemplateConfigurations::default();
+    let mut pools = SpawnPools::default();
+    let mut context_ledger = ExportLedger::default();
+    let mut context_failures = Vec::new();
+    let mut read = visit_kind_by_record_guid(
         forge,
         projection.original(),
         Kind::ContractTemplates,
@@ -44,33 +54,27 @@ pub(crate) fn read<'source>(
             template_canonical_read::read(projection, tags, record, tree, cancel, &unknowns)
                 .map_err(|error| Box::new(error) as crate::record_read::ReadError)
         },
-        |built| built.definition.physical_guid,
-    )?;
-    let KindRead {
-        items,
-        skipped,
-        mut failures,
-        mut ledger,
-    } = read;
-    let mut definitions = Vec::with_capacity(items.len());
-    let mut configurations = TemplateConfigurations::default();
-    let mut pools = SpawnPools::default();
-    for built in items {
-        definitions.push(built.definition);
-        configurations.templates.push(built.projection);
-        configurations.flows.extend(built.flows);
-        configurations.properties.extend(built.properties);
-        pools.merge(built.pools);
-        ledger.merge(built.ledger);
-        failures.extend(built.failures);
-    }
-    Ok(ContractTemplates {
-        read: KindRead {
-            items: definitions,
-            skipped,
-            failures,
-            ledger,
+        |built| {
+            definitions.append(built.definition, |definition| DefinitionSource {
+                guid: definition.physical_guid.0,
+                path: definition.physical_path,
+                numbers: definition.numbers,
+            })?;
+            configurations.templates.push(built.projection);
+            configurations.flows.extend(built.flows);
+            configurations.properties.extend(built.properties);
+            pools.merge(built.pools);
+            context_ledger.merge(built.ledger);
+            context_failures.extend(built.failures);
+            Ok(())
         },
+    )?;
+    let definitions = definitions.finish(forge)?;
+    read.ledger.merge(context_ledger);
+    read.failures.extend(context_failures);
+    Ok(ContractTemplates {
+        read,
+        definitions,
         configurations,
         pools,
         unknowns,

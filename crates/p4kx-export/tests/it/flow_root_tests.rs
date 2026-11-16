@@ -3,13 +3,13 @@
 
 use std::time::UNIX_EPOCH;
 
-use p4kx_export::{CatalogOptions, ExportHealthStatus};
+use p4kx_export::{CatalogOptions, Compression, ExportHealthStatus, write_catalog_from};
 use serde_json::Value;
 
 use crate::flow_root_fixture::{self as fixture, Case};
 use crate::flow_root_output;
 use crate::flow_root_source as source;
-use crate::health_origin_fixture::{Input, TestResult};
+use crate::health_origin_fixture::{Fixture, Input, TestResult};
 
 #[test]
 fn actual_inside_and_overlapping_source_roots_have_complete_original_controls() -> TestResult {
@@ -50,6 +50,9 @@ fn producer(case: Case) -> TestResult {
             ExportHealthStatus::Complete,
             "exact actually selected raw roots retain even the wrong-shaped id subtree's nonfinite number without a kind-wide waiver"
         );
+        if matches!(input, Input::Encrypted) {
+            check_template_replay(&fixture, built.json())?;
+        }
         let catalog: Value = serde_json::from_slice(built.json())?;
         flow_root_output::check(
             &catalog,
@@ -59,5 +62,26 @@ fn producer(case: Case) -> TestResult {
             input,
         )?;
     }
+    Ok(())
+}
+
+fn check_template_replay(fixture: &Fixture, expected: &[u8]) -> TestResult {
+    let options = CatalogOptions::new(UNIX_EPOCH);
+    let (summary, packed) = write_catalog_from(
+        &fixture.archive,
+        &fixture.entry,
+        &options,
+        Compression::Zstd { level: 1 },
+        || Ok(Vec::new()),
+    )?;
+    assert!(
+        summary.staged_row_bytes() > 0,
+        "the fixture has a staged original Template and no other staged table"
+    );
+    assert_eq!(
+        zstd::stream::decode_all(packed.as_slice())?,
+        expected,
+        "both compression passes preserve exact Template rows, links and source provenance"
+    );
     Ok(())
 }

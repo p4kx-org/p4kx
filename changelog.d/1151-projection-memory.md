@@ -14,5 +14,5 @@
 - Track mission template source membership by original Record ranges.
 - Allocate Record failure details only for observations with a diagnosis.
 - Share empty origin markers and store literal DataForge field paths in their compact source identifiers.
-- Stage contract generator and broker definitions as their Record windows complete.
+- Stage contract generator, contract template and broker definitions as their Record windows complete.
 - Stage particle libraries and weapon animation candidates as they are projected.
