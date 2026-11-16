@@ -230,6 +230,13 @@ The native ARM64 execution job for merge `867e6b9d9` passed the MSI lifecycle,
 runtime and preservation checks. Its result is bound to that producer and architecture.
 [Native ARM64 execution](https://github.com/p4kx-org/p4kx/actions/runs/43826004006/job/133175698510)
 
+A read-only Windows check opened both exact AMD64 MSI inputs prepared by the
+same run. Both SHA-256 hashes matched the diagnostic input receipt. The
+v0.2.0 predecessor had template `x64;1033`, one expected per-user Registry
+key and the same UpgradeCode as the produced MSI. The hosted historical
+install, upgrade and removal remain the lifecycle checks for this pair.
+[Native AMD64 execution](https://github.com/p4kx-org/p4kx/actions/runs/43826004006/job/133175698571)
+
 ### Dynamic parent-chain feedback experiment
 
 The separate `MSI dynamic parent-chain probe` workflow exercises the actual preparation output,
