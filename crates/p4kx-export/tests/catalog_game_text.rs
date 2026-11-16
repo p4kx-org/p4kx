@@ -183,13 +183,9 @@ fn expected_annotation(owner: &str, name: &str, field: &Value, schema: &Value) -
             field.get("$ref").and_then(Value::as_str) == Some("#/$defs/SourcedValueOfGameTextRef")
         }
         ("BrokerProjection" | "TemplateProjection", "title") => {
+            let target = "#/$defs/SourceValueRef";
             assert!(
-                references(
-                    field,
-                    schema,
-                    "#/$defs/SourceValueRef",
-                    &mut BTreeSet::new()
-                ),
+                references(field, schema, target, &mut BTreeSet::new()),
                 "{owner}.{name} is navigation to the actual source occurrence"
             );
             false
