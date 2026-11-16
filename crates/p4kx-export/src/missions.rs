@@ -9,6 +9,8 @@ use crate::blueprint::as_struct;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::original::OriginalFlowFields;
+use crate::catalog_rows::staged::{StagedCatalogRows, StagedCatalogTable};
+use crate::catalog_table::DatasetAvailability;
 use crate::catalog_v3::mission_sources::contract_scenario_requirements::ContractScenarioRequirements;
 use crate::catalog_v3::mission_sources::local_contract_generator_configuration::LocalContractGeneratorConfiguration;
 use crate::catalog_v3::tag_catalog::{CapturedTags, TagDependencies};
@@ -50,7 +52,7 @@ const CONTAINERS: [&str; 4] = [
 pub(crate) struct Missions<'f> {
     pub(crate) ledger: ExportLedger,
     pub(crate) contracts: Vec<ContractWithTitles<'f>>,
-    pub(crate) generators: Vec<GeneratorDefinition<'f>>,
+    pub(crate) generators: StagedCatalogTable,
     pub(crate) scenario_requirements: Vec<ContractScenarioRequirements<'f>>,
     pub(crate) local_generators: Vec<LocalContractGeneratorConfiguration<'f>>,
     pub(crate) skipped: usize,
@@ -206,10 +208,13 @@ pub(crate) fn read<'f>(
         run,
         &mut ledger.field_inspections,
     )?;
+    let generator_type = Kind::Contracts.records().type_name;
+    let availability =
+        DatasetAvailability::from_source_declarations(forge, |name| name == generator_type);
     let mut missions = Missions {
         ledger,
         contracts: Vec::new(),
-        generators: Vec::new(),
+        generators: StagedCatalogTable::empty(availability),
         scenario_requirements: Vec::new(),
         local_generators: Vec::new(),
         skipped: 0,
@@ -220,6 +225,7 @@ pub(crate) fn read<'f>(
     };
     crate::mission_ledger::inventory(&mut missions.ledger);
     run.begin(CatalogStage::ProjectContractGenerators);
+    run.check_cancelled()?;
     if records.is_empty() {
         return Ok(missions);
     }
@@ -231,13 +237,16 @@ pub(crate) fn read<'f>(
         places: &places,
         cancel,
     };
+    let scratch = std::env::temp_dir();
+    let mut generators = StagedCatalogRows::new(&scratch, cancel);
     let mut pending = Vec::new();
     for window in records.chunks(rayon::current_num_threads()) {
         for piece in record_read::read(window, input, &context, cancel)? {
-            missions.take(piece, &mut pending, &mut grants)?;
+            missions.take(piece, &mut pending, &mut grants, &mut generators)?;
         }
     }
     drop(index);
+    missions.generators = generators.finish(availability)?;
     missions.complete_contracts(pending, grants)?;
     Ok(missions)
 }
@@ -294,13 +303,14 @@ impl<'f> Missions<'f> {
         observed: ObservedPiece<'f>,
         pending: &mut Vec<PendingContract<'f>>,
         grants: &mut Grants,
+        generators: &mut StagedCatalogRows<'_>,
     ) -> Result<(), CatalogError> {
         self.ledger.merge(observed.ledger);
         self.scenario_requirements
             .extend(observed.scenario_requirements);
         self.local_generators.extend(observed.local_generators);
         if let Some(definition) = observed.definition {
-            self.generators.push(definition);
+            generators.append(&definition)?;
         }
         match observed.piece {
             Piece::Contracts(piece) => {

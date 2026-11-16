@@ -47,7 +47,6 @@ use crate::guid_text::CatalogGuid;
 use crate::location_template::MissionLocationTemplate;
 use crate::loot_kinds::LootKinds;
 use crate::manufacturer::Manufacturer;
-use crate::mission_generator::GeneratorDefinition;
 use crate::mission_kinds::MissionKinds;
 use crate::mission_property_set::MissionPropertySet;
 use crate::mission_titles::MissionTitles;
@@ -110,7 +109,7 @@ pub(crate) struct Collected<'f> {
     pub(crate) loadouts: Vec<Loadout>,
     pub(crate) contracts: Vec<ContractEntry<'f>>,
     pub(crate) mission_titles: Vec<MissionTitles<'f>>,
-    pub(crate) contract_generators: Vec<GeneratorDefinition<'f>>,
+    pub(crate) contract_generators: StagedCatalogTable,
     pub(crate) local_contract_generators: CatalogTable<LocalContractGeneratorConfiguration<'f>>,
     pub(crate) contract_scenario_requirements:
         Vec<crate::catalog_v3::mission_sources::contract_scenario_requirements::ContractScenarioRequirements<'f>>,
@@ -226,7 +225,7 @@ impl<'f> Collected<'f> {
             loadouts: Vec::new(),
             contracts: Vec::new(),
             mission_titles: Vec::new(),
-            contract_generators: Vec::new(),
+            contract_generators: StagedCatalogTable::empty(DatasetAvailability::Absent),
             local_contract_generators: CatalogTable::empty(DatasetAvailability::Absent),
             contract_scenario_requirements: Vec::new(),
             mission_location_templates: Vec::new(),

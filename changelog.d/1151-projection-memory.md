@@ -11,4 +11,6 @@
 - Release duplicate field inspections as Record scan batches finish and index source uses with their existing IDs.
 - Collect selected Record rows directly into their catalog tables as each read window finishes.
 - Share common Commodity fallback source evidence across ResourceType rows.
+- Track mission template source membership by original Record ranges.
+- Stage contract generator definitions as each Record window completes.
 - Stage particle libraries and weapon animation candidates as they are projected.

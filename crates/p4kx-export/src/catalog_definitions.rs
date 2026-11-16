@@ -107,7 +107,8 @@ pub(crate) struct CatalogDefinitions<'source> {
     pub(crate) items:
         CatalogTable<super::catalog_item_components::item_definition::ItemDefinition<'source>>,
     pub(crate) blueprints: CatalogTable<crate::blueprint_definition::BlueprintDefinition<'source>>,
-    pub(crate) contract_generators: CatalogTable<GeneratorDefinition<'source>>,
+    #[schemars(with = "CatalogTable<GeneratorDefinition<'source>>")]
+    pub(crate) contract_generators: StagedCatalogTable,
     pub(crate) mission_module_declarations: CatalogTable<MissionModuleDeclaration<'source>>,
     pub(crate) mission_items: CatalogTable<
         crate::catalog_v3::mission_sources::item_definition::MissionItemDefinition<'source>,

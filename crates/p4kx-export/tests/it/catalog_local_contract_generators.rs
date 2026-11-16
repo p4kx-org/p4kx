@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_export::build_catalog;
+use p4kx_export::{BuiltCatalog, Compression, build_catalog, write_catalog_from};
+use p4kx_extraction::{Archive, DataForgeEntry};
 use p4kx_testkit::{DataForgeBuilder, TestInstance, TestRecord, TestStruct, TestType, TestValue};
 use serde_json::{Value, json};
 
@@ -21,6 +22,7 @@ const TAG_GUID: u128 = 0x0010_8692;
 const IDENTITY_GUID: u128 = 0x0010_8693;
 const GENERATOR_GUID: u128 = 0x0010_8694;
 const MISSING_GUID: u128 = 0x0010_8695;
+const SECOND_GENERATOR_GUID: u128 = 0x0010_8600;
 
 fn schema() -> DataForgeBuilder {
     let scope_type = TestType::Enum(SCOPE.to_owned());
@@ -262,9 +264,19 @@ fn current_handler_shape_reports_scope_configuration_as_absent() -> TestResult {
                     TestValue::Struct(TestInstance::new(AVAILABILITY)),
                 ))]),
             ),
+        )
+        .record(
+            TestRecord::new(
+                SECOND_GENERATOR_GUID,
+                GENERATOR,
+                "ContractGenerator.FixtureSecond",
+                "libs/foundry/records/contracts/contractgenerator/fixture_second.xml",
+            )
+            .value("generators", TestValue::Array(Vec::new())),
         );
     let (_folder, archive) = fixture::open(&database, DcbOrigin::Plain)?;
     let built = build_catalog(&archive, &fixture::options()).map_err(|error| error.to_string())?;
+    check_generator_spool(&archive, &built)?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let table = at(&catalog, "/configurations/localContractGenerators")?;
     assert_eq!(at(table, "/availability")?, "absent");
@@ -274,7 +286,38 @@ fn current_handler_shape_reports_scope_configuration_as_absent() -> TestResult {
             &catalog,
             "/definitions/contractGenerators/rows/0/guid/value"
         )?,
-        &json!(guid(GENERATOR_GUID))
+        &json!(guid(GENERATOR_GUID)),
+        "the first physical generator precedes the lower GUID"
+    );
+    assert_eq!(
+        at(
+            &catalog,
+            "/definitions/contractGenerators/rows/1/guid/value"
+        )?,
+        &json!(guid(SECOND_GENERATOR_GUID)),
+        "the cursor retains physical source order"
     );
     crate::commodity_v3_source_inventory::reference_closure(&catalog)
+}
+
+fn check_generator_spool(archive: &Archive, built: &BuiltCatalog) -> TestResult {
+    let entry = DataForgeEntry::read(archive)?;
+    let (summary, packed) = write_catalog_from(
+        archive,
+        &entry,
+        &fixture::options(),
+        Compression::Zstd { level: 1 },
+        || Ok(Vec::new()),
+    )?;
+    assert!(
+        summary.staged_row_bytes() > 0,
+        "the fixture produces only generator spool bytes"
+    );
+    let decoded = zstd::stream::decode_all(packed.as_slice())?;
+    assert_eq!(
+        decoded,
+        built.json(),
+        "both writer passes replay the original generator rows and provenance"
+    );
+    Ok(())
 }

@@ -17,6 +17,27 @@ pub(crate) enum DatasetAvailability {
     Unavailable,
 }
 
+impl DatasetAvailability {
+    pub(crate) fn from_source_declarations(
+        forge: &DataForge<'_>,
+        matches_source_type: impl Fn(&str) -> bool,
+    ) -> Self {
+        let mut unavailable = false;
+        for structure in forge.structs() {
+            match structure.name() {
+                Ok(name) if matches_source_type(name) => return Self::Available,
+                Ok(_) => {}
+                Err(_) => unavailable = true,
+            }
+        }
+        if unavailable {
+            Self::Unavailable
+        } else {
+            Self::Absent
+        }
+    }
+}
+
 /// One named typed dataset with its measured source-family availability.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -44,21 +65,10 @@ impl<T> CatalogTable<T> {
         matches_source_type: impl Fn(&str) -> bool,
         rows: Vec<T>,
     ) -> Self {
-        let mut unavailable = false;
-        let mut declared = !rows.is_empty();
-        for structure in forge.structs() {
-            match structure.name() {
-                Ok(name) if matches_source_type(name) => declared = true,
-                Ok(_) => {}
-                Err(_) => unavailable = true,
-            }
-        }
-        let availability = if declared {
-            DatasetAvailability::Available
-        } else if unavailable {
-            DatasetAvailability::Unavailable
+        let availability = if rows.is_empty() {
+            DatasetAvailability::from_source_declarations(forge, matches_source_type)
         } else {
-            DatasetAvailability::Absent
+            DatasetAvailability::Available
         };
         Self { availability, rows }
     }

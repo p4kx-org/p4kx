@@ -238,11 +238,7 @@ fn assemble<R>(
             faction_reputations: reputation_tables.factions.definitions,
             reputation_scopes: reputation_tables.scopes,
             reputation_standings: reputation_tables.standings,
-            contract_generators: CatalogTable::new(
-                &forge,
-                &["ContractGenerator"],
-                collected.contract_generators,
-            ),
+            contract_generators: collected.contract_generators,
             mission_scenarios: collected.mission_kinds.take_scenario_definitions(&forge),
             mission_module_declarations: collected.mission_kinds.take_module_declarations(&forge),
             mission_items: collected.mission_kinds.take_items(&forge),
