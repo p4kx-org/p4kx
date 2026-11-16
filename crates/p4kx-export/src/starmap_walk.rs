@@ -167,10 +167,8 @@ impl System<'_> {
     }
 
     const fn note_blocked_descendants(&mut self, child: &Child) {
-        self.read.routes_incomplete |= child.external.is_some()
-            || !child.below.children.is_empty()
-            || child.below.capped
-            || child.below.truncated;
+        self.read.routes_incomplete |=
+            child.external.is_some() || !child.below.children.is_empty() || child.below.truncated;
     }
 
     /// Notes that the container at `entry`, `external` containers below the system container,

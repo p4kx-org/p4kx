@@ -26,7 +26,6 @@ enum Frame<'a> {
 
 struct ChildCursor<'a> {
     remaining: Iter<'a, Child>,
-    capped: bool,
     truncated: bool,
     parent: WalkPath,
     label: &'a str,
@@ -37,7 +36,6 @@ impl<'a> ChildCursor<'a> {
     fn new(level: &'a Level, parent: WalkPath, label: &'a str, file: &'a ContainerFile) -> Self {
         Self {
             remaining: level.children.iter(),
-            capped: level.capped,
             truncated: level.truncated,
             parent,
             label,
@@ -138,11 +136,6 @@ impl<'a> System<'a> {
         stack: &mut Vec<Frame<'a>>,
     ) -> Result<(), CatalogError> {
         let label = cursor.label;
-        if cursor.capped {
-            let limit = self.limits.depth;
-            self.skip_route(&format!("{label}: Children nested deeper than {limit}"));
-            return Ok(());
-        }
         let Some(child) = cursor.remaining.next() else {
             if cursor.truncated {
                 let limit = self.limits.children;

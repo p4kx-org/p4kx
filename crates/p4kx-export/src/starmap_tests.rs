@@ -12,6 +12,8 @@ use crate::starmap_parse::read_all;
 
 const FOLDER: &str = "Data\\ObjectContainers\\PU\\system\\t\\";
 
+#[path = "starmap_direct_depth_tests.rs"]
+mod direct_depth;
 #[path = "starmap_external_chain_tests.rs"]
 mod external_chain;
 #[path = "starmap_placement_storage_tests.rs"]
@@ -138,23 +140,6 @@ fn a_position_beyond_a_million_billion_metres_or_overflowing_is_not_placed() {
 }
 
 #[test]
-fn nested_children_beyond_the_depth_limit_are_counted() {
-    let dir = tempfile::tempdir().expect("a directory");
-    let deepest = child("1,0,0", 3);
-    let middle = child("1,0,0", 2).child(TestElement::new("ChildObjectContainers").child(deepest));
-    let top = child("1,0,0", 1).child(TestElement::new("ChildObjectContainers").child(middle));
-    let limits = Limits {
-        depth: 2,
-        ..Limits::default()
-    };
-    let placements = read(dir.path(), system(&root(vec![top]), &[]), limits);
-    assert!(placed(&placements, 1).is_some(), "depth 0");
-    assert!(placed(&placements, 2).is_some(), "depth 1");
-    assert_eq!(placed(&placements, 3), None, "depth 2 is beyond the limit");
-    assert_eq!(placements.counts.malformed, 1, "counted once");
-}
-
-#[test]
 fn children_beyond_the_budget_of_a_system_are_counted() {
     let dir = tempfile::tempdir().expect("a directory");
     let xml = root(vec![
@@ -162,10 +147,7 @@ fn children_beyond_the_budget_of_a_system_are_counted() {
         child("2,0,0", 2),
         child("3,0,0", 3),
     ]);
-    let limits = Limits {
-        children: 2,
-        ..Limits::default()
-    };
+    let limits = Limits { children: 2 };
     let placements = read(dir.path(), system(&xml, &[]), limits);
     assert!(placed(&placements, 2).is_some(), "within the budget");
     assert_eq!(placed(&placements, 3), None, "beyond the budget");
@@ -258,14 +240,7 @@ fn a_container_instanced_several_times_is_parsed_once() {
     let roots: Vec<usize> = index.systems().iter().map(|(_, entry)| *entry).collect();
     let limits = Limits::default();
     let read = crate::catalog_read::original::with_entry_capture(&archive, |capture| {
-        read_all(
-            &archive,
-            &index,
-            &roots,
-            None,
-            (limits.depth, limits.children),
-            capture,
-        )
+        read_all(&archive, &index, &roots, None, limits.children, capture)
     })
     .expect("original Entry capture");
     assert_eq!(read.parsed, 3, "the system, the ring and the leaf");

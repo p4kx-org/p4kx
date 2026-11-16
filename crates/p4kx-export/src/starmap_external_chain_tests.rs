@@ -135,14 +135,7 @@ fn walk(archive: &Archive) -> TestResult<SystemRead> {
         .ok_or("the real synthetic system root is admitted")?;
     let limits = Limits::default();
     Ok(with_entry_capture(archive, |capture| {
-        let sources = read_all(
-            archive,
-            &index,
-            &[*root],
-            None,
-            (limits.depth, limits.children),
-            capture,
-        )?;
+        let sources = read_all(archive, &index, &[*root], None, limits.children, capture)?;
         assert_eq!(sources.parsed, 2, "each physical container is parsed once");
         System::run(
             &index,

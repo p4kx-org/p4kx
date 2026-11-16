@@ -1968,10 +1968,11 @@ all are asteroids and wreck sets of the Nyx ring segments, whose containers are 
 times). A Child whose `pos` or `rot` is malformed (not numbers, not three or four parts, a
 quaternion without length), or whose composed position is not a finite number or lies beyond
 1e15 m on an axis (about a tenth of a light year, far outside any star system), and everything
-below it are not placed. The same holds for the walk limits: Children nested deeper than 64,
-more than 4,194,304 Children in one system, an external container reached through more than 32
-others, and an external container that is already open above the Child that names it (a cycle) are
-counted and not followed. All of these, and a container that cannot be read, are warned about by
+below it are not placed. The walk counts and skips Children beyond the limit of 4,194,304 per
+system. Child traversal in admitted binary CryXml is iterative. Text XML has a separate admission
+limit of 128 simultaneously open elements. A container already open on the active route counts
+as a cycle. Shared external containers keep each independent use. Skipped Children, cycles and
+unreadable containers are reported by
 `p4kx catalog` (exit code 1); the counts `unreadable_containers` and `malformed_children` are
 counted per reference, not per distinct container, so one container named by ten Children
 counts ten times. A container that a Child names and the Archive does

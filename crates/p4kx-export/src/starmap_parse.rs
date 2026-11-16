@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::collections::{HashMap, HashSet};
+use std::mem;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -65,10 +66,33 @@ impl Child {
 #[derive(Default)]
 pub(crate) struct Level {
     pub(crate) children: Vec<Child>,
-    /// The list lies beyond the depth limit and was not read.
-    pub(crate) capped: bool,
     /// The list holds more Children than the budget of the parse allowed; the rest was not read.
     pub(crate) truncated: bool,
+}
+
+impl Drop for Level {
+    fn drop(&mut self) {
+        if self.children.is_empty() {
+            return;
+        }
+        let mut children = mem::take(&mut self.children).into_iter();
+        let mut parents = Vec::new();
+        loop {
+            if let Some(mut child) = children.next() {
+                if !child.below.children.is_empty() {
+                    let below = mem::take(&mut child.below.children);
+                    if !children.as_slice().is_empty() {
+                        parents.push(children);
+                    }
+                    children = below.into_iter();
+                }
+            } else if let Some(parent) = parents.pop() {
+                children = parent;
+            } else {
+                return;
+            }
+        }
+    }
 }
 
 /// What reading one container found.
@@ -84,10 +108,9 @@ pub(crate) enum Body {
     },
 }
 
-/// What bounds the parse: the nesting depth and the number of Children kept in all containers.
+/// The shared Child count and read controls for the discovered containers.
 struct Bounds<'a> {
     cancel: Option<&'a CancelToken>,
-    depth: usize,
     children: AtomicUsize,
     jump_endpoints: bool,
 }
@@ -157,7 +180,7 @@ fn parse_body(
         );
         return Ok(Body::Unparsed);
     };
-    let loss = children::source_loss(&mut root, &entities, capture.source_uses())?;
+    let loss = children::source_loss(&mut root, &entities, capture.source_uses(), bounds.cancel)?;
     if loss.inventory {
         ledger.incomplete_inventory(Kind::StarmapObjects);
     }
@@ -203,7 +226,7 @@ fn parsed_root(
         files.cancel,
     );
     let mut reader = children::ChildReader::new(bounds, &xml, &mut hcd, ledger);
-    let root = reader.level(xml.root(), 0)?;
+    let root = reader.level(xml.root())?;
     let guids = reader.entity_guids;
     let entities = files.scan(&guids, &xml, ledger)?;
     let (gate, gate_proof) = if bounds.jump_endpoints {
@@ -230,11 +253,23 @@ fn parsed_root(
     }))
 }
 fn externals<'level>(level: &'level Level, out: &mut Vec<&'level AuthoredEntryPath>) {
-    for child in &level.children {
-        out.extend(child.external.as_ref());
-        externals(&child.below, out);
+    let mut parents = Vec::new();
+    let mut children = level.children.iter();
+    loop {
+        if let Some(child) = children.next() {
+            out.extend(child.external.as_ref());
+            if !child.below.children.is_empty() {
+                parents.push(children);
+                children = child.below.children.iter();
+            }
+        } else if let Some(parent) = parents.pop() {
+            children = parent;
+        } else {
+            return;
+        }
     }
 }
+
 /// The containers read, and how many parses that took.
 pub(crate) struct Read {
     pub(crate) ledger: ExportLedger,
@@ -253,17 +288,10 @@ pub(crate) fn read_all(
     index: &Index<'_>,
     roots: &[usize],
     cancel: Option<&CancelToken>,
-    (depth, children): (usize, usize),
+    children: usize,
     capture: &EntryCapture<'_>,
 ) -> Result<Read, CatalogError> {
-    read_all_with_jumps(
-        archive,
-        index,
-        roots,
-        cancel,
-        (depth, children, false),
-        capture,
-    )
+    read_all_with_jumps(archive, index, roots, cancel, (children, false), capture)
 }
 
 pub(crate) fn read_all_with_jumps(
@@ -271,12 +299,11 @@ pub(crate) fn read_all_with_jumps(
     index: &Index<'_>,
     roots: &[usize],
     cancel: Option<&CancelToken>,
-    (depth, children, jump_endpoints): (usize, usize, bool),
+    (children, jump_endpoints): (usize, bool),
     capture: &EntryCapture<'_>,
 ) -> Result<Read, CatalogError> {
     let bounds = Bounds {
         cancel,
-        depth,
         children: AtomicUsize::new(children),
         jump_endpoints,
     };

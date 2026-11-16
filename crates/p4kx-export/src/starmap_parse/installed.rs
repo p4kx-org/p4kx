@@ -20,7 +20,6 @@ pub(crate) fn read_jump_witness_body(
 ) -> Result<Body, CatalogError> {
     let bounds = Bounds {
         cancel: None,
-        depth: usize::MAX,
         children: AtomicUsize::new(usize::MAX),
         jump_endpoints: true,
     };

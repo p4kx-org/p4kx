@@ -2,10 +2,11 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::collections::HashSet;
+use std::mem;
 use std::sync::Arc;
 
 use p4kx_assembly::is_external_child_value;
-use p4kx_extraction::{Guid, SourceUses};
+use p4kx_extraction::{CancelToken, Guid, SourceUses};
 
 use super::entxml::EntXmlIndex;
 use super::{Bounds, CHILD, CHILDREN, Child, Level, Pose, hcd::HcdReader};
@@ -44,50 +45,59 @@ impl<'a, 'read, 'capture, 'input, 'archive, 'cancel>
     }
 
     /// Reads direct Child lists in source order, with the legacy wrapped-list fallback.
-    pub(super) fn level(&mut self, node: Root<'_>, depth: usize) -> Result<Level, CatalogError> {
+    pub(super) fn level<'node>(&mut self, node: Root<'node>) -> Result<Level, CatalogError> {
         let xml = self.xml;
-        let mut lists = child_lists(node);
-        let mut level = Level::default();
-        if depth >= self.bounds.depth {
-            level.capped = lists.any(|list| {
-                list.children()
-                    .any(|child| child.name().eq_ignore_ascii_case(CHILD))
-            });
-            return Ok(level);
-        }
-        for list in lists {
-            let list_source = xml.node_source(list)?;
-            for child in list.children() {
-                let name = xml.name(child)?;
+        let elements = |list: Root<'node>| list.children();
+        let mut level = ReadLevel::new(child_lists(node));
+        let mut parents = Vec::new();
+        loop {
+            if self.bounds.cancel.is_some_and(CancelToken::is_cancelled) {
+                return Err(CatalogError::Cancelled);
+            }
+            if let Some(node) = level.advance(xml, elements)? {
+                let name = xml.name(node)?;
                 if !name.as_str().eq_ignore_ascii_case(CHILD) {
                     continue;
                 }
-                if !self.bounds.take() {
-                    level.truncated = true;
-                    return Ok(level);
+                if self.bounds.take() {
+                    let child = ReadChild::parse(node, &name, xml)?;
+                    let below = ReadLevel::new(child_lists(node));
+                    parents.push(PendingLevel {
+                        cursor: mem::replace(&mut level, below),
+                        child,
+                    });
+                    continue;
                 }
-                level
-                    .children
-                    .push(self.read_child(child, &name, &list_source, depth)?);
+                level.output.truncated = true;
             }
+            let Some(PendingLevel { mut cursor, child }) = parents.pop() else {
+                return Ok(level.output);
+            };
+            let source = cursor
+                .list_source
+                .as_ref()
+                .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+            cursor
+                .output
+                .children
+                .push(self.finish_child(child, source, level.output)?);
+            level = cursor;
         }
-        Ok(level)
     }
 
-    fn read_child(
+    fn finish_child(
         &mut self,
-        child: Root<'_>,
-        name: &AuthoredEntryPath,
+        authored: ReadChild<'_>,
         list: &XmlNodeSource,
-        depth: usize,
+        below: Level,
     ) -> Result<Child, CatalogError> {
         let xml = self.xml;
-        let record = attribute(child, "starMapRecord")
-            .and_then(|text| text.trim().parse::<Guid>().ok())
-            .filter(|guid| guid.stored() != [0; 16]);
-        let external = external(child, name, xml)?;
-        let pose = child_pose(child);
-        let below = self.level(child, depth + 1)?;
+        let ReadChild {
+            record,
+            external,
+            pose,
+            node: child,
+        } = authored;
         let mut location = ChildLocation::read(xml, child, xml.capture())?;
         if let Some(location) = &mut location {
             location.read_context(self.hcd, xml, child, self.ledger)?;
@@ -112,6 +122,75 @@ impl<'a, 'read, 'capture, 'input, 'archive, 'cancel>
     }
 }
 
+struct ReadLevel<L, C> {
+    lists: L,
+    children: Option<C>,
+    list_source: Option<XmlNodeSource>,
+    output: Level,
+}
+
+impl<'node, L, C> ReadLevel<L, C>
+where
+    L: Iterator<Item = Root<'node>>,
+    C: Iterator<Item = Root<'node>>,
+{
+    fn new(lists: L) -> Self {
+        Self {
+            lists,
+            children: None,
+            list_source: None,
+            output: Level::default(),
+        }
+    }
+
+    fn advance(
+        &mut self,
+        xml: &EntryXml<'_, '_, '_>,
+        elements: impl Fn(Root<'node>) -> C,
+    ) -> Result<Option<Root<'node>>, CatalogError> {
+        loop {
+            if let Some(child) = self.children.as_mut().and_then(Iterator::next) {
+                return Ok(Some(child));
+            }
+            let Some(list) = self.lists.next() else {
+                return Ok(None);
+            };
+            self.list_source = Some(xml.node_source(list)?);
+            self.children = Some(elements(list));
+        }
+    }
+}
+
+struct PendingLevel<'node, L, C> {
+    cursor: ReadLevel<L, C>,
+    child: ReadChild<'node>,
+}
+
+struct ReadChild<'node> {
+    node: Root<'node>,
+    record: Option<Guid>,
+    external: Option<AuthoredEntryPath>,
+    pose: Pose,
+}
+
+impl<'node> ReadChild<'node> {
+    fn parse(
+        node: Root<'node>,
+        name: &AuthoredEntryPath,
+        xml: &EntryXml<'_, '_, '_>,
+    ) -> Result<Self, CatalogError> {
+        let record = attribute(node, "starMapRecord")
+            .and_then(|text| text.trim().parse::<Guid>().ok())
+            .filter(|guid| guid.stored() != [0; 16]);
+        Ok(Self {
+            node,
+            record,
+            external: external(node, name, xml)?,
+            pose: child_pose(node),
+        })
+    }
+}
+
 pub(super) struct SourceLoss {
     pub(super) projection: bool,
     pub(super) inventory: bool,
@@ -121,23 +200,37 @@ pub(super) fn source_loss(
     level: &mut Level,
     entities: &EntXmlIndex,
     uses: &SourceUses,
+    cancel: Option<&CancelToken>,
 ) -> Result<SourceLoss, CatalogError> {
-    let inventory = level.capped || level.truncated;
-    let mut loss = SourceLoss {
-        projection: inventory,
-        inventory,
-    };
-    for child in &mut level.children {
-        if let Some(location) = &mut child.location {
-            Arc::get_mut(location)
-                .ok_or(ExportAccountingError::ConflictingSourceDatum)?
-                .attach_entity(entities, uses);
+    let mut inventory = level.truncated;
+    let mut malformed = false;
+    let mut parents = Vec::new();
+    let mut children = level.children.iter_mut();
+    loop {
+        if cancel.is_some_and(CancelToken::is_cancelled) {
+            return Err(CatalogError::Cancelled);
         }
-        let below = source_loss(&mut child.below, entities, uses)?;
-        loss.projection |= matches!(&child.pose, Pose::Malformed { .. }) || below.projection;
-        loss.inventory |= below.inventory;
+        if let Some(child) = children.next() {
+            if let Some(location) = &mut child.location {
+                Arc::get_mut(location)
+                    .ok_or(ExportAccountingError::ConflictingSourceDatum)?
+                    .attach_entity(entities, uses);
+            }
+            malformed |= matches!(&child.pose, Pose::Malformed { .. });
+            inventory |= child.below.truncated;
+            if !child.below.children.is_empty() {
+                parents.push(children);
+                children = child.below.children.iter_mut();
+            }
+        } else if let Some(parent) = parents.pop() {
+            children = parent;
+        } else {
+            return Ok(SourceLoss {
+                projection: inventory || malformed,
+                inventory,
+            });
+        }
     }
-    Ok(loss)
 }
 
 pub(super) fn child_lists(node: Root<'_>) -> impl Iterator<Item = Root<'_>> {

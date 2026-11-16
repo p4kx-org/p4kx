@@ -17,8 +17,9 @@ container on the chain (up to 128 MiB each) was held at once. Only the systems r
   an explicit stack to compose positions in authored depth-first order. A physical container
   can contribute under multiple positions. Only a link to an active ancestor is a cycle.
 - **Memory bound.** The parse keeps at most `Limits::children` (4,194,304) Children in all
-  containers together, counted by one shared counter, and nests lists at most `Limits::depth`
-  (64) deep. A list cut by the counter is marked and reported as a skipped Child; which
+  containers together, counted by one shared counter. The source tree is read, visited, and
+  freed iteratively using cursors proportional to the current ancestry. Text XML follows the
+  text parser's admission policy. A list cut by the counter produces a skipped Child entry. Which
   container is cut when the bound is hit depends on the thread order, which only matters for an
   Archive that is already reported as over the limit. The raw XML and its DOM are alive only
   while one container is parsed, so the peak is the kept Children plus, per rayon thread, one

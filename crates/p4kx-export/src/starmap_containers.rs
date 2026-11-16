@@ -63,16 +63,11 @@ mod collect_tests;
 pub(crate) struct Limits {
     /// The most Child elements one star system may place, itself and its external containers.
     pub(crate) children: usize,
-    /// The deepest chain of Child elements that is followed.
-    pub(crate) depth: usize,
 }
 
 impl Default for Limits {
     fn default() -> Self {
-        Self {
-            children: 1 << 22,
-            depth: 64,
-        }
+        Self { children: 1 << 22 }
     }
 }
 

@@ -104,7 +104,7 @@ impl Placements {
             &index,
             &roots,
             cancel,
-            (limits.depth, limits.children, endpoints.is_some()),
+            (limits.children, endpoints.is_some()),
             capture,
         )?;
         if cancel.is_some_and(CancelToken::is_cancelled) {
