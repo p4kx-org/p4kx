@@ -156,11 +156,12 @@ pinned 0.5.9 AMD64 and explicitly analyzes `--target <target>`, including on an 
 its compatibility execution is dependency analysis, never native app evidence. WiX is pinned
 7.0.0. Native compiler and nextest pins come from the common setup.
 
-The shared workflow scans every architecture-specific package, attests each target's packages
-and metadata and assembles SHA-256/SHA3-512 sums. The Linux owner consumes `linux-matrix` from
-the same prepare job and emits the same `release-<target>` interface. Publishing requires all
-twelve packages, twelve SBOMs and four executed native proofs; a Windows-only run cannot publish
-a partial matrix. PR runs prepare artifacts without publication.
+Release preflight verifies thirteen native packages, fifteen target/application SBOMs and five
+native runtime records across Windows, Linux and macOS. For a tagged release, the workflow
+verifies the scan result for each exact package, attests target packages and metadata, and
+assembles SHA-256 and SHA3-512 checksums. Windows-only runs validate both native Windows targets
+and upload package evidence. Publication uses the full
+[release preflight](supported-platforms.md#release-preflight-and-evidence).
 
 MSI transport keeps its single execute AppSearch before CostInitialize. Early Reserve carries only
 ProductCode, actual PackageCode and a fresh nonce; after costing and InstallValidate, Seal binds
