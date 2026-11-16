@@ -13,7 +13,10 @@ use crate::source_use::{
 };
 use crate::{SourceInput, SourceScope, SourceUses, SourceValue};
 
-use super::{LocationView, StoredXmlSite};
+use super::{LocationView, RetainedLocation, StoredXmlSite};
+
+#[path = "source_reference_subresource_tests.rs"]
+mod reference_subresource_tests;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -320,10 +323,10 @@ fn compact_xml_locations_keep_the_original_keys_and_shapes() -> TestResult {
 }
 
 #[test]
-fn compact_xml_falls_back_for_other_shapes_and_preserves_full_ids() -> TestResult {
+fn full_xml_uses_keep_exact_ids_with_specialized_and_generic_storage() -> TestResult {
     let uses = SourceUses::new();
     let scope = uses.observe(SourceInput::Unknown, InputScope::Payload)?;
-    for (location, compact) in [
+    for (location, specialized) in [
         (subresource("xml", &[64], "$absent:@pos"), true),
         (subresource("xml", &[0, u64::MAX], "$text"), true),
         (subresource("xml", &[u64::MAX], "$name"), false),
@@ -333,6 +336,22 @@ fn compact_xml_falls_back_for_other_shapes_and_preserves_full_ids() -> TestResul
         (subresource("xmlSource.cryXml", &[7, u64::MAX], "@a"), false),
         (subresource("xmlSource.cryxml", &[7, 2], "@a"), false),
     ] {
+        let payload = scope.at(location.clone(), SourceUseRole::Payload)?;
+        assert_eq!(
+            payload.reference().as_str(),
+            format!(
+                "u2:u0:payload:payload:{}",
+                LocationView::Original(&location).key()
+            ),
+            "the full reference keeps the exact original location key",
+        );
+        assert_eq!(
+            matches!(payload.description().location, RetainedLocation::Xml(_)),
+            specialized,
+            "only the recognized XML coordinates use specialized XML storage",
+        );
+        let compact =
+            matches!(&location, SourceLocation::Subresource { indices, .. } if indices.len() <= 2);
         verify_roles(&uses, &scope, &location, compact)?;
     }
     Ok(())

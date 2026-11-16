@@ -73,24 +73,28 @@ impl UseReferences {
         scope: InputScope,
         role: SourceUseRole,
         location: LocationView<'_>,
-    ) -> SourceUseRef {
+    ) -> (SourceUseRef, Option<usize>) {
         if matches!(self, Self::CompactCoordinates) {
-            return source_use_ref_encoding::encode(source, scope, role, location);
+            return (
+                source_use_ref_encoding::encode(source, scope, role, location),
+                None,
+            );
         }
         let source = source.as_str();
+        let location = location.key();
         let id = SourceUseRef::registered(format!(
-            "u{}:{source}:{}:{}:{}",
+            "u{}:{source}:{}:{}:{location}",
             source.len(),
             scope.key(),
-            role.key(),
-            location.key()
+            role.key()
         ));
         let Self::CompactOrdinals(compact) = self else {
-            return id;
+            let location_start = id.as_str().len() - location.len();
+            return (id, Some(location_start));
         };
         let ordinal = compact.aliases.len();
         let batch = compact.batch;
-        compact
+        let id = compact
             .aliases
             .entry(id)
             .or_insert_with(|| {
@@ -99,7 +103,8 @@ impl UseReferences {
                     |batch| format!("u{batch}.{ordinal}"),
                 ))
             })
-            .clone()
+            .clone();
+        (id, None)
     }
 }
 
@@ -291,12 +296,16 @@ impl SourceRegistry {
         role: SourceUseRole,
         encryption: SourceEncryptionState,
     ) -> SourceUse {
-        let id =
+        let (id, full_start) =
             self.use_references
                 .reference(source, scope, role, LocationView::Original(&location));
         let compact = matches!(self.use_references, UseReferences::CompactCoordinates);
         self.retain_use(id, source, scope, role, encryption, |id| {
-            RetainedLocation::new(location, compact.then_some(id))
+            RetainedLocation::new(
+                location,
+                compact.then_some(id),
+                full_start.map(|start| (id, start)),
+            )
         })
     }
 
@@ -305,7 +314,7 @@ impl SourceRegistry {
         original: &SourceUseDescription,
         role: SourceUseRole,
     ) -> SourceUse {
-        let id = self.use_references.reference(
+        let (id, full_start) = self.use_references.reference(
             original.source(),
             original.scope(),
             role,
@@ -317,7 +326,7 @@ impl SourceRegistry {
             original.scope(),
             role,
             original.effective_encryption(),
-            |id| original.location.for_reference(id),
+            |id| original.location.for_reference(id, full_start),
         )
     }
 
