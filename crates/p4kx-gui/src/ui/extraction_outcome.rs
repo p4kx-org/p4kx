@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use egui::text::{LayoutJob, TextFormat};
-use egui::{Id, InnerResponse, ScrollArea, Sense, Ui, vec2};
+use egui::{Id, InnerResponse, Response, ScrollArea, Sense, Ui, vec2};
 use fluent_bundle::FluentValue;
 use p4kx_extraction::Progress;
 
@@ -349,6 +349,10 @@ pub(super) fn list(
 }
 
 pub(super) fn list_row(ui: &mut Ui, text: &str, reason: Option<usize>) {
+    let _response = list_row_response(ui, text, reason);
+}
+
+pub(super) fn list_row_response(ui: &mut Ui, text: &str, reason: Option<usize>) -> Response {
     let size = vec2(ui.available_width(), ROW_HEIGHT);
     let (rect, response) = ui.allocate_exact_size(size, Sense::hover());
     response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Label, true, text));
@@ -367,4 +371,5 @@ pub(super) fn list_row(ui: &mut Ui, text: &str, reason: Option<usize>) {
     let galley = ui.fonts_mut(|fonts| fonts.layout_job(job));
     paint_left(ui, inner, galley, palette::GRAY_1);
     paint_divider(ui.painter(), rect);
+    response
 }

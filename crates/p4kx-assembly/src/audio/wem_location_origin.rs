@@ -226,6 +226,15 @@ impl WemLocationOrigins {
 }
 
 impl SoundVariant<'_> {
+    /// Returns the exact physical Entry holding the selected WEM.
+    #[must_use]
+    pub fn wem_location_entry<'archive>(
+        &self,
+        archive: &'archive Archive,
+    ) -> Option<ObservedEntry<'archive>> {
+        entry(archive, &self.location_source.as_ref()?.entry)
+    }
+
     /// Returns the original selected WEM metadata, including each bank-relative DIDX word.
     ///
     /// Use a path-source resolution to retain evidence. An unproved location is unknown.

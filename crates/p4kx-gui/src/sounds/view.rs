@@ -87,10 +87,10 @@ pub enum Playable {
 }
 
 /// Where the bytes of a WEM to play are.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Playback {
-    Loose(String),
-    Embedded { bank: String, wem: u32 },
+    Loose(u32),
+    Embedded { bank: u32, wem: u32 },
 }
 
 /// One sound a trigger may play, with the details of where it comes from.

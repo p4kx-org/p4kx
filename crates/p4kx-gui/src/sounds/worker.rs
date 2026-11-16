@@ -13,8 +13,9 @@ use p4kx_assembly::audio::{
 use p4kx_assembly::{ENTITY_TYPE, Entities};
 use p4kx_extraction::{CancelToken, ConversionError};
 
+use super::provenance::{ResolvedSoundList, SoundListProvenance};
 use super::resolve::{entity_rows, search_rows, sound_list};
-use super::view::{EntityInfo, IndexInfo, ListSource, SoundList, TriggerList};
+use super::view::{EntityInfo, IndexInfo, ListSource, TriggerList};
 use crate::EntryIndex;
 use crate::forge_cache::ReadFailure;
 use crate::model::describe;
@@ -69,7 +70,7 @@ pub(super) enum Answer {
     Ready(IndexInfo),
     Unavailable,
     List(u64, Result<TriggerList, ListError>),
-    Sounds(u64, Result<SoundList, String>),
+    Sounds(u64, Result<Box<ResolvedSoundList>, String>),
     Exported(u64, Result<Written, String>),
 }
 
@@ -158,11 +159,8 @@ pub(super) fn run(
     cancel: &CancelToken,
     wake: Wake<'_>,
 ) {
-    if index.watch().check().is_err() {
-        send(answers, wake, Answer::Unavailable);
-        return;
-    }
-    let Some(archive) = index.archive() else {
+    let archive = index.watch().check().ok().and_then(|()| index.archive());
+    let Some(archive) = archive else {
         send(answers, wake, Answer::Unavailable);
         return;
     };
@@ -193,9 +191,10 @@ pub(super) fn run(
                     Request::List(generation, list) => {
                         Answer::List(generation, make_list(index, &audio, list))
                     }
-                    Request::Resolve(generation, trigger) => {
-                        Answer::Sounds(generation, resolve(&audio, &choice, &trigger, cancel))
-                    }
+                    Request::Resolve(generation, trigger) => Answer::Sounds(
+                        generation,
+                        resolve(index, &audio, &choice, &trigger, cancel),
+                    ),
                     Request::Language(name) => {
                         choice = LanguageChoice::new(name.as_deref(), default_language);
                         continue;
@@ -311,17 +310,23 @@ fn entity_list(
 }
 
 fn resolve(
+    index: &EntryIndex,
     audio: &ArchiveAudio<'_>,
     choice: &LanguageChoice,
     trigger: &str,
     cancel: &CancelToken,
-) -> Result<SoundList, String> {
-    let options = ResolveOptions::default().with_cancel(cancel);
-    audio
+) -> Result<Box<ResolvedSoundList>, String> {
+    let options = ResolveOptions::default()
+        .with_cancel(cancel)
+        .with_path_sources();
+    let sounds = audio
         .resolve_trigger_with_options(trigger, choice, options)
         .map_err(|error| describe(&error))?
-        .map(|sounds| sound_list(&sounds))
-        .ok_or_else(|| trigger.to_owned())
+        .ok_or_else(|| trigger.to_owned())?;
+    Ok(Box::new(ResolvedSoundList {
+        list: sound_list(index, &sounds),
+        provenance: SoundListProvenance::capture(audio.archive(), audio.index(), &sounds),
+    }))
 }
 
 fn write(

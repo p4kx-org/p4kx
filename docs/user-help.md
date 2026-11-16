@@ -421,7 +421,9 @@ Entity (or use the selected Record) and press **Show sounds**, or search the aud
 Wwise events of the whole Archive by name (`Play_*_Spool`; `*` and `?` allowed). Each trigger shows
 its status (resolved, no definition, no event, no soundbank) and its Wwise events. Selecting a
 trigger resolves its sounds: soundbank, WEM ID, source (embedded, prefetched, streamed, plug-in) and
-language, and lists the places where the way to a sound breaks. Select a sound to play it; a
+language, and lists the places where the way to a sound breaks. Hover over the selected sound's
+details or a broken-link row to see the original encryption provenance of its individual fields.
+Select a sound to play it. Playback uses the physical Archive Entry selected by the resolver. A
 sound with no loose WEM Entry or only a prefetched start is explained instead. **Export sounds…**
 writes the sounds of the selected trigger or of all triggers as Ogg, WAV or unchanged WEM files.
 `p4kx wwise` and `p4kx entity audio` do the same on the command line.

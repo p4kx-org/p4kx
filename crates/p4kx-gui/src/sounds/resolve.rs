@@ -7,6 +7,7 @@ use p4kx_assembly::audio::{
 };
 
 use super::view::{BreakLine, EventLine, Playable, Playback, SoundList, TriggerRow, Variant};
+use crate::EntryIndex;
 
 fn event_line(event: &EventMatch<'_>, matched: bool) -> EventLine {
     EventLine {
@@ -49,8 +50,12 @@ pub(super) fn search_rows(page: &SearchPage<'_>) -> Vec<TriggerRow> {
         .collect()
 }
 
-fn variant(variant: &SoundVariant<'_>) -> Variant {
+fn variant(index: &EntryIndex, variant: &SoundVariant<'_>) -> Variant {
     let kind = variant.source_kind();
+    let entry = index
+        .archive()
+        .and_then(|archive| variant.wem_location_entry(archive))
+        .and_then(|entry| index.id_of_entry(entry.entry()));
     let (playable, playback) = match (variant.wem_id(), kind, variant.location()) {
         (None, SourceKind::External, _) => (Playable::External, None),
         (None, _, _) | (_, SourceKind::Plugin, _) => (Playable::Plugin, None),
@@ -59,15 +64,12 @@ fn variant(variant: &SoundVariant<'_>) -> Variant {
         (Some(_), SourceKind::PrefetchStreamed, Some(WemLocation::Soundbank { .. })) => {
             (Playable::PrefetchOnly, None)
         }
-        (Some(wem), _, Some(WemLocation::Soundbank { soundbank, .. })) => (
+        (Some(wem), _, Some(WemLocation::Soundbank { .. })) => (
             Playable::Yes,
-            Some(Playback::Embedded {
-                bank: soundbank.path().to_owned(),
-                wem,
-            }),
+            entry.map(|bank| Playback::Embedded { bank, wem }),
         ),
-        (Some(_), _, Some(WemLocation::Entry { path, .. })) => {
-            (Playable::Yes, Some(Playback::Loose((*path).to_owned())))
+        (Some(_), _, Some(WemLocation::Entry { .. })) => {
+            (Playable::Yes, entry.map(Playback::Loose))
         }
         (Some(_), _, _) => (Playable::Missing, None),
     };
@@ -97,10 +99,14 @@ fn break_line(link: &BrokenLink<'_>) -> BreakLine {
 }
 
 /// Returns the sounds of a trigger as the list shows them.
-pub(super) fn sound_list(sounds: &TriggerSounds<'_>) -> SoundList {
+pub(super) fn sound_list(index: &EntryIndex, sounds: &TriggerSounds<'_>) -> SoundList {
     SoundList {
         trigger: sounds.trigger().name().to_owned(),
-        variants: sounds.variants().iter().map(variant).collect(),
+        variants: sounds
+            .variants()
+            .iter()
+            .map(|row| variant(index, row))
+            .collect(),
         breaks: sounds.breaks().iter().map(break_line).collect(),
     }
 }

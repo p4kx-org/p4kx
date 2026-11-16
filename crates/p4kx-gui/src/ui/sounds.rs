@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use egui::{Color32, Frame, Label, Margin, Panel, RichText, ScrollArea, Ui};
+use egui::{Color32, Frame, Label, Margin, Panel, Response, RichText, ScrollArea, Ui};
 use fluent_bundle::FluentValue;
 
 use super::audio_preview::{self, AudioAction, Named};
-use super::record_export_outcome;
 use super::sounds_note::player_note;
 use super::{RESIZE_GAP, empty, list_footer, sounds_toolbar, sounds_triggers, sounds_variants};
 use crate::theme::desktop::{
@@ -22,6 +21,9 @@ use crate::{
     ListSource, ListStatus, Model, SoundList, SoundsListStatus, SoundsStatus, SoundsText, Texts,
     TriggerList, format,
 };
+
+#[path = "sounds_origins.rs"]
+mod origins;
 
 /// Shows the Sounds tab: the Entity and search fields, the audio triggers they list and, below,
 /// the sounds of the selected trigger with the player, or the state of indexing the audio.
@@ -252,39 +254,13 @@ fn sounds(ui: &mut Ui, model: &Model, list: &SoundList) -> Option<DetailAction> 
             ("number", format::number(total, texts.language()).into()),
         ],
     );
-    padded(
+    let proof = origins::proof(tab);
+    let heading = padded(
         ui,
         plain(heading, FS_SM, Weight::Bold).color(palette::GRAY_1),
     );
-    if !list.breaks.is_empty() {
-        let breaks = u64::try_from(list.breaks.len()).unwrap_or(u64::MAX);
-        let heading = texts.format(
-            SoundsText::BreaksHeading,
-            &[
-                ("count", FluentValue::from(breaks)),
-                ("number", format::number(breaks, texts.language()).into()),
-            ],
-        );
-        let lines: Vec<String> = list
-            .breaks
-            .iter()
-            .map(|link| {
-                let mut args = vec![
-                    ("name", link.event.clone().into()),
-                    ("reason", link.reason.clone().into()),
-                ];
-                let text = link
-                    .soundbank
-                    .as_ref()
-                    .map_or(SoundsText::BreakLine, |bank| {
-                        args.push(("bank", bank.clone().into()));
-                        SoundsText::BreakLineIn
-                    });
-                texts.format(text, &args)
-            })
-            .collect();
-        record_export_outcome::list(ui, (&heading, "sound-breaks"), &lines, None, false);
-    }
+    origins::heading(heading, texts, proof);
+    origins::broken_links(ui, texts, list, proof);
     if list.variants.is_empty() {
         message(ui, texts.get(SoundsText::NoVariants), palette::GRAY_2_TEXT);
         return None;
@@ -305,7 +281,10 @@ fn sounds(ui: &mut Ui, model: &Model, list: &SoundList) -> Option<DetailAction> 
 fn selected(ui: &mut Ui, model: &Model, list: &SoundList) -> Option<AudioAction> {
     let texts = model.texts();
     let tab = model.sounds();
-    let Some(variant) = tab.selected_variant().and_then(|at| list.variants.get(at)) else {
+    let Some((position, variant)) = tab
+        .selected_variant()
+        .and_then(|at| list.variants.get(at).map(|variant| (at, variant)))
+    else {
         message(
             ui,
             texts.get(SoundsText::SelectVariant),
@@ -323,10 +302,11 @@ fn selected(ui: &mut Ui, model: &Model, list: &SoundList) -> Option<AudioAction>
             ("source", source.into()),
         ],
     );
-    padded(
+    let response = padded(
         ui,
         plain(detail, FS_SM, Weight::Regular).color(palette::GRAY_2_TEXT),
     );
+    origins::variant(response, texts, origins::proof(tab), position);
     let audio = tab.audio();
     if let Some(note) = player_note(variant.playable(), audio.is_some()) {
         message(ui, texts.get(note), palette::WARNING);
@@ -349,12 +329,11 @@ fn selected(ui: &mut Ui, model: &Model, list: &SoundList) -> Option<AudioAction>
 }
 
 /// Shows `text` with the inner padding of a table cell.
-fn padded(ui: &mut Ui, text: RichText) {
+fn padded(ui: &mut Ui, text: RichText) -> Response {
     Frame::NONE
         .inner_margin(Margin::symmetric(px(CELL_PADDING_X), 0))
-        .show(ui, |ui| {
-            ui.label(text);
-        });
+        .show(ui, |ui| ui.label(text))
+        .inner
 }
 
 fn loading(ui: &mut Ui, texts: &Texts, text: SoundsText) {

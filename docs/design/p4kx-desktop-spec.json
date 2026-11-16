@@ -1133,6 +1133,7 @@
     "columnsFrom": "name: the sample name of forty characters Play_SC_Ship_Weapon_Ballistic_Fire_Heavy, 293.0, longer names clip; state: the longest status or head of the trigger table in German or British English, 131.4; language: the default language English(US) with the fallback mark in German or British English, 155.0; language folder names are Archive data, so other names may clip and the column is resizable; each in bold at the row font plus the cell padding twice, rounded up",
     "columnMin": 80,
     "dividers": "the column dividers of the trigger table end above the list footer, like the tag tree",
+    "originTooltips": "the existing tooltip on the variant heading, selected sound details and each broken-link row shows original encryption provenance field by field",
     "languagePicker": "a wrapping row between the Entity actions and the search field, shown only while the Archive holds more than one language folder: the eyebrow label, then one btn-xs per language, the chosen one in the selected colours of the controls (control-selected-bg, control-selected-border, control-selected-fg) and exposed as selected, the others btn-ghost; btn-outline stays the primary action"
   },
   "xmlPreview": {

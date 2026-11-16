@@ -163,8 +163,9 @@ pub use record_tree::{DataForgeFailure, RecordNode, RecordRow, RecordTree, Recor
 pub use sort::{Sort, SortColumn, SortDirection};
 pub use sounds::{
     BreakLine, EntityInfo, EventLine, IndexInfo, ListSource, ListStatus, MAX_SOUND_HITS, Playable,
-    SoundList, SoundsExport, SoundsExportSetup, SoundsExportStatus, SoundsListStatus, SoundsScope,
-    SoundsStatus, SoundsTab, TriggerList, TriggerRow, Variant,
+    SoundBreakProvenance, SoundList, SoundListProvenance, SoundVariantProvenance, SoundsExport,
+    SoundsExportSetup, SoundsExportStatus, SoundsListStatus, SoundsScope, SoundsStatus, SoundsTab,
+    TriggerList, TriggerRow, Variant,
 };
 pub use tags::{TagRow, TagsStatus, TagsTab, TagsView};
 pub use texts::{

@@ -4,6 +4,7 @@
 mod export;
 mod exporting;
 mod language;
+mod provenance;
 mod resolve;
 mod status;
 mod view;
@@ -13,7 +14,10 @@ mod worker_tests;
 
 use std::sync::Arc;
 
+use p4kx_extraction::SourceEvidenceError;
+
 pub use export::{SoundsExport, SoundsExportSetup, SoundsExportStatus, SoundsScope};
+pub use provenance::{SoundBreakProvenance, SoundListProvenance, SoundVariantProvenance};
 pub use status::{ListStatus, SoundsListStatus, SoundsStatus};
 pub use view::{
     BreakLine, EntityInfo, EventLine, IndexInfo, ListSource, Playable, SoundList, TriggerList,
@@ -132,8 +136,19 @@ impl SoundsTab {
             Sounds::None => SoundsListStatus::None,
             Sounds::Loading => SoundsListStatus::Loading,
             Sounds::Undefined => SoundsListStatus::Undefined,
-            Sounds::Ready(list) => SoundsListStatus::Ready(list),
+            Sounds::Ready(list) => SoundsListStatus::Ready(&list.list),
         }
+    }
+
+    /// Returns the exact sound receipts or their preparation error for the current result.
+    #[must_use]
+    pub fn resolution_provenance(
+        &self,
+    ) -> Option<Result<&SoundListProvenance, SourceEvidenceError>> {
+        let Sounds::Ready(result) = &self.sounds else {
+            return None;
+        };
+        Some(result.provenance.as_ref().map_err(|error| *error))
     }
 
     /// Returns a number that changes with every resolved sound list.
@@ -288,19 +303,20 @@ impl SoundsTab {
         let Sounds::Ready(list) = &self.sounds else {
             return;
         };
-        let Some(variant) = list.variants.get(position) else {
+        let Some(variant) = list.list.variants.get(position) else {
             return;
         };
         if self.variant == Some(position) {
             return;
         }
         self.audio = match &variant.playback {
-            Some(Playback::Loose(path)) => index
-                .id_of_path(path)
-                .map(|id| AudioPreview::start(index, id, wake)),
-            Some(Playback::Embedded { bank, wem }) => index
-                .id_of_path(bank)
-                .map(|id| AudioPreview::start_in_bank(index, (id, *wem), &self.banks, wake)),
+            Some(Playback::Loose(id)) => Some(AudioPreview::start(index, *id, wake)),
+            Some(Playback::Embedded { bank, wem }) => Some(AudioPreview::start_in_bank(
+                index,
+                (*bank, *wem),
+                &self.banks,
+                wake,
+            )),
             None => None,
         };
         self.variant = Some(position);
@@ -359,7 +375,7 @@ impl SoundsTab {
             Answer::Sounds(generation, result) if generation == self.sounds_generation => {
                 self.sounds_serial += 1;
                 self.sounds = match result {
-                    Ok(list) => Sounds::Ready(Box::new(list)),
+                    Ok(list) => Sounds::Ready(list),
                     Err(_unknown) => Sounds::Undefined,
                 };
             }
