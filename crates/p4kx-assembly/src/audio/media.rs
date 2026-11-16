@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 use super::language::{LooseName, bank_language, loose_name};
 use super::read::folded_order;
-use super::{AudioFileError, MAX_LANGUAGES, MAX_LOOSE_WEMS, WemLocation};
+use super::{MAX_LANGUAGES, MAX_LOOSE_WEMS, WemLocation};
 
 /// A loose WEM Entry of the audio index.
 #[derive(Debug)]
@@ -31,6 +31,12 @@ pub(crate) struct WemSource<'a> {
 pub(crate) struct BankPath<'a> {
     pub(crate) path: &'a str,
     pub(crate) entry: usize,
+}
+
+#[derive(Debug)]
+pub(super) struct MediaOmission {
+    pub(super) path: Box<str>,
+    pub(super) entry: usize,
 }
 
 /// How many loose WEMs and language folders [`LooseMedia::collect`] keeps.
@@ -64,20 +70,20 @@ impl LooseMedia {
     ///
     /// Returns the Entries that were left out, the first of each cause: past `limits.wems` WEMs or
     /// `limits.languages` languages further ones are dropped.
-    pub(crate) fn collect<'a>(
+    pub(super) fn collect<'a>(
         wems: impl Iterator<Item = WemSource<'a>>,
         bank_paths: impl Iterator<Item = BankPath<'a>>,
         limits: Limits,
-    ) -> (Self, Vec<(Box<str>, AudioFileError)>) {
+    ) -> (Self, Vec<MediaOmission>) {
         let mut media = Self::default();
-        let mut bank_failure: Option<&str> = None;
-        let mut wem_failure: Option<&str> = None;
+        let mut bank_failure = None;
+        let mut wem_failure = None;
         for BankPath { path, entry } in bank_paths {
             let Some(name) = bank_language(path) else {
                 continue;
             };
             if media.language(name, entry, limits.languages).is_none() {
-                bank_failure.get_or_insert(path);
+                bank_failure.get_or_insert((path, entry));
             }
         }
         let mut count = 0_usize;
@@ -89,7 +95,7 @@ impl LooseMedia {
                 media.language(name, source.entry as usize, limits.languages)
             });
             let Some(language) = language.filter(|_| count < limits.wems) else {
-                wem_failure.get_or_insert(source.path);
+                wem_failure.get_or_insert((source.path, source.entry as usize));
                 continue;
             };
             count += 1;
@@ -104,7 +110,10 @@ impl LooseMedia {
         let failures = [bank_failure, wem_failure]
             .into_iter()
             .flatten()
-            .map(|path| (path.into(), AudioFileError::TooManyMedia))
+            .map(|(path, entry)| MediaOmission {
+                path: path.into(),
+                entry,
+            })
             .collect();
         (media, failures)
     }
@@ -231,7 +240,7 @@ mod tests {
         wems: &[WemSource<'a>],
         banks: &[&'a str],
         limits: Limits,
-    ) -> (LooseMedia, Vec<(Box<str>, AudioFileError)>) {
+    ) -> (LooseMedia, Vec<MediaOmission>) {
         let bank_paths = banks
             .iter()
             .enumerate()
@@ -291,8 +300,14 @@ mod tests {
         assert_eq!(entries(&media, 2), vec![(2, None)]);
         assert_eq!(entries(&media, 3).len(), 0);
         assert_eq!(failures.len(), 1);
-        assert_eq!(&*failures[0].0, "Data\\Sounds\\wwise\\Media\\3.wem");
-        assert!(matches!(failures[0].1, AudioFileError::TooManyMedia));
+        assert_eq!(
+            failures
+                .iter()
+                .map(|omission| (&*omission.path, omission.entry))
+                .collect::<Vec<_>>(),
+            [("Data\\Sounds\\wwise\\Media\\3.wem", 3)],
+            "the omission keeps the physical position of the first WEM past the limit"
+        );
     }
 
     #[test]
@@ -311,13 +326,17 @@ mod tests {
         };
         let (media, failures) = collect(&wems, &banks, limits);
         assert_eq!(media.languages().len(), 1);
-        let paths: Vec<&str> = failures.iter().map(|(path, _)| &**path).collect();
+        let paths: Vec<_> = failures
+            .iter()
+            .map(|omission| (&*omission.path, omission.entry))
+            .collect();
         assert_eq!(
             paths,
             [
-                "Data\\Sounds\\wwise\\Dd\\y.bnk",
-                "Data\\Sounds\\wwise\\Media\\Aa\\1.wem"
-            ]
+                ("Data\\Sounds\\wwise\\Dd\\y.bnk", 1),
+                ("Data\\Sounds\\wwise\\Media\\Aa\\1.wem", 1)
+            ],
+            "bank and WEM omissions retain their respective candidate positions"
         );
     }
 

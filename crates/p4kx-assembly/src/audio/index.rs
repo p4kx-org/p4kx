@@ -9,6 +9,7 @@ use p4kx_extraction::CancelToken;
 use super::banks::{BankStinger, StingerDeclaration};
 use super::event_sources::BankEventIndex;
 use super::index_read::{self, BankRead};
+use super::inventory::{AudioSurveys, Candidate};
 use super::language::SOUND_FOLDER;
 use super::media::{BankPath, Limits, LooseMedia, WemSource};
 use super::read::{folded_order, has_extension, starts_with_folder};
@@ -25,7 +26,8 @@ use super::{
 /// name the same trigger, the first by Entry path wins.
 #[derive(Debug, Default)]
 pub struct AudioIndex {
-    definitions: AtlDefinitions,
+    pub(super) definitions: AtlDefinitions,
+    pub(super) surveys: AudioSurveys,
     soundbanks: Vec<IndexedSoundbank>,
     events: HashMap<u32, Box<[u32]>>,
     pub(super) event_sources: Vec<Option<BankEventIndex>>,
@@ -75,6 +77,7 @@ impl AudioIndex {
         let mut index = Self {
             definitions,
             issues,
+            surveys: AudioSurveys::new(archive),
             ..Self::default()
         };
         index.add_soundbanks(archive, &bank_entries, soundbanks);
@@ -87,11 +90,14 @@ impl AudioIndex {
             Limits::DEFAULT,
         );
         index.loose = loose;
-        index.issues.extend(
-            failures
-                .into_iter()
-                .map(|(path, error)| AudioIssue { path, error }),
-        );
+        index.issues.extend(failures.into_iter().map(|omission| {
+            AudioIssue::with_position(
+                archive,
+                omission.path,
+                omission.entry,
+                super::AudioFileError::TooManyMedia,
+            )
+        }));
         Some(index)
     }
 
@@ -106,7 +112,12 @@ impl AudioIndex {
         let mut bank_ids: HashMap<u32, Vec<u32>> = HashMap::new();
         let mut stingers = StingerList::default();
         for ((_, entry), soundbank) in entries.iter().zip(soundbanks) {
-            match soundbank {
+            self.surveys.soundbanks.push(Candidate::of(
+                entry,
+                soundbank.result.as_ref().err(),
+                soundbank.decoded_bytes,
+            ));
+            match soundbank.result {
                 Ok(contents) => {
                     let position = u32::try_from(self.soundbanks.len()).unwrap_or(u32::MAX);
                     bank_ids
@@ -134,10 +145,7 @@ impl AudioIndex {
                         });
                     }
                 }
-                Err(error) => self.issues.push(AudioIssue {
-                    path: entry.path().into(),
-                    error,
-                }),
+                Err(error) => self.issues.push(AudioIssue::new(archive, entry, error)),
             }
         }
         self.events = boxed(events);

@@ -19,6 +19,7 @@ mod hirc_path_source;
 mod hirc_route_source;
 mod index;
 mod index_read;
+mod inventory;
 mod language;
 mod locate;
 mod media;
@@ -55,6 +56,7 @@ pub use export::{
 };
 pub use hirc_path_source::HircPathSource;
 pub use index::AudioIndex;
+pub use inventory::{AudioCandidate, AudioCandidateState, AudioSurvey, AudioSurveyKind};
 pub use language::LanguageChoice;
 pub use p4kx_audio::wwise_id;
 pub use references::{

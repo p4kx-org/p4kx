@@ -11,6 +11,7 @@ use p4kx_extraction::CancelToken;
 use p4kx_extraction::sound::wwise_path;
 
 use super::index_read::{self, DefinitionRead};
+use super::inventory::Candidate;
 use super::read;
 use super::{AtlTrigger, AudioFileError, AudioIssue, MAX_AUDIO_TRIGGERS};
 
@@ -21,6 +22,7 @@ pub struct AtlDefinitions {
     triggers: Vec<AtlTrigger>,
     by_name: HashMap<Box<str>, usize>,
     issues: Vec<AudioIssue>,
+    candidates: Vec<Candidate>,
 }
 
 #[derive(Debug)]
@@ -50,7 +52,7 @@ impl AtlDefinitions {
         entries.sort_by(|(_, left), (_, right)| read::folded_order(left.path(), right.path()));
         let definitions = index_read::read_definitions(archive, &entries, cancel)?;
         let mut index = Self::default();
-        index.add_definitions(archive, &entries, definitions);
+        index.add_definitions(archive, &entries, definitions, MAX_AUDIO_TRIGGERS);
         Some(index)
     }
 
@@ -113,15 +115,20 @@ impl AtlDefinitions {
         self.files.get(usize::try_from(trigger.file).ok()?)
     }
 
+    pub(super) fn candidates(&self) -> &[Candidate] {
+        &self.candidates
+    }
+
     pub(super) fn take_issues(&mut self) -> Vec<AudioIssue> {
         mem::take(&mut self.issues)
     }
 
-    fn add_definitions(
+    pub(super) fn add_definitions(
         &mut self,
         archive: &Archive,
         entries: &[(usize, &Entry)],
         definitions: Vec<DefinitionRead>,
+        trigger_limit: usize,
     ) {
         self.files = entries
             .iter()
@@ -132,24 +139,31 @@ impl AtlDefinitions {
             })
             .collect();
         for ((_, entry), definition) in entries.iter().zip(definitions) {
-            let error = match definition {
-                Ok(triggers) => self.add_triggers(triggers).err(),
+            let before = self.triggers.len();
+            let error = match definition.result {
+                Ok(triggers) => self.add_triggers(triggers, trigger_limit).err(),
                 Err(error) => Some(error),
             };
+            let mut candidate = Candidate::of(entry, error.as_ref(), definition.decoded_bytes);
+            if self.triggers.len() > before {
+                candidate.retain_prefix();
+            }
+            self.candidates.push(candidate);
             if let Some(error) = error {
-                self.issues.push(AudioIssue {
-                    path: entry.path().into(),
-                    error,
-                });
+                self.issues.push(AudioIssue::new(archive, entry, error));
             }
         }
     }
 
-    fn add_triggers(&mut self, triggers: Vec<AtlTrigger>) -> Result<(), AudioFileError> {
+    fn add_triggers(
+        &mut self,
+        triggers: Vec<AtlTrigger>,
+        trigger_limit: usize,
+    ) -> Result<(), AudioFileError> {
         for trigger in triggers {
             if let Slot::Vacant(slot) = self.by_name.entry(trigger.name.to_ascii_lowercase().into())
             {
-                if self.triggers.len() >= MAX_AUDIO_TRIGGERS {
+                if self.triggers.len() >= trigger_limit {
                     return Err(AudioFileError::TooManyTriggers);
                 }
                 slot.insert(self.triggers.len());
