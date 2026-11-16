@@ -4,17 +4,45 @@
 use p4kx_testkit::{DataForgeBuilder, TestInstance, TestRecord, TestStruct, TestType, TestValue};
 
 use crate::commodity_v3_fixture;
+use crate::commodity_v3_fixture_records::{composition, container, entity, resource};
+use crate::commodity_v3_fixture_schema;
 
 /// Healthy optional costs whose distinct selector paths exceed decision-capture storage.
 pub(crate) const COST_COUNT: u16 = 1600;
 pub(crate) const BLUEPRINT: u128 = 0x104;
 pub(crate) const BLUEPRINT_INDEX: u64 = 10;
 pub(crate) const INDEPENDENT_RESOURCE: u128 = 4;
+pub(crate) const CRAFTED_COMMODITY: u128 = 0x105;
 
 pub(crate) fn database() -> DataForgeBuilder {
     structures(commodity_v3_fixture::database())
         .record(independent_resource())
-        .record(blueprint())
+        .record(blueprint(COST_COUNT))
+}
+
+pub(crate) fn crafted_database() -> DataForgeBuilder {
+    let fallback = commodity_v3_fixture::RESOURCE_FALLBACK;
+    let crafter = TestInstance::new("CrafterComponentParams")
+        .value("maxJobsInHistory", TestValue::Int32(1))
+        .value("baseCraftingTime", TestValue::Single(1.0));
+    structures(commodity_v3_fixture_schema::database())
+        .structure(
+            TestStruct::new("CrafterComponentParams")
+                .parent("FixtureComponent")
+                .field("maxJobsInHistory", TestType::Int32)
+                .field("baseCraftingTime", TestType::Single),
+        )
+        .record(resource(fallback, "Fallback", "@fallback_resource_name"))
+        .record(entity(
+            CRAFTED_COMMODITY,
+            "ResourceCrafter",
+            vec![
+                TestValue::Struct(crafter),
+                container(vec![composition(Some(fallback))]),
+            ],
+            Vec::new(),
+        ))
+        .record(blueprint(1))
 }
 
 fn structures(builder: DataForgeBuilder) -> DataForgeBuilder {
@@ -74,10 +102,10 @@ fn independent_resource() -> TestRecord {
     )
 }
 
-fn blueprint() -> TestRecord {
+fn blueprint(cost_count: u16) -> TestRecord {
     let costs = TestInstance::new("CraftingRecipeCosts").value(
         "optionalCosts",
-        TestValue::Array((0..COST_COUNT).map(cost).collect()),
+        TestValue::Array((0..cost_count).map(cost).collect()),
     );
     let recipe = TestInstance::new("CraftingRecipe").value("costs", TestValue::Struct(costs));
     let tier =

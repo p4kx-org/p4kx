@@ -154,15 +154,20 @@ pub(crate) struct Collected<'f> {
 
 impl<'f> Collected<'f> {
     /// Collects picked Records and crafting rows in GUID order.
+    #[cfg(test)]
     pub(crate) fn new(picked: Vec<Picked<'f>>, crafting: CraftingKinds<'f>) -> Self {
         let mut collected = Self::from_crafting(crafting);
-        let mut missing_categories = HashSet::new();
         for pick in picked {
-            collected.take(pick, &mut missing_categories);
+            collected.take(pick);
         }
-        missing_categories.extend(
-            collected
-                .ledger
+        collected.finish_selection();
+        collected
+    }
+
+    /// Orders the completed selection and retains category skip and failure identities.
+    pub(crate) fn finish_selection(&mut self) {
+        self.missing_blueprint_categories.extend(
+            self.ledger
                 .sources
                 .iter()
                 .filter(|source| {
@@ -175,16 +180,16 @@ impl<'f> Collected<'f> {
                 })
                 .map(|source| source.guid),
         );
-        collected.missing_blueprint_categories = missing_categories;
-        collected.order();
-        collected
+        self.order();
+        self.resource_group_members
+            .sort_by_cached_key(|row| (row.physical.guid.text(), row.physical.record_index));
     }
 
     #[expect(
         clippy::too_many_lines,
         reason = "one initializer per collected dataset"
     )]
-    fn from_crafting(crafting: CraftingKinds<'f>) -> Self {
+    pub(crate) fn from_crafting(crafting: CraftingKinds<'f>) -> Self {
         Self {
             skipped: Self::crafting_skipped(&crafting),
             ledger: crafting.ledger,
@@ -270,7 +275,7 @@ impl<'f> Collected<'f> {
         clippy::too_many_lines,
         reason = "one exhaustive dispatch arm per selected row"
     )]
-    fn take(&mut self, pick: Picked<'f>, missing_categories: &mut HashSet<Guid>) {
+    pub(crate) fn take(&mut self, pick: Picked<'f>) {
         match pick {
             Picked::Manufacturer(entity) => self.manufacturers.push(*entity),
             Picked::FactionIdentity(entity) => self.faction_identities.push(*entity),
@@ -336,11 +341,11 @@ impl<'f> Collected<'f> {
             Picked::Crafter(entity) => self.crafters.push(entity),
             Picked::Crafted(pick, entity) => {
                 self.crafters.push(entity);
-                self.take(*pick, missing_categories);
+                self.take(*pick);
             }
             Picked::Skipped(kind, guid) => {
                 if kind == Kind::BlueprintCategories {
-                    missing_categories.insert(guid);
+                    self.missing_blueprint_categories.insert(guid);
                 }
                 self.skip(kind);
             }

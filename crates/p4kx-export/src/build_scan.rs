@@ -15,7 +15,7 @@ use crate::catalog_read::original::EntryCapture;
 use crate::collected::Collected;
 use crate::options::{CatalogRun, CatalogStage};
 use crate::scan::{Scan, ScanDomain};
-use crate::scan_health::ScanRead;
+
 use crate::starmap_containers::jump_class::JumpEndpointRecords;
 use crate::starmap_containers::{PlacementScope, Placements};
 use crate::{CatalogError, CatalogOptions, StarmapSummary};
@@ -48,13 +48,13 @@ pub(super) fn scan<'f>(
         None => Placements::default(),
     };
     run.begin(CatalogStage::Records);
-    let scanned = Scan::run(
+    let mut collected = Scan::run(
         forge,
         files,
         Arc::clone(entities),
         options,
         projection,
-        &crafting,
+        crafting,
         ScanDomain::all(&placements),
     )?;
     if options.cancel.is_some_and(CancelToken::is_cancelled) {
@@ -62,7 +62,8 @@ pub(super) fn scan<'f>(
     }
     placements.release_record_lookup();
     run.begin(CatalogStage::Projections);
-    let mut collected = collect(crafting, scanned);
+    collected.finish_selection();
+
     // Harvest and loot consume placement dependencies in RecordSelection scope.
     if matches!(scope, Some(PlacementScope::ArchiveInventory)) {
         collected
@@ -96,19 +97,6 @@ pub(super) fn project_locations(
     add_harvest_locations(archive, placements, collected, cancel, capture)?;
     add_loot_containers(archive, placements, collected, cancel, capture)?;
     Ok(summary)
-}
-
-pub(super) fn collect<'f>(mut crafting: CraftingKinds<'f>, scanned: ScanRead<'f>) -> Collected<'f> {
-    crafting.ledger.merge(scanned.ledger);
-    let mut collected = Collected::new(scanned.picked, crafting);
-    collected.resource_group_members = scanned.resource_group_members;
-    collected
-        .resource_group_members
-        .sort_by_cached_key(|row| (row.physical.guid.text(), row.physical.record_index));
-    collected.tags.entity_tags = scanned.entity_tags;
-    collected.entity_configurations = scanned.entity_configurations;
-    collected.tags.order_entities();
-    collected
 }
 
 fn placement_scope(forge: &DataForge<'_>, options: &CatalogOptions<'_>) -> Option<PlacementScope> {

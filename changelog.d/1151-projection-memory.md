@@ -9,4 +9,6 @@
 - Reuse original Struct and array positions for mission source lookups instead of storing a second index of every occurrence.
 - Coalesce repeated whole-Record inspections during loadout resolution while retaining their source evidence.
 - Release duplicate field inspections as Record scan batches finish and index source uses with their existing IDs.
+- Collect selected Record rows directly into their catalog tables as each read window finishes.
+- Share common Commodity fallback source evidence across ResourceType rows.
 - Stage particle libraries and weapon animation candidates as they are projected.

@@ -13,7 +13,7 @@ use serde::Serialize;
 use serde_json::{Value, json};
 
 use crate::archive_key_use::ArchiveKeyUse;
-use crate::build::{original_input::OriginalCatalogInput, parts, scanning, source};
+use crate::build::{original_input::OriginalCatalogInput, parts, source};
 use crate::catalog_crafting;
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::{CatalogProjection, CatalogTextRegistry};
@@ -71,16 +71,17 @@ pub(super) fn read(
     let placements = Placements::default();
     let locations = quality_location_targets(&crafting.ledger)?;
     let domain = ScanDomain::resources(&placements, &locations);
-    let scanned = Scan::run(
+    let mut collected = Scan::run(
         &forge,
         &files,
         entities,
         &options,
         &projection,
-        &crafting,
+        crafting,
         domain,
     )?;
-    let mut collected = scanning::collect(crafting, scanned);
+    collected.finish_selection();
+
     let health = resource_health(&mut collected, &input, &options)?;
     let metadata = source(
         archive,

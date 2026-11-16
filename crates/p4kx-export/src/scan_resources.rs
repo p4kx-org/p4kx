@@ -3,21 +3,22 @@
 
 use std::collections::{BTreeSet, HashSet};
 
-use p4kx_extraction::{CancelToken, Guid, Record, RecordTree, TreeBuilder};
+use p4kx_extraction::{CancelToken, Guid, Record, RecordTree, SharedFieldOrigin, TreeBuilder};
 
 use super::projection::SelectedProjection;
 use super::{RESOURCE_TYPE, Scan};
 use crate::blueprint_catalog_rows::BlueprintRow;
-use crate::catalog_crafting::CraftingKinds;
-use crate::catalog_v3::catalog_entity_configurations::EntityConfigurationRows;
 use crate::catalog_v3::catalog_resource_network_read::resource_network_global;
+use crate::catalog_v3::tag_catalog::EntityTags;
+use crate::collected::Collected;
 use crate::commodity;
+use crate::commodity_backfill::{self, CommodityPresence};
 use crate::commodity_resource::{self, CommodityResource};
 use crate::export_diagnostic::{ExportDiagnosticCode, ExportSourceRole};
 use crate::export_ledger::{DerivedFailure, ExportLedger, SourceDiagnosis, SourceDisposition};
 use crate::picked::Picked;
 use crate::record_observation::RecordObservation;
-use crate::scan_health::{ScanError, ScanRead, SourceTrace};
+use crate::scan_health::{ScanError, SourceTrace};
 use crate::source_fields::FieldError;
 use crate::{CatalogError, ExportAccountingError, Kind};
 
@@ -27,9 +28,15 @@ struct ResourceRead<'source> {
 }
 
 struct BackfillContext<'context, 'source> {
-    picked: &'context [Picked<'source>],
-    crafting: &'context CraftingKinds<'source>,
-    scanned: &'context ExportLedger,
+    representation: SharedFieldOrigin,
+    collected: &'context Collected<'source>,
+}
+
+#[derive(Default)]
+pub(super) struct ResourceRows<'source> {
+    pub(super) picked: Vec<Picked<'source>>,
+    pub(super) entity_tags: Vec<EntityTags<'source>>,
+    pub(super) ledger: ExportLedger,
 }
 impl<'f> SelectedProjection<'_, '_, '_, 'f> {
     pub(super) fn resource_network_global(
@@ -166,14 +173,14 @@ impl<'f> Scan<'_, '_, 'f> {
     /// Reads the used additional resource definitions at their actual projection boundary.
     pub(super) fn resource_commodities(
         &self,
-        picked: &[Picked<'f>],
-        crafting: &CraftingKinds<'f>,
+        presence: CommodityPresence,
+        collected: &Collected<'f>,
         scanned: &ExportLedger,
-    ) -> Result<ScanRead<'f>, CatalogError> {
+    ) -> Result<ResourceRows<'f>, CatalogError> {
         let used = unrepresented_resources(
-            picked,
-            &crafting.blueprints,
-            crafting.quality.fallbacks.targets(),
+            &presence,
+            &collected.blueprints,
+            collected.quality.fallbacks.targets(),
         );
         let physical: BTreeSet<_> = scanned
             .sources
@@ -191,19 +198,15 @@ impl<'f> Scan<'_, '_, 'f> {
             })
             .map(|source| source.record_index)
             .collect();
+        if physical.is_empty() {
+            return Ok(ResourceRows::default());
+        }
         let context = BackfillContext {
-            picked,
-            crafting,
-            scanned,
+            representation: presence.into_origin(scanned, self.projection.origins()),
+            collected,
         };
         let mut trees = TreeBuilder::new();
-        let mut read = ScanRead {
-            picked: Vec::new(),
-            entity_tags: Vec::new(),
-            entity_configurations: EntityConfigurationRows::default(),
-            resource_group_members: Vec::new(),
-            ledger: ExportLedger::default(),
-        };
+        let mut read = ResourceRows::default();
         for index in physical {
             if self.options.cancel.is_some_and(CancelToken::is_cancelled) {
                 return Err(CatalogError::Cancelled);
@@ -264,15 +267,15 @@ impl<'f> Scan<'_, '_, 'f> {
             ExportSourceRole::Selected,
             self.options.cancel,
         )?);
-        let evidence = crate::commodity_backfill::for_resource(
+        let selection = commodity_backfill::for_resource(
             &tree,
-            context.picked,
-            context.crafting,
-            context.scanned,
+            &context.representation,
+            &context.collected.blueprints,
+            &context.collected.quality,
             self.projection.origins(),
         )?;
         let projection = self.projection.for_kind(Kind::Commodities);
-        let read = commodity::resource_commodity(&tree, &projection, &self.groups, &evidence)?;
+        let read = commodity::resource_commodity(&tree, &projection, &self.groups, selection)?;
         crate::source_projection_notes::record(
             Kind::Commodities,
             ExportSourceRole::Selected,
@@ -286,20 +289,14 @@ impl<'f> Scan<'_, '_, 'f> {
 }
 
 fn unrepresented_resources(
-    picked: &[Picked<'_>],
+    presence: &CommodityPresence,
     blueprints: &[BlueprintRow<'_>],
     quantizations: impl Iterator<Item = Guid>,
 ) -> HashSet<Guid> {
-    let mut carried = HashSet::new();
-    for pick in picked {
-        if let Picked::Commodity(commodity) = pick {
-            carried.extend(commodity.subtype_guid.map(|guid| guid.0));
-        }
-    }
     blueprints
         .iter()
         .flat_map(|blueprint| blueprint.resources.targets())
         .chain(quantizations)
-        .filter(|guid| !carried.contains(guid))
+        .filter(|guid| !presence.represents(guid))
         .collect()
 }

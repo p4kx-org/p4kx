@@ -29,16 +29,6 @@ pub(crate) struct RecordEntityRows<'f> {
     pub(crate) configurations: EntityConfigurationRows<'f>,
 }
 
-/// Rows and production accounting of the generic catalog scan.
-pub(crate) struct ScanRead<'f> {
-    pub(crate) picked: Vec<Picked<'f>>,
-    pub(crate) entity_tags: Vec<EntityTags<'f>>,
-    pub(crate) entity_configurations: EntityConfigurationRows<'f>,
-    pub(crate) resource_group_members:
-        Vec<crate::catalog_v3::resource_group_catalog::ResourceGroupMembers>,
-    pub(crate) ledger: ExportLedger,
-}
-
 /// A source-Record failure remains separate from cancellation or accounting failure.
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum ScanError {

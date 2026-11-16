@@ -13,6 +13,7 @@ use crate::catalog_crafting::CraftingKinds;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_v3::catalog_entity_configurations;
 use crate::catalog_v3::catalog_item_alignment::AlignmentOptions;
+use crate::collected::Collected;
 use crate::entity_selection::{Selected, select};
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
@@ -22,7 +23,7 @@ use crate::picked::Picked;
 use crate::playability_rules::Evidence;
 use crate::record_observation::RecordObservation;
 use crate::resource_group::Groups;
-use crate::scan_health::{RecordEntityRows, RecordScan, ScanError, ScanRead, SourceTrace};
+use crate::scan_health::{RecordEntityRows, RecordScan, ScanError, SourceTrace};
 use crate::scan_signature::SignatureSlot;
 use crate::ship_pool::ShipPool;
 use crate::starmap::TypeNames;
@@ -89,9 +90,9 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
         entities: Arc<Entities<'f>>,
         options: &'o CatalogOptions<'a>,
         projection: &'f CatalogProjection<'f, 'f>,
-        crafting: &CraftingKinds<'f>,
+        crafting: CraftingKinds<'f>,
         domain: ScanDomain<'o>,
-    ) -> Result<ScanRead<'f>, CatalogError> {
+    ) -> Result<Collected<'f>, CatalogError> {
         projection.original().check_forge(forge)?;
         let records = domain.records(forge);
         let groups::GroupRead {

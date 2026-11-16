@@ -1,26 +1,91 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{RecordTree, SourceUseRole};
+use std::collections::HashSet;
+
+use p4kx_extraction::{
+    Guid, RecordTree, SharedFieldOrigin, SourceUse, SourceUseRole, SourceValue, SourcedValue,
+};
 
 use crate::CatalogError;
-use crate::catalog_crafting::CraftingKinds;
+use crate::blueprint_catalog_rows::BlueprintRow;
 use crate::catalog_origins::CatalogOrigins;
+use crate::commodity_contract::{Commodity, CommoditySelection};
 use crate::commodity_inputs::CommodityInputs;
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_ledger::ExportLedger;
 use crate::picked::Picked;
+use crate::quality_catalog::QualityRows;
 use crate::record_header_field::{RecordHeaderField, RecordHeaderInput};
 use crate::selection::Kind;
 
+/// Original Commodity observations needed to decide `ResourceType` backfill.
+pub(crate) struct CommodityPresence {
+    represented: HashSet<Guid>,
+    inputs: Vec<SourceUse>,
+    complete: bool,
+}
+
+impl CommodityPresence {
+    pub(crate) fn new() -> Self {
+        Self {
+            represented: HashSet::new(),
+            inputs: Vec::new(),
+            complete: true,
+        }
+    }
+
+    pub(crate) fn observe(&mut self, pick: &mut Picked<'_>) {
+        match pick {
+            Picked::Commodity(row) => {
+                self.represented.extend(row.subtype_guid.map(|guid| guid.0));
+                self.inputs
+                    .extend(std::mem::take(&mut row.relationship_inputs));
+                self.crafter(row);
+            }
+            Picked::Crafted(inner, _) => {
+                if let Picked::Commodity(row) = inner.as_mut() {
+                    drop(std::mem::take(&mut row.relationship_inputs));
+                    self.crafter(row);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    pub(crate) fn represents(&self, guid: &Guid) -> bool {
+        self.represented.contains(guid)
+    }
+
+    pub(crate) fn into_origin(
+        self,
+        scanned: &ExportLedger,
+        origins: &CatalogOrigins,
+    ) -> SharedFieldOrigin {
+        let complete = self.complete
+            && scanned.sources.iter().all(|source| {
+                !source.disposition.failed()
+                    || !(source.kind == Some(Kind::Commodities)
+                        || (source.kind.is_none()
+                            && source.role == ExportSourceRole::SelectionCandidate))
+            });
+        origins.uses.shared_origin(&self.inputs, complete)
+    }
+
+    fn crafter(&mut self, row: &mut Commodity<'_>) {
+        self.inputs.extend(std::mem::take(&mut row.crafter_inputs));
+        self.complete &= row.crafter_complete;
+    }
+}
+
 /// Retains actual eligibility and representation inputs only on the backfill-presence decision.
-pub(crate) fn for_resource<'context>(
+pub(crate) fn for_resource(
     tree: &RecordTree<'_>,
-    picked: &[Picked<'_>],
-    crafting: &CraftingKinds<'_>,
-    scanned: &ExportLedger,
-    origins: &'context CatalogOrigins,
-) -> Result<CommodityInputs<'context>, CatalogError> {
+    representation: &SharedFieldOrigin,
+    blueprints: &[BlueprintRow<'_>],
+    quality: &QualityRows<'_>,
+    origins: &CatalogOrigins,
+) -> Result<SourcedValue<CommoditySelection>, CatalogError> {
     let mut inputs = CommodityInputs::new(origins);
     for field in [
         RecordHeaderInput::Field(RecordHeaderField::Guid),
@@ -31,42 +96,26 @@ pub(crate) fn for_resource<'context>(
         inputs.header_input(tree.record_index(), field, SourceUseRole::Selector)?;
     }
     let mut eligibility = false;
-    for blueprint in &crafting.blueprints {
+    for blueprint in blueprints {
         eligibility |= blueprint.resources.observe(tree.guid(), &mut inputs)?;
     }
-    if let Some(members) = crafting.quality.fallbacks.evidence(tree.guid()) {
+    if let Some(members) = quality.fallbacks.evidence(tree.guid()) {
         for original in members {
             inputs.extend_retained(original.inputs(), original.complete)?;
         }
         eligibility = true;
     }
-    for pick in picked {
-        representation(pick, &mut inputs);
-    }
-    inputs.require_complete(scanned.sources.iter().all(|source| {
-        !source.disposition.failed()
-            || !(source.kind == Some(Kind::Commodities)
-                || (source.kind.is_none() && source.role == ExportSourceRole::SelectionCandidate))
-    }));
+
     if !eligibility {
         return Err(CatalogError::Accounting(
             crate::ExportAccountingError::MissingFieldInspection,
         ));
     }
-    Ok(inputs)
-}
-
-fn representation(pick: &Picked<'_>, inputs: &mut CommodityInputs<'_>) {
-    match pick {
-        Picked::Commodity(value) => {
-            inputs.extend(value.relationship_inputs.iter().cloned(), true);
-            inputs.extend(value.crafter_inputs.iter().cloned(), value.crafter_complete);
-        }
-        Picked::Crafted(inner, _) => {
-            if let Picked::Commodity(value) = inner.as_ref() {
-                inputs.extend(value.crafter_inputs.iter().cloned(), value.crafter_complete);
-            }
-        }
-        _ => {}
-    }
+    let (local, complete) = inputs.into_evidence();
+    Ok(origins.uses.value_with_shared_origin(
+        SourceValue::Present(CommoditySelection::ResourceFallback),
+        representation,
+        &local,
+        complete,
+    )?)
 }

@@ -187,7 +187,7 @@ pub(crate) fn resource_commodity<'source>(
     tree: &RecordTree<'source>,
     projection: &CatalogProjection<'_, 'source>,
     groups: &Groups,
-    evidence: &CommodityInputs<'_>,
+    selection: SourcedValue<CommoditySelection>,
 ) -> Result<CommodityRead<'source>, CatalogError> {
     let origins = projection.origins();
     let context = origins.record(tree.record_index());
@@ -207,7 +207,7 @@ pub(crate) fn resource_commodity<'source>(
         SourceValue::Present(Some(CatalogGuid(tree.guid()))),
     )?;
     let presentation = presentation_context.finish(tree, texts, subtype, groups)?;
-    let selection = evidence.value(CommoditySelection::ResourceFallback);
+
     let entity = context.header_selector(RecordHeaderField::SourceType, SourceValue::Absent)?;
     let definition = commodity_source::definition(tree, entity, selection, origins)?;
     Ok(CommodityRead {

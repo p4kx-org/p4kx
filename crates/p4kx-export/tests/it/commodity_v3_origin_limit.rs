@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::collections::BTreeSet;
+
 use p4kx_export::{CatalogPublicationMode, Kind};
 use serde_json::{Value, json};
 
@@ -8,6 +10,107 @@ use crate::catalog_crafting_support::blueprint;
 use crate::commodity_v3_fixture::{self as fixture, DcbOrigin, TestResult};
 use crate::commodity_v3_origin_limit_fixture::{self as limit_fixture, COST_COUNT};
 use crate::commodity_v3_origin_payload as payload;
+use crate::health_origin_assertions as health;
+
+#[test]
+fn a_crafted_commodity_keeps_its_resource_link_and_the_separate_backfill_proof() -> TestResult {
+    let database = limit_fixture::crafted_database();
+    let (_directory, archive) = fixture::open(&database, DcbOrigin::Encrypted)?;
+    let built = p4kx_export::build_catalog(&archive, &fixture::options())?;
+    let catalog: Value = serde_json::from_slice(built.json())?;
+    let fallback = fixture::RESOURCE_FALLBACK;
+    let entity = limit_fixture::CRAFTED_COMMODITY;
+    let [fallback_guid, entity_guid] = [fallback, entity].map(fixture::guid);
+    let [fallback_row, entity_row] = health::rows(&catalog, "/definitions/commodities/rows")?
+    else {
+        return Err("one original entity and one separately backfilled Commodity".into());
+    };
+    assert_eq!(
+        [
+            fixture::payload(fallback_row, "guid")?,
+            fixture::payload(entity_row, "guid")?
+        ],
+        [&json!(fallback_guid), &json!(entity_guid)],
+        "both canonical definitions remain in GUID order"
+    );
+    health::present(entity_row, "selection", &json!("entity"), Some(true))?;
+    let selection = health::present(
+        fallback_row,
+        "selection",
+        &json!("resourceFallback"),
+        Some(true),
+    )?;
+    for guid in [fallback, entity] {
+        health::present(
+            fixture::presentation(&catalog, guid)?,
+            "subtypeGuid",
+            &json!(fallback_guid),
+            Some(true),
+        )?;
+    }
+    let [crafter] = health::rows(&catalog, "/crafters")? else {
+        return Err("the dual-role entity contributes one Crafter".into());
+    };
+    assert_eq!(
+        crafter["guid"], entity_guid,
+        "the Crafter keeps its entity GUID"
+    );
+    assert_crafter_choices(&catalog, selection)?;
+    assert_crafted_blueprint_slot(&catalog, selection)
+}
+
+fn assert_crafter_choices(catalog: &Value, selection: &Value) -> TestResult {
+    const CRAFTER_INDEX: u64 = 1;
+    let original = health::uses(catalog, selection)?;
+    let selectors = original
+        .iter()
+        .filter(|row| {
+            row.pointer("/location/recordIndex").and_then(Value::as_u64) == Some(CRAFTER_INDEX)
+        })
+        .map(|row| {
+            Ok((
+                fixture::at(row, "/location/field")?
+                    .as_str()
+                    .ok_or("original crafter field")?,
+                fixture::at(row, "/role")?
+                    .as_str()
+                    .ok_or("original crafter role")?,
+            ))
+        })
+        .collect::<TestResult<BTreeSet<_>>>()?;
+    assert_eq!(
+        selectors,
+        BTreeSet::from([
+            ("Components", "selector"),
+            ("Components[0].$type", "selector")
+        ]),
+        "the backfill consumes the earlier crafter match without its resource-container choices"
+    );
+    Ok(())
+}
+
+fn assert_crafted_blueprint_slot(catalog: &Value, selection: &Value) -> TestResult {
+    let recipe = blueprint::by_guid(catalog, limit_fixture::BLUEPRINT)?;
+    let index = fixture::at(recipe.definition, "/recordIndex/value")?
+        .as_u64()
+        .ok_or("original crafted-commodity Blueprint position")?;
+    let tiers = recipe.tiers()?;
+    let [tier] = tiers.as_slice() else {
+        return Err("one tier with the original resource cost".into());
+    };
+    let [cost] = health::rows(tier, "/costs")? else {
+        return Err("one selected source cost".into());
+    };
+    let resource = blueprint::field_ref(recipe.node(&cost["source"])?, "resource")?;
+    let ordinal = resource["valueIndex"]
+        .as_str()
+        .ok_or("actual resource field ordinal")?;
+    assert!(
+        blueprint::selected_ordinals(catalog, selection, index)?.contains(ordinal),
+        "the separate ResourceType row retains the original Blueprint eligibility operand"
+    );
+    Ok(())
+}
 
 #[test]
 fn wide_blueprint_backfill_keeps_every_original_selection_use() -> TestResult {
