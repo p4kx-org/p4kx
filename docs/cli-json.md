@@ -176,8 +176,16 @@ field is absent.
 
 ```json
 {"archive": "…", "entry": "Data\\Game2.dcb", "entity": Node, "ports": 100, "attached": 71,
- "empty": 29, "unresolved": 0, "docked_vehicles": 0}
+ "empty": 29, "unresolved": 0, "docked_vehicles": 0,
+ "fieldOrigins": FieldOrigins, "provenance": SourceInventory}
 ```
+
+The `fieldOrigins` map uses JSON Pointers from the report root and resolves its source references
+through `provenance`. It covers `entry`, each Entity's `guid`, `record_path`, `name` and
+`class_name`, and each port's `name`, including nested ports. The selected port carries the
+original DataForge field occurrence or the XML attribute that supplied its spelling. An XML
+override carries the winning attribute's source. An unavailable coordinate gives
+`sourceSetComplete: false` for that field.
 
 An Entity whose default Loadout is an outfit (an NPC actor, `SItemPortLoadoutOutfitParams`) also
 has `outfit`: `{"base_files": ["…"], "outfits": [{"tags": ["Outfits.S42.Work"], "files": ["…"],

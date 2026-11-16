@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_cryxml::{ByteOrder, Document as CryDocument, Element, Signature, Xml};
+use p4kx_cryxml::{
+    ByteOrder, Document as CryDocument, Element, Signature, SourceAttributePosition, Xml,
+};
+use p4kx_extraction::SourceLocation;
 
 #[path = "loadout_xml_source_positions.rs"]
 mod source_positions;
@@ -78,6 +81,12 @@ impl XmlLoadoutPathSite<'_> {
     #[must_use]
     pub const fn decoding(&self) -> LoadoutXmlDecoding {
         self.attribute.decoding()
+    }
+
+    /// Returns the location of the authored attribute when its XML was decoded losslessly.
+    #[must_use]
+    pub fn location(&self) -> Option<SourceLocation> {
+        self.attribute.location()
     }
 
     /// Returns the actual operation used to copy this path.
@@ -195,6 +204,7 @@ struct Attribute<'node> {
     ordinal: u64,
     name: &'node str,
     value: &'node str,
+    position: SourceAttributePosition,
 }
 
 impl Scope<'_, '_> {
@@ -221,6 +231,7 @@ impl Scope<'_, '_> {
             ordinal: attribute_index,
             name: attribute.name,
             value: attribute.value,
+            position: attribute.position,
         }))
     }
 
@@ -278,6 +289,7 @@ impl Scope<'_, '_> {
                 attribute_name: attribute.name,
                 value: attribute.value,
                 decoding: self.decoding,
+                position: attribute.position,
             },
             operation,
         };
@@ -305,6 +317,7 @@ impl Scope<'_, '_> {
             attribute_name: attribute.name,
             value: attribute.value,
             decoding: self.decoding,
+            position: attribute.position,
         };
         let selection = LoadoutClassSelection::new();
         if observation.xml_class(&selection, &site).is_break() {

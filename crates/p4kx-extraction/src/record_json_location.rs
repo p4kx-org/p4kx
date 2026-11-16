@@ -2,7 +2,8 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_dataforge::{
-    RecordJsonBytes, RecordJsonRecordField, RecordJsonSource, RecordJsonUse, RecordJsonUseRole,
+    DataForge, RecordJsonBytes, RecordJsonRecordField, RecordJsonSource, RecordJsonUse,
+    RecordJsonUseRole,
 };
 
 use crate::{SourceLocation, SourceUseRole};
@@ -18,6 +19,18 @@ pub struct RecordJsonLocation {
 }
 
 impl RecordJsonLocation {
+    /// Addresses the original text borrowed from this DataForge.
+    #[must_use]
+    pub fn borrowed_text(forge: &DataForge<'_>, text: &str) -> Option<SourceLocation> {
+        let span = forge.original_text_span(text)?;
+        Self::of(RecordJsonSource::Bytes {
+            start: span.start,
+            end: span.end,
+            kind: RecordJsonBytes::Text,
+        })
+        .map(|source| source.location)
+    }
+
     /// Resolves one Record JSON observation to its exact original input coordinate.
     #[must_use]
     pub fn of(source: RecordJsonSource<'_>) -> Option<Self> {

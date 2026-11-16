@@ -125,6 +125,23 @@ impl<'a> DataForge<'a> {
         std::ptr::eq(self.bytes, bytes)
     }
 
+    /// Returns the original byte range of text borrowed from this database.
+    #[must_use]
+    pub fn original_text_span(&self, text: &str) -> Option<Range<u64>> {
+        if !text.is_empty() {
+            return self.byte_span(text.as_bytes());
+        }
+        let start = text
+            .as_ptr()
+            .addr()
+            .checked_sub(self.bytes.as_ptr().addr())?;
+        let end = start.checked_add(1)?;
+        let terminator = self.bytes.get(start..end)?;
+        (terminator == [0])
+            .then(|| self.byte_span(terminator))
+            .flatten()
+    }
+
     pub(crate) fn byte_span(&self, bytes: &[u8]) -> Option<Range<u64>> {
         if bytes.is_empty() {
             return None;

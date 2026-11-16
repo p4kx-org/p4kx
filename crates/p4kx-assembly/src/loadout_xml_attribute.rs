@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_cryxml::SourceAttributePosition;
+use p4kx_extraction::SourceLocation;
+
 use crate::{LoadoutFileObservation, LoadoutXmlDecoding};
 
 /// An attribute borrowed from the actual parse of its original file operation.
@@ -12,9 +15,25 @@ pub struct XmlLoadoutAttributeSite<'parse> {
     pub(super) attribute_name: &'parse str,
     pub(super) value: &'parse str,
     pub(super) decoding: LoadoutXmlDecoding,
+    pub(super) position: SourceAttributePosition,
 }
 
 impl XmlLoadoutAttributeSite<'_> {
+    /// Returns the location of the authored attribute when its XML was decoded losslessly.
+    #[must_use]
+    pub fn location(&self) -> Option<SourceLocation> {
+        if matches!(
+            self.decoding,
+            LoadoutXmlDecoding::CryXml {
+                repaired_utf8: true,
+                ..
+            }
+        ) {
+            return None;
+        }
+        SourceLocation::xml_attribute(&self.position, self.attribute_name)
+    }
+
     /// Borrows the genuine original read operation of this parse.
     #[must_use]
     pub const fn observation(&self) -> &LoadoutFileObservation {

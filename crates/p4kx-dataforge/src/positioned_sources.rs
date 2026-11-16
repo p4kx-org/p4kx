@@ -125,18 +125,12 @@ impl PositionedRecord<'_> {
     }
 
     pub(crate) fn describe_text(&self, text: &str) -> Option<RecordJsonSource<'static>> {
-        if !text.is_empty() {
-            return self.describe_bytes(Some(text.as_bytes()), RecordJsonBytes::Text);
-        }
-        let start = text
-            .as_ptr()
-            .addr()
-            .checked_sub(self.forge.bytes.as_ptr().addr())?;
-        let end = start.checked_add(1)?;
-        if self.forge.bytes.get(start..end) != Some(&[0]) {
-            return None;
-        }
-        self.describe_bytes(self.forge.bytes.get(start..end), RecordJsonBytes::Text)
+        let span = self.forge.original_text_span(text)?;
+        Some(RecordJsonSource::Bytes {
+            start: span.start,
+            end: span.end,
+            kind: RecordJsonBytes::Text,
+        })
     }
 }
 

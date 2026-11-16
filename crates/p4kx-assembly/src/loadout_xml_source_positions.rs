@@ -12,7 +12,7 @@ pub(super) struct OriginalAttribute<'node> {
     pub(super) ordinal: usize,
     pub(super) name: &'node str,
     pub(super) value: &'node str,
-    position: SourceAttributePosition,
+    pub(super) position: SourceAttributePosition,
 }
 
 impl Scope<'_, '_> {

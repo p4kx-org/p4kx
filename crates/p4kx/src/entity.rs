@@ -3,11 +3,12 @@
 
 use std::io::{self, BufWriter, Write};
 use std::process::ExitCode;
+use std::sync::Arc;
 
 use anyhow::Result;
 use p4kx_assembly::{
-    ArchiveFiles, Attachment, EntityNode, LoadoutResolver, PortDefinition, PortNode, PortSource,
-    PortVisibility,
+    ArchiveFiles, Attachment, Entities, EntityNode, LoadoutResolver, PortDefinition, PortNode,
+    PortSource, PortVisibility,
 };
 use p4kx_extraction::DataForgeEntry;
 
@@ -17,6 +18,9 @@ use crate::entity_outfit::{self, OutfitsJson};
 use crate::entity_vehicle;
 use crate::query_table::one_line;
 use crate::{entity_audio, entity_glb, entity_package, json};
+
+#[path = "entity_loadout_origins.rs"]
+mod loadout_origins;
 
 /// Runs a `p4kx entity` subcommand.
 pub(crate) fn run(args: &EntityArgs, as_json: bool) -> Result<ExitCode> {
@@ -36,7 +40,19 @@ fn loadout(args: &EntityLoadoutArgs, as_json: bool) -> Result<()> {
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;
     let files = ArchiveFiles::new(&archive);
-    let mut resolver = LoadoutResolver::new(&forge).with_files(&files);
+    let capture = as_json.then(|| Arc::new(loadout_origins::Capture::new(&forge)));
+    let mut resolver = capture
+        .as_ref()
+        .map_or_else(
+            || LoadoutResolver::new(&forge),
+            |capture| {
+                LoadoutResolver::with_observed_entities(
+                    Arc::new(Entities::new(&forge)),
+                    capture.clone(),
+                )
+            },
+        )
+        .with_files(&files);
     if args.stop_at_docked_vehicles {
         resolver = resolver.stopping_at_docked_vehicles();
     }
@@ -46,8 +62,8 @@ fn loadout(args: &EntityLoadoutArgs, as_json: bool) -> Result<()> {
     let tree = applied.node();
     let counts = Counts::of(tree);
     let outfits = resolver.outfits(&entity).as_ref().map(OutfitsJson::from);
-    if as_json {
-        json::print(&LoadoutJson {
+    if let Some(capture) = &capture {
+        let payload = LoadoutJson {
             archive: json::path(archive.path()),
             entry: entry.path(),
             entity: NodeJson::from(tree),
@@ -55,8 +71,8 @@ fn loadout(args: &EntityLoadoutArgs, as_json: bool) -> Result<()> {
             ignored: applied.ignored(),
             incompatible: crate::entity_ignored::incompatible(&applied),
             counts,
-        })?;
-        return Ok(());
+        };
+        return capture.print(payload, entry.origin_of(&forge), tree);
     }
     let printed = print_tree(tree, counts, outfits.as_ref());
     match printed {
