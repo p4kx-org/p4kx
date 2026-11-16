@@ -9,6 +9,7 @@ mod animation_load;
 mod animation_select;
 mod animation_set;
 mod animation_sources;
+mod archive_api;
 mod archive_byte_range;
 mod archive_cause;
 mod archive_layout_info;
@@ -194,17 +195,7 @@ pub use animation_listing::{AnimationListing, headers as animation_headers};
 pub use animation_set::{
     AnimationBounds, AnimationChoice, AnimationSet, MAX_ANIMATION_FILE_LEN, UnreadAnimation,
 };
-pub use archive_byte_range::ArchiveByteRange;
-pub use archive_cause::archive_error_in;
-pub use archive_layout_info::{ArchiveDeclarationState, ArchiveLayout, ArchiveLayoutInfo};
-pub use archive_layout_v2::ArchiveV2Layout;
-pub use archive_layout_zip::{
-    ArchiveCigInstallation, ArchiveZip64End, ArchiveZip64Locator, ArchiveZipEnd, ArchiveZipLayout,
-};
-pub use archive_material_reference::ArchiveMaterialPaths;
-pub use archive_metadata_version::ArchiveMetadataVersion;
-pub use archive_region_info::{ArchiveRegion, ArchiveRegionState};
-pub use archive_table_declaration::ArchiveTableDeclaration;
+pub use archive_api::*;
 pub use bank::{Bank, BankExtraction, MAX_SOUNDBANK_LEN, WemFailure, WemFormat, WrittenWem};
 pub use chunk_source::{ChunkSource, ChunkTextError, MAX_CHUNK_FILE_LEN};
 pub use conversion_error::ConversionError;
@@ -267,25 +258,6 @@ pub use output_file::{
     write_replacing_counted, write_replacing_counted_protected, write_replacing_protected,
 };
 pub use owned_output_failure::owned_output_failure;
-pub use p4kx_archive::{
-    Archive, ArchiveError, ArchiveInputOrigin, Build, BuildError, BuildManifestObservation,
-    BuildManifestOrigin, BuildManifestOutcome, Checksum, Compression, DemandScope, DosCalendar,
-    DosTimestamp, EffectiveEncoding, Entry, EntryIssue, EntryMetadata, EntryOrigin,
-    EntryOriginStep, EntryReader, EntryRecordFormat, InstallationStatus, KeyCheck, KeyDemand,
-    KeyDemandSnapshot, MAX_COMPRESSION_RATIO, MAX_CONTAINER_DEPTH, MAX_CONTAINER_ENTRIES,
-    MAX_CONTAINER_LEN, MAX_RECOVERED_ENTRIES, MAX_RECOVERY_SCAN, ObservedEntry,
-    ObservedEntryBinding, OpenOptions, SourceEncryption, UnreadEntries, ZipHeaderMetadata,
-};
-pub use p4kx_archive::{
-    ArchiveLayoutKind, ArchiveMetadata, ArchiveMetadataStatus, AvailableMetadataSpan,
-    CigInstallMetadata, MAX_METADATA_CHUNK, MetadataAccess, MetadataCost, MetadataExtra,
-    MetadataExtraStatus, MetadataFreeStatus, MetadataFreeValue, MetadataInstallValue,
-    MetadataProgressBound, MetadataRange, MetadataReadError, MetadataRecord, MetadataRegion,
-    MetadataRegionStatus, MetadataReservedWord, MetadataSection, MetadataSpan,
-    MetadataTableProblem, MetadataTableRow, MetadataTableValue, MetadataTables, MetadataView,
-    V2DirectoryMetadata, Zip64EndMetadata, Zip64LocatorMetadata, ZipDirectoryMetadata,
-    ZipEndMetadata,
-};
 pub use p4kx_audio::{
     ActionTarget, BankError, BankHeader, BankWarning, Container, ContainerKind, EmbeddedWem,
     HircKind, HircLayout, HircObject, HircValue, MediaStorage, MusicClip, MusicGroupKind,
@@ -404,4 +376,3 @@ pub use ui_service::*;
 pub use ui_svg::UiSvg;
 pub use verify::{VerificationReport, VerifyOptions, verify, verify_observed};
 pub use watch::{ArchiveChanged, ArchiveWatch, DEFAULT_WATCH_INTERVAL, FileStamp};
-pub use zip_header_info::ZipHeaderInfo;
