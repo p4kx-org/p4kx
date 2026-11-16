@@ -91,6 +91,7 @@ mod model_source;
 mod model_source_glb;
 mod model_textures;
 mod observed_file_origin;
+mod observed_verification;
 mod options;
 mod origin_artifact;
 mod origin_companion;
@@ -253,6 +254,9 @@ pub use model_info_materials::{DefaultMaterialInfo, LibraryInfo, MaterialInfo};
 pub use model_source::{ArchiveDefaultMaterial, ArchiveDefaultMaterialState, ModelSource};
 pub use model_textures::{ArchiveTextures, MAX_MODEL_TEXTURE_PIXELS};
 pub use observed_file_origin::{ObservedFileOrigin, ObservedFileRead, read_observed_file};
+pub use observed_verification::{
+    ObservedVerification, VerificationObservation, VerificationOutcome,
+};
 pub use options::{
     AudioConversion, CancelToken, ConflictPolicy, ExtractOptions, Progress, TextureConversion,
 };
@@ -393,6 +397,6 @@ pub use ui_render::{MAX_UI_RENDER_BITMAP_PIXELS, UiBitmapFailure, UiRender};
 pub use ui_screen_texts::ScreenTexts;
 pub use ui_service::*;
 pub use ui_svg::UiSvg;
-pub use verify::{VerificationReport, VerifyOptions, verify};
+pub use verify::{VerificationReport, VerifyOptions, verify, verify_observed};
 pub use watch::{ArchiveChanged, ArchiveWatch, DEFAULT_WATCH_INTERVAL, FileStamp};
 pub use zip_header_info::ZipHeaderInfo;
