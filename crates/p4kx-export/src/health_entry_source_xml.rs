@@ -107,19 +107,18 @@ impl<'read> EntrySourceXml<'read> {
         node.attributes()
             .map(|attribute| {
                 let location = attribute_location(attribute.position(), attribute.name())?;
-                let name = self
+                let selector = self
                     .entry
                     .payload_at(location.clone(), SourceUseRole::Selector)?;
                 let value = self.entry.payload_at(location, SourceUseRole::Payload)?;
+                let name = self.project(
+                    SourceValue::Present(attribute.name().to_owned()),
+                    &[selector],
+                );
+                let namespace = name.map_ref(|_| attribute.namespace().map(str::to_owned));
                 Ok(SourceXmlAttribute {
-                    name: self.project(
-                        SourceValue::Present(attribute.name().to_owned()),
-                        std::slice::from_ref(&name),
-                    ),
-                    namespace: self.project(
-                        SourceValue::Present(attribute.namespace().map(str::to_owned)),
-                        &[name],
-                    ),
+                    name,
+                    namespace,
                     value: self
                         .project(SourceValue::Present(attribute.value().to_owned()), &[value]),
                 })
@@ -184,3 +183,7 @@ fn location(shape: &str, indices: Vec<u64>, field: String) -> SourceLocation {
 fn coordinate(value: usize) -> Result<u64, ExportAccountingError> {
     u64::try_from(value).map_err(|_| ExportAccountingError::CounterOverflow)
 }
+
+#[cfg(test)]
+#[path = "health_entry_source_xml_tests.rs"]
+mod tests;
