@@ -7,6 +7,7 @@
 - Release paint-specific vehicle facts before loadout resolution.
 - Release catalog projection state before sealing provenance for a refused export.
 - Release localization lookup indexes after the last projection and share equal text origins.
+- Retain checked field examples with shared path operands until export health needs the full receipt.
 - Merge mission dependency results in original order after each read window and reuse the pending result buffers.
 - Fold contract generator results in original order per read window and report the active mission projection phase.
 - Reuse original Struct and array positions for mission source lookups instead of storing a second index of every occurrence.

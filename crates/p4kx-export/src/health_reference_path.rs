@@ -19,12 +19,13 @@ struct PathFrame {
     owner: ReferenceOwner,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub(super) struct ReferenceOwner {
     pub(super) type_name: HealthText,
     pub(super) input: ReferenceUse,
 }
 
+#[derive(Debug, Clone)]
 pub(super) struct ReferencePathReceipt {
     pub(super) field: HealthText,
     pub(super) uses: ReferencePathUses,

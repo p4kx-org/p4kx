@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use p4kx_extraction::SourceValue;
 
+use super::health_example_body::ExampleBodyReceipt;
 use super::health_reference_data::{ReferenceData, ReferencePointer};
 use super::health_reference_error;
 use super::health_reference_observation::{ReferenceBody, ReferenceObservation};
@@ -91,14 +92,10 @@ impl<'scope, 'read, 'source> ReferenceCapture<'scope, 'read, 'source> {
     pub(crate) fn example(
         &self,
         site: &OriginalValueSite<'_, '_, '_, '_>,
-    ) -> Result<super::health_example_body::ExampleBodyReceipt, CatalogError> {
-        self.check_site(site)?;
-        let body = self.body(site)?;
-        Ok(super::health_example_body::ExampleBodyReceipt::captured(
+    ) -> Result<ExampleBodyReceipt, CatalogError> {
+        Ok(ExampleBodyReceipt::field_path(
             Arc::clone(&self.frame),
-            body.field,
-            body.source_type,
-            body.target_guid,
+            self.path_receipt(site)?,
         ))
     }
 

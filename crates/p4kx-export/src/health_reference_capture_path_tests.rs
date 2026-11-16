@@ -349,3 +349,6 @@ fn at<T>(
     }
     Err("the demanded genuine original site is absent".into())
 }
+
+#[path = "health_compact_example_tests.rs"]
+mod health_compact_example_tests;
