@@ -6,11 +6,12 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::item_component_owner::ComponentOwner;
-use crate::CatalogError;
+use crate::catalog_rows::staged::{OrderedComponentRows, StagedCatalogTable};
 use crate::catalog_table::CatalogTable;
 use crate::record_fields::number_value;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
+use crate::{CatalogError, ExportAccountingError};
 
 use super::{authored_damage as damage, authored_fields as observed, authored_link as link};
 
@@ -109,6 +110,16 @@ impl<'source> DurabilityRows<'source> {
         }
     }
 
+    pub(crate) fn stage_health(
+        &mut self,
+        staging: &mut OrderedComponentRows<'_>,
+    ) -> Result<(), CatalogError> {
+        for row in std::mem::take(&mut self.health) {
+            staging.append(row.owner.key(), &row)?;
+        }
+        Ok(())
+    }
+
     pub(super) fn extend(&mut self, other: Self) {
         self.health.extend(other.health);
         self.degradation.extend(other.degradation);
@@ -146,23 +157,35 @@ impl DurabilityComponent {
     }
 }
 
-pub(crate) struct DurabilityTables<'source> {
-    pub(crate) health: CatalogTable<Durability<'source>>,
+pub(crate) struct DurabilityTables {
     pub(crate) degradation: CatalogTable<Degradation>,
     pub(crate) distortion: CatalogTable<Distortion>,
 }
 
-/// Orders each family by physical Record and original component slot.
-pub(crate) fn tables<'source>(
+/// Completes the Health table with the original source-family availability.
+pub(crate) fn finish_health(
+    staging: OrderedComponentRows<'_>,
     forge: &DataForge<'_>,
-    mut rows: DurabilityRows<'source>,
-) -> DurabilityTables<'source> {
-    rows.health.sort_by_key(|row| row.owner.key());
+) -> Result<StagedCatalogTable, CatalogError> {
+    staging.finish(forge, &[HEALTH])
+}
+
+/// Orders the resident component families by physical Record and slot.
+pub(crate) fn tables(
+    forge: &DataForge<'_>,
+    mut rows: DurabilityRows<'_>,
+) -> Result<DurabilityTables, CatalogError> {
+    if !rows.health.is_empty() {
+        return Err(ExportAccountingError::ConflictingSourceDatum.into());
+    }
     rows.degradation.sort_by_key(|row| row.owner.key());
     rows.distortion.sort_by_key(|row| row.owner.key());
-    DurabilityTables {
-        health: CatalogTable::new(forge, &[HEALTH], rows.health),
+    Ok(DurabilityTables {
         degradation: CatalogTable::new(forge, &[DEGRADATION], rows.degradation),
         distortion: CatalogTable::new(forge, &[DISTORTION], rows.distortion),
-    }
+    })
 }
+
+#[cfg(test)]
+#[path = "catalog_durability_staging_tests.rs"]
+mod staging_tests;

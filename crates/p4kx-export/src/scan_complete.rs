@@ -7,6 +7,7 @@ use rayon::prelude::{IndexedParallelIterator, IntoParallelRefIterator, ParallelI
 use crate::catalog_crafting::CraftingKinds;
 use crate::catalog_read_failure::CatalogReadFailure;
 use crate::catalog_rows::staged::OrderedComponentRows;
+use crate::catalog_v3::catalog_durability;
 use crate::catalog_v3::catalog_item_alignment::ItemPortStaging;
 use crate::collected::Collected;
 use crate::commodity_backfill::CommodityPresence;
@@ -32,23 +33,26 @@ impl<'f> Scan<'_, '_, 'f> {
         let mut inspections = ScanInspectionFold::start(&mut ledger);
         let mut collected = Collected::from_crafting(crafting);
         let scratch = std::env::temp_dir();
-        let mut item_ports = ItemPortStaging::new(&scratch, self.options.cancel);
-        let mut interactions = OrderedComponentRows::new(&scratch, self.options.cancel);
+        let mut staging = RecordStaging {
+            item_ports: ItemPortStaging::new(&scratch, self.options.cancel),
+            interactions: OrderedComponentRows::new(&scratch, self.options.cancel),
+            health: OrderedComponentRows::new(&scratch, self.options.cancel),
+        };
         let evidence = self.collect_records(
             records,
             &mut collected,
             &mut ledger,
             &mut inspections,
-            &mut item_ports,
-            &mut interactions,
+            &mut staging,
         )?;
         collected
             .entity_configurations
             .alignment
-            .install_staged_ports(item_ports, self.forge)?;
+            .install_staged_ports(staging.item_ports, self.forge)?;
         collected
             .entity_configurations
-            .install_staged_interactions(interactions, self.forge)?;
+            .install_staged_interactions(staging.interactions, self.forge)?;
+        collected.item_health = catalog_durability::finish_health(staging.health, self.forge)?;
         for failure in failures {
             collected.take(Picked::Failed(failure));
         }
@@ -87,8 +91,7 @@ impl<'f> Scan<'_, '_, 'f> {
         collected: &mut Collected<'f>,
         ledger: &mut ExportLedger,
         inspections: &mut ScanInspectionFold,
-        item_ports: &mut ItemPortStaging<'_, 'f>,
-        interactions: &mut OrderedComponentRows<'_>,
+        staging: &mut RecordStaging<'_, 'f>,
     ) -> Result<RecordEvidence, CatalogError> {
         let mut evidence = RecordEvidence {
             commodities: CommodityPresence::new(),
@@ -109,18 +112,41 @@ impl<'f> Scan<'_, '_, 'f> {
                 if let Some(record) = result? {
                     if let Some(mut pick) = record.picked {
                         evidence.observe(&mut pick);
+                        staging.stage_health(&mut pick)?;
                         collected.take(pick);
                     }
                     collected.tags.entity_tags.extend(record.entity.tags);
                     let mut configurations = record.entity.configurations;
-                    configurations.alignment.stage_ports(item_ports)?;
-                    configurations.stage_interactions(interactions)?;
+                    configurations
+                        .alignment
+                        .stage_ports(&mut staging.item_ports)?;
+                    configurations.stage_interactions(&mut staging.interactions)?;
                     collected.entity_configurations.extend(configurations);
                     inspections.merge(ledger, record.ledger);
                 }
             }
         }
         Ok(evidence)
+    }
+}
+
+struct RecordStaging<'stage, 'source> {
+    item_ports: ItemPortStaging<'stage, 'source>,
+    interactions: OrderedComponentRows<'stage>,
+    health: OrderedComponentRows<'stage>,
+}
+
+impl RecordStaging<'_, '_> {
+    fn stage_health(&mut self, mut pick: &mut Picked<'_>) -> Result<(), CatalogError> {
+        loop {
+            match pick {
+                Picked::Crafted(inner, _) => pick = inner.as_mut(),
+                Picked::Item { components, .. } => {
+                    return components.durability.stage_health(&mut self.health);
+                }
+                _ => return Ok(()),
+            }
+        }
     }
 }
 

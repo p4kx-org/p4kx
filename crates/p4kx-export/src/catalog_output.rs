@@ -70,6 +70,7 @@ pub(crate) fn emit<W: Write>(
 ) -> Result<Written<W>, CatalogError> {
     let cancel = run.options.cancel;
     let staged_row_bytes = catalog.placements.staged_row_bytes()
+        + u128::from(catalog.configurations.durability.stored_bytes())
         + u128::from(catalog.definitions.blueprints.stored_bytes())
         + u128::from(catalog.definitions.particle_libraries.stored_bytes())
         + u128::from(catalog.definitions.contract_generators.stored_bytes())
@@ -149,6 +150,7 @@ fn write_json(
             let failure = catalog
                 .placements
                 .take_row_spool_failure()
+                .or_else(|| catalog.configurations.durability.take_failure())
                 .or_else(|| catalog.definitions.blueprints.take_failure())
                 .or_else(|| catalog.definitions.contract_generators.take_failure())
                 .or_else(|| catalog.definitions.contract_templates.take_failure())

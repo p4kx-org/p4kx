@@ -2,9 +2,23 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use super::Collected;
+use crate::KindSummary;
 use crate::selection::Kind;
 
 impl Collected<'_> {
+    /// Returns the counts of every kind, in the order of [`Kind::ALL`].
+    pub(crate) fn summary(&self, complete: bool) -> Vec<KindSummary> {
+        Kind::ALL
+            .into_iter()
+            .map(|kind| KindSummary {
+                kind,
+                count: self.count(kind),
+                skipped: self.skipped.get(kind.index()).copied().unwrap_or_default(),
+                complete: complete || matches!(kind, Kind::Tags | Kind::ShopInventories),
+            })
+            .collect()
+    }
+
     /// Returns the number of written rows for one catalog kind.
     #[expect(
         clippy::too_many_lines,

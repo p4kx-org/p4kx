@@ -5,6 +5,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::broker_entry::BrokerProjection;
+use crate::catalog_rows::staged::StagedCatalogTable;
 use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::cargo_globals::CargoGlobalTables;
 use crate::catalog_v3::catalog_ammo_containers::AmmoContainer;
@@ -33,7 +34,8 @@ pub(crate) struct CatalogConfigurations<'source> {
     pub(crate) reputation_triggers: CatalogTable<ReputationTriggerConfiguration<'source>>,
     pub(crate) blueprint_tiers: CatalogTable<crate::blueprint_tier_contract::BlueprintTier>,
     pub(crate) contract_templates: CatalogTable<TemplateProjection<'source>>,
-    pub(crate) durability: CatalogTable<Durability<'source>>,
+    #[schemars(with = "CatalogTable<Durability<'source>>")]
+    pub(crate) durability: StagedCatalogTable,
     pub(crate) degradation: CatalogTable<Degradation>,
     pub(crate) distortion: CatalogTable<Distortion>,
     pub(crate) emp: CatalogTable<Emp<'source>>,

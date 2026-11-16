@@ -79,9 +79,12 @@ impl<'source> ItemComponentRows<'source> {
         self.numbers.extend(other.numbers);
     }
 
-    pub(crate) fn into_tables(self, forge: &DataForge<'_>) -> ItemComponentTables<'source> {
-        ItemComponentTables {
-            durability: catalog_durability::tables(forge, self.durability),
+    pub(crate) fn into_tables(
+        self,
+        forge: &DataForge<'_>,
+    ) -> Result<ItemComponentTables<'source>, CatalogError> {
+        Ok(ItemComponentTables {
+            durability: catalog_durability::tables(forge, self.durability)?,
             emp: catalog_emp::table(forge, self.emp),
             explosives: catalog_explosives::table(forge, self.explosives),
             hacking_chips: catalog_hacking_chips::table(forge, self.hacking_chips),
@@ -104,12 +107,12 @@ impl<'source> ItemComponentRows<'source> {
                 forge,
                 self.projectile_ammo_selections,
             ),
-        }
+        })
     }
 }
 
 pub(crate) struct ItemComponentTables<'source> {
-    pub(crate) durability: DurabilityTables<'source>,
+    pub(crate) durability: DurabilityTables,
     pub(crate) emp: CatalogTable<Emp<'source>>,
     pub(crate) explosives: CatalogTable<Explosive<'source>>,
     pub(crate) hacking_chips: CatalogTable<HackingChip<'source>>,

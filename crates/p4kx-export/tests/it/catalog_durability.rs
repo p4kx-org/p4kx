@@ -41,6 +41,10 @@ fn durability_keeps_health_only_and_every_original_component_occurrence() -> Tes
     for (origin, encrypted) in [(DcbOrigin::Plain, false), (DcbOrigin::Encrypted, true)] {
         let (_folder, archive) = common::open(&source, origin)?;
         let built = build_catalog(&archive, &common::options())?;
+        assert!(
+            built.summary().staged_row_bytes() > 0,
+            "complete Health rows contribute their compressed staging bytes"
+        );
         let catalog = serde_json::from_slice(built.json())?;
         assert_eq!(
             proof::at(&catalog, "/exportHealth/status")?,

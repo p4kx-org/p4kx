@@ -166,7 +166,7 @@ fn assemble<R>(
     let reputation_tables = collected.mission_kinds.take_reputation_tables(&forge);
     let quality = collected.quality.take_tables(&forge);
     let law_tables = collected.law.into_tables(&forge);
-    let components = collected.item_components.into_tables(&forge);
+    let components = collected.item_components.into_tables(&forge)?;
     let weapon_tables = weapon_combat_base::CatalogWeaponTables::build(
         &forge,
         &input,
@@ -301,7 +301,7 @@ fn assemble<R>(
             blueprint_tiers: blueprints.tiers,
             reputation_triggers: reputation_tables.factions.triggers,
             independent: independent.tables,
-            durability: components.durability.health,
+            durability: collected.item_health,
             degradation: components.durability.degradation,
             distortion: components.durability.distortion,
             emp: components.emp,

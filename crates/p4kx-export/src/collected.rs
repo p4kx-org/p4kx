@@ -59,7 +59,7 @@ use crate::shop_inventories::ShopInventoryTable;
 use crate::shop_inventory_resolution::ShopInventoryResolution;
 use crate::spawn_model::{LocationQuery, ShipSpawnPool};
 use crate::template_rows::TemplateConfigurations;
-use crate::{ItemClassSummary, Kind, KindSummary};
+use crate::{ItemClassSummary, Kind};
 
 #[path = "collected_counts.rs"]
 mod counts;
@@ -81,6 +81,7 @@ pub(crate) struct Collected<'f> {
     pub(crate) items: Vec<Item<'f>>,
     pub(crate) item_definitions: Vec<crate::catalog_v3::catalog_item_components::item_definition::ItemDefinition<'f>>,
     pub(crate) item_components: ItemComponentRows<'f>,
+    pub(crate) item_health: StagedCatalogTable,
     pub(crate) entity_configurations: EntityConfigurationRows<'f>,
     pub(crate) ships: Vec<Ship<'f>>,
     pub(crate) commodities: Vec<Commodity<'f>>,
@@ -198,6 +199,7 @@ impl<'f> Collected<'f> {
             items: Vec::new(),
             item_definitions: Vec::new(),
             item_components: ItemComponentRows::default(),
+            item_health: StagedCatalogTable::empty(DatasetAvailability::Absent),
             entity_configurations: EntityConfigurationRows::default(),
             ships: Vec::new(),
             commodities: Vec::new(),
@@ -383,18 +385,5 @@ impl<'f> Collected<'f> {
             .sort_by_cached_key(|failure| CatalogGuid(failure.guid()).text());
         self.failures
             .dedup_by(|later, earlier| later.guid() == earlier.guid());
-    }
-
-    /// Returns the counts of every kind, in the order of [`Kind::ALL`].
-    pub(crate) fn summary(&self, complete: bool) -> Vec<KindSummary> {
-        Kind::ALL
-            .into_iter()
-            .map(|kind| KindSummary {
-                kind,
-                count: self.count(kind),
-                skipped: self.skipped.get(kind.index()).copied().unwrap_or_default(),
-                complete: complete || matches!(kind, Kind::Tags | Kind::ShopInventories),
-            })
-            .collect()
     }
 }
