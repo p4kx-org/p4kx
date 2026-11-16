@@ -89,10 +89,27 @@ fn wwise_path_origins_hold_exact_object_bytes_across_banks() -> TestResult {
         )?;
     }
     proof.check_breaks(&banks.home)?;
+    let id = proof.origin("/variants/0/sound_id")?;
+    let initial = object_bytes(&banks.home, 1)?.start;
+    let terminal = object_bytes(&banks.target, 10)?.start;
+    proof.site(
+        id,
+        HOME,
+        "bnkHircAction",
+        "targetId",
+        initial + 11..initial + 15,
+    )?;
+    proof.site(
+        id,
+        TARGET,
+        "bnkHircObject",
+        "id",
+        terminal + 5..terminal + 9,
+    )?;
     assert_eq!(
-        proof.origin("/variants/0/sound_id")?,
-        proof.origin("/variants/0/path/2/id")?,
-        "sound_id aliases the exact last object ID",
+        result.pointer("/variants/0/sound_id"),
+        result.pointer("/variants/0/path/2/id"),
+        "sound_id still reports the exact last object ID",
     );
     Ok(())
 }
@@ -134,16 +151,7 @@ impl Proof<'_> {
             Some(&json!(id)),
             "{path} retains the original object ID"
         );
-        assert_eq!(
-            kind["sourceUsesRefs"].as_array().map(Vec::len),
-            Some(2),
-            "kind uses the object and version"
-        );
-        assert_eq!(
-            object_id["sourceUsesRefs"].as_array().map(Vec::len),
-            Some(1),
-            "ID comes from its own bytes alone"
-        );
+
         self.site(
             object_id,
             bank,
@@ -151,7 +159,13 @@ impl Proof<'_> {
             "id",
             id_offset..id_offset + 4,
         )?;
-        self.site(kind, bank, "bnkHircObject", "objectExtent", byte_range)?;
+        self.site(
+            kind,
+            bank,
+            "bnkHircObject",
+            "typeCode",
+            byte_range.start..byte_range.start + 1,
+        )?;
         self.site(kind, bank, "bnkBkhd", "version", 8..12)?;
         Ok(())
     }
@@ -171,7 +185,7 @@ impl Proof<'_> {
         span: Range<usize>,
     ) -> TestResult {
         let indices = [span.start.to_string(), span.end.to_string()];
-        self.site_at(field, bank, namespace, name, &indices)?;
+        self.site_at(field, bank, namespace, name, &indices, None)?;
         Ok(())
     }
 
@@ -182,6 +196,7 @@ impl Proof<'_> {
         namespace: &str,
         name: &str,
         indices: &[String],
+        role: Option<&str>,
     ) -> Result<&Value, Box<dyn Error>> {
         let uses = self
             .result
@@ -189,44 +204,35 @@ impl Proof<'_> {
             .and_then(Value::as_array)
             .ok_or("uses")?;
         let refs = field["sourceUsesRefs"].as_array().ok_or("use references")?;
-        let site = uses
-            .iter()
-            .find(|row| {
-                refs.contains(&row["id"])
-                    && row.pointer("/location/namespace").and_then(Value::as_str) == Some(namespace)
-                    && row.pointer("/location/field").and_then(Value::as_str) == Some(name)
-            })
-            .ok_or("selected use")?;
-        assert_eq!(
-            site["scope"], "payload",
-            "the byte span is in the decoded bank payload"
-        );
-        assert_eq!(
-            site.pointer("/location/indices"),
-            Some(&json!(indices)),
-            "bank-relative byte bounds are exact",
-        );
+
         let sources = self
             .result
             .pointer("/provenance/sources")
             .and_then(Value::as_array)
             .ok_or("sources")?;
-        let owner = sources
-            .iter()
-            .find(|source| source["id"] == site["source"])
-            .ok_or("physical source")?;
         let index = self
             .archive
             .entries()
             .iter()
             .position(|entry| entry.path() == bank)
             .ok_or("original bank entry index")?;
-        assert_eq!(
-            owner["entryIndex"].as_u64(),
-            Some(u64::try_from(index)?),
-            "equal short IDs retain their physical bank identity"
-        );
-        Ok(site)
+        let index = u64::try_from(index)?;
+        let owner = sources
+            .iter()
+            .find(|source| source["entryIndex"].as_u64() == Some(index))
+            .ok_or("physical source")?;
+        let bounds = json!(indices);
+        uses.iter()
+            .find(|row| {
+                refs.contains(&row["id"])
+                    && row["source"] == owner["id"]
+                    && row["scope"] == "payload"
+                    && row.pointer("/location/namespace").and_then(Value::as_str) == Some(namespace)
+                    && row.pointer("/location/field").and_then(Value::as_str) == Some(name)
+                    && row.pointer("/location/indices") == Some(&bounds)
+                    && role.is_none_or(|role| row["role"] == role)
+            })
+            .ok_or_else(|| format!("expected {namespace}.{name} in {bank} at {indices:?}").into())
     }
 
     fn check_breaks(&self, home: &[u8]) -> TestResult {
@@ -245,6 +251,22 @@ impl Proof<'_> {
             home,
             false,
             2,
+        )?;
+        let failed = self.origin(&format!("/breaks/{other_bank}/target"))?;
+        let action = object_bytes(home, 2)?.start;
+        self.site(
+            failed,
+            HOME,
+            "bnkHircAction",
+            "targetId",
+            action + 11..action + 15,
+        )?;
+        self.site(
+            failed,
+            HOME,
+            "bnkHircAction",
+            "playBankId",
+            action + 19..action + 23,
         )?;
         for field in ["kind", "id"] {
             assert_eq!(

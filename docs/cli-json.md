@@ -1097,19 +1097,21 @@ soundbank), `malformed`, `unknown_layout` (an object of a bank version other tha
 in the fallback language).
 New kinds may be added in later versions.
 
-The `fieldOrigins` object uses JSON Pointers for every path step's `kind` and `id`, the
-variant's `sound_id`, `wem_id` and `source`, and the break's copy of its final `object`. Each present origin references
-the original bank through the `provenance` inventory. HIRC coordinates are half-open byte spans
-in the decoded bank. Kind evidence includes the decoded bank-version selector and the HIRC
-object. A synthetic Event step has an unknown marker and an incomplete source set. A break
-may name a different bank than the bank that supplied its last observed path step.
+`fieldOrigins` addresses the trigger, language choice, visited paths, resolved variants, breaks,
+counts and reported issues by JSON Pointer. `provenance` holds the bound original sources
+and the coordinates or roles referenced by those fields. ATL evidence addresses the original
+XML attributes and owning elements. In decoded soundbanks, HIRC evidence addresses half-open
+byte spans for original object IDs, type or mode values and the inspected route selectors.
+Field origins for a synthetic Event step are unknown. A break can name a different bank from
+the one that supplied the last visited object. Its `target` retains the authored selector
+that led to the lookup.
 
-For `wem_id`, the terminal's original plug-in selector determines whether the variant has a file,
-and the original media ID supplies its value when present. For `source`, the plug-in selector
-identifies plug-in, external and MIDI kinds. The original storage code supplies the remaining
-kinds. A MusicTrack source records the authored source count and the physical row ordinal as the
-third index of each source word. These fields describe the terminal HIRC declaration. The located
-WEM can reside in another Entry with independent encryption status.
+The original terminal plug-in selector and media ID determine `wem_id`. The terminal plug-in
+and storage selectors determine `source`. A MusicTrack receipt retains the authored source
+count and the physical row ordinal as the third index of each source word. An embedded
+`location` uses the selected DIDX entry and DATA header. A loose location uses the selected
+Archive directory Entry. A WEM payload itself is unread during this metadata resolution.
+A failed or partial inspection leaves the corresponding contributor set incomplete.
 
 ## `p4kx dcb query <archive> <query> --json`
 

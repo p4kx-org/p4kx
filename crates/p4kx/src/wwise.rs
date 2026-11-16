@@ -89,7 +89,7 @@ fn resolve(args: &WwiseResolveArgs, as_json: bool) -> Result<()> {
         .ok_or_else(|| UnknownTrigger::new(&args.trigger))?;
     let counts = Counts::of(&sounds);
     if as_json {
-        let (field_origins, provenance) = wwise_json::capture(&archive, &sounds)?;
+        let (field_origins, provenance) = wwise_json::capture(&archive, index, &sounds)?;
         json::print(&ResolveJson {
             archive: json::path(archive.path()),
             language: LanguageJson::of(&choice),

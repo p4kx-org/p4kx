@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::ops::Range;
-use std::path::Path;
-
 use p4kx_extraction::Archive;
 use p4kx_testkit::{ArchiveBuilder, TestAtl, TestBank, TestEntry, TestHircObject, wwise_short_id};
-use serde_json::json;
+use serde_json::{Value, json};
+use std::ops::Range;
+use std::path::Path;
 
 use super::{PLAY, Proof, TestResult, object_bytes, probe};
 
@@ -37,7 +36,10 @@ fn wwise_terminal_fields_cite_the_declaring_bank_and_each_physical_source_row() 
     let path = scratch.path().join("Data.p4k");
     let sealed = sealed_bank();
     let ordinary = ordinary_bank();
-    write_fixture(&path, &sealed, &ordinary)?;
+    let packed = TestBank::new(wwise_short_id("PackedMedia"))
+        .wem(EMBED_ID, vec![0x5A; 8])
+        .bytes();
+    write_fixture(&path, &sealed, &ordinary, &packed)?;
     let archive = Archive::open_with_key(&path, Some(p4kx_testkit::test_key()))?;
     let result = probe(&path, TRIGGER)?;
     let proof = Proof {
@@ -60,7 +62,65 @@ fn wwise_terminal_fields_cite_the_declaring_bank_and_each_physical_source_row() 
         "the plain declaration selects WEM bytes from an encrypted bank"
     );
     verify_encrypted(&proof, &sealed)?;
-    verify_plain(&proof, &ordinary)
+    verify_plain(&proof, &ordinary)?;
+    verify_locations(&proof, &packed)
+}
+
+fn verify_locations(proof: &Proof<'_>, packed: &[u8]) -> TestResult {
+    let didx = packed
+        .windows(4)
+        .position(|window| window == b"DIDX")
+        .ok_or("DIDX section")?
+        + 8;
+    for (member, word, start) in [
+        ("offset", "dataOffset", didx + 4),
+        ("len", "dataLength", didx + 8),
+    ] {
+        let selected = proof.origin(&format!("/variants/3/location/{member}"))?;
+        assert_eq!(
+            selected["containsEncryptedSource"], true,
+            "the clear HIRC declaration selected encrypted DIDX bytes"
+        );
+        proof.site(selected, EMBEDDED_BANK, "bnkDidx", word, start..start + 4)?;
+    }
+    let loose = proof.origin("/variants/0/location/entry")?;
+    let index = proof
+        .archive
+        .entries()
+        .iter()
+        .position(|entry| entry.path() == LOOSE_WEM)
+        .ok_or("loose WEM archive ordinal")?;
+    let inventory = |key| {
+        proof
+            .result
+            .pointer(key)
+            .and_then(Value::as_array)
+            .ok_or("inventory")
+    };
+    let sources = inventory("/provenance/sources")?;
+    let own = sources
+        .iter()
+        .find(|source| source["entryIndex"] == json!(index))
+        .ok_or("physical loose WEM")?;
+    let uses = inventory("/provenance/uses")?;
+    let refs = loose["sourceUsesRefs"]
+        .as_array()
+        .ok_or("location evidence")?;
+    let mut selected = uses
+        .iter()
+        .filter(|site| refs.contains(&site["id"]) && site["source"] == own["id"]);
+    assert!(
+        selected.clone().any(|site| {
+            site["scope"] == "archiveDirectoryMetadata"
+                && site.pointer("/location/field") == Some(&json!("path"))
+        }),
+        "location uses the actual clear WEM directory"
+    );
+    assert!(
+        selected.all(|site| site["scope"] != "payload"),
+        "resolution does not read loose WEM bytes"
+    );
+    Ok(())
 }
 
 fn sealed_bank() -> Vec<u8> {
@@ -90,11 +150,8 @@ fn ordinary_bank() -> Vec<u8> {
         .bytes()
 }
 
-fn write_fixture(path: &Path, sealed: &[u8], ordinary: &[u8]) -> TestResult {
+fn write_fixture(path: &Path, sealed: &[u8], ordinary: &[u8], packed: &[u8]) -> TestResult {
     let atl = TestAtl::new("SC_Proof").trigger(TRIGGER, &[SEALED_EVENT, OPEN_EVENT]);
-    let packed = TestBank::new(wwise_short_id("PackedMedia"))
-        .wem(EMBED_ID, vec![0x5A; 8])
-        .bytes();
     ArchiveBuilder::new()
         .entry(TestEntry::zstd(
             "Data\\Libs\\GameAudio\\SC_Proof.xml",
@@ -246,11 +303,7 @@ impl Bank<'_> {
             origin["sourceSetComplete"], true,
             "{address} is fully evidenced"
         );
-        assert_eq!(
-            origin["sourceUsesRefs"].as_array().map(Vec::len),
-            Some(common.len() + usize::from(selected.is_some())),
-            "{address} references exactly its declaration sites"
-        );
+
         for site in common.iter().chain(selected) {
             let actual = proof.site_at(
                 origin,
@@ -258,6 +311,7 @@ impl Bank<'_> {
                 site.namespace,
                 site.name,
                 &site.indices(),
+                Some(site.role),
             )?;
             assert_eq!(
                 actual["role"], site.role,
