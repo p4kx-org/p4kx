@@ -3,9 +3,11 @@
 
 use std::process::ExitCode;
 
-use anyhow::Result;
+use anyhow::{Context as _, Result};
 use p4kx_extraction::{
-    Archive, AudioConversion, Entry, TextureConversion, UnknownEntries, select_entries,
+    Archive, AudioConversion, Entry, FieldOrigins, FieldPath, InputScope, SourceInput,
+    SourceInventory, SourceLocation, SourceUse, SourceUseRole, SourceUses, TextureConversion,
+    UnknownEntries, select_entries,
 };
 use serde::Serialize;
 
@@ -18,22 +20,89 @@ use crate::{exit, filter_pair, list, verify};
 #[derive(Serialize)]
 struct ListJson<'a> {
     archive: String,
-    containers: &'a [String],
+    containers: Vec<String>,
     entries: EntryRows<'a>,
+    #[serde(rename = "fieldOrigins")]
+    field_origins: FieldOrigins,
+    provenance: SourceInventory,
+}
+
+struct ListOrigins {
+    names: Vec<String>,
+    fields: FieldOrigins,
+    uses: SourceUses,
+    route: Vec<SourceUse>,
+}
+
+impl ListOrigins {
+    fn new() -> Self {
+        Self {
+            names: Vec::new(),
+            fields: FieldOrigins::new(),
+            uses: SourceUses::with_compact_use_refs(),
+            route: Vec::new(),
+        }
+    }
+
+    fn retain(&mut self, parent: &Archive, entry: &Entry, has_child: bool) -> Result<()> {
+        let original = parent
+            .observed_entry(entry)
+            .context("selected container is not an Entry of its owning Archive")?;
+        let complete = original.ancestors().all(|ancestor| ancestor.is_some());
+        let scope = self.uses.observe(
+            SourceInput::ArchiveView(original),
+            InputScope::ArchiveDirectoryMetadata,
+        )?;
+        let location = || SourceLocation::Metadata {
+            field: "path".into(),
+        };
+        self.route
+            .push(scope.at(location(), SourceUseRole::Payload)?);
+        let origin = self.uses.origin(&self.route, complete);
+        self.fields.insert(
+            FieldPath::parse(&format!("/containers/{}", self.names.len()))?,
+            origin,
+        )?;
+        let _ = self.route.pop();
+        if has_child {
+            self.route
+                .push(scope.at(location(), SourceUseRole::Selector)?);
+        }
+        self.names.push(entry.path().to_owned());
+        Ok(())
+    }
+
+    fn report<'archive>(
+        mut self,
+        archive: &'archive Archive,
+        entries: &'archive [&'archive Entry],
+    ) -> Result<ListJson<'archive>> {
+        let chain = self
+            .uses
+            .origin_with_origins(self.fields.iter().map(|(_, origin)| origin), true)?;
+        self.fields
+            .insert(FieldPath::parse("/containers")?, chain)?;
+        self.fields
+            .insert(FieldPath::parse("/archive")?, self.uses.origin(&[], true))?;
+        Ok(ListJson {
+            archive: json::path(archive.path()),
+            containers: self.names,
+            entries: EntryRows::physical(archive, entries),
+            field_origins: self.fields,
+            provenance: self.uses.freeze()?,
+        })
+    }
 }
 
 /// Runs `p4kx socpak list` or `p4kx socpak extract`.
 pub(crate) fn run(args: &SocpakArgs, as_json: bool) -> Result<ExitCode> {
     match &args.action {
         SocpakAction::List(source) => {
-            let (container, containers) = open(source)?;
+            let mut listing = as_json.then(ListOrigins::new);
+            let container = open(source, listing.as_mut())?;
             let entries: Vec<&Entry> = container.entries().iter().collect();
-            if as_json {
-                json::print(&ListJson {
-                    archive: json::path(container.path()),
-                    containers: &containers,
-                    entries: EntryRows::physical(&container, &entries),
-                })?;
+            if let Some(listing) = listing {
+                json::print(&listing.report(&container, &entries)?)?;
             } else {
                 list::print_table(&entries)?;
             }
@@ -44,7 +113,7 @@ pub(crate) fn run(args: &SocpakArgs, as_json: bool) -> Result<ExitCode> {
             filter,
             exclude,
         } => {
-            let (container, _) = open(source)?;
+            let container = open(source, None)?;
             let entries = filter_pair::verification(&container, filter.as_deref(), exclude)?;
             verify::execute(&container, &entries, as_json)
         }
@@ -57,7 +126,7 @@ pub(crate) fn run(args: &SocpakArgs, as_json: bool) -> Result<ExitCode> {
             convert,
             verify,
         } => {
-            let (container, _) = open(source)?;
+            let container = open(source, None)?;
             let entries = extracted(&container, filter.as_deref(), exclude, *convert)?;
             let settings = Settings {
                 out: out.as_deref(),
@@ -95,18 +164,18 @@ fn extracted<'a>(
     }
 }
 
-/// Opens the Archive and every container of the chain in turn; returns the last container and
-/// the Entry paths of the chain as the Archive and the containers store them.
-fn open(source: &SocpakSource) -> Result<(Archive, Vec<String>)> {
+/// Opens the Archive and each selected container in order.
+fn open(source: &SocpakSource, mut listing: Option<&mut ListOrigins>) -> Result<Archive> {
     let mut current = crate::key::open(&source.archive)?;
-    let mut chain = Vec::with_capacity(source.containers.len());
-    for path in &source.containers {
+    for (position, path) in source.containers.iter().enumerate() {
         let found = select_entries(&current, &[path])?;
         let Some(entry) = found.first() else {
             return Err(UnknownEntries(vec![path.clone()]).into());
         };
-        chain.push(entry.path().to_owned());
+        if let Some(listing) = &mut listing {
+            listing.retain(&current, entry, position + 1 < source.containers.len())?;
+        }
         current = current.open_container(entry)?;
     }
-    Ok((current, chain))
+    Ok(current)
 }

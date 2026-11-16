@@ -2489,6 +2489,12 @@ these cases no JSON is printed.
 with the paths as they are stored. `entries` holds the Entries of the last container in directory
 order; folder Entries are left out.
 
+The top-level `fieldOrigins` and `provenance` identify each `containers` value's
+actual Entry path in the owning directory. Earlier selected names contribute as
+selectors. An encrypted outer container can therefore give an inner name an
+encrypted origin while the outer name comes from its plain parent directory.
+Entry rows retain their own field origins and source inventories.
+
 ## `p4kx socpak extract <archive> <container…> --json`
 
 The report of `p4kx extract … --json`, for the Entries of the last container.
