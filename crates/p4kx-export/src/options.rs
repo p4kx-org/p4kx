@@ -131,6 +131,16 @@ pub enum CatalogStage {
     LinkMissionFactions,
     /// Projects shops and the remaining configuration tables.
     ProjectConfigurations,
+    /// Projects shop definitions and inventory.
+    ProjectShops,
+    /// Joins world jump operators to their owning Records.
+    ResolveJumpOperators,
+    /// Reads independent DataForge configuration tables.
+    ReadIndependentConfigurations,
+    /// Projects authored particle libraries.
+    ProjectParticleLibraries,
+    /// Projects weapon animation sources.
+    ProjectWeaponAnimation,
     /// Captures selected rows and assembles Blueprint and placement tables.
     FinalizeProjections,
 }
@@ -165,6 +175,11 @@ impl CatalogStage {
             Self::ProjectContractGenerators => "project-contract-generators",
             Self::LinkMissionFactions => "link-mission-factions",
             Self::ProjectConfigurations => "project-configurations",
+            Self::ProjectShops => "project-shops",
+            Self::ResolveJumpOperators => "resolve-jump-operators",
+            Self::ReadIndependentConfigurations => "read-independent-configurations",
+            Self::ProjectParticleLibraries => "project-particle-libraries",
+            Self::ProjectWeaponAnimation => "project-weapon-animation",
             Self::FinalizeProjections => "finalize-projections",
         }
     }

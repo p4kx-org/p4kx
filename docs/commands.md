@@ -502,9 +502,10 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   `project-mission-broker-entries` and `project-mission-location-templates` report the three
   definition reads in order. `project-contract-generators` marks the generator read and row
   assembly.
-  `link-mission-factions` marks scenario faction linking. `project-configurations` covers shops
-  and the remaining configurations. `finalize-projections` marks selected row capture and final
-  Blueprint and placement tables. These markers precede `export-health`.
+  `link-mission-factions` marks scenario faction linking. Within `project-configurations`, the
+  phases are `project-shops`, `resolve-jump-operators`, `read-independent-configurations`,
+  `project-particle-libraries` and `project-weapon-animation`. `finalize-projections` marks
+  selected row capture and final Blueprint and placement tables. These markers precede `export-health`.
   `p4kx catalog schema` prints the catalog's JSON Schema.
 - `p4kx ships <archive> --out <file> [--format json|ndjson] [--filter <filter>]
   [--exported-at <seconds>]` writes the base data of every ship

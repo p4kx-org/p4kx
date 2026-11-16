@@ -102,9 +102,12 @@ fn assemble<R>(
         options.cancel,
     )?);
     run.begin(CatalogStage::ProjectConfigurations);
+    run.begin(CatalogStage::ProjectShops);
     let shop_summary = add_shops(archive, &files, &mut collected, options, &entry_capture)?;
+    run.begin(CatalogStage::ResolveJumpOperators);
     let jump_owners = placements.join_jump_operators(&entities, &input, options.cancel)?;
     let jump_connections = CatalogTable::empty(placements.jump_connection_availability());
+    run.begin(CatalogStage::ReadIndependentConfigurations);
     let independent = catalog_independent_configurations::read(
         &forge,
         &projection,
@@ -112,9 +115,12 @@ fn assemble<R>(
         &mut collected,
         &jump_owners,
     )?;
+    run.begin(CatalogStage::ProjectParticleLibraries);
     particle_library::collect(archive, &entry_capture, options, &mut collected)?;
+    run.begin(CatalogStage::ProjectWeaponAnimation);
     let weapon_animation =
         parts::capture_weapon_animation(archive, &entities, &input, options, &mut collected)?;
+    drop(entities);
     run.begin(CatalogStage::FinalizeProjections);
     let kinds = collected.summary(options.filter.is_none());
     parts::capture_rows(
@@ -133,6 +139,7 @@ fn assemble<R>(
         options,
     )?;
     let health = parts::require_publishable(&mut collected, &kinds, &input, run)?;
+    drop(collected.failures);
     let key_use = ArchiveKeyUse::of(archive);
     let store_slugs = StoreSlugs::embedded()?;
     let resolved = store_slugs.resolve(

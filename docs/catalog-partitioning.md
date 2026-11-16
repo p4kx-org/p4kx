@@ -12,6 +12,15 @@ so this run provides no encoded or decoded size. The process working set grew fr
 to 36.70 GiB during `records` and from 40.38 GiB to 44.30 GiB during
 `project-mission-broker-entries`. [Release producer](https://github.com/p4kx-org/p4kx/actions/runs/43803352398/job/133089995250)
 
+A second unfiltered trial used the verified Windows AMD64 release producer for
+`0e1da3f4a` on the same LIVE Archive. Peak sampled working set during `records`
+was 32.37 GiB, down from 36.72 GiB. The run passed `project-contract-generators`
+and reached `project-configurations`, where the 12 GiB physical-memory reserve
+stopped it at 44.87 GiB working set and 11.96 GiB available on the host. It again
+stopped before JSON sizing or publication. The reserves apply to the host's
+available physical memory and system commit headroom in the measurement harness.
+[Release producer](https://github.com/p4kx-org/p4kx/actions/runs/43813424470/job/133122281746)
+
 | Section | LIVE | PTU |
 | --- | ---: | ---: |
 | `placements.containerInstances` | 1.734 GB | 2.046 GB |
@@ -161,7 +170,9 @@ Within `projections`, record `resolve-loadouts`, `project-locations`, `project-m
 `read-mission-dependencies`, `project-mission-definitions`, `project-contract-templates`,
 `project-mission-broker-entries`, `project-mission-location-templates`,
 `project-contract-generators`, `link-mission-factions`, `project-configurations` and
-`finalize-projections` as separate phase starts.
+`finalize-projections` as separate phase starts. Record the configuration phases `project-shops`,
+`resolve-jump-operators`, `read-independent-configurations`, `project-particle-libraries` and
+`project-weapon-animation` separately.
 Record peak working set and peak private bytes separately.
 Sample host commit and paging counters alongside the process write counter to distinguish process
 writes from system memory pressure. Record the exit status, elapsed time, file length and decoded
