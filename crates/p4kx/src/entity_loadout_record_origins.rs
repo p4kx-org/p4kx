@@ -6,9 +6,13 @@ use std::collections::HashMap;
 use std::ops::ControlFlow;
 use std::ptr;
 
-use p4kx_assembly::{LoadoutPathObserver, LoadoutPathOperation, LoadoutSelection};
+use p4kx_assembly::{
+    LoadoutClassSelection, LoadoutPathObserver, LoadoutPathOperation, LoadoutReferenceSelection,
+    LoadoutSelection,
+};
 use p4kx_extraction::{
-    DataForge, Record, RecordJsonLocation, RecordTree, SourceLocation, StructValue, Value,
+    DataForge, DataType, Guid, Record, RecordJsonLocation, RecordTree, SourceLocation, StructValue,
+    Value, ValueError,
 };
 
 pub(super) struct RecordPaths<'forge> {
@@ -16,15 +20,26 @@ pub(super) struct RecordPaths<'forge> {
     selections: RefCell<HashMap<usize, Vec<Pending>>>,
 }
 
-struct Pending {
-    selection: LoadoutSelection,
-    text: Option<SourceLocation>,
+pub(super) enum Selection {
+    Path(LoadoutSelection),
+    Class(LoadoutClassSelection),
+    Reference(LoadoutReferenceSelection),
 }
 
-pub(super) struct SelectedName {
+struct Pending {
+    selection: Selection,
+    datum: Datum,
+}
+
+pub(super) struct RecordSite {
     pub(super) record: u32,
     pub(super) ordinal: u64,
-    pub(super) text: Option<SourceLocation>,
+    pub(super) datum: Datum,
+}
+
+pub(super) enum Datum {
+    Text(Option<SourceLocation>),
+    Reference { guid: Guid, stored: bool },
 }
 
 impl<'forge> RecordPaths<'forge> {
@@ -39,7 +54,7 @@ impl<'forge> RecordPaths<'forge> {
         self,
         record: &Record<'_>,
         tree: &RecordTree<'_>,
-    ) -> Vec<(LoadoutSelection, SelectedName)> {
+    ) -> Vec<(Selection, RecordSite)> {
         let mut pending = self.selections.into_inner();
         let mut selected = Vec::new();
         if !pending.is_empty() {
@@ -49,10 +64,10 @@ impl<'forge> RecordPaths<'forge> {
                     selected.extend(sites.into_iter().map(|site| {
                         (
                             site.selection,
-                            SelectedName {
+                            RecordSite {
                                 record: record.index(),
                                 ordinal: visit.ordinal() as u64,
-                                text: site.text,
+                                datum: site.datum,
                             },
                         )
                     }));
@@ -60,6 +75,31 @@ impl<'forge> RecordPaths<'forge> {
             });
         }
         selected
+    }
+
+    fn capture_text(&self, selection: Selection, parent: &StructValue<'_>, value: &Value<'_>) {
+        if !parent
+            .fields()
+            .iter()
+            .any(|field| ptr::eq(field.value(), value))
+        {
+            return;
+        }
+        let location = match value {
+            Value::String(text) | Value::Locale(text) | Value::Enum(text) => {
+                RecordJsonLocation::borrowed_text(self.forge, text)
+            }
+            _ => None,
+        };
+        self.capture(selection, value, Datum::Text(location));
+    }
+
+    fn capture(&self, selection: Selection, value: &Value<'_>, datum: Datum) {
+        self.selections
+            .borrow_mut()
+            .entry(ptr::from_ref(value).addr())
+            .or_default()
+            .push(Pending { selection, datum });
     }
 }
 
@@ -70,28 +110,51 @@ impl LoadoutPathObserver for RecordPaths<'_> {
         parent: &StructValue<'_>,
         value: &Value<'_>,
     ) -> ControlFlow<()> {
-        if selection.operation() != LoadoutPathOperation::PortName
-            || !parent
-                .fields()
-                .iter()
-                .any(|field| ptr::eq(field.value(), value))
-        {
-            return ControlFlow::Continue(());
+        if matches!(
+            selection.operation(),
+            LoadoutPathOperation::PortName | LoadoutPathOperation::Copy
+        ) {
+            self.capture_text(Selection::Path(selection.clone()), parent, value);
         }
-        let text = match value {
-            Value::String(text) | Value::Locale(text) | Value::Enum(text) => {
-                RecordJsonLocation::borrowed_text(self.forge, text)
-            }
-            _ => None,
+        ControlFlow::Continue(())
+    }
+
+    fn record_class(
+        &self,
+        selection: &LoadoutClassSelection,
+        parent: &StructValue<'_>,
+        value: &Value<'_>,
+    ) -> ControlFlow<()> {
+        self.capture_text(Selection::Class(selection.clone()), parent, value);
+        ControlFlow::Continue(())
+    }
+
+    fn record_reference(
+        &self,
+        selection: &LoadoutReferenceSelection,
+        parent: &StructValue<'_>,
+        value: &Value<'_>,
+    ) -> ControlFlow<()> {
+        let Some(field) = parent
+            .fields()
+            .iter()
+            .find(|field| ptr::eq(field.value(), value))
+        else {
+            return ControlFlow::Continue(());
         };
-        self.selections
-            .borrow_mut()
-            .entry(ptr::from_ref(value).addr())
-            .or_default()
-            .push(Pending {
-                selection: selection.clone(),
-                text,
-            });
+        let guid = match value {
+            Value::Reference(reference) => reference.guid(),
+            Value::Error(ValueError::DanglingReference { guid }) => *guid,
+            _ => return ControlFlow::Continue(()),
+        };
+        self.capture(
+            Selection::Reference(selection.clone()),
+            value,
+            Datum::Reference {
+                guid,
+                stored: field.storage().data_type() == DataType::Reference,
+            },
+        );
         ControlFlow::Continue(())
     }
 

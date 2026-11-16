@@ -187,6 +187,14 @@ original DataForge field occurrence or the XML attribute that supplied its spell
 override carries the winning attribute's source. An unavailable coordinate gives
 `sourceSetComplete: false` for that field.
 
+Attached Entity identity fields also carry the selected class or Reference. An XML class includes
+the loadout caller and the Include attributes on its actual route. A stored unresolved Reference
+has its original GUID receipt at `/error/reference` beneath the port. Diagnostic receipts carry
+known inputs and remain incomplete when the failed lookup evidence is unavailable. An applied
+`--exclude` or `--replace` carries the authored port-name selectors matched by the operator path
+at the port's `source` field. The same selectors supply the exclusion's empty attachment or the
+replacement's Entity identity.
+
 An Entity whose default Loadout is an outfit (an NPC actor, `SItemPortLoadoutOutfitParams`) also
 has `outfit`: `{"base_files": ["…"], "outfits": [{"tags": ["Outfits.S42.Work"], "files": ["…"],
 "applied": true}, …]}`, the XML Loadouts of the base Loadout and, per outfit in the Record's order,

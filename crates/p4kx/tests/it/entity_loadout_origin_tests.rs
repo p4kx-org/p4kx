@@ -11,6 +11,9 @@ use serde_json::Value;
 
 use super::TestResult;
 
+#[path = "entity_loadout_attachment_origin_tests.rs"]
+mod attachments;
+
 const BASE_PATH: &str = "Data\\Loadouts\\Base.xml";
 const LOCAL_PATH: &str = "Data\\Loadouts\\Root.xml";
 const BASE: &str = concat!(
@@ -57,6 +60,7 @@ fn json_names_keep_exact_mixed_sources_and_the_winning_loadout_occurrence() -> T
     );
     let json: Value = serde_json::from_slice(&result.stdout)?;
     verify_xml_names(&json)?;
+    verify_xml_attachment(&json)?;
     verify_record_fields(&json, &database)?;
     verify_emitted_fields(&json)
 }
@@ -108,6 +112,43 @@ fn verify_xml_names(json: &Value) -> TestResult {
     Ok(())
 }
 
+fn verify_xml_attachment(json: &Value) -> TestResult {
+    let left = "/entity/ports/0/entity/guid";
+    let right = "/entity/ports/1/entity/guid";
+    for (pointer, expected) in [
+        (
+            left,
+            &[(BASE_PATH, "itemName"), (LOCAL_PATH, "loadout")][..],
+        ),
+        (right, &[(LOCAL_PATH, "itemName")][..]),
+    ] {
+        assert_eq!(
+            origin(json, pointer)?["sourceSetComplete"],
+            true,
+            "{pointer}"
+        );
+        let mut xml = Vec::new();
+        for site in field_uses(json, pointer)? {
+            if site["role"] == "selector"
+                && site.pointer("/location/namespace").and_then(Value::as_str)
+                    == Some("textXmlAttribute")
+            {
+                let attribute = site
+                    .pointer("/location/field")
+                    .and_then(Value::as_str)
+                    .ok_or("original attribute")?;
+                xml.push((source_path(json, site)?, attribute));
+            }
+        }
+        xml.sort_unstable();
+        assert_eq!(
+            xml, expected,
+            "{pointer} has the actual class and include route"
+        );
+    }
+    Ok(())
+}
+
 fn verify_record_fields(json: &Value, database: &[u8]) -> TestResult {
     let base = "/entity/ports/1/entity";
     for (pointer, bytes) in [
@@ -135,6 +176,7 @@ fn verify_record_fields(json: &Value, database: &[u8]) -> TestResult {
                 site.pointer("/location/namespace").and_then(Value::as_str)
                     == Some("dataforgeDecodedBytes")
                     && site.pointer("/location/field").and_then(Value::as_str) == Some("text")
+                    && site["role"] != "selector"
             })
             .ok_or("original DataForge text")?;
         assert_eq!(source_path(json, text)?, "Data\\Game2.dcb", "{pointer}");
