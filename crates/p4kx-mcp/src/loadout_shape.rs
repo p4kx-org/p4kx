@@ -12,7 +12,7 @@ use crate::budget_text;
 use crate::error::ToolError;
 use crate::loadout_error;
 use crate::loadout_shapes::{
-    Counts, DefinitionShape, EntityShape, LoadoutResult, PortShape, TypeShape,
+    Counts, DefinitionShape, EntityShape, LoadoutHeader, PortShape, TypeShape,
 };
 
 /// The most issues listed per Entity.
@@ -22,22 +22,20 @@ const MAX_TYPES: usize = 16;
 /// The most sub-types listed per item type.
 const MAX_SUB_TYPES: usize = 16;
 
-pub(crate) fn envelope(
+pub(crate) fn header(
     archive: &Path,
     node: &EntityNode,
     counts: Counts,
     total: usize,
     deeper: usize,
-) -> Result<LoadoutResult, ToolError> {
+) -> Result<LoadoutHeader, ToolError> {
     let mut text = Budget::new();
-    Ok(LoadoutResult {
+    Ok(LoadoutHeader {
         archive: budget_text::display(&mut text, &archive.display())?,
         entity: entity(node, &mut text)?,
         counts,
         total,
         deeper,
-        ports: Vec::new(),
-        next_cursor: None,
     })
 }
 

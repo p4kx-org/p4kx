@@ -1,18 +1,23 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::sync::Arc;
+
 use p4kx_assembly::{
-    ArchiveFiles, Attachment, LoadoutChanges, LoadoutPicks, LoadoutResolver, PortNode,
+    ArchiveFiles, Attachment, EntityNode, LoadoutChanges, LoadoutPicks, LoadoutResolver, PortNode,
 };
-use p4kx_extraction::DataForge;
+use p4kx_extraction::{DataForge, DataForgeOrigin};
 
 use crate::archives::Opened;
-use crate::budget::{fill_within, json_len};
+use crate::budget::{fill_within, fit_prefix, json_len};
 use crate::error::{ToolError, capped};
 use crate::loadout_shape;
-use crate::loadout_shapes::Counts;
+use crate::loadout_shapes::{Counts, LoadoutHeader};
 pub(crate) use crate::loadout_shapes::{LoadoutParams, LoadoutResult};
 use crate::page::Page;
+
+#[path = "loadout_origins.rs"]
+mod origins;
 
 /// The deepest port nesting a call returns when it gives no depth.
 pub(crate) const DEFAULT_DEPTH: u32 = 16;
@@ -27,13 +32,50 @@ const MAX_PICKS: usize = 64;
 pub(crate) fn resolve(
     opened: &Opened,
     forge: &DataForge<'_>,
+    origin: &DataForgeOrigin,
     params: &LoadoutParams,
     page: Page,
 ) -> Result<LoadoutResult, ToolError> {
+    let tree = resolve_tree(opened, forge, params)?;
+    let max_depth = usize::try_from(
+        params
+            .max_depth
+            .unwrap_or(DEFAULT_DEPTH)
+            .clamp(1, MAX_DEPTH),
+    )
+    .unwrap_or(1);
+    let all = tree.walk();
+    let counts = counts(&all);
+    let near: Vec<_> = all
+        .iter()
+        .filter(|(path, _)| depth(path) <= max_depth)
+        .map(|(path, port)| (path, *port))
+        .collect();
+    let header = loadout_shape::header(
+        opened.archive().path(),
+        &tree,
+        counts,
+        near.len(),
+        all.len() - near.len(),
+    )?;
+    Projection {
+        forge,
+        origin,
+        tree: &tree,
+        page,
+    }
+    .publish(header, &near)
+}
+
+fn resolve_tree(
+    opened: &Opened,
+    forge: &DataForge<'_>,
+    params: &LoadoutParams,
+) -> Result<Arc<EntityNode>, ToolError> {
     let stop_at_docked = params.stop_at_docked_vehicles == Some(true);
     let picks = picks_of(params.loadout_pick.as_deref().unwrap_or_default())?;
     let key = picks.normalised();
-    let tree = opened.loadouts().get_or_resolve(
+    opened.loadouts().get_or_resolve(
         opened.archive(),
         &params.entity,
         (stop_at_docked, &key),
@@ -47,38 +89,61 @@ pub(crate) fn resolve(
             let changes = LoadoutChanges::new().with_picks(picks.clone());
             Ok(resolver.resolve_with(&record, &changes)?)
         },
-    )?;
-    let max_depth = usize::try_from(
-        params
-            .max_depth
-            .unwrap_or(DEFAULT_DEPTH)
-            .clamp(1, MAX_DEPTH),
     )
-    .unwrap_or(1);
-    let all = tree.walk();
-    let counts = counts(&all);
-    let near: Vec<(&String, &PortNode)> = all
-        .iter()
-        .filter(|(path, _)| depth(path) <= max_depth)
-        .map(|(path, port)| (path, *port))
-        .collect();
-    let mut result = loadout_shape::envelope(
-        opened.archive().path(),
-        &tree,
-        counts,
-        near.len(),
-        all.len() - near.len(),
-    )?;
-    let items = page
-        .slice(&near)
-        .iter()
-        .map(|&(path, port)| loadout_shape::port(path, depth(path), port));
-    let (ports, next_cursor) = fill_within(page, near.len(), json_len(&result), items, |shape| {
-        format!("loadout port at depth {}", shape.depth)
-    })?;
-    result.ports = ports;
-    result.next_cursor = next_cursor;
-    Ok(result)
+}
+
+struct Projection<'input, 'forge> {
+    forge: &'input DataForge<'forge>,
+    origin: &'input DataForgeOrigin,
+    tree: &'input EntityNode,
+    page: Page,
+}
+
+impl Projection<'_, '_> {
+    fn publish(
+        self,
+        header: LoadoutHeader,
+        near: &[(&String, &PortNode)],
+    ) -> Result<LoadoutResult, ToolError> {
+        let page = self.page;
+        let window = page.slice(near);
+        let items = window
+            .iter()
+            .map(|&(path, port)| loadout_shape::port(path, depth(path), port));
+        let (mut ports, _) = fill_within(page, near.len(), json_len(&header), items, |shape| {
+            format!("loadout port at depth {}", shape.depth)
+        })?;
+        let (keep, fitted) = fit_prefix(
+            ports.len(),
+            |len| {
+                let origins = origins::identities(
+                    self.forge,
+                    self.origin,
+                    self.tree,
+                    window.iter().take(len).map(|&(_, port)| port),
+                )?;
+                Ok(LoadoutResult {
+                    header: &header,
+                    ports: ports.split_at(len).0,
+                    next_cursor: page.next_cursor_after(len, near.len())?,
+                    origins,
+                })
+            },
+            || format!("loadout port at position {}", page.offset()),
+        )?;
+        let LoadoutResult {
+            next_cursor,
+            origins,
+            ..
+        } = fitted;
+        ports.truncate(keep);
+        Ok(LoadoutResult {
+            header,
+            ports,
+            next_cursor,
+            origins,
+        })
+    }
 }
 
 /// Reads the picks of a call: each text `<group>=<index>` or a bare `<index>`, several to a text

@@ -52,7 +52,9 @@ impl Server {
             );
             let page = Page::new(&listing, params.cursor.as_deref(), params.limit)?;
             let held = Arc::clone(&opened);
-            opened.with_dataforge(move |forge, _| loadout::resolve(&held, forge, &params, page))
+            opened.with_dataforge_origin(move |forge, _, origin| {
+                loadout::resolve(&held, forge, origin, &params, page)
+            })
         })
         .await
     }

@@ -145,15 +145,6 @@ impl Opened {
             .index(&self.archive)
     }
 
-    /// Runs `work` against the DataForge with the Archive path as text, reading the DataForge on
-    /// first use.
-    pub(crate) fn with_dataforge<T, F>(&self, work: F) -> Result<T, ToolError>
-    where
-        T: Send + 'static,
-        F: FnOnce(&DataForge<'_>, String) -> Result<T, ToolError> + Send + 'static,
-    {
-        self.with_dataforge_origin(move |forge, archive, _| work(forge, archive))
-    }
 
     /// Runs work against the DataForge and its retained original input.
     pub(crate) fn with_dataforge_origin<T, F>(&self, work: F) -> Result<T, ToolError>

@@ -2,11 +2,15 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_dataforge::{
-    DataForge, RecordJsonBytes, RecordJsonRecordField, RecordJsonSource, RecordJsonUse,
-    RecordJsonUseRole,
+    DataForge, Record, RecordJsonBytes, RecordJsonRecordField, RecordJsonSource, RecordJsonUse,
+    RecordJsonUseRole, RecordText,
 };
 
-use crate::{SourceLocation, SourceUseRole};
+use crate::{
+    FieldOrigin, SourceEvidenceError, SourceLocation, SourceScope, SourceUseRole, SourceUses,
+};
+
+const IDENTITY_FIELDS: [&str; 4] = ["guid", "record_path", "name", "class_name"];
 
 /// The source coordinate and contribution role of an observed Record JSON value.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -19,6 +23,77 @@ pub struct RecordJsonLocation {
 }
 
 impl RecordJsonLocation {
+    /// Binds the four emitted Record identity members to their physical header and text sites.
+    ///
+    /// # Errors
+    /// Returns an error if the Record belongs to a different DataForge or source registration fails.
+    pub fn identity(
+        forge: &DataForge<'_>,
+        record: Option<&Record<'_>>,
+        uses: &SourceUses,
+        scope: &SourceScope,
+        source_set_complete: bool,
+    ) -> Result<[(&'static str, FieldOrigin); 4], SourceEvidenceError> {
+        let Some(record) = record else {
+            return Ok(IDENTITY_FIELDS.map(|field| (field, uses.origin(&[], false))));
+        };
+        if !record.is_from(forge) {
+            return Err(SourceEvidenceError::ForeignEvidence);
+        }
+        let RecordIdentityText {
+            path,
+            name,
+            name_complete,
+        } = RecordIdentityText::read(forge, record);
+        let bind = |field: &str, role, text: Option<&SourceLocation>, complete| {
+            let field = scope.at(
+                SourceLocation::DataForge {
+                    record_index: record.index(),
+                    field: field.into(),
+                },
+                role,
+            )?;
+            let complete = source_set_complete && complete;
+            Ok::<_, SourceEvidenceError>(if let Some(location) = text {
+                let original = scope.at(location.clone(), role)?;
+                uses.origin(&[field, original], complete)
+            } else {
+                uses.origin(&[field], complete)
+            })
+        };
+        let [guid, path_field, name_field, class] = IDENTITY_FIELDS;
+        Ok([
+            (guid, bind("guid", SourceUseRole::Payload, None, true)?),
+            (
+                path_field,
+                bind(
+                    "fileName",
+                    SourceUseRole::Conversion,
+                    path.as_ref(),
+                    path.is_some(),
+                )?,
+            ),
+            (
+                name_field,
+                bind(
+                    "recordName",
+                    SourceUseRole::Payload,
+                    name.as_ref(),
+                    name_complete,
+                )?,
+            ),
+            (
+                class,
+                bind(
+                    "recordName",
+                    SourceUseRole::Conversion,
+                    name.as_ref(),
+                    name_complete,
+                )?,
+            ),
+        ])
+    }
+
     /// Addresses the original text borrowed from this DataForge.
     #[must_use]
     pub fn borrowed_text(forge: &DataForge<'_>, text: &str) -> Option<SourceLocation> {
@@ -136,6 +211,35 @@ impl RecordJsonLocation {
                 field: field.to_owned(),
             },
             role,
+        }
+    }
+}
+
+struct RecordIdentityText {
+    path: Option<SourceLocation>,
+    name: Option<SourceLocation>,
+    name_complete: bool,
+}
+
+impl RecordIdentityText {
+    fn read(forge: &DataForge<'_>, record: &Record<'_>) -> Self {
+        let path = record
+            .stored_file_name()
+            .ok()
+            .and_then(|text| RecordJsonLocation::borrowed_text(forge, text));
+        let (name, name_complete) = match record.stored_name() {
+            Ok(RecordText::Present(text)) => {
+                let name = RecordJsonLocation::borrowed_text(forge, text);
+                let complete = name.is_some();
+                (name, complete)
+            }
+            Ok(RecordText::Absent | RecordText::Null) => (None, true),
+            _ => (None, false),
+        };
+        Self {
+            path,
+            name,
+            name_complete,
         }
     }
 }

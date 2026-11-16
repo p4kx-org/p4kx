@@ -4,6 +4,8 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::forge_shapes::ForgeFieldOrigins;
+
 /// The arguments of `entity_loadout`.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -32,7 +34,22 @@ pub(crate) struct LoadoutParams {
 
 /// The Loadout tree of an Entity as a list of ports, parents before their children.
 #[derive(Debug, Serialize, JsonSchema)]
-pub(crate) struct LoadoutResult {
+pub(crate) struct LoadoutResult<Ports = Vec<PortShape>, Header = LoadoutHeader> {
+    #[serde(flatten)]
+    #[schemars(with = "LoadoutHeader")]
+    pub(crate) header: Header,
+    /// The ports on this page, depth first in port order.
+    #[schemars(with = "Vec<PortShape>")]
+    pub(crate) ports: Ports,
+    /// The cursor of the next page; absent on the last page.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) next_cursor: Option<String>,
+    #[serde(flatten)]
+    pub(crate) origins: ForgeFieldOrigins,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub(crate) struct LoadoutHeader {
     /// The path of the Archive.
     pub(crate) archive: String,
     /// The Entity.
@@ -43,11 +60,6 @@ pub(crate) struct LoadoutResult {
     pub(crate) total: usize,
     /// The number of ports left out because they lie deeper than `max_depth`.
     pub(crate) deeper: usize,
-    /// The ports on this page, depth first in port order.
-    pub(crate) ports: Vec<PortShape>,
-    /// The cursor of the next page; absent on the last page.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) next_cursor: Option<String>,
 }
 
 /// An Entity.
@@ -71,7 +83,7 @@ pub(crate) struct EntityShape {
     pub(crate) issue_count: usize,
     /// What the Loadout cannot decide without the game's spawn, in the form of `issues` but no
     /// problem: nothing was kept from being read. Absent when there is none.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub(crate) notes: Vec<ErrorShape>,
 }
 
