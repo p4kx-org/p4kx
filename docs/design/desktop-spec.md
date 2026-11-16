@@ -253,7 +253,9 @@ starten", nicht „Exportieren", damit sie sich vom Menü „Export" unterscheid
 Screenreader. Fortschritt und Zusammenfassung sind wie bei der Extraktion nicht modal (D.3, D.7)
 und haben je genau eine Aktion im Fuß: „Abbrechen" als Ghost, „Schließen" als CTA. Der Balken
 zeigt erst beim Schreiben einen Anteil (D.5); davor steht ein Spinner mit „Lese DataForge …"
-bzw. „Wähle Records aus …". Der Hinweis auf einen Abbruch steht in `color-warning` (D.8, D.11).
+bzw. „Wähle Records aus …“. Der Hinweis auf einen Abbruch steht in `color-warning` (D.8, D.11).
+Der Tooltip der Zusammenfassung zeigt die Verschlüsselungsherkunft der als geschrieben
+gezählten Records.
 
 **D.18 Töne im Tab „Audio".** Wählt man eine WEM (`.wem`), öffnet die Vorschau den Tab „Audio";
 andere Einträge kehren zu „Text" zurück. Codec, Kanäle, Abtastrate und Dauer stehen als

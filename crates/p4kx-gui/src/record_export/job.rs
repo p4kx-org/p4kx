@@ -11,10 +11,12 @@ use std::thread;
 use std::time::SystemTime;
 
 use p4kx_export::{
-    CancelToken, ConflictPolicy, RecordExportOptions, RecordForm, write_planned_record_export,
+    CancelToken, ConflictPolicy, RecordExportOptions, RecordForm,
+    write_planned_record_export_with_receipt,
 };
 use p4kx_extraction::{
-    ArchiveWriteProtection, Filter, Record, TagResolver, create_default_target_protected,
+    ArchiveWriteProtection, DataForge, Filter, Record, TagResolver, TagTree,
+    create_default_target_protected,
 };
 use rayon::prelude::*;
 
@@ -254,6 +256,25 @@ impl Job<'_> {
             Err(error) if crate::installation::guard_cancelled(&error) => return Ok(cancelled()),
             Err(error) => return Err(describe(&error)),
         };
+        Ok(self.write(
+            &source,
+            &forge,
+            &records,
+            target,
+            &protection,
+            tags.as_deref(),
+        ))
+    }
+
+    fn write(
+        &self,
+        source: &ForgeSource,
+        forge: &DataForge<'_>,
+        records: &[Record<'_>],
+        target: PathBuf,
+        protection: &ArchiveWriteProtection,
+        tags: Option<&TagTree>,
+    ) -> RecordExportSummary {
         self.shared.total.store(records.len(), Ordering::Relaxed);
         self.shared.enter(RecordExportStage::Writing);
         #[cfg(feature = "test-hooks")]
@@ -266,18 +287,19 @@ impl Job<'_> {
             cancel: Some(self.cancel),
             progress: Some(&progress),
             texts: None,
-            tags: tags.as_deref().map(|tags| tags as &dyn TagResolver),
-            protection: Some(&protection),
+            tags: tags.map(|tags| tags as &dyn TagResolver),
+            protection: Some(protection),
         };
-        let summary = write_planned_record_export(
-            &forge,
+        let summary = write_planned_record_export_with_receipt(
+            forge,
             &source.plans,
-            &records,
+            records,
             self.request.form,
             &target,
             &options,
         );
-        Ok(RecordExportSummary::new(target, records.len(), &summary))
+        let actual = source.entry.origin_of(forge);
+        RecordExportSummary::new(target, records.len(), summary, actual)
     }
 
     /// Returns DataForge from the cache of the Archive, reading it first when the cache is empty.

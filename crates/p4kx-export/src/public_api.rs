@@ -44,8 +44,11 @@ pub use crate::options::CatalogStage;
 pub use crate::options::{CatalogOptions, CatalogPhase, CatalogProgress};
 pub use crate::playability::{Playability, PlayabilityCounts, PlayabilitySummary};
 pub use crate::quantization_summary::QuantizationSummary;
-pub use crate::record_export::{RecordFilePlans, write_planned_record_export, write_record_export};
-pub use crate::record_summary::RecordExportSummary;
+pub use crate::record_export::{
+    RecordFilePlans, write_planned_record_export, write_planned_record_export_with_receipt,
+    write_record_export,
+};
+pub use crate::record_summary::{RecordExportReceipt, RecordExportSummary};
 pub use crate::selection::{
     EXCLUDED_TOKENS, Kind, KindRule, SHIP_EXCLUDED_TOKENS, is_kind_leftover,
 };

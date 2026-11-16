@@ -456,6 +456,7 @@ record-export-summary-title = Record export finished
 record-export-summary-cancelled-title = Record export cancelled
 record-export-summary-cancelled = The Record export was cancelled before every Record was written.
 record-export-summary-counts = Records written { $written }, skipped { $skipped }, failed { $failed }, cancelled { $cancelled }
+record-export-summary-written = Records written
 record-export-summary-errors = Records with error values: { $erroneous }, error values: { $errors }
 record-export-summary-no-match = No Record matches the filter.
 record-export-summary-target = Target: { $path }

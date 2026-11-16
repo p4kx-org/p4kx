@@ -456,6 +456,7 @@ record-export-summary-title = Record-Export abgeschlossen
 record-export-summary-cancelled-title = Record-Export abgebrochen
 record-export-summary-cancelled = Der Record-Export wurde abgebrochen, bevor alle Records geschrieben waren.
 record-export-summary-counts = Records geschrieben { $written }, übersprungen { $skipped }, fehlgeschlagen { $failed }, abgebrochen { $cancelled }
+record-export-summary-written = Geschriebene Records
 record-export-summary-errors = Records mit Fehlerwerten: { $erroneous }, Fehlerwerte: { $errors }
 record-export-summary-no-match = Kein Record passt zum Filter.
 record-export-summary-target = Ziel: { $path }

@@ -331,6 +331,7 @@ mod quantization_fixture;
 mod record_export;
 mod record_export_plans;
 mod record_export_protection;
+mod record_export_receipt;
 mod reputation_fixture;
 mod resource_1069_fixture;
 mod resource_cargo_slot_duplicates;

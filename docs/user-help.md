@@ -259,7 +259,8 @@ The export runs in the background with a progress window; the first export of an
 DataForge first, and later ones reuse it. **Cancel** stops it at once. The summary gives the
 Records written, skipped, failed and cancelled, the Records with error values and their number,
 and the target, then lists failed Records with the reason. A cancelled NDJSON export keeps no
-partial file.
+partial file. Hover over the summary counts to see the original encryption provenance of the
+written count. Files kept from an earlier run do not contribute to this count.
 
 ### Creating the P4KX catalog
 

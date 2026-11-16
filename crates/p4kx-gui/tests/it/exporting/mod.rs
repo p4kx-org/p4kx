@@ -8,6 +8,7 @@ use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use p4kx_extraction::ArchiveKey;
 use p4kx_gui::{Browser, Language, Model, RecordExport, RecordExportStatus, RecordTreeStatus};
 use p4kx_testkit::TestValue;
 use p4kx_testkit::{ArchiveBuilder, DataForgeBuilder, TestEntry, TestRecord, TestStruct, TestType};
@@ -102,10 +103,19 @@ pub(crate) fn opened(
 pub(crate) fn opened_with(
     builder: &ArchiveBuilder,
 ) -> Result<(TempDir, Model, PathBuf), Box<dyn Error>> {
+    opened_with_key(builder, None)
+}
+
+/// Opens the test Archive with its key available before the first window frame.
+pub(crate) fn opened_with_key(
+    builder: &ArchiveBuilder,
+    key: Option<ArchiveKey>,
+) -> Result<(TempDir, Model, PathBuf), Box<dyn Error>> {
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("Data.p4k");
     builder.write_to(&path)?;
     let mut model = Model::new(Language::BritishEnglish);
+    model.set_archive_key(key);
     model.open(path, || {});
     wait_until(&mut model, |model| model.browser().is_some())?;
     let out = dir.path().join("out");

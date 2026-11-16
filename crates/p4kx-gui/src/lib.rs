@@ -148,9 +148,9 @@ pub use query::{
     QueryResult, QueryStage, QueryStatus, QueryTab, ResultColumn, SavedDialog,
 };
 pub use record_export::{
-    FailedRecord, RECORD_FORMS, RecordExport, RecordExportProgress, RecordExportSetup,
-    RecordExportStage, RecordExportStatus, RecordExportSummary, RecordScope, RenamedRecord,
-    TreeSelection, form_annotates_tags,
+    FailedRecord, RECORD_FORMS, RecordExport, RecordExportProgress, RecordExportProvenance,
+    RecordExportSetup, RecordExportStage, RecordExportStatus, RecordExportSummary, RecordScope,
+    RenamedRecord, TreeSelection, form_annotates_tags,
 };
 pub use record_index::{
     DataForgeSummary, RecordId, RecordInfo, RecordNodeId, RecordNodeKind, SUMMARY_RECORDS,

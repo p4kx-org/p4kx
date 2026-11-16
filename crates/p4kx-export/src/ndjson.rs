@@ -13,6 +13,7 @@ use p4kx_extraction::{
 use rayon::prelude::*;
 
 use crate::line_writer::LineWriter;
+use crate::record_summary::RecordExportReceipt;
 use crate::{NDJSON_FILE, RecordExportSummary, RecordForm};
 
 const BATCH_LEN: usize = 4096;
@@ -30,6 +31,28 @@ struct Part<'r, 'f> {
     bytes: Vec<u8>,
     error_counts: Vec<usize>,
     failures: Vec<(&'r Record<'f>, RecordExportError)>,
+    receipt: Option<RecordExportReceipt>,
+}
+
+impl Part<'_, '_> {
+    fn account(self, summary: &mut RecordExportSummary) {
+        if let (Some(receipt), Some(part)) = (&mut summary.receipt, self.receipt) {
+            receipt.indices.extend(part.indices);
+            receipt.rowless_indices.extend(part.rowless_indices);
+        }
+        summary.written = summary.written.saturating_add(self.error_counts.len());
+        for errors in self.error_counts {
+            summary.error_values = summary.error_values.saturating_add(errors);
+            summary.records_with_errors = summary
+                .records_with_errors
+                .saturating_add(usize::from(errors > 0));
+        }
+        summary.failures.extend(
+            self.failures
+                .into_iter()
+                .map(|(record, error)| failure(record, error)),
+        );
+    }
 }
 
 struct Scratch<'f> {
@@ -44,9 +67,11 @@ pub(crate) fn write(
     form: RecordForm,
     target: &Path,
     options: &RecordExportOptions<'_>,
+    retain_receipt: bool,
 ) -> RecordExportSummary {
     let mut summary = RecordExportSummary {
         form,
+        receipt: retain_receipt.then(RecordExportReceipt::default),
         ..RecordExportSummary::default()
     };
     let lines = ordered_lines(forge, records, &mut summary);
@@ -121,6 +146,7 @@ fn write_output(
     if kept {
         summary.skipped.push(file.to_owned());
         summary.written = 0;
+        summary.clear_receipt();
         return Ok(());
     }
     if output.persist(destination, existing.is_some(), options)? {
@@ -140,6 +166,7 @@ fn stream(
     summary: &mut RecordExportSummary,
 ) -> Result<bool, ExtractionError> {
     let form = summary.form;
+    let retain_receipt = summary.receipt.is_some();
     let mut failed_lines = 0_usize;
     let mut start = 0;
     let mut batch_len = BATCH_LEN;
@@ -166,6 +193,7 @@ fn stream(
                         options.progress,
                         options.annotations(),
                         form,
+                        retain_receipt,
                     )
                 },
             )
@@ -176,18 +204,7 @@ fn stream(
                 .append(&part.bytes)
                 .map_err(|error| write_error(destination, error))?;
             failed_lines = failed_lines.saturating_add(part.failures.len());
-            summary.written = summary.written.saturating_add(part.error_counts.len());
-            for errors in part.error_counts {
-                summary.error_values = summary.error_values.saturating_add(errors);
-                summary.records_with_errors = summary
-                    .records_with_errors
-                    .saturating_add(usize::from(errors > 0));
-            }
-            summary.failures.extend(
-                part.failures
-                    .into_iter()
-                    .map(|(record, error)| failure(record, error)),
-            );
+            part.account(summary);
         }
     }
     Ok(true)
@@ -202,10 +219,11 @@ fn next_batch_len(len: usize, bytes: usize) -> usize {
 }
 
 /// Forgets the Records counted as written, since the file is not put in place.
-const fn discard(summary: &mut RecordExportSummary) {
+fn discard(summary: &mut RecordExportSummary) {
     summary.written = 0;
     summary.error_values = 0;
     summary.records_with_errors = 0;
+    summary.clear_receipt();
 }
 
 /// Returns the selected Records of `forge` in Record order ([`DataForge::path_order`]), each once,
@@ -241,18 +259,29 @@ fn write_part<'r, 'f>(
     progress: Option<&(dyn Fn() + Sync)>,
     annotations: Annotations<'_>,
     form: RecordForm,
+    retain_receipt: bool,
 ) -> Part<'r, 'f> {
     let mut part = Part {
         bytes: Vec::new(),
         error_counts: Vec::with_capacity(lines.len()),
         failures: Vec::new(),
+        receipt: retain_receipt.then(RecordExportReceipt::default),
     };
     for line in lines {
         match scratch.trees.build(line.record) {
             Ok(tree) => {
                 let start = part.bytes.len();
                 match scratch.lines.write(&tree, annotations, &mut part.bytes) {
-                    Ok(()) => part.error_counts.push(tree.error_count()),
+                    Ok(()) => {
+                        part.error_counts.push(tree.error_count());
+                        if let Some(receipt) = &mut part.receipt {
+                            let index = line.record.index();
+                            receipt.indices.push(index);
+                            if part.bytes.len() == start {
+                                receipt.rowless_indices.push(index);
+                            }
+                        }
+                    }
                     Err(error) => {
                         part.bytes.truncate(start);
                         part.failures.push((

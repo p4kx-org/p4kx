@@ -4,8 +4,11 @@
 use std::path::{Path, PathBuf};
 
 use p4kx_export::RecordForm;
-use p4kx_extraction::{RecordFailure, RecordRenamed, RenameCause};
+use p4kx_extraction::{
+    DataForgeOrigin, RecordFailure, RecordRenamed, RenameCause, SourceEvidenceError,
+};
 
+use super::provenance::RecordExportProvenance;
 use crate::model::describe;
 
 /// One Record a Record export did not write, with the reason.
@@ -66,14 +69,19 @@ pub struct RecordExportSummary {
     records_with_errors: usize,
     error: Option<String>,
     interrupted: bool,
+    provenance: Option<Result<Box<RecordExportProvenance>, SourceEvidenceError>>,
 }
 
 impl RecordExportSummary {
     pub(crate) fn new(
         target: PathBuf,
         selected: usize,
-        summary: &p4kx_export::RecordExportSummary,
+        mut summary: p4kx_export::RecordExportSummary,
+        source: Option<&DataForgeOrigin>,
     ) -> Self {
+        let provenance = summary
+            .take_receipt()
+            .map(|receipt| RecordExportProvenance::capture(source, receipt).map(Box::new));
         Self {
             form: summary.form(),
             target: Some(target),
@@ -87,6 +95,7 @@ impl RecordExportSummary {
             records_with_errors: summary.records_with_errors(),
             error: summary.error().map(|error| describe(error)),
             interrupted: summary.cancelled() > 0,
+            provenance,
         }
     }
 
@@ -111,6 +120,7 @@ impl RecordExportSummary {
             records_with_errors: 0,
             error: None,
             interrupted,
+            provenance: None,
         }
     }
 
@@ -145,6 +155,12 @@ impl RecordExportSummary {
     #[must_use]
     pub const fn written(&self) -> usize {
         self.written
+    }
+
+    /// Returns the original DataForge contributors to the number of Records written.
+    #[must_use]
+    pub fn provenance(&self) -> Option<Result<&RecordExportProvenance, &SourceEvidenceError>> {
+        self.provenance.as_ref().map(Result::as_deref)
     }
 
     /// Returns the files, relative to the target, whose existing file was kept.

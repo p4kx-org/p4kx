@@ -5,6 +5,33 @@ use p4kx_extraction::{ExtractionError, RecordExportReport, RecordFailure, Record
 
 use crate::RecordForm;
 
+/// Original DataForge definition indices counted as written by a committed output.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct RecordExportReceipt {
+    pub(crate) indices: Vec<u32>,
+    pub(crate) rowless_indices: Vec<u32>,
+}
+
+impl RecordExportReceipt {
+    /// Returns the definitions counted as written in file or selection order.
+    #[must_use]
+    pub fn indices(&self) -> &[u32] {
+        &self.indices
+    }
+
+    /// Returns the counted definitions that produced no rows in a flat form.
+    #[must_use]
+    pub fn rowless_indices(&self) -> &[u32] {
+        &self.rowless_indices
+    }
+
+    /// Takes the definitions counted as written without copying.
+    #[must_use]
+    pub fn into_indices(self) -> Vec<u32> {
+        self.indices
+    }
+}
+
 /// The outcome of a Record export.
 #[derive(Debug, Default)]
 pub struct RecordExportSummary {
@@ -17,10 +44,11 @@ pub struct RecordExportSummary {
     pub(crate) error_values: usize,
     pub(crate) records_with_errors: usize,
     pub(crate) error: Option<ExtractionError>,
+    pub(crate) receipt: Option<RecordExportReceipt>,
 }
 
 impl RecordExportSummary {
-    pub(crate) fn from_report(form: RecordForm, report: RecordExportReport) -> Self {
+    pub(crate) fn from_report(form: RecordForm, mut report: RecordExportReport) -> Self {
         let mut summary = Self {
             form,
             written: report.written(),
@@ -29,6 +57,12 @@ impl RecordExportSummary {
             cancelled: report.cancelled(),
             error_values: report.error_values(),
             records_with_errors: report.records_with_errors(),
+            receipt: report
+                .take_written_record_indices()
+                .map(|indices| RecordExportReceipt {
+                    indices,
+                    rowless_indices: Vec::new(),
+                }),
             ..Self::default()
         };
         summary.failures = report.into_failures();
@@ -45,6 +79,25 @@ impl RecordExportSummary {
     #[must_use]
     pub const fn written(&self) -> usize {
         self.written
+    }
+
+    /// Returns the committed Record positions when the run requested them.
+    #[must_use]
+    pub const fn receipt(&self) -> Option<&RecordExportReceipt> {
+        self.receipt.as_ref()
+    }
+
+    /// Takes the committed Record positions when the run requested them.
+    #[must_use]
+    pub const fn take_receipt(&mut self) -> Option<RecordExportReceipt> {
+        self.receipt.take()
+    }
+
+    pub(crate) fn clear_receipt(&mut self) {
+        if let Some(receipt) = &mut self.receipt {
+            receipt.indices.clear();
+            receipt.rowless_indices.clear();
+        }
     }
 
     /// Returns the files, relative to the target, whose existing file was kept.

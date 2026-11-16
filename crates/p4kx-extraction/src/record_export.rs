@@ -20,8 +20,12 @@ use crate::record_plan::RecordFilePlan;
 use crate::write::write_error;
 use crate::{
     ConflictPolicy, ExtractionError, RecordExportError, RecordExportOptions, RecordExportReport,
-    RecordFailure, RecordRenamed,
+    RecordRenamed,
 };
+
+#[path = "record_export_accounting.rs"]
+mod accounting;
+use accounting::summarise;
 
 /// Writes `records` of `forge` as Record XML, one file per Record, below the existing folder
 /// `target`; [`export_record_files`] with [`RecordXml`].
@@ -54,7 +58,7 @@ pub fn export_record_files<F: RecordFileFormat>(
     options: &RecordExportOptions<'_>,
 ) -> RecordExportReport {
     let plan = RecordFiles::plan(forge, F::EXTENSION);
-    write_with_options::<F>(forge, &plan, records, target, options)
+    write_with_options::<F>(forge, &plan, records, target, options, false)
 }
 
 /// Writes `records` of `forge` like [`export_record_files`], with the files of `plan`.
@@ -69,11 +73,37 @@ pub fn export_planned_record_files<F: RecordFileFormat>(
     target: &Path,
     options: &RecordExportOptions<'_>,
 ) -> RecordExportReport {
-    if plan.fits(forge) {
-        write_with_options::<F>(forge, plan.files(), records, target, options)
+    write_planned(forge, plan, records, target, options, false)
+}
+
+/// Writes the planned Records and retains the definition positions of the committed files.
+#[must_use]
+pub fn export_planned_record_files_with_receipt<F: RecordFileFormat>(
+    forge: &DataForge<'_>,
+    plan: &RecordFilePlan<F>,
+    records: &[Record<'_>],
+    target: &Path,
+    options: &RecordExportOptions<'_>,
+) -> RecordExportReport {
+    write_planned(forge, plan, records, target, options, true)
+}
+
+fn write_planned<F: RecordFileFormat>(
+    forge: &DataForge<'_>,
+    plan: &RecordFilePlan<F>,
+    records: &[Record<'_>],
+    target: &Path,
+    options: &RecordExportOptions<'_>,
+    retain_receipt: bool,
+) -> RecordExportReport {
+    let rebuilt;
+    let files = if plan.fits(forge) {
+        plan.files()
     } else {
-        export_record_files::<F>(forge, records, target, options)
-    }
+        rebuilt = RecordFiles::plan(forge, F::EXTENSION);
+        &rebuilt
+    };
+    write_with_options::<F>(forge, files, records, target, options, retain_receipt)
 }
 
 fn write_with_options<F: RecordFileFormat>(
@@ -82,6 +112,7 @@ fn write_with_options<F: RecordFileFormat>(
     records: &[Record<'_>],
     target: &Path,
     options: &RecordExportOptions<'_>,
+    retain_receipt: bool,
 ) -> RecordExportReport {
     let (cancel, progress) = (options.cancel, options.progress);
     let run = RecordRun {
@@ -96,7 +127,7 @@ fn write_with_options<F: RecordFileFormat>(
             }
         },
     };
-    write_records::<F>(forge, plan, records, target, &run)
+    write_records_inner::<F>(forge, plan, records, target, &run, retain_receipt)
 }
 
 /// How a run writes Record files: the Conflict policy, whether to stop before the next Record,
@@ -112,17 +143,30 @@ pub(crate) struct RecordRun<'a> {
 
 /// Writes `records` of `forge` in the format `F` to the files of `plan` like
 /// [`export_record_files`], under the control of `run`.
-pub(crate) fn write_records<'f, F: RecordFileFormat>(
+pub(crate) fn write_records<F: RecordFileFormat>(
+    forge: &DataForge<'_>,
+    plan: &RecordFiles,
+    records: &[Record<'_>],
+    target: &Path,
+    run: &RecordRun<'_>,
+) -> RecordExportReport {
+    write_records_inner::<F>(forge, plan, records, target, run, false)
+}
+
+fn write_records_inner<'f, F: RecordFileFormat>(
     forge: &DataForge<'_>,
     plan: &RecordFiles,
     records: &[Record<'f>],
     target: &Path,
     run: &RecordRun<'_>,
+    retain_receipt: bool,
 ) -> RecordExportReport {
+    let written_record_indices = retain_receipt.then(Vec::new);
     if let Err(refused) = crate::check_protected_output(target, run.protection, run.cancel) {
         if refused.is_cancelled() {
             return RecordExportReport {
                 cancelled: records.len(),
+                written_record_indices,
                 ..RecordExportReport::default()
             };
         }
@@ -132,7 +176,7 @@ pub(crate) fn write_records<'f, F: RecordFileFormat>(
                 (index, RecordOutcome::Failed(error.into()))
             })
             .collect();
-        return summarise(records, outcomes);
+        return summarise(records, outcomes, written_record_indices);
     }
     let files = select_files(forge, plan, records);
     let (independent, dependent) = split_dependent(files.iter().map(|file| match file {
@@ -173,7 +217,7 @@ pub(crate) fn write_records<'f, F: RecordFileFormat>(
     let mut scratch = Scratch::default();
     outcomes.extend(dependent.into_iter().map(|index| run(&mut scratch, index)));
     outcomes.sort_unstable_by_key(|(index, _)| *index);
-    let mut report = summarise(records, outcomes);
+    let mut report = summarise(records, outcomes, written_record_indices);
     report.renamed = renamed(forge, plan, records);
     report
 }
@@ -214,41 +258,6 @@ fn select_files<'p>(
             Some(file) => Selected::Taken(file),
         })
         .collect()
-}
-
-fn summarise(records: &[Record<'_>], outcomes: Vec<(usize, RecordOutcome)>) -> RecordExportReport {
-    let mut report = RecordExportReport::default();
-    for (index, outcome) in outcomes {
-        let errors = match outcome {
-            RecordOutcome::Written { errors } => {
-                report.written += 1;
-                errors
-            }
-            RecordOutcome::Kept { file, errors } => {
-                report.skipped.push(file);
-                errors
-            }
-            RecordOutcome::Cancelled => {
-                report.cancelled += 1;
-                0
-            }
-            RecordOutcome::Failed(error) => {
-                let record = records.get(index);
-                report.failures.push(RecordFailure {
-                    guid: record.map_or_default(Record::guid),
-                    record_path: record
-                        .and_then(|record| record.record_path().ok())
-                        .unwrap_or_default()
-                        .to_owned(),
-                    error,
-                });
-                0
-            }
-        };
-        report.error_values += errors;
-        report.records_with_errors += usize::from(errors > 0);
-    }
-    report
 }
 
 /// The file a selected Record is written to, if it can be.

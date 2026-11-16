@@ -171,6 +171,7 @@ pub struct RecordExportReport {
     pub(crate) cancelled: usize,
     pub(crate) error_values: usize,
     pub(crate) records_with_errors: usize,
+    pub(crate) written_record_indices: Option<Vec<u32>>,
 }
 
 impl RecordExportReport {
@@ -178,6 +179,12 @@ impl RecordExportReport {
     #[must_use]
     pub const fn written(&self) -> usize {
         self.written
+    }
+
+    /// Takes the original definition indices of the Records committed by this run, when requested.
+    #[must_use]
+    pub const fn take_written_record_indices(&mut self) -> Option<Vec<u32>> {
+        self.written_record_indices.take()
     }
 
     /// Returns the files, relative to the target, whose existing file was kept.

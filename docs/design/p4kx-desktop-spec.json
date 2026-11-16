@@ -733,6 +733,7 @@
     "setup": "modal wide: groups Records (radio tree selection with name and count, radio Record path filter over a searchField), Form (radio JSON, radio NDJSON, radio flat CSV, radio flat CSV exact, radio flat NDJSON, then checkbox \"Write the tag path next to every tag Reference\", off by default, disabled for the flat forms), Target (as the Extraction setup); bodyGroupGap between groups",
     "cta": "buttonCta Start export; Close is buttonGhost",
     "progress": "non-modal modal frame, width 440: spinner while DataForge is read and Records are chosen, then progressBar with done of total; Cancel buttonGhost alone in the foot",
+    "originTooltip": "the summary count line shows the encryption provenance of the original definitions of the Records actually written",
     "summary": "non-modal modal frame, width 600: cancel note in color-warning, counts and target in color-gray-1, failed Records as collapsibleSection rows with the reason in color-danger-text; Close buttonCta alone in the foot; no target line when none was created"
   },
   "catalog": {

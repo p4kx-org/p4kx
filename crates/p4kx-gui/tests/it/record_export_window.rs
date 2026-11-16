@@ -13,10 +13,11 @@ use egui::accesskit::Role;
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use exporting::{
-    TestResult, database, ended, files_below, many, opened, opened_with, select_node, wait_until,
+    TestResult, database, ended, files_below, many, opened, opened_with, opened_with_key,
+    select_node, wait_until,
 };
-use p4kx_gui::{Language, Model, RecordExport, RecordExportStatus, ui};
-use p4kx_testkit::{ArchiveBuilder, TestEntry};
+use p4kx_gui::{Language, Model, RecordExport, RecordExportStatus, TargetKind, ui};
+use p4kx_testkit::{ArchiveBuilder, TestEntry, test_key};
 use tempfile::TempDir;
 
 fn harness(model: Model) -> Harness<'static, Model> {
@@ -111,6 +112,98 @@ fn the_tree_selection_is_exported_and_summarised() -> TestResult {
     harness.get_by_label("Close").click();
     harness.run_quiet();
     assert!(harness.state().record_export().is_none(), "dismissed");
+    Ok(())
+}
+
+#[test]
+fn the_record_export_count_shows_only_committed_dataforge_origins() -> TestResult {
+    let dcb = database().build();
+    let archive = ArchiveBuilder::new()
+        .entry(TestEntry::stored("Data\\Game.dcb", dcb.clone()))
+        .entry(TestEntry::deflated("Data\\Game2.dcb", dcb).encrypted());
+    let (dir, mut model, out) = opened_with_key(&archive, Some(test_key()))?;
+    select_node(&mut model, "libs/foundry/records/entities/spaceships")?;
+    let skipped = out.join("libs/foundry/records/entities/spaceships/aegs_avenger.json");
+    fs::create_dir_all(skipped.parent().ok_or("Record folder")?)?;
+    fs::write(&skipped, b"existing bytes")?;
+    let (_dir, _, mut harness) = window((dir, model, out));
+    harness.state_mut().begin_record_export();
+    harness
+        .state_mut()
+        .record_export_setup_mut()
+        .ok_or("Record export setup")?
+        .set_kind(TargetKind::ExistingFolder);
+    assert!(
+        harness.state_mut().submit_record_export(|| {}),
+        "Record export starts through the window model"
+    );
+    wait_for_the_end(&mut harness)?;
+    assert_single_committed_definition(harness.state())?;
+    assert_eq!(
+        fs::read(&skipped)?,
+        b"existing bytes",
+        "kept output untouched"
+    );
+
+    let counts = harness.get_by_label("Records written 1, skipped 1, failed 0, cancelled 0");
+    let point = counts.rect().center();
+    harness.ctx.style_mut_of(harness.ctx.theme(), |style| {
+        style.interaction.tooltip_delay = 0.0;
+        style.interaction.show_tooltips_only_when_still = false;
+    });
+    harness.event(egui::Event::PointerMoved(point));
+    harness.run_steps(4);
+    let _written = harness.get_by_label("Records written");
+    let _origin = harness.get_by_label("Includes encrypted source data");
+    Ok(())
+}
+
+fn assert_single_committed_definition(model: &Model) -> TestResult {
+    let Some(RecordExportStatus::Finished(summary)) =
+        model.record_export().map(RecordExport::status)
+    else {
+        return Err("finished summary".into());
+    };
+    let proof = summary
+        .provenance()
+        .ok_or("Record export provenance")?
+        .map_err(ToString::to_string)?;
+    assert_eq!(
+        proof.written.contains_encrypted_source(),
+        Some(true),
+        "selected Game2.dcb"
+    );
+    assert!(
+        proof.written.source_set_complete(),
+        "physical origin of the committed Record"
+    );
+    assert_eq!(proof.inventory().source_count(), 1, "the actual DataForge");
+    let mut contributors = proof
+        .inventory()
+        .iter_uses()
+        .filter(|site| proof.written.source_uses_refs().contains(site.id()));
+    let used = contributors.next().ok_or("committed definition range")?;
+    assert!(
+        contributors.next().is_none(),
+        "only one committed definition range contributes to the counter"
+    );
+    let p4kx_extraction::SourceLocation::Subresource {
+        namespace,
+        indices,
+        field,
+    } = used.location()
+    else {
+        return Err("DataForge occurrence".into());
+    };
+    assert_eq!(
+        namespace, "dataforgeRecordTable",
+        "original DataForge definition table"
+    );
+    assert_eq!(
+        field, "committedDefinitions",
+        "only committed definitions contributed"
+    );
+    assert_eq!(indices, &[1, 2], "only the other ship was written");
     Ok(())
 }
 
