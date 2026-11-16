@@ -5,7 +5,7 @@ use std::collections::HashSet;
 use std::sync::{Arc, Mutex, PoisonError};
 
 use p4kx_assembly::{ArchiveFiles, Entities, LoadoutResolver};
-use p4kx_extraction::{Archive, CancelToken, DataForge, Guid, RecordTree, Value};
+use p4kx_extraction::{CancelToken, DataForge, Guid, RecordTree, Value};
 use rayon::prelude::*;
 
 use crate::catalog_v3::catalog_item_alignment::{AlignmentIndex, ItemAlignmentRows};
@@ -115,7 +115,7 @@ pub(crate) struct SelectedSources<'rows, 'source> {
 ///
 /// Returns [`CatalogError::Cancelled`] once `cancel` is cancelled.
 pub(crate) fn loadouts<'f>(
-    archive: &Archive,
+    files: &ArchiveFiles<'_>,
     entities: &Arc<Entities<'f>>,
     wanted: &[Wanted],
     known: &HashSet<Guid>,
@@ -133,11 +133,10 @@ pub(crate) fn loadouts<'f>(
         Kind::Loadouts,
     ));
     let alignment = AlignmentIndex::new(sources.alignment)?;
-    let files = ArchiveFiles::new(archive);
     let pool = Pool {
         forge: entities.forge(),
         entities: Arc::clone(entities),
-        files: &files,
+        files,
         idle: Mutex::new(Vec::new()),
         alignment: &alignment,
         capture: Arc::clone(&capture),
@@ -151,7 +150,9 @@ pub(crate) fn loadouts<'f>(
             Some(pool.read(*want))
         })
         .collect();
+    drop(pool);
     let mut ledger = capture.finish()?;
+    drop(capture);
     ledger.inventory(Kind::Loadouts);
     let mut entries = Vec::with_capacity(read.len());
     let mut failures = Vec::new();

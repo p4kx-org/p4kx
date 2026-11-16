@@ -4,8 +4,8 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use p4kx_assembly::Entities;
-use p4kx_extraction::{Archive, CancelToken, DataForge, Guid};
+use p4kx_assembly::{ArchiveFiles, Entities};
+use p4kx_extraction::{CancelToken, DataForge, Guid};
 
 use crate::broker_entry_read::BrokerEntries;
 use crate::build::original_input::OriginalCatalogInput;
@@ -146,7 +146,7 @@ pub(crate) fn add_paints<'f>(
 /// Resolves the Default Loadout of every ship and of every item that may have ports, stores the
 /// loadouts in `collected` and returns the counts.
 pub(crate) fn add_loadouts<'f>(
-    archive: &Archive,
+    files: &ArchiveFiles<'_>,
     entities: &Arc<Entities<'f>>,
     collected: &mut Collected<'f>,
     input: &OriginalCatalogInput<'_, 'f>,
@@ -169,7 +169,7 @@ pub(crate) fn add_loadouts<'f>(
         .chain(collected.ships.iter().map(|ship| ship.guid.0))
         .collect();
     let built = loadouts(
-        archive,
+        files,
         entities,
         &wanted,
         &known,
