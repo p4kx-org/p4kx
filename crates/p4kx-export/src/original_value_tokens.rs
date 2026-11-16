@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::SourceLocation;
+
 /// One actual original field or array edge beneath a root or owned value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) enum OriginalValueEdge {
@@ -48,7 +50,15 @@ impl OriginalValuePart {
         )
     }
 
-    pub(super) const fn label(self) -> &'static str {
+    pub(crate) fn location(self, record: u32, ordinal: u64) -> SourceLocation {
+        SourceLocation::Subresource {
+            namespace: "dataforgeValue".to_owned(),
+            indices: vec![u64::from(record), ordinal],
+            field: self.label().to_owned(),
+        }
+    }
+
+    const fn label(self) -> &'static str {
         match self {
             Self::Value => "$value",
             Self::FieldName => "$fieldName",

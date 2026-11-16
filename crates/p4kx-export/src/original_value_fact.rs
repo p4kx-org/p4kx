@@ -106,10 +106,6 @@ impl<'scope, 'read, 'source> OriginalValueFact<'scope, 'read, 'source> {
         } else {
             self.ordinal
         };
-        SourceLocation::Subresource {
-            namespace: "dataforgeValue".to_owned(),
-            indices: vec![u64::from(self.scope.record().index()), ordinal],
-            field: part.label().to_owned(),
-        }
+        part.location(self.scope.record().index(), ordinal)
     }
 }

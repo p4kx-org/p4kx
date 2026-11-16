@@ -1,71 +1,72 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{
-    DataType, Guid, ReferenceOrigin, SourceUseRole, SourceValue, Value, ValueError,
-};
+use std::sync::Arc;
+
+use p4kx_extraction::{Guid, SourceUseRole, Value, ValueError};
 
 use super::health_reference_capture::ReferenceCapture;
+use super::health_reference_data::ReferenceData;
 use super::health_reference_observation::ReferenceObservation;
-use super::health_reference_receipt::{ReferenceDatum, ReferenceUse};
-use super::{OriginalValueFact, OriginalValuePart, OriginalValueSite};
-use crate::record_header_field::RecordHeaderField;
+use super::health_reference_receipt::ReferenceDatum;
+use super::health_reference_recipe::{self, ReferenceCaller, ReferenceRecipe};
+use super::{OriginalValueFact, OriginalValueSite};
 use crate::{CatalogError, ExportAccountingError};
+
+#[derive(Clone, Copy)]
+pub(super) enum Retention {
+    Immediate,
+    Deferred,
+}
 
 pub(super) fn read(
     capture: &ReferenceCapture<'_, '_, '_>,
     site: &OriginalValueSite<'_, '_, '_, '_>,
+    retention: Retention,
 ) -> Result<ReferenceObservation, CatalogError> {
     capture.check_site(site)?;
     let fact = site.fact();
     let admitted = fact.admit_reference()?;
-    let source_type = admitted
+    let target_type = admitted
         .origin
         .record_type()
         .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
-    let mut body = capture.body(site)?;
-    let selector = caller(&fact, SourceUseRole::Selector);
-    body.target_guid = guid(&fact, admitted.origin, admitted.storage, &selector)?;
-    body.target_record_index = ReferenceDatum::captured(
-        SourceValue::Present(admitted.origin.record_index()),
-        vec![
-            header(
-                admitted.origin,
-                RecordHeaderField::RecordIndex,
-                SourceUseRole::Selector,
-            ),
-            selector.clone(),
-        ],
-    );
-    let path = capture
+    let base = capture.body(site)?;
+    let (field, path) = base.field.into_present_inputs()?;
+    let (source_type, type_uses) = base.source_type.into_present_inputs()?;
+    let [owner_type] = type_uses
+        .try_into()
+        .map_err(|_| ExportAccountingError::ConflictingSourceDatum)?;
+    let target_record_path = capture
         .texts
         .retain_text(admitted.origin.record_path())?
         .text()
         .clone();
-    body.target_record_path = ReferenceDatum::captured(
-        SourceValue::Present(path),
-        vec![
-            header(
-                admitted.origin,
-                RecordHeaderField::FileName,
-                SourceUseRole::Conversion,
-            ),
-            selector.clone(),
-        ],
-    );
-    let source_type = capture.texts.retain_text(source_type)?.text().clone();
-    body.target_type = ReferenceDatum::captured(
-        SourceValue::Present(source_type),
-        vec![
-            header(
-                admitted.origin,
-                RecordHeaderField::SourceType,
-                SourceUseRole::Selector,
-            ),
-            selector,
-        ],
-    );
-    capture.observation(None, body)
+    let target_type = capture.texts.retain_text(target_type)?.text().clone();
+    let data = ReferenceData {
+        field,
+        source_type,
+        target_guid: Some(admitted.origin.record_guid()),
+        target_record_index: Some(admitted.origin.record_index()),
+        target_record_path: Some(target_record_path),
+        target_type: Some(target_type),
+        target_location: None,
+        source_pointer: None,
+    };
+    let recipe = ReferenceRecipe {
+        path,
+        owner_type,
+        caller: ReferenceCaller::from_fact(&fact),
+        storage: admitted.storage,
+    };
+    let frame = Arc::clone(&capture.frame);
+    Ok(match retention {
+        Retention::Immediate => {
+            let body = recipe.body(&data)?;
+            ReferenceObservation::captured(data, None, frame, body)
+        }
+        Retention::Deferred => ReferenceObservation::deferred(data, frame, recipe),
+    })
 }
 
 pub(super) fn guid_for_fact(
@@ -74,8 +75,15 @@ pub(super) fn guid_for_fact(
     match fact.value() {
         Value::Reference(_) => {
             let admitted = fact.admit_reference()?;
-            let selector = caller(fact, SourceUseRole::Selector);
-            Ok(guid(fact, admitted.origin, admitted.storage, &selector)?)
+            let caller = ReferenceCaller::from_fact(fact);
+            let selector = caller.operand(SourceUseRole::Selector);
+            Ok(health_reference_recipe::guid_datum(
+                admitted.origin.record_guid(),
+                admitted.origin.record_index(),
+                admitted.storage,
+                caller,
+                &selector,
+            )?)
         }
         Value::Error(ValueError::DanglingReference { .. }) => {
             super::health_reference_error::dangling_guid(fact)
@@ -83,35 +91,7 @@ pub(super) fn guid_for_fact(
         _ => Err(ExportAccountingError::ConflictingSourceDatum.into()),
     }
 }
-fn guid(
-    fact: &OriginalValueFact<'_, '_, '_>,
-    origin: ReferenceOrigin<'_, '_>,
-    storage: DataType,
-    selector: &ReferenceUse,
-) -> Result<ReferenceDatum<Guid>, ExportAccountingError> {
-    let inputs = match storage {
-        DataType::Reference => vec![caller(fact, SourceUseRole::Payload)],
-        DataType::WeakPointer => vec![
-            header(origin, RecordHeaderField::Guid, SourceUseRole::Payload),
-            selector.clone(),
-            caller(fact, SourceUseRole::Conversion),
-        ],
-        _ => return Err(ExportAccountingError::ConflictingSourceDatum),
-    };
-    Ok(ReferenceDatum::captured(
-        SourceValue::Present(origin.record_guid()),
-        inputs,
-    ))
-}
 
-fn caller(fact: &OriginalValueFact<'_, '_, '_>, role: SourceUseRole) -> ReferenceUse {
-    ReferenceUse::captured(fact.location(OriginalValuePart::Value), role)
-}
-
-fn header(
-    origin: ReferenceOrigin<'_, '_>,
-    field: RecordHeaderField,
-    role: SourceUseRole,
-) -> ReferenceUse {
-    ReferenceUse::captured(field.location(origin.record_index()), role)
-}
+#[cfg(test)]
+#[path = "health_reference_recipe_tests.rs"]
+mod tests;

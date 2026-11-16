@@ -99,6 +99,8 @@ mod health_reference_observation;
 mod health_reference_path;
 #[path = "health_reference_receipt.rs"]
 mod health_reference_receipt;
+#[path = "health_reference_recipe.rs"]
+mod health_reference_recipe;
 #[path = "health_reference_target.rs"]
 mod health_reference_target;
 #[path = "original_error_input.rs"]

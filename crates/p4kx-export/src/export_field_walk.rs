@@ -296,7 +296,8 @@ impl Inspector<'_, '_> {
             return Ok(());
         }
         let observation = match original {
-            Some((capture, site)) => capture.reference(site)?,
+            Some((capture, site)) if foreign => capture.reference(site)?,
+            Some((capture, site)) => capture.catalog_reference(site)?,
             None => self
                 .collector
                 .accounting_reference(path, source_type, reference),

@@ -69,7 +69,15 @@ impl<'scope, 'read, 'source> ReferenceCapture<'scope, 'read, 'source> {
         site: &OriginalValueSite<'_, '_, '_, '_>,
     ) -> Result<ReferenceObservation, CatalogError> {
         self.check_site(site)?;
-        health_reference_target::read(self, site)
+        health_reference_target::read(self, site, health_reference_target::Retention::Immediate)
+    }
+
+    pub(crate) fn catalog_reference(
+        &self,
+        site: &OriginalValueSite<'_, '_, '_, '_>,
+    ) -> Result<ReferenceObservation, CatalogError> {
+        self.check_site(site)?;
+        health_reference_target::read(self, site, health_reference_target::Retention::Deferred)
     }
 
     pub(crate) fn error(

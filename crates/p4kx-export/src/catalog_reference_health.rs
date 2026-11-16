@@ -138,7 +138,7 @@ fn record(
     status: ExportReferenceStatus,
     fields: &mut Fields,
 ) -> Result<(), ExportAccountingError> {
-    let mut original = reference.original.clone().resolved(status);
+    let mut original = reference.original.clone().resolved(status).materialize()?;
     original.merge_owner(source.subject())?;
     original.contextualize(source.kind, source.role);
     let data = original.data();
