@@ -8,8 +8,10 @@ use p4kx_extraction::Archive;
 use p4kx_testkit::{ArchiveBuilder, TestContainer, TestEntry, TestMtl, TestMtlMaterial, test_key};
 use sha2::{Digest as _, Sha256};
 
-use crate::{Artifact, ExportOutcome, Index, Limits, export, hashing};
+use crate::source_selection::EntrySelection;
+use crate::{Artifact, ExportOutcome, Index, Limits, MediaError, export, hashing};
 
+use super::census::Census;
 use super::{Observed, Phase, TestResult, options, require, verify};
 
 #[test]
@@ -26,7 +28,6 @@ fn material_observer_matches_the_file_based_export_with_nested_sources_and_depen
         phases,
         [
             Phase::HashRoot,
-            Phase::CollectInputs,
             Phase::ReconcileStream,
             Phase::FinalizeStream,
             Phase::VerifyTotals,
@@ -57,6 +58,37 @@ fn material_observer_matches_the_file_based_export_with_nested_sources_and_depen
             "actual raw SHA-256"
         );
     }
+    drop(archive);
+    directory.close()?;
+    Ok(())
+}
+
+#[test]
+fn material_census_rejects_a_skipped_container_without_materials() -> TestResult {
+    let directory = tempfile::tempdir()?;
+    let input = directory.path().join("skipped.p4k");
+    let nested = TestContainer::new()
+        .entry(TestEntry::stored("unselected.bin", b"binary"))
+        .build();
+    ArchiveBuilder::new()
+        .entry(TestEntry::stored("inner.PAK", nested))
+        .write_to(&input)?;
+    let archive = Archive::open_with_key(input, Some(test_key()))?;
+    let [container] = archive.entries() else {
+        return Err("one physical container required".into());
+    };
+    let mut census = Census::default();
+    census.open(&archive, &[])?;
+    assert!(
+        census
+            .entry(&archive, container, EntrySelection::Unmatched)?
+            .is_none(),
+        "a container is not a material"
+    );
+    assert!(
+        matches!(census.close(&[]), Err(MediaError::Contract(message)) if message == "material traversal skipped a physical container"),
+        "omitting a whole unselected subtree must fail the physical census"
+    );
     drop(archive);
     directory.close()?;
     Ok(())

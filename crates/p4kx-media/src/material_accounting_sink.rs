@@ -14,8 +14,8 @@ use crate::{
     reconstruct_material_library,
 };
 
+use super::census::CensusCounts;
 use super::fields::{self, Counts};
-use super::input::Inputs;
 use super::{TestResult, require};
 
 pub(super) struct Sink {
@@ -24,7 +24,6 @@ pub(super) struct Sink {
 }
 
 struct State {
-    inputs: Inputs,
     counts: Counts,
     sources: Rows<Source>,
     records: Rows<MediaRecord>,
@@ -32,16 +31,11 @@ struct State {
 }
 
 impl Sink {
-    pub(super) fn new(inputs: Inputs) -> TestResult<Self> {
-        let counts = Counts {
-            enumerated: inputs.enumerated,
-            ..Counts::default()
-        };
+    pub(super) fn new() -> TestResult<Self> {
         Ok(Self {
             schema: jsonschema::validator_for(&material_record_schema()?)?,
             state: RefCell::new(State {
-                inputs,
-                counts,
+                counts: Counts::default(),
                 records: Rows::new(),
                 sources: Rows::new(),
                 artifacts: Rows::new(),
@@ -51,6 +45,7 @@ impl Sink {
 
     pub(super) fn check_entry(
         &self,
+        identity: &Identity,
         expected: &Source,
         library: &Result<MaterialLibrary, MaterialError>,
         size: u64,
@@ -58,19 +53,23 @@ impl Sink {
         self.state
             .try_borrow_mut()
             .map_err(|error| MediaError::Contract(error.to_string()))?
-            .check_entry(expected, library, size)
+            .check_entry(identity, expected, library, size)
             .map_err(|error| MediaError::Contract(error.to_string()))
     }
 
-    pub(super) fn finish(self) -> TestResult<Counts> {
-        let state = self.state.into_inner();
-        require(state.inputs.selected.is_empty(), "missing material sources")?;
+    pub(super) fn finish(self, census: CensusCounts) -> TestResult<Counts> {
+        let mut state = self.state.into_inner();
+        require(
+            state.counts.selected == census.selected,
+            "missing material sources",
+        )?;
         require(
             state.sources.ready.is_empty()
                 && state.records.ready.is_empty()
                 && state.artifacts.ready.is_empty(),
             "unexpected trailing material rows",
         )?;
+        state.counts.enumerated = census.enumerated;
         Ok(state.counts)
     }
 }
@@ -121,6 +120,7 @@ impl Sink {
 impl State {
     fn check_entry(
         &mut self,
+        identity: &Identity,
         expected: &Source,
         library: &Result<MaterialLibrary, MaterialError>,
         size: u64,
@@ -131,13 +131,8 @@ impl State {
         let [artifact] = self.artifacts.ready.as_slice() else {
             return Err("one raw receipt per selected material".into());
         };
-        let identity = self
-            .inputs
-            .selected
-            .pop_front()
-            .ok_or("extra material source")?;
         require(
-            source.identity == identity,
+            &source.identity == identity,
             "complete original container and Entry identity",
         )?;
         fields::check_source(source, expected)?;

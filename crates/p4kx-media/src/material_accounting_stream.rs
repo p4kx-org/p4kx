@@ -21,6 +21,8 @@ use crate::{
 
 use super::TestResult;
 
+#[path = "material_accounting_census.rs"]
+mod census;
 #[path = "../tests/real_archive/material_accounting_fields.rs"]
 mod fields;
 #[path = "material_accounting_input.rs"]
@@ -30,8 +32,9 @@ mod parity;
 #[path = "material_accounting_sink.rs"]
 mod sink;
 
+use census::CensusCounts;
 use fields::Counts;
-use input::{Inputs, Visit};
+use input::Visit;
 use sink::Sink;
 
 #[test]
@@ -82,7 +85,6 @@ fn options(limits: Limits) -> TestResult<ExportOptions> {
 enum Phase {
     Open,
     HashRoot,
-    CollectInputs,
     ReconcileStream,
     FinalizeStream,
     VerifyTotals,
@@ -110,10 +112,8 @@ fn verify(archive: &Archive, limits: Limits, mut enter: impl FnMut(Phase)) -> Te
         root.enumeration_complete,
         "material root inventory incomplete",
     )?;
-    enter(Phase::CollectInputs);
-    let inputs = Inputs::collect(archive, &watch)?;
     enter(Phase::ReconcileStream);
-    let sink = Sink::new(inputs)?;
+    let sink = Sink::new()?;
     let provider = MaterialProvider::default();
     let providers: [&dyn Provider; 1] = [&provider];
     let mut writer = MediaWriter::observed(
@@ -126,7 +126,7 @@ fn verify(archive: &Archive, limits: Limits, mut enter: impl FnMut(Phase)) -> Te
     )?;
     writer.origins.observe_root(archive, size)?;
     writer.bind_build(archive, &mut root)?;
-    let entries = collect(
+    let Traversed { entries, census } = collect(
         archive,
         &options,
         &root.digest,
@@ -138,7 +138,7 @@ fn verify(archive: &Archive, limits: Limits, mut enter: impl FnMut(Phase)) -> Te
     writer.index_build(&root)?;
     let finished = writer.finish()?;
     enter(Phase::VerifyTotals);
-    let counts = sink.finish()?;
+    let counts = sink.finish(census)?;
     let [kind] = finished.kinds.as_slice() else {
         return Err("one material provider summary required".into());
     };
@@ -151,6 +151,11 @@ fn verify(archive: &Archive, limits: Limits, mut enter: impl FnMut(Phase)) -> Te
     })
 }
 
+struct Traversed {
+    entries: Tally,
+    census: CensusCounts,
+}
+
 fn collect(
     archive: &Archive,
     options: &ExportOptions,
@@ -158,7 +163,7 @@ fn collect(
     providers: &[&dyn Provider],
     sink: &Sink,
     writer: &mut MediaWriter<'_>,
-) -> TestResult<Tally> {
+) -> TestResult<Traversed> {
     let include = options.include.as_ref().ok_or("material include filter")?;
     let exclude = &options.exclude;
     let budget = InputBudget::default();
@@ -175,7 +180,10 @@ fn collect(
     };
     let mut visit = Visit::new(providers, &budget, sink);
     traversal.visit(archive, &mut Vec::new(), writer, &mut visit)?;
-    Ok(traversal.entries)
+    Ok(Traversed {
+        entries: traversal.entries,
+        census: visit.complete()?,
+    })
 }
 
 fn require(condition: bool, message: &'static str) -> TestResult {

@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::VecDeque;
 use std::io::Read;
 
 use p4kx_extraction::model::{
     MaterialError, MaterialLibrary, MaterialReadError, MaterialSourceLimits,
 };
-use p4kx_extraction::{Archive, ArchiveWatch, Entry};
+use p4kx_extraction::{Archive, Entry};
 use sha2::{Digest as _, Sha256};
 
 use crate::checkpoint::IO_BLOCK_BYTES;
@@ -17,67 +16,18 @@ use crate::input_budget::InputBudget;
 use crate::source_selection::EntrySelection;
 use crate::traversal_visit::TraversalVisit;
 use crate::{
-    Algorithm, ByteScope, ContainerIdentity, Digest, Identity, MediaError, MediaWriter, Provider,
-    SourceContext, error, hashing, material_projection, raw_output, source, traversal_container,
+    Algorithm, ByteScope, Digest, Identity, MediaError, MediaWriter, Provider, SourceContext,
+    error, hashing, material_projection, raw_output, source,
 };
 
+use super::census::{Census, CensusCounts};
 use super::sink::Sink;
-use super::{TestResult, require};
-
-#[derive(Default)]
-pub(super) struct Inputs {
-    pub(super) enumerated: u64,
-    pub(super) selected: VecDeque<Identity>,
-}
-
-impl Inputs {
-    pub(super) fn collect(archive: &Archive, watch: &ArchiveWatch) -> TestResult<Self> {
-        let mut inputs = Self::default();
-        inputs.walk(archive, watch, &mut Vec::new())?;
-        Ok(inputs)
-    }
-
-    fn walk(
-        &mut self,
-        archive: &Archive,
-        watch: &ArchiveWatch,
-        chain: &mut Vec<ContainerIdentity>,
-    ) -> TestResult {
-        require(
-            !archive
-                .issues()
-                .iter()
-                .any(|(_, issue)| issue.is_archive_wide()),
-            "material enumeration crossed an incomplete archive",
-        )?;
-        for entry in archive.entries() {
-            watch.poll()?;
-            self.enumerated += 1;
-            let extension = entry
-                .path()
-                .rsplit_once('.')
-                .map(|(_, extension)| extension);
-            if extension.is_some_and(|ext| ext.eq_ignore_ascii_case("mtl")) {
-                self.selected.push_back(Identity::Entry {
-                    containers: chain.clone(),
-                    entry: ContainerIdentity::try_new_with_entry(archive, entry)?,
-                });
-            }
-            if traversal_container::is_container(entry.path()) {
-                let nested = archive.open_container(entry)?;
-                chain.push(ContainerIdentity::try_new_with_entry(archive, entry)?);
-                self.walk(&nested, watch, chain)?;
-                let _parent = chain.pop();
-            }
-        }
-        Ok(())
-    }
-}
 
 pub(super) struct Visit<'a> {
     providers: &'a [&'a dyn Provider],
     budget: &'a InputBudget,
     sink: &'a Sink,
+    census: Census,
     read_buffer: Vec<u8>,
 }
 
@@ -91,8 +41,13 @@ impl<'a> Visit<'a> {
             providers,
             budget,
             sink,
+            census: Census::default(),
             read_buffer: vec![0; IO_BLOCK_BYTES],
         }
+    }
+
+    pub(super) fn complete(self) -> Result<CensusCounts, MediaError> {
+        self.census.finish()
     }
 }
 
@@ -107,6 +62,7 @@ impl TraversalVisit for Visit<'_> {
         lookup: &DirectoryLookup<'_>,
         writer: &mut MediaWriter<'_>,
     ) -> Result<(), MediaError> {
+        self.census.open(archive, lookup.chain)?;
         directory_run::run(
             archive,
             lookup,
@@ -123,6 +79,7 @@ impl TraversalVisit for Visit<'_> {
         lookup: &DirectoryLookup<'_>,
         writer: &mut MediaWriter<'_>,
     ) -> Result<(), MediaError> {
+        self.census.close(lookup.chain)?;
         directory_run::run(
             archive,
             lookup,
@@ -140,15 +97,15 @@ impl TraversalVisit for Visit<'_> {
         lookup: &DirectoryLookup<'_>,
         writer: &mut MediaWriter<'_>,
     ) -> Result<bool, MediaError> {
-        if selection != EntrySelection::Included {
+        let Some(identity) = self.census.entry(lookup.index.archive, entry, selection)? else {
             return Ok(false);
-        }
+        };
         let declared = source::entry(lookup.root, lookup.index.archive, entry, lookup.chain)?;
         let inputs = lookup.input_state()?;
         if inputs.begin(entry.index(), writer)?.is_some() {
             return Err(invalid("material payload already retained"));
         }
-        let result = self.project(entry, lookup, declared, writer);
+        let result = self.project(entry, lookup, declared, &identity, writer);
         let raw = result.as_ref().ok().cloned();
         error::finish(result.map(|_| true), inputs.end(entry.index(), raw))
     }
@@ -162,6 +119,7 @@ impl Visit<'_> {
         entry: &Entry,
         lookup: &DirectoryLookup<'_>,
         mut source: crate::Source,
+        identity: &Identity,
         writer: &mut MediaWriter<'_>,
     ) -> Result<crate::RawReference, MediaError> {
         let archive = lookup.index.archive;
@@ -201,7 +159,7 @@ impl Visit<'_> {
         )?;
         writer.end_source(projected)?;
         self.sink
-            .check_entry(&source, &expected, entry.uncompressed_size())?;
+            .check_entry(identity, &source, &expected, entry.uncompressed_size())?;
         Ok(raw)
     }
 }
