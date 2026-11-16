@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_export::ExportHealthStatus;
+use p4kx_export::{CatalogPublicationMode, Compression, ExportHealthStatus, write_catalog_from};
 use p4kx_extraction::{DataType, Field, Value};
 use serde_json::Value as Json;
 
@@ -71,6 +71,9 @@ fn a_failed_broker_meaning_keeps_its_own_original_nonflow_payload() -> TestResul
     for (source, kind) in checked {
         crate::broker_flow_tests::refusal(&source);
         let (built, document) = source.diagnostic()?;
+        if matches!(kind, Input::Encrypted) {
+            check_broker_replay(&source, built.json())?;
+        }
         let graph = Broker::for_guid(&document, crate::broker_flow_fixture::GUID)?;
         let payload = original_nonflow_payload(&graph)?;
         let input_ref = graph
@@ -91,6 +94,28 @@ fn a_failed_broker_meaning_keeps_its_own_original_nonflow_payload() -> TestResul
         )?;
         crate::health_origin_assertions::closure(&document)?;
     }
+    Ok(())
+}
+
+fn check_broker_replay(source: &Fixture, expected: &[u8]) -> TestResult {
+    let mut options = crate::health_origin_fixture::options();
+    options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
+    let (summary, packed) = write_catalog_from(
+        &source.archive,
+        &source.entry,
+        &options,
+        Compression::Zstd { level: 1 },
+        || Ok(Vec::new()),
+    )?;
+    assert!(
+        summary.staged_row_bytes() > 0,
+        "the canonical Broker row is staged even when context projection fails"
+    );
+    let decoded = zstd::stream::decode_all(packed.as_slice())?;
+    assert_eq!(
+        decoded, expected,
+        "both writer passes preserve the raw Broker, failure and exact provenance"
+    );
     Ok(())
 }
 

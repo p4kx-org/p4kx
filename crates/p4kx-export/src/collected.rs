@@ -7,8 +7,8 @@ use p4kx_extraction::Guid;
 
 use crate::blueprint_catalog_rows::BlueprintRow;
 use crate::blueprint_category::BlueprintCategory;
-use crate::broker_definition::BrokerDefinition;
 use crate::broker_entry::BrokerProjection;
+use crate::broker_entry_read::BrokerDefinitions;
 use crate::catalog_crafting::CraftingKinds;
 use crate::catalog_definitions::planet_tech_definitions::PlanetTechDefinitions;
 use crate::catalog_read_failure::CatalogReadFailure;
@@ -119,7 +119,7 @@ pub(crate) struct Collected<'f> {
     pub(crate) contract_templates: Vec<TemplateDefinition<'f>>,
     pub(crate) template_configurations: TemplateConfigurations<'f>,
     pub(crate) broker_projections: Vec<BrokerProjection<'f>>,
-    pub(crate) broker_definitions: Vec<BrokerDefinition<'f>>,
+    pub(crate) broker_definitions: BrokerDefinitions,
     pub(crate) contract_npc_spawns: Vec<PublishedNpcPool>,
     pub(crate) contract_entity_spawns: Vec<EntitySpawnPool>,
     pub(crate) mission_property_sets: Vec<MissionPropertySet<'f>>,
@@ -234,7 +234,7 @@ impl<'f> Collected<'f> {
             contract_templates: Vec::new(),
             template_configurations: TemplateConfigurations::default(),
             broker_projections: Vec::new(),
-            broker_definitions: Vec::new(),
+            broker_definitions: BrokerDefinitions::empty(),
             contract_npc_spawns: Vec::new(),
             contract_entity_spawns: Vec::new(),
             mission_property_sets: Vec::new(),

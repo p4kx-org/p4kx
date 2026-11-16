@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use crate::broker_definition::BrokerDefinition;
 use crate::broker_entry::BrokerProjection;
+use crate::broker_entry_read::BrokerDefinitions;
 use crate::catalog_number_capture::CapturedNumber;
 use crate::catalog_projection::CatalogProjection;
 use crate::contract_missions::ContractWithTitles;
@@ -101,7 +101,7 @@ impl<'f> Collected<'f> {
     pub(crate) fn add_broker_entries(
         &mut self,
         entries: KindRead<'f, BrokerProjection<'f>>,
-        definitions: Vec<BrokerDefinition<'f>>,
+        definitions: BrokerDefinitions,
     ) {
         self.ledger.merge(entries.ledger);
         self.broker_projections = entries.items;

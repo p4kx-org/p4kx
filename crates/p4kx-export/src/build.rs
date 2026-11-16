@@ -247,11 +247,7 @@ fn assemble<R>(
                 &["ContractTemplate"],
                 collected.contract_templates,
             ),
-            mission_broker_entries: CatalogTable::new(
-                &forge,
-                &["MissionBrokerEntry"],
-                collected.broker_definitions,
-            ),
+            mission_broker_entries: collected.broker_definitions.table,
             loot: collected.loot_kinds.definitions.tables(&forge),
             gameplay_properties: crate::catalog_v3::gameplay_property_catalog::table(
                 &forge,

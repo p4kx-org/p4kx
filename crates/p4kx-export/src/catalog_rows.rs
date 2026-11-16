@@ -57,13 +57,18 @@ pub(crate) fn snapshot(collected: &mut Collected<'_>, filter: Option<&Filter>) -
             .map(|row| (row.definition.physical_guid.0, row.definition.physical_path)),
     );
     append_missions(&mut emitted, collected);
+    let mut template_numbers = template_numbers(collected);
+    for receipt in std::mem::take(&mut collected.broker_definitions.proof) {
+        emitted.push(receipt.row);
+        template_numbers.push(receipt.numbers);
+    }
     append_gameplay_definitions(&mut emitted, collected);
     CatalogRows {
         emitted,
         filter: filter.cloned(),
         numbers: row_numbers::numbers(collected),
         configuration_numbers: collected.take_configuration_numbers(),
-        template_numbers: template_numbers(collected),
+        template_numbers,
         recovery_numbers: Vec::new(),
     }
 }
@@ -142,12 +147,6 @@ fn template_numbers(collected: &Collected<'_>) -> Vec<TemplateNumbers> {
         .contract_templates
         .iter()
         .map(|row| row.numbers.clone())
-        .chain(
-            collected
-                .broker_definitions
-                .iter()
-                .map(|row| row.numbers.clone()),
-        )
         .collect()
 }
 
@@ -222,14 +221,6 @@ fn append_missions(emitted: &mut Vec<CatalogRow>, collected: &Collected<'_>) {
         Kind::ContractTemplates,
         collected
             .contract_templates
-            .iter()
-            .map(|row| (row.physical_guid.0, row.physical_path)),
-    );
-    append(
-        emitted,
-        Kind::MissionBrokerEntries,
-        collected
-            .broker_definitions
             .iter()
             .map(|row| (row.physical_guid.0, row.physical_path)),
     );

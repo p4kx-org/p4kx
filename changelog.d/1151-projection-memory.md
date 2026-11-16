@@ -12,5 +12,6 @@
 - Collect selected Record rows directly into their catalog tables as each read window finishes.
 - Share common Commodity fallback source evidence across ResourceType rows.
 - Track mission template source membership by original Record ranges.
-- Stage contract generator definitions as each Record window completes.
+- Allocate Record failure details only for observations with a diagnosis.
+- Stage contract generator and broker definitions as their Record windows complete.
 - Stage particle libraries and weapon animation candidates as they are projected.

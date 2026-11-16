@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_extraction::{CancelToken, DataForge, Filter, Record, RecordTree, TreeBuilder};
-use rayon::prelude::*;
 
 use crate::build::original_input::OriginalCatalogInput;
 use crate::export_diagnostic::ExportSourceRole;
@@ -13,6 +12,11 @@ use crate::record_observation::RecordObservation;
 use crate::selection::{Kind, is_kind_leftover};
 use crate::source_fields::FieldError;
 use crate::{CatalogError, CatalogReadFailure};
+
+#[path = "record_read_cursor.rs"]
+mod cursor;
+
+pub(crate) use self::cursor::{KindReadAccounting, visit_kind_by_record_guid};
 
 // Several Records per worker amortize the join and bound pending results.
 const RECORDS_PER_WORKER: usize = 64;
@@ -104,7 +108,7 @@ pub(crate) fn read_kind_with_notes<'f, T: Send>(
     forge: &'f DataForge<'f>,
     input: &OriginalCatalogInput<'_, '_>,
     kind: Kind,
-    (filter, cancel, mut inspections): (
+    (filter, cancel, inspections): (
         Option<&Filter>,
         Option<&CancelToken>,
         Option<&mut WholeInspectionFold<'_>>,
@@ -116,57 +120,21 @@ pub(crate) fn read_kind_with_notes<'f, T: Send>(
     + Sync,
     guid: impl Fn(&T) -> CatalogGuid,
 ) -> Result<KindRead<'f, T>, CatalogError> {
-    input.check_forge(forge)?;
-    let rule = kind.records();
-    let records: Vec<Record<'f>> = forge
-        .records()
-        .filter(|record| {
-            record
-                .record_path()
-                .is_ok_and(|path| rule.matches_path(path) && filter.is_none_or(|f| f.matches(path)))
-        })
-        .collect();
-
-    let mut read = KindRead {
-        items: Vec::new(),
-        skipped: 0,
-        failures: Vec::new(),
-        ledger: ExportLedger::default(),
-    };
-    read.ledger.inventory(kind);
-    let mut pending = Vec::new();
-    for window in records.chunks(kind_window_size(kind, records.len())) {
-        window
-            .par_iter()
-            .map_init(TreeBuilder::new, |trees, record| {
-                if cancel.is_some_and(CancelToken::is_cancelled) {
-                    return Err(CatalogError::Cancelled);
-                }
-                piece(input, kind, trees, record, &build, cancel)
-            })
-            .collect_into_vec(&mut pending);
-        #[expect(
-            clippy::iter_with_drain,
-            reason = "reuse the indexed Rayon result buffer across Record windows"
-        )]
-        for result in pending.drain(..) {
-            let Some(mut observed) = result? else {
-                continue;
-            };
-            if let Some(inspections) = inspections.as_deref_mut() {
-                inspections.merge_matching(&mut observed.fields.field_inspections)?;
-            }
-            read.ledger.observe(observed.source);
-            read.ledger.merge(observed.fields);
-            match observed.piece {
-                Piece::Item(item) => read.items.push(*item),
-                Piece::Skipped => read.skipped = read.skipped.saturating_add(1),
-                Piece::Failed(failure) => read.failures.push(failure),
-            }
-        }
-    }
-    sort_by_guid(&mut read.items, guid);
-    Ok(read)
+    let mut items = Vec::new();
+    let read = cursor::visit_kind_with_notes(
+        forge,
+        input,
+        kind,
+        (filter, cancel, inspections),
+        cursor::ReadOrder::Physical,
+        build,
+        |value| {
+            items.push(value);
+            Ok(())
+        },
+    )?;
+    sort_by_guid(&mut items, guid);
+    Ok(read.into_read(items))
 }
 
 fn piece<'f, T>(
