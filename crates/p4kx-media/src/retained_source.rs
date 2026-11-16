@@ -2,17 +2,19 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use p4kx_extraction::{
     Archive, ConflictPolicy, Entry, ExtractOptions, ExtractionReport, OwnedDirectoryPermit,
     VerifiedEntryPayload,
 };
 
+use crate::directory_inputs::RetainedPayload;
 use crate::hashing;
 use crate::output_path;
 use crate::raw_output;
 use crate::staged_directory::StagedDirectory;
-use crate::{ByteScope, Digest, ExtractionCounts, MediaError, MediaWriter, RawReference};
+use crate::{ByteScope, Digest, ExtractionCounts, MediaError, MediaWriter};
 
 const PAYLOAD_FILE: &str = "payload";
 
@@ -31,22 +33,29 @@ pub(crate) fn retain(
     entry: &Entry,
     verification: PayloadVerification,
     writer: &mut MediaWriter<'_>,
-) -> Result<(RawReference, PathBuf), MediaError> {
+) -> Result<(RetainedPayload, PathBuf), MediaError> {
     materialize(
         archive,
         entry,
         verification,
         writer,
-        |payload, permit, digest, writer| {
+        |payload, permit, digest, proof, writer| {
             let origin = writer.origins.input(archive, entry)?;
-            raw_output::place(
+            let (raw, retained) = raw_output::place(
                 payload,
                 permit,
                 digest,
                 entry.uncompressed_size(),
                 &origin,
                 writer,
-            )
+            )?;
+            Ok((
+                RetainedPayload {
+                    raw,
+                    original: proof.map(Arc::new),
+                },
+                retained,
+            ))
         },
     )
 }
@@ -62,7 +71,7 @@ pub(crate) fn with_private<T>(
         entry,
         PayloadVerification::Ordinary,
         writer,
-        |payload, _permit, digest, writer| consume(digest, payload, writer),
+        |payload, _permit, digest, _proof, writer| consume(digest, payload, writer),
     )
 }
 
@@ -75,6 +84,7 @@ fn materialize<T>(
         &Path,
         &OwnedDirectoryPermit,
         Digest,
+        Option<VerifiedEntryPayload>,
         &mut MediaWriter<'_>,
     ) -> Result<T, MediaError>,
 ) -> Result<T, MediaError> {
@@ -118,7 +128,7 @@ fn materialize<T>(
         if let Some(proof) = proof.as_ref() {
             verify_payload(proof, archive, entry, &digest, actual)?;
         }
-        consume(&payload, temporary.permit(), digest, writer)
+        consume(&payload, temporary.permit(), digest, proof, writer)
     })();
     temporary.finish(result)
 }

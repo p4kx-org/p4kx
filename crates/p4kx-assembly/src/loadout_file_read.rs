@@ -2,9 +2,10 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::fmt::Display;
-use std::io::Read;
+use std::io::{self, Read, Write};
 
 use p4kx_archive::{Archive, Entry};
+use p4kx_extraction::{OriginDigestWriter, VerifiedEntryPayload};
 
 use crate::{LoadoutFileError, LoadoutFileSource, MAX_XML_LOADOUT_LEN};
 
@@ -45,6 +46,41 @@ impl LoadoutFileRead {
             Ok(bytes) => Self::new(LoadoutFileSource::archive(observed.snapshot()), Ok(bytes)),
             Err(error) => Self::unbound(entry.path(), Err(error)),
         }
+    }
+
+    /// Binds retained decoded bytes to the original verified write.
+    ///
+    /// # Errors
+    /// Returns an error when the proof or bytes differ from the Entry, or the caller stops.
+    pub fn from_retained(
+        archive: &Archive,
+        entry: &Entry,
+        proof: &VerifiedEntryPayload,
+        bytes: Vec<u8>,
+        stopped: &dyn Fn() -> bool,
+    ) -> Result<Self, LoadoutFileError> {
+        check_stop(stopped)?;
+        let size = entry.uncompressed_size();
+        if size > MAX_XML_LOADOUT_LEN {
+            return Err(LoadoutFileError::TooLarge { size });
+        }
+        let observed = archive
+            .observed_entry(entry)
+            .filter(|_| proof.is_for(archive, entry))
+            .ok_or(LoadoutFileError::SourceEvidenceUnavailable)?;
+        let mut digest = OriginDigestWriter::new(io::sink());
+        for block in bytes.chunks(READ_BLOCK_BYTES) {
+            check_stop(stopped)?;
+            digest.write_all(block).map_err(unreadable)?;
+        }
+        check_stop(stopped)?;
+        if digest.finish().map_err(unreadable)? != *proof.digest() {
+            return Err(LoadoutFileError::SourceEvidenceUnavailable);
+        }
+        Ok(Self::new(
+            LoadoutFileSource::archive(observed.snapshot()),
+            Ok(bytes),
+        ))
     }
 
     /// Borrows the original admission of this operation.

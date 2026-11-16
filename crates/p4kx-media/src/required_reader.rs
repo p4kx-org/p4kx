@@ -258,7 +258,10 @@ impl Seek for RequiredReader<'_> {
     }
 }
 
-fn checked<T>(result: Result<T, MediaError>, checkpoint: Checkpoint<'_>) -> Result<T, MediaError> {
+pub(crate) fn checked<T>(
+    result: Result<T, MediaError>,
+    checkpoint: Checkpoint<'_>,
+) -> Result<T, MediaError> {
     match (result, checkpoint.check()) {
         (Ok(value), Ok(())) => Ok(value),
         (Err(cause), Ok(())) | (Ok(_), Err(cause)) => Err(cause),

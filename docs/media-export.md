@@ -727,9 +727,14 @@ retain their own Entry filters. An Animation-only export with
 `--animation-entity` uses the independent clip inventory selection. For selected root-Archive
 XML in that inventory, Media measures the verified decoded Entry stream and checks its length
 and SHA-256 against the staged file before publishing the raw reference. The proof binds the
-physical Entry and uses the existing staged-file digest.
+physical Entry and uses the existing staged-file digest. The clip inventory follows XML and CryXml
+Loadouts only when each resolved path identifies a unique included physical Entry with a completed
+retention receipt. It checks the staged payload against the original decoded proof before replay.
+Missing, ambiguous, unselected, malformed and refused Include routes produce explicit issues on the
+Entity catalogue row. Placement origins retain each observed selector and mark incomplete routes.
+A failure to read or verify an included payload prevents complete publication.
 
-The scoped Entity export follows external XML and CryXml Loadouts and their
+The scoped Animation Definition export follows external XML and CryXml Loadouts and their
 authored Includes in the root Archive. A required dependency can fall outside
 `--include`. An explicit `--exclude` still blocks the read. Each required path
 must match one physical Entry in a complete directory inventory. A successful

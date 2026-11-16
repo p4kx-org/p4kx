@@ -306,10 +306,11 @@ impl Scope {
 
     pub(super) fn health(
         &mut self,
+        ordinal: usize,
         proof: OriginContributions,
         writer: &MediaWriter<'_>,
     ) -> Result<(), MediaError> {
-        origin::at(&mut self.0, "/issues/0", proof, writer)
+        origin::at(&mut self.0, &format!("/issues/{ordinal}"), proof, writer)
     }
 
     pub(super) fn write(

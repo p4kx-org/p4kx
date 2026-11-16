@@ -6,16 +6,26 @@ use std::ops::ControlFlow;
 use std::sync::Mutex;
 
 use p4kx_assembly::{
-    LoadoutClassSelection, LoadoutFileObservation, LoadoutPath, LoadoutReadEvent,
+    EntityRig, LoadoutClassSelection, LoadoutFileObservation, LoadoutPath, LoadoutReadEvent,
     LoadoutReadObserver, LoadoutSelection, LoadoutTargetGuid, LoadoutXmlDecoding,
     LoadoutXmlRecordSelector, XmlLoadoutClassSite, XmlLoadoutPathSite,
 };
-use p4kx_extraction::{DataForge, EntryOrigin, InputScope, SourceUseRole};
+use p4kx_extraction::{DataForge, EntryOrigin, InputScope, SourceLocation, SourceUseRole};
 
 use crate::origin_capture::{OriginCapture, OriginSite};
 use crate::origin_contributions::OriginContributions;
 use crate::origin_input::MediaOriginInput;
-use crate::{MediaError, MediaWriter, origin_error};
+use crate::{MediaError, MediaIssue, MediaWriter, origin_error};
+
+#[path = "entity_loadout_attempt_issue.rs"]
+mod attempts;
+
+use self::attempts::AttemptIssue;
+
+pub(super) struct ObservedLoadoutIssue {
+    pub(super) issue: MediaIssue,
+    pub(super) origin: OriginContributions,
+}
 
 pub(crate) struct EntityLoadoutEvidence<'forge> {
     forge: &'forge DataForge<'forge>,
@@ -27,6 +37,7 @@ struct Sites {
     paths: HashMap<LoadoutSelection, Site>,
     classes: HashMap<LoadoutClassSelection, Site>,
     xml_roots: HashMap<LoadoutSelection, [u64; 2]>,
+    attempts: Vec<AttemptIssue>,
 }
 
 struct Site {
@@ -83,6 +94,47 @@ impl<'forge> EntityLoadoutEvidence<'forge> {
         }
     }
 
+    pub(super) fn issues(
+        &self,
+        dataforge: &MediaOriginInput,
+        writer: &MediaWriter<'_>,
+    ) -> Result<Vec<ObservedLoadoutIssue>, MediaError> {
+        let sites = self.sites.lock().map_err(|_| origin_error::foreign())?;
+        sites
+            .attempts
+            .iter()
+            .map(|attempt| {
+                writer.checkpoint()?;
+                let mut capture = writer.capture_origins();
+                if let Some(selection) = attempt.request.selection() {
+                    if let Some(site) = sites.paths.get(selection) {
+                        site.add(&mut capture, writer)?;
+                    } else if let Some(indices) = sites.xml_roots.get(selection) {
+                        capture.add(
+                            dataforge,
+                            InputScope::Payload,
+                            OriginSite::new("dataforgeValue", indices, "$value"),
+                            SourceUseRole::Selector,
+                            writer,
+                        )?;
+                    } else {
+                        capture.include_original(&OriginContributions::unknown(
+                            &writer.origins.owner,
+                        ))?;
+                    }
+                } else {
+                    capture
+                        .include_original(&OriginContributions::unknown(&writer.origins.owner))?;
+                }
+                attempt.add_original(&mut capture, writer)?;
+                Ok(ObservedLoadoutIssue {
+                    issue: attempt.issue(),
+                    origin: capture.finish(),
+                })
+            })
+            .collect()
+    }
+
     pub(crate) fn path(
         &self,
         path: &LoadoutPath,
@@ -97,6 +149,33 @@ impl<'forge> EntityLoadoutEvidence<'forge> {
             site.add(capture, writer)?;
         }
         Ok(site.is_some())
+    }
+
+    pub(crate) fn position_route(
+        &self,
+        rig: &EntityRig,
+        dataforge: &MediaOriginInput,
+        writer: &MediaWriter<'_>,
+    ) -> Result<OriginContributions, MediaError> {
+        let mut capture = writer.capture_origins();
+        let selectors = rig.port_selectors();
+        let paths = rig.port_name_paths();
+        if selectors.len() != paths.len() {
+            return Err(MediaError::Contract(
+                "animation port route lost a physical selector".into(),
+            ));
+        }
+        for (selector, path) in selectors.iter().zip(paths) {
+            writer.checkpoint()?;
+            if selector.is_none()
+                && let Some(path) = path
+                && self.path(path, &mut capture, writer)?
+            {
+                continue;
+            }
+            record_location(&mut capture, dataforge, selector.as_ref(), writer)?;
+        }
+        Ok(capture.finish())
     }
 
     pub(crate) fn class(
@@ -142,8 +221,40 @@ impl<'forge> EntityLoadoutEvidence<'forge> {
     }
 }
 
+pub(crate) fn record_location(
+    capture: &mut OriginCapture,
+    dataforge: &MediaOriginInput,
+    location: Option<&SourceLocation>,
+    writer: &MediaWriter<'_>,
+) -> Result<(), MediaError> {
+    let Some(SourceLocation::DataForge {
+        record_index,
+        field,
+    }) = location
+    else {
+        return capture.include(&OriginContributions::unknown(&writer.origins.owner), writer);
+    };
+    capture.add(
+        dataforge,
+        InputScope::Payload,
+        OriginSite::new("dataforge-record", &[u64::from(*record_index)], field),
+        SourceUseRole::Selector,
+        writer,
+    )
+}
+
 impl LoadoutReadObserver for EntityLoadoutEvidence<'_> {
-    fn observe(&self, _event: LoadoutReadEvent<'_, '_>) -> ControlFlow<()> {
+    fn observe(&self, event: LoadoutReadEvent<'_, '_>) -> ControlFlow<()> {
+        let Some(attempt) = AttemptIssue::from_event(&event) else {
+            return ControlFlow::Continue(());
+        };
+        let Ok(mut sites) = self.sites.lock() else {
+            return ControlFlow::Break(());
+        };
+        if sites.attempts.try_reserve(1).is_err() {
+            return ControlFlow::Break(());
+        }
+        sites.attempts.push(attempt);
         ControlFlow::Continue(())
     }
 

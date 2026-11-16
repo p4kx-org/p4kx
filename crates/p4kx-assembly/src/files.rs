@@ -27,6 +27,11 @@ pub trait LoadoutFiles: Sync {
         LoadoutFileRead::unbound(path, self.read(path))
     }
 
+    /// Reports whether this provider supplies vehicle definitions and patches.
+    fn reads_vehicle_implementations(&self) -> bool {
+        true
+    }
+
     /// Returns the exact source identity selected by the same resolution as `read`.
     fn identity(&self, _path: &str) -> Option<LoadoutFileIdentity<'_>> {
         None
@@ -46,6 +51,15 @@ pub enum LoadoutFileError {
     /// There is no such file.
     #[error("there is no such file")]
     NotFound,
+    /// Several physical Entries have the requested name.
+    #[error("several physical Entries match the XML Loadout")]
+    Ambiguous,
+    /// The only matching physical Entry is outside the selected inputs.
+    #[error("the XML Loadout is outside the selected inputs")]
+    NotSelected,
+    /// The original source inventory or the selected name cannot establish membership.
+    #[error("the XML Loadout selection cannot establish original membership")]
+    UnprovedSelection,
     /// The file is larger than [`MAX_XML_LOADOUT_LEN`].
     #[error("the file holds {size} bytes, more than the limit of {MAX_XML_LOADOUT_LEN} bytes")]
     TooLarge {

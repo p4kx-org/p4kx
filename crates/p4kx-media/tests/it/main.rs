@@ -12,6 +12,7 @@ mod animation_definition_scope;
 mod animation_entity_adb_scope;
 mod animation_entity_catalogue;
 mod animation_entity_named_dba;
+mod animation_entity_xml_replay;
 mod animation_event_bindings;
 mod animation_event_timeline;
 mod animation_graph_source;

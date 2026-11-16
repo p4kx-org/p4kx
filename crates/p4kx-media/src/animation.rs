@@ -23,7 +23,7 @@ mod schema;
 pub(crate) mod selection_path;
 mod skeleton_selection;
 
-pub(crate) use entity_catalogue::{loadout_issue, with_resolved_entity};
+pub(crate) use entity_catalogue::{EntityLoadoutMode, loadout_issue, with_resolved_entity};
 pub(crate) use provider::AnimationProvider;
 pub(crate) use schema::bind_record_schema;
 pub(crate) use skeleton_selection::{SkeletonSelection, validate_skeleton_path};

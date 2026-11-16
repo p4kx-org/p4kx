@@ -5,7 +5,9 @@ use std::cell::OnceCell;
 use std::collections::HashMap;
 use std::io;
 use std::path::Path;
-use std::sync::{Mutex, MutexGuard};
+use std::sync::{Arc, Mutex, MutexGuard};
+
+use p4kx_extraction::VerifiedEntryPayload;
 
 use crate::checkpoint::Checkpoint;
 use crate::input_budget::InputBudget;
@@ -14,7 +16,13 @@ use crate::{Limits, MediaError, MediaWriter, RawReference};
 #[derive(Default)]
 struct Slot {
     busy: bool,
-    raw: Option<RawReference>,
+    retained: Option<RetainedPayload>,
+}
+
+#[derive(Clone)]
+pub(crate) struct RetainedPayload {
+    pub(crate) raw: RawReference,
+    pub(crate) original: Option<Arc<VerifiedEntryPayload>>,
 }
 
 pub(crate) struct DirectoryInputs<'run> {
@@ -80,7 +88,7 @@ impl<'run> DirectoryInputs<'run> {
         &self,
         position: usize,
         writer: &MediaWriter<'_>,
-    ) -> Result<Option<RawReference>, MediaError> {
+    ) -> Result<Option<RetainedPayload>, MediaError> {
         self.admit(position, writer)?;
         let mut slots = self.admission().slots()?;
         let slot = slots.get_mut(&position).ok_or_else(invalid_position)?;
@@ -88,9 +96,9 @@ impl<'run> DirectoryInputs<'run> {
             return Err(busy());
         }
         slot.busy = true;
-        let raw = slot.raw.clone();
+        let retained = slot.retained.clone();
         drop(slots);
-        Ok(raw)
+        Ok(retained)
     }
 
     pub(crate) fn begin_retained(
@@ -109,7 +117,7 @@ impl<'run> DirectoryInputs<'run> {
         if slot.busy {
             return Err(busy());
         }
-        let Some(raw) = slot.raw.clone() else {
+        let Some(raw) = slot.retained.as_ref().map(|retained| retained.raw.clone()) else {
             return Ok(None);
         };
         slot.busy = true;
@@ -117,7 +125,11 @@ impl<'run> DirectoryInputs<'run> {
         Ok(Some(raw))
     }
 
-    pub(crate) fn end(&self, position: usize, raw: Option<RawReference>) -> Result<(), MediaError> {
+    pub(crate) fn end(
+        &self,
+        position: usize,
+        retained: Option<RetainedPayload>,
+    ) -> Result<(), MediaError> {
         let mut slots = self.admission().slots()?;
         let slot = slots.get_mut(&position).ok_or_else(invalid_position)?;
         if !slot.busy {
@@ -126,8 +138,8 @@ impl<'run> DirectoryInputs<'run> {
             ));
         }
         slot.busy = false;
-        if raw.is_some() {
-            slot.raw = raw;
+        if retained.is_some() {
+            slot.retained = retained;
         }
         drop(slots);
         Ok(())
@@ -135,6 +147,27 @@ impl<'run> DirectoryInputs<'run> {
 }
 
 impl<'run> DirectoryAdmission<'run> {
+    pub(crate) fn completed_payload(
+        &self,
+        position: usize,
+        checkpoint: Checkpoint<'_>,
+    ) -> Result<Option<RetainedPayload>, MediaError> {
+        checkpoint.check()?;
+        if position >= self.count {
+            return Err(invalid_position());
+        }
+        let slots = self.slots()?;
+        let Some(slot) = slots.get(&position) else {
+            return Ok(None);
+        };
+        if slot.busy {
+            return Err(busy());
+        }
+        let retained = slot.retained.clone();
+        drop(slots);
+        Ok(retained)
+    }
+
     pub(crate) fn admit(
         &self,
         position: usize,

@@ -8,6 +8,7 @@ use super::super::db;
 use super::{
     Attempt, Owner, PARAMETER, Parameter, Payload, Placement, RIG, ReadStatus, Rig, Scope,
 };
+use crate::animation::entity_loadout_evidence::EntityLoadoutEvidence;
 use crate::origin_capture::OriginSite;
 use crate::origin_contributions::OriginContributions;
 use crate::origin_input::MediaOriginInput;
@@ -31,11 +32,12 @@ impl Rows<'_, '_> {
     pub(in super::super) fn rigs(
         &self,
         catalogue: &EntityClipCatalogue,
+        loadout: &EntityLoadoutEvidence<'_>,
         writer: &mut MediaWriter<'_>,
     ) -> Result<(), MediaError> {
         let mut banks = banks::Banks::default();
         for (position, rig) in catalogue.rigs.iter().enumerate() {
-            self.rig(position, &rig.rig, writer)?;
+            self.rig(position, &rig.rig, loadout, writer)?;
             self.links(position, rig, &catalogue.sources, &mut banks, writer)?;
         }
         Ok(())
@@ -45,21 +47,11 @@ impl Rows<'_, '_> {
         &self,
         position: usize,
         rig: &EntityRig,
+        loadout: &EntityLoadoutEvidence<'_>,
         writer: &mut MediaWriter<'_>,
     ) -> Result<(), MediaError> {
         let mut scope = Scope::new(writer);
-        if let Some(record) = rig.record_index {
-            scope.at(
-                "owner/guid",
-                db(self.input, record, "guid", writer)?,
-                writer,
-            )?;
-            scope.at(
-                "owner/record",
-                db(self.input, record, "recordIndex", writer)?,
-                writer,
-            )?;
-        }
+        self.rig_origins(&mut scope, rig, loadout, writer)?;
         if rig.geometry.is_some() {
             scope.at(
                 "geometry",
@@ -106,6 +98,39 @@ impl Rows<'_, '_> {
             &[],
             writer,
         )
+    }
+
+    fn rig_origins(
+        &self,
+        scope: &mut Scope,
+        rig: &EntityRig,
+        loadout: &EntityLoadoutEvidence<'_>,
+        writer: &MediaWriter<'_>,
+    ) -> Result<(), MediaError> {
+        let xml_target = rig
+            .attachment_target()
+            .filter(|target| target.class_xml_use().is_some());
+        let class = xml_target
+            .map(|target| loadout.class(target, self.input, writer))
+            .transpose()?;
+        if let Some(record) = rig.record_index {
+            for (member, location) in [("owner/guid", "guid"), ("owner/record", "recordIndex")] {
+                let mut capture = writer.capture_origins();
+                capture.include_original(&db(self.input, record, location, writer)?)?;
+                if let Some(class) = &class {
+                    capture.include_original(class)?;
+                }
+                scope.at(member, capture.finish(), writer)?;
+            }
+        }
+        if xml_target.is_some() && matches!(rig.placement, RigPlacement::Attachment { .. }) {
+            scope.at(
+                "placement/port_path",
+                loadout.position_route(rig, self.input, writer)?,
+                writer,
+            )?;
+        }
+        Ok(())
     }
 
     fn parameter(

@@ -120,7 +120,7 @@ fn write_source(
         )?;
         scope.at("status", proof.clone(), writer)?;
         if !matches!(status, ReadStatus::Read) {
-            scope.health(proof, writer)?;
+            scope.health(0, proof, writer)?;
         }
     }
     let issue = match status {

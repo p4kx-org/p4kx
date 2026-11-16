@@ -19,9 +19,9 @@ pub(crate) fn retain(
     let declared = source::entry(lookup.root, lookup.index.archive, entry, lookup.chain)?;
     let cached = state.begin(entry.index(), writer)?;
     let first = cached.is_none();
-    let retained = if let Some(raw) = cached {
-        let payload = writer.root.join(&raw.path);
-        Ok((raw, payload))
+    let retained = if let Some(retained) = cached {
+        let payload = writer.root.join(&retained.raw.path);
+        Ok((retained, payload))
     } else {
         let verification = retention_verification(lookup, entry, writer);
         state
@@ -31,11 +31,12 @@ pub(crate) fn retain(
                 retained_source::retain(lookup.index.archive, entry, verification, writer)
             })
     };
+    let mut completed = None;
     let result = match retained {
         Err(cause) => Err(error::at(&declared, cause)),
-        Ok((raw, payload)) => {
+        Ok((retained, payload)) => {
             let mut source = declared;
-            source::retained(&mut source, entry, raw);
+            source::retained(&mut source, entry, retained.raw.clone());
             let publication = if first {
                 writer
                     .origins
@@ -45,20 +46,15 @@ pub(crate) fn retain(
                 Ok(())
             };
             match publication {
-                Ok(()) => Ok((source, payload)),
+                Ok(()) => {
+                    completed = first.then_some(retained);
+                    Ok((source, payload))
+                }
                 Err(cause) => Err(error::at(&source, cause)),
             }
         }
     };
-    let raw = if first {
-        result
-            .as_ref()
-            .ok()
-            .and_then(|(source, _)| source.raw.clone())
-    } else {
-        None
-    };
-    error::finish(result, state.end(entry.index(), raw))
+    error::finish(result, state.end(entry.index(), completed))
 }
 
 fn retention_verification(

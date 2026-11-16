@@ -7,6 +7,7 @@ use p4kx_extraction::{Archive, Entry};
 use sha2::{Digest as _, Sha256};
 
 use crate::checkpoint::IO_BLOCK_BYTES;
+use crate::directory_inputs::RetainedPayload;
 use crate::directory_lookup::DirectoryLookup;
 use crate::directory_run::{self, Phase};
 use crate::input_budget::InputBudget;
@@ -216,9 +217,15 @@ impl TraversalVisit for Visit<'_> {
         if inputs.begin(entry.index(), writer)?.is_some() {
             return Err(invalid("animation Entry was visited repeatedly"));
         }
-        let result = self.project(entry, lookup, original, writer);
-        let raw = result.as_ref().ok().cloned();
-        error::finish(result.map(|_| true), inputs.end(entry.index(), raw))
+        let mut retained = None;
+        let result = self.project(entry, lookup, original, writer).map(|raw| {
+            retained = Some(RetainedPayload {
+                raw,
+                original: None,
+            });
+            true
+        });
+        error::finish(result, inputs.end(entry.index(), retained))
     }
 
     fn excluded_container(&mut self) {}

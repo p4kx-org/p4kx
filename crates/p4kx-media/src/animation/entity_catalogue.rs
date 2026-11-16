@@ -21,6 +21,7 @@ mod rows;
 
 use self::loadout_files::EntityLoadoutFiles;
 
+pub(crate) use loadout_files::EntityLoadoutMode;
 pub(super) use rows::bind_schema;
 pub(crate) use rows::loadout_issue;
 
@@ -77,9 +78,9 @@ fn project(
         selector,
         forge,
         lookup,
-        false,
+        EntityLoadoutMode::RetainedAnimations,
         writer,
-        |owner, tree, _, writer| {
+        |owner, tree, evidence, writer| {
             let state = if loadout_issue(tree, writer)?.is_some() {
                 rows::CatalogueState::IncompleteLoadout
             } else {
@@ -95,7 +96,18 @@ fn project(
             )?;
             let models = ArchiveModels::from_path_index(index);
             let catalogue = discover_entity_clips_using(&models, tree, &mut inputs)?;
-            rows::write(selector, state, owner, origin, lookup, &catalogue, writer)
+            rows::write(
+                selector,
+                state,
+                rows::EntitySources {
+                    owner,
+                    input: origin,
+                    lookup,
+                    loadout: evidence,
+                },
+                &catalogue,
+                writer,
+            )
         },
     )
 }
@@ -104,7 +116,7 @@ pub(crate) fn with_resolved_entity<'forge, T>(
     selector: &str,
     forge: &'forge DataForge<'forge>,
     lookup: &DirectoryLookup<'_>,
-    scoped: bool,
+    mode: EntityLoadoutMode,
     writer: &mut MediaWriter<'_>,
     consume: impl FnOnce(
         &Record<'forge>,
@@ -119,31 +131,20 @@ pub(crate) fn with_resolved_entity<'forge, T>(
     writer.checkpoint()?;
     let evidence = Arc::new(EntityLoadoutEvidence::new(forge));
     let (owner_index, tree) = {
-        let files = scoped
-            .then(|| EntityLoadoutFiles::new(lookup, writer))
-            .transpose()?;
-        let mut resolver = files
-            .as_ref()
-            .map_or_else(
-                || LoadoutResolver::new(forge),
-                |files| {
-                    LoadoutResolver::with_observed_entities(
-                        Arc::new(Entities::new(forge)),
-                        evidence.clone(),
-                    )
-                    .with_files(files)
-                },
-            )
-            .with_stop(&stop);
+        let files = EntityLoadoutFiles::new(mode, lookup, writer)?;
+        let mut resolver = LoadoutResolver::with_observed_entities(
+            Arc::new(Entities::new(forge)),
+            evidence.clone(),
+        )
+        .with_files(&files)
+        .with_stop(&stop);
         writer.checkpoint()?;
         let owner = resolver
             .entities()
             .find(selector)
             .map_err(|error| MediaError::Contract(error.to_string()))?;
         let tree = resolver.resolve_with(&owner, &LoadoutChanges::new());
-        if let Some(files) = &files {
-            files.check()?;
-        }
+        files.check()?;
         writer.checkpoint()?;
         let tree = tree.map_err(|error| MediaError::Contract(error.to_string()))?;
         (owner.index(), tree)

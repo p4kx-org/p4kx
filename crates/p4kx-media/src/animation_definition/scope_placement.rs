@@ -2,13 +2,12 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_assembly::{EntityRig, GearPlacementSource, RigPlacement};
-use p4kx_extraction::{InputScope, SourceLocation, SourceUseRole};
+use p4kx_extraction::SourceLocation;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::animation::entity_loadout_evidence::EntityLoadoutEvidence;
+use crate::animation::entity_loadout_evidence::{self, EntityLoadoutEvidence};
 use crate::audio_record_origins as records;
-use crate::origin_capture::{OriginCapture, OriginSite};
 use crate::origin_contributions::OriginContributions;
 use crate::origin_input::MediaOriginInput;
 use crate::origin_prepared::PreparedRecordOrigins;
@@ -134,25 +133,7 @@ impl<'source, 'forge> PlacementEvidence<'source, 'forge> {
         &self,
         writer: &MediaWriter<'_>,
     ) -> Result<OriginContributions, MediaError> {
-        let mut capture = writer.capture_origins();
-        let selectors = self.rig.port_selectors();
-        let paths = self.rig.port_name_paths();
-        if selectors.len() != paths.len() {
-            return Err(MediaError::Contract(
-                "animation port route lost a physical selector".into(),
-            ));
-        }
-        for (selector, path) in selectors.iter().zip(paths) {
-            writer.checkpoint()?;
-            if selector.is_none()
-                && let Some(path) = path
-                && self.loadout.path(path, &mut capture, writer)?
-            {
-                continue;
-            }
-            self.add(&mut capture, selector.as_ref(), writer)?;
-        }
-        Ok(capture.finish())
+        self.loadout.position_route(self.rig, self.input, writer)
     }
 
     fn location(
@@ -161,29 +142,7 @@ impl<'source, 'forge> PlacementEvidence<'source, 'forge> {
         writer: &MediaWriter<'_>,
     ) -> Result<OriginContributions, MediaError> {
         let mut capture = writer.capture_origins();
-        self.add(&mut capture, location, writer)?;
+        entity_loadout_evidence::record_location(&mut capture, self.input, location, writer)?;
         Ok(capture.finish())
-    }
-
-    fn add(
-        &self,
-        capture: &mut OriginCapture,
-        location: Option<&SourceLocation>,
-        writer: &MediaWriter<'_>,
-    ) -> Result<(), MediaError> {
-        let Some(SourceLocation::DataForge {
-            record_index,
-            field,
-        }) = location
-        else {
-            return capture.include(&OriginContributions::unknown(&writer.origins.owner), writer);
-        };
-        capture.add(
-            self.input,
-            InputScope::Payload,
-            OriginSite::new("dataforge-record", &[u64::from(*record_index)], field),
-            SourceUseRole::Selector,
-            writer,
-        )
     }
 }

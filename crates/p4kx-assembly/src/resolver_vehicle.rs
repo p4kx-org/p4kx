@@ -21,7 +21,9 @@ impl LoadoutResolver<'_> {
         spec: &EntitySpec,
     ) -> Option<(VehicleResult, LoadoutRequest)> {
         let vehicle_spec = spec.vehicle.as_ref()?;
-        let files = self.files?;
+        let files = self
+            .files
+            .filter(|files| files.reads_vehicle_implementations())?;
         let class_name = crate::entities::class_name_of(&spec.name).unwrap_or(&spec.name);
         if vehicle_spec.definition.is_empty() {
             return None;

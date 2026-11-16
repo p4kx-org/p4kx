@@ -115,7 +115,7 @@ impl DefinitionScope {
             selector,
             &forge,
             lookup,
-            true,
+            animation::EntityLoadoutMode::ScopedDefinitions,
             writer,
             |_, tree, loadout, writer| {
                 if let Some(issue) = animation::loadout_issue(tree, writer)? {

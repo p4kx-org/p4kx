@@ -4,6 +4,8 @@
 use p4kx_assembly::{Attachment, EntityClipCatalogue, EntityNode};
 use p4kx_extraction::{InputScope, Record, SourceUseRole};
 
+use super::super::entity_loadout_evidence::EntityLoadoutEvidence;
+
 use crate::origin_capture::OriginSite;
 use crate::origin_contributions::OriginContributions;
 use crate::origin_input::MediaOriginInput;
@@ -55,12 +57,22 @@ pub(super) fn unavailable(
     )
 }
 
+pub(super) struct EntitySources<'row, 'dir, 'forge> {
+    pub(super) owner: &'row Record<'forge>,
+    pub(super) input: &'row MediaOriginInput,
+    pub(super) lookup: &'row DirectoryLookup<'dir>,
+    pub(super) loadout: &'row EntityLoadoutEvidence<'forge>,
+}
+
 pub(super) fn write(
     selector: &str,
     state: CatalogueState,
-    owner: &Record<'_>,
-    input: &MediaOriginInput,
-    lookup: &DirectoryLookup<'_>,
+    EntitySources {
+        owner,
+        input,
+        lookup,
+        loadout,
+    }: EntitySources<'_, '_, '_>,
     catalogue: &EntityClipCatalogue,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
@@ -72,9 +84,14 @@ pub(super) fn write(
         db(input, owner.index(), "recordIndex", writer)?,
         writer,
     )?;
-    let issues = state.issue();
-    if issues.is_some() {
-        scope.health(db(input, owner.index(), "loadout", writer)?, writer)?;
+    let observed = loadout.issues(input, writer)?;
+    let mut issues: Vec<_> = state.issue().into_iter().collect();
+    if !issues.is_empty() {
+        scope.health(0, db(input, owner.index(), "loadout", writer)?, writer)?;
+    }
+    for attempt in observed {
+        scope.health(issues.len(), attempt.origin, writer)?;
+        issues.push(attempt.issue);
     }
     scope.write(
         CATALOGUE,
@@ -88,7 +105,7 @@ pub(super) fn write(
         writer,
     )?;
     let rows = wire::Rows { lookup, input };
-    rows.rigs(catalogue, writer)?;
+    rows.rigs(catalogue, loadout, writer)?;
     rows.sources(catalogue, writer)
 }
 
