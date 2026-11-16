@@ -226,6 +226,10 @@ payload. The local probe used the same metadata and helper-digest readers as the
 installer step. Installation, rollback and profile preservation require the separate hosted
 lifecycle result. [Release producer](https://github.com/p4kx-org/p4kx/actions/runs/43813424470/job/133122281746)
 
+The native ARM64 execution job for merge `867e6b9d9` passed the MSI lifecycle,
+runtime and preservation checks. Its result is bound to that producer and architecture.
+[Native ARM64 execution](https://github.com/p4kx-org/p4kx/actions/runs/43826004006/job/133175698510)
+
 ### Dynamic parent-chain feedback experiment
 
 The separate `MSI dynamic parent-chain probe` workflow exercises the actual preparation output,

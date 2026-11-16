@@ -21,6 +21,15 @@ stopped before JSON sizing or publication. The reserves apply to the host's
 available physical memory and system commit headroom in the measurement harness.
 [Release producer](https://github.com/p4kx-org/p4kx/actions/runs/43813424470/job/133122281746)
 
+A third unfiltered trial used the Windows AMD64 release artifact of merge `867e6b9d9`
+on the same LIVE Archive. The peak sampled working set in `records` was 32.39 GiB.
+The process reached 41.79 GiB during `project-contract-generators`, also the sampled
+peak of that phase in the prior trial. Available physical memory reached 11.97 GiB
+while system commit headroom was 38.01 GiB. The physical-memory reserve stopped the
+process before JSON sizing or publication. The trial preceded the singleton Entity
+class index and prefab-inventory ownership changes.
+[Release producer](https://github.com/p4kx-org/p4kx/actions/runs/43826004006/job/133160321493)
+
 | Section | LIVE | PTU |
 | --- | ---: | ---: |
 | `placements.containerInstances` | 1.734 GB | 2.046 GB |
