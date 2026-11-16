@@ -57,7 +57,7 @@ impl Sink {
             .map_err(|error| MediaError::Contract(error.to_string()))
     }
 
-    pub(super) fn finish(self, census: CensusCounts) -> TestResult<Counts> {
+    pub(super) fn finish(self, census: &CensusCounts) -> TestResult<Counts> {
         let mut state = self.state.into_inner();
         require(
             state.counts.selected == census.selected,

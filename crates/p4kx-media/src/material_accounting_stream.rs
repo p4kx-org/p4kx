@@ -138,7 +138,7 @@ fn verify(archive: &Archive, limits: Limits, mut enter: impl FnMut(Phase)) -> Te
     writer.index_build(&root)?;
     let finished = writer.finish()?;
     enter(Phase::VerifyTotals);
-    let counts = sink.finish(census)?;
+    let counts = sink.finish(&census)?;
     let [kind] = finished.kinds.as_slice() else {
         return Err("one material provider summary required".into());
     };
