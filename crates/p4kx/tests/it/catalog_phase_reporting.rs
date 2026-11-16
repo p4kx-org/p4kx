@@ -5,6 +5,32 @@ use std::fs;
 
 use super::{TestResult, p4kx, write_archive};
 
+const CATALOG_PHASES: &[&str] = &[
+    "read-dataforge",
+    "read-inputs",
+    "open-dataforge",
+    "read-localization",
+    "index-localization",
+    "initialize-origins",
+    "crafting",
+    "world-placements",
+    "records",
+    "projections",
+    "resolve-loadouts",
+    "project-locations",
+    "project-missions",
+    "read-mission-dependencies",
+    "project-mission-definitions",
+    "project-contract-generators",
+    "link-mission-factions",
+    "project-configurations",
+    "finalize-projections",
+    "export-health",
+    "provenance",
+    "measure-json",
+    "write-json",
+];
+
 #[test]
 fn phases_are_logged_with_redirected_stderr_without_changing_the_catalog() -> TestResult {
     let dir = tempfile::tempdir()?;
@@ -41,32 +67,7 @@ fn phases_are_logged_with_redirected_stderr_without_changing_the_catalog() -> Te
         .filter_map(|line| line.strip_prefix("catalog phase: "))
         .collect();
     assert_eq!(
-        phases,
-        [
-            "read-dataforge",
-            "read-inputs",
-            "open-dataforge",
-            "read-localization",
-            "index-localization",
-            "initialize-origins",
-            "crafting",
-            "world-placements",
-            "records",
-            "projections",
-            "resolve-loadouts",
-            "project-locations",
-            "project-missions",
-            "read-mission-dependencies",
-            "project-mission-definitions",
-            "project-contract-generators",
-            "link-mission-factions",
-            "project-configurations",
-            "finalize-projections",
-            "export-health",
-            "provenance",
-            "measure-json",
-            "write-json",
-        ],
+        phases, CATALOG_PHASES,
         "ordered preparation and write phases"
     );
     Ok(())
