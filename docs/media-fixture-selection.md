@@ -176,6 +176,28 @@ linear probe measured `0.231372461` with the multiplier absent and
 `0.615686238` with `0.5`. The shared stencil probe also verified all eight
 painted and eight fallback samples.
 
+## LayerBlend palette tint modes
+
+The LayerBlend fixture exports both a GLB and Blender package from one synthetic Archive.
+It checks authored values `0`, `1`, `2` and `3`, an absent value, malformed and nonfinite
+tokens, unknown bits and repeating declarations. An unselected layer supplies a control.
+The two palette slots and the authored diffuse and specular inputs are distinguishable.
+The test checks exact source order and per-value material and palette origins.
+
+`layer_tint_mode_baseline_preserves_raw_values_and_matches_glb_colour` writes the package when
+`P4KX_SYNTHETIC_LAYER_TINT_MODE_PACKAGE` names a new absolute directory in the isolated
+verification profile. Run the native probe with the settings above and
+`blender_addon/tests/blender_layer_tint_modes_package.py -- <package>/scene.json`.
+
+On Windows AMD64 with Blender 5.3.0 (`02f0899d78e3`), both outputs used the same linear
+colour for every palette-bound case. The dielectric input was
+`(0.52711523, 0.21586053, 0.05126947)` and the metallic input was
+`(0.63075721, 0.87136722, 0.52711523)`. Blender's linear EXR probe of Specular IOR Level
+returned `0.41352269` for both authored modes `1` and `2`, within one 8-bit step.
+The unselected control used the original material colours. These observations measure
+the P4KX projection. The engine's CPU flag packing and matched installed comparisons
+are separate acceptance evidence.
+
 ## Forward Illum and explicit Emittance
 
 This fixture exports a textured GLB and a Blender package for absent, zero and positive

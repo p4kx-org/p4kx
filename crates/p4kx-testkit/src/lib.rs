@@ -233,7 +233,10 @@ pub use entity_prop_rig::{
 };
 pub use entity_requirement::TestRequirement;
 pub use entity_sample::{SAMPLE_GUN, SAMPLE_MISSING, SAMPLE_MOUNT, SAMPLE_SHIP, sample_ship};
-pub use entity_schema::{entity_schema, tint_palette_record, tint_palette_record_with_decal};
+pub use entity_schema::{
+    entity_schema, tint_palette_record, tint_palette_record_with_decal,
+    tint_palette_record_with_specular,
+};
 pub use entity_skin::{SKIN_BODY, skin_attachment_entries};
 pub use entity_vehicle::landing_system_record;
 pub use entity_zones::{
