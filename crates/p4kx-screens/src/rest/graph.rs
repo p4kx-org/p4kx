@@ -4,6 +4,7 @@
 use p4kx_dataforge::{Guid, Reference, StructValue, Value};
 
 use super::Rest;
+use super::integer_number_switch::IntegerNumberSwitch;
 use super::ops::{Arith, Cmp};
 use crate::bindings::index_at;
 use crate::reader::{as_struct, exact, flag, int, items, reference, text};
@@ -52,6 +53,7 @@ pub(crate) enum Node {
         branches: [Input; 2],
         whole: bool,
     },
+    NumberSwitch(IntegerNumberSwitch),
     Same(Input),
     Arith {
         op: Arith,
@@ -251,6 +253,7 @@ fn numeric(short: &str, op: &StructValue<'_>) -> Option<Node> {
             ],
             whole,
         },
+        "NumberFromIntegerSwitch" => Node::NumberSwitch(IntegerNumberSwitch::read(op, input())?),
         "NumberFromInteger" => Node::Same(input()),
         "NumberArithmatic" | "IntegerArithmatic" => {
             let arith = Arith::parse(text(op, "type"))?;

@@ -8,6 +8,7 @@
 mod eval;
 mod fields;
 mod graph;
+mod integer_number_switch;
 mod ops;
 mod state;
 #[cfg(test)]

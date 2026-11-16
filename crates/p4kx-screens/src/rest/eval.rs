@@ -7,6 +7,7 @@ use p4kx_dataforge::Guid;
 
 use super::Rest;
 use super::graph::{Input, Node, Operations};
+use super::integer_number_switch::SwitchNumber;
 use super::state::{AtRest, key_of};
 use crate::report::ContentOmissionCode;
 use crate::variables::Variable;
@@ -253,6 +254,14 @@ impl Eval<'_> {
                 let branch = branches.get(at).copied().flatten();
                 let value = self.number_or(branch, constant, depth)?;
                 Ok(Rest::Num(whole_if(value, *whole)))
+            }
+            Node::NumberSwitch(switch) => {
+                let key = self.number(switch.input, depth)?;
+                let value = match switch.select(key)? {
+                    SwitchNumber::Constant(value) => value,
+                    SwitchNumber::Operation(input) => self.number(Some(input), depth)?,
+                };
+                Ok(Rest::Num(value))
             }
             Node::Same(input) => Ok(Rest::Num(self.number(*input, depth)?)),
             Node::Arith {
