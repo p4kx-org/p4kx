@@ -28,23 +28,23 @@ pub(super) enum PlacementDetail<'source> {
     },
 }
 
-pub(super) struct PlacementEvidence<'source> {
+pub(super) struct PlacementEvidence<'source, 'forge> {
     pub(super) rig: &'source EntityRig,
     pub(super) input: &'source MediaOriginInput,
-    loadout: &'source EntityLoadoutEvidence,
+    loadout: &'source EntityLoadoutEvidence<'forge>,
     pub(super) owner: OriginContributions,
 }
 
-impl<'source> PlacementEvidence<'source> {
+impl<'source, 'forge> PlacementEvidence<'source, 'forge> {
     pub(super) fn new(
         rig: &'source EntityRig,
         input: &'source MediaOriginInput,
-        loadout: &'source EntityLoadoutEvidence,
+        loadout: &'source EntityLoadoutEvidence<'forge>,
         writer: &MediaWriter<'_>,
     ) -> Result<Self, MediaError> {
         let owner = rig.attachment_target().map_or_else(
             || Ok(OriginContributions::independent(&writer.origins.owner)),
-            |target| loadout.class(target, writer),
+            |target| loadout.class(target, input, writer),
         )?;
         Ok(Self {
             rig,

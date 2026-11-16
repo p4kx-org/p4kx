@@ -732,7 +732,10 @@ authored Includes in the root Archive. A required dependency can fall outside
 must match one physical Entry in a complete directory inventory. A successful
 read verifies the declared decoded length and available CRC. Missing, ambiguous,
 excluded and unreadable targets have distinct errors. An unresolved required
-dependency prevents publication of a complete index.
+dependency prevents publication of a complete index. Placement origins retain the original
+DataForge `loadoutPath` selector for an observed XML root. Each selector identifies the
+physical Record and Value that the resolver used. The source set is incomplete when the full
+root, Include and class route cannot be established.
 
 An Entity scope also selects Mannequin ADBs from `animDatabase3P` on animated
 character components and `AnimationDatabase` on controller components of the

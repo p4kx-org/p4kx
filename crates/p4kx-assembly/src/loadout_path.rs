@@ -9,6 +9,7 @@ use std::sync::Arc;
 
 use p4kx_dataforge::{RecordTree, StructValue, Value};
 
+use crate::loadout_xml_record_selector::XmlRecordPaths;
 use crate::read;
 use crate::resolver_observation::Observation;
 use crate::{
@@ -213,6 +214,7 @@ pub trait LoadoutPathObserver {
 pub(crate) struct PathRead<'scope> {
     observer: Option<&'scope dyn LoadoutPathObserver>,
     observation: Option<&'scope Observation<'scope>>,
+    xml_record_paths: Option<&'scope XmlRecordPaths>,
     stopped: Cell<bool>,
 }
 
@@ -224,8 +226,17 @@ impl<'scope> PathRead<'scope> {
         Self {
             observer,
             observation,
+            xml_record_paths: None,
             stopped: Cell::new(false),
         }
+    }
+
+    pub(crate) const fn with_xml_record_paths(
+        mut self,
+        xml_record_paths: Option<&'scope XmlRecordPaths>,
+    ) -> Self {
+        self.xml_record_paths = xml_record_paths;
+        self
     }
 
     pub(crate) fn stopped(&self) -> bool {
@@ -245,7 +256,25 @@ impl<'scope> PathRead<'scope> {
         name: &str,
         operation: LoadoutPathOperation,
     ) -> LoadoutPath {
-        let value = parent.field(name);
+        self.field_value(parent, parent.field(name), operation, None)
+    }
+
+    pub(crate) fn xml_loadout(&self, parent: &StructValue<'_>) -> LoadoutPath {
+        self.field_value(
+            parent,
+            parent.field("loadoutPath"),
+            LoadoutPathOperation::Copy,
+            self.xml_record_paths,
+        )
+    }
+
+    fn field_value(
+        &self,
+        parent: &StructValue<'_>,
+        value: Option<&Value<'_>>,
+        operation: LoadoutPathOperation,
+        xml_record_paths: Option<&XmlRecordPaths>,
+    ) -> LoadoutPath {
         let raw = value.map_or("", read::value_text);
         let text = match operation {
             LoadoutPathOperation::Trim => raw.trim(),
@@ -257,24 +286,24 @@ impl<'scope> PathRead<'scope> {
                     .observation
                     .is_some_and(Observation::observes_port_names)
         });
-        let selection = match (observer, value) {
-            (Some(observer), Some(value))
-                if (!raw.is_empty()
-                    || operation == LoadoutPathOperation::PortName
-                        && matches!(
-                            value,
-                            Value::String(_) | Value::Locale(_) | Value::Enum(_)
-                        ))
-                    && !self.stopped() =>
+        let selection = value.and_then(|value| {
+            if (observer.is_none() && xml_record_paths.is_none())
+                || self.stopped()
+                || (raw.is_empty()
+                    && !(operation == LoadoutPathOperation::PortName
+                        && matches!(value, Value::String(_) | Value::Locale(_) | Value::Enum(_))))
             {
-                let selection = LoadoutSelection::new(operation);
-                if observer.record_path(&selection, parent, value).is_break() {
-                    self.stop();
-                }
-                Some(selection)
+                return None;
             }
-            _ => None,
-        };
+            let selection = LoadoutSelection::new(operation);
+            if observer
+                .is_some_and(|observer| observer.record_path(&selection, parent, value).is_break())
+                || xml_record_paths.is_some_and(|paths| paths.capture(value, &selection).is_break())
+            {
+                self.stop();
+            }
+            Some(selection)
+        });
         LoadoutPath {
             value: Arc::from(text),
             selection,

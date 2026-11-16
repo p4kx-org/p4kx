@@ -12,7 +12,7 @@ pub(crate) use crate::resolver_path_read::parse_spec;
 use crate::{
     Entities, LoadoutClassSelection, LoadoutError, LoadoutFileObservation, LoadoutPath,
     LoadoutPathObserver, LoadoutRequest, LoadoutResolver, LoadoutSelection, LoadoutTargetGuid,
-    VehicleImplementation, XmlLoadoutClassSite, XmlLoadoutPathSite,
+    LoadoutXmlRecordSelector, VehicleImplementation, XmlLoadoutClassSite, XmlLoadoutPathSite,
 };
 
 /// An actual source operation performed by a loadout resolver.
@@ -116,6 +116,20 @@ impl<'f> Observation<'f> {
 
     pub(crate) fn observes_port_names(&self) -> bool {
         self.observer.observes_port_names()
+    }
+
+    pub(crate) fn observes_xml_record_selectors(&self) -> bool {
+        self.observer.observes_xml_record_selectors()
+    }
+
+    pub(crate) fn xml_record_selector(
+        &self,
+        site: &LoadoutXmlRecordSelector<'_, '_>,
+    ) -> ControlFlow<()> {
+        if self.stopped() {
+            return ControlFlow::Break(());
+        }
+        self.observer.xml_record_selector(site)
     }
 
     pub(crate) fn observes_vehicle_visibility(&self) -> bool {

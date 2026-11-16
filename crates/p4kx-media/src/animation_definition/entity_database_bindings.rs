@@ -63,7 +63,7 @@ impl Bindings {
     pub(super) fn collect(
         forge: &DataForge<'_>,
         rigs: &[EntityRig],
-        loadout: &EntityLoadoutEvidence,
+        loadout: &EntityLoadoutEvidence<'_>,
         entry: &Entry,
         lookup: &DirectoryLookup<'_>,
         writer: &mut MediaWriter<'_>,
@@ -120,7 +120,7 @@ impl Binding {
     fn capture(
         selector: &Selector<'_>,
         input: &MediaOriginInput,
-        loadout: &EntityLoadoutEvidence,
+        loadout: &EntityLoadoutEvidence<'_>,
         writer: &MediaWriter<'_>,
     ) -> Result<Self, MediaError> {
         let coordinates = [u64::from(selector.record_index)];

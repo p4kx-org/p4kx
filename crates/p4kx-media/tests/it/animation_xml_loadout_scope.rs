@@ -15,7 +15,12 @@ use serde_json::{Value, json};
 
 use super::support::{self, TestResult};
 
+#[path = "animation_xml_loadout_root_proof.rs"]
+mod root_proof;
+
 const ENTITY: &str = "FixtureXmlRoot";
+const DATAFORGE: &str = "Data/Game2.dcb";
+const LOADOUT_PATH: &str = r"Scripts\Loadouts\scoperoot.xml";
 const ROOT: &str = "Data/Scripts/Loadouts/ScopeRoot.xml";
 const PARTS: &str = "Data/Scripts/Loadouts/ScopeParts.xml";
 const PARAMETERS: &str = "Data/Objects/xml-child.chrparams";
@@ -153,6 +158,7 @@ fn verify_definitions(archive: &Archive, rows: &[MediaRecord]) -> TestResult {
 
 fn verify_port_origins(archive: &Archive, rows: &[MediaRecord], base: &Path) -> TestResult {
     let sources = json_rows(base, "origin-sources.jsonl")?;
+    let root_proof = root_proof::RootProof::new(archive, &sources)?;
     let uses = json_rows(base, "origin-uses.jsonl")?;
     let fields = json_rows(base, "field-origins.jsonl")?;
     let included_index = entry_index(archive, PARTS)?;
@@ -172,7 +178,7 @@ fn verify_port_origins(archive: &Archive, rows: &[MediaRecord], base: &Path) -> 
             _ => continue,
         };
         let origin = field_origin(&fields, ordinal, "/data/payload/placement_detail/port_path")?;
-        verify_class_origins(&fields, &uses, ordinal, node)?;
+        verify_class_origins(&fields, &uses, ordinal, node, &root_proof)?;
         assert_eq!(
             origin["containsEncryptedSource"], true,
             "encrypted port name"
@@ -211,12 +217,14 @@ fn verify_class_origins(
     uses: &[Value],
     ordinal: usize,
     node: &str,
+    root_proof: &root_proof::RootProof<'_>,
 ) -> TestResult {
     for field in [
         "/data/payload/owner_record_index",
         "/data/payload/outcome/entry_index",
     ] {
         let origin = field_origin(fields, ordinal, field)?;
+        root_proof.verify(origin, uses)?;
         assert_eq!(
             origin.get("containsEncryptedSource"),
             Some(&json!(true)),
@@ -321,7 +329,7 @@ enum IncludedXml {
 
 fn fixture(root: &Path, included: IncludedXml) -> Result<Archive, Box<dyn Error>> {
     let mut archive = ArchiveBuilder::new()
-        .entry(TestEntry::stored("Data/Game2.dcb", dataforge()))
+        .entry(TestEntry::stored(DATAFORGE, dataforge()))
         .entry(TestEntry::stored(
             ROOT,
             br#"<Loadout><Loadouts><Loadout loadout="Scripts/Loadouts/sCoPePaRtS.xml"/></Loadouts></Loadout>"#,
@@ -365,7 +373,8 @@ fn fixture(root: &Path, included: IncludedXml) -> Result<Archive, Box<dyn Error>
 
 fn dataforge() -> Vec<u8> {
     let root = TestEntity::new(1, ENTITY, "entities/xml_root.xml")
-        .loadout(TestLoadout::Xml(r"Scripts\Loadouts\scoperoot.xml".into()));
+        .loadout(TestLoadout::Xml(LOADOUT_PATH.into()))
+        .component(root_proof::duplicate_component());
     let child = TestEntity::new(2, "FixtureXmlChild", "entities/xml_child.xml")
         .geometry("Objects/xml-child.chr", None);
     entity_schema(DataForgeBuilder::new())

@@ -134,6 +134,7 @@ mod loadout_path;
 mod loadout_record_text;
 mod loadout_request;
 mod loadout_xml;
+mod loadout_xml_record_selector;
 mod loadout_xml_use;
 mod manual_loadout;
 mod markup;
@@ -259,6 +260,7 @@ pub use loadout_path::{LoadoutPath, LoadoutPathObserver, LoadoutPathOperation, L
 pub use loadout_record_text::LoadoutRecordText;
 pub use loadout_request::LoadoutRequest;
 pub use loadout_xml::{LoadoutXmlDecoding, XmlLoadoutPathSite};
+pub use loadout_xml_record_selector::LoadoutXmlRecordSelector;
 pub use loadout_xml_use::LoadoutXmlClassUse;
 pub use material_variant::MaterialVariant;
 pub use merge::port_key;

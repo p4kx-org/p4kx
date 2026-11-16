@@ -100,16 +100,16 @@ fn project(
     )
 }
 
-pub(crate) fn with_resolved_entity<T>(
+pub(crate) fn with_resolved_entity<'forge, T>(
     selector: &str,
-    forge: &DataForge<'_>,
+    forge: &'forge DataForge<'forge>,
     lookup: &DirectoryLookup<'_>,
     scoped: bool,
     writer: &mut MediaWriter<'_>,
     consume: impl FnOnce(
-        &Record<'_>,
+        &Record<'forge>,
         &EntityNode,
-        &EntityLoadoutEvidence,
+        &EntityLoadoutEvidence<'forge>,
         &mut MediaWriter<'_>,
     ) -> Result<T, MediaError>,
 ) -> Result<T, MediaError> {
@@ -117,7 +117,7 @@ pub(crate) fn with_resolved_entity<T>(
     let cancel = writer.checkpoint.cancel.clone();
     let stop = || cancel.is_cancelled();
     writer.checkpoint()?;
-    let evidence = Arc::new(EntityLoadoutEvidence::default());
+    let evidence = Arc::new(EntityLoadoutEvidence::new(forge));
     let (owner_index, tree) = {
         let files = scoped
             .then(|| EntityLoadoutFiles::new(lookup, writer))

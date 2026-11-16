@@ -7,12 +7,13 @@ use p4kx_dataforge::{Record, RecordTree};
 
 use crate::LoadoutError;
 use crate::loadout_path::PathRead;
+use crate::loadout_xml_record_selector::XmlRecordPaths;
 use crate::resolver_observation::Observation;
 use crate::spec::EntitySpec;
 
-pub(crate) fn parse_spec(
-    record: &Record<'_>,
-    tree: &RecordTree<'_>,
+pub(crate) fn parse_spec<'source>(
+    record: &Record<'source>,
+    tree: &RecordTree<'source>,
     observation: Option<&Observation<'_>>,
 ) -> Result<EntitySpec, LoadoutError> {
     with_record_paths(record, tree, observation, |paths| {
@@ -20,15 +21,17 @@ pub(crate) fn parse_spec(
     })
 }
 
-pub(crate) fn with_record_paths<T>(
-    record: &Record<'_>,
-    tree: &RecordTree<'_>,
+pub(crate) fn with_record_paths<'source, T>(
+    record: &Record<'source>,
+    tree: &RecordTree<'source>,
     observation: Option<&Observation<'_>>,
     mut read: impl FnMut(&PathRead<'_>) -> T,
 ) -> Result<T, LoadoutError> {
     let Some(observation) = observation else {
         return Ok(read(&PathRead::new(None, None)));
     };
+    let xml_record_paths = (observation.observes_xml_record_selectors() && tree.is_from(record))
+        .then(XmlRecordPaths::default);
     let mut called = false;
     let mut repeated = false;
     let mut result = None;
@@ -38,7 +41,8 @@ pub(crate) fn with_record_paths<T>(
             return ControlFlow::Break(());
         }
         called = true;
-        let paths = PathRead::new(observer, Some(observation));
+        let paths = PathRead::new(observer, Some(observation))
+            .with_xml_record_paths(xml_record_paths.as_ref());
         let value = read(&paths);
         if paths.stopped() {
             return ControlFlow::Break(());
@@ -50,13 +54,16 @@ pub(crate) fn with_record_paths<T>(
         observation.stop();
         return Err(LoadoutError::ObservationStopped);
     }
-    result.map_or_else(
-        || {
-            observation.stop();
-            Err(LoadoutError::ObservationStopped)
-        },
-        Ok,
-    )
+    let Some(result) = result else {
+        observation.stop();
+        return Err(LoadoutError::ObservationStopped);
+    };
+    if let Some(paths) = xml_record_paths
+        && paths.finish(record, tree, observation).is_break()
+    {
+        return Err(LoadoutError::ObservationStopped);
+    }
+    Ok(result)
 }
 #[cfg(test)]
 #[path = "resolver_path_read_tests.rs"]

@@ -146,7 +146,7 @@ pub(super) fn entity(
     lookup: &DirectoryLookup<'_>,
     entry: &Entry,
     rigs: &[EntityRig],
-    loadout: &EntityLoadoutEvidence,
+    loadout: &EntityLoadoutEvidence<'_>,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
     let mut scope = Scope::new(lookup, entry, writer)?;
@@ -286,7 +286,7 @@ impl<'a, 'directory> Scope<'a, 'directory> {
         &self,
         ordinal: u64,
         placement: ScopePlacement,
-        evidence: Option<PlacementEvidence<'_>>,
+        evidence: Option<PlacementEvidence<'_, '_>>,
         outcome: ScopeOutcome,
         proof: OriginContributions,
         writer: &mut MediaWriter<'_>,

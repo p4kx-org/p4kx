@@ -8,7 +8,7 @@ use p4kx_dataforge::{Record, RecordTree};
 use super::LoadoutReadEvent;
 use crate::{
     LoadoutClassSelection, LoadoutPath, LoadoutPathObserver, LoadoutRequest, LoadoutSelection,
-    VehicleImplementation, XmlLoadoutClassSite, XmlLoadoutPathSite,
+    LoadoutXmlRecordSelector, VehicleImplementation, XmlLoadoutClassSite, XmlLoadoutPathSite,
 };
 
 /// Observes actual resolver source operations, including concurrent prefetch reads.
@@ -19,6 +19,16 @@ pub trait LoadoutReadObserver: Send + Sync {
     /// Enables original port-name selections in the resolver's read callbacks.
     fn observes_port_names(&self) -> bool {
         false
+    }
+
+    /// Enables exact DataForge selectors that supply an XML Loadout.
+    fn observes_xml_record_selectors(&self) -> bool {
+        false
+    }
+
+    /// Captures the original DataForge datum accepted by the XML Loadout path getter.
+    fn xml_record_selector(&self, _site: &LoadoutXmlRecordSelector<'_, '_>) -> ControlFlow<()> {
+        ControlFlow::Continue(())
     }
 
     /// Enables exact XML evidence for effective vehicle visibility fields.

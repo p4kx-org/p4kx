@@ -7,17 +7,18 @@ use std::sync::Mutex;
 
 use p4kx_assembly::{
     LoadoutClassSelection, LoadoutFileObservation, LoadoutPath, LoadoutReadEvent,
-    LoadoutReadObserver, LoadoutSelection, LoadoutXmlDecoding, XmlLoadoutClassSite,
-    XmlLoadoutPathSite,
+    LoadoutReadObserver, LoadoutSelection, LoadoutTargetGuid, LoadoutXmlDecoding,
+    LoadoutXmlRecordSelector, XmlLoadoutClassSite, XmlLoadoutPathSite,
 };
-use p4kx_extraction::{EntryOrigin, InputScope, SourceUseRole};
+use p4kx_extraction::{DataForge, EntryOrigin, InputScope, SourceUseRole};
 
 use crate::origin_capture::{OriginCapture, OriginSite};
 use crate::origin_contributions::OriginContributions;
+use crate::origin_input::MediaOriginInput;
 use crate::{MediaError, MediaWriter, origin_error};
 
-#[derive(Default)]
-pub(crate) struct EntityLoadoutEvidence {
+pub(crate) struct EntityLoadoutEvidence<'forge> {
+    forge: &'forge DataForge<'forge>,
     sites: Mutex<Sites>,
 }
 
@@ -25,6 +26,7 @@ pub(crate) struct EntityLoadoutEvidence {
 struct Sites {
     paths: HashMap<LoadoutSelection, Site>,
     classes: HashMap<LoadoutClassSelection, Site>,
+    xml_roots: HashMap<LoadoutSelection, [u64; 2]>,
 }
 
 struct Site {
@@ -73,7 +75,14 @@ impl Site {
     }
 }
 
-impl EntityLoadoutEvidence {
+impl<'forge> EntityLoadoutEvidence<'forge> {
+    pub(crate) fn new(forge: &'forge DataForge<'forge>) -> Self {
+        Self {
+            forge,
+            sites: Mutex::default(),
+        }
+    }
+
     pub(crate) fn path(
         &self,
         path: &LoadoutPath,
@@ -92,7 +101,8 @@ impl EntityLoadoutEvidence {
 
     pub(crate) fn class(
         &self,
-        target: &p4kx_assembly::LoadoutTargetGuid,
+        target: &LoadoutTargetGuid,
+        input: &MediaOriginInput,
         writer: &MediaWriter<'_>,
     ) -> Result<OriginContributions, MediaError> {
         let mut capture = writer.capture_origins();
@@ -100,6 +110,22 @@ impl EntityLoadoutEvidence {
             return Ok(capture.finish());
         };
         let sites = self.sites.lock().map_err(|_| origin_error::foreign())?;
+        let root = route.original_root();
+        if root.read_outcome().is_ok()
+            && root.source().entry_origin().is_some()
+            && let Some(indices) = route
+                .caller()
+                .selection()
+                .and_then(|selection| sites.xml_roots.get(selection))
+        {
+            capture.add(
+                input,
+                InputScope::Payload,
+                OriginSite::new("dataforgeValue", indices, "$value"),
+                SourceUseRole::Selector,
+                writer,
+            )?;
+        }
         let class = target
             .class_selection()
             .and_then(|selection| sites.classes.get(selection));
@@ -116,13 +142,34 @@ impl EntityLoadoutEvidence {
     }
 }
 
-impl LoadoutReadObserver for EntityLoadoutEvidence {
+impl LoadoutReadObserver for EntityLoadoutEvidence<'_> {
     fn observe(&self, _event: LoadoutReadEvent<'_, '_>) -> ControlFlow<()> {
         ControlFlow::Continue(())
     }
 
     fn observes_port_names(&self) -> bool {
         true
+    }
+
+    fn observes_xml_record_selectors(&self) -> bool {
+        true
+    }
+
+    fn xml_record_selector(&self, site: &LoadoutXmlRecordSelector<'_, '_>) -> ControlFlow<()> {
+        if !site.record().is_from(self.forge) {
+            return ControlFlow::Continue(());
+        }
+        let Ok(mut sites) = self.sites.lock() else {
+            return ControlFlow::Break(());
+        };
+        if sites.xml_roots.try_reserve(1).is_err() {
+            return ControlFlow::Break(());
+        }
+        sites.xml_roots.insert(
+            site.selection().clone(),
+            [u64::from(site.record().index()), site.ordinal() as u64],
+        );
+        ControlFlow::Continue(())
     }
 
     fn xml_path(

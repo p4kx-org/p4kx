@@ -24,7 +24,7 @@ pub(crate) fn read_loadout(
     paths: &PathRead<'_>,
 ) -> Option<LoadoutSpec> {
     if loadout.type_name() == XML_LOADOUT {
-        let path = paths.field(loadout, "loadoutPath", LoadoutPathOperation::Copy);
+        let path = paths.xml_loadout(loadout);
         return (!path.is_empty()).then_some(LoadoutSpec::Xml(path));
     }
     if loadout.type_name() == OUTFIT_LOADOUT {
