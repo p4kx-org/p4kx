@@ -44,6 +44,7 @@ pub(crate) struct SourceRegistry {
     pub(crate) sources: BTreeMap<PhysicalSourceRef, Arc<PhysicalSource>>,
     pub(crate) uses: BTreeMap<SourceUseRef, Arc<SourceUseDescription>>,
     use_references: UseReferences,
+    sealed: bool,
 }
 
 enum UseReferences {
@@ -107,7 +108,18 @@ impl SourceRegistry {
             sources: BTreeMap::new(),
             uses: BTreeMap::new(),
             use_references,
+            sealed: false,
         }
+    }
+
+    pub(crate) const fn is_sealed(&self) -> bool {
+        self.sealed
+    }
+
+    pub(crate) fn seal(&mut self) {
+        self.sealed = true;
+        self.inputs = Vec::new();
+        self.use_references = UseReferences::Full;
     }
 
     pub(crate) fn with_compact_use_refs(identity: Arc<()>) -> Self {

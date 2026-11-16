@@ -160,5 +160,7 @@ pub(super) fn freeze_provenance(
     run: CatalogRun<'_, '_>,
 ) -> Result<CatalogProvenance, crate::CatalogError> {
     run.begin(CatalogStage::Provenance);
-    Ok(CatalogProvenance::new(uses.freeze()?))
+    Ok(CatalogProvenance::new(
+        uses.finish_with(|| run.check_cancelled())?,
+    ))
 }

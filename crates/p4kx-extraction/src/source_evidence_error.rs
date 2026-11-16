@@ -5,6 +5,8 @@ use std::sync::{Mutex, MutexGuard};
 
 use thiserror::Error;
 
+use crate::source_registry::SourceRegistry;
+
 /// A physical-source evidence registry cannot be used reliably.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
 #[non_exhaustive]
@@ -18,10 +20,19 @@ pub enum SourceEvidenceError {
     /// An owner unwound while mutating the protected evidence.
     #[error("source evidence was interrupted during mutation")]
     PoisonedEvidence,
+    /// The registry has finished and released its indexing state.
+    #[error("source evidence registry is sealed")]
+    SealedInventory,
 }
 
-pub(crate) fn lock<T>(state: &Mutex<T>) -> Result<MutexGuard<'_, T>, SourceEvidenceError> {
-    state
+pub(crate) fn lock(
+    state: &Mutex<SourceRegistry>,
+) -> Result<MutexGuard<'_, SourceRegistry>, SourceEvidenceError> {
+    let registry = state
         .lock()
-        .map_err(|_| SourceEvidenceError::PoisonedEvidence)
+        .map_err(|_| SourceEvidenceError::PoisonedEvidence)?;
+    if registry.is_sealed() {
+        return Err(SourceEvidenceError::SealedInventory);
+    }
+    Ok(registry)
 }
