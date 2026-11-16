@@ -13,6 +13,8 @@ use super::TestResult;
 
 #[path = "entity_loadout_attachment_origin_tests.rs"]
 mod attachments;
+#[path = "entity_loadout_definition_origin_tests.rs"]
+mod definitions;
 
 const BASE_PATH: &str = "Data\\Loadouts\\Base.xml";
 const LOCAL_PATH: &str = "Data\\Loadouts\\Root.xml";

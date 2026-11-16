@@ -11,7 +11,10 @@ use p4kx_dataforge::{RecordTree, StructValue, Value};
 
 use crate::read;
 use crate::resolver_observation::Observation;
-use crate::{LoadoutClassName, LoadoutClassSelection, LoadoutError, LoadoutReferenceSelection};
+use crate::{
+    LoadoutClassName, LoadoutClassSelection, LoadoutError, LoadoutReferenceSelection,
+    PortDefinition,
+};
 
 /// A text operation supplying a file request or its selection.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -194,6 +197,15 @@ pub trait LoadoutPathObserver {
         ControlFlow::Continue(())
     }
 
+    /// Captures the resolved definition and its original struct during the same Record read.
+    fn record_port_definition(
+        &self,
+        _definition: &PortDefinition,
+        _original: &StructValue<'_>,
+    ) -> ControlFlow<()> {
+        ControlFlow::Continue(())
+    }
+
     /// Captures the actual Record name before its vehicle class fallback is copied.
     fn record_name(&self, selection: &LoadoutSelection, tree: &RecordTree<'_>) -> ControlFlow<()>;
 }
@@ -312,6 +324,17 @@ impl<'scope> PathRead<'scope> {
             self.stop();
         }
         Some(selection)
+    }
+
+    pub(crate) fn port_definition(&self, definition: &PortDefinition, original: &StructValue<'_>) {
+        if !self.stopped()
+            && let Some(observer) = self.observer
+            && observer
+                .record_port_definition(definition, original)
+                .is_break()
+        {
+            self.stop();
+        }
     }
 
     pub(crate) fn record_name(&self, tree: &RecordTree<'_>) -> Option<LoadoutPath> {

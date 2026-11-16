@@ -2,22 +2,30 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::ops::ControlFlow;
 use std::ptr;
 
 use p4kx_assembly::{
     LoadoutClassSelection, LoadoutPathObserver, LoadoutPathOperation, LoadoutReferenceSelection,
-    LoadoutSelection,
+    LoadoutSelection, PortDefinition,
 };
 use p4kx_extraction::{
     DataForge, DataType, Guid, Record, RecordJsonLocation, RecordTree, SourceLocation, StructValue,
     Value, ValueError,
 };
 
+use super::definition_sites::{Definition, DefinitionKey, PendingDefinition, Site};
+
 pub(super) struct RecordPaths<'forge> {
     forge: &'forge DataForge<'forge>,
     selections: RefCell<HashMap<usize, Vec<Pending>>>,
+    definitions: RefCell<Vec<PendingDefinition>>,
+}
+
+pub(super) struct CapturedRecord {
+    pub(super) selections: Vec<(Selection, RecordSite)>,
+    pub(super) definitions: Vec<(DefinitionKey, Definition)>,
 }
 
 pub(super) enum Selection {
@@ -47,34 +55,56 @@ impl<'forge> RecordPaths<'forge> {
         Self {
             forge,
             selections: RefCell::new(HashMap::new()),
+            definitions: RefCell::new(Vec::new()),
         }
     }
 
-    pub(super) fn positions(
-        self,
-        record: &Record<'_>,
-        tree: &RecordTree<'_>,
-    ) -> Vec<(Selection, RecordSite)> {
+    pub(super) fn positions(self, record: &Record<'_>, tree: &RecordTree<'_>) -> CapturedRecord {
         let mut pending = self.selections.into_inner();
-        let mut selected = Vec::new();
-        if !pending.is_empty() {
+        let definitions = self.definitions.into_inner();
+        let mut requested: HashSet<_> = definitions
+            .iter()
+            .flat_map(PendingDefinition::sites)
+            .collect();
+        let mut definition_sites = HashMap::new();
+        let mut selections = Vec::new();
+        if !pending.is_empty() || !requested.is_empty() {
             tree.root().visit_owned_values(|visit| {
-                let address = ptr::from_ref(visit.value()).addr();
+                let value = visit.value();
+                let ordinal = visit.ordinal() as u64;
+                let address = ptr::from_ref(value).addr();
                 if let Some(sites) = pending.remove(&address) {
-                    selected.extend(sites.into_iter().map(|site| {
+                    selections.extend(sites.into_iter().map(|site| {
                         (
                             site.selection,
                             RecordSite {
                                 record: record.index(),
-                                ordinal: visit.ordinal() as u64,
+                                ordinal,
                                 datum: site.datum,
                             },
                         )
                     }));
                 }
+                let site = Site::value(value);
+                if requested.remove(&site) {
+                    definition_sites.insert(site, ordinal);
+                }
+                if let Value::Struct(structure) = value {
+                    let site = Site::structure(structure);
+                    if requested.remove(&site) {
+                        definition_sites.insert(site, ordinal);
+                    }
+                }
             });
         }
-        selected
+        let definitions = definitions
+            .into_iter()
+            .map(|definition| definition.bind(&definition_sites))
+            .collect();
+        CapturedRecord {
+            selections,
+            definitions,
+        }
     }
 
     fn capture_text(&self, selection: Selection, parent: &StructValue<'_>, value: &Value<'_>) {
@@ -155,6 +185,17 @@ impl LoadoutPathObserver for RecordPaths<'_> {
                 stored: field.storage().data_type() == DataType::Reference,
             },
         );
+        ControlFlow::Continue(())
+    }
+
+    fn record_port_definition(
+        &self,
+        definition: &PortDefinition,
+        original: &StructValue<'_>,
+    ) -> ControlFlow<()> {
+        self.definitions
+            .borrow_mut()
+            .push(PendingDefinition::read(self.forge, definition, original));
         ControlFlow::Continue(())
     }
 

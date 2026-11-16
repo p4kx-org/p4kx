@@ -14,6 +14,7 @@ use p4kx_extraction::{
 };
 
 use super::Output;
+use super::definition_sites::{Definition, DefinitionKey};
 use super::record_origins::{Datum, RecordSite, Selection};
 
 #[derive(Default)]
@@ -22,6 +23,7 @@ pub(super) struct Facts {
     pub(super) classes: HashMap<LoadoutClassSelection, Authored>,
     pub(super) references: HashMap<LoadoutReferenceSelection, RecordSite>,
     pub(super) class_records: HashMap<LoadoutClassSelection, Option<u32>>,
+    pub(super) definitions: HashMap<DefinitionKey, Definition>,
 }
 
 impl Facts {

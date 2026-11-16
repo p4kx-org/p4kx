@@ -264,17 +264,19 @@ fn read_ports(tree: &RecordTree<'_>, paths: &PathRead<'_>) -> (Vec<PortSpec>, Ve
         .flat_map(|(component_index, component)| {
             indexed_struct_items(component, "Ports").map(move |(port_index, port)| {
                 let name_proof = paths.field(port, "Name", LoadoutPathOperation::PortName);
+                let definition = read_definition(
+                    port,
+                    PortDefinitionPosition {
+                        record: record_index,
+                        component: component_index,
+                        port: port_index,
+                    },
+                );
+                paths.port_definition(&definition, port);
                 PortSpec {
                     name: name_proof.value().to_owned(),
                     name_proof,
-                    definition: Arc::new(read_definition(
-                        port,
-                        PortDefinitionPosition {
-                            record: record_index,
-                            component: component_index,
-                            port: port_index,
-                        },
-                    )),
+                    definition: Arc::new(definition),
                     default_item: struct_field(port, "defaultItem")
                         .and_then(|item| {
                             item.field("entityClass")

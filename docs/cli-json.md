@@ -195,6 +195,12 @@ known inputs and remain incomplete when the failed lookup evidence is unavailabl
 at the port's `source` field. The same selectors supply the exclusion's empty attachment or the
 replacement's Entity identity.
 
+A port's DataForge `definition` carries the original declaration selected by the resolver. Its
+members retain the original type and subtype occurrences, attachment helpers and individual
+position and rotation coordinates. A visibility result supplied by DataForge carries the original
+`Flags` conversion. A visibility decision that needs original vehicle XML proof is marked
+incomplete. A missing definition without the original lookup evidence is also marked incomplete.
+
 An Entity whose default Loadout is an outfit (an NPC actor, `SItemPortLoadoutOutfitParams`) also
 has `outfit`: `{"base_files": ["…"], "outfits": [{"tags": ["Outfits.S42.Work"], "files": ["…"],
 "applied": true}, …]}`, the XML Loadouts of the base Loadout and, per outfit in the Record's order,

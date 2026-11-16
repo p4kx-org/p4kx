@@ -24,10 +24,15 @@ use crate::json;
 mod attachment_origins;
 #[path = "entity_loadout_bound_origins.rs"]
 mod bound_origins;
+#[path = "entity_loadout_definition_origins.rs"]
+mod definition_origins;
+#[path = "entity_loadout_definition_sites.rs"]
+mod definition_sites;
 #[path = "entity_loadout_record_origins.rs"]
 mod record_origins;
 
 use bound_origins::{Authored, Facts, Xml};
+use definition_origins::VisibilityOwner;
 use record_origins::RecordPaths;
 
 pub(super) struct Capture<'forge> {
@@ -104,14 +109,15 @@ impl LoadoutReadObserver for Capture<'_> {
         }
         let sources = RecordPaths::new(self.forge);
         parse(Some(&sources))?;
-        let sites = sources.positions(record, tree);
-        if !sites.is_empty() {
+        let captured = sources.positions(record, tree);
+        if !captured.selections.is_empty() || !captured.definitions.is_empty() {
             let Ok(mut facts) = self.facts.lock() else {
                 return ControlFlow::Break(());
             };
-            for (selection, source) in sites {
+            for (selection, source) in captured.selections {
                 facts.retain(selection, source);
             }
+            facts.definitions.extend(captured.definitions);
         }
         ControlFlow::Continue(())
     }
@@ -227,7 +233,12 @@ impl Output<'_, '_> {
             .and_then(|index| self.forge.record(index))
             .filter(|record| record.guid() == entity.guid());
         self.identity(record, address, incoming)?;
-        self.ports(entity.ports(), &format!("{address}/ports"), ancestors)
+        self.ports(
+            entity.ports(),
+            &format!("{address}/ports"),
+            ancestors,
+            VisibilityOwner::of(entity),
+        )
     }
 
     fn identity(
@@ -257,6 +268,7 @@ impl Output<'_, '_> {
         ports: &'node [PortNode],
         collection: &str,
         ancestors: &mut Vec<&'node PortNode>,
+        visibility: VisibilityOwner<'node>,
     ) -> Result<()> {
         for (ordinal, port) in ports.iter().enumerate() {
             let address = format!("{collection}/{ordinal}");
@@ -265,9 +277,15 @@ impl Output<'_, '_> {
                 SourceUseRole::Payload,
             )?;
             self.put(&format!("{address}/name"), name)?;
+            self.definition(port, &address, visibility)?;
             ancestors.push(port);
             let configured = self.configured_port(ancestors, &address)?;
-            self.ports(port.nested(), &format!("{address}/nested"), ancestors)?;
+            self.ports(
+                port.nested(),
+                &format!("{address}/nested"),
+                ancestors,
+                VisibilityOwner::DataForge,
+            )?;
             match port.attachment() {
                 Attachment::Entity(child) => {
                     let incoming = self.attached(child, configured)?;
