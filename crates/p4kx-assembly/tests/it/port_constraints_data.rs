@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! whether the item keeps its own orientation.
+//! Port constraints and static attachment transforms.
 
 use std::error::Error;
 
-use p4kx_assembly::{EntityNode, LoadoutResolver, Placement, PortDefinition};
+use p4kx_assembly::{Assembly, EntityNode, LoadoutResolver, Placement, PortDefinition};
 use p4kx_dataforge::DataForge;
 use p4kx_extraction::Archive;
+use p4kx_gltf::GlbOptions;
 use p4kx_testkit::{
     DataForgeBuilder, TestEntity, TestEntry, TestModel, TestNode, TestPort, entity_schema,
 };
@@ -94,18 +95,7 @@ fn a_static_attachment_with_no_rotation_takes_the_rotated_port_node() -> TestRes
         .record(relay.record())
         .record(fuse.record())
         .build();
-    let relay_model = TestModel::cube()
-        .with_nodes(vec![TestNode {
-            name: "slot".into(),
-            parent: None,
-            local: [
-                [0.0, -1.0, 0.0, 2.0],
-                [1.0, 0.0, 0.0, 3.0],
-                [0.0, 0.0, 1.0, 4.0],
-            ],
-            kind: 2,
-        }])
-        .helpers_only();
+    let relay_model = relay_with_rotated_socket();
     let fixture = fixture(vec![
         TestEntry::stored("Data/Game2.dcb", forge),
         TestEntry::stored("Data/objects/test/relay.cgf", relay_model.cgf()),
@@ -125,11 +115,81 @@ fn a_static_attachment_with_no_rotation_takes_the_rotated_port_node() -> TestRes
     assert_eq!(
         attached.world().rows,
         [
-            [0.0, -1.0, 0.0, 2.0],
-            [1.0, 0.0, 0.0, 3.0],
-            [0.0, 0.0, 1.0, 4.0],
+            [0.0, -1.0, 0.0, 9.0],
+            [0.0, 0.0, -1.0, 7.0],
+            [1.0, 0.0, 0.0, 16.0],
         ],
-        "the static fuse takes the complete authored slot transform"
+        "the static fuse composes the frame's X rotation with the socket's Z rotation and offset"
+    );
+    verify_glb_socket(&assembly)
+}
+
+fn relay_with_rotated_socket() -> TestModel {
+    TestModel::cube()
+        .with_nodes(vec![
+            TestNode {
+                name: "socket frame".into(),
+                parent: None,
+                local: [
+                    [1.0, 0.0, 0.0, 7.0],
+                    [0.0, 0.0, -1.0, 11.0],
+                    [0.0, 1.0, 0.0, 13.0],
+                ],
+                kind: 2,
+            },
+            TestNode {
+                name: "slot".into(),
+                parent: Some(0),
+                local: [
+                    [0.0, -1.0, 0.0, 2.0],
+                    [1.0, 0.0, 0.0, 3.0],
+                    [0.0, 0.0, 1.0, 4.0],
+                ],
+                kind: 2,
+            },
+        ])
+        .helpers_only()
+}
+
+fn verify_glb_socket(assembly: &Assembly) -> TestResult {
+    let mut bytes = Vec::new();
+    assembly.write_glb(&GlbOptions::default(), &mut bytes)?;
+    let glb = p4kx_testkit::check_glb(&bytes)?;
+    let relay = glb
+        .document
+        .nodes()
+        .find(|node| node.name() == Some("TEST_Relay"))
+        .ok_or("static GLB relay node")?;
+    let fuse = relay
+        .children()
+        .find(|node| node.name() == Some("slot/TEST_Fuse"))
+        .ok_or("GLB fuse attached to its relay")?;
+    let model_root = fuse
+        .children()
+        .find(|node| node.name() == Some("cube"))
+        .ok_or("the authored fuse model root is below its attachment")?;
+    assert!(
+        model_root
+            .children()
+            .any(|node| node.name() == Some("cube_mesh") && node.mesh().is_some()),
+        "the attached model retains its drawable geometry"
+    );
+
+    // glTF columns are the original Z-up basis and translation expressed in Y-up axes.
+    let expected = [
+        [0.0, 1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0, 0.0],
+        [1.0, 0.0, 0.0, 0.0],
+        [9.0, 16.0, -7.0, 1.0],
+    ];
+    let matrix = fuse.transform().matrix();
+    assert!(
+        matrix
+            .into_iter()
+            .flatten()
+            .zip(expected.into_iter().flatten())
+            .all(|(actual, wanted)| (actual - wanted).abs() < 1e-5),
+        "the full socket transform reaches GLB: {matrix:?}"
     );
     Ok(())
 }
