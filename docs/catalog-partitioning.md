@@ -185,9 +185,11 @@ P4KX 0.5.0 release acceptance requires a complete unfiltered LIVE Catalog and
 a complete unfiltered current PTU Catalog on a system with 16 GiB of total
 physical or assigned RAM. The operating system, desktop, background services
 and every other running process share that RAM with P4KX. Use the normal
-packaged command and ordinary OS paging settings. Each result
-must retain every field, language, cross-domain reference and source marker
-of the complete v3 document.
+packaged command and ordinary OS paging settings. Keep the usual desktop
+and background workload active throughout each run and record those
+conditions with the baseline. Each result must retain every field,
+language, cross-domain reference and source marker of the complete v3
+document.
 
 Record total system RAM, OS, CPU and the running system's baseline memory
 before launch. Measure the producer's peak working set and private bytes,
