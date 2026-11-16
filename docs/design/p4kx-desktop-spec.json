@@ -719,6 +719,7 @@
   },
   "dataForgeSummary": {
     "decision": "D.27",
+    "originTooltips": "the existing tooltip shows original encryption provenance for each header fact and Record cell",
     "focusRingOffset": -2,
     "keyboard": "Tab focuses the summary of the DataForge tab (name DataForge summary); up and down arrows, Page Up, Page Down, Home and End scroll"
   },

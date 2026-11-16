@@ -19,6 +19,7 @@ mod checks;
 mod comparison;
 mod containers;
 mod content_search;
+mod dataforge_summary_provenance;
 mod dialog;
 #[cfg(test)]
 mod discovery_test_support;
@@ -103,6 +104,9 @@ pub use containers::{
     ContainerFailure, ContainerId, ContainerStatus, OPEN_CONTAINERS_BUDGET, Place,
 };
 pub use content_search::{ContentResult, ContentSearchStatus, ContentSearchTab};
+pub use dataforge_summary_provenance::{
+    DataForgeSummaryProvenance, DataForgeSummaryRecordProvenance,
+};
 pub use entities::{AssemblyView, VIEW_LOD, ViewFailure, ViewProgress, ViewStage};
 pub use entities::{
     EntitiesStatus, EntitiesTab, EntityFilter, EntityList, EntityRole, EntityRow, LoadoutRow,

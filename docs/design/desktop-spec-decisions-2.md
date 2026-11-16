@@ -49,7 +49,9 @@ ihren Teilen; ein Teil in einem anderen Ordner als sein Kopf gehört zur Ansicht
 ADR-0023). Keine
 neuen Maße (`tableRow.textureGroup` im JSON der Spec nennt die benutzten).
 
-**D.27 Scrollflächen der Vorschau und des Vergleichs rollen mit der Tastatur.** egui rollt eine
+**D.27 Scrollflächen der Vorschau und des Vergleichs rollen mit der Tastatur.** In der
+DataForge-Zusammenfassung zeigt der vorhandene Tooltip die Verschlüsselungsherkunft je Header-Wert
+und Tabellenzelle. egui rollt eine
 `ScrollArea` nur mit Maus und Rad; ohne Tastenbehandlung käme ein Tastaturnutzer über die erste
 Bildschirmseite nicht hinaus. Deshalb ist jede lange Fläche eine fokussierbare Rollfläche
 (`widgets::scroll_region`), wie die Zeilenansicht des XML (D.19): die Tabulatortaste erreicht sie,

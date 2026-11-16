@@ -8,7 +8,9 @@ use egui::{
     WidgetInfo, pos2, vec2,
 };
 use fluent_bundle::FluentValue;
+use p4kx_extraction::{DataForgeHeaderField, FieldOrigin};
 
+use super::source_origin;
 use crate::theme::desktop::{
     CELL_PADDING_X, DETAIL_COLUMN_GAP, DETAIL_KEY_MIN_WIDTH, DETAIL_KEY_TRACKING, DETAIL_ROW_GAP,
     DETAIL_VALUE_SIZE, PANEL_TITLE_MARGIN_BOTTOM, PANEL_TITLE_MARGIN_TOP,
@@ -24,7 +26,8 @@ use crate::widgets::scroll_region;
 use crate::widgets::text::{caps, hairline_below, line, plain};
 use crate::widgets::tooltip;
 use crate::{
-    DataForgeFailure, DataForgeSummary, DataForgeText, Language, RecordTree, RecordTreeStatus,
+    DataForgeFailure, DataForgeSummary, DataForgeSummaryProvenance,
+    DataForgeSummaryRecordProvenance, DataForgeText, Language, RecordTree, RecordTreeStatus,
     ScrollText, Text, Texts, format,
 };
 
@@ -92,7 +95,7 @@ pub(super) fn show(ui: &mut Ui, texts: &Texts, tree: &RecordTree) {
                 (id, || texts.get(ScrollText::Summary)),
                 ROW_HEIGHT,
                 area,
-                |area, ui| area.show(ui, |ui| laid.show(ui)),
+                |area, ui| area.show(ui, |ui| laid.show(ui, texts, summary.provenance().ok())),
             );
         }
         status => {
@@ -113,10 +116,17 @@ struct Key {
 
 type Labelled = (String, Arc<Galley>);
 
+struct SummaryFact {
+    source: DataForgeHeaderField,
+    label: DataForgeText,
+    key: Labelled,
+    value: Labelled,
+}
+
 /// The laid-out summary, kept across frames until the Records, the language or the width change.
 struct Laid {
     key: Key,
-    facts: Vec<(Labelled, Labelled)>,
+    facts: Vec<SummaryFact>,
     heading: Labelled,
     head: Vec<Labelled>,
     rows: Vec<Vec<Labelled>>,
@@ -189,42 +199,9 @@ impl Laid {
         }
     }
 
-    fn show(&self, ui: &mut Ui) {
+    fn show(&self, ui: &mut Ui, texts: &Texts, origins: Option<&DataForgeSummaryProvenance>) {
         ui.spacing_mut().item_spacing.y = 0.0;
-        let key_width = self
-            .facts
-            .iter()
-            .map(|((_, galley), _)| galley.size().x)
-            .fold(DETAIL_KEY_MIN_WIDTH, f32::max);
-        for (index, (key, value)) in self.facts.iter().enumerate() {
-            if index > 0 {
-                ui.add_space(DETAIL_ROW_GAP);
-            }
-            let height = key.1.size().y.max(value.1.size().y) + DETAIL_ROW_GAP;
-            let (rect, _) =
-                ui.allocate_exact_size(vec2(ui.available_width(), height), Sense::hover());
-            let content = rect.with_max_y(rect.bottom() - DETAIL_ROW_GAP);
-            let key_rect = rect.with_max_x(rect.left() + key_width);
-            let value_rect = rect.with_min_x(key_rect.right() + DETAIL_COLUMN_GAP);
-            let on_baseline = |cell: Rect, galley: &Galley| {
-                cell.with_min_y(content.bottom() - galley.size().y)
-                    .with_max_y(content.bottom())
-            };
-            labelled(
-                ui,
-                (0, index, 0),
-                key,
-                (on_baseline(key_rect, &key.1), palette::GRAY_2_TEXT),
-            );
-            labelled(
-                ui,
-                (0, index, 1),
-                value,
-                (on_baseline(value_rect, &value.1), palette::DATA_FG),
-            );
-            hairline_below(ui, key_rect);
-            hairline_below(ui, value_rect);
-        }
+        self.show_facts(ui, texts, origins);
         ui.add_space(PANEL_TITLE_MARGIN_TOP);
         let size = vec2(
             ui.available_width(),
@@ -235,17 +212,59 @@ impl Laid {
         labelled(ui, (1, 0, 0), &self.heading, (text_rect, palette::GRAY_1));
         hairline_below(ui, rect);
         ui.add_space(PANEL_TITLE_MARGIN_BOTTOM);
-        self.table(ui);
+        self.table(ui, texts, origins);
     }
 
-    fn table(&self, ui: &mut Ui) {
+    fn show_facts(&self, ui: &mut Ui, texts: &Texts, origins: Option<&DataForgeSummaryProvenance>) {
+        let key_width = self
+            .facts
+            .iter()
+            .map(|fact| fact.key.1.size().x)
+            .fold(DETAIL_KEY_MIN_WIDTH, f32::max);
+        for (index, fact) in self.facts.iter().enumerate() {
+            if index > 0 {
+                ui.add_space(DETAIL_ROW_GAP);
+            }
+            let (key, value) = (&fact.key, &fact.value);
+            let height = key.1.size().y.max(value.1.size().y) + DETAIL_ROW_GAP;
+            let (rect, _) =
+                ui.allocate_exact_size(vec2(ui.available_width(), height), Sense::hover());
+            let content = rect.with_max_y(rect.bottom() - DETAIL_ROW_GAP);
+            let key_rect = rect.with_max_x(rect.left() + key_width);
+            let value_rect = rect.with_min_x(key_rect.right() + DETAIL_COLUMN_GAP);
+            let on_baseline = |cell: Rect, galley: &Galley| {
+                cell.with_min_y(content.bottom() - galley.size().y)
+                    .with_max_y(content.bottom())
+            };
+            let key_response = labelled(
+                ui,
+                (0, index, 0),
+                key,
+                (on_baseline(key_rect, &key.1), palette::GRAY_2_TEXT),
+            );
+            let value_response = labelled(
+                ui,
+                (0, index, 1),
+                value,
+                (on_baseline(value_rect, &value.1), palette::DATA_FG),
+            );
+            tooltip::hover(key_response.union(value_response), |ui| {
+                let origin = origins.and_then(|origins| fact_origin(origins, fact.source));
+                source_origin::row(ui, texts, fact.label, origin);
+            });
+            hairline_below(ui, key_rect);
+            hairline_below(ui, value_rect);
+        }
+    }
+
+    fn table(&self, ui: &mut Ui, texts: &Texts, origins: Option<&DataForgeSummaryProvenance>) {
         let (head, _) =
             ui.allocate_exact_size(vec2(ui.available_width(), ROW_HEIGHT), Sense::hover());
         let painter = ui.painter();
         painter.rect_filled(head, CornerRadius::ZERO, palette::SURFACE_INPUT);
         let rule = Rect::from_min_max(pos2(head.left(), head.bottom() - 2.0), head.max);
         painter.rect_filled(rule, CornerRadius::ZERO, palette::PRIMARY);
-        cells(ui, (2, 0), head, &self.head);
+        cells(ui, texts, (2, 0), head, &self.head, None);
         for (index, row) in self.rows.iter().enumerate() {
             let (rect, _) =
                 ui.allocate_exact_size(vec2(ui.available_width(), ROW_HEIGHT), Sense::hover());
@@ -256,12 +275,26 @@ impl Laid {
                 ui.painter().rect_filled(rect, CornerRadius::ZERO, ZEBRA);
             }
             paint_divider(ui.painter(), rect);
-            cells(ui, (ROWS, index), rect, row);
+            cells(
+                ui,
+                texts,
+                (ROWS, index),
+                rect,
+                row,
+                origins.and_then(|origins| origins.rows().get(index)),
+            );
         }
     }
 }
 
-fn cells(ui: &Ui, (section, row): (u8, usize), rect: Rect, cells: &[Labelled]) {
+fn cells(
+    ui: &Ui,
+    texts: &Texts,
+    (section, row): (u8, usize),
+    rect: Rect,
+    cells: &[Labelled],
+    origins: Option<&DataForgeSummaryRecordProvenance>,
+) {
     let width = rect.width() / 3.0;
     for ((column, step), cell) in (0_usize..).zip(0_u8..).zip(cells) {
         let left = f32::from(step).mul_add(width, rect.left());
@@ -276,6 +309,10 @@ fn cells(ui: &Ui, (section, row): (u8, usize), rect: Rect, cells: &[Labelled]) {
         if section == ROWS {
             tooltip::hover(response, |ui| {
                 tooltip::line(ui, cell.0.as_str());
+                if let Some(&label) = COLUMNS.get(column) {
+                    let origin = origins.and_then(|row| cell_origin(row, label));
+                    source_origin::row(ui, texts, label, origin);
+                }
             });
         }
     }
@@ -300,29 +337,62 @@ fn labelled(
     response
 }
 
-fn facts(
-    ui: &Ui,
-    texts: &Texts,
-    width: f32,
-    summary: &DataForgeSummary,
-) -> Vec<(Labelled, Labelled)> {
+fn facts(ui: &Ui, texts: &Texts, width: f32, summary: &DataForgeSummary) -> Vec<SummaryFact> {
+    use DataForgeHeaderField::{EnumCount, RecordCount, StructCount, Version};
+
     let language = texts.language();
     let count = |value: usize| format::number(u64::try_from(value).unwrap_or(u64::MAX), language);
     [
-        (DataForgeText::Version, summary.version().to_string()),
-        (DataForgeText::Records, count(summary.record_count())),
-        (DataForgeText::Structs, count(summary.struct_count())),
-        (DataForgeText::Enums, count(summary.enum_count())),
+        (
+            Version,
+            DataForgeText::Version,
+            summary.version().to_string(),
+        ),
+        (
+            RecordCount,
+            DataForgeText::Records,
+            count(summary.record_count()),
+        ),
+        (
+            StructCount,
+            DataForgeText::Structs,
+            count(summary.struct_count()),
+        ),
+        (EnumCount, DataForgeText::Enums, count(summary.enum_count())),
     ]
     .into_iter()
-    .map(|(name, value)| {
-        let name = texts.get(name);
+    .map(|(source, label, value)| {
+        let name = texts.get(label);
         let key_text = caps(&name, FS_SM, Weight::Bold, DETAIL_KEY_TRACKING);
         let value_text = plain(value.clone(), DETAIL_VALUE_SIZE, Weight::Light);
-        (
-            (name, line(ui, key_text, f32::INFINITY)),
-            (value, line(ui, value_text, width)),
-        )
+        SummaryFact {
+            source,
+            label,
+            key: (name, line(ui, key_text, f32::INFINITY)),
+            value: (value, line(ui, value_text, width)),
+        }
     })
     .collect()
+}
+
+fn fact_origin(
+    origins: &DataForgeSummaryProvenance,
+    field: DataForgeHeaderField,
+) -> Option<&FieldOrigin> {
+    match field {
+        DataForgeHeaderField::Version => Some(&origins.version),
+        DataForgeHeaderField::RecordCount => Some(&origins.record_count),
+        DataForgeHeaderField::StructCount => Some(&origins.struct_count),
+        DataForgeHeaderField::EnumCount => Some(&origins.enum_count),
+        _ => None,
+    }
+}
+
+fn cell_origin(row: &DataForgeSummaryRecordProvenance, field: Text) -> Option<&FieldOrigin> {
+    match field {
+        Text::ColumnName => Some(&row.name),
+        Text::DataForge(DataForgeText::ColumnType) => Some(&row.type_name),
+        Text::DataForge(DataForgeText::ColumnRecordPath) => Some(&row.record_path),
+        _ => None,
+    }
 }

@@ -58,6 +58,7 @@ mod content_search_hits;
 mod content_search_window;
 mod dataforge_file;
 mod dataforge_file_render;
+mod dataforge_summary_origins;
 mod dataforge_summary_scrolling;
 mod diffing;
 mod entity_export_window;

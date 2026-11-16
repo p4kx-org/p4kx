@@ -198,7 +198,8 @@ disk. A DataForge version this P4KX does not read (only versions 6 and 8 are rea
 on the node; the rest of the window keeps working.
 
 The **DataForge** tab of the preview shows the version, the numbers of Records, structs and enums,
-and the first 10 Records in the order DataForge stores them.
+and the first 10 Records in the order DataForge stores them. Hover over a fact or Record cell to
+see its original encryption provenance.
 
 The **Referenced by** tab, next to the **Record** tab while a Record is selected, lists the Records that
 refer to the selected Record: one line per Reference with the field that holds it, e.g.

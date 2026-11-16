@@ -5,10 +5,14 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use p4kx_extraction::{DataForge, Guid, Record};
+use p4kx_extraction::{DataForge, DataForgeOrigin, Guid, Record, SourceEvidenceError, Struct};
 use rayon::slice::ParallelSliceMut;
 
 use crate::sort::compare_ignoring_case;
+use crate::{
+    DataForgeSummaryProvenance,
+    dataforge_summary_provenance::{Capture, ReadIdentity},
+};
 
 /// The number of Records the DataForge summary lists.
 pub const SUMMARY_RECORDS: usize = 10;
@@ -76,6 +80,7 @@ pub struct DataForgeSummary {
     struct_count: usize,
     enum_count: usize,
     first_records: Vec<RecordInfo>,
+    provenance: Result<Box<DataForgeSummaryProvenance>, SourceEvidenceError>,
 }
 
 impl DataForgeSummary {
@@ -108,6 +113,12 @@ impl DataForgeSummary {
     pub fn first_records(&self) -> &[RecordInfo] {
         &self.first_records
     }
+
+    /// Returns the original sources of the facts and first Record cells.
+    #[must_use]
+    pub fn provenance(&self) -> Result<&DataForgeSummaryProvenance, SourceEvidenceError> {
+        self.provenance.as_deref().map_err(|error| *error)
+    }
 }
 
 #[derive(Debug)]
@@ -130,11 +141,16 @@ pub(crate) struct RecordIndex {
 
 impl RecordIndex {
     /// Reads every Record of `forge` and builds the tree; this belongs on a background thread.
-    pub(crate) fn build(forge: &DataForge<'_>) -> Self {
+    pub(crate) fn build(forge: &DataForge<'_>, origin: Option<&DataForgeOrigin>) -> Self {
         let mut types = HashMap::new();
+        let mut capture = Capture::new(origin);
         let records: Vec<RecordInfo> = forge
             .records()
-            .map(|record| info(&record, &mut types))
+            .enumerate()
+            .map(|(position, record)| {
+                let capture = (position < SUMMARY_RECORDS).then_some(&mut capture);
+                info(forge, &record, &mut types, capture)
+            })
             .collect();
         let summary = DataForgeSummary {
             version: forge.version(),
@@ -142,6 +158,7 @@ impl RecordIndex {
             struct_count: forge.struct_count(),
             enum_count: forge.enum_count(),
             first_records: records.iter().take(SUMMARY_RECORDS).cloned().collect(),
+            provenance: capture.and_then(Capture::finish).map(Box::new),
         };
         let (nodes, by_path) = tree(&records);
         let mut record_nodes = vec![RecordNodeId(0); records.len()];
@@ -162,16 +179,40 @@ impl RecordIndex {
     }
 }
 
-fn info<'f>(record: &Record<'f>, types: &mut HashMap<&'f str, Arc<str>>) -> RecordInfo {
+fn info<'f>(
+    forge: &DataForge<'_>,
+    record: &Record<'f>,
+    types: &mut HashMap<&'f str, Arc<str>>,
+    capture: Option<&mut Result<Capture, SourceEvidenceError>>,
+) -> RecordInfo {
     let guid = record.guid();
-    let type_name = record.type_name().unwrap_or_default();
-    let type_name = Arc::clone(types.entry(type_name).or_insert_with(|| type_name.into()));
+    let name = record.name().ok();
+    let structure = record.struct_type().ok();
+    let type_name = structure
+        .as_ref()
+        .and_then(|structure| structure.name().ok());
+    let path = record.record_path().ok();
+    if let Some(capture) = capture
+        && let Ok(bound) = capture
+        && let Err(error) = bound.row(
+            forge,
+            ReadIdentity {
+                index: record.index(),
+                name,
+                struct_index: structure.as_ref().map(Struct::index),
+                type_name,
+                path,
+                file_name: path.and_then(|_| record.stored_file_name().ok()),
+            },
+        )
+    {
+        *capture = Err(error);
+    }
+    let type_name = type_name.unwrap_or_default();
     RecordInfo {
-        name: record
-            .name()
-            .map_or_else(|_| guid.to_string().into(), Into::into),
-        type_name,
-        record_path: record.record_path().unwrap_or_default().into(),
+        name: name.map_or_else(|| guid.to_string().into(), Into::into),
+        type_name: Arc::clone(types.entry(type_name).or_insert_with(|| type_name.into())),
+        record_path: path.unwrap_or_default().into(),
         guid,
     }
 }
