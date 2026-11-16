@@ -99,6 +99,22 @@ pub enum OriginOutputAddress {
         /// Exact JSON Pointer relative to the root of the JSON chunk.
         path: FieldPath,
     },
+    /// The original DDS header bytes from the start of the artifact.
+    DdsHeaderBytes {
+        /// First byte past the DDS header.
+        end_exclusive: DecimalU64,
+    },
+    /// One surface's mip bytes in the merged DDS artifact.
+    DdsMipBytes {
+        /// The mip level, with zero the largest.
+        level: u32,
+        /// Original DDS surface ordinal.
+        surface: DecimalU64,
+        /// First byte in the emitted mip.
+        start: DecimalU64,
+        /// First byte past the emitted mip.
+        end_exclusive: DecimalU64,
+    },
     /// The bytes addressed by a buffer view in the GLB binary chunk.
     GlbBinaryBytes {
         /// Exact JSON Pointer to the buffer view.

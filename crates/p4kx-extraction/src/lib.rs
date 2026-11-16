@@ -359,9 +359,9 @@ pub use texture_member_keys::{
 };
 pub use texture_png::{CUBE_FACE_NAMES, CubemapLayout, PngReport};
 pub use textures::{
-    ObservedPreviewPng, PreviewPng, PreviewPngEvidence, PreviewTextureEvidence, Texture,
-    TextureArtifacts, TextureImage, TextureImageArtifact, TextureImageFace, TextureImageFormat,
-    TextureImagePlan, codec as texture_codec,
+    MergeOrigins, ObservedPreviewPng, PreviewPng, PreviewPngEvidence, PreviewTextureEvidence,
+    Texture, TextureArtifacts, TextureImage, TextureImageArtifact, TextureImageFace,
+    TextureImageFormat, TextureImagePlan, codec as texture_codec,
 };
 use ui_service::{ui_jobs, ui_movie};
 

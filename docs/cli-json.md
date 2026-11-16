@@ -1766,9 +1766,14 @@ values stay explicit; no image decode or material-specific alpha meaning is impl
 
 Also `p4kx texture merge <file> --out <file> --json` for a header file on disk.
 
+`origin_receipt` names the digest-bound DDS companion written in both text and JSON modes.
+The `field_origins` map covers `texture`, `parts` and `size`. Resolve its use references in
+`provenance`. The example shows the output summary fields. [DDS merge origins](source-origin.md#merged-dds)
+describes the companion addresses.
+
 ```json
 {"texture": "Data\\Textures\\hull_ddna.dds", "output": "…\\hull_ddna.dds", "parts": 4,
- "size": 2916}
+ "size": 2916, "origin_receipt": ".\\hull_ddna.dds.p4kx-origin.jsonl"}
 ```
 
 `parts` is the number of mip parts merged and `size` the size of the written DDS file.

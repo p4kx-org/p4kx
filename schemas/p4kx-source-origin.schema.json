@@ -398,6 +398,61 @@
         },
         {
           "additionalProperties": false,
+          "description": "The original DDS header bytes from the start of the artifact.",
+          "properties": {
+            "endExclusive": {
+              "$ref": "#/$defs/DecimalU64",
+              "description": "First byte past the DDS header."
+            },
+            "type": {
+              "const": "ddsHeaderBytes",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "endExclusive"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "One surface's mip bytes in the merged DDS artifact.",
+          "properties": {
+            "endExclusive": {
+              "$ref": "#/$defs/DecimalU64",
+              "description": "First byte past the emitted mip."
+            },
+            "level": {
+              "description": "The mip level, with zero the largest.",
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "start": {
+              "$ref": "#/$defs/DecimalU64",
+              "description": "First byte in the emitted mip."
+            },
+            "surface": {
+              "$ref": "#/$defs/DecimalU64",
+              "description": "Original DDS surface ordinal."
+            },
+            "type": {
+              "const": "ddsMipBytes",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "level",
+            "surface",
+            "start",
+            "endExclusive"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
           "description": "The bytes addressed by a buffer view in the GLB binary chunk.",
           "properties": {
             "endExclusive": {

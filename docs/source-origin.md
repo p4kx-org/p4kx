@@ -297,6 +297,18 @@ whose contributing reads cannot be proved carry an incomplete origin. A
 successfully written partial model has a companion for its actual bytes and
 retains its existing issue and exit-code behavior.
 
+## Merged DDS
+
+`p4kx texture merge` writes `<file>.p4kx-origin.jsonl` beside the standard DDS.
+`ddsHeaderBytes` covers `[0, endExclusive)`. `ddsMipBytes` covers one emitted
+mip surface in `[start, endExclusive)`. Mip level 0 is the largest and the
+surface ordinal follows DDS order. The offsets and surface ordinal are decimal
+strings. The source-use row records the original decoded input offset and byte
+length, with the DDS header recorded as a selector when it determines the mip
+layout. Unused sibling candidates and a stripped CryEngine trailer supply no
+output field. Loose DDS files identify the observed file input and retain
+unknown original P4K encryption.
+
 ## Bulk texture conversion
 
 The `texture_artifacts` field in `p4kx extract --convert --json` and

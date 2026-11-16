@@ -5,7 +5,10 @@ use std::io::{self, Write};
 use std::path::Path;
 
 use anyhow::Result;
-use p4kx_extraction::{ConversionError, CubemapLayout, DdsSourceInfo, Texture, TextureError};
+use p4kx_extraction::{
+    ConversionError, CubemapLayout, DdsSourceInfo, FieldOrigins, SourceInventory, Texture,
+    TextureError,
+};
 use serde::Serialize;
 
 use crate::cli::{TextureAction, TextureArgs, TextureSource};
@@ -87,6 +90,9 @@ struct MergeJson<'a> {
     output: String,
     parts: u32,
     size: u64,
+    origin_receipt: String,
+    field_origins: FieldOrigins,
+    provenance: SourceInventory,
 }
 
 /// Runs `p4kx texture info`, `merge` or `png`.
@@ -192,13 +198,16 @@ fn info(texture: &Texture<'_>, as_json: bool) -> Result<()> {
 }
 
 fn merge(texture: &Texture<'_>, out: &Path, as_json: bool) -> Result<()> {
-    let report = texture.merge_to_file(out)?;
+    let (report, origins) = texture.merge_to_file_with_origins(out)?;
     if as_json {
         json::print(&MergeJson {
             texture: texture.name(),
             output: json::path(out),
             parts: report.parts,
             size: report.size,
+            origin_receipt: json::path(&origins.receipt),
+            field_origins: origins.fields,
+            provenance: origins.inventory,
         })?;
     } else {
         writeln!(

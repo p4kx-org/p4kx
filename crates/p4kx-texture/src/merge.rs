@@ -4,6 +4,7 @@
 use std::io::{self, Read, Write};
 
 use crate::header::{CRYENGINE_TRAILER, MAX_HEADER_LEN};
+use crate::merge_span::SpanObserver;
 use crate::{DdsHeader, TextureError};
 
 const COPY_BUFFER_LEN: usize = 64 * 1024;
@@ -59,10 +60,31 @@ pub struct MergeReport {
 /// mips, the trailer is not `CExtCEnd` ([`TextureError::UnknownTrailer`]), or reading or writing
 /// fails.
 pub fn merge<R, S, W>(
+    header: R,
+    header_size: u64,
+    siblings: &S,
+    out: &mut W,
+) -> Result<MergeReport, TextureError>
+where
+    R: Read,
+    S: SiblingReader + ?Sized,
+    W: Write + ?Sized,
+{
+    merge_impl(
+        header,
+        header_size,
+        siblings,
+        out,
+        &mut SpanObserver::default(),
+    )
+}
+
+pub(crate) fn merge_impl<R, S, W>(
     mut header: R,
     header_size: u64,
     siblings: &S,
     out: &mut W,
+    observer: &mut SpanObserver<'_>,
 ) -> Result<MergeReport, TextureError>
 where
     R: Read,
@@ -88,29 +110,16 @@ where
         .unwrap_or((start, &[]));
     let after_data = start.get(data_end..).unwrap_or_default();
     out.write_all(own_header).map_err(TextureError::Write)?;
+    observer.header(own_header.len() as u64)?;
     let mut buffer = vec![0; COPY_BUFFER_LEN];
     if parts > 0 && dds.surfaces() > 1 {
         let mut tail = own_tail.chain(after_data).chain(header);
         let data = read_tail(&dds, &mut tail, header_size)?;
         check_trailer(tail, trailer_len, header_size)?;
-        write_surfaces(&dds, parts, &data, siblings, out, &mut buffer)?;
-        return finish(dds, parts, header_size, out);
+        write_surfaces(&dds, parts, &data, siblings, out, &mut buffer, observer)?;
+        return observer.finish(finish(dds, parts, header_size, out)?);
     }
-    for (index, expected) in (1..=parts).rev().zip(sizes.into_iter().rev()) {
-        let reader = siblings
-            .open_part(index)
-            .map_err(|source| TextureError::ReadPart { index, source })?;
-        let copied = copy(reader, expected, out, &mut buffer).map_err(|error| {
-            error.into_texture_error(|source| TextureError::ReadPart { index, source })
-        })?;
-        if copied < expected {
-            return Err(TextureError::TruncatedPart {
-                index,
-                expected,
-                actual: copied,
-            });
-        }
-    }
+    write_parts(parts, sizes, siblings, out, &mut buffer, observer)?;
     out.write_all(own_tail).map_err(TextureError::Write)?;
     let rest = header_size.saturating_sub(prefix_len as u64);
     let copied = copy(&mut header, rest, out, &mut buffer)
@@ -122,7 +131,44 @@ where
         });
     }
     check_trailer(after_data.chain(header), trailer_len, header_size)?;
-    finish(dds, parts, header_size, out)
+    observer.tail(
+        &dds,
+        parts,
+        0..dds.surfaces(),
+        own_tail.len() as u64 + copied,
+    )?;
+    observer.finish(finish(dds, parts, header_size, out)?)
+}
+
+fn write_parts<S, W>(
+    parts: u32,
+    sizes: Vec<u64>,
+    siblings: &S,
+    out: &mut W,
+    buffer: &mut [u8],
+    observer: &mut SpanObserver<'_>,
+) -> Result<(), TextureError>
+where
+    S: SiblingReader + ?Sized,
+    W: Write + ?Sized,
+{
+    for (index, expected) in (1..=parts).rev().zip(sizes.into_iter().rev()) {
+        let reader = siblings
+            .open_part(index)
+            .map_err(|source| TextureError::ReadPart { index, source })?;
+        let copied = copy(reader, expected, out, buffer).map_err(|error| {
+            error.into_texture_error(|source| TextureError::ReadPart { index, source })
+        })?;
+        if copied < expected {
+            return Err(TextureError::TruncatedPart {
+                index,
+                expected,
+                actual: copied,
+            });
+        }
+        observer.part(parts - index, 0, index, 0, copied)?;
+    }
+    Ok(())
 }
 
 /// Checks that the `trailer_len` bytes after the data of `data_len` bytes are the CryEngine
@@ -195,6 +241,7 @@ fn write_surfaces<S, W>(
     siblings: &S,
     out: &mut W,
     buffer: &mut [u8],
+    observer: &mut SpanObserver<'_>,
 ) -> Result<(), TextureError>
 where
     S: SiblingReader + ?Sized,
@@ -234,8 +281,10 @@ where
                     actual: copied,
                 });
             }
+            observer.part(level, surface, index, offset, copied)?;
         }
         out.write_all(own_mips).map_err(TextureError::Write)?;
+        observer.tail(dds, parts, surface..surface + 1, own_mips.len() as u64)?;
     }
     Ok(())
 }

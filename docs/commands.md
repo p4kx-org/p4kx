@@ -556,7 +556,9 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
 - `p4kx texture info <archive> <entry>` prints the format, size, depth, mip count, array size,
   cubemap faces and number of mip parts of a DDS texture; `p4kx texture merge <archive> <entry>
   --out <file>` merges the header Entry and its mip parts `<entry>.1` Ã¢â‚¬Â¦ `<entry>.N` into one
-  standard DDS file that common tools open. Both also take a header file on disk instead of an
+  standard DDS file that common tools open. Merge publishes a sibling
+  `<file>.p4kx-origin.jsonl` with [header and mip origins](source-origin.md#merged-dds).
+  Both also take a header file on disk instead of an
   Archive and an Entry, with its parts next to it. Legacy and DX10 headers are read; a missing,
   truncated or oversized part is named in the error and nothing is written. A split cubemap or
   texture array, whose parts hold one mip of every face, merges face by face into a valid

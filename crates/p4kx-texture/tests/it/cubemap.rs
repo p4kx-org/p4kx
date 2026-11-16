@@ -12,6 +12,9 @@ use p4kx_texture::{
     DdsHeader, Mip, RgbaImage, SiblingReader, TextureError, cube_cross, merge, read_mip,
 };
 
+#[path = "merge_spans.rs"]
+mod merge_spans;
+
 /// Parts held in memory, by part number.
 struct Parts(BTreeMap<u32, Vec<u8>>);
 
