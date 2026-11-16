@@ -25,6 +25,11 @@ use crate::source_use::{
 use crate::source_use_ref_encoding;
 use crate::source_value::{SourceValue, SourcedValue};
 
+#[path = "source_registered_uses.rs"]
+mod registered_uses;
+
+use self::registered_uses::RegisteredUses;
+
 pub(crate) struct RegisteredSource {
     pub(crate) id: PhysicalSourceRef,
     pub(crate) payload: SourceEncryptionState,
@@ -44,7 +49,7 @@ pub(crate) struct SourceRegistry {
     pub(crate) identity: Arc<()>,
     pub(crate) inputs: Vec<InputIdentity>,
     pub(crate) sources: BTreeMap<PhysicalSourceRef, Arc<PhysicalSource>>,
-    pub(crate) uses: BTreeMap<SourceUseRef, Arc<SourceUseDescription>>,
+    pub(crate) uses: RegisteredUses,
     use_references: UseReferences,
     sealed: bool,
 }
@@ -108,7 +113,7 @@ impl SourceRegistry {
             identity,
             inputs: Vec::new(),
             sources: BTreeMap::new(),
-            uses: BTreeMap::new(),
+            uses: RegisteredUses::new(),
             use_references,
             sealed: false,
         }
@@ -145,9 +150,7 @@ impl SourceRegistry {
         )
     }
 
-    pub(crate) fn take_use_batch(
-        &mut self,
-    ) -> std::io::Result<BTreeMap<SourceUseRef, Arc<SourceUseDescription>>> {
+    pub(crate) fn take_use_batch(&mut self) -> std::io::Result<RegisteredUses> {
         let UseReferences::CompactOrdinals(compact) = &mut self.use_references else {
             return Err(std::io::Error::other(
                 "source inventory does not support batches",
@@ -326,18 +329,16 @@ impl SourceRegistry {
         encryption: SourceEncryptionState,
         location: impl FnOnce() -> RetainedLocation,
     ) -> SourceUse {
-        let description = self.uses.entry(id.clone()).or_insert_with(|| {
-            Arc::new(SourceUseDescription {
-                id,
-                source: source.clone(),
-                scope,
-                role,
-                location: location(),
-                effective_encryption: encryption,
-            })
+        let description = self.uses.get_or_insert_with(id, |id| SourceUseDescription {
+            id,
+            source: source.clone(),
+            scope,
+            role,
+            location: location(),
+            effective_encryption: encryption,
         });
         SourceUse {
-            description: Arc::clone(description),
+            description,
             identity: Arc::clone(&self.identity),
         }
     }
