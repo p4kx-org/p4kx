@@ -9,6 +9,7 @@ use std::path::Path;
 use serde_json::{Value, json};
 
 pub(super) struct Origins {
+    stream: &'static str,
     fields: Vec<Value>,
     uses: Vec<Value>,
     sources: Vec<Value>,
@@ -16,7 +17,12 @@ pub(super) struct Origins {
 
 impl Origins {
     pub(super) fn read(base: &Path) -> Result<Self, Box<dyn Error>> {
+        Self::read_stream(base, "animation-definition")
+    }
+
+    pub(super) fn read_stream(base: &Path, stream: &'static str) -> Result<Self, Box<dyn Error>> {
         Ok(Self {
+            stream,
             fields: read_jsonl(&base.join("field-origins.jsonl"))?,
             uses: read_jsonl(&base.join("origin-uses.jsonl"))?,
             sources: read_jsonl(&base.join("origin-sources.jsonl"))?,
@@ -66,8 +72,7 @@ impl Origins {
             .fields
             .iter()
             .find(|row| {
-                row.pointer("/scope/stream/kind").and_then(Value::as_str)
-                    == Some("animation-definition")
+                row.pointer("/scope/stream/kind").and_then(Value::as_str) == Some(self.stream)
                     && row.pointer("/scope/ordinal").and_then(Value::as_str)
                         == Some(ordinal.as_str())
                     && row.get("field").and_then(Value::as_str) == Some(field)

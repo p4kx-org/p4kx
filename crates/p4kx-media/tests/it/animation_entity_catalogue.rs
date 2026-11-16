@@ -15,15 +15,19 @@ use serde_json::Value;
 
 use super::support::{TestResult, published, records};
 
+#[path = "animation_entity_sibling_bank.rs"]
+mod sibling_bank;
+
 const CAF: &str = "Data/Animations/Fixture/sub/clip.caf";
 const OMITTED: &str = "Data/Animations/Fixture/omitted.caf";
 const DBA: &str = "Data/Animations/Banks/mixed.dba";
+const BAD_DBA: &str = "Data/Animations/Banks/damaged.dba";
 
 #[test]
 fn real_generation_joins_placements_to_physical_clips_and_preserves_filter_and_origin() -> TestResult
 {
     let scratch = tempfile::tempdir()?;
-    let archive = fixture(scratch.path(), false)?;
+    let archive = fixture(scratch.path(), FixtureLayout::Inline)?;
     let output = scratch.path().join("output");
     let options = ExportOptions {
         kinds: vec![MediaKind::Animation],
@@ -45,7 +49,7 @@ fn filtered_owner_and_unavailable_xml_do_not_publish_a_complete_catalogue() -> T
         (0, Some("Data/Animations/*"), "dataforge-not-selected"),
         (1, None, "incomplete-loadout"),
     ] {
-        let archive = fixture(scratch.path(), true)?;
+        let archive = fixture(scratch.path(), FixtureLayout::MissingXml)?;
         let output = scratch.path().join(format!("output-{slot}"));
         let options = ExportOptions {
             kinds: vec![MediaKind::Animation],
@@ -85,7 +89,7 @@ fn filtered_owner_and_unavailable_xml_do_not_publish_a_complete_catalogue() -> T
 fn stopped_or_budget_refused_entity_projection_leaves_the_current_index_unpublished() -> TestResult
 {
     let scratch = tempfile::tempdir()?;
-    let archive = fixture(scratch.path(), false)?;
+    let archive = fixture(scratch.path(), FixtureLayout::Inline)?;
     let output = scratch.path().join("refused");
     let mut options = ExportOptions {
         kinds: vec![MediaKind::Animation],
@@ -235,13 +239,17 @@ fn verify_clip_origins(base: &Path, rows: &[MediaRecord]) -> TestResult {
     Ok(())
 }
 
-fn fixture(folder: &Path, external_loadout: bool) -> Result<Archive, Box<dyn Error>> {
+#[derive(Clone, Copy)]
+enum FixtureLayout {
+    Inline,
+    MissingXml,
+    SiblingBank,
+}
+
+fn fixture(folder: &Path, layout: FixtureLayout) -> Result<Archive, Box<dyn Error>> {
     let path = folder.join("Data.p4k");
     let mut builder = ArchiveBuilder::new()
-        .entry(TestEntry::stored(
-            "Data/Game2.dcb",
-            database(external_loadout),
-        ))
+        .entry(TestEntry::stored("Data/Game2.dcb", database(layout)))
         .entry(TestEntry::stored(
             "Data/Objects/Fixture/child.chr",
             TestModel::cube()
@@ -260,6 +268,18 @@ fn fixture(folder: &Path, external_loadout: bool) -> Result<Archive, Box<dyn Err
     ] {
         builder = builder.entry(TestEntry::stored(path, params));
     }
+    if matches!(layout, FixtureLayout::SiblingBank) {
+        builder = builder
+            .entry(TestEntry::stored(
+                "Data/Objects/Fixture/damaged.chr",
+                TestModel::cube().with_skeleton(&TestSkeleton::two_bones()).cgf(),
+            ))
+            .entry(TestEntry::stored(
+                "Data/Objects/Fixture/damaged.chrparams",
+                r#"<Params><AnimationList><Animation name="$TracksDatabase" path="Animations/Banks/damaged.dba"/></AnimationList></Params>"#,
+            ))
+            .entry(TestEntry::stored(BAD_DBA, b"invalid DBA chunk container").encrypted());
+    }
     builder
         .entry(TestEntry::stored(CAF, animation(24).caf()).encrypted())
         .entry(TestEntry::stored(OMITTED, animation(50).caf()).encrypted())
@@ -277,21 +297,31 @@ fn fixture(folder: &Path, external_loadout: bool) -> Result<Archive, Box<dyn Err
     )?)
 }
 
-fn database(external_loadout: bool) -> Vec<u8> {
-    let loadout = if external_loadout {
-        TestLoadout::Xml("Objects/Fixture/external.xml".into())
-    } else {
-        TestLoadout::Manual(vec![TestLoadoutEntry::class("port", "FixtureChild")])
+fn database(layout: FixtureLayout) -> Vec<u8> {
+    let loadout = match layout {
+        FixtureLayout::MissingXml => TestLoadout::Xml("Objects/Fixture/external.xml".into()),
+        FixtureLayout::Inline => {
+            TestLoadout::Manual(vec![TestLoadoutEntry::class("port", "FixtureChild")])
+        }
+        FixtureLayout::SiblingBank => TestLoadout::Manual(vec![
+            TestLoadoutEntry::class("bankBad", "FixtureDamagedChild"),
+            TestLoadoutEntry::class("bankGood", "FixtureChild"),
+        ]),
     };
     let root = TestEntity::new(1, "FixtureRoot", "entities/fixture_root.xml")
         .geometry("Objects/Fixture/root.chr", None)
         .loadout(loadout);
     let child = TestEntity::new(2, "FixtureChild", "entities/fixture_child.xml")
         .geometry("Objects/Fixture/child.chr", None);
-    entity_schema(DataForgeBuilder::new())
+    let mut forge = entity_schema(DataForgeBuilder::new())
         .record(root.record())
-        .record(child.record())
-        .build()
+        .record(child.record());
+    if matches!(layout, FixtureLayout::SiblingBank) {
+        let damaged = TestEntity::new(3, "FixtureDamagedChild", "entities/fixture_damaged.xml")
+            .geometry("Objects/Fixture/damaged.chr", None);
+        forge = forge.record(damaged.record());
+    }
+    forge.build()
 }
 
 fn animation(rate: u16) -> TestAnimation {
