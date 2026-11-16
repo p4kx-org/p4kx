@@ -7,10 +7,13 @@ use p4kx_extraction::{Archive, FieldOrigin, FieldOrigins, FieldPath, SourceInven
 
 #[path = "wwise_resolve_source_fields.rs"]
 mod source_fields;
+#[path = "wwise_resolve_totals.rs"]
+mod totals;
 #[path = "wwise_resolve_variant_origins.rs"]
 mod variant_origins;
 
 use source_fields::{Definition, LanguageOrigins};
+use totals::{SummaryFields, Totals};
 
 pub(crate) fn capture(
     archive: &Archive,
@@ -27,34 +30,39 @@ pub(crate) fn capture(
         definition,
         language,
     };
+    let root = FieldPath::root();
     capture.header(sounds)?;
-    let mut totals = Totals::default();
-    for (ordinal, variant) in sounds.variants().iter().enumerate() {
-        let row = row_path("variants", ordinal)?;
-        let proof = variant_origins::write(&mut capture, &row, variant)?;
-        totals.variants.push(proof.row);
-        totals.routes.push(proof.route);
-        totals.media.push(proof.media);
-        totals.locations.push(proof.location);
-    }
-    let searched = sounds
-        .breaks()
-        .iter()
-        .any(|link| matches!(link.reason(), BreakReason::NoSoundbank))
-        .then(|| source_fields::bank_survey(archive, index, &capture.uses))
-        .transpose()?;
-    for (ordinal, link) in sounds.breaks().iter().enumerate() {
-        let row = row_path("breaks", ordinal)?;
-        let proof = capture.broken_link(&row, link, searched.as_ref())?;
-        if link.reason().truncated_by_limit() {
-            totals.cutoff = Some(proof.reason.clone());
-        }
-        totals.breaks.push(proof.row);
-        totals.reasons.push(proof.reason);
-    }
-    totals.write(&mut capture)?;
+    capture
+        .resolved(sounds, index, &root)?
+        .write(&mut capture, &root, SummaryFields::Counts)?;
     capture.issues(index)?;
     Ok((capture.fields, capture.uses.freeze()?))
+}
+
+pub(crate) fn capture_nested(
+    archive: &Archive,
+    index: &AudioIndex,
+    sounds: &TriggerSounds<'_>,
+    uses: &SourceUses,
+    root: &FieldPath,
+    trigger_selector: &FieldOrigin,
+) -> Result<(FieldOrigins, FieldOrigin)> {
+    let mut definition = Definition::open(archive, index, uses, sounds.trigger())?;
+    definition.selection =
+        uses.origin_with_origins([&definition.selection, trigger_selector], true)?;
+    let language = LanguageOrigins::of(archive, index, uses, sounds.language_choice())?;
+    let mut capture = Capture {
+        archive,
+        uses: uses.clone(),
+        fields: FieldOrigins::new(),
+        definition,
+        language,
+    };
+    let origin =
+        capture
+            .resolved(sounds, index, root)?
+            .write(&mut capture, root, SummaryFields::Nested)?;
+    Ok((capture.fields, origin))
 }
 
 struct Capture<'a> {
@@ -81,6 +89,33 @@ struct BreakOrigins {
 }
 
 impl Capture<'_> {
+    fn resolved(
+        &mut self,
+        sounds: &TriggerSounds<'_>,
+        index: &AudioIndex,
+        root: &FieldPath,
+    ) -> Result<Totals> {
+        let variants = field(root, "variants")?;
+        let breaks = field(root, "breaks")?;
+        let mut totals = Totals::default();
+        for (ordinal, variant) in sounds.variants().iter().enumerate() {
+            let proof = variant_origins::write(self, &index_path(&variants, ordinal)?, variant)?;
+            totals.variant(proof);
+        }
+        let searched = sounds
+            .breaks()
+            .iter()
+            .any(|link| matches!(link.reason(), BreakReason::NoSoundbank))
+            .then(|| source_fields::bank_survey(self.archive, index, &self.uses))
+            .transpose()?;
+        for (ordinal, link) in sounds.breaks().iter().enumerate() {
+            let proof =
+                self.broken_link(&index_path(&breaks, ordinal)?, link, searched.as_ref())?;
+            totals.broken_link(proof, link.reason());
+        }
+        Ok(totals)
+    }
+
     fn header(&mut self, sounds: &TriggerSounds<'_>) -> Result<()> {
         let root = FieldPath::root();
         self.put(&root, "archive", self.uses.origin(&[], true))?;
@@ -306,63 +341,6 @@ impl Capture<'_> {
         }
         Ok(result)
     }
-}
-
-#[derive(Default)]
-struct Totals {
-    variants: Vec<FieldOrigin>,
-    routes: Vec<FieldOrigin>,
-    media: Vec<FieldOrigin>,
-    locations: Vec<FieldOrigin>,
-    breaks: Vec<FieldOrigin>,
-    reasons: Vec<FieldOrigin>,
-    cutoff: Option<FieldOrigin>,
-}
-
-impl Totals {
-    fn write(&self, capture: &mut Capture<'_>) -> Result<()> {
-        let root = FieldPath::root();
-        let original = [&capture.definition.selection, &capture.definition.topology];
-        let broken = capture.union(original.into_iter().chain(&self.reasons), true)?;
-        let visited = capture.union(
-            original.into_iter().chain(&self.routes).chain([&broken]),
-            true,
-        )?;
-        let media = capture.union(std::iter::once(&visited).chain(&self.media), true)?;
-        let locations = capture.union(std::iter::once(&visited).chain(&self.locations), true)?;
-        let counts = capture.group(
-            &field(&root, "counts")?,
-            [
-                ("variants", visited.clone()),
-                ("located", locations.clone()),
-                ("unlocated", capture.union([&locations, &media], true)?),
-                ("plugins", media),
-                ("breaks", broken.clone()),
-            ],
-        )?;
-        capture.put(&root, "counts", counts)?;
-        let variants = if self.variants.is_empty() {
-            visited.clone()
-        } else {
-            capture.union(&self.variants, true)?
-        };
-        capture.put(&root, "variants", variants)?;
-        let breaks = if self.breaks.is_empty() {
-            broken
-        } else {
-            capture.union(&self.breaks, true)?
-        };
-        capture.put(&root, "breaks", breaks)?;
-        capture.put(
-            &root,
-            "truncated_by_limits",
-            self.cutoff.clone().unwrap_or(visited),
-        )
-    }
-}
-
-fn row_path(section: &str, index: usize) -> Result<FieldPath> {
-    index_path(&field(&FieldPath::root(), section)?, index)
 }
 
 fn index_path(base: &FieldPath, index: usize) -> Result<FieldPath> {

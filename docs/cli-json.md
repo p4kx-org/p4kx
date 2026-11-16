@@ -830,7 +830,7 @@ read exits with code 2 and writes nothing.
  "entity": {"guid": "…", "record_path": "…", "name": "EntityClassDefinition.ORIG_890Jump",
             "class_name": "ORIG_890Jump"},
  "triggers": [Trigger, …], "counts": {"triggers": 47, "matched": 47, "unmatched": 0},
- "issues": [Issue, …]}
+ "issues": [Issue, …], "fieldOrigins": FieldOrigins, "provenance": SourceInventory}
 ```
 
 `<entity>` is named as for `p4kx entity loadout`, with the same exit codes. The command reads
@@ -871,6 +871,13 @@ definition posts no Wwise event) and `no_soundbank` (no soundbank holds any of i
 `soundbank`, `too_many_triggers`: the index already holds 262,144 triggers, or `too_many_media`:
 the index already holds 4,194,304 loose WEMs or 1,024 language folders) and `message`; without
 `--json` each issue is a warning on stderr. New kinds may be added in later versions.
+
+The JSON includes `fieldOrigins` and a shared `provenance` inventory. The first original DataForge
+occurrence supplies the trigger name and location, and every original occurrence contributes to
+its reference count. The ATL declaration, matching physical soundbank entries and any survey
+needed for an unmatched result carry their own evidence. With `--sounds` or `--extract`, pointers
+under `/triggers/{index}/sounds` use the same inventory and include the original DataForge trigger
+selector. Files and the report written by `--extract` have a separate output contract.
 
 ## `p4kx wwise events <archive> [--search <text>] --json`
 

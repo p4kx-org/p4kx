@@ -3,6 +3,7 @@
 
 use std::fmt::Write as _;
 use std::io::{self, BufWriter, Write};
+use std::path::Path;
 use std::process::ExitCode;
 
 use anyhow::Result;
@@ -16,27 +17,17 @@ use serde::Serialize;
 
 use crate::cli::EntityAudioArgs;
 use crate::extract::cancel_on_interrupt;
-use crate::json;
 use crate::query_table::one_line;
 use crate::wwise::{break_line, language_choice, variant_line};
-use crate::wwise_extract::{self, ExportJson};
-use crate::wwise_json::{self, BreakJson, LanguageJson, VariantJson};
+use crate::wwise_extract;
+use crate::wwise_json::{self, BreakJson, VariantJson};
+
+#[path = "entity_audio_origins.rs"]
+mod origins;
+#[path = "entity_audio_json.rs"]
+mod presentation;
 
 const CLASS_PREFIX: &str = "EntityClassDefinition.";
-
-#[derive(Serialize)]
-struct AudioJson<'a> {
-    archive: String,
-    entry: &'a str,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    language: Option<LanguageJson<'a>>,
-    entity: EntityJson<'a>,
-    triggers: Vec<TriggerJson<'a>>,
-    counts: Counts,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    extraction: Option<ExportJson>,
-    issues: Vec<IssueJson<'a>>,
-}
 
 #[derive(Serialize)]
 struct EntityJson<'a> {
@@ -122,55 +113,77 @@ pub(crate) fn run(args: &EntityAudioArgs, as_json: bool) -> Result<ExitCode> {
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;
     let entity = Entities::new(&forge).find(&args.entity)?;
-    let references = trigger_references(&entity.tree()?);
+    let (references, inspection) = if as_json {
+        let (references, original) = origins::inspect(&entity)?;
+        (references, Some(original))
+    } else {
+        (trigger_references(&entity.tree()?), None)
+    };
     let audio = ArchiveAudio::new(&archive);
     let index = audio
         .index_until(&cancel)
         .ok_or(ConversionError::Cancelled)?;
     let choice = language_choice(index, &args.resolve)?;
     let resolved = index.resolve(references);
-    let options = resolve_variants.then(|| args.resolve.options(&cancel));
+    let options = resolve_variants.then(|| {
+        let options = args.resolve.options(&cancel);
+        if as_json {
+            options.with_path_sources()
+        } else {
+            options
+        }
+    });
     let sounds = resolve_sounds(&audio, &resolved, &choice, options)?;
     let counts = Counts::of(&resolved);
     let report = export_sounds(&audio, &sounds, args, &cancel)?;
     let code = report
         .as_ref()
         .map_or(ExitCode::SUCCESS, wwise_extract::exit_code);
-    if as_json {
-        json::print(&AudioJson {
-            archive: json::path(archive.path()),
-            entry: entry.path(),
-            language: resolve_variants.then(|| LanguageJson::of(&choice)),
-            entity: entity_json(&entity),
-            triggers: resolved
-                .triggers()
-                .iter()
-                .enumerate()
-                .map(|(position, trigger)| {
-                    trigger_json(trigger, sounds.get(position).and_then(Option::as_ref))
-                })
-                .collect(),
-            counts,
-            extraction: report
-                .as_ref()
-                .zip(args.extract.as_deref())
-                .map(|(report, out)| wwise_extract::export_json(report, out, &args.export)),
-            issues: issues_json(index),
-        })?;
+    if let Some(inspection) = &inspection {
+        let input = origins::Input {
+            archive: &archive,
+            index,
+            original: entry.origin(),
+            record: &entity,
+            inspection,
+            resolved: &resolved,
+            sounds: &sounds,
+            language: resolve_variants.then_some(&choice),
+        };
+        presentation::print(&input, entry.path(), counts, args, report.as_ref())?;
         return Ok(code);
     }
+    print_completion(
+        index,
+        &entity,
+        &resolved,
+        &sounds,
+        counts,
+        report.as_ref().zip(args.extract.as_deref()),
+    )?;
+    Ok(code)
+}
+
+fn print_completion(
+    index: &AudioIndex,
+    entity: &Record<'_>,
+    resolved: &EntityAudio<'_>,
+    sounds: &[Option<TriggerSounds<'_>>],
+    counts: Counts,
+    export: Option<(&ExportReport, &Path)>,
+) -> Result<()> {
     if !warn_open(index)? {
-        return Ok(code);
+        return Ok(());
     }
-    match print_text(&entity, &resolved, &sounds, counts) {
+    match print_text(entity, resolved, sounds, counts) {
         Err(error) if error.kind() != io::ErrorKind::BrokenPipe => return Err(error.into()),
-        Err(_) => return Ok(code),
+        Err(_) => return Ok(()),
         Ok(()) => {}
     }
-    if let (Some(report), Some(out)) = (&report, &args.extract) {
+    if let Some((report, out)) = export {
         wwise_extract::print_report(report, out)?;
     }
-    Ok(code)
+    Ok(())
 }
 
 fn resolve_sounds<'i>(
