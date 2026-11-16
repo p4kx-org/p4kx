@@ -18,6 +18,14 @@ OS and CPU. The architecture-neutral Blender add-on ZIP and the availability of 
 wheels are separate from the native application matrix. [Blender package exchange](media-fixture-selection.md#native-package-exchange-in-ci)
 lists the native consumer environments and the Linux ARM64 Blender version boundary.
 
+## System memory
+
+The 0.5.0 release requires P4KX to run with 16 GiB total system RAM. This
+includes the operating system, normal CLI/GUI/MCP operation and the complete
+unfiltered v3 Catalog export. Record results on a 16 GiB system with the
+packaged applications. The Catalog contract describes the installed LIVE and
+PTU checks and their memory and disk measurements. [Catalog memory acceptance](catalog-partitioning.md#16-gib-total-system-ram)
+
 ## Build and test contract
 
 The matrix job validates the five explicit rows and publishes them to lint, doctest, schema,
