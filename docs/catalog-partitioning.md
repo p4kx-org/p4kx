@@ -237,6 +237,10 @@ Finalizing the text registries reconstructs the text forms from the in-memory lo
 These lookups add CPU work and require no temporary storage or additional Archive reads.
 Catalog health retains the original coordinates and target identity in compact reference proofs.
 It constructs the full diagnostic record when reconciliation needs to report a reference.
+Clean field inspections store one optional findings pointer. An allocation holds the
+diagnostic vectors only when they contain findings. Captured Record subjects share their
+key with the original header receipt and clone the handle. Layout tests verify both
+representations and preserve the original evidence and authority checks.
 
 Record peak working set and peak private bytes separately.
 Sample host commit and paging counters alongside the process write counter to distinguish process

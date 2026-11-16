@@ -7,6 +7,7 @@ use p4kx_extraction::{
 
 use super::OriginalDatum;
 use super::health_record_capture::CapturedRecord;
+use super::health_record_key::RecordSubjectKey;
 use super::health_text_capture::CapturedText;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::record_header_field::RecordHeaderField;
@@ -47,8 +48,7 @@ pub(super) struct CapturedSubject {
 #[derive(Debug, Clone)]
 pub(super) struct HeaderReadReceipt {
     inventory: SourceUses,
-    index: u32,
-    guid: Guid,
+    key: RecordSubjectKey,
     path: SourceValue<CapturedText>,
     source_type: SourceValue<CapturedText>,
     frame: HeaderFrame,
@@ -80,29 +80,22 @@ impl HeaderReadReceipt {
         frame: HeaderFrame,
     ) -> Result<Self, CatalogError> {
         let texts = input.origins().health_texts();
+        let path = text_value(&record.record_path(), texts)?;
+        let key_path = match &path {
+            SourceValue::Present(path) => Some(path.text().clone()),
+            _ => None,
+        };
         Ok(Self {
             inventory: input.origins().uses.clone(),
-            index: record.index(),
-            guid: record.guid(),
-            path: text_value(&record.record_path(), texts)?,
+            key: RecordSubjectKey::new(record.index(), record.guid(), key_path),
+            path,
             source_type: text_value(&record.type_name(), texts)?,
             frame,
         })
     }
 
-    pub(super) const fn index(&self) -> u32 {
-        self.index
-    }
-
-    pub(super) const fn guid(&self) -> Guid {
-        self.guid
-    }
-
-    pub(super) const fn path(&self) -> Option<&CapturedText> {
-        match &self.path {
-            SourceValue::Present(path) => Some(path),
-            _ => None,
-        }
+    pub(super) const fn key(&self) -> &RecordSubjectKey {
+        &self.key
     }
 
     pub(super) fn merge(&self, other: &Self) -> Result<(), ExportAccountingError> {
@@ -113,8 +106,8 @@ impl HeaderReadReceipt {
         ) {
             return Err(ExportAccountingError::UnboundHealthSubject);
         }
-        if self.index != other.index
-            || self.guid != other.guid
+        if self.key.index() != other.key.index()
+            || self.key.guid() != other.key.guid()
             || self.path != other.path
             || self.source_type != other.source_type
         {
@@ -136,10 +129,14 @@ impl HeaderReadReceipt {
         self.check_inventory(inventory)?;
         let inputs = vec![self.frame.index.clone()];
         Ok(CapturedSubject {
-            record_index: OriginalDatum::observed(SourceValue::Present(self.index), inputs, true),
+            record_index: OriginalDatum::observed(
+                SourceValue::Present(self.key.index()),
+                inputs,
+                true,
+            ),
             guid: self.header(
                 RecordHeaderField::Guid,
-                SourceValue::Present(self.guid),
+                SourceValue::Present(self.key.guid()),
                 SourceUseRole::Payload,
             )?,
             record_path: self.header(
@@ -157,7 +154,7 @@ impl HeaderReadReceipt {
         self.check_inventory(inventory)?;
         self.header(
             RecordHeaderField::Guid,
-            SourceValue::Present(self.guid),
+            SourceValue::Present(self.key.guid()),
             SourceUseRole::Payload,
         )
     }
@@ -214,7 +211,11 @@ impl HeaderReadReceipt {
         } else {
             SourceUseRole::Attempted
         };
-        let inputs = vec![self.frame.scope.at(field.location(self.index), role)?];
+        let inputs = vec![
+            self.frame
+                .scope
+                .at(field.location(self.key.index()), role)?,
+        ];
         Ok(OriginalDatum::observed(value, inputs, complete))
     }
 }

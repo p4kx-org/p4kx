@@ -16,14 +16,13 @@ use crate::{CatalogError, ExportAccountingError, HealthText};
 #[derive(Debug, Clone)]
 enum Subject {
     Captured(Arc<HeaderReadReceipt>),
-    Accounting,
+    Accounting(Arc<RecordSubjectKey>),
     Absent,
 }
 
 /// A retained original header read or an explicit non-authorizing accounting state.
 #[derive(Debug, Clone)]
 pub(crate) struct RecordSubject {
-    key: Option<RecordSubjectKey>,
     subject: Subject,
 }
 
@@ -46,44 +45,41 @@ impl RecordSubject {
     }
 
     fn from_receipt(facts: HeaderReadReceipt) -> Self {
-        let key = RecordSubjectKey::new(
-            facts.index(),
-            facts.guid(),
-            facts.path().map(|path| path.text().clone()),
-        );
         Self {
-            key: Some(key),
             subject: Subject::Captured(Arc::new(facts)),
         }
     }
 
-    pub(crate) const fn accounting(index: u32, guid: Guid, path: Option<HealthText>) -> Self {
+    pub(crate) fn accounting(index: u32, guid: Guid, path: Option<HealthText>) -> Self {
         Self {
-            key: Some(RecordSubjectKey::new(index, guid, path)),
-            subject: Subject::Accounting,
+            subject: Subject::Accounting(Arc::new(RecordSubjectKey::new(index, guid, path))),
         }
     }
 
     pub(crate) const fn absent() -> Self {
         Self {
-            key: None,
             subject: Subject::Absent,
         }
     }
 
-    pub(crate) const fn key(&self) -> Option<&RecordSubjectKey> {
-        self.key.as_ref()
+    pub(crate) fn key(&self) -> Option<&RecordSubjectKey> {
+        match &self.subject {
+            Subject::Captured(receipt) => Some(receipt.key()),
+            Subject::Accounting(key) => Some(key),
+            Subject::Absent => None,
+        }
     }
 
     pub(crate) fn merge(&mut self, other: Self) -> Result<(), ExportAccountingError> {
-        if self.key != other.key {
+        if self.key() != other.key() {
             return Err(ExportAccountingError::ConflictingSourceDatum);
         }
         match (&mut self.subject, other.subject) {
             (Subject::Captured(retained), Subject::Captured(other)) => {
                 retained.merge(&other)?;
             }
-            (Subject::Accounting, Subject::Accounting) | (Subject::Absent, Subject::Absent) => {}
+            (Subject::Accounting(_), Subject::Accounting(_))
+            | (Subject::Absent, Subject::Absent) => {}
             _ => return Err(ExportAccountingError::UnboundHealthSubject),
         }
         Ok(())
@@ -96,7 +92,7 @@ impl RecordSubject {
         match &self.subject {
             Subject::Captured(receipt) => receipt.check_input(input),
             Subject::Absent => Ok(()),
-            Subject::Accounting => Err(ExportAccountingError::UnboundHealthSubject),
+            Subject::Accounting(_) => Err(ExportAccountingError::UnboundHealthSubject),
         }
     }
     pub(super) fn retain_guid(
@@ -105,7 +101,7 @@ impl RecordSubject {
     ) -> Result<OriginalDatum<Guid>, CatalogError> {
         match &self.subject {
             Subject::Captured(receipt) => receipt.guid_only(inventory),
-            Subject::Accounting | Subject::Absent => {
+            Subject::Accounting(_) | Subject::Absent => {
                 Err(ExportAccountingError::UnboundHealthSubject.into())
             }
         }
@@ -114,7 +110,7 @@ impl RecordSubject {
     pub(super) fn source_type_text(&self) -> Result<Option<HealthText>, ExportAccountingError> {
         match &self.subject {
             Subject::Captured(receipt) => Ok(receipt.source_type_text().cloned()),
-            Subject::Accounting | Subject::Absent => {
+            Subject::Accounting(_) | Subject::Absent => {
                 Err(ExportAccountingError::UnboundHealthSubject)
             }
         }
@@ -126,7 +122,7 @@ impl RecordSubject {
     ) -> Result<OriginalDatum<CapturedText>, CatalogError> {
         match &self.subject {
             Subject::Captured(receipt) => receipt.source_type_only(inventory),
-            Subject::Accounting | Subject::Absent => {
+            Subject::Accounting(_) | Subject::Absent => {
                 Err(ExportAccountingError::UnboundHealthSubject.into())
             }
         }
@@ -138,7 +134,7 @@ impl RecordSubject {
     ) -> Result<CapturedRecord, CatalogError> {
         match &self.subject {
             Subject::Captured(receipt) => receipt.record(inventory),
-            Subject::Accounting | Subject::Absent => {
+            Subject::Accounting(_) | Subject::Absent => {
                 Err(ExportAccountingError::UnboundHealthSubject.into())
             }
         }
@@ -151,7 +147,7 @@ impl RecordSubject {
         match &self.subject {
             Subject::Captured(receipt) => receipt.subject(inventory).map(Some),
             Subject::Absent => Ok(None),
-            Subject::Accounting => Err(ExportAccountingError::UnboundHealthSubject.into()),
+            Subject::Accounting(_) => Err(ExportAccountingError::UnboundHealthSubject.into()),
         }
     }
 }

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::mem::size_of;
+
 use p4kx_extraction::{
     InputScope, Record, SourceInventory, SourceLocation, SourceUseDescription, SourceUseRole,
     SourceValue,
@@ -22,6 +24,51 @@ fn bytes() -> Vec<u8> {
                 .value("value", TestValue::UInt32(11)),
         )
         .build()
+}
+
+#[test]
+fn captured_and_accounting_subjects_share_their_keys_without_sharing_authority() -> TestResult {
+    assert!(
+        size_of::<RecordSubject>() <= size_of::<[usize; 2]>(),
+        "an inline subject holds only its variant tag and shared storage handle"
+    );
+    test_support::with_input(&bytes(), |forge, input| {
+        let record = forge.record(0).ok_or("actual original Record")?;
+        let mut captured = RecordSubject::capture(input, &record)?;
+        let key = captured.key().ok_or("original identity key")?;
+        let accounting =
+            RecordSubject::accounting(key.index(), key.guid(), key.path_text().cloned());
+        for subject in [&captured, &accounting] {
+            let duplicate = (*subject).clone();
+            let original = subject.key().ok_or("original key")?;
+            let shared = duplicate.key().ok_or("shared key")?;
+            assert!(
+                std::ptr::eq(original, shared),
+                "clones retain the same allocated key"
+            );
+        }
+        assert_eq!(
+            captured.key(),
+            accounting.key(),
+            "both modes retain the same identity"
+        );
+        captured.merge(RecordSubject::capture(input, &record)?)?;
+        assert!(
+            matches!(
+                captured.merge(accounting),
+                Err(ExportAccountingError::UnboundHealthSubject)
+            ),
+            "matching identity is insufficient to admit accounting evidence"
+        );
+        assert!(
+            matches!(
+                captured.merge(RecordSubject::absent()),
+                Err(ExportAccountingError::ConflictingSourceDatum)
+            ),
+            "the key comparison precedes the variant authority check"
+        );
+        Ok(())
+    })
 }
 
 #[test]
