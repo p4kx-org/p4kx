@@ -177,7 +177,7 @@ pub(crate) struct EntitySoundsResult {
 }
 
 /// The languages localised sounds were resolved in.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub(crate) struct LanguageShape {
     /// The language asked for.
     pub(crate) requested: Option<String>,
@@ -186,7 +186,7 @@ pub(crate) struct LanguageShape {
 }
 
 /// A Wwise event a trigger posts.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub(crate) struct TriggerEventShape {
     /// The event name.
     pub(crate) name: String,
@@ -197,7 +197,7 @@ pub(crate) struct TriggerEventShape {
 }
 
 /// A resolved trigger.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub(crate) struct TriggerShape {
     /// The trigger name as its ATL definition writes it.
     pub(crate) name: String,
@@ -210,7 +210,7 @@ pub(crate) struct TriggerShape {
 }
 
 /// One object of the path from an event to a sound.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub(crate) struct StepShape {
     /// The kind of object, e.g. `event`, `random` or `sound`.
     pub(crate) kind: &'static str,
@@ -235,7 +235,7 @@ pub(crate) struct LocationShape {
 }
 
 /// One sound a trigger may play.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub(crate) struct VariantShape {
     /// The event the sound is reached from.
     pub(crate) event: String,
@@ -260,7 +260,7 @@ pub(crate) struct VariantShape {
 }
 
 /// A link of the chain from an event to its sounds that is broken.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub(crate) struct BreakShape {
     /// The event.
     pub(crate) event: String,
@@ -318,4 +318,6 @@ pub(crate) struct TriggerSoundsResult {
     /// The cursor of the next page; absent on the last page.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) next_cursor: Option<String>,
+    #[serde(flatten)]
+    pub(crate) origins: ForgeFieldOrigins,
 }

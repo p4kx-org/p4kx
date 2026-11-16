@@ -54,6 +54,14 @@ impl<'a> Definition<'a> {
         )
     }
 
+    pub(super) fn event_localised(&self, event: &WwiseEvent) -> Result<FieldOrigin, EvidenceError> {
+        let position = event.localised_position().map_or_else(
+            || SourceLocation::xml_element(event.position(), "WwiseEvent"),
+            |position| SourceLocation::xml_attribute(position, "wwise_localised"),
+        );
+        self.payload(position, SourceUseRole::Conversion)
+    }
+
     pub(super) fn events(&self) -> Result<FieldOrigin, EvidenceError> {
         self.payload(
             SourceLocation::xml_element(self.trigger.position(), "ATLTrigger"),

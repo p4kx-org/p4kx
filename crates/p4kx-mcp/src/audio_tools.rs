@@ -98,8 +98,8 @@ impl Server {
         links and their reasons come with the first page. An optional max_visits bounds HIRC object and music track \
         source visits across the whole trigger. If it leaves references unfollowed, truncated_by_limits is true on \
         every page and counts describe the variants reached. Use the same max_visits when continuing with a cursor. \
-        Only paths, IDs and metadata are returned, no audio. Retained text is complete within the existing 256 KiB response budget; \
-        an item that cannot fit first is refused. \
+        Returns paths, IDs, metadata and per-field original source evidence. The 256 KiB response budget includes that evidence; \
+        an item that cannot fit first is refused. Aggregate provenance can report incomplete source sets. \
         The content may be forwarded by the client to third parties; game texts \
         and media must not be redistributed.",
         output_schema = rmcp::handler::server::tool::schema_for_output::<TriggerSoundsResult>(),
