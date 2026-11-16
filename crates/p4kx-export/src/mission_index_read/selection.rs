@@ -44,10 +44,21 @@ pub(super) fn choose(record: &Record<'_>) -> Result<Option<Action>, DataForgeErr
     choose_at_path(record, record.record_path()?)
 }
 
-pub(super) fn choose_at_path(
-    record: &Record<'_>,
-    path: &str,
-) -> Result<Option<Action>, DataForgeError> {
+pub(super) enum SelectionError {
+    Path(DataForgeError),
+    SourceType(DataForgeError),
+}
+
+pub(super) fn choose_dependency(record: &Record<'_>) -> Option<Result<Action, SelectionError>> {
+    match record.record_path() {
+        Ok(path) => choose_at_path(record, path)
+            .map_err(SelectionError::SourceType)
+            .transpose(),
+        Err(error) => Some(Err(SelectionError::Path(error))),
+    }
+}
+
+fn choose_at_path(record: &Record<'_>, path: &str) -> Result<Option<Action>, DataForgeError> {
     for (prefix, action) in [
         (TEMPLATES, Action::Template),
         (TYPES, Action::Type),

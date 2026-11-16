@@ -122,6 +122,12 @@ impl HealthTextCapture {
         Ok(captured)
     }
 
+    #[cfg(test)]
+    pub(crate) fn contains_text_for_test(&self, text: &str) -> Result<bool, CatalogError> {
+        let state = crate::export_evidence_lock::lock(&self.state)?;
+        Ok(matches!(&*state, State::Open { atoms, .. } if atoms.contains_key(text)))
+    }
+
     pub(super) fn seal(
         &self,
         sources: &SourceUses,

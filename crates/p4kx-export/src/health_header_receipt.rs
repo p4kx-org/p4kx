@@ -18,6 +18,24 @@ struct HeaderFrame {
     index: SourceUse,
 }
 
+impl HeaderFrame {
+    fn read(
+        input: &OriginalCatalogInput<'_, '_>,
+        record: &Record<'_>,
+    ) -> Result<Self, CatalogError> {
+        let context = input.record_context(record)?;
+        let scope = context.dataforge();
+        let index = scope.at(
+            RecordHeaderField::RecordIndex.location(record.index()),
+            SourceUseRole::Selector,
+        )?;
+        Ok(Self {
+            scope: scope.clone(),
+            index,
+        })
+    }
+}
+
 /// Three original subject facts materialized only for a retained diagnostic occurrence.
 pub(super) struct CapturedSubject {
     pub(super) record_index: OriginalDatum<u32>,
@@ -41,24 +59,34 @@ impl HeaderReadReceipt {
         input: &OriginalCatalogInput<'_, '_>,
         record: &Record<'_>,
     ) -> Result<Self, CatalogError> {
-        let context = input.record_context(record)?;
-        let scope = context.dataforge();
-        let index = record.index();
-        let selector = scope.at(
-            RecordHeaderField::RecordIndex.location(index),
-            SourceUseRole::Selector,
-        )?;
+        let frame = HeaderFrame::read(input, record)?;
+        Self::capture(input, record, frame)
+    }
+
+    pub(super) fn read_selected<T>(
+        input: &OriginalCatalogInput<'_, '_>,
+        record: &Record<'_>,
+        choose: impl FnOnce() -> Option<T>,
+    ) -> Result<Option<(Self, T)>, CatalogError> {
+        let frame = HeaderFrame::read(input, record)?;
+        choose()
+            .map(|selection| Self::capture(input, record, frame).map(|facts| (facts, selection)))
+            .transpose()
+    }
+
+    fn capture(
+        input: &OriginalCatalogInput<'_, '_>,
+        record: &Record<'_>,
+        frame: HeaderFrame,
+    ) -> Result<Self, CatalogError> {
         let texts = input.origins().health_texts();
         Ok(Self {
             inventory: input.origins().uses.clone(),
-            index,
+            index: record.index(),
             guid: record.guid(),
             path: text_value(&record.record_path(), texts)?,
             source_type: text_value(&record.type_name(), texts)?,
-            frame: HeaderFrame {
-                scope: scope.clone(),
-                index: selector,
-            },
+            frame,
         })
     }
 

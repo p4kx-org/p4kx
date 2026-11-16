@@ -28,6 +28,19 @@ impl<'read, 'source> RecordObservation<'read, 'source> {
         })
     }
 
+    /// Keeps the original Record index selection even when no header receipt is needed.
+    pub(crate) fn capture_selected<T>(
+        input: Option<&OriginalCatalogInput<'_, '_>>,
+        record: &'read Record<'source>,
+        choose: impl FnOnce() -> Option<T>,
+    ) -> Result<Option<(Self, T)>, CatalogError> {
+        Ok(match input {
+            Some(input) => RecordSubject::capture_selected(input, record, choose)?
+                .map(|(subject, selection)| (Self { record, subject }, selection)),
+            None => choose().map(|selection| (Self::accounting(record), selection)),
+        })
+    }
+
     pub(crate) fn accounting(record: &'read Record<'source>) -> Self {
         Self {
             record,

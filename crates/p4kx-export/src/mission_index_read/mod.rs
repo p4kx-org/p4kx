@@ -20,7 +20,7 @@ use crate::{CatalogError, CatalogReadFailure, Kind};
 
 use super::template_read::FailedTemplate;
 use super::{Piece, RewardDependency};
-use selection::Action;
+use selection::{Action, SelectionError};
 
 pub(super) use catalog_scope::needed as catalog_needs_index;
 
@@ -119,16 +119,6 @@ fn candidate<'f>(
         ledger,
     })
 }
-fn admit<'read, 'source>(
-    record: &'read Record<'source>,
-    input: Option<&OriginalCatalogInput<'_, '_>>,
-) -> Result<RecordObservation<'read, 'source>, CatalogError> {
-    input.map_or_else(
-        || Ok(RecordObservation::accounting(record)),
-        |input| RecordObservation::capture(input, record),
-    )
-}
-
 pub(super) fn read<'f>(
     trees: &mut TreeBuilder<'f>,
     record: &Record<'f>,
@@ -140,20 +130,23 @@ pub(super) fn read<'f>(
     if cancel.is_some_and(CancelToken::is_cancelled) {
         return Err(CatalogError::Cancelled);
     }
-    let admission = admit(record, input)?;
-    let path = match record.record_path() {
-        Ok(path) => path,
-        Err(error) => {
+    let Some((admission, selection)) = RecordObservation::capture_selected(input, record, || {
+        selection::choose_dependency(record)
+    })?
+    else {
+        return Ok(None);
+    };
+    let action = match selection {
+        Ok(action) => action,
+        Err(SelectionError::Path(error)) => {
             let unreadable = input
                 .map(|input| RewardRead::unreadable_path(input, &admission))
                 .transpose()?;
             return candidate(&admission, &error, unreadable).map(Some);
         }
-    };
-    let action = match selection::choose_at_path(record, path) {
-        Ok(Some(action)) => action,
-        Ok(None) => return Ok(None),
-        Err(error) => return candidate(&admission, &error, None).map(Some),
+        Err(SelectionError::SourceType(error)) => {
+            return candidate(&admission, &error, None).map(Some);
+        }
     };
     let tree = match trees.build(record) {
         Ok(tree) => tree,
@@ -328,6 +321,9 @@ pub(super) fn read_tags<'f>(
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod selection_capture_tests;
 
 #[cfg(test)]
 #[path = "template_number_dependency_tests.rs"]

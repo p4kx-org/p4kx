@@ -32,16 +32,29 @@ impl RecordSubject {
         input: &OriginalCatalogInput<'_, '_>,
         record: &Record<'_>,
     ) -> Result<Self, CatalogError> {
-        let facts = HeaderReadReceipt::read(input, record)?;
+        Ok(Self::from_receipt(HeaderReadReceipt::read(input, record)?))
+    }
+
+    /// Captures complete header receipts when the checked selection yields an outcome.
+    pub(crate) fn capture_selected<T>(
+        input: &OriginalCatalogInput<'_, '_>,
+        record: &Record<'_>,
+        choose: impl FnOnce() -> Option<T>,
+    ) -> Result<Option<(Self, T)>, CatalogError> {
+        let selected = HeaderReadReceipt::read_selected(input, record, choose)?;
+        Ok(selected.map(|(facts, selection)| (Self::from_receipt(facts), selection)))
+    }
+
+    fn from_receipt(facts: HeaderReadReceipt) -> Self {
         let key = RecordSubjectKey::new(
             facts.index(),
             facts.guid(),
             facts.path().map(|path| path.text().clone()),
         );
-        Ok(Self {
+        Self {
             key: Some(key),
             subject: Subject::Captured(Arc::new(facts)),
-        })
+        }
     }
 
     pub(crate) const fn accounting(index: u32, guid: Guid, path: Option<HealthText>) -> Self {
