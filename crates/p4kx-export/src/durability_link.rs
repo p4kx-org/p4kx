@@ -68,12 +68,8 @@ fn resolved<'source>(
 ) -> Result<HealthLink<'source>, CatalogError> {
     Ok(
         match read_reference_payload(fact.reference_observation()?, sources)? {
-            SourcePayload::RecordReference { value } => HealthLink::RecordReference {
-                value: Box::new(value),
-            },
-            SourcePayload::WeakReference { value } => HealthLink::WeakReference {
-                value: Box::new(value),
-            },
+            SourcePayload::RecordReference { value } => HealthLink::RecordReference { value },
+            SourcePayload::WeakReference { value } => HealthLink::WeakReference { value },
             _ => return Err(ExportAccountingError::ConflictingSourceDatum.into()),
         },
     )

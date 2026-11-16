@@ -22,13 +22,13 @@ pub(crate) fn read<'source>(
     match (storage, captured.shape) {
         (DataType::Reference, OriginalTargetShape::Record { source_type }) => {
             Ok(SourcePayload::RecordReference {
-                value: SourceRecordReference {
+                value: Box::new(SourceRecordReference {
                     target_record_index,
                     guid,
                     record_path: captured.record_path.into_cell(sources),
                     target_type: source_type.into_cell(sources),
                     status: DefinitionStatus::Present,
-                },
+                }),
             })
         }
         (DataType::WeakPointer, shape) => {
@@ -45,12 +45,12 @@ pub(crate) fn read<'source>(
                 },
             };
             Ok(SourcePayload::WeakReference {
-                value: SourceWeakReference {
+                value: Box::new(SourceWeakReference {
                     target_record_index,
                     record_guid: guid,
                     record_path: captured.record_path.into_cell(sources),
                     target,
-                },
+                }),
             })
         }
         _ => Err(ExportAccountingError::ConflictingSourceDatum.into()),

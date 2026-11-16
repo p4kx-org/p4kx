@@ -25,7 +25,7 @@ pub(crate) fn read<'source>(
         Value::Null => (SourceValue::Null, None),
         Value::Error(_) => (
             SourceValue::Unreadable,
-            Some(error_read::read(fact, sources)?),
+            Some(Box::new(error_read::read(fact, sources)?)),
         ),
         value => (SourceValue::Present(payload(fact, value)?), None),
     };

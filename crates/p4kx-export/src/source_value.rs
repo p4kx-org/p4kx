@@ -29,7 +29,7 @@ pub(crate) struct SourceValueRef {
 #[schemars(transform = every_field_required)]
 pub(crate) struct SourceNode<'source> {
     pub(crate) value: SourcedValue<SourcePayload<'source>>,
-    pub(crate) original_error: Option<OriginalValueErrorFacts>,
+    pub(crate) original_error: Option<Box<OriginalValueErrorFacts>>,
 }
 
 /// Typed original contents whose scalar representation shares its node's sourced cell.
@@ -68,9 +68,28 @@ pub(crate) enum SourcePayload<'source> {
     },
     RecordReference {
         #[schemars(with = "CatalogRecordReference")]
-        value: SourceRecordReference<'source>,
+        value: Box<SourceRecordReference<'source>>,
     },
     WeakReference {
-        value: SourceWeakReference<'source>,
+        value: Box<SourceWeakReference<'source>>,
     },
+}
+
+#[cfg(test)]
+mod tests {
+    use std::mem::size_of;
+
+    use super::{SourceNode, SourcePayload, SourceRecordReference, SourceWeakReference};
+
+    #[test]
+    fn scalar_nodes_store_reference_payloads_indirectly() {
+        assert!(
+            size_of::<SourcePayload<'_>>() < size_of::<SourceRecordReference<'_>>(),
+            "scalar payloads must not allocate space for resolved references"
+        );
+        assert!(
+            size_of::<SourceNode<'_>>() < size_of::<SourceWeakReference<'_>>(),
+            "an ordinary node, including error and origin storage, must fit below a weak reference"
+        );
+    }
 }

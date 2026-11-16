@@ -225,7 +225,7 @@ impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
             if !compatible {
                 value.status = DefinitionStatus::UnexpectedTargetType;
             }
-            return Ok(Some((OriginalValuePart::Value, Box::new(value))));
+            return Ok(Some((OriginalValuePart::Value, value)));
         }
         Ok(
             link::read(fact, sources)?.and_then(|(part, link)| match link {

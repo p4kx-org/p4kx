@@ -11,28 +11,20 @@ use crate::catalog_template_modules::template_action_layout::{
 };
 use crate::record_read::ReadError;
 use crate::source_fields::FieldCapture;
-use crate::template_action_meaning::{ActionMeaning, RandomPhaseMeaning};
+use crate::template_action_meaning::ActionMeaning;
 use crate::template_flow_plan::{FlowPlan, FlowRole, RoleSelection};
 use crate::template_issues::{TemplateError, Unknowns};
 use crate::template_reference_index::TemplateReferences;
-use crate::template_source::TemplateSourceValue;
-use crate::template_source_meaning::{ConditionMeaning, TriggerMeaning};
+use crate::template_source::{TemplateSourceValue, TemplateValueMeaning};
+use crate::template_source_meaning::ConditionMeaning;
 use crate::template_source_members::TemplateMembers;
 use crate::template_source_read;
 use crate::{CatalogError, ExportAccountingError};
 
-#[derive(Default)]
-struct Meanings {
-    condition: Option<ConditionMeaning>,
-    action: Option<ActionMeaning>,
-    random_phase: Option<RandomPhaseMeaning>,
-    trigger: Option<TriggerMeaning>,
-}
-
 /// Interpreted Flow roles kept until the shared original inventory is emitted.
 pub(crate) struct FlowMeanings<'members, 'fields, 'scope, 'read, 'source> {
     members: &'members TemplateMembers<'fields, 'scope, 'read, 'source>,
-    values: BTreeMap<u64, Meanings>,
+    values: BTreeMap<u64, TemplateValueMeaning>,
 }
 
 pub(crate) struct PreparedFlow<'members, 'fields, 'scope, 'read, 'source> {
@@ -91,12 +83,11 @@ fn role_meaning<'fields, 'scope, 'read, 'source>(
     unknowns: Option<&Unknowns>,
     capture: &dyn FieldCapture<'source>,
     failure: &mut Option<ReadError>,
-) -> Result<Meanings, CatalogError> {
-    let mut value = Meanings::default();
-    match role.role {
-        FlowRole::Trigger => {
-            value.trigger = Some(crate::template_trigger_read::read(members, role.fact)?);
-        }
+) -> Result<TemplateValueMeaning, CatalogError> {
+    Ok(match role.role {
+        FlowRole::Trigger => TemplateValueMeaning::Trigger(Box::new(
+            crate::template_trigger_read::read(members, role.fact)?,
+        )),
         FlowRole::Condition => {
             let condition = crate::template_condition_read::read(
                 members,
@@ -114,7 +105,7 @@ fn role_meaning<'fields, 'scope, 'read, 'source>(
                     capture,
                 )?);
             }
-            value.condition = Some(condition);
+            TemplateValueMeaning::Condition(Box::new(condition))
         }
         FlowRole::Action => {
             let action = crate::template_action_read::action(
@@ -126,20 +117,18 @@ fn role_meaning<'fields, 'scope, 'read, 'source>(
             if role.required && failure.is_none() {
                 *failure = action_failure(members, role.fact, &action, capture)?;
             }
-            value.action = Some(action);
+            TemplateValueMeaning::Action(Box::new(action))
         }
-        FlowRole::RandomPhase => {
-            value.random_phase = Some(crate::template_action_read::phase(
-                members, references, role.fact,
-            )?);
-        }
+        FlowRole::RandomPhase => TemplateValueMeaning::RandomPhase(Box::new(
+            crate::template_action_read::phase(members, references, role.fact)?,
+        )),
         FlowRole::RandomActionEntry => {
             if role.required && failure.is_none() {
                 *failure = entry_failure(members, role.fact, capture)?;
             }
+            TemplateValueMeaning::None
         }
-    }
-    Ok(value)
+    })
 }
 
 fn action_failure<'scope, 'read, 'source>(
@@ -199,14 +188,10 @@ impl<'members, 'fields, 'scope, 'read, 'source>
             values: mut meanings,
         } = self;
         let source = template_source_read::read(members, references, |fact, original| {
-            let meaning = meanings.remove(&fact.ordinal()).unwrap_or_default();
             Ok(TemplateSourceValue {
                 source_ordinal: DecimalU64::new(fact.ordinal()),
                 original,
-                condition: meaning.condition,
-                action: meaning.action,
-                random_phase: meaning.random_phase,
-                trigger: meaning.trigger,
+                meaning: meanings.remove(&fact.ordinal()).unwrap_or_default(),
             })
         })?;
         if !meanings.is_empty() {

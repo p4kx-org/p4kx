@@ -5,6 +5,13 @@ PTU `13189690` Nyx Starmap diagnostic export was 2.995 GB. Both measurements pre
 source-use IDs. These Filter-scoped exports establish section sizes. Current complete output size,
 compression and peak memory still need to be measured. [Size investigation](https://github.com/p4kx-org/p4kx/issues/1151)
 
+An unfiltered Windows AMD64 LIVE trial using the release producer for `2f134fbfc`
+reached 46.68 GiB of sampled peak working set during `project-contract-generators`.
+The host fell below the 12 GiB physical-memory reserve before JSON sizing or publication,
+so this run provides no encoded or decoded size. The process working set grew from 6.10 GiB
+to 36.70 GiB during `records` and from 40.38 GiB to 44.30 GiB during
+`project-mission-broker-entries`. [Release producer](https://github.com/p4kx-org/p4kx/actions/runs/43803352398/job/133089995250)
+
 | Section | LIVE | PTU |
 | --- | ---: | ---: |
 | `placements.containerInstances` | 1.734 GB | 2.046 GB |
