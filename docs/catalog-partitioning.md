@@ -30,6 +30,18 @@ process before JSON sizing or publication. The trial preceded the singleton Enti
 class index and prefab-inventory ownership changes.
 [Release producer](https://github.com/p4kx-org/p4kx/actions/runs/43826004006/job/133160321493)
 
+A fourth unfiltered trial used the Windows AMD64 release artifact of merge
+`bcd39e238` on the same LIVE Archive with four Rayon workers. Compared with
+the third trial, the sampled working-set peak fell from 32.39 to 28.05 GiB
+during `records` and from 41.79 to 36.37 GiB during
+`project-contract-generators`. Available physical memory at launch was
+50.41 GiB, compared with 50.34 GiB in the third trial. The new run passed
+the contract and configuration phases and reached `project-weapon-animation`.
+The local reserve stopped it at 40.61 GiB working set and 42.04 GiB private
+bytes, with 11.81 GiB physical memory and 36.78 GiB system commit headroom
+available. The writer had yet to size or publish JSON.
+[Release producer](https://github.com/p4kx-org/p4kx/actions/runs/43837672769/job/133201840292)
+
 | Section | LIVE | PTU |
 | --- | ---: | ---: |
 | `placements.containerInstances` | 1.734 GB | 2.046 GB |
