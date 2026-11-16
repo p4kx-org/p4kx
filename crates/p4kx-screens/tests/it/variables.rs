@@ -10,7 +10,9 @@ use p4kx_screens::{
 };
 use p4kx_testkit::{TestCanvas, TestDim, TestInstance, TestOp, TestValue, TestWidget};
 
-use crate::support::{RED, SCREEN, TestResult, database, empty_at, guid_text, red_at, stage};
+use crate::support::{
+    RED, SCREEN, TestResult, database, empty_at, guid_text, near, pixel, red_at, stage,
+};
 
 const INNER: u128 = SCREEN + 0x100;
 
@@ -163,6 +165,102 @@ fn a_numeric_field_accepts_zero_and_diagnoses_an_invalid_setting() -> TestResult
     assert_eq!(issue.source.as_deref(), Some("/seatdashboard/level"));
     assert_eq!(issue.code, ContentOmissionCode::UnresolvedInput);
     assert!(red_at(&invalid.rasterize(&stage())?.image, 5, 5));
+    Ok(())
+}
+
+fn scalar_fields(alpha: TestOp, visibility: TestOp) -> TestCanvas {
+    let bar = |name, x| {
+        TestWidget::display(name)
+            .size(TestDim::Fixed(3.0), TestDim::Fixed(10.0))
+            .offset(x, 0.0)
+            .background(RED)
+    };
+    canvas()
+        .operation("alpha_input", alpha)
+        .operation("visibility_input", visibility)
+        .widget(bar("fade", 0.0).alpha(0.5))
+        .widget(bar("instantiation", 3.0))
+        .widget(bar("activity", 6.0))
+        .operation("fade", TestOp::NumField("fade", "Alpha", "alpha_input"))
+        .operation(
+            "instantiate",
+            TestOp::BoolField("instantiation", "Instantiated", "visibility_input"),
+        )
+        .operation(
+            "activate",
+            TestOp::BoolField("activity", "IsActive", "visibility_input"),
+        )
+}
+
+#[test]
+fn a_mismatched_scalar_binding_reports_its_widget_and_preserves_its_saved_state() -> TestResult {
+    let screen = scalar_fields(
+        TestOp::NamedLocalVar("/seatdashboard/label"),
+        TestOp::NamedNumVar("/seatdashboard/level"),
+    );
+    let composed = compose_with(vec![screen.record()], &["label=0", "level=0"])?;
+    let image = composed.rasterize(&stage())?.image;
+    assert!(
+        near(pixel(&image, 1, 5), [255, 0, 0, 128], 3),
+        "saved alpha"
+    );
+    assert!(red_at(&image, 4, 5), "saved instantiation");
+    assert!(red_at(&image, 7, 5), "saved activity");
+
+    let omissions = &composed.report().content_omissions;
+    let actual = omissions
+        .iter()
+        .map(|row| {
+            (
+                row.widget.as_str(),
+                row.widget_input.slot,
+                row.field.as_str(),
+                row.source.as_deref(),
+                row.code,
+            )
+        })
+        .collect::<Vec<_>>();
+    let unresolved = ContentOmissionCode::UnresolvedInput;
+    assert_eq!(
+        actual,
+        [
+            ("fade", 0, "Alpha", Some("/seatdashboard/label"), unresolved),
+            (
+                "instantiation",
+                1,
+                "Instantiated",
+                Some("/seatdashboard/level"),
+                unresolved,
+            ),
+            (
+                "activity",
+                2,
+                "IsActive",
+                Some("/seatdashboard/level"),
+                unresolved
+            ),
+        ],
+        "each mismatch belongs to its authored slot, field and variable"
+    );
+    Ok(())
+}
+
+#[test]
+fn scalar_bindings_accept_explicit_zero_and_false() -> TestResult {
+    let screen = scalar_fields(
+        TestOp::NamedNumVar("/seatdashboard/level"),
+        TestOp::NamedBoolVar("/seatdashboard/visible"),
+    );
+    let composed = compose_with(vec![screen.record()], &["level=0", "visible=false"])?;
+    let image = composed.rasterize(&stage())?.image;
+    assert!(empty_at(&image, 1, 5), "zero alpha");
+    assert!(empty_at(&image, 4, 5), "false instantiation");
+    assert!(empty_at(&image, 7, 5), "false activity");
+    assert_eq!(
+        composed.report().content_omissions,
+        [],
+        "valid scalar inputs produce no omissions"
+    );
     Ok(())
 }
 

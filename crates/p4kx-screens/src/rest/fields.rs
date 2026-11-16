@@ -118,7 +118,7 @@ impl AtRest {
                 if let Some(why) = layout_problem(field, &value) {
                     return Err(why.to_owned());
                 }
-                self.set(binding.widget, field, value);
+                self.set(binding.widget, field, value)?;
             }
             _ => self.omit(eval, binding, ContentOmissionCode::UnsupportedField, None),
         }

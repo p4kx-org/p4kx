@@ -69,7 +69,12 @@ pub(crate) fn key_of(inputs: &[(String, Rest)], texts: &[(String, String)]) -> u
 }
 
 impl AtRest {
-    pub(super) fn set(&mut self, widget: usize, field: &str, value: Rest) {
+    pub(super) fn set(
+        &mut self,
+        widget: usize,
+        field: &str,
+        value: Rest,
+    ) -> Result<(), &'static str> {
         match (field, value) {
             ("Instantiated", Rest::Bool(flag)) => {
                 self.instantiated.insert(widget, flag);
@@ -85,6 +90,8 @@ impl AtRest {
                 let alpha = number.clamp(0.0, 1.0) as f32;
                 self.alpha.insert(widget, alpha);
             }
+            ("Instantiated" | "IsActive", _) => return Err("a value that is not a boolean"),
+            ("Alpha", _) => return Err("a value that is not a number"),
             (field, Rest::Num(number)) if GeometryModifiers::has_field(field) => {
                 #[expect(
                     clippy::cast_possible_truncation,
@@ -103,6 +110,7 @@ impl AtRest {
             }
             _ => {}
         }
+        Ok(())
     }
 
     /// Sets the localised parameter `parameter` that widget `widget` hands to its canvas.
