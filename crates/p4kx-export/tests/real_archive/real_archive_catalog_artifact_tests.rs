@@ -4,7 +4,7 @@
 use std::fs;
 use std::io::Write as _;
 
-use super::{FRAME, RAW, Sizes, reconcile, support::TestResult};
+use super::{FRAME, RAW, Sizes, read_completed, reconcile, support::TestResult};
 
 const CATALOG: &str = concat!(
     r#"{"schemaVersion":3,"texts":{"example":"München"},"provenance":{"sources":[],"uses":[]}}"#,
@@ -73,4 +73,41 @@ const fn sizes(frame: &[u8], decoded_bytes: u64) -> Sizes {
         decoded: decoded_bytes,
         file: frame.len() as u64,
     }
+}
+
+#[test]
+fn completed_measurement_can_be_read_without_writing_another_catalog() -> TestResult {
+    let directory = tempfile::tempdir()?;
+    let frame = encoded()?;
+    fs::write(directory.path().join(FRAME), &frame)?;
+    let receipt = directory.path().join("receipt.private.json");
+    let write_receipt = |status, decoded| {
+        fs::write(
+            &receipt,
+            serde_json::to_vec(&serde_json::json!({
+                "status": status,
+                "mode": "normal",
+                "sizes": {"encodedBytes": frame.len(), "fileBytes": frame.len(), "decodedBytes": decoded}
+            }))?,
+        )?;
+        Ok::<(), Box<dyn std::error::Error>>(())
+    };
+    let read = || {
+        read_completed(directory.path(), |stream| {
+            let mut json = String::new();
+            stream.read_to_string(&mut json)?;
+            Ok(json)
+        })
+    };
+    write_receipt("complete", CATALOG.len())?;
+    assert_eq!(read()?, CATALOG, "reuse the exact encoded bytes");
+    assert!(
+        !directory.path().join(RAW).exists(),
+        "reusing the catalog publishes no raw output"
+    );
+    write_receipt("complete", CATALOG.len() + 1)?;
+    assert!(read().is_err(), "verify the precise decoded count");
+    write_receipt("stopped-host-headroom", CATALOG.len())?;
+    assert!(read().is_err(), "refuse unfinished measurements");
+    Ok(())
 }

@@ -2,12 +2,13 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::fs::{self, File};
-use std::io::{self, BufReader};
+use std::io::{self, BufReader, Read};
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
 use super::{sections, support};
+use crate::real_archive_catalog_pipe::CountingReader;
 
 const FRAME: &str = "p4kx-catalog.json.zst";
 const RAW: &str = "p4kx-catalog.json";
@@ -35,11 +36,7 @@ fn reconcile_completed_catalog_artifact() -> support::TestResult {
     let directory = std::env::var_os("P4KX_CATALOG_MEASUREMENT_DIR")
         .map(PathBuf::from)
         .ok_or("P4KX_CATALOG_MEASUREMENT_DIR is required")?;
-    let receipt = File::open(directory.join("receipt.private.json"))?;
-    let measurement: Measurement = serde_json::from_reader(BufReader::new(receipt))?;
-    if measurement.status != "complete" || measurement.mode != "normal" {
-        return Err("the measurement receipt must describe a completed normal export".into());
-    }
+    let measurement = Measurement::load(&directory)?;
     let census = reconcile(&directory, &measurement.sizes)?;
     support::print_line(&format!(
         "catalog artifact {}",
@@ -48,11 +45,42 @@ fn reconcile_completed_catalog_artifact() -> support::TestResult {
     Ok(())
 }
 
-fn reconcile(directory: &Path, sizes: &Sizes) -> support::TestResult<sections::Census> {
+impl Measurement {
+    fn load(directory: &Path) -> support::TestResult<Self> {
+        let receipt = File::open(directory.join("receipt.private.json"))?;
+        let measurement: Self = serde_json::from_reader(BufReader::new(receipt))?;
+        if measurement.status != "complete" || measurement.mode != "normal" {
+            return Err("the measurement receipt must describe a completed normal export".into());
+        }
+        Ok(measurement)
+    }
+}
+
+fn open_frame(directory: &Path, sizes: &Sizes) -> support::TestResult<File> {
     let frame = File::open(directory.join(FRAME))?;
     if frame.metadata()?.len() != sizes.encoded || sizes.file != sizes.encoded {
         return Err("compressed file length differs from the producer receipt".into());
     }
+    Ok(frame)
+}
+
+pub(crate) fn read_completed<T>(
+    directory: &Path,
+    consume: impl FnOnce(&mut dyn Read) -> support::TestResult<T>,
+) -> support::TestResult<T> {
+    let measurement = Measurement::load(directory)?;
+    let frame = open_frame(directory, &measurement.sizes)?;
+    let decoder = zstd::stream::read::Decoder::new(frame)?;
+    let mut input = BufReader::new(CountingReader::new(decoder));
+    let projection = consume(&mut input)?;
+    if input.read(&mut [0])? != 0 || input.into_inner().byte_count() != measurement.sizes.decoded {
+        return Err("decoded catalog length differs from the completed measurement".into());
+    }
+    Ok(projection)
+}
+
+fn reconcile(directory: &Path, sizes: &Sizes) -> support::TestResult<sections::Census> {
+    let frame = open_frame(directory, sizes)?;
     let raw = directory.join(RAW);
     match fs::symlink_metadata(&raw) {
         Err(error) if error.kind() == io::ErrorKind::NotFound => {}

@@ -4,6 +4,7 @@
 use std::collections::BTreeMap;
 use std::fmt;
 use std::io::Read;
+use std::path::Path;
 
 use p4kx_export::{CatalogOptions, CatalogSummary, Compression, Kind, SCHEMA_VERSION};
 use p4kx_extraction::Archive;
@@ -12,6 +13,7 @@ use serde::de::{DeserializeSeed, IgnoredAny, MapAccess, Visitor};
 use serde_json::{Map, Value};
 
 use crate::catalog_v3_consumer;
+use crate::real_archive_catalog_size::artifact;
 
 #[path = "real_archive_item_text_capture.rs"]
 mod item_capture;
@@ -22,7 +24,7 @@ mod pipe;
 #[path = "real_archive_text_census_tests.rs"]
 mod tests;
 
-type TestResult<T> = Result<T, Box<dyn std::error::Error>>;
+pub(super) type TestResult<T> = Result<T, Box<dyn std::error::Error>>;
 
 pub(super) fn write_catalog(
     archive: &Archive,
@@ -39,15 +41,20 @@ pub(super) fn write_catalog(
     if capture.bytes != summary.size() {
         return Err("text census byte count differs from the catalog writer".into());
     }
-    if capture
-        .document
-        .get("schemaVersion")
-        .and_then(Value::as_u64)
-        != Some(u64::from(SCHEMA_VERSION))
-    {
+    Ok((summary, schema_v3(capture.document)?))
+}
+
+pub(super) fn read_completed_catalog(directory: &Path) -> TestResult<Value> {
+    let paths = TextPaths::catalog();
+    let projection = artifact::read_completed(directory, |decoded| Ok(paths.read(decoded)?))?;
+    schema_v3(projection)
+}
+
+fn schema_v3(document: Value) -> TestResult<Value> {
+    if document.get("schemaVersion").and_then(Value::as_u64) != Some(u64::from(SCHEMA_VERSION)) {
         return Err("the text census requires catalog schema v3".into());
     }
-    Ok((summary, capture.document))
+    Ok(document)
 }
 
 #[derive(Default)]
@@ -65,6 +72,12 @@ impl TextPaths {
         for path in [
             "/schemaVersion",
             "/source",
+            "/completeness",
+            "/exportHealth/status",
+            "/exportHealth/read",
+            "/exportHealth/projection",
+            "/exportHealth/publicationMode",
+            "/exportHealth/kinds",
             "/texts",
             "/configurations/contractTemplates",
             "/configurations/missionBrokerEntries",

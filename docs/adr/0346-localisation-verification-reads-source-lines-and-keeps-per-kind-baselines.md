@@ -49,15 +49,15 @@ contribute to the same per-kind denominators. The new group and scope descriptio
 description, gameplay-property unit formats and name overrides have independent contradiction
 checks. A source translation gap in an added field leaves the existing denominator unchanged.
 
-The ignored LIVE text check runs a single unfiltered catalog writer before comparing the current
-Build identity and English and German source lines:
+The ignored LIVE text check compares the current Build identity and English and German source
+lines with an unfiltered catalog.
 
 ~~~powershell
 cargo test --locked -p p4kx-export --test real_archive -- installed_live_catalog_texts_match_the_independent_source_oracle --ignored --nocapture
 ~~~
 
 Set the installed LIVE Archive through `P4KX_DATA_P4K` and use the configured testkit key source
-and task-local `TMP` and `TEMP`. The ordinary catalog writer sends JSON through an anonymous
+and task-local `TMP` and `TEMP`. By default a catalog writer sends JSON through an anonymous
 pipe to the text verification reader. The reader keeps the schema-v3 sections needed by the
 existing per-kind comparisons, including original mission graphs and the shared language tables.
 It discards unrelated sections as it consumes the stream and checks the exact written byte count.
@@ -66,6 +66,12 @@ carriers and text references used by the oracle. The decoder still checks the sy
 Item fields, and synthetic cases compare the results with a fully decoded document.
 The test logs elapsed time for Record progress, opening the output sink and finishing JSON
 decoding. These milestones let a process-memory sample be assigned to preparation or output.
-This check writes no catalog file. It requires complete reads and projections for the text
-families with baselines and allows unrelated diagnostic partial publication. The full
-installed-Archive suite verifies the normal publication, size and schema separately.
+This check writes no catalog file. By default it requires complete reads and projections for
+the text families with baselines and allows unrelated diagnostic partial publication.
+
+To reuse a [completed normal measurement](../catalog-partitioning.md#reconciling-an-existing-measurement)
+set `P4KX_CATALOG_MEASUREMENT_DIR` for the same test. The reader streams the compressed file
+in place. It checks receipt lengths, schema version, unfiltered selection, normal export health
+and the catalog's Build and Archive stamp before comparing the original translations.
+
+The full installed-Archive suite verifies publication size and schema separately.
