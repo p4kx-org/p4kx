@@ -231,6 +231,10 @@ Within `projections`, record `resolve-loadouts`, `project-locations`, `project-m
 `project-blueprint-tables`, `resolve-cargo-capacities`, `project-facility-loadouts`,
 `project-facility-interiors` when present, `project-resource-topology` and
 `project-starmap-placements`.
+Pending localization keys retain per-language lookup outcomes and their source uses.
+Finalizing the text registries reconstructs the text forms from the in-memory localization index.
+These lookups add CPU work and require no temporary storage or additional Archive reads.
+
 Record peak working set and peak private bytes separately.
 Sample host commit and paging counters alongside the process write counter to distinguish process
 writes from system memory pressure. Record the exit status, elapsed time, file length and decoded

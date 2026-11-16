@@ -61,7 +61,7 @@ pub struct KindTextSummary {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Outcome {
+pub(super) enum Outcome {
     Resolved,
     MissingLanguage,
     MissingKey,
@@ -71,42 +71,41 @@ enum Outcome {
 }
 
 #[derive(Clone, Copy)]
-pub(super) enum Lookup<'lookup, 'source> {
+pub(super) enum Lookup {
     Placeholder,
-    Projected(&'lookup Translations<'source>),
+    Projected([Outcome; CATALOG_LANGUAGES.len()]),
 }
 
-impl<'lookup, 'source> Lookup<'lookup, 'source> {
-    pub(super) const fn from_projection(
-        translations: &'lookup Translations<'source>,
-        looked_up: bool,
-    ) -> Self {
-        if looked_up {
-            Self::Projected(translations)
-        } else {
-            Self::Placeholder
-        }
-    }
-
-    pub(super) fn recount(self, texts: &Texts<'_>) {
-        match self {
-            Self::Placeholder => texts.note_placeholder(),
-            Self::Projected(_) => {
-                texts.note_languages(|language| self.outcome(language) == Outcome::Resolved);
-            }
-        }
-    }
-
-    fn outcome(self, language: Language) -> Outcome {
-        match self {
-            Self::Placeholder => Outcome::Placeholder,
-            Self::Projected(translations) => match translations.get(&language) {
+impl Lookup {
+    pub(super) fn from_projection(translations: &Translations<'_>) -> Self {
+        Self::Projected(
+            CATALOG_LANGUAGES.map(|language| match translations.get(&language) {
                 None => Outcome::MissingLanguage,
                 Some(None) => Outcome::MissingKey,
                 Some(Some(text)) if text.source.is_empty() => Outcome::EmptySource,
                 Some(Some(text)) if text.display.is_empty() => Outcome::EmptyDisplay,
                 Some(Some(_)) => Outcome::Resolved,
-            },
+            }),
+        )
+    }
+
+    pub(super) const fn was_projected(self) -> bool {
+        matches!(self, Self::Projected(_))
+    }
+
+    pub(super) fn recount(self, texts: &Texts<'_>) {
+        match self {
+            Self::Placeholder => texts.note_placeholder(),
+            Self::Projected(outcomes) => {
+                texts.note_languages(outcomes.map(|outcome| outcome == Outcome::Resolved));
+            }
+        }
+    }
+
+    const fn outcomes(self) -> [Outcome; CATALOG_LANGUAGES.len()] {
+        match self {
+            Self::Placeholder => [Outcome::Placeholder; CATALOG_LANGUAGES.len()],
+            Self::Projected(outcomes) => outcomes,
         }
     }
 }
@@ -153,10 +152,10 @@ pub(super) struct KindTextCoverage {
 }
 
 impl KindTextCoverage {
-    pub(super) fn record(&mut self, owner: TextOwner, lookup: Lookup<'_, '_>) {
+    pub(super) fn record(&mut self, owner: TextOwner, lookup: Lookup) {
         let counts = self.by_owner.entry(owner).or_default();
-        for (total, language) in counts.iter_mut().zip(CATALOG_LANGUAGES) {
-            total.note(lookup.outcome(language));
+        for (total, outcome) in counts.iter_mut().zip(lookup.outcomes()) {
+            total.note(outcome);
         }
     }
 

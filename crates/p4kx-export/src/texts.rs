@@ -141,13 +141,14 @@ impl<'e> Texts<'e> {
     }
 
     /// Counts one lookup occurrence per supported language from prepared outcomes.
-    pub(crate) fn note_languages(&self, mut resolved: impl FnMut(Language) -> bool) {
-        for count in &self.languages {
-            count.note(resolved(count.language));
+    pub(crate) fn note_languages(&self, resolved: [bool; CATALOG_LANGUAGES.len()]) {
+        for (count, resolved) in self.languages.iter().zip(resolved) {
+            count.note(resolved);
         }
     }
 
-    fn lookup_forms(&self, language: Language, key: &str) -> Option<TextProjection<'e>> {
+    /// Returns the winning forms without recording another lookup.
+    pub(crate) fn lookup_forms(&self, language: Language, key: &str) -> Option<TextProjection<'e>> {
         if is_placeholder_key(key) {
             return None;
         }

@@ -40,8 +40,7 @@ struct Pending<'source> {
     key: &'source str,
     payloads: Vec<SourceUse>,
     selectors: Vec<SourceUse>,
-    translations: Translations<'source>,
-    looked_up: bool,
+    lookup: Lookup,
 }
 
 #[derive(Default)]
@@ -231,15 +230,14 @@ impl<'context, 'source> CatalogProjection<'context, 'source> {
         render: impl FnOnce(&Translations<'source>, &SelectedKey) -> Result<T, CatalogError>,
     ) -> Result<(GameTextRef, T), CatalogError> {
         let observed = key.retain(self.origins())?;
-        let translations = self.translations(key.text, false);
+        let translations = self.translations(key.text);
         let value = render(&translations, &observed)?;
         self.insert_pending(
             Domain::GameText,
             key.text,
             observed.payload,
             observed.selector,
-            translations,
-            true,
+            Lookup::from_projection(&translations),
         )?;
         Ok((GameTextRef(identifier(Domain::GameText, key.text)), value))
     }
@@ -258,7 +256,11 @@ impl<'context, 'source> CatalogProjection<'context, 'source> {
             let owner = self
                 .owner
                 .ok_or(ExportAccountingError::UnscopedCatalogText)?;
-            let lookup = Lookup::from_projection(&row.translations, !placeholder);
+            let lookup = if placeholder {
+                Lookup::Placeholder
+            } else {
+                row.lookup
+            };
             lookup.recount(self.texts);
             coverage.record(owner, lookup);
             row.payloads.push(payload);
@@ -266,24 +268,19 @@ impl<'context, 'source> CatalogProjection<'context, 'source> {
             return Ok(());
         }
         drop(state);
-        if placeholder {
+        let lookup = if placeholder {
             self.texts.note_placeholder();
-        }
-        let translations = self.translations(key, placeholder);
-        self.insert_pending(domain, key, payload, selector, translations, !placeholder)
+            Lookup::Placeholder
+        } else {
+            Lookup::from_projection(&self.translations(key))
+        };
+        self.insert_pending(domain, key, payload, selector, lookup)
     }
 
-    fn translations(&self, key: &str, placeholder: bool) -> Translations<'source> {
+    fn translations(&self, key: &str) -> Translations<'source> {
         CATALOG_LANGUAGES
             .into_iter()
-            .map(|language| {
-                let text = if placeholder {
-                    None
-                } else {
-                    self.texts.project(language, key)
-                };
-                (language, text)
-            })
+            .map(|language| (language, self.texts.project(language, key)))
             .filter(|(language, _)| self.origins().locale(*language).is_some())
             .collect()
     }
@@ -294,14 +291,13 @@ impl<'context, 'source> CatalogProjection<'context, 'source> {
         key: &'source str,
         payload: SourceUse,
         selector: SourceUse,
-        translations: Translations<'source>,
-        looked_up: bool,
+        lookup: Lookup,
     ) -> Result<(), CatalogError> {
         let mut state = crate::export_evidence_lock::lock(&self.registry.state)?;
         let owner = self
             .owner
             .ok_or(ExportAccountingError::UnscopedCatalogText)?;
-        let lookup = Lookup::from_projection(&translations, looked_up);
+
         state.coverage.record(owner, lookup);
         let row = state
             .pending
@@ -310,8 +306,7 @@ impl<'context, 'source> CatalogProjection<'context, 'source> {
                 key,
                 payloads: Vec::new(),
                 selectors: Vec::new(),
-                translations,
-                looked_up,
+                lookup,
             });
         row.payloads.push(payload);
         row.selectors.push(selector);
@@ -331,10 +326,10 @@ impl<'context, 'source> CatalogProjection<'context, 'source> {
         for ((domain, key), row) in rows {
             match domain {
                 Domain::PublicName => {
-                    public_names.push(self.row(row, PublicNameRef(identifier(domain, key)))?);
+                    public_names.push(self.row(&row, PublicNameRef(identifier(domain, key)))?);
                 }
                 Domain::GameText => {
-                    game_texts.push(self.row(row, GameTextRef(identifier(domain, key)))?);
+                    game_texts.push(self.row(&row, GameTextRef(identifier(domain, key)))?);
                 }
             }
         }
@@ -351,15 +346,21 @@ impl<'context, 'source> CatalogProjection<'context, 'source> {
 
     fn row<R>(
         &self,
-        row: Pending<'source>,
+        row: &Pending<'source>,
         id: R,
     ) -> Result<CanonicalText<'source, R>, CatalogError> {
         let uses = &self.origins().uses;
         let mut all_uses = row.selectors.clone();
         let mut translations = BTreeMap::new();
-        for (language, text) in row.translations {
+        let looked_up = row.lookup.was_projected();
+        for language in CATALOG_LANGUAGES {
             let Some(input) = self.origins().locale(language) else {
                 continue;
+            };
+            let text = if looked_up {
+                self.texts.lookup_forms(language, row.key)
+            } else {
+                None
             };
             let projection = catalog_text_forms::project(
                 uses,
@@ -367,7 +368,7 @@ impl<'context, 'source> CatalogProjection<'context, 'source> {
                 language,
                 &row.selectors,
                 text,
-                row.looked_up,
+                looked_up,
             )?;
             all_uses.extend(projection.uses);
             translations.insert(language.code().to_owned(), projection.forms);

@@ -5,7 +5,7 @@ use std::borrow::Cow;
 
 use super::{KindTextCoverage, KindTextSummary, Lookup, Outcome, TextOwner, Translations};
 use crate::Kind;
-use crate::texts::TextProjection;
+use crate::texts::{CATALOG_LANGUAGES, TextProjection};
 use p4kx_extraction::Language;
 
 #[test]
@@ -16,7 +16,7 @@ fn lookup_outcomes_distinguish_source_gaps_from_present_empty_values() {
         (Language::French, Some(text("", ""))),
         (Language::Italian, Some(text("  ", ""))),
     ]);
-    let lookup = Lookup::Projected(&translations);
+    let lookup = Lookup::from_projection(&translations);
 
     let expected = [
         (Language::English, Outcome::Resolved),
@@ -25,12 +25,16 @@ fn lookup_outcomes_distinguish_source_gaps_from_present_empty_values() {
         (Language::Italian, Outcome::EmptyDisplay),
         (Language::SpanishSpain, Outcome::MissingLanguage),
     ];
-    for (language, outcome) in expected {
-        assert_eq!(lookup.outcome(language), outcome, "lookup for {language:?}");
+    for (language, expected_outcome) in expected {
+        assert_eq!(
+            outcome(lookup, language),
+            Some(expected_outcome),
+            "lookup for {language:?}"
+        );
     }
     assert_eq!(
-        Lookup::Placeholder.outcome(Language::SpanishSpain),
-        Outcome::Placeholder,
+        outcome(Lookup::Placeholder, Language::SpanishSpain),
+        Some(Outcome::Placeholder),
         "a placeholder never attempts to look up a missing language"
     );
 }
@@ -44,15 +48,15 @@ fn coverage_counts_registrations_in_stable_owner_and_language_order() -> Result<
 
     counts.record(
         TextOwner::ConsumableSubtypes,
-        Lookup::Projected(&translations),
+        Lookup::from_projection(&translations),
     );
-    counts.record(ships, Lookup::Projected(&translations));
-    counts.record(items, Lookup::Projected(&translations));
-    counts.record(items, Lookup::Projected(&translations));
+    counts.record(ships, Lookup::from_projection(&translations));
+    counts.record(items, Lookup::from_projection(&translations));
+    counts.record(items, Lookup::from_projection(&translations));
     counts.record(items, Lookup::Placeholder);
     counts.record(
         TextOwner::ItemRecoveryPolicy,
-        Lookup::Projected(&translations),
+        Lookup::from_projection(&translations),
     );
 
     let result = counts.finish();
@@ -97,6 +101,13 @@ fn coverage_counts_registrations_in_stable_owner_and_language_order() -> Result<
         "one disjoint outcome per registration"
     );
     Ok(())
+}
+
+fn outcome(lookup: Lookup, language: Language) -> Option<Outcome> {
+    CATALOG_LANGUAGES
+        .into_iter()
+        .zip(lookup.outcomes())
+        .find_map(|(candidate, outcome)| (language == candidate).then_some(outcome))
 }
 
 const fn text<'source>(source: &'source str, display: &'source str) -> TextProjection<'source> {

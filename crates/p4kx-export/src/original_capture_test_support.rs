@@ -4,7 +4,7 @@
 use std::error::Error;
 
 use p4kx_extraction::{
-    Archive, DataForge, DataForgeEntry, DataForgeOrigin, InputScope, SourceInput,
+    Archive, DataForge, DataForgeEntry, DataForgeOrigin, InputScope, Language, SourceInput,
 };
 use p4kx_testkit::{ArchiveBuilder, TestEntry};
 
@@ -19,7 +19,7 @@ pub(crate) fn with_input(
     bytes: &[u8],
     check: impl FnOnce(&DataForge<'_>, &OriginalCatalogInput<'_, '_>) -> TestResult,
 ) -> TestResult {
-    with_sources(bytes, |forge, input, _| check(forge, input))
+    with_sources(bytes, &[], |forge, input, _| check(forge, input))
 }
 
 pub(crate) fn with_projection(
@@ -29,7 +29,18 @@ pub(crate) fn with_projection(
         &CatalogProjection<'context, 'source>,
     ) -> TestResult,
 ) -> TestResult {
-    with_sources(bytes, |forge, input, sources| {
+    with_localized_projection(bytes, &[], check)
+}
+
+pub(crate) fn with_localized_projection(
+    bytes: &[u8],
+    languages: &[(Language, &[u8])],
+    check: impl for<'source, 'context> FnOnce(
+        &'source DataForge<'source>,
+        &CatalogProjection<'context, 'source>,
+    ) -> TestResult,
+) -> TestResult {
+    with_sources(bytes, languages, |forge, input, sources| {
         let texts = crate::texts::Texts::parse(sources)?;
         let text_registry = CatalogTextRegistry::default();
         let projection = CatalogProjection::new(&texts, input, &text_registry);
@@ -39,6 +50,7 @@ pub(crate) fn with_projection(
 
 fn with_sources(
     bytes: &[u8],
+    languages: &[(Language, &[u8])],
     check: impl for<'context> FnOnce(
         &'context DataForge<'context>,
         &'context OriginalCatalogInput<'context, 'context>,
@@ -47,9 +59,11 @@ fn with_sources(
 ) -> TestResult {
     let folder = tempfile::tempdir()?;
     let path = folder.path().join("original-input.p4k");
-    ArchiveBuilder::new()
-        .entry(TestEntry::stored("Data\\Game2.dcb", bytes))
-        .write_to(&path)?;
+    let mut archive = ArchiveBuilder::new().entry(TestEntry::stored("Data\\Game2.dcb", bytes));
+    for &(language, text) in languages {
+        archive = archive.entry(TestEntry::stored(language.global_ini_path(), text));
+    }
+    archive.write_to(&path)?;
     let archive = Archive::open(path)?;
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;
