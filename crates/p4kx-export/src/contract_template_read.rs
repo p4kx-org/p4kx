@@ -5,6 +5,7 @@ use p4kx_extraction::{CancelToken, DataForge, Filter};
 
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_v3::tag_catalog::CapturedTags;
+use crate::export_field_inspection::WholeInspectionFold;
 use crate::record_read::{KindRead, read_kind};
 use crate::spawn_pools::SpawnPools;
 use crate::template_canonical_read;
@@ -31,13 +32,14 @@ pub(crate) fn read<'source>(
     tags: &CapturedTags<'_, 'source>,
     filter: Option<&Filter>,
     cancel: Option<&CancelToken>,
+    inspections: &mut WholeInspectionFold<'_>,
 ) -> Result<ContractTemplates<'source>, CatalogError> {
     let unknowns = Unknowns::default();
     let read = read_kind(
         forge,
         projection.original(),
         Kind::ContractTemplates,
-        (filter, cancel),
+        (filter, cancel, Some(inspections)),
         |record, tree| {
             template_canonical_read::read(projection, tags, record, tree, cancel, &unknowns)
                 .map_err(|error| Box::new(error) as crate::record_read::ReadError)

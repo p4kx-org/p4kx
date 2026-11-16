@@ -6,6 +6,7 @@ use rayon::prelude::*;
 
 use crate::build::original_input::OriginalCatalogInput;
 use crate::export_diagnostic::ExportSourceRole;
+use crate::export_field_inspection::WholeInspectionFold;
 use crate::export_ledger::{ExportLedger, SourceDisposition, SourceObservation};
 use crate::guid_text::{CatalogGuid, sort_by_guid};
 use crate::record_observation::RecordObservation;
@@ -74,7 +75,11 @@ pub(crate) fn read_kind<'f, T: Send>(
     forge: &'f DataForge<'f>,
     input: &OriginalCatalogInput<'_, '_>,
     kind: Kind,
-    (filter, cancel): (Option<&Filter>, Option<&CancelToken>),
+    (filter, cancel, inspections): (
+        Option<&Filter>,
+        Option<&CancelToken>,
+        Option<&mut WholeInspectionFold<'_>>,
+    ),
     build: impl Fn(&Record<'f>, &RecordTree<'f>) -> Result<T, ReadError> + Sync,
     guid: impl Fn(&T) -> CatalogGuid,
 ) -> Result<KindRead<'f, T>, CatalogError> {
@@ -82,7 +87,7 @@ pub(crate) fn read_kind<'f, T: Send>(
         forge,
         input,
         kind,
-        (filter, cancel),
+        (filter, cancel, inspections),
         |admission, tree| {
             let value = build(admission.record(), tree)?;
             Ok(RecordProjection {
@@ -99,7 +104,11 @@ pub(crate) fn read_kind_with_notes<'f, T: Send>(
     forge: &'f DataForge<'f>,
     input: &OriginalCatalogInput<'_, '_>,
     kind: Kind,
-    (filter, cancel): (Option<&Filter>, Option<&CancelToken>),
+    (filter, cancel, mut inspections): (
+        Option<&Filter>,
+        Option<&CancelToken>,
+        Option<&mut WholeInspectionFold<'_>>,
+    ),
     build: impl Fn(
         &RecordObservation<'_, 'f>,
         &RecordTree<'f>,
@@ -141,7 +150,12 @@ pub(crate) fn read_kind_with_notes<'f, T: Send>(
             reason = "reuse the indexed Rayon result buffer across Record windows"
         )]
         for result in pending.drain(..) {
-            let Some(observed) = result? else { continue };
+            let Some(mut observed) = result? else {
+                continue;
+            };
+            if let Some(inspections) = inspections.as_deref_mut() {
+                inspections.merge_matching(&mut observed.fields.field_inspections)?;
+            }
             read.ledger.observe(observed.source);
             read.ledger.merge(observed.fields);
             match observed.piece {
@@ -296,3 +310,7 @@ mod callback_error_tests;
 #[cfg(test)]
 #[path = "record_read_path_tests.rs"]
 mod path_boundary_tests;
+
+#[cfg(test)]
+#[path = "record_read_inspections_tests.rs"]
+mod inspection_tests;

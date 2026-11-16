@@ -9,6 +9,7 @@ use crate::broker_definition::BrokerDefinition;
 use crate::broker_entry::BrokerProjection;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_v3::tag_catalog::CapturedTags;
+use crate::export_field_inspection::WholeInspectionFold;
 use crate::mission_index::MissionIndex;
 use crate::record_read::{KindRead, read_kind};
 use crate::selection::Kind;
@@ -36,6 +37,7 @@ pub(crate) fn read<'source>(
     ),
     filter: Option<&Filter>,
     cancel: Option<&CancelToken>,
+    inspections: &mut WholeInspectionFold<'_>,
 ) -> Result<BrokerEntries<'source>, CatalogError> {
     let sources = Sources {
         projection,
@@ -47,7 +49,7 @@ pub(crate) fn read<'source>(
         forge,
         projection.original(),
         Kind::MissionBrokerEntries,
-        (filter, cancel),
+        (filter, cancel, Some(inspections)),
         |record, tree| {
             broker_canonical_read::read(&sources, record, tree, cancel)
                 .map_err(|error| Box::new(error) as crate::record_read::ReadError)

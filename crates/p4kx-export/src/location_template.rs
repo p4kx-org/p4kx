@@ -99,7 +99,7 @@ pub(crate) fn read<'f>(
         forge,
         projection.original(),
         Kind::MissionLocationTemplates,
-        (filter, cancel),
+        (filter, cancel, None),
         |admission, tree| template(projection, admission, tree, tags, cancel),
         |template| template.guid,
     )

@@ -84,6 +84,14 @@ impl FieldInspection {
 }
 
 impl FieldInspection {
+    const fn is_whole(&self) -> bool {
+        self.root_field.is_none() && self.configuration.is_none()
+    }
+
+    fn canonicalize_whole(&mut self) {
+        self.contextualize(None, ExportSourceRole::Dependency);
+    }
+
     pub(crate) fn merge(&mut self, other: Self) -> Result<(), ExportAccountingError> {
         if self != &other {
             return Err(ExportAccountingError::ConflictingFieldInspection);
@@ -135,6 +143,43 @@ impl PartialEq for FieldInspection {
 
 impl Eq for FieldInspection {}
 
+/// Matches whole inspections from sequential reads of the same physical Records.
+pub(crate) struct WholeInspectionFold<'a> {
+    earlier: &'a mut [FieldInspection],
+    positions: BTreeMap<u32, usize>,
+}
+
+impl<'a> WholeInspectionFold<'a> {
+    pub(crate) fn new(earlier: &'a mut [FieldInspection]) -> Self {
+        let mut positions = BTreeMap::new();
+        for (position, inspection) in earlier.iter().enumerate() {
+            if inspection.is_whole() {
+                positions.entry(inspection.record_index).or_insert(position);
+            }
+        }
+        Self { earlier, positions }
+    }
+
+    pub(crate) fn merge_matching(
+        &mut self,
+        inspections: &mut Vec<FieldInspection>,
+    ) -> Result<(), ExportAccountingError> {
+        let positions = &self.positions;
+        for mut inspection in inspections.extract_if(.., |inspection| {
+            inspection.is_whole() && positions.contains_key(&inspection.record_index)
+        }) {
+            let retained = positions
+                .get(&inspection.record_index)
+                .and_then(|&position| self.earlier.get_mut(position))
+                .ok_or(ExportAccountingError::ConflictingFieldInspection)?;
+            retained.canonicalize_whole();
+            inspection.canonicalize_whole();
+            retained.merge(inspection)?;
+        }
+        Ok(())
+    }
+}
+
 /// Immutable field receipts indexed by whole Record or the exact field consumed by a reader.
 #[derive(Default)]
 pub(crate) struct FieldInspections {
@@ -166,7 +211,7 @@ impl FieldInspections {
                 let key = (inspection.record_index, kind.index(), inspection.role);
                 Self::merge(indexed.scoped.entry(key), inspection)?;
             } else {
-                inspection.contextualize(None, ExportSourceRole::Dependency);
+                inspection.canonicalize_whole();
                 Self::merge(indexed.whole.entry(inspection.record_index), inspection)?;
             }
         }

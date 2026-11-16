@@ -197,8 +197,15 @@ pub(crate) fn read<'f>(
     let records = selected_generators(forge, input, filter, cancel, &mut grants)?;
     run.begin(CatalogStage::ReadMissionDependencies);
     let mut index = MissionIndex::read_captured(forge, input, filter, cancel, dependencies, tags)?;
-    let (pools, failures, ledger) = index.take_template_results();
+    let (pools, failures, mut ledger) = index.take_template_results();
     run.begin(CatalogStage::ProjectMissionDefinitions);
+    let siblings = mission_siblings::read(
+        forge,
+        projection,
+        (tags, &index),
+        run,
+        &mut ledger.field_inspections,
+    )?;
     let mut missions = Missions {
         ledger,
         contracts: Vec::new(),
@@ -208,7 +215,7 @@ pub(crate) fn read<'f>(
         skipped: 0,
         failures,
         pools,
-        siblings: mission_siblings::read(forge, projection, (tags, &index), run)?,
+        siblings,
         property_sets: MissionPropertySets::default(),
     };
     crate::mission_ledger::inventory(&mut missions.ledger);

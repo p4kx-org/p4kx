@@ -21,7 +21,7 @@ fn callback_preserves_cancellation_from_actual_original_work() -> TestResult {
             forge,
             input,
             Kind::ContractTemplates,
-            (None, None),
+            (None, None, None),
             |record, tree| {
                 let scope = input.record_scope(record, tree)?;
                 cancel.cancel();
@@ -52,7 +52,7 @@ fn callback_preserves_the_actual_foreign_input_source_error() -> TestResult {
                 forge,
                 input,
                 Kind::ContractTemplates,
-                (None, None),
+                (None, None, None),
                 |record, tree| {
                     foreign.record_scope(record, tree)?;
                     Ok(CatalogGuid(record.guid()))
@@ -81,7 +81,7 @@ fn callback_preserves_accounting_from_actual_same_site_operation() -> TestResult
             forge,
             input,
             Kind::ContractTemplates,
-            (None, None),
+            (None, None, None),
             |record, tree| {
                 let scope = input.record_scope(record, tree)?;
                 let mut walk = scope.walk(None);
@@ -118,7 +118,7 @@ fn ordinary_projection_error_keeps_the_existing_failed_row() -> TestResult {
             forge,
             input,
             Kind::ContractTemplates,
-            (None, None),
+            (None, None, None),
             |_, tree| {
                 let Some(Value::Struct(value)) = tree.field("payload") else {
                     return Err("genuine original domain-error input".into());

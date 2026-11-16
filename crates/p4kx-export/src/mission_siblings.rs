@@ -7,6 +7,7 @@ use crate::broker_entry_read::{self, BrokerEntries};
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_v3::tag_catalog::CapturedTags;
 use crate::contract_template_read::{self, ContractTemplates};
+use crate::export_field_inspection::{FieldInspection, WholeInspectionFold};
 use crate::location_template::{self, LocationTemplates};
 use crate::mission_index::MissionIndex;
 use crate::options::{CatalogRun, CatalogStage};
@@ -32,9 +33,11 @@ pub(crate) fn read<'f>(
     projection: &CatalogProjection<'_, 'f>,
     (captured_tags, index): (&CapturedTags<'_, 'f>, &MissionIndex<'f>),
     run: CatalogRun<'_, '_>,
+    dependencies: &mut [FieldInspection],
 ) -> Result<Siblings<'f>, CatalogError> {
     let filter = run.options.filter;
     let cancel = run.options.cancel;
+    let mut inspections = WholeInspectionFold::new(dependencies);
     run.begin(CatalogStage::ProjectContractTemplates);
     let contract_templates = contract_template_read::read(
         forge,
@@ -42,6 +45,7 @@ pub(crate) fn read<'f>(
         captured_tags,
         filter,
         cancel,
+        &mut inspections,
     )?;
     run.begin(CatalogStage::ProjectMissionBrokerEntries);
     let broker_entries = broker_entry_read::read(
@@ -50,6 +54,7 @@ pub(crate) fn read<'f>(
         (captured_tags, index, &contract_templates.unknowns),
         filter,
         cancel,
+        &mut inspections,
     )?;
     run.begin(CatalogStage::ProjectMissionLocationTemplates);
     let location_templates = location_template::read(

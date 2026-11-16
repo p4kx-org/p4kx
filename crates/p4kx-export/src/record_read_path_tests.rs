@@ -32,7 +32,7 @@ fn dedicated_kind_prefilter_does_not_replace_the_public_generic_selection_scan()
             forge,
             input,
             Kind::ContractTemplates,
-            (None, None),
+            (None, None, None),
             |record, _tree| {
                 calls.fetch_add(1, Ordering::Relaxed);
                 Ok(CatalogGuid(record.guid()))
@@ -111,7 +111,7 @@ fn filtered_and_successful_unretained_subjects_create_no_unused_header_payloads(
             forge,
             input,
             Kind::ContractTemplates,
-            (Some(&filter), None),
+            (Some(&filter), None, None),
             |record, _| Ok(record.index()),
             |_| CatalogGuid(p4kx_extraction::Guid::default()),
         )?;
@@ -124,7 +124,7 @@ fn filtered_and_successful_unretained_subjects_create_no_unused_header_payloads(
             forge,
             input,
             Kind::ContractTemplates,
-            (None, None),
+            (None, None, None),
             |record, _| Ok(record.index()),
             |_| CatalogGuid(p4kx_extraction::Guid::default()),
         )?;

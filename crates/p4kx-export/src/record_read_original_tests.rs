@@ -41,7 +41,7 @@ fn kind_callback_retains_the_actual_record_tree_pair_and_physical_aliases() -> T
                 forge,
                 input,
                 Kind::ContractTemplates,
-                (None, None),
+                (None, None, None),
                 project,
                 |(record, _)| CatalogGuid(record.guid()),
             )
@@ -179,7 +179,7 @@ fn reject_foreign(
         foreign,
         input,
         Kind::ContractTemplates,
-        (filter, None),
+        (filter, None, None),
         |record, _tree| {
             calls.fetch_add(1, Ordering::Relaxed);
             Ok(CatalogGuid(record.guid()))
@@ -228,7 +228,7 @@ fn canonical_failures(forge: &DataForge<'_>, input: &OriginalCatalogInput<'_, '_
         forge,
         input,
         Kind::ContractTemplates,
-        (None, None),
+        (None, None, None),
         |record, _tree| {
             calls.fetch_add(1, Ordering::Relaxed);
             Ok(CatalogGuid(record.guid()))
@@ -274,7 +274,7 @@ fn projection_failure() -> TestResult {
             forge,
             input,
             Kind::ContractTemplates,
-            (None, None),
+            (None, None, None),
             |record, tree| {
                 let item = project(record, tree)?;
                 if record.index() == 2 {
@@ -343,7 +343,7 @@ fn filtered_read(forge: &DataForge<'_>, input: &OriginalCatalogInput<'_, '_>) ->
         forge,
         input,
         Kind::ContractTemplates,
-        (Some(&filter), None),
+        (Some(&filter), None, None),
         project,
         |(record, _)| CatalogGuid(record.guid()),
     )?;
@@ -367,7 +367,7 @@ fn cancelled_read(forge: &DataForge<'_>, input: &OriginalCatalogInput<'_, '_>) {
         forge,
         input,
         Kind::ContractTemplates,
-        (None, Some(&cancel)),
+        (None, Some(&cancel), None),
         |record, _tree| {
             calls.fetch_add(1, Ordering::Relaxed);
             Ok(CatalogGuid(record.guid()))
