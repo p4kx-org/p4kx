@@ -4,7 +4,7 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 
-use p4kx_extraction::{CancelToken, SourceEvidenceError, StructValue, Value};
+use p4kx_extraction::{CancelToken, Field, SourceEvidenceError, StructValue, Value};
 
 use super::{OriginalRecordScope, OriginalValueEdge, OriginalValueEvent, OriginalValueFact};
 use crate::{CatalogError, ExportAccountingError};
@@ -15,7 +15,6 @@ pub(crate) struct OriginalFlowFields<'scope, 'read, 'source> {
     cancel: Option<&'scope CancelToken>,
     facts: Vec<OriginalValueFact<'scope, 'read, 'source>>,
     ends: Vec<Option<usize>>,
-    edges: HashMap<(Option<u64>, OriginalValueEdge), usize>,
     values: HashMap<*const (), usize>,
     structures: HashMap<*const StructValue<'source>, usize>,
     first_fields: RefCell<HashMap<Option<u64>, HashMap<&'source str, usize>>>,
@@ -42,7 +41,6 @@ impl<'scope, 'read, 'source> OriginalFlowFields<'scope, 'read, 'source> {
             cancel,
             facts: Vec::new(),
             ends: Vec::new(),
-            edges: HashMap::new(),
             values: HashMap::new(),
             structures: HashMap::new(),
             first_fields: RefCell::new(HashMap::new()),
@@ -79,15 +77,15 @@ impl<'scope, 'read, 'source> OriginalFlowFields<'scope, 'read, 'source> {
         }
         let index =
             usize::try_from(fact.ordinal()).map_err(|_| ExportAccountingError::CounterOverflow)?;
-        let edge = (fact.parent_ordinal(), fact.edge());
         let value = std::ptr::from_ref(fact.value()).cast::<()>();
         if index != self.facts.len()
-            || self.edges.contains_key(&edge)
+            || self
+                .child_value(fact.parent_ordinal(), fact.edge())
+                .is_none_or(|original| !std::ptr::eq(original, fact.value()))
             || self.values.contains_key(&value)
         {
             return Err(ExportAccountingError::ConflictingSourceDatum.into());
         }
-        self.edges.insert(edge, index);
         self.values.insert(value, index);
         let end = if matches!(fact.value(), Value::Struct(_) | Value::Array(_)) {
             None
@@ -152,18 +150,44 @@ impl<'scope, 'read, 'source> OriginalFlowFields<'scope, 'read, 'source> {
         edge: OriginalValueEdge,
     ) -> Result<&OriginalValueFact<'scope, 'read, 'source>, CatalogError> {
         self.check_cancel()?;
-        let index = self
-            .edges
-            .get(&(parent, edge))
+        let value = self
+            .child_value(parent, edge)
             .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
-        let fact = self
-            .facts
-            .get(*index)
-            .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+        let fact = self.fact(value)?;
         if fact.parent_ordinal() != parent || fact.edge() != edge {
             return Err(ExportAccountingError::ConflictingSourceDatum.into());
         }
         Ok(fact)
+    }
+
+    fn child_value(
+        &self,
+        parent: Option<u64>,
+        edge: OriginalValueEdge,
+    ) -> Option<&'read Value<'source>> {
+        let owner = match parent {
+            Some(ordinal) => Some(self.facts.get(usize::try_from(ordinal).ok()?)?.value()),
+            None => None,
+        };
+        match edge {
+            OriginalValueEdge::Field { ordinal } => {
+                let source = match owner {
+                    Some(Value::Struct(source)) => source,
+                    None => self.root(),
+                    _ => return None,
+                };
+                source
+                    .fields()
+                    .get(usize::try_from(ordinal).ok()?)
+                    .map(Field::value)
+            }
+            OriginalValueEdge::Element { ordinal } => {
+                let Some(Value::Array(values)) = owner else {
+                    return None;
+                };
+                values.get(usize::try_from(ordinal).ok()?)
+            }
+        }
     }
 }
 

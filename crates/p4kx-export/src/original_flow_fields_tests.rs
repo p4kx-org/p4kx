@@ -76,6 +76,7 @@ fn occurrence_positions(fields: &OriginalFlowFields<'_, '_, '_>) -> TestResult {
             "the real typed source edge"
         );
     }
+    reject_invalid_edges(fields);
     assert!(
         matches!(
             fields.facts.get(8).map(OriginalValueFact::value),
@@ -91,6 +92,28 @@ fn occurrence_positions(fields: &OriginalFlowFields<'_, '_, '_>) -> TestResult {
         "the real invalid pointer remains a distinct occurrence"
     );
     Ok(())
+}
+
+fn reject_invalid_edges(fields: &OriginalFlowFields<'_, '_, '_>) {
+    let invalid_edges = [
+        (None, OriginalValueEdge::Element { ordinal: 0 }),
+        (Some(0), OriginalValueEdge::Field { ordinal: 0 }),
+        (Some(2), OriginalValueEdge::Element { ordinal: 0 }),
+        (Some(5), OriginalValueEdge::Field { ordinal: 0 }),
+        (Some(5), OriginalValueEdge::Element { ordinal: 4 }),
+        (Some(13), OriginalValueEdge::Field { ordinal: 0 }),
+    ];
+    for (parent, edge) in invalid_edges {
+        assert!(
+            matches!(
+                fields.child(parent, edge),
+                Err(CatalogError::Accounting(
+                    ExportAccountingError::ConflictingSourceDatum
+                ))
+            ),
+            "invalid route {parent:?}/{edge:?} cannot resolve a source value"
+        );
+    }
 }
 
 #[test]

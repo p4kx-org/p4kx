@@ -221,13 +221,15 @@ fn wrong_in_range_target_and_caller_entries_cannot_alias_genuine_facts() -> Test
 }
 
 fn wrong_target(fields: &mut OriginalFlowFields<'_, '_, '_>) -> TestResult {
-    let early = *fields
-        .edges
-        .get(&(None, OriginalValueEdge::Field { ordinal: 0 }))
-        .ok_or("actual early physical index")?;
+    let early = fields
+        .child(None, OriginalValueEdge::Field { ordinal: 0 })?
+        .ordinal();
+    let late = fields
+        .child(None, OriginalValueEdge::Field { ordinal: 4 })?
+        .ordinal();
     fields
-        .edges
-        .insert((None, OriginalValueEdge::Field { ordinal: 4 }), early);
+        .facts
+        .swap(usize::try_from(early)?, usize::try_from(late)?);
     Ok(())
 }
 

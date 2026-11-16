@@ -6,3 +6,4 @@
 - Reuse the Archive file index during loadout resolution and release its worker and proof caches after collection.
 - Merge mission dependency results in original order after each read window and reuse the pending result buffers.
 - Fold contract generator results in original order per read window and report the active mission projection phase.
+- Reuse original Struct and array positions for mission source lookups instead of storing a second index of every occurrence.
