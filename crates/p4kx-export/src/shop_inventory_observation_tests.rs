@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_testkit::TestEntry;
+use p4kx_testkit::{TestContainer, TestEntry};
 
 use crate::Kind;
 use crate::export_diagnostic::ExportDiagnosticCode;
@@ -11,7 +11,7 @@ use crate::shop_inventories::ItemList;
 use crate::shop_prefabs::Prefabs;
 
 use super::inventory_source::{items, request};
-use super::{ENTITY, TestResult, opened};
+use super::{CONTAINER, ENTITY, REGISTRY, TestResult, opened, read_shops, registry};
 
 #[test]
 fn partial_inventory_json_retains_valid_ids_and_reports_one_failed_entry() -> TestResult {
@@ -167,6 +167,111 @@ fn malformed_prefab_values_retain_valid_entity_inventory_pairs() -> TestResult {
         Some(ExportDiagnosticCode::MalformedSource),
         "technical field loss remains visible"
     );
+    Ok(())
+}
+
+#[test]
+fn merged_prefab_inventories_keep_ordered_authored_candidates() -> TestResult {
+    let metadata = format!(r#"<Entities><Entity CryGUID="{ENTITY}"/></Entities>"#);
+    let soc = format!(
+        "CrChF\0{ENTITY}\0EntityComponentShop\0offlineInventoryJSON\0Scripts/ShopInventories/shared.json\0"
+    );
+    let container = TestContainer::new()
+        .entry(TestEntry::stored(
+            "test/metadata/entitycomponentshop.xml",
+            metadata,
+        ))
+        .entry(TestEntry::stored("good.soc", soc));
+    let prefab = r#"<PrefabLibrary><Object Type="Entity" Id="{9730AC77-4077-4DCE-B700-273B6B917450}">
+        <PropertiesDataCore><EntityComponentShop offlineInventoryJSON="Scripts/ShopInventories/SHARED.json"
+        offlineInventoryXMLName="Scripts/ShopInventories/Shared.xml"
+        offlineInventoryOther="Scripts/ShopInventories/rejected.csv"/></PropertiesDataCore>
+        </Object></PrefabLibrary>"#;
+    let (_folder, archive) = opened(vec![
+        TestEntry::stored(REGISTRY, registry("")),
+        TestEntry::stored(CONTAINER, container.build()),
+        TestEntry::stored("Data/Prefabs/Shops/mixed.xml", prefab),
+        TestEntry::stored(
+            "Data/Scripts/ShopInventories/shared.json",
+            r#"{"Inventory":[]}"#,
+        ),
+    ])?;
+    let read = crate::catalog_read::original::with_entry_capture(&archive, |capture| {
+        read_shops(&archive, capture)
+    })?;
+    assert_eq!(
+        (
+            read.summary.prefab_entities,
+            read.summary.prefab_ambiguous,
+            read.summary.prefab_only_shops
+        ),
+        (1, 0, 0),
+        "container and prefab name the same inventory stem"
+    );
+    let [resolved] = read.resolutions.rows.as_slice() else {
+        return Err("one shop inventory resolution".into());
+    };
+    let row = serde_json::to_value(resolved)?;
+    verify_merged_candidates(&row)?;
+    let prefab = read
+        .ledger
+        .entries
+        .iter()
+        .find(|entry| entry.operation == EntryOperation::ShopPrefab)
+        .ok_or("original prefab operation")?;
+    assert_eq!(
+        (prefab.entry_index, prefab.disposition),
+        (Some(2), SourceDisposition::ProjectionFailed),
+        "the rejected path retains the original prefab failure"
+    );
+    Ok(())
+}
+
+fn verify_merged_candidates(row: &serde_json::Value) -> TestResult {
+    assert_eq!(
+        (
+            row.pointer("/status/value")
+                .and_then(serde_json::Value::as_str),
+            row.pointer("/candidates/sourceSetComplete")
+                .and_then(serde_json::Value::as_bool),
+        ),
+        (Some("resolved"), Some(false)),
+        "the common stem resolves with the rejected authored path still represented"
+    );
+    let candidates = row["candidates"]["value"]
+        .as_array()
+        .ok_or("candidate values")?;
+    let authored: Vec<_> = candidates
+        .iter()
+        .map(|candidate| {
+            (
+                candidate["value"]["type"].as_str(),
+                candidate["value"]["sourcePath"]["value"].as_str(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        authored,
+        [
+            (Some("file"), Some("Scripts/ShopInventories/shared.json")),
+            (Some("file"), Some("Scripts/ShopInventories/SHARED.json")),
+            (Some("file"), Some("Scripts/ShopInventories/Shared.xml")),
+            (
+                Some("rejected"),
+                Some("Scripts/ShopInventories/rejected.csv")
+            ),
+        ],
+        "a common stem keeps each original container and prefab candidate in source order"
+    );
+    for pair in candidates.windows(2) {
+        if let [first, second] = pair {
+            assert_ne!(
+                first["value"]["sourcePath"]["sourceUsesRefs"],
+                second["value"]["sourcePath"]["sourceUsesRefs"],
+                "each authored candidate keeps its own original occurrence"
+            );
+        }
+    }
     Ok(())
 }
 

@@ -12,7 +12,6 @@ use crate::export_ledger::ExportLedger;
 use crate::shop_container_scan::{Scanned, shop_entities};
 use crate::shop_inventory_observations::InventoryObservations;
 use crate::shop_inventory_path::InventoryStem;
-use crate::shop_prefabs::Prefabs;
 use crate::starmap_index::key;
 
 const SHOPS: &str = "data\\objectcontainers\\pu\\shops\\";
@@ -194,17 +193,21 @@ impl Containers {
         Ok(())
     }
 
-    /// Adds the inventory files the shop prefabs name as one more place per Entity.
-    pub(crate) fn add_prefabs(&mut self, prefabs: &Prefabs) -> Result<(), CatalogError> {
-        for (entity, stems) in &prefabs.by_entity {
-            let named = self.by_entity.entry(entity.clone()).or_default();
+    /// Moves the declared prefab inventories into each Entity and counts ambiguous selections.
+    pub(crate) fn add_prefabs(
+        &mut self,
+        inventories: HashMap<String, Vec<InventoryStem>>,
+    ) -> Result<usize, CatalogError> {
+        let mut ambiguous = 0;
+        for (entity, stems) in inventories {
+            let named = self.by_entity.entry(entity).or_default();
             named.prefab = true;
             for stem in stems {
-                let state = Component::File(stem.clone());
-                append_inventory(&mut named.inventories, state)?;
+                append_inventory(&mut named.inventories, Component::File(stem))?;
             }
+            ambiguous += usize::from(matches!(verdict(&named.inventories), Inventory::Ambiguous));
         }
-        Ok(())
+        Ok(ambiguous)
     }
 
     /// Returns whether a prefab names the Entity and no container holds it.

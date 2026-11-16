@@ -14,7 +14,7 @@ use crate::crafting_warning::CraftingWarning;
 use crate::entry_source::EntrySource;
 use crate::export_diagnostic::ExportDiagnosticCode;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
-use crate::shop_containers::{Containers, Inventory};
+use crate::shop_containers::Containers;
 use crate::shop_entry_read;
 use crate::shop_inventories::{Inventories, ItemList, PreparedInventories, is_placeholder};
 use crate::shop_inventory_resolution::{InventoryResolver, ShopInventoryResolution};
@@ -76,17 +76,13 @@ impl ShopDeclarations {
             return Err(CatalogError::Cancelled);
         }
         let mut containers = Containers::read(archive, cancel, capture)?;
-        let prefabs = Prefabs::read(archive, cancel, capture)?;
+        let mut prefabs = Prefabs::read(archive, cancel, capture)?;
         if cancel.is_some_and(CancelToken::is_cancelled) {
             return Err(CatalogError::Cancelled);
         }
-        containers.add_prefabs(&prefabs)?;
-        summary.prefab_ambiguous = prefabs
-            .by_entity
-            .keys()
-            .filter(|entity| matches!(containers.inventory(entity), Inventory::Ambiguous))
-            .count();
         summary.count_sources(&containers, &prefabs);
+        summary.prefab_ambiguous =
+            containers.add_prefabs(std::mem::take(&mut prefabs.by_entity))?;
         Ok(Self {
             containers,
             prefabs,
