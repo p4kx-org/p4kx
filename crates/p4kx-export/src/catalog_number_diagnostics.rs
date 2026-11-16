@@ -30,7 +30,7 @@ pub(crate) fn uncovered(
         count_unit: ExportDiagnosticUnit::Values,
         examples: Vec::new(),
     };
-    for required in &inspection.number_requirements {
+    for required in inspection.findings.number_requirements() {
         if coverage.take(required) {
             continue;
         }

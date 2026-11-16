@@ -55,7 +55,7 @@ pub(crate) fn resolve(
         source.key()?;
         let mut owner = inspection.subject.clone();
         owner.merge(source.subject().clone())?;
-        if !inspection.number_requirements.is_empty() {
+        if !inspection.findings.number_requirements().is_empty() {
             let mut coverage = captured.for_source(source)?;
             if let Some(diagnostic) =
                 crate::catalog_number_diagnostics::uncovered(inspection, source, &mut coverage)?
@@ -89,19 +89,23 @@ fn retain(
     source: &SourceObservation,
     fields: &mut Fields,
 ) -> Result<(), ExportAccountingError> {
-    for original in &inspection.diagnostics {
+    for original in inspection.findings.diagnostics() {
         let mut diagnostic = original.clone();
         diagnostic.kind = source.kind;
         diagnostic.source_role = Some(source.role);
         retain_diagnostic(diagnostic, inspection, source, fields)?;
     }
-    fields
-        .references
-        .extend(inspection.unresolved_references.iter().map(|original| {
-            let mut reference = original.clone();
-            reference.contextualize(source.kind, source.role);
-            reference
-        }));
+    fields.references.extend(
+        inspection
+            .findings
+            .unresolved_references()
+            .iter()
+            .map(|original| {
+                let mut reference = original.clone();
+                reference.contextualize(source.kind, source.role);
+                reference
+            }),
+    );
     Ok(())
 }
 

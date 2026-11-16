@@ -138,7 +138,8 @@ fn original_errors_after_reference_metadata_boundary_remain_inspected() -> TestR
 
 fn errors(inspection: &FieldInspection) -> TestResult {
     let dangling: Vec<_> = inspection
-        .unresolved_references
+        .findings
+        .unresolved_references()
         .iter()
         .filter(|reference| reference.data().field.as_str() == "lateDangling")
         .collect();
@@ -155,7 +156,8 @@ fn errors(inspection: &FieldInspection) -> TestResult {
     );
     assert!(
         inspection
-            .diagnostics
+            .findings
+            .diagnostics()
             .iter()
             .any(
                 |diagnostic| diagnostic.code == ExportDiagnosticCode::UnreadableSource
@@ -185,12 +187,13 @@ fn original_nonfinite_after_reference_metadata_boundary_keeps_exact_requirement(
 
 fn number(inspection: &FieldInspection, case: Case) -> TestResult {
     assert_eq!(
-        inspection.number_requirements.len(),
+        inspection.findings.number_requirements().len(),
         1,
         "the later original nonfinite cannot bypass final raw coverage checks"
     );
     let number = inspection
-        .number_requirements
+        .findings
+        .number_requirements()
         .first()
         .ok_or("one original nonfinite requirement")?;
     assert_eq!(

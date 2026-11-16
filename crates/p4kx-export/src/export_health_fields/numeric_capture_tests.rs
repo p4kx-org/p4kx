@@ -162,7 +162,7 @@ fn repeated_resource_inspections_are_identical_across_projection_contexts() -> T
         "canonical evidence does not depend on the requesting projection"
     );
     assert_eq!(
-        selected.number_requirements.len(),
+        selected.findings.number_requirements().len(),
         1,
         "the raw number still has conditional failure evidence"
     );

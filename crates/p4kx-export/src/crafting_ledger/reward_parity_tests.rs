@@ -78,7 +78,8 @@ fn ordered_chunks_match_sequential_placements_and_receipts() -> TestResult {
         );
         assert!(
             expected.ledger.field_inspections.iter().any(|field| {
-                !field.diagnostics.is_empty() && !field.unresolved_references.is_empty()
+                !field.findings.diagnostics().is_empty()
+                    && !field.findings.unresolved_references().is_empty()
             }),
             "the fixture includes actual diagnostics and reference receipts",
         );

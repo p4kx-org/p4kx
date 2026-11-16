@@ -69,12 +69,13 @@ fn inspect(
         .pop()
         .ok_or("original numeric inspection")?;
     assert_eq!(
-        inspection.number_requirements.len(),
+        inspection.findings.number_requirements().len(),
         1,
         "one original token requires coverage"
     );
     let required = inspection
-        .number_requirements
+        .findings
+        .number_requirements()
         .first()
         .ok_or("original requirement")?;
     assert_eq!(
@@ -234,13 +235,15 @@ fn equal_numeric_requirements_reject_foreign_body_inventory_before_retention() -
     test_support::with_input(&bytes(), |forge, input| {
         let (inspection, _) = inspect(forge, input)?;
         let original = inspection
-            .number_requirements
+            .findings
+            .number_requirements()
             .first()
             .ok_or("own original token")?;
         test_support::with_input(&bytes(), |foreign_forge, foreign_input| {
             let (foreign, _) = inspect(foreign_forge, foreign_input)?;
             let foreign = foreign
-                .number_requirements
+                .findings
+                .number_requirements()
                 .first()
                 .ok_or("foreign original token")?;
             assert_eq!(
@@ -271,7 +274,8 @@ fn genuine_numeric_clone_merges_but_an_accounting_only_body_cannot_replace_it() 
     test_support::with_input(&bytes(), |forge, input| {
         let (inspection, _) = inspect(forge, input)?;
         let original = inspection
-            .number_requirements
+            .findings
+            .number_requirements()
             .first()
             .ok_or("own original numeric token")?;
         let mut clone = original.clone();

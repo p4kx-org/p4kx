@@ -189,12 +189,13 @@ fn check_source(tree: &RecordTree<'_>, expected: &Expected) -> Checked {
 fn check_requirement(proof: &FieldInspection, expected: &Expected) -> Checked {
     assert!(proof.complete, "the readable source inventory is complete");
     assert_eq!(
-        proof.number_requirements.len(),
+        proof.findings.number_requirements().len(),
         1,
         "every original nonfinite is staged once independently of kind"
     );
     let required = proof
-        .number_requirements
+        .findings
+        .number_requirements()
         .first()
         .ok_or("actual numeric requirement")?;
     assert_eq!(

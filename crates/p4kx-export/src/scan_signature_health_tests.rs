@@ -58,7 +58,7 @@ fn an_unknown_slot_from_a_readable_source_is_a_projection_warning() -> TestResul
         ledger
             .field_inspections
             .iter()
-            .flat_map(|inspection| &inspection.diagnostics)
+            .flat_map(|inspection| inspection.findings.diagnostics())
             .any(|diagnostic| diagnostic.code == ExportDiagnosticCode::UnreadableSource),
         "optional slot helpers retain unrelated source-field decoding errors"
     );

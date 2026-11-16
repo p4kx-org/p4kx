@@ -169,7 +169,8 @@ fn many_represented_targets_keep_complete_identity_and_bounded_examples() -> Tes
             .field_inspections
             .first()
             .ok_or("actual canonical proof missing")?
-            .unresolved_references
+            .findings
+            .unresolved_references()
             .len(),
         50,
         "bounded examples never discard the complete configured target identities"

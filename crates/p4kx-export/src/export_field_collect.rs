@@ -17,7 +17,7 @@ use crate::export_diagnostic::{
     EXPORT_DIAGNOSTIC_EXAMPLE_LIMIT, ExportDiagnosticCode, ExportDiagnosticSeverity,
     ExportDiagnosticStage, ExportDiagnosticUnit, ExportSourceRole,
 };
-use crate::export_field_inspection::FieldInspection;
+use crate::export_field_inspection::{FieldInspection, InspectionFindings};
 use crate::health_diagnostic_observation::{
     DiagnosticObservation as ExportDiagnostic, ExampleObservation as ExportDiagnosticExample,
 };
@@ -277,7 +277,6 @@ impl<'t, 'f> FieldCollector<'t, 'f> {
 
     pub(crate) fn finish(self) -> FieldInspection {
         let diagnostics = self.diagnostics.into_values().collect();
-        let number_requirements = self.numbers;
         FieldInspection {
             record_index: self.record_index,
             kind: self.kind,
@@ -288,9 +287,7 @@ impl<'t, 'f> FieldCollector<'t, 'f> {
             complete: true,
             root_field: None,
             configuration: None,
-            diagnostics,
-            number_requirements,
-            unresolved_references: self.unresolved,
+            findings: InspectionFindings::new(diagnostics, self.numbers, self.unresolved),
             catalog_references: self.catalog_references,
         }
     }

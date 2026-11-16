@@ -133,7 +133,7 @@ fn optional_evidence_helpers_preserve_actual_field_errors() -> TestResult {
         ledger
             .field_inspections
             .iter()
-            .flat_map(|inspection| &inspection.diagnostics)
+            .flat_map(|inspection| inspection.findings.diagnostics())
             .any(|diagnostic| diagnostic.code == ExportDiagnosticCode::UnreadableSource),
         "an invalid source field is not silently converted to an absent optional field"
     );

@@ -13,6 +13,7 @@ mod membership;
 use p4kx_extraction::Guid;
 
 use crate::export_diagnostic::ExportSourceRole;
+use crate::export_field_inspection::InspectionFindings;
 use crate::export_ledger::{ExportLedger, SourceDisposition, SourceObservation};
 use crate::{Kind, KindSummary};
 
@@ -53,9 +54,7 @@ fn observe(ledger: &mut ExportLedger, source: SourceObservation) {
                 complete: true,
                 root_field: None,
                 configuration: None,
-                diagnostics: Vec::new(),
-                number_requirements: Vec::new(),
-                unresolved_references: Vec::new(),
+                findings: InspectionFindings::default(),
                 catalog_references: Vec::new(),
             });
     }

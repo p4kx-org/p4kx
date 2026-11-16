@@ -281,7 +281,7 @@ fn unreadable_field_leaves_are_retained_even_without_reward_rows() -> TestResult
             .ledger
             .field_inspections
             .iter()
-            .flat_map(|inspection| &inspection.diagnostics)
+            .flat_map(|inspection| inspection.findings.diagnostics())
             .any(|diagnostic| diagnostic.code
                 == crate::export_diagnostic::ExportDiagnosticCode::UnreadableSource),
         "field decoding errors survive optional projection helpers"

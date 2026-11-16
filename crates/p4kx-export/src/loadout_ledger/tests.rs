@@ -325,7 +325,7 @@ fn real_field_decoder_errors_survive_optional_loadout_mapping() -> TestResult {
         ledger
             .field_inspections
             .iter()
-            .flat_map(|inspection| &inspection.diagnostics)
+            .flat_map(|inspection| inspection.findings.diagnostics())
             .any(
                 |diagnostic| diagnostic.code == ExportDiagnosticCode::UnreadableSource
                     && diagnostic.severity == ExportDiagnosticSeverity::Error

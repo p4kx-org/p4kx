@@ -102,14 +102,20 @@ fn a_selected_resource_dangling_link_keeps_its_actual_read_and_the_existing_coun
 
 fn assert_dangling_reference(proof: &FieldInspection) {
     let expected = format!("00000000-0000-0000-0000-{MISSING:012x}");
-    assert!(proof.unresolved_references.iter().any(|reference| {
-        reference
-            .data()
-            .target_guid
-            .map(|guid| guid.to_string())
-            .as_deref()
-            == Some(expected.as_str())
-    }));
+    assert!(
+        proof
+            .findings
+            .unresolved_references()
+            .iter()
+            .any(|reference| {
+                reference
+                    .data()
+                    .target_guid
+                    .map(|guid| guid.to_string())
+                    .as_deref()
+                    == Some(expected.as_str())
+            })
+    );
 }
 
 fn quantization(builder: DataForgeBuilder) -> DataForgeBuilder {

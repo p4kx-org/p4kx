@@ -5,19 +5,19 @@ use std::collections::BTreeMap;
 
 use p4kx_extraction::Guid;
 
-use crate::catalog_number_health::NumberRequirement;
 use crate::catalog_read::original::RecordSubject;
-use crate::catalog_read::original::ReferenceObservation;
 use crate::catalog_reference::CatalogReference;
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_ledger::SourceObservation;
-use crate::health_diagnostic_observation::DiagnosticObservation as ExportDiagnostic;
 use crate::selection::Kind;
 use crate::{ExportAccountingError, HealthText};
 
+#[path = "inspection_findings.rs"]
+mod findings;
 #[path = "scan_inspection_fold.rs"]
 mod scan_fold;
 
+pub(crate) use findings::InspectionFindings;
 pub(crate) use scan_fold::ScanInspectionFold;
 
 /// Independently exported configuration fields on one physical Record.
@@ -70,10 +70,7 @@ pub(crate) struct FieldInspection {
     pub(crate) complete: bool,
     pub(crate) root_field: Option<&'static str>,
     pub(crate) configuration: Option<ConfigurationInspection>,
-    pub(crate) diagnostics: Vec<ExportDiagnostic>,
-    /// Conditional failures until the exact physical source has an emitted lossless row.
-    pub(crate) number_requirements: Vec<NumberRequirement>,
-    pub(crate) unresolved_references: Vec<ReferenceObservation>,
+    pub(crate) findings: InspectionFindings,
     pub(crate) catalog_references: Vec<CatalogReference>,
 }
 
@@ -82,13 +79,7 @@ impl FieldInspection {
     pub(crate) fn contextualize(&mut self, kind: Option<Kind>, role: ExportSourceRole) {
         self.kind = kind;
         self.role = role;
-        for diagnostic in &mut self.diagnostics {
-            diagnostic.kind = kind;
-            diagnostic.source_role = Some(role);
-        }
-        for reference in &mut self.unresolved_references {
-            reference.contextualize(kind, role);
-        }
+        self.findings.contextualize(kind, role);
     }
 }
 
@@ -131,7 +122,9 @@ impl FieldInspection {
     }
 
     fn absorbs_scan_duplicate(&self, other: &mut Self, key: InspectionKey) -> bool {
-        if !self.number_requirements.is_empty() || !other.number_requirements.is_empty() {
+        if !self.findings.number_requirements().is_empty()
+            || !other.findings.number_requirements().is_empty()
+        {
             return false;
         }
         let context = (other.kind, other.role);
@@ -151,13 +144,7 @@ impl FieldInspection {
 
     pub(crate) fn merge(&mut self, mut other: Self) -> Result<(), ExportAccountingError> {
         self.check_duplicate_shape(&other)?;
-        for (required, other) in self
-            .number_requirements
-            .iter_mut()
-            .zip(std::mem::take(&mut other.number_requirements))
-        {
-            required.merge(other)?;
-        }
+        self.findings.merge_numbers(&mut other.findings)?;
         self.check_duplicate_references(&other)?;
         self.check_sample_owners()
     }
@@ -172,9 +159,10 @@ impl FieldInspection {
 
     fn check_duplicate_references(&self, other: &Self) -> Result<(), ExportAccountingError> {
         for (reference, other) in self
-            .unresolved_references
+            .findings
+            .unresolved_references()
             .iter()
-            .zip(&other.unresolved_references)
+            .zip(other.findings.unresolved_references())
         {
             reference.check_duplicate(other)?;
         }
@@ -189,7 +177,7 @@ impl FieldInspection {
     }
 
     fn check_sample_owners(&self) -> Result<(), ExportAccountingError> {
-        for diagnostic in &self.diagnostics {
+        for diagnostic in self.findings.diagnostics() {
             for example in &diagnostic.examples {
                 example.check_owner(&self.subject)?;
             }
@@ -209,9 +197,7 @@ impl PartialEq for FieldInspection {
             && self.complete == other.complete
             && self.root_field == other.root_field
             && self.configuration == other.configuration
-            && self.diagnostics == other.diagnostics
-            && self.number_requirements == other.number_requirements
-            && self.unresolved_references == other.unresolved_references
+            && self.findings == other.findings
             && self.catalog_references == other.catalog_references
     }
 }

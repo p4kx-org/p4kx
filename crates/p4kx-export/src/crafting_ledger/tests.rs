@@ -188,7 +188,7 @@ fn error_leaves_are_not_disguised_as_absent_empty_or_dangling_fields() -> TestRe
         .ledger
         .field_inspections
         .iter()
-        .flat_map(|inspection| &inspection.diagnostics)
+        .flat_map(|inspection| inspection.findings.diagnostics())
         .collect::<Vec<_>>();
     for code in [
         ExportDiagnosticCode::OptionalAbsent,
