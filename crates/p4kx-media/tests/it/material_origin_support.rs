@@ -35,6 +35,7 @@ pub(super) struct Fixture {
     origins: Vec<Value>,
     uses: Vec<Value>,
     sources: Vec<Value>,
+    use_sets: Vec<Value>,
 }
 
 pub(super) fn options() -> ExportOptions {
@@ -80,6 +81,7 @@ impl Fixture {
         let origins = rows(base.join("field-origins.jsonl"))?;
         let uses = rows(base.join("origin-uses.jsonl"))?;
         let sources = rows(base.join("origin-sources.jsonl"))?;
+        let use_sets = rows(base.join("origin-use-sets.jsonl"))?;
         Ok(Self {
             folder,
             archive,
@@ -92,6 +94,7 @@ impl Fixture {
             origins,
             uses,
             sources,
+            use_sets,
         })
     }
 
@@ -169,21 +172,36 @@ impl Fixture {
             "{pointer}: literal contributor inventory is complete"
         );
         assert!(
-            references(field)?.is_empty(),
+            self.contributions(path, pointer)?.is_empty(),
             "{pointer}: literal has no physical input"
         );
         Ok(())
     }
 
     pub(super) fn contributions(&self, path: &str, pointer: &str) -> TestResult<Vec<&Value>> {
-        references(self.field(path, pointer)?)?
+        let field = self.field(path, pointer)?;
+        let shared = self.set_references(field.get("sourceUseSetRef"))?;
+        references(field)?
             .iter()
+            .chain(shared)
             .map(|reference| {
                 self.uses
                     .iter()
                     .find(|row| row.get("id") == Some(reference))
                     .ok_or_else(|| "original source use".into())
             })
+            .collect()
+    }
+
+    fn set_references(&self, id: Option<&Value>) -> TestResult<Vec<&Value>> {
+        let Some(id) = id else {
+            return Ok(Vec::new());
+        };
+        let mut rows = self.use_sets.iter();
+        rows.find(|row| row["type"] == "set" && row.get("id") == Some(id))
+            .ok_or("original source-use set")?;
+        rows.take_while(|row| row["type"] == "member")
+            .map(|row| row.get("sourceUseRef").ok_or_else(|| "set member".into()))
             .collect()
     }
 

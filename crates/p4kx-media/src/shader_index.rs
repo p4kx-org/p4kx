@@ -60,7 +60,7 @@ impl ShaderIndex {
             shaders: None,
         };
         traversal.visit(lookup.archive, &mut Vec::new(), writer, &mut collector)?;
-        collector.index.inventory_origins = collector.inventory_capture.finish();
+        collector.index.inventory_origins = collector.inventory_capture.finish().share_uses();
         Ok(collector.index)
     }
 
