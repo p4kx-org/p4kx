@@ -235,6 +235,8 @@ Within `projections`, record `resolve-loadouts`, `project-locations`, `project-m
 Pending localization keys retain per-language lookup outcomes and their source uses.
 Finalizing the text registries reconstructs the text forms from the in-memory localization index.
 These lookups add CPU work and require no temporary storage or additional Archive reads.
+Catalog health retains the original coordinates and target identity in compact reference proofs.
+It constructs the full diagnostic record when reconciliation needs to report a reference.
 
 Record peak working set and peak private bytes separately.
 Sample host commit and paging counters alongside the process write counter to distinguish process

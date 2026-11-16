@@ -38,12 +38,12 @@ fn references(inspection: &FieldInspection, bytes: usize, case: Case) -> TestRes
     );
     for (ordinal, reference) in inspection.catalog_references.iter().enumerate() {
         assert_eq!(
-            reference.original.data().field.as_str(),
+            reference.proof.data().field.as_str(),
             format!("links[{ordinal}]"),
             "original array order is retained"
         );
         assert_eq!(
-            reference.target()?.index,
+            reference.target().index,
             1,
             "every retained target has its actual physical header"
         );
@@ -57,8 +57,8 @@ fn state(inspection: &FieldInspection, original_bytes: usize) -> TestResult {
     let mut logical_utf8 = 0usize;
     let mut field_utf8 = 0usize;
     for reference in &inspection.catalog_references {
-        let data = reference.original.data();
-        let target = reference.target()?;
+        let data = reference.proof.data();
+        let target = reference.target();
         for value in [
             data.field.as_str(),
             data.source_type.as_str(),
@@ -101,12 +101,12 @@ fn shared_metadata(inspection: &FieldInspection) -> TestResult<usize> {
         .catalog_references
         .first()
         .ok_or("original retained references")?;
-    let first_data = first.original.data();
-    let first_target = first.target()?;
+    let first_data = first.proof.data();
+    let first_target = first.target();
     let mut texts = HashSet::new();
     for reference in &inspection.catalog_references {
-        let data = reference.original.data();
-        let target = reference.target()?;
+        let data = reference.proof.data();
+        let target = reference.target();
         for (actual, expected) in [
             (data.source_type.as_str(), first_data.source_type.as_str()),
             (target.path, first_target.path),

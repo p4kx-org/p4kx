@@ -292,17 +292,13 @@ impl Inspector<'_, '_> {
             && reference.location().is_some();
         let kind =
             catalog_reference::target_kind(source_type, visit.parent_type(), path, reference);
-        if !foreign && kind.is_none() {
-            return Ok(());
-        }
-        let observation = match original {
-            Some((capture, site)) if foreign => capture.reference(site)?,
-            Some((capture, site)) => capture.catalog_reference(site)?,
-            None => self
-                .collector
-                .accounting_reference(path, source_type, reference),
-        };
         if foreign {
+            let observation = match original {
+                Some((capture, site)) => capture.reference(site)?,
+                None => self
+                    .collector
+                    .accounting_reference(path, source_type, reference),
+            };
             self.collector.note(
                 path,
                 source_type,
@@ -317,7 +313,13 @@ impl Inspector<'_, '_> {
             self.collector
                 .unresolved(observation.resolved(crate::ExportReferenceStatus::OutsideOwner));
         } else if let Some(kind) = kind {
-            self.collector.catalog_reference(kind, observation);
+            let proof = match original {
+                Some((capture, site)) => capture.catalog_reference(site)?,
+                None => self
+                    .collector
+                    .accounting_catalog_reference(path, source_type, reference),
+            };
+            self.collector.catalog_reference(kind, proof);
         }
         Ok(())
     }

@@ -70,7 +70,7 @@ pub(super) fn read(
     let files = ArchiveFiles::new(archive);
     let entities = Arc::new(Entities::new(&forge));
     let placements = Placements::default();
-    let locations = quality_location_targets(&crafting.ledger)?;
+    let locations = quality_location_targets(&crafting.ledger);
     let domain = ScanDomain::resources(&placements, &locations);
     let mut collected = Scan::run(
         &input,
@@ -101,15 +101,13 @@ pub(super) fn read(
     Ok((tables(catalog, collected, &forge)?, health))
 }
 
-fn quality_location_targets(
-    ledger: &crate::export_ledger::ExportLedger,
-) -> Result<BTreeSet<Guid>, CatalogError> {
+fn quality_location_targets(ledger: &crate::export_ledger::ExportLedger) -> BTreeSet<Guid> {
     ledger
         .field_inspections
         .iter()
         .flat_map(|inspection| &inspection.catalog_references)
         .filter(|reference| reference.target_kind == Kind::StarmapObjects)
-        .map(|reference| Ok(reference.target()?.guid))
+        .map(|reference| reference.target().guid)
         .collect()
 }
 

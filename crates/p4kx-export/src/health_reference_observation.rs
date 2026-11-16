@@ -8,7 +8,7 @@ use p4kx_extraction::Guid;
 use super::RecordSubject;
 use super::health_reference_data::ReferenceData;
 use super::health_reference_receipt::{ReferenceDatum, ReferenceFrame};
-use super::health_reference_recipe::ReferenceRecipe;
+
 use crate::{ExportAccountingError, ExportReferenceStatus, ExportSourceRole, HealthText, Kind};
 
 /// Retained source recipes for one actual Reference occurrence.
@@ -38,10 +38,7 @@ pub(super) enum ReferenceEvidence {
         frame: Arc<ReferenceFrame>,
         body: Arc<ReferenceBody>,
     },
-    Deferred {
-        frame: Arc<ReferenceFrame>,
-        recipe: Arc<ReferenceRecipe>,
-    },
+
     Accounting(RecordSubject),
 }
 
@@ -72,34 +69,6 @@ impl ReferenceObservation {
                 body: Arc::new(body),
             },
         }
-    }
-
-    pub(super) fn deferred(
-        data: ReferenceData,
-        frame: Arc<ReferenceFrame>,
-        recipe: ReferenceRecipe,
-    ) -> Self {
-        Self {
-            kind: None,
-            source_role: ExportSourceRole::Dependency,
-            data,
-            status: None,
-            evidence: ReferenceEvidence::Deferred {
-                frame,
-                recipe: Arc::new(recipe),
-            },
-        }
-    }
-
-    pub(crate) fn materialize(mut self) -> Result<Self, ExportAccountingError> {
-        self.evidence = match self.evidence {
-            ReferenceEvidence::Deferred { frame, recipe } => ReferenceEvidence::Captured {
-                frame,
-                body: Arc::new(Arc::unwrap_or_clone(recipe).body(&self.data)?),
-            },
-            original => original,
-        };
-        Ok(self)
     }
 
     pub(crate) const fn accounting(
@@ -136,8 +105,7 @@ impl ReferenceObservation {
 
     pub(crate) fn subject(&self) -> &RecordSubject {
         match &self.evidence {
-            ReferenceEvidence::Captured { frame, .. }
-            | ReferenceEvidence::Deferred { frame, .. } => frame.subject(),
+            ReferenceEvidence::Captured { frame, .. } => frame.subject(),
             ReferenceEvidence::Accounting(subject) => subject,
         }
     }
@@ -164,34 +132,6 @@ impl ReferenceObservation {
                 }
                 check_frames(frame, other)
             }
-            (
-                ReferenceEvidence::Deferred { frame, recipe },
-                ReferenceEvidence::Deferred {
-                    frame: other,
-                    recipe: other_recipe,
-                },
-            ) => {
-                if recipe != other_recipe {
-                    return Err(ExportAccountingError::ConflictingSourceDatum);
-                }
-                check_frames(frame, other)
-            }
-            (
-                ReferenceEvidence::Captured { frame, body },
-                ReferenceEvidence::Deferred {
-                    frame: other,
-                    recipe,
-                },
-            )
-            | (
-                ReferenceEvidence::Deferred { frame, recipe },
-                ReferenceEvidence::Captured { frame: other, body },
-            ) => {
-                if body.as_ref() != &recipe.as_ref().clone().body(&self.data)? {
-                    return Err(ExportAccountingError::ConflictingSourceDatum);
-                }
-                check_frames(frame, other)
-            }
             (ReferenceEvidence::Accounting(subject), ReferenceEvidence::Accounting(other)) => {
                 let mut original = subject.clone();
                 original.merge(other.clone())
@@ -201,7 +141,7 @@ impl ReferenceObservation {
     }
 }
 
-fn check_frames(
+pub(super) fn check_frames(
     frame: &ReferenceFrame,
     other: &ReferenceFrame,
 ) -> Result<(), ExportAccountingError> {

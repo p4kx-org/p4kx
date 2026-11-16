@@ -3,14 +3,13 @@
 
 use p4kx_extraction::{Guid, Reference};
 
-use crate::ExportAccountingError;
-use crate::catalog_read::original::ReferenceObservation;
+use crate::catalog_read::original::CatalogReferenceProof;
 use crate::selection::Kind;
 
 /// A resolved catalog candidate retaining its actual original Reference observation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct CatalogReference {
-    pub(crate) original: ReferenceObservation,
+    pub(crate) proof: CatalogReferenceProof,
     pub(crate) target_kind: Kind,
 }
 
@@ -24,27 +23,15 @@ pub(crate) struct CatalogReferenceTarget<'reference> {
 }
 
 impl CatalogReference {
-    pub(crate) fn target(&self) -> Result<CatalogReferenceTarget<'_>, ExportAccountingError> {
-        let data = self.original.data();
-        Ok(CatalogReferenceTarget {
-            index: data
-                .target_record_index
-                .ok_or(ExportAccountingError::ConflictingSourceDatum)?,
-            guid: data
-                .target_guid
-                .ok_or(ExportAccountingError::ConflictingSourceDatum)?,
-            path: data
-                .target_record_path
-                .as_ref()
-                .ok_or(ExportAccountingError::ConflictingSourceDatum)?
-                .as_str(),
-            source_type: data
-                .target_type
-                .as_ref()
-                .ok_or(ExportAccountingError::ConflictingSourceDatum)?
-                .as_str(),
+    pub(crate) fn target(&self) -> CatalogReferenceTarget<'_> {
+        let data = self.proof.data();
+        CatalogReferenceTarget {
+            index: data.target_record_index,
+            guid: data.target_guid,
+            path: data.target_record_path.as_str(),
+            source_type: data.target_type.as_str(),
             kind: self.target_kind,
-        })
+        }
     }
 }
 

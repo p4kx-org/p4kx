@@ -4,7 +4,6 @@
 use p4kx_extraction::{DataForge, SourceLocation, SourceUse, SourceUseRole, Value};
 use p4kx_testkit::{DataForgeBuilder, TestInstance, TestRecord, TestStruct, TestType, TestValue};
 
-use super::Retention;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::build::original_input::test_support::{self, TestResult};
 use crate::catalog_read::original::health_reference_observation::{
@@ -14,7 +13,8 @@ use crate::catalog_read::original::health_reference_path::ReferencePathUses;
 use crate::catalog_read::original::health_reference_receipt::{ReferenceFrame, ReferenceUse};
 use crate::catalog_read::original::health_reference_recipe::ReferenceRecipe;
 use crate::catalog_read::original::{
-    self, ExampleBodyReceipt, OriginalValueEvent, ReferenceCapture, ReferenceObservation,
+    self, CatalogReferenceProof, ExampleBodyReceipt, OriginalValueEvent, OriginalValueSite,
+    ReferenceCapture, ReferenceObservation,
 };
 use crate::export_diagnostic::{
     ExportDiagnosticCode, ExportDiagnosticSeverity, ExportDiagnosticStage, ExportDiagnosticUnit,
@@ -23,6 +23,12 @@ use crate::export_diagnostic::{
 use crate::health_diagnostic_observation::{DiagnosticObservation, ExampleObservation};
 use crate::record_observation::RecordObservation;
 use crate::{CatalogError, ExportAccountingError, ExportReferenceStatus, Kind};
+
+#[derive(Clone, Copy)]
+enum Retention {
+    Immediate,
+    Deferred,
+}
 
 #[test]
 fn exact_target_report_and_sample_bytes_match_the_eager_representation() -> TestResult {
@@ -51,13 +57,11 @@ fn snapshot(retention: Retention) -> TestResult<Vec<u8>> {
         let references = references
             .into_iter()
             .map(|reference| {
-                let mut row = reference
-                    .resolved(ExportReferenceStatus::ExcludedByFilter)
-                    .materialize()?;
+                let mut row = reference.resolved(ExportReferenceStatus::ExcludedByFilter);
                 row.contextualize(Some(Kind::Items), ExportSourceRole::Dependency);
-                Ok(row)
+                row
             })
-            .collect::<Result<Vec<_>, ExportAccountingError>>()?;
+            .collect::<Vec<_>>();
         let diagnostic = diagnostic(&references)?;
         let report = original::finish_report(
             input,
@@ -109,17 +113,12 @@ fn diagnostic(references: &[ReferenceObservation]) -> TestResult<DiagnosticObser
 #[test]
 fn deferred_recipe_keeps_physical_path_caller_and_target_operands_in_order() -> TestResult {
     test_support::with_input(&database(), |forge, input| {
-        let refs = observations(forge, input, Retention::Deferred)?;
+        let refs = candidates(forge, input)?;
         let [first, second, weak] = refs.as_slice() else {
             return Err("two array References and one actual root-target WeakPointer".into());
         };
-        let (
-            ReferenceEvidence::Deferred { recipe: left, .. },
-            ReferenceEvidence::Deferred { recipe: right, .. },
-        ) = (&first.evidence, &second.evidence)
-        else {
-            return Err("deferred recipes for both original array elements".into());
-        };
+        let left = first.recipe_for_test().ok_or("first original recipe")?;
+        let right = second.recipe_for_test().ok_or("second original recipe")?;
         assert!(
             left.path.shares_prefix_with(&right.path),
             "both retained candidates share the same physical prefix allocation"
@@ -137,9 +136,9 @@ fn deferred_recipe_keeps_physical_path_caller_and_target_operands_in_order() -> 
         assert_eq!(weak.data().field.as_str(), "body.weak", "weak caller site");
         let uses = &input.origins().uses;
         let before = uses.freeze()?;
-        let first = first.clone().materialize()?;
-        let second = second.clone().materialize()?;
-        let weak = weak.clone().materialize()?;
+        let first = first.materialize(None)?;
+        let second = second.materialize(None)?;
+        let weak = weak.materialize(None)?;
         assert_eq!(
             before,
             uses.freeze()?,
@@ -268,8 +267,8 @@ fn immediate_and_deferred_reads_of_one_occurrence_are_equivalent() -> TestResult
 #[test]
 fn equal_deferred_recipes_cannot_import_another_archive_within_the_same_inventory() -> TestResult {
     test_support::with_shared_inventory_inputs(&database(), |forge, input, other, other_input| {
-        let original = observations(forge, input, Retention::Deferred)?;
-        let foreign = observations(other, other_input, Retention::Deferred)?;
+        let original = candidates(forge, input)?;
+        let foreign = candidates(other, other_input)?;
         for (left, right) in original.iter().zip(&foreign) {
             assert_eq!(left, right, "description and coordinate equality coincide");
             assert!(
@@ -289,10 +288,7 @@ fn equal_deferred_recipes_cannot_import_another_archive_within_the_same_inventor
             Vec::new(),
             original
                 .into_iter()
-                .map(|row| {
-                    row.resolved(ExportReferenceStatus::TargetNotEmitted)
-                        .materialize()
-                })
+                .map(|row| row.materialize(Some(ExportReferenceStatus::TargetNotEmitted)))
                 .collect::<Result<_, _>>()?,
             None,
         );
@@ -319,6 +315,29 @@ fn observations(
     input: &OriginalCatalogInput<'_, '_>,
     retention: Retention,
 ) -> TestResult<Vec<ReferenceObservation>> {
+    read_occurrences(forge, input, |capture, site| match retention {
+        Retention::Immediate => capture.reference(site),
+        Retention::Deferred => Ok(capture.catalog_reference(site)?.materialize(None)?),
+    })
+}
+
+fn candidates(
+    forge: &DataForge<'_>,
+    input: &OriginalCatalogInput<'_, '_>,
+) -> TestResult<Vec<CatalogReferenceProof>> {
+    read_occurrences(forge, input, |capture, site| {
+        capture.catalog_reference(site)
+    })
+}
+
+fn read_occurrences<T>(
+    forge: &DataForge<'_>,
+    input: &OriginalCatalogInput<'_, '_>,
+    mut read: impl FnMut(
+        &ReferenceCapture<'_, '_, '_>,
+        &OriginalValueSite<'_, '_, '_, '_>,
+    ) -> Result<T, CatalogError>,
+) -> TestResult<Vec<T>> {
     let owner = forge.record(0).ok_or("original Owner record")?;
     let tree = owner.tree()?;
     assert_eq!(
@@ -335,24 +354,7 @@ fn observations(
         match event {
             OriginalValueEvent::Value(site) => match site.value() {
                 Value::Struct(_) | Value::Array(_) => capture.enter(&site)?,
-                Value::Reference(_) => {
-                    let row = match retention {
-                        Retention::Immediate => capture.reference(&site)?,
-                        Retention::Deferred => capture.catalog_reference(&site)?,
-                    };
-                    assert_eq!(
-                        row.data().target_record_index,
-                        Some(1),
-                        "original root target"
-                    );
-                    if matches!(retention, Retention::Deferred) {
-                        assert!(
-                            matches!(row.evidence, ReferenceEvidence::Deferred { .. }),
-                            "a positive target stays compact through the original walk",
-                        );
-                    }
-                    rows.push(row);
-                }
+                Value::Reference(_) => rows.push(read(&capture, &site)?),
                 _ => {}
             },
             OriginalValueEvent::EndContainer { ordinal, .. } => capture.leave(ordinal)?,

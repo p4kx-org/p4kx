@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use p4kx_extraction::SourceValue;
 
+use super::health_catalog_reference_proof::CatalogReferenceProof;
 use super::health_example_body::ExampleBodyReceipt;
 use super::health_reference_data::{ReferenceData, ReferencePointer};
 use super::health_reference_error;
@@ -70,15 +71,15 @@ impl<'scope, 'read, 'source> ReferenceCapture<'scope, 'read, 'source> {
         site: &OriginalValueSite<'_, '_, '_, '_>,
     ) -> Result<ReferenceObservation, CatalogError> {
         self.check_site(site)?;
-        health_reference_target::read(self, site, health_reference_target::Retention::Immediate)
+        Ok(health_reference_target::read(self, site)?.into_observation(None)?)
     }
 
     pub(crate) fn catalog_reference(
         &self,
         site: &OriginalValueSite<'_, '_, '_, '_>,
-    ) -> Result<ReferenceObservation, CatalogError> {
+    ) -> Result<CatalogReferenceProof, CatalogError> {
         self.check_site(site)?;
-        health_reference_target::read(self, site, health_reference_target::Retention::Deferred)
+        health_reference_target::read(self, site)
     }
 
     pub(crate) fn error(

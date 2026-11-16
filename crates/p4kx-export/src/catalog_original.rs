@@ -81,6 +81,8 @@ pub(crate) use owned::{
     OwnedValueWalk,
 };
 
+#[path = "health_catalog_reference_proof.rs"]
+mod health_catalog_reference_proof;
 #[path = "health_reference_capture.rs"]
 mod health_reference_capture;
 #[path = "health_reference_cells.rs"]
@@ -106,6 +108,7 @@ mod health_reference_target;
 #[path = "original_error_input.rs"]
 mod original_error_input;
 
+pub(crate) use health_catalog_reference_proof::{CatalogReferenceData, CatalogReferenceProof};
 pub(crate) use health_reference_capture::ReferenceCapture;
 pub use health_reference_cells::{ExportSourcePointer, ExportUnresolvedReference};
 pub(crate) use health_reference_data::ReferenceData;

@@ -89,9 +89,6 @@ impl FieldInspection {
         for reference in &mut self.unresolved_references {
             reference.contextualize(kind, role);
         }
-        for reference in &mut self.catalog_references {
-            reference.original.contextualize(kind, role);
-        }
     }
 }
 
@@ -186,7 +183,7 @@ impl FieldInspection {
             .iter()
             .zip(&other.catalog_references)
         {
-            reference.original.check_duplicate(&other.original)?;
+            reference.proof.check_duplicate(&other.proof)?;
         }
         Ok(())
     }

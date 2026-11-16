@@ -51,7 +51,7 @@ pub(crate) fn resolve(
     {
         let proof = canonical.for_source(source)?;
         for reference in &proof.catalog_references {
-            let target = reference.target()?;
+            let target = reference.target();
             let target_sources = by_target.get(&target.index).map_or(&[][..], Vec::as_slice);
             if let Some(status) = status(&target, rows, targets, target_sources) {
                 record(source, reference, status, fields)?;
@@ -138,7 +138,7 @@ fn record(
     status: ExportReferenceStatus,
     fields: &mut Fields,
 ) -> Result<(), ExportAccountingError> {
-    let mut original = reference.original.clone().resolved(status).materialize()?;
+    let mut original = reference.proof.materialize(Some(status))?;
     original.merge_owner(source.subject())?;
     original.contextualize(source.kind, source.role);
     let data = original.data();

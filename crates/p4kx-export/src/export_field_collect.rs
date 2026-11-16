@@ -8,7 +8,8 @@ use p4kx_extraction::{Guid, RecordTree, Reference, ValueError};
 use crate::catalog_number_capture::FloatToken;
 use crate::catalog_number_health::NumberRequirement;
 use crate::catalog_read::original::{
-    ExampleBodyReceipt, RecordSubject, ReferenceData, ReferenceLink, ReferenceObservation,
+    CatalogReferenceData, CatalogReferenceProof, ExampleBodyReceipt, RecordSubject, ReferenceData,
+    ReferenceLink, ReferenceObservation,
 };
 use crate::catalog_reference::CatalogReference;
 use crate::catalog_reference_texts::CatalogReferenceTexts;
@@ -133,16 +134,37 @@ impl<'t, 'f> FieldCollector<'t, 'f> {
     }
 
     /// Retains the admitted candidate without expanding its shared descriptive text.
-    pub(crate) fn catalog_reference(
+    pub(crate) fn catalog_reference(&mut self, target_kind: Kind, proof: CatalogReferenceProof) {
+        self.catalog_references
+            .push(CatalogReference { proof, target_kind });
+    }
+
+    pub(crate) fn accounting_catalog_reference(
         &mut self,
-        target_kind: Kind,
-        mut original: ReferenceObservation,
-    ) {
-        original.contextualize(self.kind, self.role);
-        self.catalog_references.push(CatalogReference {
-            original,
-            target_kind,
-        });
+        field: &str,
+        source_type: &str,
+        target: &Reference<'_>,
+    ) -> CatalogReferenceProof {
+        CatalogReferenceProof::accounting(
+            self.subject.clone(),
+            self.describe_reference(field, source_type, target),
+        )
+    }
+
+    fn describe_reference(
+        &mut self,
+        field: &str,
+        source_type: &str,
+        target: &Reference<'_>,
+    ) -> CatalogReferenceData {
+        CatalogReferenceData {
+            field: self.reference_texts.retain(field),
+            source_type: self.reference_texts.retain(source_type),
+            target_guid: target.guid(),
+            target_record_index: target.record_index(),
+            target_record_path: self.reference_texts.retain(target.record_path()),
+            target_type: self.reference_texts.retain(target.type_name()),
+        }
     }
 
     pub(crate) fn accounting_reference(
@@ -151,17 +173,12 @@ impl<'t, 'f> FieldCollector<'t, 'f> {
         source_type: &str,
         target: &Reference<'_>,
     ) -> ReferenceObservation {
+        let described = self.describe_reference(field, source_type, target);
         let data = ReferenceData {
-            field: self.reference_texts.retain(field),
-            source_type: self.reference_texts.retain(source_type),
-            target_guid: Some(target.guid()),
-            target_record_index: Some(target.record_index()),
-            target_record_path: Some(self.reference_texts.retain(target.record_path())),
-            target_type: Some(self.reference_texts.retain(target.type_name())),
             target_location: target
                 .location()
                 .map(|location| self.reference_texts.retain(location.as_str())),
-            source_pointer: None,
+            ..described.into()
         };
         ReferenceObservation::accounting(self.subject.clone(), data, None)
     }

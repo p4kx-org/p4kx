@@ -5,25 +5,18 @@ use std::sync::Arc;
 
 use p4kx_extraction::{Guid, SourceUseRole, Value, ValueError};
 
+use super::health_catalog_reference_proof::{CatalogReferenceData, CatalogReferenceProof};
 use super::health_reference_capture::ReferenceCapture;
-use super::health_reference_data::ReferenceData;
-use super::health_reference_observation::ReferenceObservation;
+
 use super::health_reference_receipt::ReferenceDatum;
 use super::health_reference_recipe::{self, ReferenceCaller, ReferenceRecipe};
 use super::{OriginalValueFact, OriginalValueSite};
 use crate::{CatalogError, ExportAccountingError};
 
-#[derive(Clone, Copy)]
-pub(super) enum Retention {
-    Immediate,
-    Deferred,
-}
-
 pub(super) fn read(
     capture: &ReferenceCapture<'_, '_, '_>,
     site: &OriginalValueSite<'_, '_, '_, '_>,
-    retention: Retention,
-) -> Result<ReferenceObservation, CatalogError> {
+) -> Result<CatalogReferenceProof, CatalogError> {
     capture.check_site(site)?;
     let fact = site.fact();
     let admitted = fact.admit_reference()?;
@@ -38,15 +31,13 @@ pub(super) fn read(
         .text()
         .clone();
     let target_type = capture.texts.retain_text(target_type)?.text().clone();
-    let data = ReferenceData {
+    let data = CatalogReferenceData {
         field: base.field,
         source_type: base.owner.type_name,
-        target_guid: Some(admitted.origin.record_guid()),
-        target_record_index: Some(admitted.origin.record_index()),
-        target_record_path: Some(target_record_path),
-        target_type: Some(target_type),
-        target_location: None,
-        source_pointer: None,
+        target_guid: admitted.origin.record_guid(),
+        target_record_index: admitted.origin.record_index(),
+        target_record_path,
+        target_type,
     };
     let recipe = ReferenceRecipe {
         path: base.uses,
@@ -54,14 +45,11 @@ pub(super) fn read(
         caller: ReferenceCaller::from_fact(&fact),
         storage: admitted.storage,
     };
-    let frame = Arc::clone(&capture.frame);
-    Ok(match retention {
-        Retention::Immediate => {
-            let body = recipe.body(&data)?;
-            ReferenceObservation::captured(data, None, frame, body)
-        }
-        Retention::Deferred => ReferenceObservation::deferred(data, frame, recipe),
-    })
+    Ok(CatalogReferenceProof::admitted(
+        data,
+        Arc::clone(&capture.frame),
+        recipe,
+    ))
 }
 
 pub(super) fn guid_for_fact(
