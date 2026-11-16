@@ -216,7 +216,7 @@ exact-limit inputs, incomplete journal rows and original writer output while rej
 UTF-8 and UTF-16 byte order marks.
 
 
-### Read-only MSI package evidence
+### MSI package evidence
 
 The AMD64 MSI from producer `0e1da3f4a` in Release run `43813424470` passed the
 native read-only MSI metadata and transport assertions. Its SHA-256 is
@@ -235,7 +235,14 @@ same run. Both SHA-256 hashes matched the diagnostic input receipt. The
 v0.2.0 predecessor had template `x64;1033`, one expected per-user Registry
 key and the same UpgradeCode as the produced MSI. The hosted historical
 install, upgrade and removal remain the lifecycle checks for this pair.
-[Native AMD64 execution](https://github.com/p4kx-org/p4kx/actions/runs/43826004006/job/133175698571)
+[Earlier AMD64 execution](https://github.com/p4kx-org/p4kx/actions/runs/43826004006/job/133175698571)
+
+Release merge `bcd39e238` passed native AMD64 verification in run `43837672769`.
+The phase journal records the legacy v0.2.0 calibration, rename upgrade, runtime
+checks and uninstall. It also records the current install, repair, rollback,
+upgrade, downgrade refusal, wrong-CPU refusal, PATH cases and cleanup with the
+original state restored. The same job ran the portable CLI, MCP and bounded GUI
+with isolated folders. [Native AMD64 execution](https://github.com/p4kx-org/p4kx/actions/runs/43837672769/job/133219150212)
 
 ### Dynamic parent-chain feedback experiment
 
