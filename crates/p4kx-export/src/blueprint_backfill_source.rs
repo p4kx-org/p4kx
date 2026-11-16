@@ -28,6 +28,14 @@ struct Selector {
 }
 
 impl BlueprintResources {
+    pub(crate) const fn new(record_index: u32) -> Self {
+        Self {
+            record_index,
+            leaves: BTreeMap::new(),
+            nodes: BTreeMap::new(),
+        }
+    }
+
     pub(crate) fn targets(&self) -> impl Iterator<Item = Guid> + '_ {
         self.leaves.keys().copied()
     }
@@ -73,11 +81,7 @@ pub(super) fn read(
     tiers: &[InterpretedTier<'_, '_>],
     fields: &OriginalFlowFields<'_, '_, '_>,
 ) -> Result<BlueprintResources, CatalogError> {
-    let mut resources = BlueprintResources {
-        record_index: fields.record_index(),
-        leaves: BTreeMap::new(),
-        nodes: BTreeMap::new(),
-    };
+    let mut resources = BlueprintResources::new(fields.record_index());
     for tier in tiers {
         for (cost, original) in tier.tier.costs().iter().zip(&tier.costs) {
             if let Cost::Resource(cost) = cost

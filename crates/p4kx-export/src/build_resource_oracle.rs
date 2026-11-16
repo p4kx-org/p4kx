@@ -65,6 +65,7 @@ pub(super) fn read(
         )?,
         &origins,
         options.filter,
+        |_| Ok(()),
     )?;
     let files = ArchiveFiles::new(archive);
     let entities = Arc::new(Entities::new(&forge));

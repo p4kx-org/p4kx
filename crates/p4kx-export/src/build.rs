@@ -70,7 +70,7 @@ fn assemble<R>(
     let projection = CatalogProjection::new(&texts, &input, &text_registry);
     let entry_capture = EntryCapture::for_input(&input);
     run.begin(CatalogStage::Crafting);
-    let crafting = catalog_crafting::read(&forge, options, &projection)?;
+    let (crafting, blueprint_definitions) = catalog_crafting::read(&forge, options, &projection)?;
     let files = ArchiveFiles::new(archive);
     let entities = Arc::new(Entities::new(&forge));
     let (mut collected, mut placements) = scanning::scan(
@@ -214,7 +214,7 @@ fn assemble<R>(
         placements: catalog_placements,
         definitions: CatalogDefinitions {
             items: parts::item_definitions(&forge, collected.item_definitions),
-            blueprints: blueprints.definitions,
+            blueprints: blueprint_definitions,
             shop_inventories: collected.shop_inventories,
             particle_libraries: collected.particle_libraries,
             planet_tech: collected.planet_tech,

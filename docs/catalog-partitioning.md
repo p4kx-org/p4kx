@@ -213,10 +213,11 @@ For each Build, record the full Build identity, exporter revision and hash, and 
 and modification time before and after the export. Run the normal `p4kx catalog` writer with a
 fixed export time, default text selection, `--progress-phases` and one private `.json.zst` output.
 The completed writer reports `catalog storage:` on stderr. It sums the logical bytes of the
-container, location, particle and weapon animation row spools and the final bytes of the
-publication temporary. The spools stay open until the output is written. This measures their
-simultaneous peak even if an open spool has no visible name. On an interrupted run, a dedicated
-scratch volume can provide sampled allocation evidence.
+temporary row spools for container instances, locations, Blueprint definitions, particle libraries,
+contract generators, contract templates, mission broker entries, item ports, interactions and
+weapon animation candidates, plus the final bytes of the publication temporary. The spools stay
+open until publication. The measurement includes open spools with no visible file name. On an
+interrupted run, a dedicated scratch volume can provide sampled allocation evidence.
 Capture stderr line by line to align process memory samples with preparation, health, provenance,
 JSON size measurement and writing. Within input preparation, record `open-dataforge`,
 `read-localization`, `index-localization` and `initialize-origins` as separate phase starts.

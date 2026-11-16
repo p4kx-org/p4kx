@@ -70,11 +70,11 @@ impl Parts {
     }
 }
 
-pub(super) fn blueprint_tables<'source>(
-    collected: &mut Collected<'source>,
+pub(super) fn blueprint_tables(
+    collected: &mut Collected<'_>,
     forge: &DataForge<'_>,
     origins: &CatalogOrigins,
-) -> Result<BlueprintTables<'source>, crate::CatalogError> {
+) -> Result<BlueprintTables, crate::CatalogError> {
     blueprint_catalog_rows::tables(
         std::mem::take(&mut collected.blueprints),
         &collected.missing_blueprint_categories,

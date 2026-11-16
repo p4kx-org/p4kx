@@ -11,8 +11,9 @@ use crate::blueprint_definition::{BlueprintDefinition, PhysicalBlueprintRef};
 use crate::blueprint_presentation::{BlueprintDismantle, BlueprintPresentation};
 use crate::blueprint_rule_inputs::BlueprintRules;
 use crate::blueprint_tier_contract::BlueprintTier;
+use crate::catalog_number_capture::CapturedNumber;
 use crate::catalog_origins::CatalogOrigins;
-use crate::catalog_table::CatalogTable;
+use crate::catalog_table::{CatalogTable, DatasetAvailability};
 use crate::export_ledger::SourceObservation;
 use crate::guid_text::CatalogGuid;
 use crate::record_header_field::RecordHeaderField;
@@ -20,15 +21,22 @@ use crate::{CatalogError, Kind};
 
 const SOURCE_TYPES: &[&str] = &["CraftingBlueprintRecord"];
 
-pub(crate) struct BlueprintRow<'source> {
-    pub(crate) definition: BlueprintDefinition<'source>,
+pub(crate) type BlueprintRow<'source> = BlueprintRowData<BlueprintDefinitionReceipt<'source>>;
+
+pub(crate) struct BlueprintDefinitionReceipt<'source> {
+    pub(crate) physical_guid: CatalogGuid,
+    pub(crate) physical_path: &'source str,
+    pub(crate) numbers: Vec<CapturedNumber>,
+}
+
+pub(crate) struct BlueprintRowData<Definition> {
+    pub(crate) definition: Definition,
     pub(crate) resources: crate::blueprint_backfill_source::BlueprintResources,
     tiers: Vec<BlueprintTier>,
     presentation: BlueprintPresentation<BlueprintChoice<CatalogGuid>>,
 }
 
-pub(crate) struct BlueprintTables<'source> {
-    pub(crate) definitions: CatalogTable<BlueprintDefinition<'source>>,
+pub(crate) struct BlueprintTables {
     pub(crate) tiers: CatalogTable<BlueprintTier>,
     pub(crate) presentation: CatalogTable<BlueprintPresentation<SourcedValue<CatalogGuid>>>,
 }
@@ -38,7 +46,7 @@ pub(crate) fn row<'source>(
     rules: &BlueprintRules,
     process: Option<Guid>,
     origins: &CatalogOrigins,
-) -> Result<BlueprintRow<'source>, CatalogError> {
+) -> Result<BlueprintRowData<BlueprintDefinition<'source>>, CatalogError> {
     let guid = source.definition.physical_guid.0;
     let mut default_uses = rules.defaults.sources.clone();
     default_uses.push(
@@ -68,12 +76,54 @@ pub(crate) fn row<'source>(
         default_available,
         dismantle,
     };
-    Ok(BlueprintRow {
+    Ok(BlueprintRowData {
         definition: source.definition,
         resources: source.resources,
         tiers: source.tiers,
         presentation,
     })
+}
+
+/// Emits definitions in canonical GUID and physical order, then releases their source arenas.
+pub(crate) fn retain_definitions<'source>(
+    mut rows: Vec<BlueprintRowData<BlueprintDefinition<'source>>>,
+    mut emit: impl FnMut(&BlueprintDefinition<'source>) -> Result<(), CatalogError>,
+) -> Result<Vec<BlueprintRow<'source>>, CatalogError> {
+    rows.sort_by_cached_key(|row| {
+        (
+            row.definition.physical_guid.text(),
+            row.definition.physical_index,
+        )
+    });
+    let mut retained = Vec::with_capacity(rows.len());
+    for BlueprintRowData {
+        definition,
+        resources,
+        tiers,
+        presentation,
+    } in rows
+    {
+        emit(&definition)?;
+        retained.push(BlueprintRowData {
+            definition: BlueprintDefinitionReceipt {
+                physical_guid: definition.physical_guid,
+                physical_path: definition.physical_path,
+                numbers: definition.numbers,
+            },
+            resources,
+            tiers,
+            presentation,
+        });
+    }
+    Ok(retained)
+}
+
+pub(crate) fn availability(forge: &DataForge<'_>, count: usize) -> DatasetAvailability {
+    if count == 0 {
+        DatasetAvailability::from_source_declarations(forge, |name| SOURCE_TYPES.contains(&name))
+    } else {
+        DatasetAvailability::Available
+    }
 }
 
 fn dismantle_choice(
@@ -110,19 +160,17 @@ fn dismantle_choice(
     )
 }
 
-pub(crate) fn tables<'source>(
-    rows: Vec<BlueprintRow<'source>>,
+pub(crate) fn tables(
+    rows: Vec<BlueprintRow<'_>>,
     missing: &HashSet<Guid>,
     sources: &[SourceObservation],
     forge: &DataForge<'_>,
     origins: &CatalogOrigins,
-) -> Result<BlueprintTables<'source>, CatalogError> {
+) -> Result<BlueprintTables, CatalogError> {
     let missing = missing_sources(missing, sources);
-    let mut definitions = Vec::with_capacity(rows.len());
     let mut tiers = Vec::new();
     let mut presentations = Vec::with_capacity(rows.len());
-    for BlueprintRow {
-        definition,
+    for BlueprintRowData {
         tiers: recipe,
         presentation,
         ..
@@ -154,7 +202,6 @@ pub(crate) fn tables<'source>(
             category.complete &= !physical.is_empty();
             category.state = SourceValue::Absent;
         }
-        definitions.push(definition);
         tiers.extend(recipe);
         presentations.push(BlueprintPresentation {
             blueprint,
@@ -168,7 +215,6 @@ pub(crate) fn tables<'source>(
         });
     }
     Ok(BlueprintTables {
-        definitions: CatalogTable::new(forge, SOURCE_TYPES, definitions),
         tiers: CatalogTable::new(forge, SOURCE_TYPES, tiers),
         presentation: CatalogTable::new(forge, SOURCE_TYPES, presentations),
     })
@@ -194,3 +240,7 @@ fn missing_sources(
     }
     found
 }
+
+#[cfg(test)]
+#[path = "blueprint_definition_staging_tests.rs"]
+mod staging_tests;

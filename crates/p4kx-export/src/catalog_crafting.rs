@@ -9,9 +9,11 @@ use crate::CatalogError;
 use crate::CatalogOptions;
 use crate::Kind;
 use crate::blueprint_catalog_rows::{self, BlueprintRow};
+use crate::blueprint_definition::BlueprintDefinition;
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read_failure::CatalogReadFailure;
+use crate::catalog_rows::staged::{StagedCatalogRows, StagedCatalogTable};
 use crate::catalog_v3::gameplay_property_catalog::GameplayPropertyDefinition;
 use crate::contract::{BlueprintPool, CraftingGlobal, DismantleProcess};
 use crate::contract_rewards::{PoolEntry, RewardSource};
@@ -44,7 +46,7 @@ pub(crate) fn read<'source>(
     forge: &'source DataForge<'_>,
     options: &CatalogOptions<'_>,
     projection: &CatalogProjection<'_, 'source>,
-) -> Result<CraftingKinds<'source>, CatalogError> {
+) -> Result<(CraftingKinds<'source>, StagedCatalogTable), CatalogError> {
     let input = crafting::read_with_progress(
         forge,
         options.filter,
@@ -52,7 +54,13 @@ pub(crate) fn read<'source>(
         options.progress,
         projection,
     )?;
-    kinds(input, projection.origins(), options.filter)
+    let directory = std::env::temp_dir();
+    let mut rows = StagedCatalogRows::new(&directory, options.cancel);
+    let kinds = kinds(input, projection.origins(), options.filter, |definition| {
+        rows.append(definition).map_err(CatalogError::from)
+    })?;
+    let availability = blueprint_catalog_rows::availability(forge, kinds.blueprints.len());
+    Ok((kinds, rows.finish(availability)?))
 }
 
 /// Combines canonical gameplay and quality facts with interpreted crafting datasets.
@@ -61,6 +69,7 @@ pub(crate) fn kinds<'f>(
     read: ReadCrafting<'f>,
     origins: &CatalogOrigins,
     filter: Option<&Filter>,
+    emit_blueprint: impl FnMut(&BlueprintDefinition<'f>) -> Result<(), CatalogError>,
 ) -> Result<CraftingKinds<'f>, CatalogError> {
     let ReadCrafting {
         data: crafting,
@@ -90,16 +99,11 @@ pub(crate) fn kinds<'f>(
         .dismantle_process()
         .map(|item| item.guid)
         .filter(|guid| kept.contains(guid));
-    let mut blueprints = blueprints
+    let blueprints = blueprints
         .into_iter()
         .map(|row| blueprint_catalog_rows::row(row, &blueprint_rules, process, origins))
         .collect::<Result<Vec<_>, _>>()?;
-    blueprints.sort_by_cached_key(|row| {
-        (
-            row.definition.physical_guid.text(),
-            row.definition.physical_index,
-        )
-    });
+    let blueprints = blueprint_catalog_rows::retain_definitions(blueprints, emit_blueprint)?;
     Ok(CraftingKinds {
         blueprints,
         properties,

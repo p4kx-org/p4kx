@@ -106,7 +106,8 @@ use crate::template_definition::TemplateDefinition;
 pub(crate) struct CatalogDefinitions<'source> {
     pub(crate) items:
         CatalogTable<super::catalog_item_components::item_definition::ItemDefinition<'source>>,
-    pub(crate) blueprints: CatalogTable<crate::blueprint_definition::BlueprintDefinition<'source>>,
+    #[schemars(with = "CatalogTable<crate::blueprint_definition::BlueprintDefinition<'source>>")]
+    pub(crate) blueprints: StagedCatalogTable,
     #[schemars(with = "CatalogTable<GeneratorDefinition<'source>>")]
     pub(crate) contract_generators: StagedCatalogTable,
     pub(crate) mission_module_declarations: CatalogTable<MissionModuleDeclaration<'source>>,
