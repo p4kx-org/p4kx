@@ -33,9 +33,14 @@ pub(crate) fn pointer(bytes: &[u8]) -> Option<(u32, u32)> {
     (structure != NULL || instance != NULL).then_some((structure, instance))
 }
 
+/// Returns the stored Reference GUID bytes following its unused instance index.
+pub(crate) fn reference_guid_bytes(bytes: &[u8]) -> Option<&[u8; 16]> {
+    bytes.get(size_of::<u32>()..)?.first_chunk()
+}
+
 /// Returns the stored Reference GUID following its unused instance index.
 pub(crate) fn reference_guid(bytes: &[u8]) -> Option<Guid> {
-    let guid = Guid::from_stored(scalar::first_bytes(bytes.get(4..).unwrap_or_default()));
+    let guid = Guid::from_stored(reference_guid_bytes(bytes).copied().unwrap_or_default());
     (guid != Guid::default()).then_some(guid)
 }
 

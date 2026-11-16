@@ -20,7 +20,7 @@ mod task;
 #[path = "tree_builder.rs"]
 mod tree_builder;
 
-pub(crate) use bytes::{element_bytes, pointer, reference_guid, words};
+pub(crate) use bytes::{element_bytes, pointer, reference_guid, reference_guid_bytes, words};
 pub use tree_builder::TreeBuilder;
 
 pub(crate) use positions::Positions;

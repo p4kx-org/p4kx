@@ -5,6 +5,7 @@ use p4kx_dataforge::{PositionedSources, RecordJsonBytes, RecordJsonSource};
 use p4kx_extraction::SourceUseRole;
 
 use crate::field_diff_inputs::Nodes;
+use crate::field_reference_evidence::ReferenceEvidence;
 use crate::{RecordSide, Value};
 
 #[derive(Clone, Copy)]
@@ -71,6 +72,13 @@ pub(crate) struct OperandEvidence {
     pub(crate) route: Coordinates,
     pub(crate) kind: Coordinates,
     pub(crate) value: Coordinates,
+    pub(crate) reference: Option<Box<ReferenceEvidence>>,
+}
+
+impl OperandEvidence {
+    pub(crate) fn link(&self) -> Option<(&Coordinates, &ReferenceEvidence)> {
+        Some((&self.route, self.reference.as_deref()?))
+    }
 }
 
 fn capture_operand(route: &[RouteStep<'_, '_>], side: RecordSide) -> Option<OperandEvidence> {
@@ -85,6 +93,10 @@ fn capture_operand(route: &[RouteStep<'_, '_>], side: RecordSide) -> Option<Oper
             .and_then(|site| site.selection_sources());
         chosen.observe(side, selection.as_ref(), selection_role);
     }
+    let reference = operand
+        .site
+        .and_then(|site| site.reference_sources())
+        .map(|input| Box::new(ReferenceEvidence::capture(side, &input)));
     let mut kind = Coordinates::complete();
     let value_sources = operand.site.map(|site| site.value_sources());
     let struct_sources = match (operand.value, operand.site) {
@@ -101,13 +113,16 @@ fn capture_operand(route: &[RouteStep<'_, '_>], side: RecordSide) -> Option<Oper
     }
 
     let mut value = Coordinates::complete();
-    value.observe(side, value_sources.as_ref(), |coordinate| {
-        value_role(operand.value, coordinate)
-    });
+    if !matches!(operand.value, Value::Null | Value::Reference(_)) {
+        value.observe(side, value_sources.as_ref(), |coordinate| {
+            value_role(operand.value, coordinate)
+        });
+    }
     Some(OperandEvidence {
         route: chosen,
         kind,
         value,
+        reference,
     })
 }
 
@@ -128,7 +143,7 @@ const fn declaration_is_enough(value: &Value<'_>) -> bool {
     )
 }
 
-const fn selection_role(coordinate: RecordJsonSource<'_>) -> SourceUseRole {
+pub(crate) const fn selection_role(coordinate: RecordJsonSource<'_>) -> SourceUseRole {
     match coordinate {
         RecordJsonSource::PropertyStorage { .. } => SourceUseRole::Conversion,
         _ => SourceUseRole::Selector,
@@ -176,14 +191,14 @@ pub(crate) struct Coordinates {
 }
 
 impl Coordinates {
-    const fn complete() -> Self {
+    pub(crate) const fn complete() -> Self {
         Self {
             uses: Vec::new(),
             complete: true,
         }
     }
 
-    fn observe(
+    pub(crate) fn observe(
         &mut self,
         side: RecordSide,
         observations: Option<&PositionedSources>,
@@ -218,7 +233,7 @@ impl Coordinates {
         }
     }
 
-    fn require(
+    pub(crate) fn require(
         &mut self,
         side: RecordSide,
         coordinate: Option<RecordJsonSource<'static>>,

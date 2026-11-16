@@ -37,6 +37,15 @@ impl PositionedSources {
         self.sources.extend(source);
     }
 
+    pub(crate) fn append(&mut self, sources: Option<Self>) {
+        if let Some(sources) = sources {
+            self.complete &= sources.complete;
+            self.sources.extend(sources.sources);
+        } else {
+            self.complete = false;
+        }
+    }
+
     pub(crate) const fn incomplete(&mut self) {
         self.complete = false;
     }
@@ -63,7 +72,7 @@ impl PositionedRecord<'_> {
         PositionedSources::new(sources, complete)
     }
 
-    pub(crate) fn describe_inline_selection(&self, slot: ValueSlot<'_>) -> PositionedSources {
+    pub(crate) fn describe_selection_header(&self, slot: ValueSlot<'_>) -> PositionedSources {
         let mut sources = PositionedSources::new(vec![property_storage(slot)], true);
         if slot.array_header.is_some() {
             sources.require(self.describe_bytes(slot.array_header, RecordJsonBytes::ArrayHeader));

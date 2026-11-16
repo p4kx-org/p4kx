@@ -2869,7 +2869,11 @@ The `path` retains the declarations used to spell it and the array headers used 
 its indices. Each present side's `type` and `value` retain their own original storage
 and ancestor selectors. Missing sides and null values have no `value` address to annotate.
 Unbound input or absent positional evidence stays unknown. Unreadable value diagnostics may
-retain partial storage evidence. Resolved Reference members remain unknown individually.
+retain partial storage evidence. A stored Reference GUID retains the caller GUID bytes.
+Its target path and type retain the same caller bytes as selector and the selected Record
+header or type definition. A weak pointer retains its original struct and instance words as
+selector. Its reported GUID and record path come from the selected Record header, and an
+owned target's `at` and type use the actual admitted field and array positions.
 
 Records are joined by GUID. A Record is `moved` when its record path differs, ignoring case and
 separator kind; its changed fields are listed as well. It is `changed` when its name, its type

@@ -15,7 +15,7 @@ use serde_json::{Value, json};
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
-fn reports(before: &[u8], after: &[u8]) -> TestResult<(Value, Value)> {
+pub(super) fn reports(before: &[u8], after: &[u8]) -> TestResult<(Value, Value)> {
     let dir = tempfile::tempdir()?;
     let open = |filename, bytes: &[u8], encrypted| -> TestResult<Archive> {
         let path = dir.path().join(filename);
@@ -172,7 +172,7 @@ fn record_body_origins_retain_reordered_nested_fields_and_array_admission() -> T
 }
 
 #[test]
-fn record_body_origins_distinguish_null_and_unproved_resolved_reference_fields() -> TestResult {
+fn record_body_origins_distinguish_null_and_resolved_reference_fields() -> TestResult {
     let make = |value| {
         DataForgeBuilder::new()
             .structure(TestStruct::new("Owner").field("target", TestType::Reference))
@@ -185,21 +185,26 @@ fn record_body_origins_distinguish_null_and_unproved_resolved_reference_fields()
     let after = make(TestValue::Reference(2));
     let (report, _) = reports(&before, &after)?;
     let target = field_path(&report, "target")?;
-    let _ = uses_at(&report, &format!("{target}/old/type"), Some(true), true)?;
+    let null = uses_at(&report, &format!("{target}/old/type"), Some(true), true)?;
+    let (_, null_word) = raw_bytes(&before, &null, "slot", "selector")?;
+    assert_eq!(
+        null_word, [0; 16],
+        "the canonical null GUID excludes the reserved bytes"
+    );
     assert!(
         origin_at(&report, &format!("{target}/old/value")).is_none(),
         "null has only type"
     );
     for member in ["guid", "record_path", "type"] {
         assert!(
-            uses_at(
+            !uses_at(
                 &report,
                 &format!("{target}/new/value/{member}"),
-                None,
-                false
+                Some(false),
+                true
             )?
             .is_empty(),
-            "resolution evidence for {member} remains unknown",
+            "the resolved member {member} has bound original evidence",
         );
     }
     assert!(
@@ -246,7 +251,7 @@ fn nested(new: bool) -> Vec<u8> {
         .build()
 }
 
-fn field_path(report: &Value, path: &str) -> TestResult<String> {
+pub(super) fn field_path(report: &Value, path: &str) -> TestResult<String> {
     let prefix = "/records/changes/0/fields";
     let index = report
         .pointer(prefix)
@@ -258,11 +263,11 @@ fn field_path(report: &Value, path: &str) -> TestResult<String> {
     Ok(format!("{prefix}/{index}"))
 }
 
-fn origin_at<'report>(report: &'report Value, path: &str) -> Option<&'report Value> {
+pub(super) fn origin_at<'report>(report: &'report Value, path: &str) -> Option<&'report Value> {
     report.pointer("/records/fieldOrigins")?.get(path)
 }
 
-fn uses_at<'report>(
+pub(super) fn uses_at<'report>(
     report: &'report Value,
     path: &str,
     encrypted: Option<bool>,
@@ -310,7 +315,7 @@ fn require_property(uses: &[&Value], index: &str, field: &str, role: &str) {
     );
 }
 
-fn raw_bytes<'input>(
+pub(super) fn raw_bytes<'input>(
     input: &'input [u8],
     uses: &[&Value],
     field: &str,

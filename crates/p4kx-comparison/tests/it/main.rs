@@ -23,6 +23,7 @@ mod record_fields;
 mod record_header_origins;
 mod record_name_tag;
 mod record_nested;
+mod record_reference_origins;
 mod record_references;
 mod records;
 mod schema_counts;

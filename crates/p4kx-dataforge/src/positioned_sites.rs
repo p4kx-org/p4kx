@@ -3,8 +3,8 @@
 
 use crate::positioned_record::ValueSlot;
 use crate::{
-    DataForgeError, DataType, Field, PositionedRecord, PositionedSources, RecordJsonBytes,
-    RecordJsonSource, StructValue, Value,
+    DataForgeError, DataType, Field, PositionedRecord, PositionedReferenceSources,
+    PositionedSources, RecordJsonBytes, RecordJsonSource, StructValue, Value,
 };
 
 /// The canonical fields and original slots of one admitted structure.
@@ -102,6 +102,11 @@ impl<'record, 'source> PositionedValue<'record, 'source> {
     /// This scope covers storage only, including slot bytes from a failed decode.
     #[must_use]
     pub fn storage_sources(&self) -> PositionedSources {
+        if self.slot.data_type == DataType::Reference
+            && (!self.slot.array || self.slot.array_header.is_some())
+        {
+            return PositionedReferenceSources::caller_storage(self.record, self.slot);
+        }
         let mut sources = self.record.describe_storage(self.slot);
         if self.slot.bytes == Some(&[]) && !matches!(self.value, Value::Struct(_)) {
             sources.incomplete();
@@ -116,7 +121,7 @@ impl<'record, 'source> PositionedValue<'record, 'source> {
     pub fn selection_sources(&self) -> Option<PositionedSources> {
         match self.value {
             Value::Struct(_) if self.slot.data_type == DataType::Class => {
-                Some(self.record.describe_inline_selection(self.slot))
+                Some(self.record.describe_selection_header(self.slot))
             }
             Value::Struct(_) | Value::Array(_) => Some(self.storage_sources()),
             _ => None,
@@ -142,6 +147,15 @@ impl<'record, 'source> PositionedValue<'record, 'source> {
             _ => {}
         }
         sources
+    }
+
+    /// Returns the caller and selected-target facts of an admitted link.
+    #[must_use]
+    pub fn reference_sources(&self) -> Option<PositionedReferenceSources> {
+        let Value::Reference(reference) = self.value else {
+            return None;
+        };
+        PositionedReferenceSources::capture(self.record, self.slot, reference)
     }
 
     /// Returns the actual array count and first element words for an array or its element.

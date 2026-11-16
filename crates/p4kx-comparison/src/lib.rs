@@ -15,6 +15,7 @@ mod error;
 mod field_change_evidence;
 mod field_diff;
 mod field_diff_inputs;
+mod field_reference_evidence;
 mod line_diff;
 mod line_diff_hunks;
 mod line_diff_origins;

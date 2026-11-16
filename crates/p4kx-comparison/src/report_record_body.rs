@@ -4,6 +4,7 @@
 use p4kx_extraction::{FieldOrigin, FieldOrigins, RecordJsonLocation, SourceScope, SourceUses};
 
 use crate::field_change_evidence::{Coordinates, OperandEvidence};
+use crate::field_reference_evidence::ReferenceMember;
 use crate::record_report::FieldChangeReport;
 use crate::report_origins::{ReportOriginsError, put};
 use crate::value_report::ValueReport;
@@ -55,15 +56,18 @@ impl BodyOrigins<'_> {
         original: Option<&ChangedValue<'_>>,
         operand: Option<&OperandEvidence>,
     ) -> Result<(), ReportOriginsError> {
-        let kind = self.origin(
-            operand
-                .into_iter()
-                .flat_map(|proof| [&proof.route, &proof.kind]),
-        )?;
+        let kind = match operand.and_then(OperandEvidence::link) {
+            Some((route, link)) => self.origin(std::iter::once(route).chain(link.kind()))?,
+            _ => self.origin(
+                operand
+                    .into_iter()
+                    .flat_map(|proof| [&proof.route, &proof.kind]),
+            )?,
+        };
         put(fields, &format!("{path}/type"), kind)?;
         match wire {
             ValueReport::Null => Ok(()),
-            ValueReport::Reference(_) => self.reference(fields, path, original),
+            ValueReport::Reference(_) => self.reference(fields, path, original, operand),
             _ => {
                 let value = self.origin(
                     operand
@@ -80,16 +84,32 @@ impl BodyOrigins<'_> {
         fields: &mut FieldOrigins,
         path: &str,
         original: Option<&ChangedValue<'_>>,
+        operand: Option<&OperandEvidence>,
     ) -> Result<(), ReportOriginsError> {
-        let unknown = self.uses.origin(&[], false);
-        for member in ["guid", "record_path", "type"] {
-            put(fields, &format!("{path}/value/{member}"), unknown.clone())?;
-        }
-        if matches!(
+        let at = matches!(
             original,
             Some(ChangedValue::Value(Value::Reference(target))) if target.location().is_some()
-        ) {
-            put(fields, &format!("{path}/value/at"), unknown)?;
+        )
+        .then_some(ReferenceMember::At);
+        for member in [
+            ReferenceMember::Guid,
+            ReferenceMember::RecordPath,
+            ReferenceMember::Type,
+        ]
+        .into_iter()
+        .chain(at)
+        {
+            let evidence = match operand.and_then(OperandEvidence::link) {
+                Some((route, link)) => {
+                    self.origin(std::iter::once(route).chain(link.members(member)))?
+                }
+                _ => self.uses.origin(&[], false),
+            };
+            put(
+                fields,
+                &format!("{path}/value/{}", member.field()),
+                evidence,
+            )?;
         }
         Ok(())
     }
