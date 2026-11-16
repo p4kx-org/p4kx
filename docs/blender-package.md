@@ -809,8 +809,11 @@ canonical material-effect values and field origins, including disabled effects, 
 tag references, and ordered modifiers. The component's field origins use paths relative to
 its `authored` value and resolve in the declaration's provenance inventory.
 
-Each owner names the package scene node and its declaration ordinal. Its links point to the
-original component, effect array, effect ordinal and link ordinal. An exact authored name can
+Each owner names the package scene node and its declaration ordinal. An owner with authored
+material effects and no recognised Glow links retains its declaration with `links: []` and an
+empty owner provenance inventory. The original DataForge field origins stay with the
+declaration. Each recognised link points to the original component, effect array, effect
+ordinal and link ordinal. An exact authored name can
 associate an observed model node and its original subsets. A repeated name remains ambiguous.
 An empty selector or `*` associates all drawable subsets of the direct owner. Each subset
 retains its model node, source node ID, LOD, subset ordinal and local triangle index range.

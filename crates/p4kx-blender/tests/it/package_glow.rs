@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::error::Error;
 use std::fs;
 use std::path::Path;
 
@@ -13,16 +14,38 @@ use p4kx_testkit::{
 };
 use serde_json::Value;
 
-use crate::support::{TestResult, fixture, glb_options};
+use crate::support::{Fixture, TestResult, fixture, glb_options};
+
+#[path = "package_glow_authored_only.rs"]
+mod authored_only;
 
 const MODEL_PATH: &str = "Objects/Test/glow.cgf";
 
 #[test]
 fn owner_glow_declaration_and_original_primitive_binding_are_published_by_the_package_writer()
 -> TestResult {
+    let fixture = glow_fixture(&["Glow"])?;
+    let archive = Archive::open_with(fixture.path, OpenOptions::new().key(Some(test_key())))?;
+    let out = tempfile::tempdir()?;
+    let location = std::env::var_os("P4KX_SYNTHETIC_GLOW_PACKAGE");
+    let package = location.map_or_else(|| out.path().join("scene"), std::path::PathBuf::from);
+    write_glow_fixture(&archive, &package)?;
+    let first = fs::read(package.join("scene.json"))?;
+    validate(&first, &package)?;
+    validate_material(&first)?;
+    write_glow_fixture(&archive, &package)?;
+    assert_eq!(
+        fs::read(package.join("scene.json"))?,
+        first,
+        "owner source schema is deterministic"
+    );
+    Ok(())
+}
+
+fn glow_fixture(properties: &[&str]) -> Result<Fixture, Box<dyn Error>> {
     let model = TestModel::cube().with_material_library("glow");
-    let fixture = fixture(vec![
-        TestEntry::stored(r"Data\Game2.dcb", database()),
+    fixture(vec![
+        TestEntry::stored(r"Data\Game2.dcb", database(properties)),
         TestEntry::stored(format!("Data/{MODEL_PATH}"), model.cgf()),
         TestEntry::stored("Data/Objects/Test/glow.cgfm", model.cgfm()),
         TestEntry::stored("Data/Objects/Test/emission.dds", emission_dds([128, 64, 32, 255])?),
@@ -30,14 +53,16 @@ fn owner_glow_declaration_and_original_primitive_binding_are_published_by_the_pa
             r"Data\Objects\Test\glow.cgf.mtl",
             br#"<Material><SubMaterials><Material/><Material Shader="Illum" MtlFlags="1024"/><Material Shader="HardSurface" StringGenMask="%EMITTANCE_MAP" Glow="2" Emissive="0.2,0.4,0.8" Opacity="0.45"><Textures><Texture Map="TexSlot14" File="objects/test/emission.dds"/></Textures></Material></SubMaterials></Material>"#,
         ).encrypted(),
-    ])?;
-    let archive = Archive::open_with(fixture.path, OpenOptions::new().key(Some(test_key())))?;
-    let input = DataForgeEntry::read(&archive)?;
+    ])
+}
+
+fn write_glow_fixture(archive: &Archive, package: &Path) -> TestResult {
+    let input = DataForgeEntry::read(archive)?;
     let forge = input.open()?;
     let mut resolver = LoadoutResolver::new(&forge).with_forge_entry(&input);
     let record = resolver.entities().find("SyntheticGlow")?;
     let tree = resolver.resolve(&record)?;
-    let models = ArchiveModels::new(&archive).with_model_node_sources();
+    let models = ArchiveModels::new(archive).with_model_node_sources();
     let assembly = Assembly::build(&tree, &models, &AssemblyOptions::default())?;
     let cancel = CancelToken::new();
     let protection = ArchiveWriteProtection::new(archive.path(), cancel.flag())?;
@@ -45,30 +70,15 @@ fn owner_glow_declaration_and_original_primitive_binding_are_published_by_the_pa
     let context = PackageWriteContext::new(&protection, cancel.flag())
         .with_entity_effects_source(&input, &forge)
         .with_archive_texture_source(&textures);
-    let out = tempfile::tempdir()?;
-    let location = std::env::var_os("P4KX_SYNTHETIC_GLOW_PACKAGE");
-    let package = location.map_or_else(|| out.path().join("scene"), std::path::PathBuf::from);
-    let run = || {
-        write_package_with_context(
-            &assembly,
-            &models,
-            &textures,
-            &glb_options(0),
-            &PackageInfo::default(),
-            &package,
-            &context,
-        )
-    };
-    run()?;
-    let first = fs::read(package.join("scene.json"))?;
-    validate(&first, &package)?;
-    validate_material(&first)?;
-    run()?;
-    assert_eq!(
-        fs::read(package.join("scene.json"))?,
-        first,
-        "owner source schema is deterministic"
-    );
+    write_package_with_context(
+        &assembly,
+        &models,
+        &textures,
+        &glb_options(0),
+        &PackageInfo::default(),
+        package,
+        &context,
+    )?;
     Ok(())
 }
 
@@ -134,7 +144,7 @@ fn validate(bytes: &[u8], package: &Path) -> TestResult {
     Ok(())
 }
 
-fn database() -> Vec<u8> {
+fn database(properties: &[&str]) -> Vec<u8> {
     let geometry = value(
         TestInstance::new("SGeometryResourceParams").value(
             "Geometry",
@@ -176,19 +186,26 @@ fn database() -> Vec<u8> {
                 "EntityClassDefinition.SyntheticGlow",
                 "synthetic.xml",
             )
-            .value("Components", TestValue::Array(vec![geometry, effects()])),
+            .value(
+                "Components",
+                TestValue::Array(vec![geometry, effects(properties)]),
+            ),
         )
         .build()
 }
 
-fn effects() -> TestValue {
-    let link = value(
-        TestInstance::new("PropertyLink")
-            .value("materialProperty", TestValue::text("Glow"))
-            .value("subMeshName", TestValue::text("cube_mesh")),
-    );
-    let effect =
-        value(TestInstance::new("Effect").value("propertyLinks", TestValue::Array(vec![link])));
+fn effects(properties: &[&str]) -> TestValue {
+    let links = properties
+        .iter()
+        .map(|property| {
+            value(
+                TestInstance::new("PropertyLink")
+                    .value("materialProperty", TestValue::text(*property))
+                    .value("subMeshName", TestValue::text("cube_mesh")),
+            )
+        })
+        .collect();
+    let effect = value(TestInstance::new("Effect").value("propertyLinks", TestValue::Array(links)));
     let group = value(
         TestInstance::new("MaterialEffects").value("tagEffects", TestValue::Array(vec![effect])),
     );
@@ -332,7 +349,7 @@ fn verify_physical_glow_use(attribute: &Value, inventory: &Value) -> TestResult 
     Ok(())
 }
 
-pub(super) fn emission_dds(pixel: [u8; 4]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+pub(super) fn emission_dds(pixel: [u8; 4]) -> Result<Vec<u8>, Box<dyn Error>> {
     let dds = SplitDds::new(
         TestTextureFormat::Dx10Block {
             dxgi_format: 28,

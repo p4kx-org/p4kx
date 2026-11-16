@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 
 use p4kx_assembly::{Assembly, EntityGlow, EntityGlowLink, GlowEffectKind, GlowSelection, Part};
 use p4kx_extraction::{
-    DataForge, DataForgeEntry, EntityMaterialEffects, FieldOrigins, SourceInventory,
+    DataForge, DataForgeEntry, EntityMaterialEffects, FieldOrigins, SourceInventory, SourceUses,
 };
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -112,15 +112,15 @@ fn capture(
         let candidate = assembly
             .entity_glow(node, source.entry, source.forge)
             .map_err(error)?;
-        if candidate.links.is_empty() {
-            continue;
-        }
         let EntityGlow {
             authored,
             links,
             model_sources,
             ..
         } = candidate;
+        if authored.components.is_empty() {
+            continue;
+        }
         let declaration = *declared.entry(index).or_insert_with(|| {
             declarations.push(Declaration::from(authored));
             declarations.len() - 1
@@ -168,16 +168,21 @@ impl Owner {
         links: Vec<EntityGlowLink>,
         manifest: &Manifest,
     ) -> PackageResult<Self> {
-        let evidence = bindings::Evidence::of(part, model_sources, manifest, node)?;
-        let links = links
-            .into_iter()
-            .map(|link| Link::of(link, &evidence))
-            .collect::<PackageResult<_>>()?;
+        let (links, provenance) = if links.is_empty() {
+            (Vec::new(), SourceUses::new().freeze().map_err(error)?)
+        } else {
+            let evidence = bindings::Evidence::of(part, model_sources, manifest, node)?;
+            let links = links
+                .into_iter()
+                .map(|link| Link::of(link, &evidence))
+                .collect::<PackageResult<_>>()?;
+            (links, evidence.finish()?)
+        };
         Ok(Self {
             node,
             declaration,
             links,
-            provenance: evidence.finish()?,
+            provenance,
         })
     }
 }
