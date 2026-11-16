@@ -8,6 +8,46 @@ of the current checkout. This report contains technical structures and implement
 only. Game values, text dumps, concrete test-build Record identities, build payloads and
 extracted assets are not included. Public technical issue updates were explicitly authorized.
 
+## PTU 13201184 comparison
+
+The installed PTU manifest identifies change `13201184` and internal version
+`5.0.201.28448`. The older local Archive matches the retained 13189690 size, modification time
+and original DataForge directory size and CRC. Its copied location has no standalone Build
+manifest. The installed LIVE comparison uses change `13165946`. The read-only checks verified
+that all three Archive stamps stayed stable.
+
+| To PTU 13201184 | Added | Removed | Changed |
+| --- | ---: | ---: | ---: |
+| Archive Entries from copied PTU 13189690 | 269 | 75 | 2,857 |
+| Archive Entries from installed LIVE | 38,941 | 13,481 | 24,395 |
+| DataForge structures, properties, enums and options from PTU 13189690 | 0 | 0 | 0 |
+| Selected ContractGenerator Records from PTU 13189690 | 1 | 0 | 16 |
+
+Both DataForge schema comparisons reported zero unreadable declarations.
+Against LIVE the new PTU has the same declaration delta counts as 13189690.
+The absence of a DataForge declaration delta leaves independent Archive formats and new
+uses of existing declarations to check.
+
+The scoped ContractGenerator comparison found changed reputation award links, rank bounds,
+completion-tag requirements, logical variants and authored text tokens. The Catalog has
+distinct owners for those facts. All 70 authored reward amount Records and all 380 queried
+standing Records match the prior PTU in their selected value fields. The 58 rewards shared
+with LIVE also agree. This establishes nominal source amounts. The effective PTU 25×
+multiplier requires an independent configuration or runtime witness.
+
+| Area | Observed source and export status |
+| --- | --- |
+| Inventory occupancy | The physical Record comparison reports 1,956 changed volume selections in the shared armour path cohort, 1,968 in clothing and 54 in the magazine path cohort. Selected magazine ammunition counts agree. The shared backpack path cohort has no changed occupancy or dimensions against the prior PTU. The recorded volume units and vectors already have separate Catalog v3 cells. Concrete equipment fit also depends on the selected container's limits and filters. [Inventory contract](catalog-inventory-storage.md) |
+| Client settings | A new profile attribute document contains 39 ordered declarations. 35 carry an optional CVar association. The existing ActionMap covers the single added action with its Hold mode and empty default bindings. The separate settings document and authored ActionMap description need structured carriers. [#1157](https://github.com/p4kx-org/p4kx/issues/1157) |
+| Contract item results | Six added result occurrences use an authored entity reference, quantity, ordered outcome flags and a weak instance reference to a MissionProperty. The source arena keeps these values and the separate Blueprint result. The typed contract projection needs item rewards and exact location selectors. [#1158](https://github.com/p4kx-org/p4kx/issues/1158) |
+| Interior companions | A verified changed SOCPAK contains both a room mapping tree and a distinct room connector metadata file. The connector owner joins to the original SOC entity in the same container. The existing positioned SOC export does not admit either companion. The sampled extraction tile descriptor changed only its editor Build marker. [#1159](https://github.com/p4kx-org/p4kx/issues/1159) |
+| Purchasable names | The selected module cohort has five changed Purchasable name selectors, three accompanied by separate changed attachable name and description selectors. The magazine Record comparison finds two independently changed Purchasable names. The canonical item definition currently omits this authored field. The tracked shop inventory path family had no changed Entry. [#1160](https://github.com/p4kx-org/p4kx/issues/1160) |
+| Climate and audio | The sampled changed climate asset exercises existing size, light and growth fields, including removed optional arrays. The sampled ATL environment library remains in the existing environment, auxiliary bus and RTPC control families. The engine's runtime terrain and audio behavior remains outside these source checks. |
+
+The raw source receipts are private. This section records source structure, exact scope counts
+and implementation ownership. The complete packaged export and 16 GiB system acceptance are
+separate requirements.
+
 ## PTU 13189690 follow-through
 
 The 2026-11-14 comparison verifies the installed manifests for PTU 13189690
