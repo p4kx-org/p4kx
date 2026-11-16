@@ -292,6 +292,10 @@ impl FieldOrigin {
         self.fields.source_uses_refs.as_slice()
     }
 
+    pub(crate) fn iter_source_use_refs(&self) -> impl ExactSizeIterator<Item = &SourceUseRef> {
+        self.fields.source_uses_refs.iter()
+    }
+
     /// Returns completeness of this contribution set, independently of source or export health.
     #[must_use]
     pub fn source_set_complete(&self) -> bool {

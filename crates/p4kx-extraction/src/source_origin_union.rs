@@ -38,7 +38,7 @@ impl SourceUses {
                 return Err(SourceEvidenceError::ForeignEvidence);
             }
             complete &= origin.source_set_complete();
-            for reference in origin.source_uses_refs() {
+            for reference in origin.iter_source_use_refs() {
                 let description = registry
                     .uses
                     .get(reference)

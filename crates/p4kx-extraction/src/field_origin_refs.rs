@@ -50,7 +50,7 @@ impl OriginRefs {
         }
     }
 
-    fn iter(&self) -> RefIter<'_> {
+    pub(super) fn iter(&self) -> RefIter<'_> {
         match self {
             Self::Shared(refs) => refs.iter(),
             _ => RefIter::new(self.as_slice(), &[]),
@@ -88,12 +88,12 @@ pub(super) struct SharedRefs {
 }
 
 impl SharedRefs {
-    fn iter(&self) -> RefIter<'_> {
+    pub(super) fn iter(&self) -> RefIter<'_> {
         RefIter::new(&self.basis, &self.additions)
     }
 }
 
-struct RefIter<'a> {
+pub(super) struct RefIter<'a> {
     basis: Iter<'a, SourceUseRef>,
     additions: Iter<'a, SourceUseRef>,
 }

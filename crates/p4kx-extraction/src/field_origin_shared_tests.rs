@@ -201,6 +201,31 @@ fn a_shared_origin_serializes_the_sorted_unique_union_without_expanding_it() -> 
 }
 
 #[test]
+fn combining_origins_leaves_a_shared_input_unexpanded() -> TestResult {
+    let sources = SourceUses::new();
+    let scope = sources.observe(SourceInput::Unknown, InputScope::Payload)?;
+    let first = evidence(&scope, "basis", SourceUseRole::Selector)?;
+    let second = evidence(&scope, "extension", SourceUseRole::Payload)?;
+    let third = evidence(&scope, "aggregate", SourceUseRole::Conversion)?;
+    let basis = sources.shared_origin(std::slice::from_ref(&first), true);
+    let shared = sources.origin_with_shared(&basis, std::slice::from_ref(&second), true)?;
+    let extra = sources.origin(std::slice::from_ref(&third), false);
+
+    let combined = sources.origin_with_origins([&shared, &extra], true)?;
+    let flat = sources.origin(&[first, second, third], false);
+    assert_eq!(
+        serde_json::to_vec(&combined)?,
+        serde_json::to_vec(&flat)?,
+        "aggregation retains the same references and completeness on the wire"
+    );
+    assert!(
+        shared.fields.source_uses_refs.is_shared_unexpanded(),
+        "aggregation must leave the shared input's slice cache empty"
+    );
+    Ok(())
+}
+
+#[test]
 fn shared_origin_retains_encryption_opaque_and_incomplete_rules() -> TestResult {
     let folder = tempfile::tempdir()?;
     let sources = SourceUses::new();
