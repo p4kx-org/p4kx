@@ -195,6 +195,12 @@ Record total system RAM, OS, CPU and the running system's baseline memory
 before launch. Measure the producer's peak working set and private bytes,
 the lowest available physical memory, system commit and paging, elapsed
 time, process bytes written and peak temporary storage.
+Check that the desktop remains usable for the usual light work throughout
+the export. Record any stalls alongside the system paging measurements.
+For a virtual machine, record the fixed guest RAM allocation and the RAM
+visible to the guest. Keep that allocation fixed throughout the run and
+check host memory pressure and paging separately.
+
 Run the artifact replay separately. Derive the raw verification artifact from
 the same compressed output so the test prepares the Catalog only once. A
 process quota or reserve on a larger machine measures a different condition.
