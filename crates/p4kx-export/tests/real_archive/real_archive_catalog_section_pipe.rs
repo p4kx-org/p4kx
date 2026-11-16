@@ -14,6 +14,8 @@ mod profile;
 #[path = "real_archive_catalog_section_scan.rs"]
 mod scan;
 
+pub(super) use profile::Report as SectionReport;
+
 #[cfg(test)]
 #[path = "real_archive_catalog_section_tests.rs"]
 mod tests;
@@ -77,6 +79,35 @@ pub(super) fn decode_to(input: impl Read, mut output: impl Write) -> io::Result<
         encoded_bytes: decoder.finish().into_inner().byte_count(),
         decoded: report,
     })
+}
+
+pub(super) struct SectionReader<R> {
+    input: R,
+    scanner: scan::Scanner,
+}
+
+impl<R> SectionReader<R> {
+    pub(super) fn new(input: R) -> Self {
+        Self {
+            input,
+            scanner: scan::Scanner::default(),
+        }
+    }
+
+    pub(super) fn finish(self) -> io::Result<SectionReport> {
+        self.scanner.finish()
+    }
+}
+
+impl<R: Read> Read for SectionReader<R> {
+    fn read(&mut self, bytes: &mut [u8]) -> io::Result<usize> {
+        let count = self.input.read(bytes)?;
+        let decoded = bytes
+            .get(..count)
+            .ok_or_else(|| profile::invalid("decoded read exceeded its buffer"))?;
+        self.scanner.push(decoded)?;
+        Ok(count)
+    }
 }
 
 struct CopyingReader<R, W> {

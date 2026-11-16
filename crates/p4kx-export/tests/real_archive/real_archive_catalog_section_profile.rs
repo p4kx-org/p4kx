@@ -9,18 +9,18 @@ use sha2::{Digest, Sha256};
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(super) struct Report {
-    pub(super) decoded_bytes: u64,
+pub(in super::super) struct Report {
+    pub(in super::super) decoded_bytes: u64,
     pub(super) framing_bytes: u64,
-    pub(super) physical_sources: u64,
-    pub(super) source_uses: u64,
-    pub(super) sections: Vec<Section>,
+    pub(in super::super) physical_sources: u64,
+    pub(in super::super) source_uses: u64,
+    pub(in super::super) sections: Vec<Section>,
     pub(super) reference_sets: ReferenceSummary,
 }
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(super) struct Section {
+pub(in super::super) struct Section {
     pub(super) group: Option<String>,
     pub(super) name: String,
     pub(super) value_bytes: u64,

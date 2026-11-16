@@ -18,7 +18,7 @@ const GROUPS: &[&str] = &[
 const SOURCE_REFS: &[u8] = b"sourceUsesRefs";
 
 #[derive(Default)]
-struct Scanner {
+pub(super) struct Scanner {
     stack: Vec<Frame>,
     text: Option<Quoted>,
     bytes: u64,
@@ -27,6 +27,7 @@ struct Scanner {
     source_rows: Option<u64>,
     use_rows: Option<u64>,
     references: ReferenceSets,
+    fingerprint_references: bool,
 }
 
 enum Frame {
@@ -79,7 +80,10 @@ enum ReferenceBoundary {
 }
 
 pub(super) fn read(mut input: impl BufRead) -> io::Result<Report> {
-    let mut scanner = Scanner::default();
+    let mut scanner = Scanner {
+        fingerprint_references: true,
+        ..Scanner::default()
+    };
     loop {
         let chunk = input.fill_buf()?;
         if chunk.is_empty() {
@@ -92,7 +96,7 @@ pub(super) fn read(mut input: impl BufRead) -> io::Result<Report> {
 }
 
 impl Scanner {
-    fn push(&mut self, bytes: &[u8]) -> io::Result<()> {
+    pub(super) fn push(&mut self, bytes: &[u8]) -> io::Result<()> {
         let mut span = self.references.active().then_some(0);
         let after = self
             .bytes
@@ -208,7 +212,7 @@ impl Scanner {
                 Some(Key {
                     start: at,
                     label: object.group.as_ref().map(|_| Vec::new()),
-                    reference_bytes: Some(0),
+                    reference_bytes: self.fingerprint_references.then_some(0),
                 })
             }
             Some(Frame::Array(Array::References)) => {
@@ -337,7 +341,7 @@ impl Scanner {
         Ok(())
     }
 
-    fn finish(self) -> io::Result<Report> {
+    pub(super) fn finish(self) -> io::Result<Report> {
         if !self.root_closed
             || !self.stack.is_empty()
             || self.text.is_some()

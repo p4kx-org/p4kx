@@ -234,7 +234,25 @@ use the separate evidence above.
 
 Set `P4KX_CATALOG_MEASUREMENT_DIR` to the private directory containing the completed
 normal writer receipt `receipt.private.json` and its `p4kx-catalog.json.zst` output.
-Then run the artifact reconciliation as a separate process.
+Run the provenance replay as a separate process.
+
+```text
+cargo test --release --locked -p p4kx-export --test real_archive -- --ignored --exact --nocapture real_archive_catalog_size::replay::replay_completed_catalog_provenance_and_sections
+```
+
+Replay checks the measurement's matching archive stamps and the export's Build, Channel, archive
+length and modification time. It requires schema v3, complete publication health and an unfiltered
+selection. The two decoding passes check the receipt lengths and compare SHA-256 digests of the
+decoded bytes. Replay checks source-use IDs, original physical source ancestry, localization selector
+roles and per-value encryption markers against the retained inventory. It rejects complete source
+sets that contain opaque coordinates.
+
+The report includes exact section byte lengths, provenance inventory counts and sourced-value
+counts. Row counts cover `/items`, `/definitions/items/rows`, `/definitions/blueprints/rows` and
+`/placements/containerInstances/rows`. Replay opens no installed Archive and creates no raw file.
+Cross-domain link validation and consumer import measurements remain separate release evidence.
+
+To produce the raw artifact from the same completed measurement, run the reconciliation test.
 
 ```text
 cargo test --release --locked -p p4kx-export --test real_archive -- --ignored --exact --nocapture real_archive_catalog_size::artifact::reconcile_completed_catalog_artifact
