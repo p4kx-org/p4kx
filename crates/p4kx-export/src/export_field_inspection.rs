@@ -15,6 +15,11 @@ use crate::health_diagnostic_observation::DiagnosticObservation as ExportDiagnos
 use crate::selection::Kind;
 use crate::{ExportAccountingError, HealthText};
 
+#[path = "scan_inspection_fold.rs"]
+mod scan_fold;
+
+pub(crate) use scan_fold::ScanInspectionFold;
+
 /// Independently exported configuration fields on one physical Record.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum ConfigurationInspection {
@@ -43,6 +48,13 @@ pub(crate) enum ConfigurationInspection {
     MiningLaser,
     MiningLaserGlobal,
     AttachableModifier,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum InspectionKey {
+    Whole(u32),
+    Scoped(u32, usize, ExportSourceRole),
+    Configuration(u32, ConfigurationInspection),
 }
 
 /// Inspection of the canonical values relevant to one source scope.
@@ -92,31 +104,97 @@ impl FieldInspection {
         self.contextualize(None, ExportSourceRole::Dependency);
     }
 
-    pub(crate) fn merge(&mut self, other: Self) -> Result<(), ExportAccountingError> {
-        if self != &other {
-            return Err(ExportAccountingError::ConflictingFieldInspection);
+    fn key(&self) -> Result<InspectionKey, ExportAccountingError> {
+        if let Some(configuration) = self.configuration {
+            if self.root_field.is_some()
+                || self.kind.is_some()
+                || self.role != ExportSourceRole::Dependency
+            {
+                return Err(ExportAccountingError::ConflictingFieldInspection);
+            }
+            return Ok(InspectionKey::Configuration(
+                self.record_index,
+                configuration,
+            ));
         }
-        self.subject.merge(other.subject)?;
+        if self.root_field.is_some() {
+            let kind = self
+                .kind
+                .ok_or(ExportAccountingError::ConflictingFieldInspection)?;
+            if self.role != ExportSourceRole::Dependency {
+                return Err(ExportAccountingError::ConflictingFieldInspection);
+            }
+            return Ok(InspectionKey::Scoped(
+                self.record_index,
+                kind.index(),
+                self.role,
+            ));
+        }
+        Ok(InspectionKey::Whole(self.record_index))
+    }
+
+    fn absorbs_scan_duplicate(&self, other: &mut Self, key: InspectionKey) -> bool {
+        if !self.number_requirements.is_empty() || !other.number_requirements.is_empty() {
+            return false;
+        }
+        let context = (other.kind, other.role);
+        if matches!(key, InspectionKey::Whole(_)) && context != (self.kind, self.role) {
+            other.contextualize(self.kind, self.role);
+        }
+        let same = self
+            .check_duplicate_shape(other)
+            .and_then(|()| self.check_duplicate_references(other))
+            .and_then(|()| self.check_sample_owners())
+            .is_ok();
+        if !same && context != (other.kind, other.role) {
+            other.contextualize(context.0, context.1);
+        }
+        same
+    }
+
+    pub(crate) fn merge(&mut self, mut other: Self) -> Result<(), ExportAccountingError> {
+        self.check_duplicate_shape(&other)?;
         for (required, other) in self
             .number_requirements
             .iter_mut()
-            .zip(other.number_requirements)
+            .zip(std::mem::take(&mut other.number_requirements))
         {
             required.merge(other)?;
         }
+        self.check_duplicate_references(&other)?;
+        self.check_sample_owners()
+    }
+
+    fn check_duplicate_shape(&self, other: &Self) -> Result<(), ExportAccountingError> {
+        if self != other {
+            return Err(ExportAccountingError::ConflictingFieldInspection);
+        }
+        let mut subject = self.subject.clone();
+        subject.merge(other.subject.clone())
+    }
+
+    fn check_duplicate_references(&self, other: &Self) -> Result<(), ExportAccountingError> {
         for (reference, other) in self
             .unresolved_references
             .iter()
-            .zip(other.unresolved_references)
+            .zip(&other.unresolved_references)
         {
-            reference.merge(other)?;
+            reference.check_duplicate(other)?;
         }
-        for (reference, other) in self.catalog_references.iter().zip(other.catalog_references) {
-            reference.original.merge(other.original)?;
+        for (reference, other) in self
+            .catalog_references
+            .iter()
+            .zip(&other.catalog_references)
+        {
+            reference.original.check_duplicate(&other.original)?;
         }
-        for diagnostic in &mut self.diagnostics {
-            for example in &mut diagnostic.examples {
-                example.merge_owner(&self.subject)?;
+        Ok(())
+    }
+
+    fn check_sample_owners(&self) -> Result<(), ExportAccountingError> {
+        for diagnostic in &self.diagnostics {
+            for example in &diagnostic.examples {
+                example.check_owner(&self.subject)?;
             }
         }
         Ok(())
@@ -192,27 +270,20 @@ impl FieldInspections {
     pub(crate) fn index(inspections: Vec<FieldInspection>) -> Result<Self, ExportAccountingError> {
         let mut indexed = Self::default();
         for mut inspection in inspections {
-            if let Some(configuration) = inspection.configuration {
-                if inspection.root_field.is_some()
-                    || inspection.kind.is_some()
-                    || inspection.role != ExportSourceRole::Dependency
-                {
-                    return Err(ExportAccountingError::ConflictingFieldInspection);
+            match inspection.key()? {
+                InspectionKey::Configuration(record, configuration) => {
+                    Self::merge(
+                        indexed.configurations.entry((record, configuration)),
+                        inspection,
+                    )?;
                 }
-                let key = (inspection.record_index, configuration);
-                Self::merge(indexed.configurations.entry(key), inspection)?;
-            } else if inspection.root_field.is_some() {
-                let kind = inspection
-                    .kind
-                    .ok_or(ExportAccountingError::ConflictingFieldInspection)?;
-                if inspection.role != ExportSourceRole::Dependency {
-                    return Err(ExportAccountingError::ConflictingFieldInspection);
+                InspectionKey::Scoped(record, kind, role) => {
+                    Self::merge(indexed.scoped.entry((record, kind, role)), inspection)?;
                 }
-                let key = (inspection.record_index, kind.index(), inspection.role);
-                Self::merge(indexed.scoped.entry(key), inspection)?;
-            } else {
-                inspection.canonicalize_whole();
-                Self::merge(indexed.whole.entry(inspection.record_index), inspection)?;
+                InspectionKey::Whole(record) => {
+                    inspection.canonicalize_whole();
+                    Self::merge(indexed.whole.entry(record), inspection)?;
+                }
             }
         }
         Ok(indexed)

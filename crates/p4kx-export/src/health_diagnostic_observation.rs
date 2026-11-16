@@ -98,11 +98,9 @@ impl ExampleObservation {
             })
     }
 
-    pub(crate) fn merge_owner(
-        &mut self,
-        subject: &RecordSubject,
-    ) -> Result<(), ExportAccountingError> {
-        self.subject.merge(subject.clone())
+    pub(crate) fn check_owner(&self, subject: &RecordSubject) -> Result<(), ExportAccountingError> {
+        let mut original = self.subject.clone();
+        original.merge(subject.clone())
     }
     pub(crate) fn merge(&mut self, other: Self) -> Result<(), ExportAccountingError> {
         if self.sample_cmp(&other) != Ordering::Equal {

@@ -113,11 +113,11 @@ impl ReferenceObservation {
         subject.merge(other.clone())
     }
 
-    pub(crate) fn merge(&self, other: Self) -> Result<(), ExportAccountingError> {
-        if self != &other {
+    pub(crate) fn check_duplicate(&self, other: &Self) -> Result<(), ExportAccountingError> {
+        if self != other {
             return Err(ExportAccountingError::ConflictingSourceDatum);
         }
-        match (&self.evidence, other.evidence) {
+        match (&self.evidence, &other.evidence) {
             (
                 ReferenceEvidence::Captured { frame, body },
                 ReferenceEvidence::Captured {
@@ -125,7 +125,7 @@ impl ReferenceObservation {
                     body: other_body,
                 },
             ) => {
-                if body != &other_body {
+                if body != other_body {
                     return Err(ExportAccountingError::ConflictingSourceDatum);
                 }
                 let mut original = frame.as_ref().clone();
@@ -133,7 +133,7 @@ impl ReferenceObservation {
             }
             (ReferenceEvidence::Accounting(subject), ReferenceEvidence::Accounting(other)) => {
                 let mut original = subject.clone();
-                original.merge(other)
+                original.merge(other.clone())
             }
             _ => Err(ExportAccountingError::UnboundHealthSubject),
         }

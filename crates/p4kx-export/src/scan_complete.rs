@@ -7,6 +7,7 @@ use rayon::prelude::*;
 use crate::catalog_crafting::CraftingKinds;
 use crate::catalog_read_failure::CatalogReadFailure;
 use crate::catalog_v3::catalog_entity_configurations::EntityConfigurationRows;
+use crate::export_field_inspection::ScanInspectionFold;
 use crate::export_ledger::ExportLedger;
 use crate::picked::Picked;
 use crate::record_read;
@@ -25,6 +26,7 @@ impl<'f> Scan<'_, '_, 'f> {
         slot_problem: Option<SlotProblem>,
         crafting: &CraftingKinds<'f>,
     ) -> Result<ScanRead<'f>, CatalogError> {
+        let mut inspections = ScanInspectionFold::start(&mut ledger);
         let mut picked = Vec::new();
         let mut entity_tags = Vec::new();
         let mut entity_configurations = EntityConfigurationRows::default();
@@ -44,7 +46,7 @@ impl<'f> Scan<'_, '_, 'f> {
                     picked.extend(record.picked);
                     entity_tags.extend(record.entity.tags);
                     entity_configurations.extend(record.entity.configurations);
-                    ledger.merge(record.ledger);
+                    inspections.merge(&mut ledger, record.ledger);
                 }
             }
         }
@@ -52,7 +54,7 @@ impl<'f> Scan<'_, '_, 'f> {
         let resources = self.resource_commodities(&picked, crafting, &ledger)?;
         picked.extend(resources.picked);
         entity_tags.extend(resources.entity_tags);
-        ledger.merge(resources.ledger);
+        inspections.merge(&mut ledger, resources.ledger);
         picked.extend(self.links.warning().map(Picked::Warned));
         let has_signatures = picked.iter().any(
             |pick| matches!(pick, Picked::MineableEntity(entity) if !entity.signatures.is_empty()),
@@ -66,6 +68,9 @@ impl<'f> Scan<'_, '_, 'f> {
         for kind in inventories {
             ledger.inventory(kind);
         }
+        let mut ammo_ledger = ExportLedger::default();
+        self.ammo.dependencies(&mut picked, &mut ammo_ledger)?;
+        inspections.merge(&mut ledger, ammo_ledger);
         Ok(ScanRead {
             picked,
             entity_tags,

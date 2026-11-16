@@ -23,10 +23,10 @@ fn equal_reference_values_do_not_admit_a_foreign_inventory() -> TestResult {
                     .is_same_inventory(&other_input.origins().uses),
                 "the actual original preparations retain different inventories"
             );
-            reject_merge(&original, foreign);
+            reject_merge(&original, &foreign);
             reject_finish(&original, other_input)
         })?;
-        finish_original(original, input)
+        finish_original(&original, input)
     })
 }
 
@@ -44,17 +44,17 @@ fn a_shared_inventory_cannot_substitute_another_original_archive_scope() -> Test
                     .is_same_inventory(&other_input.origins().uses),
                 "the genuine sources share one inventory"
             );
-            reject_merge(&original, foreign);
+            reject_merge(&original, &foreign);
             reject_finish(&original, other_input)
         },
     )
 }
 
-fn reject_merge(original: &ReferenceObservation, foreign: ReferenceObservation) {
-    assert_eq!(original, &foreign, "visible values alone coincide");
+fn reject_merge(original: &ReferenceObservation, foreign: &ReferenceObservation) {
+    assert_eq!(original, foreign, "visible values alone coincide");
     assert!(
         matches!(
-            original.merge(foreign),
+            original.check_duplicate(foreign),
             Err(ExportAccountingError::ConflictingSourceDatum)
         ),
         "value equality cannot admit a foreign original frame"
@@ -90,11 +90,11 @@ fn reject_finish(
 }
 
 fn finish_original(
-    original: ReferenceObservation,
+    original: &ReferenceObservation,
     input: &OriginalCatalogInput<'_, '_>,
 ) -> TestResult {
     let clone = original.clone();
-    clone.merge(original)?;
+    clone.check_duplicate(original)?;
     let retained = RetainedReference::read(
         clone.resolved(ExportReferenceStatus::TargetNotEmitted),
         input,

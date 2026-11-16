@@ -140,7 +140,6 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
             slot_problem,
             crafting,
         )?;
-        scan.ammo.dependencies(&mut read.picked, &mut read.ledger)?;
         read.resource_group_members = members;
         Ok(read)
     }
