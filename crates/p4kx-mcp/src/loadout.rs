@@ -4,7 +4,7 @@
 use std::sync::Arc;
 
 use p4kx_assembly::{
-    ArchiveFiles, Attachment, EntityNode, LoadoutChanges, LoadoutPicks, LoadoutResolver, PortNode,
+    ArchiveFiles, Attachment, Entities, LoadoutChanges, LoadoutPicks, LoadoutResolver, PortNode,
 };
 use p4kx_extraction::{DataForge, DataForgeOrigin};
 
@@ -16,8 +16,12 @@ use crate::loadout_shapes::{Counts, LoadoutHeader};
 pub(crate) use crate::loadout_shapes::{LoadoutParams, LoadoutResult};
 use crate::page::Page;
 
+#[path = "loadout_name_origins.rs"]
+mod name_origins;
 #[path = "loadout_origins.rs"]
 mod origins;
+
+pub(crate) use name_origins::ResolvedLoadout;
 
 /// The deepest port nesting a call returns when it gives no depth.
 pub(crate) const DEFAULT_DEPTH: u32 = 16;
@@ -36,7 +40,7 @@ pub(crate) fn resolve(
     params: &LoadoutParams,
     page: Page,
 ) -> Result<LoadoutResult, ToolError> {
-    let tree = resolve_tree(opened, forge, params)?;
+    let resolved = resolve_tree(opened, forge, params)?;
     let max_depth = usize::try_from(
         params
             .max_depth
@@ -44,7 +48,7 @@ pub(crate) fn resolve(
             .clamp(1, MAX_DEPTH),
     )
     .unwrap_or(1);
-    let all = tree.walk();
+    let all = resolved.tree.walk();
     let counts = counts(&all);
     let near: Vec<_> = all
         .iter()
@@ -53,7 +57,7 @@ pub(crate) fn resolve(
         .collect();
     let header = loadout_shape::header(
         opened.archive().path(),
-        &tree,
+        &resolved.tree,
         counts,
         near.len(),
         all.len() - near.len(),
@@ -61,7 +65,7 @@ pub(crate) fn resolve(
     Projection {
         forge,
         origin,
-        tree: &tree,
+        resolved: &resolved,
         page,
     }
     .publish(header, &near)
@@ -71,7 +75,7 @@ fn resolve_tree(
     opened: &Opened,
     forge: &DataForge<'_>,
     params: &LoadoutParams,
-) -> Result<Arc<EntityNode>, ToolError> {
+) -> Result<Arc<ResolvedLoadout>, ToolError> {
     let stop_at_docked = params.stop_at_docked_vehicles == Some(true);
     let picks = picks_of(params.loadout_pick.as_deref().unwrap_or_default())?;
     let key = picks.normalised();
@@ -81,13 +85,19 @@ fn resolve_tree(
         (stop_at_docked, &key),
         || {
             let files = ArchiveFiles::new(opened.archive());
-            let mut resolver = LoadoutResolver::new(forge).with_files(&files);
+            let capture = Arc::new(name_origins::Capture::new(forge));
+            let mut resolver = LoadoutResolver::with_observed_entities(
+                Arc::new(Entities::new(forge)),
+                capture.clone(),
+            )
+            .with_files(&files);
             if stop_at_docked {
                 resolver = resolver.stopping_at_docked_vehicles();
             }
             let record = resolver.entities().find(&params.entity)?;
             let changes = LoadoutChanges::new().with_picks(picks.clone());
-            Ok(resolver.resolve_with(&record, &changes)?)
+            let tree = resolver.resolve_with(&record, &changes)?;
+            capture.finish(tree).map_err(ToolError::from)
         },
     )
 }
@@ -95,7 +105,7 @@ fn resolve_tree(
 struct Projection<'input, 'forge> {
     forge: &'input DataForge<'forge>,
     origin: &'input DataForgeOrigin,
-    tree: &'input EntityNode,
+    resolved: &'input ResolvedLoadout,
     page: Page,
 }
 
@@ -116,10 +126,10 @@ impl Projection<'_, '_> {
         let (keep, fitted) = fit_prefix(
             ports.len(),
             |len| {
-                let origins = origins::identities(
+                let origins = origins::capture(
                     self.forge,
                     self.origin,
-                    self.tree,
+                    self.resolved,
                     window.iter().take(len).map(|&(_, port)| port),
                 )?;
                 Ok(LoadoutResult {

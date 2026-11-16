@@ -7,8 +7,8 @@ use std::ops::ControlFlow;
 use std::ptr;
 
 use p4kx_assembly::{
-    LoadoutClassSelection, LoadoutPathObserver, LoadoutPathOperation, LoadoutReferenceSelection,
-    LoadoutSelection, PortDefinition,
+    LoadoutClassSelection, LoadoutPathObserver, LoadoutPathOperation, LoadoutRecordText,
+    LoadoutReferenceSelection, LoadoutSelection, PortDefinition,
 };
 use p4kx_extraction::{
     DataForge, DataType, Guid, Record, RecordJsonLocation, RecordText, RecordTree, SourceLocation,
@@ -54,7 +54,7 @@ pub(super) struct RecordSite {
 }
 
 pub(super) enum Datum {
-    Text(Option<SourceLocation>),
+    Text(LoadoutRecordText),
     Reference { guid: Guid, stored: bool },
 }
 
@@ -118,20 +118,9 @@ impl<'forge> RecordPaths<'forge> {
     }
 
     fn capture_text(&self, selection: Selection, parent: &StructValue<'_>, value: &Value<'_>) {
-        if !parent
-            .fields()
-            .iter()
-            .any(|field| ptr::eq(field.value(), value))
-        {
-            return;
+        if let Some(text) = LoadoutRecordText::capture(self.forge, parent, value) {
+            self.capture(selection, value, Datum::Text(text));
         }
-        let location = match value {
-            Value::String(text) | Value::Locale(text) | Value::Enum(text) => {
-                RecordJsonLocation::borrowed_text(self.forge, text)
-            }
-            _ => None,
-        };
-        self.capture(selection, value, Datum::Text(location));
     }
 
     fn capture(&self, selection: Selection, value: &Value<'_>, datum: Datum) {

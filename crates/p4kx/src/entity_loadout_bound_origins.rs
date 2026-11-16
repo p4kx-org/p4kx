@@ -134,21 +134,31 @@ impl Output<'_, '_> {
     }
 
     fn record_site(&self, site: &RecordSite, role: SourceUseRole) -> Result<FieldOrigin> {
+        let stored = match &site.datum {
+            Datum::Text(text) => {
+                return Ok(text.origin(
+                    &self.uses,
+                    &self.forge_scope,
+                    site.record,
+                    site.ordinal,
+                    role,
+                    self.forge_complete,
+                )?);
+            }
+            Datum::Reference { stored, .. } => *stored,
+        };
         let location = SourceLocation::Subresource {
             namespace: "dataforgeValue".into(),
             indices: vec![u64::from(site.record), site.ordinal],
             field: "$value".into(),
         };
-        let (body_role, complete) = match &site.datum {
-            Datum::Text(text) => (SourceUseRole::Selector, text.is_some()),
-            Datum::Reference { stored: true, .. } => (role, true),
-            Datum::Reference { .. } => (SourceUseRole::Selector, false),
+        let role = if stored {
+            role
+        } else {
+            SourceUseRole::Selector
         };
-        let mut inputs = vec![self.forge_scope.at(location, body_role)?];
-        if let Datum::Text(Some(location)) = &site.datum {
-            inputs.push(self.forge_scope.at(location.clone(), role)?);
-        }
-        Ok(self.uses.origin(&inputs, self.forge_complete && complete))
+        let original = self.forge_scope.at(location, role)?;
+        Ok(self.uses.origin(&[original], self.forge_complete && stored))
     }
 
     fn record_name_site(&self, original: &RecordName, role: SourceUseRole) -> Result<FieldOrigin> {

@@ -7,16 +7,20 @@ use p4kx_extraction::{DataForge, DataForgeOrigin, RecordJsonLocation};
 use crate::forge_origins::{EvidenceError, ForgeOrigins};
 use crate::forge_shapes::ForgeFieldOrigins;
 
-pub(super) fn identities<'port>(
+use super::ResolvedLoadout;
+
+pub(super) fn capture<'port>(
     forge: &DataForge<'_>,
     origin: &DataForgeOrigin,
-    root: &EntityNode,
+    resolved: &ResolvedLoadout,
     ports: impl IntoIterator<Item = &'port PortNode>,
 ) -> Result<ForgeFieldOrigins, EvidenceError> {
     let mut output = ForgeOrigins::new(origin)?;
     output.put("archive", output.uses.origin(&[], true))?;
-    entity(forge, &mut output, root, "entity")?;
+    entity(forge, &mut output, &resolved.tree, "entity")?;
     for (row, port) in ports.into_iter().enumerate() {
+        let name = resolved.port_name(&output, port)?;
+        output.put(&format!("ports/{row}/name"), name)?;
         if let Attachment::Entity(child) = port.attachment() {
             entity(forge, &mut output, child, &format!("ports/{row}/entity"))?;
         }

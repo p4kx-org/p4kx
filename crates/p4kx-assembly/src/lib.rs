@@ -131,6 +131,7 @@ mod loadout_file_read;
 mod loadout_file_source;
 mod loadout_file_trace;
 mod loadout_path;
+mod loadout_record_text;
 mod loadout_request;
 mod loadout_xml;
 mod loadout_xml_use;
@@ -255,6 +256,7 @@ pub use loadout_file_observation::{LoadoutFileObservation, LoadoutFileOperationK
 pub use loadout_file_read::LoadoutFileRead;
 pub use loadout_file_source::LoadoutFileSource;
 pub use loadout_path::{LoadoutPath, LoadoutPathObserver, LoadoutPathOperation, LoadoutSelection};
+pub use loadout_record_text::LoadoutRecordText;
 pub use loadout_request::LoadoutRequest;
 pub use loadout_xml::{LoadoutXmlDecoding, XmlLoadoutPathSite};
 pub use loadout_xml_use::LoadoutXmlClassUse;

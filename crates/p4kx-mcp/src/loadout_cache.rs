@@ -3,11 +3,12 @@
 
 use std::sync::{Arc, Mutex, PoisonError};
 
-use p4kx_assembly::{EntityNode, LoadoutPicks};
+use p4kx_assembly::LoadoutPicks;
 use p4kx_extraction::Archive;
 
 use crate::error::ToolError;
 use crate::key_stamp::KeyStamp;
+use crate::loadout::ResolvedLoadout;
 
 #[cfg(test)]
 #[path = "loadout_cache_race_tests.rs"]
@@ -53,11 +54,11 @@ pub(crate) struct Cache<T> {
 }
 
 /// The resolved Loadout trees of one Archive.
-pub(crate) type LoadoutCache = Cache<EntityNode>;
+pub(crate) type LoadoutCache = Cache<ResolvedLoadout>;
 
 impl Default for LoadoutCache {
     fn default() -> Self {
-        Self::new(PORT_BUDGET, |tree| tree.walk().len())
+        Self::new(PORT_BUDGET, ResolvedLoadout::port_count)
     }
 }
 
