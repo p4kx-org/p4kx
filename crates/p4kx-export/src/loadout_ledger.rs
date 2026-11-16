@@ -22,7 +22,8 @@ mod path_proofs;
 #[path = "loadout_ledger/typed.rs"]
 mod typed;
 
-use std::collections::HashSet;
+use std::collections::btree_map::Entry;
+use std::collections::{BTreeMap, HashSet};
 use std::ops::ControlFlow;
 use std::sync::{Mutex, MutexGuard};
 
@@ -32,11 +33,13 @@ use self::file_proofs::FileProofs;
 use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_read::original::FileGraph;
+use crate::export_field_inspection::FieldInspection;
 use crate::export_ledger::{ExportAccountingError, ExportLedger};
 use crate::record_observation::RecordObservation;
 
 struct State {
     ledger: ExportLedger,
+    inspections: BTreeMap<u32, FieldInspection>,
     files: FileProofs,
     paths: path_proofs::PathProofs,
     references: reference_proofs::ReferenceProofs,
@@ -51,6 +54,7 @@ impl State {
     fn new(source: &ExportLedger) -> Self {
         let mut state = Self {
             ledger: ExportLedger::default(),
+            inspections: BTreeMap::new(),
             files: FileProofs::default(),
             paths: path_proofs::PathProofs::default(),
             references: reference_proofs::ReferenceProofs::default(),
@@ -62,6 +66,19 @@ impl State {
         };
         state.seed(source);
         state
+    }
+
+    fn merge_canonical(&mut self, mut ledger: ExportLedger) -> Result<(), ExportAccountingError> {
+        for inspection in std::mem::take(&mut ledger.field_inspections) {
+            match self.inspections.entry(inspection.record_index) {
+                Entry::Vacant(slot) => {
+                    slot.insert(inspection);
+                }
+                Entry::Occupied(mut slot) => slot.get_mut().merge(inspection)?,
+            }
+        }
+        self.ledger.merge(ledger);
+        Ok(())
     }
 
     fn seed(&mut self, source: &ExportLedger) {
@@ -174,10 +191,17 @@ impl<'f> Capture<'f> {
         if self.cancel.as_ref().is_some_and(CancelToken::is_cancelled) {
             return Err(CatalogError::Cancelled);
         }
-        Ok(std::mem::take(&mut state.ledger))
+        let mut ledger = std::mem::take(&mut state.ledger);
+        let inspections = std::mem::take(&mut state.inspections);
+        drop(state);
+        ledger.field_inspections.extend(inspections.into_values());
+        Ok(ledger)
     }
 }
 
+#[cfg(test)]
+#[path = "loadout_ledger/inspection_tests.rs"]
+mod inspection_tests;
 #[cfg(test)]
 #[path = "loadout_ledger/tests.rs"]
 mod tests;

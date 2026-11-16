@@ -61,11 +61,14 @@ impl Capture<'_> {
         let Ok(mut state) = self.lock() else {
             return ControlFlow::Break(());
         };
+        if let Err(error) = state.merge_canonical(ledger) {
+            state.error.get_or_insert_with(|| error.into());
+            return ControlFlow::Break(());
+        }
         state.seen.insert(record.index());
         if outcome.is_ok() {
             state.proofs.insert(record.index());
         }
-        state.ledger.merge(ledger);
         drop(state);
         ControlFlow::Continue(())
     }
