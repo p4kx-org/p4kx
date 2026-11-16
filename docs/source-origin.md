@@ -311,6 +311,18 @@ unknown original P4K encryption.
 
 ## Bulk texture conversion
 
+Archive extraction and loose folder conversion write a sibling `.p4kx-origin.jsonl`
+for each newly merged DDS,
+including the separate alpha DDS when no PNG consumes it. The companion binds the
+emitted file's byte length and SHA-256. Its header and mip ranges use the same
+addresses as `texture merge`. Stable loose contributors are observed files with unknown original
+P4K encryption and complete actual source sets. Files kept by the conflict
+policy retain their existing companions. If a companion fails after its DDS was
+renamed, the output remains merged and the run reports the companion failure.
+A DDS replacement without a new receipt retires an owned companion before replacing
+the file, even when the bytes match. This applies to Archive fallback and loose-folder
+conversion. A foreign file at the sibling path stays.
+
 The `texture_artifacts` field in `p4kx extract --convert --json` and
 `p4kx convert --json` binds each written PNG or OpenEXR image to its
 target-relative path, byte length and SHA-256. Its direct encryption marker

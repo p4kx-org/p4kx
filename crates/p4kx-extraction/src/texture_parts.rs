@@ -9,6 +9,7 @@ use std::path::{Path, PathBuf};
 use p4kx_archive::Archive;
 use p4kx_texture::SiblingReader;
 
+use crate::ObservedFileOrigin;
 use crate::disk_parts::DiskParts;
 use crate::entry_path::same_entry_path;
 use crate::path_index::PathIndex;
@@ -41,6 +42,15 @@ pub(crate) struct Found<'a> {
 pub(crate) enum PartReader<'a> {
     Source(SourceReader<'a>),
     File(File),
+}
+
+impl PartReader<'_> {
+    pub(crate) fn file_origin(&self) -> Option<ObservedFileOrigin> {
+        match self {
+            Self::Source(reader) => reader.file_origin(),
+            Self::File(_) => None,
+        }
+    }
 }
 
 impl Read for PartReader<'_> {

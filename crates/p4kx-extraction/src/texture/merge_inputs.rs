@@ -4,11 +4,12 @@
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::io::{self, Read, Write};
+use std::path::PathBuf;
 
 use p4kx_texture::{MergeReport, MergeSpan, SiblingReader};
 
-use super::disk_mip::DiskRead;
 use crate::disk_parts::DiskParts;
+use crate::observed_file_origin::ObservedFileStream;
 use crate::output_file::read_error;
 use crate::source::SourceEntry;
 use crate::texture_parts::Parts;
@@ -19,10 +20,7 @@ pub(super) enum Inputs<'texture> {
         header: SourceEntry<'texture>,
         parts: &'texture BTreeMap<u32, SourceEntry<'texture>>,
     },
-    Files {
-        header: Option<ObservedFileOrigin>,
-        parts: BTreeMap<u32, Vec<Option<ObservedFileOrigin>>>,
-    },
+    Files(FileMergeInputs),
 }
 
 impl Inputs<'_> {
@@ -31,7 +29,7 @@ impl Inputs<'_> {
             Self::Archive { header, .. } => header
                 .observed_entry()
                 .map_or(SourceInput::Unknown, SourceInput::ArchiveView),
-            Self::Files { header, .. } => file_input(header.as_ref()),
+            Self::Files(files) => file_input(files.header.as_ref()),
         }
     }
 
@@ -41,12 +39,27 @@ impl Inputs<'_> {
                 .get(&index)
                 .and_then(SourceEntry::observed_entry)
                 .map_or(SourceInput::Unknown, SourceInput::ArchiveView),
-            Self::Files { parts, .. } => file_input(
+            Self::Files(files) => file_input(
                 usize::try_from(surface)
                     .ok()
-                    .and_then(|surface| parts.get(&index)?.get(surface)?.as_ref()),
+                    .and_then(|surface| files.parts.0.get(&index)?.get(surface)?.as_ref()),
             ),
         }
+    }
+}
+
+pub(crate) struct FileMergeInputs {
+    pub(crate) header: Option<ObservedFileOrigin>,
+    pub(crate) parts: FilePartReads,
+}
+
+#[derive(Default)]
+pub(crate) struct FilePartReads(BTreeMap<u32, Vec<Option<ObservedFileOrigin>>>);
+
+impl FilePartReads {
+    /// Associates a consumed sibling open with its actual surface slot.
+    pub(crate) fn record(&mut self, index: u32, origin: Option<ObservedFileOrigin>) {
+        self.0.entry(index).or_default().push(origin);
     }
 }
 
@@ -106,7 +119,7 @@ fn write_disk<'texture>(
     let (path, file) = parts
         .open_with_path(None)
         .map_err(|error| read_error(parts.header(), error))?;
-    let mut header = DiskRead::new(path, file);
+    let mut header = ObservedFileStream::new(path, file);
     let siblings = ObservedSiblings {
         parts,
         reads: RefCell::default(),
@@ -121,18 +134,16 @@ fn write_disk<'texture>(
     .map_err(|error| ConversionError::of_texture(texture.name(), error))?;
     Ok((
         report,
-        Inputs::Files {
+        Inputs::Files(FileMergeInputs {
             header: header.origin(),
             parts: siblings.reads.into_inner(),
-        },
+        }),
     ))
 }
 
-type Reads = RefCell<BTreeMap<u32, Vec<Option<ObservedFileOrigin>>>>;
-
 struct ObservedSiblings<'parts> {
     parts: &'parts DiskParts,
-    reads: Reads,
+    reads: RefCell<FilePartReads>,
 }
 
 impl SiblingReader for ObservedSiblings<'_> {
@@ -149,7 +160,7 @@ impl SiblingReader for ObservedSiblings<'_> {
         let (path, file) = self.parts.open_with_path(Some(index))?;
         Ok(ObservedPart {
             index,
-            reader: DiskRead::new(path, file),
+            reader: ObservedFileStream::new(path, file),
             reads: &self.reads,
         })
     }
@@ -157,8 +168,8 @@ impl SiblingReader for ObservedSiblings<'_> {
 
 struct ObservedPart<'r> {
     index: u32,
-    reader: DiskRead,
-    reads: &'r Reads,
+    reader: ObservedFileStream<PathBuf>,
+    reads: &'r RefCell<FilePartReads>,
 }
 
 impl Read for ObservedPart<'_> {
@@ -171,8 +182,6 @@ impl Drop for ObservedPart<'_> {
     fn drop(&mut self) {
         self.reads
             .borrow_mut()
-            .entry(self.index)
-            .or_default()
-            .push(self.reader.origin());
+            .record(self.index, self.reader.origin());
     }
 }

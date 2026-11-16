@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::io;
+
+use crate::file_receipt;
 use crate::{ConversionError, ExtractionError, QueryExportError, WriteProtectionError};
 
 impl From<WriteProtectionError> for ConversionError {
@@ -37,9 +40,7 @@ pub(crate) fn retained_output(error: &ExtractionError) -> bool {
         ExtractionError::OwnedOutput(_) | ExtractionError::CleanupFailed { .. } => true,
         ExtractionError::Texture(error) => retained_conversion_output(error),
         ExtractionError::Sound(error) => retained_conversion_output(error),
-        ExtractionError::Write { source, .. } => {
-            crate::owned_output_failure(source).is_some_and(|error| !error.is_cancelled())
-        }
+        ExtractionError::Write { source, .. } => retained_io_output(source),
         _ => false,
     }
 }
@@ -47,11 +48,14 @@ pub(crate) fn retained_output(error: &ExtractionError) -> bool {
 fn retained_conversion_output(error: &ConversionError) -> bool {
     match error {
         ConversionError::OwnedOutput(_) | ConversionError::CleanupFailed { .. } => true,
-        ConversionError::Write { source, .. } => {
-            crate::owned_output_failure(source).is_some_and(|error| !error.is_cancelled())
-        }
+        ConversionError::Write { source, .. } => retained_io_output(source),
         _ => false,
     }
+}
+
+fn retained_io_output(source: &io::Error) -> bool {
+    file_receipt::retained_lock_failure(source)
+        || crate::owned_output_failure(source).is_some_and(|error| !error.is_cancelled())
 }
 
 const fn conversion_cancelled(error: &ConversionError) -> bool {

@@ -16,6 +16,8 @@ pub(crate) mod preview_header;
 #[path = "texture/texture.rs"]
 mod texture;
 
+pub(crate) use merge_inputs::{FileMergeInputs, FilePartReads};
+pub(crate) use merge_receipt::DdsMergeOrigins;
 pub use merge_receipt::MergeOrigins;
 pub use p4kx_texture as codec;
 pub use texture::Texture;

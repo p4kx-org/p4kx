@@ -3,9 +3,12 @@
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
+use crate::Texture;
+use crate::file_receipt::COMPANION_SUFFIX;
 use crate::sound_job::sound_role;
 use crate::source::{EntrySource, SourceEntry};
 use crate::texture_images::IMAGE_EXTENSIONS;
+use crate::write::EntryWriter;
 
 /// An Entry of the run with its position in the requested order.
 pub(crate) type Indexed<'a> = (usize, &'a SourceEntry<'a>);
@@ -75,24 +78,28 @@ impl Item<'_> {
     /// Calls `visit` with the Entry path of each file the item may write below the target, and
     /// with a trailing separator for a folder it fills with files not known in advance, and with
     /// a trailing `*` for the names that start with a prefix, as the images of a texture do.
-    pub(crate) fn output_paths(&self, mut visit: impl FnMut(&str)) {
+    pub(crate) fn output_paths(&self, writer: &EntryWriter<'_>, mut visit: impl FnMut(&str)) {
         match self {
-            Self::Entry((_, entry)) => visit(entry.path()),
+            Self::Entry((_, entry)) => {
+                let path = writer.disk_name(entry);
+                visit(&path);
+                visit_companion(&path, &mut visit);
+            }
             Self::Sound((_, entry)) => {
-                visit(entry.path());
+                visit(&writer.disk_name(entry));
                 if let Some((_, stem)) = sound_role(entry.path()) {
                     visit(&format!("{stem}.ogg"));
                     visit(&format!("{stem}.wav"));
                 }
             }
             Self::Bank((_, entry)) => {
-                visit(entry.path());
+                visit(&writer.disk_name(entry));
                 if let Some((_, stem)) = sound_role(entry.path()) {
                     visit(&format!("{stem}\\"));
                 }
             }
             Self::Texture(job) => {
-                let header = job.header.1.path();
+                let header = writer.disk_name(job.header.1);
                 let stem = header
                     .get(..header.len().saturating_sub(4))
                     .unwrap_or_default();
@@ -101,12 +108,22 @@ impl Item<'_> {
                 }
                 visit(&format!("{stem}_*"));
                 visit(&format!("{header}.a"));
-                visit(header);
+                visit(&header);
+                visit_companion(&header, &mut visit);
+                if let Some(alpha) = &job.alpha_header {
+                    visit_companion(&writer.disk_name(alpha), &mut visit);
+                }
                 for (_, entry) in &job.requested {
-                    visit(entry.path());
+                    visit(&writer.disk_name(entry));
                 }
             }
         }
+    }
+}
+
+fn visit_companion(path: &str, visit: &mut impl FnMut(&str)) {
+    if Texture::is_header_path(path) {
+        visit(&format!("{path}{COMPANION_SUFFIX}"));
     }
 }
 

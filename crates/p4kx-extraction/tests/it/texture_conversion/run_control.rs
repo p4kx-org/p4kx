@@ -87,7 +87,7 @@ fn if_changed_keeps_identical_outputs_and_replaces_changed_ones() -> TestResult 
     assert_eq!(fixture.read(DDS)?, merged_layout(&rock()), "restored");
     assert_eq!(
         files(&fixture.target)?,
-        [DDS, PNG],
+        [DDS, "Data/Textures/rock_diff.dds.p4kx-origin.jsonl", PNG],
         "no temporary files left"
     );
     Ok(())

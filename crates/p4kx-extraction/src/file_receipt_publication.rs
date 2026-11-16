@@ -13,7 +13,8 @@ use crate::{
     CancelToken, ConflictPolicy, OriginArtifactBinding, OriginArtifactDigest, OriginDigestWriter,
 };
 
-use super::lock::{Contention, ReceiptLock, protection_error, regular_file};
+use super::lock::{Contention, ReceiptLock, invalid, protection_error, regular_file};
+use super::target_path::target;
 use super::{ExistingCompanions, FileReceipt};
 
 #[cfg(test)]
@@ -39,6 +40,49 @@ pub enum FilePublication {
 }
 
 impl FileReceipt<'_> {
+    pub(super) fn publish_companion(
+        &self,
+        held: &ReceiptLock,
+        digest: OriginArtifactDigest,
+        describe: impl FnOnce(&mut dyn Write, &OriginArtifactBinding) -> io::Result<()>,
+    ) -> io::Result<()> {
+        self.publish_companion_checked(held, digest, || Ok(()), describe)
+    }
+
+    pub(super) fn publish_companion_checked(
+        &self,
+        held: &ReceiptLock,
+        digest: OriginArtifactDigest,
+        checkpoint: impl FnOnce() -> io::Result<()>,
+        describe: impl FnOnce(&mut dyn Write, &OriginArtifactBinding) -> io::Result<()>,
+    ) -> io::Result<()> {
+        let binding = OriginArtifactBinding::File {
+            path: self.artifact_name.clone(),
+            digest,
+        };
+        origin_file_io::write_replacing_before(
+            &self.receipt,
+            self.receipt_protection,
+            Some(&self.cancel),
+            |writer| describe(writer, &binding),
+            |_| {
+                checkpoint()?;
+                held.check(&self.cancel)?;
+                self.check_committed_target()
+            },
+        )
+    }
+
+    fn check_committed_target(&self) -> io::Result<()> {
+        let actual = target(&self.artifact, self.protection, &self.cancel)?;
+        if actual != self.artifact || regular_file(&actual)?.is_none() {
+            return Err(invalid(
+                "the committed artifact is no longer a regular file at its output path",
+            ));
+        }
+        Ok(())
+    }
+
     /// Publishes byte content and its receipt according to the conflict policy.
     /// Calls `describe` only for a committed artifact replacement.
     ///

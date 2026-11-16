@@ -50,6 +50,7 @@ fn a_texture_with_a_missing_part_is_reported_and_its_raw_entries_are_written() -
         files(&fixture.target)?,
         [
             "Data/Ships/hull_ddna.dds",
+            "Data/Ships/hull_ddna.dds.p4kx-origin.jsonl",
             "Data/Ships/hull_ddna.png",
             "Data/Textures/rock_diff.dds",
             "Data/Textures/rock_diff.dds.1",
@@ -93,6 +94,7 @@ fn a_format_without_a_decoder_keeps_the_merged_dds_and_writes_the_raw_parts() ->
             "Data/Ships/hull_ddna.dds",
             "Data/Ships/hull_ddna.dds.1",
             "Data/Ships/hull_ddna.dds.2",
+            "Data/Ships/hull_ddna.dds.p4kx-origin.jsonl",
         ],
         "the merged DDS and the raw parts, no PNG"
     );

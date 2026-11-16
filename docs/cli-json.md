@@ -2837,6 +2837,11 @@ the selected `level`, `layer`, `face` and `slice`, and its own `containsEncrypte
 `sourceUsesRefs` and `sourceSetComplete`. Existing images retained by the conflict policy do
 not gain a receipt from this run. The field is omitted when no image was written.
 
+`merged_texture_artifacts` lists newly written merged DDS files with a portable
+origin companion. Each has a target-relative `path`, `origin_receipt` and the actual
+artifact's `digest`. An emitted alpha DDS has its own receipt. The summary omits this
+field when the run published no merged DDS companion.
+
 An Entry whose path has a part that is no valid file name on Linux and Windows, a path that is too
 long for Windows or that differs only in case from an earlier written Entry is listed in `failed`
 with the part and the rule it breaks

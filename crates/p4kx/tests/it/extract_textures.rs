@@ -122,6 +122,7 @@ fn convert_merges_textures_and_exports_png_once_per_texture() -> TestResult {
         [
             "Data/Textures/broken_ddna.dds",
             "Data/Textures/panel_diff.dds",
+            "Data/Textures/panel_diff.dds.p4kx-origin.jsonl",
             "Data/Textures/panel_diff.png",
             "Data/readme.txt",
         ],
@@ -203,6 +204,24 @@ fn the_json_report_lists_textures_that_were_not_converted() -> TestResult {
         .clone();
 
     let report: Value = serde_json::from_slice(&output)?;
+    let merged = report["merged_texture_artifacts"]
+        .as_array()
+        .ok_or("merged DDS report")?;
+    let [artifact] = merged.as_slice() else {
+        return Err("only the completed DDS has a provenance receipt".into());
+    };
+    assert_eq!(
+        artifact["path"], "Data/Textures/panel_diff.dds",
+        "the summary identifies the actual output"
+    );
+    let relative = artifact["origin_receipt"]
+        .as_str()
+        .ok_or("portable receipt path")?;
+    assert!(
+        fixture.out.join(relative).is_file(),
+        "the receipt remains next to the DDS"
+    );
+
     assert_eq!(
         report["converted"], 3,
         "the Entries of the converted texture"
@@ -261,8 +280,10 @@ fn convert_merges_an_alpha_tail_into_the_png_and_writes_cubemap_faces() -> TestR
 
     let mut expected = vec![
         "Data/glass.dds".to_owned(),
+        "Data/glass.dds.p4kx-origin.jsonl".to_owned(),
         "Data/glass.png".to_owned(),
         "Data/sky.dds".to_owned(),
+        "Data/sky.dds.p4kx-origin.jsonl".to_owned(),
     ];
     expected.extend(
         ["posx", "negx", "posy", "negy", "posz", "negz"]

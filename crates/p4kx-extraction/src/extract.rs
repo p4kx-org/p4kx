@@ -26,7 +26,8 @@ pub(crate) use crate::extract_outcome::{Ended, EntryEnded};
 /// Files that already exist are handled by the [`ConflictPolicy`](crate::ConflictPolicy) of
 /// `options`. Entries are written in parallel on the current rayon pool with the same files and
 /// report as a sequential run in the order of `entries`. Entry paths that could leave `target` are
-/// rejected, and existing links below `target` are never followed. A failed or cancelled Entry
+/// rejected, the origin publication lock name is reserved, and existing links below `target`
+/// are never followed. A failed or cancelled Entry
 /// leaves no partial file and keeps an existing one; once the token of `options` is cancelled,
 /// the Entries not yet complete are reported as cancelled.
 ///
@@ -180,8 +181,10 @@ fn run_guarded(
         DataForgePick::default()
     };
     let dataforge = found.position;
-    let (independent, dependent) =
-        split_dependent(within(pool, || items(source, entries, options, dataforge)));
+    let (independent, dependent) = split_dependent(
+        within(pool, || items(source, entries, options, dataforge)),
+        &writer,
+    );
     let run = |buffers: &mut Buffers, item: Item<'_>| {
         let ended = write_item(&writer, item, buffers);
         writer.record_written(entries, &ended);
@@ -333,11 +336,14 @@ fn items<'a>(
 
 /// Splits `items` into those that may run in parallel and, in order, those that write a path
 /// colliding with an earlier one by name or as a file where a folder is needed.
-fn split_dependent(items: Vec<Item<'_>>) -> (Vec<Item<'_>>, Vec<Item<'_>>) {
+fn split_dependent<'item>(
+    items: Vec<Item<'item>>,
+    writer: &EntryWriter<'_>,
+) -> (Vec<Item<'item>>, Vec<Item<'item>>) {
     let mut collisions = Collisions::default();
     items.into_iter().partition(|item| {
         let mut free = true;
-        item.output_paths(|path| free &= collisions.claim(path));
+        item.output_paths(writer, |path| free &= collisions.claim(path));
         free
     })
 }

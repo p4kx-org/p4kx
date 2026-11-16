@@ -63,6 +63,7 @@ pub struct ExtractionSummary {
     records_renamed: Vec<RenamedRecord>,
     excluded_parts: usize,
     not_converted: usize,
+    merged_texture_receipts: Vec<String>,
 }
 
 impl ExtractionSummary {
@@ -110,6 +111,11 @@ impl ExtractionSummary {
             }),
             excluded_parts: 0,
             not_converted: report.not_converted(),
+            merged_texture_receipts: report
+                .merged_texture_artifacts()
+                .iter()
+                .map(|artifact| artifact.origin_receipt.clone())
+                .collect(),
         }
     }
 
@@ -195,6 +201,10 @@ impl ExtractionSummary {
     #[must_use]
     pub const fn not_converted(&self) -> usize {
         self.not_converted
+    }
+
+    pub(crate) fn merged_texture_receipts(&self) -> &[String] {
+        &self.merged_texture_receipts
     }
 
     pub(crate) const fn with_excluded_parts(mut self, excluded_parts: usize) -> Self {

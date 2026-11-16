@@ -49,6 +49,7 @@ fn an_array_is_exported_as_one_png_per_element() -> TestResult {
         files(&fixture.target)?,
         [
             "Data/Textures/rock_diff.dds",
+            "Data/Textures/rock_diff.dds.p4kx-origin.jsonl",
             "Data/Textures/rock_diff_layer0.png",
             "Data/Textures/rock_diff_layer1.png",
             "Data/Textures/rock_diff_layer2.png",
@@ -87,6 +88,7 @@ fn a_volume_is_exported_as_one_png_per_slice() -> TestResult {
         files(&fixture.target)?,
         [
             "Data/Textures/rock_diff.dds",
+            "Data/Textures/rock_diff.dds.p4kx-origin.jsonl",
             "Data/Textures/rock_diff_slice0.png",
             "Data/Textures/rock_diff_slice1.png",
             "Data/Textures/rock_diff_slice2.png",

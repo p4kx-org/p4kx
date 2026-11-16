@@ -18,6 +18,9 @@ use crate::{
     TextureConversion, WriteProtectionError,
 };
 
+#[path = "write_publication.rs"]
+mod publication;
+
 /// How one Entry of an Extraction ended.
 pub(crate) enum Outcome {
     Written,
@@ -279,10 +282,7 @@ impl EntryWriter<'_> {
         match self.entry_target {
             EntryTarget::Source => entry_path::relative_path(&self.disk_name(entry)),
             EntryTarget::Leaf(name) => {
-                portable_name::check_part(name).map_err(|rule| ExtractionError::InvalidName {
-                    part: name.to_owned(),
-                    rule,
-                })?;
+                entry_path::check_output_part(name)?;
                 Ok(PathBuf::from(name))
             }
         }
@@ -308,38 +308,6 @@ impl EntryWriter<'_> {
         let name = relative.file_name().ok_or(ExtractionError::UnsafePath)?;
         let folder = self.folder(relative.parent())?;
         Destination::new(folder, name)
-    }
-
-    /// Renames `temporary` to `destination` once `copied` reached the end of the data, or removes
-    /// it; returns `done` once the file is in place.
-    pub(crate) fn put_in_place(
-        &self,
-        temporary: &Path,
-        ownership: &crate::OwnedFileToken,
-        destination: &Path,
-        copied: Result<Chunk, ExtractionError>,
-        done: Outcome,
-    ) -> Result<Outcome, ExtractionError> {
-        if !matches!(copied, Ok(Chunk::End)) || self.tracker.archive_file_changed() {
-            return crate::output_cleanup::extraction(
-                copied.map(|_| Outcome::Cancelled),
-                ownership,
-                temporary,
-                self.cancel,
-            );
-        }
-        let result = (|| {
-            ownership.ensure_writable(temporary, crate::output_file::cancel_flag(self.cancel))?;
-            self.check_output(destination)?;
-            fs::rename(temporary, destination)
-                .map_err(|source| write_error(destination.to_path_buf(), source))?;
-            Ok(done)
-        })();
-        if result.is_err() {
-            crate::output_cleanup::extraction(result, ownership, temporary, self.cancel)
-        } else {
-            result
-        }
     }
 
     fn copy(

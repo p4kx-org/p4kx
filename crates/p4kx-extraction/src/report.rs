@@ -7,10 +7,12 @@ use std::path::PathBuf;
 use p4kx_archive::{ArchiveError, Checksum, DataError};
 use p4kx_cryxml::CryXmlError;
 use p4kx_dataforge::DataForgeError;
+use serde::Serialize;
 use thiserror::Error;
 
 use crate::{
-    ConversionError, NameRule, PathLimit, RecordExportReport, SourceEvidenceError, TextureArtifacts,
+    ConversionError, NameRule, OriginArtifactDigest, PathLimit, RecordExportReport,
+    SourceEvidenceError, TextureArtifacts,
 };
 
 /// Why one Entry of an Extraction was not written.
@@ -184,6 +186,18 @@ impl EntryFailure {
     }
 }
 
+/// A committed merged DDS and its portable source-origin companion.
+#[derive(Debug, Serialize)]
+#[non_exhaustive]
+pub struct MergedTextureArtifact {
+    /// The DDS path relative to the extraction target, with forward slash separators.
+    pub path: String,
+    /// The companion path relative to the extraction target, with forward slash separators.
+    pub origin_receipt: String,
+    /// The byte length and SHA-256 of the committed DDS.
+    pub digest: OriginArtifactDigest,
+}
+
 /// The outcome of an Extraction.
 #[derive(Debug, Default)]
 pub struct ExtractionReport {
@@ -199,6 +213,7 @@ pub struct ExtractionReport {
     pub(crate) records_entry: Option<String>,
     pub(crate) dataforge_left_out: Vec<String>,
     pub(crate) texture_artifacts: Vec<TextureArtifacts>,
+    pub(crate) merged_texture_artifacts: Vec<MergedTextureArtifact>,
 }
 
 impl ExtractionReport {
@@ -206,6 +221,12 @@ impl ExtractionReport {
     #[must_use]
     pub fn texture_artifacts(&self) -> &[TextureArtifacts] {
         &self.texture_artifacts
+    }
+
+    /// Returns the DDS files that were committed with their source-origin companions.
+    #[must_use]
+    pub fn merged_texture_artifacts(&self) -> &[MergedTextureArtifact] {
+        &self.merged_texture_artifacts
     }
 
     /// Returns the number of Entries written.

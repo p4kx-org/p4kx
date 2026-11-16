@@ -3,6 +3,7 @@
 
 use std::error::Error;
 use std::io;
+use std::iter;
 
 use crate::{ConversionError, ExtractionError, OwnedOutputError, QueryExportError};
 
@@ -11,17 +12,18 @@ const MAX_ERROR_DEPTH: usize = 64;
 /// Finds a typed factory failure without discarding its original I/O wrapper chain.
 #[must_use]
 pub fn owned_output_failure(error: &io::Error) -> Option<&OwnedOutputError> {
-    let mut current: &(dyn Error + 'static) = error;
-    for _ in 0..MAX_ERROR_DEPTH {
-        if let Some(owned) = current.downcast_ref::<OwnedOutputError>() {
-            return Some(owned);
-        }
-        current = current
+    io_error_chain(error).find_map(|cause| cause.downcast_ref())
+}
+
+/// Visits the typed causes without skipping nested I/O wrappers.
+pub(crate) fn io_error_chain(error: &io::Error) -> impl Iterator<Item = &(dyn Error + 'static)> {
+    iter::successors(Some(error as &(dyn Error + 'static)), |&cause| {
+        cause
             .downcast_ref::<io::Error>()
             .and_then(|error| error.get_ref().map(|inner| inner as &(dyn Error + 'static)))
-            .or_else(|| current.source())?;
-    }
-    None
+            .or_else(|| cause.source())
+    })
+    .take(MAX_ERROR_DEPTH)
 }
 
 impl From<OwnedOutputError> for ConversionError {

@@ -342,7 +342,7 @@ pub use record_report::{
     RecordExportError, RecordExportOptions, RecordExportReport, RecordFailure, RecordRenamed,
     RenameCause,
 };
-pub use report::{EntryFailure, ExtractionError, ExtractionReport};
+pub use report::{EntryFailure, ExtractionError, ExtractionReport, MergedTextureArtifact};
 pub use resolved_texts::LanguageTexts;
 pub use selection::{UnknownEntries, select_entries};
 pub use sound::{MAX_SOUND_LEN, Sound};

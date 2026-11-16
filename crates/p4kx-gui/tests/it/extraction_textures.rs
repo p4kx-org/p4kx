@@ -107,9 +107,14 @@ fn the_default_outputs_merge_the_texture_and_export_its_largest_mip() -> TestRes
     extract_shown(&mut harness, &[])?;
 
     harness.get_by_label("Extracted 3 (3 converted), skipped 0, failed 0, cancelled 0");
+    harness.get_by_label("DDS origin receipts (1)");
     assert_eq!(
         files(&out)?,
-        ["panel_diff.dds", "panel_diff.png"],
+        [
+            "panel_diff.dds",
+            "panel_diff.dds.p4kx-origin.jsonl",
+            "panel_diff.png"
+        ],
         "outputs"
     );
     let merged = fs::read(out.join("Data/Textures/panel_diff.dds"))?;
@@ -129,7 +134,12 @@ fn the_switches_choose_the_outputs_and_are_remembered() -> TestResult {
 
     assert_eq!(
         files(&out)?,
-        ["panel_diff.dds", "panel_diff.dds.1", "panel_diff.dds.2"],
+        [
+            "panel_diff.dds",
+            "panel_diff.dds.1",
+            "panel_diff.dds.2",
+            "panel_diff.dds.p4kx-origin.jsonl",
+        ],
         "the merged DDS and the raw parts"
     );
     assert_eq!(

@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::collections::HashSet;
+use std::ffi::OsStr;
 use std::fs::{self, Metadata, OpenOptions};
 use std::io;
 use std::path::{Path, PathBuf};
@@ -20,6 +21,10 @@ use crate::{
 use super::lock_retirement;
 
 pub(super) const LOCK_NAME: &str = ".p4kx-origin.lock";
+
+pub(crate) fn is_origin_lock_name(name: &OsStr) -> bool {
+    name.eq_ignore_ascii_case(LOCK_NAME)
+}
 
 const LOCK_RETRY: Duration = Duration::from_millis(10);
 static RECEIPT_PUBLISHERS: LazyLock<Mutex<HashSet<PathBuf>>> =
@@ -218,7 +223,7 @@ fn retained_lock(path: &Path, source: io::Error) -> io::Error {
 
 #[derive(Debug, thiserror::Error)]
 #[error("temporary ordinary publication lock at {} was retained before commit", path.display())]
-struct RetainedLock {
+pub(super) struct RetainedLock {
     path: PathBuf,
     #[source]
     source: io::Error,

@@ -7,8 +7,8 @@ use std::path::{Path, PathBuf};
 use p4kx_archive::{Archive, Entry};
 use p4kx_texture::{DdsHeader, DdsRawHeader, MergeReport, TextureError, merge};
 
-use super::disk_mip::DiskRead;
 use crate::disk_parts::DiskParts;
+use crate::observed_file_origin::ObservedFileStream;
 use crate::output_file::{read_error, write_replacing_protected};
 use crate::path_index::PathIndex;
 use crate::source::SourceEntry;
@@ -115,7 +115,7 @@ impl<'a> Texture<'a> {
                     .metadata()
                     .map_err(|source| read_error(path, source))?
                     .len();
-                let mut read = DiskRead::new(actual, file);
+                let mut read = ObservedFileStream::new(actual, file);
                 let header = texture_header::read(&mut read, &name)?;
                 (name, size, header, read.origin())
             }

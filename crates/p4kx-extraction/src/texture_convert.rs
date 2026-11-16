@@ -10,7 +10,7 @@ use crate::buffers::Buffers;
 use crate::extract::Ended;
 use crate::source::SourceEntry;
 use crate::texture_job::TextureJob;
-use crate::texture_outputs::Counted;
+use crate::texture_outputs::{Counted, MergedOutput};
 use crate::texture_parts::Parts;
 use crate::write::{EntryWriter, Outcome};
 use crate::{ConversionError, EntryFailure, ExtractionError, Texture, TextureArtifacts};
@@ -29,20 +29,21 @@ pub(crate) enum Step {
 /// What converting a texture got done before it ended or failed.
 #[derive(Debug, Default)]
 struct Done {
-    merged: Option<Step>,
-    merged_tail: Option<Step>,
+    merged: MergedOutput,
+    merged_tail: MergedOutput,
     png: Option<Step>,
+    interrupted: bool,
     counted: Counted,
     artifacts: Option<TextureArtifacts>,
 }
 
 impl Done {
     const fn steps(&self) -> [Option<Step>; 3] {
-        [self.merged, self.merged_tail, self.png]
+        [self.merged.step, self.merged_tail.step, self.png]
     }
 
     fn cancelled(&self) -> bool {
-        self.steps().contains(&Some(Step::Cancelled))
+        self.interrupted || self.steps().contains(&Some(Step::Cancelled))
     }
 
     fn outcome(&self) -> Outcome {
@@ -56,12 +57,12 @@ impl Done {
     /// Returns whether a merged file holds the path of `entry`, so its raw data is not written.
     fn holds_path_of(&self, job: &TextureJob<'_>, entry: &SourceEntry<'_>) -> bool {
         let in_place = |step: Option<Step>| matches!(step, Some(Step::Written | Step::Kept));
-        (job.header.1.index() == entry.index() && in_place(self.merged))
+        (job.header.1.index() == entry.index() && in_place(self.merged.step))
             || (job
                 .alpha_header
                 .as_ref()
                 .is_some_and(|tail| tail.index() == entry.index())
-                && in_place(self.merged_tail))
+                && in_place(self.merged_tail.step))
     }
 
     /// Takes up to `size` bytes of the merge progress already reported for one Entry.
@@ -113,9 +114,11 @@ impl EntryWriter<'_> {
         };
         let failure = match self.convert_texture(job, buffers, &mut done) {
             Ok(()) => None,
-            Err(_) if self.tracker.archive_file_changed() => {
-                done.merged = Some(Step::Cancelled);
-                None
+            Err(error) if self.tracker.archive_file_changed() => {
+                done.interrupted = true;
+                (done.steps().contains(&Some(Step::Written))
+                    || crate::guard_cancellation::retained_output(&error))
+                .then_some(error)
             }
             Err(error) => Some(error),
         };
@@ -154,6 +157,10 @@ impl EntryWriter<'_> {
             entries,
             unconverted,
             artifacts: done.artifacts.map(|artifacts| (job.header.0, artifacts)),
+            merged_artifacts: [done.merged.artifact, done.merged_tail.artifact]
+                .into_iter()
+                .flatten()
+                .collect(),
         }
     }
 
@@ -164,7 +171,7 @@ impl EntryWriter<'_> {
         done: &mut Done,
     ) -> Result<(), ExtractionError> {
         if self.tracker.should_stop() {
-            done.merged = Some(Step::Cancelled);
+            done.merged.step = Some(Step::Cancelled);
             return Ok(());
         }
         let (_, header) = job.header;
@@ -183,10 +190,14 @@ impl EntryWriter<'_> {
             .map(|level| source.part_count - level);
         buffers.data.clear();
         if self.textures.merge {
-            let step =
-                self.write_merged((&source, &destination), capture, &mut done.counted, buffers)?;
-            done.merged = Some(step);
-            if step == Step::Cancelled {
+            self.write_merged(
+                (&source, &destination),
+                capture,
+                &mut done.counted,
+                buffers,
+                &mut done.merged,
+            )?;
+            if done.merged.step == Some(Step::Cancelled) {
                 return Ok(());
             }
         }
@@ -215,9 +226,13 @@ impl EntryWriter<'_> {
         };
         let tail = Source::new(tail.map_err(ExtractionError::Texture)?, tail_header)?;
         let destination = self.destination(tail_header)?;
-        done.merged_tail =
-            Some(self.write_merged((&tail, &destination), None, &mut done.counted, buffers)?);
-        Ok(())
+        self.write_merged(
+            (&tail, &destination),
+            None,
+            &mut done.counted,
+            buffers,
+            &mut done.merged_tail,
+        )
     }
 
     fn open_source<'j>(&'j self, job: &'j TextureJob<'_>) -> Result<Source<'j>, ExtractionError> {

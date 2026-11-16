@@ -246,6 +246,10 @@ impl<'a> StagedOutput<'a> {
         self.temporary
     }
 
+    pub(crate) const fn output(&self) -> &Path {
+        self.output
+    }
+
     pub(crate) fn check(&self) -> Result<(), WriteProtectionError> {
         self.ownership
             .ensure_writable(self.temporary, cancel_flag(self.cancel))?;

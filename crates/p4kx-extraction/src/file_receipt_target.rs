@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 use crate::{ArchiveWriteProtection, CancelToken, OriginArtifactName, is_redirected_metadata};
 
-use super::lock::{LOCK_NAME, invalid};
+use super::lock::{invalid, is_origin_lock_name};
 use super::{COMPANION_SUFFIX, check};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -76,7 +76,7 @@ pub(super) fn bind_target(
         .path
         .file_name()
         .ok_or_else(|| invalid("the output names no file"))?;
-    if name.eq_ignore_ascii_case(LOCK_NAME) {
+    if is_origin_lock_name(name) {
         return Err(invalid("the output names the origin publication lock"));
     }
     if name

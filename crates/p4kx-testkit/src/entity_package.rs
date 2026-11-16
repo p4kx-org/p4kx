@@ -7,9 +7,9 @@ use std::fs::{self, File};
 use std::io::{self, BufRead, BufReader};
 use std::path::Path;
 
+use crate::test_digest;
 use flate2::bufread::GzDecoder;
 use serde_json::Value;
-use sha2::{Digest, Sha256};
 
 type Checked<T = ()> = Result<T, Box<dyn Error>>;
 
@@ -276,14 +276,7 @@ fn check_receipt(root: &Path, manifest: &Value, paths: &[&str]) -> Checked {
 }
 
 fn digest(path: &Path) -> Checked<String> {
-    use std::fmt::Write as _;
-
-    let bytes = Sha256::digest(fs::read(path)?);
-    let mut output = String::with_capacity(bytes.len() * 2);
-    for byte in bytes {
-        write!(output, "{byte:02x}")?;
-    }
-    Ok(output)
+    Ok(test_digest::sha256_hex(&fs::read(path)?)?)
 }
 
 fn count_files(path: &Path) -> io::Result<usize> {

@@ -4,11 +4,24 @@
 use std::io;
 use std::path::Path;
 
-use super::lock::{Contention, ReceiptLock};
+use super::lock::{Contention, ReceiptLock, RetainedLock};
+use super::staged::RetirementFailure;
 use super::target_path::BindTarget;
 use super::{ExistingCompanions, FileReceipt};
 use crate::output_file::write_error;
-use crate::{ArchiveWriteProtection, CancelToken, ConversionError};
+use crate::owned_output_failure::io_error_chain;
+use crate::{ArchiveWriteProtection, CancelToken, ConversionError, ExtractionError};
+
+/// Whether the publication could not release its owned lock.
+pub(crate) fn retained_lock_failure(error: &io::Error) -> bool {
+    io_error_chain(error).any(|cause| {
+        cause.is::<RetainedLock>()
+            || cause.is::<RetirementFailure>()
+            || cause.is::<LockFinishFailure<io::Error>>()
+            || cause.is::<LockFinishFailure<ConversionError>>()
+            || cause.is::<LockFinishFailure<ExtractionError>>()
+    })
+}
 
 pub(crate) struct OrdinaryReplacement<'source> {
     receipt: FileReceipt<'source>,
@@ -44,6 +57,16 @@ impl<'source> OrdinaryReplacement<'source> {
         result: Result<T, ConversionError>,
     ) -> Result<T, ConversionError> {
         self.finish(result, |error| write_error(out, io::Error::other(error)))
+    }
+
+    pub(crate) fn finish_extraction<T>(
+        self,
+        out: &Path,
+        result: Result<T, ExtractionError>,
+    ) -> Result<T, ExtractionError> {
+        self.finish(result, |error| {
+            crate::write::write_error(out.to_path_buf(), io::Error::other(error))
+        })
     }
 
     pub(crate) fn finish_io<T>(self, result: io::Result<T>) -> io::Result<T> {
@@ -87,7 +110,7 @@ mod tests {
     use std::fs;
     use std::io;
 
-    use super::{LockFinishFailure, OrdinaryReplacement};
+    use super::{LockFinishFailure, OrdinaryReplacement, retained_lock_failure};
     use crate::file_receipt::lock::LOCK_NAME;
 
     #[test]
@@ -108,6 +131,10 @@ mod tests {
             let failed = replacement
                 .finish_io(outcome)
                 .expect_err("a foreign lock cannot be retired");
+            assert!(
+                retained_lock_failure(&failed),
+                "lock cleanup remains observable"
+            );
             let typed = failed
                 .get_ref()
                 .and_then(|error| error.downcast_ref::<LockFinishFailure<io::Error>>());

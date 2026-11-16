@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use crate::write::Outcome;
-use crate::{EntryFailure, ExtractionReport, TextureArtifacts};
+use crate::{EntryFailure, ExtractionReport, MergedTextureArtifact, TextureArtifacts};
 
 /// The outcome of one Entry of an Extraction: its position, its path and how it ended.
 pub(crate) type EntryEnded = (usize, String, Outcome);
@@ -16,6 +16,7 @@ pub(crate) enum Ended {
         entries: Vec<EntryEnded>,
         unconverted: Option<(usize, EntryFailure)>,
         artifacts: Option<(usize, TextureArtifacts)>,
+        merged_artifacts: Vec<MergedTextureArtifact>,
     },
     /// A sound or soundbank Entry, the failures of what could not be converted and the names of
     /// the sounds of a soundbank the cancelled run left unwritten.
@@ -31,6 +32,7 @@ pub(crate) fn summarise(ended: Vec<Ended>, convert: bool) -> ExtractionReport {
     let mut unconverted = Vec::new();
     let mut unwritten = Vec::new();
     let mut texture_artifacts = Vec::new();
+    let mut merged_texture_artifacts = Vec::new();
     for item in ended {
         match item {
             Ended::Entry(outcome) => outcomes.push(outcome),
@@ -38,10 +40,12 @@ pub(crate) fn summarise(ended: Vec<Ended>, convert: bool) -> ExtractionReport {
                 entries,
                 unconverted: failure,
                 artifacts,
+                merged_artifacts,
             } => {
                 outcomes.extend(entries);
                 unconverted.extend(failure);
                 texture_artifacts.extend(artifacts);
+                merged_texture_artifacts.extend(merged_artifacts);
             }
             Ended::Sound {
                 entry,
@@ -59,7 +63,9 @@ pub(crate) fn summarise(ended: Vec<Ended>, convert: bool) -> ExtractionReport {
     unwritten.sort_by_key(|(index, _)| *index);
     unconverted.sort_by_key(|(index, _)| *index);
     texture_artifacts.sort_unstable_by_key(|(index, _)| *index);
+    merged_texture_artifacts.sort_unstable_by(|left, right| left.path.cmp(&right.path));
     let mut report = ExtractionReport {
+        merged_texture_artifacts,
         texture_artifacts: texture_artifacts
             .into_iter()
             .map(|(_, artifacts)| artifacts)

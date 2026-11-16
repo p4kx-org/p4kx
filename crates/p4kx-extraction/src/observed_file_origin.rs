@@ -7,6 +7,8 @@ use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use same_file::Handle;
+
 use crate::FileStamp;
 
 /// Owned identity and observations of one successfully read standalone file.
@@ -79,6 +81,57 @@ impl fmt::Debug for ObservedFileOrigin {
             .debug_struct("ObservedFileOrigin")
             .field("stamp", &self.source.stamp)
             .finish_non_exhaustive()
+    }
+}
+
+/// A stream that can identify the opened file supplying its consumed bytes.
+pub(crate) struct ObservedFileStream<P> {
+    path: P,
+    file: File,
+    before: Option<FileStamp>,
+    extent: u64,
+}
+
+impl<P: AsRef<Path>> ObservedFileStream<P> {
+    pub(crate) fn new(path: P, file: File) -> Self {
+        let before = file
+            .metadata()
+            .ok()
+            .map(|meta| FileStamp::from_metadata(&meta));
+        Self::with_stamp(path, file, before)
+    }
+
+    pub(crate) const fn with_stamp(path: P, file: File, before: Option<FileStamp>) -> Self {
+        Self {
+            path,
+            file,
+            before,
+            extent: 0,
+        }
+    }
+
+    pub(crate) fn origin(&self) -> Option<ObservedFileOrigin> {
+        let path = self.path.as_ref();
+        let before = self.before?;
+        let opened = Handle::from_file(self.file.try_clone().ok()?).ok()?;
+        let named = Handle::from_path(path).ok()?;
+        if opened != named {
+            return None;
+        }
+        ObservedFileOrigin::of_extent(path, &self.file, before, self.extent)
+            .ok()
+            .flatten()
+    }
+}
+
+impl<P> Read for ObservedFileStream<P> {
+    fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+        let count = self.file.read(buffer)?;
+        self.extent = self
+            .extent
+            .checked_add(count as u64)
+            .ok_or_else(|| io::Error::other("observed file byte range overflows"))?;
+        Ok(count)
     }
 }
 

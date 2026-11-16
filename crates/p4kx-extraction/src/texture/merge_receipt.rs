@@ -6,12 +6,13 @@ use std::path::{Path, PathBuf};
 
 use p4kx_texture::{MergeReport, MergeSpan, MergeSpanSite};
 
-use super::merge_inputs::{self, Inputs, WrittenMerge};
+use super::merge_inputs::{self, FileMergeInputs, Inputs, WrittenMerge};
 use crate::output_file::write_error;
+use crate::texture_parts::Parts;
 use crate::{
     ConversionError, DecimalU64, FieldOrigin, FieldOrigins, FieldPath, FileReceipt, InputScope,
-    OriginOutputAddress, SourceInput, SourceInventory, SourceLocation, SourceUse, SourceUseRole,
-    SourceUses, Texture, write_origin_companion,
+    OriginArtifactBinding, OriginOutputAddress, SourceInput, SourceInventory, SourceLocation,
+    SourceUse, SourceUseRole, SourceUses, Texture, write_origin_companion,
 };
 
 /// Exact source evidence for a merged DDS and its summary.
@@ -50,17 +51,7 @@ impl Texture<'_> {
                 let origins = RecordedMerge::capture(&written)?;
                 Ok((written.report, origins))
             },
-            |writer, binding, (_, origins)| {
-                write_origin_companion(
-                    writer,
-                    binding,
-                    &origins.inventory,
-                    origins
-                        .output
-                        .iter()
-                        .map(|(address, field)| (address, field)),
-                )
-            },
+            |writer, binding, (_, origins)| origins.dds.write(writer, binding),
         );
         let (report, origins) =
             written.map_err(|error| merge_error.unwrap_or_else(|| write_error(out, error)))?;
@@ -76,18 +67,65 @@ impl Texture<'_> {
 }
 
 struct RecordedMerge {
-    output: Vec<(OriginOutputAddress, FieldOrigin)>,
+    dds: DdsMergeOrigins,
     summary: FieldOrigins,
     summary_inventory: SourceInventory,
-    inventory: SourceInventory,
 }
 
 impl RecordedMerge {
     fn capture(written: &WrittenMerge<'_>) -> io::Result<Self> {
+        let (dds, header_len) = DdsMergeOrigins::capture(&written.inputs, &written.spans)?;
+        let (summary, summary_inventory) = summary(written.inputs.header(), header_len)?;
+        Ok(Self {
+            dds,
+            summary,
+            summary_inventory,
+        })
+    }
+}
+
+/// Exact source contributions of the header and mip ranges emitted by a merge.
+pub(crate) struct DdsMergeOrigins {
+    output: Vec<(OriginOutputAddress, FieldOrigin)>,
+    inventory: SourceInventory,
+}
+
+impl DdsMergeOrigins {
+    pub(crate) fn archive(parts: &Parts<'_>, spans: &[MergeSpan]) -> io::Result<Self> {
+        let Parts::Source { header, parts, .. } = parts else {
+            return Err(io::Error::other("the archived DDS input is missing"));
+        };
+        Self::capture(
+            &Inputs::Archive {
+                header: *header,
+                parts,
+            },
+            spans,
+        )
+        .map(|(origins, _)| origins)
+    }
+
+    pub(crate) fn files(inputs: FileMergeInputs, spans: &[MergeSpan]) -> io::Result<Self> {
+        Self::capture(&Inputs::Files(inputs), spans).map(|(origins, _)| origins)
+    }
+
+    pub(crate) fn write(
+        &self,
+        writer: &mut dyn io::Write,
+        binding: &OriginArtifactBinding,
+    ) -> io::Result<()> {
+        write_origin_companion(
+            writer,
+            binding,
+            &self.inventory,
+            self.output.iter().map(|(address, field)| (address, field)),
+        )
+    }
+
+    fn capture(inputs: &Inputs<'_>, spans: &[MergeSpan]) -> io::Result<(Self, u64)> {
         let uses = SourceUses::with_compact_use_refs();
-        let header = written.inputs.header();
-        let (header_span, mips) = written
-            .spans
+        let header = inputs.header();
+        let (header_span, mips) = spans
             .split_first()
             .filter(|(span, _)| span.site == MergeSpanSite::Header)
             .ok_or_else(|| io::Error::other("merged DDS header span is missing"))?;
@@ -109,9 +147,7 @@ impl RecordedMerge {
             SourceUseRole::Selector,
         )?;
         let mut output = Vec::new();
-        output
-            .try_reserve(written.spans.len())
-            .map_err(io::Error::other)?;
+        output.try_reserve(spans.len()).map_err(io::Error::other)?;
         output.push((
             OriginOutputAddress::DdsHeaderBytes {
                 end_exclusive: DecimalU64::new(header_len),
@@ -119,15 +155,15 @@ impl RecordedMerge {
             uses.origin(&[original], known(header)),
         ));
         for mip in mips {
-            output.push(mip_field(&uses, &written.inputs, header, &selector, mip)?);
+            output.push(mip_field(&uses, inputs, header, &selector, mip)?);
         }
-        let (summary, summary_inventory) = summary(header, header_len)?;
-        Ok(Self {
-            output,
-            summary,
-            summary_inventory,
-            inventory: uses.freeze().map_err(io::Error::other)?,
-        })
+        Ok((
+            Self {
+                output,
+                inventory: uses.freeze().map_err(io::Error::other)?,
+            },
+            header_len,
+        ))
     }
 }
 

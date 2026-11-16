@@ -45,10 +45,14 @@ pub(crate) fn write_replacing_before<T>(
 ) -> io::Result<T> {
     write_staged(out, protection, cancel, write, |value, staged| {
         before_publish(staged)?;
-        staged.check().map_err(protection_error)?;
-        fs::rename(staged.temporary(), out)?;
+        replace_staged(staged)?;
         Ok(StageDisposition::Moved(value))
     })
+}
+
+pub(crate) fn replace_staged(staged: &StagedOutput<'_>) -> io::Result<()> {
+    staged.check().map_err(protection_error)?;
+    fs::rename(staged.temporary(), staged.output())
 }
 
 pub(crate) enum StageDisposition<T> {

@@ -6,8 +6,8 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 use crate::{
-    ArchiveWriteProtection, CancelToken, OriginArtifactBinding, OriginArtifactDigest,
-    OriginArtifactName, OriginDigestWriter, check_protected_output,
+    ArchiveWriteProtection, CancelToken, OriginArtifactBinding, OriginArtifactName,
+    OriginDigestWriter, check_protected_output,
 };
 
 use crate::origin_file_io;
@@ -28,6 +28,8 @@ mod lock_retirement;
 mod ordinary;
 #[path = "file_receipt_publication.rs"]
 mod publication;
+#[path = "file_receipt_staged.rs"]
+mod staged;
 #[path = "file_receipt_target.rs"]
 mod target_path;
 
@@ -41,13 +43,19 @@ mod tests;
 pub use directory::{DirectoryCommit, DirectoryReceipt};
 use directory_table::ReplacementPath;
 use header::ReceiptOwner;
+pub(crate) use lock::is_origin_lock_name;
 use lock::{Contention, ReceiptLock, invalid, protection_error, regular_file};
-pub(crate) use ordinary::OrdinaryReplacement;
+pub(crate) use ordinary::{OrdinaryReplacement, retained_lock_failure};
 pub use publication::FilePublication;
+pub(crate) use staged::StagedReceiptPublication;
 use target_path::{BindTarget, TargetLeaf, bind_target, lexical_receipt, sibling_receipt, target};
 
-const COMPANION_SUFFIX: &str = ".p4kx-origin.jsonl";
+pub(crate) const COMPANION_SUFFIX: &str = ".p4kx-origin.jsonl";
 const DIRECTORY_NAME: &str = COMPANION_SUFFIX;
+
+pub(crate) fn companion_path(artifact: &Path) -> io::Result<PathBuf> {
+    sibling_receipt(artifact)
+}
 
 /// Bound file paths and guard policy for one ordinary artifact publication.
 pub struct FileReceipt<'source> {
@@ -85,20 +93,36 @@ impl<'source> FileReceipt<'source> {
         receipt_protection: Option<&'source ArchiveWriteProtection>,
         cancel: CancelToken,
     ) -> io::Result<Self> {
-        let binding = Self::bind(
+        Self::bind(
             output,
             protection,
             receipt_protection,
             cancel,
             BindTarget::Receipt,
-        )?;
-        check(
-            &binding.receipt,
-            binding.receipt_protection,
-            &binding.cancel,
-        )?;
-        regular_file(&binding.receipt)?;
-        Ok(binding)
+        )?
+        .check_companion_target()
+    }
+
+    /// Binds a planned staged replacement whose existing leaf may be a link.
+    pub(crate) fn for_staged_replacement(
+        output: &Path,
+        protection: Option<&'source ArchiveWriteProtection>,
+        cancel: CancelToken,
+    ) -> io::Result<Self> {
+        Self::bind(
+            output,
+            protection,
+            protection,
+            cancel,
+            BindTarget::Replacement,
+        )?
+        .check_companion_target()
+    }
+
+    fn check_companion_target(self) -> io::Result<Self> {
+        check(&self.receipt, self.receipt_protection, &self.cancel)?;
+        regular_file(&self.receipt)?;
+        Ok(self)
     }
 
     fn bind(
@@ -167,25 +191,6 @@ impl<'source> FileReceipt<'source> {
             describe(writer, binding, &result)
         })?;
         Ok(result)
-    }
-
-    fn publish_companion(
-        &self,
-        held: &ReceiptLock,
-        digest: OriginArtifactDigest,
-        describe: impl FnOnce(&mut dyn Write, &OriginArtifactBinding) -> io::Result<()>,
-    ) -> io::Result<()> {
-        let binding = OriginArtifactBinding::File {
-            path: self.artifact_name.clone(),
-            digest,
-        };
-        origin_file_io::write_replacing_before(
-            &self.receipt,
-            self.receipt_protection,
-            Some(&self.cancel),
-            |writer| describe(writer, &binding),
-            |_| held.check(&self.cancel),
-        )
     }
 
     fn acquire(&self, contention: Contention) -> io::Result<ReceiptLock> {
