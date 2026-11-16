@@ -39,6 +39,7 @@ const CATALOG_PHASES: &[&str] = &[
     "project-blueprint-tables",
     "resolve-cargo-capacities",
     "project-facility-loadouts",
+    "project-facility-interiors",
     "project-resource-topology",
     "project-starmap-placements",
     "export-health",
