@@ -2,9 +2,11 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use crate::positioned_record::ValueSlot;
+use crate::positioned_reference_members::DanglingReferenceMember;
 use crate::{
     DataForgeError, DataType, Field, PositionedRecord, PositionedReferenceSources,
-    PositionedSources, RecordJsonBytes, RecordJsonSource, StructValue, Value,
+    PositionedSources, RecordJsonBytes, RecordJsonReferenceSources, RecordJsonSource, StructValue,
+    Value, ValueError,
 };
 
 /// The canonical fields and original slots of one admitted structure.
@@ -151,6 +153,23 @@ impl<'record, 'source> PositionedValue<'record, 'source> {
             return None;
         };
         PositionedReferenceSources::capture(self.record, self.slot, reference)
+    }
+
+    /// Returns the original contributors to a dangling Reference error.
+    #[must_use]
+    pub fn dangling_reference_error_sources(&self) -> Option<RecordJsonReferenceSources> {
+        match self.value {
+            Value::Error(ValueError::DanglingReference { .. })
+                if self.slot.data_type == DataType::Reference =>
+            {
+                Some(RecordJsonReferenceSources::dangling(
+                    self.record,
+                    Some(self.slot),
+                    DanglingReferenceMember::Error,
+                ))
+            }
+            _ => None,
+        }
     }
 
     /// Returns the actual array count and first element words for an array or its element.

@@ -5,7 +5,7 @@ use std::io;
 
 use p4kx_dataforge::{
     DataForge, DataForgeError, Guid, JsonLayout, RecordJson, RecordJsonObserver, RecordJsonSource,
-    RecordJsonStep, StructValue, TreeBuilder, Value,
+    RecordJsonStep, RecordJsonUse, StructValue, TreeBuilder, Value,
 };
 use serde_json::Value as JsonValue;
 use thiserror::Error;
@@ -224,18 +224,16 @@ impl<'a> Capture<'a> {
             fields: FieldOrigins::new(),
         })
     }
-}
 
-impl RecordJsonObserver for Capture<'_> {
-    fn value(
+    fn record(
         &mut self,
         pointer: &str,
-        sources: &[RecordJsonSource<'_>],
+        locations: impl IntoIterator<Item = Option<RecordJsonLocation>>,
         mut complete: bool,
     ) -> io::Result<()> {
         let mut uses = self.identity.to_vec();
-        for source in sources {
-            if let Some(located) = RecordJsonLocation::of(*source) {
+        for location in locations {
+            if let Some(located) = location {
                 uses.push(
                     self.scope
                         .at(located.location, located.role)
@@ -249,5 +247,33 @@ impl RecordJsonObserver for Capture<'_> {
         self.fields
             .insert(FieldPath::parse(pointer).map_err(io::Error::other)?, origin)
             .map_err(io::Error::other)
+    }
+}
+
+impl RecordJsonObserver for Capture<'_> {
+    fn value(
+        &mut self,
+        pointer: &str,
+        sources: &[RecordJsonSource<'_>],
+        complete: bool,
+    ) -> io::Result<()> {
+        self.record(
+            pointer,
+            sources.iter().copied().map(RecordJsonLocation::of),
+            complete,
+        )
+    }
+
+    fn reference_value(
+        &mut self,
+        pointer: &str,
+        sources: &[RecordJsonUse],
+        complete: bool,
+    ) -> io::Result<()> {
+        self.record(
+            pointer,
+            sources.iter().map(RecordJsonLocation::of_use),
+            complete,
+        )
     }
 }

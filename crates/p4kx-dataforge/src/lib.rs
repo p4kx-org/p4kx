@@ -42,6 +42,7 @@ mod nested;
 mod pointer_offsets;
 mod positioned_record;
 mod positioned_reference;
+mod positioned_reference_members;
 mod positioned_sites;
 mod positioned_sources;
 mod probe;
@@ -100,13 +101,14 @@ pub use header::{SNIFF_LEN, SUPPORTED_VERSIONS, looks_like_dataforge};
 pub use issues::{DataForgeIssue, MAX_DATAFORGE_ISSUES};
 pub use json::{
     JsonLayout, RecordJson, RecordJsonBytes, RecordJsonObserver, RecordJsonRecordField,
-    RecordJsonSource, RecordJsonStep,
+    RecordJsonSource, RecordJsonStep, RecordJsonUse, RecordJsonUseRole,
 };
 pub use kinds::{DataType, ValueKind};
 pub use location::{Location, Step};
 pub use nested::{Reference, StructValue};
 pub use positioned_record::PositionedRecord;
 pub use positioned_reference::PositionedReferenceSources;
+pub use positioned_reference_members::{RecordJsonReferenceMember, RecordJsonReferenceSources};
 pub use positioned_sites::{PositionedFields, PositionedValue};
 pub use positioned_sources::PositionedSources;
 pub use probe::PointerProbe;

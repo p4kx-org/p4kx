@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_dataforge::{RecordJsonBytes, RecordJsonRecordField, RecordJsonSource};
+use p4kx_dataforge::{
+    RecordJsonBytes, RecordJsonRecordField, RecordJsonSource, RecordJsonUse, RecordJsonUseRole,
+};
 
 use crate::{SourceLocation, SourceUseRole};
 
@@ -54,6 +56,26 @@ impl RecordJsonLocation {
                 ))
             }
             RecordJsonSource::Bytes { start, end, kind } => Self::bytes(start, end, kind),
+            _ => None,
+        }
+    }
+
+    /// Resolves an observed reference contributor with its role for the emitted member.
+    #[must_use]
+    pub fn of_use(observed: &RecordJsonUse) -> Option<Self> {
+        let role = Self::use_role(observed.role)?;
+        let mut located = Self::of(observed.source)?;
+        located.role = role;
+        Some(located)
+    }
+
+    /// Maps the contribution role assigned by the Record JSON observer.
+    #[must_use]
+    pub const fn use_role(role: RecordJsonUseRole) -> Option<SourceUseRole> {
+        match role {
+            RecordJsonUseRole::Payload => Some(SourceUseRole::Payload),
+            RecordJsonUseRole::Selector => Some(SourceUseRole::Selector),
+            RecordJsonUseRole::Conversion => Some(SourceUseRole::Conversion),
             _ => None,
         }
     }

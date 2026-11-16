@@ -15,5 +15,8 @@ mod subtree;
 mod tasks;
 
 pub use record_json::{JsonLayout, RecordJson};
-pub use source::{RecordJsonBytes, RecordJsonObserver, RecordJsonRecordField, RecordJsonSource};
+pub use source::{
+    RecordJsonBytes, RecordJsonObserver, RecordJsonRecordField, RecordJsonSource, RecordJsonUse,
+    RecordJsonUseRole,
+};
 pub use subtree::RecordJsonStep;

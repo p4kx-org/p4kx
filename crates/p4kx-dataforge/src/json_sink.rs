@@ -4,9 +4,13 @@
 use std::io::{self, Write};
 
 use crate::positioned_record::ValueSlot;
-use crate::{Annotations, RecordTree, Reference, Resolution, StructValue, Value};
+use crate::positioned_reference_members::DanglingReferenceMember;
+use crate::{
+    Annotations, PositionedReferenceSources, RecordJsonReferenceMember, RecordTree, Reference,
+    Resolution, StructValue, Value, ValueError,
+};
 
-use super::observation::{Observation, ReferenceMember};
+use super::observation::Observation;
 use super::source::RecordJsonRecordField;
 use crate::{json_text, texts, value_json};
 
@@ -124,25 +128,37 @@ pub(super) fn leaf<'source, Writer: Write>(
     match value {
         Value::Reference(value) => reference(out, value, slot, depth),
         Value::Null => out.sink.write_all(b"null"),
-        Value::Error(error) => {
-            out.sink.write_all(b"{")?;
-            out.key(true, depth + 1, "error")?;
-            value_json::write_json_string(out.sink, &error.to_string())?;
-            if let Some(observation) = &mut out.observation {
-                observation.value(slot, None)?;
-            }
-            if let Some(guid) = error.dangling_guid() {
-                out.key(false, depth + 1, "guid")?;
-                write!(out.sink, "\"{guid}\"")?;
-                if let Some(observation) = &mut out.observation {
-                    observation.value(slot, None)?;
-                }
-            }
-            out.close(depth, b"}")
-        }
+        Value::Error(error) => error_value(out, error, slot, depth),
         Value::Locale(key) => locale(out, key, depth),
         scalar => value_json::write_json_value(out.sink, scalar),
     }
+}
+
+fn error_value<'source, Writer: Write>(
+    out: &mut Out<'_, 'source, Writer>,
+    error: &ValueError,
+    slot: Option<ValueSlot<'source>>,
+    depth: usize,
+) -> io::Result<()> {
+    let dangling = error.dangling_guid();
+    out.sink.write_all(b"{")?;
+    out.key(true, depth + 1, "error")?;
+    value_json::write_json_string(out.sink, &error.to_string())?;
+    if let Some(observation) = &mut out.observation {
+        if dangling.is_some() {
+            observation.dangling_reference(slot, DanglingReferenceMember::Error)?;
+        } else {
+            observation.value(slot, None)?;
+        }
+    }
+    if let Some(guid) = dangling {
+        out.key(false, depth + 1, "guid")?;
+        write!(out.sink, "\"{guid}\"")?;
+        if let Some(observation) = &mut out.observation {
+            observation.dangling_reference(slot, DanglingReferenceMember::Guid)?;
+        }
+    }
+    out.close(depth, b"}")
 }
 
 fn locale<Writer: Write>(out: &mut Out<'_, '_, Writer>, key: &str, depth: usize) -> io::Result<()> {
@@ -168,20 +184,25 @@ fn reference<'source, Writer: Write>(
     slot: Option<ValueSlot<'source>>,
     depth: usize,
 ) -> io::Result<()> {
+    let sources = out
+        .observation
+        .as_ref()
+        .and_then(|observation| observation.reference_sources(slot, reference));
+    let sources = sources.as_ref();
     out.sink.write_all(b"{")?;
     out.key(true, depth + 1, "guid")?;
     write!(out.sink, "\"{}\"", reference.guid())?;
-    observe_link(out, reference, slot, ReferenceMember::Guid)?;
+    observe_link(out, sources, RecordJsonReferenceMember::Guid)?;
     out.key(false, depth + 1, "path")?;
     value_json::write_json_string(out.sink, reference.record_path())?;
-    observe_link(out, reference, slot, ReferenceMember::Path)?;
+    observe_link(out, sources, RecordJsonReferenceMember::Path)?;
     out.key(false, depth + 1, "type")?;
     value_json::write_json_string(out.sink, reference.type_name())?;
-    observe_link(out, reference, slot, ReferenceMember::Type)?;
+    observe_link(out, sources, RecordJsonReferenceMember::Type)?;
     if let Some(location) = reference.location() {
         out.key(false, depth + 1, "at")?;
         value_json::write_json_string(out.sink, location.as_str())?;
-        observe_link(out, reference, slot, ReferenceMember::InstancePath)?;
+        observe_link(out, sources, RecordJsonReferenceMember::InstancePath)?;
     }
     if let Some(path) = out.annotations.tag_path(reference) {
         out.key(false, depth + 1, "tag")?;
@@ -190,14 +211,13 @@ fn reference<'source, Writer: Write>(
     out.close(depth, b"}")
 }
 
-fn observe_link<'source, Writer: Write>(
-    out: &mut Out<'_, 'source, Writer>,
-    reference: &Reference<'source>,
-    slot: Option<ValueSlot<'source>>,
-    member: ReferenceMember,
+fn observe_link<Writer: Write>(
+    out: &mut Out<'_, '_, Writer>,
+    sources: Option<&PositionedReferenceSources>,
+    member: RecordJsonReferenceMember,
 ) -> io::Result<()> {
     if let Some(observation) = &mut out.observation {
-        observation.reference(slot, reference, member)?;
+        observation.reference(sources, member)?;
     }
     Ok(())
 }

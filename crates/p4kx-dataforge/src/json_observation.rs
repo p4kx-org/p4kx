@@ -5,7 +5,11 @@ use std::fmt::Write as _;
 use std::io;
 
 use crate::positioned_record::ValueSlot;
-use crate::{PositionedRecord, PositionedSources, Reference, StructValue, Value};
+use crate::positioned_reference_members::DanglingReferenceMember;
+use crate::{
+    PositionedRecord, PositionedReferenceSources, PositionedSources, RecordJsonReferenceMember,
+    RecordJsonReferenceSources, RecordJsonUse, Reference, StructValue, Value,
+};
 
 use super::source::{RecordJsonBytes, RecordJsonObserver, RecordJsonRecordField, RecordJsonSource};
 
@@ -176,57 +180,47 @@ impl<'observer, 'source> Observation<'observer, 'source> {
         Ok(())
     }
 
-    pub(super) fn reference(
-        &mut self,
+    pub(super) fn reference_sources(
+        &self,
         slot: Option<ValueSlot<'source>>,
         reference: &Reference<'_>,
-        member: ReferenceMember,
+    ) -> Option<PositionedReferenceSources> {
+        PositionedReferenceSources::capture(self.input, slot?, reference)
+    }
+
+    pub(super) fn reference(
+        &mut self,
+        sources: Option<&PositionedReferenceSources>,
+        member: RecordJsonReferenceMember,
     ) -> io::Result<()> {
-        let (mut sources, complete) = self.slot(slot, None);
-        let original = reference.original_target();
-        let index = original.record_index();
-        match member {
-            ReferenceMember::Guid => sources.push(RecordJsonSource::Record {
-                index,
-                field: RecordJsonRecordField::Guid,
-            }),
-            ReferenceMember::Path => {
-                sources.push(RecordJsonSource::Record {
-                    index,
-                    field: RecordJsonRecordField::FileName,
-                });
-                let original_name = original
-                    .record()
-                    .and_then(|record| record.stored_file_name())
-                    .map_err(io::Error::other)?;
-                sources.extend(self.bytes(Some(original_name.as_bytes()), RecordJsonBytes::Text));
-            }
-            ReferenceMember::Type | ReferenceMember::InstancePath => {
-                if let Some(ordinals) = original.instance_positions() {
-                    sources.push(RecordJsonSource::InstancePath {
-                        record: index,
-                        ordinals,
-                    });
-                    sources.extend(self.bytes(
-                        Some(reference.type_name().as_bytes()),
-                        RecordJsonBytes::Text,
-                    ));
-                } else {
-                    let structure = original
-                        .record()
-                        .and_then(|record| record.struct_type())
-                        .map_err(io::Error::other)?;
-                    sources.push(RecordJsonSource::Record {
-                        index,
-                        field: RecordJsonRecordField::Struct,
-                    });
-                    sources.push(RecordJsonSource::StructName {
-                        index: structure.index(),
-                    });
-                }
-            }
+        let local = sources.map_or_else(RecordJsonReferenceSources::unavailable, |sources| {
+            sources.member(member)
+        });
+        self.emit_reference(&local)
+    }
+
+    pub(super) fn dangling_reference(
+        &mut self,
+        slot: Option<ValueSlot<'source>>,
+        member: DanglingReferenceMember,
+    ) -> io::Result<()> {
+        let local = RecordJsonReferenceSources::dangling(self.input, slot, member);
+        self.emit_reference(&local)
+    }
+
+    fn emit_reference(&mut self, local: &RecordJsonReferenceSources) -> io::Result<()> {
+        if self.selection.sources().is_empty() && self.nested.is_empty() {
+            return self.observer.reference_value(
+                &self.pointer,
+                local.sources(),
+                local.complete() && self.selection.complete(),
+            );
         }
-        self.emit(&sources, complete)
+        let mut uses = Vec::new();
+        let complete = self.append_routes(&mut uses, RecordJsonUse::selection) && local.complete();
+        uses.extend_from_slice(local.sources());
+        self.observer
+            .reference_value(&self.pointer, &uses, complete)
     }
 
     fn slot(
@@ -253,30 +247,36 @@ impl<'observer, 'source> Observation<'observer, 'source> {
     }
 
     fn emit(&mut self, sources: &[RecordJsonSource<'_>], complete: bool) -> io::Result<()> {
-        let mut complete = complete && self.selection.complete();
-        let selected = self.selection.sources();
-        if selected.is_empty() && self.nested.is_empty() {
-            return self.observer.value(&self.pointer, sources, complete);
+        if self.selection.sources().is_empty() && self.nested.is_empty() {
+            return self.observer.value(
+                &self.pointer,
+                sources,
+                complete && self.selection.complete(),
+            );
         }
-        let mut inputs = selected.to_vec();
-        for route in &self.nested {
-            inputs.extend_from_slice(route.selection.sources());
-            complete &= route.selection.complete();
-        }
+        let mut inputs = Vec::new();
+        let complete = self.append_routes(&mut inputs, |source| source) && complete;
         inputs.extend_from_slice(sources);
         self.observer.value(&self.pointer, &inputs, complete)
+    }
+
+    fn append_routes<T>(
+        &self,
+        inputs: &mut Vec<T>,
+        use_source: impl Fn(RecordJsonSource<'static>) -> T,
+    ) -> bool {
+        let selections = std::iter::once(&self.selection)
+            .chain(self.nested.iter().map(|route| &route.selection));
+        let mut complete = true;
+        for selection in selections {
+            complete &= selection.complete();
+            inputs.extend(selection.sources().iter().copied().map(&use_source));
+        }
+        complete
     }
 }
 
 struct Route {
     depth: usize,
     selection: PositionedSources,
-}
-
-#[derive(Clone, Copy)]
-pub(super) enum ReferenceMember {
-    Guid,
-    Path,
-    Type,
-    InstancePath,
 }

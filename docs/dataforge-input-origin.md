@@ -110,6 +110,15 @@ The `dataforgeDecodedBytes` location `pointerSelector` gives the half-open range
 The selected scalar contributes its own storage bytes as payload. This distinction also
 applies to the storage facts for a structure's generated `$type` member.
 
+The GUID of a stored Reference uses its original 16 GUID bytes as payload. Those bytes
+act as a selector for the target path and type. A weak pointer's original locator
+selects its target, and the owning Record supplies the emitted GUID. An owned target's
+members retain the actual layout and array selectors used to resolve the instance.
+Its `at` value also cites the property names used to render the path. An unresolved
+stored Reference retains the original GUID contribution and reports incomplete
+evidence for its resolution error. For a Reference in an array, the original header
+selects the element, and the GUID bytes contribute to the error text.
+
 ## Observed loadout documents
 
 `LoadoutFiles::read_observed` returns one `LoadoutFileRead` pairing its actual bytes or

@@ -141,6 +141,48 @@ fn a_dangling_reference_keeps_the_caller_word_with_an_incomplete_error() -> Test
     Ok(())
 }
 
+#[test]
+fn a_dangling_reference_element_uses_the_array_header_as_selector() -> TestResult {
+    let make = |value| {
+        DataForgeBuilder::new()
+            .structure(TestStruct::new("Owner").array("links", TestType::Reference))
+            .record(
+                TestRecord::new(1, "Owner", "Owner.One", "owner.xml")
+                    .value("links", TestValue::Array(vec![value])),
+            )
+            .build()
+    };
+    let before = make(TestValue::Null);
+    let after = make(TestValue::Reference(77));
+    let (doc, _) = reports(&before, &after)?;
+    let link = field_path(&doc, "links[0]")?;
+    let path = format!("{link}/new/value");
+    assert_eq!(
+        doc.pointer(&path),
+        Some(&json!(
+            "the Reference refers to the Record 00000000-0000-0000-0000-00000000004d, which does not exist"
+        )),
+        "the original error message is preserved"
+    );
+    let evidence = uses_at(&doc, &path, None, false)?;
+    let (_, header) = raw_bytes(&after, &evidence, "arrayHeader", "selector")?;
+    assert_eq!(header, [1, 0, 0, 0, 0, 0, 0, 0], "original array admission");
+    assert!(
+        evidence.iter().all(|site| {
+            site.pointer("/location/field").and_then(Value::as_str) != Some("arrayHeader")
+                || site.get("role").and_then(Value::as_str) == Some("selector")
+        }),
+        "the array header only admits the element and never spells the error"
+    );
+    let (_, guid) = raw_bytes(&after, &evidence, "arrayElement", "conversion")?;
+    assert_eq!(
+        guid,
+        [0, 0, 0, 0, 0, 0, 0, 0, 77, 0, 0, 0, 0, 0, 0, 0],
+        "exact GUID suffix used to render the original error"
+    );
+    Ok(())
+}
+
 fn reference(value: TestValue) -> Vec<u8> {
     DataForgeBuilder::new()
         .structure(TestStruct::new("Owner").field("link", TestType::Reference))

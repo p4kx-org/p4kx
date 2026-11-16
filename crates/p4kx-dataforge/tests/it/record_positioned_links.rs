@@ -9,13 +9,19 @@ use p4kx_dataforge::{
 };
 use p4kx_testkit::{DataForgeBuilder, TestInstance, TestRecord, TestStruct, TestType, TestValue};
 
+#[path = "record_positioned_links_json.rs"]
+mod observed_json;
+
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 const STORED_GUID: [u8; 16] = [0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0];
+const DANGLING_GUID: [u8; 16] = [0, 0, 0, 0, 0, 0, 0, 0, 77, 0, 0, 0, 0, 0, 0, 0];
 
 fn database() -> Vec<u8> {
     let mut requested_guid = vec![0xaa, 0xbb, 0xcc, 0xdd];
     requested_guid.extend(STORED_GUID);
+    let mut dangling_guid = vec![0xdd, 0xcc, 0xbb, 0xaa];
+    dangling_guid.extend(DANGLING_GUID);
     let node = TestType::Class("Node".to_owned());
     DataForgeBuilder::new()
         .structure(TestStruct::new("Node").field("weight", TestType::Int32))
@@ -26,8 +32,11 @@ fn database() -> Vec<u8> {
                 .field("external", TestType::WeakPointer("Node".to_owned()))
                 .field("local", TestType::WeakPointer("Node".to_owned()))
                 .array("nodes", node)
-                .array("references", TestType::Reference),
+                .array("references", TestType::Reference)
+                .field("nested", TestType::Class("LinkHolder".to_owned()))
+                .field("dangling", TestType::Reference),
         )
+        .structure(TestStruct::new("LinkHolder").field("ownedLink", TestType::Reference))
         .record(
             TestRecord::new(1, "Owner", "Owner.One", "owner.xml")
                 .value("reference", TestValue::Raw(requested_guid))
@@ -44,7 +53,14 @@ fn database() -> Vec<u8> {
                 .value(
                     "references",
                     TestValue::Array(vec![TestValue::Reference(2)]),
-                ),
+                )
+                .value(
+                    "nested",
+                    TestValue::Struct(
+                        TestInstance::new("LinkHolder").value("ownedLink", TestValue::Reference(2)),
+                    ),
+                )
+                .value("dangling", TestValue::Raw(dangling_guid)),
         )
         .record(TestRecord::new(2, "Node", "Node.Selected", "selected.xml"))
         .record(TestRecord::new(2, "Node", "Node.Decoy", "decoy.xml"))

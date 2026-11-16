@@ -10,6 +10,9 @@ use crate::forge::{AVENGER_TEXT, dataforge};
 use crate::model_item_origin_checks::{assert_all_addresses, assert_site, field, marker, uses};
 use crate::support::{Install, TestResult};
 
+#[path = "record_reference_uses.rs"]
+mod reference_uses;
+
 #[test]
 fn canonical_headers_and_leaves_keep_actual_record_and_pool_sources() -> TestResult {
     let fixture = dataforge(0, 0);
@@ -40,16 +43,8 @@ fn canonical_headers_and_leaves_keep_actual_record_and_pool_sources() -> TestRes
     ] {
         marker(field(page, &format!("records/0/{output}"))?, true);
     }
-    assert_record_site(page, "records/0/maker/guid", "guid", 0)?;
     assert_record_site(page, "records/0/$guid", "guid", 1)?;
-    assert_record_site(page, "records/0/maker/path", "fileName", 0)?;
-    assert_site(
-        page,
-        "records/0/maker/type",
-        "dataforgeStructDefinition",
-        "name",
-        &["0"],
-    )?;
+    reference_uses::direct(page, &fixture)?;
     let first = source_bytes(page, "records/0/tags/0", "arrayElement", &fixture)?;
     let second = source_bytes(page, "records/0/tags/1", "arrayElement", &fixture)?;
     assert_ne!(
@@ -149,8 +144,12 @@ fn source_bytes<'a>(
                 && site.pointer("/location/field") == Some(&json!(label))
         })
         .ok_or_else(|| format!("{output} has no original {label} span"))?;
+    source_span(span, original)
+}
+
+fn source_span<'a>(site: &Value, original: &'a [u8]) -> TestResult<&'a [u8]> {
     let at = |address: &str| -> TestResult<usize> {
-        Ok(span
+        Ok(site
             .pointer(address)
             .and_then(Value::as_str)
             .ok_or("source offset")?
@@ -158,7 +157,7 @@ fn source_bytes<'a>(
     };
     original
         .get(at("/location/indices/0")?..at("/location/indices/1")?)
-        .ok_or_else(|| format!("invalid original {label} range for {output}").into())
+        .ok_or_else(|| "invalid original source range".into())
 }
 
 #[test]
@@ -255,26 +254,7 @@ fn selected_weak_target_keeps_original_child_slot_without_the_other_child() -> T
         Some(&json!("test-tag")),
         "canonical optional header"
     );
-    assert_site(
-        page,
-        "records/0/selected/at",
-        "dataforgeOwnedInstance",
-        "path",
-        &["0", "0", "1"],
-    )?;
-    assert_site(
-        page,
-        "records/0/selected/type",
-        "dataforgeOwnedInstance",
-        "path",
-        &["0", "0", "1"],
-    )?;
-    assert!(
-        uses(page, "records/0/selected/at")?
-            .iter()
-            .all(|site| { site.pointer("/location/indices") != Some(&json!(["0", "0", "0"])) }),
-        "the other owned occurrence supplied no link target"
-    );
+    reference_uses::weak(page, &fixture)?;
     assert_eq!(
         source_bytes(page, "records/0/children/1/count", "slot", &fixture)?,
         23_i32.to_le_bytes(),
@@ -286,12 +266,7 @@ fn selected_weak_target_keeps_original_child_slot_without_the_other_child() -> T
         "the empty list still uses its stored count and first element"
     );
     assert_record_site(page, "records/0/$tag", "tag", 0)?;
-    assert!(
-        page.pointer("/records/0/invalid/guid").is_some(),
-        "original dangling link output"
-    );
-    marker(field(page, "records/0/invalid/error")?, false);
-    marker(field(page, "records/0/invalid/guid")?, false);
+    reference_uses::dangling(page, &fixture)?;
     assert_owned_pointer_origin(page, &fixture)?;
     assert_all_addresses(&response)
 }

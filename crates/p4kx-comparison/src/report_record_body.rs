@@ -57,7 +57,7 @@ impl BodyOrigins<'_> {
         operand: Option<&OperandEvidence>,
     ) -> Result<(), ReportOriginsError> {
         let kind = match operand.and_then(OperandEvidence::link) {
-            Some((route, link)) => self.origin(std::iter::once(route).chain(link.kind()))?,
+            Some((route, link)) => self.origin([route, link.kind()])?,
             _ => self.origin(
                 operand
                     .into_iter()
@@ -100,9 +100,7 @@ impl BodyOrigins<'_> {
         .chain(at)
         {
             let evidence = match operand.and_then(OperandEvidence::link) {
-                Some((route, link)) => {
-                    self.origin(std::iter::once(route).chain(link.members(member)))?
-                }
+                Some((route, link)) => self.origin([route, link.member(member)])?,
                 _ => self.uses.origin(&[], false),
             };
             put(

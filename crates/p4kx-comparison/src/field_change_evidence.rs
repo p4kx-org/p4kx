@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_dataforge::{PositionedSources, RecordJsonBytes, RecordJsonSource};
-use p4kx_extraction::SourceUseRole;
+use p4kx_dataforge::{
+    PositionedSources, RecordJsonBytes, RecordJsonReferenceSources, RecordJsonSource,
+};
+use p4kx_extraction::{RecordJsonLocation, SourceUseRole};
 
 use crate::field_diff_inputs::Nodes;
 use crate::field_reference_evidence::ReferenceEvidence;
@@ -113,7 +115,12 @@ fn capture_operand(route: &[RouteStep<'_, '_>], side: RecordSide) -> Option<Oper
     }
 
     let mut value = Coordinates::complete();
-    if !matches!(operand.value, Value::Null | Value::Reference(_)) {
+    if let Some(error) = operand
+        .site
+        .and_then(|site| site.dangling_reference_error_sources())
+    {
+        value = Coordinates::from_reference(side, &error);
+    } else if !matches!(operand.value, Value::Null | Value::Reference(_)) {
         value.observe(side, value_sources.as_ref(), |coordinate| {
             value_role(operand.value, coordinate)
         });
@@ -143,7 +150,7 @@ const fn declaration_is_enough(value: &Value<'_>) -> bool {
     )
 }
 
-pub(crate) const fn selection_role(coordinate: RecordJsonSource<'_>) -> SourceUseRole {
+const fn selection_role(coordinate: RecordJsonSource<'_>) -> SourceUseRole {
     match coordinate {
         RecordJsonSource::PropertyStorage { .. } => SourceUseRole::Conversion,
         _ => SourceUseRole::Selector,
@@ -203,6 +210,25 @@ impl Coordinates {
             uses: Vec::new(),
             complete: true,
         }
+    }
+
+    pub(crate) fn from_reference(side: RecordSide, input: &RecordJsonReferenceSources) -> Self {
+        let mut result = Self {
+            uses: Vec::with_capacity(input.sources().len()),
+            complete: input.complete(),
+        };
+        for fact in input.sources() {
+            if let Some(role) = RecordJsonLocation::use_role(fact.role) {
+                result.uses.push(Observation {
+                    side,
+                    coordinate: fact.source,
+                    role,
+                });
+            } else {
+                result.complete = false;
+            }
+        }
+        result
     }
 
     pub(crate) fn observe(

@@ -15,6 +15,52 @@ pub trait RecordJsonObserver {
         sources: &[RecordJsonSource<'_>],
         complete: bool,
     ) -> io::Result<()>;
+
+    /// Receives an emitted Reference member's original contributors and their roles.
+    ///
+    /// # Errors
+    /// Returns an error to stop emission at this value.
+    fn reference_value(
+        &mut self,
+        pointer: &str,
+        sources: &[RecordJsonUse],
+        complete: bool,
+    ) -> io::Result<()> {
+        let coordinates: Vec<_> = sources.iter().map(|input| input.source).collect();
+        self.value(pointer, &coordinates, complete)
+    }
+}
+
+/// How an original input contributes to a Reference member.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum RecordJsonUseRole {
+    /// Supplies the emitted data.
+    Payload,
+    /// Selects the original field, element, or target.
+    Selector,
+    /// Determines how to interpret or render original data.
+    Conversion,
+}
+
+/// A source coordinate and its contribution to a Reference member.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct RecordJsonUse {
+    /// Original source coordinate.
+    pub source: RecordJsonSource<'static>,
+    /// Role of that coordinate for this member.
+    pub role: RecordJsonUseRole,
+}
+
+impl RecordJsonUse {
+    pub(crate) const fn selection(source: RecordJsonSource<'static>) -> Self {
+        let role = match source {
+            RecordJsonSource::PropertyStorage { .. } => RecordJsonUseRole::Conversion,
+            _ => RecordJsonUseRole::Selector,
+        };
+        Self { source, role }
+    }
 }
 
 /// One observed input that contributes to an emitted Record JSON value.

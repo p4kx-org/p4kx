@@ -5,7 +5,7 @@ use std::io;
 
 use p4kx_extraction::{
     DataForge, DataForgeOrigin, RecordJsonLocation, RecordJsonObserver, RecordJsonSource,
-    SourceUse, SourceUseRole,
+    RecordJsonUse, SourceUse, SourceUseRole,
 };
 use serde_json::value::RawValue;
 
@@ -44,13 +44,11 @@ impl Capture {
     pub(crate) const fn minimum_wire_len(&self) -> usize {
         self.minimum_wire_len
     }
-}
 
-impl RecordJsonObserver for Capture {
-    fn value(
+    fn record(
         &mut self,
         pointer: &str,
-        sources: &[RecordJsonSource<'_>],
+        locations: impl ExactSizeIterator<Item = Option<RecordJsonLocation>>,
         complete: bool,
     ) -> io::Result<()> {
         // Each address owns a distinct JSON member, even when its source sites deduplicate.
@@ -62,16 +60,42 @@ impl RecordJsonObserver for Capture {
             ));
         }
         self.minimum_wire_len += minimum;
-        let locations: Vec<_> = sources
-            .iter()
-            .filter_map(|source| RecordJsonLocation::of(*source))
-            .collect();
+        let observed_count = locations.len();
+        let locations: Vec<_> = locations.flatten().collect();
         self.fields.push(CapturedField {
             pointer: pointer.to_owned(),
-            complete: complete && locations.len() == sources.len(),
+            complete: complete && locations.len() == observed_count,
             sources: locations,
         });
         Ok(())
+    }
+}
+
+impl RecordJsonObserver for Capture {
+    fn value(
+        &mut self,
+        pointer: &str,
+        sources: &[RecordJsonSource<'_>],
+        complete: bool,
+    ) -> io::Result<()> {
+        self.record(
+            pointer,
+            sources.iter().copied().map(RecordJsonLocation::of),
+            complete,
+        )
+    }
+
+    fn reference_value(
+        &mut self,
+        pointer: &str,
+        sources: &[RecordJsonUse],
+        complete: bool,
+    ) -> io::Result<()> {
+        self.record(
+            pointer,
+            sources.iter().map(RecordJsonLocation::of_use),
+            complete,
+        )
     }
 }
 

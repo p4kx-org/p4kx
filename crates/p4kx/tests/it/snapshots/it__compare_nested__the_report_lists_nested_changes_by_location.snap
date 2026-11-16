@@ -527,19 +527,23 @@ expression: report
       "/records/changes/0/fields/8/new/value/guid": {
         "containsEncryptedSource": false,
         "sourceUsesRefs": [
+          "u100",
           "u14",
           "u96",
-          "u97"
+          "u97",
+          "u99"
         ],
         "sourceSetComplete": true
       },
       "/records/changes/0/fields/8/new/value/record_path": {
         "containsEncryptedSource": false,
         "sourceUsesRefs": [
+          "u100",
           "u19",
           "u96",
           "u97",
-          "u98"
+          "u98",
+          "u99"
         ],
         "sourceSetComplete": true
       },
@@ -584,6 +588,8 @@ expression: report
         "sourceUsesRefs": [
           "u87",
           "u88",
+          "u90",
+          "u91",
           "u93"
         ],
         "sourceSetComplete": true
@@ -594,7 +600,9 @@ expression: report
           "u15",
           "u87",
           "u88",
-          "u89"
+          "u89",
+          "u90",
+          "u91"
         ],
         "sourceSetComplete": true
       },
