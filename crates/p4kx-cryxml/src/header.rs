@@ -7,7 +7,7 @@ use crate::error::{CryXmlError, Table};
 use crate::format::{ByteOrder, Signature};
 
 pub(crate) const NODE_LEN: usize = 28;
-const ATTRIBUTE_LEN: usize = 8;
+pub(crate) const ATTRIBUTE_LEN: usize = 8;
 const CHILD_LEN: usize = 4;
 
 /// The header of a `CryXml` file and the byte slices of its tables.
@@ -54,6 +54,11 @@ impl<'a> Header<'a> {
             strings,
             places,
         })
+    }
+
+    pub(crate) const fn render_starts(&self) -> [usize; 3] {
+        let [(_, nodes, _), (_, attributes, _), _, (_, strings, _)] = self.places;
+        [nodes, attributes, strings]
     }
 
     /// Checks that no two tables share a byte, so that what is derived from them cannot exceed a

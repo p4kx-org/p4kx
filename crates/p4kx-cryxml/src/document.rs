@@ -7,11 +7,11 @@ use std::io::{self, Write};
 use crate::element::Element;
 use crate::error::CryXmlError;
 use crate::format::{ByteOrder, Signature};
-use crate::header::{Header, NODE_LEN, Reader};
+use crate::header::{ATTRIBUTE_LEN, Header, NODE_LEN, Reader};
+use crate::render_source::RenderSource;
 use crate::strings::{Span, Strings};
 
 const NO_PARENT: u32 = u32::MAX;
-const ATTRIBUTE_LEN: usize = 8;
 
 /// A parsed `CryXml` file: a tree of elements whose strings borrow from the input.
 ///
@@ -24,6 +24,7 @@ pub struct Document<'a> {
     byte_order: ByteOrder,
     pub(crate) text: Cow<'a, str>,
     repaired_utf8: bool,
+    pub(crate) source: RenderSource<'a>,
     pub(crate) nodes: Vec<Node>,
     pub(crate) attributes: Vec<(Span, Span)>,
     pub(crate) child_starts: Vec<u32>,
@@ -57,6 +58,7 @@ pub fn parse(bytes: &[u8]) -> Result<Document<'_>, CryXmlError> {
         signature,
         byte_order: header.byte_order,
         repaired_utf8: strings.repaired_utf8(),
+        source: RenderSource::of(&header),
         text: strings.into_text(),
         nodes,
         attributes,
@@ -113,7 +115,26 @@ impl Document<'_> {
         out: W,
         observe: impl FnMut(crate::XmlWriteField) -> io::Result<()>,
     ) -> io::Result<()> {
-        crate::write::write(self, out, observe)
+        crate::write::write(
+            self,
+            out,
+            observe,
+            None::<fn(crate::XmlRenderSpan) -> io::Result<()>>,
+        )
+    }
+
+    /// Writes XML and observes original decoded-file ranges for emitted spans.
+    ///
+    /// Empty authored values have a zero-width output range. Text runs end at emitted LF.
+    ///
+    /// # Errors
+    /// Returns the first output or observation error.
+    pub fn write_xml_positioned<W: Write>(
+        &self,
+        out: W,
+        observe: impl FnMut(crate::XmlRenderSpan) -> io::Result<()>,
+    ) -> io::Result<()> {
+        crate::write::write(self, out, |_| Ok(()), Some(observe))
     }
 }
 

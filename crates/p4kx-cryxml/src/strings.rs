@@ -31,6 +31,14 @@ impl Span {
             .unwrap_or_default()
     }
 
+    pub(crate) const fn start(self) -> u32 {
+        self.start
+    }
+
+    pub(crate) const fn end(self) -> u32 {
+        self.end
+    }
+
     pub(crate) const fn is_empty(self) -> bool {
         self.start == self.end
     }

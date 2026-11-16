@@ -97,6 +97,10 @@ impl<W: Write> Tracked<W> {
         Self { inner, offset: 0 }
     }
 
+    pub(crate) const fn offset(&self) -> u64 {
+        self.offset
+    }
+
     pub(crate) fn field(
         &mut self,
         site: FieldSite,

@@ -9,6 +9,7 @@
 mod changed_value;
 mod compare;
 mod comparison;
+mod cryxml_lines;
 mod decode;
 mod entry_change;
 mod error;

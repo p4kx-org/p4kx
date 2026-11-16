@@ -2977,10 +2977,13 @@ hold the size its central directory states, or holds corrupt CryXml.
 
 The JSON adds `fieldOrigins` and `provenance`. Each line's `kind` uses the two-sided alignment.
 Its `text` points to the displayed input, with exact original byte ranges for raw text and
-UTF-16. UTF-16 also records the byte order mark. For converted CryXml text, the input Entry
-is known and the line's original subspan is explicitly unavailable. A directory size
-rejection uses only the decisive directory evidence. The proof inventory adds space
-proportional to the emitted origin paths.
+UTF-16. UTF-16 also records the byte order mark. Converted CryXml lines cite half-open ranges
+in the original decoded CryXml bytes, with named selectors for offset words and string
+boundaries and conversion ranges for the bytes used in the rendered line. Multi-line node text
+has a separate range for each emitted section. The generated XML declaration has no payload
+range. Where a structural decision has incomplete positional evidence, the line carries its
+known ranges and an explicit opaque use of the Entry. A directory size rejection uses only
+the decisive directory evidence. The comparison retains line proofs for emitted hunks.
 
 ## `p4kx cryxml <file> --out <file> --json`
 

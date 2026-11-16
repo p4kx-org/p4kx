@@ -11,4 +11,5 @@ mod source_document;
 mod source_syntax;
 mod text_depth;
 mod write_observed;
+mod write_positioned;
 mod xml;

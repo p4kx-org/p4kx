@@ -6,21 +6,25 @@ use std::str;
 
 use p4kx_extraction::{FieldOrigin, FieldOrigins, SourceUses};
 
+use crate::cryxml_lines::CryXmlLines;
 use crate::decode::DecodeOutcome;
 use crate::line_diff_side::SideOrigins;
 use crate::report_origins::{ReportOriginsError, put};
+use crate::text_diff::rendered_range;
 use crate::{Encoding, LineKind, TextDiff};
 
 pub(crate) fn write(
     fields: &mut FieldOrigins,
     text: &TextDiff,
     sides: [&SideOrigins<'_>; 2],
+    cryxml: &[CryXmlLines; 2],
     alignment: &FieldOrigin,
     uses: &SourceUses,
 ) -> Result<(), ReportOriginsError> {
     let [old_side, new_side] = sides;
-    let mut old = TextPositions::new(old_side.outcome, text.old_bytes());
-    let mut new = TextPositions::new(new_side.outcome, text.new_bytes());
+    let [old_xml, new_xml] = cryxml;
+    let mut old = TextPositions::new(old_side.outcome, text.old_bytes(), old_xml);
+    let mut new = TextPositions::new(new_side.outcome, text.new_bytes(), new_xml);
     for (hunk_index, hunk) in text.hunks().enumerate() {
         let path = format!("/hunks/{hunk_index}");
         put(fields, &path, alignment.clone())?;
@@ -31,9 +35,9 @@ pub(crate) fn write(
             let path = format!("{path}/lines/{line_index}");
             let text = match line.kind() {
                 LineKind::Context | LineKind::Removed => {
-                    old_side.line(old.original(line.bytes()), uses)?
+                    old.origin(old_side, line.bytes(), uses)?
                 }
-                LineKind::Added => new_side.line(new.original(line.bytes()), uses)?,
+                LineKind::Added => new.origin(new_side, line.bytes(), uses)?,
             };
             put(
                 fields,
@@ -50,30 +54,41 @@ pub(crate) fn write(
 struct TextPositions<'a> {
     outcome: Option<DecodeOutcome>,
     decoded: &'a [u8],
+    cryxml: &'a CryXmlLines,
     utf16_at: usize,
     original_at: u64,
 }
 
 impl<'a> TextPositions<'a> {
-    const fn new(outcome: Option<DecodeOutcome>, decoded: &'a [u8]) -> Self {
+    const fn new(
+        outcome: Option<DecodeOutcome>,
+        decoded: &'a [u8],
+        cryxml: &'a CryXmlLines,
+    ) -> Self {
         Self {
             outcome,
             decoded,
+            cryxml,
             utf16_at: 0,
             original_at: 2,
         }
     }
 
-    fn original(&mut self, line: &[u8]) -> Option<Range<u64>> {
+    fn origin(
+        &mut self,
+        side: &SideOrigins<'_>,
+        line: &[u8],
+        uses: &SourceUses,
+    ) -> Result<FieldOrigin, ReportOriginsError> {
+        let rendered = rendered_range(self.decoded, line);
         if matches!(self.outcome, Some(DecodeOutcome::Text(Encoding::CryXml(_)))) {
-            return None;
+            return side.cryxml_line(rendered.and_then(|range| self.cryxml.find(range)), uses);
         }
-        let start = line
-            .as_ptr()
-            .addr()
-            .checked_sub(self.decoded.as_ptr().addr())?;
-        let end = start.checked_add(line.len())?;
-        self.decoded.get(start..end)?;
+        side.line(rendered.and_then(|range| self.original(range)), uses)
+    }
+
+    fn original(&mut self, range: Range<usize>) -> Option<Range<u64>> {
+        let Range { start, end } = range;
         match self.outcome {
             Some(DecodeOutcome::Text(Encoding::Text)) => Some(start as u64..end as u64),
             Some(DecodeOutcome::Text(Encoding::Utf16Le | Encoding::Utf16Be)) => {

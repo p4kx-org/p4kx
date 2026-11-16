@@ -6,9 +6,10 @@ use std::ops::Range;
 use p4kx_extraction::{
     EntryDirectoryFact, EntryDirectoryOrigins, FieldOrigin, FieldOrigins, InputScope,
     SourceCoordinateOmission, SourceEvidenceError, SourceInput, SourceLocation, SourceScope,
-    SourceUseRole, SourceUses,
+    SourceUse, SourceUseRole, SourceUses,
 };
 
+use crate::cryxml_lines::CryXmlLine;
 use crate::decode::{DecodeOutcome, LimitSource};
 use crate::line_diff::LineInput;
 use crate::report_origins::{ReportOriginsError, put};
@@ -117,8 +118,48 @@ impl<'archive> SideOrigins<'archive> {
         ) {
             facts.push(payload.at(entry_range(0..2, "byteOrderMark"), SourceUseRole::Selector)?);
         }
+        self.line_origin(&facts, uses)
+    }
+
+    pub(crate) fn cryxml_line(
+        &self,
+        evidence: Option<&CryXmlLine>,
+        uses: &SourceUses,
+    ) -> Result<FieldOrigin, ReportOriginsError> {
+        let payload = self
+            .payload
+            .as_ref()
+            .ok_or(SourceEvidenceError::ForeignEvidence)?;
+        let mut facts = Vec::new();
+        if let Some(line) = evidence {
+            for fact in &line.facts {
+                let role = if fact.kind().is_selector() {
+                    SourceUseRole::Selector
+                } else {
+                    SourceUseRole::Conversion
+                };
+                facts.push(payload.at(
+                    entry_range(fact.range().clone(), fact.kind().as_str()),
+                    role,
+                )?);
+            }
+        }
+        if !evidence.is_some_and(CryXmlLine::complete) {
+            facts.push(payload.at_opaque(
+                SourceUseRole::Conversion,
+                SourceCoordinateOmission::Unavailable,
+            )?);
+        }
+        self.line_origin(&facts, uses)
+    }
+
+    fn line_origin(
+        &self,
+        facts: &[SourceUse],
+        uses: &SourceUses,
+    ) -> Result<FieldOrigin, ReportOriginsError> {
         let body = uses.origin(
-            &facts,
+            facts,
             self.directory
                 .as_ref()
                 .is_some_and(EntryDirectoryOrigins::complete),

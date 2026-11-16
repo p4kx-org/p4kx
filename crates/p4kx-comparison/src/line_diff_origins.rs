@@ -41,7 +41,14 @@ pub(crate) fn capture(diff: &LineDiff<'_>) -> Result<ReportOriginFields, ReportO
     put(&mut fields, "/content", content.clone())?;
     put(&mut fields, "/hunks", content.clone())?;
     if let DiffBody::Text(text) = diff.body() {
-        line_diff_hunks::write(&mut fields, text, [&old, &new], &content, &uses)?;
+        line_diff_hunks::write(
+            &mut fields,
+            text,
+            [&old, &new],
+            diff.cryxml_lines(),
+            &content,
+            &uses,
+        )?;
     }
     ReportOriginFields::finish(fields, &uses)
 }
