@@ -3,6 +3,7 @@
 
 use std::collections::HashMap;
 use std::hash::Hash;
+use std::mem;
 
 use crate::collected::Collected;
 use crate::digest::Digest;
@@ -45,25 +46,34 @@ fn normalised(path: &str) -> Box<str> {
 }
 
 impl Collected<'_> {
+    /// Moves the ship variant keys out of the vehicle facts used for paints.
+    pub(crate) fn take_ship_variant_keys(&mut self) -> HashMap<CatalogGuid, ShipKey> {
+        mem::take(&mut self.vehicles)
+            .into_iter()
+            .filter_map(|vehicle| Some((vehicle.ship, vehicle.variant_key?)))
+            .collect()
+    }
+
     /// Sets `variant_of` of the ships and the items that belong to a variant group and returns the
     /// counts.
-    pub(crate) fn group_variants(&mut self) -> VariantSummary {
-        let keys: HashMap<CatalogGuid, &ShipKey> = self
-            .vehicles
-            .iter()
-            .filter_map(|vehicle| Some((vehicle.ship, vehicle.variant_key.as_ref()?)))
-            .collect();
-        let candidates: Vec<Candidate<'_, &ShipKey>> = self
-            .ships
-            .iter()
-            .map(|ship| Candidate {
-                guid: ship.guid,
-                class_name: ship.class_name,
-                playability: ship.playability,
-                key: keys.get(&ship.guid).copied(),
-            })
-            .collect();
-        let (bases, counts) = group(&candidates);
+    pub(crate) fn group_variants(
+        &mut self,
+        ship_keys: HashMap<CatalogGuid, ShipKey>,
+    ) -> VariantSummary {
+        let (bases, counts) = {
+            let candidates: Vec<Candidate<'_, &ShipKey>> = self
+                .ships
+                .iter()
+                .map(|ship| Candidate {
+                    guid: ship.guid,
+                    class_name: ship.class_name,
+                    playability: ship.playability,
+                    key: ship_keys.get(&ship.guid),
+                })
+                .collect();
+            group(&candidates)
+        };
+        drop(ship_keys);
         for (ship, base) in self.ships.iter_mut().zip(bases) {
             ship.variant_of = base;
         }

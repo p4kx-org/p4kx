@@ -82,9 +82,10 @@ fn assemble<R>(
     )?;
     let (tags, paint_tags) = add_tags(&forge, &input, options, &mut collected)?;
     let paint_summary = add_paints(paint_tags, &mut collected, options.cancel)?;
+    let ship_variant_keys = collected.take_ship_variant_keys();
     run.begin(CatalogStage::ResolveLoadouts);
     let loadout_summary = add_loadouts(&files, &entities, &mut collected, &input, options.cancel)?;
-    let variants = collected.group_variants();
+    let variants = collected.group_variants(ship_variant_keys);
     let starmap_summary = scanning::project_locations(
         archive,
         &mut placements,
