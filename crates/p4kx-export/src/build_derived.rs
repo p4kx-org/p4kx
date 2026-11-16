@@ -10,7 +10,7 @@ use p4kx_extraction::{Archive, CancelToken, DataForge, Guid};
 use crate::broker_entry_read::BrokerEntries;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_projection::CatalogProjection;
-use crate::catalog_v3::tag_catalog::{CapturedTags, TagDependencies};
+use crate::catalog_v3::tag_catalog::{CapturedTags, TagConsumers, TagDependencies};
 use crate::collected::Collected;
 use crate::contract_loadout::EntityKind;
 use crate::contract_template_read::ContractTemplates;
@@ -18,7 +18,7 @@ use crate::crafter_hosts::link_hosts;
 use crate::crafting_warning::CraftingWarning;
 use crate::loadout::{Wanted, loadouts};
 use crate::missions;
-use crate::paint::paints;
+use crate::paint::{is_paint, paints};
 use crate::{CatalogError, CatalogOptions, Kind, LoadoutSummary, PaintSummary};
 
 /// The captured tag inputs used by the mission projection.
@@ -33,19 +33,33 @@ pub(crate) fn add_tags<'context, 'source>(
     input: &'context OriginalCatalogInput<'context, 'source>,
     options: &CatalogOptions<'_>,
     collected: &mut Collected<'source>,
-) -> Result<MissionTags<'context, 'source>, CatalogError> {
-    let need_mission_tags =
-        crate::mission_index::MissionIndex::needs_index(forge, options.filter, options.cancel)?;
-    let mut tags =
-        crate::catalog_v3::tag_catalog::read(forge, input, options.cancel, need_mission_tags)?;
+) -> Result<
+    (
+        MissionTags<'context, 'source>,
+        Option<TagDependencies<'source>>,
+    ),
+    CatalogError,
+> {
+    let consumers = TagConsumers {
+        contracts: crate::mission_index::MissionIndex::needs_index(
+            forge,
+            options.filter,
+            options.cancel,
+        )?,
+        paints: collected.items.iter().any(is_paint),
+    };
+    let mut tags = crate::catalog_v3::tag_catalog::read(forge, input, options.cancel, consumers)?;
     tags.rows.entity_tags = std::mem::take(&mut collected.tags.entity_tags);
     collected.tags = tags.rows;
     collected.ledger.merge(tags.ledger);
     collected.add_failures(tags.failures);
-    Ok(MissionTags {
-        context: tags.context,
-        dependencies: tags.dependencies,
-    })
+    Ok((
+        MissionTags {
+            context: tags.context,
+            dependencies: tags.dependencies,
+        },
+        tags.paint_dependencies,
+    ))
 }
 
 /// Reads the contracts and sub contracts into `collected`.
@@ -106,14 +120,12 @@ pub(crate) fn add_contracts<'f>(
 ///
 /// Returns [`CatalogError::Cancelled`] once `cancel` is cancelled.
 pub(crate) fn add_paints<'f>(
-    forge: &'f DataForge<'f>,
-    input: &OriginalCatalogInput<'_, 'f>,
+    tags: Option<TagDependencies<'f>>,
     collected: &mut Collected<'f>,
     cancel: Option<&CancelToken>,
 ) -> Result<PaintSummary, CatalogError> {
     let derived = paints(
-        forge,
-        input,
+        tags,
         &collected.items,
         &collected.vehicles,
         &collected.ledger,

@@ -3,20 +3,25 @@
 
 use std::collections::{HashMap, HashSet};
 
-use p4kx_extraction::{CancelToken, DataForge, TagTree};
+use p4kx_extraction::{CancelToken, TagTree};
 use rayon::prelude::*;
 
-use crate::build::original_input::OriginalCatalogInput;
+use crate::catalog_v3::tag_catalog::TagDependencies;
 use crate::contract::{Item, Paint};
 use crate::guid_text::CatalogGuid;
 use crate::paint_port::{PaintPort, VehicleFacts};
-use crate::{CatalogError, PaintSummary};
+use crate::{CatalogError, ExportAccountingError, PaintSummary};
 
 const PAINT_TYPE: &str = "Paints";
 
 /// Returns whether `kind` is the `AttachDef.Type` of a paint, ignoring ASCII case.
 pub(crate) const fn is_paint_type(kind: &str) -> bool {
     kind.eq_ignore_ascii_case(PAINT_TYPE)
+}
+
+/// Returns whether the selected item is a paint.
+pub(crate) fn is_paint(item: &Item<'_>) -> bool {
+    item.r#type.is_some_and(is_paint_type)
 }
 
 /// The paints of a catalog and what was counted deriving them.
@@ -41,19 +46,18 @@ pub(crate) struct Paints<'f> {
 ///
 /// Returns [`CatalogError::Cancelled`] once `cancel` is cancelled.
 pub(crate) fn paints<'f>(
-    forge: &'f DataForge<'f>,
-    input: &OriginalCatalogInput<'_, 'f>,
+    tags: Option<TagDependencies<'f>>,
     items: &[Item<'_>],
     vehicles: &[VehicleFacts],
     sources: &crate::export_ledger::ExportLedger,
     cancel: Option<&CancelToken>,
 ) -> Result<Paints<'f>, CatalogError> {
-    let candidates: Vec<&Item<'_>> = items
-        .iter()
-        .filter(|item| item.r#type.is_some_and(is_paint_type))
-        .collect();
+    let candidates: Vec<&Item<'_>> = items.iter().filter(|item| is_paint(item)).collect();
     let mut ledger = crate::paint_ledger::inputs(sources, &candidates, vehicles)?;
-    if candidates.is_empty() {
+    if candidates.is_empty() != tags.is_none() {
+        return Err(ExportAccountingError::ConflictingTagTrace.into());
+    }
+    let Some(tags) = tags else {
         return Ok(Paints {
             ledger,
             failures: Vec::new(),
@@ -61,14 +65,13 @@ pub(crate) fn paints<'f>(
             summary: PaintSummary::default(),
             unreadable_files: Vec::new(),
         });
-    }
+    };
     let (groups, mut unreadable_files) = group_ships(vehicles);
     let unreadable = unreadable_files.len();
     unreadable_files.sort_unstable();
     unreadable_files.dedup();
-    let tags = crate::export_tag_read::read(forge, crate::Kind::Paints, Some(input), cancel)?;
     ledger.merge(tags.ledger);
-    let index = TagIndex::new(&tags.tree);
+    let index = TagIndex::new(tags.tree.tree());
     let mut paints: Vec<Paint> = candidates
         .par_iter()
         .map(|item| {

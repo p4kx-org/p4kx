@@ -21,8 +21,8 @@ mod path_capture;
 mod path_row;
 
 pub(crate) use capture::{
-    CapturedTagTree, CapturedTags, ContextualTagPath, OriginalTagPath, TagDatum, TagDependencies,
-    TagNameSelector, TagPathLookup, TagPathMeaning, read,
+    CapturedTagTree, CapturedTags, ContextualTagPath, OriginalTagPath, TagConsumers, TagDatum,
+    TagDependencies, TagNameSelector, TagPathLookup, TagPathMeaning, read,
 };
 pub(crate) use contract::{EntityTags, TagDefinition, TagRoots, TagRows};
 pub(crate) use entities::read as entity;

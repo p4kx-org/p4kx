@@ -93,7 +93,7 @@ pub(super) fn selected<'input>(
     forge: &'input DataForge<'input>,
     input: &'input OriginalCatalogInput<'input, 'input>,
 ) -> TestResult<TagInputs> {
-    let captured = tag_catalog::read(forge, input, None, false)?;
+    let captured = tag_catalog::read(forge, input, None, tag_catalog::TagConsumers::default())?;
     assert_eq!(
         captured.context.tree().len(),
         TAGS,

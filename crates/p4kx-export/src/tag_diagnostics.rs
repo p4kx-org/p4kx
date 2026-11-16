@@ -18,23 +18,14 @@ pub(super) fn relation(
     ledger: &mut ExportLedger,
     admission: &RecordObservation<'_, '_>,
     reason: TagRelationIssue,
-    body: ExampleBodyReceipt,
-) -> Result<(), CatalogError> {
+    example: ExampleObservation,
+) {
     let label = match reason {
         TagRelationIssue::Dangling => "tag_relation_dangling",
         TagRelationIssue::Repeated => "tag_relation_repeated",
         TagRelationIssue::MalformedValue => "tag_relation_malformed",
     };
-    let (field, source_type, target) = body.description()?;
-    let example = ExampleObservation::captured(
-        admission.subject().clone(),
-        field.as_deref(),
-        source_type.as_deref(),
-        target,
-        body,
-    )?;
     issue(ledger, admission, label, example);
-    Ok(())
 }
 pub(super) fn duplicate(
     input: &OriginalCatalogInput<'_, '_>,

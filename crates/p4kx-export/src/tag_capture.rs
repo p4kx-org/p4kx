@@ -4,8 +4,8 @@
 use std::collections::BTreeMap;
 
 use p4kx_extraction::{
-    CancelToken, DataForge, DataForgeError, Record, RecordTree, TagBuildEvent, TagPathEdgeKind,
-    TagTree,
+    CancelToken, DataForge, DataForgeError, Guid, Record, RecordTree, TagBuildEvent,
+    TagPathEdgeKind, TagPathIncoming, TagRelationIssue, TagTree,
 };
 
 use super::contract::{TagDefinition, TagRoots, TagRows};
@@ -16,7 +16,9 @@ use crate::catalog_read::CatalogFields;
 use crate::catalog_read::original::TagRelationReceipts;
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
+use crate::export_tag_read::Capture as DependencyCapture;
 use crate::guid_text::CatalogGuid;
+use crate::health_diagnostic_observation::ExampleObservation;
 use crate::record_observation::RecordObservation;
 use crate::source_fields::FieldError;
 use crate::{CatalogError, CatalogReadFailure, Kind};
@@ -33,6 +35,7 @@ pub(crate) struct TagRead<'context, 'source> {
     pub(crate) rows: TagRows<'source>,
     pub(crate) context: CapturedTags<'context, 'source>,
     pub(crate) dependencies: Option<TagDependencies<'source>>,
+    pub(crate) paint_dependencies: Option<TagDependencies<'source>>,
     pub(crate) ledger: ExportLedger,
     pub(crate) failures: Vec<CatalogReadFailure<'source>>,
 }
@@ -42,6 +45,12 @@ pub(crate) struct TagDependencies<'source> {
     pub(crate) tree: CapturedTagTree,
     pub(crate) failures: Vec<CatalogReadFailure<'source>>,
     pub(crate) ledger: ExportLedger,
+}
+
+#[derive(Clone, Copy, Default)]
+pub(crate) struct TagConsumers {
+    pub(crate) contracts: bool,
+    pub(crate) paints: bool,
 }
 
 struct Capture<'context, 'source> {
@@ -59,7 +68,7 @@ pub(crate) fn read<'context, 'source>(
     forge: &'source DataForge<'source>,
     input: &'context OriginalCatalogInput<'context, 'source>,
     cancel: Option<&CancelToken>,
-    dependencies: bool,
+    consumers: TagConsumers,
 ) -> Result<TagRead<'context, 'source>, CatalogError> {
     input.check_forge(forge)?;
     let mut capture = Capture {
@@ -72,20 +81,22 @@ pub(crate) fn read<'context, 'source>(
         ledger: ExportLedger::default(),
         failures: Vec::new(),
     };
-    let mut dependency =
-        dependencies.then(|| crate::export_tag_read::Capture::new(Kind::Contracts, Some(input)));
+    let mut dependencies = [
+        consumers
+            .contracts
+            .then(|| DependencyCapture::new(Kind::Contracts, Some(input))),
+        consumers
+            .paints
+            .then(|| DependencyCapture::new(Kind::Paints, Some(input))),
+    ];
     let tree = TagTree::build_observed(
         forge,
         &|| cancel.is_some_and(CancelToken::is_cancelled),
-        &mut |event| {
-            capture.event(&event)?;
-            if let Some(dependency) = dependency.as_mut() {
-                dependency.event(&event, cancel)?;
-            }
-            Ok::<(), CatalogError>(())
-        },
+        &mut |event| capture.event(&event, &mut dependencies),
     )?
     .ok_or(CatalogError::Cancelled)?;
+    drop(capture.relations);
+    drop(capture.names);
     let context = CapturedTags::finish(
         input,
         tree,
@@ -93,28 +104,21 @@ pub(crate) fn read<'context, 'source>(
         capture.failures.is_empty(),
         cancel,
     )?;
-    capture.rows.paths = context.path_rows(cancel)?;
-    capture.rows.definitions.sort_by_key(|row| {
-        (
-            CatalogGuid(row.source.physical.guid).text(),
-            row.source.physical.record_index,
-        )
-    });
-    capture
-        .rows
-        .roots
-        .sort_by_key(|row| row.source.physical.record_index);
+    finish_rows(&mut capture.rows, &context, cancel)?;
     capture.ledger.inventory(Kind::Tags);
-    let dependencies = dependency.map(|capture| {
-        let (failures, ledger) = capture.finish();
-        TagDependencies {
-            tree: context.tree_owner(),
-            failures,
-            ledger,
-        }
+    let [dependencies, paint_dependencies] = dependencies.map(|dependency| {
+        dependency.map(|capture| {
+            let (failures, ledger) = capture.finish();
+            TagDependencies {
+                tree: context.tree_owner(),
+                failures,
+                ledger,
+            }
+        })
     });
     Ok(TagRead {
         dependencies,
+        paint_dependencies,
         context,
         rows: capture.rows,
         ledger: capture.ledger,
@@ -122,8 +126,29 @@ pub(crate) fn read<'context, 'source>(
     })
 }
 
+fn finish_rows(
+    rows: &mut TagRows<'_>,
+    context: &CapturedTags<'_, '_>,
+    cancel: Option<&CancelToken>,
+) -> Result<(), CatalogError> {
+    rows.paths = context.path_rows(cancel)?;
+    rows.definitions.sort_by_key(|row| {
+        (
+            CatalogGuid(row.source.physical.guid).text(),
+            row.source.physical.record_index,
+        )
+    });
+    rows.roots
+        .sort_by_key(|row| row.source.physical.record_index);
+    Ok(())
+}
+
 impl<'source> Capture<'_, 'source> {
-    fn event(&mut self, event: &TagBuildEvent<'_, 'source>) -> Result<(), CatalogError> {
+    fn event(
+        &mut self,
+        event: &TagBuildEvent<'_, 'source>,
+        dependencies: &mut [Option<DependencyCapture<'_, 'source>>],
+    ) -> Result<(), CatalogError> {
         if self.cancel.is_some_and(CancelToken::is_cancelled) {
             return Err(CatalogError::Cancelled);
         }
@@ -163,11 +188,7 @@ impl<'source> Capture<'_, 'source> {
                 target,
                 reason,
             } => {
-                let admission = RecordObservation::capture(self.input, incoming.record())?;
-                let body =
-                    self.relations
-                        .take(self.input, admission.subject(), *incoming, *target)?;
-                diagnostics::relation(&mut self.ledger, &admission, *reason, body)?;
+                return self.skipped_relation(*incoming, *target, *reason, dependencies);
             }
             TagBuildEvent::DuplicateSkipped { record } => {
                 let admission = RecordObservation::capture(self.input, record)?;
@@ -176,6 +197,35 @@ impl<'source> Capture<'_, 'source> {
             TagBuildEvent::Projected { .. } => {}
             TagBuildEvent::Cancelled => return Err(CatalogError::Cancelled),
         }
+        for dependency in dependencies.iter_mut().flatten() {
+            dependency.event(event)?;
+        }
+        Ok(())
+    }
+
+    fn skipped_relation(
+        &mut self,
+        incoming: TagPathIncoming<'_, 'source>,
+        target: Option<Guid>,
+        reason: TagRelationIssue,
+        dependencies: &mut [Option<DependencyCapture<'_, 'source>>],
+    ) -> Result<(), CatalogError> {
+        let admission = RecordObservation::capture(self.input, incoming.record())?;
+        let body = self
+            .relations
+            .take(self.input, admission.subject(), incoming, target)?;
+        let (field, source_type, target_guid) = body.description()?;
+        let example = ExampleObservation::captured(
+            admission.subject().clone(),
+            field.as_deref(),
+            source_type.as_deref(),
+            target_guid,
+            body,
+        )?;
+        for dependency in dependencies.iter_mut().flatten() {
+            dependency.relation(reason, example.clone());
+        }
+        diagnostics::relation(&mut self.ledger, &admission, reason, example);
         Ok(())
     }
 
@@ -263,7 +313,7 @@ impl<'source> Capture<'_, 'source> {
                 children: fields::references(&fields, "children", &mut notes, self.cancel)?,
             });
         }
-        if tree.guid() == p4kx_extraction::Guid::default() {
+        if tree.guid() == Guid::default() {
             notes.push(
                 FieldError::Malformed {
                     source_type: tree.type_name().to_owned(),
@@ -298,3 +348,7 @@ impl<'source> Capture<'_, 'source> {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "tag_capture_tests.rs"]
+mod tests;

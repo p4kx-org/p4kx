@@ -80,8 +80,8 @@ fn assemble<R>(
         &projection,
         crafting,
     )?;
-    let tags = add_tags(&forge, &input, options, &mut collected)?;
-    let paint_summary = add_paints(&forge, &input, &mut collected, options.cancel)?;
+    let (tags, paint_tags) = add_tags(&forge, &input, options, &mut collected)?;
+    let paint_summary = add_paints(paint_tags, &mut collected, options.cancel)?;
     run.begin(CatalogStage::ResolveLoadouts);
     let loadout_summary = add_loadouts(archive, &entities, &mut collected, &input, options.cancel)?;
     let variants = collected.group_variants();
