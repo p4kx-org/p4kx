@@ -24,6 +24,9 @@ use crate::json;
 use crate::loc::print_notes;
 use crate::progress::ProgressLine;
 
+#[path = "catalog_refusal_progress.rs"]
+mod refusal_progress;
+
 /// Writes a publishable catalog or an explicitly requested diagnostic catalog and prints its summary.
 /// Returns exit code 1 for incomplete diagnostic output; normal incomplete output is refused.
 pub(crate) fn run(args: &CatalogArgs, as_json: bool) -> Result<ExitCode> {
@@ -129,7 +132,7 @@ fn report_refusal(health: &ExportHealth, output: &mut impl Write) -> io::Result<
             diagnostic.count_unit,
         )?;
     }
-    Ok(())
+    refusal_progress::report(health, output)
 }
 
 fn print_result(

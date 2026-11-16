@@ -491,8 +491,10 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   `encryptedEntriesUnread`, the encrypted Entries the export could not read without a usable key.
   `--progress-phases` reports each phase as a `catalog phase: <identifier>` line on stderr,
   including when redirected. It works in both publication modes and leaves stdout for the summary.
-  If normal publication is refused, stderr includes the read and projection status and the
-  blocking diagnostic counts by kind, stage and code.
+  If normal publication is refused, stderr includes the read and projection status,
+  diagnostic counts by kind, stage and code, and retained technical field and type examples.
+  Failed Entry operations are grouped by kind, source role, operation, code, stage and
+  whether a physical Entry coordinate was captured.
   After publication it also prints
   `catalog storage: staged_row_bytes=<n> publication_bytes=<n> peak_temporary_bytes=<n>`.
   The peak counts the logical bytes of the private row spools and the unpublished output file
