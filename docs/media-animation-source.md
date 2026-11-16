@@ -144,6 +144,9 @@ decoded sample bytes from the independent parser. The CAF header supplies its ch
 even above the preview budget. The DBA declaration reader checks all metadata and controller
 tables and counts every clip and declared key through the last block. The census compares both
 counts against the export. Preview budget refusals are counted separately.
+The installed check reconciles each emitted origin with the original Entry,
+its containing Archives and its byte ranges. It releases each Entry's uses
+after that check and keeps exact digest counts across the selected family.
 Diagnostic rows are verified and an incomplete census fails the check.
 
 The separate global-image export replay selects the two original root image families and

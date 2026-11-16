@@ -6,6 +6,7 @@ use std::path::Path;
 
 use p4kx_extraction::{
     Archive, ArchiveWatch, ArchiveWriteProtection, Build, CancelToken, Exclusion, Filter,
+    SourceUses,
 };
 
 use crate::checkpoint::Checkpoint;
@@ -21,6 +22,8 @@ use super::AnimationProvider;
 
 #[path = "../../tests/real_archive/animation_fixture.rs"]
 mod fixture;
+#[path = "installed_origin_batches.rs"]
+mod origin_batches;
 #[path = "installed_projection.rs"]
 mod projection;
 #[path = "../../tests/real_archive/animation_rows.rs"]
@@ -140,6 +143,7 @@ impl Census<'_> {
             true,
             &observation,
         )?;
+        writer.origins.owner = SourceUses::with_batched_use_refs();
         let mut root = source::root(self.archive, self.digest.clone(), self.size);
         require(
             root.enumeration_complete,
@@ -162,12 +166,13 @@ impl Census<'_> {
         let mut visit = Visit::new(family, &providers, &budget, &observation, self.schema);
         traversal.visit(self.archive, &mut Vec::new(), &mut writer, &mut visit)?;
         writer.index_build(&root)?;
+        observation.origins.finish_build(&root, &writer)?;
         let finished = writer.finish()?;
         let [kind] = finished.kinds.as_slice() else {
             return Err("one original animation provider required".into());
         };
         let totals = visit.finish(&traversal.entries, kind)?;
-        observation.finish_census()?;
+        observation.finish_census(&kind.counts.converted_outputs)?;
         report(family, &totals);
         Ok(totals)
     }

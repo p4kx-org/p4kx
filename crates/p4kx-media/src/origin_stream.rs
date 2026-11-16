@@ -10,6 +10,8 @@ use sha2::{Digest as _, Sha256};
 use crate::artifact::{Stream, StreamDestination};
 use crate::checkpoint::{Checkpoint, IO_BLOCK_BYTES};
 use crate::origin_aggregate::MaterialDataAggregate;
+#[cfg(test)]
+use crate::origin_contract::use_sets::SetId;
 use crate::origin_contract::use_sets::Sets;
 use crate::origin_contract::{
     OriginCoverage, OriginField, OriginProfile, OriginProtocol, OriginReceipts, OriginRow,
@@ -146,12 +148,15 @@ impl<'a> OriginTransport<'a> {
                 .map(p4kx_extraction::SourceUse::reference)
                 .collect();
             observe(coverage, &origin)?;
-            return self.write(&OriginRow::Field {
+            self.write(&OriginRow::Field {
                 scope,
                 field,
                 origin: OriginField::with_set(&origin, &local, id),
                 cuts: &contribution.cuts,
-            });
+            })?;
+            #[cfg(test)]
+            self.observe_field(&origin, Some(id))?;
+            return Ok(());
         }
         references.with_origin(contribution, |origin, encoded| {
             observe(coverage, origin)?;
@@ -160,8 +165,21 @@ impl<'a> OriginTransport<'a> {
                 field,
                 origin: OriginField::new(origin, encoded),
                 cuts: &contribution.cuts,
-            })
+            })?;
+            #[cfg(test)]
+            self.observe_field(origin, None)?;
+            Ok(())
         })
+    }
+
+    #[cfg(test)]
+    fn observe_field(&self, origin: &FieldOrigin, shared: Option<SetId>) -> Result<(), MediaError> {
+        if let Some(observer) = self.destination.observer() {
+            observer
+                .origin_field(origin, shared)
+                .map_err(|cause| error::io(self.fields.path(), cause))?;
+        }
+        Ok(())
     }
 
     pub(crate) fn finish(

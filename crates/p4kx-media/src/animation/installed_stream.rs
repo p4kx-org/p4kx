@@ -5,10 +5,14 @@ use std::cell::RefCell;
 use std::collections::{HashSet, VecDeque};
 use std::io;
 
+use p4kx_extraction::FieldOrigin;
 use sha2::{Digest as _, Sha256};
 
 use crate::artifact::StreamObserver;
-use crate::{Algorithm, Artifact, ByteScope, MediaKind, MediaRecord, Source, hashing};
+use crate::origin_contract::use_sets::SetId;
+use crate::{Algorithm, Artifact, ByteScope, MediaKind, MediaRecord, Source, Tally, hashing};
+
+use super::origin_batches::OriginBatches;
 
 use super::rows::Evidence;
 use super::{TestResult, require};
@@ -17,6 +21,7 @@ use super::{TestResult, require};
 pub(super) struct Observation {
     entry: RefCell<EntryEvidence>,
     seen: RefCell<HashSet<[u8; 32]>>,
+    pub(super) origins: OriginBatches,
 }
 
 impl Observation {
@@ -24,8 +29,14 @@ impl Observation {
         self.entry.take()
     }
 
-    pub(super) fn finish_census(&self) -> TestResult {
-        self.entry.borrow().finish_entry()
+    pub(super) fn finish_census(&self, converted: &Tally) -> TestResult {
+        self.entry.borrow().finish_entry()?;
+        let distinct = u64::try_from(self.seen.borrow().len())?;
+        require(
+            converted.written == distinct
+                && converted.enumerated.checked_sub(distinct) == Some(converted.skipped),
+            "converted animation tally agrees with exact typed artifact deduplication",
+        )
     }
 }
 
@@ -50,6 +61,10 @@ impl StreamObserver for Observation {
             _ => {}
         }
         Ok(())
+    }
+
+    fn origin_field(&self, origin: &FieldOrigin, shared: Option<SetId>) -> io::Result<()> {
+        self.origins.field(origin, shared)
     }
 
     fn typed_chunk(&self, artifact: &Artifact) -> io::Result<bool> {

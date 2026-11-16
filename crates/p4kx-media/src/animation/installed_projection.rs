@@ -99,7 +99,7 @@ impl<'a> Visit<'a> {
         raw_output::record(&raw, &input, writer)?;
         source::retained(&mut source, entry, raw.clone());
         writer.retained_with_input(&source, &input)?;
-        writer.begin_with_input(0, source.clone(), input)?;
+        writer.begin_with_input(0, source.clone(), input.clone())?;
         let path = writer.root.join(&raw.path);
         let context = SourceContext {
             source: &source,
@@ -115,6 +115,10 @@ impl<'a> Visit<'a> {
         })?;
         writer.end_source(projected)?;
         self.check_source(entry, &source, &payload.bytes)
+            .map_err(|cause| invalid(cause.to_string()))?;
+        self.observation
+            .origins
+            .finish_entry(archive, entry, &input, writer)
             .map_err(|cause| invalid(cause.to_string()))?;
         Ok(raw)
     }

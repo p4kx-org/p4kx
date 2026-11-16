@@ -5,12 +5,16 @@ use std::fs::File;
 use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
 
+#[cfg(test)]
+use p4kx_extraction::FieldOrigin;
 use p4kx_extraction::OwnedFileToken;
 use sha2::{Digest as _, Sha256};
 
 use crate::checkpoint::Checkpoint;
 use crate::error;
 use crate::hashing;
+#[cfg(test)]
+use crate::origin_contract::use_sets::SetId;
 use crate::output_path;
 use crate::{Algorithm, Artifact, ByteScope, Digest, MediaError};
 
@@ -19,6 +23,10 @@ pub(crate) trait StreamObserver {
     fn write(&self, relative: &str, bytes: &[u8]) -> io::Result<()>;
 
     fn finish(&self, _relative: &str) -> io::Result<()> {
+        Ok(())
+    }
+
+    fn origin_field(&self, _origin: &FieldOrigin, _shared: Option<SetId>) -> io::Result<()> {
         Ok(())
     }
 
