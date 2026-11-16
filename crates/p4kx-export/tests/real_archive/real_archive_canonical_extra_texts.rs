@@ -325,6 +325,14 @@ fn compare_item_slots(
                     TextReferenceShape::Required,
                 )?;
                 purchasable.next().count(counters, target)?;
+                let name = index.reference(
+                    component
+                        .pointer("/value/displayName")
+                        .ok_or("Item Purchasable name carrier")?,
+                    TextDomain::PublicName,
+                    TextReferenceShape::Required,
+                )?;
+                counters.count_supplemental(name)?;
             }
             Some("physics") => {}
             _ => return Err("unknown Item component kind".into()),

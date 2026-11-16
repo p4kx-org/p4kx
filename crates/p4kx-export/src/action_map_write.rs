@@ -181,6 +181,8 @@ struct JsonAction<'a> {
     name: &'a str,
     label_key: Option<&'a str>,
     label: Option<Cow<'a, str>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ui_description: Option<&'a str>,
     activation_mode: Option<&'a str>,
     bindings: Vec<JsonBinding<'a>>,
 }
@@ -209,6 +211,7 @@ fn write_json(maps: &ActionMaps, labels: &Labels<'_, '_>, out: &mut impl Write) 
                         name: &action.name,
                         label_key: action.label_key.as_deref(),
                         label: labels.resolve(action.label_key.as_deref()),
+                        ui_description: action.ui_description.as_deref(),
                         activation_mode: action.activation_mode.as_deref(),
                         bindings: action
                             .bindings

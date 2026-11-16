@@ -62,6 +62,8 @@ pub struct Action {
     pub name: String,
     /// The localisation key of the label, with its leading `@`; `None` when the action has none.
     pub label_key: Option<String>,
+    /// The authored `UIDescription` value, including an explicit empty value.
+    pub ui_description: Option<String>,
     /// The activation mode the action names.
     pub activation_mode: Option<String>,
     /// The default bindings that are set, in the order keyboard, mouse, gamepad, joystick and

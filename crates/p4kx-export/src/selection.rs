@@ -257,11 +257,13 @@ pub enum Kind {
     CargoLoadingGlobals,
     /// Physical DataForge commodity shop settings Records.
     ShopCommodityGlobals,
+    /// Authored general and VR client profile attribute files.
+    ClientProfileSettings,
 }
 
 impl Kind {
     /// Every kind, in the order of the catalog.
-    pub const ALL: [Self; 105] = [
+    pub const ALL: [Self; 106] = [
         Self::Manufacturers,
         Self::Items,
         Self::Ships,
@@ -367,6 +369,7 @@ impl Kind {
         Self::ContractScopes,
         Self::CargoLoadingGlobals,
         Self::ShopCommodityGlobals,
+        Self::ClientProfileSettings,
     ];
 }
 

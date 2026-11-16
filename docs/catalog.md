@@ -2470,6 +2470,12 @@ the failed operation, and diagnostic publication retains the failed row. Price, 
 rental values describe offline design settings. Stored values and unit-bearing source fields
 retain their original form.
 
+### Client profile settings
+
+`configurations.clientProfileSettings` contains the original general and VR profile
+documents with independent selection and read outcomes, authoring order and source
+origins. [Client profile settings](client-profile-settings.md)
+
 ### Shop inventory resolution
 
 `declarations.shopInventoryResolution` has one row for each emitted shop. Its `shopKey` is

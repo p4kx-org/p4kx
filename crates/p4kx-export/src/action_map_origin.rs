@@ -138,6 +138,12 @@ impl<'input> Recorder<'input> {
             &format!("{path}/label"),
             self.label(label_key, sites.label.as_ref(), &sites.node)?,
         )?;
+        if let Some(description) = &sites.ui_description {
+            self.json_field(
+                &format!("{path}/ui_description"),
+                self.attribute_field(description)?,
+            )?;
+        }
         self.json_field(
             &format!("{path}/activation_mode"),
             self.optional_attribute(sites.mode.as_ref(), &sites.node, "activationModeSelection")?,

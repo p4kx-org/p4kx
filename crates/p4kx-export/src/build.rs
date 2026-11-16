@@ -105,6 +105,14 @@ fn assemble<R>(
         options.cancel,
     )?);
     run.begin(CatalogStage::ProjectConfigurations);
+    let client_profile_settings = crate::client_profile_settings::read(
+        archive,
+        &entry_capture,
+        options.filter,
+        options.cancel,
+        &mut collected.ledger,
+    )?;
+    collected.client_profile_count = client_profile_settings.decoded_documents();
     run.begin(CatalogStage::ProjectShops);
     let shop_summary = add_shops(archive, &files, &mut collected, options, &entry_capture)?;
     run.begin(CatalogStage::ResolveJumpOperators);
@@ -298,6 +306,7 @@ fn assemble<R>(
             jump_connections,
         },
         configurations: crate::catalog_configurations::CatalogConfigurations {
+            client_profile_settings,
             blueprint_tiers: blueprints.tiers,
             reputation_triggers: reputation_tables.factions.triggers,
             independent: independent.tables,

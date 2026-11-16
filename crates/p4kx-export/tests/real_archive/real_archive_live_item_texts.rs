@@ -160,8 +160,29 @@ fn with_item_texts<T>(
             &texts,
             TextDomain::GameText,
         )?);
+        targets.extend(purchase_name_target(source, wire, &texts)?);
     }
     inspect(&targets)
+}
+
+fn purchase_name_target<'index, 'catalog>(
+    source: &StructValue<'_>,
+    wire: &Value,
+    texts: &'index TextIndex<'catalog>,
+) -> TestResult<Option<&'index TextTarget<'catalog>>> {
+    let carrier = wire
+        .pointer("/value/displayName")
+        .ok_or("the Purchasable name lacks a sourced carrier")?;
+    if let Some(original) = source.field("displayName") {
+        return item_text_target(Some(original), Some(carrier), texts, TextDomain::PublicName)
+            .map(Some);
+    }
+    if catalog_v3_consumer::source_value(carrier)?.is_some()
+        || carrier.get("state").and_then(Value::as_str) != Some("absent")
+    {
+        return Err("the Catalog invented a Purchasable name".into());
+    }
+    Ok(None)
 }
 
 fn first_slot<'a, 'f>(

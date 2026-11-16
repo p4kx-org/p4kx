@@ -24,6 +24,16 @@ pub(crate) enum ActionMapAction {
     /// bindings per device as JSON or CSV.
     #[command(after_help = EXIT_CODES_HELP)]
     Export(ActionMapExportArgs),
+    /// Reports authored general and VR client-profile settings and their source origins.
+    #[command(after_help = EXIT_CODES_HELP)]
+    Settings(ActionMapSettingsArgs),
+}
+
+/// Arguments of `p4kx actionmap settings`.
+#[derive(Debug, Args)]
+pub(crate) struct ActionMapSettingsArgs {
+    /// Path of the Data.p4k Archive.
+    pub(crate) archive: PathBuf,
 }
 
 /// Arguments of `p4kx actionmap export`.

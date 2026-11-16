@@ -65,6 +65,17 @@ fn kind_health(kind: Kind, written_rows: usize) -> Value {
 }
 
 fn row_count(kind: Kind, catalog: &Value) -> usize {
+    if kind == Kind::ClientProfileSettings {
+        return catalog
+            .pointer("/configurations/clientProfileSettings/documents")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter(|document| {
+                document.pointer("/status/value").and_then(Value::as_str) == Some("read")
+            })
+            .count();
+    }
     match kind {
         Kind::LocationClassRegistries => {
             catalog.pointer("/definitions/locationRegistries/classes/rows")
@@ -95,6 +106,7 @@ const fn mode(kind: Kind) -> ExportSourceMode {
         | Kind::Shops
         | Kind::ShopInventories
         | Kind::ParticleLibraries
+        | Kind::ClientProfileSettings
         | Kind::PlanetResources
         | Kind::Creatures
         | Kind::ClimateAssets

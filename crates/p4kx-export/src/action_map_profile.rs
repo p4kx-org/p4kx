@@ -94,6 +94,7 @@ pub(crate) struct ActionSites {
     pub(crate) node: SourceElementPosition,
     pub(crate) name: AttributeSite,
     pub(crate) label: Option<AttributeSite>,
+    pub(crate) ui_description: Option<AttributeSite>,
     pub(crate) mode: Option<AttributeSite>,
     pub(crate) bindings: Vec<BindingSites>,
 }
@@ -132,13 +133,24 @@ fn named<'xml>(
 }
 
 fn text<'xml>(node: SourceElement<'xml>, name: &str, bytes: &[u8]) -> Option<Attribute<'xml>> {
-    let attribute = node
-        .attributes()
-        .find(|attribute| attribute.name().eq_ignore_ascii_case(name))?;
-    let value = attribute.value().trim();
+    let mut attribute = authored_text(node, name, bytes)?;
+    let value = attribute.value.trim();
     if value.is_empty() {
         return None;
     }
+    attribute.site.converted |= value != attribute.value;
+    attribute.value = value;
+    Some(attribute)
+}
+
+fn authored_text<'xml>(
+    node: SourceElement<'xml>,
+    name: &str,
+    bytes: &[u8],
+) -> Option<Attribute<'xml>> {
+    let attribute = node
+        .attributes()
+        .find(|attribute| attribute.name().eq_ignore_ascii_case(name))?;
     let normalized = match attribute.position() {
         SourceAttributePosition::Text(range) => bytes
             .get(range.clone())
@@ -151,10 +163,10 @@ fn text<'xml>(node: SourceElement<'xml>, name: &str, bytes: &[u8]) -> Option<Att
         _ => false,
     };
     Some(Attribute {
-        value,
+        value: attribute.value(),
         site: AttributeSite {
             position: attribute.position().clone(),
-            converted: normalized || value != attribute.value(),
+            converted: normalized,
         },
     })
 }
@@ -184,11 +196,15 @@ fn read_action(node: SourceElement<'_>, bytes: &[u8]) -> Option<(Action, ActionS
     let name = text(node, "name", bytes)?;
     let mode = text(node, "activationMode", bytes);
     let label = text(node, "UILabel", bytes);
+    let description = authored_text(node, "UIDescription", bytes);
     let (bindings, binding_sites) = read_bindings(node, mode.as_ref(), bytes);
     Some((
         Action {
             name: name.value.to_owned(),
             label_key: label.as_ref().map(|attribute| attribute.value.to_owned()),
+            ui_description: description
+                .as_ref()
+                .map(|attribute| attribute.value.to_owned()),
             activation_mode: mode.as_ref().map(|attribute| attribute.value.to_owned()),
             bindings,
         },
@@ -196,6 +212,7 @@ fn read_action(node: SourceElement<'_>, bytes: &[u8]) -> Option<(Action, ActionS
             node: node.position(),
             name: name.site,
             label: label.map(|attribute| attribute.site),
+            ui_description: description.map(|attribute| attribute.site),
             mode: mode.map(|attribute| attribute.site),
             bindings: binding_sites,
         },

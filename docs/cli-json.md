@@ -1676,6 +1676,11 @@ shape shown above. The companion identifies each emitted table value and is save
 file. For stdout use `--origin-stderr` or `--origin-out <file>`. See
 [localisation origins](source-origin.md#localisation-tables).
 
+## `p4kx actionmap settings <archive>`
+
+The command writes the structured JSON [client profile report](client-profile-settings.md)
+to stdout, including the profile documents and their per-value provenance.
+
 ## `p4kx actionmap export <archive> [--format json|csv] [--csv-raw] [--language <language>] [--out <file>]`
 
 Without `--out` the export goes to stdout and `--json` changes nothing. The JSON format is
@@ -1692,7 +1697,10 @@ in document order. `label_key` and `activation_mode` are `null` when the profile
 is `null` when there is no key or the language has no text for it, and has `\n` decoded to a line
 feed. `device` is `keyboard`, `mouse`, `gamepad` or `joystick`; `input` is the profile's spelling,
 with `+` between the keys of a combination. A binding's `activation_mode` is its own, else the
-action's. An input that is empty or blank is no binding.
+action's. An input that is empty or blank is no binding. When an action authors
+`UIDescription`, JSON adds `ui_description` with the original decoded value, including an empty
+string. A localisation key keeps its leading `@`. The field has its own source coordinate in the
+origin companion.
 
 The CSV starts with a UTF-8 byte order mark, has CRLF line ends and the header
 `action_map,action_map_label,action,label,activation_mode,keyboard,mouse,gamepad,joystick`. A

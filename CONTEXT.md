@@ -721,6 +721,10 @@ The optional, user-switched question to GitHub whether a newer Release than the 
 it only links to that Release, never downloads it.
 _Avoid_: updater, auto-update
 
+**Client Profile**:
+The game ships client settings as named declarations with authored default values and optional
+console variable associations. The general and VR profiles are independent source documents.
+
 **P4KX catalog**:
 The versioned JSON Export of authored game data and derived projections from an Archive.
 _Avoid_: p4k-catalog

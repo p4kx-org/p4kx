@@ -72,6 +72,10 @@ impl<'read> EntrySourceXml<'read> {
         self.receipt.source_uses()
     }
 
+    pub(crate) const fn is_lossy(&self) -> bool {
+        self.document.is_lossy()
+    }
+
     pub(crate) fn root(&self) -> SourceElement<'_> {
         self.document.root()
     }
@@ -124,6 +128,16 @@ impl<'read> EntrySourceXml<'read> {
                 })
             })
             .collect()
+    }
+
+    pub(crate) fn retain<T>(
+        &self,
+        location: SourceLocation,
+        value: T,
+        role: SourceUseRole,
+    ) -> Result<SourcedValue<T>, CatalogError> {
+        let source = self.entry.payload_at(location, role)?;
+        Ok(self.project(SourceValue::Present(value), &[source]))
     }
 
     fn project<T>(&self, value: SourceValue<T>, references: &[SourceUse]) -> SourcedValue<T> {

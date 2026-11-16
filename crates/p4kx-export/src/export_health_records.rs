@@ -112,6 +112,7 @@ pub(crate) const fn source_mode(kind: Kind) -> ExportSourceMode {
         | Kind::Shops
         | Kind::ShopInventories
         | Kind::ParticleLibraries
+        | Kind::ClientProfileSettings
         | Kind::PlanetResources
         | Kind::Creatures
         | Kind::ClimateAssets

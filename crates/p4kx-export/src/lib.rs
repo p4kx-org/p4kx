@@ -56,6 +56,10 @@
 //! the chosen languages as JSON or CSV.
 
 mod action_map;
+mod client_profile_settings;
+pub use client_profile_settings::{
+    ClientProfileSettings, ClientProfileSettingsReport, read_client_profile_settings,
+};
 mod action_map_origin;
 mod action_map_profile;
 mod action_map_source;

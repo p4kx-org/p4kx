@@ -125,6 +125,50 @@ fn uses<'rows>(rows: &'rows [Value], field: &Value) -> Result<Vec<&'rows Value>,
         .collect()
 }
 
+#[test]
+fn structured_actions_retain_the_authored_description_and_its_origin() -> TestResult {
+    let directory = tempfile::tempdir()?;
+    let xml = PROFILE
+        .replace(
+            r#"name="v_eject""#,
+            r#"name="v_eject" UIDescription=" @fixture_desc &amp; text ""#,
+        )
+        .replace(r#"name="prone""#, r#"name="prone" UIDescription="""#);
+    let path = archive(
+        directory.path(),
+        vec![
+            TestEntry::stored("Data/Libs/Config/defaultProfile.xml", xml).encrypted(),
+            english(),
+        ],
+    )?;
+    let output = run(&path, &["--origin-stderr"])?;
+    let payload: Value = serde_json::from_slice(&output.stdout)?;
+    let paths = [
+        (
+            "/action_maps/0/actions/0/ui_description",
+            " @fixture_desc & text ",
+        ),
+        ("/action_maps/0/actions/1/ui_description", ""),
+    ];
+    let origin_rows = rows(&output.stderr)?;
+    check_binding(&origin_rows, &output.stdout)?;
+    for (path, expected) in paths {
+        assert_eq!(
+            payload.pointer(path).and_then(Value::as_str),
+            Some(expected)
+        );
+        let origin = field(&origin_rows, path)?;
+        assert_eq!(origin.get("sourceSetComplete"), Some(&json!(true)));
+        assert_eq!(origin.get("containsEncryptedSource"), Some(&json!(true)));
+    }
+    assert!(
+        payload
+            .pointer("/action_maps/0/actions/2/ui_description")
+            .is_none()
+    );
+    Ok(())
+}
+
 fn assert_json_bytes(stdout: &[u8]) {
     let expected = concat!(
         "{\"language\":\"en\",\"action_maps\":[{\"name\":\"seat_general\",",

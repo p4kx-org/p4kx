@@ -31,7 +31,7 @@ const COMPONENT: Projection = Fields(&[
         "value",
         Carrier {
             value: &Fields(&[("localization", Projection::carrier(&LOCALIZATION))]),
-            additional: &[("displayType", Whole)],
+            additional: &[("displayName", Whole), ("displayType", Whole)],
         },
     ),
 ]);

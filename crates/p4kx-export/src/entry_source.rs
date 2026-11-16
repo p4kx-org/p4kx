@@ -117,6 +117,13 @@ impl EntrySource {
         self
     }
 
+    #[must_use]
+    pub(crate) const fn selection_candidate(mut self) -> Self {
+        self.role = ExportSourceRole::SelectionCandidate;
+        self.operation = EntryOperation::Enumeration;
+        self
+    }
+
     pub(crate) fn record(
         self,
         ledger: &mut ExportLedger,

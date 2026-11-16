@@ -255,7 +255,7 @@ fn dispatch(command: Command, json: bool, given: &key::Given) -> anyhow::Result<
         Command::Armour(args) => armour::run(&args, json).map(success),
         Command::Character(args) => character_package::run(&args, json).map(success),
         Command::Loc(args) => loc::run(&args, json),
-        Command::ActionMap(args) => actionmap::run(&args, json).map(success),
+        Command::ActionMap(args) => actionmap::run(&args, json),
         Command::Compare(args) => Ok(compare::run(&args, json).unwrap_or_else(|error| {
             report(&error);
             exit::for_compare_error(&error)

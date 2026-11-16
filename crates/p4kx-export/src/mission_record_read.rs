@@ -15,7 +15,7 @@ use crate::catalog_v3::mission_sources::{
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
 use crate::mission_entry_source::MissionEntryContext;
-use crate::mission_generator::{GeneratorDefinition, completion_tag_results};
+use crate::mission_generator::{GeneratorDefinition, completion_tag_results, item_reward_results};
 use crate::mission_layers;
 use crate::mission_property_set_registry::MissionPropertySetRegistry;
 use crate::record_observation::RecordObservation;
@@ -171,6 +171,7 @@ fn generator_definition<'source>(
         header: CanonicalRecordHeader::read(tree, input.origins())?,
         source,
         completion_tag_results,
+        item_reward_results: item_reward_results::read(fields)?,
         mission_item_properties,
     };
     Ok((definition, error, notes))

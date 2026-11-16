@@ -17,7 +17,7 @@ a component could not be decoded.
 | --- | --- | --- |
 | `attachment` | `SAttachableComponentParams.AttachDef` | Original `Grade`, `Manufacturer`, and `Localization`. `Name` refers to `texts.publicNames` and `Description` to `texts.gameTexts`. Join `configurations.itemAttachmentConstraints` by `ownerRecordIndex` equal to `recordIndex` and the same `componentOrdinal` for the same AttachDef's `Type`, `SubType`, `Size`, `Tags`, `RequiredTags` and alignment fields. |
 | `physics` | `SEntityPhysicsControllerParams.PhysType` | Exact stored `Mass` in kilograms as a Single with IEEE bits. Repeated controllers retain separate slots. |
-| `purchasable` | `SCItemPurchasableParams.displayType` | Original Locale occurrence in `texts.gameTexts`. |
+| `purchasable` | `SCItemPurchasableParams` | Original `displayName` refers to `texts.publicNames` and `displayType` to `texts.gameTexts`. |
 
 A stored Manufacturer Reference retains its authored GUID and independently
 observed physical target metadata. Other stored shapes retain their original
@@ -35,8 +35,11 @@ Follow the first stored `purchasable` entry for `value.displayType`. A missing o
 value in the first matching entry stays missing or unreadable. Later entries supply their own
 authored values.
 
-Resolve `name.value` through `texts.publicNames`, and `description.value` and
-`displayType.value` through `texts.gameTexts`. The original key is `key.value` in that row.
+Read `value.displayName` from each `purchasable` entry for the independently authored purchase
+name of that component. The reference records the source of the authored key. Purchase names
+convey no information about current shop stock.
+
+Resolve each reference through its text table above. The original key is `key.value` in that row.
 For a given language use `translations.value[language].displayText.value`; the exact decoded
 text is in `sourceText.value`. A language map entry can be absent. An authored empty key or
 translation remains distinguishable from a missing value. The three inline `key/en/de` objects

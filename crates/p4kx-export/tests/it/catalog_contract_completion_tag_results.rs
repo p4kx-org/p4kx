@@ -266,3 +266,6 @@ fn database(declaration: Option<TestType>, values: Option<[TestValue; 2]>) -> Ve
         )
         .build()
 }
+
+#[path = "catalog_contract_item_rewards.rs"]
+mod item_rewards;

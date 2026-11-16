@@ -45,6 +45,12 @@ fn rows_of_kind(catalog: &Value, kind: Kind) -> TestResult<&Vec<Value>> {
         return table(catalog, &row_location(kind));
     }
     let path = row_location(kind);
+    if kind == Kind::ClientProfileSettings {
+        return catalog
+            .pointer(&path)
+            .and_then(Value::as_array)
+            .ok_or_else(|| "client profile input dispositions are missing".into());
+    }
     if path.starts_with('/') {
         return checked_table(catalog, kind, &path);
     }
@@ -65,6 +71,7 @@ pub(crate) fn row_location(kind: Kind) -> Cow<'static, str> {
         Kind::Blueprints => "/definitions/blueprints",
         Kind::ShopInventories => "/definitions/shopInventories",
         Kind::ParticleLibraries => "/definitions/particleLibraries",
+        Kind::ClientProfileSettings => "/configurations/clientProfileSettings/documents",
         Kind::ExplosionDefinitions => "/definitions/explosionDefinitions",
         Kind::AmmoDefinitions => "/definitions/ammoDefinitions",
         Kind::MissionScenarios => "/definitions/missionScenarios",

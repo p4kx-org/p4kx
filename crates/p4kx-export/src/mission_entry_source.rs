@@ -233,6 +233,7 @@ impl<'t, 'f> MissionEntrySource<'t, 'f> {
             offered_at,
             giver_faction: rewards.giver_faction,
             blueprint_rewards: rewards.blueprints,
+            item_reward_results: rewards.item_results,
             reputation_gains: rewards.gains,
             min_standing_guid: shared.standing.min,
             max_standing_guid: shared.standing.max,

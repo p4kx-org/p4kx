@@ -16,6 +16,7 @@ use crate::mission_cooldown::ContractCooldown;
 use crate::mission_generator::ContractOccurrence;
 use crate::mission_titles::MissionTitles;
 use crate::resource_integer::ResourceInt64;
+use crate::source_value_catalog::SourceValueRef;
 use crate::spawn_model::{LocationPrerequisite, LocationQueryLink, SpawnPoolLink};
 
 /// One contract projection and its separately published title and description.
@@ -96,6 +97,8 @@ pub(crate) struct ContractBase<'a> {
     /// sub contract when it states any, else of the contract. A contract that hands out none
     /// has an empty list.
     pub(crate) blueprint_rewards: Vec<BlueprintReward>,
+    /// Links to the physical item rewards in the selected result block.
+    pub(crate) item_reward_results: Vec<SourcedValue<SourceValueRef>>,
     /// The reputation the contract grants on success, one entry per amount: the results whose
     /// first mission result (success) is set. A result that fires on failure only is left out; an
     /// amount may be negative (a success that costs standing with a rival, as stored).

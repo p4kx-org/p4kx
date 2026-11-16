@@ -22,8 +22,6 @@ mod origins;
 
 use origins::{Lookup, TextOrigins};
 
-const ITEM_REGISTRATIONS: usize = 3;
-
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and P4KX_CATALOG_ITEM_TEXT_RECORD and pass --ignored"]
 fn installed_item_texts_match_every_available_archive_language() -> TestResult<()> {
@@ -108,7 +106,7 @@ fn compare_item(
     evidence: &TextOrigins<'_>,
     channel: &str,
 ) -> TestResult<()> {
-    verify_item_registration_scope(original)?;
+    let registrations = item_registrations(original)?;
     let mut reported = BTreeMap::new();
     for row in summary
         .text_kind_coverage()
@@ -123,8 +121,8 @@ fn compare_item(
         return Err("Item coverage must contain every supported language".into());
     }
     with_item_texts(original, catalog, |targets| {
-        if targets.len() != ITEM_REGISTRATIONS {
-            return Err("three original Item Locale registrations are required".into());
+        if targets.len() != registrations {
+            return Err("the physical Item Locale registration count differs".into());
         }
         for target in targets {
             if target.translations.len() != languages.len()
@@ -161,20 +159,31 @@ fn compare_item(
     })
 }
 
-fn verify_item_registration_scope(original: &RecordTree<'_>) -> TestResult<()> {
+fn item_registrations(original: &RecordTree<'_>) -> TestResult<usize> {
     let Some(Original::Array(components)) = original.field("Components") else {
         return Err("the selected original Item must have a Components array".into());
     };
-    for required in ["SAttachableComponentParams", "SCItemPurchasableParams"] {
-        let occurrences = components
-            .iter()
-            .filter(|value| matches!(value, Original::Struct(component) if component.type_name() == required))
-            .count();
-        if occurrences != 1 {
-            return Err(format!("select an Item with exactly one physical {required}").into());
+    let mut registrations = 0;
+    for (required, fields) in [
+        ("SAttachableComponentParams", 2),
+        ("SCItemPurchasableParams", 1),
+    ] {
+        let mut matching = components.iter().filter_map(|value| match value {
+            Original::Struct(component) if component.type_name() == required => Some(component),
+            _ => None,
+        });
+        let component = matching
+            .next()
+            .filter(|_| matching.next().is_none())
+            .ok_or_else(|| format!("select an Item with exactly one physical {required}"))?;
+        registrations += fields;
+        if required == "SCItemPurchasableParams"
+            && matches!(component.field("displayName"), Some(Original::Locale(_)))
+        {
+            registrations += 1;
         }
     }
-    Ok(())
+    Ok(registrations)
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -211,7 +220,7 @@ impl Coverage {
         };
         if *self != reported {
             return Err(format!(
-                "{}: Item coverage differs from the three original Locale registrations, expected {self:?}, reported {reported:?}",
+                "{}: Item coverage differs from the original Locale registrations, expected {self:?}, reported {reported:?}",
                 actual.language,
             )
             .into());

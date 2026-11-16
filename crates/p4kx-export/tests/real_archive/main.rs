@@ -36,6 +36,7 @@ mod real_archive_contract_cooldown_overrides;
 mod real_archive_contract_cooldowns;
 mod real_archive_contract_facts;
 mod real_archive_contract_gaps;
+mod real_archive_contract_item_rewards;
 mod real_archive_contract_scopes;
 mod real_archive_contract_template_parts;
 mod real_archive_contract_templates;

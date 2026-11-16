@@ -129,7 +129,7 @@ fn exactly_the_game_text_fields_carry_the_game_text_annotation() {
         marked += usize::from(carries);
     }
     assert_eq!(
-        marked, 106,
+        marked, 108,
         "every protected field in the canonical schema is accounted for"
     );
 }
@@ -155,6 +155,7 @@ fn expected_annotation(owner: &str, name: &str, field: &Value, schema: &Value) -
         )
         | ("GroundLayer", "surfaceTypeName" | "surfaceGroupName")
         | ("MissionStringVariant", "string")
+        | ("ProfileText", "value" | "lexeme")
         | ("StandingDefinition", "perkDescription")
         | ("FactionReputationDefinition", "background")
         | ("InfractionParameters", "graceWarnings")
@@ -251,6 +252,24 @@ fn manufacturer_localization_uses_separate_public_and_protected_text_domains() {
                 .any(|required| required == field)
         );
     }
+}
+
+#[test]
+fn item_purchase_name_uses_the_public_text_domain() {
+    let schema = p4kx_export::catalog_schema();
+    let properties = &schema["$defs"]["ItemPurchasable"]["properties"];
+    assert!(
+        is_only_public_name(&schema, &properties["displayName"]),
+        "the purchase name resolves only through the public name registry"
+    );
+    assert!(
+        properties["displayName"].get("x-gameText").is_none(),
+        "the purchase name is public"
+    );
+    assert_eq!(
+        properties["displayType"]["x-gameText"], true,
+        "the independently authored purchase type stays protected"
+    );
 }
 
 #[test]

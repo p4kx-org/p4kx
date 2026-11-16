@@ -44,6 +44,13 @@ multiplier requires an independent configuration or runtime witness.
 | Purchasable names | The selected module cohort has five changed Purchasable name selectors, three accompanied by separate changed attachable name and description selectors. The magazine Record comparison finds two independently changed Purchasable names. The canonical item definition currently omits this authored field. The tracked shop inventory path family had no changed Entry. [#1160](https://github.com/p4kx-org/p4kx/issues/1160) |
 | Climate and audio | The sampled changed climate asset exercises existing size, light and growth fields, including removed optional arrays. The sampled ATL environment library remains in the existing environment, auxiliary bus and RTPC control families. The engine's runtime terrain and audio behavior remains outside these source checks. |
 
+The `actionmap settings` CLI verified 316 general declarations in each PTU. The VR
+document is absent in `13189690` and contains 39 declarations in `13201184`.
+The ActionMap JSON read the added action description and the empty bindings from
+their own source. A scoped Catalog witness compared 57 typed item reward
+occurrences from one selected `13201184` ContractGenerator to their original
+outcomes, amounts and physical references.
+
 The raw source receipts are private. This section records source structure, exact scope counts
 and implementation ownership. The complete packaged export and 16 GiB system acceptance are
 separate requirements.

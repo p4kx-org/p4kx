@@ -4996,6 +4996,9 @@
         "cargoLoadingGlobals": {
           "$ref": "#/$defs/CatalogTableOfCargoLoadingGlobal"
         },
+        "clientProfileSettings": {
+          "$ref": "#/$defs/ClientProfileSettings"
+        },
         "clothing": {
           "$ref": "#/$defs/CatalogTableOfClothing"
         },
@@ -5164,6 +5167,7 @@
         "attachableModifiers",
         "blueprintTiers",
         "cargoLoadingGlobals",
+        "clientProfileSettings",
         "clothing",
         "consumables",
         "contractTemplates",
@@ -9173,6 +9177,23 @@
       ],
       "type": "object"
     },
+    "ClientProfileSettings": {
+      "description": "The authored General and VR client profile documents.",
+      "properties": {
+        "documents": {
+          "items": {
+            "$ref": "#/$defs/ProfileDocument"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        }
+      },
+      "required": [
+        "documents"
+      ],
+      "type": "object"
+    },
     "ClimateAppearance": {
       "properties": {
         "debrisPath": {
@@ -11728,6 +11749,13 @@
           "$ref": "#/$defs/Stated_boolean",
           "description": "Parameter `Illegal`; base: `illegal` of the template's display info."
         },
+        "itemRewardResults": {
+          "description": "Links to the physical item rewards in the selected result block.",
+          "items": {
+            "$ref": "#/$defs/SourcedValueOfSourceValueRef"
+          },
+          "type": "array"
+        },
         "locationPrerequisites": {
           "description": "The `ContractPrerequisite_LocationProperty` prerequisites of handler, contract and sub\ncontract, in that order and as stored: the contract is offered at the location the named\nvariable of `locationQueries` resolves to. On LIVE four contracts (the North Rock PVP\nbounties) name a variable no query states.",
           "items": {
@@ -11912,6 +11940,7 @@
         "haulingOrders",
         "hideInMobiGlas",
         "illegal",
+        "itemRewardResults",
         "locationPrerequisites",
         "locationQueries",
         "maxPlayersPerInstance",
@@ -11967,6 +11996,46 @@
         "displayName",
         "guid",
         "name"
+      ],
+      "type": "object"
+    },
+    "ContractItemRewardResult": {
+      "description": "The original settings of one physical item result.",
+      "properties": {
+        "amount": {
+          "$ref": "#/$defs/SourcedValueOfResourceInt64"
+        },
+        "awardOnlyToMissionOwner": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "entityClass": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "missionResults": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfboolean"
+        },
+        "notification": {
+          "$ref": "#/$defs/SourcedValueOfSourceValueRef"
+        },
+        "sendToPlayerHomeLocation": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "source": {
+          "$ref": "#/$defs/SourceValueRef"
+        },
+        "targetLocation": {
+          "$ref": "#/$defs/SourcedValueOfItemRewardTarget"
+        }
+      },
+      "required": [
+        "amount",
+        "awardOnlyToMissionOwner",
+        "entityClass",
+        "missionResults",
+        "notification",
+        "sendToPlayerHomeLocation",
+        "source",
+        "targetLocation"
       ],
       "type": "object"
     },
@@ -17942,6 +18011,12 @@
         "inputRef": {
           "$ref": "#/$defs/PhysicalSourceRef"
         },
+        "itemRewardResults": {
+          "items": {
+            "$ref": "#/$defs/ContractItemRewardResult"
+          },
+          "type": "array"
+        },
         "metadataTag": {
           "$ref": "#/$defs/SourcedValueOfstring"
         },
@@ -17973,6 +18048,7 @@
         "fileName",
         "guid",
         "inputRef",
+        "itemRewardResults",
         "metadataTag",
         "missionItemProperties",
         "recordIndex",
@@ -24007,12 +24083,16 @@
     },
     "ItemPurchasable": {
       "properties": {
+        "displayName": {
+          "$ref": "#/$defs/SourcedValueOfPublicNameRef"
+        },
         "displayType": {
           "$ref": "#/$defs/SourcedValueOfGameTextRef",
           "x-gameText": true
         }
       },
       "required": [
+        "displayName",
         "displayType"
       ],
       "type": "object"
@@ -24134,6 +24214,29 @@
         "notificationParams",
         "ownerGuid",
         "ownerRecordIndex"
+      ],
+      "type": "object"
+    },
+    "ItemRewardTarget": {
+      "description": "An authored location selector and its exact joined value when it targets an owned instance.",
+      "properties": {
+        "reference": {
+          "$ref": "#/$defs/SourceWeakReference"
+        },
+        "targetValue": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceValueRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "reference",
+        "targetValue"
       ],
       "type": "object"
     },
@@ -25433,6 +25536,10 @@
         {
           "description": "Physical DataForge commodity shop settings Records.",
           "value": "shopCommodityGlobals"
+        },
+        {
+          "description": "Authored general and VR client profile attribute files.",
+          "value": "clientProfileSettings"
         }
       ]
     },
@@ -33837,6 +33944,131 @@
         "recordPath",
         "sourceType",
         "temperatureRtpc"
+      ],
+      "type": "object"
+    },
+    "ProfileDeclaration": {
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "value": {
+          "$ref": "#/$defs/ProfileText"
+        }
+      },
+      "required": [
+        "name",
+        "value"
+      ],
+      "type": "object"
+    },
+    "ProfileDocument": {
+      "properties": {
+        "candidates": {
+          "items": {
+            "$ref": "#/$defs/PhysicalEntryIdentity"
+          },
+          "type": "array"
+        },
+        "elements": {
+          "items": {
+            "$ref": "#/$defs/ProfileElement"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "$ref": "#/$defs/ProfileKind"
+        },
+        "requestedPath": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/SourcedValueOfProfileState"
+        }
+      },
+      "required": [
+        "candidates",
+        "elements",
+        "kind",
+        "requestedPath",
+        "status"
+      ],
+      "type": "object"
+    },
+    "ProfileElement": {
+      "properties": {
+        "content": {
+          "items": {
+            "$ref": "#/$defs/ProfileText"
+          },
+          "type": "array"
+        },
+        "declarations": {
+          "items": {
+            "$ref": "#/$defs/ProfileDeclaration"
+          },
+          "type": "array"
+        },
+        "name": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "parent": {
+          "$ref": "#/$defs/SourcedValueOfNullable_uint32"
+        },
+        "position": {
+          "$ref": "#/$defs/SourcedValueOfSourceLocation"
+        }
+      },
+      "required": [
+        "content",
+        "declarations",
+        "name",
+        "parent",
+        "position"
+      ],
+      "type": "object"
+    },
+    "ProfileKind": {
+      "enum": [
+        "general",
+        "virtualReality"
+      ],
+      "type": "string"
+    },
+    "ProfileState": {
+      "enum": [
+        "read",
+        "missing",
+        "filtered",
+        "unavailable",
+        "ambiguous",
+        "unreadable",
+        "malformed",
+        "unsupported"
+      ],
+      "type": "string"
+    },
+    "ProfileText": {
+      "properties": {
+        "lexeme": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "x-gameText": true
+        },
+        "value": {
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "x-gameText": true
+        }
+      },
+      "required": [
+        "lexeme",
+        "value"
       ],
       "type": "object"
     },
@@ -65219,6 +65451,139 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfArray_of_SourcedValueOfboolean": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfboolean"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfArray_of_SourcedValueOfstring": {
       "allOf": [
         {
@@ -89058,6 +89423,136 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfItemRewardTarget": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ItemRewardTarget"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfItemTokenOutcome": {
       "allOf": [
         {
@@ -98763,6 +99258,141 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfNullable_uint32": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfOperatingEntity": {
       "allOf": [
         {
@@ -101067,6 +101697,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/Probe"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfProfileState": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ProfileState"
               }
             }
           }

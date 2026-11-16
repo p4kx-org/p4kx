@@ -117,7 +117,6 @@ impl<'input> EntryCapture<'input> {
     }
 }
 
-#[cfg(test)]
 pub(crate) fn with_entry_capture<T>(
     archive: &Archive,
     read: impl FnOnce(&EntryCapture<'_>) -> Result<T, CatalogError>,

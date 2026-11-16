@@ -7,6 +7,7 @@ use crate::Kind;
 use crate::catalog_read::original::FailedEntryObservation;
 use crate::export_diagnostic::{
     ExportDiagnosticCode, ExportDiagnosticSeverity, ExportDiagnosticStage, ExportDiagnosticUnit,
+    ExportSourceRole,
 };
 use crate::export_entry_ledger::ArchiveEntryObservation;
 use crate::export_health::ExportSourceCounts;
@@ -76,7 +77,12 @@ pub(crate) fn compile(
 }
 
 fn failure(source: &ArchiveEntryObservation) -> FailedEntryObservation {
-    let (stage, code) = if source.disposition == SourceDisposition::ReadFailed {
+    let (stage, code) = if source.role == ExportSourceRole::SelectionCandidate {
+        (
+            ExportDiagnosticStage::Selection,
+            ExportDiagnosticCode::SelectionFailure,
+        )
+    } else if source.disposition == SourceDisposition::ReadFailed {
         (
             ExportDiagnosticStage::SourceRead,
             ExportDiagnosticCode::SourceReadFailure,

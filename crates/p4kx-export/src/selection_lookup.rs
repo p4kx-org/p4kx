@@ -76,6 +76,7 @@ impl Kind {
                 | Self::Shops
                 | Self::ShopInventories
                 | Self::ParticleLibraries
+                | Self::ClientProfileSettings
                 | Self::PlanetResources
                 | Self::Creatures
                 | Self::ClimateAssets

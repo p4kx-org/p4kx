@@ -72,6 +72,7 @@ pub(super) fn contracts() -> Value {
             "minStandingGuid": "62000000-0000-4000-8000-000000000001",
             "maxStandingGuid": null
         }],
+        "itemRewardResults": [],
         "fixedRewards": present(json!([{
             "currency": present(json!("UEC")),
             "amount": present(json!("40000")),

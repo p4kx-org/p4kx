@@ -424,6 +424,9 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   ends. File exports write a sibling origin companion. Raw stdout can carry a separate receipt
   through `--origin-stderr` or `--origin-out <file>`. See [localisation origins](source-origin.md#localisation-tables).
   `--fallback en` is the usual choice; there is no default. `--json` gives the shapes in [docs/cli-json.md](cli-json.md).
+- `p4kx actionmap settings <archive>` reports the authored general and VR client profile
+  attribute files with ordered XML and exact source origins. See
+  [client profile settings](client-profile-settings.md).
 - `p4kx actionmap export <archive> [--format json|csv] [--csv-raw] [--language <language>]
   [--out <file>]` writes the action maps of `Data\Libs\Config\defaultProfile.xml`: every action with the
   localised label of its key and its default bindings for the keyboard, mouse, gamepad and

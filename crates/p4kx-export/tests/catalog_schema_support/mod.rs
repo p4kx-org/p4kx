@@ -262,6 +262,18 @@ pub(crate) fn minimal_catalog() -> Value {
             "vehicleArmor": absent_table(), "suitArmor": absent_table(), "clothing": absent_table(), "itemRadars": absent_table(), "turretHealth": absent_table(), "miningLasers": absent_table(), "attachableModifiers": absent_table(), "consumables": absent_table(),
             "contractTemplates": absent_table(),
             "missionBrokerEntries": absent_table(),
+            "clientProfileSettings": {
+                "documents": [
+                    {"kind": "general", "requestedPath": "Data/fixture/attributes.xml",
+                        "status": {"state": "present", "value": "missing", "sourceUsesRefs": [],
+                            "sourceSetComplete": false, "containsEncryptedSource": null},
+                        "candidates": [], "elements": []},
+                    {"kind": "virtualReality", "requestedPath": "Data/fixture/attributesVR.xml",
+                        "status": {"state": "present", "value": "missing", "sourceUsesRefs": [],
+                            "sourceSetComplete": false, "containsEncryptedSource": null},
+                        "candidates": [], "elements": []}
+                ]
+            },
             "localContractGenerators": absent_table(),
             "missionFlows": absent_table(),
             "reputationTriggers": absent_table(),

@@ -3,11 +3,13 @@
 
 use std::io::{self, BufWriter, Write};
 use std::path::Path;
+use std::process::ExitCode;
 
 use anyhow::{Context, Result};
 use p4kx_export::{
     ActionMapCounts, ActionMapFormat, ActionMapLabels, ActionMapProfile,
-    action_map_summary_origins, write_action_maps, write_action_maps_with_origins,
+    action_map_summary_origins, read_client_profile_settings, write_action_maps,
+    write_action_maps_with_origins,
 };
 use p4kx_extraction::{
     Archive, ArchiveWriteProtection, CancelToken, FieldOrigins, LocalizationSet,
@@ -42,10 +44,26 @@ struct JsonReport<'a> {
 }
 
 /// Runs `p4kx actionmap`.
-pub(crate) fn run(args: &ActionMapArgs, as_json: bool) -> Result<()> {
+pub(crate) fn run(args: &ActionMapArgs, as_json: bool) -> Result<ExitCode> {
     match &args.action {
-        ActionMapAction::Export(args) => export(args, as_json),
+        ActionMapAction::Export(args) => {
+            export(args, as_json)?;
+            Ok(ExitCode::from(crate::exit::SUCCESS))
+        }
+        ActionMapAction::Settings(args) => settings(&args.archive),
     }
+}
+
+fn settings(path: &Path) -> Result<ExitCode> {
+    let archive = crate::key::open(path)?;
+    let report = read_client_profile_settings(&archive, None)?;
+    json::print(&report)?;
+    let code = if report.settings().has_failed_inputs() {
+        crate::exit::PARTIAL_FAILURE
+    } else {
+        crate::exit::SUCCESS
+    };
+    Ok(ExitCode::from(code))
 }
 
 fn export(args: &ActionMapExportArgs, as_json: bool) -> Result<()> {

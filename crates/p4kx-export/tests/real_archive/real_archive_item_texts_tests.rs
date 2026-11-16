@@ -17,6 +17,45 @@ const LOCALIZATION: &str = "SCItemLocalization";
 const PURCHASE: &str = "SCItemPurchasableParams";
 const COMPONENTS: &str = "/definitions/items/rows/0/components/value";
 
+const MUTATIONS: [(&str, &str, &str, (usize, usize)); 6] = [
+    (
+        "0/value/value/localization/value/name/value",
+        "publicNames",
+        "displayText",
+        (1, 0),
+    ),
+    (
+        "0/value/value/localization/value/description/value",
+        "gameTexts",
+        "sourceText",
+        (1, 0),
+    ),
+    (
+        "1/value/displayType/value",
+        "gameTexts",
+        "displayText",
+        (1, 0),
+    ),
+    (
+        "1/value/displayName/value",
+        "publicNames",
+        "displayText",
+        (0, 1),
+    ),
+    (
+        "2/value/value/localization/value/name/value",
+        "publicNames",
+        "sourceText",
+        (0, 1),
+    ),
+    (
+        "3/value/displayType/value",
+        "gameTexts",
+        "displayText",
+        (0, 1),
+    ),
+];
+
 #[test]
 fn item_translation_mutations_fail_without_changing_historical_baselines() -> TestResult {
     let fixture = Fixture::from_database(&database())?;
@@ -29,38 +68,7 @@ fn item_translation_mutations_fail_without_changing_historical_baselines() -> Te
     assert_eq!(german.resolved, 3, "the original German texts resolve");
     assert_eq!(german.supplemental_contradictions, 0);
 
-    for (path, domain, form, expected) in [
-        (
-            "0/value/value/localization/value/name/value",
-            "publicNames",
-            "displayText",
-            (1, 0),
-        ),
-        (
-            "0/value/value/localization/value/description/value",
-            "gameTexts",
-            "sourceText",
-            (1, 0),
-        ),
-        (
-            "1/value/displayType/value",
-            "gameTexts",
-            "displayText",
-            (1, 0),
-        ),
-        (
-            "2/value/value/localization/value/name/value",
-            "publicNames",
-            "sourceText",
-            (0, 1),
-        ),
-        (
-            "3/value/displayType/value",
-            "gameTexts",
-            "displayText",
-            (0, 1),
-        ),
-    ] {
+    for (path, domain, form, expected) in MUTATIONS {
         let catalog = mutate_german(&fixture, path, domain, form)?;
         let (english, german) = check_pipe_coverage(&fixture, &catalog, path)?;
         assert_eq!(english.total(), 3, "English denominator is preserved");
@@ -143,6 +151,7 @@ fn item_text_census_keeps_positions_and_checked_carriers_without_the_nontext_bod
     for path in [
         "/definitions/items/rows/0/recordIndex",
         "/definitions/items/rows/0/components/sourceUsesRefs",
+        "/definitions/items/rows/0/components/value/1/value/displayName",
         "/definitions/items/rows/0/components/value/2/componentOrdinal",
         "/definitions/items/rows/0/components/value/2/value/value/localization/value/description",
     ] {
@@ -246,9 +255,9 @@ fn database() -> DataForgeBuilder {
         "Components",
         TestValue::Array(vec![
             attachment("@shared", "@resource_description"),
-            purchasable("@own_type"),
+            purchasable("@fallback_resource_name", "@own_type"),
             attachment("@resource_name", "@own_description"),
-            purchasable("@fallback_resource_name"),
+            purchasable("@own_description", "@fallback_resource_name"),
         ]),
     );
 
@@ -273,6 +282,7 @@ fn database() -> DataForgeBuilder {
         .structure(
             TestStruct::new(PURCHASE)
                 .parent(BASE)
+                .field("displayName", TestType::Locale)
                 .field("displayType", TestType::Locale),
         )
         .record(item)
@@ -289,6 +299,10 @@ fn attachment(name: &str, description: &str) -> TestValue {
     )
 }
 
-fn purchasable(key: &str) -> TestValue {
-    TestValue::Struct(TestInstance::new(PURCHASE).value("displayType", TestValue::text(key)))
+fn purchasable(name: &str, display_type: &str) -> TestValue {
+    TestValue::Struct(
+        TestInstance::new(PURCHASE)
+            .value("displayName", TestValue::text(name))
+            .value("displayType", TestValue::text(display_type)),
+    )
 }

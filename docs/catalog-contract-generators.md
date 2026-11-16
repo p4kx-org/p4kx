@@ -140,6 +140,35 @@ when that header supplies the tag. An empty grant list describes the admitted Ge
 Relevant read failures, including an unreadable Generator path that prevents selection, make
 the list's source set incomplete.
 
+## Authored item rewards
+
+Each `itemRewardResults` row belongs to a physical `ContractResult_Item` occurrence in a
+Generator. The `source.valueIndex` identifies the original result in `source.values`.
+Rows retain physical order and repeated occurrences, including those on contracts that
+the logical projection excludes or deduplicates. The list is empty for a Generator
+without a readable item-result occurrence.
+
+`missionResults` carries the original flags in order, with state and source evidence
+per flag. Its first flag is the existing success selector. `entityClass` identifies the
+physical EntityClassDefinition Record. `amount` preserves the signed Int32 as decimal
+text. `awardOnlyToMissionOwner` and `sendToPlayerHomeLocation` retain each authored Bool
+independently. `notification` links to the original structured notification, including its
+locale, token and audio fields, in the same source arena.
+
+`targetLocation` describes the authored WeakPointer. A resolved reference carries the
+target Record index, GUID, path and its Record or instance variant with their sources.
+An instance has the decoder's original location and its `targetValue` selects the exact
+owned value in `source.values`. Whole-Record targets have a null `targetValue`. Index
+zero is a valid identity. Missing, null, unsupported and unreadable fields keep their
+source states. The target describes an authored mission property, whose runtime delivery
+destination is decided by the game.
+
+Each logical contract's `itemRewardResults` is an ordered list of sourced value references
+to the physical rows in its Generator. A sub contract with a nonempty result list uses
+its own list. The parent supplies the results otherwise. Every item result in the
+selected block is linked; each physical row retains its outcome flags. Blueprint
+pools, currency payouts and reputation gains keep their own fields and selection rules.
+
 ## Fixed payouts
 
 `fixedRewards` is a sourced list. The parent contract's first `contractResults` struct supplies

@@ -15,11 +15,13 @@ use crate::guid_text::CatalogGuid;
 use crate::mission_blueprints::{Overrides, blueprint_rewards};
 use crate::mission_cooldown::ContractCooldown;
 use crate::mission_facts::SharedFacts;
+use crate::mission_generator::item_reward_results;
 use crate::mission_giver::giver;
 use crate::mission_index::MissionIndex;
 use crate::mission_layers::one;
 use crate::mission_results::{entry_results, gains};
 use crate::mission_standing::{Standing, required_faction};
+use crate::source_value_catalog::SourceValueRef;
 use crate::spawn_layers::Resolved;
 
 /// What an entry is resolved to besides its layers: its places, facts and spawn descriptions.
@@ -60,6 +62,7 @@ pub(crate) struct Rewards<'f> {
     pub(crate) gains: SourcedValue<Vec<ReputationGain<'f>>>,
     pub(crate) giver_faction: Option<GiverFaction<'f>>,
     pub(crate) blueprints: Vec<BlueprintReward>,
+    pub(crate) item_results: Vec<SourcedValue<SourceValueRef>>,
 }
 
 impl<'f> Rewards<'f> {
@@ -89,6 +92,7 @@ impl<'f> Rewards<'f> {
             gains,
             giver_faction,
             blueprints: blueprint_rewards(block, &overrides),
+            item_results: item_reward_results::links::read(fields, contract, sub)?,
         })
     }
 }

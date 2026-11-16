@@ -94,6 +94,7 @@ struct ItemPhysics {
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 struct ItemPurchasable {
+    display_name: SourcedValue<PublicNameRef>,
     #[schemars(extend("x-gameText" = true))]
     display_type: SourcedValue<GameTextRef>,
 }
@@ -246,6 +247,7 @@ fn read_component<'source>(
             },
         ),
         PURCHASABLE => ItemDefinitionComponentKind::Purchasable(ItemPurchasable {
+            display_name: source.public_name("displayName", projection, notes)?,
             display_type: source.protected_locale("displayType", projection, notes)?,
         }),
         _ => return Ok(None),

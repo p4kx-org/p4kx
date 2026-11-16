@@ -3,6 +3,7 @@
 
 use p4kx_extraction::{SourceUse, SourceUseRole, SourceValue, SourcedValue, StructValue, Value};
 
+use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_read::original::{
     OriginalDatum, OriginalFlowFields, OriginalReferenceObservation, OriginalValueFact,
@@ -13,10 +14,9 @@ use crate::guid_text::CatalogGuid;
 use crate::mission_facts::choice;
 use crate::mission_index::MissionIndex;
 use crate::mission_layers::items_value;
+use crate::mission_results;
 use crate::resource_integer::ResourceInt64;
-use crate::{CatalogError, ExportAccountingError};
 
-const RESULT_BLOCK: &str = "contractResults";
 const LEGACY_REPUTATION: &str = "ContractResult_LegacyReputation";
 
 /// Reads the successful reputation results in the selected contract or sub-contract block.
@@ -29,7 +29,8 @@ pub(crate) fn gains<'source>(
 ) -> Result<SourcedValue<Vec<ReputationGain<'source>>>, CatalogError> {
     let reader = Reader { fields };
     let mut path = Vec::new();
-    let results = reader.selected_results(parent, sub, &mut path)?;
+    let results =
+        mission_results::selected_result_fact(fields, parent, sub, |used| retain(&mut path, used))?;
     let mut membership = Vec::new();
     choice::extend(&mut membership, &path)?;
     let mut gains = Vec::new();
@@ -60,40 +61,6 @@ struct Reader<'fields, 'scope, 'read, 'source> {
 }
 
 impl<'fields, 'scope, 'read, 'source> Reader<'fields, 'scope, 'read, 'source> {
-    fn selected_results(
-        &self,
-        parent: &StructValue<'source>,
-        sub: Option<&StructValue<'source>>,
-        uses: &mut Vec<SourceUse>,
-    ) -> Result<Option<Fact<'fields, 'scope, 'read, 'source>>, CatalogError> {
-        if let Some(sub) = sub
-            && let Some(results) = self.result_list(sub, uses)?
-            && !items_value(results.value()).is_empty()
-        {
-            return Ok(Some(results));
-        }
-        self.result_list(parent, uses)
-    }
-
-    fn result_list(
-        &self,
-        owner: &StructValue<'source>,
-        uses: &mut Vec<SourceUse>,
-    ) -> Result<Option<Fact<'fields, 'scope, 'read, 'source>>, CatalogError> {
-        let owner = self
-            .fields
-            .owner_of(owner)?
-            .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
-        let Some(block) = self
-            .fields
-            .observe_struct_selection(owner, RESULT_BLOCK, |used| retain(uses, used))?
-        else {
-            return Ok(None);
-        };
-        self.fields
-            .observe_field_selection(block, RESULT_BLOCK, &mut |used| retain(uses, used))
-    }
-
     fn selected_amounts(
         &self,
         candidate: Fact<'fields, 'scope, 'read, 'source>,
