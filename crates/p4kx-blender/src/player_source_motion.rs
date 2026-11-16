@@ -176,7 +176,7 @@ pub(crate) struct ControllerRigOwner {
 
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-enum RigOwnerState {
+pub(crate) enum RigOwnerState {
     Unresolved,
 }
 

@@ -790,6 +790,90 @@
       ],
       "type": "object"
     },
+    "ClipAliasCandidate": {
+      "additionalProperties": false,
+      "properties": {
+        "chunk": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "group": {
+          "$ref": "#/$defs/SourcedValueOfuint"
+        },
+        "record": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "rig": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "rule": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "rig",
+        "rule",
+        "chunk",
+        "record",
+        "group"
+      ],
+      "type": "object"
+    },
+    "ClipAliasGroup": {
+      "additionalProperties": false,
+      "properties": {
+        "aliasKey": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "controllerRigBinding": {
+          "$ref": "#/$defs/RigOwnerState"
+        }
+      },
+      "required": [
+        "aliasKey",
+        "controllerRigBinding"
+      ],
+      "type": "object"
+    },
+    "ClipAliasOccurrence": {
+      "additionalProperties": false,
+      "properties": {
+        "animation": {
+          "$ref": "#/$defs/SourcedValueOfuint"
+        },
+        "document": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "fragment": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "group": {
+          "$ref": "#/$defs/SourcedValueOfuint"
+        },
+        "layer": {
+          "$ref": "#/$defs/SourcedValueOfuint"
+        }
+      },
+      "required": [
+        "document",
+        "fragment",
+        "layer",
+        "animation",
+        "group"
+      ],
+      "type": "object"
+    },
     "ClipSources": {
       "oneOf": [
         {
@@ -8664,6 +8748,63 @@
         "type",
         "document",
         "index",
+        "value"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "index": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "type": {
+          "const": "adbClipAliasGroup",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/ClipAliasGroup"
+        }
+      },
+      "required": [
+        "type",
+        "index",
+        "value"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "adbClipAliasOccurrence",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/ClipAliasOccurrence"
+        }
+      },
+      "required": [
+        "type",
+        "value"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "rigClipAliasCandidate",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/ClipAliasCandidate"
+        }
+      },
+      "required": [
+        "type",
         "value"
       ],
       "type": "object"

@@ -211,13 +211,13 @@ fn prepare_observed<'sink>(
     let resources = Resources::new(archive, &sources, cancel);
     let (loadouts, original_motion) =
         capture_motion(&resources, &directory, classes, &mut documents)?;
-    let rig_clips = streaming_rigs(
+    let rig_clips = capture_rig_clips(
         &mut documents,
         &paths,
         variants,
-        &sources,
+        &resources,
         &directory,
-        cancel,
+        &original_motion.adb_declarations,
     )?;
     let actor_rig_candidates = documents
         .is_streaming()
@@ -267,19 +267,27 @@ fn capture_motion(
     Ok((loadouts, motion))
 }
 
-fn streaming_rigs(
+fn capture_rig_clips(
     documents: &mut XmlDocuments<'_>,
     paths: &p4kx_extraction::PathIndex<'_>,
     variants: &[BodyVariant],
-    sources: &SourceUses,
+    resources: &Resources<'_>,
     directory: &SourceUse,
-    cancel: &CancelToken,
+    declarations: &[AdbDeclarations],
 ) -> Result<RigClips, PlayerSourceError> {
-    if documents.is_streaming() {
-        player_rig_clip::read(paths, variants, sources, directory, cancel, documents)
-    } else {
-        Ok(RigClips::default())
+    if !documents.is_streaming() {
+        return Ok(RigClips::default());
     }
+    let mut clips = player_rig_clip::read(
+        paths,
+        variants,
+        resources.sources,
+        directory,
+        resources.cancel,
+        documents,
+    )?;
+    clips.bind_aliases(declarations, resources.sources, resources.cancel)?;
+    Ok(clips)
 }
 
 fn capture_bodies(
@@ -385,3 +393,7 @@ mod installed_witness;
 #[cfg(test)]
 #[path = "player_bundle_installed_witness.rs"]
 mod bundle_witness;
+
+#[cfg(test)]
+#[path = "player_adb_clip_alias_witness.rs"]
+mod adb_clip_alias_witness;

@@ -5,7 +5,7 @@ use std::fs;
 
 use p4kx_assembly::BodyVariant;
 use p4kx_blender::{player_bundle_record_schema, write_player_source_bundle};
-use p4kx_extraction::CancelToken;
+use p4kx_extraction::{Archive, CancelToken};
 use p4kx_model::CafImage;
 use p4kx_testkit::{TestAnimation, TestChunkFile, TestDba, TestEntry};
 use serde_json::{Value, json};
@@ -240,25 +240,40 @@ fn assert_rules(rows: &[Value]) -> TestResult {
 }
 
 fn capture(unique: bool) -> TestResult<Vec<Value>> {
-    let skeleton = format!("Data/{}", BodyVariant::Male.skeleton());
-    let stem = skeleton.strip_suffix(".chr").ok_or("skeleton extension")?;
-    let images = cif_image()?;
-    let mut entries = vec![
-        TestEntry::stored(&skeleton, b"rig"),
-        TestEntry::stored(format!("{stem}.chrparams"), PARAMS),
-        TestEntry::stored("Data/Animations/Animations.img", images),
-        TestEntry::stored(LOOSEN, b"loose"),
-        TestEntry::stored(BANK, dba()).encrypted(),
-        TestEntry::stored(OTHER_BANK, dba()),
-    ];
+    let mut entries = body_entries(BodyVariant::Male)?
+        .into_iter()
+        .collect::<Vec<_>>();
+    entries.extend(animation_entries()?);
     if !unique {
         entries.push(TestEntry::stored(BANK.to_ascii_lowercase(), dba()));
     }
     let (_input, archive) = fixture_with_entries(entries)?;
+    capture_rows(&archive)
+}
+
+pub(super) fn body_entries(body: BodyVariant) -> TestResult<[TestEntry; 2]> {
+    let skeleton = format!("Data/{}", body.skeleton());
+    let stem = skeleton.strip_suffix(".chr").ok_or("skeleton extension")?;
+    Ok([
+        TestEntry::stored(&skeleton, b"rig"),
+        TestEntry::stored(format!("{stem}.chrparams"), PARAMS),
+    ])
+}
+
+pub(super) fn animation_entries() -> TestResult<[TestEntry; 4]> {
+    Ok([
+        TestEntry::stored("Data/Animations/Animations.img", cif_image()?),
+        TestEntry::stored(LOOSEN, b"loose"),
+        TestEntry::stored(BANK, dba()).encrypted(),
+        TestEntry::stored(OTHER_BANK, dba()),
+    ])
+}
+
+pub(super) fn capture_rows(archive: &Archive) -> TestResult<Vec<Value>> {
     let output = tempfile::tempdir()?;
     let path = output.path().join("bundle");
     write_player_source_bundle(
-        &archive,
+        archive,
         &[BodyVariant::Male, BodyVariant::Female],
         &path,
         &CancelToken::new(),
@@ -312,7 +327,7 @@ fn dba() -> Vec<u8> {
         .bytes()
 }
 
-fn family<'a>(rows: &'a [Value], kind: &str) -> Vec<&'a Value> {
+pub(super) fn family<'a>(rows: &'a [Value], kind: &str) -> Vec<&'a Value> {
     rows.iter()
         .filter(|row| row.get("type").and_then(Value::as_str) == Some(kind))
         .collect()

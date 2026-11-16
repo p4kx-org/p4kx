@@ -36,6 +36,9 @@ mod actor_rig_candidates;
 #[path = "player_rig_clip_candidates.rs"]
 mod rig_clip_candidates;
 
+#[path = "player_adb_clip_candidates.rs"]
+mod adb_clip_candidates;
+
 #[path = "player_controller_contexts.rs"]
 mod controller_contexts;
 

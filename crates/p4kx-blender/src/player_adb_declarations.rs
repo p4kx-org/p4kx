@@ -2,8 +2,8 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_extraction::{
-    CancelToken, FieldOrigin, PhysicalSourceRef, SourceUse, SourceUseRole, SourceUses, SourceValue,
-    SourcedValue,
+    CancelToken, FieldOrigin, PhysicalSourceRef, SourceEvidenceError, SourceUse, SourceUseRole,
+    SourceUses, SourceValue, SourcedValue,
 };
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -43,6 +43,52 @@ pub(crate) struct Fragment {
     layers: Vec<Layer>,
 }
 
+pub(crate) struct AnimationAlias<'a> {
+    pub(crate) layer: SourcedValue<usize>,
+    pub(crate) animation: SourcedValue<usize>,
+    pub(crate) key: Option<AdbAliasKey<'a>>,
+    name: &'a AttributeSelection,
+}
+
+pub(crate) struct AdbAliasKey<'a> {
+    pub(crate) value: &'a SourcedValue<String>,
+    pub(crate) selector: &'a SourceUse,
+}
+
+impl AnimationAlias<'_> {
+    pub(crate) fn unavailable<T>(
+        &self,
+        sources: &SourceUses,
+    ) -> Result<SourcedValue<T>, SourceEvidenceError> {
+        let state = match self.name.state {
+            AttributeState::Absent => SourceValue::Absent,
+            AttributeState::Invalid => SourceValue::Invalid,
+            AttributeState::Present => SourceValue::Unsupported,
+        };
+        sources.value_with_origins(state, &[&self.name.origin])
+    }
+}
+
+impl Fragment {
+    pub(crate) fn animation_aliases(&self) -> impl Iterator<Item = AnimationAlias<'_>> {
+        self.layers.iter().flat_map(|layer| {
+            layer
+                .animations
+                .iter()
+                .map(move |animation| AnimationAlias {
+                    layer: layer.position.map_ref(|_| layer.ordinal),
+                    animation: animation.position.map_ref(|_| animation.ordinal),
+                    key: animation
+                        .alias_key
+                        .as_ref()
+                        .zip(animation.alias_selector.as_ref())
+                        .map(|(value, selector)| AdbAliasKey { value, selector }),
+                    name: &animation.name,
+                })
+        })
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct Branch {
     pub(crate) ordinal: usize,
@@ -74,6 +120,8 @@ struct Animation {
     position: SourcedValue<SocXmlPosition>,
     name: AttributeSelection,
     alias_key: Option<SourcedValue<String>>,
+    #[serde(skip)]
+    alias_selector: Option<SourceUse>,
     flags: AttributeSelection,
     preceding_blend: SourcedValue<usize>,
 }
@@ -242,6 +290,7 @@ impl Animation {
         origin: &XmlOrigin<'_>,
     ) -> Result<Self, SocSceneError> {
         let (position, used) = node_position(animation.position, origin)?;
+        let name_attribute = animation.name.name;
         let name = AttributeSelection::bind(animation.name, &used, origin)?;
         let alias_key = match name.occurrences.as_slice() {
             [attribute] => attribute
@@ -249,6 +298,12 @@ impl Animation {
                 .value()
                 .and_then(|value| crate::player_rig_clip::alias_key(value))
                 .map(|key| attribute.value.map_ref(|_| key)),
+            _ => None,
+        };
+        let alias_selector = match (&alias_key, name.occurrences.as_slice()) {
+            (Some(_), [attribute]) => {
+                Some(origin.at(&attribute.position, name_attribute, SourceUseRole::Selector)?)
+            }
             _ => None,
         };
         let flags = AttributeSelection::bind(animation.flags, &used, origin)?;
@@ -270,6 +325,7 @@ impl Animation {
             position,
             name,
             alias_key,
+            alias_selector,
             flags,
             preceding_blend,
         })

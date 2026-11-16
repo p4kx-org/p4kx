@@ -6,10 +6,13 @@ use p4kx_extraction::{CancelToken, PathIndex, SourceUse, SourceUses, SourceValue
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use crate::player_adb_declarations::AdbDeclarations;
 use crate::player_source::{PlayerSourceError, check};
 use crate::soc_scene_class_resources::{ResourceKind, resource_path};
 use crate::soc_scene_xml::XmlDocuments;
 
+#[path = "player_rig_clip_aliases.rs"]
+mod aliases;
 #[path = "player_rig_clip_bank.rs"]
 mod bank;
 #[path = "player_rig_clip_image.rs"]
@@ -19,6 +22,7 @@ mod input;
 #[path = "player_rig_clip_rules.rs"]
 mod rules;
 
+pub(crate) use aliases::{ClipAliasCandidate, ClipAliasGroup, ClipAliasOccurrence};
 pub(crate) use bank::Bank;
 pub(crate) use rules::Rule;
 
@@ -34,6 +38,20 @@ pub(crate) struct RigClips {
     pub(crate) banks: Vec<(usize, usize, Bank)>,
     pub(crate) clips: Vec<(usize, Clip)>,
     pub(crate) image: Option<ImageInventory>,
+    #[serde(skip)]
+    pub(crate) aliases: aliases::ClipAliases,
+}
+
+impl RigClips {
+    pub(crate) fn bind_aliases(
+        &mut self,
+        declarations: &[AdbDeclarations],
+        sources: &SourceUses,
+        cancel: &CancelToken,
+    ) -> Result<(), PlayerSourceError> {
+        self.aliases = aliases::collect(declarations, &self.clips, sources, cancel)?;
+        Ok(())
+    }
 }
 
 #[derive(Debug, Serialize, JsonSchema)]

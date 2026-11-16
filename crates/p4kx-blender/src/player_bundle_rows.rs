@@ -49,6 +49,7 @@ pub(super) fn write(
             })?;
         }
     }
+    clip_alias_rows(capture, &mut push)?;
     tag_rows(capture, &mut push)?;
     weapon_rows(capture, &mut push)?;
     for value in capture.source_inventory.sources() {
@@ -56,6 +57,23 @@ pub(super) fn write(
     }
     for value in capture.source_inventory.uses() {
         push(&Row::SourceUse { value })?;
+    }
+    Ok(())
+}
+
+fn clip_alias_rows(
+    capture: &PlayerSourceCapture,
+    push: &mut impl FnMut(&Row<'_>) -> io::Result<()>,
+) -> io::Result<()> {
+    let aliases = &capture.rig_clips.aliases;
+    for (index, value) in aliases.groups.iter().enumerate() {
+        push(&Row::AdbClipAliasGroup { index, value })?;
+    }
+    for value in &aliases.occurrences {
+        push(&Row::AdbClipAliasOccurrence { value })?;
+    }
+    for value in &aliases.candidates {
+        push(&Row::RigClipAliasCandidate { value })?;
     }
     Ok(())
 }

@@ -10,7 +10,9 @@ use serde::Serialize;
 
 use crate::PlayerDocumentRejection;
 use crate::player_adb_declarations::Fragment;
-use crate::player_rig_clip::{Bank, Clip, ImageInventory, Rig, Rule};
+use crate::player_rig_clip::{
+    Bank, Clip, ClipAliasCandidate, ClipAliasGroup, ClipAliasOccurrence, ImageInventory, Rig, Rule,
+};
 use crate::player_source_body::Body;
 use crate::player_source_classes::ClassTarget;
 use crate::player_source_loadout::Loadout;
@@ -191,6 +193,16 @@ pub(crate) enum Row<'a> {
         document: usize,
         index: usize,
         value: &'a Fragment,
+    },
+    AdbClipAliasGroup {
+        index: usize,
+        value: &'a ClipAliasGroup,
+    },
+    AdbClipAliasOccurrence {
+        value: &'a ClipAliasOccurrence,
+    },
+    RigClipAliasCandidate {
+        value: &'a ClipAliasCandidate,
     },
     AdbTagSelectors {
         #[serde(flatten)]

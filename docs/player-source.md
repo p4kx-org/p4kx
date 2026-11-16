@@ -165,6 +165,14 @@ scoped weapon and option token and checks field-use coordinates and encryption.
 The selected source graph is read without writing a bundle.
 The diagnostics report structural mismatches without printing source values.
 
+The ADB clip witness compares the alias groups and each animation's original
+position against the selected ADB documents. It checks the candidate links for
+both body variants and consumes the Player Bundle rows in memory.
+
+```text
+cargo test --locked -p p4kx-blender --lib installed_adb_aliases_reconcile_original_occurrences_and_body_candidates -- --ignored
+```
+
 `weaponMotionSource` records identify observed personal weapon AttachDef
 occurrences by physical record index, GUID and component ordinal, and preserve the authored Tags. `weaponMotionLoadout`
 references the source candidates of each original loadout item occurrence,
@@ -186,13 +194,29 @@ the preceding valid `#filepath` in the same AnimationList with a plain `*` alias
 and a recursive `*/*.caf` mask. Other mappings remain visible as original rules.
 
 `rigClipCandidate` links a rule and a physical CAF image record by chunk and
-record ordinal and retains its full original path. Its ASCII-insensitive
-`aliasKey` can be compared with the matching key of a single original
-`adbFragment` animation name. These comparisons describe possible matches for
-each requested body. Controller scope and runtime playback selection remain
-unresolved. Multiple physical alternatives are retained. An otherwise valid
-path with a basename outside the alias comparison's bare ASCII alphabet keeps
-its physical row and an unsupported key state.
+record ordinal and retains its full original path. An otherwise valid path with
+a basename outside the alias comparison's bare ASCII alphabet keeps its physical
+row and an unsupported key state.
+
+`adbClipAliasGroup.index` identifies a shared normalized `aliasKey`, in first
+authored ADB animation order. `adbClipAliasOccurrence` identifies the original
+`adbFragment` by `document` and `fragment`, then gives the original XML `layer`
+and `animation` ordinals. Its sourced `group` points to the matching group.
+Missing names, repeated names and unsupported names have distinct source states.
+A valid authored alias gets a group even when it has no observed physical match.
+
+`rigClipAliasCandidate` points to the same group and identifies its physical
+`rigClipCandidate` by `rig`, `rule`, `chunk` and `record`. Consumers can follow the
+group to all authored occurrences and physical alternatives without expanding a
+row for each pairing. `group` retains the authored alias and the source evidence
+used for the join. The original candidate path and loose CAF or DBA lookup retain
+their own source evidence. Body, rule and CAF inventory states distinguish
+available observations from missing or incomplete input.
+
+The group's `controllerRigBinding` is `unresolved`. The group represents an
+ASCII-insensitive authored name comparison across the requested body variants.
+Controller scope, runtime clip selection and playback still require independent
+evidence.
 
 The CAF image's zero DBA checksum is an exact loose archive lookup. Other
 checksums select only authored `$TracksDatabase` declarations in the rule's
