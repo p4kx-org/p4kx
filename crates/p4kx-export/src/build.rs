@@ -316,7 +316,7 @@ fn assemble<R>(
             quantum_drives: components.quantum_drives,
             quantum_interdiction: components.quantum_interdiction,
             shield_generators: components.shield_generators,
-            entity_configurations: collected.entity_configurations.into_tables(&forge),
+            entity_configurations: collected.entity_configurations.into_tables(&forge)?,
             local_contract_generators: collected.local_contract_generators,
             contract_templates: CatalogTable::new(
                 &forge,

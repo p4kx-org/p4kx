@@ -76,6 +76,14 @@ pub(crate) fn emit<W: Write>(
         + u128::from(catalog.definitions.mission_broker_entries.stored_bytes())
         + u128::from(
             catalog
+                .configurations
+                .entity_configurations
+                .alignment
+                .item_ports
+                .stored_bytes(),
+        )
+        + u128::from(
+            catalog
                 .projections
                 .weapon_player_animation_candidates
                 .stored_bytes(),
@@ -137,6 +145,14 @@ fn write_json(
                 .or_else(|| catalog.definitions.contract_templates.take_failure())
                 .or_else(|| catalog.definitions.mission_broker_entries.take_failure())
                 .or_else(|| catalog.definitions.particle_libraries.take_failure())
+                .or_else(|| {
+                    catalog
+                        .configurations
+                        .entity_configurations
+                        .alignment
+                        .item_ports
+                        .take_failure()
+                })
                 .or_else(|| {
                     catalog
                         .projections

@@ -31,6 +31,23 @@ pub(super) struct PortRestrictions<'source> {
 }
 
 impl<'source> PortRestrictions<'source> {
+    #[cfg(test)]
+    pub(super) fn fixture(sources: &p4kx_extraction::SourceUses) -> Self {
+        use p4kx_extraction::SourceValue;
+
+        Self {
+            types: sources.value(SourceValue::Absent, &[], true),
+            min_size: sources.value(SourceValue::Absent, &[], true),
+            max_size: sources.value(SourceValue::Absent, &[], true),
+            flags: sources.value(SourceValue::Absent, &[], true),
+            port_tags: sources.value(SourceValue::Absent, &[], true),
+            required_port_tags: sources.value(SourceValue::Absent, &[], true),
+            tag_references: sources.value(SourceValue::Absent, &[], true),
+            item_port_rules: sources.value(SourceValue::Absent, &[], true),
+            resource_link_to_parent: sources.value(SourceValue::Absent, &[], true),
+        }
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

@@ -25,6 +25,19 @@ pub(crate) struct ComponentOwner {
 }
 
 impl ComponentOwner {
+    #[cfg(test)]
+    pub(super) fn fixture(
+        sources: &p4kx_extraction::SourceUses,
+        record: u32,
+        component: u32,
+    ) -> Self {
+        Self {
+            owner_guid: sources.value(SourceValue::Absent, &[], true),
+            owner_record_index: sources.value(SourceValue::Present(record), &[], true),
+            component_ordinal: sources.value(SourceValue::Present(component), &[], true),
+        }
+    }
+
     pub(super) fn read<'scope, 'read, 'source>(
         tree: &RecordTree<'source>,
         context: &CatalogRecordContext<'_>,

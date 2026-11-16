@@ -6,6 +6,7 @@ use rayon::prelude::{IndexedParallelIterator, IntoParallelRefIterator, ParallelI
 
 use crate::catalog_crafting::CraftingKinds;
 use crate::catalog_read_failure::CatalogReadFailure;
+use crate::catalog_v3::catalog_item_alignment::ItemPortStaging;
 use crate::collected::Collected;
 use crate::commodity_backfill::CommodityPresence;
 use crate::export_field_inspection::ScanInspectionFold;
@@ -29,8 +30,19 @@ impl<'f> Scan<'_, '_, 'f> {
     ) -> Result<Collected<'f>, CatalogError> {
         let mut inspections = ScanInspectionFold::start(&mut ledger);
         let mut collected = Collected::from_crafting(crafting);
-        let evidence =
-            self.collect_records(records, &mut collected, &mut ledger, &mut inspections)?;
+        let scratch = std::env::temp_dir();
+        let mut item_ports = ItemPortStaging::new(&scratch, self.options.cancel);
+        let evidence = self.collect_records(
+            records,
+            &mut collected,
+            &mut ledger,
+            &mut inspections,
+            &mut item_ports,
+        )?;
+        collected
+            .entity_configurations
+            .alignment
+            .install_staged_ports(item_ports, self.forge)?;
         for failure in failures {
             collected.take(Picked::Failed(failure));
         }
@@ -69,6 +81,7 @@ impl<'f> Scan<'_, '_, 'f> {
         collected: &mut Collected<'f>,
         ledger: &mut ExportLedger,
         inspections: &mut ScanInspectionFold,
+        item_ports: &mut ItemPortStaging<'_, 'f>,
     ) -> Result<RecordEvidence, CatalogError> {
         let mut evidence = RecordEvidence {
             commodities: CommodityPresence::new(),
@@ -92,9 +105,9 @@ impl<'f> Scan<'_, '_, 'f> {
                         collected.take(pick);
                     }
                     collected.tags.entity_tags.extend(record.entity.tags);
-                    collected
-                        .entity_configurations
-                        .extend(record.entity.configurations);
+                    let mut configurations = record.entity.configurations;
+                    configurations.alignment.stage_ports(item_ports)?;
+                    collected.entity_configurations.extend(configurations);
                     inspections.merge(ledger, record.ledger);
                 }
             }

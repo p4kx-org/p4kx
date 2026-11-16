@@ -104,15 +104,9 @@ struct PortOwner<'rows> {
 impl<'rows> AlignmentIndex<'rows> {
     pub(crate) fn new(rows: &'rows ItemAlignmentRows<'_>) -> Result<Self, CatalogError> {
         let mut this = Self::default();
-        for row in &rows.ports {
+        for row in rows.port_facts() {
             let (record, component) = physical_key(&row.owner)?;
-            for port in row
-                .ports
-                .value()
-                .into_iter()
-                .flatten()
-                .filter_map(SourcedValue::value)
-            {
+            for port in &row.ports {
                 let ordinal = port
                     .port_ordinal
                     .value()

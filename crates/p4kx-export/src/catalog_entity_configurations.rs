@@ -161,13 +161,13 @@ impl<'source> EntityConfigurationRows<'source> {
     pub(crate) fn into_tables(
         mut self,
         forge: &DataForge<'_>,
-    ) -> EntityConfigurationTables<'source> {
+    ) -> Result<EntityConfigurationTables<'source>, CatalogError> {
         self.facilities.sort_by_key(|row| row.owner().key());
         self.resources.sort_by_key(|row| row.owner().key());
         self.connections.sort_by_key(|row| row.owner().key());
         self.vehicle_armor.sort_by_key(|row| row.owner().key());
-        EntityConfigurationTables {
-            alignment: self.alignment.into_tables(forge),
+        Ok(EntityConfigurationTables {
+            alignment: self.alignment.into_tables(forge)?,
             fuel: self.fuel.into_tables(forge),
             inventory: self.inventory.into_tables(forge),
             interactions: catalog_interactions::table(forge, self.interactions),
@@ -187,7 +187,7 @@ impl<'source> EntityConfigurationRows<'source> {
                 &[catalog_vehicle_armor::COMPONENT],
                 self.vehicle_armor,
             ),
-        }
+        })
     }
 }
 
@@ -196,7 +196,7 @@ impl<'source> EntityConfigurationRows<'source> {
 #[schemars(transform = every_field_required)]
 pub(crate) struct EntityConfigurationTables<'source> {
     #[serde(flatten)]
-    alignment: ItemAlignmentTables<'source>,
+    pub(crate) alignment: ItemAlignmentTables<'source>,
     #[serde(flatten)]
     fuel: FuelConfigurationTables<'source>,
     #[serde(flatten)]
