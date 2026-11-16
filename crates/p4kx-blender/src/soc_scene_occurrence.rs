@@ -24,6 +24,11 @@ use crate::soc_scene_stream::{IndexedStream, Stream};
 use crate::soc_scene_tile_ports::TilePorts;
 use crate::soc_scene_xml::XmlDocuments;
 
+#[path = "soc_scene_room_companions.rs"]
+mod room_companions;
+
+use room_companions::RoomCompanions;
+
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct Occurrence {
@@ -33,6 +38,8 @@ pub(super) struct Occurrence {
     registry: Member<RoomRegistry>,
     children: Vec<Child>,
     streams: Vec<Stream>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    room_companions: Option<RoomCompanions>,
 }
 
 impl Occurrence {
@@ -76,7 +83,7 @@ impl Occurrence {
         let tile_ports = descriptor_input
             .as_ref()
             .map(|(descriptor, origin)| TilePorts::new(descriptor, origin));
-        let streams = streams(
+        let inputs = read_streams(
             original,
             room_input.as_ref(),
             tile_ports.as_ref(),
@@ -91,7 +98,8 @@ impl Occurrence {
             descriptor,
             registry,
             children,
-            streams,
+            streams: inputs.streams,
+            room_companions: inputs.room_companions,
         })
     }
 }
@@ -113,7 +121,12 @@ fn read_xml<'a, T>(
     )))
 }
 
-fn streams(
+struct OccurrenceInputs {
+    streams: Vec<Stream>,
+    room_companions: Option<RoomCompanions>,
+}
+
+fn read_streams(
     occurrence: &SocContainerOccurrence,
     room: Option<&(SocRoomRegistry<'_>, XmlOrigin<'_>)>,
     tile_ports: Option<&TilePorts<'_>>,
@@ -121,7 +134,7 @@ fn streams(
     (documents, included): (&mut XmlDocuments<'_>, &mut IncludedSources),
     classes: &Classes,
     cancel: &CancelToken,
-) -> Result<Vec<Stream>, SocSceneError> {
+) -> Result<OccurrenceInputs, SocSceneError> {
     let (index, admitted, complete) = index_streams(&occurrence.streams, cancel)?;
     let room_index = room.map(|(registry, origin)| {
         (
@@ -133,7 +146,7 @@ fn streams(
     let indexed = IndexedStream {
         index,
         admitted,
-        complete,
+        complete: complete && tile_ports.is_some(),
         classes,
         tile_ports,
         room: room_index.as_ref().map(|(index, origin, xml)| IndexedRoom {
@@ -143,7 +156,7 @@ fn streams(
             complete: !xml.is_lossy(),
         }),
     };
-    occurrence
+    let streams = occurrence
         .streams
         .iter()
         .map(|declaration| {
@@ -158,7 +171,12 @@ fn streams(
                 cancel,
             )
         })
-        .collect()
+        .collect::<Result<_, _>>()?;
+    let room_companions = RoomCompanions::read(occurrence, sources, &indexed, documents, cancel)?;
+    Ok(OccurrenceInputs {
+        streams,
+        room_companions,
+    })
 }
 
 fn index_streams<'a>(
@@ -220,14 +238,28 @@ fn index_streams<'a>(
 pub(super) enum Member<T> {
     UnusableSelector,
     Missing,
-    Ambiguous { candidates: Vec<PhysicalSourceRef> },
-    Unreadable { source: PhysicalSourceRef },
-    Invalid { source: PhysicalSourceRef },
-    Present { source: PhysicalSourceRef, data: T },
+    Ambiguous {
+        candidates: Vec<PhysicalSourceRef>,
+    },
+    Unreadable {
+        source: PhysicalSourceRef,
+    },
+    Invalid {
+        source: PhysicalSourceRef,
+    },
+    Unsupported {
+        source: PhysicalSourceRef,
+        xml: usize,
+    },
+    Present {
+        source: PhysicalSourceRef,
+        data: T,
+    },
 }
 
 pub(super) enum InputState {
     Invalid,
+    Unsupported(usize),
     Capture(SocSceneError),
 }
 
@@ -251,6 +283,7 @@ impl<T> Member<T> {
                 match read(payload, &origin) {
                     Ok(data) => Ok(Self::Present { source, data }),
                     Err(InputState::Invalid) => Ok(Self::Invalid { source }),
+                    Err(InputState::Unsupported(xml)) => Ok(Self::Unsupported { source, xml }),
                     Err(InputState::Capture(error)) => Err(error),
                 }
             }

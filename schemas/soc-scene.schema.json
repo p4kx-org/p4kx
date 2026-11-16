@@ -846,6 +846,47 @@
       ],
       "type": "string"
     },
+    "Connector": {
+      "properties": {
+        "crossSectionPosition": {
+          "$ref": "#/$defs/SourcedValueOfArray_size_3_of_double"
+        },
+        "crossSectionRotation": {
+          "$ref": "#/$defs/SourcedValueOfArray_size_4_of_double"
+        },
+        "cryGuid": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "ordinal": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "owner": {
+          "$ref": "#/$defs/SourcedValueOfEntityTarget"
+        },
+        "pivotRelativePosition": {
+          "$ref": "#/$defs/SourcedValueOfArray_size_3_of_double"
+        },
+        "pivotRelativeRotation": {
+          "$ref": "#/$defs/SourcedValueOfArray_size_4_of_double"
+        },
+        "position": {
+          "$ref": "#/$defs/SocXmlPosition"
+        }
+      },
+      "required": [
+        "ordinal",
+        "position",
+        "cryGuid",
+        "owner",
+        "pivotRelativePosition",
+        "pivotRelativeRotation",
+        "crossSectionPosition",
+        "crossSectionRotation"
+      ],
+      "type": "object"
+    },
     "ControllerCandidate": {
       "properties": {
         "controllerComponent": {
@@ -1994,6 +2035,28 @@
         },
         {
           "properties": {
+            "source": {
+              "$ref": "#/$defs/PhysicalSourceRef"
+            },
+            "state": {
+              "const": "unsupported",
+              "type": "string"
+            },
+            "xml": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "state",
+            "source",
+            "xml"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
             "data": {
               "format": "uint",
               "minimum": 0,
@@ -2090,6 +2153,28 @@
           "required": [
             "state",
             "source"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "source": {
+              "$ref": "#/$defs/PhysicalSourceRef"
+            },
+            "state": {
+              "const": "unsupported",
+              "type": "string"
+            },
+            "xml": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "state",
+            "source",
+            "xml"
           ],
           "type": "object"
         },
@@ -2194,11 +2279,154 @@
         },
         {
           "properties": {
+            "source": {
+              "$ref": "#/$defs/PhysicalSourceRef"
+            },
+            "state": {
+              "const": "unsupported",
+              "type": "string"
+            },
+            "xml": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "state",
+            "source",
+            "xml"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
             "data": {
               "items": {
                 "$ref": "#/$defs/Chunk"
               },
               "type": "array"
+            },
+            "source": {
+              "$ref": "#/$defs/PhysicalSourceRef"
+            },
+            "state": {
+              "const": "present",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "source",
+            "data"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "Member4": {
+      "oneOf": [
+        {
+          "properties": {
+            "state": {
+              "const": "unusableSelector",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "state": {
+              "const": "missing",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "candidates": {
+              "items": {
+                "$ref": "#/$defs/PhysicalSourceRef"
+              },
+              "type": "array"
+            },
+            "state": {
+              "const": "ambiguous",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "candidates"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "source": {
+              "$ref": "#/$defs/PhysicalSourceRef"
+            },
+            "state": {
+              "const": "unreadable",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "source"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "source": {
+              "$ref": "#/$defs/PhysicalSourceRef"
+            },
+            "state": {
+              "const": "invalid",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "source"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "source": {
+              "$ref": "#/$defs/PhysicalSourceRef"
+            },
+            "state": {
+              "const": "unsupported",
+              "type": "string"
+            },
+            "xml": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "state",
+            "source",
+            "xml"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/RoomConnectors"
             },
             "source": {
               "$ref": "#/$defs/PhysicalSourceRef"
@@ -2398,6 +2626,16 @@
         },
         "registry": {
           "$ref": "#/$defs/Member2"
+        },
+        "roomCompanions": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RoomCompanions"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "streams": {
           "items": {
@@ -2875,6 +3113,41 @@
         "boundsCenter",
         "pivotRelativePosition",
         "pivotRelativeRotation"
+      ],
+      "type": "object"
+    },
+    "RoomCompanions": {
+      "properties": {
+        "roomConnectors": {
+          "$ref": "#/$defs/Member4"
+        },
+        "roomMapping": {
+          "$ref": "#/$defs/Member"
+        }
+      },
+      "required": [
+        "roomMapping",
+        "roomConnectors"
+      ],
+      "type": "object"
+    },
+    "RoomConnectors": {
+      "properties": {
+        "connectors": {
+          "items": {
+            "$ref": "#/$defs/Connector"
+          },
+          "type": "array"
+        },
+        "xml": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "xml",
+        "connectors"
       ],
       "type": "object"
     },

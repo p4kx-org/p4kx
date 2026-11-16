@@ -21,6 +21,36 @@ ordinals. Typed rows use the same source coordinates. A room link targets a phys
 declaration in that occurrence's registry. An entity link targets a physical stream, chunk
 and entity inside its owning container occurrence. Cyclic references remain ordinary links.
 
+Room companions belong to the selected physical container occurrence. When
+either companion path is present, `occurrences[].roomCompanions` reports both
+selections. `roomMapping` selects the exact `<container-stem>.rmxml` member
+and its `data` points to the original ordered `RoomMapping` XML in
+`documents`. Keep repeated `SuperGUID` declarations, empty values and
+compound lexemes in those original positions. The raw document also retains
+`Distance`, `Features` and any further authored attributes. Consumers need
+separate evidence to interpret these as effective room relationships.
+
+`roomConnectors` selects
+`<container-stem>/metadata/entitycomponentroomconnector.xml`. Its `data.xml`
+points to the ordered XML and `data.connectors` lists the original direct
+`Entity` occurrences with their positions and source origins. The typed
+fields expose the owner `cryGuid`, pivot-relative position and rotation, and
+cross-section position and rotation. Coordinates use the stored component
+order. Their original text, including signed zero and alternate number
+spellings, remains in the referenced XML attributes. `owner` uses the
+connector's GUID and only the positioned entities of that physical container.
+A unique match requires a complete stream census. An observed ambiguity
+carries its original candidate positions. An incomplete census leaves a
+single candidate or an apparent absence unverified.
+
+Each selected source and its directory identity resolves in `sourceInventory`.
+The member states distinguish missing, ambiguous, unreadable and invalid
+payloads. An unsupported XML root or lossy decode also retains its raw document
+index. When both members are missing the optional block is omitted. The
+standalone scene command and package companion share the same checked SOC
+reader. The independently configured Media export selection applies to its own
+provider streams.
+
 Room segment coordinates are stored in the original segment-local frame. Quaternion order is
 W, X, Y, Z. Triangle-soup points retain their original order. Source XML attributes remain
 available alongside typed values, including additional attributes and repeated declarations.

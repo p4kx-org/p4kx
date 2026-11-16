@@ -151,6 +151,7 @@ mod soc_inline_loadout;
 mod soc_light;
 mod soc_light_projection;
 mod soc_light_source;
+mod soc_room_connector;
 mod soc_room_registry;
 mod soc_room_segment;
 mod soc_source_node;
@@ -289,6 +290,7 @@ pub use soc_light::{LightState, SocLight};
 pub use soc_light_source::{
     SocBakedLightSource, SocLightGroupSource, SocLightMode, SocLightSource,
 };
+pub use soc_room_connector::SocRoomConnector;
 pub use soc_room_registry::{SocRoomDeclaration, SocRoomRegistry, SocRoomRegistryError};
 pub use soc_room_segment::{
     SocRoomSegment, SocSegmentGeometry, SocSegmentPoint, SocSegmentTransform,

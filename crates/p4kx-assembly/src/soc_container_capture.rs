@@ -89,6 +89,10 @@ pub struct SocContainerOccurrence {
     pub descriptor: SocMemberSelection,
     /// Selection of the room registry within the opened container.
     pub registry: SocMemberSelection,
+    /// Selection of the authored room mapping in its physical container.
+    pub room_mapping: SocMemberSelection,
+    /// Selection of the authored room connector document in its physical container.
+    pub room_connectors: SocMemberSelection,
     /// Original stream declarations and their physical selections.
     pub streams: Vec<SocStreamInput>,
     /// Original nested placements, including failed and repeated declarations.
@@ -167,6 +171,12 @@ fn scan(
     let stem = crate::interior::container_stem(origin.entry().path());
     let descriptor = soc_descriptor_member::descriptor(index, stem, || check.poll())?;
     let registry = soc_descriptor_member::registry(index.archive(), || check.poll())?;
+    let room_mapping = SocMemberSelection::read(index, [format!("{stem}.rmxml")], || check.poll())?;
+    let room_connectors = SocMemberSelection::read(
+        index,
+        [format!(r"{stem}\metadata\entitycomponentroomconnector.xml")],
+        || check.poll(),
+    )?;
     let parsed = soc_descriptor_member::parsed(&descriptor);
     let streams = parsed
         .as_ref()
@@ -181,6 +191,8 @@ fn scan(
         origin,
         descriptor,
         registry,
+        room_mapping,
+        room_connectors,
         streams,
         children,
     })

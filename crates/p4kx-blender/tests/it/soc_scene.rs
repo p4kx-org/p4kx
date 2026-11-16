@@ -12,6 +12,9 @@ use p4kx_extraction::{Archive, CancelToken, GlbOptions};
 use p4kx_testkit::{ArchiveBuilder, TestChunkFile, TestContainer, TestEntry};
 use serde_json::Value;
 
+#[path = "soc_scene_room_companions.rs"]
+mod room_companions;
+
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
 const GUID: &str = "11111111-1111-1111-1111-111111111111";

@@ -75,6 +75,16 @@ impl<'sink> XmlDocuments<'sink> {
         document: &SourceDocument<'_>,
         origin: &XmlOrigin<'_>,
     ) -> Result<usize, SocSceneError> {
+        self.bind_checked(document, origin, || Ok(()))
+    }
+
+    pub(crate) fn bind_checked(
+        &mut self,
+        document: &SourceDocument<'_>,
+        origin: &XmlOrigin<'_>,
+        mut check: impl FnMut() -> Result<(), SocSceneError>,
+    ) -> Result<usize, SocSceneError> {
+        check()?;
         let key = (origin.source(), origin.chunk);
         if let Some(&index) = self.indices.get(&key) {
             return Ok(index);
@@ -94,7 +104,7 @@ impl<'sink> XmlDocuments<'sink> {
             })
             .map_err(SocSceneError::DocumentSink)?;
         } else {
-            self.rows.push(XmlDocument::read(document, origin)?);
+            self.rows.push(XmlDocument::read(document, origin, check)?);
         }
         self.indices.insert(key, index);
         Ok(index)
@@ -235,15 +245,17 @@ const fn source_format(document: &SourceDocument<'_>) -> &'static str {
 }
 
 impl XmlDocument {
-    pub(crate) fn read(
+    fn read(
         document: &SourceDocument<'_>,
         origin: &XmlOrigin<'_>,
+        mut check: impl FnMut() -> Result<(), SocSceneError>,
     ) -> Result<Self, SocSceneError> {
         let document_origin = origin.node_origin(document.root())?;
         let contains_encrypted_source = document_origin.contains_encrypted_source();
         let mut pending = vec![(None, 0, document.root())];
         let mut nodes = Vec::new();
         while let Some((parent, ordinal, element)) = pending.pop() {
+            check()?;
             let position = nodes.len();
             nodes.push(XmlNode::read(
                 element,

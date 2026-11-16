@@ -42,7 +42,13 @@ impl SocEntityIndex {
     /// Resolves an authored link against the Entity declarations indexed for this container.
     #[must_use]
     pub fn target(&self, link: SocEntityLink<'_>) -> SocEntityTarget<'_> {
-        let guid = match SocSourceGuid::read(link.target_attributes()) {
+        self.target_guid(SocSourceGuid::read(link.target_attributes()))
+    }
+
+    /// Resolves an authored GUID against the Entity declarations of this container.
+    #[must_use]
+    pub fn target_guid(&self, guid: SocSourceGuid) -> SocEntityTarget<'_> {
+        let guid = match guid {
             SocSourceGuid::Absent => return SocEntityTarget::Absent,
             SocSourceGuid::Invalid => return SocEntityTarget::Invalid,
             SocSourceGuid::Present(guid) => guid,

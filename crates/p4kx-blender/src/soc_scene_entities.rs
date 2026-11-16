@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_assembly::{SocEntitySite, SocEntityTarget};
+use p4kx_extraction::cryxml::{SourceAttribute, SourceElement};
 use p4kx_extraction::{PhysicalSourceRef, SourceUseRole, SourceValue, SourcedValue};
 use p4kx_model::{SocEntity, SocEntityComponent, SocEntityComponentKind, SocEntityLink};
 use schemars::JsonSchema;
@@ -97,7 +98,7 @@ fn entity_transform(
     origin: &XmlOrigin<'_>,
 ) -> Result<SourcedValue<[[f32; 4]; 3]>, SocSceneError> {
     let element = entity.element();
-    let is_transform = |attribute: &p4kx_extraction::cryxml::SourceAttribute<'_>| {
+    let is_transform = |attribute: &SourceAttribute<'_>| {
         attribute.namespace().is_none() && matches!(attribute.name(), "Pos" | "Rotate" | "Scale")
     };
     let value = if element
@@ -214,7 +215,13 @@ impl Link {
                 link.target_attributes(),
                 guid_value(link.target_attributes()),
             )?,
-            target: entity_target(link, index, origin)?,
+            target: EntityTarget::read(
+                element,
+                link.target_attributes(),
+                index,
+                origin,
+                Some(index.index.target(link)),
+            )?,
         })
     }
 }
@@ -225,7 +232,7 @@ impl Link {
     rename_all = "camelCase",
     rename_all_fields = "camelCase"
 )]
-enum EntityTarget {
+pub(crate) enum EntityTarget {
     Unmatched,
     Matched { site: EntitySite },
     Ambiguous { sites: Vec<EntitySite> },
@@ -233,50 +240,58 @@ enum EntityTarget {
 
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-struct EntitySite {
+pub(crate) struct EntitySite {
     stream: PhysicalSourceRef,
     chunk: usize,
     ordinal: usize,
     position: SocXmlPosition,
 }
 
-fn entity_target(
-    link: SocEntityLink<'_>,
-    index: &IndexedStream<'_>,
-    origin: &XmlOrigin<'_>,
-) -> Result<SourcedValue<EntityTarget>, SocSceneError> {
-    use SourceUseRole::{Payload, Selector};
-    let mut uses = vec![origin.node(link.element(), Selector)?];
-    for attribute in link.target_attributes() {
-        uses.push(origin.attribute(&attribute, Selector)?.1);
+impl EntityTarget {
+    pub(crate) fn read<'document>(
+        element: SourceElement<'_>,
+        attributes: impl IntoIterator<Item = SourceAttribute<'document>>,
+        index: &IndexedStream<'_>,
+        origin: &XmlOrigin<'_>,
+        target: Option<SocEntityTarget<'_>>,
+    ) -> Result<SourcedValue<Self>, SocSceneError> {
+        use SourceUseRole::{Payload, Selector};
+        let mut uses = vec![origin.node(element, Selector)?];
+        for attribute in attributes {
+            uses.push(origin.attribute(&attribute, Selector)?.1);
+        }
+        let mut add_target = |site: &SocEntitySite| {
+            let input = index
+                .admitted
+                .get(&site.stream_index)
+                .ok_or(SocSceneError::Position)?;
+            let scope = XmlOrigin::new(origin.sources, input, Some(site.chunk_index))?;
+            let position = SocXmlPosition::element(site.position.clone())?;
+            uses.push(scope.at(&position, "$entityOwner", Payload)?);
+            Ok::<_, SocSceneError>(EntitySite {
+                stream: scope.source(),
+                chunk: site.chunk_index,
+                ordinal: site.entity_ordinal,
+                position,
+            })
+        };
+        let value = match target {
+            None => SourceValue::Unreadable,
+            Some(SocEntityTarget::Absent) => SourceValue::Absent,
+            Some(SocEntityTarget::Invalid) => SourceValue::Invalid,
+            Some(SocEntityTarget::Unmatched { .. }) => SourceValue::Present(Self::Unmatched),
+            Some(SocEntityTarget::Matched { site, .. }) => SourceValue::Present(Self::Matched {
+                site: add_target(site)?,
+            }),
+            Some(SocEntityTarget::Ambiguous { sites, .. }) => {
+                SourceValue::Present(Self::Ambiguous {
+                    sites: sites.iter().map(add_target).collect::<Result<_, _>>()?,
+                })
+            }
+            _ => SourceValue::Unsupported,
+        };
+        let complete =
+            index.complete || !matches!(value, SourceValue::Present(_) | SourceValue::Unreadable);
+        Ok(origin.sources.value(value, &uses, complete))
     }
-    let mut add_target = |site: &SocEntitySite| {
-        let input = index
-            .admitted
-            .get(&site.stream_index)
-            .ok_or(SocSceneError::Position)?;
-        let scope = XmlOrigin::new(origin.sources, input, Some(site.chunk_index))?;
-        let position = SocXmlPosition::element(site.position.clone())?;
-        uses.push(scope.at(&position, "$entityOwner", Payload)?);
-        Ok::<_, SocSceneError>(EntitySite {
-            stream: scope.source(),
-            chunk: site.chunk_index,
-            ordinal: site.entity_ordinal,
-            position,
-        })
-    };
-    let value = match index.index.target(link) {
-        SocEntityTarget::Absent => SourceValue::Absent,
-        SocEntityTarget::Invalid => SourceValue::Invalid,
-        SocEntityTarget::Unmatched { .. } => SourceValue::Present(EntityTarget::Unmatched),
-        SocEntityTarget::Matched { site, .. } => SourceValue::Present(EntityTarget::Matched {
-            site: add_target(site)?,
-        }),
-        SocEntityTarget::Ambiguous { sites, .. } => SourceValue::Present(EntityTarget::Ambiguous {
-            sites: sites.iter().map(add_target).collect::<Result<_, _>>()?,
-        }),
-        _ => SourceValue::Unsupported,
-    };
-    let complete = index.complete || !matches!(value, SourceValue::Present(_));
-    Ok(origin.sources.value(value, &uses, complete))
 }
