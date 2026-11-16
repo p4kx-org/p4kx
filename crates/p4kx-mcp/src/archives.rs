@@ -145,7 +145,6 @@ impl Opened {
             .index(&self.archive)
     }
 
-
     /// Runs work against the DataForge and its retained original input.
     pub(crate) fn with_dataforge_origin<T, F>(&self, work: F) -> Result<T, ToolError>
     where
