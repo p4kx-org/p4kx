@@ -18,6 +18,8 @@ use crate::layout::{Frame, Sibling, place};
 use crate::limits::Limits;
 use crate::look::Look;
 use crate::paint::Area;
+#[cfg(test)]
+use crate::power_source_witness::Observation;
 use crate::rest::{AtRest, RestParams};
 use crate::screen_asset_inputs::WidgetInput;
 use crate::style::preset::PresetStyles;
@@ -133,12 +135,18 @@ impl<'s, 'a, 'f, 't> Walk<'s, 'a, 'f, 't> {
     ) -> Option<Sibling<'c>> {
         let widget = canvas.widgets.get(index)?;
         if !self.instantiated(index) {
+            #[cfg(test)]
+            self.trace_site(widget, position >= own, Observation::NotInstantiated);
             self.note_gone(canvas, index, widget, "Instantiated");
             return None;
         }
         let mut plan = self.plan_kids(canvas, index, widget);
         let style = self.style_of(canvas, (index, widget), (position, &plan.kids));
         if self.budget == 0 || !self.shown(index, widget, &style) {
+            #[cfg(test)]
+            if self.budget > 0 {
+                self.trace_inactive(index, widget, position >= own, style.active);
+            }
             if self.budget > 0 && style.active.is_none() {
                 self.note_gone(canvas, index, widget, "IsActive");
             }
@@ -294,6 +302,8 @@ impl<'s, 'a, 'f, 't> Walk<'s, 'a, 'f, 't> {
         elements::paint(self.cx, widget, look, area, alpha);
         #[cfg(test)]
         self.trace_painted(widget, look, alpha);
+        #[cfg(test)]
+        self.trace_site(widget, sibling.instance, Observation::LaidOut);
         let clipped = widget.overflow.clips();
         if clipped {
             self.cx.painter.push_clip(area);

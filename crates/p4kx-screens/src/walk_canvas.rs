@@ -42,6 +42,8 @@ impl Walk<'_, '_, '_, '_> {
     ) {
         self.cx.report.canvases += 1;
         self.stack.push(canvas.guid);
+        #[cfg(test)]
+        self.trace_enter_canvas(canvas, roots);
         let sheet = self.sheet(canvas);
         self.note_unsupported(canvas.guid, &sheet);
         self.sheets.push(sheet);
@@ -72,6 +74,8 @@ impl Walk<'_, '_, '_, '_> {
         }
         self.push_chain(&over);
         self.lay_out(canvas, roots, frame, alpha, depth, sizing);
+        #[cfg(test)]
+        self.trace_leave_canvas();
         self.chain.pop();
         self.cx.palette = inherited;
         self.rests.pop();

@@ -2375,6 +2375,8 @@ An unknown diagnostic retains a null origin marker.
 
 The screen is an offline still of the authored widget properties, the supported style cascade and
 the evaluated bindings. A source-enabled parent background can appear behind a text widget.
+The RSI POWER reference keeps the authored backgrounds in the powered still. Without supplied
+variables that reference leaves the POWER canvas outside the entered canvas set.
 `variables` describes the caller's settings and whether reachable operations read them.
 `unsupported` groups approximations and undecided bindings. `content_omissions` is present when
 the renderer finds an omitted runtime target, list data source or field binding. Each row lists

@@ -48,17 +48,24 @@ labels there remain unverified.
 
 ## Trace on the installed Archive
 
-The ignored source test follows the canvas actually selected by the powered RSI MFD and uses the
-original widget coordinates to check the parent Reference, enabled background, inline fill and
-font. It verifies the palette slot of the winning style Record against the background emitted
-by the painter. It also counts direct binding targets and local input References on each
-candidate's visited ancestor chain. The same DataForge is used for the still at rest. The
-test reports Build identity and aggregate counts.
+The source test traces the original Record, scene or library position, parent Reference,
+enabled background, inline fill and declared font for the painted pairs. It verifies the
+background against the palette slot of the winning style Record and checks for active background
+style overrides. The original parent name is independent of this test. Installed LIVE and PTU
+both contain named enabled DisplayWidget parents with the relevant palette slots.
+
+The test checks authored candidates in each entered static POWER canvas against the observed
+`Instantiated` and `IsActive` gates. It follows original local binding operations on the painted
+pairs and their ancestors, classifies supplied and missing variable declarations, and matches
+renderer omissions to their original operation positions. Both installed inputs preserve the
+authored background in the powered still. With no supplied variables the POWER canvas is outside
+the entered canvas set, so that state provides no equivalent label visit.
 
 Run the test with the ordinary installed-Archive fixture environment.
 
-    cargo test -p p4kx-screens --lib the_rsi_power_source_trace -- --ignored --nocapture
+    cargo test -p p4kx-screens --lib -- --ignored --exact --nocapture power_source_witness::the_rsi_power_source_trace_binds_painted_labels_to_original_parents_and_palette
 
-The binding count does not evaluate every authored input chain or locate unsupported raw
-selectors. The trace therefore verifies the offline paint and its physical sources while the
-in-game state and a complete source account of potentially suppressing rules remain open.
+The offline evidence covers entered canvases, evaluated styles and the observed operations.
+Game state, inactive dynamic canvas routes and the exact appearance in the game remain unresolved.
+The renderer retains the source-backed background and reports unavailable runtime inputs through
+the ordinary diagnostics.

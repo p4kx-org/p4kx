@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::BTreeSet;
 use std::io::{self, Write};
 use std::ops::Range;
 
-use p4kx_dataforge::{DataForge, Guid, Reference, Step};
+use p4kx_dataforge::{DataForge, Guid};
 use p4kx_extraction::{Archive, ArchiveWatch, Build, DataForgeEntry, DataForgeOrigin};
 use p4kx_gfx::Rgba;
 use p4kx_testkit::{real_archive_key, real_archive_path};
@@ -13,14 +12,22 @@ use p4kx_testkit::{real_archive_key, real_archive_path};
 use crate::canvas::find_canvas;
 use crate::colour::{ColorSpec, Palette, PaletteSite, scale_alpha, slot_names};
 use crate::look::Look;
-use crate::reader::{as_struct, child, items, reference};
+use crate::reader::child;
+use crate::report::Report;
 use crate::walk::Walk;
 use crate::widget::Widget;
 
+#[path = "power_source_diagnostics.rs"]
+mod diagnostics;
 #[path = "power_source_inputs.rs"]
 mod original;
+#[path = "power_source_binding_trace.rs"]
+mod source_bindings;
+#[path = "power_source_visibility.rs"]
+mod visibility;
 
 use self::original::{check_pair, heavy_font, palette_colour, same_widget, tree, widget_source};
+pub(crate) use self::visibility::Observation;
 
 #[path = "button_source_witness.rs"]
 mod button;
@@ -39,6 +46,7 @@ type Check<T = ()> = Result<T, &'static str>;
 #[derive(Debug)]
 pub(crate) struct Trace {
     scope: Guid,
+    visibility: visibility::Visibility,
     active: Vec<usize>,
     visits: Vec<Visit>,
     first_item: usize,
@@ -79,6 +87,7 @@ impl Trace {
     pub(crate) const fn new(scope: Guid) -> Self {
         Self {
             scope,
+            visibility: visibility::Visibility::new(),
             active: Vec::new(),
             visits: Vec::new(),
             first_item: 0,
@@ -160,6 +169,18 @@ impl Walk<'_, '_, '_, '_> {
     }
 }
 
+fn parent_slot(widget: &Widget) -> Option<&str> {
+    if widget.type_name == DISPLAY
+        && widget.background_enabled
+        && let Some(ColorSpec::Slot { name, .. }) = &widget.background
+        && LABEL_BACKGROUND.contains(&name.as_str())
+    {
+        Some(name)
+    } else {
+        None
+    }
+}
+
 fn observed_kind(
     widget: &Widget,
     look: &Look<'_>,
@@ -167,14 +188,9 @@ fn observed_kind(
     alpha: f32,
     drawn: Option<Rgba>,
 ) -> VisitKind {
-    if widget.type_name == DISPLAY
-        && widget.name.is_empty()
-        && widget.background_enabled
-        && let Some(ColorSpec::Slot { name, .. }) = &widget.background
-        && LABEL_BACKGROUND.contains(&name.as_str())
-    {
+    if let Some(name) = parent_slot(widget) {
         return VisitKind::Parent {
-            slot: name.clone(),
+            slot: name.to_owned(),
             drawn,
             palette: palette.sources.get(name).copied(),
             alpha,
@@ -203,28 +219,45 @@ fn black(colour: Option<&ColorSpec>) -> bool {
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn the_rsi_power_source_trace_binds_painted_labels_to_original_parents_and_palette() -> Check {
-    let (build, (summary, at_rest)) = with_installed_forge(|_, forge| {
+    let (build, (summary, census)) = with_installed_forge(|_, forge| {
         let scope = find_canvas(forge, POWER).map_err(|_| "no unique POWER master canvas")?;
         let variables = power_variables()?;
-        let powered = compose(forge, scope, &variables)?;
-        let rest = compose(forge, scope, &[])?;
-        Ok((
-            inspect(forge, &powered)?,
-            rest.visits.iter().filter(|visit| visit.in_scope).count(),
-        ))
+        let (powered, report) = compose(forge, scope, &variables)?;
+        let (rest, rest_report) = compose(forge, scope, &[])?;
+        if !rest_report.variables.is_empty() {
+            return Err("the at-rest composition unexpectedly supplied variables");
+        }
+        let mut out = io::stdout().lock();
+        diagnostics::rendered(&mut out, "powered", forge, &powered, &report)?;
+        diagnostics::rendered(&mut out, "at rest", forge, &rest, &rest_report)?;
+        let census = visibility::report(&mut out, forge, &powered.visibility, &rest.visibility);
+        Ok((inspect(forge, &powered, &variables, &report), census))
     })?;
+    let mut stdout = io::stdout().lock();
     writeln!(
-        io::stdout(),
-        "RSI POWER build {} change {}: {} source-backed label pairs, {} target bindings ({} with local input), {} at-rest POWER visits",
+        stdout,
+        "RSI POWER build {} change {}",
         build.version(),
         build.change_number(),
-        summary.pairs,
-        summary.bindings,
-        summary.local_inputs,
-        at_rest,
     )
     .map_err(|_| "cannot report the witness")?;
-    Ok(())
+    let summary = summary?;
+    let counts = summary.bindings.counts();
+    writeln!(
+        stdout,
+        "{} source-backed label pairs, {} target bindings ({} to background fields), {} upstream operation occurrences, {} local input edges, {} supplied and {} absent variable declarations, {} source gaps, {} reported omissions",
+        summary.pairs,
+        counts.sites,
+        counts.background_targets,
+        counts.graph_nodes,
+        counts.local_edges,
+        counts.supplied,
+        counts.absent,
+        counts.source_gaps,
+        counts.reported_omissions,
+    )
+    .map_err(|_| "cannot report the binding evidence")?;
+    census
 }
 
 fn with_installed_forge<T>(
@@ -259,7 +292,7 @@ fn power_variables() -> Check<[Variable; 3]> {
     ])
 }
 
-fn compose(forge: &DataForge<'_>, scope: Guid, variables: &[Variable]) -> Check<Trace> {
+fn compose(forge: &DataForge<'_>, scope: Guid, variables: &[Variable]) -> Check<(Trace, Report)> {
     let mut composer = ScreenComposer::new(forge).with_variables(variables);
     composer.power_scope = Some(scope);
     let screen = composer
@@ -268,20 +301,28 @@ fn compose(forge: &DataForge<'_>, scope: Guid, variables: &[Variable]) -> Check<
     if screen.report().truncated {
         return Err("the composition reached a limit");
     }
-    screen.power_trace.ok_or("composition has no source trace")
+    let report = screen.report().clone();
+    let trace = screen
+        .power_trace
+        .ok_or("composition has no source trace")?;
+    Ok((trace, report))
 }
 
 #[derive(Default)]
 struct Summary {
     pairs: usize,
-    bindings: usize,
-    local_inputs: usize,
+    bindings: source_bindings::BindingEvidence,
 }
 
-fn inspect(forge: &DataForge<'_>, trace: &Trace) -> Check<Summary> {
+fn inspect(
+    forge: &DataForge<'_>,
+    trace: &Trace,
+    variables: &[Variable],
+    report: &Report,
+) -> Check<Summary> {
     let slots = slot_names(forge);
-    let mut seen = BTreeSet::new();
     let mut summary = Summary::default();
+    let bindings = source_bindings::BindingInputs::new(forge, variables, report);
     for (index, visit) in trace.visits.iter().enumerate() {
         let VisitKind::Label {
             font: Some(font),
@@ -309,7 +350,7 @@ fn inspect(forge: &DataForge<'_>, trace: &Trace) -> Check<Summary> {
         let original = tree(forge, visit.input.record_index)?;
         check_pair(&original, visit.input, parent.input, slot, font)?;
         if *has_override {
-            return Err("the effective cascade now overrides a candidate parent background");
+            return Err("the effective cascade overrides a candidate parent background");
         }
         let expected = palette_colour(
             forge,
@@ -331,50 +372,12 @@ fn inspect(forge: &DataForge<'_>, trace: &Trace) -> Check<Summary> {
             return Err("the parent paint no longer agrees with its original colour slot");
         }
         summary.pairs += 1;
-        count_target_bindings(forge, trace, index, &mut seen, &mut summary)?;
+        summary
+            .bindings
+            .inspect_ancestors(trace, index, &bindings)?;
     }
     if summary.pairs == 0 {
         return Err("no original RSI POWER label and parent matched the source signature");
     }
     Ok(summary)
-}
-
-fn count_target_bindings(
-    forge: &DataForge<'_>,
-    trace: &Trace,
-    index: usize,
-    seen: &mut BTreeSet<(u32, &'static str, usize)>,
-    summary: &mut Summary,
-) -> Check {
-    let mut current = Some(index);
-    while let Some(visit) = current.and_then(|at| trace.visits.get(at)) {
-        current = visit.parent;
-        let input = visit.input;
-        if !seen.insert((input.record_index, input.section.field_name(), input.slot)) {
-            continue;
-        }
-        let owner = tree(forge, input.record_index)?;
-        let operations = items(owner.root(), "operations");
-        for binding in operations.iter().filter_map(as_struct) {
-            if !reference(binding, "widget")
-                .is_some_and(|value| same_widget(value, owner.guid(), input))
-            {
-                continue;
-            }
-            summary.bindings += 1;
-            if reference(binding, "input")
-                .is_some_and(|value| local_input(value, owner.guid(), operations.len()))
-            {
-                summary.local_inputs += 1;
-            }
-        }
-    }
-    Ok(())
-}
-
-fn local_input(input: &Reference<'_>, owner: Guid, operations: usize) -> bool {
-    input.guid() == owner
-        && matches!(input.location().map(p4kx_dataforge::Location::steps),
-            Some([Step::Field("operations"), Step::Element(slot)])
-                if usize::try_from(*slot).is_ok_and(|slot| slot < operations))
 }
