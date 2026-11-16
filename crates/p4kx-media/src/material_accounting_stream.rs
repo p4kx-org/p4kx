@@ -3,6 +3,7 @@
 
 use std::cell::Cell;
 use std::path::Path;
+use std::time::Instant;
 
 use p4kx_extraction::{Archive, ArchiveWatch, ArchiveWriteProtection, Filter};
 
@@ -45,9 +46,14 @@ fn verify_configured() -> TestResult {
     let secondary = p4kx_testkit::real_archive_b_path();
     let key = p4kx_testkit::real_archive_key()?;
     for (ordinal, path) in std::iter::once(primary).chain(secondary).enumerate() {
+        let archive_number = ordinal + 1;
+        let started = Instant::now();
+        report_phase(archive_number, Phase::Open, started);
         let archive = Archive::open_with_key(path, Some(key.clone()))?;
-        let result = verify(&archive, Limits::default())?;
-        report(ordinal + 1, &result.counts);
+        let result = verify(&archive, Limits::default(), |phase| {
+            report_phase(archive_number, phase, started);
+        })?;
+        report(archive_number, &result.counts);
         require(
             result.counts.selected > 0,
             "selected material inventory is empty",
@@ -72,7 +78,17 @@ fn options(limits: Limits) -> TestResult<ExportOptions> {
     })
 }
 
-fn verify(archive: &Archive, limits: Limits) -> TestResult<Observed> {
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Phase {
+    Open,
+    HashRoot,
+    CollectInputs,
+    ReconcileStream,
+    FinalizeStream,
+    VerifyTotals,
+}
+
+fn verify(archive: &Archive, limits: Limits, mut enter: impl FnMut(Phase)) -> TestResult<Observed> {
     let watch = ArchiveWatch::new(archive);
     let options = options(limits)?;
     options.limits.validate()?;
@@ -82,6 +98,7 @@ fn verify(archive: &Archive, limits: Limits) -> TestResult<Observed> {
         watch: &watch,
         protection: &protection,
     };
+    enter(Phase::HashRoot);
     let (digest, size) = hashing::file(
         archive.path(),
         ByteScope::RootArchiveFile,
@@ -93,7 +110,9 @@ fn verify(archive: &Archive, limits: Limits) -> TestResult<Observed> {
         root.enumeration_complete,
         "material root inventory incomplete",
     )?;
+    enter(Phase::CollectInputs);
     let inputs = Inputs::collect(archive, &watch)?;
+    enter(Phase::ReconcileStream);
     let sink = Sink::new(inputs)?;
     let provider = MaterialProvider::default();
     let providers: [&dyn Provider; 1] = [&provider];
@@ -115,8 +134,10 @@ fn verify(archive: &Archive, limits: Limits) -> TestResult<Observed> {
         &sink,
         &mut writer,
     )?;
+    enter(Phase::FinalizeStream);
     writer.index_build(&root)?;
     let finished = writer.finish()?;
+    enter(Phase::VerifyTotals);
     let counts = sink.finish()?;
     let [kind] = finished.kinds.as_slice() else {
         return Err("one material provider summary required".into());
@@ -163,6 +184,17 @@ fn require(condition: bool, message: &'static str) -> TestResult {
     } else {
         Err(message.into())
     }
+}
+
+#[expect(
+    clippy::print_stderr,
+    reason = "the opt-in test prints phase timing without source paths"
+)]
+fn report_phase(archive: usize, phase: Phase, started: Instant) {
+    eprintln!(
+        "material-source-export archive={archive} phase={phase:?} elapsed_ms={}",
+        started.elapsed().as_millis()
+    );
 }
 
 #[expect(

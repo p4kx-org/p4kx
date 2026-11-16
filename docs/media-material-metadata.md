@@ -63,7 +63,8 @@ Independent synthetic cases cover roots, unknown submaterial slots, ordered case
 The opt-in Media replay runs the material projection and Media writer against a stream observer.
 It reconciles material records, decoded payload sizes and digests, original container and Entry
 identities, and coverage counts across all selected root and nested `.mtl` Entries. It reports
-aggregate counts and writes no installed-Archive export. A small synthetic fixture compares stream
+elapsed time at the start of each phase and aggregate counts after verification. The progress output
+identifies an Archive by its input ordinal. The replay writes no installed-Archive export. A small synthetic fixture compares stream
 receipts with a file-backed export and checks the retained payload bytes.
 Set `P4KX_DATA_P4K` and optionally `P4KX_DATA_P4K_B`, then run
 `cargo test --locked -p p4kx-media --lib all_selected_material_libraries_and_raw_artifacts_reconcile -- --ignored --nocapture`.

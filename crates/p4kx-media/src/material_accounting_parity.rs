@@ -10,7 +10,7 @@ use sha2::{Digest as _, Sha256};
 
 use crate::{Artifact, ExportOutcome, Index, Limits, export, hashing};
 
-use super::{Observed, TestResult, options, require, verify};
+use super::{Observed, Phase, TestResult, options, require, verify};
 
 #[test]
 fn material_observer_matches_the_file_based_export_with_nested_sources_and_dependencies()
@@ -20,7 +20,19 @@ fn material_observer_matches_the_file_based_export_with_nested_sources_and_depen
     let output = directory.path().join("parity-output");
     fixture(&input)?;
     let archive = Archive::open_with_key(input, Some(test_key()))?;
-    let observed = verify(&archive, Limits::default())?;
+    let mut phases = Vec::new();
+    let observed = verify(&archive, Limits::default(), |phase| phases.push(phase))?;
+    assert_eq!(
+        phases,
+        [
+            Phase::HashRoot,
+            Phase::CollectInputs,
+            Phase::ReconcileStream,
+            Phase::FinalizeStream,
+            Phase::VerifyTotals,
+        ],
+        "the stream verifier reaches each phase in execution order"
+    );
     assert_eq!(observed.counts.selected, 4, "root and nested sources");
     assert_eq!(observed.counts.nested, 2, "two nested sources");
     assert_eq!(observed.counts.complete, 3, "three valid libraries");
