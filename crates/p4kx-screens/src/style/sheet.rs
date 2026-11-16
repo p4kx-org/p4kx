@@ -9,7 +9,7 @@ use p4kx_dataforge::{DataForge, Guid};
 use super::condition::{Uses, selects_part};
 use super::entry::{Entry, Modifiers, parse_entries};
 use super::matching::{Subject, TagPaths, applies, applies_to_lists};
-use crate::canvas::Canvas;
+use crate::canvas::{BrandStyle, Canvas};
 use crate::reader::items;
 use crate::widget::Widget;
 
@@ -34,7 +34,11 @@ impl CanvasStyles {
         }
         groups.push(Rc::clone(&canvas.defaults));
         if let Some(chosen) = canvas.pick_brand(brand) {
-            groups.push(style_entries(forge, cache, chosen.style.guid));
+            groups.extend(
+                chosen
+                    .styles()
+                    .map(|style| style_entries(forge, cache, style.guid)),
+            );
             groups.push(Rc::clone(&chosen.entries));
         }
         groups.push(Rc::clone(&canvas.embedded));
@@ -75,7 +79,7 @@ impl CanvasStyles {
         let styles = canvas
             .shared
             .iter()
-            .chain(canvas.brands.iter().map(|brand| &brand.style));
+            .chain(canvas.brands.iter().flat_map(BrandStyle::styles));
         let mut groups: Vec<Rc<[Entry]>> = styles
             .map(|style| style_entries(forge, cache, style.guid))
             .collect();

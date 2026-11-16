@@ -14,6 +14,29 @@ use crate::paint::{Area, TWIPS};
 use crate::picture::{NineSlice, VectorFit, icon_preset_path};
 use crate::widget::Widget;
 
+fn path<'a>(widget: &'a Widget, look: &Look<'a>) -> &'a str {
+    look.style
+        .picture
+        .svg_path
+        .as_deref()
+        .unwrap_or(&widget.picture.vector.path)
+}
+
+pub(super) fn paint_fill(
+    cx: &mut Context<'_>,
+    widget: &Widget,
+    look: &Look<'_>,
+    area: Area,
+    alpha: f32,
+) {
+    if widget.picture.has_svg_fill
+        && widget.picture.vector.visible
+        && !path(widget, look).is_empty()
+    {
+        paint(cx, widget, look, area, alpha);
+    }
+}
+
 pub(super) fn paint(
     cx: &mut Context<'_>,
     widget: &Widget,
@@ -29,12 +52,7 @@ pub(super) fn paint(
     if area.is_empty() {
         return;
     }
-    let path = look
-        .style
-        .picture
-        .svg_path
-        .as_deref()
-        .unwrap_or(&widget.picture.vector.path);
+    let path = path(widget, look);
     if let Some(preset) = widget
         .picture
         .icon_preset
@@ -125,6 +143,10 @@ pub(super) fn draw(
     alpha: f32,
     record_path: &str,
 ) {
+    #[cfg(test)]
+    if let Some(trace) = &mut cx.power_trace {
+        trace.record_vector_request(record_path);
+    }
     let entry = match cx.images.vector(record_path) {
         Ok(entry) => entry,
         Err(why) => {
@@ -153,12 +175,12 @@ pub(super) fn draw(
     }
 }
 
-struct Placing<'a> {
+struct Placing {
     area: Area,
     fit: VectorFit,
     place: [f32; 2],
     flip: [bool; 2],
-    slice: Option<&'a NineSlice>,
+    slice: Option<NineSlice>,
     by_slot: bool,
 }
 
@@ -175,6 +197,7 @@ fn place(
         return false;
     }
     let style = &look.style.picture;
+    let fit = style.svg_fit.unwrap_or(spec.fit);
     let overlay = style.overlay.unwrap_or(spec.overlay);
     let tinted = overlay
         .then(|| overlay_colours(cx, widget, look, alpha))
@@ -188,7 +211,7 @@ fn place(
     }
     let by_slot = tinted.is_none() && entry.vector.slots.iter().any(Option::is_some);
     let stretching = matches!(
-        spec.fit,
+        fit,
         VectorFit::StretchXY | VectorFit::StretchX | VectorFit::StretchY
     );
     let sliced = style.nine_slice.unwrap_or(spec.nine_slice_enabled) && stretching;
@@ -203,27 +226,30 @@ fn place(
     }
     let placing = Placing {
         area,
-        fit: spec.fit,
+        fit,
         place: spec.place,
         flip: [
             style.svg_flip[0].unwrap_or(spec.flip[0]),
             style.svg_flip[1].unwrap_or(spec.flip[1]),
         ],
-        slice: spec.nine_slice.as_ref().filter(|_| sliced),
+        slice: spec
+            .nine_slice
+            .filter(|_| sliced)
+            .map(|own| style.slice(own)),
         by_slot,
     };
     put(cx, entry, &placing, colours);
     true
 }
 
-fn put(cx: &mut Context<'_>, entry: &VectorEntry, how: &Placing<'_>, colours: ColorTransform) {
+fn put(cx: &mut Context<'_>, entry: &VectorEntry, how: &Placing, colours: ColorTransform) {
     let view = entry.vector.view;
     let layers: Cow<'_, [ShapeLayer]> = if how.by_slot {
         Cow::Owned(slotted(cx, entry))
     } else {
         Cow::Borrowed(&entry.vector.layers)
     };
-    let sliced = how.slice.and_then(|slice| {
+    let sliced = how.slice.as_ref().and_then(|slice| {
         vector_layers(
             &layers,
             view,

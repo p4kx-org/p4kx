@@ -127,9 +127,15 @@ conditions. The template's tag switches supply the effective choices for fill st
 position. The instance supplies the label, visibility, anchors and scale when authored. The graph
 keeps Integer and Number parameters distinct when their names match.
 
-The synthetic checks cover frame and label paint, hidden parts, draw order and an invalid proxy.
-A reported icon-asset override or undecidable template selector identifies the affected button.
-The installed MFD paint check and mapping of other families remain open in #994.
+A selected brand can supply shared style entries for both template proxy mounts. A DisplayWidget
+paints an enabled SVG fill with its authored scaling and explicit nine-slice edges. A reported
+icon-asset override, missing SVG or undecidable template selector identifies the affected widget.
+
+The synthetic checks cover vector, frame and label paint, hidden parts, draw order and an invalid
+proxy. The installed LIVE check isolates both original footer button paint ranges and verifies
+their side-by-side pixels. Both styled SVG references are absent from that Archive, so the observed
+pixels come from the authored background and frame. Coverage of the other button families remains
+open in #994.
 
 ## Guesses, unverified against the game
 

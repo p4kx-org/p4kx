@@ -126,6 +126,7 @@ fn widget_structs() -> Vec<TestStruct> {
             .array("entries", pointer("BuildingBlocks_StyleEntry")),
         TestStruct::new("BuildingBlocks_BrandStyles")
             .field("brandIdentifier", reference("BuildingBlocks_Style"))
+            .field("sharedStyles", reference("BuildingBlocks_Style"))
             .array("entries", pointer("BuildingBlocks_StyleEntry")),
         TestStruct::new("BuildingBlocks_DisplayWidget")
             .field("name", TestType::String)
@@ -151,6 +152,7 @@ fn widget_structs() -> Vec<TestStruct> {
             .field("padding", class("BuildingBlocks_TRBL"))
             .field("margin", class("BuildingBlocks_TRBL"))
             .field("background", class("BuildingBlocks_Background"))
+            .field("svgFill", class("BuildingBlocks_SvgFill"))
             .field("border", class("BuildingBlocks_Border"))
             .field("layoutPolicy", pointer("BuildingBlocks_LayoutPolicy"))
             .field("layoutPolicyItem", pointer("BuildingBlocks_FlexItem"))
@@ -276,6 +278,9 @@ fn condition_structs() -> Vec<TestStruct> {
         TestStruct::new("BuildingBlocks_StyleSelectorConditionTag")
             .parent("BuildingBlocks_StyleSelectorCondition")
             .field("tag", reference("Tag")),
+        TestStruct::new("BuildingBlocks_StyleSelectorConditionAnyOfTag")
+            .parent("BuildingBlocks_StyleSelectorCondition")
+            .array("tags", reference("Tag")),
         TestStruct::new("BuildingBlocks_StyleSelectorConditionParent")
             .parent("BuildingBlocks_StyleSelectorCondition")
             .array(

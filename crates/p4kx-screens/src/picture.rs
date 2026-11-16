@@ -41,14 +41,15 @@ pub(crate) enum VectorFit {
 }
 
 impl VectorFit {
-    fn parse(name: Option<&str>) -> Self {
-        match name {
-            Some("StretchXY") => Self::StretchXY,
-            Some("StretchX") => Self::StretchX,
-            Some("StretchY") => Self::StretchY,
-            Some("Center") => Self::Center,
-            _ => Self::Contain,
-        }
+    pub(crate) fn parse(name: &str) -> Option<Self> {
+        Some(match name {
+            "Contain" => Self::Contain,
+            "StretchXY" => Self::StretchXY,
+            "StretchX" => Self::StretchX,
+            "StretchY" => Self::StretchY,
+            "Center" => Self::Center,
+            _ => return None,
+        })
     }
 }
 
@@ -97,7 +98,9 @@ impl VectorSpec {
         let edge = |name, default| rect.and_then(|rect| float(rect, name)).unwrap_or(default);
         Self {
             path,
-            fit: VectorFit::parse(text(source, "scalingBehavior")),
+            fit: text(source, "scalingBehavior")
+                .and_then(VectorFit::parse)
+                .unwrap_or_default(),
             flip: [
                 flag(source, "flipHorizontal").unwrap_or(false),
                 flag(source, "flipVertical").unwrap_or(false),
@@ -147,6 +150,7 @@ pub(crate) struct Picture {
     pub(crate) place: [f32; 2],
     pub(crate) colour: Option<ColorSpec>,
     pub(crate) vector: VectorSpec,
+    pub(crate) has_svg_fill: bool,
     pub(crate) icon_preset: Option<String>,
     pub(crate) url: String,
 }
@@ -191,6 +195,7 @@ impl Picture {
             ],
             colour: structure.field("color").and_then(ColorSpec::parse),
             vector,
+            has_svg_fill: svg_fill.is_some(),
             icon_preset: preset.map(str::to_owned),
             url: text(structure, "urlOptional")
                 .unwrap_or_default()

@@ -34,6 +34,13 @@ pub fn named_tag_record(guid: u128, path: &str) -> TestRecord {
     record(guid, "Tag", path).value("tagName", TestValue::text(path))
 }
 
+#[derive(Debug, Clone)]
+struct BrandStyles {
+    identifier: u128,
+    shared: Option<u128>,
+    entries: Vec<TestStyleEntry>,
+}
+
 /// A synthetic `BuildingBlocks_Canvas` Record.
 #[derive(Debug, Clone)]
 pub struct TestCanvas {
@@ -47,7 +54,7 @@ pub struct TestCanvas {
     arrays: Vec<(String, usize)>,
     operations: Vec<(String, TestOp)>,
     shared: Option<u128>,
-    brand: Option<(u128, Vec<TestStyleEntry>)>,
+    brands: Vec<BrandStyles>,
     defaults: Vec<TestStyleEntry>,
     embedded: Vec<TestStyleEntry>,
 }
@@ -67,7 +74,7 @@ impl TestCanvas {
             arrays: Vec::new(),
             operations: Vec::new(),
             shared: None,
-            brand: None,
+            brands: Vec::new(),
             defaults: Vec::new(),
             embedded: Vec::new(),
         }
@@ -133,8 +140,23 @@ impl TestCanvas {
 
     /// Adds a brand style: the style Record `guid` and entries the canvas holds for it.
     #[must_use]
-    pub fn brand_style(mut self, guid: u128, entries: Vec<TestStyleEntry>) -> Self {
-        self.brand = Some((guid, entries));
+    pub fn brand_style(self, guid: u128, entries: Vec<TestStyleEntry>) -> Self {
+        self.brand_group(guid, None, entries)
+    }
+
+    /// Adds a brand group with its optional shared style and local entries.
+    #[must_use]
+    pub fn brand_group(
+        mut self,
+        identifier: u128,
+        shared: Option<u128>,
+        entries: Vec<TestStyleEntry>,
+    ) -> Self {
+        self.brands.push(BrandStyles {
+            identifier,
+            shared,
+            entries,
+        });
         self
     }
 
@@ -167,11 +189,15 @@ impl TestCanvas {
                 self.shared.map_or(TestValue::Null, TestValue::Reference),
             )
             .value("entries", entries(&self.defaults));
-        let brands = self.brand.iter().map(|(guid, brand_entries)| {
+        let brands = self.brands.iter().map(|brand| {
             TestValue::Struct(
                 TestInstance::new("BuildingBlocks_BrandStyles")
-                    .value("brandIdentifier", TestValue::Reference(*guid))
-                    .value("entries", entries(brand_entries)),
+                    .value("brandIdentifier", TestValue::Reference(brand.identifier))
+                    .value(
+                        "sharedStyles",
+                        brand.shared.map_or(TestValue::Null, TestValue::Reference),
+                    )
+                    .value("entries", entries(&brand.entries)),
             )
         });
         record_in(self.folder, self.guid, "BuildingBlocks_Canvas", &self.name)

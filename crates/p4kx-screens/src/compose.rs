@@ -25,6 +25,10 @@ use crate::variables::{Variable, check_variable_count};
 use crate::walk::Walk;
 use crate::widget::CanvasSizing;
 
+#[cfg(test)]
+#[path = "compose_test_raster.rs"]
+mod test_raster;
+
 const STYLES: &str = "libs/foundry/records/ui/buildingblocks/styles";
 const DEFAULT_STYLE: &str = "libs/foundry/records/ui/buildingblocks/styles/default";
 const MAX_CANVAS_SIDE: f32 = 16_384.0;

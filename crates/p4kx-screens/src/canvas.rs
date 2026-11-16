@@ -29,6 +29,13 @@ pub(crate) struct StyleRef {
 pub(crate) struct BrandStyle {
     pub(crate) style: StyleRef,
     pub(crate) entries: Rc<[Entry]>,
+    shared: Option<StyleRef>,
+}
+
+impl BrandStyle {
+    pub(crate) fn styles(&self) -> impl Iterator<Item = &StyleRef> {
+        std::iter::once(&self.style).chain(self.shared.as_ref())
+    }
 }
 
 /// A canvas read from its Record: the widgets of its scene followed by those of its library.
@@ -261,6 +268,7 @@ fn brand_styles(root: &StructValue<'_>) -> Vec<BrandStyle> {
         .filter_map(|brand| {
             Some(BrandStyle {
                 style: style_ref(brand, "brandIdentifier")?,
+                shared: style_ref(brand, "sharedStyles"),
                 entries: parse_entries(items(brand, "entries")).into(),
             })
         })

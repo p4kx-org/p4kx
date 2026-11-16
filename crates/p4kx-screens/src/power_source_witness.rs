@@ -3,9 +3,10 @@
 
 use std::collections::BTreeSet;
 use std::io::{self, Write};
+use std::ops::Range;
 
 use p4kx_dataforge::{DataForge, Guid, Reference, Step};
-use p4kx_extraction::{Archive, ArchiveWatch, DataForgeEntry, DataForgeOrigin};
+use p4kx_extraction::{Archive, ArchiveWatch, Build, DataForgeEntry, DataForgeOrigin};
 use p4kx_gfx::Rgba;
 use p4kx_testkit::{real_archive_key, real_archive_path};
 
@@ -21,6 +22,8 @@ mod original;
 
 use self::original::{check_pair, heavy_font, palette_colour, same_widget, tree, widget_source};
 
+#[path = "button_source_witness.rs"]
+mod button;
 #[path = "power_source_witness_tests.rs"]
 mod tests;
 use crate::{ScreenComposer, Variable, WidgetInput};
@@ -38,6 +41,8 @@ pub(crate) struct Trace {
     scope: Guid,
     active: Vec<usize>,
     visits: Vec<Visit>,
+    first_item: usize,
+    vector_requests: Vec<String>,
     pub(crate) background: Option<Rgba>,
 }
 
@@ -47,6 +52,11 @@ struct Visit {
     parent: Option<usize>,
     in_scope: bool,
     kind: VisitKind,
+    styled_vector: Option<String>,
+    vector_requests: Vec<String>,
+    vectors: Option<Vec<(usize, String)>>,
+    own_items: Range<usize>,
+    last_item: usize,
 }
 
 #[derive(Debug)]
@@ -71,14 +81,22 @@ impl Trace {
             scope,
             active: Vec::new(),
             visits: Vec::new(),
+            first_item: 0,
+            vector_requests: Vec::new(),
             background: None,
         }
+    }
+
+    pub(crate) fn record_vector_request(&mut self, path: &str) {
+        self.vector_requests.push(path.to_owned());
     }
 
     pub(crate) fn enter(
         &mut self,
         (canvas, widget): (&[Guid], &Widget),
         (look, palette, alpha): (&Look<'_>, &Palette, f32),
+        items: usize,
+        vectors: Option<Vec<(usize, String)>>,
     ) {
         let in_scope = canvas.contains(&self.scope);
         let kind = if in_scope {
@@ -92,12 +110,19 @@ impl Trace {
             parent: self.active.last().copied(),
             in_scope,
             kind,
+            styled_vector: look.style.picture.svg_path.clone(),
+            vector_requests: std::mem::take(&mut self.vector_requests),
+            vectors,
+            own_items: self.first_item..items,
+            last_item: items,
         });
         self.active.push(next);
     }
 
-    pub(crate) fn leave(&mut self) {
-        self.active.pop();
+    pub(crate) fn leave(&mut self, items: usize) {
+        if let Some(visit) = self.active.pop().and_then(|at| self.visits.get_mut(at)) {
+            visit.last_item = items;
+        }
     }
 }
 
@@ -105,18 +130,32 @@ impl Walk<'_, '_, '_, '_> {
     pub(crate) fn trace_begin(&mut self) {
         if let Some(trace) = &mut self.cx.power_trace {
             trace.background = None;
+            trace.first_item = self.cx.painter.len();
         }
     }
 
     pub(crate) fn trace_painted(&mut self, widget: &Widget, look: &Look<'_>, alpha: f32) {
         if let Some(trace) = &mut self.cx.power_trace {
-            trace.enter((&self.stack, widget), (look, &self.cx.palette, alpha));
+            let items = self.cx.painter.len();
+            let vectors = self.cx.inputs.as_ref().map(|inputs| {
+                inputs
+                    .vectors
+                    .range(trace.first_item..items)
+                    .map(|(&item, path)| (item, path.clone()))
+                    .collect()
+            });
+            trace.enter(
+                (&self.stack, widget),
+                (look, &self.cx.palette, alpha),
+                items,
+                vectors,
+            );
         }
     }
 
     pub(crate) fn trace_leave(&mut self) {
         if let Some(trace) = &mut self.cx.power_trace {
-            trace.leave();
+            trace.leave(self.cx.painter.len());
         }
     }
 }
@@ -164,29 +203,16 @@ fn black(colour: Option<&ColorSpec>) -> bool {
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn the_rsi_power_source_trace_binds_painted_labels_to_original_parents_and_palette() -> Check {
-    let path = real_archive_path().map_err(|_| "missing real Archive")?;
-    let key = real_archive_key().map_err(|_| "missing real Archive key")?;
-    let archive =
-        Archive::open_with_key(path, Some(key)).map_err(|_| "cannot open real Archive")?;
-    let build = archive.build().ok_or("no installed Build manifest")?;
-    let watch = ArchiveWatch::new(&archive);
-    watch.check().map_err(|_| "Archive changed")?;
-    let entry = DataForgeEntry::read_until(&archive, &|| watch.poll().is_err())
-        .map_err(|_| "cannot read original DataForge Entry")?;
-    let forge = entry.open().map_err(|_| "cannot open original DataForge")?;
-    if !matches!(entry.origin_of(&forge), Some(DataForgeOrigin::Archive(_))) {
-        return Err("the DataForge origin is unbound");
-    }
-    let scope = find_canvas(&forge, POWER).map_err(|_| "no unique POWER master canvas")?;
-    let variables = [
-        Variable::new("powerstate", "1").map_err(|_| "invalid power variable")?,
-        Variable::new("landscapecanvasguid", POWER).map_err(|_| "invalid page variable")?,
-        Variable::new("mfdviewname", "POWER MANAGEMENT").map_err(|_| "invalid footer variable")?,
-    ];
-    let powered = compose(&forge, scope, &variables)?;
-    let rest = compose(&forge, scope, &[])?;
-    let summary = inspect(&forge, &powered)?;
-    watch.check().map_err(|_| "Archive changed")?;
+    let (build, (summary, at_rest)) = with_installed_forge(|_, forge| {
+        let scope = find_canvas(forge, POWER).map_err(|_| "no unique POWER master canvas")?;
+        let variables = power_variables()?;
+        let powered = compose(forge, scope, &variables)?;
+        let rest = compose(forge, scope, &[])?;
+        Ok((
+            inspect(forge, &powered)?,
+            rest.visits.iter().filter(|visit| visit.in_scope).count(),
+        ))
+    })?;
     writeln!(
         io::stdout(),
         "RSI POWER build {} change {}: {} source-backed label pairs, {} target bindings ({} with local input), {} at-rest POWER visits",
@@ -195,10 +221,42 @@ fn the_rsi_power_source_trace_binds_painted_labels_to_original_parents_and_palet
         summary.pairs,
         summary.bindings,
         summary.local_inputs,
-        rest.visits.iter().filter(|visit| visit.in_scope).count(),
+        at_rest,
     )
     .map_err(|_| "cannot report the witness")?;
     Ok(())
+}
+
+fn with_installed_forge<T>(
+    run: impl FnOnce(&Archive, &DataForge<'_>) -> Check<T>,
+) -> Check<(Build, T)> {
+    let path = real_archive_path().map_err(|_| "missing real Archive")?;
+    let key = real_archive_key().map_err(|_| "missing real Archive key")?;
+    let archive =
+        Archive::open_with_key(path, Some(key)).map_err(|_| "cannot open real Archive")?;
+    let build = archive
+        .build()
+        .ok_or("no installed Build manifest")?
+        .clone();
+    let watch = ArchiveWatch::new(&archive);
+    watch.check().map_err(|_| "Archive changed")?;
+    let entry = DataForgeEntry::read_until(&archive, &|| watch.poll().is_err())
+        .map_err(|_| "cannot read original DataForge Entry")?;
+    let forge = entry.open().map_err(|_| "cannot open original DataForge")?;
+    if !matches!(entry.origin_of(&forge), Some(DataForgeOrigin::Archive(_))) {
+        return Err("the DataForge origin is unbound");
+    }
+    let result = run(&archive, &forge)?;
+    watch.check().map_err(|_| "Archive changed")?;
+    Ok((build, result))
+}
+
+fn power_variables() -> Check<[Variable; 3]> {
+    Ok([
+        Variable::new("powerstate", "1").map_err(|_| "invalid power variable")?,
+        Variable::new("landscapecanvasguid", POWER).map_err(|_| "invalid page variable")?,
+        Variable::new("mfdviewname", "POWER MANAGEMENT").map_err(|_| "invalid footer variable")?,
+    ])
 }
 
 fn compose(forge: &DataForge<'_>, scope: Guid, variables: &[Variable]) -> Check<Trace> {

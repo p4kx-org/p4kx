@@ -49,8 +49,7 @@ pub(crate) fn image_structs() -> Vec<TestStruct> {
             .field("flipV", TestType::Bool)
             .field("containPositionX", TestType::Single)
             .field("containPositionY", TestType::Single)
-            .field("color", pointer("BuildingBlocks_Color"))
-            .field("svgFill", class("BuildingBlocks_SvgFill")),
+            .field("color", pointer("BuildingBlocks_Color")),
         vector_fields(
             TestStruct::new("BuildingBlocks_WidgetCustomShape")
                 .parent(display)
@@ -61,8 +60,7 @@ pub(crate) fn image_structs() -> Vec<TestStruct> {
             .field(
                 "iconProperties",
                 class("BuildingBlocks_ComponentIconProperties"),
-            )
-            .field("svgFill", class("BuildingBlocks_SvgFill")),
+            ),
         TestStruct::new("BuildingBlocks_WidgetForegroundOverlay")
             .parent(display)
             .field("urlOptional", TestType::String),

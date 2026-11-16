@@ -17,6 +17,9 @@ use crate::support::{
 use crate::text::fonts;
 use crate::text_part::{field, field_entry};
 
+#[path = "standard_button_vector.rs"]
+mod vector;
+
 const COMPONENT: u128 = SCREEN + 1;
 const FILLED: u128 = SCREEN + 2;
 const GHOST: u128 = SCREEN + 3;

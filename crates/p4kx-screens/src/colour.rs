@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use p4kx_dataforge::{DataForge, Guid, RecordTree, Value};
 use p4kx_gfx::Rgba;
 
-use crate::canvas::{Canvas, StyleRef};
+use crate::canvas::{BrandStyle, Canvas, StyleRef};
 use crate::reader::{as_struct, child, float, int, items, reference};
 
 const COLOUR_SLOT_MARKERS: [&str; 3] = ["Base", "Accent1", "Bright"];
@@ -94,7 +94,10 @@ impl Palette {
         cache: &mut HashMap<Guid, Self>,
     ) -> Self {
         let own = cache.entry(canvas.guid).or_insert_with(|| {
-            let chosen = canvas.pick_brand(brand).map(|chosen| &chosen.style);
+            let chosen = canvas
+                .pick_brand(brand)
+                .into_iter()
+                .flat_map(BrandStyle::styles);
             let styles: Vec<&StyleRef> = canvas.shared.iter().chain(chosen).collect();
             Self::of_styles(forge, slot_names, &styles)
         });

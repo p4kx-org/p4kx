@@ -160,6 +160,7 @@ fn enumerated_structs() -> impl Iterator<Item = TestStruct> {
         "FlexCrossAxisJustification",
         "FlexItemAlignment",
         "FlexWrap",
+        "SvgScalingBehavior",
     ]
     .into_iter()
     .map(|kind| {
