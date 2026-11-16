@@ -5,7 +5,7 @@ use std::error::Error;
 
 use p4kx_testkit::{CryXmlByteOrder, CryXmlSignature, TestContainer, TestElement, TestEntry};
 
-use super::{FOLDER, Limits, child, external_at, guid, read, text_of};
+use super::{FOLDER, Limits, Placements, child, external_at, guid, read, root, socpak, text_of};
 use crate::export_entry_ledger::EntryOperation;
 use crate::export_ledger::SourceDisposition;
 use crate::starmap_containers::proof::PlacementStep;
@@ -19,20 +19,38 @@ fn binary_xml_places_and_follows_external_sources_beyond_64_inline_levels()
     let system = binary_container("tsystem", inline_chain(DEPTH));
     let leaf = binary_container("leaf", child("2,0,0", 2));
     let placements = read(folder.path(), vec![system, leaf], Limits::default());
+    assert_placements(&placements, DEPTH, 0)
+}
 
+#[test]
+fn text_xml_places_and_follows_external_sources_beyond_128_inline_levels()
+-> Result<(), Box<dyn Error>> {
+    const DEPTH: u16 = 135;
+    let folder = tempfile::tempdir()?;
+    let system = socpak("tsystem", &text_chain(DEPTH));
+    let leaf = socpak("leaf", &root(vec![child("2,0,0", 2)]));
+    let placements = read(folder.path(), vec![system, leaf], Limits::default());
+    assert_placements(&placements, DEPTH, 1)
+}
+
+fn assert_placements(
+    placements: &Placements,
+    depth: u16,
+    document_element_index: u32,
+) -> Result<(), Box<dyn Error>> {
     let terminal = placements.get(guid(1)).ok_or("the deep inline placement")?;
     let external = placements.get(guid(2)).ok_or("the external placement")?;
     assert_eq!(
         terminal.position,
-        [f64::from(DEPTH), 0.0, 0.0],
+        [f64::from(depth), 0.0, 0.0],
         "inline transforms"
     );
     assert_eq!(
         external.position,
-        [f64::from(DEPTH + 2), 0.0, 0.0],
+        [f64::from(depth + 2), 0.0, 0.0],
         "external transform"
     );
-    assert_routes(terminal, external, DEPTH);
+    assert_routes(terminal, external, depth, document_element_index);
     assert_eq!(
         placements
             .ledger
@@ -64,6 +82,21 @@ fn inline_chain(depth: u16) -> TestElement {
     })
 }
 
+fn text_chain(depth: u16) -> String {
+    const OPEN: &str = r#"<Child pos="1,0,0"><ChildObjectContainers>"#;
+    const CLOSE: &str = "</ChildObjectContainers></Child>";
+    let parents = usize::from(depth - 1);
+    let terminal = format!(
+        r#"<Child pos="1,0,0" external="1" name="{FOLDER}leaf.socpak" starMapRecord="{}"/>"#,
+        text_of(1),
+    );
+    format!(
+        "<ObjectContainer><ChildObjectContainers>{}{terminal}{}</ChildObjectContainers></ObjectContainer>",
+        OPEN.repeat(parents),
+        CLOSE.repeat(parents),
+    )
+}
+
 fn binary_container(name: &str, child: TestElement) -> TestEntry {
     let binary = TestElement::new("ObjectContainer")
         .child(TestElement::new("ChildObjectContainers").child(child))
@@ -76,8 +109,16 @@ fn binary_container(name: &str, child: TestElement) -> TestEntry {
     )
 }
 
-fn assert_routes(terminal: &Placement, external: &Placement, depth: u16) {
-    let original_nodes: Vec<_> = (1..=u32::from(depth)).rev().map(|n| n * 2).collect();
+fn assert_routes(
+    terminal: &Placement,
+    external: &Placement,
+    depth: u16,
+    document_element_index: u32,
+) {
+    let original_nodes: Vec<_> = (1..=u32::from(depth))
+        .rev()
+        .map(|level| document_element_index + level * 2)
+        .collect();
     assert_eq!(
         terminal
             .proof
@@ -91,7 +132,7 @@ fn assert_routes(terminal: &Placement, external: &Placement, depth: u16) {
     let mut steps = external.proof.last.steps().map(PlacementStep::child_index);
     assert_eq!(
         steps.next(),
-        Some(2),
+        Some(document_element_index + 2),
         "the leaf refers to the original Child in the other XML"
     );
     assert_eq!(

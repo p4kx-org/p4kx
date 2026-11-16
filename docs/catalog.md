@@ -1969,9 +1969,9 @@ times). A Child whose `pos` or `rot` is malformed (not numbers, not three or fou
 quaternion without length), or whose composed position is not a finite number or lies beyond
 1e15 m on an axis (about a tenth of a light year, far outside any star system), and everything
 below it are not placed. The walk counts and skips Children beyond the limit of 4,194,304 per
-system. Child traversal in admitted binary CryXml is iterative. Text XML has a separate admission
-limit of 128 simultaneously open elements. A container already open on the active route counts
-as a cycle. Shared external containers keep each independent use. Skipped Children, cycles and
+system. Child traversal in admitted binary CryXml and text XML is iterative. Text XML must be
+well-formed and contain no DTD. A container already open on the active route counts as a cycle.
+Shared external containers keep each independent use. Skipped Children, cycles and
 unreadable containers are reported by
 `p4kx catalog` (exit code 1); the counts `unreadable_containers` and `malformed_children` are
 counted per reference, not per distinct container, so one container named by ten Children

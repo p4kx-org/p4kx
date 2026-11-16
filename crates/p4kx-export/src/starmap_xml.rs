@@ -71,6 +71,12 @@ pub(crate) enum Document<'b> {
     Text(roxmltree::Document<'b>),
 }
 
+#[derive(Clone, Copy)]
+enum TextDepth {
+    Preflight,
+    Parser,
+}
+
 impl<'b> Document<'b> {
     /// Parses `bytes` as `CryXml` or as text XML, ignoring a byte order mark.
     ///
@@ -78,13 +84,24 @@ impl<'b> Document<'b> {
     ///
     /// Returns why `bytes` are no document: not XML, not UTF-8, or nested too deep.
     pub(crate) fn parse(bytes: &'b [u8]) -> Result<Self, XmlError> {
+        Self::parse_with_depth(bytes, TextDepth::Preflight)
+    }
+
+    /// Parses a Starmap main descriptor consumed by the iterative placement walk.
+    pub(crate) fn parse_starmap_main(bytes: &'b [u8]) -> Result<Self, XmlError> {
+        Self::parse_with_depth(bytes, TextDepth::Parser)
+    }
+
+    fn parse_with_depth(bytes: &'b [u8], depth: TextDepth) -> Result<Self, XmlError> {
         match cryxml::read(bytes).map_err(|_| XmlError::Malformed)? {
             cryxml::Xml::CryXml(document) => Ok(Self::Cry(document)),
             cryxml::Xml::Text(text) => {
                 let text = std::str::from_utf8(text)
                     .map_err(|_| XmlError::NotUtf8)?
                     .trim_start_matches('\u{feff}');
-                cryxml::check_text_depth(text).map_err(|_| XmlError::TooDeep)?;
+                if matches!(depth, TextDepth::Preflight) {
+                    cryxml::check_text_depth(text).map_err(|_| XmlError::TooDeep)?;
+                }
                 roxmltree::Document::parse(text)
                     .map(Self::Text)
                     .map_err(|_| XmlError::Malformed)
@@ -281,6 +298,27 @@ mod tests {
     fn a_byte_order_mark_is_ignored() {
         let text = "\u{feff}<Root key=\"v\"><A/><B/></Root>";
         assert_reads_alike(&Document::parse(text.as_bytes()).expect("text"));
+    }
+
+    #[test]
+    fn starmap_main_enforces_text_well_formedness_and_disallows_doctypes() {
+        let deep_unclosed = "<a>".repeat(cryxml::MAX_TEXT_DEPTH + 1);
+        assert_eq!(
+            Document::parse_starmap_main(deep_unclosed.as_bytes()).err(),
+            Some(XmlError::Malformed),
+            "the parser diagnoses malformed XML after deep nesting",
+        );
+        assert_eq!(
+            Document::parse(deep_unclosed.as_bytes()).err(),
+            Some(XmlError::TooDeep),
+            "the shared parser still has its preflight policy",
+        );
+        let doctype = b"<!DOCTYPE a [<!ENTITY fragment '<b/>'>]><a>&fragment;</a>";
+        assert_eq!(
+            Document::parse_starmap_main(doctype).err(),
+            Some(XmlError::Malformed),
+            "DTD entities are disabled in the main descriptor",
+        );
     }
 
     #[test]

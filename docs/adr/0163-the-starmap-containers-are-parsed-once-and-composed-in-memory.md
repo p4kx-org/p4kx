@@ -18,8 +18,9 @@ container on the chain (up to 128 MiB each) was held at once. Only the systems r
   can contribute under multiple positions. Only a link to an active ancestor is a cycle.
 - **Memory bound.** The parse keeps at most `Limits::children` (4,194,304) Children in all
   containers together, counted by one shared counter. The source tree is read, visited, and
-  freed iteratively using cursors proportional to the current ancestry. Text XML follows the
-  text parser's admission policy. A list cut by the counter produces a skipped Child entry. Which
+  freed iteratively using cursors proportional to the current ancestry. The main descriptor uses
+  the text parser's node bound and rejects DTDs. A list cut by the Child counter produces a skipped
+  Child entry. Which
   container is cut when the bound is hit depends on the thread order, which only matters for an
   Archive that is already reported as over the limit. The raw XML and its DOM are alive only
   while one container is parsed, so the peak is the kept Children plus, per rayon thread, one

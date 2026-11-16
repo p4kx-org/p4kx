@@ -40,8 +40,24 @@ impl<'read, 'capture, 'input> EntryXml<'read, 'capture, 'input> {
         read: &'read EntryRead,
         capture: &'capture EntryCapture<'input>,
     ) -> Result<Result<Self, XmlError>, CatalogError> {
+        Self::parse_using(read, capture, Document::parse)
+    }
+
+    /// Opens the Starmap main descriptor from its original sealed Entry.
+    pub(crate) fn parse_starmap_main(
+        read: &'read EntryRead,
+        capture: &'capture EntryCapture<'input>,
+    ) -> Result<Result<Self, XmlError>, CatalogError> {
+        Self::parse_using(read, capture, Document::parse_starmap_main)
+    }
+
+    fn parse_using(
+        read: &'read EntryRead,
+        capture: &'capture EntryCapture<'input>,
+        parser: impl FnOnce(&'read [u8]) -> Result<Document<'read>, XmlError>,
+    ) -> Result<Result<Self, XmlError>, CatalogError> {
         read.receipt().check_frame(&capture.frame())?;
-        let document = match Document::parse(read.bytes()) {
+        let document = match parser(read.bytes()) {
             Ok(document) => document,
             Err(error) => return Ok(Err(error)),
         };

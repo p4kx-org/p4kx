@@ -214,7 +214,7 @@ fn parsed_root(
     files: &entxml::EntXmlFiles<'_, '_>,
     ledger: &mut ExportLedger,
 ) -> Result<Result<ParsedRoot, XmlError>, CatalogError> {
-    let xml = match EntryXml::parse(read, files.capture)? {
+    let xml = match EntryXml::parse_starmap_main(read, files.capture)? {
         Ok(xml) => xml,
         Err(error) => return Ok(Err(error)),
     };
