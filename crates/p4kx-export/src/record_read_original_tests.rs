@@ -24,14 +24,28 @@ type Projected<'source> = (Record<'source>, u32);
 fn kind_callback_retains_the_actual_record_tree_pair_and_physical_aliases() -> TestResult {
     test_support::with_input(&fixture::database(false), |forge, input| {
         prove_original_aliases(forge)?;
-        let read = read_kind(
-            forge,
-            input,
-            Kind::ContractTemplates,
-            (None, None),
-            project,
-            |(record, _)| CatalogGuid(record.guid()),
-        )?;
+        let worker = rayon::ThreadPoolBuilder::new().num_threads(1).build()?;
+        let read = worker.install(|| {
+            for kind in [
+                Kind::ContractTemplates,
+                Kind::MissionBrokerEntries,
+                Kind::MissionLocationTemplates,
+            ] {
+                assert_eq!(
+                    super::kind_window_size(kind, forge.records().len()),
+                    1,
+                    "one pending mission definition per worker"
+                );
+            }
+            read_kind(
+                forge,
+                input,
+                Kind::ContractTemplates,
+                (None, None),
+                project,
+                |(record, _)| CatalogGuid(record.guid()),
+            )
+        })?;
         check_projected(&read, forge);
         Ok(())
     })

@@ -119,6 +119,12 @@ pub enum CatalogStage {
     ReadMissionDependencies,
     /// Projects template, broker and mission location definitions.
     ProjectMissionDefinitions,
+    /// Projects the selected contract templates.
+    ProjectContractTemplates,
+    /// Projects the selected mission broker entries.
+    ProjectMissionBrokerEntries,
+    /// Projects the selected mission location templates.
+    ProjectMissionLocationTemplates,
     /// Reads contract generators and assembles their output rows.
     ProjectContractGenerators,
     /// Resolves original references between mission scenarios and factions.
@@ -153,6 +159,9 @@ impl CatalogStage {
             Self::ProjectMissions => "project-missions",
             Self::ReadMissionDependencies => "read-mission-dependencies",
             Self::ProjectMissionDefinitions => "project-mission-definitions",
+            Self::ProjectContractTemplates => "project-contract-templates",
+            Self::ProjectMissionBrokerEntries => "project-mission-broker-entries",
+            Self::ProjectMissionLocationTemplates => "project-mission-location-templates",
             Self::ProjectContractGenerators => "project-contract-generators",
             Self::LinkMissionFactions => "link-mission-factions",
             Self::ProjectConfigurations => "project-configurations",

@@ -208,7 +208,7 @@ pub(crate) fn read<'f>(
         skipped: 0,
         failures,
         pools,
-        siblings: mission_siblings::read(forge, projection, (tags, &index), filter, cancel)?,
+        siblings: mission_siblings::read(forge, projection, (tags, &index), run)?,
         property_sets: MissionPropertySets::default(),
     };
     crate::mission_ledger::inventory(&mut missions.ledger);

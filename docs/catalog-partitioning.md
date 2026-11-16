@@ -151,9 +151,10 @@ Capture stderr line by line to align process memory samples with preparation, he
 JSON size measurement and writing. Within input preparation, record `open-dataforge`,
 `read-localization`, `index-localization` and `initialize-origins` as separate phase starts.
 Within `projections`, record `resolve-loadouts`, `project-locations`, `project-missions`,
-`read-mission-dependencies`, `project-mission-definitions`, `project-contract-generators`,
-`link-mission-factions`, `project-configurations` and `finalize-projections` as separate phase
-starts so samples can be assigned to the active work.
+`read-mission-dependencies`, `project-mission-definitions`, `project-contract-templates`,
+`project-mission-broker-entries`, `project-mission-location-templates`,
+`project-contract-generators`, `link-mission-factions`, `project-configurations` and
+`finalize-projections` as separate phase starts.
 Record peak working set and peak private bytes separately.
 Sample host commit and paging counters alongside the process write counter to distinguish process
 writes from system memory pressure. Record the exit status, elapsed time, file length and decoded

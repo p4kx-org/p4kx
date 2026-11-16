@@ -24,6 +24,15 @@ pub(crate) fn window_size(records: usize) -> usize {
         .max(1)
 }
 
+fn kind_window_size(kind: Kind, records: usize) -> usize {
+    match kind {
+        Kind::ContractTemplates | Kind::MissionBrokerEntries | Kind::MissionLocationTemplates => {
+            rayon::current_num_threads().min(records).max(1)
+        }
+        _ => window_size(records),
+    }
+}
+
 /// The entities of one kind of a DataForge and what was left out.
 pub(crate) struct KindRead<'f, T> {
     pub(crate) items: Vec<T>,
@@ -108,16 +117,7 @@ pub(crate) fn read_kind_with_notes<'f, T: Send>(
                 .is_ok_and(|path| rule.matches_path(path) && filter.is_none_or(|f| f.matches(path)))
         })
         .collect();
-    let pieces: Vec<Observed<'f, T>> = records
-        .par_iter()
-        .map_init(TreeBuilder::new, |trees, record| {
-            if cancel.is_some_and(CancelToken::is_cancelled) {
-                return Err(CatalogError::Cancelled);
-            }
-            piece(input, kind, trees, record, &build, cancel)
-        })
-        .filter_map(Result::transpose)
-        .collect::<Result<_, _>>()?;
+
     let mut read = KindRead {
         items: Vec::new(),
         skipped: 0,
@@ -125,13 +125,30 @@ pub(crate) fn read_kind_with_notes<'f, T: Send>(
         ledger: ExportLedger::default(),
     };
     read.ledger.inventory(kind);
-    for observed in pieces {
-        read.ledger.observe(observed.source);
-        read.ledger.merge(observed.fields);
-        match observed.piece {
-            Piece::Item(item) => read.items.push(*item),
-            Piece::Skipped => read.skipped = read.skipped.saturating_add(1),
-            Piece::Failed(failure) => read.failures.push(failure),
+    let mut pending = Vec::new();
+    for window in records.chunks(kind_window_size(kind, records.len())) {
+        window
+            .par_iter()
+            .map_init(TreeBuilder::new, |trees, record| {
+                if cancel.is_some_and(CancelToken::is_cancelled) {
+                    return Err(CatalogError::Cancelled);
+                }
+                piece(input, kind, trees, record, &build, cancel)
+            })
+            .collect_into_vec(&mut pending);
+        #[expect(
+            clippy::iter_with_drain,
+            reason = "reuse the indexed Rayon result buffer across Record windows"
+        )]
+        for result in pending.drain(..) {
+            let Some(observed) = result? else { continue };
+            read.ledger.observe(observed.source);
+            read.ledger.merge(observed.fields);
+            match observed.piece {
+                Piece::Item(item) => read.items.push(*item),
+                Piece::Skipped => read.skipped = read.skipped.saturating_add(1),
+                Piece::Failed(failure) => read.failures.push(failure),
+            }
         }
     }
     sort_by_guid(&mut read.items, guid);
