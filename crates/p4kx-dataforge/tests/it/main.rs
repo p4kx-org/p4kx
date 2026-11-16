@@ -64,6 +64,7 @@ mod record_instance_positions;
 mod record_json;
 mod record_json_nested;
 mod record_json_order;
+mod record_json_routes;
 mod record_layout;
 mod record_metadata_baseline;
 mod record_name_tag;

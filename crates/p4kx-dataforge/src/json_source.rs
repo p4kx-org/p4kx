@@ -89,6 +89,8 @@ pub enum RecordJsonBytes {
     ArrayHeader,
     /// Original selected element in a pool or instance block.
     ArrayElement,
+    /// Original struct and instance words selecting a strong pointer target.
+    PointerSelector,
     /// Original text selected by a stored offset or value.
     Text,
 }

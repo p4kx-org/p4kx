@@ -152,6 +152,13 @@ pub(crate) const fn selection_role(coordinate: RecordJsonSource<'_>) -> SourceUs
 
 const fn value_role(value: &Value<'_>, coordinate: RecordJsonSource<'_>) -> SourceUseRole {
     match (value, coordinate) {
+        (
+            _,
+            RecordJsonSource::Bytes {
+                kind: RecordJsonBytes::PointerSelector,
+                ..
+            },
+        ) => SourceUseRole::Selector,
         (_, RecordJsonSource::PropertyStorage { .. }) | (Value::Error(_), _) => {
             SourceUseRole::Conversion
         }

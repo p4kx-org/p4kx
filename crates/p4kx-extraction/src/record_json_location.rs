@@ -80,6 +80,7 @@ impl RecordJsonLocation {
         let (label, role) = match kind {
             RecordJsonBytes::Slot => ("slot", SourceUseRole::Payload),
             RecordJsonBytes::ArrayHeader => ("arrayHeader", SourceUseRole::Selector),
+            RecordJsonBytes::PointerSelector => ("pointerSelector", SourceUseRole::Selector),
             RecordJsonBytes::ArrayElement => ("arrayElement", SourceUseRole::Payload),
             RecordJsonBytes::Text => ("text", SourceUseRole::Payload),
             _ => return None,

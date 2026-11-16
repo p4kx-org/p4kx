@@ -32,8 +32,7 @@ pub(super) fn selected_value<'tree, 'source>(
         .get(*first)
         .ok_or_else(invalid)?;
     for step in rest {
-        observation.select(slot);
-        (value, slot) = match (step, value) {
+        let next = match (step, value) {
             (RecordJsonStep::Field(index), Value::Struct(structure)) => (
                 structure.fields().get(*index).ok_or_else(invalid)?.value(),
                 *input
@@ -48,6 +47,8 @@ pub(super) fn selected_value<'tree, 'source>(
             ),
             _ => return Err(invalid()),
         };
+        observation.select(slot, value);
+        (value, slot) = next;
     }
     Ok((value, slot))
 }

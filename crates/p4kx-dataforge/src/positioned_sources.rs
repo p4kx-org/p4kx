@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use crate::positioned_record::ValueSlot;
-use crate::{DataType, PositionedRecord, RecordJsonBytes, RecordJsonSource};
+use crate::{DataType, PositionedRecord, RecordJsonBytes, RecordJsonSource, Value};
 
 /// Local original observations for one property name, storage declaration or decoded value.
 #[derive(Debug)]
@@ -70,6 +70,37 @@ impl PositionedRecord<'_> {
         let complete = original.is_some() || slot.bytes == Some(&[]);
         sources.extend(original);
         PositionedSources::new(sources, complete)
+    }
+
+    pub(crate) fn describe_container_selection(
+        &self,
+        slot: ValueSlot<'_>,
+        value: &Value<'_>,
+    ) -> Option<PositionedSources> {
+        match value {
+            Value::Struct(_) => Some(self.describe_structure_selection(slot)),
+            Value::Array(_) => {
+                let mut sources = PositionedSources::new(vec![property_storage(slot)], true);
+                sources.require(self.describe_bytes(slot.bytes, RecordJsonBytes::ArrayHeader));
+                Some(sources)
+            }
+            _ => None,
+        }
+    }
+
+    pub(crate) fn describe_structure_selection(&self, slot: ValueSlot<'_>) -> PositionedSources {
+        let mut sources = self.describe_selection_header(slot);
+        if slot.array && slot.array_header.is_none() {
+            sources.incomplete();
+        }
+        match slot.data_type {
+            DataType::Class => {}
+            DataType::StrongPointer => {
+                sources.require(self.describe_bytes(slot.bytes, RecordJsonBytes::PointerSelector));
+            }
+            _ => sources.incomplete(),
+        }
+        sources
     }
 
     pub(crate) fn describe_selection_header(&self, slot: ValueSlot<'_>) -> PositionedSources {

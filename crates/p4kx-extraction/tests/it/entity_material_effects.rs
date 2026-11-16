@@ -6,7 +6,8 @@ use std::io::Read as _;
 
 use p4kx_extraction::{
     Archive, DataForgeEntry, EntityMaterialEffects, EntityMaterialEffectsComponent,
-    EntityMaterialEffectsError, FieldPath, SourceInventory, SourceLocation, SourceUseRole,
+    EntityMaterialEffectsError, FieldOrigin, FieldPath, SourceInventory, SourceLocation,
+    SourceUseRole,
 };
 use p4kx_testkit::{
     ArchiveBuilder, DataForgeBuilder, TestEntry, TestInstance, TestRecord, TestStruct, TestType,
@@ -113,7 +114,18 @@ fn verify_modifier_origin(
         origin.source_set_complete(),
         "{field}: exact route and value evidence"
     );
+    verify_modifier_ranges(inventory, input, origin, field, expected)
+}
+
+fn verify_modifier_ranges(
+    inventory: &SourceInventory,
+    input: &[u8],
+    origin: &FieldOrigin,
+    field: &str,
+    expected: f32,
+) -> TestResult {
     let mut header_count = 0;
+    let mut pointers = 0;
     let mut slots = Vec::new();
     for site in inventory.uses() {
         if !origin.source_uses_refs().contains(site.id()) {
@@ -128,14 +140,19 @@ fn verify_modifier_origin(
         {
             match (field.as_str(), site.role()) {
                 ("arrayHeader", SourceUseRole::Selector) => header_count += 1,
-                ("slot", SourceUseRole::Payload)
-                    if matches!(
-                        indices.as_slice(),
-                        [start, end] if end.checked_sub(*start) == Some(size_of::<f32>() as u64)
-                    ) =>
-                {
-                    slots.push(indices.as_slice());
+                ("pointerSelector", SourceUseRole::Selector) => {
+                    let [start, end] = indices.as_slice() else {
+                        return Err("original pointer selector span".into());
+                    };
+                    assert_eq!(
+                        end.checked_sub(*start),
+                        Some(size_of::<[u32; 2]>() as u64),
+                        "the route uses only the original struct and instance words",
+                    );
+                    pointers += 1;
                 }
+                ("slot", SourceUseRole::Payload) => slots.push(indices.as_slice()),
+                (_, SourceUseRole::Payload) => return Err("unexpected decoded payload span".into()),
                 _ => {}
             }
         }
@@ -143,6 +160,10 @@ fn verify_modifier_origin(
     assert_eq!(
         header_count, 4,
         "{field}: the original component, effect, link and modifier array headers"
+    );
+    assert_eq!(
+        pointers, 2,
+        "{field}: component and modifier pointer selectors"
     );
     let [[start, end]] = slots.as_slice() else {
         return Err(format!("{field}: expected one original Float32 slot").into());

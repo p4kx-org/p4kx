@@ -5,7 +5,7 @@ use std::fmt::Write as _;
 use std::io;
 
 use crate::positioned_record::ValueSlot;
-use crate::{PositionedRecord, Reference, StructValue, Value};
+use crate::{PositionedRecord, PositionedSources, Reference, StructValue, Value};
 
 use super::source::{RecordJsonBytes, RecordJsonObserver, RecordJsonRecordField, RecordJsonSource};
 
@@ -44,9 +44,12 @@ impl<'observer, 'source> Observation<'observer, 'source> {
         });
     }
 
-    pub(super) fn select(&mut self, slot: ValueSlot<'source>) {
-        let (sources, complete) = self.slot(Some(slot), None);
+    pub(super) fn select(&mut self, slot: ValueSlot<'source>, value: &Value<'_>) {
         if let Some(context) = &mut self.context {
+            let (sources, complete) = self
+                .input
+                .describe_container_selection(slot, value)
+                .map_or_default(PositionedSources::into_parts);
             context.selection.uses.extend(sources);
             context.selection.complete &= complete;
         }
@@ -126,7 +129,16 @@ impl<'observer, 'source> Observation<'observer, 'source> {
         record: Option<u32>,
         slot: Option<ValueSlot<'source>>,
     ) -> io::Result<()> {
-        let (mut sources, complete) = self.slot(slot, None);
+        let local_selection_tracked = self
+            .context
+            .as_ref()
+            .and_then(|routes| routes.nested.last())
+            .is_some_and(|route| self.lengths.len().checked_sub(1) == Some(route.depth));
+        let (mut sources, complete) = if local_selection_tracked {
+            (Vec::new(), true)
+        } else {
+            slot.map_or_default(|slot| self.input.describe_structure_selection(slot).into_parts())
+        };
         if let Some(record) = record {
             sources.push(RecordJsonSource::Record {
                 index: record,
@@ -134,10 +146,7 @@ impl<'observer, 'source> Observation<'observer, 'source> {
             });
         }
         sources.push(RecordJsonSource::StructName { index });
-        self.emit(
-            &sources,
-            record.is_some() || complete || slot.is_some_and(|slot| slot.bytes == Some(&[])),
-        )
+        self.emit(&sources, record.is_some() || complete)
     }
 
     pub(super) fn property_name(
@@ -153,6 +162,15 @@ impl<'observer, 'source> Observation<'observer, 'source> {
         self.emit(&sources, slot.is_some())
     }
 
+    pub(super) fn field_wrapper(
+        &mut self,
+        slot: Option<ValueSlot<'source>>,
+        value: &Value<'_>,
+    ) -> io::Result<()> {
+        let (sources, complete) = self.slot(slot, Some(value));
+        self.emit(&sources, complete)
+    }
+
     pub(super) fn value(
         &mut self,
         slot: Option<ValueSlot<'source>>,
@@ -160,12 +178,16 @@ impl<'observer, 'source> Observation<'observer, 'source> {
     ) -> io::Result<()> {
         let (sources, complete) = self.slot(slot, value);
         self.emit(&sources, complete)?;
-        if matches!(value, Some(Value::Struct(_) | Value::Array(_)))
-            && let Some(context) = &mut self.context
+        if let Some(context) = &mut self.context
+            && let Some(value) = value
+            && matches!(value, Value::Struct(_) | Value::Array(_))
         {
+            let (uses, complete) = slot
+                .and_then(|slot| self.input.describe_container_selection(slot, value))
+                .map_or_default(PositionedSources::into_parts);
             context.nested.push(Route {
                 depth: self.lengths.len(),
-                uses: sources,
+                uses,
                 complete,
             });
         }

@@ -1705,7 +1705,7 @@ expression: report
               "674",
               "682"
             ],
-            "field": "slot"
+            "field": "pointerSelector"
           },
           "effectiveEncryption": "unencrypted"
         },

@@ -119,13 +119,8 @@ impl<'record, 'source> PositionedValue<'record, 'source> {
     /// An inline class is selected by its declaration and any array header.
     #[must_use]
     pub fn selection_sources(&self) -> Option<PositionedSources> {
-        match self.value {
-            Value::Struct(_) if self.slot.data_type == DataType::Class => {
-                Some(self.record.describe_selection_header(self.slot))
-            }
-            Value::Struct(_) | Value::Array(_) => Some(self.storage_sources()),
-            _ => None,
-        }
+        self.record
+            .describe_container_selection(self.slot, self.value)
     }
 
     /// Returns local storage and data used for a scalar, null, array length or structure name.

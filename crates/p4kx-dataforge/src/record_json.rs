@@ -288,7 +288,7 @@ impl RecordJson {
         if selected.escaped {
             out.key(false, depth + 1, &format!("${}", selected.index))?;
             if let Some(observation) = &mut out.observation {
-                observation.value(slot, Some(selected.field.value()))?;
+                observation.field_wrapper(slot, selected.field.value())?;
             }
             out.sink.write_all(b"{")?;
             out.key(true, depth + 2, "name")?;
