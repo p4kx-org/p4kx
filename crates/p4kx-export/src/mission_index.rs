@@ -4,7 +4,7 @@
 use std::collections::{BTreeMap, HashMap};
 
 use p4kx_extraction::{
-    CancelToken, DataForge, Filter, Guid, Record, SourceEvidenceError, TagTree, TreeBuilder,
+    CancelToken, DataForge, Filter, Guid, SourceEvidenceError, TagTree, TreeBuilder,
 };
 use rayon::prelude::*;
 
@@ -16,6 +16,7 @@ use crate::contract_hauling::HaulingRequirement;
 use crate::export_ledger::ExportLedger;
 use crate::mission_hauling::HaulingProperty;
 use crate::mission_text_inputs::{BrokerTexts, MissionItemTexts, OrganizationTexts, TemplateTexts};
+use crate::record_read;
 use crate::spawn_layers::Level;
 use crate::spawn_pools::SpawnPools;
 use crate::{CatalogError, CatalogReadFailure};
@@ -227,14 +228,6 @@ impl<'f> MissionIndex<'f> {
         ledger: ExportLedger,
         captured: Option<&crate::catalog_v3::tag_catalog::CapturedTags<'_, 'f>>,
     ) -> Result<Self, CatalogError> {
-        let records: Vec<Record<'f>> = forge.records().collect();
-        let pieces = records
-            .par_iter()
-            .map_init(TreeBuilder::new, |trees, record| {
-                read::read(trees, record, tags.tree(), input, captured, cancel)
-            })
-            .filter_map(Result::transpose)
-            .collect::<Result<Vec<_>, _>>()?;
         let mut index = Self {
             tags,
             failures,
@@ -242,13 +235,45 @@ impl<'f> MissionIndex<'f> {
             template_source: input.map(|input| TemplateReadSource::new(input.origins())),
             ..Self::default()
         };
-        for read in pieces {
-            index.ledger.merge(read.ledger);
-            if let Some(piece) = read.piece {
-                index.insert(piece);
+        index.read_dependencies(forge, input, captured, cancel)?;
+        Ok(index)
+    }
+
+    fn read_dependencies(
+        &mut self,
+        forge: &'f DataForge<'f>,
+        input: Option<&OriginalCatalogInput<'_, 'f>>,
+        captured: Option<&crate::catalog_v3::tag_catalog::CapturedTags<'_, 'f>>,
+        cancel: Option<&CancelToken>,
+    ) -> Result<(), CatalogError> {
+        let mut records = forge.records();
+        let window_size = record_read::window_size(records.len());
+        let mut window = Vec::with_capacity(window_size);
+        let mut checked = Vec::new();
+        while records.len() != 0 {
+            window.clear();
+            window.extend(records.by_ref().take(window_size));
+            let tags = self.tags.tree();
+            window
+                .par_iter()
+                .map_init(TreeBuilder::new, |trees, record| {
+                    read::read(trees, record, tags, input, captured, cancel)
+                })
+                .collect_into_vec(&mut checked);
+            #[expect(
+                clippy::iter_with_drain,
+                reason = "reuse the indexed Rayon result buffer across Record windows"
+            )]
+            for result in checked.drain(..) {
+                if let Some(read) = result? {
+                    self.ledger.merge(read.ledger);
+                    if let Some(piece) = read.piece {
+                        self.insert(piece);
+                    }
+                }
             }
         }
-        Ok(index)
+        Ok(())
     }
 
     fn insert(&mut self, piece: Piece<'f>) {

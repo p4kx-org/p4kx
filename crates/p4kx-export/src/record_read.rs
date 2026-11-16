@@ -13,6 +13,17 @@ use crate::selection::{Kind, is_kind_leftover};
 use crate::source_fields::FieldError;
 use crate::{CatalogError, CatalogReadFailure};
 
+// Several Records per worker amortize the join and bound pending results.
+const RECORDS_PER_WORKER: usize = 64;
+
+/// Returns the number of Records held for one parallel read window.
+pub(crate) fn window_size(records: usize) -> usize {
+    rayon::current_num_threads()
+        .saturating_mul(RECORDS_PER_WORKER)
+        .min(records)
+        .max(1)
+}
+
 /// The entities of one kind of a DataForge and what was left out.
 pub(crate) struct KindRead<'f, T> {
     pub(crate) items: Vec<T>,

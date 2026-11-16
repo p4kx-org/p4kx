@@ -87,6 +87,86 @@ fn all_seven_unreadable_dependency_families_are_retained() -> TestResult {
     Ok(())
 }
 
+fn brokers_across_read_windows(window_size: usize) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    let home = SOURCE + 1;
+    let departure = SOURCE + 2;
+    let mut spec = DataForgeBuilder::new()
+        .structure(TestStruct::new("Helper"))
+        .structure(TestStruct::new("Broker").field("type", TestType::Reference))
+        .record(
+            TestRecord::new(
+                SOURCE,
+                "Broker",
+                "Broker.First",
+                "libs/foundry/records/missionbroker/first.xml",
+            )
+            .value("type", TestValue::Reference(home)),
+        )
+        .record(TestRecord::new(
+            home,
+            "Helper",
+            "Helper.Home",
+            "helper/home.xml",
+        ));
+    for position in 0..window_size {
+        spec = spec.record(TestRecord::new(
+            SOURCE + 3 + u128::try_from(position)?,
+            "Helper",
+            format!("Helper.Unselected{position}"),
+            format!("helper/unselected{position}.xml"),
+        ));
+    }
+    Ok(spec
+        .record(TestRecord::new(
+            departure,
+            "Helper",
+            "Helper.Departure",
+            "helper/departure.xml",
+        ))
+        .record(
+            TestRecord::new(
+                SOURCE,
+                "Broker",
+                "Broker.Last",
+                "libs/foundry/records/missionbroker/last.xml",
+            )
+            .value("type", TestValue::Reference(departure)),
+        )
+        .build())
+}
+
+#[test]
+fn duplicate_brokers_keep_definition_order_across_read_windows() -> TestResult {
+    let pool = rayon::ThreadPoolBuilder::new().num_threads(1).build()?;
+    let window_size = pool.install(|| crate::record_read::window_size(usize::MAX));
+    let bytes = brokers_across_read_windows(window_size)?;
+    let forge = DataForge::open(&bytes)?;
+    let guid = forge.records().next().ok_or("first broker fixture")?.guid();
+    let selected_type = forge
+        .records()
+        .nth(window_size + 2)
+        .ok_or("departure fixture")?
+        .guid();
+    let mut index = pool.install(|| MissionIndex::read(&forge, None))?;
+    let broker = index.broker(guid).ok_or("indexed broker")?;
+    assert_eq!(
+        broker.mission_type,
+        Some(selected_type),
+        "the later selected definition replaces the earlier broker across windows"
+    );
+    let (_, failures, ledger) = index.take_template_results();
+    assert!(
+        failures.is_empty(),
+        "both source brokers decode successfully"
+    );
+    assert_eq!(
+        ledger.sources.len(),
+        2,
+        "each selected broker retains its original physical source"
+    );
+    Ok(())
+}
+
 #[test]
 fn a_missing_optional_reward_amount_completes_a_zero_row_projection() -> TestResult {
     let bytes = DataForgeBuilder::new()

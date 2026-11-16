@@ -9,14 +9,12 @@ use crate::catalog_read_failure::CatalogReadFailure;
 use crate::catalog_v3::catalog_entity_configurations::EntityConfigurationRows;
 use crate::export_ledger::ExportLedger;
 use crate::picked::Picked;
+use crate::record_read;
 use crate::scan_health::ScanRead;
 use crate::scan_signature::SlotProblem;
 use crate::{CatalogError, Kind};
 
 use super::Scan;
-
-// Several records per worker amortize each window's join while bounding pending results.
-const RECORDS_PER_SCAN_WORKER: usize = 64;
 
 impl<'f> Scan<'_, '_, 'f> {
     pub(super) fn complete(
@@ -30,10 +28,7 @@ impl<'f> Scan<'_, '_, 'f> {
         let mut picked = Vec::new();
         let mut entity_tags = Vec::new();
         let mut entity_configurations = EntityConfigurationRows::default();
-        let window_size = rayon::current_num_threads()
-            .saturating_mul(RECORDS_PER_SCAN_WORKER)
-            .min(records.len())
-            .max(1);
+        let window_size = record_read::window_size(records.len());
         let mut checked = Vec::new();
         for window in records.chunks(window_size) {
             window
