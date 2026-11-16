@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 
 use p4kx_dataforge::{DataForge, Guid, Record};
 
@@ -32,10 +33,12 @@ impl<'f> Entities<'f> {
             if let Some(class) = record.name().ok().and_then(class_name_of)
                 && is_entity(&record)
             {
-                classes
-                    .entry(class.to_ascii_lowercase().into_boxed_str())
-                    .or_default()
-                    .push(record);
+                match classes.entry(class.to_ascii_lowercase().into_boxed_str()) {
+                    Entry::Occupied(mut records) => records.get_mut().push(record),
+                    Entry::Vacant(records) => {
+                        records.insert(vec![record]);
+                    }
+                }
             }
         }
         Self { forge, classes }
