@@ -201,7 +201,7 @@ impl Capture<'_> {
         let mut collection = self.field(original, field, SourceUseRole::Selector);
         if let Some(Value::Array(values)) = original.field(field) {
             let mut emitted = 0;
-            for value in values.iter() {
+            for value in values {
                 let selection = Input::value(self.forge, value, SourceUseRole::Selector);
                 collection.push(selection.clone());
                 if let Value::Struct(kind) = value {
@@ -222,7 +222,7 @@ impl Capture<'_> {
         let mut collection = self.field(original, field, SourceUseRole::Selector);
         if let Some(Value::Array(values)) = original.field(field) {
             let mut emitted = 0;
-            for value in values.iter() {
+            for value in values {
                 collection.push(Input::value(self.forge, value, SourceUseRole::Selector));
                 if matches!(value, Value::String(text) | Value::Locale(text) | Value::Enum(text) if !text.is_empty())
                 {

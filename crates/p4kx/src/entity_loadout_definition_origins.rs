@@ -113,18 +113,18 @@ impl Output<'_, '_> {
 
     fn definition_visibility(
         &mut self,
-        port: &PortNode,
+        node: &PortNode,
         address: &str,
         owner: VisibilityOwner<'_>,
         flags: Option<&FieldOrigin>,
     ) -> Result<()> {
-        if port.visibility() == PortVisibility::Unspecified {
+        if node.visibility() == PortVisibility::Unspecified {
             return Ok(());
         }
         let origin = match owner {
             VisibilityOwner::DataForge => self.uses.origin_with_origins(flags, flags.is_some())?,
-            VisibilityOwner::Vehicle(vehicle) => match vehicle.port_part(port.name()) {
-                Some(part) => self.vehicle_visibility(port, part)?,
+            VisibilityOwner::Vehicle(vehicle) => match vehicle.port_part(node.name()) {
+                Some(part) => self.vehicle_visibility(node, part)?,
                 None => self.uses.origin_with_origins(flags, false)?,
             },
             VisibilityOwner::Unverified => self.uses.origin_with_origins(flags, false)?,
@@ -132,11 +132,11 @@ impl Output<'_, '_> {
         self.put(&format!("{address}/visibility"), origin)
     }
 
-    fn vehicle_visibility(&self, port: &PortNode, part: &VehiclePart) -> Result<FieldOrigin> {
+    fn vehicle_visibility(&self, node: &PortNode, part: &VehiclePart) -> Result<FieldOrigin> {
         let mut inputs = vec![
             self.path_origin(
-                port.name_proof()
-                    .filter(|proof| proof.value() == port.name()),
+                node.name_proof()
+                    .filter(|proof| proof.value() == node.name()),
                 SourceUseRole::Selector,
             )?,
             self.path_origin(

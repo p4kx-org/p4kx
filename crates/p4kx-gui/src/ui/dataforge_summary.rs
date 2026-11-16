@@ -375,7 +375,7 @@ fn facts(ui: &Ui, texts: &Texts, width: f32, summary: &DataForgeSummary) -> Vec<
     .collect()
 }
 
-fn fact_origin(
+const fn fact_origin(
     origins: &DataForgeSummaryProvenance,
     field: DataForgeHeaderField,
 ) -> Option<&FieldOrigin> {
@@ -388,7 +388,7 @@ fn fact_origin(
     }
 }
 
-fn cell_origin(row: &DataForgeSummaryRecordProvenance, field: Text) -> Option<&FieldOrigin> {
+const fn cell_origin(row: &DataForgeSummaryRecordProvenance, field: Text) -> Option<&FieldOrigin> {
     match field {
         Text::ColumnName => Some(&row.name),
         Text::DataForge(DataForgeText::ColumnType) => Some(&row.type_name),

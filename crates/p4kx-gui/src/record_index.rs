@@ -115,7 +115,9 @@ impl DataForgeSummary {
     }
 
     /// Returns the original sources of the facts and first Record cells.
-    #[must_use]
+    ///
+    /// # Errors
+    /// Returns the source evidence error if recording the original inputs failed.
     pub fn provenance(&self) -> Result<&DataForgeSummaryProvenance, SourceEvidenceError> {
         self.provenance.as_deref().map_err(|error| *error)
     }
@@ -196,7 +198,7 @@ fn info<'f>(
         && let Ok(bound) = capture
         && let Err(error) = bound.row(
             forge,
-            ReadIdentity {
+            &ReadIdentity {
                 index: record.index(),
                 name,
                 struct_index: structure.as_ref().map(Struct::index),

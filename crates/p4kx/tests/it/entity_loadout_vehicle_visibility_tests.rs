@@ -182,8 +182,7 @@ fn verify_base_and_last_elem(json: &Value) -> TestResult {
         assert!(
             uses.iter().any(|site| site["role"] == "selector"
                 && original_bytes(BASE.as_bytes(), site).ok() == Some(selector)),
-            "original Elem match includes {:?}",
-            selector
+            "original Elem match includes {selector:?}"
         );
     }
     assert_eq!(

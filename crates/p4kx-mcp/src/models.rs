@@ -167,7 +167,7 @@ fn read(
     request: ModelRead,
 ) -> Result<(ModelSource, AnimationSet), ToolError> {
     let index = opened.index();
-    if let ModelRead::Section(Section::Materials) = request {
+    if matches!(request, ModelRead::Section(Section::Materials)) {
         let source =
             ModelSource::from_index_with_material_pages(&index, path, &TextureVerdicts::new())
                 .map_err(|error| converted(path, "a model with its material sources", error))?;

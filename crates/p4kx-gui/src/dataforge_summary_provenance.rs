@@ -92,11 +92,11 @@ impl Capture {
     pub(crate) fn row(
         &mut self,
         forge: &DataForge<'_>,
-        identity: ReadIdentity<'_>,
+        identity: &ReadIdentity<'_>,
     ) -> Result<(), SourceEvidenceError> {
-        let name = self.name(forge, &identity)?;
-        let type_name = self.type_name(forge, &identity)?;
-        let record_path = self.record_path(forge, &identity)?;
+        let name = self.name(forge, identity)?;
+        let type_name = self.type_name(forge, identity)?;
+        let record_path = self.record_path(forge, identity)?;
         self.rows.push(DataForgeSummaryRecordProvenance {
             name,
             type_name,
@@ -210,10 +210,10 @@ impl Capture {
         text: &str,
         role: SourceUseRole,
     ) -> Result<SourceUse, SourceEvidenceError> {
-        match forge.original_text_span(text) {
-            Some(span) => self.site("dataforgeStringBytes", field, span, role),
-            None => self.unknown_string(role),
-        }
+        forge.original_text_span(text).map_or_else(
+            || self.unknown_string(role),
+            |span| self.site("dataforgeStringBytes", field, span, role),
+        )
     }
 
     fn unknown_string(&self, role: SourceUseRole) -> Result<SourceUse, SourceEvidenceError> {
