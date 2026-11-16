@@ -4,7 +4,7 @@
 use p4kx_extraction::{Language, SourceUseRole};
 use p4kx_testkit::{DataForgeBuilder, TestRecord, TestStruct, TestType, TestValue};
 
-use super::{Domain, TextOwner};
+use super::{Domain, FinishedTexts, TextOwner};
 use crate::Kind;
 use crate::build::original_input::test_support::{self, TestResult};
 
@@ -53,6 +53,7 @@ fn an_existing_lookup_does_not_change_ordinary_placeholder_counts() -> TestResul
             "only the first registration performed a lookup"
         );
         let finished = projection.finish()?;
+        assert_shared_text_origins(&finished)?;
         let item = finished
             .kind_coverage
             .iter()
@@ -67,4 +68,20 @@ fn an_existing_lookup_does_not_change_ordinary_placeholder_counts() -> TestResul
         );
         Ok(())
     })
+}
+
+fn assert_shared_text_origins(finished: &FinishedTexts<'_>) -> TestResult {
+    let row = finished
+        .texts
+        .game_texts
+        .first()
+        .ok_or("canonical text row")?;
+    let id = row.id.origin().source_uses_refs();
+    let key = row.key.origin().source_uses_refs();
+    assert_eq!(id.len(), 2, "both source payloads remain");
+    assert!(
+        std::ptr::eq(id, key),
+        "the derived ID and authored key share the exact contributors"
+    );
+    Ok(())
 }

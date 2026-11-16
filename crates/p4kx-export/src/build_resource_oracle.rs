@@ -72,7 +72,7 @@ pub(super) fn read(
     let locations = quality_location_targets(&crafting.ledger)?;
     let domain = ScanDomain::resources(&placements, &locations);
     let mut collected = Scan::run(
-        &forge,
+        &input,
         &files,
         entities,
         &options,

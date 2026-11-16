@@ -104,9 +104,10 @@ impl<'e> Texts<'e> {
             .map(p4kx_extraction::GlobalIni::skipped)
     }
 
-    /// Returns a note for every `global.ini` that was read lossily or had lines skipped.
-    pub(crate) fn notes(&self) -> &[LocalizationNote] {
-        &self.notes
+    /// Drops the lookup indexes and returns the language counts and localization notes.
+    pub(crate) fn into_summary(self) -> (Vec<TextSummary>, Vec<LocalizationNote>) {
+        let summary = self.summary();
+        (summary, self.notes)
     }
 
     /// Returns what resolved per language, in the order of [`CATALOG_LANGUAGES`].

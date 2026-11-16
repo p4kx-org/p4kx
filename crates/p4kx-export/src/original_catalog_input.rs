@@ -26,6 +26,10 @@ impl<'read, 'source> OriginalCatalogInput<'read, 'source> {
         Self { forge, origins }
     }
 
+    pub(crate) const fn forge(&self) -> &'read DataForge<'source> {
+        self.forge
+    }
+
     pub(crate) const fn origins(&self) -> &'read CatalogOrigins {
         self.origins
     }

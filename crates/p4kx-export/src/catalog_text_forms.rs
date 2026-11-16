@@ -56,27 +56,62 @@ pub(crate) fn project<'source>(
             }
         }
     }
-    let mut display_uses = source_uses.clone();
-    if looked_up && text.is_some() {
+    let converts = looked_up && text.is_some();
+    let display_only_conversion = converts && !input.decoded() && !selectors.is_empty();
+    let mut display_uses = display_only_conversion.then(|| source_uses.clone());
+    if converts {
+        let conversions = display_uses.as_mut().unwrap_or(&mut source_uses);
         for selector in selectors {
-            let conversion = lookup_use(input, language, selector, SourceUseRole::Conversion)?;
-            if input.decoded() {
-                source_uses.push(conversion.clone());
-            }
-            display_uses.push(conversion);
+            conversions.push(lookup_use(
+                input,
+                language,
+                selector,
+                SourceUseRole::Conversion,
+            )?);
         }
     }
-    let source = text.as_ref().map_or(SourceValue::Absent, |text| {
-        SourceValue::Present(Cow::Borrowed(text.source))
-    });
-    let display = text.map_or(SourceValue::Absent, |text| {
-        SourceValue::Present(text.display)
-    });
     Ok(TextFormProjection {
-        forms: TextForms {
-            source_text: registry.value(source, &source_uses, true),
-            display_text: registry.value(display, &display_uses, true),
-        },
-        uses: display_uses,
+        forms: bind_forms(registry, text, &source_uses, display_uses.as_deref()),
+        uses: display_uses.unwrap_or(source_uses),
     })
 }
+
+fn bind_forms<'source>(
+    registry: &SourceUses,
+    text: Option<TextProjection<'source>>,
+    source_uses: &[SourceUse],
+    display_uses: Option<&[SourceUse]>,
+) -> TextForms<'source> {
+    let text = text.map(|text| (Cow::Borrowed(text.source), text.display));
+    let (source_text, display_text) = if let Some(display_uses) = display_uses {
+        let (source, display) = text.unzip();
+        (
+            registry.value(
+                source.map_or(SourceValue::Absent, SourceValue::Present),
+                source_uses,
+                true,
+            ),
+            registry.value(
+                display.map_or(SourceValue::Absent, SourceValue::Present),
+                display_uses,
+                true,
+            ),
+        )
+    } else {
+        registry
+            .value(
+                text.map_or(SourceValue::Absent, SourceValue::Present),
+                source_uses,
+                true,
+            )
+            .unzip()
+    };
+    TextForms {
+        source_text,
+        display_text,
+    }
+}
+
+#[cfg(test)]
+#[path = "catalog_text_forms_tests.rs"]
+mod tests;

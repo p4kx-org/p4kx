@@ -6,6 +6,7 @@ use std::sync::Arc;
 use p4kx_assembly::{ArchiveFiles, Entities};
 use p4kx_extraction::{Archive, CancelToken, DataForge};
 
+use crate::build::original_input::OriginalCatalogInput;
 use crate::build_harvest::add_harvest_locations;
 use crate::build_loot::add_loot_containers;
 use crate::build_starmap::add_starmap;
@@ -23,15 +24,16 @@ use crate::{CatalogError, CatalogOptions, StarmapSummary};
 /// Reads required placements and assembles ordered selected Record rows.
 pub(super) fn scan<'f>(
     archive: &Archive,
-    forge: &'f DataForge<'f>,
+    original: &'f OriginalCatalogInput<'f, 'f>,
     files: &'f ArchiveFiles<'f>,
     entities: &Arc<Entities<'f>>,
     run: CatalogRun<'_, '_>,
-    projection: &'f CatalogProjection<'f, 'f>,
+    projection: &CatalogProjection<'_, 'f>,
     crafting: CraftingKinds<'f>,
 ) -> Result<(Collected<'f>, Placements), CatalogError> {
     run.begin(CatalogStage::WorldPlacements);
     let options = run.options;
+    let forge = original.forge();
     let scope = placement_scope(forge, options);
     let mut placements = match scope {
         Some(scope) => {
@@ -39,7 +41,7 @@ pub(super) fn scan<'f>(
             Placements::read_for_catalog(
                 archive,
                 options.cancel,
-                &EntryCapture::for_input(projection.original()),
+                &EntryCapture::for_input(original),
                 scope,
                 &endpoints,
                 &std::env::temp_dir(),
@@ -49,7 +51,7 @@ pub(super) fn scan<'f>(
     };
     run.begin(CatalogStage::Records);
     let mut collected = Scan::run(
-        forge,
+        original,
         files,
         Arc::clone(entities),
         options,
@@ -71,7 +73,6 @@ pub(super) fn scan<'f>(
             .merge(std::mem::take(&mut placements.ledger));
     }
     collected.ledger.archive_inventory_problem = crate::export_archive_health::inventory(archive);
-    let original = projection.original();
     let capture = EntryCapture::for_input(original);
     collected.planet_tech = crate::catalog_definitions::planet_tech_definitions::read(
         archive,

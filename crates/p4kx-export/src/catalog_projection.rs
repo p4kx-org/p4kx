@@ -354,6 +354,7 @@ impl<'context, 'source> CatalogProjection<'context, 'source> {
         row: Pending<'source>,
         id: R,
     ) -> Result<CanonicalText<'source, R>, CatalogError> {
+        let uses = &self.origins().uses;
         let mut all_uses = row.selectors.clone();
         let mut translations = BTreeMap::new();
         for (language, text) in row.translations {
@@ -361,7 +362,7 @@ impl<'context, 'source> CatalogProjection<'context, 'source> {
                 continue;
             };
             let projection = catalog_text_forms::project(
-                &self.origins().uses,
+                uses,
                 input,
                 language,
                 &row.selectors,
@@ -371,20 +372,13 @@ impl<'context, 'source> CatalogProjection<'context, 'source> {
             all_uses.extend(projection.uses);
             translations.insert(language.code().to_owned(), projection.forms);
         }
+        let (id, key) = uses
+            .value(SourceValue::Present((id, row.key)), &row.payloads, true)
+            .unzip();
         Ok(CanonicalText {
-            id: self
-                .origins()
-                .uses
-                .value(SourceValue::Present(id), &row.payloads, true),
-            key: self
-                .origins()
-                .uses
-                .value(SourceValue::Present(row.key), &row.payloads, true),
-            translations: self.origins().uses.value(
-                SourceValue::Present(translations),
-                &all_uses,
-                true,
-            ),
+            id,
+            key,
+            translations: uses.value(SourceValue::Present(translations), &all_uses, true),
         })
     }
 }

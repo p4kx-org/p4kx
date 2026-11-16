@@ -75,7 +75,7 @@ fn assemble<R>(
     let entities = Arc::new(Entities::new(&forge));
     let (mut collected, mut placements) = scanning::scan(
         archive,
-        &forge,
+        &input,
         &files,
         &entities,
         run,
@@ -175,6 +175,7 @@ fn assemble<R>(
         options.cancel,
     )?;
     let finished_texts = projection.finish()?;
+    let (text_summary, text_notes) = texts.into_summary();
     let catalog = Catalog {
         schema_version: SCHEMA_VERSION,
         source: source(
@@ -378,9 +379,9 @@ fn assemble<R>(
             export_health: catalog.export_health,
             provenance: catalog.provenance,
             kinds,
-            texts: texts.summary(),
+            texts: text_summary,
             text_kind_coverage: finished_texts.kind_coverage,
-            notes: texts.notes().to_vec(),
+            notes: text_notes,
             item_classes: collected.item_classes,
             paints: paint_summary,
             loadouts: loadout_summary,

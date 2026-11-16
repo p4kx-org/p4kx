@@ -28,7 +28,7 @@ use crate::{CatalogError, Kind, item_stats, item_variant};
 
 pub(super) struct SelectedProjection<'scan, 'options, 'parameters, 'source> {
     pub(super) scan: &'scan Scan<'options, 'parameters, 'source>,
-    pub(super) projection: CatalogProjection<'source, 'source>,
+    pub(super) projection: CatalogProjection<'options, 'source>,
     kind: Kind,
 }
 
@@ -292,7 +292,7 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
             record,
             tree,
             ledger,
-            self.projection.original(),
+            self.scan.original,
             self.scan.options.cancel,
         )?;
         ledger.merge(read.ledger);

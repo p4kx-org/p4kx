@@ -9,6 +9,7 @@ use p4kx_extraction::{
     CancelToken, DataForge, DataForgeError, Filter, PointerProbe, Record, TreeBuilder,
 };
 
+use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_crafting::CraftingKinds;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_v3::catalog_entity_configurations;
@@ -64,11 +65,12 @@ fn selects_group(record: &Record<'_>, filter: Option<&Filter>) -> bool {
 /// The parallel check of every Record, with its progress.
 pub(crate) struct Scan<'o, 'a, 'f> {
     forge: &'f DataForge<'f>,
+    original: &'f OriginalCatalogInput<'f, 'f>,
     ships: ShipPool<'f>,
-    ammo: ammo::AmmoReads<'a, 'f, 'f>,
+    ammo: ammo::AmmoReads<'a, 'o, 'f>,
     options: &'o CatalogOptions<'a>,
     texts: &'o Texts<'f>,
-    projection: &'f CatalogProjection<'f, 'f>,
+    projection: &'o CatalogProjection<'o, 'f>,
     domain: ScanDomain<'o>,
     types: TypeNames<'f>,
     links: Links<'f>,
@@ -85,14 +87,15 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
     /// Checks every Record of `forge` in parallel and returns those a kind selected; a ship's base
     /// data is read here, once, by the worker that checks it.
     pub(crate) fn run(
-        forge: &'f DataForge<'f>,
+        original: &'f OriginalCatalogInput<'f, 'f>,
         files: &'f ArchiveFiles<'f>,
         entities: Arc<Entities<'f>>,
         options: &'o CatalogOptions<'a>,
-        projection: &'f CatalogProjection<'f, 'f>,
+        projection: &'o CatalogProjection<'o, 'f>,
         crafting: CraftingKinds<'f>,
         domain: ScanDomain<'o>,
     ) -> Result<Collected<'f>, CatalogError> {
+        let forge = original.forge();
         projection.original().check_forge(forge)?;
         let records = domain.records(forge);
         let groups::GroupRead {
@@ -112,6 +115,7 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
             SignatureSlot::read_captured(&records, projection.original(), options.cancel)?;
         let scan = Self {
             forge,
+            original,
             ships: ShipPool::new(entities, files),
             ammo: ammo::AmmoReads::new(projection, options.filter, options.cancel),
             options,
@@ -158,7 +162,7 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
         let mut ledger = ExportLedger::default();
         let capture = Arc::new(
             crate::export_builder_capture::BuilderCapture::for_input_root(
-                self.projection.original(),
+                self.original,
                 record,
                 self.options.cancel,
             )?,
@@ -176,7 +180,7 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
         trees.set_read_observer(None);
         ledger.merge(capture.finish()?);
         let mut checked =
-            crate::scan_health::finish(self.projection.original(), record, &trace, result, ledger)?;
+            crate::scan_health::finish(self.original, record, &trace, result, ledger)?;
         if let Some(checked) = &mut checked {
             checked.entity = entity;
         }
@@ -193,7 +197,7 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
         ledger: &mut ExportLedger,
     ) -> Result<Option<Picked<'f>>, ScanError> {
         if kind == Kind::Items {
-            let admission = RecordObservation::capture(self.projection.original(), record)?;
+            let admission = RecordObservation::capture(self.original, record)?;
             let tree = match trees.build(record) {
                 Ok(tree) => tree,
                 Err(error) => {
@@ -210,7 +214,7 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
                 }
             };
             ledger.merge(crate::export_field_walk::inspect_observed(
-                Some(self.projection.original()),
+                Some(self.original),
                 &tree,
                 &admission,
                 Some(kind),
@@ -281,11 +285,11 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
             trace.projecting();
             return Ok(Some(Picked::AmmoDefinition(Box::new(definition))));
         }
-        let admission = RecordObservation::capture(self.projection.original(), record)?;
+        let admission = RecordObservation::capture(self.original, record)?;
         let tree = trees.build(record)?;
         trace.projecting();
         ledger.merge(crate::export_field_walk::inspect_observed(
-            Some(self.projection.original()),
+            Some(self.original),
             &tree,
             &admission,
             Some(kind),
@@ -294,7 +298,7 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
         )?);
         let selected = SelectedProjection::new(self, kind);
         if tree.type_name() == "EntityClassDefinition" {
-            let input = self.projection.original();
+            let input = self.original;
             let cancel = self.options.cancel;
             let (tags, mut notes) =
                 crate::catalog_v3::tag_catalog::entity(&tree, input, &admission, cancel)?;

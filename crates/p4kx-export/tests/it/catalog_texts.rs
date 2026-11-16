@@ -193,6 +193,43 @@ fn names_and_descriptions_hold_canonical_keys_and_both_resolved_texts() -> TestR
 }
 
 #[test]
+fn completing_a_catalog_keeps_localization_notes_in_language_order() -> TestResult {
+    let locale = |language: Language, translation, invalid_lines: &[u8]| {
+        let mut data = GlobalIniBuilder::new()
+            .text("manufacturer_NameACAS", translation)
+            .build();
+        data.extend_from_slice(invalid_lines);
+        TestEntry::zstd(language.global_ini_path(), data)
+    };
+    let built = build_fixture(vec![
+        locale(
+            Language::German,
+            "Astrogation",
+            b"invalid\r\nalso invalid\r\n",
+        ),
+        locale(Language::English, "Ace Astrogation", b"invalid\r\n"),
+    ])?;
+    let notes: Vec<_> = built
+        .summary()
+        .text_notes()
+        .iter()
+        .map(|note| (note.path(), note.skipped(), note.is_lossy()))
+        .collect();
+    assert_eq!(
+        notes,
+        [
+            (Language::English.global_ini_path(), 1, false),
+            (Language::German.global_ini_path(), 2, false),
+        ],
+        "notes keep the original paths and malformed-line counts in language order"
+    );
+    let catalog = serde_json::from_slice(built.json())?;
+    let name = text(&catalog, 0, "name")?;
+    values::translation(name, "en", "present", &json!("Ace Astrogation"))?;
+    values::translation(name, "de", "present", &json!("Astrogation"))
+}
+
+#[test]
 fn missing_keys_keep_canonical_keys_and_explicit_absent_translations() -> TestResult {
     let (catalog, summary) = catalog(vec![english(), german()])?;
     let name = text(&catalog, 1, "name")?;
