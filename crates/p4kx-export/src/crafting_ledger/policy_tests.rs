@@ -88,12 +88,12 @@ fn a_malformed_leftover_quantization_reassigns_its_single_field_proof() -> TestR
         "canonical reading succeeded before the typed shape rejection"
     );
     assert_eq!(
-        failed.diagnosis.code,
+        failed.diagnosis().code,
         Some(ExportDiagnosticCode::MalformedSource),
         "typed failure diagnosis is retained"
     );
     assert_eq!(
-        failed.diagnosis.field.as_deref(),
+        failed.diagnosis().field.as_deref(),
         Some("qualityQuantization"),
         "the exact typed field is retained"
     );

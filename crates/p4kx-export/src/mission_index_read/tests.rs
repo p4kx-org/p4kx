@@ -282,7 +282,7 @@ fn an_unknown_template_condition_is_a_typed_projection_failure() -> TestResult {
     assert!(
         ledger.sources.iter().all(|source| source.disposition
             == SourceDisposition::ProjectionFailed
-            && source.diagnosis.code == Some(ExportDiagnosticCode::UnsupportedValue)),
+            && source.diagnosis().code == Some(ExportDiagnosticCode::UnsupportedValue)),
         "readable unsupported source structs retain their typed category"
     );
     assert_eq!(
@@ -295,7 +295,7 @@ fn an_unknown_template_condition_is_a_typed_projection_failure() -> TestResult {
             .sources
             .first()
             .ok_or("source missing")?
-            .diagnosis
+            .diagnosis()
             .field
             .as_deref(),
         Some("location condition"),

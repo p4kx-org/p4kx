@@ -177,7 +177,7 @@ fn stage(source: &SourceObservation) -> (ExportDiagnosticStage, ExportDiagnostic
             ExportDiagnosticCode::ProjectionFailure,
         )
     };
-    (stage, source.diagnosis.code.unwrap_or(code))
+    (stage, source.diagnosis().code.unwrap_or(code))
 }
 
 fn diagnostic(
@@ -194,6 +194,6 @@ fn diagnostic(
         warning_code: None,
         count: 1,
         count_unit: ExportDiagnosticUnit::Records,
-        examples: vec![source.diagnosis.example(source.subject().clone())?],
+        examples: vec![source.diagnosis().example(source.subject().clone())?],
     })
 }

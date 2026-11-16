@@ -38,7 +38,7 @@ impl SourceDisposition {
 }
 
 /// Available technical field metadata of a source failure.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub(crate) struct SourceDiagnosis {
     pub(crate) code: Option<ExportDiagnosticCode>,
     pub(crate) field: Option<String>,
@@ -58,6 +58,18 @@ pub(crate) enum DiagnosisBody {
 }
 
 impl SourceDiagnosis {
+    pub(crate) const EMPTY: Self = Self {
+        code: None,
+        field: None,
+        source_type: None,
+        target_guid: None,
+        body: DiagnosisBody::Absent,
+    };
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self == &Self::EMPTY && matches!(self.body, DiagnosisBody::Absent)
+    }
+
     pub(crate) fn from_body(
         code: ExportDiagnosticCode,
         body: ExampleBodyReceipt,
@@ -117,6 +129,12 @@ impl SourceDiagnosis {
             (DiagnosisBody::Captured(body), DiagnosisBody::Captured(other)) => body.merge(other),
             _ => Err(ExportAccountingError::UnboundHealthSubject),
         }
+    }
+}
+
+impl Default for SourceDiagnosis {
+    fn default() -> Self {
+        Self::EMPTY
     }
 }
 

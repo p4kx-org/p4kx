@@ -11,6 +11,8 @@ use crate::record_source_status::{SourceDiagnosis, SourceDisposition};
 use crate::selection::Kind;
 use crate::{CatalogError, ExportAccountingError, HealthText};
 
+static EMPTY_DIAGNOSIS: SourceDiagnosis = SourceDiagnosis::EMPTY;
+
 /// One actual Record admission retained across its read and projection outcomes.
 pub(crate) struct RecordObservation<'read, 'source> {
     record: &'read Record<'source>,
@@ -84,7 +86,7 @@ impl<'read, 'source> RecordObservation<'read, 'source> {
             record_path: key.path_text().cloned(),
             role,
             disposition,
-            diagnosis: SourceDiagnosis::default(),
+            diagnosis: None,
             configuration: None,
             subject: self.subject.clone(),
         })
@@ -101,7 +103,7 @@ pub(crate) struct SourceObservation {
     pub(crate) record_path: Option<HealthText>,
     pub(crate) role: ExportSourceRole,
     pub(crate) disposition: SourceDisposition,
-    pub(crate) diagnosis: SourceDiagnosis,
+    diagnosis: Option<Box<SourceDiagnosis>>,
     pub(crate) configuration: Option<ConfigurationInspection>,
     subject: RecordSubject,
 }
@@ -123,7 +125,7 @@ impl SourceObservation {
             record_path: path.clone(),
             role,
             disposition,
-            diagnosis: SourceDiagnosis::default(),
+            diagnosis: None,
             configuration: None,
             subject: RecordSubject::accounting(index, guid, path),
         }
@@ -153,7 +155,7 @@ impl SourceObservation {
             record_path: record.record_path().ok().map(HealthText::new),
             role,
             disposition,
-            diagnosis: SourceDiagnosis::default(),
+            diagnosis: None,
             configuration: None,
             subject: RecordObservation::accounting(record).subject,
         }
@@ -173,8 +175,12 @@ impl SourceObservation {
     }
 
     pub(crate) fn diagnosed(mut self, diagnosis: SourceDiagnosis) -> Self {
-        self.diagnosis = diagnosis;
+        self.diagnosis = (!diagnosis.is_empty()).then(|| Box::new(diagnosis));
         self
+    }
+
+    pub(crate) fn diagnosis(&self) -> &SourceDiagnosis {
+        self.diagnosis.as_deref().unwrap_or(&EMPTY_DIAGNOSIS)
     }
 
     pub(crate) const fn subject(&self) -> &RecordSubject {
@@ -188,7 +194,12 @@ impl SourceObservation {
         if self != &other {
             return Err(ExportAccountingError::ConflictingDisposition { kind: self.kind });
         }
-        self.diagnosis.merge(other.diagnosis)?;
+        match (&mut self.diagnosis, other.diagnosis) {
+            (Some(left), Some(right)) => left.merge(*right)?,
+            (None, None) => {}
+            // Equal metadata with mixed presence means the body evidence differs.
+            _ => return Err(ExportAccountingError::UnboundHealthSubject),
+        }
         self.subject.merge(other.subject)
     }
 
@@ -216,9 +227,63 @@ impl PartialEq for SourceObservation {
             && self.record_path == other.record_path
             && self.role == other.role
             && self.disposition == other.disposition
-            && self.diagnosis == other.diagnosis
+            && self.diagnosis() == other.diagnosis()
             && self.configuration == other.configuration
     }
 }
 
 impl Eq for SourceObservation {}
+
+#[cfg(test)]
+mod tests {
+    use p4kx_extraction::Guid;
+
+    use super::{SourceDiagnosis, SourceDisposition, SourceObservation};
+    use crate::ExportAccountingError;
+    use crate::export_diagnostic::ExportSourceRole;
+    use crate::record_source_status::DiagnosisBody;
+
+    #[test]
+    fn default_diagnosis_uses_no_allocation_and_preserves_body_conflicts() {
+        let source = SourceObservation::accounting(
+            None,
+            0,
+            Guid::from_stored([0; 16]),
+            None,
+            ExportSourceRole::Selected,
+            SourceDisposition::ReadFailed,
+        );
+        let mut defaulted = source.clone().diagnosed(SourceDiagnosis::default());
+        assert!(
+            defaulted.diagnosis.is_none(),
+            "an unsuccessful read with no diagnosis also keeps an empty slot"
+        );
+        assert!(
+            defaulted.merge(source.clone()).is_ok(),
+            "implicit and explicitly supplied empty diagnoses merge"
+        );
+
+        let mut pending = source.diagnosed(SourceDiagnosis {
+            body: DiagnosisBody::Pending,
+            ..SourceDiagnosis::default()
+        });
+        assert_eq!(
+            defaulted, pending,
+            "body evidence is distinct from accounting metadata"
+        );
+        assert!(
+            matches!(
+                defaulted.merge(pending.clone()),
+                Err(ExportAccountingError::UnboundHealthSubject)
+            ),
+            "a pending incoming body stays distinct from an empty body"
+        );
+        assert!(
+            matches!(
+                pending.merge(defaulted),
+                Err(ExportAccountingError::UnboundHealthSubject)
+            ),
+            "a retained pending body stays distinct from an empty body"
+        );
+    }
+}
