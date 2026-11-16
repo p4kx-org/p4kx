@@ -12,6 +12,7 @@ mod entry_decision_origins;
 mod forge_pair;
 mod line_diff;
 mod line_diff_content;
+mod line_diff_origins;
 mod line_diff_viewer;
 mod nested_diff;
 mod owned;

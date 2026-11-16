@@ -14,8 +14,8 @@ use thiserror::Error;
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = historical_optional)]
 pub(crate) struct ReportOriginFields {
-    field_origins: FieldOrigins,
-    provenance: SourceInventory,
+    pub(crate) field_origins: FieldOrigins,
+    pub(crate) provenance: SourceInventory,
 }
 
 impl ReportOriginFields {

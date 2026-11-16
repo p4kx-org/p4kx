@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::fmt;
+
 use rayon::prelude::*;
 
-use crate::decode::{Decoded, Encoding, decode};
+use crate::decode::{DecodeOutcome, Decoded, Encoding, decode};
 use crate::path_key::eq_normalised;
 use crate::{Archive, CancelToken, ChangeKind, Entry, LineDiffError, TextDiff};
 
@@ -28,28 +30,71 @@ pub enum DiffBody {
 }
 
 /// The line diff of one Entry between an old and a new Archive.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone)]
 pub struct LineDiff<'a> {
-    old: Option<&'a Entry>,
-    new: Option<&'a Entry>,
-    old_encoding: Option<Encoding>,
-    new_encoding: Option<Encoding>,
+    old: LineInput<'a>,
+    new: LineInput<'a>,
     body: DiffBody,
 }
 
+#[derive(Clone, Copy)]
+pub(crate) struct LineInput<'a> {
+    pub(crate) archive: &'a Archive,
+    pub(crate) entry: Option<&'a Entry>,
+    pub(crate) outcome: Option<DecodeOutcome>,
+}
+
+impl LineInput<'_> {
+    const fn encoding(self) -> Option<Encoding> {
+        match self.outcome {
+            Some(DecodeOutcome::Text(encoding)) => Some(encoding),
+            _ => None,
+        }
+    }
+}
+
+impl fmt::Debug for LineDiff<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("LineDiff")
+            .field("old", &self.old.entry)
+            .field("new", &self.new.entry)
+            .field("old_encoding", &self.old_encoding())
+            .field("new_encoding", &self.new_encoding())
+            .field("body", &self.body)
+            .finish()
+    }
+}
+
+impl PartialEq for LineDiff<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.old.entry == other.old.entry
+            && self.new.entry == other.new.entry
+            && self.old_encoding() == other.old_encoding()
+            && self.new_encoding() == other.new_encoding()
+            && self.body == other.body
+    }
+}
+
+impl Eq for LineDiff<'_> {}
+
 impl<'a> LineDiff<'a> {
+    pub(crate) const fn original_inputs(&self) -> [LineInput<'a>; 2] {
+        [self.old, self.new]
+    }
+
     /// Returns the Entry path as the new side stores it, or as the old side does for a removed
     /// Entry.
     #[must_use]
     pub fn path(&self) -> &'a str {
-        self.new.or(self.old).map_or("", Entry::path)
+        self.new.entry.or(self.old.entry).map_or("", Entry::path)
     }
 
     /// Returns how the Entry differs by its central-directory size and CRC-32C, `None` when it
     /// is unchanged.
     #[must_use]
     pub fn kind(&self) -> Option<ChangeKind> {
-        match (self.old, self.new) {
+        match (self.old.entry, self.new.entry) {
             (Some(old), Some(new)) => (old.uncompressed_size() != new.uncompressed_size()
                 || old.checksum() != new.checksum())
             .then_some(ChangeKind::Changed),
@@ -61,25 +106,25 @@ impl<'a> LineDiff<'a> {
     /// Returns the Entry of the old side, `None` when it was added.
     #[must_use]
     pub const fn old_entry(&self) -> Option<&'a Entry> {
-        self.old
+        self.old.entry
     }
 
     /// Returns the Entry of the new side, `None` when it was removed.
     #[must_use]
     pub const fn new_entry(&self) -> Option<&'a Entry> {
-        self.new
+        self.new.entry
     }
 
     /// Returns how the old side was read, `None` when it is missing or not text.
     #[must_use]
     pub const fn old_encoding(&self) -> Option<Encoding> {
-        self.old_encoding
+        self.old.encoding()
     }
 
     /// Returns how the new side was read, `None` when it is missing or not text.
     #[must_use]
     pub const fn new_encoding(&self) -> Option<Encoding> {
-        self.new_encoding
+        self.new.encoding()
     }
 
     /// Returns the hunks, or why there are none.
@@ -178,13 +223,18 @@ fn diff<'a>(
     );
     let (old_side, new_side) = (old_side?, new_side?);
     check()?;
-    let encoding = |side: &Option<Decoded>| match side {
-        Some(Decoded::Text(_, encoding)) => Some(*encoding),
-        _ => None,
+    let old_input = LineInput {
+        archive: old,
+        entry: old_entry,
+        outcome: old_side.as_ref().map(Decoded::outcome),
     };
-    let (old_encoding, new_encoding) = (encoding(&old_side), encoding(&new_side));
+    let new_input = LineInput {
+        archive: new,
+        entry: new_entry,
+        outcome: new_side.as_ref().map(Decoded::outcome),
+    };
     let body = match (old_side, new_side) {
-        (Some(Decoded::TooLarge), _) | (_, Some(Decoded::TooLarge)) => {
+        (Some(Decoded::TooLarge(_)), _) | (_, Some(Decoded::TooLarge(_))) => {
             DiffBody::NotText(NotText::TooLarge)
         }
         (Some(Decoded::Binary), _) | (_, Some(Decoded::Binary)) => {
@@ -195,10 +245,8 @@ fn diff<'a>(
         }
     };
     Ok(LineDiff {
-        old: old_entry,
-        new: new_entry,
-        old_encoding,
-        new_encoding,
+        old: old_input,
+        new: new_input,
         body,
     })
 }

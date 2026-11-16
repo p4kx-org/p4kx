@@ -2962,8 +2962,14 @@ edits there, or every region once a fixed work budget is spent, is shown as remo
 whole. An Entry whose bytes changed but whose lines (for CryXml: the converted XML) did not has
 `change` `changed`, `differs` true and no hunks; without `--json` a note says so. The exit code
 is 0 when `differs` is false, 1 when it is true, 2 when neither Archive has the Entry and 3 when an Entry cannot be read, does not
-hold the size its central directory states, or holds corrupt CryXml. Memory stays bounded: each
-side holds at most 128 MiB of text and about 9 bytes of bookkeeping per line.
+hold the size its central directory states, or holds corrupt CryXml.
+
+The JSON adds `fieldOrigins` and `provenance`. Each line's `kind` uses the two-sided alignment.
+Its `text` points to the displayed input, with exact original byte ranges for raw text and
+UTF-16. UTF-16 also records the byte order mark. For converted CryXml text, the input Entry
+is known and the line's original subspan is explicitly unavailable. A directory size
+rejection uses only the decisive directory evidence. The proof inventory adds space
+proportional to the emitted origin paths.
 
 ## `p4kx cryxml <file> --out <file> --json`
 

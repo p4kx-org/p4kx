@@ -70,10 +70,27 @@ impl SourceUses {
         &self,
         archive: &Archive,
     ) -> Result<Option<SourceUse>, SourceEvidenceError> {
+        self.observe_root_directory_path_prefix(archive, archive.entries().len())
+    }
+
+    /// Retains the consulted prefix of the original root Archive directory.
+    /// The prefix is in admitted Entry order.
+    ///
+    /// # Errors
+    /// Returns an error when the prefix exceeds the admitted directory or registration fails.
+    pub fn observe_root_directory_path_prefix(
+        &self,
+        archive: &Archive,
+        end: usize,
+    ) -> Result<Option<SourceUse>, SourceEvidenceError> {
         self.observe_root_directory(archive, |count| {
+            let end = end as u64;
+            if end > count.get() {
+                return Err(SourceEvidenceError::InvalidDirectoryRange);
+            }
             Ok(SourceLocation::ArchiveDirectoryPaths {
                 start_entry_index: DecimalU64::new(0),
-                end_entry_index: count,
+                end_entry_index: DecimalU64::new(end),
             })
         })
     }

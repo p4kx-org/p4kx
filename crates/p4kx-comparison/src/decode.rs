@@ -47,12 +47,35 @@ impl Encoding {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DecodeOutcome {
+    Text(Encoding),
+    Binary,
+    TooLarge(LimitSource),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum LimitSource {
+    DeclaredSize,
+    DecodedPayload,
+}
+
 /// One side of a line diff after reading it.
 #[derive(Debug)]
 pub(crate) enum Decoded {
     Text(Vec<u8>, Encoding),
     Binary,
-    TooLarge,
+    TooLarge(LimitSource),
+}
+
+impl Decoded {
+    pub(crate) const fn outcome(&self) -> DecodeOutcome {
+        match self {
+            Self::Text(_, encoding) => DecodeOutcome::Text(*encoding),
+            Self::Binary => DecodeOutcome::Binary,
+            Self::TooLarge(source) => DecodeOutcome::TooLarge(*source),
+        }
+    }
 }
 
 /// Reads `entry` of `archive` as text, converting `CryXml` to XML and decoding UTF-16; stops
@@ -64,7 +87,7 @@ pub(crate) fn decode(
 ) -> Result<Decoded, LineDiffError> {
     let declared = entry.uncompressed_size();
     if declared > MAX_DIFF_LEN {
-        return Ok(Decoded::TooLarge);
+        return Ok(Decoded::TooLarge(LimitSource::DeclaredSize));
     }
     let path = || entry.path().to_owned();
     let mut bytes = Vec::with_capacity(initial_capacity(declared));
@@ -96,7 +119,9 @@ pub(crate) fn decode(
         _ => text(bytes),
     };
     Ok(match decoded {
-        Decoded::Text(text, _) if line_count(&text) > MAX_DIFF_LINES => Decoded::TooLarge,
+        Decoded::Text(text, _) if line_count(&text) > MAX_DIFF_LINES => {
+            Decoded::TooLarge(LimitSource::DecodedPayload)
+        }
         decoded => decoded,
     })
 }
@@ -118,7 +143,9 @@ fn convert(
     match document.write_xml(&mut out) {
         Ok(()) => Ok(Decoded::Text(out.bytes, Encoding::CryXml(signature))),
         Err(_) if cancel.is_some_and(CancelToken::is_cancelled) => Err(LineDiffError::Cancelled),
-        Err(error) if error.kind() == io::ErrorKind::FileTooLarge => Ok(Decoded::TooLarge),
+        Err(error) if error.kind() == io::ErrorKind::FileTooLarge => {
+            Ok(Decoded::TooLarge(LimitSource::DecodedPayload))
+        }
         Err(source) => Err(LineDiffError::Read {
             path: entry.path().to_owned(),
             source,
