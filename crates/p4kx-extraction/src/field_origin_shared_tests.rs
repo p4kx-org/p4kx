@@ -12,7 +12,50 @@ use crate::{
     SourceLocation, SourceScope, SourceUse, SourceUseRole, SourceUses, SourceValue, SourcedValue,
 };
 
+use super::FieldOrigin;
+use super::refs::OriginRefs;
+
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
+
+#[test]
+fn one_distinct_contributor_stays_inline_with_the_same_wire() -> TestResult {
+    let sources = SourceUses::new();
+    let scope = sources.observe(SourceInput::Unknown, InputScope::Payload)?;
+    let used = evidence(&scope, "value", SourceUseRole::Payload)?;
+    let attempt = evidence(&scope, "attempt", SourceUseRole::Attempted)?;
+    let local = sources.origin(&[attempt, used.clone(), used.clone()], true);
+    let shared = sources.shared_origin(std::slice::from_ref(&used), true);
+    let basis = sources.origin_with_shared(&shared, &[], true)?;
+    let decoded = FieldOrigin::from_wire(
+        None,
+        vec![crate::SourceUseRef::decoded(
+            used.reference().as_str().into(),
+        )],
+        true,
+    )?;
+    for origin in [&local, &decoded] {
+        assert!(
+            matches!(&origin.fields.source_uses_refs, OriginRefs::Single(reference)
+                if reference == used.reference()),
+            "one distinct contribution uses no reference vector"
+        );
+        assert_eq!(
+            origin.source_uses_refs(),
+            std::slice::from_ref(used.reference()),
+            "the borrowed contribution stays the exact original reference"
+        );
+        assert_eq!(
+            origin, &basis,
+            "ownership storage leaves equality unchanged"
+        );
+        assert_eq!(
+            serde_json::to_vec(origin)?,
+            serde_json::to_vec(&basis)?,
+            "the same contribution set has the same wire representation"
+        );
+    }
+    Ok(())
+}
 
 #[test]
 fn unchanged_shared_origins_reuse_the_same_field_bundle() -> TestResult {

@@ -24,7 +24,7 @@ pub struct SourceUseRef(#[schemars(with = "String")] ReferenceText);
 
 #[derive(Clone)]
 enum ReferenceText {
-    Registered(Arc<String>),
+    Registered(Arc<str>),
     Decoded(Box<str>),
 }
 
@@ -45,7 +45,7 @@ impl Serialize for ReferenceText {
 
 impl SourceUseRef {
     pub(crate) fn registered(text: String) -> Self {
-        Self(ReferenceText::Registered(Arc::new(text)))
+        Self(ReferenceText::Registered(text.into()))
     }
 
     pub(crate) const fn decoded(text: Box<str>) -> Self {

@@ -216,7 +216,7 @@ impl FieldOrigin {
             identity: Some(identity),
             fields: Arc::new(OriginFields {
                 contains_encrypted_source: facts.contains_encrypted_source,
-                source_uses_refs: OriginRefs::Flat(facts.references),
+                source_uses_refs: OriginRefs::flat(facts.references),
                 source_set_complete: facts.source_set_complete,
             }),
         }
@@ -306,7 +306,7 @@ impl FieldOrigin {
             identity: None,
             fields: Arc::new(OriginFields {
                 contains_encrypted_source,
-                source_uses_refs: OriginRefs::Flat(source_uses_refs),
+                source_uses_refs: OriginRefs::flat(source_uses_refs),
                 source_set_complete,
             }),
         })
