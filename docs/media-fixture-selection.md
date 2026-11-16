@@ -176,6 +176,10 @@ cargo test --locked -p p4kx-blender --test it -- forward_illum_package_preserves
 & 'C:\Program Files\Blender Foundation\Blender 5.3\blender.exe' --background --factory-startup --disable-autoexec --python-exit-code 23 --python-expr 'import sys; sys.dont_write_bytecode = True' --python blender_addon/tests/blender_forward_illum_package.py -- "$env:P4KX_SYNTHETIC_FORWARD_ILLUM_PACKAGE/scene.json"
 ```
 
+The Forward Illum and palette gloss recipes passed on native Windows AMD64 with Blender 5.3.0
+(`02f0899d78e3`). The former rendered explicit Emittance. The latter verified packed alpha and
+the palette roughness graph.
+
 ## Native package exchange in CI
 
 The focused job builds the native P4KX CLI on each row of the
