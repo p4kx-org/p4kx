@@ -304,7 +304,7 @@ fn allowed_destination_symlink_is_replaced_without_writing_its_referent() -> Tes
         let receipt = rows(&fixture.read(COLOR_RECEIPT)?)?;
         let binding = &receipt.first().ok_or("receipt header")?["binding"];
         assert_eq!(
-            binding["sha256"],
+            binding.get("sha256").and_then(Value::as_str),
             Some(expected.sha256()),
             "the sidecar binds the new DDS"
         );
