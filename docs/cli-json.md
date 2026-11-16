@@ -2818,6 +2818,15 @@ run then stops and the exit code is 4. Otherwise the exit code is 1 when `mismat
 document for the Entries of the last container; its `archive` is the Archive path followed by the
 Entry paths of the containers.
 
+`fieldOrigins` maps JSON Pointers to the actual contributing Entries and their immediate
+encryption markers. The `provenance` inventory identifies the physical Entry independently of its
+path, including when several Entries share the same spelling. An expected checksum cites
+its directory declaration, and a computed checksum cites the half-open logical byte range in
+`entryDecodedBytes` for CRC or `entryStoredBytes` for SHA-256. A successful count cites the
+completed checks it counts, including a zero-length decoded range when applicable. Read failures
+cite the attempted Entry without claiming a completed byte range. Cancelled Entries cite their
+stored paths. An observed Archive change leaves the completed byte proof incomplete.
+
 ## `p4kx compare <old> <new> --json`
 
 The Comparison report, the same document `--report <file>` writes (there pretty-printed). Its
