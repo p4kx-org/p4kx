@@ -45,6 +45,31 @@ impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
         self.locale(name, notes, |fact| projection.public_name_fact(fact))
     }
 
+    pub(in crate::catalog_v3) fn port_display_name(
+        &self,
+        projection: &CatalogProjection<'_, 'source>,
+        notes: &mut Vec<FieldError>,
+    ) -> Result<SourcedValue<PublicNameRef>, CatalogError> {
+        const FIELD: &str = "DisplayName";
+        let Some((_, fact)) = self.originals.field(self.owner, FIELD)? else {
+            return self.absent();
+        };
+        let state = match fact.value() {
+            Value::Locale("") => SourceValue::Absent,
+            Value::String(_) | Value::Enum(_) => SourceValue::Unsupported,
+            _ => {
+                return self
+                    .locale_cell(FIELD, fact, notes, |fact| projection.public_name_fact(fact));
+            }
+        };
+        self.bind_field(
+            fact,
+            OriginalValuePart::Value,
+            state,
+            SourceUseRole::Selector,
+        )
+    }
+
     pub(in crate::catalog_v3) fn protected_locale(
         &self,
         name: &str,

@@ -23959,6 +23959,9 @@
         "attachAxesToAlign": {
           "$ref": "#/$defs/AlignmentAxis"
         },
+        "displayName": {
+          "$ref": "#/$defs/SourcedValueOfPublicNameRef"
+        },
         "name": {
           "$ref": "#/$defs/SourcedValueOfstring"
         },
@@ -23971,6 +23974,7 @@
       },
       "required": [
         "attachAxesToAlign",
+        "displayName",
         "name",
         "portOrdinal",
         "restrictions"

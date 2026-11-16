@@ -90,7 +90,7 @@ impl<'source> EntityConfigurationRows<'source> {
                     self.topology.links.push(links);
                 }
                 self.alignment
-                    .push(alignment, owner, source, options, notes)?;
+                    .push(alignment, owner, source, options, projection, notes)?;
             }
             ConfigurationKind::RoomAssociations => {
                 self.inventory.vehicle(&owner, source, notes)?;

@@ -21,6 +21,8 @@ pub enum TextOwner {
     ItemRecoveryPolicy,
     /// Localized subtype names and effect descriptions of consumables.
     ConsumableSubtypes,
+    /// Localized display names of physical item port definitions.
+    ItemPorts,
 }
 
 impl TextOwner {
@@ -31,6 +33,7 @@ impl TextOwner {
             Self::Catalog(kind) => kind.name(),
             Self::ItemRecoveryPolicy => "configurations.itemRecoveryPolicy",
             Self::ConsumableSubtypes => "definitions.consumableSubtypes",
+            Self::ItemPorts => "configurations.itemPorts",
         }
     }
 }
@@ -159,10 +162,11 @@ impl KindTextCoverage {
 
     pub(super) fn finish(mut self) -> Vec<KindTextSummary> {
         let mut summaries = Vec::new();
-        let owners = Kind::ALL
-            .into_iter()
-            .map(TextOwner::Catalog)
-            .chain([TextOwner::ItemRecoveryPolicy, TextOwner::ConsumableSubtypes]);
+        let owners = Kind::ALL.into_iter().map(TextOwner::Catalog).chain([
+            TextOwner::ItemRecoveryPolicy,
+            TextOwner::ConsumableSubtypes,
+            TextOwner::ItemPorts,
+        ]);
         for owner in owners {
             if let Some(counts) = self.by_owner.remove(&owner) {
                 summaries.extend(

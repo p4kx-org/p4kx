@@ -14,7 +14,9 @@ use super::item_component_owner::ComponentOwner;
 use super::port_restrictions::PortRestrictions;
 use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
+use crate::catalog_projection::{CatalogProjection, TextOwner};
 use crate::catalog_table::CatalogTable;
+use crate::catalog_text_contract::PublicNameRef;
 use crate::resource_number::ResourceNumber;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
@@ -55,12 +57,14 @@ impl<'source> ItemAlignmentRows<'source> {
         owner: ComponentOwner,
         source: Observed<'_, '_, '_, 'source>,
         options: &AlignmentOptions<'_>,
+        projection: &CatalogProjection<'_, 'source>,
         notes: &mut Vec<FieldError>,
     ) -> Result<(), CatalogError> {
         match kind {
             ItemAlignmentKind::Port => {
-                self.ports
-                    .push(ItemPortContainer::read(owner, source, options, notes)?);
+                self.ports.push(ItemPortContainer::read(
+                    owner, source, options, projection, notes,
+                )?);
             }
             ItemAlignmentKind::Attachment => {
                 self.attachments.push(ItemAttachmentComponent::read(
@@ -151,6 +155,7 @@ struct ItemPortContainer<'source> {
 struct ItemPort<'source> {
     port_ordinal: SourcedValue<u32>,
     name: SourcedValue<&'source str>,
+    display_name: SourcedValue<PublicNameRef>,
     #[serde(skip)]
     name_use: Option<SourceUse>,
     restrictions: PortRestrictions<'source>,
@@ -247,12 +252,15 @@ impl<'source> ItemPortContainer<'source> {
         owner: ComponentOwner,
         source: Observed<'_, '_, '_, 'source>,
         options: &AlignmentOptions<'_>,
+        projection: &CatalogProjection<'_, 'source>,
         notes: &mut Vec<FieldError>,
     ) -> Result<Self, CatalogError> {
+        let names = projection.for_text_owner(TextOwner::ItemPorts);
         let ports = source.class_array_to("Ports", PORT, notes, |port, notes| {
             Ok(ItemPort {
                 port_ordinal: port.owned_element_ordinal()?,
                 name: port.borrowed_string("Name", notes)?,
+                display_name: port.port_display_name(&names, notes)?,
                 name_use: port.selector_use("Name")?,
                 restrictions: PortRestrictions::read(port, notes)?,
                 attach_axes_to_align: port.alignment_axis("attachAxesToAlign", options, notes)?,

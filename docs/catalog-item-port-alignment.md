@@ -7,6 +7,7 @@ per-value source provenance.
 | Catalog path | Original DataForge location |
 |---|---|
 | `configurations.itemPorts.rows[].ports` | `EntityClassDefinition.Components[]` → `SItemPortContainerComponentParams.Ports[]` |
+| `ports.value[].value.displayName` | Authored `SItemPortDef.DisplayName` Locale in `texts.publicNames` |
 | `ports.value[].value.attachAxesToAlign` | `SItemPortDef.attachAxesToAlign` |
 | `configurations.itemAttachmentConstraints.rows[].definition` | `EntityClassDefinition.Components[]` → `SAttachableComponentParams.AttachDef` |
 | `definition.value.attachAxesToAlign` | `SItemDefinition.attachAxesToAlign` |
@@ -48,6 +49,18 @@ configuration output, for example under a Record filter. `notDeclared` means
 the resolved item has no attachable component. Empty and unresolved
 attachments have a null `attachedItem`. XML-only ports have a null
 `portDefinition`.
+
+Use the projected `sourceConstraints.portDefinition` link to find a contextual
+Loadout port's canonical display name. Match the link's `ownerRecordIndex.value`
+and `componentOrdinal.value` to the item-port container, then match its
+`portOrdinal.value` to the physical slot in `ports.value`. The slot's
+`displayName.value` references `texts.publicNames`. The reference retains the
+original Locale occurrence, and each available language carries its own source
+and display forms with no fallback. Empty or missing keys have an absent
+reference. Placeholder keys keep their canonical row and have no translations.
+Non-Locale storage does not supply a canonical key. The contextual
+`displayNameKey` retains its existing raw behavior, including for definitions
+outside the filter. XML-only ports have no physical slot to join.
 
 The resolver continues to place attachments using its established helper
 transforms and merge rules. The alignment labels and center-of-mass declaration

@@ -8,6 +8,8 @@ use serde_json::{Value, json};
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
 use crate::health_origin_assertions as proof;
 
+#[path = "catalog_item_alignment_display_names.rs"]
+mod display_names;
 #[path = "catalog_item_alignment_links.rs"]
 mod links;
 
@@ -20,6 +22,7 @@ const ITEMS: &str = "/configurations/itemAttachmentConstraints/rows";
 #[derive(Clone, Copy)]
 enum Layout {
     Complete,
+    Localized,
     Absent,
     Unreadable,
 }
@@ -171,6 +174,9 @@ fn database(layout: Layout) -> DataForgeBuilder {
         .field("MinSize", TestType::UInt32)
         .field("MaxSize", TestType::UInt32)
         .field("defaultItem", class("SItemPortDefaultItemDef"));
+    if matches!(layout, Layout::Localized) {
+        port = port.field("DisplayName", TestType::Locale);
+    }
     let mut definition = TestStruct::new("SItemDefinition")
         .field("Type", TestType::String)
         .field("SubType", TestType::String)
@@ -259,6 +265,14 @@ fn port(name: &str, target: Option<u128>, label: &str, layout: Layout) -> TestVa
         .value("Name", TestValue::text(name))
         .value("MinSize", TestValue::UInt32(1))
         .value("MaxSize", TestValue::UInt32(2));
+    if matches!(layout, Layout::Localized) {
+        let display_name = if name == "mount" {
+            display_names::PORT_KEY
+        } else {
+            "@LOC_EMPTY"
+        };
+        port = port.value("DisplayName", TestValue::text(display_name));
+    }
     if let Some(guid) = target {
         port = port.value(
             "defaultItem",
