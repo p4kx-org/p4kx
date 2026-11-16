@@ -97,3 +97,33 @@ fn emissive_magnitude_remains_distinct_and_ignores_nonfinite_input() -> TestResu
     );
     Ok(())
 }
+
+#[test]
+fn positive_glow_preserves_black_and_white_emissive_colours() -> TestResult {
+    let black = matte("black").emissive([0.0; 3]).glow(4.0);
+    let white = matte("white").emissive([1.0; 3]).glow(4.0);
+    let file = TestMtl::multi(&[matte("unused"), black, white]).cryxml();
+    let (glb, _) = export(Some(file))?;
+
+    for (name, expected_colour, expected_strength) in [
+        ("black", [0.0_f32; 3], None),
+        ("white", [1.0; 3], Some(4.0)),
+    ] {
+        let material = glb
+            .document
+            .materials()
+            .nth(material_of(&glb, name)?)
+            .ok_or("converted emissive material")?;
+        assert_eq!(
+            material.emissive_factor().map(f32::to_bits),
+            expected_colour.map(f32::to_bits),
+            "{name}: preserve the exact achromatic core factor"
+        );
+        assert_eq!(
+            emissive_strength(&glb, name)?.map(f32::to_bits),
+            expected_strength.map(f32::to_bits),
+            "{name}: emit a strength extension only for the over-range white input"
+        );
+    }
+    Ok(())
+}
