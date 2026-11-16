@@ -116,6 +116,30 @@ fn particle_scope_keeps_readable_siblings_and_records_failed_and_skipped_entries
 }
 
 #[test]
+fn staged_particle_rows_match_typed_bytes_and_bound_source_inventory() -> TestResult {
+    let (folder, archive) = synthetic_archive(true)?;
+    let scratch = tempfile::tempdir_in(folder.path())?;
+    let (staged, staged_inventory) = with_entry_capture(&archive, |capture| {
+        let mut ledger = ExportLedger::default();
+        let table = stage(&archive, capture, &mut ledger, None, None, scratch.path())?;
+        Ok((table, capture.source_uses().freeze()?))
+    })?;
+    let (typed, original_inventory) = with_entry_capture(&archive, |capture| {
+        let mut ledger = ExportLedger::default();
+        let table = read(&archive, capture, &mut ledger, None, None)?;
+        Ok((table, capture.source_uses().freeze()?))
+    })?;
+    assert_eq!(staged.len(), typed.rows.len());
+    assert_eq!(staged_inventory, original_inventory);
+    let expected = serde_json::to_vec(&typed)?;
+    assert_eq!(serde_json::to_vec(&staged)?, expected, "counting replay");
+    assert_eq!(serde_json::to_vec(&staged)?, expected, "writing replay");
+    drop(staged);
+    assert_eq!(scratch.path().read_dir()?.count(), 0);
+    Ok(())
+}
+
+#[test]
 fn particle_wire_preserves_order_tokens_and_per_datum_physical_provenance() -> TestResult {
     let (_folder, archive) = synthetic_archive(true)?;
     let (table, inventory) = with_entry_capture(&archive, |capture| {

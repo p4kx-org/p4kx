@@ -15,6 +15,8 @@ use crate::template_number_capture::TemplateNumbers;
 mod row_numbers;
 #[path = "catalog_row_spool.rs"]
 pub(crate) mod spool;
+#[path = "catalog_staged_table.rs"]
+pub(crate) mod staged;
 
 /// Captures the actual final row selection independently of successful source projections.
 pub(crate) fn snapshot(collected: &mut Collected<'_>, filter: Option<&Filter>) -> CatalogRows {

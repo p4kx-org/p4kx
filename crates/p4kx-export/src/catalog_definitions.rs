@@ -6,7 +6,8 @@ use serde::Serialize;
 
 use crate::blueprint_category::BlueprintCategoryDefinition;
 use crate::broker_definition::BrokerDefinition;
-use crate::build_derived::particle_library::ParticleLibraryTable;
+use crate::build_derived::particle_library::ParticleLibrary;
+use crate::catalog_rows::staged::StagedCatalogTable;
 use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::ammo_definition::AmmoDefinition;
 use crate::catalog_v3::catalog_independent_configurations::{
@@ -123,7 +124,8 @@ pub(crate) struct CatalogDefinitions<'source> {
     pub(crate) quality_quantizations: CatalogTable<QualityQuantizationDefinition<'source>>,
     pub(crate) tags: CatalogTable<super::tag_catalog::TagDefinition<'source>>,
     pub(crate) shop_inventories: ShopInventoryTable,
-    pub(crate) particle_libraries: ParticleLibraryTable,
+    #[schemars(with = "CatalogTable<ParticleLibrary>")]
+    pub(crate) particle_libraries: StagedCatalogTable,
     #[serde(flatten)]
     pub(crate) planet_tech: PlanetTechDefinitions,
     pub(crate) explosion_definitions: CatalogTable<ExplosionDefinition<'source>>,

@@ -9,10 +9,10 @@ use crate::blueprint_catalog_rows::BlueprintRow;
 use crate::blueprint_category::BlueprintCategory;
 use crate::broker_definition::BrokerDefinition;
 use crate::broker_entry::BrokerProjection;
-use crate::build_derived::particle_library::ParticleLibraryTable;
 use crate::catalog_crafting::CraftingKinds;
 use crate::catalog_definitions::planet_tech_definitions::PlanetTechDefinitions;
 use crate::catalog_read_failure::CatalogReadFailure;
+use crate::catalog_rows::staged::StagedCatalogTable;
 use crate::catalog_table::{CatalogTable, DatasetAvailability};
 use crate::catalog_v3::ammo_definition::PreparedAmmoDefinition;
 use crate::catalog_v3::blueprint_category_list::PreparedBlueprintCategoryList;
@@ -138,7 +138,7 @@ pub(crate) struct Collected<'f> {
     pub(crate) loot_containers: Vec<LootContainer>,
     pub(crate) shops: Vec<Shop>,
     pub(crate) shop_inventories: ShopInventoryTable,
-    pub(crate) particle_libraries: ParticleLibraryTable,
+    pub(crate) particle_libraries: StagedCatalogTable,
     pub(crate) planet_tech: PlanetTechDefinitions,
     pub(crate) shop_inventory_resolution: CatalogTable<ShopInventoryResolution>,
     pub(crate) crafters: Vec<Crafter<'f>>,
@@ -248,7 +248,7 @@ impl<'f> Collected<'f> {
             loot_containers: Vec::new(),
             shops: Vec::new(),
             shop_inventories: ShopInventoryTable::default(),
-            particle_libraries: ParticleLibraryTable::empty(DatasetAvailability::Absent),
+            particle_libraries: StagedCatalogTable::empty(DatasetAvailability::Absent),
             planet_tech: PlanetTechDefinitions::default(),
             shop_inventory_resolution: CatalogTable::empty(DatasetAvailability::Absent),
             crafters: Vec::new(),

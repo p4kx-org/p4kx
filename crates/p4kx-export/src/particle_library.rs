@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::path::Path;
+
 use p4kx_extraction::{Archive, CancelToken, Entry, Filter};
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -8,7 +10,11 @@ use serde::Serialize;
 use crate::catalog_read::original::{
     EntryCapture, EntryDiagnosis, EntryRead, EntryXml, PhysicalEntryIdentity,
 };
-use crate::catalog_table::{CatalogTable, DatasetAvailability};
+use crate::catalog_rows::spool::RowSpoolWriter;
+use crate::catalog_rows::staged::StagedCatalogTable;
+#[cfg(test)]
+use crate::catalog_table::CatalogTable;
+use crate::catalog_table::DatasetAvailability;
 use crate::collected::Collected;
 use crate::entry_source::EntrySource;
 use crate::export_diagnostic::ExportDiagnosticCode;
@@ -27,8 +33,6 @@ const FOLDER: &str = "data/libs/particles/";
 const ROOT: &str = "ParticleLibrary";
 const KIND: Kind = Kind::ParticleLibraries;
 
-pub(crate) type ParticleLibraryTable = CatalogTable<ParticleLibrary>;
-
 /// One original particle-library Entry and its ordered XML elements.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -44,23 +48,63 @@ pub(crate) fn collect(
     options: &CatalogOptions<'_>,
     collected: &mut Collected<'_>,
 ) -> Result<(), CatalogError> {
-    collected.particle_libraries = read(
+    collected.particle_libraries = stage(
         archive,
         capture,
         &mut collected.ledger,
         options.filter,
         options.cancel,
+        &std::env::temp_dir(),
     )?;
     Ok(())
 }
+
+fn stage(
+    archive: &Archive,
+    capture: &EntryCapture<'_>,
+    ledger: &mut ExportLedger,
+    filter: Option<&Filter>,
+    cancel: Option<&CancelToken>,
+    directory: &Path,
+) -> Result<StagedCatalogTable, CatalogError> {
+    let mut spool = None::<RowSpoolWriter>;
+    let availability = visit(archive, capture, ledger, filter, cancel, |row| {
+        let writer = match spool {
+            Some(ref mut writer) => writer,
+            None => spool.insert(RowSpoolWriter::new(directory)?),
+        };
+        writer.append(&row, cancel)?;
+        Ok(())
+    })?;
+    let spool = spool.map(|writer| writer.finish(cancel)).transpose()?;
+    Ok(StagedCatalogTable::new(availability, spool, cancel))
+}
+
+#[cfg(test)]
 fn read(
     archive: &Archive,
     capture: &EntryCapture<'_>,
     ledger: &mut ExportLedger,
     filter: Option<&Filter>,
     cancel: Option<&CancelToken>,
-) -> Result<ParticleLibraryTable, CatalogError> {
+) -> Result<CatalogTable<ParticleLibrary>, CatalogError> {
     let mut rows = Vec::new();
+    let availability = visit(archive, capture, ledger, filter, cancel, |row| {
+        rows.push(row);
+        Ok(())
+    })?;
+    Ok(CatalogTable { availability, rows })
+}
+
+fn visit(
+    archive: &Archive,
+    capture: &EntryCapture<'_>,
+    ledger: &mut ExportLedger,
+    filter: Option<&Filter>,
+    cancel: Option<&CancelToken>,
+    mut emit: impl FnMut(ParticleLibrary) -> Result<(), CatalogError>,
+) -> Result<DatasetAvailability, CatalogError> {
+    let mut available = false;
     let mut unknown = ledger.archive_inventory_problem.is_some();
     ledger.inventory(KIND);
     let candidates = archive
@@ -77,7 +121,8 @@ fn read(
             EntrySource::outer(capture, archive, entry)?.operation(EntryOperation::SourceXml);
         match observe(archive, entry, &source, capture, cancel)? {
             Observation::Projected(row) => {
-                rows.push(row);
+                emit(row)?;
+                available = true;
                 source.record(ledger, KIND, SourceDisposition::Projected);
             }
             Observation::OtherRoot => {
@@ -89,14 +134,13 @@ fn read(
             }
         }
     }
-    let availability = if !rows.is_empty() {
+    Ok(if available {
         DatasetAvailability::Available
     } else if unknown {
         DatasetAvailability::Unavailable
     } else {
         DatasetAvailability::Absent
-    };
-    Ok(CatalogTable { availability, rows })
+    })
 }
 
 enum Observation {

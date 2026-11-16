@@ -1,12 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::cell::RefCell;
-
-use p4kx_extraction::{Archive, CancelToken, DataForge};
+use p4kx_extraction::{Archive, DataForge};
 use schemars::JsonSchema;
-use serde::ser::SerializeStruct;
-use serde::{Serialize, Serializer};
+use serde::Serialize;
 
 use super::catalog_independent_configurations::flight_configuration_tables::FlightConfigurationTables;
 use super::facility_instance::FacilityInstance;
@@ -17,8 +14,9 @@ use super::resource_network_placements::ResourceNetworkPlacementTables;
 use super::resource_topology_declarations::ResourceTopologyTables;
 use super::starmap_placement::{self, StarmapPlacement};
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_rows::spool::{RowSpool, RowSpoolError};
-use crate::catalog_table::{CatalogTable, DatasetAvailability};
+use crate::catalog_rows::spool::RowSpoolError;
+use crate::catalog_rows::staged::StagedCatalogTable;
+use crate::catalog_table::CatalogTable;
 use crate::collected::Collected;
 use crate::schema_fields::every_field_required;
 use crate::starmap_containers::Placements;
@@ -39,51 +37,14 @@ pub(crate) struct CatalogPlacements {
     facility_interior_coverage: Vec<InteriorRoomCoverage>,
     installed_configurations: CatalogTable<InstalledConfiguration>,
     #[schemars(with = "CatalogTable<ContainerInstance>")]
-    container_instances: ContainerInstances,
+    container_instances: StagedCatalogTable,
     location_instances: CatalogTable<LocationInstance>,
     jump_endpoints: CatalogTable<JumpEndpoint>,
 }
 
-#[derive(Debug)]
-struct ContainerInstances {
-    availability: DatasetAvailability,
-    spool: Option<RowSpool>,
-    cancel: Option<CancelToken>,
-    failure: RefCell<Option<RowSpoolError>>,
-}
-
-impl ContainerInstances {
-    fn take(placements: &mut Placements, cancel: Option<&CancelToken>) -> Self {
-        let (availability, spool) = placements.take_instance_spool();
-        Self {
-            availability,
-            spool,
-            cancel: cancel.cloned(),
-            failure: RefCell::new(None),
-        }
-    }
-}
-
-impl Serialize for ContainerInstances {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        *self.failure.borrow_mut() = None;
-        let mut table = serializer.serialize_struct("CatalogTable", 2)?;
-        table.serialize_field("availability", &self.availability)?;
-        if let Some(spool) = &self.spool {
-            let rows = spool.serialize_rows(self.cancel.as_ref());
-            let result = table.serialize_field("rows", &rows);
-            *self.failure.borrow_mut() = rows.take_failure();
-            result?;
-        } else {
-            table.serialize_field("rows", &[] as &[ContainerInstance])?;
-        }
-        table.end()
-    }
-}
-
 impl CatalogPlacements {
     pub(crate) fn take_row_spool_failure(&self) -> Option<RowSpoolError> {
-        self.container_instances.failure.take()
+        self.container_instances.take_failure()
     }
 }
 
@@ -123,13 +84,14 @@ impl<'source> Collected<'source> {
         )?;
         let topology = self.resource_topology(forge, &origins.uses, cancel)?;
         let starmap = std::mem::take(&mut self.starmap_objects);
+        let (availability, spool) = placements.take_instance_spool();
         let placements = CatalogPlacements {
             resource_network: topology.placements,
             starmap_placements: starmap_placement::table(forge, starmap, origins)?,
             facility_instances,
             facility_interior_coverage,
             installed_configurations,
-            container_instances: ContainerInstances::take(placements, cancel),
+            container_instances: StagedCatalogTable::new(availability, spool, cancel),
             location_instances: placements.take_locations(),
             jump_endpoints: placements.take_jump_endpoints(),
         };

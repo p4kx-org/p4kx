@@ -116,7 +116,11 @@ fn write_json(
     let mut buffered = BufWriter::with_capacity(BUFFER, out);
     let written = serde_json::to_writer(&mut buffered, catalog)
         .map_err(|error| {
-            if let Some(failure) = catalog.placements.take_row_spool_failure() {
+            let failure = catalog
+                .placements
+                .take_row_spool_failure()
+                .or_else(|| catalog.definitions.particle_libraries.take_failure());
+            if let Some(failure) = failure {
                 return CatalogError::from(failure);
             }
             if error.is_io() {
