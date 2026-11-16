@@ -129,7 +129,7 @@ fn exactly_the_game_text_fields_carry_the_game_text_annotation() {
         marked += usize::from(carries);
     }
     assert_eq!(
-        marked, 102,
+        marked, 106,
         "every protected field in the canonical schema is accounted for"
     );
 }
@@ -163,6 +163,7 @@ fn expected_annotation(owner: &str, name: &str, field: &Value, schema: &Value) -
             "StarmapObjectDefinition",
             "name" | "description" | "callout1" | "callout2" | "callout3",
         )
+        | ("ManufacturerDisplayFeatures", "callout1" | "callout2" | "callout3" | "history")
         | ("ContainerInstance", "declaredLabel")
         | ("ChildLocation", "label")
         | ("HcdDocument", "presetRecordName")

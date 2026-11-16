@@ -13,6 +13,9 @@ use p4kx_testkit::{
 };
 use serde_json::Value;
 
+#[path = "json_snapshot_paths.rs"]
+mod snapshot_paths;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 const TEXTURE: &str = "Data\\Textures\\hull_ddna.dds";
@@ -84,7 +87,7 @@ impl Fixture {
         let stdout = String::from_utf8(output.stdout)?;
         assert_eq!(stdout.lines().count(), 1, "one line of JSON: {stdout}");
         let mut value: Value = serde_json::from_str(&stdout)?;
-        redact(&mut value, &self.dir().display().to_string());
+        snapshot_paths::redact(&mut value, self.dir())?;
         Ok(serde_json::to_string_pretty(&value)?)
     }
 }
@@ -93,19 +96,6 @@ fn checked_entry_snapshot(text: &str) -> Result<String, Box<dyn Error>> {
     let mut value = serde_json::from_str(text)?;
     crate::entry_listing_origins::remove_checked_origins_for_snapshot(&mut value)?;
     Ok(serde_json::to_string_pretty(&value)?)
-}
-
-fn redact(value: &mut Value, dir: &str) {
-    match value {
-        Value::String(text) => {
-            if let Some(rest) = text.strip_prefix(dir) {
-                *text = format!("[DIR]{}", rest.replace('\\', "/"));
-            }
-        }
-        Value::Array(items) => items.iter_mut().for_each(|item| redact(item, dir)),
-        Value::Object(map) => map.values_mut().for_each(|item| redact(item, dir)),
-        _ => {}
-    }
 }
 
 #[test]

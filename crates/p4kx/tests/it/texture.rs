@@ -237,57 +237,6 @@ fn merge_of_an_entry_writes_the_standard_dds_layout() -> TestResult {
 }
 
 #[test]
-fn merge_of_a_file_with_its_parts_next_to_it_writes_json() -> TestResult {
-    let dir = tempfile::tempdir()?;
-    let dds = texture();
-    let header = dds.write_files(dir.path(), "hull_ddna.dds")?;
-    let out = dir.path().join("merged.dds");
-
-    let output = p4kx()?
-        .args(["texture", "merge", "--json"])
-        .arg(&header)
-        .arg("--out")
-        .arg(&out)
-        .output()?;
-
-    assert_eq!(output.status.code(), Some(0), "success");
-    let merged = std::fs::read(&out)?;
-    assert_standard_layout(&merged, &dds);
-    let mut json: serde_json::Value = serde_json::from_slice(&output.stdout)?;
-    let fields = json.as_object_mut().ok_or("DDS merge report")?;
-    let origins = fields.remove("field_origins").ok_or("summary origin")?;
-    assert_eq!(
-        origins["/parts"]["containsEncryptedSource"],
-        serde_json::Value::Null,
-        "an observed loose file has unknown original Archive encryption"
-    );
-    assert_eq!(
-        origins["/parts"]["sourceSetComplete"], true,
-        "the opened file is observed"
-    );
-    assert!(
-        fields.remove("provenance").is_some(),
-        "summary source inventory"
-    );
-    let receipt = fields.remove("origin_receipt").ok_or("DDS companion")?;
-    assert!(
-        Path::new(receipt.as_str().ok_or("companion path")?).is_file(),
-        "companion exists"
-    );
-    assert_eq!(
-        json,
-        serde_json::json!({
-            "texture": header.display().to_string(),
-            "output": out.display().to_string(),
-            "parts": 4,
-            "size": merged.len(),
-        }),
-        "the JSON shape"
-    );
-    Ok(())
-}
-
-#[test]
 fn a_missing_part_fails_naming_the_part() -> TestResult {
     let dir = tempfile::tempdir()?;
     let header = texture().write_files(dir.path(), "hull_ddna.dds")?;

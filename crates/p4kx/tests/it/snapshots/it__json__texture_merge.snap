@@ -1,10 +1,228 @@
 ---
-source: crates/p4kx/tests/json.rs
+source: crates/p4kx/tests/it/json.rs
 expression: json
 ---
 {
+  "field_origins": {
+    "/parts": {
+      "containsEncryptedSource": false,
+      "sourceSetComplete": true,
+      "sourceUsesRefs": [
+        "u7",
+        "u8"
+      ]
+    },
+    "/size": {
+      "containsEncryptedSource": false,
+      "sourceSetComplete": true,
+      "sourceUsesRefs": [
+        "u7",
+        "u8"
+      ]
+    },
+    "/texture": {
+      "containsEncryptedSource": false,
+      "sourceSetComplete": true,
+      "sourceUsesRefs": [
+        "u0"
+      ]
+    }
+  },
+  "origin_receipt": "[DIR]/hull_ddna.dds.p4kx-origin.jsonl",
   "output": "[DIR]/hull_ddna.dds",
   "parts": 4,
+  "provenance": {
+    "sources": [
+      {
+        "ancestors": [],
+        "declarations": {
+          "containsEncryptedSource": false,
+          "sourceSetComplete": true,
+          "sourceUsesRefs": [
+            "u6"
+          ],
+          "state": "present",
+          "value": [
+            {
+              "containsEncryptedSource": false,
+              "sourceSetComplete": true,
+              "sourceUsesRefs": [
+                "u5"
+              ],
+              "state": "present",
+              "value": {
+                "declaredBlockLength": {
+                  "containsEncryptedSource": false,
+                  "sourceSetComplete": true,
+                  "sourceUsesRefs": [
+                    "u2"
+                  ],
+                  "state": "present",
+                  "value": 6
+                },
+                "kind": "cigExtraBlock",
+                "rawBytes": {
+                  "containsEncryptedSource": false,
+                  "sourceSetComplete": true,
+                  "sourceUsesRefs": [
+                    "u4"
+                  ],
+                  "state": "present",
+                  "value": [
+                    0,
+                    0
+                  ]
+                },
+                "rawWord": {
+                  "containsEncryptedSource": false,
+                  "sourceSetComplete": true,
+                  "sourceUsesRefs": [
+                    "u3"
+                  ],
+                  "state": "present",
+                  "value": 0
+                },
+                "valueOffset": "1511"
+              }
+            }
+          ]
+        },
+        "entryIndex": 0,
+        "id": "a0.0",
+        "kind": "archiveEntry",
+        "path": {
+          "containsEncryptedSource": false,
+          "sourceSetComplete": true,
+          "sourceUsesRefs": [
+            "u0"
+          ],
+          "state": "present",
+          "value": "Data\\Textures\\hull_ddna.dds"
+        },
+        "recordFormat": "zipCentralDirectory",
+        "recordRange": {
+          "length": "279",
+          "offset": "1270"
+        },
+        "storedEncryption": "unencrypted",
+        "zipFlags": {
+          "containsEncryptedSource": false,
+          "sourceSetComplete": true,
+          "sourceUsesRefs": [
+            "u1"
+          ],
+          "state": "present",
+          "value": 0
+        }
+      }
+    ],
+    "uses": [
+      {
+        "effectiveEncryption": "unencrypted",
+        "id": "u0",
+        "location": {
+          "field": "path",
+          "type": "metadata"
+        },
+        "role": "payload",
+        "scope": "archiveDirectoryMetadata",
+        "source": "a0.0"
+      },
+      {
+        "effectiveEncryption": "unencrypted",
+        "id": "u1",
+        "location": {
+          "field": "generalPurposeFlags",
+          "type": "metadata"
+        },
+        "role": "payload",
+        "scope": "archiveDirectoryMetadata",
+        "source": "a0.0"
+      },
+      {
+        "effectiveEncryption": "unencrypted",
+        "id": "u2",
+        "location": {
+          "field": "encryptionDeclarations[0].declaredBlockLength",
+          "type": "metadata"
+        },
+        "role": "payload",
+        "scope": "archiveDirectoryMetadata",
+        "source": "a0.0"
+      },
+      {
+        "effectiveEncryption": "unencrypted",
+        "id": "u3",
+        "location": {
+          "field": "encryptionDeclarations[0].rawWord",
+          "type": "metadata"
+        },
+        "role": "payload",
+        "scope": "archiveDirectoryMetadata",
+        "source": "a0.0"
+      },
+      {
+        "effectiveEncryption": "unencrypted",
+        "id": "u4",
+        "location": {
+          "field": "encryptionDeclarations[0].rawBytes",
+          "type": "metadata"
+        },
+        "role": "payload",
+        "scope": "archiveDirectoryMetadata",
+        "source": "a0.0"
+      },
+      {
+        "effectiveEncryption": "unencrypted",
+        "id": "u5",
+        "location": {
+          "field": "encryptionDeclarations[0]",
+          "type": "metadata"
+        },
+        "role": "payload",
+        "scope": "archiveDirectoryMetadata",
+        "source": "a0.0"
+      },
+      {
+        "effectiveEncryption": "unencrypted",
+        "id": "u6",
+        "location": {
+          "field": "encryptionDeclarations",
+          "type": "metadata"
+        },
+        "role": "payload",
+        "scope": "archiveDirectoryMetadata",
+        "source": "a0.0"
+      },
+      {
+        "effectiveEncryption": "unencrypted",
+        "id": "u7",
+        "location": {
+          "field": "uncompressedSize",
+          "type": "metadata"
+        },
+        "role": "conversion",
+        "scope": "archiveDirectoryMetadata",
+        "source": "a0.0"
+      },
+      {
+        "effectiveEncryption": "unencrypted",
+        "id": "u8",
+        "location": {
+          "field": "bytes",
+          "indices": [
+            "0",
+            "148"
+          ],
+          "namespace": "ddsHeader",
+          "type": "subresource"
+        },
+        "role": "conversion",
+        "scope": "payload",
+        "source": "a0.0"
+      }
+    ]
+  },
   "size": 2916,
   "texture": "Data\\Textures\\hull_ddna.dds"
 }
