@@ -9,7 +9,8 @@ use crate::{
     CancelToken, ConflictPolicy, OriginArtifactBinding, SourceUses, write_origin_companion,
 };
 
-use super::{FilePublication, FileReceipt, install_without_replacing};
+use super::{FilePublication, FileReceipt};
+use crate::origin_file_io::install_without_replacing;
 
 const ORIGINAL: &[u8] = b"# sound\nsynthetic.wav\n";
 const EDITED: &[u8] = b"# sound\nsynthetic.wav ";

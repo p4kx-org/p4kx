@@ -6,6 +6,8 @@ use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::process;
 
+use tempfile::TempPath;
+
 use crate::file_receipt::OrdinaryReplacement;
 use crate::output_file::StagedOutput;
 use crate::{ArchiveWriteProtection, CancelToken, WriteProtectionError, check_protected_output};
@@ -53,6 +55,19 @@ pub(crate) fn write_replacing_before<T>(
 pub(crate) fn replace_staged(staged: &StagedOutput<'_>) -> io::Result<()> {
     staged.check().map_err(protection_error)?;
     fs::rename(staged.temporary(), staged.output())
+}
+
+pub(crate) fn install_without_replacing(
+    staged: &StagedOutput<'_>,
+    target: &Path,
+) -> io::Result<bool> {
+    let mut temporary = TempPath::try_from_path(staged.temporary())?;
+    temporary.disable_cleanup(true);
+    match temporary.persist_noclobber(target) {
+        Ok(()) => Ok(true),
+        Err(error) if error.error.kind() == io::ErrorKind::AlreadyExists => Ok(false),
+        Err(error) => Err(error.error),
+    }
 }
 
 pub(crate) enum StageDisposition<T> {

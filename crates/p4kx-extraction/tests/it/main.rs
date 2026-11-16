@@ -47,6 +47,7 @@ mod model_dds;
 mod model_observed;
 mod model_textures;
 mod non_utf8_paths;
+mod ordinary_origin_replacement;
 mod origin_companion;
 mod origin_directory;
 mod path_index;

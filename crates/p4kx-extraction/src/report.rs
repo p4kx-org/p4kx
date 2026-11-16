@@ -68,6 +68,12 @@ pub enum ExtractionError {
         #[source]
         source: io::Error,
     },
+    /// A directory or redirected object occupies the reserved publication lock.
+    #[error("the origin publication lock {path} must be a regular, non-redirected file")]
+    OriginLockCollision {
+        /// The unmodified reserved path.
+        path: PathBuf,
+    },
     /// Source or target protection refused the write.
     #[error(transparent)]
     Installation(#[from] p4kx_guard::WriteProtectionError),

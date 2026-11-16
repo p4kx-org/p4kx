@@ -20,6 +20,12 @@ use crate::{
 
 use super::lock_retirement;
 
+#[path = "file_receipt_lock_collision.rs"]
+mod collision;
+
+use collision::lock_metadata;
+pub(crate) use collision::origin_lock_collision;
+
 pub(super) const LOCK_NAME: &str = ".p4kx-origin.lock";
 
 pub(crate) fn is_origin_lock_name(name: &OsStr) -> bool {
@@ -60,7 +66,7 @@ impl ReceiptLock {
         contention: Contention,
     ) -> io::Result<Self> {
         let permit = crate::validated_output_directory(directory, None, cancel.flag(), |root| {
-            regular_file(&root.join(LOCK_NAME)).map(|_| ())
+            lock_metadata(&root.join(LOCK_NAME)).map(|_| ())
         })
         .map_err(OwnedOutputError::into_io_error)?;
         let path = permit.path().join(LOCK_NAME);
@@ -235,7 +241,7 @@ fn open_candidate(
     cancel: &CancelToken,
     contention: Contention,
 ) -> io::Result<Option<LockCandidate>> {
-    let opened = if regular_file(path)?.is_some() {
+    let opened = if lock_metadata(path)?.is_some() {
         OpenOptions::new()
             .read(true)
             .write(true)
@@ -248,6 +254,11 @@ fn open_candidate(
                 Ok((file, Some(ownership)))
             }
             Err(OwnedOutputError::Protection(error)) if lock_target_disappeared(path, &error) => {
+                return Ok(None);
+            }
+            Err(OwnedOutputError::Io { source, .. })
+                if source.kind() == io::ErrorKind::AlreadyExists =>
+            {
                 return Ok(None);
             }
             Err(error) => Err(error.into_io_error()),
@@ -313,7 +324,7 @@ fn validate_lock(file: &Handle, path: &Path) -> io::Result<()> {
 
 fn same_lock(file: &Handle, path: &Path) -> io::Result<bool> {
     let metadata = file.as_file().metadata()?;
-    let Some(current) = regular_file(path)? else {
+    let Some(current) = lock_metadata(path)? else {
         return Ok(false);
     };
     if !metadata.is_file() || metadata.len() != 0 || current.len() != 0 {

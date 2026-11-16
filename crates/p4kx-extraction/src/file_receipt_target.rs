@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::ffi::OsStr;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -14,6 +15,7 @@ use super::{COMPANION_SUFFIX, check};
 pub(super) enum BindTarget {
     Receipt,
     Replacement,
+    NativeReplacement,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -51,7 +53,7 @@ pub(super) fn bind_target(
         .unwrap_or_else(|| Path::new("."));
     let lexical = fs::canonicalize(parent)?.join(name);
     let bound = match fs::symlink_metadata(&lexical) {
-        Ok(metadata) if metadata.file_type().is_symlink() && mode == BindTarget::Replacement => {
+        Ok(metadata) if metadata.file_type().is_symlink() && mode != BindTarget::Receipt => {
             BoundTarget {
                 path: lexical,
                 leaf: TargetLeaf::SymbolicLink,
@@ -79,11 +81,7 @@ pub(super) fn bind_target(
     if is_origin_lock_name(name) {
         return Err(invalid("the output names the origin publication lock"));
     }
-    if name
-        .to_string_lossy()
-        .to_ascii_lowercase()
-        .ends_with(COMPANION_SUFFIX)
-    {
+    if mode != BindTarget::NativeReplacement && is_companion_name(name) {
         return Err(invalid("the output names a reserved origin companion"));
     }
     #[cfg(windows)]
@@ -92,6 +90,12 @@ pub(super) fn bind_target(
     }
     check(&bound.path, protection, cancel)?;
     Ok(bound)
+}
+
+pub(super) fn is_companion_name(name: &OsStr) -> bool {
+    name.as_encoded_bytes()
+        .get(name.len().saturating_sub(COMPANION_SUFFIX.len())..)
+        .is_some_and(|suffix| suffix.eq_ignore_ascii_case(COMPANION_SUFFIX.as_bytes()))
 }
 
 pub(super) fn sibling_receipt(path: &Path) -> io::Result<PathBuf> {
@@ -106,7 +110,14 @@ pub(super) fn sibling_receipt(path: &Path) -> io::Result<PathBuf> {
 pub(super) fn lexical_receipt(path: &Path) -> io::Result<Option<OriginArtifactName>> {
     let metadata = match fs::symlink_metadata(path) {
         Ok(metadata) => metadata,
-        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(error)
+            if matches!(
+                error.kind(),
+                io::ErrorKind::NotFound | io::ErrorKind::InvalidFilename
+            ) =>
+        {
+            return Ok(None);
+        }
         Err(error) => return Err(error),
     };
     if !metadata.is_file() || is_redirected_metadata(&metadata) {

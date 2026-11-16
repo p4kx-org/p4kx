@@ -3,9 +3,6 @@
 
 use std::fs::{self, File};
 use std::io::{self, BufRead, BufReader, Write};
-use std::path::Path;
-
-use tempfile::TempPath;
 
 use crate::origin_file_io::{self, StageDisposition};
 use crate::output_file::StagedOutput;
@@ -173,18 +170,8 @@ impl FileReceipt<'_> {
             fs::rename(staged.temporary(), &self.artifact)?;
             return Ok(StageDisposition::Moved(Some(digest)));
         }
-        let installed = install_without_replacing(staged, &self.artifact)?;
+        let installed = origin_file_io::install_without_replacing(staged, &self.artifact)?;
         Ok(StageDisposition::Cleanup(installed.then_some(digest)))
-    }
-}
-
-fn install_without_replacing(staged: &StagedOutput<'_>, target: &Path) -> io::Result<bool> {
-    let mut temporary = TempPath::try_from_path(staged.temporary())?;
-    temporary.disable_cleanup(true);
-    match temporary.persist_noclobber(target) {
-        Ok(()) => Ok(true),
-        Err(error) if error.error.kind() == io::ErrorKind::AlreadyExists => Ok(false),
-        Err(error) => Err(error.error),
     }
 }
 

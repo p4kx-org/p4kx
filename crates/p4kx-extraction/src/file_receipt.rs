@@ -18,6 +18,8 @@ mod directory;
 mod directory_table;
 #[path = "origin_directory_wire.rs"]
 mod directory_wire;
+#[path = "file_receipt_fresh.rs"]
+mod fresh;
 #[path = "file_receipt_header.rs"]
 mod header;
 #[path = "file_receipt_lock.rs"]
@@ -42,9 +44,10 @@ mod tests;
 
 pub use directory::{DirectoryCommit, DirectoryReceipt};
 use directory_table::ReplacementPath;
+pub(crate) use fresh::{FreshPublication, try_create_fresh};
 use header::ReceiptOwner;
-pub(crate) use lock::is_origin_lock_name;
 use lock::{Contention, ReceiptLock, invalid, protection_error, regular_file};
+pub(crate) use lock::{is_origin_lock_name, origin_lock_collision};
 pub(crate) use ordinary::{OrdinaryReplacement, retained_lock_failure};
 pub use publication::FilePublication;
 pub(crate) use staged::StagedReceiptPublication;
@@ -211,6 +214,10 @@ impl<'source> FileReceipt<'source> {
             TargetLeaf::File => BindTarget::Receipt,
             TargetLeaf::SymbolicLink => BindTarget::Replacement,
         };
+        self.check_target_mode(mode)
+    }
+
+    fn check_target_mode(&self, mode: BindTarget) -> io::Result<()> {
         let actual = bind_target(&self.artifact, self.protection, &self.cancel, mode)?;
         if actual.path != self.artifact {
             return Err(invalid("the artifact spelling changed before publication"));
@@ -239,7 +246,7 @@ impl<'source> FileReceipt<'source> {
         };
         let previous = previous.map_or(Ok(None), |(path, owner)| {
             existing
-                .owned(header::check_existing(path, ReceiptOwner::File(owner)))
+                .owned_sibling(header::check_existing(path, ReceiptOwner::File(owner)))
                 .map(|owned| owned.then_some(path))
         })?;
         let replacement = match self.leaf {
@@ -275,6 +282,18 @@ enum ExistingCompanions {
 }
 
 impl ExistingCompanions {
+    fn owned_sibling(self, observed: io::Result<bool>) -> io::Result<bool> {
+        match observed {
+            Err(error)
+                if self == Self::PreserveForeign
+                    && error.kind() == io::ErrorKind::InvalidFilename =>
+            {
+                Ok(false)
+            }
+            result => self.owned(result),
+        }
+    }
+
     fn owned(self, observed: io::Result<bool>) -> io::Result<bool> {
         match observed {
             Err(error)

@@ -51,14 +51,18 @@ file companion names, publication lock names and unrelated existing files are
 reserved. The write guards reject destinations that alias the observed input or
 lie inside a protected installation.
 
-Ordinary atomic replacements retire proven companions for the replaced file
-before rename and preserve unrelated files. A replacement shares an existing
-publication lock or creates a temporary lock in a fresh destination. The
-temporary lock is moved out of the shared name before it is removed. Successful
-ordinary writes leave only their requested outputs in fresh destinations.
-Existing receipt locks remain in place. If temporary lock retirement fails,
-the error says whether the artifact was committed. A counted write that keeps
-the existing bytes keeps their proof and needs no publication lock.
+Ordinary Archive extraction and loose folder conversion retire proven companions
+for replaced files before rename and preserve unrelated files. If the target
+and both receipt forms are absent, an ordinary new file can use an atomic
+creation that cannot replace another file. Other writes use the destination
+directory's publication lock. A directory or redirect at the reserved lock name
+causes a destination conflict when a replacement needs the lock. A native file name ending
+in `.p4kx-origin.jsonl` remains usable when the path is free of an owned companion.
+
+Temporary replacement locks are moved out of the shared name before removal.
+Existing receipt locks remain in place. If retirement fails, the error states
+whether the artifact was committed. Conflict policies that keep existing bytes
+also keep their proof.
 
 An ordinary replacement of a symbolic link changes its directory entry. The
 writer preserves the referent and receipts proven to address other names.
