@@ -67,6 +67,7 @@ mod record_json_order;
 mod record_layout;
 mod record_metadata_baseline;
 mod record_name_tag;
+mod record_positioned_sites;
 mod record_reference_origin;
 mod record_reference_origin_source;
 mod record_texts;

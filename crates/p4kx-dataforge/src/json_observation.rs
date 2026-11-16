@@ -5,7 +5,7 @@ use std::fmt::Write as _;
 use std::io;
 
 use crate::positioned_record::ValueSlot;
-use crate::{DataType, PositionedRecord, Reference, StructValue, Value};
+use crate::{PositionedRecord, Reference, StructValue, Value};
 
 use super::source::{RecordJsonBytes, RecordJsonObserver, RecordJsonRecordField, RecordJsonSource};
 
@@ -233,21 +233,7 @@ impl<'observer, 'source> Observation<'observer, 'source> {
         let Some(slot) = slot else {
             return (Vec::new(), false);
         };
-        let mut sources = vec![RecordJsonSource::PropertyStorage {
-            index: slot.property,
-            target_used: matches!(slot.data_type, DataType::Class | DataType::Enum),
-        }];
-        let kind = if slot.array_header.is_some() {
-            RecordJsonBytes::ArrayElement
-        } else if slot.array {
-            RecordJsonBytes::ArrayHeader
-        } else {
-            RecordJsonBytes::Slot
-        };
-        sources.extend(self.bytes(slot.array_header, RecordJsonBytes::ArrayHeader));
-        let original = self.bytes(slot.bytes, kind);
-        let complete = original.is_some() || slot.bytes == Some(&[]);
-        sources.extend(original);
+        let (mut sources, complete) = self.input.describe_storage(slot).into_parts();
         if let Some(Value::String(text) | Value::Locale(text) | Value::Enum(text)) = value {
             sources.extend(self.bytes(Some(text.as_bytes()), RecordJsonBytes::Text));
         }
@@ -259,12 +245,7 @@ impl<'observer, 'source> Observation<'observer, 'source> {
         bytes: Option<&[u8]>,
         kind: RecordJsonBytes,
     ) -> Option<RecordJsonSource<'static>> {
-        let span = self.input.forge.byte_span(bytes?)?;
-        Some(RecordJsonSource::Bytes {
-            start: span.start,
-            end: span.end,
-            kind,
-        })
+        self.input.describe_bytes(bytes, kind)
     }
 
     fn emit(&mut self, sources: &[RecordJsonSource<'_>], complete: bool) -> io::Result<()> {
