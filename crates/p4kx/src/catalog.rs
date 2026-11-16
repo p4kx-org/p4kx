@@ -9,8 +9,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use anyhow::{Context, Result};
 use p4kx_export::{
     CatalogError, CatalogFailures, CatalogFile, CatalogOptions, CatalogPublicationMode,
-    CatalogStage, CatalogSummary, Compression, CraftingWarning, Filter, catalog_schema,
-    write_catalog_file_with_phases,
+    CatalogStage, CatalogSummary, Compression, CraftingWarning, ExportDiagnosticSeverity,
+    ExportHealth, Filter, Kind, catalog_schema, write_catalog_file_with_phases,
 };
 use p4kx_extraction::Archive;
 
@@ -73,16 +73,27 @@ pub(crate) fn run(args: &CatalogArgs, as_json: bool) -> Result<ExitCode> {
     if !args.progress_phases {
         line.finish();
     }
-    let summary = &written?;
     if args.progress_phases {
-        report_storage(summary);
+        report_outcome(&written);
     }
+    let summary = &written?;
     print_result(&archive, out, summary, as_json)?;
     Ok(ExitCode::from(if summary.is_complete() {
         exit::SUCCESS
     } else {
         exit::PARTIAL_FAILURE
     }))
+}
+
+fn report_outcome(written: &Result<CatalogSummary>) {
+    match written {
+        Ok(summary) => report_storage(summary),
+        Err(error) => {
+            if let Some(CatalogError::IncompleteExport(refusal)) = error.downcast_ref() {
+                let _ignored = report_refusal(refusal.health(), &mut io::stderr().lock());
+            }
+        }
+    }
 }
 
 fn report_storage(summary: &CatalogSummary) {
@@ -93,6 +104,32 @@ fn report_storage(summary: &CatalogSummary) {
         io::stderr().lock(),
         "catalog storage: staged_row_bytes={staged} publication_bytes={publication} peak_temporary_bytes={peak}"
     );
+}
+
+fn report_refusal(health: &ExportHealth, output: &mut impl Write) -> io::Result<()> {
+    writeln!(
+        output,
+        "catalog refusal: read={:?} projection={:?}",
+        health.read, health.projection,
+    )?;
+    for diagnostic in health
+        .diagnostics()
+        .iter()
+        .filter(|row| row.severity != ExportDiagnosticSeverity::Information)
+    {
+        let kind = diagnostic.kind.map_or("catalog", Kind::name);
+        let warning = diagnostic.warning_code.as_deref().unwrap_or("-");
+        writeln!(
+            output,
+            "catalog refusal: kind={kind} stage={:?} severity={:?} code={:?} warning={warning} count={} unit={:?}",
+            diagnostic.stage,
+            diagnostic.severity,
+            diagnostic.code,
+            diagnostic.count,
+            diagnostic.count_unit,
+        )?;
+    }
+    Ok(())
 }
 
 fn print_result(

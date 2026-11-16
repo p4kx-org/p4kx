@@ -141,8 +141,20 @@ pub enum CatalogStage {
     ProjectParticleLibraries,
     /// Projects weapon animation sources.
     ProjectWeaponAnimation,
-    /// Captures selected rows and assembles Blueprint and placement tables.
+    /// Captures final row counts and their source accounting.
     FinalizeProjections,
+    /// Assembles the final Blueprint tables.
+    ProjectBlueprintTables,
+    /// Resolves the inventory-backed cargo capacities of facility definitions.
+    ResolveCargoCapacities,
+    /// Joins loadout occurrences to facility and flight configurations.
+    ProjectFacilityLoadouts,
+    /// Reads original interior routes, room containers and model helpers.
+    ProjectFacilityInteriors,
+    /// Projects resource networks and their topology declarations.
+    ProjectResourceTopology,
+    /// Projects Starmap Record placements and attaches the world-placement tables.
+    ProjectStarmapPlacements,
 }
 
 impl CatalogStage {
@@ -181,6 +193,12 @@ impl CatalogStage {
             Self::ProjectParticleLibraries => "project-particle-libraries",
             Self::ProjectWeaponAnimation => "project-weapon-animation",
             Self::FinalizeProjections => "finalize-projections",
+            Self::ProjectBlueprintTables => "project-blueprint-tables",
+            Self::ResolveCargoCapacities => "resolve-cargo-capacities",
+            Self::ProjectFacilityLoadouts => "project-facility-loadouts",
+            Self::ProjectFacilityInteriors => "project-facility-interiors",
+            Self::ProjectResourceTopology => "project-resource-topology",
+            Self::ProjectStarmapPlacements => "project-starmap-placements",
         }
     }
 }

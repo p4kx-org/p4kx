@@ -218,7 +218,10 @@ Within `projections`, record `resolve-loadouts`, `project-locations`, `project-m
 `project-contract-generators`, `link-mission-factions`, `project-configurations` and
 `finalize-projections` as separate phase starts. Record the configuration phases `project-shops`,
 `resolve-jump-operators`, `read-independent-configurations`, `project-particle-libraries` and
-`project-weapon-animation` separately.
+`project-weapon-animation` separately. During finalization, distinguish
+`project-blueprint-tables`, `resolve-cargo-capacities`, `project-facility-loadouts`,
+`project-facility-interiors` when present, `project-resource-topology` and
+`project-starmap-placements`.
 Record peak working set and peak private bytes separately.
 Sample host commit and paging counters alongside the process write counter to distinguish process
 writes from system memory pressure. Record the exit status, elapsed time, file length and decoded

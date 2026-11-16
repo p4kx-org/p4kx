@@ -13,17 +13,18 @@ use super::facility_loadout_placements::{
 use super::resource_network_placements::ResourceNetworkPlacementTables;
 use super::resource_topology_declarations::ResourceTopologyTables;
 use super::starmap_placement::{self, StarmapPlacement};
+use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_rows::spool::RowSpoolError;
 use crate::catalog_rows::staged::StagedCatalogTable;
 use crate::catalog_table::CatalogTable;
 use crate::collected::Collected;
+use crate::options::{CatalogRun, CatalogStage};
 use crate::schema_fields::every_field_required;
 use crate::starmap_containers::Placements;
 use crate::starmap_containers::instance::ContainerInstance;
 use crate::starmap_containers::jump_endpoint::JumpEndpoint;
 use crate::starmap_containers::location_instance::LocationInstance;
-use crate::{CatalogError, CatalogOptions};
 
 /// Contextual placements and relationships keyed by their physical definitions.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -64,9 +65,11 @@ impl<'source> Collected<'source> {
         input: &OriginalCatalogInput<'_, '_>,
         placements: &mut Placements,
         flight: &FlightConfigurationTables<'_>,
-        options: &CatalogOptions<'_>,
+        run: CatalogRun<'_, '_>,
     ) -> Result<(CatalogPlacements, ResourceTopologyTables<'source>), CatalogError> {
         let origins = input.origins();
+        let options = run.options;
+        run.begin(CatalogStage::ResolveCargoCapacities);
         self.entity_configurations.resolve_cargo_capacities(
             forge,
             &self.inventory_containers,
@@ -74,6 +77,7 @@ impl<'source> Collected<'source> {
             options,
         )?;
         let cancel = options.cancel;
+        run.begin(CatalogStage::ProjectFacilityLoadouts);
         let LoadoutPlacements {
             facilities: facility_instances,
             rooms: facility_interior_coverage,
@@ -88,9 +92,11 @@ impl<'source> Collected<'source> {
                 flight,
             },
             input,
-            cancel,
+            run,
         )?;
+        run.begin(CatalogStage::ProjectResourceTopology);
         let topology = self.resource_topology(forge, &origins.uses, cancel)?;
+        run.begin(CatalogStage::ProjectStarmapPlacements);
         let starmap = std::mem::take(&mut self.starmap_objects);
         let (availability, spools) = placements.take_spools();
         let placements = CatalogPlacements {

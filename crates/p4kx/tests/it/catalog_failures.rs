@@ -90,6 +90,18 @@ fn an_unreadable_record_refuses_normal_publication_before_creating_a_file() -> T
         !stderr.contains("catalog phase: write-json"),
         "write was refused"
     );
+    assert!(
+        stderr
+            .lines()
+            .any(|line| line.starts_with("catalog refusal: kind=")
+                && line.contains("severity=Error")
+                && line.contains("count=1")),
+        "refusal shows the aggregate failure without publishing a catalog: {stderr}"
+    );
+    assert!(
+        !stderr.contains(BROKEN_GUID) && !stderr.contains(BROKEN_PATH),
+        "refusal telemetry omits original Record identities"
+    );
     assert!(!out.exists(), "no normal snapshot is created");
     Ok(())
 }

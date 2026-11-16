@@ -491,6 +491,8 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   `encryptedEntriesUnread`, the encrypted Entries the export could not read without a usable key.
   `--progress-phases` reports each phase as a `catalog phase: <identifier>` line on stderr,
   including when redirected. It works in both publication modes and leaves stdout for the summary.
+  If normal publication is refused, stderr includes the read and projection status and the
+  blocking diagnostic counts by kind, stage and code.
   After publication it also prints
   `catalog storage: staged_row_bytes=<n> publication_bytes=<n> peak_temporary_bytes=<n>`.
   The peak counts the logical bytes of the private row spools and the unpublished output file
@@ -509,7 +511,10 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   `link-mission-factions` marks scenario faction linking. Within `project-configurations`, the
   phases are `project-shops`, `resolve-jump-operators`, `read-independent-configurations`,
   `project-particle-libraries` and `project-weapon-animation`. `finalize-projections` marks
-  selected row capture and final Blueprint and placement tables. These markers precede `export-health`.
+  selected row capture. The remaining phases before `export-health` are
+  `project-blueprint-tables`, `resolve-cargo-capacities`, `project-facility-loadouts`,
+  `project-resource-topology` and `project-starmap-placements`. When facility interior
+  projection runs, `project-facility-interiors` follows the facility loadout joins.
   `p4kx catalog schema` prints the catalog's JSON Schema.
 - `p4kx ships <archive> --out <file> [--format json|ndjson] [--filter <filter>]
   [--exported-at <seconds>]` writes the base data of every ship

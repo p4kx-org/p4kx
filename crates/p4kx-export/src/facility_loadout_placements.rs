@@ -28,6 +28,7 @@ use crate::catalog_table::CatalogTable;
 use crate::contract_entities::Ship;
 use crate::contract_loadout::{EntityKind, Loadout, LoadoutPort};
 use crate::loadout::alignment::AttachmentIdentity;
+use crate::options::{CatalogRun, CatalogStage};
 use crate::record_header_field::RecordHeaderField;
 use crate::{CatalogError, ExportAccountingError};
 
@@ -78,8 +79,9 @@ pub(super) fn table(
     loadouts: &[Loadout],
     configurations: ConfigurationSources<'_, '_>,
     input: &OriginalCatalogInput<'_, '_>,
-    cancel: Option<&CancelToken>,
+    run: CatalogRun<'_, '_>,
 ) -> Result<LoadoutPlacements, CatalogError> {
+    let cancel = run.options.cancel;
     input.check_forge(forge)?;
     let mut project = Projection::new(configurations.entities, input.origins(), cancel)?;
     let mut flight_instances = InstalledConfigurations::new(configurations.flight)?;
@@ -101,6 +103,7 @@ pub(super) fn table(
                     )?;
                 }
             }
+            run.begin(CatalogStage::ProjectFacilityInteriors);
             let capture = EntryCapture::for_input(input);
             interior::project(
                 &mut project,

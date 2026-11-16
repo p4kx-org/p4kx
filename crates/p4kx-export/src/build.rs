@@ -129,6 +129,7 @@ fn assemble<R>(
         independent.recovery_numbers,
         independent.configuration_numbers,
     );
+    run.begin(CatalogStage::ProjectBlueprintTables);
     let blueprints = parts::blueprint_tables(&mut collected, &forge, &origins)?;
     let (catalog_placements, resource_declarations) = collected.catalog_placements(
         archive,
@@ -136,7 +137,7 @@ fn assemble<R>(
         &input,
         &mut placements,
         &independent.tables.flight,
-        options,
+        run,
     )?;
     let health = parts::require_publishable(&mut collected, &kinds, &input, run)?;
     drop(collected.failures);
