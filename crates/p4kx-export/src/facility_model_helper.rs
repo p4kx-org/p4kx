@@ -6,7 +6,7 @@ use p4kx_assembly::{
 };
 use p4kx_extraction::model::ModelFile;
 use p4kx_extraction::{
-    CancelToken, DataForge, EntryOrigin, InputScope, PathIndex, SourceInput, SourceUse,
+    CancelToken, DataForge, EntryOrigin, InputScope, PathIndex, PathKeys, SourceInput, SourceUse,
     SourceUseRole,
 };
 
@@ -19,6 +19,7 @@ use crate::{CatalogError, ExportAccountingError};
 
 pub(super) struct RoomHelperModels<'archive, 'forge, 'capture> {
     index: &'archive PathIndex<'archive>,
+    keys: &'archive PathKeys,
     forge: &'forge DataForge<'forge>,
     capture: &'capture EntryCapture<'capture>,
     origins: &'capture CatalogOrigins,
@@ -49,6 +50,7 @@ impl std::fmt::Debug for RoomHelperModels<'_, '_, '_> {
 impl<'archive, 'forge, 'capture> RoomHelperModels<'archive, 'forge, 'capture> {
     pub(super) const fn new(
         index: &'archive PathIndex<'archive>,
+        keys: &'archive PathKeys,
         forge: &'forge DataForge<'forge>,
         capture: &'capture EntryCapture<'capture>,
         origins: &'capture CatalogOrigins,
@@ -56,6 +58,7 @@ impl<'archive, 'forge, 'capture> RoomHelperModels<'archive, 'forge, 'capture> {
     ) -> Self {
         Self {
             index,
+            keys,
             forge,
             capture,
             origins,
@@ -127,9 +130,9 @@ impl<'archive, 'forge, 'capture> RoomHelperModels<'archive, 'forge, 'capture> {
         let original = archive
             .entry_origin(entry)
             .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
-        let provider = self
-            .provider
-            .get_or_insert_with(|| ArchiveModels::new(archive).with_model_node_sources());
+        let provider = self.provider.get_or_insert_with(|| {
+            ArchiveModels::from_path_index(self.keys.index(archive)).with_model_node_sources()
+        });
         let model = host
             .model
             .get_or_insert_with(|| read_model(provider, geometry.path()));

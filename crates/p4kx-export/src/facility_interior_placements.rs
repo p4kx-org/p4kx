@@ -4,7 +4,7 @@
 use std::collections::{HashMap, HashSet};
 
 use p4kx_extraction::{
-    Archive, DataForge, Guid, PathIndex, SourceUse, SourceUseRole, SourceUses, SourceValue,
+    Archive, DataForge, Guid, PathKeys, SourceUse, SourceUseRole, SourceUses, SourceValue,
     SourcedValue,
 };
 
@@ -40,7 +40,7 @@ pub(super) fn project(
     forge: &DataForge<'_>,
     ships: &[Ship<'_>],
     rooms: &RoomOwners<'_, '_>,
-    attachments: &[RoomAttachment],
+    attachments: Vec<RoomAttachment>,
     capture: &EntryCapture<'_>,
 ) -> Result<Vec<InteriorRoomCoverage>, CatalogError> {
     let mut ship_hosts: Vec<_> = ships
@@ -52,7 +52,8 @@ pub(super) fn project(
         return Ok(Vec::new());
     }
     let targets = class_targets(project, forge)?;
-    let index = PathIndex::new(archive);
+    let keys = PathKeys::new(archive);
+    let index = keys.index(archive);
     let reader = RoomReader {
         archive,
         index: &index,
@@ -61,7 +62,14 @@ pub(super) fn project(
         cancel: project.cancel,
     };
     let mut coverage = Vec::new();
-    let mut models = RoomHelperModels::new(&index, forge, capture, project.origins, project.cancel);
+    let mut models = RoomHelperModels::new(
+        &index,
+        &keys,
+        forge,
+        capture,
+        project.origins,
+        project.cancel,
+    );
     for root in ship_hosts {
         project.check_cancel()?;
         let record = root.source_record_index;
@@ -78,7 +86,7 @@ pub(super) fn project(
         let host = RoomHost {
             record: attachment.record,
             ship: &attachment.ship,
-            attachment: Some(attachment),
+            attachment: Some(&attachment),
         };
         reader.project_host(project, &mut coverage, rooms, &host, &mut models)?;
     }

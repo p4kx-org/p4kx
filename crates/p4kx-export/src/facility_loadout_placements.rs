@@ -111,7 +111,7 @@ pub(super) fn table(
                 forge,
                 ships,
                 &rooms,
-                &attachments,
+                attachments,
                 &capture,
             )?
         };
