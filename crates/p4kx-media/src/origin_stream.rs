@@ -187,7 +187,9 @@ impl<'a> OriginTransport<'a> {
         root: &Path,
         owner: &SourceUses,
     ) -> Result<OriginReceipts, MediaError> {
-        let inventory = owner.freeze().map_err(origin_error::evidence)?;
+        let inventory = owner
+            .finish_with(|| Ok(()))
+            .map_err(origin_error::evidence)?;
         let checkpoint = self.destination.checkpoint();
         let sources = inventory_stream(
             root,
@@ -203,6 +205,7 @@ impl<'a> OriginTransport<'a> {
             self.destination,
             &mut self.row_buffer,
         )?;
+        drop(inventory);
         write_row(
             &mut self.fields,
             &mut self.row_buffer,
