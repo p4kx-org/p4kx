@@ -7,6 +7,11 @@ use serde::{Serialize, Serializer};
 
 use super::{LocationView, SourceLocation, Subresource};
 
+#[path = "source_xml_location_storage.rs"]
+mod xml;
+
+use self::xml::StoredXmlSite;
+
 const VALUE_FIELDS: &[&str] = &[
     "$value",
     "$fieldName",
@@ -87,6 +92,7 @@ impl DataForgeSite {
 pub(crate) enum RetainedLocation {
     Original(SourceLocation),
     DataForge(StoredDataForgeSite),
+    Xml(StoredXmlSite),
 }
 
 #[derive(Debug)]
@@ -106,16 +112,17 @@ impl StoredDataForgeSite {
 
 impl RetainedLocation {
     pub(crate) fn new(location: SourceLocation) -> Self {
-        DataForgeSite::from_original(&location).map_or_else(
-            || Self::Original(location),
-            |site| Self::DataForge(StoredDataForgeSite::new(site)),
-        )
+        if let Some(site) = DataForgeSite::from_original(&location) {
+            return Self::DataForge(StoredDataForgeSite::new(site));
+        }
+        StoredXmlSite::from_original(location).map_or_else(Self::Original, Self::Xml)
     }
 
-    pub(crate) const fn view(&self) -> LocationView<'_> {
+    pub(crate) fn view(&self) -> LocationView<'_> {
         match self {
             Self::Original(location) => LocationView::Original(location),
             Self::DataForge(stored) => LocationView::Subresource(stored.site.subresource()),
+            Self::Xml(stored) => LocationView::Subresource(stored.subresource()),
         }
     }
 
@@ -125,6 +132,7 @@ impl RetainedLocation {
             Self::DataForge(stored) => stored
                 .original
                 .get_or_init(|| Box::new(stored.site.subresource().to_owned_location())),
+            Self::Xml(stored) => stored.original(),
         }
     }
 
@@ -137,6 +145,7 @@ impl RetainedLocation {
         match self {
             Self::Original(_) => None,
             Self::DataForge(stored) => Some(stored.original.get().is_some()),
+            Self::Xml(stored) => Some(stored.is_materialized()),
         }
     }
 }
@@ -146,6 +155,7 @@ impl Clone for RetainedLocation {
         match self {
             Self::Original(location) => Self::Original(location.clone()),
             Self::DataForge(stored) => Self::DataForge(StoredDataForgeSite::new(stored.site)),
+            Self::Xml(stored) => Self::Xml(stored.clone()),
         }
     }
 }
@@ -155,6 +165,7 @@ impl PartialEq for RetainedLocation {
         match (self, other) {
             (Self::Original(left), Self::Original(right)) => left == right,
             (Self::DataForge(left), Self::DataForge(right)) => left.site == right.site,
+            (Self::Xml(left), Self::Xml(right)) => left == right,
             _ => false,
         }
     }

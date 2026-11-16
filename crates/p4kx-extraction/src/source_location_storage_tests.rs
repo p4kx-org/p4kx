@@ -13,6 +13,8 @@ use crate::source_use::{
 };
 use crate::{SourceInput, SourceScope, SourceUses, SourceValue};
 
+use super::StoredXmlSite;
+
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
 /// One source-use inventory row, kept separately from the field's actual contribution set.
@@ -72,7 +74,7 @@ fn compact_and_owned_locations_keep_original_bytes_and_roles() -> TestResult {
             subresource("dataforgeRecordHeader", &[u64::MAX], "recordIndex"),
             false,
         ),
-        (subresource("xml", &[273_907, 13], "@pos"), false),
+        (subresource("xml", &[273_907, 13], "@pos"), true),
     ] {
         verify_roles(&uses, &scope, &location, compact)?;
     }
@@ -86,7 +88,7 @@ fn compact_and_owned_locations_keep_original_bytes_and_roles() -> TestResult {
             .iter()
             .filter(|row| row.location.compact_is_materialized().is_some())
             .count(),
-        6,
+        8,
         "one compact payload and one compact selector exist for each compact location"
     );
     assert!(
@@ -233,4 +235,72 @@ fn opaque_observations_stay_incomplete_inside_a_compact_inventory() -> TestResul
         "measuring completeness does not expand adjacent known coordinates"
     );
     Ok(())
+}
+
+#[test]
+fn compact_xml_locations_keep_the_original_keys_and_shapes() -> TestResult {
+    let uses = SourceUses::with_compact_coordinates();
+    let scope = uses.observe(SourceInput::Unknown, InputScope::Payload)?;
+    for (location, expected_payload) in [
+        (
+            subresource("xml", &[273_907, 13], "@pos"),
+            "c2:u0ppxpBC3z.N",
+        ),
+        (
+            subresource("xml", &[273_907, 13], "@Pos"),
+            "c2:u0ppsx273907.13.:@Pos",
+        ),
+        (
+            subresource("xmlSource.text", &[5, u64::MAX], "@n\u{e4}m\u{e9}"),
+            "c2:u0pps?14:xmlSource.text5.18446744073709551615.:@n\u{e4}m\u{e9}",
+        ),
+        (
+            subresource("xmlSource.cryXml", &[7, 2], "@Pos"),
+            "c2:u0pps?16:xmlSource.cryXml7.2.:@Pos",
+        ),
+        (
+            subresource("xmlSource.cryXml", &[7, 3], "@Pos"),
+            "c2:u0pps?16:xmlSource.cryXml7.3.:@Pos",
+        ),
+        (
+            subresource("xmlSource.cryXml", &[7], "$node"),
+            "c2:u0pps?16:xmlSource.cryXml7.:$node",
+        ),
+    ] {
+        let payload = scope.at(location.clone(), SourceUseRole::Payload)?;
+        assert_eq!(
+            payload.reference().as_str(),
+            expected_payload,
+            "the original ID includes exact spelling and occurrence",
+        );
+        verify_roles(&uses, &scope, &location, true)?;
+    }
+    Ok(())
+}
+
+#[test]
+fn compact_xml_falls_back_for_other_shapes_and_preserves_full_ids() -> TestResult {
+    let uses = SourceUses::new();
+    let scope = uses.observe(SourceInput::Unknown, InputScope::Payload)?;
+    for (location, compact) in [
+        (subresource("xml", &[64], "$absent:@pos"), true),
+        (subresource("xml", &[0, u64::MAX], "$text"), true),
+        (subresource("xml", &[u64::MAX], "$name"), false),
+        (subresource("xml", &[2, 3, 4], "$name"), false),
+        (subresource("xmlSource.text", &[12, 11], "@a"), false),
+        (subresource("xmlSource.text", &[12, 13], "$unknown"), false),
+        (subresource("xmlSource.cryXml", &[7, u64::MAX], "@a"), false),
+        (subresource("xmlSource.cryxml", &[7, 2], "@a"), false),
+    ] {
+        verify_roles(&uses, &scope, &location, compact)?;
+    }
+    Ok(())
+}
+
+#[test]
+fn compact_xml_site_fits_in_the_existing_owned_location_space() {
+    assert!(
+        size_of::<StoredXmlSite>() <= size_of::<SourceLocation>(),
+        "compact XML does not make unrelated retained variants larger",
+    );
 }
