@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::collections::BTreeSet;
+use std::sync::Arc;
 
 use p4kx_extraction::{CancelToken, SourceValueState};
 
@@ -14,7 +15,10 @@ use crate::{CatalogError, ExportAccountingError};
 /// The set-like item projection of the original inventory document.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum ItemList {
-    Items { guids: Vec<String>, dropped: usize },
+    Items {
+        guids: Arc<[String]>,
+        dropped: usize,
+    },
     Missing,
     Unreadable(String),
 }

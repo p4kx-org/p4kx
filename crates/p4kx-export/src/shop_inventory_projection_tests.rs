@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::error::Error;
+use std::sync::Arc;
 
 use p4kx_extraction::Archive;
 use p4kx_testkit::{ArchiveBuilder, TestEntry};
@@ -13,7 +14,7 @@ use crate::shop_inventory_file::ReadInventory;
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
-fn parse(bytes: &[u8]) -> TestResult<Option<(Vec<String>, usize)>> {
+fn parse(bytes: &[u8]) -> TestResult<Option<(Arc<[String]>, usize)>> {
     let folder = tempfile::tempdir()?;
     let path = folder.path().join("Data.p4k");
     ArchiveBuilder::new()
@@ -62,10 +63,11 @@ fn only_the_item_ids_are_read_ordered_and_without_repeats() -> TestResult {
     assert_eq!(
         parse(json)?,
         Some((
-            vec![
+            [
                 "70a98c94-9252-4fd3-a673-5a584339e273".to_owned(),
                 "d195eb47-24b8-45c0-a4d0-1771d60dc1a8".to_owned(),
-            ],
+            ]
+            .into(),
             1
         )),
         "one value that is no GUID is counted as dropped"
@@ -77,12 +79,15 @@ fn only_the_item_ids_are_read_ordered_and_without_repeats() -> TestResult {
 fn an_empty_inventory_is_an_empty_list_and_other_json_is_unreadable() -> TestResult {
     assert_eq!(
         parse(br#"{"Collection":{"Inventory":[]}}"#)?,
-        Some((Vec::new(), 0)),
+        Some(([].into(), 0)),
         "a present empty inventory"
     );
     assert_eq!(
         parse(br#"{"Inventory":[{"ID":{"ID":["70a98c94-9252-4fd3-a673-5a584339e273"]}}]}"#)?,
-        Some((vec!["70a98c94-9252-4fd3-a673-5a584339e273".to_owned()], 0)),
+        Some((
+            ["70a98c94-9252-4fd3-a673-5a584339e273".to_owned()].into(),
+            0
+        )),
         "the shape without a Collection"
     );
     assert_eq!(parse(br#"{"Other":1}"#)?, None, "no inventory shape");

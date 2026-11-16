@@ -52,34 +52,44 @@ impl Prefabs {
                         .is_some_and(|extension| extension.eq_ignore_ascii_case("xml"))
             })
             .collect();
-        let read = listed
-            .par_iter()
-            .map(|entry| {
-                if cancel.is_some_and(CancelToken::is_cancelled) {
-                    return Ok(ReadPrefab::default());
-                }
-                named(archive, entry, capture)
-            })
-            .collect::<Result<Vec<_>, CatalogError>>()?;
         let mut prefabs = Self {
             listed: listed.len(),
             ..Self::default()
         };
-        for read in read {
-            prefabs.ledger.merge(read.ledger);
-            let Some(pairs) = read.pairs else {
-                prefabs.unreadable += 1;
-                continue;
-            };
-            for (entity, stem) in pairs {
-                insert(prefabs.by_entity.entry(entity).or_default(), stem)?;
+        for window in listed.chunks(rayon::current_num_threads()) {
+            let scanned = window
+                .par_iter()
+                .map(|entry| {
+                    if cancel.is_some_and(CancelToken::is_cancelled) {
+                        return Err(CatalogError::Cancelled);
+                    }
+                    named(archive, entry, capture)
+                })
+                .collect::<Result<Vec<_>, CatalogError>>()?;
+            for read in scanned {
+                prefabs.retain(read)?;
             }
-            for (entity, path) in read.rejected {
-                prefabs.rejected.entry(entity).or_default().push(path);
-            }
-            prefabs.unattributed_declarations |= read.unattributed_declarations;
+        }
+        if cancel.is_some_and(CancelToken::is_cancelled) {
+            return Err(CatalogError::Cancelled);
         }
         Ok(prefabs)
+    }
+
+    fn retain(&mut self, read: ReadPrefab) -> Result<(), CatalogError> {
+        self.ledger.merge(read.ledger);
+        let Some(pairs) = read.pairs else {
+            self.unreadable += 1;
+            return Ok(());
+        };
+        for (entity, stem) in pairs {
+            insert(self.by_entity.entry(entity).or_default(), stem)?;
+        }
+        for (entity, path) in read.rejected {
+            self.rejected.entry(entity).or_default().push(path);
+        }
+        self.unattributed_declarations |= read.unattributed_declarations;
+        Ok(())
     }
 }
 

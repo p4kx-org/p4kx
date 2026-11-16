@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::sync::Arc;
+
 use p4kx_assembly::ArchiveFiles;
 use p4kx_extraction::{Archive, Filter};
 use p4kx_testkit::{ArchiveBuilder, TestContainer, TestEntry};
@@ -214,6 +216,12 @@ fn malformed_registry_rows_retain_valid_shops_and_one_failed_source() -> TestRes
         1,
         "the valid registry row remains present"
     );
+    let shop = read.shops.first().ok_or("one valid shop")?;
+    assert_eq!(
+        serde_json::to_value(shop)?.get("itemGuids"),
+        Some(&serde_json::Value::Null),
+        "the unresolved inventory still exports a null item list"
+    );
     assert_eq!(
         read.ledger.incomplete_inventories,
         Vec::new(),
@@ -235,6 +243,43 @@ fn malformed_registry_rows_retain_valid_shops_and_one_failed_source() -> TestRes
         counts.read_successful, 1,
         "the canonical source read succeeded"
     );
+    Ok(())
+}
+
+#[test]
+fn shop_placements_share_their_item_list_and_emit_the_same_guids() -> TestResult {
+    let other_root = "4b269932-183e-362d-aacc-188e7debbea9";
+    let item = "70a98c94-9252-4fd3-a673-5a584339e273";
+    let extra =
+        format!(r#"<ShopBackup ID="{other_root},{ENTITY}" SuperName="OtherRoot,SCShop_Test"/>"#);
+    let prefab = r#"<PrefabLibrary><Object Type="Entity" Id="{9730AC77-4077-4DCE-B700-273B6B917450}">
+        <PropertiesDataCore><EntityComponentShop offlineInventoryJSON="Scripts/ShopInventories/shared.json"/>
+        </PropertiesDataCore></Object></PrefabLibrary>"#;
+    let (_folder, archive) = opened(vec![
+        TestEntry::stored(REGISTRY, registry(&extra)),
+        TestEntry::stored("Data/Prefabs/Shops/shared.xml", prefab),
+        TestEntry::stored(
+            "Data/Scripts/ShopInventories/shared.json",
+            format!(r#"{{"Inventory":[{{"ID":{{"ID":["{item}"]}}}}]}}"#),
+        ),
+    ])?;
+    let read = crate::catalog_read::original::with_entry_capture(&archive, |capture| {
+        read_shops(&archive, capture)
+    })?;
+    let [first, second] = read.shops.as_slice() else {
+        return Err("two physical shop placements".into());
+    };
+    let (Some(first_guids), Some(second_guids)) = (&first.item_guids, &second.item_guids) else {
+        return Err("both shops have a resolved inventory".into());
+    };
+    assert!(
+        Arc::ptr_eq(first_guids, second_guids),
+        "placements sharing an inventory reuse its in-memory list"
+    );
+    let expected = serde_json::json!([item]);
+    for shop in &read.shops {
+        assert_eq!(serde_json::to_value(shop)?["itemGuids"], expected);
+    }
     Ok(())
 }
 

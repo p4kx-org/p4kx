@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::sync::Arc;
 
 use super::Lists;
 use crate::CatalogError;
@@ -165,7 +166,7 @@ fn shop(
         || (lower.starts_with(PLATINUMBAY_PREFIX) && lower.ends_with(COMMODITY_SUFFIX));
     let (inventory, item_guids) = match containers.inventory(&entity_guid) {
         Inventory::One(stem) => match lists.get(stem) {
-            Some(ItemList::Items { guids, .. }) => (Some(stem.to_owned()), Some(guids.clone())),
+            Some(ItemList::Items { guids, .. }) => (Some(stem.to_owned()), Some(Arc::clone(guids))),
             _ => (None, None),
         },
         Inventory::None | Inventory::Ambiguous | Inventory::Unknown => (None, None),

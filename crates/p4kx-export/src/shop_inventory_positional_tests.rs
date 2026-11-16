@@ -37,7 +37,7 @@ fn legacy_inventory_structs_accept_positional_json() -> TestResult {
         assert_eq!(
             list,
             ItemList::Items {
-                guids: vec![ITEM.to_owned()],
+                guids: [ITEM.to_owned()].into(),
                 dropped: 0,
             },
             "the original positional {shape} supplies the selected item"
@@ -75,7 +75,7 @@ fn duplicate_file_members_refuse_the_list_but_duplicate_item_members_drop_one_li
     assert_eq!(
         list,
         ItemList::Items {
-            guids: vec![ITEM.to_owned()],
+            guids: [ITEM.to_owned()].into(),
             dropped: 1,
         },
         "the line with a duplicate ID is dropped and the valid line survives"

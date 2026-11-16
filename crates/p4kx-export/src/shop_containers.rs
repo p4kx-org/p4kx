@@ -130,61 +130,68 @@ impl Containers {
         capture: &EntryCapture<'_>,
     ) -> Result<Self, CatalogError> {
         let listed = listed(archive);
-        let read = listed
-            .par_iter()
-            .map(|(entry, _)| {
-                if cancel.is_some_and(CancelToken::is_cancelled) {
-                    return Ok(Scanned::default());
-                }
-                shop_entities(archive, entry, capture)
-            })
-            .collect::<Result<Vec<_>, CatalogError>>()?;
+        let mut containers = Self::default();
+        for window in listed.chunks(rayon::current_num_threads()) {
+            let scanned = window
+                .par_iter()
+                .map(|(entry, _)| {
+                    if cancel.is_some_and(CancelToken::is_cancelled) {
+                        return Err(CatalogError::Cancelled);
+                    }
+                    shop_entities(archive, entry, capture)
+                })
+                .collect::<Result<Vec<_>, CatalogError>>()?;
+            for ((_, class), entities) in window.iter().zip(scanned) {
+                containers.retain(class.as_ref(), entities)?;
+            }
+        }
         if cancel.is_some_and(CancelToken::is_cancelled) {
             return Err(CatalogError::Cancelled);
         }
-        let mut containers = Self::default();
-        for ((_, class), entities) in listed.into_iter().zip(read) {
+        Ok(containers)
+    }
+
+    fn retain(&mut self, class: Option<&Class>, scanned: Scanned) -> Result<(), CatalogError> {
+        if class.is_some() {
+            self.listed += 1;
+        } else {
+            self.other_scanned += 1;
+        }
+        self.ledger.merge(scanned.ledger);
+        self.unattributed_declarations |= scanned.unattributed_declarations;
+        let mut observations = scanned.observations;
+        let Some((entities, rejected)) = scanned.entities else {
             if class.is_some() {
-                containers.listed += 1;
+                self.unreadable += 1;
             } else {
-                containers.other_scanned += 1;
+                self.other_unreadable += 1;
             }
-            containers.ledger.merge(entities.ledger);
-            containers.unattributed_declarations |= entities.unattributed_declarations;
-            let mut observations = entities.observations;
-            let Some((entities, rejected)) = entities.entities else {
-                if class.is_some() {
-                    containers.unreadable += 1;
-                } else {
-                    containers.other_unreadable += 1;
-                }
-                continue;
-            };
-            containers.rejected += rejected;
-            if !entities.is_empty() {
-                if class.is_some() {
-                    containers.with_shop += 1;
-                } else {
-                    containers.other_with_shop += 1;
-                }
-            }
-            for (entity, inventory) in entities {
-                containers.components += usize::from(inventory != Component::NotFound);
-                let original = observations.remove(&entity);
-                let named = containers.by_entity.entry(entity).or_default();
-                if let Some(original) = original {
-                    named.observations.merge(original)?;
-                }
-                named.placed = true;
-                if let Some(class) = &class
-                    && !named.classes.contains(class)
-                {
-                    named.classes.push(class.clone());
-                }
-                append_inventory(&mut named.inventories, inventory)?;
+            return Ok(());
+        };
+        self.rejected += rejected;
+        if !entities.is_empty() {
+            if class.is_some() {
+                self.with_shop += 1;
+            } else {
+                self.other_with_shop += 1;
             }
         }
-        Ok(containers)
+        for (entity, inventory) in entities {
+            self.components += usize::from(inventory != Component::NotFound);
+            let original = observations.remove(&entity);
+            let named = self.by_entity.entry(entity).or_default();
+            if let Some(original) = original {
+                named.observations.merge(original)?;
+            }
+            named.placed = true;
+            if let Some(class) = class
+                && !named.classes.contains(class)
+            {
+                named.classes.push(class.clone());
+            }
+            append_inventory(&mut named.inventories, inventory)?;
+        }
+        Ok(())
     }
 
     /// Adds the inventory files the shop prefabs name as one more place per Entity.

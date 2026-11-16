@@ -58,6 +58,26 @@ fn shop<'a>(catalog: &'a Value, location_id: &str) -> Result<&'a Value, Box<dyn 
 }
 
 #[test]
+fn merging_shop_scans_in_archive_order_preserves_catalog_bytes() -> TestResult {
+    use rayon::ThreadPoolBuilder;
+
+    let dir = tempfile::tempdir()?;
+    let archive =
+        Archive::open_with_key(write_archive(dir.path())?, Some(p4kx_testkit::test_key()))?;
+    let mut options = CatalogOptions::new(UNIX_EPOCH + EXPORTED_AT);
+    options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
+    let serial = ThreadPoolBuilder::new().num_threads(1).build()?;
+    let parallel = ThreadPoolBuilder::new().num_threads(4).build()?;
+    let one = serial.install(|| build_catalog(&archive, &options))?;
+    let four = parallel.install(|| build_catalog(&archive, &options))?;
+    assert!(
+        one.json() == four.json(),
+        "Shop data, health and provenance preserve archive order across worker counts"
+    );
+    Ok(())
+}
+
+#[test]
 fn a_shop_is_a_registry_entry_with_its_chain_as_the_key() -> TestResult {
     let (_, catalog) = build(write_archive, None)?;
     let keys: Vec<&str> = catalog["shops"]

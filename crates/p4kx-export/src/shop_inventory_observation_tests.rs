@@ -36,7 +36,7 @@ fn partial_inventory_json_retains_valid_ids_and_reports_one_failed_entry() -> Te
     assert_eq!(
         items,
         ItemList::Items {
-            guids: vec![item.to_owned()],
+            guids: [item.to_owned()].into(),
             dropped: 3
         },
         "valid IDs survive malformed populated values"
@@ -110,7 +110,7 @@ fn an_authored_empty_inventory_is_a_successful_zero_row_projection() -> TestResu
     assert_eq!(
         items(&archive, "empty", &mut ledger)?,
         ItemList::Items {
-            guids: Vec::new(),
+            guids: [].into(),
             dropped: 0
         },
         "authored emptiness is retained"
