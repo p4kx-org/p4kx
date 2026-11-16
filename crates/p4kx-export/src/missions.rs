@@ -26,6 +26,7 @@ use crate::mission_property_set::MissionPropertySets;
 use crate::mission_property_set_registry::MissionPropertySetRegistry;
 use crate::mission_siblings::{self, Siblings};
 use crate::mission_text_inputs::{LayerKind, LayerTexts};
+use crate::options::{CatalogRun, CatalogStage};
 use crate::record_fields::{identity, text};
 use crate::selection::{Kind, is_leftover};
 use crate::spawn_layers::RecordSpawns;
@@ -187,14 +188,17 @@ pub(crate) fn read<'f>(
     projection: &CatalogProjection<'_, 'f>,
     (tags, dependencies): (&CapturedTags<'_, 'f>, Option<TagDependencies<'f>>),
     starmap: &[StarmapObject<'f>],
-    filter: Option<&Filter>,
-    cancel: Option<&CancelToken>,
+    run: CatalogRun<'_, '_>,
 ) -> Result<Missions<'f>, CatalogError> {
+    let filter = run.options.filter;
+    let cancel = run.options.cancel;
     let input = projection.original();
     let mut grants = Grants::new(projection.origins());
     let records = selected_generators(forge, input, filter, cancel, &mut grants)?;
+    run.begin(CatalogStage::ReadMissionDependencies);
     let mut index = MissionIndex::read_captured(forge, input, filter, cancel, dependencies, tags)?;
     let (pools, failures, ledger) = index.take_template_results();
+    run.begin(CatalogStage::ProjectMissionDefinitions);
     let mut missions = Missions {
         ledger,
         contracts: Vec::new(),
@@ -208,6 +212,7 @@ pub(crate) fn read<'f>(
         property_sets: MissionPropertySets::default(),
     };
     crate::mission_ledger::inventory(&mut missions.ledger);
+    run.begin(CatalogStage::ProjectContractGenerators);
     if records.is_empty() {
         return Ok(missions);
     }
@@ -219,8 +224,14 @@ pub(crate) fn read<'f>(
         places: &places,
         cancel,
     };
-    let observed = record_read::read(&records, input, &context, cancel)?;
-    missions.complete_contracts(observed, grants)?;
+    let mut pending = Vec::new();
+    for window in records.chunks(rayon::current_num_threads()) {
+        for piece in record_read::read(window, input, &context, cancel)? {
+            missions.take(piece, &mut pending, &mut grants)?;
+        }
+    }
+    drop(index);
+    missions.complete_contracts(pending, grants)?;
     Ok(missions)
 }
 
@@ -257,13 +268,9 @@ fn selected_generators<'source>(
 impl<'f> Missions<'f> {
     fn complete_contracts(
         &mut self,
-        observed: Vec<ObservedPiece<'f>>,
-        mut grants: Grants,
+        mut contracts: Vec<PendingContract<'f>>,
+        grants: Grants,
     ) -> Result<(), CatalogError> {
-        let mut contracts = Vec::new();
-        for piece in observed {
-            self.take(piece, &mut contracts, &mut grants)?;
-        }
         property_set_collision::finalize(
             &self.property_sets,
             contracts.iter_mut().map(|contract| &mut contract.base),

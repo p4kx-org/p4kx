@@ -496,9 +496,13 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   of database validation, reading and decoding language Entries, indexing translations and binding
   the original input sources, respectively.
   Within `projections`, `resolve-loadouts` marks default loadout resolution,
-  `project-locations` marks starmap, harvest and loot projections, `project-missions` marks
-  the start of contract and mission projections, and `finalize-projections` marks selected row
-  capture and final Blueprint and placement tables. All four markers precede `export-health`.
+  and `project-locations` marks starmap, harvest and loot projections.
+  `project-missions` starts generator selection. `read-mission-dependencies` marks the index read,
+  `project-mission-definitions` marks template, broker and mission location projections, and
+  `project-contract-generators` marks the generator read and row assembly.
+  `link-mission-factions` marks scenario faction linking. `project-configurations` covers shops
+  and the remaining configurations. `finalize-projections` marks selected row capture and final
+  Blueprint and placement tables. These markers precede `export-health`.
   `p4kx catalog schema` prints the catalog's JSON Schema.
 - `p4kx ships <archive> --out <file> [--format json|ndjson] [--filter <filter>]
   [--exported-at <seconds>]` writes the base data of every ship

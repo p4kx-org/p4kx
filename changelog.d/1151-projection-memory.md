@@ -5,3 +5,4 @@
 - Share the canonical Tag tree and original field inspections across catalog tag paths, mission dependencies and paint matching.
 - Reuse the Archive file index during loadout resolution and release its worker and proof caches after collection.
 - Merge mission dependency results in original order after each read window and reuse the pending result buffers.
+- Fold contract generator results in original order per read window and report the active mission projection phase.

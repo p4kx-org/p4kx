@@ -93,13 +93,15 @@ fn assemble<R>(
         run,
     )?;
     run.begin(CatalogStage::ProjectMissions);
-    add_contracts(&forge, &projection, tags, options, &mut collected)?;
+    add_contracts(&forge, &projection, tags, run, &mut collected)?;
+    run.begin(CatalogStage::LinkMissionFactions);
     collected.ledger.merge(link_scenario_factions(
         &forge,
         &mut collected.mission_kinds.scenarios,
         &input,
         options.cancel,
     )?);
+    run.begin(CatalogStage::ProjectConfigurations);
     let shop_summary = add_shops(archive, &files, &mut collected, options, &entry_capture)?;
     let jump_owners = placements.join_jump_operators(&entities, &input, options.cancel)?;
     let jump_connections = CatalogTable::empty(placements.jump_connection_availability());

@@ -113,8 +113,18 @@ pub enum CatalogStage {
     ResolveLoadouts,
     /// Projects starmap, harvestable and loot locations.
     ProjectLocations,
-    /// Starts contract and mission projections.
+    /// Selects the source Records for contract and mission projections.
     ProjectMissions,
+    /// Reads the dependencies of the selected mission projections.
+    ReadMissionDependencies,
+    /// Projects template, broker and mission location definitions.
+    ProjectMissionDefinitions,
+    /// Reads contract generators and assembles their output rows.
+    ProjectContractGenerators,
+    /// Resolves original references between mission scenarios and factions.
+    LinkMissionFactions,
+    /// Projects shops and the remaining configuration tables.
+    ProjectConfigurations,
     /// Captures selected rows and assembles Blueprint and placement tables.
     FinalizeProjections,
 }
@@ -141,6 +151,11 @@ impl CatalogStage {
             Self::ResolveLoadouts => "resolve-loadouts",
             Self::ProjectLocations => "project-locations",
             Self::ProjectMissions => "project-missions",
+            Self::ReadMissionDependencies => "read-mission-dependencies",
+            Self::ProjectMissionDefinitions => "project-mission-definitions",
+            Self::ProjectContractGenerators => "project-contract-generators",
+            Self::LinkMissionFactions => "link-mission-factions",
+            Self::ProjectConfigurations => "project-configurations",
             Self::FinalizeProjections => "finalize-projections",
         }
     }

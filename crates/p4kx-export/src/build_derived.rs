@@ -18,6 +18,7 @@ use crate::crafter_hosts::link_hosts;
 use crate::crafting_warning::CraftingWarning;
 use crate::loadout::{Wanted, loadouts};
 use crate::missions;
+use crate::options::CatalogRun;
 use crate::paint::{is_paint, paints};
 use crate::{CatalogError, CatalogOptions, Kind, LoadoutSummary, PaintSummary};
 
@@ -67,7 +68,7 @@ pub(crate) fn add_contracts<'f>(
     forge: &'f DataForge<'f>,
     projection: &CatalogProjection<'_, 'f>,
     tags: MissionTags<'_, 'f>,
-    options: &CatalogOptions<'_>,
+    run: CatalogRun<'_, '_>,
     collected: &mut Collected<'f>,
 ) -> Result<(), CatalogError> {
     let missions = missions::read(
@@ -75,8 +76,7 @@ pub(crate) fn add_contracts<'f>(
         projection,
         (&tags.context, tags.dependencies),
         &collected.starmap_objects,
-        options.filter,
-        options.cancel,
+        run,
     )?;
     collected.ledger.merge(missions.ledger);
     collected.add_contracts(missions.contracts, missions.skipped, missions.failures);
@@ -89,7 +89,7 @@ pub(crate) fn add_contracts<'f>(
     collected.contract_scenario_requirements = missions.scenario_requirements;
     collected.mission_property_sets = missions.property_sets.publish(
         &projection.for_kind(Kind::MissionPropertySets),
-        options.cancel,
+        run.options.cancel,
     )?;
     let ContractTemplates {
         read,

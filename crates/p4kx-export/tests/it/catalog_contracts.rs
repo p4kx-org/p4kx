@@ -135,7 +135,8 @@ fn a_contract_and_each_sub_contract_is_an_entry_ordered_by_guid() -> TestResult 
 
 #[test]
 fn a_pair_a_later_generator_record_repeats_is_skipped_and_the_first_record_wins() -> TestResult {
-    let (_, catalog) = build(None)?;
+    let pool = rayon::ThreadPoolBuilder::new().num_threads(1).build()?;
+    let (_, catalog) = pool.install(|| build(None).map_err(|error| error.to_string()))?;
     let projections = v3::Projections::read(&catalog)?;
     for sub in [None, Some(SUB_ONE)] {
         assert_eq!(
