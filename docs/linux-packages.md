@@ -322,8 +322,8 @@ At merge revision `8195275fda13f8176c48c77a91465249c9d3f8f7` for PR #1117 head `
 both native Ubuntu CI rows passed the synthetic CLI and MCP checks and GUI frames under
 X11 and headless HiDPI Wayland with software rendering. Physical audio playback, clipboard
 exchange, interactive file chooser use and hardware GPU behavior remain unchecked by these
-runner jobs. [AMD64 CI job](https://github.com/p4kx-org/p4kx/actions/runs/43803352411/job/133091363724) ·
-[ARM64 CI job](https://github.com/p4kx-org/p4kx/actions/runs/43803352411/job/133091679587)
+runner jobs. [AMD64 CI job](https://github.com/p4kx-org/p4kx/actions/runs/43803352411/job/133091679587) ·
+[ARM64 CI job](https://github.com/p4kx-org/p4kx/actions/runs/43803352411/job/133091363724)
 
 The native package consumers for merge revision `0e1da3f4a7cd5a46fb2594dd6a5fafa97f1fd28b`
 and PR #1117 head `b27bdac875` passed all four package formats on both CPUs. The successful jobs
