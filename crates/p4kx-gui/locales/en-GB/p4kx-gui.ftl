@@ -636,6 +636,7 @@ audio-plugin = Plug-in
 audio-plugin-note = WEM { $id } is plug-in media, such as a convolution reverb impulse, and holds no sound to play.
 audio-midi = MIDI
 audio-midi-note = Media { $id } is a MIDI file and holds no sound to play.
+audio-bank-wem-count = Embedded WEM count
 audio-bank-summary =
     { $size } · { $count ->
         [one] { $number } WEM

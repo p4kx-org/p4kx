@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::ops::Range;
+
 use crate::{SourceEvidenceError, SourceLocation, SourceScope, SourceUse, SourceUseRole};
 
 /// A coordinate in one WEM parse, ready to bind to the actual input.
@@ -101,6 +103,27 @@ impl WemOriginSite {
                 field: self.name.to_owned(),
             },
             self.role,
+        )
+    }
+
+    /// Binds this WEM-local coordinate to its observed half-open range in a decoded soundbank.
+    ///
+    /// # Errors
+    /// Returns an error when the source evidence registry cannot record the use.
+    pub fn bind_embedded(
+        &self,
+        bank: &SourceScope,
+        bytes: Range<u64>,
+    ) -> Result<SourceUse, SourceEvidenceError> {
+        let mut indices = vec![bytes.start, bytes.end];
+        indices.extend_from_slice(self.indices());
+        bank.at(
+            SourceLocation::Subresource {
+                namespace: format!("bnkWem.{}", self.namespace()),
+                indices,
+                field: self.name().into(),
+            },
+            self.role(),
         )
     }
 }

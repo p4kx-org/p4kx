@@ -7,7 +7,7 @@ use std::sync::mpsc::{self, Receiver, TryRecvError};
 use std::thread;
 use std::time::Duration;
 
-use p4kx_extraction::{Codec, ObservedEntry, Soundbank, Wem};
+use p4kx_extraction::{Codec, EmbeddedWem, EntryOrigin, ObservedEntry, Soundbank, Wem};
 
 use super::audio_worker::{Source, Worker};
 use super::bank_cache::BankCache;
@@ -106,6 +106,18 @@ impl SoundHeader {
             provenance: Some(WemHeaderProvenance::capture(wem, source).map(Box::new)),
         }
     }
+
+    pub(super) fn observed_embedded<B: AsRef<[u8]>>(
+        wem: &Wem<B>,
+        embedded: &EmbeddedWem<'_>,
+        source: Option<&EntryOrigin>,
+    ) -> Self {
+        let provenance = WemHeaderProvenance::capture_embedded(wem, embedded, source);
+        Self {
+            info: SoundInfo::of(wem),
+            provenance: Some(provenance.map(Box::new)),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -162,9 +174,17 @@ impl AudioPreview {
     pub(crate) fn start_embedded(
         bank: &Arc<Soundbank<Vec<u8>>>,
         id: u32,
+        original: Option<&Arc<EntryOrigin>>,
         wake: impl Fn() + Send + 'static,
     ) -> Self {
-        Self::spawn(Source::Embedded(Arc::clone(bank), id), wake)
+        Self::spawn(
+            Source::Embedded {
+                bank: Arc::clone(bank),
+                id,
+                original: original.cloned(),
+            },
+            wake,
+        )
     }
 
     /// Starts reading the soundbank Entry `bank` of `index`, unless `cache` keeps it, and decoding
@@ -225,7 +245,7 @@ impl AudioPreview {
         }
     }
 
-    /// Returns the original contributions to the facts of a directly opened WEM.
+    /// Returns the original contributions to the facts of an opened WEM.
     #[must_use]
     pub fn header_provenance(
         &self,

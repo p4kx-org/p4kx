@@ -3,17 +3,17 @@
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
+use std::sync::mpsc::{self, Receiver, TryRecvError};
 use std::thread;
 
-use p4kx_extraction::{AudioError, EmbeddedWem, Soundbank};
-use rayon::prelude::*;
+use p4kx_extraction::{EntryOrigin, Soundbank, SourceEvidenceError};
 
-use super::SoundInfo;
 use super::audio::AudioPreview;
-use super::entry_bytes::{Unreadable, read_whole};
+use super::bank_sound::{BankSound, BankWemRow};
+use super::soundbank_provenance::{BankSoundProvenance, SoundbankSummaryProvenance};
+use super::soundbank_worker::Worker;
+use super::wem_header_provenance::WemHeaderEvidenceError;
 use crate::EntryIndex;
-use crate::model::describe;
 
 static SERIAL: AtomicU64 = AtomicU64::new(0);
 
@@ -25,92 +25,6 @@ pub fn is_bank_path(path: &str) -> bool {
         .checked_sub(4)
         .and_then(|start| path.get(start..));
     extension.is_some_and(|extension| extension.eq_ignore_ascii_case(".bnk"))
-}
-
-/// One WEM embedded in a soundbank, as the list of the Audio tab shows it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct BankSound {
-    id: u32,
-    size: u64,
-    kind: Kind,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Kind {
-    Sound(SoundInfo),
-    Prefetch,
-    Plugin,
-    Midi,
-    Unreadable,
-}
-
-impl BankSound {
-    fn of(wem: &EmbeddedWem<'_>) -> Self {
-        let kind = if wem.is_prefetch() {
-            Kind::Prefetch
-        } else {
-            match wem.parse() {
-                Ok(parsed) => Kind::Sound(SoundInfo::of(&parsed)),
-                Err(AudioError::PluginMedia) => Kind::Plugin,
-                Err(AudioError::MidiMedia) => Kind::Midi,
-                Err(_) => Kind::Unreadable,
-            }
-        };
-        Self {
-            id: wem.id(),
-            size: wem.bytes().len() as u64,
-            kind,
-        }
-    }
-
-    /// Returns the WEM ID.
-    #[must_use]
-    pub const fn id(&self) -> u32 {
-        self.id
-    }
-
-    /// Returns the size of the WEM in the soundbank, in bytes.
-    #[must_use]
-    pub const fn size(&self) -> u64 {
-        self.size
-    }
-
-    /// Returns whether the soundbank holds only the prefetched start of a streamed WEM, which a
-    /// loose WEM Entry of the same ID holds whole.
-    #[must_use]
-    pub const fn is_prefetch(&self) -> bool {
-        matches!(self.kind, Kind::Prefetch)
-    }
-
-    /// Returns whether the media is Wwise plug-in data, such as a convolution reverb impulse,
-    /// which holds no sound to play.
-    #[must_use]
-    pub const fn is_plugin(&self) -> bool {
-        matches!(self.kind, Kind::Plugin)
-    }
-
-    /// Returns whether the media is a MIDI file, which holds no sound to decode.
-    #[must_use]
-    pub const fn is_midi(&self) -> bool {
-        matches!(self.kind, Kind::Midi)
-    }
-
-    /// Returns whether the WEM can be decoded: it is neither a prefetched start, plug-in media
-    /// nor MIDI.
-    #[must_use]
-    pub const fn is_playable(&self) -> bool {
-        !matches!(self.kind, Kind::Prefetch | Kind::Plugin | Kind::Midi)
-    }
-
-    /// Returns what the header says about the sound, or `None` for a prefetched start, plug-in
-    /// media and media that is no valid WEM.
-    #[must_use]
-    pub const fn info(&self) -> Option<&SoundInfo> {
-        match &self.kind {
-            Kind::Sound(info) => Some(info),
-            _ => None,
-        }
-    }
 }
 
 /// Where the preview of a soundbank stands.
@@ -131,17 +45,42 @@ pub enum SoundbankStatus<'a> {
 }
 
 #[derive(Debug)]
-struct Opened {
+pub(super) struct Opened {
     bank: Arc<Soundbank<Vec<u8>>>,
+    original: Option<Arc<EntryOrigin>>,
     sounds: Vec<BankSound>,
+    evidence: Vec<BankWemRow>,
+    summary: Result<SoundbankSummaryProvenance, SourceEvidenceError>,
+}
+
+impl Opened {
+    pub(super) const fn new(
+        bank: Arc<Soundbank<Vec<u8>>>,
+        original: Option<Arc<EntryOrigin>>,
+        sounds: Vec<BankSound>,
+        evidence: Vec<BankWemRow>,
+        summary: Result<SoundbankSummaryProvenance, SourceEvidenceError>,
+    ) -> Self {
+        Self {
+            bank,
+            original,
+            sounds,
+            evidence,
+            summary,
+        }
+    }
+
+    fn position(&self, id: u32) -> Option<usize> {
+        self.sounds.binary_search_by_key(&id, BankSound::id).ok()
+    }
 }
 
 #[derive(Debug)]
-enum Event {
+pub(super) enum Event {
     TooLarge,
     Failed(Option<String>),
     ArchiveChanged,
-    Opened(Opened),
+    Opened(Box<Opened>),
 }
 
 #[derive(Debug)]
@@ -150,7 +89,7 @@ enum State {
     TooLarge,
     Failed(Option<String>),
     ArchiveChanged,
-    Opened(Opened),
+    Opened(Box<Opened>),
 }
 
 #[derive(Debug)]
@@ -168,6 +107,7 @@ pub struct SoundbankPreview {
     serial: u64,
     dropped: Arc<AtomicBool>,
     events: Receiver<Event>,
+    index: Arc<EntryIndex>,
     state: State,
     selected: Option<Selected>,
 }
@@ -198,6 +138,7 @@ impl SoundbankPreview {
             serial: SERIAL.fetch_add(1, Ordering::Relaxed),
             dropped,
             events,
+            index: Arc::clone(index),
             state,
             selected: None,
         }
@@ -212,6 +153,9 @@ impl SoundbankPreview {
     /// Returns where the preview stands.
     #[must_use]
     pub fn status(&self) -> SoundbankStatus<'_> {
+        if self.index.watch().is_changed() {
+            return SoundbankStatus::ArchiveChanged;
+        }
         match &self.state {
             State::Opening => SoundbankStatus::Opening,
             State::TooLarge => SoundbankStatus::TooLarge,
@@ -221,9 +165,30 @@ impl SoundbankPreview {
         }
     }
 
+    /// Returns original inputs for the displayed path, size and distinct embedded WEM count.
+    #[must_use]
+    pub fn summary_provenance(
+        &self,
+    ) -> Option<Result<&SoundbankSummaryProvenance, &SourceEvidenceError>> {
+        Some(self.opened()?.summary.as_ref())
+    }
+
+    /// Returns the original inputs for a row of the current soundbank.
+    #[must_use]
+    pub fn row_provenance(
+        &self,
+        id: u32,
+    ) -> Option<Result<&BankSoundProvenance, &WemHeaderEvidenceError>> {
+        let opened = self.opened()?;
+        let row = opened.evidence.get(opened.position(id)?)?;
+        let wem = opened.bank.wem(id)?;
+        Some(row.provenance(&wem, opened.original.as_deref()))
+    }
+
     /// Returns the ID of the selected WEM.
     #[must_use]
     pub fn selected(&self) -> Option<u32> {
+        self.opened()?;
         self.selected.as_ref().map(|selected| selected.id)
     }
 
@@ -238,11 +203,13 @@ impl SoundbankPreview {
     /// soundbank holds only its prefetched start.
     #[must_use]
     pub fn audio(&self) -> Option<&AudioPreview> {
+        self.opened()?;
         self.selected.as_ref()?.audio.as_ref()
     }
 
     /// Returns the audio preview of the selected WEM for controlling its playback.
     pub fn audio_mut(&mut self) -> Option<&mut AudioPreview> {
+        self.opened()?;
         self.selected.as_mut()?.audio.as_mut()
     }
 
@@ -253,21 +220,27 @@ impl SoundbankPreview {
         if self.selected() == Some(id) {
             return;
         }
-        let State::Opened(opened) = &self.state else {
+        let Some(opened) = self.opened() else {
             return;
         };
         let Some(sound) = self.sound(id) else {
             return;
         };
-        let audio = sound
-            .is_playable()
-            .then(|| AudioPreview::start_embedded(&opened.bank, id, wake));
+        let audio = sound.is_playable().then(|| {
+            AudioPreview::start_embedded(&opened.bank, id, opened.original.as_ref(), wake)
+        });
         self.selected = Some(Selected { id, audio });
     }
 
     /// Takes the result of the background thread and of the audio preview of the selected WEM;
     /// returns whether one arrived.
     pub(crate) fn poll(&mut self) -> bool {
+        if self.index.watch().is_changed() {
+            let changed = !matches!(self.state, State::ArchiveChanged);
+            self.dropped.store(true, Ordering::Release);
+            self.apply(Event::ArchiveChanged);
+            return changed;
+        }
         let sounded = self.audio_mut().is_some_and(AudioPreview::poll);
         let mut changed = false;
         loop {
@@ -289,14 +262,15 @@ impl SoundbankPreview {
     }
 
     fn sound(&self, id: u32) -> Option<&BankSound> {
-        let State::Opened(opened) = &self.state else {
-            return None;
-        };
-        let at = opened
-            .sounds
-            .binary_search_by_key(&id, BankSound::id)
-            .ok()?;
-        opened.sounds.get(at)
+        let opened = self.opened()?;
+        opened.sounds.get(opened.position(id)?)
+    }
+
+    fn opened(&self) -> Option<&Opened> {
+        match &self.state {
+            State::Opened(opened) if !self.index.watch().is_changed() => Some(opened),
+            _ => None,
+        }
     }
 
     fn apply(&mut self, event: Event) {
@@ -315,37 +289,5 @@ impl SoundbankPreview {
 impl Drop for SoundbankPreview {
     fn drop(&mut self) {
         self.dropped.store(true, Ordering::Release);
-    }
-}
-
-struct Worker {
-    index: Arc<EntryIndex>,
-    events: Sender<Event>,
-    dropped: Arc<AtomicBool>,
-}
-
-impl Worker {
-    fn run(&self, id: u32, wake: &impl Fn()) {
-        let event = self.open(id);
-        if !self.dropped.load(Ordering::Acquire) && self.events.send(event).is_ok() {
-            wake();
-        }
-    }
-
-    fn open(&self, id: u32) -> Event {
-        let bytes = match read_whole(&self.index, id, &self.dropped) {
-            Ok(bytes) => bytes,
-            Err(Unreadable::TooLarge) => return Event::TooLarge,
-            Err(Unreadable::ArchiveChanged) => return Event::ArchiveChanged,
-            Err(Unreadable::Failed(reason)) => return Event::Failed(reason),
-        };
-        let bank = match Soundbank::parse(bytes) {
-            Ok(bank) => Arc::new(bank),
-            Err(error) => return Event::Failed(Some(describe(&error))),
-        };
-        let wems: Vec<EmbeddedWem<'_>> = bank.wems().collect();
-        let sounds: Vec<BankSound> = wems.par_iter().map(BankSound::of).collect();
-        drop(wems);
-        Event::Opened(Opened { bank, sounds })
     }
 }

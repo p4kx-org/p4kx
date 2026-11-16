@@ -636,6 +636,7 @@ audio-plugin = Plug-in
 audio-plugin-note = WEM { $id } ist ein Plug-in-Medium, etwa ein Faltungshall-Impuls, und enthält keinen Ton zum Abspielen.
 audio-midi = MIDI
 audio-midi-note = Das Medium { $id } ist eine MIDI-Datei und enthält keinen Ton zum Abspielen.
+audio-bank-wem-count = Anzahl eingebetteter WEMs
 audio-bank-summary =
     { $size } · { $count ->
         [one] { $number } WEM

@@ -205,7 +205,8 @@ in D.18 in `color-danger-text`, mit dem Namen der WEM („WEM 123 aus Data\Sound
 Hinweises auf Text und Hex, die hier die Bank zeigen. Eine unlesbare Bank steht als Satz in
 `color-danger-text`, eine ohne WEMs als schlichter Satz; das übrige Fenster bleibt bedienbar. Die
 Liste ist eine Tabelle und kein Baum, weil die Bank keine Ebenen kennt; Ereignisse und Auslöser
-gehören zur Auflösung der Sounds (M11).
+gehören zur Auflösung der Sounds (M11). Die vorhandenen Tooltips zeigen die Verschlüsselungsherkunft
+von Pfad, Größe und Anzahl der WEMs, je Tabellenzeile und in der Faktenleiste der gewählten WEM.
 
 **D.34 Reiter „Referenziert von" listet die verweisenden Records.** Ist ein Record gewählt, steht
 nach „Record" ein weiterer Reiter der Vorschau-Leiste (D.1 Tab-Leiste, 44 px, gleiche Beschriftung

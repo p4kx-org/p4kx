@@ -114,6 +114,7 @@ mod sidebar;
 #[path = "../../tests/support/software_wgpu.rs"]
 mod software_wgpu;
 mod sound_grid;
+mod soundbank_origins;
 mod soundbank_preview;
 mod soundbank_table;
 mod sounds;

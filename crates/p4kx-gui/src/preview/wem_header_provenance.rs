@@ -3,10 +3,12 @@
 
 use p4kx_extraction::sound::{WemOriginError, WemOriginField, WemOriginPlan};
 use p4kx_extraction::{
-    FieldOrigin, InputScope, ObservedEntry, SourceEvidenceError, SourceInput, SourceInventory,
-    SourceUses, Wem,
+    EmbeddedWem, EntryOrigin, FieldOrigin, InputScope, ObservedEntry, SourceEvidenceError,
+    SourceInput, SourceInventory, SourceUses, Wem,
 };
 use thiserror::Error;
+
+use super::soundbank_provenance::SoundbankSource;
 
 /// Why the original WEM metadata inputs could not be recorded.
 #[derive(Debug, Error)]
@@ -20,7 +22,7 @@ pub enum WemHeaderEvidenceError {
     Source(#[from] SourceEvidenceError),
 }
 
-/// Origins of the metadata shown for a directly opened WEM.
+/// Origins of the metadata shown for an opened WEM.
 #[derive(Debug)]
 #[non_exhaustive]
 pub struct WemHeaderProvenance {
@@ -63,6 +65,26 @@ impl WemHeaderProvenance {
                 .collect::<Result<Vec<_>, _>>()?;
             Ok::<_, WemHeaderEvidenceError>(uses.origin(&inputs, complete))
         };
+        Self::from_fields(&uses, field)
+    }
+
+    pub(super) fn capture_embedded<B: AsRef<[u8]>>(
+        wem: &Wem<B>,
+        embedded: &EmbeddedWem<'_>,
+        source: Option<&EntryOrigin>,
+    ) -> Result<Self, WemHeaderEvidenceError> {
+        let uses = SourceUses::new();
+        let source = SoundbankSource::from_origin(&uses, source)?;
+        let placement = source.embedded(embedded);
+        let selectors = placement.riff_selection()?;
+        let plan = WemOriginPlan::new(wem.info_source(), wem.codec(), wem.sample_count());
+        Self::from_fields(&uses, |field| placement.field(&plan, field, &selectors))
+    }
+
+    fn from_fields(
+        uses: &SourceUses,
+        field: impl Fn(WemOriginField) -> Result<FieldOrigin, WemHeaderEvidenceError>,
+    ) -> Result<Self, WemHeaderEvidenceError> {
         Ok(Self {
             codec: field(WemOriginField::Codec)?,
             channels: field(WemOriginField::Channels)?,

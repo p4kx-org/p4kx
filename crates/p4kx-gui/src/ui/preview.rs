@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use egui::{Role, Sense, Ui, WidgetInfo, vec2};
+use egui::{Response, Role, Sense, Ui, WidgetInfo, vec2};
 use p4kx_extraction::{Entry, Texture};
 
 use super::audio_preview;
@@ -9,8 +9,8 @@ use super::entry_status::status_body;
 use super::preview_bar::Export;
 use super::preview_tab::{Asked, Typed, typed_tab};
 use super::record_preview;
-use super::soundbank_preview;
 use super::{dataforge_summary, image_preview, preview_bar, record_incoming};
+use super::{soundbank_origins, soundbank_preview};
 use crate::theme::desktop::{PREVIEW_PADDING_X, PREVIEW_PATH_HEIGHT};
 use crate::theme::palette;
 use crate::theme::tokens::{FS_XS, SPACE_2, Weight};
@@ -171,7 +171,7 @@ fn tab_body(
     match (tab, browser.records()) {
         (PreviewTab::DataForge, Some(tree)) => {
             let size = browser.archive_index().dataforge_size();
-            path_line(ui, tree.entry_path(), &format::size(size, texts.language()));
+            let _response = path_line(ui, tree.entry_path(), &format::size(size, texts.language()));
             dataforge_summary::show(ui, texts, tree);
             None
         }
@@ -212,7 +212,10 @@ fn body(
         .soundbank()
         .and_then(|bank| soundbank_preview::summary(texts, bank, size))
         .unwrap_or_else(|| format::size(size, texts.language()));
-    path_line(ui, path, &size_line);
+    let response = path_line(ui, path, &size_line);
+    if let Some(bank) = preview.soundbank() {
+        soundbank_origins::summary(response, texts, bank);
+    }
     let jump = browser
         .hit_line()
         .filter(|hit| hit.entry() == preview.entry())
@@ -237,7 +240,7 @@ fn body(
 }
 
 /// Shows the path line of the preview: `path`, then `size` muted.
-pub(super) fn path_line(ui: &mut Ui, path: &str, size: &str) {
+pub(super) fn path_line(ui: &mut Ui, path: &str, size: &str) -> Response {
     let (rect, response) = ui.allocate_exact_size(
         vec2(ui.available_width(), PREVIEW_PATH_HEIGHT),
         Sense::hover(),
@@ -254,4 +257,5 @@ pub(super) fn path_line(ui: &mut Ui, path: &str, size: &str) {
     paint_left(ui, inner, galley, palette::GRAY_1);
     paint_left(ui, size_rect, size, palette::GRAY_2_TEXT);
     hairline_below(ui, rect);
+    response
 }

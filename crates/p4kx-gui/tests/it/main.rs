@@ -159,6 +159,7 @@ mod search_window;
 mod software_wgpu;
 mod software_wgpu_setup;
 mod soundbank_preview;
+mod soundbank_preview_origins;
 mod sounding;
 mod tagging;
 mod tags_render;

@@ -242,16 +242,7 @@ impl PayloadPlan {
         };
         for site in sites {
             let used = if self.placement.is_some() {
-                let mut indices = vec![self.extent.start, self.extent.end];
-                indices.extend_from_slice(site.indices());
-                scope.at(
-                    SourceLocation::Subresource {
-                        namespace: format!("bnkWem.{}", site.namespace()),
-                        indices,
-                        field: site.name().into(),
-                    },
-                    site.role(),
-                )?
+                site.bind_embedded(scope, self.extent.clone())?
             } else {
                 site.bind(scope)?
             };

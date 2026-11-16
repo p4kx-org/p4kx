@@ -1102,7 +1102,7 @@
     "labelColor": "color-gray-2-text",
     "background": "surface-panel",
     "facts": "factsBar without direction: codec, channels, sample rate, duration",
-    "originTooltip": "the existing tooltip on the facts bar shows original encryption provenance for each fact of a directly opened WEM",
+    "originTooltip": "the existing tooltip on the facts bar shows original encryption provenance for each fact of a loose WEM or of the selected embedded WEM",
     "toggle": "outline btn-xs, play or pause; Space while no other control has the focus",
     "pauses": "when the preview tab leaves Audio or the work tab leaves Browse",
     "messages": "unsupported codec, too long, decoding and output failure color-danger-text"
@@ -1123,6 +1123,7 @@
     "prefetched": "codec cell Prefetched in color-gray-2-text; the controls give way to a color-warning note",
     "pluginMedia": "codec cell Plug-in in color-gray-2-text; the controls give way to a color-warning note",
     "row": "tableRow with the active bar; accessible name WEM id, codec, duration",
+    "originTooltips": "show original encryption provenance for the path, size and embedded WEM count in the path line and for each value of each row",
     "focusRing": {"width": 2, "offset": -2, "color": "color-primary"},
     "keys": "Tab focuses the rows and the list; Enter or a click selects; arrows, Page Up, Page Down, Home and End scroll",
     "messages": "unreadable bank color-danger-text, empty bank plain text"

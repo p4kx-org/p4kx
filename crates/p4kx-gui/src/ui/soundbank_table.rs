@@ -4,11 +4,12 @@
 use std::sync::Arc;
 
 use egui::scroll_area::ScrollAreaOutput;
-use egui::{Align, Id, Label, Layout, Role, Sense, Ui, Vec2, WidgetInfo, pos2, vec2};
+use egui::{Align, Id, Label, Layout, Response, Role, Sense, Ui, Vec2, WidgetInfo, pos2, vec2};
 use egui_extras::{Column, TableBuilder, TableRow};
 
 use super::audio_controls::clock;
 use super::regions;
+use super::soundbank_origins;
 use super::table::{cell_text, head_fill};
 use crate::theme::desktop::{
     CELL_PADDING_X, ROW_FONT, ROW_HEIGHT, TABLE_HEAD_SIZE, TABLE_HEAD_TRACKING,
@@ -22,7 +23,7 @@ use crate::widgets::rows::{RowState, focus_inside, row_weight};
 use crate::widgets::scroll_region::{self, Stand};
 use crate::widgets::table_row::RowSlots;
 use crate::widgets::text::{caps, line, plain};
-use crate::{AudioText, BankSound, Language, ScrollText, Text, Texts, format};
+use crate::{AudioText, BankSound, Language, ScrollText, SoundbankPreview, Text, Texts, format};
 
 /// The shown texts of one row, and whether the codec and the duration stand for a missing value
 /// and are shown muted.
@@ -132,6 +133,8 @@ struct Outcome {
 struct Rows<'a> {
     laid: &'a Laid,
     sounds: &'a [BankSound],
+    bank: &'a SoundbankPreview,
+    texts: &'a Texts,
     selected: Option<u32>,
     hovered: Option<usize>,
     left: f32,
@@ -142,9 +145,10 @@ struct Rows<'a> {
 pub(super) fn show(
     ui: &mut Ui,
     texts: &Texts,
-    (serial, sounds): (u64, &[BankSound]),
-    selected: Option<u32>,
+    bank: &SoundbankPreview,
+    sounds: &[BankSound],
 ) -> Option<u32> {
+    let selected = bank.selected();
     let region = scroll_region::begin(
         ui,
         (ui.scope_id().with("soundbank-region"), || {
@@ -155,7 +159,7 @@ pub(super) fn show(
     let hovered_id = ui.scope_id().with("soundbank-hovered-row");
     let hovered = ui.data(|data| data.get_temp::<usize>(hovered_id));
     let reveal = unrevealed_row(ui, sounds, selected);
-    let laid = cached(ui, texts, serial, sounds);
+    let laid = cached(ui, texts, bank.serial(), sounds);
     ui.spacing_mut().item_spacing = Vec2::ZERO;
     let left = ui.max_rect().left();
     let mut table = builder(ui);
@@ -168,6 +172,8 @@ pub(super) fn show(
     let rows = Rows {
         laid: &laid,
         sounds,
+        bank,
+        texts,
         selected,
         hovered,
         left,
@@ -215,13 +221,14 @@ fn grid(table: TableBuilder<'_>, rows: &Rows<'_>, outcome: &mut Outcome) -> Scro
                 };
                 let active = rows.selected == Some(sound.id());
                 let state = RowState::of(active, false, rows.hovered == Some(index));
-                let (picked, is_hovered) = show_row(row, texts, state);
-                if picked {
+                let response = show_row(row, texts, state);
+                if response.clicked() {
                     outcome.clicked = Some(sound.id());
                 }
-                if is_hovered {
+                if response.hovered() {
                     outcome.hovered = Some(index);
                 }
+                soundbank_origins::row(response, rows.texts, rows.bank, sound.id());
             });
         })
 }
@@ -283,7 +290,7 @@ fn head_cell(ui: &Ui, label: &str, left: f32) {
         );
 }
 
-fn show_row(mut row: TableRow<'_, '_>, texts: &Row, state: RowState) -> (bool, bool) {
+fn show_row(mut row: TableRow<'_, '_>, texts: &Row, state: RowState) -> Response {
     row.set_hovered(false);
     let (_, colour) = state.colours();
     let active = state == RowState::Active;
@@ -315,5 +322,5 @@ fn show_row(mut row: TableRow<'_, '_>, texts: &Row, state: RowState) -> (bool, b
         response.rect,
         &response,
     );
-    (response.clicked(), response.hovered())
+    response
 }

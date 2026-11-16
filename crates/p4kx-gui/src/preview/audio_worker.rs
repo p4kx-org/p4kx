@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
 
-use p4kx_extraction::{Soundbank, Wem};
+use p4kx_extraction::{EmbeddedWem, EntryOrigin, Soundbank, Wem};
 
 use super::audio::{Event, SoundHeader};
 use super::bank_cache::BankCache;
@@ -17,7 +17,11 @@ use crate::model::describe;
 /// Where the WEM of one audio preview comes from.
 pub(super) enum Source {
     Entry(Arc<EntryIndex>, u32),
-    Embedded(Arc<Soundbank<Vec<u8>>>, u32),
+    Embedded {
+        bank: Arc<Soundbank<Vec<u8>>>,
+        id: u32,
+        original: Option<Arc<EntryOrigin>>,
+    },
     InBank(Arc<EntryIndex>, (u32, u32), BankCache),
 }
 
@@ -52,7 +56,11 @@ impl Worker {
     pub(super) fn run(&self, wake: &impl Fn()) {
         let event = match &self.source {
             Source::Entry(index, id) => self.run_entry(index, *id, wake),
-            Source::Embedded(bank, id) => self.run_embedded(bank, *id, wake),
+            Source::Embedded { bank, id, original } => {
+                self.run_embedded(bank, *id, wake, |wem, selected| {
+                    SoundHeader::observed_embedded(wem, selected, original.as_deref())
+                })
+            }
             Source::InBank(index, ids, cache) => self.run_in_bank(index, (*ids, cache), wake),
         };
         if let Some(event) = event {
@@ -99,20 +107,26 @@ impl Worker {
                 Err(unread) => return Some(Event::from(unread)),
             },
         };
-        let event = self.run_embedded(&bank, id, wake)?;
+        let event = self.run_embedded(&bank, id, wake, |wem, _| SoundHeader::of(wem))?;
         Some(match event {
             Event::Decoded(_) if index.watch().check().is_err() => Event::ArchiveChanged,
             other => other,
         })
     }
 
-    fn run_embedded(&self, bank: &Soundbank<Vec<u8>>, id: u32, wake: &impl Fn()) -> Option<Event> {
+    fn run_embedded(
+        &self,
+        bank: &Soundbank<Vec<u8>>,
+        id: u32,
+        wake: &impl Fn(),
+        header: impl FnOnce(&Wem<&[u8]>, &EmbeddedWem<'_>) -> SoundHeader,
+    ) -> Option<Event> {
         let Some(embedded) = bank.wem(id) else {
             return Some(Event::Failed(None));
         };
         match embedded.parse() {
             Ok(wem) => self
-                .decode(&wem, SoundHeader::of(&wem), wake)
+                .decode(&wem, header(&wem, &embedded), wake)
                 .map(Event::Decoded),
             Err(error) => Some(Event::Failed(Some(describe(&error)))),
         }
