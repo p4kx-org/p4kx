@@ -3,7 +3,8 @@
 
 use std::ops::Range;
 
-use crate::XmlFieldKind;
+use crate::header::NODE_LEN;
+use crate::{ByteOrder, XmlFieldKind};
 
 /// The source fact in the original decoded CryXml bytes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -93,12 +94,102 @@ pub enum XmlRenderKind {
     Structure,
 }
 
+/// Original later parent words used to exclude children of a CryXml node.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct XmlParentWords {
+    first: u64,
+    count: u32,
+}
+
+impl XmlParentWords {
+    pub(crate) const fn new(first: u64, count: u32) -> Self {
+        Self { first, count }
+    }
+
+    /// Returns the first parent-word offset in the decoded CryXml input.
+    #[must_use]
+    pub const fn first_offset(&self) -> u64 {
+        self.first
+    }
+
+    /// Returns the number of consecutive node rows whose parent words were surveyed.
+    #[must_use]
+    pub const fn word_count(&self) -> u32 {
+        self.count
+    }
+
+    /// Returns the distance in bytes between parent words.
+    #[must_use]
+    pub const fn stride(&self) -> u64 {
+        NODE_LEN as u64
+    }
+
+    /// Returns the width in bytes of each original parent word.
+    #[must_use]
+    pub const fn word_width(&self) -> u64 {
+        size_of::<u32>() as u64
+    }
+}
+
+/// Original node-table inputs proving a CryXml node has no children.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct XmlChildAbsence {
+    node: u32,
+    order: ByteOrder,
+    directory: Range<u64>,
+    parents: Option<XmlParentWords>,
+}
+
+impl XmlChildAbsence {
+    pub(crate) const fn new(
+        node: u32,
+        order: ByteOrder,
+        directory: Range<u64>,
+        parents: Option<XmlParentWords>,
+    ) -> Self {
+        Self {
+            node,
+            order,
+            directory,
+            parents,
+        }
+    }
+
+    /// Returns the node whose children were ruled out.
+    #[must_use]
+    pub const fn node_index(&self) -> u32 {
+        self.node
+    }
+
+    /// Returns the byte order used to read the directory and parent words.
+    #[must_use]
+    pub const fn byte_order(&self) -> ByteOrder {
+        self.order
+    }
+
+    /// Returns the original file size, node-table offset and node-count words.
+    #[must_use]
+    pub const fn node_directory(&self) -> &Range<u64> {
+        &self.directory
+    }
+
+    /// Returns the later parent words, or none when the node is last in the table.
+    #[must_use]
+    pub const fn parent_words(&self) -> Option<&XmlParentWords> {
+        self.parents.as_ref()
+    }
+}
+
 pub(crate) type RawSpans = [Option<XmlRawSpan>; 4];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Contributors {
     Fields(RawSpans),
     Indentation(Vec<XmlRawSpan>),
+    ChildAbsence {
+        fields: RawSpans,
+        absence: XmlChildAbsence,
+    },
 }
 
 /// Emitted bytes and their original decoded-input ranges.
@@ -138,6 +229,19 @@ impl XmlRenderSpan {
         }
     }
 
+    pub(crate) const fn without_children(
+        range: Range<u64>,
+        fields: RawSpans,
+        absence: XmlChildAbsence,
+    ) -> Self {
+        Self {
+            kind: XmlRenderKind::Structure,
+            range,
+            sources: Contributors::ChildAbsence { fields, absence },
+            complete: false,
+        }
+    }
+
     /// Returns the emitted XML byte range or the insertion point for an empty value.
     #[must_use]
     pub const fn range(&self) -> &Range<u64> {
@@ -150,17 +254,29 @@ impl XmlRenderSpan {
         self.kind
     }
 
-    /// Returns whether the span's contribution proof is complete.
+    /// Returns whether the span is proved by its contiguous source ranges alone.
+    /// Consumers that also verify the child-absence evidence can complete those spans.
     /// A start tag's attribute-name choices share the same line's attribute-name observations.
     #[must_use]
     pub const fn complete(&self) -> bool {
         self.complete
     }
 
-    /// Iterates all captured original contributors.
+    /// Returns a complete child-absence proof when this span also needs a parent-word survey.
+    #[must_use]
+    pub const fn child_absence(&self) -> Option<&XmlChildAbsence> {
+        match &self.sources {
+            Contributors::ChildAbsence { absence, .. } => Some(absence),
+            Contributors::Fields(_) | Contributors::Indentation(_) => None,
+        }
+    }
+
+    /// Iterates the contiguous contributors other than the separate child-absence proof.
     pub fn sources(&self) -> impl Iterator<Item = &XmlRawSpan> {
         let (fields, indent): (&[_], &[_]) = match &self.sources {
-            Contributors::Fields(fields) => (fields, &[]),
+            Contributors::Fields(fields) | Contributors::ChildAbsence { fields, .. } => {
+                (fields, &[])
+            }
             Contributors::Indentation(indent) => (&[], indent),
         };
         fields.iter().flatten().chain(indent)

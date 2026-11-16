@@ -10,6 +10,12 @@ use crate::xml_render_span::RawSpans;
 use crate::xml_write_field::FieldSite;
 use crate::{XmlFieldKind, XmlRenderKind, XmlRenderSpan, XmlWriteField};
 
+#[derive(Clone, Copy)]
+pub(crate) enum ChildMarkup {
+    Children,
+    EmptyText,
+}
+
 pub(crate) struct Observation<'document, FieldObserver, SpanObserver> {
     input: &'document Document<'document>,
     legacy: FieldObserver,
@@ -76,6 +82,18 @@ where
         Ok(())
     }
 
+    pub(crate) fn child_markup(
+        &mut self,
+        emitted: Range<u64>,
+        element: Element<'_>,
+        kind: ChildMarkup,
+    ) -> io::Result<()> {
+        if let Some(positioned) = &mut self.positioned {
+            positioned(child_span(self.input, emitted, element, kind))?;
+        }
+        Ok(())
+    }
+
     pub(crate) fn markup(
         &mut self,
         kind: XmlRenderKind,
@@ -94,23 +112,39 @@ pub(crate) const fn no_sources() -> (RawSpans, bool) {
     ([None, None, None, None], true)
 }
 
-pub(crate) fn conditional_child(input: &Document<'_>, element: Element<'_>) -> (RawSpans, bool) {
-    let edge = element
-        .children()
-        .next()
-        .and_then(|child| input.source.parent(child.index()));
-    let complete = edge.is_some();
-    ([edge, None, None, None], complete)
-}
-
-pub(crate) fn empty_content(input: &Document<'_>, element: Element<'_>) -> (RawSpans, bool) {
-    let text = FieldSite::node(element.index(), XmlFieldKind::Text);
-    let ([edge, _, _, _], child_known) = conditional_child(input, element);
-    if let Some([offset, _, prefix, terminator]) = input.source.field(input, &text, None) {
-        ([offset, edge, prefix, terminator], child_known)
-    } else {
-        ([edge, None, None, None], false)
+fn child_span(
+    input: &Document<'_>,
+    emitted: Range<u64>,
+    element: Element<'_>,
+    kind: ChildMarkup,
+) -> XmlRenderSpan {
+    let child = element.children().next();
+    let edge = child.and_then(|child| input.source.parent(child.index()));
+    let child_known = edge.is_some();
+    let (sources, text_known) = match kind {
+        ChildMarkup::Children => ([edge, None, None, None], true),
+        ChildMarkup::EmptyText => {
+            let site = FieldSite::node(element.index(), XmlFieldKind::Text);
+            match input.source.field(input, &site, None) {
+                Some([offset, _, prefix, terminator]) => ([offset, edge, prefix, terminator], true),
+                None => ([edge, None, None, None], false),
+            }
+        }
+    };
+    if child.is_none()
+        && text_known
+        && let Some(proof) = input
+            .source
+            .child_absence(element.index(), input.byte_order())
+    {
+        return XmlRenderSpan::without_children(emitted, sources, proof);
     }
+    XmlRenderSpan::new(
+        XmlRenderKind::Structure,
+        emitted,
+        sources,
+        child_known && text_known,
+    )
 }
 
 fn source_span(

@@ -3,6 +3,8 @@
 
 use std::ops::Range;
 
+use p4kx_cryxml::{ByteOrder, XmlChildAbsence};
+
 use p4kx_extraction::{
     EntryDirectoryFact, EntryDirectoryOrigins, FieldOrigin, FieldOrigins, InputScope,
     SourceCoordinateOmission, SourceEvidenceError, SourceInput, SourceLocation, SourceScope,
@@ -143,6 +145,9 @@ impl<'archive> SideOrigins<'archive> {
                     role,
                 )?);
             }
+            for proof in &line.child_absences {
+                facts.push(payload.at(child_absence_location(proof), SourceUseRole::Selector)?);
+            }
         }
         if !evidence.is_some_and(CryXmlLine::complete) {
             facts.push(payload.at_opaque(
@@ -189,6 +194,32 @@ fn side_body(
     let body = uses.origin(&[input], directory.complete());
     uses.origin_with_origins([lookup, &body], true)
         .map_err(Into::into)
+}
+
+fn child_absence_location(proof: &XmlChildAbsence) -> SourceLocation {
+    let directory = proof.node_directory();
+    let mut indices = vec![
+        u64::from(proof.node_index()),
+        directory.start,
+        directory.end,
+    ];
+    if let Some(words) = proof.parent_words() {
+        indices.extend([
+            words.first_offset(),
+            words.word_count().into(),
+            words.stride(),
+            words.word_width(),
+        ]);
+    }
+    let order = match proof.byte_order() {
+        ByteOrder::Little => "littleEndian",
+        ByteOrder::Big => "bigEndian",
+    };
+    SourceLocation::Subresource {
+        namespace: "cryXmlChildAbsence".into(),
+        indices,
+        field: order.into(),
+    }
 }
 
 fn entry_range(range: Range<u64>, field: &str) -> SourceLocation {

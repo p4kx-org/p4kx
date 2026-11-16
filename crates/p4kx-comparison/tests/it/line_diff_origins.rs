@@ -88,7 +88,7 @@ fn an_encrypted_unread_entry_uses_the_declared_size_of_its_directory() -> TestRe
 }
 
 #[test]
-fn converted_cryxml_keeps_exact_bytes_when_leaf_shape_is_unavailable() -> TestResult {
+fn converted_cryxml_proves_a_terminal_leaf_in_encrypted_input() -> TestResult {
     let bytes =
         TestElement::new("Original").to_cryxml(CryXmlSignature::CryXmlB, CryXmlByteOrder::Little);
     let name = original_string(&bytes, "Original")?;
@@ -104,24 +104,7 @@ fn converted_cryxml_keeps_exact_bytes_when_leaf_shape_is_unavailable() -> TestRe
         "the fixed XML declaration has no authored payload bytes"
     );
     let element = "/hunks/0/lines/1/text";
-    let line = field(&report, element)?;
-    assert_eq!(
-        line.get("containsEncryptedSource"),
-        Some(&json!(true)),
-        "the name originates in encrypted input"
-    );
-    assert_eq!(
-        line.get("sourceSetComplete"),
-        Some(&json!(false)),
-        "the unknown leaf shape remains incomplete"
-    );
-    assert!(
-        uses(&report, line)?.iter().any(|usage| {
-            usage.get("role") == Some(&json!("conversion"))
-                && usage.pointer("/location/type") == Some(&json!("opaque"))
-        }),
-        "an unavailable structural contribution stays explicitly opaque"
-    );
+    assert_child_absence(&report, element, "littleEndian", &json!(["0", "8", "20"]))?;
     raw_use(&report, element, "conversion", "stringBytes", name)?;
     Ok(())
 }
@@ -181,6 +164,105 @@ fn cryxml_hunks_bind_original_operands_only_for_the_emitted_side_and_line() -> T
                         .any(|range| usage.pointer("/location/indices") == Some(range))
             }),
         "unchanged CryXml lines beyond context add no original byte evidence"
+    );
+    Ok(())
+}
+
+#[test]
+fn converted_cryxml_keeps_only_the_relevant_parent_words_for_each_leaf() -> TestResult {
+    let original = TestElement::new("Root")
+        .child(TestElement::new("Empty"))
+        .child(TestElement::new("Text").content("value"));
+    for (signature, order, prefix, order_name) in [
+        (
+            CryXmlSignature::CryXmlB,
+            CryXmlByteOrder::Little,
+            8,
+            "littleEndian",
+        ),
+        (
+            CryXmlSignature::Cry3Sdk,
+            CryXmlByteOrder::Big,
+            9,
+            "bigEndian",
+        ),
+    ] {
+        let bytes = original.to_cryxml(signature, order);
+        let table_offset = bytes
+            .get(prefix + 4..prefix + 8)
+            .ok_or("node table offset")?
+            .try_into()?;
+        let node_table = match order {
+            CryXmlByteOrder::Little => u32::from_le_bytes(table_offset),
+            CryXmlByteOrder::Big => u32::from_be_bytes(table_offset),
+        };
+        let parent_word = node_table as usize + 2 * 28 + 12;
+        assert_eq!(
+            bytes.get(parent_word..parent_word + 4),
+            Some([0; 4].as_slice()),
+            "the sole later parent word belongs to the root, not the empty leaf"
+        );
+        let (_dir, old, new) = pair(Vec::new(), vec![TestEntry::stored(PATH, bytes).encrypted()])?;
+        let report = serde_json::to_value(line_diff(&old, &new, PATH, DEFAULT_CONTEXT)?)?;
+        let empty = "/hunks/0/lines/2/text";
+        let text = "/hunks/0/lines/3/text";
+        assert_eq!(
+            report.pointer(empty),
+            Some(&json!("  <Empty/>\n")),
+            "self-closing leaf"
+        );
+        assert_eq!(
+            report.pointer(text),
+            Some(&json!("  <Text>value</Text>\n")),
+            "inline text leaf"
+        );
+        let start = prefix.to_string();
+        let end = (prefix + 12).to_string();
+        assert_child_absence(
+            &report,
+            empty,
+            order_name,
+            &json!(["1", start, end, parent_word.to_string(), "1", "28", "4"]),
+        )?;
+        assert_child_absence(&report, text, order_name, &json!(["2", start, end]))?;
+    }
+    Ok(())
+}
+
+fn assert_child_absence(report: &Value, path: &str, order: &str, expected: &Value) -> TestResult {
+    let observations = assert_origin(report, path, true)?;
+    let matching: Vec<_> = observations
+        .iter()
+        .filter(|usage| usage.pointer("/location/namespace") == Some(&json!("cryXmlChildAbsence")))
+        .collect();
+    let [proof] = matching.as_slice() else {
+        return Err(format!("expected exactly one child-absence proof for {path}").into());
+    };
+    assert_eq!(
+        proof.get("role"),
+        Some(&json!("selector")),
+        "child-presence decision"
+    );
+    assert_eq!(
+        proof.get("scope"),
+        Some(&json!("payload")),
+        "original decoded entry"
+    );
+    assert_eq!(
+        proof.pointer("/location/field"),
+        Some(&json!(order)),
+        "actual byte order"
+    );
+    assert_eq!(
+        proof.pointer("/location/indices"),
+        Some(expected),
+        "exact source positions"
+    );
+    assert!(
+        observations
+            .iter()
+            .all(|usage| usage.pointer("/location/type") != Some(&json!("opaque"))),
+        "the line's structural choice has complete positional evidence"
     );
     Ok(())
 }

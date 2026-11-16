@@ -49,5 +49,7 @@ pub use source_document::{SourceDocument, SourceReadError, SourceReadOptions};
 pub use source_element::SourceElement;
 pub use source_position::{SourceAttributePosition, SourceElementPosition};
 pub use source_syntax::{SourceSpanError, SourceSyntax};
-pub use xml_render_span::{XmlRawKind, XmlRawSpan, XmlRenderKind, XmlRenderSpan};
+pub use xml_render_span::{
+    XmlChildAbsence, XmlParentWords, XmlRawKind, XmlRawSpan, XmlRenderKind, XmlRenderSpan,
+};
 pub use xml_write_field::{XmlFieldKind, XmlWriteField};

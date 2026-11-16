@@ -4,7 +4,7 @@
 use std::io::{self, Write};
 use std::ops::Range;
 
-use p4kx_cryxml::{Document, XmlRawSpan, XmlRenderSpan};
+use p4kx_cryxml::{Document, XmlChildAbsence, XmlRawSpan, XmlRenderSpan};
 
 use crate::text_diff::rendered_range;
 use crate::{CancelToken, LineDiffError, LineKind, TextDiff};
@@ -21,6 +21,7 @@ pub(crate) struct CryXmlLine {
     covered: u64,
     complete: bool,
     pub(crate) facts: Vec<XmlRawSpan>,
+    pub(crate) child_absences: Vec<XmlChildAbsence>,
 }
 
 impl CryXmlLine {
@@ -30,15 +31,18 @@ impl CryXmlLine {
             rendered,
             complete: true,
             facts: Vec::new(),
+            child_absences: Vec::new(),
         }
     }
 
     fn observe(&mut self, span: &XmlRenderSpan) {
         let start = span.range().start.max(self.rendered.start);
         let end = span.range().end.min(self.rendered.end);
-        self.complete &= self.covered >= start && span.complete();
+        let child_absence = span.child_absence();
+        self.complete &= self.covered >= start && (span.complete() || child_absence.is_some());
         self.covered = self.covered.max(end);
         self.facts.extend(span.sources().cloned());
+        self.child_absences.extend(child_absence.cloned());
     }
 
     pub(crate) const fn complete(&self) -> bool {

@@ -7,7 +7,7 @@ use crate::document::Document;
 use crate::element::{Children, Element};
 use crate::escape::{Context, write_escaped};
 use crate::names::{AttributeNames, sanitized};
-use crate::write_observation::{Observation, conditional_child, empty_content, no_sources};
+use crate::write_observation::{ChildMarkup, Observation, no_sources};
 use crate::xml_render_span::RawSpans;
 use crate::xml_write_field::{FieldSite, Tracked, XmlFieldKind};
 use crate::{XmlRenderKind, XmlRenderSpan, XmlWriteField};
@@ -83,17 +83,13 @@ where
         match element.content() {
             None => {
                 let close: &[u8] = if has_children { b">\n" } else { b"/>\n" };
-                self.markup(close, XmlRenderKind::Structure, |input| {
-                    empty_content(input, element)
-                })?;
+                self.child_markup(close, element, ChildMarkup::EmptyText)?;
             }
             Some(content) => {
                 self.literal(b">")?;
                 self.text(element, content)?;
                 if has_children {
-                    self.markup(b"\n", XmlRenderKind::Structure, |input| {
-                        conditional_child(input, element)
-                    })?;
+                    self.child_markup(b"\n", element, ChildMarkup::Children)?;
                 } else {
                     self.end_tag(element)?;
                 }
@@ -160,9 +156,7 @@ where
     }
 
     fn end_tag(&mut self, element: Element<'_>) -> io::Result<()> {
-        self.markup(b"</", XmlRenderKind::Structure, |input| {
-            conditional_child(input, element)
-        })?;
+        self.child_markup(b"</", element, ChildMarkup::Children)?;
         self.write_node_name(element, XmlFieldKind::ClosingElementName)?;
         self.literal(b">\n")
     }
@@ -181,6 +175,18 @@ where
             .take(levels);
         self.observation
             .indentation(start..self.out.offset(), levels, nodes)
+    }
+
+    fn child_markup(
+        &mut self,
+        bytes: &[u8],
+        element: Element<'_>,
+        kind: ChildMarkup,
+    ) -> io::Result<()> {
+        let start = self.out.offset();
+        self.out.write_all(bytes)?;
+        self.observation
+            .child_markup(start..self.out.offset(), element, kind)
     }
 
     fn literal(&mut self, bytes: &[u8]) -> io::Result<()> {

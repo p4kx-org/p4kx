@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::ops::Range;
+
 use p4kx_foundation::{ByteReader, ParseError};
 
 use crate::error::{CryXmlError, Table};
@@ -17,6 +19,7 @@ pub(crate) struct Header<'a> {
     pub(crate) attributes: &'a [u8],
     pub(crate) children: &'a [u8],
     pub(crate) strings: &'a [u8],
+    pub(crate) node_directory: Range<u64>,
     places: [(Table, usize, usize); 4],
 }
 
@@ -25,13 +28,17 @@ impl<'a> Header<'a> {
     pub(crate) fn read(bytes: &'a [u8], signature: Signature) -> Result<Self, CryXmlError> {
         let mut reader = ByteReader::new(bytes);
         reader.skip(signature.len())?;
+        let size_offset = reader.offset();
         let size_field: [u8; 4] = array(&mut reader)?;
         let (byte_order, size) = byte_order(size_field, bytes.len())?;
         let data = bytes.get(..size).unwrap_or(bytes);
         let mut fields = Reader { reader, byte_order };
         let mut places = [(Table::Nodes, 0, 0); 4];
         let mut next = 0;
-        let mut table = |table: Table, entry_len: usize| -> Result<&'a [u8], CryXmlError> {
+        let mut table = |fields: &mut Reader<'a>,
+                         table: Table,
+                         entry_len: usize|
+         -> Result<&'a [u8], CryXmlError> {
             let position = fields.u32()?;
             let count = fields.u32()?;
             let found = slice(data, table, position, count, entry_len)?;
@@ -42,16 +49,18 @@ impl<'a> Header<'a> {
             next += 1;
             Ok(found)
         };
-        let nodes = table(Table::Nodes, NODE_LEN)?;
-        let attributes = table(Table::Attributes, ATTRIBUTE_LEN)?;
-        let children = table(Table::Children, CHILD_LEN)?;
-        let strings = table(Table::Strings, 1)?;
+        let nodes = table(&mut fields, Table::Nodes, NODE_LEN)?;
+        let node_directory = size_offset..fields.reader.offset();
+        let attributes = table(&mut fields, Table::Attributes, ATTRIBUTE_LEN)?;
+        let children = table(&mut fields, Table::Children, CHILD_LEN)?;
+        let strings = table(&mut fields, Table::Strings, 1)?;
         Ok(Self {
             byte_order,
             nodes,
             attributes,
             children,
             strings,
+            node_directory,
             places,
         })
     }

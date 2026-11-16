@@ -8,7 +8,7 @@ use crate::header::{ATTRIBUTE_LEN, Header, NODE_LEN, Reader};
 use crate::strings::Span;
 use crate::xml_render_span::RawSpans;
 use crate::xml_write_field::FieldSite;
-use crate::{ByteOrder, XmlFieldKind, XmlRawKind, XmlRawSpan};
+use crate::{ByteOrder, XmlChildAbsence, XmlFieldKind, XmlParentWords, XmlRawKind, XmlRawSpan};
 
 const NODE_NAME: usize = 0;
 const NODE_TEXT: usize = 4;
@@ -22,15 +22,17 @@ const WORD: usize = size_of::<u32>();
 #[derive(Debug, Clone)]
 pub(crate) struct RenderSource<'input> {
     nodes: Table<'input>,
+    node_directory: Range<u64>,
     attributes: Table<'input>,
     strings: Table<'input>,
 }
 
 impl<'input> RenderSource<'input> {
-    pub(crate) const fn of(header: &Header<'input>) -> Self {
+    pub(crate) fn of(header: &Header<'input>) -> Self {
         let [nodes, attributes, strings] = header.render_starts();
         Self {
             nodes: Table::new(header.nodes, nodes),
+            node_directory: header.node_directory.clone(),
             attributes: Table::new(header.attributes, attributes),
             strings: Table::new(header.strings, strings),
         }
@@ -96,6 +98,24 @@ impl<'input> RenderSource<'input> {
 
     pub(crate) fn parent(&self, node: u32) -> Option<XmlRawSpan> {
         self.node(node, NODE_PARENT, WORD, XmlRawKind::NodeParent)
+    }
+
+    pub(crate) fn child_absence(&self, node: u32, order: ByteOrder) -> Option<XmlChildAbsence> {
+        let first = node.checked_add(1)?;
+        let count = u32::try_from(self.nodes.bytes.len() / NODE_LEN).ok()?;
+        let remaining = count.checked_sub(first)?;
+        let parents = if remaining == 0 {
+            None
+        } else {
+            let start = self.parent(first)?.range().start;
+            Some(XmlParentWords::new(start, remaining))
+        };
+        Some(XmlChildAbsence::new(
+            node,
+            order,
+            self.node_directory.clone(),
+            parents,
+        ))
     }
 
     fn word_and_string(
