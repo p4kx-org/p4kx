@@ -49,6 +49,9 @@ impl LoadoutResolver<'_> {
     ) -> Option<Arc<VehicleImplementation>> {
         match self.vehicle_of(spec) {
             Some((Ok(vehicle), caller)) => {
+                if let (Some(observer), Some(record)) = (&self.observation, spec.record_index) {
+                    observer.vehicle_used(record, &vehicle, &caller);
+                }
                 if vehicle.issues.iter().any(LoadoutError::is_missing_file) {
                     let caller = Arc::new(caller);
                     issues.extend(vehicle.issues.iter().cloned().map(|mut issue| {

@@ -14,14 +14,20 @@ use super::definition_sites::{DefinitionKey, Member};
 #[derive(Clone, Copy)]
 pub(super) enum VisibilityOwner<'node> {
     DataForge,
-    Vehicle(&'node VehicleImplementation),
+    Vehicle {
+        implementation: &'node VehicleImplementation,
+        selection: Option<&'node FieldOrigin>,
+    },
     Unverified,
 }
 
 impl<'node> VisibilityOwner<'node> {
-    pub(super) fn of(entity: &'node EntityNode) -> Self {
-        if let Some(vehicle) = entity.vehicle() {
-            return Self::Vehicle(vehicle);
+    pub(super) fn of(entity: &'node EntityNode, selection: Option<&'node FieldOrigin>) -> Self {
+        if let Some(implementation) = entity.vehicle() {
+            return Self::Vehicle {
+                implementation,
+                selection,
+            };
         }
         if entity.issues().iter().any(|issue| {
             matches!(
@@ -123,16 +129,26 @@ impl Output<'_, '_> {
         }
         let origin = match owner {
             VisibilityOwner::DataForge => self.uses.origin_with_origins(flags, flags.is_some())?,
-            VisibilityOwner::Vehicle(vehicle) => match vehicle.port_part(node.name()) {
-                Some(part) => self.vehicle_visibility(node, part)?,
-                None => self.uses.origin_with_origins(flags, false)?,
+            VisibilityOwner::Vehicle {
+                implementation,
+                selection,
+            } => match implementation.port_part(node.name()) {
+                Some(part) => self.vehicle_visibility(node, part, selection)?,
+                None => self
+                    .uses
+                    .origin_with_origins(flags.into_iter().chain(selection), false)?,
             },
             VisibilityOwner::Unverified => self.uses.origin_with_origins(flags, false)?,
         };
         self.put(&format!("{address}/visibility"), origin)
     }
 
-    fn vehicle_visibility(&self, node: &PortNode, part: &VehiclePart) -> Result<FieldOrigin> {
+    fn vehicle_visibility(
+        &self,
+        node: &PortNode,
+        part: &VehiclePart,
+        selection: Option<&FieldOrigin>,
+    ) -> Result<FieldOrigin> {
         let mut inputs = vec![
             self.path_origin(
                 node.name_proof()
@@ -160,6 +176,8 @@ impl Output<'_, '_> {
                 )?);
             }
         }
-        Ok(self.uses.origin_with_origins(&inputs, false)?)
+        Ok(self
+            .uses
+            .origin_with_origins(inputs.iter().chain(selection), false)?)
     }
 }

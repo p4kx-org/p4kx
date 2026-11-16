@@ -43,8 +43,8 @@ fn json_definition_and_visibility_keep_the_actual_dataforge_port() -> TestResult
 }
 
 #[test]
-fn xml_visibility_is_incomplete_without_taint_from_unconsumed_dataforge_flags() -> TestResult {
-    let (json, _) = loadout(Some(VEHICLE_PATH))?;
+fn xml_visibility_carries_the_vehicle_selector_and_excludes_unused_dataforge_flags() -> TestResult {
+    let (json, dataforge) = loadout(Some(VEHICLE_PATH))?;
     let visibility = format!("{PORT}/visibility");
     assert_eq!(
         json.pointer(&visibility).and_then(Value::as_str),
@@ -53,14 +53,26 @@ fn xml_visibility_is_incomplete_without_taint_from_unconsumed_dataforge_flags() 
     );
     assert_eq!(
         origin(&json, &visibility)?["containsEncryptedSource"],
-        Value::Null,
-        "the overridden DataForge flag cannot mark the vehicle decision"
+        true,
+        "the encrypted DataForge vehicle selector selected the clear XML"
     );
     assert_eq!(
         origin(&json, &visibility)?["sourceSetComplete"],
         false,
-        "the XML flag's original coordinate was not captured"
+        "the first-matching effective Part survey remains incomplete"
     );
+    let text: Vec<_> = field_uses(&json, &visibility)?
+        .into_iter()
+        .filter(|source| {
+            source
+                .pointer("/location/namespace")
+                .and_then(Value::as_str)
+                == Some("dataforgeDecodedBytes")
+        })
+        .map(|source| original_bytes(&dataforge, source))
+        .collect::<Result<_, _>>()?;
+    assert!(text.contains(&VEHICLE_PATH.as_bytes()));
+    assert!(!text.contains(&b"invisible locked".as_slice()));
     Ok(())
 }
 

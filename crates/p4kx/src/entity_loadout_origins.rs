@@ -7,8 +7,8 @@ use std::sync::Mutex;
 use anyhow::{Result, anyhow};
 use p4kx_assembly::{
     Attachment, EntityNode, LoadoutClassSelection, LoadoutPathObserver, LoadoutPathOperation,
-    LoadoutReadEvent, LoadoutReadObserver, LoadoutSelection, PortNode, XmlLoadoutClassSite,
-    XmlLoadoutPathSite,
+    LoadoutReadEvent, LoadoutReadObserver, LoadoutRequest, LoadoutSelection, PortNode,
+    VehicleImplementation, XmlLoadoutClassSite, XmlLoadoutPathSite,
 };
 use p4kx_extraction::{
     DataForge, DataForgeOrigin, FieldOrigin, FieldOrigins, FieldPath, InputScope, Record,
@@ -30,8 +30,10 @@ mod definition_origins;
 mod definition_sites;
 #[path = "entity_loadout_record_origins.rs"]
 mod record_origins;
+#[path = "entity_loadout_vehicle_selection_origins.rs"]
+mod vehicle_selection_origins;
 
-use bound_origins::{Authored, Facts, Xml};
+use bound_origins::{Authored, DerivedPath, Facts, Xml};
 use definition_origins::VisibilityOwner;
 use record_origins::RecordPaths;
 
@@ -90,7 +92,60 @@ impl<'forge> Capture<'forge> {
 }
 
 impl LoadoutReadObserver for Capture<'_> {
-    fn observe(&self, _: LoadoutReadEvent<'_, '_>) -> ControlFlow<()> {
+    fn observe(&self, event: LoadoutReadEvent<'_, '_>) -> ControlFlow<()> {
+        let (file, request, caller, reused) = match event {
+            LoadoutReadEvent::FileRead {
+                observation,
+                request,
+                caller,
+            } => (observation, request, caller, false),
+            LoadoutReadEvent::FileReused {
+                observation,
+                request,
+                caller,
+            } => (observation, request, caller, true),
+            _ => return ControlFlow::Continue(()),
+        };
+        if let LoadoutRequest::Vehicle { .. } = caller {
+            let Ok(mut facts) = self.facts.lock() else {
+                return ControlFlow::Break(());
+            };
+            facts.vehicles.read(file, request, caller, reused);
+        }
+        ControlFlow::Continue(())
+    }
+
+    fn vehicle_used(
+        &self,
+        record_index: u32,
+        implementation: &VehicleImplementation,
+        caller: &LoadoutRequest,
+    ) -> ControlFlow<()> {
+        let Ok(mut facts) = self.facts.lock() else {
+            return ControlFlow::Break(());
+        };
+        facts
+            .vehicles
+            .use_vehicle(record_index, implementation, caller);
+        ControlFlow::Continue(())
+    }
+
+    fn derived_path(
+        &self,
+        selection: &LoadoutSelection,
+        inputs: &[&p4kx_assembly::LoadoutPath],
+        value: &str,
+    ) -> ControlFlow<()> {
+        let Ok(mut facts) = self.facts.lock() else {
+            return ControlFlow::Break(());
+        };
+        facts.derived.insert(
+            selection.clone(),
+            DerivedPath {
+                value: value.to_owned(),
+                inputs: inputs.iter().map(|input| (*input).clone()).collect(),
+            },
+        );
         ControlFlow::Continue(())
     }
 
@@ -114,7 +169,10 @@ impl LoadoutReadObserver for Capture<'_> {
         let sources = RecordPaths::new(self.forge);
         parse(Some(&sources))?;
         let captured = sources.positions(record, tree);
-        if !captured.selections.is_empty() || !captured.definitions.is_empty() {
+        if !captured.selections.is_empty()
+            || !captured.definitions.is_empty()
+            || !captured.names.is_empty()
+        {
             let Ok(mut facts) = self.facts.lock() else {
                 return ControlFlow::Break(());
             };
@@ -122,6 +180,12 @@ impl LoadoutReadObserver for Capture<'_> {
                 facts.retain(selection, source);
             }
             facts.definitions.extend(captured.definitions);
+            facts.paths.extend(
+                captured
+                    .names
+                    .into_iter()
+                    .map(|(selection, source)| (selection, Authored::RecordName(source))),
+            );
         }
         ControlFlow::Continue(())
     }
@@ -133,7 +197,9 @@ impl LoadoutReadObserver for Capture<'_> {
     ) -> ControlFlow<()> {
         if !matches!(
             selection.operation(),
-            LoadoutPathOperation::Copy | LoadoutPathOperation::PortName
+            LoadoutPathOperation::Copy
+                | LoadoutPathOperation::PortName
+                | LoadoutPathOperation::VehicleModificationName
         ) {
             return ControlFlow::Continue(());
         }
@@ -237,11 +303,12 @@ impl Output<'_, '_> {
             .and_then(|index| self.forge.record(index))
             .filter(|record| record.guid() == entity.guid());
         self.identity(record, address, incoming)?;
+        let vehicle = self.vehicle_selection(entity, address)?;
         self.ports(
             entity.ports(),
             &format!("{address}/ports"),
             ancestors,
-            VisibilityOwner::of(entity),
+            VisibilityOwner::of(entity, vehicle.as_ref()),
         )
     }
 
@@ -272,7 +339,7 @@ impl Output<'_, '_> {
         ports: &'node [PortNode],
         collection: &str,
         ancestors: &mut Vec<&'node PortNode>,
-        visibility: VisibilityOwner<'node>,
+        visibility: VisibilityOwner<'_>,
     ) -> Result<()> {
         for (ordinal, port) in ports.iter().enumerate() {
             let address = format!("{collection}/{ordinal}");

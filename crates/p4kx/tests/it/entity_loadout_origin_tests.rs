@@ -15,6 +15,8 @@ use super::TestResult;
 mod attachments;
 #[path = "entity_loadout_definition_origin_tests.rs"]
 mod definitions;
+#[path = "entity_loadout_vehicle_selection_tests.rs"]
+mod vehicle_selection;
 #[path = "entity_loadout_vehicle_visibility_tests.rs"]
 mod vehicle_visibility;
 

@@ -198,11 +198,19 @@ replacement's Entity identity.
 A port's DataForge `definition` carries the original declaration selected by the resolver. Its
 members retain the original type and subtype occurrences, attachment helpers and individual
 position and rotation coordinates. DataForge visibility carries the original `Flags` conversion.
+The vehicle's `path` carries the authored request and the selected archive directory entry. A
+class-name fallback carries the original Record name. The `patch_path` carries the applied patch
+selection, including the original Modification name and `patchFile` attributes when present.
+The `modification` field carries the original request from DataForge. When the resolver reuses
+one vehicle for another Entity, the file receipts also retain the current caller's authored
+cache selectors. Earlier missing candidates and unproved Modification searches leave the affected
+field incomplete.
+
 Vehicle visibility uses the first matching effective part and carries its original flag attribute,
 including inherited values, patch attributes and the last applied `Elem` value. A missing flag or
-`Elem` value carries the original element scope. Vehicle visibility stays incomplete while its
-full file-selection and match evidence is unavailable. A missing definition without original lookup
-evidence is also marked incomplete.
+`Elem` value carries the original element scope. The vehicle selection supplies additional source
+uses to that visibility decision. Visibility stays incomplete while the full effective part
+search is unproved. A missing definition without original lookup evidence is also marked incomplete.
 
 An Entity whose default Loadout is an outfit (an NPC actor, `SItemPortLoadoutOutfitParams`) also
 has `outfit`: `{"base_files": ["…"], "outfits": [{"tags": ["Outfits.S42.Work"], "files": ["…"],

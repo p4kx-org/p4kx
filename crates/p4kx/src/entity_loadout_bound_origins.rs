@@ -15,7 +15,8 @@ use p4kx_extraction::{
 
 use super::Output;
 use super::definition_sites::{Definition, DefinitionKey};
-use super::record_origins::{Datum, RecordSite, Selection};
+use super::record_origins::{Datum, RecordName, RecordSite, Selection};
+use super::vehicle_selection_origins::VehicleFacts;
 
 #[derive(Default)]
 pub(super) struct Facts {
@@ -24,6 +25,8 @@ pub(super) struct Facts {
     pub(super) references: HashMap<LoadoutReferenceSelection, RecordSite>,
     pub(super) class_records: HashMap<LoadoutClassSelection, Option<u32>>,
     pub(super) definitions: HashMap<DefinitionKey, Definition>,
+    pub(super) vehicles: VehicleFacts,
+    pub(super) derived: HashMap<LoadoutSelection, DerivedPath>,
 }
 
 impl Facts {
@@ -63,7 +66,13 @@ impl Facts {
 
 pub(super) enum Authored {
     Record(RecordSite),
+    RecordName(RecordName),
     Xml(Xml),
+}
+
+pub(super) struct DerivedPath {
+    pub(super) value: String,
+    pub(super) inputs: Vec<LoadoutPath>,
 }
 
 pub(super) struct Xml {
@@ -77,11 +86,23 @@ impl Output<'_, '_> {
         path: Option<&LoadoutPath>,
         role: SourceUseRole,
     ) -> Result<FieldOrigin> {
-        self.authored(
-            path.and_then(LoadoutPath::selection)
-                .and_then(|selection| self.facts.paths.get(selection)),
-            role,
-        )
+        let Some((path, selection)) = path.and_then(|path| Some((path, path.selection()?))) else {
+            return Ok(self.uses.origin(&[], false));
+        };
+        if let Some(derived) = self
+            .facts
+            .derived
+            .get(selection)
+            .filter(|derived| derived.value == path.value())
+        {
+            let inputs = derived
+                .inputs
+                .iter()
+                .map(|path| self.path_origin(Some(path), role))
+                .collect::<Result<Vec<_>>>()?;
+            return Ok(self.uses.origin_with_origins(&inputs, !inputs.is_empty())?);
+        }
+        self.authored(self.facts.paths.get(selection), role)
     }
 
     pub(super) fn authored(
@@ -91,6 +112,7 @@ impl Output<'_, '_> {
     ) -> Result<FieldOrigin> {
         match source {
             Some(Authored::Record(site)) => self.record_site(site, role),
+            Some(Authored::RecordName(site)) => self.record_name_site(site, role),
             Some(Authored::Xml(site)) => self.xml_origin(&site.file, site.location.as_ref(), role),
             None => Ok(self.uses.origin(&[], false)),
         }
@@ -127,6 +149,20 @@ impl Output<'_, '_> {
             inputs.push(self.forge_scope.at(location.clone(), role)?);
         }
         Ok(self.uses.origin(&inputs, self.forge_complete && complete))
+    }
+
+    fn record_name_site(&self, original: &RecordName, role: SourceUseRole) -> Result<FieldOrigin> {
+        let location = SourceLocation::DataForge {
+            record_index: original.record,
+            field: "recordName".to_owned(),
+        };
+        let mut sites = vec![self.forge_scope.at(location, role)?];
+        if let Some(raw) = &original.raw {
+            sites.push(self.forge_scope.at(raw.clone(), role)?);
+        }
+        Ok(self
+            .uses
+            .origin(&sites, original.complete && self.forge_complete))
     }
 
     pub(super) fn xml_origin(

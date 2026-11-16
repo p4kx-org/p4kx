@@ -99,6 +99,7 @@ fn verify_patch(json: &Value, patch: &[u8]) -> TestResult {
             receipt["sourceSetComplete"], false,
             "the full vehicle selector route is still incomplete"
         );
+        verify_patch_selector(json, &pointer)?;
         let site = flag_use(json, &pointer)?;
         assert_eq!(
             source_path(json, site)?,
@@ -128,6 +129,28 @@ fn verify_patch(json: &Value, patch: &[u8]) -> TestResult {
             "{name} excludes the equal-folded decoy"
         );
     }
+    Ok(())
+}
+
+fn verify_patch_selector(json: &Value, pointer: &str) -> TestResult {
+    let sites = field_uses(json, pointer)?;
+    let selector = sites
+        .into_iter()
+        .find(|site| {
+            site.get("role").and_then(Value::as_str) == Some("selector")
+                && site.pointer("/location/field").and_then(Value::as_str) == Some("patchFile")
+        })
+        .ok_or("original patch file selection")?;
+    assert_eq!(
+        source_path(json, selector)?,
+        format!("Data/{VEHICLE}"),
+        "the patchFile selector belongs to the base implementation"
+    );
+    assert_eq!(
+        original_bytes(BASE.as_bytes(), selector)?,
+        br#"patchFile="Modifications/Evidence.xml""#,
+        "visibility carries the actual patchFile selection attribute"
+    );
     Ok(())
 }
 

@@ -12,7 +12,7 @@ pub(crate) use crate::resolver_path_read::parse_spec;
 use crate::{
     Entities, LoadoutClassSelection, LoadoutError, LoadoutFileObservation, LoadoutPath,
     LoadoutPathObserver, LoadoutRequest, LoadoutResolver, LoadoutSelection, LoadoutTargetGuid,
-    XmlLoadoutClassSite, XmlLoadoutPathSite,
+    VehicleImplementation, XmlLoadoutClassSite, XmlLoadoutPathSite,
 };
 
 /// An actual source operation performed by a loadout resolver.
@@ -96,68 +96,10 @@ pub enum LoadoutReadEvent<'r, 'f> {
     },
 }
 
-/// Observes actual resolver source operations, including concurrent prefetch reads.
-pub trait LoadoutReadObserver: Send + Sync {
-    /// Returns `Break` to stop the observed resolution.
-    fn observe(&self, event: LoadoutReadEvent<'_, '_>) -> ControlFlow<()>;
+#[path = "loadout_read_observer.rs"]
+mod loadout_read_observer;
 
-    /// Enables original port-name selections in the resolver's read callbacks.
-    fn observes_port_names(&self) -> bool {
-        false
-    }
-
-    /// Enables exact XML evidence for effective vehicle visibility fields.
-    fn observes_vehicle_visibility(&self) -> bool {
-        false
-    }
-
-    /// Runs the actual Record projection exactly once within a borrowed path scope.
-    fn with_record_paths(
-        &self,
-        _record: &Record<'_>,
-        _tree: &RecordTree<'_>,
-        parse: &mut dyn FnMut(Option<&dyn LoadoutPathObserver>) -> ControlFlow<()>,
-    ) -> ControlFlow<()> {
-        parse(None)
-    }
-
-    /// Captures an actual same-parse XML attribute before its path text is copied.
-    fn xml_path(
-        &self,
-        _selection: &LoadoutSelection,
-        _site: &XmlLoadoutPathSite<'_>,
-    ) -> ControlFlow<()> {
-        ControlFlow::Continue(())
-    }
-
-    /// Captures the actual XML class-name attribute before its text is copied.
-    fn xml_class(
-        &self,
-        _selection: &LoadoutClassSelection,
-        _site: &XmlLoadoutClassSite<'_>,
-    ) -> ControlFlow<()> {
-        ControlFlow::Continue(())
-    }
-
-    /// Captures the actual Record chosen for this class getter before copying its GUID.
-    fn class_record(
-        &self,
-        _selection: &LoadoutClassSelection,
-        _record: &Record<'_>,
-    ) -> ControlFlow<()> {
-        ControlFlow::Continue(())
-    }
-
-    /// Captures one concrete candidate builder from its actual private input pairs.
-    fn derived_path(
-        &self,
-        _selection: &LoadoutSelection,
-        _inputs: &[&LoadoutPath],
-        _value: &str,
-    ) -> ControlFlow<()> {
-        ControlFlow::Continue(())
-    }
-}
+pub use loadout_read_observer::LoadoutReadObserver;
 
 pub(crate) struct Observation<'f> {
     observer: Arc<dyn LoadoutReadObserver + 'f>,
@@ -178,6 +120,22 @@ impl<'f> Observation<'f> {
 
     pub(crate) fn observes_vehicle_visibility(&self) -> bool {
         self.observer.observes_vehicle_visibility()
+    }
+
+    pub(crate) fn vehicle_used(
+        &self,
+        record_index: u32,
+        implementation: &VehicleImplementation,
+        caller: &LoadoutRequest,
+    ) {
+        if !self.stopped()
+            && self
+                .observer
+                .vehicle_used(record_index, implementation, caller)
+                .is_break()
+        {
+            self.stop();
+        }
     }
 
     pub(crate) fn stopped(&self) -> bool {

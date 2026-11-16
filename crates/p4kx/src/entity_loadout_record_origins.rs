@@ -11,8 +11,8 @@ use p4kx_assembly::{
     LoadoutSelection, PortDefinition,
 };
 use p4kx_extraction::{
-    DataForge, DataType, Guid, Record, RecordJsonLocation, RecordTree, SourceLocation, StructValue,
-    Value, ValueError,
+    DataForge, DataType, Guid, Record, RecordJsonLocation, RecordText, RecordTree, SourceLocation,
+    StructValue, Value, ValueError,
 };
 
 use super::definition_sites::{Definition, DefinitionKey, PendingDefinition, Site};
@@ -21,11 +21,19 @@ pub(super) struct RecordPaths<'forge> {
     forge: &'forge DataForge<'forge>,
     selections: RefCell<HashMap<usize, Vec<Pending>>>,
     definitions: RefCell<Vec<PendingDefinition>>,
+    names: RefCell<Vec<(LoadoutSelection, RecordName)>>,
 }
 
 pub(super) struct CapturedRecord {
     pub(super) selections: Vec<(Selection, RecordSite)>,
     pub(super) definitions: Vec<(DefinitionKey, Definition)>,
+    pub(super) names: Vec<(LoadoutSelection, RecordName)>,
+}
+
+pub(super) struct RecordName {
+    pub(super) record: u32,
+    pub(super) raw: Option<SourceLocation>,
+    pub(super) complete: bool,
 }
 
 pub(super) enum Selection {
@@ -56,6 +64,7 @@ impl<'forge> RecordPaths<'forge> {
             forge,
             selections: RefCell::new(HashMap::new()),
             definitions: RefCell::new(Vec::new()),
+            names: RefCell::new(Vec::new()),
         }
     }
 
@@ -104,6 +113,7 @@ impl<'forge> RecordPaths<'forge> {
         CapturedRecord {
             selections,
             definitions,
+            names: self.names.into_inner(),
         }
     }
 
@@ -142,7 +152,9 @@ impl LoadoutPathObserver for RecordPaths<'_> {
     ) -> ControlFlow<()> {
         if matches!(
             selection.operation(),
-            LoadoutPathOperation::PortName | LoadoutPathOperation::Copy
+            LoadoutPathOperation::PortName
+                | LoadoutPathOperation::Copy
+                | LoadoutPathOperation::Trim
         ) {
             self.capture_text(Selection::Path(selection.clone()), parent, value);
         }
@@ -199,7 +211,24 @@ impl LoadoutPathObserver for RecordPaths<'_> {
         ControlFlow::Continue(())
     }
 
-    fn record_name(&self, _: &LoadoutSelection, _: &RecordTree<'_>) -> ControlFlow<()> {
+    fn record_name(&self, selection: &LoadoutSelection, tree: &RecordTree<'_>) -> ControlFlow<()> {
+        let (raw, complete) = match tree.metadata().name() {
+            RecordText::Present(text) => {
+                let site = RecordJsonLocation::borrowed_text(self.forge, text);
+                let complete = site.is_some();
+                (site, complete)
+            }
+            RecordText::Absent | RecordText::Null => (None, true),
+            _ => (None, false),
+        };
+        self.names.borrow_mut().push((
+            selection.clone(),
+            RecordName {
+                record: tree.record_index(),
+                raw,
+                complete,
+            },
+        ));
         ControlFlow::Continue(())
     }
 }
