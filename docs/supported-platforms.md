@@ -21,7 +21,8 @@ lists the native consumer environments and the Linux ARM64 Blender version bound
 ## System memory
 
 The 0.5.0 release requires P4KX to run with 16 GiB total system RAM. This
-includes the operating system, normal CLI/GUI/MCP operation and the complete
+includes the operating system, the desktop, background services and all
+running processes. It covers normal CLI/GUI/MCP operation and the complete
 unfiltered v3 Catalog export. Record results on a 16 GiB system with the
 packaged applications. The Catalog contract describes the installed LIVE and
 PTU checks and their memory and disk measurements. [Catalog memory acceptance](catalog-partitioning.md#16-gib-total-system-ram)

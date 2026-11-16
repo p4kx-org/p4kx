@@ -183,13 +183,16 @@ work. Keep those measurements distinct from the package reader and the transfer 
 
 P4KX 0.5.0 release acceptance requires a complete unfiltered LIVE Catalog and
 a complete unfiltered current PTU Catalog on a system with 16 GiB of total
-physical or assigned RAM. The operating system shares that RAM with P4KX.
-Use the normal packaged command and ordinary OS paging settings. Each result
+physical or assigned RAM. The operating system, desktop, background services
+and every other running process share that RAM with P4KX. Use the normal
+packaged command and ordinary OS paging settings. Each result
 must retain every field, language, cross-domain reference and source marker
 of the complete v3 document.
 
-Record total system RAM, OS, CPU, producer peak working set and private bytes,
-system paging, elapsed time, process bytes written and peak temporary storage.
+Record total system RAM, OS, CPU and the running system's baseline memory
+before launch. Measure the producer's peak working set and private bytes,
+the lowest available physical memory, system commit and paging, elapsed
+time, process bytes written and peak temporary storage.
 Run the artifact replay separately. Derive the raw verification artifact from
 the same compressed output so the test prepares the Catalog only once. A
 process quota or reserve on a larger machine measures a different condition.
