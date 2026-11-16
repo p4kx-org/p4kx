@@ -5,8 +5,8 @@ use std::ops::Range;
 
 use p4kx_extraction::chunks::ChunkFile;
 use p4kx_extraction::model::{
-    AnimationController, AnimationError, AnimationHeader, AnimationSource, CorruptAnimation,
-    DbaAnimationSources, DbaHeaders, DbaMetadataRecords, DecodedAnimationChannel,
+    AnimationController, AnimationSource, CorruptAnimation, DbaAnimationSources,
+    DbaMetadataRecords, DecodedAnimationChannel,
 };
 use serde_json::{Value, json};
 
@@ -17,6 +17,8 @@ use super::{
 
 #[path = "animation_fields.rs"]
 mod fields;
+#[path = "animation_headers.rs"]
+mod headers;
 
 #[derive(Clone, Copy)]
 pub(super) enum Family {
@@ -91,7 +93,7 @@ impl AnimationRows<'_> {
         let before = (self.totals.clips, self.totals.declared, self.totals.partial);
         let complete = self.clips(family, name, &file)?;
         if complete && before.2 == self.totals.partial {
-            self.headers(family, name, &file, before.0, before.1)?;
+            headers::verify(family, name, &file, self.totals, before.0, before.1)?;
         }
         let status = if complete {
             Status::Complete
@@ -150,52 +152,6 @@ impl AnimationRows<'_> {
             }
         }
         Ok(false)
-    }
-
-    fn headers(
-        &mut self,
-        family: Family,
-        name: &str,
-        file: &ChunkFile<&[u8]>,
-        clips_before: u64,
-        keys_before: u64,
-    ) -> TestResult {
-        let inventory = match family {
-            Family::Caf => {
-                AnimationHeader::read_caf(name, file).map(|header| (1, header.keys as u64))
-            }
-            Family::Dba => DbaHeaders::read(name, file).map(|headers| {
-                let clips = headers.animations.len() + headers.skipped.len();
-                let mut keys = headers
-                    .animations
-                    .iter()
-                    .map(|header| header.keys as u64)
-                    .sum();
-                for skipped in headers.skipped {
-                    if let CorruptAnimation::TooManyKeys { keys: declared, .. } = skipped.reason {
-                        keys += declared;
-                        self.totals.header_budget_refusals += 1;
-                    }
-                }
-                (clips as u64, keys)
-            }),
-            Family::Aim => return Err("AIM does not have decoded headers".into()),
-        };
-        match inventory {
-            Ok((clips, keys)) => require(
-                self.totals.clips - clips_before == clips
-                    && self.totals.declared - keys_before == keys,
-                "complete media clip and key totals agree with the independent header inventory",
-            ),
-            Err(AnimationError::Corrupt {
-                source: CorruptAnimation::TooManyKeys { .. },
-                ..
-            }) => {
-                self.totals.header_budget_refusals += 1;
-                Ok(())
-            }
-            Err(error) => Err(error.into()),
-        }
     }
 
     fn clip(&mut self, clip: &AnimationSource<'_>) -> TestResult {
