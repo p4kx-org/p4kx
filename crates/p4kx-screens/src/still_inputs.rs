@@ -4,6 +4,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::ops::Range;
 
+use crate::style::preset::PresetFillSource;
+
 /// The source requests selected by the composed screen and its output backend.
 #[derive(Debug)]
 #[non_exhaustive]
@@ -26,6 +28,7 @@ pub struct StillTextInput {
     pub font: usize,
     /// The authored lookup key when its translated value was used.
     pub localization_key: Option<Box<str>>,
+    pub(crate) preset_fill: Option<PresetFillSource>,
 }
 
 #[derive(Debug, Default)]
@@ -37,6 +40,17 @@ pub(crate) struct TrackedInputs {
 }
 
 impl TrackedInputs {
+    pub(crate) fn record_text_paint(
+        &mut self,
+        range: Range<usize>,
+        input: &StillTextInput,
+        fill: Option<PresetFillSource>,
+    ) {
+        let mut input = input.clone();
+        input.preset_fill = fill;
+        self.text_items.push((range, input));
+    }
+
     pub(crate) fn selected(
         mut self,
         canvas_record: u32,

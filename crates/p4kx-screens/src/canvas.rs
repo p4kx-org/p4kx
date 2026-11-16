@@ -74,7 +74,7 @@ impl Canvas {
 
     /// Returns the brand style whose Record path holds `s_<code>_`, ignoring case.
     pub(crate) fn brand_of(&self, code: &str) -> Option<&BrandStyle> {
-        let wanted = format!("s_{}_", code.to_ascii_lowercase());
+        let wanted = brand_pattern(code);
         self.brands.iter().find(|brand| {
             brand
                 .style
@@ -252,6 +252,10 @@ fn hierarchy(widgets: &[Widget], scene_len: usize) -> (Vec<usize>, Vec<Vec<usize
         list.sort_by_key(order);
     }
     (roots, children)
+}
+
+pub(crate) fn brand_pattern(code: &str) -> String {
+    format!("s_{}_", code.to_ascii_lowercase())
 }
 
 fn style_ref(structure: &StructValue<'_>, name: &str) -> Option<StyleRef> {

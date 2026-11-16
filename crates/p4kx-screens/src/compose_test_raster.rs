@@ -8,6 +8,17 @@ use p4kx_gfx::{RasterOptions, RgbaImage};
 use super::Composed;
 
 impl Composed {
+    /// Returns the tracked glyph range and actual lookup key of a widget's painted text.
+    pub(crate) fn text_items_in(
+        &self,
+        owner: &Range<usize>,
+    ) -> Option<(&Range<usize>, Option<&str>)> {
+        self.inputs.text_items.iter().find_map(|(range, input)| {
+            (range.start >= owner.start && range.end <= owner.end)
+                .then_some((range, input.localization_key.as_deref()))
+        })
+    }
+
     pub(crate) fn rasterize_without_items(
         &self,
         options: &RasterOptions,

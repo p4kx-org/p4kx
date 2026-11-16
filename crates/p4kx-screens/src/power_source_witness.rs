@@ -23,10 +23,13 @@ mod diagnostics;
 mod original;
 #[path = "power_source_binding_trace.rs"]
 mod source_bindings;
+#[path = "screen_text_witness.rs"]
+mod text_witness;
 #[path = "power_source_visibility.rs"]
 mod visibility;
 
 use self::original::{check_pair, heavy_font, palette_colour, same_widget, tree, widget_source};
+use self::text_witness::TextPaintFailure;
 pub(crate) use self::visibility::Observation;
 
 #[path = "button_source_witness.rs"]
@@ -50,6 +53,7 @@ pub(crate) struct Trace {
     active: Vec<usize>,
     visits: Vec<Visit>,
     first_item: usize,
+    text_failure: Option<TextPaintFailure>,
     vector_requests: Vec<String>,
     pub(crate) background: Option<Rgba>,
 }
@@ -64,6 +68,7 @@ struct Visit {
     vector_requests: Vec<String>,
     vectors: Option<Vec<(usize, String)>>,
     own_items: Range<usize>,
+    text_failure: Option<TextPaintFailure>,
     last_item: usize,
 }
 
@@ -91,6 +96,7 @@ impl Trace {
             active: Vec::new(),
             visits: Vec::new(),
             first_item: 0,
+            text_failure: None,
             vector_requests: Vec::new(),
             background: None,
         }
@@ -123,6 +129,7 @@ impl Trace {
             vector_requests: std::mem::take(&mut self.vector_requests),
             vectors,
             own_items: self.first_item..items,
+            text_failure: self.text_failure.take(),
             last_item: items,
         });
         self.active.push(next);
@@ -139,6 +146,7 @@ impl Walk<'_, '_, '_, '_> {
     pub(crate) fn trace_begin(&mut self) {
         if let Some(trace) = &mut self.cx.power_trace {
             trace.background = None;
+            trace.text_failure = None;
             trace.first_item = self.cx.painter.len();
         }
     }

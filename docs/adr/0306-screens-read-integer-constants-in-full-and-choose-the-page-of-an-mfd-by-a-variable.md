@@ -114,8 +114,8 @@ description.
   of the power page (`OUTPUT`) are far too large; the tab bar text is right.
 - **Labels on a pale-blue background** on the Aegis SHIELDS and the RSI power pages: the
   background belongs to the text widget in the Records; whether the game draws it is not known.
-- **Buttons.** The Secondary family has a data-driven default rendering path. The other button
-  families and the game-driven interaction states need separate evidence.
+- **Buttons.** The General and Secondary families have data-driven default rendering paths.
+  Other button families and game-driven interaction states need separate evidence.
 - **Run-time pictures and numbers** (silhouette, readouts, rows, pips).
 
 ## Default Secondary buttons
@@ -134,8 +134,20 @@ icon-asset override, missing SVG or undecidable template selector identifies the
 The synthetic checks cover vector, frame and label paint, hidden parts, draw order and an invalid
 proxy. The installed LIVE check isolates both original footer button paint ranges and verifies
 their side-by-side pixels. Both styled SVG references are absent from that Archive, so the observed
-pixels come from the authored background and frame. Coverage of the other button families remains
-open in #994.
+pixels come from the authored background and frame. Other button families require their own source mapping.
+
+## Default General buttons
+
+The still renderer associates the exact General class with the standard General component
+canvas when the original widget has no canvas reference. Scoped LIVE General owners have
+empty direct canvas fields. The standard template supplies the proxy root and ordered icon
+and text parts. The selected RSI shared Style uses the General-Button-Primary tag on the
+holder to select the proxy frame and label styles.
+
+The instance transfers the label text and the two Boolean visibility inputs. The template's
+authored Integer switches supply the fill and icon-position state tags. The General template
+owns its remaining Integer and String defaults. The still renderer leaves icon-asset overrides
+and game-driven interaction to the original game.
 
 ## Guesses, unverified against the game
 

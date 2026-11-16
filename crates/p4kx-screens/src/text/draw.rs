@@ -14,6 +14,7 @@ use crate::glyphs::{self, MISSING};
 use crate::look::Look;
 use crate::paint::{Area, Painter, TWIPS};
 use crate::still_inputs::StillTextInput;
+use crate::style::preset::PresetFillSource;
 use crate::widget::Widget;
 
 const MAX_MISSING_REPORTED: usize = 8;
@@ -108,6 +109,7 @@ impl Texts<'_> {
             input: self.observe_inputs.then_some(StillTextInput {
                 font: font.0,
                 localization_key: resolved.lookup_key,
+                preset_fill: None,
             }),
             line_spacing: modifiers
                 .line_spacing
@@ -262,11 +264,21 @@ impl Context<'_> {
             .text
             .as_ref()
             .and_then(|spec| look.fill.or(spec.colour.as_ref()));
+        let preset_fill = look.style.text.preset_fill.as_ref();
+        let fill = preset_fill.filter(|_| colour_spec.is_none());
+        let colour_spec = colour_spec.or_else(|| fill.map(|fill| &fill.colour));
         if colour_spec.is_none() {
             self.report
                 .note(&widget.type_name, "text has no colour", &widget.name);
         }
         let colour = colour_spec.and_then(|spec| self.colour(spec, alpha, widget));
+        #[cfg(test)]
+        self.note_text_inputs(
+            prepared.is_some(),
+            colour_spec.is_some(),
+            colour.as_ref().map(|colour| colour.alpha),
+            &shaped.notes,
+        );
         let (Some(prepared), Some(colour)) = (prepared, colour) else {
             self.report.texts_left_out += 1;
             return;
@@ -286,9 +298,12 @@ impl Context<'_> {
             self.report.texts_left_out += 1;
             return;
         }
-        if self.place_text(widget, prepared, area, colour) {
+        let paint = (colour, fill.map(|fill| fill.source));
+        if self.place_text(widget, prepared, area, paint) {
             self.report.texts_drawn += 1;
         } else {
+            #[cfg(test)]
+            self.note_text_without_glyphs();
             self.report.texts_left_out += 1;
         }
     }
@@ -298,7 +313,7 @@ impl Context<'_> {
         widget: &Widget,
         prepared: &Prepared,
         area: Area,
-        colour: Rgba,
+        (colour, preset_fill): (Rgba, Option<PresetFillSource>),
     ) -> bool {
         let Some(face) = self
             .texts
@@ -356,7 +371,7 @@ impl Context<'_> {
         if end > before
             && let (Some(inputs), Some(input)) = (self.inputs.as_mut(), prepared.input.as_ref())
         {
-            inputs.text_items.push((before..end, input.clone()));
+            inputs.record_text_paint(before..end, input, preset_fill);
         }
         end > before
     }

@@ -120,6 +120,9 @@ impl ScreenSource<'_, '_> {
         let mut complete = true;
         for input in &inputs.text {
             complete &= self.texts.append_font_uses(input.font, registry, actual)?;
+            if let Some(fill) = input.preset_fill {
+                actual.push(forge.at(fill.location(), Conversion)?);
+            }
             if let Some(key) = &input.localization_key {
                 if let Some(ini) = self.ini {
                     complete &= self

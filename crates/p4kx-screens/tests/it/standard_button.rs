@@ -17,6 +17,8 @@ use crate::support::{
 use crate::text::fonts;
 use crate::text_part::{field, field_entry};
 
+#[path = "standard_button_general.rs"]
+mod general;
 #[path = "standard_button_vector.rs"]
 mod vector;
 
@@ -30,6 +32,10 @@ const BUTTON: &str = "BuildingBlocks_ComponentGeneralButtonSecondary";
 const FOLDER: &str = "libs/foundry/records/ui/buildingblocks/modularkit/standard/components/";
 
 fn button(fill: &str, position: &str, show_parts: bool) -> TestRecord {
+    component(BUTTON, fill, position, show_parts)
+}
+
+fn component(kind: &'static str, fill: &str, position: &str, show_parts: bool) -> TestRecord {
     let label = TestInstance::new("BuildingBlocks_ComponentLabelProperties")
         .value("show", TestValue::Bool(show_parts))
         .value("label", TestValue::text("@fixture_button_label"))
@@ -39,7 +45,7 @@ fn button(fill: &str, position: &str, show_parts: bool) -> TestRecord {
         .value("scale", TestValue::Single(6.0));
     TestCanvas::new(SCREEN, "buttons", 40.0, 20.0)
         .widget(
-            TestWidget::new(BUTTON, "button")
+            TestWidget::new(kind, "button")
                 .size(TestDim::Fixed(32.0), TestDim::Fixed(20.0))
                 .with("sizingMethod", TestValue::text("Size"))
                 .with("fillStyle", TestValue::text(fill))

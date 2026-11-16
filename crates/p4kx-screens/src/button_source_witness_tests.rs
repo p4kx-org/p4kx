@@ -113,6 +113,7 @@ fn proxy_visit_with_box() -> Visit {
         vector_requests: vec![STYLED_SVG.to_owned()],
         vectors: Some(Vec::new()),
         own_items: 2..4,
+        text_failure: None,
         last_item: 4,
     }
 }

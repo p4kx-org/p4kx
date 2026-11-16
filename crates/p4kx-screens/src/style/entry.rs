@@ -60,7 +60,7 @@ pub(crate) fn parse_entries(values: &[Value<'_>]) -> Vec<Entry> {
         .collect()
 }
 
-fn parse_entry(entry: &StructValue<'_>) -> Entry {
+pub(super) fn parse_entry(entry: &StructValue<'_>) -> Entry {
     let lists: Vec<Vec<Condition>> = items(entry, "conditionsList")
         .iter()
         .filter_map(as_struct)

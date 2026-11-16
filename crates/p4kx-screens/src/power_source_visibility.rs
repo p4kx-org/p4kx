@@ -145,6 +145,10 @@ impl Visibility {
         }
     }
 
+    pub(super) fn root_observation(&self, input: WidgetInput) -> Option<Observation> {
+        self.canvases.first()?.observations.get(&input).copied()
+    }
+
     pub(super) fn counts(&self, forge: &DataForge<'_>) -> Check<Counts> {
         let mut counts = Counts {
             canvases: self.canvases.len(),

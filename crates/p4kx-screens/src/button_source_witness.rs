@@ -17,12 +17,14 @@ use crate::canvas::{CANVAS_TYPE, find_canvas};
 use crate::elements::SECONDARY_CANVAS;
 use crate::reader::{as_struct, child, flag, items, reference, text};
 use crate::{
-    Composed, ImageSources, MAX_SVG_BYTES, ScreenComposer, ScreenFontFile, TextSources,
+    Composed, ImageSources, MAX_SVG_BYTES, ScreenComposer, ScreenFontFile, TextSources, Variable,
     WidgetInput, WidgetSection,
 };
 
 #[path = "button_source_frame.rs"]
 mod frame;
+#[path = "button_general_witness.rs"]
+mod general;
 #[path = "button_source_witness_tests.rs"]
 mod tests;
 
@@ -162,18 +164,41 @@ fn compose(
     reads: &VectorReads,
 ) -> Check<Composed> {
     let vars = power_variables()?;
+    with_screen_texts(archive, forge, |texts| {
+        compose_canvas(archive, forge, (MFD, footer, &vars), reads, texts)
+    })
+}
+
+fn with_screen_texts<T>(
+    archive: &Archive,
+    forge: &DataForge<'_>,
+    check: impl FnOnce(TextSources<'_>) -> Check<T>,
+) -> Check<T> {
     let font = ScreenFontFile::read(forge);
     let text = ScreenTexts::load_observed(archive, &font.path, Some(Language::English));
     let fonts = text
         .fonts()
-        .ok_or("cannot load the selected MFD font movie")?;
+        .ok_or("cannot load the selected screen font movie")?;
     let ini = text
         .parsed(&mut Vec::new())
-        .ok_or("cannot read the selected MFD language")?;
+        .ok_or("cannot read the selected screen language")?;
     let lookup = |key: &str| {
         ini.resolve(key)
             .map(|value| decode_line_breaks(value).into_owned())
     };
+    check(TextSources {
+        fonts,
+        localise: Some(&lookup as Localise<'_>),
+    })
+}
+
+fn compose_canvas(
+    archive: &Archive,
+    forge: &DataForge<'_>,
+    (selector, scope, variables): (&str, Guid, &[Variable]),
+    reads: &VectorReads,
+    texts: TextSources<'_>,
+) -> Check<Composed> {
     let images = ArchiveImages::new(archive);
     let texture = |path: &str, side: u32, pixels: u64| {
         images
@@ -186,22 +211,19 @@ fn compose(
         result.map_err(|error| error.to_string())
     };
     let mut composer = ScreenComposer::new(forge)
-        .with_texts(TextSources {
-            fonts,
-            localise: Some(&lookup as Localise<'_>),
-        })
+        .with_texts(texts)
         .with_images(ImageSources {
             texture: &texture,
             vector: &vector,
         })
-        .with_variables(&vars)
+        .with_variables(variables)
         .observing_inputs();
-    composer.power_scope = Some(footer);
+    composer.power_scope = Some(scope);
     let made = composer
-        .compose(MFD, Some("rsi"))
-        .map_err(|_| "cannot compose the original MFD")?;
+        .compose(selector, Some("rsi"))
+        .map_err(|_| "cannot compose the selected screen")?;
     if made.report().truncated || made.report().unknown_variables().next().is_some() {
-        return Err("the MFD did not completely evaluate the selected scenario");
+        return Err("the screen did not completely evaluate the selected scenario");
     }
     Ok(made)
 }
@@ -308,7 +330,7 @@ fn changed_pixels(reference: &RgbaImage, removed: &RgbaImage) -> Check<Footprint
         changed.count += 1;
     }
     if changed.x_min >= changed.x_max || changed.y_min >= changed.y_max {
-        return Err("a footer button has no visible area in the final raster");
+        return Err("the selected items have no visible area in the final raster");
     }
     Ok(changed)
 }

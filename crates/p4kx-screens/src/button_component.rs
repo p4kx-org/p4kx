@@ -10,10 +10,28 @@ use crate::rest::{Rest, parameter_for_tag, same_parameter};
 use crate::style::TagPaths;
 use crate::walk_rest::Handover;
 
+pub(crate) const GENERAL: &str = "BuildingBlocks_ComponentGeneralButton";
 pub(crate) const SECONDARY: &str = "BuildingBlocks_ComponentGeneralButtonSecondary";
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum ButtonFamily {
+    General,
+    Secondary,
+}
+
+impl ButtonFamily {
+    pub(crate) fn of_type(name: &str) -> Option<Self> {
+        match name {
+            GENERAL => Some(Self::General),
+            SECONDARY => Some(Self::Secondary),
+            _ => None,
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub(crate) struct ButtonComponent {
+    family: ButtonFamily,
     label: Part,
     icon: Part,
     text: Option<String>,
@@ -67,9 +85,7 @@ impl Choice {
 
 impl ButtonComponent {
     pub(crate) fn read(source: &StructValue<'_>) -> Option<Self> {
-        if source.type_name() != SECONDARY {
-            return None;
-        }
+        let family = ButtonFamily::of_type(source.type_name())?;
         let label = child(source, "labelProperties");
         let icon = child(source, "iconProperties");
         let has_icon_override = icon.is_some_and(|icon| {
@@ -77,6 +93,7 @@ impl ButtonComponent {
                 || text(icon, "iconPreset").is_some_and(|name| !matches!(name, "" | "_None"))
         });
         Some(Self {
+            family,
             label: Part::read(label),
             icon: Part::read(icon),
             text: label
@@ -99,6 +116,10 @@ impl ButtonComponent {
                 ],
             ),
         })
+    }
+
+    pub(crate) const fn family(&self) -> ButtonFamily {
+        self.family
     }
 
     pub(crate) fn transfer(
@@ -143,7 +164,7 @@ impl ButtonComponent {
                 add_parameter(&mut typed, parameter, Rest::Integer(key));
             } else {
                 report.note(
-                    SECONDARY,
+                    &values.widget.type_name,
                     &format!("button {description} does not select an authored template case"),
                     &values.widget.name,
                 );
@@ -152,7 +173,7 @@ impl ButtonComponent {
         values.typed = typed.into();
         if self.icon.shown == Some(true) && self.has_icon_override {
             report.note(
-                SECONDARY,
+                &values.widget.type_name,
                 "the component's icon asset override is not evaluated",
                 &values.widget.name,
             );
@@ -160,7 +181,10 @@ impl ButtonComponent {
     }
 
     fn part_values(&self) -> [(&'static str, Option<Rest>); 8] {
-        let number = |value: Option<f32>| value.map(|value| Rest::Num(f64::from(value)));
+        let number = |value: Option<f32>| match self.family {
+            ButtonFamily::Secondary => value.map(|value| Rest::Num(f64::from(value))),
+            ButtonFamily::General => None,
+        };
         [
             ("ParamInput0", self.label.shown.map(Rest::Bool)),
             ("ParamInput1", self.icon.shown.map(Rest::Bool)),
