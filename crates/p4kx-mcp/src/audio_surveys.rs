@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_assembly::audio::{AudioCandidate, AudioCandidateState, AudioIssue, AudioSurvey};
+use p4kx_assembly::audio::{
+    AudioCandidate, AudioCandidateState, AudioIndex, AudioIssue, AudioSurvey,
+};
 use p4kx_extraction::{
     Archive, FieldOrigin, InputScope, SourceCoordinateOmission, SourceDetails, SourceEncryption,
     SourceInput, SourceLocation, SourceUse, SourceUseRole, SourceUses,
 };
 
 use crate::forge_origins::{EvidenceError, ForgeOrigins};
-
-use super::Listing;
 
 #[derive(Clone, Copy)]
 pub(super) enum SurveyMode {
@@ -99,14 +99,20 @@ fn candidate_fact(
 }
 
 pub(super) fn issues(
-    listing: &Listing<'_, '_, '_>,
+    archive: &Archive,
+    index: &AudioIndex,
     output: &mut ForgeOrigins,
     listed: usize,
+    mode: SurveyMode,
 ) -> Result<(), EvidenceError> {
     let mut rows = Vec::new();
     let mut count = Vec::new();
-    for (position, issue) in listing.index.issues().iter().enumerate() {
-        let (path, diagnostic) = issue_origins(listing.archive, &output.uses, issue)?;
+    let observed = match mode {
+        SurveyMode::Witness => listed,
+        SurveyMode::Complete => index.issues().len(),
+    };
+    for (position, issue) in index.issues().iter().take(observed).enumerate() {
+        let (path, diagnostic) = issue_origins(archive, &output.uses, issue)?;
         let row = output
             .uses
             .origin_with_origins([&path, &diagnostic], true)?;
@@ -122,7 +128,9 @@ pub(super) fn issues(
     }
     let issues = output.uses.origin_with_origins(&rows, true)?;
     output.put("issues", issues)?;
-    let total = output.uses.origin_with_origins(&count, true)?;
+    let total = output
+        .uses
+        .origin_with_origins(&count, observed == index.issues().len())?;
     output.put("issues_total", total)
 }
 

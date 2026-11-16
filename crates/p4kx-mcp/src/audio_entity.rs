@@ -19,18 +19,12 @@ use crate::budget_text;
 use crate::error::ToolError;
 use crate::page::Page;
 
+use super::surveys::SurveyMode;
 use super::{event, header};
-
-#[path = "audio_entity_event_origins.rs"]
-mod event_origins;
 #[path = "audio_entity_origins.rs"]
 mod origins;
 #[path = "audio_entity_record_origins.rs"]
 mod record_origins;
-#[path = "audio_entity_surveys.rs"]
-mod surveys;
-
-use self::surveys::SurveyMode;
 
 /// Returns one page of an actual Entity's audio references with original source evidence.
 pub(crate) fn entity_sounds(

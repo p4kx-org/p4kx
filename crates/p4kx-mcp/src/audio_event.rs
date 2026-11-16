@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_assembly::audio::{
-    AtlTrigger, AudioIndex, EntityTrigger, EventMatch, IndexedSoundbank, TriggerSounds, WwiseEvent,
+    EntityTrigger, EventMatch, IndexedSoundbank, TriggerSounds, WwiseEvent,
 };
 
 use crate::audio_convert as convert;
@@ -38,7 +38,7 @@ fn event<'index>(
     })
 }
 
-fn events<'index>(
+pub(super) fn events<'index>(
     all: impl Iterator<Item = (EventMatch<'index>, Option<bool>)>,
     text: &mut Budget,
 ) -> Result<(Vec<EventShape>, usize), ToolError> {
@@ -49,29 +49,6 @@ fn events<'index>(
         listed.push(event(found.event(), found.soundbanks(), matched, text)?);
     }
     Ok((listed, total))
-}
-
-pub(super) fn hit_events(
-    index: &AudioIndex,
-    trigger: &AtlTrigger,
-    matched: &[bool],
-    text: &mut Budget,
-) -> Result<(Vec<EventShape>, usize), ToolError> {
-    if matched.len() != trigger.events().len() {
-        return Err(ToolError::Refused(
-            "selected audio event decisions do not match the index".to_owned(),
-        ));
-    }
-    let mut listed = Vec::new();
-    for (source, matched) in trigger.events().iter().zip(matched) {
-        listed.push(event(
-            source,
-            index.event_soundbanks(source.id()),
-            Some(*matched),
-            text,
-        )?);
-    }
-    Ok((listed, trigger.events().len()))
 }
 
 pub(super) fn entity_trigger(trigger: &EntityTrigger<'_>) -> Result<EntityTriggerShape, ToolError> {

@@ -5,20 +5,20 @@ use p4kx_assembly::audio::{
     AtlTrigger, AudioSurvey, AudioSurveyKind, EntityTrigger, EventMatch, TriggerOccurrence,
     Unmatched,
 };
-use p4kx_extraction::{
-    FieldOrigin, InputScope, SourceInput, SourceLocation, SourceScope, SourceUseRole,
-};
+use p4kx_extraction::{FieldOrigin, SourceUseRole};
 
 use crate::audio_shapes::EntityTriggerShape;
 use crate::error::ToolError;
 use crate::forge_origins::{EvidenceError, ForgeOrigins};
 use crate::forge_shapes::ForgeFieldOrigins;
 
+use super::super::definition_origins::Definition;
+use super::super::event_origins::AudioEventOrigins;
+use super::super::occurrence_origins as occurrence;
+use super::super::surveys::{self, SurveyMode};
 use super::Listing;
-use super::event_origins::EntityAudioEventOrigins;
 use super::position_error;
 use super::record_origins as record;
-use super::surveys::{self, SurveyMode};
 
 pub(super) fn capture(
     listing: &Listing<'_, '_, '_>,
@@ -45,7 +45,7 @@ pub(super) fn capture(
     } else {
         None
     };
-    let events = EntityAudioEventOrigins::new(
+    let events = AudioEventOrigins::new(
         listing.archive,
         listing.index,
         output.uses.clone(),
@@ -60,7 +60,13 @@ pub(super) fn capture(
     let total = record::header(listing, &mut output)?;
     context.matched(&mut output, &total)?;
     context.triggers(&mut output, triggers, occurrences, rows)?;
-    surveys::issues(listing, &mut output, issue_rows)?;
+    surveys::issues(
+        listing.archive,
+        listing.index,
+        &mut output,
+        issue_rows,
+        mode,
+    )?;
     if has_cursor {
         output.put("next_cursor", total)?;
     }
@@ -106,7 +112,7 @@ fn needs_bank_absence(listing: &Listing<'_, '_, '_>, rows: &[EntityTriggerShape]
 
 struct TriggerOrigins<'listing, 'archive, 'record, 'index, 'survey> {
     listing: &'listing Listing<'archive, 'record, 'index>,
-    events: EntityAudioEventOrigins<'survey>,
+    events: AudioEventOrigins<'survey>,
     atlas: Option<&'survey FieldOrigin>,
 }
 
@@ -161,18 +167,11 @@ impl TriggerOrigins<'_, '_, '_, '_, '_> {
         row: &EntityTriggerShape,
     ) -> Result<FieldOrigin, ToolError> {
         let first = occurrences.first().ok_or_else(position_error)?;
-        let name = record::occurrences_origin(
-            output,
-            std::slice::from_ref(first),
-            SourceUseRole::Payload,
-        )?;
-        let location = record::occurrences_origin(
-            output,
-            std::slice::from_ref(first),
-            SourceUseRole::Selector,
-        )?;
-        let references =
-            record::occurrences_origin(output, occurrences, SourceUseRole::Conversion)?;
+        let name =
+            occurrence::collect(output, std::slice::from_ref(first), SourceUseRole::Payload)?;
+        let location =
+            occurrence::collect(output, std::slice::from_ref(first), SourceUseRole::Selector)?;
+        let references = occurrence::collect(output, occurrences, SourceUseRole::Conversion)?;
         let [definition, events_total, lookup] =
             self.definition(output, trigger.definition(), &location)?;
         let status = self.status(output, trigger)?;
@@ -231,14 +230,10 @@ impl TriggerOrigins<'_, '_, '_, '_, '_> {
             }
             for (ordinal, (event, row)) in trigger.events().zip(&row.events).enumerate() {
                 let address = format!("{path}/events/{ordinal}");
-                event_origins.push(self.events.write(
-                    output,
-                    &address,
-                    definition,
-                    event,
-                    row.soundbanks.len(),
-                    lookup,
-                )?);
+                event_origins.push(
+                    self.events
+                        .write(output, &address, definition, event, row, lookup)?,
+                );
             }
         }
         Ok(output
@@ -261,35 +256,18 @@ impl TriggerOrigins<'_, '_, '_, '_, '_> {
             let absent = output.uses.origin_with_origins([caller, &absent], true)?;
             return Ok([absent.clone(), absent.clone(), absent]);
         };
-        let Some(entry) = self
-            .listing
-            .index
-            .definition_source(self.listing.archive, trigger)
-        else {
-            let unknown = output.uses.origin_with_origins([caller], false)?;
-            return Ok([unknown.clone(), unknown.clone(), unknown]);
-        };
-        let complete = entry.ancestors().all(|step| step.is_some());
-        let source = output
-            .uses
-            .observe(SourceInput::ArchiveView(entry), InputScope::Payload)?;
-        let directory = source.for_scope(InputScope::ArchiveDirectoryMetadata);
-        let name = SourceLocation::xml_attribute(trigger.name_position(), "atl_name")
-            .map(|location| source.at(location, SourceUseRole::Selector))
-            .transpose()?;
-        let path = directory.at(
-            SourceLocation::Metadata {
-                field: "path".into(),
-            },
-            SourceUseRole::Payload,
+        let source = Definition::open(
+            self.listing.archive,
+            self.listing.index,
+            &output.uses,
+            trigger,
         )?;
-        let selected = output
-            .uses
-            .origin(name.as_slice(), complete && name.is_some());
+        let selected = source.name(SourceUseRole::Selector)?;
         let lookup = output.uses.origin_with_origins([caller, &selected], true)?;
-        let path = output.uses.origin(&[path], complete);
-        let definition = output.uses.origin_with_origins([&lookup, &path], true)?;
-        let list = event_list(output, &source, trigger, complete)?;
+        let definition = output
+            .uses
+            .origin_with_origins([&lookup, &source.path()?], true)?;
+        let list = source.events()?;
         let events = output.uses.origin_with_origins([&lookup, &list], true)?;
         Ok([definition, events, lookup])
     }
@@ -309,20 +287,13 @@ impl TriggerOrigins<'_, '_, '_, '_, '_> {
         if let Some(event) = trigger.events().find(EventMatch::is_matched) {
             return self.events.matched_origin(definition, event);
         }
-        let complete_definition = if let Some(entry) = self
-            .listing
-            .index
-            .definition_source(self.listing.archive, definition)
-        {
-            let complete = entry.ancestors().all(|step| step.is_some());
-            let source = output
-                .uses
-                .observe(SourceInput::ArchiveView(entry), InputScope::Payload)
-                .map_err(EvidenceError::from)?;
-            event_list(output, &source, definition, complete)?
-        } else {
-            output.uses.origin(&[], false)
-        };
+        let complete_definition = Definition::open(
+            self.listing.archive,
+            self.listing.index,
+            &output.uses,
+            definition,
+        )?
+        .events()?;
         let checked = trigger
             .events()
             .map(|event| self.events.matched_origin(definition, event))
@@ -332,18 +303,4 @@ impl TriggerOrigins<'_, '_, '_, '_, '_> {
             .origin_with_origins(std::iter::once(&complete_definition).chain(&checked), true)
             .map_err(EvidenceError::from)?)
     }
-}
-
-fn event_list(
-    output: &ForgeOrigins,
-    source: &SourceScope,
-    trigger: &AtlTrigger,
-    complete: bool,
-) -> Result<FieldOrigin, EvidenceError> {
-    let position = SourceLocation::xml_element(trigger.position(), "ATLTrigger")
-        .map(|location| source.at(location, SourceUseRole::Selector))
-        .transpose()?;
-    Ok(output
-        .uses
-        .origin(position.as_slice(), complete && position.is_some()))
 }

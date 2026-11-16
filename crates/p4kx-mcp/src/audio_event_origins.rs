@@ -10,12 +10,13 @@ use p4kx_extraction::{
     SourceUse, SourceUseRole, SourceUses,
 };
 
+use crate::audio_shapes::EventShape;
 use crate::error::ToolError;
 use crate::forge_origins::{EvidenceError, ForgeOrigins, site};
 
 type Result<T> = std::result::Result<T, EvidenceError>;
 
-pub(crate) struct EntityAudioEventOrigins<'a> {
+pub(crate) struct AudioEventOrigins<'a> {
     archive: &'a Archive,
     index: &'a AudioIndex,
     uses: SourceUses,
@@ -23,7 +24,7 @@ pub(crate) struct EntityAudioEventOrigins<'a> {
     bank_survey: Option<&'a FieldOrigin>,
 }
 
-impl<'a> EntityAudioEventOrigins<'a> {
+impl<'a> AudioEventOrigins<'a> {
     pub(crate) const fn new(
         archive: &'a Archive,
         index: &'a AudioIndex,
@@ -46,19 +47,20 @@ impl<'a> EntityAudioEventOrigins<'a> {
         path: &str,
         definition: &AtlTrigger,
         event: EventMatch<'_>,
-        listed_banks: usize,
+        row: &EventShape,
         lookup: &FieldOrigin,
     ) -> std::result::Result<FieldOrigin, ToolError> {
         let declaration = self.declaration(definition, event);
         let location = SourceLocation::xml_attribute(event.event().name_position(), "wwise_name");
         let original_name =
             self.attribute(declaration, location.clone(), SourceUseRole::Payload)?;
-        let original_id = self.attribute(declaration, location, SourceUseRole::Conversion)?;
+        let original_id =
+            self.attribute(declaration, location.clone(), SourceUseRole::Conversion)?;
         let original_flag = self.localised(declaration, event)?;
         let name = self.union([lookup, &original_name], true)?;
         let id = self.union([lookup, &original_id], true)?;
         let localised = self.union([lookup, &original_flag], true)?;
-        let banks = self.banks(output, path, declaration, event, listed_banks, &id)?;
+        let banks = self.banks(output, path, declaration, event, row.soundbanks.len(), &id)?;
         let fields = [
             ("name", name),
             ("id", id),
@@ -66,7 +68,20 @@ impl<'a> EntityAudioEventOrigins<'a> {
             ("soundbank_count", banks.count),
             ("soundbanks", banks.listed),
         ];
-        let row = self.union(fields.iter().map(|(_, origin)| origin), true)?;
+        let matched = row
+            .matched
+            .map(|_| {
+                let authored = self.attribute(declaration, location, SourceUseRole::Conversion)?;
+                self.union([lookup, &authored], true)
+            })
+            .transpose()?;
+        let row = self.union(
+            fields.iter().map(|(_, origin)| origin).chain(&matched),
+            true,
+        )?;
+        if let Some(matched) = matched {
+            output.put(&format!("{path}/matched"), matched)?;
+        }
         for (field, origin) in fields {
             output.put(&format!("{path}/{field}"), origin)?;
         }

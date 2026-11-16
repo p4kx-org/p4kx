@@ -54,7 +54,7 @@ pub(crate) struct UnmatchedShape {
 }
 
 /// An Entity whose Record names a trigger.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub(crate) struct EntityRef {
     /// The GUID of the Record.
     pub(crate) guid: String,
@@ -65,7 +65,7 @@ pub(crate) struct EntityRef {
 }
 
 /// The Entities that name a trigger.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub(crate) struct EntitiesShape {
     /// How many Entities name the trigger.
     pub(crate) count: usize,
@@ -74,7 +74,7 @@ pub(crate) struct EntitiesShape {
 }
 
 /// An audio trigger a search found.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub(crate) struct TriggerHitShape {
     /// The trigger name as its ATL definition writes it.
     pub(crate) name: String,
@@ -116,6 +116,8 @@ pub(crate) struct TriggerSearchResult {
     /// The cursor of the next page; absent on the last page.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) next_cursor: Option<String>,
+    #[serde(flatten)]
+    pub(crate) origins: ForgeFieldOrigins,
 }
 
 /// The Record of an Entity.

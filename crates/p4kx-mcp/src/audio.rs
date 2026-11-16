@@ -1,20 +1,26 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+#[path = "audio_trigger_definition_origins.rs"]
+mod definition_origins;
 #[path = "audio_entity.rs"]
 mod entity;
 #[path = "audio_event.rs"]
 pub(super) mod event;
+#[path = "audio_event_origins.rs"]
+mod event_origins;
 #[path = "audio_header.rs"]
 mod header;
-#[path = "audio_hit_plan.rs"]
-mod hit_plan;
 #[path = "audio_location.rs"]
 pub(super) mod location;
+#[path = "audio_trigger_occurrence_origins.rs"]
+mod occurrence_origins;
 #[path = "audio_resolve.rs"]
 mod resolve;
 #[path = "audio_search.rs"]
 mod search;
+#[path = "audio_surveys.rs"]
+mod surveys;
 #[path = "audio_users.rs"]
 mod users;
 
