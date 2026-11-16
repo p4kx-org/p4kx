@@ -15,7 +15,7 @@ pub(crate) enum Unreadable {
     /// The entry is no container.
     #[error("cannot be opened as a container")]
     NotAContainer,
-    /// An entity file is over the size limit or cannot be read.
+    /// An entity file cannot be read in full.
     #[error("an entity file cannot be read")]
     EntityFile,
     /// An entity file could be read but is not valid XML.
@@ -24,8 +24,8 @@ pub(crate) enum Unreadable {
     /// An entity places a container that the Archive lacks.
     #[error("placed by an entity but not in the Archive")]
     MissingFromArchive,
-    /// A `.soc` file is over the size limit or cannot be read.
-    #[error("a .soc is over the limit or cannot be read")]
+    /// A `.soc` file cannot be read in full.
+    #[error("a .soc cannot be read in full")]
     SocFile,
     /// A `.soc` file cannot be counted.
     #[error("{0}")]

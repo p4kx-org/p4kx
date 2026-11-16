@@ -3,7 +3,7 @@
 
 use std::path::Path;
 
-use p4kx_extraction::{Archive, Entry};
+use p4kx_extraction::{Archive, CancelToken, Entry};
 
 use crate::catalog_read::original::{EntryCapture, EntryDiagnosis, EntryRead};
 use crate::entry_source::EntrySource;
@@ -14,8 +14,6 @@ use crate::loot_entxml::{self, CapturedEntityLink};
 use crate::loot_unreadable::Unreadable;
 use crate::starmap_index;
 use crate::{CatalogError, Kind};
-
-const MAX_ENTXML_LEN: u64 = 1 << 20;
 
 /// The actual source operations and readable entity links of one container.
 #[derive(Default)]
@@ -29,8 +27,12 @@ pub(crate) struct Read {
 pub(crate) fn read(
     archive: &Archive,
     entry: usize,
+    cancel: Option<&CancelToken>,
     capture: &EntryCapture<'_>,
 ) -> Result<Read, CatalogError> {
+    if cancel.is_some_and(CancelToken::is_cancelled) {
+        return Err(CatalogError::Cancelled);
+    }
     let mut read = Read::default();
     let Some(socpak) = archive.entries().get(entry) else {
         read.unreadable = Some(Unreadable::NoSuchEntry);
@@ -57,7 +59,9 @@ pub(crate) fn read(
         .iter()
         .filter(|inner| is_entity_file(inner.path()));
     for inner in entity_files {
-        read_entity(archive, &container, socpak, inner, &mut read, capture)?;
+        read_entity(
+            archive, &container, socpak, inner, &mut read, cancel, capture,
+        )?;
     }
     Ok(read)
 }
@@ -68,12 +72,12 @@ fn read_entity(
     socpak: &Entry,
     inner: &Entry,
     read: &mut Read,
+    cancel: Option<&CancelToken>,
     capture: &EntryCapture<'_>,
 ) -> Result<(), CatalogError> {
     let source = EntrySource::inner(capture, archive, socpak, container, inner)?
         .operation(EntryOperation::EntityLinks);
-    let Ok(bytes) = EntryRead::read(source.receipt().clone(), container, inner, MAX_ENTXML_LEN)?
-    else {
+    let Ok(bytes) = EntryRead::read_all(source.receipt().clone(), container, inner, cancel)? else {
         source.record(
             &mut read.ledger,
             Kind::LootContainers,

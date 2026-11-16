@@ -63,7 +63,9 @@ pub(crate) fn explore(
         let read: Vec<_> = frontier
             .par_iter()
             .filter(|_| !cancel.is_some_and(CancelToken::is_cancelled))
-            .map(|&entry| summarise(archive, index, entry, capture).map(|read| (entry, read)))
+            .map(|&entry| {
+                summarise(archive, index, entry, cancel, capture).map(|read| (entry, read))
+            })
             .collect::<Result<Vec<_>, _>>()?;
         frontier = read
             .iter()
@@ -81,9 +83,10 @@ fn summarise(
     archive: &Archive,
     index: &Index<'_>,
     entry: usize,
+    cancel: Option<&CancelToken>,
     capture: &EntryCapture<'_>,
 ) -> Result<(Summary, ExportLedger), CatalogError> {
-    let read = crate::loot_container_source::read(archive, entry, capture)?;
+    let read = crate::loot_container_source::read(archive, entry, cancel, capture)?;
     let mut ledger = read.ledger;
     let mut summary = Summary {
         unreadable: read.unreadable,

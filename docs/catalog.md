@@ -2249,7 +2249,11 @@ each tag, summed over all `.soc` files of the container. A container without a `
 read, or that the Archive lacks, has `null` and no counts.
 
 The walk starts at every container below `ObjectContainers/PU/system` and follows the containers
-the entity files place, each container read once. The location is that of the container the walk
+the entity files place, each container read once. Entity XML and SOC reads consume the complete
+declared payload with cancellation checks. An Entry that ends early or exceeds its declared
+size causes a read failure. An authored link to a missing container retains its selector as a
+failed enumeration, including when the linking entity has no multi config.
+The location is that of the container the walk
 started in: `starmapObjectGuid` is the object the Child that reaches it hangs below (as for
 "Locations" above, with `null` for a container no Child reaches or an object the catalog lacks). A
 container placed under several roots gives a row for each, and containers that place each other

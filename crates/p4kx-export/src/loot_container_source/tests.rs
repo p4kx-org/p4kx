@@ -31,7 +31,7 @@ fn malformed_xml_does_not_hide_a_later_readable_entity() -> TestResult {
         ));
     let (_folder, archive) = opened(&container)?;
     let read = crate::catalog_read::original::with_entry_capture(&archive, |capture| {
-        super::read(&archive, 0, capture)
+        super::read(&archive, 0, None, capture)
     })?;
     assert!(
         matches!(read.unreadable, Some(Unreadable::EntityXml(_))),
@@ -67,7 +67,7 @@ fn a_malformed_config_keeps_other_declared_links_with_field_diagnostics() -> Tes
     ));
     let (_folder, archive) = opened(&container)?;
     let read = crate::catalog_read::original::with_entry_capture(&archive, |capture| {
-        super::read(&archive, 0, capture)
+        super::read(&archive, 0, None, capture)
     })?;
     let [(_, link)] = read.links.as_slice() else {
         return Err("one partially projected source expected".into());
@@ -103,13 +103,56 @@ fn a_malformed_config_keeps_other_declared_links_with_field_diagnostics() -> Tes
 }
 
 #[test]
+fn a_large_source_keeps_the_link_after_the_full_entity_document() -> TestResult {
+    let padding = "x".repeat(1024 * 1024);
+    let xml = format!("<!--{padding}--><Entity objectContainer=\"next.socpak\"/>");
+    let container = TestContainer::new().entry(TestEntry::deflated("entdata/full.entxml", xml));
+    let (_folder, archive) = opened(&container)?;
+    let read = crate::catalog_read::original::with_entry_capture(&archive, |capture| {
+        super::read(&archive, 0, None, capture)
+    })?;
+    let [(_, link)] = read.links.as_slice() else {
+        return Err("the original link at the end of the source must survive".into());
+    };
+    assert_eq!(link.value().container.as_deref(), Some("next.socpak"));
+    assert_eq!(read.unreadable, None);
+    let [_, source] = read.ledger.entries.as_slice() else {
+        return Err("outer container and the complete Entity source".into());
+    };
+    assert_eq!(source.disposition, SourceDisposition::Projected);
+    Ok(())
+}
+
+#[test]
+fn an_overlong_entity_source_cannot_publish_its_valid_prefix() -> TestResult {
+    let xml = r#"<Entity objectContainer="next.socpak"/>"#;
+    let entry = TestEntry::deflated("entdata/overlong.entxml", format!("{xml}broken"))
+        .with_uncompressed_size(u64::try_from(xml.len())?);
+    let (_folder, archive) = opened(&TestContainer::new().entry(entry))?;
+    let read = crate::catalog_read::original::with_entry_capture(&archive, |capture| {
+        super::read(&archive, 0, None, capture)
+    })?;
+    assert_eq!(
+        read.links.len(),
+        0,
+        "an underdeclared stream yields no link"
+    );
+    assert_eq!(read.unreadable, Some(Unreadable::EntityFile));
+    let [_, source] = read.ledger.entries.as_slice() else {
+        return Err("outer container and the failed Entity source".into());
+    };
+    assert_eq!(source.disposition, SourceDisposition::ReadFailed);
+    Ok(())
+}
+
+#[test]
 fn duplicate_paths_preserve_distinct_physical_entry_indices() -> TestResult {
     let container = TestContainer::new()
         .entry(TestEntry::stored("entdata/same.entxml", "<Entity/>"))
         .entry(TestEntry::stored("entdata/same.entxml", "invalid"));
     let (_folder, archive) = opened(&container)?;
     let read = crate::catalog_read::original::with_entry_capture(&archive, |capture| {
-        super::read(&archive, 0, capture)
+        super::read(&archive, 0, None, capture)
     })?;
     let [_, first, second] = read.ledger.entries.as_slice() else {
         return Err("both physical source Entries expected".into());

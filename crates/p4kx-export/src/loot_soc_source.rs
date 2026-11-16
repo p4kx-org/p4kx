@@ -4,7 +4,7 @@
 use p4kx_extraction::{Archive, CancelToken};
 
 use crate::catalog_read::original::{EntryCapture, EntryRead};
-use crate::container_read::{self, MAX_SOC_LEN};
+use crate::container_read;
 use crate::entry_source::EntrySource;
 use crate::export_entry_ledger::EntryOperation;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
@@ -19,6 +19,9 @@ pub(crate) fn read(
     cancel: Option<&CancelToken>,
     capture: &EntryCapture<'_>,
 ) -> Result<(Result<EntityTags, Unreadable>, ExportLedger), CatalogError> {
+    if cancel.is_some_and(CancelToken::is_cancelled) {
+        return Err(CatalogError::Cancelled);
+    }
     let mut ledger = ExportLedger::default();
     let Some(socpak) = archive.entries().get(entry) else {
         return Ok((Err(Unreadable::NoSuchEntry), ledger));
@@ -41,12 +44,9 @@ pub(crate) fn read(
     let mut counts = EntityTags::default();
     let mut failure = None;
     for soc in container_read::soc_entries(&container) {
-        if cancel.is_some_and(CancelToken::is_cancelled) {
-            break;
-        }
         let source = EntrySource::inner(capture, archive, socpak, &container, soc)?
             .operation(EntryOperation::SocTags);
-        let Ok(bytes) = EntryRead::read(source.receipt().clone(), &container, soc, MAX_SOC_LEN)?
+        let Ok(bytes) = EntryRead::read_all(source.receipt().clone(), &container, soc, cancel)?
         else {
             source.record(
                 &mut ledger,
