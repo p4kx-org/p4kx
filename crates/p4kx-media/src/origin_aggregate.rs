@@ -12,20 +12,54 @@ use crate::origin_resolver::OriginResolver;
 use crate::origin_source;
 use crate::origin_subject::OriginSubject;
 
+#[derive(Default)]
+pub(crate) struct MaterialDataAggregate {
+    origin: Option<OriginContributions>,
+}
+
+impl MaterialDataAggregate {
+    pub(crate) fn for_occurrence(
+        resolver: &OriginResolver<'_>,
+        prepared: Option<&PreparedRecordOrigins>,
+    ) -> Option<Self> {
+        (prepared.is_some()
+            && resolver
+                .builtin
+                .is_some_and(|builtin| builtin.profile == OriginProfile::MaterialPart))
+        .then(Self::default)
+    }
+
+    fn resolve(
+        &mut self,
+        resolver: &OriginResolver<'_>,
+        prepared: Option<&PreparedRecordOrigins>,
+    ) -> Result<OriginContributions, MediaError> {
+        if let Some(origin) = &self.origin {
+            return Ok(origin.clone());
+        }
+        let origin = data(resolver, prepared)?;
+        self.origin = Some(origin.clone());
+        Ok(origin)
+    }
+}
+
 pub(crate) fn resolve(
     resolver: &OriginResolver<'_>,
     pointer: &str,
     prepared: Option<&PreparedRecordOrigins>,
+    material_data: Option<&mut MaterialDataAggregate>,
 ) -> Result<Option<OriginContributions>, MediaError> {
     match resolver.subject {
-        OriginSubject::Record(_) if pointer.is_empty() => record(resolver, prepared).map(Some),
+        OriginSubject::Record(_) if pointer.is_empty() => {
+            record(resolver, prepared, material_data).map(Some)
+        }
         OriginSubject::Artifact if pointer.is_empty() || pointer == "/digest" => {
             artifact(resolver, pointer, prepared).map(Some)
         }
         _ if pointer == "/data"
             || (pointer == "/data/payload" && (shader(resolver) || prepared_data(resolver))) =>
         {
-            data(resolver, prepared).map(Some)
+            occurrence_data(resolver, prepared, material_data).map(Some)
         }
         _ if pointer.starts_with("/data/")
             && prepared.is_some_and(|prepared| prepared.has_known_descendants(pointer)) =>
@@ -39,10 +73,11 @@ pub(crate) fn resolve(
 fn record(
     resolver: &OriginResolver<'_>,
     prepared: Option<&PreparedRecordOrigins>,
+    material_data: Option<&mut MaterialDataAggregate>,
 ) -> Result<OriginContributions, MediaError> {
     let mut capture = OriginCapture::with_limit(resolver.owner, resolver.detail_bytes);
     capture.include_original(&origin_source::whole(resolver)?)?;
-    capture.include_original(&data(resolver, prepared)?)?;
+    capture.include_original(&occurrence_data(resolver, prepared, material_data)?)?;
     if resolver.builtin.is_some() && !explicit_data(resolver) {
         capture.include_original(&resolver.resolve("/subresource", None)?)?;
     }
@@ -57,6 +92,17 @@ fn record(
         capture.include_original(&OriginContributions::unknown(resolver.owner))?;
     }
     Ok(capture.finish())
+}
+
+fn occurrence_data(
+    resolver: &OriginResolver<'_>,
+    prepared: Option<&PreparedRecordOrigins>,
+    material_data: Option<&mut MaterialDataAggregate>,
+) -> Result<OriginContributions, MediaError> {
+    material_data.map_or_else(
+        || data(resolver, prepared),
+        |cache| cache.resolve(resolver, prepared),
+    )
 }
 
 fn artifact(

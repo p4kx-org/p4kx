@@ -4,6 +4,7 @@
 use p4kx_extraction::{InputScope, SourceUseRole, SourceUses};
 
 use crate::origin_aggregate;
+use crate::origin_aggregate::MaterialDataAggregate;
 use crate::origin_capture::{OriginCapture, OriginSite};
 use crate::origin_contract::OriginProfile;
 use crate::origin_contributions::OriginContributions;
@@ -39,6 +40,15 @@ impl OriginResolver<'_> {
         pointer: &str,
         prepared: Option<&PreparedRecordOrigins>,
     ) -> Result<OriginContributions, MediaError> {
+        self.resolve_in_occurrence(pointer, prepared, None)
+    }
+
+    pub(crate) fn resolve_in_occurrence(
+        &self,
+        pointer: &str,
+        prepared: Option<&PreparedRecordOrigins>,
+        material_data: Option<&mut MaterialDataAggregate>,
+    ) -> Result<OriginContributions, MediaError> {
         if let Some(prepared) = prepared
             && matches!(
                 prepared.profile(),
@@ -48,7 +58,8 @@ impl OriginResolver<'_> {
         {
             return Ok(actual.clone());
         }
-        if let Some(aggregate) = origin_aggregate::resolve(self, pointer, prepared)? {
+        if let Some(aggregate) = origin_aggregate::resolve(self, pointer, prepared, material_data)?
+        {
             if let Some(prepared) = prepared {
                 let _actual = prepared.visit(pointer);
             }

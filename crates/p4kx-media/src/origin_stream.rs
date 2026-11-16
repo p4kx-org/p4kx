@@ -9,6 +9,7 @@ use sha2::{Digest as _, Sha256};
 
 use crate::artifact::{Stream, StreamDestination};
 use crate::checkpoint::{Checkpoint, IO_BLOCK_BYTES};
+use crate::origin_aggregate::MaterialDataAggregate;
 use crate::origin_contract::use_sets::Sets;
 use crate::origin_contract::{
     OriginCoverage, OriginField, OriginProfile, OriginProtocol, OriginReceipts, OriginRow,
@@ -21,6 +22,10 @@ use crate::{Artifact, MediaError, MediaKind, error, hashing, origin_error, origi
 
 #[path = "origin_stream_reference_cache.rs"]
 mod reference_cache;
+
+#[cfg(test)]
+#[path = "origin_stream_material_data_tests.rs"]
+mod material_data_tests;
 
 /// Streaming provenance files with unchanged payload-stream admission budgets.
 pub(crate) struct OriginTransport<'a> {
@@ -64,6 +69,19 @@ impl<'a> OriginTransport<'a> {
         resolver: &OriginResolver<'_>,
         prepared: Option<&PreparedRecordOrigins>,
     ) -> Result<(), MediaError> {
+        let material_data = MaterialDataAggregate::for_occurrence(resolver, prepared);
+        self.emit_resolved(stream, profile, payload, resolver, prepared, material_data)
+    }
+
+    fn emit_resolved(
+        &mut self,
+        stream: OriginStream,
+        profile: OriginProfile,
+        payload: &[u8],
+        resolver: &OriginResolver<'_>,
+        prepared: Option<&PreparedRecordOrigins>,
+        mut material_data: Option<MaterialDataAggregate>,
+    ) -> Result<(), MediaError> {
         let position = self
             .summaries
             .iter()
@@ -92,7 +110,8 @@ impl<'a> OriginTransport<'a> {
                 self.destination.checkpoint().check()?;
                 let address = address(stream, field);
                 let field = address.as_ref();
-                let contribution = resolver.resolve(field, prepared)?;
+                let contribution =
+                    resolver.resolve_in_occurrence(field, prepared, material_data.as_mut())?;
                 self.emit_field(&scope, field, &contribution, &mut coverage, &mut references)
             },
         )?;
