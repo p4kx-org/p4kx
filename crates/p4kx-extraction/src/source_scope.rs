@@ -65,6 +65,29 @@ impl SourceScope {
         ))
     }
 
+    /// Observes another role at a registered original coordinate in this source scope.
+    ///
+    /// # Errors
+    /// Returns an error when the original use is foreign, unregistered or in another scope.
+    pub fn at_observed_location(
+        &self,
+        original: &SourceUse,
+        role: SourceUseRole,
+    ) -> Result<SourceUse, SourceEvidenceError> {
+        let mut registry = source_evidence_error::lock(&self.registry)?;
+        let description = original.description();
+        if description.source() != &self.source
+            || description.scope() != self.scope
+            || !registry
+                .uses
+                .get(original.reference())
+                .is_some_and(|known| Arc::ptr_eq(known, &original.description))
+        {
+            return Err(SourceEvidenceError::ForeignEvidence);
+        }
+        Ok(registry.repeat_use(description, role))
+    }
+
     /// Attaches a localization lookup to a registered authored key selector from this inventory.
     ///
     /// # Errors

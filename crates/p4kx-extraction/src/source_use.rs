@@ -4,6 +4,15 @@
 #[path = "source_xml_location.rs"]
 mod xml_location;
 
+#[path = "source_location.rs"]
+mod location;
+#[path = "source_location_storage.rs"]
+pub(crate) mod storage;
+
+pub use location::SourceLocation;
+pub(crate) use location::{LocationView, Subresource};
+use storage::RetainedLocation;
+
 use std::cmp::Ordering;
 use std::fmt;
 use std::hash::{Hash, Hasher};
@@ -13,9 +22,7 @@ use schemars::JsonSchema;
 use serde::{Serialize, Serializer};
 
 use crate::projection_schema;
-use crate::source_details::SourceCoordinateOmission;
 use crate::source_inventory::{PhysicalSourceRef, SourceEncryptionState};
-use crate::{DecimalU64, Language};
 
 /// A document-local source-use identifier, independent of addresses or pointer values.
 #[derive(Clone, Serialize, JsonSchema)]
@@ -152,122 +159,6 @@ impl InputScope {
     }
 }
 
-/// A retained source coordinate or an explicit omission inside an observed physical input.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
-#[non_exhaustive]
-#[serde(
-    tag = "type",
-    rename_all = "camelCase",
-    rename_all_fields = "camelCase"
-)]
-pub enum SourceLocation {
-    /// An actual input use with explicitly omitted optional coordinates.
-    Opaque {
-        /// Why coordinate details were not retained.
-        reason: SourceCoordinateOmission,
-    },
-    /// One field of the physical DataForge Record index.
-    DataForge {
-        /// Physical Record position, independent of nominal GUID aliases.
-        record_index: u32,
-        /// Exact owned-field path, including stored list positions.
-        field: String,
-    },
-    /// A localization lookup addressed by its retained authored selector.
-    LocalizationLookup {
-        /// The language Entry used by the lookup.
-        #[serde(serialize_with = "language_code")]
-        #[schemars(with = "String")]
-        language: Language,
-        /// The source use holding the actual lookup key.
-        selector: SourceUseRef,
-    },
-    /// Half-open admitted Entry positions in a parsed root Archive directory.
-    ArchiveDirectoryPaths {
-        /// First admitted Entry path position.
-        start_entry_index: DecimalU64,
-        /// Position after the last consulted Entry path.
-        end_entry_index: DecimalU64,
-    },
-    /// Half-open Entry positions in an original root Archive's path-ordered folder tree.
-    ArchiveDirectoryTreePaths {
-        /// First path-order Entry position.
-        start_entry_index: DecimalU64,
-        /// Position after the last contributing path-order Entry.
-        end_entry_index: DecimalU64,
-    },
-    /// One exact logical field inside an already observed structured source subresource.
-    Subresource {
-        /// Format-owned namespace for the original source object.
-        namespace: String,
-        /// Original source ordinals, including repeated declarations and unknown slots.
-        #[serde(serialize_with = "subresource_indices")]
-        #[schemars(with = "Vec<DecimalU64>")]
-        indices: Vec<u64>,
-        /// Original source field or token-range label within that object.
-        field: String,
-    },
-    /// A directory or standalone input metadata field.
-    Metadata {
-        /// Exact metadata field, including stored occurrence positions.
-        field: String,
-    },
-}
-
-impl SourceLocation {
-    pub(crate) fn key(&self) -> String {
-        match self {
-            Self::Opaque { reason } => format!("o:{}", reason.key()),
-            Self::DataForge {
-                record_index,
-                field,
-            } => format!("d{record_index}:{}:{field}", field.len()),
-            Self::LocalizationLookup { language, selector } => {
-                let code = language.code();
-                format!(
-                    "q{}:{code}{}:{}",
-                    code.len(),
-                    selector.as_str().len(),
-                    selector.as_str()
-                )
-            }
-            Self::ArchiveDirectoryPaths {
-                start_entry_index,
-                end_entry_index,
-            } => format!("a{}:{}", start_entry_index.get(), end_entry_index.get()),
-            Self::ArchiveDirectoryTreePaths {
-                start_entry_index,
-                end_entry_index,
-            } => format!("t{}:{}", start_entry_index.get(), end_entry_index.get()),
-            Self::Subresource {
-                namespace,
-                indices,
-                field,
-            } => {
-                use std::fmt::Write as _;
-                let mut key = format!("s{}:{namespace}{}:", namespace.len(), indices.len());
-                for index in indices {
-                    let _written = write!(&mut key, "{index}.");
-                }
-                let _written = write!(&mut key, "{}:{field}", field.len());
-                key
-            }
-            Self::Metadata { field } => format!("m{}:{field}", field.len()),
-        }
-    }
-}
-
-fn subresource_indices<S: Serializer>(indices: &[u64], serializer: S) -> Result<S::Ok, S::Error> {
-    serializer.collect_seq(indices.iter().copied().map(DecimalU64::new))
-}
-#[expect(
-    clippy::trivially_copy_pass_by_ref,
-    reason = "Serde field serializers receive references"
-)]
-fn language_code<S: Serializer>(language: &Language, serializer: S) -> Result<S::Ok, S::Error> {
-    serializer.serialize_str(language.code())
-}
-
 /// A registered observed use and its captured encryption evidence.
 #[derive(Debug, Clone)]
 pub struct SourceUse {
@@ -310,7 +201,8 @@ pub struct SourceUseDescription {
     pub(crate) source: PhysicalSourceRef,
     pub(crate) scope: InputScope,
     pub(crate) role: SourceUseRole,
-    pub(crate) location: SourceLocation,
+    #[schemars(with = "SourceLocation")]
+    pub(crate) location: RetainedLocation,
     pub(crate) effective_encryption: SourceEncryptionState,
 }
 
@@ -340,9 +232,15 @@ impl SourceUseDescription {
     }
 
     /// Returns the retained source coordinate or its explicit omission.
+    ///
+    /// A compact coordinate materializes its owned view on the first call.
     #[must_use]
-    pub const fn location(&self) -> &SourceLocation {
-        &self.location
+    pub fn location(&self) -> &SourceLocation {
+        self.location.original()
+    }
+
+    pub(crate) const fn is_opaque(&self) -> bool {
+        self.location.is_opaque()
     }
 
     /// Returns the effective encryption captured for this observation's original byte domain.

@@ -9,7 +9,7 @@ use serde::{Serialize, Serializer};
 
 use crate::projection_schema;
 use crate::source_inventory::SourceEncryptionState;
-use crate::source_use::{SourceLocation, SourceUse, SourceUseDescription, SourceUseRef};
+use crate::source_use::{SourceUse, SourceUseDescription, SourceUseRef};
 
 #[path = "field_origin_refs.rs"]
 mod refs;
@@ -165,7 +165,7 @@ impl OriginFacts {
             .into_iter()
             .filter(|source| source.role().contributes());
         for source in contributing {
-            if matches!(source.location(), SourceLocation::Opaque { .. }) {
+            if source.is_opaque() {
                 complete = false;
                 unknown = true;
             }

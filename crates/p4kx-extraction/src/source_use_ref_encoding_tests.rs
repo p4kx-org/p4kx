@@ -5,6 +5,7 @@ use std::collections::BTreeSet;
 
 use crate::source_details::SourceCoordinateOmission;
 use crate::source_inventory::PhysicalSourceRef;
+use crate::source_use::LocationView;
 use crate::{DecimalU64, InputScope, Language, SourceEvidenceError, SourceInput, SourceLocation};
 use crate::{SourceScope, SourceUse, SourceUseRef, SourceUseRole, SourceUses, SourceValue};
 
@@ -30,7 +31,12 @@ fn compact_coordinates_distinguish_source_use_keys() {
             ] {
                 for location in &locations {
                     assert!(
-                        observed.insert(encode(&source, scope, role, location)),
+                        observed.insert(encode(
+                            &source,
+                            scope,
+                            role,
+                            LocationView::Original(location)
+                        )),
                         "each distinct original coordinate has a distinct key"
                     );
                 }
@@ -112,7 +118,7 @@ fn common_xml_locations_use_shorter_ids_and_preserve_exact_spelling() {
         &source,
         InputScope::Payload,
         SourceUseRole::Conversion,
-        &authored,
+        LocationView::Original(&authored),
     );
     let old = "c6:a0.1.2pcsx273907.13.:@pos";
     assert_eq!(
@@ -131,7 +137,7 @@ fn common_xml_locations_use_shorter_ids_and_preserve_exact_spelling() {
         &source,
         InputScope::Payload,
         SourceUseRole::Conversion,
-        &uppercase,
+        LocationView::Original(&uppercase),
     );
     assert_eq!(
         encoded.as_str(),

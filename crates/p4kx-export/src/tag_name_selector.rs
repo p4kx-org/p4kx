@@ -53,9 +53,7 @@ impl TagNameSelector {
             return Err(SourceEvidenceError::ForeignEvidence.into());
         }
         let (equal, selected, role) = self.decision(name)?;
-        let input = origins
-            .dataforge
-            .at(selected.description().location().clone(), role)?;
+        let input = origins.dataforge.at_observed_location(selected, role)?;
         into.try_reserve(1)
             .map_err(CatalogError::SourceUseAllocation)?;
         into.push(input);

@@ -17,8 +17,10 @@ use crate::source_inventory::{
 };
 use crate::source_registration;
 use crate::source_scope::SourceInput;
+use crate::source_use::storage::RetainedLocation;
 use crate::source_use::{
-    InputScope, SourceLocation, SourceUse, SourceUseDescription, SourceUseRef, SourceUseRole,
+    InputScope, LocationView, SourceLocation, SourceUse, SourceUseDescription, SourceUseRef,
+    SourceUseRole,
 };
 use crate::source_use_ref_encoding;
 use crate::source_value::{SourceValue, SourcedValue};
@@ -65,7 +67,7 @@ impl UseReferences {
         source: &PhysicalSourceRef,
         scope: InputScope,
         role: SourceUseRole,
-        location: &SourceLocation,
+        location: LocationView<'_>,
     ) -> SourceUseRef {
         if matches!(self, Self::CompactCoordinates) {
             return source_use_ref_encoding::encode(source, scope, role, location);
@@ -286,16 +288,51 @@ impl SourceRegistry {
         role: SourceUseRole,
         encryption: SourceEncryptionState,
     ) -> SourceUse {
-        let id = self
-            .use_references
-            .reference(source, scope, role, &location);
+        let id =
+            self.use_references
+                .reference(source, scope, role, LocationView::Original(&location));
+        self.retain_use(id, source, scope, role, encryption, || {
+            RetainedLocation::new(location)
+        })
+    }
+
+    pub(crate) fn repeat_use(
+        &mut self,
+        original: &SourceUseDescription,
+        role: SourceUseRole,
+    ) -> SourceUse {
+        let id = self.use_references.reference(
+            original.source(),
+            original.scope(),
+            role,
+            original.location.view(),
+        );
+        self.retain_use(
+            id,
+            original.source(),
+            original.scope(),
+            role,
+            original.effective_encryption(),
+            || original.location.clone(),
+        )
+    }
+
+    fn retain_use(
+        &mut self,
+        id: SourceUseRef,
+        source: &PhysicalSourceRef,
+        scope: InputScope,
+        role: SourceUseRole,
+        encryption: SourceEncryptionState,
+        location: impl FnOnce() -> RetainedLocation,
+    ) -> SourceUse {
         let description = self.uses.entry(id.clone()).or_insert_with(|| {
             Arc::new(SourceUseDescription {
-                id: id.clone(),
+                id,
                 source: source.clone(),
                 scope,
                 role,
-                location,
+                location: location(),
                 effective_encryption: encryption,
             })
         });

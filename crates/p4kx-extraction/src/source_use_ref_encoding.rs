@@ -4,13 +4,15 @@
 use std::fmt::Write as _;
 
 use crate::source_inventory::PhysicalSourceRef;
-use crate::source_use::{InputScope, SourceLocation, SourceUseRef, SourceUseRole};
+use crate::source_use::{
+    InputScope, LocationView, SourceLocation, SourceUseRef, SourceUseRole, Subresource,
+};
 
 pub(crate) fn encode(
     source: &PhysicalSourceRef,
     scope: InputScope,
     role: SourceUseRole,
-    location: &SourceLocation,
+    location: LocationView<'_>,
 ) -> SourceUseRef {
     let scope = match scope {
         InputScope::Payload => 'p',
@@ -29,7 +31,10 @@ pub(crate) fn encode(
     let mut key = String::from("c");
     append_counted(&mut key, source.as_str());
     let _written = write!(key, "{scope}{role}");
-    append_location(&mut key, location);
+    match location {
+        LocationView::Original(original) => append_location(&mut key, original),
+        LocationView::Subresource(site) => append_subresource(&mut key, &site),
+    }
     SourceUseRef::registered(key)
 }
 
@@ -75,23 +80,37 @@ fn append_location(key: &mut String, location: &SourceLocation) {
             namespace,
             indices,
             field,
-        } => {
-            if namespace == "xml" && append_xml_location(key, indices, field) {
-                return;
-            }
-            key.push('s');
-            append_namespace(key, namespace);
-            for index in indices {
-                let _written = write!(key, "{index}.");
-            }
-            key.push(':');
-            key.push_str(field);
-        }
+        } => append_subresource(
+            key,
+            &Subresource {
+                namespace,
+                indices,
+                field,
+            },
+        ),
         SourceLocation::Metadata { field } => {
             key.push('m');
             key.push_str(field);
         }
     }
+}
+
+fn append_subresource(key: &mut String, site: &Subresource<'_>) {
+    let Subresource {
+        namespace,
+        indices,
+        field,
+    } = site;
+    if *namespace == "xml" && append_xml_location(key, indices, field) {
+        return;
+    }
+    key.push('s');
+    append_namespace(key, namespace);
+    for index in *indices {
+        let _written = write!(key, "{index}.");
+    }
+    key.push(':');
+    key.push_str(field);
 }
 
 fn append_xml_location(key: &mut String, indices: &[u64], field: &str) -> bool {
