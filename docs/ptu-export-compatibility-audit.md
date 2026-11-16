@@ -49,7 +49,16 @@ document is absent in `13189690` and contains 39 declarations in `13201184`.
 The ActionMap JSON read the added action description and the empty bindings from
 their own source. A scoped Catalog witness compared 57 typed item reward
 occurrences from one selected `13201184` ContractGenerator to their original
-outcomes, amounts and physical references.
+outcomes, amounts and physical references. The normal `interior source` CLI
+verified the selected RoomMapping and connector documents in both PTUs directly
+against the retained CryXmlB node, attribute and string tables. The semantic
+owner link resolves to the same-container SOC entity.
+
+An exact Item Filter verified the old and new purchase-name Locale, its
+DataForge selector and the separate unchanged attachable name. The normal
+Catalog writer refused the older filtered export with one `shopInventories`
+`MalformedSource` projection failure. The purchase-name witnesses use explicit
+diagnostic Catalogs with independent source checks for the selected Item.
 
 The raw source receipts are private. This section records source structure, exact scope counts
 and implementation ownership. The complete packaged export and 16 GiB system acceptance are
