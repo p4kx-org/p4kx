@@ -3,10 +3,12 @@
 
 use p4kx_extraction::{CancelToken, DataForge, Guid, RecordTree, StructValue};
 
+use super::display;
 use super::manufacturer_definition::{
     Manufacturer, ManufacturerDefinition, ManufacturerLocalization,
 };
 use crate::CatalogError;
+use crate::build::original_input::OriginalCatalogInput;
 use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::original::{ExampleBodyReceipt, OriginalFlowFields};
@@ -34,26 +36,26 @@ pub(crate) fn read<'source>(
     let original = OriginalFlowFields::read(&scope, cancel)?;
     let capture = TemplateFieldCapture::new(&original, input, admission)?;
     let mut notes = Vec::new();
-    if tree.guid() == Guid::default() {
-        notes.push(
-            FieldError::Malformed {
-                source_type: tree.type_name().to_owned(),
-                field: "$guid".to_owned(),
-                expected: "a non-nil Record identity",
-            }
-            .with_body(ExampleBodyReceipt::technical(
-                input,
-                admission.subject().clone(),
-                "$guid",
-            )?),
-        );
-    }
+    check_guid(tree, input, admission, &mut notes)?;
     let context = projection
         .origins()
         .record(tree.record_index())
         .with_cancel(cancel);
     let fields = CatalogFields::observed(tree.root(), "", &context, &capture)?;
-    fields.check_observed(&["Code", "Localization"], &mut notes)?;
+    fields.check_observed(
+        &[
+            "Code",
+            "Localization",
+            "AudioManufacturerTag",
+            "BuildingBlocksStyle",
+            "DashboardCanvasConfig",
+            "LightAmplification",
+            "Logo",
+            "LogoFullColor",
+            "LogoSimplifiedWhite",
+        ],
+        &mut notes,
+    )?;
     let localization = fields
         .structure("Localization", &mut notes)?
         .try_map(|source| {
@@ -70,6 +72,13 @@ pub(crate) fn read<'source>(
         source: CanonicalRecordHeader::read(tree, projection.origins())?,
         code: fields.text("Code", &mut notes)?,
         localization,
+        audio_manufacturer_tag: fields.reference("AudioManufacturerTag", &mut notes)?,
+        building_blocks_style: fields.reference("BuildingBlocksStyle", &mut notes)?,
+        dashboard_canvas_config: fields.reference("DashboardCanvasConfig", &mut notes)?,
+        light_amplification: fields.reference("LightAmplification", &mut notes)?,
+        logo: fields.text("Logo", &mut notes)?,
+        logo_full_color: fields.text("LogoFullColor", &mut notes)?,
+        logo_simplified_white: fields.text("LogoSimplifiedWhite", &mut notes)?,
     };
     Ok(ManufacturerRead {
         value: Manufacturer {
@@ -81,6 +90,29 @@ pub(crate) fn read<'source>(
     })
 }
 
+fn check_guid(
+    tree: &RecordTree<'_>,
+    input: &OriginalCatalogInput<'_, '_>,
+    admission: &RecordObservation<'_, '_>,
+    notes: &mut Vec<FieldError>,
+) -> Result<(), CatalogError> {
+    if tree.guid() == Guid::default() {
+        notes.push(
+            FieldError::Malformed {
+                source_type: tree.type_name().to_owned(),
+                field: "$guid".to_owned(),
+                expected: "a non-nil Record identity",
+            }
+            .with_body(ExampleBodyReceipt::technical(
+                input,
+                admission.subject().clone(),
+                "$guid",
+            )?),
+        );
+    }
+    Ok(())
+}
+
 fn localization<'source>(
     source: &StructValue<'source>,
     record_index: u32,
@@ -90,7 +122,15 @@ fn localization<'source>(
     notes: &mut Vec<FieldError>,
 ) -> Result<ManufacturerLocalization<'source>, CatalogError> {
     let fields = CatalogFields::observed(source, "Localization", context, capture)?;
-    fields.check_observed(&["Name", "Description"], notes)?;
+    fields.check_observed(
+        &["Name", "Description", "ShortName", "displayFeatures"],
+        notes,
+    )?;
+    let display_features = fields
+        .structure("displayFeatures", notes)?
+        .try_map(|source| {
+            display::read(source, record_index, projection, context, capture, notes)
+        })?;
     Ok(ManufacturerLocalization {
         source_type: fields.source_type()?,
         name: projection.name(
@@ -103,6 +143,12 @@ fn localization<'source>(
             record_index,
             "Localization.Description",
         )?,
+        short_name: projection.name(
+            fields.locale("ShortName", notes)?,
+            record_index,
+            "Localization.ShortName",
+        )?,
+        display_features,
     })
 }
 

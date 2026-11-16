@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+#[path = "manufacturer_v3_display_features.rs"]
+mod display_features;
+
 use p4kx_export::{CatalogPublicationMode, Filter, Kind};
 use p4kx_testkit::{DataForgeBuilder, TestStruct};
 use serde_json::{Value, json};

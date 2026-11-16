@@ -28038,14 +28038,38 @@
       ],
       "type": "object"
     },
+    "ManufacturerAudioTrigger": {
+      "properties": {
+        "audioTrigger": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "audioTrigger",
+        "sourceType"
+      ],
+      "type": "object"
+    },
     "ManufacturerDefinition": {
       "description": "One physical Manufacturer definition with directly sourced authored facts.",
       "properties": {
+        "audioManufacturerTag": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "buildingBlocksStyle": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
         "className": {
           "$ref": "#/$defs/SourcedValueOfstring"
         },
         "code": {
           "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "dashboardCanvasConfig": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
         },
         "fileName": {
           "$ref": "#/$defs/SourcedValueOfstring"
@@ -28053,8 +28077,20 @@
         "guid": {
           "$ref": "#/$defs/SourcedValueOfGuid"
         },
+        "lightAmplification": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
         "localization": {
           "$ref": "#/$defs/SourcedValueOfManufacturerLocalization"
+        },
+        "logo": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "logoFullColor": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "logoSimplifiedWhite": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "metadataTag": {
           "$ref": "#/$defs/SourcedValueOfstring"
@@ -28073,16 +28109,74 @@
         }
       },
       "required": [
+        "audioManufacturerTag",
+        "buildingBlocksStyle",
         "className",
         "code",
+        "dashboardCanvasConfig",
         "fileName",
         "guid",
+        "lightAmplification",
         "localization",
+        "logo",
+        "logoFullColor",
+        "logoSimplifiedWhite",
         "metadataTag",
         "recordIndex",
         "recordName",
         "recordPath",
         "sourceType"
+      ],
+      "type": "object"
+    },
+    "ManufacturerDisplayFeatures": {
+      "properties": {
+        "callout1": {
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "x-gameText": true
+        },
+        "callout2": {
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "x-gameText": true
+        },
+        "callout3": {
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "x-gameText": true
+        },
+        "frontendBackground": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "history": {
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "x-gameText": true
+        },
+        "locationAudioPlayTrigger": {
+          "$ref": "#/$defs/SourcedValueOfManufacturerAudioTrigger"
+        },
+        "locationAudioStopTrigger": {
+          "$ref": "#/$defs/SourcedValueOfManufacturerAudioTrigger"
+        },
+        "logoSimplifiedWhite": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "uiPriority": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        }
+      },
+      "required": [
+        "callout1",
+        "callout2",
+        "callout3",
+        "frontendBackground",
+        "history",
+        "locationAudioPlayTrigger",
+        "locationAudioStopTrigger",
+        "logoSimplifiedWhite",
+        "sourceType",
+        "uiPriority"
       ],
       "type": "object"
     },
@@ -28093,7 +28187,13 @@
           "$ref": "#/$defs/SourcedValueOfGameTextRef",
           "x-gameText": true
         },
+        "displayFeatures": {
+          "$ref": "#/$defs/SourcedValueOfManufacturerDisplayFeatures"
+        },
         "name": {
+          "$ref": "#/$defs/SourcedValueOfPublicNameRef"
+        },
+        "shortName": {
           "$ref": "#/$defs/SourcedValueOfPublicNameRef"
         },
         "sourceType": {
@@ -28102,7 +28202,9 @@
       },
       "required": [
         "description",
+        "displayFeatures",
         "name",
+        "shortName",
         "sourceType"
       ],
       "type": "object"
@@ -92040,6 +92142,266 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/MaelstromEvent"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfManufacturerAudioTrigger": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ManufacturerAudioTrigger"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfManufacturerDisplayFeatures": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ManufacturerDisplayFeatures"
               }
             }
           }

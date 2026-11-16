@@ -17,10 +17,19 @@ pub(super) fn manufacturer() -> Value {
         "recordIndex": source_values::present(json!(0)),
         "sourceType": source_values::present(json!("SCItemManufacturer")),
         "code": source_values::present(json!("ACAS")),
+        "audioManufacturerTag": source_values::source(SourceValue::Absent),
+        "buildingBlocksStyle": source_values::source(SourceValue::Absent),
+        "dashboardCanvasConfig": source_values::source(SourceValue::Absent),
+        "lightAmplification": source_values::source(SourceValue::Absent),
+        "logo": source_values::source(SourceValue::Absent),
+        "logoFullColor": source_values::source(SourceValue::Absent),
+        "logoSimplifiedWhite": source_values::source(SourceValue::Absent),
         "localization": source_values::present(json!({
             "sourceType": source_values::present(json!("SCItemLocalization")),
             "name": source_values::present(json!("name:22:@manufacturer_NameACAS")),
-            "description": source_values::source(SourceValue::Null)
+            "description": source_values::source(SourceValue::Null),
+            "shortName": source_values::source(SourceValue::Absent),
+            "displayFeatures": source_values::source(SourceValue::Absent)
         }))
     }]})
 }

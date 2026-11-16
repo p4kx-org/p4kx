@@ -38,17 +38,32 @@ is a direct conservative filter index over actual used inputs, independently of 
 | `metadataTag` | Raw Record-table tag: v6 absent, v8 sentinel null, actual empty text present |
 | `code` | Raw `Code` String, including an authored empty string; no enum/code/name fallback |
 | `localization` | Actual owned `Localization` state, including absent/null/unreadable/invalid |
+| `audioManufacturerTag`, `buildingBlocksStyle`, `dashboardCanvasConfig`, `lightAmplification` | Original Record references and admitted target-header evidence |
+| `logo`, `logoFullColor`, `logoSimplifiedWhite` | Exact authored asset strings, including stored empty strings |
 
-A present `localization.value` contains sourced `sourceType`, `name` and `description`.
-The type is the actual owned struct type. `Name` and `Description` are authored Locale fields;
-wrong concrete values are not accepted as literal text. Missing/unreadable parents do not acquire
-invented child fields. Unsupported additional declared fields retain exact diagnostic locations.
-The reader uses the shared Catalog Record/field state and source-binding implementation.
+A present `localization.value` contains sourced `sourceType`, `name`, `description`,
+`shortName` and `displayFeatures`. The name, short name and description use the actual owned
+Locale declarations. A present `displayFeatures.value` retains the actual `sourceType`
+and each of these independent values.
+
+| Display field | Original source |
+|---|---|
+| `callout1`, `callout2`, `callout3`, `history` | Authored Locale keys in the protected text register |
+| `frontendBackground`, `logoSimplifiedWhite` | Exact authored asset strings |
+| `locationAudioPlayTrigger`, `locationAudioStopTrigger` | Owned blocks with actual `sourceType` and stored `audioTrigger` string |
+| `uiPriority` | Original signed Int32 |
+
+Asset and audio strings retain their spelling, case and whitespace. They identify authored
+inputs. The reference fields expose source reference status and admitted target headers.
+Their targets do not acquire a catalog dataset or a runtime interpretation from the field
+name. Missing and unreadable parents give no child payload. Unknown additional declarations
+still produce exact field diagnostics and can prevent normal publication.
 
 ## Canonical text and protection
 
 `localization.value.name.value` references `texts.publicNames[].id.value`.
-`localization.value.description.value` references `texts.gameTexts[].id.value`.
+`localization.value.shortName.value` uses the same public register. The description, callouts and
+history use `texts.gameTexts[].id.value`.
 Both the description owner and protected reference/target retain `x-gameText`; the public Name is
 not hidden when a key is also used as a protected Description. There are no duplicated inline
 `key`/`en`/`de` objects or flat secondary name/description fields.
