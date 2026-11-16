@@ -105,6 +105,7 @@ fn check_compressed_replay(fixture: &Fixture, expected: &[u8]) -> TestResult {
 
 fn check_sources(catalog: &Value) -> TestResult {
     let sources = origin::at(catalog, "/definitions/weaponAnimationSources")?;
+    check_shared_tag_selection(catalog, sources)?;
     let statuses: Vec<_> = origin::rows(sources, "/fragmentSelectors")?
         .iter()
         .filter_map(|row| row.pointer("/status/value").and_then(Value::as_str))
@@ -142,6 +143,41 @@ fn check_sources(catalog: &Value) -> TestResult {
         has_proc_layer,
         "uninterpreted original procedural layers survive"
     );
+    Ok(())
+}
+
+fn check_shared_tag_selection(catalog: &Value, sources: &Value) -> TestResult {
+    let scopes = origin::rows(sources, "/scopes")?;
+    let [first, rest @ ..] = scopes else {
+        return Err("physical ADB tag scopes".into());
+    };
+    assert_eq!(rest.len(), 2, "three databases declare the shared tag root");
+    let declarations = origin::rows(first, "/tags/declarations")?;
+    assert_eq!(declarations.len(), 1, "the original imported tag");
+    let imports = origin::rows(first, "/tags/imports")?;
+    assert_eq!(imports.len(), 1, "the original shared import");
+    let uses = origin::rows(catalog, "/provenance/uses")?;
+    for scope in scopes {
+        assert_eq!(
+            origin::rows(scope, "/tags/declarations")?,
+            declarations,
+            "same physical definition retains the same declaration rows"
+        );
+        assert_eq!(
+            origin::rows(scope, "/tags/imports")?,
+            imports,
+            "each scope preserves its original matching import"
+        );
+        let database = origin::at(scope, "/database/inputRef")?;
+        let coverage = origin::rows(scope, "/tags/coverage/sourceUsesRefs")?;
+        assert!(
+            uses.iter().any(|row| {
+                row.get("source") == Some(database)
+                    && row.get("id").is_some_and(|id| coverage.contains(id))
+            }),
+            "the coverage includes the arriving database's own selector"
+        );
+    }
     Ok(())
 }
 
