@@ -191,6 +191,8 @@ pub use animation_folders::{
     AnimationFolders, animation_choice, character_animations,
     character_animations_with_archive_sources,
 };
+#[cfg(feature = "verification")]
+pub use armour::FaceRotationComparison;
 pub use armour::{
     Armour, ArmourPart, BodyVariant, CharacterAnimations, Expressions, ForgeItems, Head, HeadError,
     HeadItems, HeadMaterial, Look, LowerMorphSources, MAX_ANIMATION_VALUES, MAX_DNA_RIG_LEN,

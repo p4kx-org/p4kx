@@ -29,7 +29,7 @@ sha2.workspace = true
 thiserror.workspace = true
 
 [features]
-verification = []
+verification = ["p4kx-character/verification"]
 
 [dev-dependencies]
 p4kx-assembly = { workspace = true, features = ["verification"] }

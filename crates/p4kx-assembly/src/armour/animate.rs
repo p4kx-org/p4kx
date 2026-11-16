@@ -4,9 +4,16 @@
 #[path = "animate_origins.rs"]
 mod origins;
 
+#[cfg(feature = "verification")]
+#[path = "face_rotation_verification.rs"]
+mod verification;
+#[cfg(feature = "verification")]
+pub use self::verification::FaceRotationComparison;
+
 use std::collections::HashSet;
 use std::io::Write;
 
+use p4kx_character::RigLogic;
 use p4kx_gltf::{
     GlbOptions, GlbSummary, GltfError, SampledAnimation, SampledWeights, TextureLoader,
     write_rigged_glb_animated, write_rigged_glb_animated_with,
@@ -141,6 +148,34 @@ fn refused(
     }
 }
 
+#[derive(Default)]
+struct FaceTracks<'animation> {
+    controls: Vec<Control<'animation>>,
+    driven: Vec<u32>,
+    skipped: Vec<u32>,
+}
+
+fn face_tracks<'animation>(
+    animation: &'animation Animation,
+    logic: &RigLogic,
+    bones: &HashSet<u32>,
+) -> FaceTracks<'animation> {
+    let mut tracks = FaceTracks::default();
+    for track in &animation.tracks {
+        match (logic.control_by_hash(track.controller_id), values_of(track)) {
+            (Some(control), Some((frames, values))) => {
+                tracks.driven.push(track.controller_id);
+                if control != 0 {
+                    tracks.controls.push((control, frames, values));
+                }
+            }
+            (None, _) if bones.contains(&track.controller_id) => {}
+            _ => tracks.skipped.push(track.controller_id),
+        }
+    }
+    tracks
+}
+
 impl Armour {
     /// Returns the part with the rig that animates the face, and its index among the parts.
     fn face_part(&self) -> Option<(usize, &ArmourPart, &FaceLink)> {
@@ -259,21 +294,11 @@ impl Armour {
         (part, link): (usize, &FaceLink),
     ) -> Result<Option<Fitted>, Refusal> {
         let logic = rig.face.logic();
-        let mut controls: Vec<Control<'_>> = Vec::new();
-        let mut driven = Vec::new();
-        let mut skipped = Vec::new();
-        for track in &animation.tracks {
-            match (logic.control_by_hash(track.controller_id), values_of(track)) {
-                (Some(control), Some((frames, values))) => {
-                    driven.push(track.controller_id);
-                    if control != 0 {
-                        controls.push((control, frames, values));
-                    }
-                }
-                (None, _) if bones.contains(&track.controller_id) => {}
-                _ => skipped.push(track.controller_id),
-            }
-        }
+        let FaceTracks {
+            controls,
+            driven,
+            mut skipped,
+        } = face_tracks(animation, logic, bones);
         if controls.is_empty() {
             return Ok(None);
         }

@@ -25,22 +25,33 @@ pub(super) fn evaluate(
     controls: &[Control<'_>],
     frames: &[u16],
 ) -> Option<Vec<FacePose>> {
-    let poses: Vec<FacePose> = frames
+    let poses = evaluate_frames(face.logic().controls(), controls, frames, |values| {
+        face.pose(values)
+    });
+    poses.iter().all(is_finite).then_some(poses)
+}
+
+pub(super) fn evaluate_frames<T: Send>(
+    count: usize,
+    controls: &[Control<'_>],
+    frames: &[u16],
+    pose: impl Fn(&[f32]) -> T + Sync,
+) -> Vec<T> {
+    frames
         .par_iter()
         .map(|&frame| {
-            let mut values = vec![0.0_f32; face.logic().controls()];
+            let mut values = vec![0.0_f32; count];
             for &(control, key_frames, key_values) in controls {
                 if let Some(slot) = values.get_mut(control) {
                     *slot = value_at(key_frames, key_values, frame);
                 }
             }
-            face.pose(&values)
+            pose(&values)
         })
-        .collect();
-    poses.iter().all(is_finite).then_some(poses)
+        .collect()
 }
 
-fn is_finite(pose: &FacePose) -> bool {
+pub(super) fn is_finite(pose: &FacePose) -> bool {
     pose.blendshapes
         .iter()
         .chain(pose.translations.iter().flatten())
@@ -163,7 +174,7 @@ fn line_fits(
 
 /// The pose of a joint with the rest pose `rest` and the rotation `delta` from the rig: the delta
 /// is multiplied on the right, so it turns in the joint's own axes.
-fn turned(rest: [f32; 4], delta: [f32; 4]) -> [f32; 4] {
+pub(super) fn turned(rest: [f32; 4], delta: [f32; 4]) -> [f32; 4] {
     multiply_quaternions(rest, delta)
 }
 
@@ -172,7 +183,17 @@ pub(super) fn joint_samples(
     bones: &[Bone],
     poses: &[FacePose],
     link: &FaceLink,
+    evidence: (&[u32], &mut Vec<u32>),
+) -> Vec<SampledBone> {
+    joint_samples_with(bones, poses, link, evidence, turned)
+}
+
+pub(super) fn joint_samples_with(
+    bones: &[Bone],
+    poses: &[FacePose],
+    link: &FaceLink,
     (hashes, skipped): (&[u32], &mut Vec<u32>),
+    rotation: impl Fn([f32; 4], [f32; 4]) -> [f32; 4],
 ) -> Vec<SampledBone> {
     let mut out = Vec::new();
     for (joint, &bone) in link.joints.iter().enumerate() {
@@ -207,7 +228,7 @@ pub(super) fn joint_samples(
                     .get(joint)
                     .copied()
                     .unwrap_or([0.0, 0.0, 0.0, 1.0]);
-                turned(rest.relative.rotation, delta)
+                rotation(rest.relative.rotation, delta)
             })
             .collect();
         out.push(SampledBone::new(bone, translations, rotations));

@@ -4,6 +4,9 @@
 //! The face of a story character's own head: the joints of its `.RigLogic` file move with a face
 //! animation, and the blendshapes of its geometry file are its expressions.
 
+#[path = "face_rotation_verification.rs"]
+mod face_rotation_verification;
+
 use std::error::Error;
 
 use p4kx_assembly::{

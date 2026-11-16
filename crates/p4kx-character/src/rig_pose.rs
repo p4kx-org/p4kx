@@ -159,6 +159,23 @@ impl FaceRig {
 
     /// Evaluates the rig into `pose`, reusing its buffers.
     pub fn pose_into(&self, controls: &[f32], pose: &mut FacePose) {
+        self.fill_pose(controls, pose, |_| {});
+    }
+
+    /// Evaluates one pose and visits its parent-local Euler radians in joint order.
+    #[cfg(feature = "verification")]
+    #[must_use]
+    pub fn pose_observing_angles(
+        &self,
+        controls: &[f32],
+        observe: impl FnMut([f32; 3]),
+    ) -> FacePose {
+        let mut pose = FacePose::default();
+        self.fill_pose(controls, &mut pose, observe);
+        pose
+    }
+
+    fn fill_pose(&self, controls: &[f32], pose: &mut FacePose, mut observe: impl FnMut([f32; 3])) {
         pose.blendshapes.resize(self.logic.blendshapes(), 0.0);
         self.logic.activations_into(controls, &mut pose.blendshapes);
         pose.translations.clear();
@@ -168,6 +185,7 @@ impl FaceRig {
             let moved = sum(&self.translations, slice.clone(), &pose.blendshapes);
             let turned = sum(&self.rotations, slice, &pose.blendshapes);
             pose.translations.push(moved);
+            observe(turned);
             pose.rotations.push(euler_quaternion(turned));
         }
     }
