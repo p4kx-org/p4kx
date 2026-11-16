@@ -12,9 +12,9 @@ use crate::error::ToolError;
 use crate::forge_origins::{EvidenceError, ForgeOrigins};
 use crate::forge_shapes::ForgeFieldOrigins;
 
-use super::super::definition_origins::Definition;
 use super::super::surveys::{self, SurveyMode};
 use super::Selection;
+use p4kx_assembly::audio::AtlTriggerOrigins as Definition;
 
 #[path = "audio_resolve_break_origins.rs"]
 mod breaks;
@@ -46,7 +46,7 @@ pub(super) fn capture(
         .any(|link| matches!(link.reason(), BreakReason::NoSoundbank))
         .then(|| {
             let survey = page.index.survey(page.archive, AudioSurveyKind::Soundbanks);
-            surveys::capture(page.archive, &uses, survey, mode)
+            surveys::capture(&uses, survey, mode)
         })
         .transpose()?;
     let context = Context {

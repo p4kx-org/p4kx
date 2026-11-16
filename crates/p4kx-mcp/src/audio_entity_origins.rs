@@ -12,13 +12,13 @@ use crate::error::ToolError;
 use crate::forge_origins::{EvidenceError, ForgeOrigins};
 use crate::forge_shapes::ForgeFieldOrigins;
 
-use super::super::definition_origins::Definition;
 use super::super::event_origins::AudioEventOrigins;
 use super::super::occurrence_origins as occurrence;
 use super::super::surveys::{self, SurveyMode};
 use super::Listing;
 use super::position_error;
 use super::record_origins as record;
+use p4kx_assembly::audio::AtlTriggerOrigins as Definition;
 
 pub(super) fn capture(
     listing: &Listing<'_, '_, '_>,
@@ -36,12 +36,7 @@ pub(super) fn capture(
         .survey(listing.archive, AudioSurveyKind::Soundbanks);
     let bank_complete = bank_survey.as_ref().is_some_and(AudioSurvey::complete);
     let bank = if needs_bank_absence(listing, rows) {
-        Some(surveys::capture(
-            listing.archive,
-            &output.uses,
-            bank_survey,
-            mode,
-        )?)
+        Some(surveys::capture(&output.uses, bank_survey, mode)?)
     } else {
         None
     };
@@ -87,12 +82,7 @@ fn survey_for_missing_atl(
         let survey = listing
             .index
             .survey(listing.archive, AudioSurveyKind::AtlDefinitions);
-        Ok(Some(surveys::capture(
-            listing.archive,
-            &output.uses,
-            survey,
-            mode,
-        )?))
+        Ok(Some(surveys::capture(&output.uses, survey, mode)?))
     } else {
         Ok(None)
     }

@@ -9,10 +9,10 @@ use crate::error::ToolError;
 use crate::forge_origins::{EvidenceError, ForgeOrigins};
 use crate::forge_shapes::ForgeFieldOrigins;
 
-use super::super::definition_origins::Definition;
 use super::super::event_origins::AudioEventOrigins;
 use super::super::surveys::{self, SurveyMode};
 use super::UsersState;
+use p4kx_assembly::audio::AtlTriggerOrigins as Definition;
 
 #[path = "audio_search_user_origins.rs"]
 mod user_origins;
@@ -44,7 +44,7 @@ pub(super) fn capture(page: &Page<'_, '_, '_, '_>) -> Result<ForgeFieldOrigins, 
         .iter()
         .flat_map(|r| &r.events)
         .any(|event| event.soundbank_count == 0)
-        .then(|| surveys::capture(page.archive, &output.uses, bank_survey, page.mode))
+        .then(|| surveys::capture(&output.uses, bank_survey, page.mode))
         .transpose()?;
     let events = AudioEventOrigins::new(
         page.archive,
@@ -81,7 +81,7 @@ fn navigation(page: &Page<'_, '_, '_, '_>, output: &mut ForgeOrigins) -> Result<
     let catalog = page
         .index
         .survey(page.archive, AudioSurveyKind::AtlDefinitions);
-    let census = surveys::capture(page.archive, &output.uses, catalog, page.mode)?;
+    let census = surveys::capture(&output.uses, catalog, page.mode)?;
     output.put("trigger_count", census.clone())?;
     output.put("total", census.clone())?;
     if page.cursor {

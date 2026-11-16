@@ -6,6 +6,7 @@
 
 mod atl;
 mod atl_definitions;
+mod atl_trigger_origins;
 mod banks;
 mod breaks;
 mod cache;
@@ -45,6 +46,7 @@ pub use p4kx_extraction::sound::wwise_path::ATL_FOLDER;
 
 pub use atl::{AtlTrigger, WwiseEvent};
 pub use atl_definitions::AtlDefinitions;
+pub use atl_trigger_origins::AtlTriggerOrigins;
 pub use banks::IndexedSoundbank;
 pub use breaks::{BreakReason, BrokenLink};
 pub use cache::ArchiveAudio;
@@ -58,7 +60,9 @@ pub use export::{
 };
 pub use hirc_path_source::{HircPathOrigins, HircPathSource};
 pub use index::AudioIndex;
-pub use inventory::{AudioCandidate, AudioCandidateState, AudioSurvey, AudioSurveyKind};
+pub use inventory::{
+    AudioCandidate, AudioCandidateState, AudioSurvey, AudioSurveyKind, AudioSurveyProof,
+};
 pub use language::LanguageChoice;
 pub use p4kx_audio::wwise_id;
 pub use references::{

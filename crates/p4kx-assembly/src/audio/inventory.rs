@@ -5,6 +5,11 @@ use p4kx_archive::{Archive, ArchiveInputOrigin, Entry, ObservedEntry, ObservedEn
 
 use super::{AudioFileError, AudioIndex};
 
+#[path = "audio_survey_origins.rs"]
+mod origins;
+
+pub use self::origins::AudioSurveyProof;
+
 /// An independently searched family of audio index inputs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
