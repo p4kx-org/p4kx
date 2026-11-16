@@ -4,9 +4,11 @@
 use std::cmp::Ordering;
 use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
 
+use p4kx_dataforge::{PositionedRecord, RecordTree, TreeBuilder};
 use rayon::prelude::*;
 
 use crate::compare::check_cancel;
+use crate::comparison::RecordSources;
 use crate::field_diff::diff_fields;
 use crate::path_key::cmp_normalised;
 use crate::{
@@ -30,6 +32,7 @@ pub(crate) fn compare_records<'a>(
     forges: DataForges<'a>,
     options: &CompareOptions<'_>,
     progress_so_far: ComparisonProgress,
+    record_sources: &RecordSources,
 ) -> Result<Vec<RecordChange<'a>>, ComparisonError> {
     let (old, new) = rayon::join(|| by_guid(forges.old), || by_guid(forges.new));
     check_cancel(options)?;
@@ -54,7 +57,7 @@ pub(crate) fn compare_records<'a>(
         .into_par_iter()
         .map(|pair| {
             check_cancel(options)?;
-            let change = diff(pair, options);
+            let change = diff(pair, options, record_sources);
             if matches!(pair, Joined::Both(..)) {
                 let finished = done.fetch_add(1, AtomicOrdering::Relaxed).saturating_add(1);
                 if finished.is_multiple_of(PROGRESS_STEP) {
@@ -93,7 +96,7 @@ pub(crate) fn compare_record<'a>(
         (None, Some(new)) => Joined::Added(new),
         _ => return None,
     };
-    diff(pair, &CompareOptions::default())
+    diff(pair, &CompareOptions::default(), &RecordSources::default())
 }
 
 fn by_guid<'a>(forge: &'a DataForge<'a>) -> Vec<Record<'a>> {
@@ -137,7 +140,11 @@ fn join<'a>(old: &[Record<'a>], new: &[Record<'a>]) -> Vec<Joined<'a>> {
     joined
 }
 
-fn diff<'a>(pair: Joined<'a>, options: &CompareOptions<'_>) -> Option<RecordChange<'a>> {
+fn diff<'a>(
+    pair: Joined<'a>,
+    options: &CompareOptions<'_>,
+    sources: &RecordSources,
+) -> Option<RecordChange<'a>> {
     let (old, new) = match pair {
         Joined::Removed(old) => (Some(old), None),
         Joined::Added(new) => (None, Some(new)),
@@ -175,18 +182,72 @@ fn diff<'a>(pair: Joined<'a>, options: &CompareOptions<'_>) -> Option<RecordChan
     else {
         return Some(change);
     };
-    let old_tree = read(old.tree(), RecordSide::Old, &mut change.errors);
-    let new_tree = read(new.tree(), RecordSide::New, &mut change.errors);
-    let (Some(old_tree), Some(new_tree)) = (old_tree, new_tree) else {
+    let Some(fields) = body_fields(&old, &new, sources, &mut change.errors) else {
         return Some(change);
     };
-    change.fields = diff_fields(old_tree.fields(), new_tree.fields());
+    change.fields = fields;
     let differs = !change.fields.is_empty()
         || before.name != after.name
         || before.tag != after.tag
         || before.type_name != after.type_name
         || change.kind() == RecordChangeKind::Moved;
     differs.then_some(change)
+}
+
+fn body_fields<'source>(
+    old: &Record<'source>,
+    new: &Record<'source>,
+    sources: &RecordSources,
+    errors: &mut Vec<RecordError>,
+) -> Option<Vec<crate::FieldChange<'source>>> {
+    let old = read(
+        ReadTree::build(old, sources.old.is_some()),
+        RecordSide::Old,
+        errors,
+    );
+    let new = read(
+        ReadTree::build(new, sources.new.is_some()),
+        RecordSide::New,
+        errors,
+    );
+    let (old, new) = old.zip(new)?;
+    Some(diff_fields(
+        old.tree().fields(),
+        new.tree().fields(),
+        old.positions(),
+        new.positions(),
+    ))
+}
+
+enum ReadTree<'source> {
+    Canonical(RecordTree<'source>),
+    Positioned(PositionedRecord<'source>),
+}
+
+impl<'source> ReadTree<'source> {
+    fn build(record: &Record<'source>, capture: bool) -> Result<Self, DataForgeError> {
+        if capture {
+            TreeBuilder::new()
+                .build_positioned_partial(record)
+                .map(Self::Positioned)
+        } else {
+            record.tree().map(Self::Canonical)
+        }
+    }
+
+    const fn tree(&self) -> &RecordTree<'source> {
+        match self {
+            Self::Canonical(tree) => tree,
+            Self::Positioned(positioned) => positioned.tree(),
+        }
+    }
+
+    const fn positions(&self) -> Option<&PositionedRecord<'source>> {
+        match self {
+            Self::Canonical(_) => None,
+            Self::Positioned(positioned) => Some(positioned),
+        }
+    }
 }
 
 fn state<'a>(record: Record<'a>, record_path: &'a str) -> Result<RecordState<'a>, DataForgeError> {

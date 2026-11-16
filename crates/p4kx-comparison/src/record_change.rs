@@ -103,11 +103,18 @@ impl<'a> RecordState<'a> {
 }
 
 /// One field or array element whose value differs, or that only one side has.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct FieldChange<'a> {
     pub(crate) path: Location<'a>,
     pub(crate) old: Option<ChangedValue<'a>>,
     pub(crate) new: Option<ChangedValue<'a>>,
+    pub(crate) evidence: Option<Box<crate::field_change_evidence::FieldEvidence>>,
+}
+
+impl PartialEq for FieldChange<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.path == other.path && self.old == other.old && self.new == other.new
+    }
 }
 
 impl<'a> FieldChange<'a> {

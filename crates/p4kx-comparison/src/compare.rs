@@ -66,6 +66,16 @@ pub fn compare<'a>(
     dataforges: Option<DataForges<'a>>,
     options: &CompareOptions<'_>,
 ) -> Result<Comparison<'a>, ComparisonError> {
+    compare_inner(old, new, dataforges, options, RecordSources::default())
+}
+
+fn compare_inner<'a>(
+    old: &'a Archive,
+    new: &'a Archive,
+    dataforges: Option<DataForges<'a>>,
+    options: &CompareOptions<'_>,
+    record_sources: RecordSources,
+) -> Result<Comparison<'a>, ComparisonError> {
     check_levels(options, dataforges.is_some())?;
     let (joined, entries_total) = join(old, new, options)?;
     let progress = ComparisonProgress {
@@ -74,7 +84,7 @@ pub fn compare<'a>(
         ..ComparisonProgress::default()
     };
     let records = match dataforges.filter(|_| options.levels.records) {
-        Some(forges) => compare_records(forges, options, progress)?,
+        Some(forges) => compare_records(forges, options, progress, &record_sources)?,
         None => Vec::new(),
     };
     Ok(Comparison {
@@ -87,7 +97,7 @@ pub fn compare<'a>(
             .filter_map(|joined| joined.resolve(old, new))
             .collect(),
         records,
-        record_sources: RecordSources::default(),
+        record_sources,
     })
 }
 
@@ -105,19 +115,20 @@ pub fn compare_with_dataforge_entries<'a>(
     entries: [&DataForgeEntry; 2],
     options: &CompareOptions<'_>,
 ) -> Result<Comparison<'a>, ComparisonError> {
-    let mut comparison = compare(old, new, Some(dataforges), options)?;
-    if options.levels.records {
+    let sources = if options.levels.records {
         let [old_entry, new_entry] = entries;
-        comparison.record_sources = RecordSources::new(
+        RecordSources::new(
             old_entry
                 .origin_of(dataforges.old)
                 .filter(|origin| origin.matches_archive(old)),
             new_entry
                 .origin_of(dataforges.new)
                 .filter(|origin| origin.matches_archive(new)),
-        );
-    }
-    Ok(comparison)
+        )
+    } else {
+        RecordSources::default()
+    };
+    compare_inner(old, new, Some(dataforges), options, sources)
 }
 
 /// Checks that a level is selected, that the Record level has DataForges, and that the

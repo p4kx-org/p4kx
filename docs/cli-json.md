@@ -2864,6 +2864,13 @@ both the Record's struct selector and the selected definition's name. A library 
 supplied only opened DataForges has unknown header encryption. An absent side or tag has no
 field to annotate.
 
+Changed fields use the original paired field positions, even when declarations share a name.
+The `path` retains the declarations used to spell it and the array headers used to select
+its indices. Each present side's `type` and `value` retain their own original storage
+and ancestor selectors. Missing sides and null values have no `value` address to annotate.
+Unbound input or absent positional evidence stays unknown. Unreadable value diagnostics may
+retain partial storage evidence. Resolved Reference members remain unknown individually.
+
 Records are joined by GUID. A Record is `moved` when its record path differs, ignoring case and
 separator kind; its changed fields are listed as well. It is `changed` when its name, its type
 or a field differs. It is `unreadable` when its record path, name, type or fields cannot be read

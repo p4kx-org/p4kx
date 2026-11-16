@@ -62,30 +62,51 @@ pub(crate) fn run(args: &CompareArgs, as_json: bool) -> Result<ExitCode> {
         .map(|(old, new)| dataforges::open_both(old, new))
         .transpose()?;
     let comparison = match (&forge_entries, &forges) {
-        (Some((old_entry, new_entry)), Some((before, after))) => compare_with_dataforge_entries(
+        (Some((old_entry, new_entry)), Some((before, after)))
+            if as_json || args.report.is_some() =>
+        {
+            compare_with_dataforge_entries(
+                &old,
+                &new,
+                DataForges {
+                    old: before,
+                    new: after,
+                },
+                [old_entry, new_entry],
+                &options,
+            )
+        }
+        (_, Some((before, after))) => compare(
             &old,
             &new,
-            DataForges {
+            Some(DataForges {
                 old: before,
                 new: after,
-            },
-            [old_entry, new_entry],
+            }),
             &options,
         ),
         _ => compare(&old, &new, None, &options),
     }?;
-    if let Some(path) = &args.report {
+    write_output(&comparison, args.report.as_deref(), as_json)
+}
+
+fn write_output(
+    comparison: &Comparison<'_>,
+    report: Option<&Path>,
+    as_json: bool,
+) -> Result<ExitCode> {
+    if let Some(path) = report {
         comparison
             .save_report(path)
             .map_err(|source| ReportNotWritten {
-                path: path.clone(),
+                path: path.to_owned(),
                 source,
             })?;
     }
     let printed = if as_json {
-        json::print(&comparison)
+        json::print(comparison)
     } else {
-        print_summary(&comparison)
+        print_summary(comparison)
     };
     finish(printed, comparison.has_differences())
 }

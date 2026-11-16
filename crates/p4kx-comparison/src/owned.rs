@@ -3,12 +3,11 @@
 
 use std::sync::Arc;
 
-use crate::comparison::RecordSources;
-
 use p4kx_channels::PublicPatches;
 use thiserror::Error;
 
 use crate::compare::{Joined, check_levels, join};
+use crate::comparison::RecordSources;
 use crate::record_compare::{compare_record, compare_records};
 use crate::{
     Archive, CancelToken, CompareOptions, Comparison, ComparisonError, ComparisonProgress,
@@ -241,7 +240,12 @@ impl OwnedComparison {
             old: &old,
             new: &new,
         };
-        let changes = compare_records(forges, &options, ComparisonProgress::default())?;
+        let changes = compare_records(
+            forges,
+            &options,
+            ComparisonProgress::default(),
+            &RecordSources::default(),
+        )?;
         Ok(use_it(&changes))
     }
 

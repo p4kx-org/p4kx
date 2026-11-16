@@ -18,6 +18,7 @@ mod nested_diff;
 mod owned;
 mod owned_records;
 mod public_patch;
+mod record_body_origins;
 mod record_fields;
 mod record_header_origins;
 mod record_name_tag;

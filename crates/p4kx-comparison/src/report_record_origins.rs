@@ -7,10 +7,14 @@ use p4kx_extraction::{
 };
 
 use crate::report_origins::{ReportOriginFields, ReportOriginsError, put};
+use crate::report_record_body::BodyOrigins;
 use crate::{Comparison, RecordState};
+
+use super::RecordChangeReport;
 
 pub(super) fn capture(
     comparison: &Comparison<'_>,
+    reported: &[RecordChangeReport<'_>],
 ) -> Result<ReportOriginFields, ReportOriginsError> {
     let uses = SourceUses::with_compact_use_refs();
     let scopes = [
@@ -19,7 +23,12 @@ pub(super) fn capture(
     ];
     let [old_scope, new_scope] = scopes.each_ref().map(Option::as_ref);
     let mut fields = FieldOrigins::new();
-    for (position, change) in comparison.record_changes().iter().enumerate() {
+    let body = BodyOrigins {
+        uses: &uses,
+        old: old_scope,
+        new: new_scope,
+    };
+    for (position, (change, row)) in comparison.record_changes().iter().zip(reported).enumerate() {
         let path = format!("/records/changes/{position}");
         let key = change.key();
         let old = key.old_position().map(|index| Header {
@@ -43,6 +52,14 @@ pub(super) fn capture(
         }
         if let Some((header, state)) = new.zip(change.new_record()) {
             header.write(&uses, &mut fields, &format!("{path}/new"), state)?;
+        }
+        for (index, (field, reported)) in change.fields().iter().zip(&row.fields).enumerate() {
+            body.write(
+                &mut fields,
+                &format!("{path}/fields/{index}"),
+                field,
+                reported,
+            )?;
         }
     }
     ReportOriginFields::finish(fields, &uses)

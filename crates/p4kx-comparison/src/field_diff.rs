@@ -3,132 +3,196 @@
 
 use std::cmp::Ordering;
 
-use crate::{ChangedValue, Field, FieldChange, Location, Step, Value};
+use p4kx_dataforge::PositionedRecord;
 
-/// Returns every value that differs between the fields `old` and `new` of a Record, nested
-/// ones included, or that only one side has.
-///
-/// The changes come depth first: within one struct in field order of `new`, then the fields only
-/// `old` has, each followed by the changes inside it. Fields join by name, array elements by
-/// index.
-pub(crate) fn diff_fields<'a>(old: &[Field<'a>], new: &[Field<'a>]) -> Vec<FieldChange<'a>> {
-    let mut walk = Walk::default();
-    walk.fields(old, new);
+use crate::field_change_evidence::{FieldEvidence, PathStep, RouteStep};
+use crate::field_diff_inputs::{FieldPick, Fields, Node, Nodes};
+use crate::{ChangedValue, Field, FieldChange, Location, RecordSide, Step, Value};
+
+/// Returns changed or one-sided fields in new layout order, including nested values.
+pub(crate) fn diff_fields<'tree, 'source>(
+    old: &'tree [Field<'source>],
+    new: &'tree [Field<'source>],
+    old_positions: Option<&'tree PositionedRecord<'source>>,
+    new_positions: Option<&'tree PositionedRecord<'source>>,
+) -> Vec<FieldChange<'source>> {
+    let mut walk = Walk {
+        route: (old_positions.is_some() || new_positions.is_some()).then(Vec::new),
+        ..Walk::default()
+    };
+    walk.fields(
+        &Fields::root(old, old_positions),
+        &Fields::root(new, new_positions),
+    );
     walk.changes
 }
 
-/// The state of one diff: the steps from the Record down to the current value, and the changes
-/// so far.
 #[derive(Default)]
-struct Walk<'a> {
-    steps: Vec<Step<'a>>,
-    changes: Vec<FieldChange<'a>>,
+struct Walk<'tree, 'source> {
+    steps: Vec<Step<'source>>,
+    route: Option<Vec<RouteStep<'tree, 'source>>>,
+    changes: Vec<FieldChange<'source>>,
 }
 
-impl<'a> Walk<'a> {
-    fn fields(&mut self, old: &[Field<'a>], new: &[Field<'a>]) {
-        let same_layout =
-            old.len() == new.len() && old.iter().zip(new).all(|(a, b)| a.name() == b.name());
+impl<'tree, 'source> Walk<'tree, 'source> {
+    fn fields(&mut self, old: &Fields<'tree, 'source>, new: &Fields<'tree, 'source>) {
+        let old_fields = old.values();
+        let new_fields = new.values();
+        let same_layout = old_fields.len() == new_fields.len()
+            && old_fields
+                .iter()
+                .zip(new_fields)
+                .all(|(a, b)| a.name() == b.name());
         if same_layout {
-            for (a, b) in old.iter().zip(new) {
-                self.at(Step::Field(a.name()), Some(a.value()), Some(b.value()));
+            for (ordinal, (before, after)) in old_fields.iter().zip(new_fields).enumerate() {
+                self.at(
+                    Step::Field(before.name()),
+                    PathStep::Field(RecordSide::Old),
+                    Nodes {
+                        old: Some(old.node(FieldPick {
+                            ordinal,
+                            field: before,
+                        })),
+                        new: Some(new.node(FieldPick {
+                            ordinal,
+                            field: after,
+                        })),
+                    },
+                );
             }
         } else {
-            for (before, after) in join_by_name(old, new) {
-                let name = after.or(before).map_or("", Field::name);
+            for (before, after) in join_by_name(old_fields, new_fields) {
+                let side = if after.is_some() {
+                    RecordSide::New
+                } else {
+                    RecordSide::Old
+                };
+                let name = after.or(before).map_or("", |picked| picked.field.name());
                 self.at(
                     Step::Field(name),
-                    before.map(Field::value),
-                    after.map(Field::value),
+                    PathStep::Field(side),
+                    Nodes {
+                        old: before.map(|picked| old.node(picked)),
+                        new: after.map(|picked| new.node(picked)),
+                    },
                 );
             }
         }
     }
 
-    fn at(&mut self, step: Step<'a>, old: Option<&Value<'a>>, new: Option<&Value<'a>>) {
+    fn at(&mut self, step: Step<'source>, path: PathStep, nodes: Nodes<'tree, 'source>) {
         self.steps.push(step);
-        self.value(old, new);
+        if let Some(route) = &mut self.route {
+            route.push(RouteStep { path, nodes });
+        }
+        self.value(nodes);
         self.steps.pop();
+        if let Some(route) = &mut self.route {
+            route.pop();
+        }
     }
 
-    fn value(&mut self, old: Option<&Value<'a>>, new: Option<&Value<'a>>) {
-        match (old, new) {
-            (Some(Value::Struct(a)), Some(Value::Struct(b))) => {
-                if a.type_name() != b.type_name() {
-                    self.push(old, new);
+    fn value(&mut self, nodes: Nodes<'tree, 'source>) {
+        match (nodes.old, nodes.new) {
+            (Some(before), Some(after)) => self.matched(nodes, before, after),
+            _ => self.changed(nodes),
+        }
+    }
+
+    fn matched(
+        &mut self,
+        nodes: Nodes<'tree, 'source>,
+        before: Node<'tree, 'source>,
+        after: Node<'tree, 'source>,
+    ) {
+        match (before.value, after.value) {
+            (Value::Struct(old), Value::Struct(new)) => {
+                if old.type_name() != new.type_name() {
+                    self.push(nodes);
                 }
-                self.fields(a.fields(), b.fields());
+                self.fields(&before.fields(old.fields()), &after.fields(new.fields()));
             }
-            (Some(Value::Array(a)), Some(Value::Array(b))) => {
-                for (index, position) in (0_u32..).zip(0..a.len().max(b.len())) {
-                    self.at(Step::Element(index), a.get(position), b.get(position));
+            (Value::Array(old), Value::Array(new)) => {
+                for (ordinal, _) in (0_u32..).zip(0..old.len().max(new.len())) {
+                    self.at(
+                        Step::Element(ordinal),
+                        PathStep::Element,
+                        Nodes {
+                            old: before.element(ordinal),
+                            new: after.element(ordinal),
+                        },
+                    );
                 }
             }
-            (Some(a), Some(b)) if same(a, b) => {}
-            _ => {
-                self.push(old, new);
-                if let Some(value) = old {
-                    self.one_side(value, Lone::Old);
-                }
-                if let Some(value) = new {
-                    self.one_side(value, Lone::New);
-                }
+            (old, new) if same(old, new) => {}
+            _ => self.changed(nodes),
+        }
+    }
+
+    fn changed(&mut self, nodes: Nodes<'tree, 'source>) {
+        self.push(nodes);
+        for side in [RecordSide::Old, RecordSide::New] {
+            if let Some(node) = nodes.side(side) {
+                self.one_side(node, side);
             }
         }
     }
 
-    /// Lists the fields or elements of a struct or array only `side` has.
-    fn one_side(&mut self, value: &Value<'a>, side: Lone) {
-        match value {
+    fn one_side(&mut self, node: Node<'tree, 'source>, side: RecordSide) {
+        match node.value {
             Value::Struct(structure) => {
-                for field in structure.fields() {
-                    let (old, new) = side.pair(field.value());
-                    self.at(Step::Field(field.name()), old, new);
+                let fields = node.fields(structure.fields());
+                for (ordinal, field) in fields.values().iter().enumerate() {
+                    let selected = fields.node(FieldPick { ordinal, field });
+                    self.at(
+                        Step::Field(field.name()),
+                        PathStep::Field(side),
+                        Nodes::one(side, selected),
+                    );
                 }
             }
             Value::Array(items) => {
-                for (index, item) in (0_u32..).zip(items.iter()) {
-                    let (old, new) = side.pair(item);
-                    self.at(Step::Element(index), old, new);
+                for (ordinal, _) in (0_u32..).zip(items.iter()) {
+                    if let Some(selected) = node.element(ordinal) {
+                        self.at(
+                            Step::Element(ordinal),
+                            PathStep::Element,
+                            Nodes::one(side, selected),
+                        );
+                    }
                 }
             }
             _ => {}
         }
     }
 
-    fn push(&mut self, old: Option<&Value<'a>>, new: Option<&Value<'a>>) {
+    fn push(&mut self, nodes: Nodes<'tree, 'source>) {
         self.changes.push(FieldChange {
             path: Location::new(&self.steps),
-            old: old.map(ChangedValue::of),
-            new: new.map(ChangedValue::of),
+            old: nodes.old.map(|node| ChangedValue::of(node.value)),
+            new: nodes.new.map(|node| ChangedValue::of(node.value)),
+            evidence: self
+                .route
+                .as_deref()
+                .map(FieldEvidence::capture)
+                .map(Box::new),
         });
     }
 }
 
-/// The side that alone has a value.
-#[derive(Clone, Copy)]
-enum Lone {
-    Old,
-    New,
-}
+type Pair<'tree, 'source> = (
+    Option<FieldPick<'tree, 'source>>,
+    Option<FieldPick<'tree, 'source>>,
+);
 
-type Sides<'v, 'a> = (Option<&'v Value<'a>>, Option<&'v Value<'a>>);
-
-impl Lone {
-    const fn pair<'v, 'a>(self, value: &'v Value<'a>) -> Sides<'v, 'a> {
-        match self {
-            Self::Old => (Some(value), None),
-            Self::New => (None, Some(value)),
-        }
-    }
-}
-
-type Pair<'f, 'a> = (Option<&'f Field<'a>>, Option<&'f Field<'a>>);
-
-/// Joins the fields by name: those `new` has in its order, then those only `old` has in its.
-fn join_by_name<'f, 'a>(old: &'f [Field<'a>], new: &'f [Field<'a>]) -> Vec<Pair<'f, 'a>> {
+/// Joins fields by name and original ordinal and preserves the display order.
+fn join_by_name<'tree, 'source>(
+    old: &'tree [Field<'source>],
+    new: &'tree [Field<'source>],
+) -> Vec<Pair<'tree, 'source>> {
     let (old_names, new_names) = (by_name(old), by_name(new));
-    let mut ordered: Vec<(usize, Pair<'f, 'a>)> = Vec::with_capacity(old.len().max(new.len()));
+    let mut ordered: Vec<(usize, Pair<'tree, 'source>)> =
+        Vec::with_capacity(old.len().max(new.len()));
     let (mut i, mut j) = (0, 0);
     loop {
         let (before, after) = (old_names.get(i), new_names.get(j));
@@ -136,21 +200,21 @@ fn join_by_name<'f, 'a>(old: &'f [Field<'a>], new: &'f [Field<'a>]) -> Vec<Pair<
             (None, None) => break,
             (Some(_), None) => Ordering::Less,
             (None, Some(_)) => Ordering::Greater,
-            (Some(before), Some(after)) => before.0.name().cmp(after.0.name()),
+            (Some(before), Some(after)) => before.field.name().cmp(after.field.name()),
         };
         match (order, before, after) {
-            (Ordering::Less, Some(&(field, index)), _) => {
+            (Ordering::Less, Some(&field), _) => {
                 i += 1;
-                ordered.push((new.len().saturating_add(index), (Some(field), None)));
+                ordered.push((new.len().saturating_add(field.ordinal), (Some(field), None)));
             }
-            (Ordering::Greater, _, Some(&(field, index))) => {
+            (Ordering::Greater, _, Some(&field)) => {
                 j += 1;
-                ordered.push((index, (None, Some(field))));
+                ordered.push((field.ordinal, (None, Some(field))));
             }
-            (_, Some(&(a, _)), Some(&(b, index))) => {
+            (_, Some(&a), Some(&b)) => {
                 i += 1;
                 j += 1;
-                ordered.push((index, (Some(a), Some(b))));
+                ordered.push((b.ordinal, (Some(a), Some(b))));
             }
             _ => break,
         }
@@ -159,9 +223,18 @@ fn join_by_name<'f, 'a>(old: &'f [Field<'a>], new: &'f [Field<'a>]) -> Vec<Pair<
     ordered.into_iter().map(|(_, pair)| pair).collect()
 }
 
-fn by_name<'f, 'a>(fields: &'f [Field<'a>]) -> Vec<(&'f Field<'a>, usize)> {
-    let mut named: Vec<_> = fields.iter().zip(0..).collect();
-    named.sort_unstable_by(|a, b| a.0.name().cmp(b.0.name()).then(a.1.cmp(&b.1)));
+fn by_name<'tree, 'source>(fields: &'tree [Field<'source>]) -> Vec<FieldPick<'tree, 'source>> {
+    let mut named: Vec<_> = fields
+        .iter()
+        .enumerate()
+        .map(|(ordinal, field)| FieldPick { ordinal, field })
+        .collect();
+    named.sort_unstable_by(|a, b| {
+        a.field
+            .name()
+            .cmp(b.field.name())
+            .then(a.ordinal.cmp(&b.ordinal))
+    });
     named
 }
 

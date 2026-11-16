@@ -103,7 +103,26 @@ impl<'source> TreeBuilder<'source> {
         &mut self,
         record: &Record<'source>,
     ) -> Result<PositionedRecord<'source>, DataForgeError> {
-        let mut instances = InstanceSpans::default();
+        self.build_positioned_with(record, InstanceSpans::default())
+    }
+
+    /// Builds the canonical Record and captures original instance spans when allocation permits.
+    /// An auxiliary capture refusal leaves positions unavailable and keeps the canonical tree.
+    ///
+    /// # Errors
+    /// Returns the canonical read or observer error.
+    pub fn build_positioned_partial(
+        &mut self,
+        record: &Record<'source>,
+    ) -> Result<PositionedRecord<'source>, DataForgeError> {
+        self.build_positioned_with(record, InstanceSpans::partial())
+    }
+
+    fn build_positioned_with(
+        &mut self,
+        record: &Record<'source>,
+        mut instances: InstanceSpans<'source>,
+    ) -> Result<PositionedRecord<'source>, DataForgeError> {
         let tree = self.build_with_sources(record, None, Some(&mut instances))?;
         Ok(PositionedRecord::new(tree, record.forge, instances))
     }

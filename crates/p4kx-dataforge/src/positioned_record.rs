@@ -103,35 +103,64 @@ pub(crate) struct ValueSlot<'source> {
 }
 
 #[derive(Debug, Default)]
-pub(crate) struct InstanceSpans<'source>(HashMap<usize, &'source [u8]>);
+pub(crate) struct InstanceSpans<'source> {
+    slots: HashMap<usize, &'source [u8]>,
+    capture: SpanCapture,
+}
+
+#[derive(Debug, Default, PartialEq, Eq)]
+enum SpanCapture {
+    #[default]
+    Required,
+    Partial,
+    Refused,
+}
 
 impl<'source> InstanceSpans<'source> {
+    pub(crate) fn partial() -> Self {
+        Self {
+            capture: SpanCapture::Partial,
+            ..Self::default()
+        }
+    }
+
     pub(crate) fn insert(
         &mut self,
         fields: &[Field<'source>],
         bytes: &'source [u8],
     ) -> Result<(), DataForgeError> {
-        const PART: &str = "positioned Record instances";
-        if fields.is_empty() {
+        if fields.is_empty() || self.capture == SpanCapture::Refused {
             return Ok(());
         }
+        if let Err(error) = self.reserve_slot() {
+            if self.capture == SpanCapture::Required {
+                return Err(error);
+            }
+            self.capture = SpanCapture::Refused;
+            self.slots = HashMap::new();
+            return Ok(());
+        }
+        // The decoder and weak-link resolver keep this backing allocation intact.
+        self.slots.insert(fields.as_ptr().addr(), bytes);
+        Ok(())
+    }
+
+    fn reserve_slot(&mut self) -> Result<(), DataForgeError> {
+        const PART: &str = "positioned Record instances";
         let elements = self
-            .0
+            .slots
             .len()
             .checked_add(1)
             .ok_or(DataForgeError::TooLarge { part: PART })?;
-        self.0
+        self.slots
             .try_reserve(1)
             .map_err(|_| DataForgeError::LayoutAllocationRefused {
                 part: PART,
                 elements: elements as u64,
-            })?;
-        // The decoder and weak-link resolver keep this backing allocation intact.
-        self.0.insert(fields.as_ptr().addr(), bytes);
-        Ok(())
+            })
     }
 
     fn get(&self, fields: &[Field<'source>]) -> Option<&'source [u8]> {
-        self.0.get(&fields.as_ptr().addr()).copied()
+        self.slots.get(&fields.as_ptr().addr()).copied()
     }
 }
