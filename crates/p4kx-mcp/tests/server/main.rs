@@ -47,6 +47,8 @@ mod dataforge_cache;
 mod dataforge_file;
 mod definition_origins;
 mod definitions;
+mod entity_audio_origins;
+mod entity_audio_survey_budget;
 mod entity_loadout;
 mod entity_loadout_notes;
 mod entity_loadout_pick;

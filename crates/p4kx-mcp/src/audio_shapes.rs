@@ -4,8 +4,10 @@
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use crate::forge_shapes::ForgeFieldOrigins;
+
 /// A file of the audio data that was left out because it could not be read.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub(crate) struct IssueShape {
     /// The Entry path.
     pub(crate) path: String,
@@ -16,7 +18,7 @@ pub(crate) struct IssueShape {
 }
 
 /// A soundbank that holds a Wwise event.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub(crate) struct SoundbankRef {
     /// The Entry path of the soundbank.
     pub(crate) path: String,
@@ -25,7 +27,7 @@ pub(crate) struct SoundbankRef {
 }
 
 /// A Wwise event of a trigger with the soundbanks that hold it.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub(crate) struct EventShape {
     /// The event name.
     pub(crate) name: String,
@@ -43,7 +45,7 @@ pub(crate) struct EventShape {
 }
 
 /// Why a trigger leads to no soundbank.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub(crate) struct UnmatchedShape {
     /// A stable code: `no_definition`, `no_event` or `no_soundbank`.
     pub(crate) kind: &'static str,
@@ -117,7 +119,7 @@ pub(crate) struct TriggerSearchResult {
 }
 
 /// The Record of an Entity.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub(crate) struct EntityShape {
     /// The GUID of the Record.
     pub(crate) guid: String,
@@ -130,7 +132,7 @@ pub(crate) struct EntityShape {
 }
 
 /// An audio trigger an Entity names.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub(crate) struct EntityTriggerShape {
     /// The trigger name as the Entity writes it.
     pub(crate) name: String,
@@ -168,6 +170,8 @@ pub(crate) struct EntitySoundsResult {
     /// The cursor of the next page; absent on the last page.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) next_cursor: Option<String>,
+    #[serde(flatten)]
+    pub(crate) origins: ForgeFieldOrigins,
 }
 
 /// The languages localised sounds were resolved in.
