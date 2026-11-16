@@ -9,8 +9,9 @@ use p4kx_testkit::{
 };
 
 pub(super) const ROOT_CLASS: &str = "TEST_Gloss_0_Half";
-pub(super) const PALETTE_BYTES: [u8; 4] = [0, 1, 128, 255];
-pub(super) const NORMAL_ALPHA: u8 = 128;
+pub(super) const FINISH_PALETTE_BYTE: u8 = 184;
+pub(super) const PALETTE_BYTES: [u8; 5] = [0, 1, 128, 255, FINISH_PALETTE_BYTE];
+pub(super) const NORMAL_ALPHA: u8 = 196;
 pub(super) const TEXTURE_PATH: &str = "Objects/Test/palette_sample_ddna.dds";
 const MODEL: &str = "Objects/Test/palette_sample.cgf";
 const SAMPLED_LAYER: &str = "Objects/Test/palette_sample.mtl";
@@ -18,15 +19,15 @@ const CONSTANT_LAYER: &str = "Objects/Test/palette_constant.mtl";
 const FIRST_PALETTE_GUID: u128 = 0x9500;
 const FIRST_ENTITY_GUID: u128 = 0x9600;
 
-pub(super) const MULTIPLIERS: [Multiplier; 2] = [
+const MULTIPLIERS: [Multiplier; 2] = [
     Multiplier {
         label: "Half",
-        token: "0.5",
+        token: Some("0.5"),
         value: 0.5,
     },
     Multiplier {
         label: "Zero",
-        token: "0",
+        token: Some("0"),
         value: 0.0,
     },
 ];
@@ -34,8 +35,24 @@ pub(super) const MULTIPLIERS: [Multiplier; 2] = [
 #[derive(Clone, Copy)]
 pub(super) struct Multiplier {
     pub(super) label: &'static str,
-    pub(super) token: &'static str,
+    pub(super) token: Option<&'static str>,
     pub(super) value: f32,
+}
+
+pub(super) fn palette_cases() -> impl Iterator<Item = (u8, Multiplier)> {
+    let neutral = Multiplier {
+        label: "Neutral",
+        token: None,
+        value: 1.0,
+    };
+    PALETTE_BYTES
+        .into_iter()
+        .flat_map(|byte| {
+            MULTIPLIERS
+                .into_iter()
+                .map(move |multiplier| (byte, multiplier))
+        })
+        .chain(std::iter::once((FINISH_PALETTE_BYTE, neutral)))
 }
 
 pub(super) fn material_name(byte: u8, multiplier: Multiplier, sampled: bool) -> String {
@@ -65,12 +82,7 @@ fn database(entries: &mut Vec<TestEntry>) -> Vec<u8> {
     let mut database = entity_schema(DataForgeBuilder::new());
     let mut root = None;
     let mut children = Vec::new();
-    let cases = PALETTE_BYTES.into_iter().flat_map(|byte| {
-        MULTIPLIERS
-            .into_iter()
-            .map(move |multiplier| (byte, multiplier))
-    });
-    for (id, (byte, multiplier)) in (FIRST_ENTITY_GUID..).zip(cases) {
+    for (id, (byte, multiplier)) in (FIRST_ENTITY_GUID..).zip(palette_cases()) {
         let class = format!("TEST_Gloss_{byte}_{}", multiplier.label);
         let material = format!("Objects/Test/gloss_{byte}_{}", multiplier.label);
         entries.push(TestEntry::stored(
@@ -109,14 +121,13 @@ fn library(byte: u8, multiplier: Multiplier) -> Vec<u8> {
         } else {
             CONSTANT_LAYER
         };
+        let mut attributes = vec![("Name", "Paint"), ("PaletteTint", "1"), ("Path", path)];
+        if let Some(token) = multiplier.token {
+            attributes.push(("GlossMult", token));
+        }
         let material = TestMtlMaterial::new(material_name(byte, multiplier, sampled))
             .shader("HardSurface")
-            .layer_with(&[
-                ("Name", "Paint"),
-                ("PaletteTint", "1"),
-                ("Path", path),
-                ("GlossMult", multiplier.token),
-            ]);
+            .layer_with(&attributes);
         if sampled {
             material.texture("TexSlot2", TEXTURE_PATH)
         } else {

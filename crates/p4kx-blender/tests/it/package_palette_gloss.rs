@@ -3,6 +3,7 @@
 
 use std::error::Error;
 use std::fs;
+use std::io::{self, Write as _};
 use std::path::{Path, PathBuf};
 
 use p4kx_assembly::{ArchiveModels, Assembly, AssemblyOptions, ForgePalettes, LoadoutResolver};
@@ -19,7 +20,9 @@ use crate::support::{TestResult, fixture, glb_options};
 #[path = "package_palette_gloss_source.rs"]
 mod source;
 
-use source::{MULTIPLIERS, Multiplier, NORMAL_ALPHA, PALETTE_BYTES, ROOT_CLASS, TEXTURE_PATH};
+use source::{
+    FINISH_PALETTE_BYTE, Multiplier, NORMAL_ALPHA, PALETTE_BYTES, ROOT_CLASS, TEXTURE_PATH,
+};
 
 #[test]
 fn palette_gloss_fixture_compares_glb_and_blender_package_inputs() -> TestResult {
@@ -75,12 +78,10 @@ fn assemble(archive: &Archive, models: &ArchiveModels<'_>) -> Result<Assembly, B
 }
 
 fn cases() -> impl Iterator<Item = (u8, Multiplier, bool)> {
-    PALETTE_BYTES.into_iter().flat_map(|byte| {
-        MULTIPLIERS.into_iter().flat_map(move |multiplier| {
-            [true, false]
-                .into_iter()
-                .map(move |sampled| (byte, multiplier, sampled))
-        })
+    source::palette_cases().flat_map(|(byte, multiplier)| {
+        [true, false]
+            .into_iter()
+            .map(move |sampled| (byte, multiplier, sampled))
     })
 }
 
@@ -108,11 +109,17 @@ fn verify_glb(glb: &CheckedGlb) -> TestResult {
                 1.0_f32.to_bits(),
                 "{name}: roughness is in the packed image"
             );
-            assert_eq!(
-                image.pixel(0, 0).map(|[_, green, _, _]| green),
-                Some(255 - NORMAL_ALPHA),
-                "{name}: inverse original alpha in GLB green"
-            );
+            let [_, green, _, _] = image.pixel(0, 0).ok_or("decoded packed texel")?;
+            assert_eq!(green, 255 - NORMAL_ALPHA, "{name}: inverse original alpha");
+            if byte == FINISH_PALETTE_BYTE {
+                let effective = f32::from(green) / 255.0 * pbr.roughness_factor();
+                let expected = 59.0 / 255.0;
+                assert!((effective - expected).abs() < 1e-6, "{name}: {effective}");
+                writeln!(
+                    io::stdout().lock(),
+                    "{name}: effective GLB roughness {effective:.9}"
+                )?;
+            }
         } else {
             assert!(
                 pbr.metallic_roughness_texture().is_none(),
@@ -215,16 +222,17 @@ fn verify_layer_tokens(manifest: &Manifest) -> TestResult {
         };
         assert_eq!(
             layer.gloss_mult.map(f32::to_bits),
-            Some(multiplier.value.to_bits()),
-            "{name}: supplied multiplier"
+            multiplier.token.map(|_| multiplier.value.to_bits()),
+            "{name}: supplied multiplier or unmodified default"
         );
-        assert!(
+        assert_eq!(
             layer
                 .attributes
                 .iter()
-                .any(|attribute| attribute.name == "GlossMult"
-                    && attribute.value == multiplier.token),
-            "{name}: original exponent-free token"
+                .find(|attribute| attribute.name == "GlossMult")
+                .map(|attribute| attribute.value.as_str()),
+            multiplier.token,
+            "{name}: original token or its absence"
         );
         let material = layer.material.as_deref().ok_or("resolved layer material")?;
         let layer = manifest
@@ -272,7 +280,7 @@ fn verify_image(manifest: &Manifest, package: &Path) -> TestResult {
     );
     assert!(origin.source_set_complete(), "exact image origin");
     let input = fs::File::open(package.join(&image.file))?;
-    let mut png = png::Decoder::new(std::io::BufReader::new(input)).read_info()?;
+    let mut png = png::Decoder::new(io::BufReader::new(input)).read_info()?;
     let mut bytes = vec![0; png.output_buffer_size().ok_or("pixel length")?];
     let decoded = png.next_frame(&mut bytes)?;
     assert_eq!(

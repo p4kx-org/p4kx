@@ -147,20 +147,34 @@ acceptance criteria.
 ## Palette gloss and packed normal alpha
 
 The focused material fixture exports a textured GLB and a Blender package from the same
-synthetic Archive. It crosses four authored palette gloss bytes with two `GlossMult` values
-and paired materials with and without a normal map. The checks cover the palette origin,
-the source texture and the authored layer multiplier.
+synthetic Archive. It crosses palette bytes `0`, `1`, `128`, `255` and `184` with authored
+`GlossMult` of `0.5` and `0`. Byte `184` also has a case with the multiplier absent.
+Each case has materials with and without a normal map. The checks cover the palette origin,
+the authored layer multiplier and packed DDNA alpha `196 / 255`.
 
 ```powershell
 $env:P4KX_SYNTHETIC_PALETTE_GLOSS_PACKAGE = Join-Path $verificationRoot 'palette-gloss'
-cargo test --locked -p p4kx-blender --test it -- palette_gloss_fixture_compares_glb_and_blender_package_inputs
-& 'C:\Program Files\Blender Foundation\Blender 5.3\blender.exe' --background --factory-startup --disable-autoexec --python-exit-code 23 --python-expr 'import sys; sys.dont_write_bytecode = True' --python blender_addon/tests/blender_material_gloss_package.py -- "$env:P4KX_SYNTHETIC_PALETTE_GLOSS_PACKAGE/scene.json"
+cargo test --locked -p p4kx-blender --test it -- palette_gloss_fixture_compares_glb_and_blender_package_inputs --nocapture
+& 'C:\Program Files\Blender Foundation\Blender 5.3\blender.exe' --background --factory-startup --disable-autoexec --python-exit-code 23 --python-expr 'import sys; sys.dont_write_bytecode = True' --threads 1 --python blender_addon/tests/blender_material_gloss_package.py -- "$env:P4KX_SYNTHETIC_PALETTE_GLOSS_PACKAGE/scene.json"
 ```
 
 Use a new package directory and the isolated Blender profile above. The GLB test reads the
-packed roughness channel from the embedded image. Blender checks the packed alpha pixels
-and the graph that scales them by `GlossMult` before deriving roughness. The fixture also
-checks the constant palette fallback in both outputs. These are P4KX projection checks.
+packed roughness channel from the embedded image and multiplies it by the exported factor.
+Blender checks the packed alpha pixels and the linked Roughness graph. For palette byte `184`,
+a one-thread 64x24 linear EXR probe samples the imported Roughness inputs through emission.
+The probe keeps a fixed orthographic camera and excludes reflectance and display grading.
+The sampled neutral and authored-half GLB cases expect `59 / 255` after the factor.
+Blender expects `59 / 255` with the
+multiplier absent and `157 / 255` with authored `0.5`, within one 8-bit step. The textureless
+fallback expects `71 / 255` and `163 / 255`, respectively. Cargo and Blender print the measured
+sampled values. The fixture measures the P4KX projection. Installed shader arithmetic, Details
+and in-game appearance have separate criteria.
+
+On Windows AMD64 with Blender 5.3.0 (`02f0899d78e3`), the sampled GLB cases
+measured `0.231372550` with absent, zero and `0.5` multipliers. The Blender
+linear probe measured `0.231372461` with the multiplier absent and
+`0.615686238` with `0.5`. The shared stencil probe also verified all eight
+painted and eight fallback samples.
 
 ## Forward Illum and explicit Emittance
 
@@ -176,7 +190,8 @@ cargo test --locked -p p4kx-blender --test it -- forward_illum_package_preserves
 & 'C:\Program Files\Blender Foundation\Blender 5.3\blender.exe' --background --factory-startup --disable-autoexec --python-exit-code 23 --python-expr 'import sys; sys.dont_write_bytecode = True' --python blender_addon/tests/blender_forward_illum_package.py -- "$env:P4KX_SYNTHETIC_FORWARD_ILLUM_PACKAGE/scene.json"
 ```
 
-The Forward Illum and palette gloss recipes passed on native Windows AMD64 with Blender 5.3.0
+The Forward Illum recipe and the earlier graph-only palette gloss recipe passed on
+native Windows AMD64 with Blender 5.3.0
 (`02f0899d78e3`). The former rendered explicit Emittance. The latter verified packed alpha and
 the palette roughness graph.
 

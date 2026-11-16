@@ -15,7 +15,9 @@ import bpy
 
 ADDON = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ADDON))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from blender_signal_probe import principled, render_linear_signals  # noqa: E402
 from p4kx_importer.importer import import_package  # noqa: E402
 from p4kx_importer.package import load_package  # noqa: E402
 from p4kx_importer.package_digests import file_sha256  # noqa: E402
@@ -47,63 +49,9 @@ def _hashes(root: Path, pattern: str) -> dict[str, str]:
     }
 
 
-def _principled(material: bpy.types.Material) -> bpy.types.Node:
-    tree = material.node_tree
-    nodes = tuple(node for node in tree.nodes if node.bl_idname == "ShaderNodeBsdfPrincipled")
-    assert len(nodes) == 1, material.name
-    return nodes[0]
-
-
-def _add_probe(material: bpy.types.Material, signal: str, y: float) -> None:
-    # Route the imported socket to emission for measurement without lighting or alpha compositing.
-    probe = material.copy()
-    tree = probe.node_tree
-    channel = _principled(probe).inputs[signal]
-    output = next(node for node in tree.nodes if node.type == "OUTPUT_MATERIAL" and node.is_active_output)
-    emission = tree.nodes.new("ShaderNodeEmission")
-    if channel.is_linked:
-        tree.links.new(channel.links[0].from_socket, emission.inputs["Color"])
-    else:
-        assert signal == "Base Color", "the imported coverage must come from the mask"
-        emission.inputs["Color"].default_value = channel.default_value
-    tree.links.new(emission.outputs[0], output.inputs["Surface"])
-
-    bpy.ops.mesh.primitive_plane_add(size=2, location=(0.0, y, 0.0))
-    plane = bpy.context.object
-    plane.scale.y = 0.10
-    plane.data.materials.append(probe)
-
-
 def _fixed_raster(material: bpy.types.Material, target: Path) -> tuple[float, ...]:
-    for item in bpy.context.scene.objects:
-        item.hide_render = True
-    _add_probe(material, "Base Color", 0.1875)
-    _add_probe(material, "Alpha", -0.1875)
-    bpy.ops.object.camera_add(location=(0.0, 0.0, 2.0))
-    camera = bpy.context.object
-    camera.data.type = "ORTHO"
-    camera.data.ortho_scale = 2.0
-    scene = bpy.context.scene
-    scene.camera = camera
-    scene.render.engine = "CYCLES"
-    scene.cycles.device = "CPU"
-    scene.cycles.samples = 8
-    scene.cycles.use_adaptive_sampling = False
-    scene.cycles.use_denoising = False
-    scene.render.threads_mode = "FIXED"
-    scene.render.threads = 1
-    scene.render.resolution_x = WIDTH
-    scene.render.resolution_y = HEIGHT
-    scene.render.resolution_percentage = 100
-    scene.view_settings.view_transform = "Standard"
-    scene.render.image_settings.file_format = "OPEN_EXR"
-    scene.render.image_settings.color_mode = "RGBA"
-    scene.render.image_settings.color_depth = "32"
-    scene.render.filepath = str(target)
-    bpy.ops.render.render(write_still=True)
-    image = bpy.data.images.load(scene.render.filepath, check_existing=False)
-    assert tuple(image.size) == (WIDTH, HEIGHT), tuple(image.size)
-    return tuple(image.pixels)
+    probes = ((material, "Base Color", 0.1875), (material, "Alpha", -0.1875))
+    return render_linear_signals(probes, target, WIDTH, HEIGHT)
 
 
 def _rgb(pixels: tuple[float, ...], cell: int, row: int) -> tuple[float, ...]:
@@ -119,7 +67,7 @@ def _verify_case(root: Path, painted: bool) -> dict[str, object]:
         result.meshes, result.warnings, package.warnings
     )
     material = bpy.data.materials["TestStencil"]
-    shader = _principled(material)
+    shader = principled(material)
     assert shader.inputs["Alpha"].is_linked, "coverage comes from the imported stencil"
     assert shader.inputs["Base Color"].is_linked == painted, "only the palette branch samples colour"
     image_nodes = [
