@@ -8,7 +8,7 @@ use p4kx_extraction::SourceValue;
 use super::health_reference_data::{ReferenceData, ReferencePointer};
 use super::health_reference_error;
 use super::health_reference_observation::{ReferenceBody, ReferenceObservation};
-use super::health_reference_path::ReferencePath;
+use super::health_reference_path::{ReferencePath, ReferencePathReceipt};
 use super::health_reference_receipt::{ReferenceDatum, ReferenceFrame};
 use super::health_reference_target;
 use super::health_text_capture::HealthTextCapture;
@@ -106,10 +106,13 @@ impl<'scope, 'read, 'source> ReferenceCapture<'scope, 'read, 'source> {
         &self,
         site: &OriginalValueSite<'_, '_, '_, '_>,
     ) -> Result<ReferenceBody, CatalogError> {
-        self.check_site(site)?;
+        let path = self.path_receipt(site)?;
         Ok(ReferenceBody {
-            field: self.path.field(site, self.texts)?,
-            source_type: self.path.owner_type(site)?,
+            field: ReferenceDatum::captured(SourceValue::Present(path.field), path.uses.into_vec()),
+            source_type: ReferenceDatum::captured(
+                SourceValue::Present(path.owner.type_name),
+                vec![path.owner.input],
+            ),
             target_guid: ReferenceDatum::absent(),
             target_record_index: ReferenceDatum::absent(),
             target_record_path: ReferenceDatum::absent(),
@@ -117,6 +120,14 @@ impl<'scope, 'read, 'source> ReferenceCapture<'scope, 'read, 'source> {
             target_location: ReferenceDatum::absent(),
             source_pointer: None,
         })
+    }
+
+    pub(super) fn path_receipt(
+        &self,
+        site: &OriginalValueSite<'_, '_, '_, '_>,
+    ) -> Result<ReferencePathReceipt, CatalogError> {
+        self.check_site(site)?;
+        self.path.receipt(site, self.texts)
     }
 
     pub(super) fn observation(

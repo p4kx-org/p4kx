@@ -5,6 +5,7 @@ use p4kx_extraction::{DataType, Guid, SourceUseRole, SourceValue};
 
 use super::health_reference_data::ReferenceData;
 use super::health_reference_observation::ReferenceBody;
+use super::health_reference_path::ReferencePathUses;
 use super::health_reference_receipt::{ReferenceDatum, ReferenceUse};
 use super::{OriginalValueFact, OriginalValuePart};
 use crate::ExportAccountingError;
@@ -33,7 +34,7 @@ impl ReferenceCaller {
 /// Original path selectors and caller storage needed to reconstruct a read target receipt.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct ReferenceRecipe {
-    pub(super) path: Vec<ReferenceUse>,
+    pub(super) path: ReferencePathUses,
     pub(super) owner_type: ReferenceUse,
     pub(super) caller: ReferenceCaller,
     pub(super) storage: DataType,
@@ -57,7 +58,10 @@ impl ReferenceRecipe {
             .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
         let selector = self.caller.operand(SourceUseRole::Selector);
         Ok(ReferenceBody {
-            field: ReferenceDatum::captured(SourceValue::Present(data.field.clone()), self.path),
+            field: ReferenceDatum::captured(
+                SourceValue::Present(data.field.clone()),
+                self.path.into_vec(),
+            ),
             source_type: ReferenceDatum::captured(
                 SourceValue::Present(data.source_type.clone()),
                 vec![self.owner_type],

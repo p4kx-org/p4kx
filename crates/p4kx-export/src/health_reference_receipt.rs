@@ -195,15 +195,6 @@ impl<T> ReferenceDatum<T> {
         &self.value
     }
 
-    pub(super) fn into_present_inputs(
-        self,
-    ) -> Result<(T, Vec<ReferenceUse>), ExportAccountingError> {
-        match self.value {
-            SourceValue::Present(value) if self.complete => Ok((value, self.inputs)),
-            _ => Err(ExportAccountingError::ConflictingSourceDatum),
-        }
-    }
-
     pub(super) fn contribute(&mut self, input: ReferenceUse) {
         self.inputs.push(input);
     }

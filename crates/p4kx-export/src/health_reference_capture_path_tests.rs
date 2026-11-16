@@ -117,6 +117,81 @@ fn sibling_receipts_keep_the_same_ordered_array_uses() -> TestResult {
     })
 }
 
+#[test]
+fn class_array_siblings_share_the_prefix_and_leaving_restores_the_parent() -> TestResult {
+    test_support::with_input(&nested_class_array(), |forge, input| {
+        let record = forge.record(0).ok_or("the actual Owner is absent")?;
+        let tree = record.tree()?;
+        let scope = input.record_scope(&record, &tree)?;
+        let admission = RecordObservation::capture(input, &record)?;
+        let mut capture = ReferenceCapture::new(input, &admission, &scope)?;
+        let body = enter(&scope, &mut capture, "body")?;
+        let before = at(
+            &scope,
+            "body.before",
+            |site| Ok(capture.path_receipt(site)?),
+        )?;
+        let array = enter(&scope, &mut capture, "body.children")?;
+        let mut siblings = Vec::new();
+        for index in 0..2 {
+            let site = format!("body.children[{index}]");
+            let member = enter(&scope, &mut capture, &site)?;
+            let field = format!("{site}.leaf");
+            siblings.push(at(&scope, &field, |site| Ok(capture.path_receipt(site)?))?);
+            capture.leave(member)?;
+        }
+        capture.leave(array)?;
+        let after = at(&scope, "body.after", |site| Ok(capture.path_receipt(site)?))?;
+        capture.leave(body)?;
+        let [first, second] = siblings.as_slice() else {
+            return Err("two original class elements".into());
+        };
+        assert!(
+            first.uses.shares_prefix_with(&second.uses),
+            "nameless Struct edges leave the common array path intact"
+        );
+        assert_ne!(
+            first.owner.input, second.owner.input,
+            "the physical Struct owners remain distinct"
+        );
+        assert_ne!(
+            first.uses, second.uses,
+            "the two fields retain their individual leaf declarations"
+        );
+        assert!(
+            before.uses.shares_prefix_with(&after.uses),
+            "leaving the nested array restores the cached parent prefix"
+        );
+        assert!(
+            !before.uses.shares_prefix_with(&first.uses),
+            "a path extended by array operands has a different prefix allocation"
+        );
+        Ok(())
+    })
+}
+
+fn nested_class_array() -> Vec<u8> {
+    let member =
+        || TestValue::Struct(TestInstance::new("Inner").value("leaf", TestValue::text("")));
+    let body =
+        TestInstance::new("Body").value("children", TestValue::Array(vec![member(), member()]));
+    DataForgeBuilder::new()
+        .version(8)
+        .structure(TestStruct::new("Owner").field("body", TestType::Class("Body".to_owned())))
+        .structure(
+            TestStruct::new("Body")
+                .field("before", TestType::String)
+                .array("children", TestType::Class("Inner".to_owned()))
+                .field("after", TestType::String),
+        )
+        .structure(TestStruct::new("Inner").field("leaf", TestType::String))
+        .record(
+            TestRecord::new(0xA611, "Owner", "Owner.Prefix", "original/prefix.xml")
+                .value("body", TestValue::Struct(body)),
+        )
+        .build()
+}
+
 fn database(shape: Shape) -> Vec<u8> {
     let owner = match shape {
         Shape::Array => TestStruct::new("Owner")

@@ -10,7 +10,8 @@ use crate::build::original_input::test_support::{self, TestResult};
 use crate::catalog_read::original::health_reference_observation::{
     ReferenceBody, ReferenceEvidence,
 };
-use crate::catalog_read::original::health_reference_receipt::ReferenceFrame;
+use crate::catalog_read::original::health_reference_path::ReferencePathUses;
+use crate::catalog_read::original::health_reference_receipt::{ReferenceFrame, ReferenceUse};
 use crate::catalog_read::original::health_reference_recipe::ReferenceRecipe;
 use crate::catalog_read::original::{
     self, ExampleBodyReceipt, OriginalValueEvent, ReferenceCapture, ReferenceObservation,
@@ -28,6 +29,11 @@ fn exact_target_report_and_sample_bytes_match_the_eager_representation() -> Test
     assert!(
         size_of::<ReferenceRecipe>() < size_of::<ReferenceBody>(),
         "the deferred payload stores contributions separately from already described values",
+    );
+    assert_eq!(
+        size_of::<ReferencePathUses>(),
+        size_of::<Vec<ReferenceUse>>(),
+        "sharing a prefix does not enlarge the retained recipe"
     );
     let baseline = snapshot(Retention::Immediate)?;
     let deferred = snapshot(Retention::Deferred)?;
@@ -107,6 +113,17 @@ fn deferred_recipe_keeps_physical_path_caller_and_target_operands_in_order() -> 
         let [first, second, weak] = refs.as_slice() else {
             return Err("two array References and one actual root-target WeakPointer".into());
         };
+        let (
+            ReferenceEvidence::Deferred { recipe: left, .. },
+            ReferenceEvidence::Deferred { recipe: right, .. },
+        ) = (&first.evidence, &second.evidence)
+        else {
+            return Err("deferred recipes for both original array elements".into());
+        };
+        assert!(
+            left.path.shares_prefix_with(&right.path),
+            "both retained candidates share the same physical prefix allocation"
+        );
         assert_eq!(
             first.data().field.as_str(),
             "body.links[0]",

@@ -31,12 +31,7 @@ pub(super) fn read(
         .origin
         .record_type()
         .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
-    let base = capture.body(site)?;
-    let (field, path) = base.field.into_present_inputs()?;
-    let (source_type, type_uses) = base.source_type.into_present_inputs()?;
-    let [owner_type] = type_uses
-        .try_into()
-        .map_err(|_| ExportAccountingError::ConflictingSourceDatum)?;
+    let base = capture.path_receipt(site)?;
     let target_record_path = capture
         .texts
         .retain_text(admitted.origin.record_path())?
@@ -44,8 +39,8 @@ pub(super) fn read(
         .clone();
     let target_type = capture.texts.retain_text(target_type)?.text().clone();
     let data = ReferenceData {
-        field,
-        source_type,
+        field: base.field,
+        source_type: base.owner.type_name,
         target_guid: Some(admitted.origin.record_guid()),
         target_record_index: Some(admitted.origin.record_index()),
         target_record_path: Some(target_record_path),
@@ -54,8 +49,8 @@ pub(super) fn read(
         source_pointer: None,
     };
     let recipe = ReferenceRecipe {
-        path,
-        owner_type,
+        path: base.uses,
+        owner_type: base.owner.input,
         caller: ReferenceCaller::from_fact(&fact),
         storage: admitted.storage,
     };
