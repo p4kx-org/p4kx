@@ -95,12 +95,18 @@ pub enum XmlRenderKind {
 
 pub(crate) type RawSpans = [Option<XmlRawSpan>; 4];
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Contributors {
+    Fields(RawSpans),
+    Indentation(Vec<XmlRawSpan>),
+}
+
 /// Emitted bytes and their original decoded-input ranges.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct XmlRenderSpan {
     kind: XmlRenderKind,
     range: Range<u64>,
-    sources: RawSpans,
+    sources: Contributors,
     complete: bool,
 }
 
@@ -114,7 +120,20 @@ impl XmlRenderSpan {
         Self {
             kind,
             range,
-            sources,
+            sources: Contributors::Fields(sources),
+            complete,
+        }
+    }
+
+    pub(crate) const fn indentation(
+        range: Range<u64>,
+        sources: Vec<XmlRawSpan>,
+        complete: bool,
+    ) -> Self {
+        Self {
+            kind: XmlRenderKind::Structure,
+            range,
+            sources: Contributors::Indentation(sources),
             complete,
         }
     }
@@ -140,6 +159,10 @@ impl XmlRenderSpan {
 
     /// Iterates all captured original contributors.
     pub fn sources(&self) -> impl Iterator<Item = &XmlRawSpan> {
-        self.sources.iter().flatten()
+        let (fields, indent): (&[_], &[_]) = match &self.sources {
+            Contributors::Fields(fields) => (fields, &[]),
+            Contributors::Indentation(indent) => (&[], indent),
+        };
+        fields.iter().flatten().chain(indent)
     }
 }

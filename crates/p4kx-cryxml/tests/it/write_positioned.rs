@@ -198,6 +198,91 @@ fn positioned_xml_keeps_repaired_and_skipped_string_bytes_distinct() -> TestResu
     Ok(())
 }
 
+#[test]
+fn positioned_indent_uses_actual_ancestry_for_opening_and_closing_tags() -> TestResult {
+    for order in [CryXmlByteOrder::Little, CryXmlByteOrder::Big] {
+        let deep = TestElement::new("deep").child(TestElement::new("leaf"));
+        let branch =
+            TestElement::new("branch")
+                .child(TestElement::new("neighbor"))
+                .child(TestElement::new("carrier").child(
+                    TestElement::new("level3").child(TestElement::new("level4").child(deep)),
+                ));
+        let fixture = TestElement::new("root")
+            .child(TestElement::new("before"))
+            .child(branch)
+            .child(TestElement::new("after"))
+            .to_cryxml(CryXmlSignature::CryXmlB, order);
+        let output = render(&fixture)?;
+        check_spans(&output)?;
+        let parents = [(7, 6), (6, 5), (5, 4), (4, 2), (2, 0)];
+        for line in [b"<deep>\n".as_slice(), b"</deep>\n"] {
+            check_indentation(&fixture, &output, order, line, &parents)?;
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn positioned_indent_at_the_cap_uses_only_the_nearest_parent_words() -> TestResult {
+    const MAX_INDENT_LEVELS: u32 = 64;
+    const DEPTH: u32 = MAX_INDENT_LEVELS + 3;
+    let order = CryXmlByteOrder::Little;
+    let input = (0..DEPTH)
+        .fold(TestElement::new("bottom"), |child, _| {
+            TestElement::new("branch").child(child)
+        })
+        .to_cryxml(CryXmlSignature::CryXmlB, order);
+    let output = render(&input)?;
+    check_spans(&output)?;
+    let parents: Vec<_> = (DEPTH - MAX_INDENT_LEVELS + 1..=DEPTH)
+        .rev()
+        .map(|node| (node, node - 1))
+        .collect();
+    check_indentation(&input, &output, order, b"<bottom/>\n", &parents)
+}
+
+fn check_indentation(
+    input: &[u8],
+    render: &Rendered,
+    order: CryXmlByteOrder,
+    line_after_indent: &[u8],
+    parents: &[(u32, u32)],
+) -> TestResult {
+    let indent = render
+        .spans
+        .iter()
+        .find(|span| {
+            span.kind() == XmlRenderKind::Structure
+                && rendered(render, span.range()).is_some_and(|bytes| {
+                    bytes.len() == parents.len() * 2 && bytes.iter().all(|byte| *byte == b' ')
+                })
+                && usize::try_from(span.range().end)
+                    .ok()
+                    .and_then(|end| render.bytes.get(end..))
+                    .is_some_and(|rest| rest.starts_with(line_after_indent))
+        })
+        .ok_or("positioned indentation before expected tag")?;
+    assert!(indent.complete(), "all contributing parent words are known");
+    assert_eq!(indent.sources().count(), parents.len(), "exact edge count");
+    let node_table = u64::from(word(input, 12, order)?);
+    for (fact, &(node, parent)) in indent.sources().zip(parents) {
+        let start = node_table + u64::from(node) * 28 + 12;
+        assert_eq!(
+            fact.kind(),
+            XmlRawKind::NodeParent,
+            "indent evidence cites a parent word"
+        );
+        assert_eq!(fact.range(), &(start..start + 4), "actual physical node");
+        assert_eq!(
+            word(input, usize::try_from(start)?, order)?,
+            parent,
+            "the authored parent word"
+        );
+    }
+    Ok(())
+}
+
 struct Rendered {
     bytes: Vec<u8>,
     spans: Vec<XmlRenderSpan>,

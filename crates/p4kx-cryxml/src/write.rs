@@ -14,7 +14,11 @@ use crate::{XmlRenderKind, XmlRenderSpan, XmlWriteField};
 
 const DECLARATION: &[u8] = b"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
 const MAX_INDENT_LEVELS: usize = 64;
-const INDENT: [u8; 2 * MAX_INDENT_LEVELS] = [b' '; 2 * MAX_INDENT_LEVELS];
+const SPACES_PER_LEVEL: usize = 2;
+const INDENT: [u8; SPACES_PER_LEVEL * MAX_INDENT_LEVELS] =
+    [b' '; SPACES_PER_LEVEL * MAX_INDENT_LEVELS];
+
+type OpenElement<'document> = (Element<'document>, Children<'document>);
 
 /// Writes the original node order iteratively, with bounded indentation.
 pub(crate) fn write<W: Write>(
@@ -29,20 +33,20 @@ pub(crate) fn write<W: Write>(
         observation: Observation::new(document, observe, positioned),
     };
     writer.markup(DECLARATION, XmlRenderKind::Declaration, |_| no_sources())?;
-    let mut open: Vec<(Element<'_>, Children<'_>)> = Vec::new();
+    let mut open: Vec<OpenElement<'_>> = Vec::new();
     let root = document.root();
-    if writer.start(root, 0)? {
+    if writer.start(root, &open)? {
         open.push((root, root.children()));
     }
     while let Some((element, children)) = open.last_mut() {
         if let Some(child) = children.next() {
-            if writer.start(child, open.len())? {
+            if writer.start(child, &open)? {
                 open.push((child, child.children()));
             }
         } else {
             let element = *element;
             open.pop();
-            writer.indent(element, open.len())?;
+            writer.indent(element, &open)?;
             writer.end_tag(element)?;
         }
     }
@@ -61,8 +65,12 @@ where
     FieldObserver: FnMut(XmlWriteField) -> io::Result<()>,
     SpanObserver: FnMut(XmlRenderSpan) -> io::Result<()>,
 {
-    fn start(&mut self, element: Element<'document>, depth: usize) -> io::Result<bool> {
-        self.indent(element, depth)?;
+    fn start(
+        &mut self,
+        element: Element<'document>,
+        open: &[OpenElement<'document>],
+    ) -> io::Result<bool> {
+        self.indent(element, open)?;
         self.markup(b"<", XmlRenderKind::Structure, |input| {
             let [count, first, _, _] = input.source.attribute_group(element.index());
             let edge = input.source.parent(element.index());
@@ -159,17 +167,20 @@ where
         self.literal(b">\n")
     }
 
-    fn indent(&mut self, element: Element<'_>, depth: usize) -> io::Result<()> {
-        let width = 2 * depth.min(MAX_INDENT_LEVELS);
+    fn indent(&mut self, element: Element<'_>, open: &[OpenElement<'_>]) -> io::Result<()> {
+        let levels = open.len().min(MAX_INDENT_LEVELS);
+        let width = levels * SPACES_PER_LEVEL;
         let spaces = INDENT.get(..width).unwrap_or_default();
         if spaces.is_empty() {
             return Ok(());
         }
-        self.markup(spaces, XmlRenderKind::Structure, |input| {
-            let edge = input.source.parent(element.index());
-            let complete = depth == 1 && edge.is_some();
-            ([edge, None, None, None], complete)
-        })
+        let start = self.out.offset();
+        self.out.write_all(spaces)?;
+        let nodes = std::iter::once(element.index())
+            .chain(open.iter().rev().map(|(parent, _)| parent.index()))
+            .take(levels);
+        self.observation
+            .indentation(start..self.out.offset(), levels, nodes)
     }
 
     fn literal(&mut self, bytes: &[u8]) -> io::Result<()> {

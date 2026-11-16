@@ -61,6 +61,21 @@ where
         Ok(())
     }
 
+    pub(crate) fn indentation(
+        &mut self,
+        emitted: Range<u64>,
+        levels: usize,
+        nodes: impl Iterator<Item = u32>,
+    ) -> io::Result<()> {
+        if let Some(positioned) = &mut self.positioned {
+            let mut sources = Vec::with_capacity(levels);
+            sources.extend(nodes.filter_map(|node| self.input.source.parent(node)));
+            let complete = sources.len() == levels;
+            positioned(XmlRenderSpan::indentation(emitted, sources, complete))?;
+        }
+        Ok(())
+    }
+
     pub(crate) fn markup(
         &mut self,
         kind: XmlRenderKind,
