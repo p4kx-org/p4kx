@@ -21,7 +21,6 @@ pub(crate) fn read<'fields, 'scope, 'read, 'source>(
 ) -> Result<Vec<TemplateTagProjection>, CatalogError> {
     members
         .values()
-        .iter()
         .filter(|fact| {
             let name = fact.field().name();
             tag_field(name)

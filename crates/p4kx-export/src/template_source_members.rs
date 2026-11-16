@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::BTreeSet;
+use std::ops::Range;
 
 use p4kx_extraction::{DecimalU64, Value};
 
@@ -18,12 +19,17 @@ use crate::{CatalogError, ExportAccountingError};
 /// The union of actual same-frame source subtrees in canonical original DFS order.
 pub(crate) struct TemplateMembers<'fields, 'scope, 'read, 'source> {
     fields: &'fields OriginalFlowFields<'scope, 'read, 'source>,
-    roots: Vec<&'fields OriginalValueFact<'scope, 'read, 'source>>,
-    values: Vec<&'fields OriginalValueFact<'scope, 'read, 'source>>,
-    indices: HashMap<u64, SourceValueRef>,
-    root_indices: HashMap<u64, DecimalU64>,
+    spans: Vec<MemberSpan<'fields, 'scope, 'read, 'source>>,
+    value_count: usize,
     owner: FlowOwnerKind,
     warning: Option<&'fields ExampleBodyCapture<'scope, 'read, 'source>>,
+}
+
+struct MemberSpan<'fields, 'scope, 'read, 'source> {
+    original: Range<usize>,
+    root: &'fields OriginalValueFact<'scope, 'read, 'source>,
+    values: &'fields [OriginalValueFact<'scope, 'read, 'source>],
+    value_start: usize,
 }
 
 impl<'fields, 'scope, 'read, 'source> TemplateMembers<'fields, 'scope, 'read, 'source> {
@@ -41,10 +47,8 @@ impl<'fields, 'scope, 'read, 'source> TemplateMembers<'fields, 'scope, 'read, 's
         }
         let mut result = Self {
             fields,
-            roots: Vec::new(),
-            values: Vec::new(),
-            indices: HashMap::new(),
-            root_indices: HashMap::new(),
+            spans: Vec::new(),
+            value_count: 0,
             owner,
             warning: None,
         };
@@ -62,34 +66,20 @@ impl<'fields, 'scope, 'read, 'source> TemplateMembers<'fields, 'scope, 'read, 's
                 continue;
             }
             covered_until = span.end;
-            let root_index = u64::try_from(result.roots.len())
-                .map_err(|_| ExportAccountingError::CounterOverflow)?;
-            result
-                .root_indices
-                .insert(fact.ordinal(), DecimalU64::new(root_index));
-            result.roots.push(fact);
-            for fact in fields
+            let value_start = result.value_count;
+            result.value_count = value_start
+                .checked_add(span.len())
+                .ok_or(ExportAccountingError::CounterOverflow)?;
+            let values = fields
                 .facts()
-                .get(span)
-                .ok_or(ExportAccountingError::ConflictingSourceDatum)?
-            {
-                fields.check_cancel()?;
-                let index = u64::try_from(result.values.len())
-                    .map_err(|_| ExportAccountingError::CounterOverflow)?;
-                if result
-                    .indices
-                    .insert(
-                        fact.ordinal(),
-                        SourceValueRef {
-                            value_index: DecimalU64::new(index),
-                        },
-                    )
-                    .is_some()
-                {
-                    return Err(ExportAccountingError::ConflictingSourceDatum.into());
-                }
-                result.values.push(fact);
-            }
+                .get(span.clone())
+                .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+            result.spans.push(MemberSpan {
+                original: span,
+                root: fact,
+                values,
+                value_start,
+            });
         }
         Ok(result)
     }
@@ -160,36 +150,67 @@ impl<'fields, 'scope, 'read, 'source> TemplateMembers<'fields, 'scope, 'read, 's
         self.fields
     }
 
-    pub(crate) fn roots(&self) -> &[&'fields OriginalValueFact<'scope, 'read, 'source>] {
-        &self.roots
+    pub(crate) fn roots(
+        &self,
+    ) -> impl Iterator<Item = &'fields OriginalValueFact<'scope, 'read, 'source>> + '_ {
+        self.spans.iter().map(|span| span.root)
     }
 
-    pub(crate) fn values(&self) -> &[&'fields OriginalValueFact<'scope, 'read, 'source>] {
-        &self.values
+    pub(crate) const fn value_count(&self) -> usize {
+        self.value_count
+    }
+
+    pub(crate) fn values(
+        &self,
+    ) -> impl Iterator<Item = &'fields OriginalValueFact<'scope, 'read, 'source>> + '_ {
+        self.spans.iter().flat_map(|span| span.values.iter())
+    }
+
+    fn containing_span(
+        &self,
+        ordinal: usize,
+    ) -> Result<(usize, &MemberSpan<'fields, 'scope, 'read, 'source>), CatalogError> {
+        let index = self
+            .spans
+            .partition_point(|span| span.original.start <= ordinal)
+            .checked_sub(1)
+            .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+        self.spans
+            .get(index)
+            .filter(|span| span.original.contains(&ordinal))
+            .map(|span| (index, span))
+            .ok_or_else(|| ExportAccountingError::ConflictingSourceDatum.into())
     }
 
     pub(crate) fn value_ref(
         &self,
         fact: &OriginalValueFact<'scope, 'read, 'source>,
     ) -> Result<SourceValueRef, CatalogError> {
-        self.fields.span(fact)?;
-        self.indices
-            .get(&fact.ordinal())
-            .copied()
-            .ok_or_else(|| ExportAccountingError::ConflictingSourceDatum.into())
+        let ordinal = self.fields.span(fact)?.start;
+        let (_, span) = self.containing_span(ordinal)?;
+        let index = span.value_start + (ordinal - span.original.start);
+        Ok(SourceValueRef {
+            value_index: DecimalU64::new(
+                u64::try_from(index).map_err(|_| ExportAccountingError::CounterOverflow)?,
+            ),
+        })
     }
 
     pub(crate) fn field_ref(
         &self,
         fact: &OriginalValueFact<'scope, 'read, 'source>,
     ) -> Result<SourceFieldRef, CatalogError> {
-        self.value_ref(fact)?;
+        let start = self.fields.span(fact)?.start;
+        let (root_index, span) = self.containing_span(start)?;
         let OriginalValueEdge::Field { ordinal } = fact.edge() else {
             return Err(ExportAccountingError::ConflictingSourceDatum.into());
         };
-        if let Some(index) = self.root_indices.get(&fact.ordinal()) {
+        if start == span.original.start {
             return Ok(SourceFieldRef::Root {
-                root_field_index: *index,
+                root_field_index: DecimalU64::new(
+                    u64::try_from(root_index)
+                        .map_err(|_| ExportAccountingError::CounterOverflow)?,
+                ),
             });
         }
         let parent = fact
@@ -206,3 +227,7 @@ impl<'fields, 'scope, 'read, 'source> TemplateMembers<'fields, 'scope, 'read, 's
         })
     }
 }
+
+#[cfg(test)]
+#[path = "template_source_members_tests.rs"]
+mod tests;

@@ -98,7 +98,6 @@ pub(crate) fn read<'fields, 'scope, 'read, 'source>(
     let sources = members.fields().sources();
     let roots = members
         .roots()
-        .iter()
         .map(|fact| {
             let OriginalValueEdge::Field { ordinal } = fact.edge() else {
                 return Err(ExportAccountingError::ConflictingSourceDatum.into());
@@ -112,7 +111,7 @@ pub(crate) fn read<'fields, 'scope, 'read, 'source>(
             })
         })
         .collect::<Result<_, CatalogError>>()?;
-    let mut values = Vec::with_capacity(members.values().len());
+    let mut values = Vec::with_capacity(members.value_count());
     for fact in members.values() {
         members.fields().check_cancel()?;
         let raw = match container(members, fact)? {
