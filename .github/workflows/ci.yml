@@ -46,6 +46,9 @@ jobs:
       - name: Reject misbound macOS device receipts
         shell: pwsh
         run: .github/scripts/test-macos-device-evidence-intake.ps1
+      - name: Reject misbound Windows and Linux ARM64 desktop receipts
+        shell: pwsh
+        run: .github/scripts/test-arm64-device-evidence.ps1
       - name: Required release scan evidence regression cases
         shell: pwsh
         run: .github/scripts/test-release-scan.ps1 -Directory (Join-Path $env:RUNNER_TEMP 'release-scan-fixtures')

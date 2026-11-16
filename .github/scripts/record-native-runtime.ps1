@@ -13,8 +13,8 @@ Assert-P4kxNativeHost -Platform $row
 $metadata = Get-Content -LiteralPath $MetadataPath -Raw | ConvertFrom-Json
 if ($metadata.target -cne $Target) { throw 'Native test archive target changed.' }
 if ($env:GITHUB_SERVER_URL -cne 'https://github.com' -or
-    $env:GITHUB_REPOSITORY -cne 'p4kx-org/p4kx' -or $env:GITHUB_RUN_ID -cnotmatch '^[0-9]+$' -or
-    $metadata.revision -cne $env:GITHUB_SHA) {
+    $env:GITHUB_REPOSITORY -cne 'p4kx-org/p4kx' -or $env:GITHUB_RUN_ID -cnotmatch '\A[1-9][0-9]*\z' -or
+    $env:GITHUB_RUN_ATTEMPT -cnotmatch '\A[1-9][0-9]*\z' -or $metadata.revision -cne $env:GITHUB_SHA) {
     throw 'Runtime evidence requires the matching repository CI run and source commit.'
 }
 $runtime = if ($null -ne $SmokeOutcomes) {
@@ -50,5 +50,6 @@ $metadata | Add-Member -NotePropertyName device_checks -NotePropertyValue ([orde
     hardware_gpu = 'not_checked'
 })
 $metadata | Add-Member -NotePropertyName workflow_run -NotePropertyValue "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
+$metadata | Add-Member -NotePropertyName workflow_attempt -NotePropertyValue $env:GITHUB_RUN_ATTEMPT
 $metadata | ConvertTo-Json -Depth 32 | Set-Content -LiteralPath $OutputPath -Encoding utf8NoBOM
 Write-Output "Recorded successful native synthetic runtime checks for $Target; physical device checks remain explicit."

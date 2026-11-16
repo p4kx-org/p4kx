@@ -179,6 +179,39 @@ for a missing capability and `not_checked` for a deferred check. The release aud
 any required check without successful evidence open. Publish structural results and synthetic
 comparisons. Keep personal paths and clipboard contents out of public evidence.
 
+### Validate the recorded ARM64 desktop evidence
+
+Use a JSON array with a record for each tested Windows or Linux ARM64 package. The receipt
+formats these existing observations as follows.
+
+| Fields | Expected values |
+| --- | --- |
+| `schema`, `scope` | Integer `1` and string `native-device`. |
+| `target`, `version`, `revision`, `workflow_run`, `workflow_attempt` | The exact native package runtime receipt values. The attempt is a string recorded by the package consumer. |
+| `package`, `package_filename`, `archive_sha256`, `gui_sha256` | Package kind from the platform matrix, canonical release filename, and lower-case SHA-256 of the package and launched GUI executable. |
+| `fixture_revision`, `tested_on` | Full source revision used to produce the fixture and the test date as `yyyy-MM-dd`. |
+| `host` | `os` (`windows` or `linux`), `architecture` (`arm64`), `os_version`, `os_build_or_kernel`, `desktop_session`, `gpu`, `gpu_driver` and `audio_backend`. |
+| `checks` | Each check below has an `outcome` and an `observation` describing the result or why it could not be checked. |
+
+- `file_dialogs` records Archive open, cancellation and extraction. Successful evidence includes
+  the matching lower-case `expected_sha256` and `observed_sha256` from the fixture and exported file.
+- `clipboard` records cross-program text transfer. `viewer` records the model preview and controls.
+  `hardware_gpu` reports adapter activity separately, including an unavailable capability.
+- `audio_start`, `audio_pause`, `audio_seek` and `audio_stop` record native playback behaviour.
+  `no_audio_device` records the native no-device check. Successful evidence names
+  `a_missing_device_is_reported_to_the_player_and_does_not_panic` in its `test` field.
+
+The offline release preflight binds these records to the already verified package receipts and
+requires successful file dialog, clipboard, viewer, playback and no-device evidence for each
+ARM64 target. Supply the original release run ID for the selected package artifacts.
+
+```powershell
+.github/scripts/check-release-matrix.ps1 -AssetDirectory $assets -Version $version -Revision $revision -Arm64DeviceEvidencePath $receipt -ReleaseRunId $releaseRunId
+```
+
+This command verifies recorded outcomes against the candidate. Device observations still come from
+the native desktop checks above.
+
 ## Desktop audio verification
 
 On each matching native CPU, use a usable default audio output on the desktop under test.
