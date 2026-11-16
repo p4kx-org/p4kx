@@ -4,7 +4,7 @@
 use crate::origin_input::MediaOriginInput;
 
 use std::io::{self, Read, Seek, SeekFrom};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use crate::origin_capture::OriginSite;
 use p4kx_extraction::chunks::{ChunkDirectory, ChunkDirectoryError};
@@ -17,9 +17,14 @@ use crate::retained_source;
 use crate::source;
 use crate::source_selection::EntrySelection;
 use crate::{
-    EntryInput, Identity, InputOmission, InputReceipt, MediaError, MediaWriter, Source,
-    SourceContext, Subresource,
+    EntryInput, Identity, InputOmission, InputReceipt, MediaError, MediaWriter, SourceContext,
+    Subresource,
 };
+
+#[path = "required_input_retention.rs"]
+mod retention;
+
+pub(crate) use retention::retain;
 
 /// Checked access to one required input for the duration of its callback.
 pub struct RequiredInput<'input> {
@@ -273,53 +278,6 @@ fn with_private_input<T>(
     })();
     error::finish(result, state.end(entry.index(), None))
         .map_err(|cause| error::at(&declared, cause))
-}
-
-pub(crate) fn retain(
-    lookup: &DirectoryLookup<'_>,
-    entry: &Entry,
-    writer: &mut MediaWriter<'_>,
-) -> Result<(Source, PathBuf), MediaError> {
-    let state = lookup.input_state()?;
-    let declared = source::entry(lookup.root, lookup.index.archive, entry, lookup.chain)?;
-    let cached = state.begin(entry.index(), writer)?;
-    let first = cached.is_none();
-    let retained = match cached {
-        Some(raw) => {
-            let payload = writer.root.join(&raw.path);
-            Ok((raw, payload))
-        }
-        None => state
-            .budget
-            .bytes(entry.uncompressed_size(), writer.limits())
-            .and_then(|()| retained_source::retain(lookup.index.archive, entry, writer)),
-    };
-    let result = match retained {
-        Err(cause) => Err(error::at(&declared, cause)),
-        Ok((raw, payload)) => {
-            let mut source = declared;
-            source::retained(&mut source, entry, raw);
-            let publication = if first {
-                let origin = writer.origins.input(lookup.index.archive, entry)?;
-                writer.retained_with_input(&source, &origin)
-            } else {
-                Ok(())
-            };
-            match publication {
-                Ok(()) => Ok((source, payload)),
-                Err(cause) => Err(error::at(&source, cause)),
-            }
-        }
-    };
-    let raw = if first {
-        result
-            .as_ref()
-            .ok()
-            .and_then(|(source, _)| source.raw.clone())
-    } else {
-        None
-    };
-    error::finish(result, state.end(entry.index(), raw))
 }
 
 fn use_payload<T>(

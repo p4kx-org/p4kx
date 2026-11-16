@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 
 use p4kx_extraction::{
     Archive, ConflictPolicy, Entry, ExtractOptions, ExtractionReport, OwnedDirectoryPermit,
+    VerifiedEntryPayload,
 };
 
 use crate::hashing;
@@ -19,22 +20,35 @@ const PAYLOAD_FILE: &str = "payload";
 #[path = "retained_source_tests.rs"]
 mod tests;
 
+#[derive(Clone, Copy)]
+pub(crate) enum PayloadVerification {
+    Ordinary,
+    MatchOriginal,
+}
+
 pub(crate) fn retain(
     archive: &Archive,
     entry: &Entry,
+    verification: PayloadVerification,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(RawReference, PathBuf), MediaError> {
-    materialize(archive, entry, writer, |payload, permit, digest, writer| {
-        let origin = writer.origins.input(archive, entry)?;
-        raw_output::place(
-            payload,
-            permit,
-            digest,
-            entry.uncompressed_size(),
-            &origin,
-            writer,
-        )
-    })
+    materialize(
+        archive,
+        entry,
+        verification,
+        writer,
+        |payload, permit, digest, writer| {
+            let origin = writer.origins.input(archive, entry)?;
+            raw_output::place(
+                payload,
+                permit,
+                digest,
+                entry.uncompressed_size(),
+                &origin,
+                writer,
+            )
+        },
+    )
 }
 
 pub(crate) fn with_private<T>(
@@ -46,6 +60,7 @@ pub(crate) fn with_private<T>(
     materialize(
         archive,
         entry,
+        PayloadVerification::Ordinary,
         writer,
         |payload, _permit, digest, writer| consume(digest, payload, writer),
     )
@@ -54,6 +69,7 @@ pub(crate) fn with_private<T>(
 fn materialize<T>(
     archive: &Archive,
     entry: &Entry,
+    verification: PayloadVerification,
     writer: &mut MediaWriter<'_>,
     consume: impl FnOnce(
         &Path,
@@ -81,7 +97,7 @@ fn materialize<T>(
     }
     let temporary = StagedDirectory::create(&writer.root, ".entry-", writer.checkpoint)?;
     let result = (|| {
-        extract_one(archive, entry, temporary.path(), writer)?;
+        let proof = extract_one(archive, entry, temporary.path(), verification, writer)?;
         let payload = temporary.path().join(PAYLOAD_FILE);
         if !output_path::file(&payload)? {
             return Err(MediaError::Destination(
@@ -99,6 +115,9 @@ fn materialize<T>(
                 "decoded source length disagrees with its Entry".into(),
             ));
         }
+        if let Some(proof) = proof.as_ref() {
+            verify_payload(proof, archive, entry, &digest, actual)?;
+        }
         consume(&payload, temporary.permit(), digest, writer)
     })();
     temporary.finish(result)
@@ -108,8 +127,9 @@ fn extract_one(
     archive: &Archive,
     entry: &Entry,
     destination: &Path,
+    verification: PayloadVerification,
     writer: &MediaWriter<'_>,
-) -> Result<(), MediaError> {
+) -> Result<Option<VerifiedEntryPayload>, MediaError> {
     let options = ExtractOptions {
         policy: ConflictPolicy::Overwrite,
         verify: true,
@@ -118,9 +138,51 @@ fn extract_one(
         protection: Some(writer.checkpoint.protection),
         ..ExtractOptions::default()
     };
-    let report =
-        p4kx_extraction::extract_entry_payload(archive, entry, destination, PAYLOAD_FILE, &options);
-    finish_extraction(report, writer)
+    let (report, proof) = match verification {
+        PayloadVerification::Ordinary => (
+            p4kx_extraction::extract_entry_payload(
+                archive,
+                entry,
+                destination,
+                PAYLOAD_FILE,
+                &options,
+            ),
+            None,
+        ),
+        PayloadVerification::MatchOriginal => p4kx_extraction::extract_verified_entry_payload(
+            archive,
+            entry,
+            destination,
+            PAYLOAD_FILE,
+            &options,
+        ),
+    };
+    finish_extraction(report, writer)?;
+    if matches!(verification, PayloadVerification::MatchOriginal) && proof.is_none() {
+        return Err(MediaError::Contract(
+            "verified decoded Entry has no original payload proof".into(),
+        ));
+    }
+    Ok(proof)
+}
+
+fn verify_payload(
+    proof: &VerifiedEntryPayload,
+    archive: &Archive,
+    entry: &Entry,
+    digest: &Digest,
+    size: u64,
+) -> Result<(), MediaError> {
+    let original = proof.digest();
+    if !proof.is_for(archive, entry)
+        || size != original.byte_length()
+        || digest.hex != original.sha256()
+    {
+        return Err(MediaError::Contract(
+            "staged decoded payload does not match its verified original Entry".into(),
+        ));
+    }
+    Ok(())
 }
 
 fn finish_extraction(report: ExtractionReport, writer: &MediaWriter<'_>) -> Result<(), MediaError> {

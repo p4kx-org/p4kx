@@ -724,7 +724,10 @@ DataForge. Explicit exclusions can leave a scope with no selected documents.
 An unavailable CDF or parameter payload can prevent a complete scoped index.
 The other requested providers
 retain their own Entry filters. An Animation-only export with
-`--animation-entity` uses the independent clip inventory selection.
+`--animation-entity` uses the independent clip inventory selection. For selected root-Archive
+XML in that inventory, Media measures the verified decoded Entry stream and checks its length
+and SHA-256 against the staged file before publishing the raw reference. The proof binds the
+physical Entry and uses the existing staged-file digest.
 
 The scoped Entity export follows external XML and CryXml Loadouts and their
 authored Includes in the root Archive. A required dependency can fall outside

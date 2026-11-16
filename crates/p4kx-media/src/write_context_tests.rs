@@ -66,9 +66,14 @@ fn observing_streams_cannot_stage_or_place_payload_files() -> Result<(), Box<dyn
     )?;
     let entry = archive.entries().first().ok_or("synthetic source Entry")?;
     assert_file_placement_rejected(
-        retained_source::retain(&archive, entry, &mut writer)
-            .err()
-            .as_ref(),
+        retained_source::retain(
+            &archive,
+            entry,
+            retained_source::PayloadVerification::Ordinary,
+            &mut writer,
+        )
+        .err()
+        .as_ref(),
     );
     assert_file_placement_rejected(
         artifact_placement::temporary(&writer, &stage, "test artifact")

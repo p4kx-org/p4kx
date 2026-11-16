@@ -11,7 +11,7 @@ use p4kx_testkit::{ArchiveBuilder, TestEntry};
 
 use crate::checkpoint::Checkpoint;
 use crate::staged_directory::StagedDirectory;
-use crate::{Limits, MediaError, MediaWriter};
+use crate::{ByteScope, Limits, MediaError, MediaWriter};
 
 #[test]
 fn cancellation_during_actual_extraction_retains_returned_counts()
@@ -62,6 +62,62 @@ fn cancellation_during_actual_extraction_retains_returned_counts()
     );
     assert!(!folder.path().join("media-index.json").exists());
     staging.close()?;
+    Ok(())
+}
+
+#[test]
+fn staged_file_must_match_the_original_payload_proof() -> Result<(), Box<dyn std::error::Error>> {
+    let folder = tempfile::tempdir()?;
+    let path = folder.path().join("Data.p4k");
+    ArchiveBuilder::new()
+        .entry(TestEntry::deflated("Data/Retained.xml", b"<Original/>"))
+        .write_to(&path)?;
+    let archive = Archive::open(path)?;
+    let entry = archive
+        .entries()
+        .first()
+        .ok_or("the original Entry is missing")?;
+    let token = CancelToken::new();
+    let watch = ArchiveWatch::new(&archive);
+    let protection = ArchiveWriteProtection::new(archive.path(), token.flag())?;
+    let checkpoint = Checkpoint {
+        cancel: &token,
+        watch: &watch,
+        protection: &protection,
+    };
+    let copied = folder.path().join("staged");
+    fs::create_dir(&copied)?;
+    let (report, proof) = p4kx_extraction::extract_verified_entry_payload(
+        &archive,
+        entry,
+        &copied,
+        "payload",
+        &ExtractOptions::default(),
+    );
+    let proof =
+        proof.ok_or_else(|| format!("the complete original read has no proof: {report:?}"))?;
+    let payload = copied.join("payload");
+    let (digest, size) = crate::hashing::file(
+        &payload,
+        ByteScope::DecodedEntryPayload,
+        entry.uncompressed_size(),
+        &checkpoint,
+    )?;
+    super::verify_payload(&proof, &archive, entry, &digest, size)?;
+    fs::write(&payload, b"<Modified/>")?;
+    let (digest, size) = crate::hashing::file(
+        &payload,
+        ByteScope::DecodedEntryPayload,
+        entry.uncompressed_size(),
+        &checkpoint,
+    )?;
+    assert!(
+        matches!(
+            super::verify_payload(&proof, &archive, entry, &digest, size),
+            Err(MediaError::Contract(_))
+        ),
+        "equal length and the same staged path cannot replace the original decoded hash"
+    );
     Ok(())
 }
 

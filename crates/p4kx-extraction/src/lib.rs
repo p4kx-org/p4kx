@@ -184,6 +184,7 @@ mod ui_render_bitmaps;
 mod ui_screen_texts;
 mod ui_service;
 mod ui_svg;
+mod verified_entry_payload;
 mod verify;
 mod watch;
 mod write;
@@ -217,7 +218,7 @@ pub use decimal_u64::DecimalU64;
 pub use disk_textures::DiskTextures;
 pub use entry_content::{EntryBytes, EntryReadError, find_entry, read_bytes};
 pub use entry_metadata_info::{DosCalendarInfo, DosTimestampInfo, EntryMetadataInfo};
-pub use entry_payload::extract_entry_payload;
+pub use entry_payload::{extract_entry_payload, extract_verified_entry_payload};
 pub use entry_record_format_info::EntryRecordFormatInfo;
 pub use entry_text::{
     EntryText, MIN_TEXT_LEN, ObservedEntryText, TextEncoding, TextReadEvidence, read_text,
@@ -364,6 +365,7 @@ pub use textures::{
     TextureImageFormat, TextureImagePlan, codec as texture_codec,
 };
 use ui_service::{ui_jobs, ui_movie};
+pub use verified_entry_payload::VerifiedEntryPayload;
 
 pub use ui_images::{ArchiveImages, MAX_SCREEN_TEXTURE_PIXELS, ObservedScreenVector};
 pub use ui_imports::{
