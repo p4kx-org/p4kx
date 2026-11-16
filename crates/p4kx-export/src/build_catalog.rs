@@ -2,12 +2,16 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::io::{self, Write};
+use std::ops::ControlFlow;
 
 use p4kx_extraction::{Archive, CancelToken, DataForgeEntry};
 
 use crate::catalog_output::{Compression, emit};
+use crate::contract::Catalog;
 use crate::options::CatalogRun;
 use crate::{BuiltCatalog, CatalogError, CatalogOptions, CatalogSummary};
+
+use super::parts::Parts;
 
 #[cfg(test)]
 #[path = "build_catalog_size_witness.rs"]
@@ -70,7 +74,7 @@ pub fn build_catalog_from(
     options: &CatalogOptions<'_>,
 ) -> Result<BuiltCatalog, CatalogError> {
     let run = CatalogRun::new(options, None);
-    let (parts, written) = super::assemble(archive, entry, run, |catalog| {
+    let (parts, written) = assemble(archive, entry, run, |catalog| {
         emit(catalog, Vec::new(), Compression::None, run)
     })?;
     Ok(BuiltCatalog {
@@ -119,9 +123,21 @@ pub(crate) fn write_catalog_from_with_run<W: Write>(
     compression: Compression,
     create: impl FnOnce() -> io::Result<W>,
 ) -> Result<(CatalogSummary, W), CatalogError> {
-    let (parts, written) = super::assemble(archive, entry, run, |catalog| {
+    let (parts, written) = assemble(archive, entry, run, |catalog| {
         let out = create().map_err(CatalogError::Write)?;
         emit(catalog, out, compression, run)
     })?;
     Ok((parts.summary(&written), written.sink))
+}
+
+fn assemble<R>(
+    archive: &Archive,
+    entry: &DataForgeEntry,
+    run: CatalogRun<'_, '_>,
+    emit: impl FnOnce(&Catalog<'_>) -> Result<R, CatalogError>,
+) -> Result<(Parts, R), CatalogError> {
+    match super::assemble(archive, entry, run, emit)? {
+        ControlFlow::Continue(built) => Ok(built),
+        ControlFlow::Break(refusal) => Err(CatalogError::IncompleteExport(refusal.freeze(run)?)),
+    }
 }

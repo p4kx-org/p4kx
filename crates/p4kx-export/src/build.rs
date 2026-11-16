@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::ops::ControlFlow;
 use std::sync::Arc;
 
 use p4kx_assembly::{ArchiveFiles, Entities};
@@ -37,6 +38,7 @@ mod parts;
 #[path = "catalog_refusal.rs"]
 pub(crate) mod refusal;
 use parts::Parts;
+use refusal::PendingRefusal;
 #[path = "build_source.rs"]
 mod metadata;
 pub(crate) use metadata::source;
@@ -51,7 +53,7 @@ fn assemble<R>(
     entry: &DataForgeEntry,
     run: CatalogRun<'_, '_>,
     emit: impl FnOnce(&Catalog<'_>) -> Result<R, CatalogError>,
-) -> Result<(Parts, R), CatalogError> {
+) -> Result<ControlFlow<PendingRefusal, (Parts, R)>, CatalogError> {
     let options = run.options;
     run.check_cancelled()?;
     run.begin(CatalogStage::ReadInputs);
@@ -140,7 +142,11 @@ fn assemble<R>(
         &independent.tables.flight,
         run,
     )?;
-    let health = parts::require_publishable(&mut collected, &kinds, &input, run)?;
+    let health = parts::export_health(&mut collected, &kinds, &input, run)?;
+    if !health.permits_publication(options.publication_mode) {
+        let refusal = PendingRefusal::new(health, origins.uses.clone());
+        return Ok(ControlFlow::Break(refusal));
+    }
     drop(collected.failures);
     let key_use = ArchiveKeyUse::of(archive);
     let store_slugs = StoreSlugs::embedded()?;
@@ -367,7 +373,7 @@ fn assemble<R>(
         ship_store_slugs: resolved.exported,
     };
     let output = emit(&catalog)?;
-    Ok((
+    Ok(ControlFlow::Continue((
         Parts {
             export_health: catalog.export_health,
             provenance: catalog.provenance,
@@ -389,5 +395,5 @@ fn assemble<R>(
             archive_key: key_use,
         },
         output,
-    ))
+    )))
 }

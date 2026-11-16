@@ -129,7 +129,7 @@ pub(super) fn capture_rows(
     }
 }
 
-pub(super) fn require_publishable(
+pub(super) fn export_health(
     collected: &mut Collected<'_>,
     kinds: &[crate::KindSummary],
     input: &super::original_input::OriginalCatalogInput<'_, '_>,
@@ -137,7 +137,7 @@ pub(super) fn require_publishable(
 ) -> Result<crate::ExportHealth, crate::CatalogError> {
     run.begin(CatalogStage::ExportHealth);
     let options = run.options;
-    let health = crate::export_health_prepare::compile_captured(
+    crate::export_health_prepare::compile_captured(
         std::mem::take(&mut collected.ledger),
         kinds,
         &collected.failures,
@@ -145,16 +145,7 @@ pub(super) fn require_publishable(
         options.publication_mode,
         input,
         options.cancel,
-    )?;
-    if health.permits_publication(options.publication_mode) {
-        return Ok(health);
-    }
-    Err(crate::CatalogError::IncompleteExport(
-        super::refusal::CatalogRefusal::new(
-            Box::new(health),
-            freeze_provenance(&input.origins().uses, run)?,
-        ),
-    ))
+    )
 }
 
 pub(super) fn freeze_provenance(
