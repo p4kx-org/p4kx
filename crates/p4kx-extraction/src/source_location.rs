@@ -77,7 +77,11 @@ impl SourceLocation {
             Self::DataForge {
                 record_index,
                 field,
-            } => format!("d{record_index}:{}:{field}", field.len()),
+            } => DataForgeField {
+                record_index: *record_index,
+                field,
+            }
+            .key(),
             Self::LocalizationLookup { language, selector } => {
                 let code = language.code();
                 format!(
@@ -123,6 +127,7 @@ fn language_code<S: Serializer>(language: &Language, serializer: S) -> Result<S:
 
 pub(crate) enum LocationView<'location> {
     Original(&'location SourceLocation),
+    DataForgeField(DataForgeField<'location>),
     Subresource(Subresource<'location>),
 }
 
@@ -130,7 +135,31 @@ impl LocationView<'_> {
     pub(crate) fn key(&self) -> String {
         match self {
             Self::Original(location) => location.key(),
+            Self::DataForgeField(location) => location.key(),
             Self::Subresource(location) => location.key(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) struct DataForgeField<'location> {
+    pub(crate) record_index: u32,
+    pub(crate) field: &'location str,
+}
+
+impl DataForgeField<'_> {
+    fn key(&self) -> String {
+        let Self {
+            record_index,
+            field,
+        } = self;
+        format!("d{record_index}:{}:{field}", field.len())
+    }
+
+    pub(crate) fn to_owned_location(self) -> SourceLocation {
+        SourceLocation::DataForge {
+            record_index: self.record_index,
+            field: self.field.to_owned(),
         }
     }
 }
@@ -168,8 +197,16 @@ impl Subresource<'_> {
 }
 
 #[derive(Serialize)]
-#[serde(tag = "type", rename_all = "camelCase")]
-enum SubresourceWire<'location> {
+#[serde(
+    tag = "type",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+enum LocationWire<'location> {
+    DataForge {
+        record_index: u32,
+        field: &'location str,
+    },
     Subresource {
         namespace: &'location str,
         #[serde(serialize_with = "subresource_indices")]
@@ -178,9 +215,19 @@ enum SubresourceWire<'location> {
     },
 }
 
+impl Serialize for DataForgeField<'_> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        LocationWire::DataForge {
+            record_index: self.record_index,
+            field: self.field,
+        }
+        .serialize(serializer)
+    }
+}
+
 impl Serialize for Subresource<'_> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        SubresourceWire::Subresource {
+        LocationWire::Subresource {
             namespace: self.namespace,
             indices: self.indices,
             field: self.field,

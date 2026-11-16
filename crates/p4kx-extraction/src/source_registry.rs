@@ -294,8 +294,9 @@ impl SourceRegistry {
         let id =
             self.use_references
                 .reference(source, scope, role, LocationView::Original(&location));
-        self.retain_use(id, source, scope, role, encryption, || {
-            RetainedLocation::new(location)
+        let compact = matches!(self.use_references, UseReferences::CompactCoordinates);
+        self.retain_use(id, source, scope, role, encryption, |id| {
+            RetainedLocation::new(location, compact.then_some(id))
         })
     }
 
@@ -316,7 +317,7 @@ impl SourceRegistry {
             original.scope(),
             role,
             original.effective_encryption(),
-            || original.location.clone(),
+            |id| original.location.for_reference(id),
         )
     }
 
@@ -327,15 +328,18 @@ impl SourceRegistry {
         scope: InputScope,
         role: SourceUseRole,
         encryption: SourceEncryptionState,
-        location: impl FnOnce() -> RetainedLocation,
+        location: impl FnOnce(&SourceUseRef) -> RetainedLocation,
     ) -> SourceUse {
-        let description = self.uses.get_or_insert_with(id, |id| SourceUseDescription {
-            id,
-            source: source.clone(),
-            scope,
-            role,
-            location: location(),
-            effective_encryption: encryption,
+        let description = self.uses.get_or_insert_with(id, |id| {
+            let location = location(&id);
+            SourceUseDescription {
+                id,
+                source: source.clone(),
+                scope,
+                role,
+                location,
+                effective_encryption: encryption,
+            }
         });
         SourceUse {
             description,

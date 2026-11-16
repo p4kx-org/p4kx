@@ -37,6 +37,41 @@ struct OriginFields {
     source_set_complete: bool,
 }
 
+impl OriginFields {
+    fn empty(complete: bool) -> Arc<Self> {
+        static COMPLETE: OnceLock<Arc<OriginFields>> = OnceLock::new();
+        static INCOMPLETE: OnceLock<Arc<OriginFields>> = OnceLock::new();
+        let cache = if complete { &COMPLETE } else { &INCOMPLETE };
+        Arc::clone(cache.get_or_init(|| {
+            Arc::new(Self {
+                contains_encrypted_source: complete.then_some(false),
+                source_uses_refs: OriginRefs::Flat(Vec::new()),
+                source_set_complete: complete,
+            })
+        }))
+    }
+
+    fn from_refs(
+        contains_encrypted_source: Option<bool>,
+        references: Vec<SourceUseRef>,
+        source_set_complete: bool,
+    ) -> Arc<Self> {
+        if references.is_empty() {
+            debug_assert_eq!(
+                contains_encrypted_source,
+                source_set_complete.then_some(false),
+                "an empty source set only reports encryption certainty through completeness"
+            );
+            return Self::empty(source_set_complete);
+        }
+        Arc::new(Self {
+            contains_encrypted_source,
+            source_uses_refs: OriginRefs::flat(references),
+            source_set_complete,
+        })
+    }
+}
+
 /// A contributor set shared by values from the same source inventory.
 #[derive(Debug)]
 pub struct SharedFieldOrigin {
@@ -72,6 +107,9 @@ impl SharedFieldOrigin {
             .references
             .retain(|reference| self.source_uses_refs.binary_search(reference).is_err());
         let source_set_complete = self.source_set_complete && local.source_set_complete;
+        if self.source_uses_refs.is_empty() && local.references.is_empty() {
+            return OriginFields::empty(source_set_complete);
+        }
         let contains_encrypted_source = match (
             self.contains_encrypted_source,
             local.contains_encrypted_source,
@@ -214,11 +252,11 @@ impl FieldOrigin {
         let facts = OriginFacts::measure(uses, complete);
         Self {
             identity: Some(identity),
-            fields: Arc::new(OriginFields {
-                contains_encrypted_source: facts.contains_encrypted_source,
-                source_uses_refs: OriginRefs::flat(facts.references),
-                source_set_complete: facts.source_set_complete,
-            }),
+            fields: OriginFields::from_refs(
+                facts.contains_encrypted_source,
+                facts.references,
+                facts.source_set_complete,
+            ),
         }
     }
 
@@ -304,11 +342,11 @@ impl FieldOrigin {
         }
         Ok(Self {
             identity: None,
-            fields: Arc::new(OriginFields {
+            fields: OriginFields::from_refs(
                 contains_encrypted_source,
-                source_uses_refs: OriginRefs::flat(source_uses_refs),
+                source_uses_refs,
                 source_set_complete,
-            }),
+            ),
         })
     }
 }

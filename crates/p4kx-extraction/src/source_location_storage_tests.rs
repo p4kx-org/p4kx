@@ -13,7 +13,7 @@ use crate::source_use::{
 };
 use crate::{SourceInput, SourceScope, SourceUses, SourceValue};
 
-use super::StoredXmlSite;
+use super::{LocationView, StoredXmlSite};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -170,6 +170,47 @@ fn verify_bytes(
         materialized,
         "serialization and field marker calculation do not expand the stored location"
     );
+    Ok(())
+}
+
+#[test]
+fn literal_dataforge_fields_share_each_roles_exact_id_suffix() -> TestResult {
+    let compact = SourceUses::with_compact_coordinates();
+    let scope = compact.observe(SourceInput::Unknown, InputScope::Payload)?;
+    let ordinal = SourceUses::with_compact_use_refs();
+    let ordinal_scope = ordinal.observe(SourceInput::Unknown, InputScope::Payload)?;
+
+    for field in ["", "attrs.\u{e4}:mode[17]\nvalue"] {
+        let location = SourceLocation::DataForge {
+            record_index: u32::MAX,
+            field: field.to_owned(),
+        };
+        let payload = scope.at(location.clone(), SourceUseRole::Payload)?;
+        let selector = scope.at_observed_location(&payload, SourceUseRole::Selector)?;
+        for (used, prefix) in [
+            (payload, "c2:u0ppd4294967295:"),
+            (selector, "c2:u0psd4294967295:"),
+        ] {
+            let encoded_field = used
+                .reference()
+                .as_str()
+                .strip_prefix(prefix)
+                .ok_or("the compact ID keeps its exact source, role and Record index")?;
+            assert_eq!(
+                encoded_field, field,
+                "the ID retains the exact UTF-8 suffix"
+            );
+            let LocationView::DataForgeField(stored) = used.description().location.view() else {
+                return Err("the compact use retains an ID-backed field".into());
+            };
+            assert!(
+                std::ptr::eq(stored.field, encoded_field),
+                "the field borrows the backing string of this role's own ID"
+            );
+        }
+        verify_roles(&compact, &scope, &location, true)?;
+        verify_roles(&ordinal, &ordinal_scope, &location, false)?;
+    }
     Ok(())
 }
 

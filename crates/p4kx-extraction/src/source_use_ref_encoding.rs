@@ -33,9 +33,16 @@ pub(crate) fn encode(
     let _written = write!(key, "{scope}{role}");
     match location {
         LocationView::Original(original) => append_location(&mut key, original),
+        LocationView::DataForgeField(site) => {
+            append_dataforge(&mut key, site.record_index, site.field);
+        }
         LocationView::Subresource(site) => append_subresource(&mut key, &site),
     }
     SourceUseRef::registered(key)
+}
+
+fn append_dataforge(key: &mut String, record_index: u32, field: &str) {
+    let _written = write!(key, "d{record_index}:{field}");
 }
 
 fn append_location(key: &mut String, location: &SourceLocation) {
@@ -46,9 +53,7 @@ fn append_location(key: &mut String, location: &SourceLocation) {
         SourceLocation::DataForge {
             record_index,
             field,
-        } => {
-            let _written = write!(key, "d{record_index}:{field}");
-        }
+        } => append_dataforge(key, *record_index, field),
         SourceLocation::LocalizationLookup { language, selector } => {
             key.push('q');
             append_counted(key, language.code());

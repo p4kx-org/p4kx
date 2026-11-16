@@ -5,7 +5,8 @@ use std::sync::OnceLock;
 
 use serde::{Serialize, Serializer};
 
-use super::{LocationView, SourceLocation, Subresource};
+use super::location::DataForgeField;
+use super::{LocationView, SourceLocation, SourceUseRef, Subresource};
 
 #[path = "source_xml_location_storage.rs"]
 mod xml;
@@ -92,6 +93,7 @@ impl DataForgeSite {
 pub(crate) enum RetainedLocation {
     Original(SourceLocation),
     DataForge(StoredDataForgeSite),
+    DataForgeField(StoredDataForgeField),
     Xml(StoredXmlSite),
 }
 
@@ -110,18 +112,85 @@ impl StoredDataForgeSite {
     }
 }
 
+#[derive(Debug)]
+pub(crate) struct StoredDataForgeField {
+    reference: SourceUseRef,
+    field_start: usize,
+    record_index: u32,
+    original: OnceLock<Box<SourceLocation>>,
+}
+
+impl StoredDataForgeField {
+    fn from_reference(field: DataForgeField<'_>, reference: &SourceUseRef) -> Option<Self> {
+        let prefix = reference.as_str().strip_suffix(field.field)?;
+        Some(Self {
+            reference: reference.clone(),
+            field_start: prefix.len(),
+            record_index: field.record_index,
+            original: OnceLock::new(),
+        })
+    }
+
+    fn site(&self) -> DataForgeField<'_> {
+        // The offset is a verified UTF-8 boundary in this immutable reference.
+        let (_, field) = self.reference.as_str().split_at(self.field_start);
+        DataForgeField {
+            record_index: self.record_index,
+            field,
+        }
+    }
+}
+
+impl Clone for StoredDataForgeField {
+    fn clone(&self) -> Self {
+        Self {
+            reference: self.reference.clone(),
+            field_start: self.field_start,
+            record_index: self.record_index,
+            original: OnceLock::new(),
+        }
+    }
+}
+
 impl RetainedLocation {
-    pub(crate) fn new(location: SourceLocation) -> Self {
+    pub(crate) fn new(location: SourceLocation, compact_reference: Option<&SourceUseRef>) -> Self {
+        if let (
+            SourceLocation::DataForge {
+                record_index,
+                field,
+            },
+            Some(reference),
+        ) = (&location, compact_reference)
+            && let Some(stored) = StoredDataForgeField::from_reference(
+                DataForgeField {
+                    record_index: *record_index,
+                    field,
+                },
+                reference,
+            )
+        {
+            return Self::DataForgeField(stored);
+        }
         if let Some(site) = DataForgeSite::from_original(&location) {
             return Self::DataForge(StoredDataForgeSite::new(site));
         }
         StoredXmlSite::from_original(location).map_or_else(Self::Original, Self::Xml)
     }
 
+    pub(crate) fn for_reference(&self, reference: &SourceUseRef) -> Self {
+        if let Self::DataForgeField(stored) = self
+            && let Some(stored) = StoredDataForgeField::from_reference(stored.site(), reference)
+        {
+            return Self::DataForgeField(stored);
+        }
+        self.clone()
+    }
+
     pub(crate) fn view(&self) -> LocationView<'_> {
         match self {
             Self::Original(location) => LocationView::Original(location),
             Self::DataForge(stored) => LocationView::Subresource(stored.site.subresource()),
+            Self::DataForgeField(stored) => LocationView::DataForgeField(stored.site()),
             Self::Xml(stored) => LocationView::Subresource(stored.subresource()),
         }
     }
@@ -132,6 +201,9 @@ impl RetainedLocation {
             Self::DataForge(stored) => stored
                 .original
                 .get_or_init(|| Box::new(stored.site.subresource().to_owned_location())),
+            Self::DataForgeField(stored) => stored
+                .original
+                .get_or_init(|| Box::new(stored.site().to_owned_location())),
             Self::Xml(stored) => stored.original(),
         }
     }
@@ -145,6 +217,7 @@ impl RetainedLocation {
         match self {
             Self::Original(_) => None,
             Self::DataForge(stored) => Some(stored.original.get().is_some()),
+            Self::DataForgeField(stored) => Some(stored.original.get().is_some()),
             Self::Xml(stored) => Some(stored.is_materialized()),
         }
     }
@@ -155,6 +228,7 @@ impl Clone for RetainedLocation {
         match self {
             Self::Original(location) => Self::Original(location.clone()),
             Self::DataForge(stored) => Self::DataForge(StoredDataForgeSite::new(stored.site)),
+            Self::DataForgeField(stored) => Self::DataForgeField(stored.clone()),
             Self::Xml(stored) => Self::Xml(stored.clone()),
         }
     }
@@ -165,6 +239,9 @@ impl PartialEq for RetainedLocation {
         match (self, other) {
             (Self::Original(left), Self::Original(right)) => left == right,
             (Self::DataForge(left), Self::DataForge(right)) => left.site == right.site,
+            (Self::DataForgeField(left), Self::DataForgeField(right)) => {
+                left.site() == right.site()
+            }
             (Self::Xml(left), Self::Xml(right)) => left == right,
             _ => false,
         }
@@ -177,6 +254,7 @@ impl Serialize for RetainedLocation {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self.view() {
             LocationView::Original(location) => location.serialize(serializer),
+            LocationView::DataForgeField(site) => site.serialize(serializer),
             LocationView::Subresource(site) => site.serialize(serializer),
         }
     }

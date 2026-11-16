@@ -18,6 +18,52 @@ use super::refs::OriginRefs;
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 #[test]
+fn empty_origin_fields_reuse_payloads_with_distinct_source_authority() -> TestResult {
+    let sources = SourceUses::new();
+    let other = SourceUses::new();
+    let shared = sources.shared_origin(&[], true);
+    for complete in [true, false] {
+        let authored = sources.origin(&[], complete);
+        let reused = sources.origin_with_shared(&shared, &[], complete)?;
+        let foreign = other.origin(&[], complete);
+        let marker = complete.then_some(false);
+        let decoded = FieldOrigin::from_wire(marker, Vec::new(), complete)?;
+        for origin in [&reused, &foreign, &decoded] {
+            assert!(
+                Arc::ptr_eq(&authored.fields, &origin.fields),
+                "the exact empty data is shared independently of the source inventory"
+            );
+        }
+        let original_identity = authored
+            .identity
+            .as_ref()
+            .ok_or("original source authority")?;
+        assert!(
+            reused.belongs_to(original_identity),
+            "locally shared origin retains authority"
+        );
+        assert!(
+            !foreign.belongs_to(original_identity),
+            "shared fields grant no foreign authority"
+        );
+        assert!(
+            !decoded.belongs_to(original_identity),
+            "wire data grants no original authority"
+        );
+        assert_eq!(
+            serde_json::to_value(&authored)?,
+            serde_json::json!({
+                "containsEncryptedSource": marker,
+                "sourceUsesRefs": [],
+                "sourceSetComplete": complete
+            }),
+            "the two empty markers retain their exact wire shape"
+        );
+    }
+    Ok(())
+}
+
+#[test]
 fn one_distinct_contributor_stays_inline_with_the_same_wire() -> TestResult {
     let sources = SourceUses::new();
     let scope = sources.observe(SourceInput::Unknown, InputScope::Payload)?;
