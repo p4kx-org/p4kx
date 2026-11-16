@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::ops::Range;
+
 use p4kx_chunks::ChunkFile;
 use p4kx_model::{
     CompanionResolver, LodSelection, MaterialReadObservation, MaterialReading, Model, ModelError,
@@ -10,12 +12,14 @@ use p4kx_model::{
 use super::{ModelSource, split_entry_path};
 use crate::chunk_source::ChunkSource;
 use crate::model_companions::ArchiveCompanions;
-use crate::model_info_materials::receipt::Observations;
+use crate::model_info_materials::receipt::{
+    MaterialEvidence, MaterialPageOrigins, MaterialPageRead, Observations, ReceiptError,
+};
 use crate::path_index::PathIndex;
 use crate::source_provenance::ModelArchiveSource;
 use crate::source_provenance::model_material_origins::MaterialObservation;
 use crate::texture_grey::TextureVerdicts;
-use crate::{ArchiveMaterialReads, ConversionError, MaterialArchiveOrigins};
+use crate::{ArchiveMaterialReads, ConversionError, FieldPath, MaterialArchiveOrigins, SourceUses};
 
 #[derive(Clone, Copy)]
 enum Coordinates {
@@ -23,6 +27,7 @@ enum Coordinates {
     Nodes,
     NodesAndBones,
     MaterialListing,
+    MaterialPage,
 }
 
 impl Coordinates {
@@ -35,10 +40,29 @@ impl Coordinates {
             return Capture::Skip;
         }
         match self {
-            Self::Skip | Self::MaterialListing => Capture::Skip,
+            Self::Skip | Self::MaterialListing | Self::MaterialPage => Capture::Skip,
             Self::Nodes => Capture::Nodes(&mut observed.nodes),
             Self::NodesAndBones => Capture::NodesAndBones(observed),
         }
+    }
+
+    fn material_evidence(
+        self,
+        model: &Model,
+        source: &ChunkSource,
+        origins: &MaterialArchiveOrigins,
+        fields: Observations,
+    ) -> Result<Option<MaterialEvidence>, ConversionError> {
+        Ok(match self {
+            Self::MaterialListing => fields
+                .project(model, source.archive_origin(), origins.library())?
+                .map(MaterialEvidence::Listing),
+            Self::MaterialPage => Some(MaterialEvidence::Page(Box::new(MaterialPageRead {
+                fields,
+                library: origins.library().cloned(),
+            }))),
+            _ => None,
+        })
     }
 }
 
@@ -133,6 +157,57 @@ impl ModelSource {
         )
     }
 
+    /// Reads an Archive model listing with original material observations for paging.
+    ///
+    /// # Errors
+    /// As [`Self::from_index_reading`].
+    pub fn from_index_with_material_pages(
+        index: &PathIndex<'_>,
+        path: &str,
+        verdicts: &TextureVerdicts,
+    ) -> Result<Self, ConversionError> {
+        Self::read_archive(
+            index,
+            path,
+            LodSelection::All,
+            PositionBox::default(),
+            MaterialReading::Plain,
+            verdicts,
+            Coordinates::MaterialPage,
+        )
+    }
+
+    /// Writes source evidence for the emitted range of a material listing at `items`.
+    ///
+    /// # Errors
+    /// Fails if the model was not read for material paging, a row is outside the listing,
+    /// or its evidence cannot be recorded.
+    pub fn material_page_origins(
+        &self,
+        uses: &SourceUses,
+        items: &FieldPath,
+        rows: Range<usize>,
+    ) -> Result<MaterialPageOrigins, ConversionError> {
+        let Some(MaterialEvidence::Page(read)) = &self.material_evidence else {
+            return Err(ConversionError::MaterialSourceEvidence(Box::new(
+                ReceiptError::MissingRows,
+            )));
+        };
+        let model_entry = self
+            .archive_sources
+            .iter()
+            .find(|read| read.file() == ModelFile::Model)
+            .and_then(ModelArchiveSource::origin);
+        read.fields.project_page(
+            &self.model,
+            model_entry,
+            read.library.as_ref(),
+            uses,
+            items,
+            rows,
+        )
+    }
+
     /// Reads the model with original node coordinates in its observed primary Entry.
     ///
     /// # Errors
@@ -197,7 +272,10 @@ impl ModelSource {
             ModelFile::Model,
             source.archive_origin().cloned(),
         )];
-        let keep_materials = matches!(coordinates, Coordinates::MaterialListing);
+        let keep_materials = matches!(
+            coordinates,
+            Coordinates::MaterialListing | Coordinates::MaterialPage
+        );
         let reads = ArchiveMaterialReads::default();
         let mut material_origins = MaterialArchiveOrigins::default();
         let mut material_fields = Observations::default();
@@ -230,11 +308,8 @@ impl ModelSource {
         if source.archive_origin().is_some() {
             bind_sources(coordinates, observed, &mut archive_sources);
         }
-        let material_receipt = if keep_materials {
-            material_fields.project(&model, source.archive_origin(), material_origins.library())?
-        } else {
-            None
-        };
+        let material_evidence =
+            coordinates.material_evidence(&model, &source, &material_origins, material_fields)?;
         Ok(Self {
             protection: source.into_protection(),
             name,
@@ -247,7 +322,7 @@ impl ModelSource {
             .then(|| Self::archive_default_material(index, verdicts)),
             model,
             archive_sources,
-            material_receipt,
+            material_evidence,
         })
     }
 }

@@ -84,6 +84,7 @@ mod model_animations;
 mod model_bone_origin_checks;
 mod model_bone_origins;
 mod model_item_origin_checks;
+mod model_material_origins;
 mod model_node_origins;
 mod models;
 mod mtl_summary;

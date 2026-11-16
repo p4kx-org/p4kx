@@ -10,6 +10,8 @@ pub(crate) mod receipt;
 use crate::material_source_info::{MaterialAuthoredInfo, MaterialLibrarySourceInfo};
 use crate::{ArchiveDefaultMaterial, DefaultMaterialReceipt};
 
+pub use receipt::MaterialPageOrigins;
+
 /// What reading a model's material library came to.
 #[derive(Debug, Serialize)]
 pub struct LibraryInfo<'a> {
@@ -85,7 +87,9 @@ impl<'a> MaterialInfo<'a> {
             .collect()
     }
 
-    fn of(material: &'a Material, id: Option<usize>) -> Self {
+    /// Describes a material with its original submaterial ID when the library has one.
+    #[must_use]
+    pub fn of(material: &'a Material, id: Option<usize>) -> Self {
         Self {
             id,
             name: &material.name,

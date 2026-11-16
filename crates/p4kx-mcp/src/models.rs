@@ -3,8 +3,8 @@
 
 use p4kx_extraction::model::{LodSelection, MaterialReading, PositionBox};
 use p4kx_extraction::{
-    AnimationChoice, AnimationSet, ChunkInfo, ConversionError, LibraryInfo, LodInfo, MaterialInfo,
-    MeshInfo, ModelSource, TextureVerdicts, UnreadInfo,
+    AnimationChoice, AnimationSet, ChunkInfo, ConversionError, LibraryInfo, LodInfo, MeshInfo,
+    ModelSource, TextureVerdicts, UnreadInfo,
 };
 use serde::Serialize;
 
@@ -12,6 +12,7 @@ use crate::archives::Opened;
 use crate::budget::{MAX_RESPONSE_LEN, fill_within, json_len};
 use crate::error::ToolError;
 use crate::model_item_page::ModelItemPage;
+use crate::model_material_items;
 use crate::model_node_items;
 use crate::model_params::Section;
 use crate::model_shapes::{LodShape, ModelCounts, ModelItemsResult, ModelOverview};
@@ -84,13 +85,7 @@ pub(crate) fn items(
         reserved,
     };
     let (total, items, next_cursor) = match section {
-        Section::Materials => paged(
-            &MaterialInfo::of_model(model),
-            page,
-            what,
-            reserved,
-            |item| item,
-        )?,
+        Section::Materials => return model_material_items::list(&observed),
         Section::Nodes => return model_node_items::list(&observed),
         Section::Meshes => {
             let lods = LodInfo::of_model(model);
@@ -172,6 +167,12 @@ fn read(
     request: ModelRead,
 ) -> Result<(ModelSource, AnimationSet), ToolError> {
     let index = opened.index();
+    if let ModelRead::Section(Section::Materials) = request {
+        let source =
+            ModelSource::from_index_with_material_pages(&index, path, &TextureVerdicts::new())
+                .map_err(|error| converted(path, "a model with its material sources", error))?;
+        return Ok((source, AnimationSet::default()));
+    }
     let load = match request {
         ModelRead::Section(Section::Bones | Section::Animations) => {
             ModelSource::from_index_observing_model_sources

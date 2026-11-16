@@ -958,6 +958,12 @@ names retain both the selecting declaration and the selected name. Definition to
 cursors use the original table count and the names consulted by filtering or sorting.
 The page budget includes provenance and a declaration that cannot fit is explicitly refused.
 
+For `list_model_items` with `section: "materials"`, `fieldOrigins` addresses material values
+at page-local positions while retaining original library and XML positions in `provenance`.
+The selected model contributes its material-library selector. The library contributes the
+decoded values and the declared material count. The page includes only source uses needed for
+the emitted values, count and cursor, and provenance counts toward the response budget.
+
 For `list_model_items` with `section: "bones"`, `fieldOrigins` addresses the returned bone fields,
 including each rotation and translation component. `cryEngineSkeleton` coordinates on a bone
 field are `[chunkOrdinal, boneOrdinal, start, endExclusive]` in the original decoded model Entry.

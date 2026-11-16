@@ -14,7 +14,7 @@ pub use crate::archive_material_reference::{ArchiveDefaultMaterial, ArchiveDefau
 use crate::chunk_source::ChunkSource;
 use crate::disk_case::CaseIndex;
 use crate::model_companions::{ArchiveCompanions, DiskCompanions};
-use crate::model_info_materials::receipt::{MaterialFieldReceipt, Observations};
+use crate::model_info_materials::receipt::{MaterialEvidence, MaterialFieldReceipt, Observations};
 use crate::path_index::PathIndex;
 use crate::source_protection::SourceProtection;
 use crate::source_provenance::model_material_origins::MaterialObservation;
@@ -37,7 +37,7 @@ pub struct ModelSource {
     model: Model,
     archive_sources: Vec<ModelArchiveSource>,
     default_material: Option<Arc<ArchiveDefaultMaterial>>,
-    material_receipt: Option<MaterialFieldReceipt>,
+    material_evidence: Option<MaterialEvidence>,
 }
 
 impl ModelSource {
@@ -331,7 +331,7 @@ impl ModelSource {
             model,
             archive_sources: Vec::new(),
             default_material: None,
-            material_receipt: None,
+            material_evidence: None,
         })
     }
 
@@ -341,12 +341,17 @@ impl ModelSource {
     /// Returns an error if field origins could not be recorded.
     pub fn from_file_with_material_receipt(path: &Path) -> Result<Self, ConversionError> {
         let mut source = Self::from_file_reading(path, LodSelection::All, MaterialReading::Plain)?;
-        source.material_receipt = Observations::default().project(&source.model, None, None)?;
+        source.material_evidence = Observations::default()
+            .project(&source.model, None, None)?
+            .map(MaterialEvidence::Listing);
         Ok(source)
     }
 
     pub(crate) const fn material_receipt(&self) -> Option<&MaterialFieldReceipt> {
-        self.material_receipt.as_ref()
+        match &self.material_evidence {
+            Some(MaterialEvidence::Listing(receipt)) => Some(receipt),
+            _ => None,
+        }
     }
 
     /// Returns the name of the model: its Entry path or its path on disk.

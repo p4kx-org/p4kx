@@ -6,6 +6,7 @@ use p4kx_model::{MaterialReadObservation, MaterialReadUse};
 use crate::{SourceLocation, SourceUseRole};
 
 /// The XML coordinate and role supplied by a material parser observation.
+#[derive(Debug)]
 pub struct MaterialSourceSite {
     location: SourceLocation,
     role: SourceUseRole,

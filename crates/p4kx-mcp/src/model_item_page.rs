@@ -5,8 +5,8 @@ use std::ops::Range;
 
 use p4kx_extraction::model::ModelFile;
 use p4kx_extraction::{
-    FieldOrigin, FieldOrigins, FieldOriginsError, FieldPath, FieldPathError, ModelArchiveSource,
-    ModelSource, SourceEvidenceError,
+    ConversionError, FieldOrigin, FieldOrigins, FieldOriginsError, FieldPath, FieldPathError,
+    ModelArchiveSource, ModelSource, SourceEvidenceError,
 };
 use serde_json::Value;
 use thiserror::Error;
@@ -28,6 +28,8 @@ pub(crate) enum EvidenceError {
     Duplicate(#[from] FieldOriginsError),
     #[error("model rows are unavailable at their requested positions")]
     MissingRows,
+    #[error("the material page origin could not be recorded")]
+    Material(#[source] Box<ConversionError>),
 }
 
 pub(crate) struct ModelItemPage<'a> {

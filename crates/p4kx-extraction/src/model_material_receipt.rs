@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::collections::BTreeMap;
+use std::ops::Range;
 
 use p4kx_archive::EntryOrigin;
 use p4kx_chunks::{crch, ivo};
@@ -16,9 +17,9 @@ use crate::material_source_info::{
     MaterialSourceEvidence, MaterialSourceOriginError, MaterialSourceSite,
 };
 use crate::{
-    ConversionError, FieldOrigins, FieldOriginsError, FieldPath, FieldPathError, InputScope,
-    SourceEvidenceError, SourceInput, SourceInventory, SourceLocation, SourceScope, SourceUse,
-    SourceUseRole, SourceUses,
+    ConversionError, FieldOrigin, FieldOrigins, FieldOriginsError, FieldPath, FieldPathError,
+    InputScope, SourceEvidenceError, SourceInput, SourceInventory, SourceLocation, SourceScope,
+    SourceUse, SourceUseRole, SourceUses,
 };
 
 #[derive(Debug, Serialize)]
@@ -26,6 +27,28 @@ use crate::{
 pub(crate) struct MaterialFieldReceipt {
     material_field_origins: FieldOrigins,
     material_provenance: SourceInventory,
+}
+
+/// Original material-count and material-field evidence for an emitted page.
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct MaterialPageOrigins {
+    /// The original inputs determining the library's material count.
+    pub count: FieldOrigin,
+    /// Origins addressed at the positions in the emitted array.
+    pub items: FieldOrigins,
+}
+
+#[derive(Debug)]
+pub(crate) enum MaterialEvidence {
+    Listing(MaterialFieldReceipt),
+    Page(Box<MaterialPageRead>),
+}
+
+#[derive(Debug)]
+pub(crate) struct MaterialPageRead {
+    pub(crate) fields: Observations,
+    pub(crate) library: Option<EntryOrigin>,
 }
 
 #[derive(Debug, Error)]
@@ -38,11 +61,13 @@ pub(crate) enum ReceiptError {
     Duplicate(#[from] FieldOriginsError),
     #[error(transparent)]
     Authored(#[from] MaterialSourceOriginError),
+    #[error("the requested material rows were not read")]
+    MissingRows,
 }
 
 type Sites = BTreeMap<(usize, MaterialReadField), Vec<MaterialSourceSite>>;
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub(crate) struct Observations(Sites);
 
 impl Observations {
@@ -84,6 +109,70 @@ impl Observations {
         use MaterialReadField::{LibraryDefaultPalette, LibrarySingle, LibraryTotal};
 
         let uses = SourceUses::with_compact_use_refs();
+        let mut writer = self.writer(&uses, library_entry, locator)?;
+        writer.put("/library/single", 0, &[LibrarySingle])?;
+        writer.put("/materials", 0, &[LibraryTotal])?;
+        writer.put("/library/default_palette", 0, &[LibraryDefaultPalette])?;
+        for (index, material) in library.materials.iter().enumerate() {
+            writer.material(&format!("/materials/{index}"), index, material)?;
+        }
+        let selected = uses.shared_origin(writer.selector.as_slice(), writer.complete);
+        MaterialSourceEvidence::new(&uses, writer.scope.as_ref(), &selected).project(
+            &library.authored,
+            &FieldPath::parse("/library/authored")?,
+            &mut writer.fields,
+        )?;
+        Ok(MaterialFieldReceipt {
+            material_field_origins: writer.fields,
+            material_provenance: uses.freeze()?,
+        })
+    }
+
+    pub(crate) fn project_page(
+        &self,
+        model: &Model,
+        model_entry: Option<&EntryOrigin>,
+        library_entry: Option<&EntryOrigin>,
+        uses: &SourceUses,
+        items: &FieldPath,
+        rows: Range<usize>,
+    ) -> Result<MaterialPageOrigins, ConversionError> {
+        let project = || {
+            let mut writer = self.writer(
+                uses,
+                library_entry,
+                model_entry.zip(material_selector(model)),
+            )?;
+            let materials = model
+                .materials
+                .library()
+                .map_or(&[][..], |library| library.materials.as_slice());
+            let selected = materials
+                .get(rows.clone())
+                .ok_or(ReceiptError::MissingRows)?;
+            let count = writer.origin(0, &[MaterialReadField::LibraryTotal])?;
+            let mut path = items.clone();
+            for (local, material) in selected.iter().enumerate() {
+                path.push_index(local)?;
+                writer.material(path.as_str(), rows.start + local, material)?;
+                path.pop();
+            }
+            Ok(MaterialPageOrigins {
+                count,
+                items: writer.fields,
+            })
+        };
+        project().map_err(|source: ReceiptError| {
+            ConversionError::MaterialSourceEvidence(Box::new(source))
+        })
+    }
+
+    fn writer<'a>(
+        &'a self,
+        uses: &'a SourceUses,
+        library_entry: Option<&EntryOrigin>,
+        locator: Option<(&EntryOrigin, usize)>,
+    ) -> Result<Writer<'a>, ReceiptError> {
         let selector = locator
             .map(|(entry, index)| {
                 uses.observe(SourceInput::Archive(entry), InputScope::Payload)?
@@ -100,34 +189,14 @@ impl Observations {
         let scope = library_entry
             .map(|entry| uses.observe(SourceInput::Archive(entry), InputScope::Payload))
             .transpose()?;
-        let mut writer = Writer {
+        Ok(Writer {
             sites: &self.0,
-            uses: &uses,
+            uses,
             scope,
             selector,
             complete: library_entry.is_some_and(complete)
                 && locator.is_some_and(|(entry, _)| complete(entry)),
             fields: FieldOrigins::new(),
-        };
-        writer.put("/library/single", 0, &[LibrarySingle])?;
-        writer.put("/materials", 0, &[LibraryTotal])?;
-        writer.put("/library/default_palette", 0, &[LibraryDefaultPalette])?;
-        for (index, material) in library.materials.iter().enumerate() {
-            writer.material(index, material)?;
-        }
-        let selected = uses.shared_origin(
-            writer.selector.as_slice(),
-            library_entry.is_some_and(complete)
-                && locator.is_some_and(|(entry, _)| complete(entry)),
-        );
-        MaterialSourceEvidence::new(&uses, writer.scope.as_ref(), &selected).project(
-            &library.authored,
-            &FieldPath::parse("/library/authored")?,
-            &mut writer.fields,
-        )?;
-        Ok(MaterialFieldReceipt {
-            material_field_origins: writer.fields,
-            material_provenance: uses.freeze()?,
         })
     }
 }
@@ -165,6 +234,16 @@ impl Writer<'_> {
         values: &[MaterialReadField],
     ) -> Result<(), ReceiptError> {
         let path = FieldPath::parse(pointer)?;
+        let origin = self.origin(material, values)?;
+        self.fields.insert(path, origin)?;
+        Ok(())
+    }
+
+    fn origin(
+        &self,
+        material: usize,
+        values: &[MaterialReadField],
+    ) -> Result<FieldOrigin, ReceiptError> {
         let mut contributions: Vec<_> = self.selector.iter().cloned().collect();
         let mut lost = self.scope.is_none();
         if let Some(scope) = &self.scope {
@@ -178,20 +257,20 @@ impl Writer<'_> {
                 }
             }
         }
-        self.fields.insert(
-            path,
-            self.uses.origin(&contributions, !lost && self.complete),
-        )?;
-        Ok(())
+        Ok(self.uses.origin(&contributions, !lost && self.complete))
     }
 
-    fn material(&mut self, index: usize, material: &Material) -> Result<(), ReceiptError> {
+    fn material(
+        &mut self,
+        parent: &str,
+        index: usize,
+        material: &Material,
+    ) -> Result<(), ReceiptError> {
         use MaterialReadField::{
             AlphaTest, Diffuse, Emissive, Flags, Glow, Name, Opacity, Row, Shader, Shininess,
             Specular, StringGenMask, SurfaceType,
         };
 
-        let parent = format!("/materials/{index}");
         self.put(&format!("{parent}/id"), index, &[Row])?;
         for (name, field) in [
             ("name", Name),
@@ -216,7 +295,7 @@ impl Writer<'_> {
                 self.put(&format!("{parent}/{name}/{channel}"), index, &[Row, field])?;
             }
         }
-        self.sources(&parent, index, material)
+        self.sources(parent, index, material)
     }
 
     fn sources(

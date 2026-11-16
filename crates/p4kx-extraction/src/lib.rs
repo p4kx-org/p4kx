@@ -250,7 +250,9 @@ pub use model_chunk_source_info::{
 };
 pub use model_info::{BoneInfo, ChunkInfo, ChunkJson, LodInfo, MeshInfo, ModelInfo, NodeInfo};
 pub use model_info_animations::{AnimationInfo, UnreadInfo};
-pub use model_info_materials::{DefaultMaterialInfo, LibraryInfo, MaterialInfo};
+pub use model_info_materials::{
+    DefaultMaterialInfo, LibraryInfo, MaterialInfo, MaterialPageOrigins,
+};
 pub use model_source::{ArchiveDefaultMaterial, ArchiveDefaultMaterialState, ModelSource};
 pub use model_textures::{ArchiveTextures, MAX_MODEL_TEXTURE_PIXELS};
 pub use observed_file_origin::{ObservedFileOrigin, ObservedFileRead, read_observed_file};
@@ -297,7 +299,6 @@ pub use p4kx_audio::{
 };
 pub use p4kx_chunks as chunks;
 pub use p4kx_cryxml as cryxml;
-pub use p4kx_dataforge::query;
 pub use p4kx_dataforge::{
     Annotations, CSV_BYTE_ORDER_MARK, CanonicalReadObserver, DataForge, DataForgeError,
     DataForgeIssue, DataType, Enum, FLAT_COLUMNS, FLAT_TAG_COLUMN, FLAT_TEXT_COLUMN, Field,
@@ -312,6 +313,7 @@ pub use p4kx_dataforge::{
     TagPathIncoming, TagRelationIssue, TagResolver, TagTree, TagTreeIssues, TextResolver,
     TrailingSurvey, TreeBuilder, Value, ValueError, ValueKind, write_csv_cell,
 };
+pub use p4kx_dataforge::{DataForgeHeaderField, query};
 #[expect(
     deprecated,
     reason = "Public compatibility for the released Tag constants"
