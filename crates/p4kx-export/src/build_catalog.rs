@@ -74,7 +74,7 @@ pub fn build_catalog_from(
         emit(catalog, Vec::new(), Compression::None, run)
     })?;
     Ok(BuiltCatalog {
-        summary: parts.summary(written.size, written.compressed),
+        summary: parts.summary(&written),
         json: written.sink,
     })
 }
@@ -123,8 +123,5 @@ pub(crate) fn write_catalog_from_with_run<W: Write>(
         let out = create().map_err(CatalogError::Write)?;
         emit(catalog, out, compression, run)
     })?;
-    Ok((
-        parts.summary(written.size, written.compressed),
-        written.sink,
-    ))
+    Ok((parts.summary(&written), written.sink))
 }

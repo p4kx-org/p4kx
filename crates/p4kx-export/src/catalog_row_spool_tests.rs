@@ -32,6 +32,16 @@ fn rows_replay_in_original_order_as_the_same_compact_json() -> TestResult {
         "physical occurrences are preserved"
     );
     let expected = serde_json::to_vec(&values)?;
+    assert_eq!(
+        spool.stored_bytes(),
+        spool
+            .file
+            .lock()
+            .map_err(|_| "private spool lock")?
+            .metadata()?
+            .len(),
+        "the stored size is the logical length of the actual open spool"
+    );
     assert!(
         spool.stored_bytes() < u64::try_from(expected.len())?,
         "the scratch file retains only the compressed row stream"

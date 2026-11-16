@@ -58,6 +58,7 @@ pub(crate) struct Written<W> {
     pub(crate) sink: W,
     pub(crate) size: u64,
     pub(crate) compressed: Option<u64>,
+    pub(crate) staged_row_bytes: u128,
 }
 
 /// Serialises `catalog` as JSON followed by a newline into `out`, through the compression.
@@ -68,6 +69,14 @@ pub(crate) fn emit<W: Write>(
     run: CatalogRun<'_, '_>,
 ) -> Result<Written<W>, CatalogError> {
     let cancel = run.options.cancel;
+    let staged_row_bytes = catalog.placements.staged_row_bytes()
+        + u128::from(catalog.definitions.particle_libraries.stored_bytes())
+        + u128::from(
+            catalog
+                .projections
+                .weapon_player_animation_candidates
+                .stored_bytes(),
+        );
     match compression {
         Compression::None => {
             run.begin(CatalogStage::WriteJson);
@@ -77,6 +86,7 @@ pub(crate) fn emit<W: Write>(
                 size: counted.count,
                 sink: counted.inner,
                 compressed: None,
+                staged_row_bytes,
             })
         }
         Compression::Zstd { level } => {
@@ -93,6 +103,7 @@ pub(crate) fn emit<W: Write>(
                 size,
                 compressed: Some(packed.count),
                 sink: packed.inner,
+                staged_row_bytes,
             })
         }
     }

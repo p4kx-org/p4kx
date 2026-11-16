@@ -44,6 +44,11 @@ pub(crate) struct CatalogPlacements {
 }
 
 impl CatalogPlacements {
+    pub(crate) fn staged_row_bytes(&self) -> u128 {
+        u128::from(self.container_instances.stored_bytes())
+            + u128::from(self.location_instances.stored_bytes())
+    }
+
     pub(crate) fn take_row_spool_failure(&self) -> Option<RowSpoolError> {
         self.container_instances
             .take_failure()

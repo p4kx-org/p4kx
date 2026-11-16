@@ -90,6 +90,13 @@ impl StagedCatalogTable {
         }
     }
 
+    pub(crate) const fn stored_bytes(&self) -> u64 {
+        match &self.spool {
+            Some(spool) => spool.stored_bytes(),
+            None => 0,
+        }
+    }
+
     pub(crate) fn take_failure(&self) -> Option<RowSpoolError> {
         self.failure.take()
     }

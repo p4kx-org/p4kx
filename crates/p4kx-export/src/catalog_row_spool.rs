@@ -138,8 +138,7 @@ impl RowSpool {
         self.rows
     }
 
-    #[cfg(test)]
-    const fn stored_bytes(&self) -> u64 {
+    pub(crate) const fn stored_bytes(&self) -> u64 {
         self.bytes
     }
 

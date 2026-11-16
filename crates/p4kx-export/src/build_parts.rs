@@ -6,6 +6,7 @@ use p4kx_extraction::{Archive, DataForge, SourceUses};
 
 use crate::blueprint_catalog_rows::{self, BlueprintTables};
 use crate::catalog_origins::CatalogOrigins;
+use crate::catalog_output::Written;
 use crate::catalog_projections::weapon_reload::{self, WeaponAnimation};
 use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::catalog_item_components::item_definition::ItemDefinition;
@@ -42,10 +43,11 @@ pub(super) struct Parts {
 }
 
 impl Parts {
-    pub(super) fn summary(self, size: u64, compressed_size: Option<u64>) -> CatalogSummary {
+    pub(super) fn summary<W>(self, written: &Written<W>) -> CatalogSummary {
         CatalogSummary {
             export_health: self.export_health,
             provenance: self.provenance,
+            staged_row_bytes: written.staged_row_bytes,
             kinds: self.kinds,
             texts: self.texts,
             text_kind_coverage: self.text_kind_coverage,
@@ -62,8 +64,8 @@ impl Parts {
             quantizations: self.quantizations,
             warnings: self.warnings,
             archive_key: self.archive_key,
-            size,
-            compressed_size,
+            size: written.size,
+            compressed_size: written.compressed,
         }
     }
 }

@@ -491,6 +491,10 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   `encryptedEntriesUnread`, the encrypted Entries the export could not read without a usable key.
   `--progress-phases` reports each phase as a `catalog phase: <identifier>` line on stderr,
   including when redirected. It works in both publication modes and leaves stdout for the summary.
+  After publication it also prints
+  `catalog storage: staged_row_bytes=<n> publication_bytes=<n> peak_temporary_bytes=<n>`.
+  The peak counts the logical bytes of the private row spools and the unpublished output file
+  while both are open. Filesystem allocation and process write counters are measured separately.
   After `read-dataforge` loads the original Entry, `read-inputs` marks the start of preparation.
   `open-dataforge`, `read-localization`, `index-localization` and `initialize-origins` mark the starts
   of database validation, reading and decoding language Entries, indexing translations and binding

@@ -173,6 +173,7 @@ pub struct TextSummary {
 pub struct CatalogSummary {
     pub(crate) export_health: crate::ExportHealth,
     pub(crate) provenance: CatalogProvenance,
+    pub(crate) staged_row_bytes: u128,
     pub(crate) kinds: Vec<KindSummary>,
     pub(crate) texts: Vec<TextSummary>,
     pub(crate) text_kind_coverage: Vec<crate::KindTextSummary>,
@@ -343,6 +344,12 @@ impl CatalogSummary {
             .filter(|summary| !summary.kind.is_derived())
             .map(|summary| summary.skipped)
             .sum()
+    }
+
+    /// Returns the total logical bytes of the private row spools held during output.
+    #[must_use]
+    pub const fn staged_row_bytes(&self) -> u128 {
+        self.staged_row_bytes
     }
 
     /// Returns the size of the catalog JSON in bytes, uncompressed.

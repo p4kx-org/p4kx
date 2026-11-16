@@ -74,12 +74,25 @@ pub(crate) fn run(args: &CatalogArgs, as_json: bool) -> Result<ExitCode> {
         line.finish();
     }
     let summary = &written?;
+    if args.progress_phases {
+        report_storage(summary);
+    }
     print_result(&archive, out, summary, as_json)?;
     Ok(ExitCode::from(if summary.is_complete() {
         exit::SUCCESS
     } else {
         exit::PARTIAL_FAILURE
     }))
+}
+
+fn report_storage(summary: &CatalogSummary) {
+    let staged = summary.staged_row_bytes();
+    let publication = summary.upload_size();
+    let peak = staged + u128::from(publication);
+    let _ignored = writeln!(
+        io::stderr().lock(),
+        "catalog storage: staged_row_bytes={staged} publication_bytes={publication} peak_temporary_bytes={peak}"
+    );
 }
 
 fn print_result(
