@@ -17,7 +17,7 @@ use crate::animation_read::{
 use crate::reader::to_usize;
 use crate::{
     Animation, AnimationClipCoordinates, AnimationDatabaseSelection, AnimationError,
-    AnimationHeader, CorruptAnimation, PositionedAnimation, PositionedDba,
+    AnimationHeader, CorruptAnimation, DbaHeaderDeclarations, PositionedAnimation, PositionedDba,
 };
 
 pub(crate) const DBA_DATA_VERSION: u32 = 0x900;
@@ -69,15 +69,7 @@ impl DbaHeaders {
         file_name: &str,
         file: &ChunkFile<B>,
     ) -> Result<Self, AnimationError> {
-        let metadata = chunk_bytes(
-            file_name,
-            file,
-            ivo::DBA_METADATA,
-            DBA_METADATA_VERSION,
-            "DbaMetadata",
-        )?;
-        let data = chunk_bytes(file_name, file, ivo::DBA_DATA, DBA_DATA_VERSION, "DbaData")?;
-        read_headers(metadata, data).map_err(|(chunk, source)| corrupt(file_name, chunk, source))
+        read_header_projection(file_name, file, read_headers)
     }
 }
 
@@ -154,12 +146,13 @@ fn read_projected<B: AsRef<[u8]>, T>(
         .map_err(|(chunk, source)| corrupt(file_name, chunk, source))
 }
 
-type ChunkFailure = (&'static str, CorruptAnimation);
+pub(crate) type ChunkFailure = (&'static str, CorruptAnimation);
 
 struct Layout<'a> {
     records: &'a [u8],
     paths: Vec<DatabasePath>,
     blocks: Vec<Block>,
+    declarations: DbaHeaderDeclarations,
 }
 
 struct DatabasePath {
@@ -189,7 +182,8 @@ fn read_database<T>(
         records,
         paths,
         blocks,
-    } = layout(metadata.bytes, data.bytes)?;
+        ..
+    } = layout(metadata.bytes, data.bytes, Some(MAX_DATABASE_KEYS))?;
     let count = blocks.len();
     let decoded: Vec<_> = blocks
         .par_iter()
@@ -244,12 +238,40 @@ fn read_database<T>(
     Ok(dba)
 }
 
+pub(crate) fn read_header_projection<B: AsRef<[u8]>, T>(
+    file_name: &str,
+    file: &ChunkFile<B>,
+    project: impl FnOnce(&[u8], &[u8]) -> Result<T, ChunkFailure>,
+) -> Result<T, AnimationError> {
+    let metadata = chunk_bytes(
+        file_name,
+        file,
+        ivo::DBA_METADATA,
+        DBA_METADATA_VERSION,
+        "DbaMetadata",
+    )?;
+    let data = chunk_bytes(file_name, file, ivo::DBA_DATA, DBA_DATA_VERSION, "DbaData")?;
+    project(metadata, data).map_err(|(chunk, source)| corrupt(file_name, chunk, source))
+}
+
+pub(crate) fn read_declarations(
+    metadata: &[u8],
+    data: &[u8],
+) -> Result<DbaHeaderDeclarations, ChunkFailure> {
+    let layout = layout(metadata, data, None)?;
+    for record in layout.records.as_chunks::<RECORD_LEN>().0 {
+        read_record(record).map_err(|source| ("DbaMetadata", source))?;
+    }
+    Ok(layout.declarations)
+}
+
 fn read_headers(metadata: &[u8], data: &[u8]) -> Result<DbaHeaders, ChunkFailure> {
     let Layout {
         records,
         paths,
         blocks,
-    } = layout(metadata, data)?;
+        ..
+    } = layout(metadata, data, Some(MAX_DATABASE_KEYS))?;
     let mut headers = DbaHeaders {
         animations: Vec::with_capacity(blocks.len()),
         skipped: Vec::new(),
@@ -278,7 +300,11 @@ fn read_headers(metadata: &[u8], data: &[u8]) -> Result<DbaHeaders, ChunkFailure
     Ok(headers)
 }
 
-fn layout<'a>(metadata: &'a [u8], data: &[u8]) -> Result<Layout<'a>, ChunkFailure> {
+fn layout<'a>(
+    metadata: &'a [u8],
+    data: &[u8],
+    key_budget: Option<u64>,
+) -> Result<Layout<'a>, ChunkFailure> {
     let in_metadata = |source| ("DbaMetadata", source);
     let in_data = |source| ("DbaData", source);
     let (records, name_table) = metadata_parts(metadata).map_err(in_metadata)?;
@@ -289,10 +315,17 @@ fn layout<'a>(metadata: &'a [u8], data: &[u8]) -> Result<Layout<'a>, ChunkFailur
     let mut blocks = Vec::with_capacity(count);
     let mut position = PREFIX_LEN;
     let mut keys = 0_u64;
+    let mut clips_over_preview_budget = 0;
     for _ in 0..count {
         let block = read_block(data, position, DBA_SIGNATURE).map_err(in_data)?;
-        keys = keys.saturating_add(declared_keys(data, &block).map_err(in_data)?);
-        check_budget(keys, MAX_DATABASE_KEYS).map_err(in_data)?;
+        let clip_keys = declared_keys(data, &block).map_err(in_data)?;
+        keys = keys
+            .checked_add(clip_keys)
+            .ok_or(("DbaData", CorruptAnimation::DeclaredKeyCountOverflow))?;
+        if let Some(limit) = key_budget {
+            check_budget(keys, limit).map_err(in_data)?;
+        }
+        clips_over_preview_budget += u64::from(clip_keys > MAX_ANIMATION_KEYS);
         position = block.end;
         blocks.push(block);
     }
@@ -300,6 +333,11 @@ fn layout<'a>(metadata: &'a [u8], data: &[u8]) -> Result<Layout<'a>, ChunkFailur
         records,
         paths,
         blocks,
+        declarations: DbaHeaderDeclarations {
+            clips: count as u64,
+            keys,
+            clips_over_preview_budget,
+        },
     })
 }
 

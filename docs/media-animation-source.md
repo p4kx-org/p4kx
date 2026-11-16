@@ -140,9 +140,10 @@ production budgets. It observes original source receipts, clip/controller rows a
 chunk receipts without writing payloads or generated streams. It verifies physical selection,
 raw sizes and hashes, chunk and clip order, original controller words, declared and decoded key
 counts, and source ranges. Each typed receipt is compared with a hash and size of the exact
-decoded sample bytes from the independent parser. It reconciles the counts with the header reader
-where that reader covers the selected source. Legacy header-budget refusals are counted
-separately. The streaming source reader still checks the complete available declarations.
+decoded sample bytes from the independent parser. The CAF header supplies its checked key count
+even above the preview budget. The DBA declaration reader checks all metadata and controller
+tables and counts every clip and declared key through the last block. The census compares both
+counts against the export. Preview budget refusals are counted separately.
 Diagnostic rows are verified and an incomplete census fails the check.
 
 The separate global-image export replay selects the two original root image families and

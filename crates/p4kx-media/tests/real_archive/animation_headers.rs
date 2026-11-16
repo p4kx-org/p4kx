@@ -2,7 +2,9 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_extraction::chunks::ChunkFile;
-use p4kx_extraction::model::{AnimationError, AnimationHeader, CorruptAnimation, DbaHeaders};
+use p4kx_extraction::model::{
+    AnimationError, AnimationHeader, CorruptAnimation, DbaHeaderDeclarations,
+};
 
 use super::{Family, TestResult, Totals, require};
 
@@ -25,40 +27,24 @@ pub(super) fn verify(
             clips: 1,
             keys: header.keys as u64,
         }),
-        Family::Dba => DbaHeaders::read(name, file)
-            .map(|headers| dba_counts(headers, &mut totals.header_budget_refusals)),
+        Family::Dba => {
+            let declarations = DbaHeaderDeclarations::read(name, file)?;
+            totals.header_budget_refusals += declarations.preview_budget_refusals();
+            Ok(Counts {
+                clips: declarations.clips,
+                keys: declarations.keys,
+            })
+        }
         Family::Aim => return Err("AIM does not have decoded headers".into()),
     };
     let observed = Counts {
         clips: totals.clips - clips_before,
         keys: totals.declared - keys_before,
     };
-    reconcile(
-        family,
-        inventory,
-        observed,
-        &mut totals.header_budget_refusals,
-    )
-}
-
-fn dba_counts(headers: DbaHeaders, budget_refusals: &mut u64) -> Counts {
-    let clips = (headers.animations.len() + headers.skipped.len()) as u64;
-    let mut keys = headers
-        .animations
-        .iter()
-        .map(|header| header.keys as u64)
-        .sum();
-    for skipped in headers.skipped {
-        if let CorruptAnimation::TooManyKeys { keys: declared, .. } = skipped.reason {
-            keys += declared;
-            *budget_refusals += 1;
-        }
-    }
-    Counts { clips, keys }
+    reconcile(inventory, observed, &mut totals.header_budget_refusals)
 }
 
 fn reconcile(
-    family: Family,
     inventory: Result<Counts, AnimationError>,
     observed: Counts,
     budget_refusals: &mut u64,
@@ -70,9 +56,6 @@ fn reconcile(
             ..
         }) => {
             *budget_refusals += 1;
-            if !matches!(family, Family::Caf) {
-                return Ok(());
-            }
             Counts { clips: 1, keys }
         }
         Err(error) => return Err(error.into()),
@@ -108,7 +91,7 @@ fn caf_header_budget_refusal_still_requires_exact_inventory() {
             },
         });
         let mut budget_refusals = 0;
-        let result = reconcile(Family::Caf, inventory, observed, &mut budget_refusals);
+        let result = reconcile(inventory, observed, &mut budget_refusals);
         assert_eq!(result.is_ok(), agrees, "exact CAF clip and key totals");
         assert_eq!(budget_refusals, 1, "budget refusal remains visible");
     }
