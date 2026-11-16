@@ -21,8 +21,12 @@ const _: () = assert!(
     "short subresource storage fits the existing XML location footprint"
 );
 
+const SURVEY_FIELD: &str = "$fields";
+const DECLARATION_FIELDS: &[&str] = &[SURVEY_FIELD];
+
 const VALUE_FIELDS: &[&str] = &[
     "$value",
+    SURVEY_FIELD,
     "$fieldName",
     "$dataType",
     "$isArray",
@@ -50,6 +54,7 @@ const HEADER_FIELDS: &[&str] = &[
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Coordinates {
     Header([u64; 1]),
+    RecordDeclarations([u64; 1]),
     Value([u64; 2]),
 }
 
@@ -74,6 +79,10 @@ impl DataForgeSite {
                 (Coordinates::Value([*record, *ordinal]), VALUE_FIELDS)
             }
             ("dataforgeRecordHeader", [record]) => (Coordinates::Header([*record]), HEADER_FIELDS),
+            ("dataforgeRecordDeclarations", [record]) => (
+                Coordinates::RecordDeclarations([*record]),
+                DECLARATION_FIELDS,
+            ),
             _ => return None,
         };
         let [record, ..] = indices.as_slice() else {
@@ -88,6 +97,9 @@ impl DataForgeSite {
         let (namespace, indices) = match &self.coordinates {
             Coordinates::Value(indices) => ("dataforgeValue", indices.as_slice()),
             Coordinates::Header(indices) => ("dataforgeRecordHeader", indices.as_slice()),
+            Coordinates::RecordDeclarations(indices) => {
+                ("dataforgeRecordDeclarations", indices.as_slice())
+            }
         };
         Subresource {
             namespace,
@@ -304,3 +316,7 @@ impl Serialize for RetainedLocation {
 #[cfg(test)]
 #[path = "source_location_storage_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "source_declaration_site_tests.rs"]
+mod declaration_tests;
