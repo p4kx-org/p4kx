@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::ops::Range;
+
 use p4kx_audio::{HircKind, HircValue, MusicNode, MusicStinger, Soundbank};
 
 use super::AudioFileError;
+use super::event_sources::EventDeclaration;
 use super::language::bank_language;
 
 /// A soundbank Entry of the audio index.
@@ -74,7 +77,8 @@ pub(crate) struct EmbeddedMedia {
 #[derive(Debug)]
 pub(crate) struct BankContents {
     pub(crate) soundbank: IndexedSoundbank,
-    pub(crate) events: Vec<u32>,
+    pub(super) events: Vec<EventDeclaration>,
+    pub(super) event_version: Option<Range<usize>>,
     pub(crate) media: Vec<EmbeddedMedia>,
     pub(crate) stingers: Vec<BankStinger>,
 }
@@ -104,11 +108,12 @@ pub(super) const fn music_node(value: &HircValue) -> Option<&MusicNode> {
 /// objects and the WEMs it embeds.
 pub(crate) fn read(path: &str, entry: usize, bytes: &[u8]) -> Result<BankContents, AudioFileError> {
     let bank = Soundbank::parse(bytes)?;
-    let events: Vec<u32> = bank
+    let events: Vec<_> = bank
         .objects()
         .iter()
-        .filter(|object| object.kind == HircKind::Event)
-        .map(|object| object.id)
+        .enumerate()
+        .filter(|(_, object)| object.kind == HircKind::Event)
+        .map(|(ordinal, object)| EventDeclaration::of(ordinal, object))
         .collect();
     let media = bank
         .wems()
@@ -148,6 +153,7 @@ pub(crate) fn read(path: &str, entry: usize, bytes: &[u8]) -> Result<BankContent
             entry,
         },
         events,
+        event_version: bank.version_byte_range(),
         media,
         stingers,
     })

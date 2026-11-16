@@ -11,6 +11,7 @@ mod breaks;
 mod cache;
 mod entity;
 mod error;
+mod event_sources;
 mod export;
 mod export_preflight;
 mod hirc_diagnostic_sites;
@@ -46,6 +47,7 @@ pub use breaks::{BreakReason, BrokenLink};
 pub use cache::ArchiveAudio;
 pub use entity::{EntityAudio, EntityTrigger, EventMatch, Unmatched};
 pub use error::{AudioFileError, AudioIssue};
+pub use event_sources::SoundbankEventSource;
 pub(crate) use export::ExportedWemOrigin;
 pub use export::{
     ExportFailure, ExportLoopOrigin, ExportLoopOrigins, ExportOptions, ExportReport, ExportState,
@@ -55,7 +57,10 @@ pub use hirc_path_source::HircPathSource;
 pub use index::AudioIndex;
 pub use language::LanguageChoice;
 pub use p4kx_audio::wwise_id;
-pub use references::{TriggerReference, TriggerScope, trigger_references, trigger_references_in};
+pub use references::{
+    PositionedTriggerReference, TriggerOccurrence, TriggerReference, TriggerScope,
+    positioned_trigger_references_in, trigger_references, trigger_references_in,
+};
 pub use resolve_options::ResolveOptions;
 pub use search::{MAX_SEARCH_PAGE, SearchPage, TriggerHit};
 pub use sounds::{NodeKind, PathStep, SoundVariant, SourceKind, TriggerSounds, WemLocation};

@@ -6,7 +6,7 @@ use std::collections::hash_map::Entry as Slot;
 use std::mem;
 use std::ptr;
 
-use p4kx_archive::{Archive, Entry};
+use p4kx_archive::{Archive, Entry, ObservedEntry, ObservedEntryBinding};
 use p4kx_extraction::CancelToken;
 use p4kx_extraction::sound::wwise_path;
 
@@ -27,6 +27,7 @@ pub struct AtlDefinitions {
 struct DefinitionEntry {
     path: Box<str>,
     position: usize,
+    owner: Option<ObservedEntryBinding>,
 }
 
 impl AtlDefinitions {
@@ -49,7 +50,7 @@ impl AtlDefinitions {
         entries.sort_by(|(_, left), (_, right)| read::folded_order(left.path(), right.path()));
         let definitions = index_read::read_definitions(archive, &entries, cancel)?;
         let mut index = Self::default();
-        index.add_definitions(&entries, definitions);
+        index.add_definitions(archive, &entries, definitions);
         Some(index)
     }
 
@@ -79,6 +80,21 @@ impl AtlDefinitions {
         self.definition_file(trigger).map(|(_, position)| position)
     }
 
+    /// Returns the physically bound Entry behind an admitted trigger.
+    #[must_use]
+    pub fn definition_source<'archive>(
+        &self,
+        archive: &'archive Archive,
+        trigger: &AtlTrigger,
+    ) -> Option<ObservedEntry<'archive>> {
+        let file = self.definition_entry(trigger)?;
+        let observed = archive.observed_entry(archive.entries().get(file.position)?)?;
+        file.owner
+            .as_ref()?
+            .is_same_entry(&observed.binding())
+            .then_some(observed)
+    }
+
     /// Returns the failures encountered while reading and admitting definitions.
     #[must_use]
     pub fn issues(&self) -> &[AudioIssue] {
@@ -86,23 +102,33 @@ impl AtlDefinitions {
     }
 
     pub(super) fn definition_file(&self, trigger: &AtlTrigger) -> Option<(&str, usize)> {
+        let file = self.definition_entry(trigger)?;
+        Some((&file.path, file.position))
+    }
+
+    fn definition_entry(&self, trigger: &AtlTrigger) -> Option<&DefinitionEntry> {
         if !ptr::eq(self.trigger(trigger.name())?, trigger) {
             return None;
         }
-        let file = self.files.get(usize::try_from(trigger.file).ok()?)?;
-        Some((&file.path, file.position))
+        self.files.get(usize::try_from(trigger.file).ok()?)
     }
 
     pub(super) fn take_issues(&mut self) -> Vec<AudioIssue> {
         mem::take(&mut self.issues)
     }
 
-    fn add_definitions(&mut self, entries: &[(usize, &Entry)], definitions: Vec<DefinitionRead>) {
+    fn add_definitions(
+        &mut self,
+        archive: &Archive,
+        entries: &[(usize, &Entry)],
+        definitions: Vec<DefinitionRead>,
+    ) {
         self.files = entries
             .iter()
             .map(|&(position, entry)| DefinitionEntry {
                 path: entry.path().into(),
                 position,
+                owner: archive.observed_entry(entry).map(|entry| entry.binding()),
             })
             .collect();
         for ((_, entry), definition) in entries.iter().zip(definitions) {

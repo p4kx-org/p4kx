@@ -31,7 +31,7 @@ pub trait RecordJsonObserver {
     }
 }
 
-/// How an original input contributes to a Reference member.
+/// How an original input contributes to an observed value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum RecordJsonUseRole {
@@ -43,7 +43,7 @@ pub enum RecordJsonUseRole {
     Conversion,
 }
 
-/// A source coordinate and its contribution to a Reference member.
+/// A source coordinate and its contribution to an observed value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct RecordJsonUse {
@@ -54,6 +54,12 @@ pub struct RecordJsonUse {
 }
 
 impl RecordJsonUse {
+    /// Pairs an observed original coordinate with its role in the emitted value.
+    #[must_use]
+    pub const fn new(source: RecordJsonSource<'static>, role: RecordJsonUseRole) -> Self {
+        Self { source, role }
+    }
+
     pub(crate) const fn selection(source: RecordJsonSource<'static>) -> Self {
         let role = match source {
             RecordJsonSource::PropertyStorage { .. } => RecordJsonUseRole::Conversion,

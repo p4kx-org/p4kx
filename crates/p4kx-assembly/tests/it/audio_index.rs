@@ -20,6 +20,9 @@ use p4kx_testkit::{
 
 type TestResult = Result<(), Box<dyn Error>>;
 
+#[path = "audio_event_sources.rs"]
+mod event_sources;
+
 const PLAY: u16 = 0x0403;
 
 fn database() -> DataForgeBuilder {

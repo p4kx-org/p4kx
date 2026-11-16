@@ -3,10 +3,11 @@
 
 use std::collections::{HashMap, HashSet};
 
-use p4kx_archive::{Archive, Entry};
+use p4kx_archive::{Archive, Entry, ObservedEntry};
 use p4kx_extraction::CancelToken;
 
 use super::banks::{BankStinger, StingerDeclaration};
+use super::event_sources::BankEventIndex;
 use super::index_read::{self, BankRead};
 use super::language::SOUND_FOLDER;
 use super::media::{BankPath, Limits, LooseMedia, WemSource};
@@ -27,6 +28,7 @@ pub struct AudioIndex {
     definitions: AtlDefinitions,
     soundbanks: Vec<IndexedSoundbank>,
     events: HashMap<u32, Box<[u32]>>,
+    pub(super) event_sources: Vec<Option<BankEventIndex>>,
     bank_ids: HashMap<u32, Box<[u32]>>,
     stingers: HashMap<u32, Box<[Stinger]>>,
     media: HashMap<u32, Box<[MediaSpot]>>,
@@ -75,7 +77,7 @@ impl AudioIndex {
             issues,
             ..Self::default()
         };
-        index.add_soundbanks(&bank_entries, soundbanks);
+        index.add_soundbanks(archive, &bank_entries, soundbanks);
         let (loose, failures) = LooseMedia::collect(
             wem_entries.iter().copied(),
             bank_entries.iter().map(|&(position, entry)| BankPath {
@@ -93,7 +95,12 @@ impl AudioIndex {
         Some(index)
     }
 
-    fn add_soundbanks(&mut self, entries: &[(usize, &Entry)], soundbanks: Vec<BankRead>) {
+    fn add_soundbanks(
+        &mut self,
+        archive: &Archive,
+        entries: &[(usize, &Entry)],
+        soundbanks: Vec<BankRead>,
+    ) {
         let mut events: HashMap<u32, Vec<u32>> = HashMap::new();
         let mut media: HashMap<u32, Vec<MediaSpot>> = HashMap::new();
         let mut bank_ids: HashMap<u32, Vec<u32>> = HashMap::new();
@@ -108,12 +115,16 @@ impl AudioIndex {
                         .push(position);
                     self.soundbanks.push(contents.soundbank);
                     stingers.add(position, &contents.stingers);
-                    for id in contents.events {
-                        let holders = events.entry(id).or_default();
+                    for declaration in &contents.events {
+                        let holders = events.entry(declaration.id).or_default();
                         if holders.last() != Some(&position) {
                             holders.push(position);
                         }
                     }
+                    let source = archive.observed_entry(entry).map(|entry| {
+                        BankEventIndex::new(entry, contents.event_version, contents.events)
+                    });
+                    self.event_sources.push(source);
                     for wem in contents.media {
                         media.entry(wem.id).or_default().push(MediaSpot {
                             soundbank: position,
@@ -159,6 +170,16 @@ impl AudioIndex {
     #[must_use]
     pub fn definition_entry_position(&self, trigger: &AtlTrigger) -> Option<usize> {
         self.definitions.definition_entry_position(trigger)
+    }
+
+    /// Returns the physically bound definition Entry behind an admitted trigger.
+    #[must_use]
+    pub fn definition_source<'archive>(
+        &self,
+        archive: &'archive Archive,
+        trigger: &AtlTrigger,
+    ) -> Option<ObservedEntry<'archive>> {
+        self.definitions.definition_source(archive, trigger)
     }
 
     pub(super) fn definition_file(&self, trigger: &AtlTrigger) -> Option<(&str, usize)> {
