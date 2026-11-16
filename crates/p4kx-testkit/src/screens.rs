@@ -116,6 +116,10 @@ fn widget_structs() -> Vec<TestStruct> {
             .array("staticVariables", pointer("BuildingBlocks_StaticVariable"))
             .array("scene", pointer("BuildingBlocks_DisplayWidget"))
             .array("library", pointer("BuildingBlocks_DisplayWidget"))
+            .field(
+                "proxyRootNode",
+                TestType::WeakPointer("BuildingBlocks_DisplayWidget".to_owned()),
+            )
             .array("operations", pointer("BuildingBlocks_BindingsOperation")),
         TestStruct::new("BuildingBlocks_DefaultStyles")
             .field("sharedStyles", reference("BuildingBlocks_Style"))
@@ -127,6 +131,7 @@ fn widget_structs() -> Vec<TestStruct> {
             .field("name", TestType::String)
             .field("isActive", TestType::Bool)
             .field("affectsLayout", TestType::Bool)
+            .field("layer", TestType::Int32)
             .field("inheritsAlpha", TestType::Bool)
             .field("alpha", TestType::Single)
             .array("styleTags", reference("Tag"))
@@ -159,6 +164,7 @@ fn widget_structs() -> Vec<TestStruct> {
 
 fn widget_kinds() -> Vec<TestStruct> {
     vec![
+        button_structure(),
         TestStruct::new("BuildingBlocks_WidgetCard").parent("BuildingBlocks_DisplayWidget"),
         TestStruct::new("BuildingBlocks_WidgetCanvas")
             .parent("BuildingBlocks_DisplayWidget")
@@ -208,6 +214,22 @@ fn widget_kinds() -> Vec<TestStruct> {
             .field("fillColor", pointer("BuildingBlocks_Color"))
             .field("strokeColor", pointer("BuildingBlocks_Color")),
     ]
+}
+
+fn button_structure() -> TestStruct {
+    TestStruct::new("BuildingBlocks_ComponentGeneralButtonSecondary")
+        .parent("BuildingBlocks_DisplayWidget")
+        .field("sizingMethod", TestType::String)
+        .field("fillStyle", TestType::String)
+        .field("iconPosition", TestType::String)
+        .field(
+            "labelProperties",
+            class("BuildingBlocks_ComponentLabelProperties"),
+        )
+        .field(
+            "iconProperties",
+            class("BuildingBlocks_ComponentIconProperties"),
+        )
 }
 
 fn style_structs() -> Vec<TestStruct> {

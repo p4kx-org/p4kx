@@ -54,6 +54,7 @@ mod archive_screen_origin;
 mod assets;
 mod bindings;
 mod boxes;
+mod button_component;
 mod canvas;
 mod colour;
 mod compose;

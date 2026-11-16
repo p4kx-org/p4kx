@@ -42,10 +42,11 @@ fn left_out_reason(field: &str) -> String {
 }
 
 /// What a widget hands to the canvas it holds: the localised and the typed parameter values.
-pub(crate) struct Handover {
+pub(crate) struct Handover<'a> {
     pub(crate) text: ParamValues,
     pub(crate) typed: RestParams,
     pub(crate) stylesheet: Option<Guid>,
+    pub(crate) widget: &'a Widget,
 }
 
 impl Walk<'_, '_, '_, '_> {
@@ -262,7 +263,7 @@ impl Walk<'_, '_, '_, '_> {
 
     /// Returns the values widget `index` hands to its nested canvas: the bound parameters over
     /// the ones the widget names, the localised ones included.
-    pub(crate) fn handover(&self, index: usize, widget: &Widget) -> Handover {
+    pub(crate) fn handover<'a>(&self, index: usize, widget: &'a Widget) -> Handover<'a> {
         let bound = self
             .rests
             .last()
@@ -301,6 +302,7 @@ impl Walk<'_, '_, '_, '_> {
             text,
             typed,
             stylesheet: widget.stylesheet,
+            widget,
         }
     }
 

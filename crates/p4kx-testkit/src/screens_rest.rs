@@ -41,6 +41,9 @@ pub(crate) fn rest_structs() -> Vec<TestStruct> {
         operation("NumberComponentParameter")
             .field("parameter", TestType::String)
             .field("defaultValue", TestType::Single),
+        operation("IntegerComponentParameter")
+            .field("parameter", TestType::String)
+            .field("defaultValue", TestType::Int64),
         operation("LocalizedComponentParameter")
             .field("parameter", TestType::String)
             .field("defaultValue", TestType::Locale),
@@ -128,13 +131,23 @@ fn number_switch_structs() -> impl Iterator<Item = TestStruct> {
 }
 
 fn tag_structs() -> impl Iterator<Item = TestStruct> {
+    const PAIR: &str = "BuildingBlocks_IntegerTagPair";
     let tag = || TestType::ReferenceTo("Tag".to_owned());
-    [operation("TagFromBoolean")
-        .field("isTrue", tag())
-        .field("isFalse", tag())
-        .field("inputTrue", operation_input())
-        .field("inputFalse", operation_input())
-        .field("input", operation_input())]
+    [
+        operation("TagFromBoolean")
+            .field("isTrue", tag())
+            .field("isFalse", tag())
+            .field("inputTrue", operation_input())
+            .field("inputFalse", operation_input())
+            .field("input", operation_input()),
+        TestStruct::new(PAIR)
+            .field("first", TestType::Int64)
+            .field("second", tag()),
+        operation("TagFromIntegerSwitch")
+            .array("values", TestType::Class(PAIR.to_owned()))
+            .field("input", operation_input())
+            .field("defaultValue", tag()),
+    ]
     .into_iter()
 }
 

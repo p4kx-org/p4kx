@@ -5,6 +5,7 @@ use p4kx_dataforge::{Guid, Location, Reference, Step, StructValue, Value};
 
 use crate::assets::WidgetAssets;
 use crate::bindings::{ParamValues, param_values, typed_values};
+use crate::button_component::ButtonComponent;
 use crate::colour::ColorSpec;
 use crate::corners::Corner;
 use crate::flex::{Flex, parse_flex};
@@ -92,6 +93,7 @@ pub(crate) struct Widget {
     pub(crate) text: Option<TextSpec>,
     pub(crate) picture: Picture,
     pub(crate) kit: Kit,
+    pub(crate) button: Option<Box<ButtonComponent>>,
     pub(crate) params: ParamValues,
     pub(crate) typed: RestParams,
     pub(crate) assets: WidgetAssets,
@@ -248,6 +250,7 @@ impl Widget {
             text: TextSpec::parse(structure),
             picture: Picture::parse(structure),
             kit: Kit::parse(structure),
+            button: ButtonComponent::read(structure).map(Box::new),
             params: param_values(structure),
             typed: typed_values(structure),
             assets: WidgetAssets::scan(structure),

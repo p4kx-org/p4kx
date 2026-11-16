@@ -167,11 +167,17 @@ impl Eval<'_> {
             Node::Variable { binding, zero } => self
                 .variable(binding)
                 .map_or_else(|| Ok(zero.clone()), |variable| variable.coerce(zero)),
-            Node::Param { parameter, default } => Ok(self
-                .inputs
-                .iter()
-                .find(|(name, given)| name == parameter && fits(given, default))
-                .map_or_else(|| default.clone(), |(_, given)| given.clone())),
+            Node::Param { parameter, default } => {
+                let value = self
+                    .inputs
+                    .iter()
+                    .find(|(name, given)| name == parameter && fits(given, default))
+                    .map_or(default, |(_, given)| given);
+                match value {
+                    Rest::Integer(number) => Ok(Rest::Num(*number)),
+                    value => Ok(value.clone()),
+                }
+            }
             Node::TextParam { parameter, default } => Ok(Rest::Text(
                 self.texts
                     .iter()

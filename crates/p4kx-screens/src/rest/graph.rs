@@ -163,9 +163,13 @@ fn source(short: &str, op: &StructValue<'_>) -> Option<Node> {
             parameter: parameter(),
             default: Rest::Bool(flag(op, "defaultValue").unwrap_or(false)),
         },
-        "NumberComponentParameter" | "IntegerComponentParameter" => Node::Param {
+        "NumberComponentParameter" => Node::Param {
             parameter: parameter(),
             default: Rest::Num(number(op, "defaultValue")?),
+        },
+        "IntegerComponentParameter" => Node::Param {
+            parameter: parameter(),
+            default: Rest::Integer(number(op, "defaultValue")?),
         },
         "LocalizedComponentParameter" => Node::TextParam {
             parameter: parameter(),

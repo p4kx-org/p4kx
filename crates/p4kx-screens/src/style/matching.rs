@@ -68,6 +68,10 @@ impl TagPaths {
             .map(|(_, guid)| guid)
     }
 
+    pub(crate) fn name_of(&self, guid: Guid) -> Option<&str> {
+        self.tree.get(guid).map(|tag| tag.name())
+    }
+
     fn within(&self, tag: Guid, ancestor: Guid) -> bool {
         if tag == ancestor {
             return true;

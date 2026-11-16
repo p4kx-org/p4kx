@@ -14,7 +14,7 @@ mod unsupported;
 mod vector;
 
 pub(crate) use canvas::{is_canvas_widget, nested as nested_canvas};
-pub(crate) use standard::{is_standard, tags_of as standard_tags};
+pub(crate) use standard::{canvas_of as standard_canvas, is_standard, tags_of as standard_tags};
 
 use crate::context::Context;
 use crate::look::Look;

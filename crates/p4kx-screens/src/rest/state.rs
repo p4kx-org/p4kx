@@ -41,8 +41,7 @@ pub(crate) struct AtRest {
     pub(super) omissions: Vec<BindingOmission>,
 }
 
-/// Returns whether two typed parameters are the same one: parameters of different kinds, a
-/// boolean and a number, have their own names even where the text of the name is equal.
+/// Returns whether the two parameters have the same name and value kind.
 pub(crate) fn same_parameter(name: &str, value: &Rest, other: &str, other_value: &Rest) -> bool {
     name == other && std::mem::discriminant(value) == std::mem::discriminant(other_value)
 }
@@ -63,6 +62,7 @@ pub(crate) fn key_of(inputs: &[(String, Rest)], texts: &[(String, String)]) -> u
             Rest::Num(number) => (1_u8, number.to_bits()).hash(&mut hasher),
             Rest::Text(text) => (2_u8, text).hash(&mut hasher),
             Rest::Tag(tag) => (3_u8, tag).hash(&mut hasher),
+            Rest::Integer(number) => (4_u8, number.to_bits()).hash(&mut hasher),
         }
     }
     hasher.finish().max(1)

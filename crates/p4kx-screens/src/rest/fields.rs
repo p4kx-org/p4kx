@@ -118,6 +118,12 @@ impl AtRest {
                 if let Some(why) = layout_problem(field, &value) {
                     return Err(why.to_owned());
                 }
+                let value = match (kind, value) {
+                    (FieldKind::Integer, Rest::Num(number)) if field.starts_with(PARAMETER) => {
+                        Rest::Integer(number)
+                    }
+                    (_, value) => value,
+                };
                 self.set(binding.widget, field, value)?;
             }
             _ => self.omit(eval, binding, ContentOmissionCode::UnsupportedField, None),

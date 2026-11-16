@@ -10,6 +10,7 @@ mod fields;
 mod graph;
 mod integer_number_switch;
 mod ops;
+mod parameter_switch;
 mod state;
 #[cfg(test)]
 mod tests;
@@ -20,6 +21,7 @@ use p4kx_dataforge::Guid;
 
 pub(crate) use eval::{Given, TEXT_FIELD};
 pub(crate) use graph::Operations;
+pub(crate) use parameter_switch::parameter_for_tag;
 pub(crate) use state::{AtRest, BindingOmission, key_of, same_parameter};
 
 /// A value of the operations graph.
@@ -27,6 +29,7 @@ pub(crate) use state::{AtRest, BindingOmission, key_of, same_parameter};
 pub(crate) enum Rest {
     Bool(bool),
     Num(f64),
+    Integer(f64),
     Text(String),
     /// A tag, or none: what a tag node gives a state tag field or a string parameter.
     Tag(Option<Guid>),

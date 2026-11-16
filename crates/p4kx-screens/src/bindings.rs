@@ -6,7 +6,7 @@ use std::rc::Rc;
 
 use p4kx_dataforge::{Location, Reference, Step, StructValue, Value};
 
-use crate::reader::{as_struct, flag, float, items, reference, text};
+use crate::reader::{as_struct, exact, flag, float, items, reference, text};
 use crate::rest::{Rest, RestParams};
 
 const PARAMETER: &str = "BuildingBlocks_BindingsLocalizedComponentParameter";
@@ -81,8 +81,10 @@ pub(crate) fn typed_values(widget: &StructValue<'_>) -> RestParams {
                 "BuildingBlocks_ComponentParameterInputBoolean" => {
                     Rest::Bool(flag(input, "value")?)
                 }
-                "BuildingBlocks_ComponentParameterInputInteger"
-                | "BuildingBlocks_ComponentParameterInputNumber" => {
+                "BuildingBlocks_ComponentParameterInputInteger" => {
+                    Rest::Integer(exact(input.field("value")?).filter(|v| v.is_finite())?)
+                }
+                "BuildingBlocks_ComponentParameterInputNumber" => {
                     Rest::Num(f64::from(float(input, "value").filter(|v| v.is_finite())?))
                 }
                 "BuildingBlocks_ComponentParameterInputString" => {

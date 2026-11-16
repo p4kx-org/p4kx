@@ -40,6 +40,7 @@ pub(crate) struct Canvas {
     pub(crate) size: [f32; 2],
     pub(crate) size_fields: [bool; 2],
     pub(crate) world_root: Option<[f32; 2]>,
+    pub(crate) proxy_root: Option<usize>,
     pub(crate) widgets: Vec<Widget>,
     pub(crate) scene_len: usize,
     pub(crate) roots: Vec<usize>,
@@ -120,6 +121,11 @@ impl Canvas {
             widget_at(&widgets, scene_len, target)
         };
         let (roots, children) = hierarchy(&widgets, scene_len);
+        let proxy_root = reference(root, "proxyRootNode")
+            .filter(|target| target.record_index() == record_index)
+            .and_then(|target| index_at(target.location(), "scene"))
+            .and_then(|slot| widget_at(&widgets, scene_len, Target::Scene(slot)))
+            .filter(|index| roots.contains(index));
         let unreachable = unreachable_widgets(&widgets, scene_len, &roots, &children);
         Self {
             unreachable,
@@ -127,6 +133,7 @@ impl Canvas {
             operations: Operations::read(root, &find_widget),
             arrays: static_arrays(root),
             world_root: raw.then(|| world_root(&widgets, &roots)).flatten(),
+            proxy_root,
             guid,
             record_index,
             record_path: tree.record_path().to_owned(),

@@ -30,6 +30,7 @@ mod render;
 mod rest;
 mod selectors;
 mod selectors_reference;
+mod standard_button;
 mod state_tags;
 mod still;
 mod stylesheet;

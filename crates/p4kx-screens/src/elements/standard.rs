@@ -3,12 +3,14 @@
 
 use p4kx_dataforge::{DataForge, Guid};
 
+use crate::button_component::SECONDARY;
 use crate::canvas::find_canvas;
 use crate::style::TagPaths;
 use crate::widget::Widget;
 
 const FOLDER: &str = "libs/foundry/records/ui/buildingblocks/modularkit/standard/widgets/";
 const TAG_FOLDER: &str = "UI.Style._Standard.ModularKit.Widgets";
+const SECONDARY_CANVAS: &str = "libs/foundry/records/ui/buildingblocks/modularkit/standard/components/buttongeneralsecondarycomponentstandard";
 
 pub(crate) const SEPARATOR: &str = "BuildingBlocks_WidgetSeparator";
 
@@ -18,7 +20,7 @@ const STYLES: [&str; 3] = ["primary", "secondary", "tertiary"];
 /// Returns whether the look of `type_name` is kept in a canvas of the `ModularKit` standard
 /// widgets.
 pub(crate) fn is_standard(type_name: &str) -> bool {
-    type_name == SEPARATOR
+    matches!(type_name, SEPARATOR | SECONDARY)
 }
 
 fn variant(widget: &Widget) -> Option<[String; 2]> {
@@ -34,6 +36,9 @@ fn variant(widget: &Widget) -> Option<[String; 2]> {
 /// Returns the canvas that holds the look of a standard widget, named by its direction and
 /// style, when the Archive has it.
 pub(crate) fn canvas_of(widget: &Widget, forge: &DataForge<'_>) -> Option<Guid> {
+    if widget.button.is_some() {
+        return find_canvas(forge, SECONDARY_CANVAS).ok();
+    }
     let [direction, style] = variant(widget)?;
     find_canvas(
         forge,

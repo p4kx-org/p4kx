@@ -104,10 +104,9 @@ description.
   `100` over `100` are a run-time picture and number.
 - **RSI (Constellation), POWER MANAGEMENT.** The palette matches the screenshot: pale lavender
   arrows and text, orange `BATTERY` and `OFFLINE`, an angled darker footer with the page name in
-  wide capitals. Not matching: the page name has no `«` and `»` (the buttons are
-  `ComponentGeneralButton` widgets, which have no renderer), the labels sit on pale-blue
-  rectangles (a background that the style sets on a text), and the red block with the warning
-  triangle is missing.
+  wide capitals. At the time, the `ComponentGeneralButton` widgets left the `«` and `»`
+  undrawn. The style supplied pale-blue rectangles behind the labels, and the red block
+  with the warning triangle was absent.
 
 ## Still different from the game, not decided here
 
@@ -115,9 +114,22 @@ description.
   of the power page (`OUTPUT`) are far too large; the tab bar text is right.
 - **Labels on a pale-blue background** on the Aegis SHIELDS and the RSI power pages: the
   background belongs to the text widget in the Records; whether the game draws it is not known.
-- **Buttons.** `ComponentGeneralButton*` has no renderer (the RSI `«` `»`, the arrows of the
-  Aegis bar are drawn through their icons).
+- **Buttons.** The Secondary family has a data-driven default rendering path. The other button
+  families and the game-driven interaction states need separate evidence.
 - **Run-time pictures and numbers** (silhouette, readouts, rows, pips).
+
+## Default Secondary buttons
+
+The inspected LIVE MFD footer contains two `ComponentGeneralButtonSecondary` instances. The
+corresponding standard template has an authored proxy root and ordered frame, label and icon
+parts. The still renderer enters that proxy subtree and applies its parent and ancestor style
+conditions. The template's tag switches supply the effective choices for fill style and icon
+position. The instance supplies the label, visibility, anchors and scale when authored. The graph
+keeps Integer and Number parameters distinct when their names match.
+
+The synthetic checks cover frame and label paint, hidden parts, draw order and an invalid proxy.
+A reported icon-asset override or undecidable template selector identifies the affected button.
+The installed MFD paint check and mapping of other families remain open in #994.
 
 ## Guesses, unverified against the game
 
