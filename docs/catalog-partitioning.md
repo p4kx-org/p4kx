@@ -60,22 +60,22 @@ limits separately. Retain the complete single-file Export.
 
 ## Consumer reference limits
 
-Basetool at `0621e8f` admits LIVE Catalog v2 with a 64,000,000-byte upload limit.
+Basetool at `470f3bc` admits LIVE Catalog v2 with a 64,000,000-byte upload limit.
 Its default decoded limit is 1,000,000,000 bytes and its default retained JSON span limit
 is 128,000,000 bytes. These are reference values for the v3 sizing work. Basetool's
 v3 importer and its acceptance run are tracked in its own repository. Its issue
 lists P4KX 0.5.0 as a prerequisite. A revision-bound release candidate is needed
 to run the cross-repository acceptance before final publication.
-[Upload gate](https://github.com/krt-profit/basetool/blob/0621e8fca89fdb9188fe89d1d1ec391dea4c8eaf/backend/src/main/java/de/greluc/krt/profit/basetool/backend/catalogue/internal/P4kUploadGate.java)
-· [Import properties](https://github.com/krt-profit/basetool/blob/0621e8fca89fdb9188fe89d1d1ec391dea4c8eaf/backend/src/main/java/de/greluc/krt/profit/basetool/backend/catalogue/internal/P4kImportProperties.java)
+[Upload gate](https://github.com/krt-profit/basetool/blob/470f3bc09a7a01bc7054da7a53243bc3f351b1aa/backend/src/main/java/de/greluc/krt/profit/basetool/backend/catalogue/internal/P4kUploadGate.java)
+· [Import properties](https://github.com/krt-profit/basetool/blob/470f3bc09a7a01bc7054da7a53243bc3f351b1aa/backend/src/main/java/de/greluc/krt/profit/basetool/backend/catalogue/internal/P4kImportProperties.java)
 · [Basetool v3 migration](https://github.com/krt-profit/basetool/issues/3107)
 
-VerseKit at `b25f486` depends on P4KX 0.4.2. It reads Blueprints and Item values from
+VerseKit at `1523a9a` depends on P4KX 0.4.2. It reads Blueprints and Item values from
 DataForge and builds filtered catalogs through the Rust library for data such as contracts
 and ship slots. Its v3 consumer verification needs to identify the actual library or
 artifact path, with the exact producer and consumer revisions.
-[VerseKit dependency](https://github.com/Xharig/VerseKit/blob/b25f486d1da9f7e633cab4f1e150c65d83cd8f42/Cargo.toml)
-· [Game data code](https://github.com/Xharig/VerseKit/blob/b25f486d1da9f7e633cab4f1e150c65d83cd8f42/crates/versekit-gamedata/src/lib.rs)
+[VerseKit dependency](https://github.com/Xharig/VerseKit/blob/1523a9a8887324914ba3bfba966c4b1babc45bbf/Cargo.toml)
+· [Game data code](https://github.com/Xharig/VerseKit/blob/1523a9a8887324914ba3bfba966c4b1babc45bbf/crates/versekit-gamedata/src/lib.rs)
 
 ## Proposed domains
 
