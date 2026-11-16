@@ -22,6 +22,9 @@ use crate::{
     UiText, format,
 };
 
+#[path = "ui_tab_omissions.rs"]
+mod omissions;
+
 /// Shows the choice between what the picture is made of and what it leaves out, and the chosen
 /// part.
 pub(super) fn show(ui: &mut Ui, model: &mut Model) {
@@ -114,21 +117,25 @@ fn column_width(ui: &Ui, texts: &Texts, kinds: &[UiText]) -> f32 {
 }
 
 fn content_row(ui: &mut Ui, texts: &Texts, row: &ContentRow, column: f32) {
+    let kind = texts.get(row.kind);
+    let detail = detail_text(texts, &row.detail);
+    detail_row(ui, &kind, &detail, column);
+}
+
+fn detail_row(ui: &mut Ui, kind: &str, detail: &str, column: f32) {
     let (rect, response) =
         ui.allocate_exact_size(vec2(ui.available_width(), XML_ROW_HEIGHT), Sense::hover());
-    let kind = texts.get(row.kind);
-    let text = detail_text(texts, &row.detail);
-    response.widget_info(|| WidgetInfo::labeled(Role::Row, true, format!("{kind} {text}")));
+    response.widget_info(|| WidgetInfo::labeled(Role::Row, true, format!("{kind} {detail}")));
     let left = rect.with_max_x(rect.left() + column);
-    let label = line(ui, plain(&kind, ROW_FONT, Weight::Regular), column);
+    let label = line(ui, plain(kind, ROW_FONT, Weight::Regular), column);
     paint_left(ui, left, label, palette::GRAY_2_TEXT);
     let right = rect.with_min_x(rect.left() + column);
-    let detail = line(ui, plain(&text, ROW_FONT, Weight::Regular), right.width());
-    let elided = detail.elided;
-    paint_left(ui, right, detail, palette::GRAY_1);
+    let galley = line(ui, plain(detail, ROW_FONT, Weight::Regular), right.width());
+    let elided = galley.elided;
+    paint_left(ui, right, galley, palette::GRAY_1);
     if elided {
         tooltip::hover(response, |ui| {
-            tooltip::line(ui, &text);
+            tooltip::line(ui, detail);
         });
     }
 }
@@ -250,7 +257,7 @@ fn report_body(ui: &mut Ui, texts: &Texts, report: Option<&UiReport>) {
         facts(ui, texts, &counts);
         ui.add_space(SPACE_2);
     }
-    if report.is_empty() {
+    if report.is_empty() && report.content_omissions().is_empty() {
         quiet(ui, texts.get(UiText::ReportNone));
         return;
     }
@@ -271,6 +278,7 @@ fn report_body(ui: &mut Ui, texts: &Texts, report: Option<&UiReport>) {
                 )];
                 quiet(ui, texts.format(UiText::ReportMore, &args));
             }
+            omissions::show(ui, texts, report.content_omissions());
         });
 }
 

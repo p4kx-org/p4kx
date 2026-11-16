@@ -445,8 +445,10 @@ page of a powered MFD) and the **Format** (PNG or SVG) and press **Export…**. 
 variables are kept across sessions, and the report lists the variables no canvas of the screen
 reads and the textures the Archive lacks. The tabs **Contents** and
 **Left out** list what the movie holds and what the renderer left out (fonts it lacks, unsupported
-widget types, limits). `p4kx ui` draws the same pictures on the command line, and `p4kx ui
-hologram` draws the hologram of a vehicle, which the window does not offer.
+widget types, limits). For a screen, **Content omissions** shows the affected widget and its
+original Scene or Library slot, field, source when present and reason. Hover over a clipped row to
+read it in full. `p4kx ui` draws the same pictures on the command line, and `p4kx ui hologram` draws
+the hologram of a vehicle, which the window does not offer.
 
 ## The window
 

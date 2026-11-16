@@ -255,6 +255,26 @@ ui_texts! {
     ReportEffect = "ui-report-effect";
     /// Widgets or features of one type that were left out.
     ReportLeftOut = "ui-report-left-out";
+    /// The heading for individual content omissions.
+    ReportOmissionDetails = "ui-report-omission-details";
+    /// The original widget, field and source of an omission.
+    ReportOmissionRow = "ui-report-omission-row";
+    /// An omission without an authored source identifier.
+    ReportOmissionNoSource = "ui-report-omission-no-source";
+    /// The widget field names no source.
+    ReportOmissionSourceMissing = "ui-report-omission-source-missing";
+    /// The image requires a game render target.
+    ReportOmissionRuntimeTarget = "ui-report-omission-runtime-target";
+    /// The list requires game data.
+    ReportOmissionRuntimeArray = "ui-report-omission-runtime-array";
+    /// A variable has no supplied value.
+    ReportOmissionVariableMissing = "ui-report-omission-variable-missing";
+    /// A binding targets an unsupported field.
+    ReportOmissionUnsupportedField = "ui-report-omission-unsupported-field";
+    /// The renderer could not evaluate the input.
+    ReportOmissionUnresolvedInput = "ui-report-omission-unresolved-input";
+    /// An omission with an unrecognised reason.
+    ReportOmissionOther = "ui-report-omission-other";
     /// A nested canvas that could not be read.
     ReportMissingCanvas = "ui-report-missing-canvas";
     /// A texture that the Archive does not hold or cannot read.

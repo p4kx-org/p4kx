@@ -563,8 +563,11 @@ geändertes Archiv bricht sie ab. Darunter steht ein verstellbares Feld mit den 
 „Ausgelassen", jedes mit seiner Zahl. „Inhalt" zeigt eine Faktenleiste, deren Paare aus Name und Wert nicht
 umbrechen, und die Zeilen der Teile (Art in `color-gray-2-text`, Zeilenhöhe `rowHeight`); „Ausgelassen"
 zeigt die Zahlen und die Zeilen dessen, was der Renderer übersprang, ohne Wirkung zeichnete, ausließ oder
-nicht lesen konnte, in den Worten von `p4kx ui render`, bis `reportMaxLines`. „Exportieren …" öffnet den
-Speichern-Dialog des Systems mit dem vorgeschlagenen Namen; das Ergebnis steht unter der Leiste in
+nicht lesen konnte, in den Worten von `p4kx ui render`, bis `reportMaxLines`. Bei Bildschirmen folgt
+„Ausgelassene Inhalte" mit einer scrollbaren Liste der betroffenen Widgets. Jede Zeile nennt die
+Ursprungsposition im Datensatz, das Feld, die Quelle und den Grund. Abgeschnittene Texte stehen
+vollständig im Tooltip. „Exportieren …" öffnet den Speichern-Dialog des Systems mit dem
+vorgeschlagenen Namen; das Ergebnis steht unter der Leiste in
 `color-success-text`, bei ausgelassenen Elementen in `color-warning`, bei Fehlern in `color-danger-text`, mit
 „Schließen" (`btn-ghost btn-xs`). Das geöffnete Archiv wird nie überschrieben, eine Datei in einer
 Star-Citizen-Installation lehnt der Tab wie die anderen Exporte ab, und hat sich das Archiv während des
