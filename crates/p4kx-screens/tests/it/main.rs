@@ -17,6 +17,7 @@ mod image_work;
 mod images;
 mod instances;
 mod layout;
+mod layout_approximations;
 mod layout_reference;
 mod limits;
 mod listing;

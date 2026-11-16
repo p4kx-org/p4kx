@@ -12,12 +12,14 @@ use crate::canvas::{Canvas, CanvasStore};
 use crate::colour::Palette;
 use crate::context::Context;
 use crate::elements;
+use crate::flex::LayoutApproximation;
 use crate::geometry::Geometry;
 use crate::layout::{Frame, Sibling, place};
 use crate::limits::Limits;
 use crate::look::Look;
 use crate::paint::Area;
 use crate::rest::{AtRest, RestParams};
+use crate::screen_asset_inputs::WidgetInput;
 use crate::style::preset::PresetStyles;
 use crate::style::{CanvasStyles, Modifiers, StyleCache, Subject, TagPaths, Uses};
 use crate::text::Shaped;
@@ -45,6 +47,7 @@ pub(crate) struct Walk<'s, 'a, 'f, 't> {
     pub(crate) pending_sheet: Option<Guid>,
     pub(crate) noted: HashSet<Guid>,
     pub(crate) left_out_noted: HashSet<Guid>,
+    layout_sites: HashSet<(WidgetInput, LayoutApproximation)>,
     pub(crate) params: Vec<ParamValues>,
     pub(crate) resolved: HashMap<(Guid, usize, u64, u64, usize), Rc<Modifiers>>,
     pub(crate) shape: Uses,
@@ -92,6 +95,7 @@ impl<'s, 'a, 'f, 't> Walk<'s, 'a, 'f, 't> {
             pending_sheet: None,
             noted: HashSet::new(),
             left_out_noted: HashSet::new(),
+            layout_sites: HashSet::new(),
             params: Vec::new(),
             resolved: HashMap::new(),
             shape: Uses::default(),
@@ -197,7 +201,12 @@ impl<'s, 'a, 'f, 't> Walk<'s, 'a, 'f, 't> {
                 break;
             }
         }
-        let mut placed_all = place(frame, &siblings);
+        let mut placed_all = place(
+            frame,
+            &siblings,
+            &mut self.cx.report,
+            &mut self.layout_sites,
+        );
         placed_all.sort_by_key(|placed| siblings.get(placed.at).map_or(0, |s| s.widget.layer));
         for placed in placed_all {
             let Some(sibling) = siblings.get(placed.at) else {
@@ -323,6 +332,7 @@ impl<'s, 'a, 'f, 't> Walk<'s, 'a, 'f, 't> {
         let frame = Frame {
             content,
             flex: sibling.geometry.flex.as_ref(),
+            owner: Some(widget),
             centred: false,
         };
         self.siblings(

@@ -18,7 +18,7 @@ pub struct Unsupported {
     pub reason: String,
     /// How many widgets it concerns.
     pub count: usize,
-    /// Names of up to three of those widgets.
+    /// All original sites for layout rules, or up to three names for other diagnostics.
     pub examples: Vec<String>,
 }
 
@@ -145,6 +145,28 @@ impl Report {
     }
 
     pub(crate) fn note(&mut self, element: &str, reason: &str, name: &str) {
+        self.note_with(element, reason, |examples| {
+            if examples.len() < MAX_EXAMPLES && !examples.iter().any(|example| example == name) {
+                examples.push(name.to_owned());
+            }
+        });
+    }
+
+    pub(crate) fn note_layout(&mut self, widget: &Widget, reason: &str, site: Option<WidgetInput>) {
+        self.note_with(&widget.type_name, reason, |examples| {
+            if let Some(site) = site {
+                examples.push(format!(
+                    "{} (Record {}, {}[{}])",
+                    widget.name,
+                    site.record_index,
+                    site.section.field_name(),
+                    site.slot
+                ));
+            }
+        });
+    }
+
+    fn note_with(&mut self, element: &str, reason: &str, remember: impl FnOnce(&mut Vec<String>)) {
         let element = element.strip_prefix("BuildingBlocks_").unwrap_or(element);
         if let Some(entry) = self
             .unsupported
@@ -152,16 +174,16 @@ impl Report {
             .find(|entry| entry.element == element && entry.reason == reason)
         {
             entry.count += 1;
-            if entry.examples.len() < MAX_EXAMPLES && !entry.examples.iter().any(|n| n == name) {
-                entry.examples.push(name.to_owned());
-            }
+            remember(&mut entry.examples);
             return;
         }
+        let mut examples = Vec::new();
+        remember(&mut examples);
         self.unsupported.push(Unsupported {
             element: element.to_owned(),
             reason: reason.to_owned(),
             count: 1,
-            examples: vec![name.to_owned()],
+            examples,
         });
     }
 

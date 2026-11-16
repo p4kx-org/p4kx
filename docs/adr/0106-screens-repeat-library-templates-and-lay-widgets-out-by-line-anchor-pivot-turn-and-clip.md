@@ -164,7 +164,27 @@ compared by its Records and what the screenshot shows of the same widgets.
   HUD screenshots show of the 1 to 5 degree turns of the HUD bounds cannot be separated from the
   perspective of the projected HUD.
 
-The four open guesses and the screenshot that decides each are listed in issue #972.
+## Layout cases without a discriminating game reference
+
+The layout policy reader takes `axisJustification`, `crossAxisJustification`,
+`itemAlignment`, `wrap` and `direction` from the widget's `layoutPolicy`.
+The style cascade can override the flex settings. Child `sizing.width` and
+`sizing.height` are resolved before the effective policy places the children.
+An automatic extent can use measured content from the child. The render report
+names the policy-owning container and the relevant fields when the placement
+uses one of these four rules.
+
+| Fixture | Rule used in the still | Discriminating game capture |
+| --- | --- | --- |
+| Two fixed children and unused main-axis space | `Stretch` may grow fixed children. The diagnostic requires actual growth after size bounds. | Head-on image of several lit annunciators with available main-axis space. |
+| One centred line and a shorter child aligned to its end | Cross justification places the line and item alignment places the child within it. Aligning the child across the whole container would move it. | Head-on image of a row with a smaller item and visible room at the cross end. |
+| Three reversed lines with unused cross-axis space | `WrapReverse` reverses the line order and swaps the meaning of `Start` and `End` across the container. | Drake HUD with countermeasures that wrap across multiple columns. |
+| Stack with a short auto-sized child and a wider sibling | The stack uses the widest contributing extent across the flow. The auto-sized child keeps its measured extent after bounds. | A stack with a visible auto-sized child and a distinct parent cross extent. |
+
+Compare captures against the same source canvas and runtime state. The
+synthetic fixtures distinguish the placement alternatives and check that the
+renderer reports its choices. The game behavior remains unverified in these
+cases.
 
 Outside the guesses: rendered at rest, the MFD frame draws large light-blue blocks at both lower
 corners and the ship diagram of the self-status page a light-blue rectangle, which the game does

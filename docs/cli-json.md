@@ -2383,6 +2383,15 @@ authored `source` and a `code`. The widget position is its original `scene` or `
 Each original widget and authored field or operation has one detailed row per omission code. The grouped report
 keeps per-visit counts when the renderer repeats a widget.
 
+The grouped layout diagnostics name the affected containers and their policy fields.
+Their `examples` list includes every distinct original widget site as a name,
+canvas record index, and `scene` or `library` slot. Repeated instances count as
+separate visits in `count` and list their original site once.
+They cover fixed children grown by `Stretch`, separate cross justification and item
+alignment in a single line, the cross-axis start for `WrapReverse`, and content-sized
+automatic children across a stack. The report records a rule when it affects the
+placement. See [ADR-0106](adr/0106-screens-repeat-library-templates-and-lay-widgets-out-by-line-anchor-pivot-turn-and-clip.md#layout-cases-without-a-discriminating-game-reference).
+
 | Code | Condition |
 | --- | --- |
 | `runtime_target` | `imageSource` names a target drawn by the game. |

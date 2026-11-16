@@ -93,6 +93,7 @@ impl Walk<'_, '_, '_, '_> {
             let frame = Frame {
                 content: fitted.layout,
                 flex: None,
+                owner: None,
                 centred: fitted.centred,
             };
             let roots = &canvas.roots;
