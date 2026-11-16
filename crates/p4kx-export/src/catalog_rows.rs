@@ -13,6 +13,8 @@ use crate::template_number_capture::TemplateNumbers;
 
 #[path = "catalog_row_numbers.rs"]
 mod row_numbers;
+#[path = "catalog_row_spool.rs"]
+pub(crate) mod spool;
 
 /// Captures the actual final row selection independently of successful source projections.
 pub(crate) fn snapshot(collected: &mut Collected<'_>, filter: Option<&Filter>) -> CatalogRows {

@@ -116,6 +116,9 @@ fn write_json(
     let mut buffered = BufWriter::with_capacity(BUFFER, out);
     let written = serde_json::to_writer(&mut buffered, catalog)
         .map_err(|error| {
+            if let Some(failure) = catalog.placements.take_row_spool_failure() {
+                return CatalogError::from(failure);
+            }
             if error.is_io() {
                 CatalogError::Write(error.into())
             } else {

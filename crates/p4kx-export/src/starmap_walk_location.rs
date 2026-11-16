@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 
-use super::{System, WalkPath};
+use super::{ContainerRows, System, WalkPath};
 use crate::starmap_containers::instance::{ContainerFile, ContainerOccurrence};
 use crate::starmap_containers::location_instance::LocationOccurrence;
 use crate::starmap_parse::Child;
@@ -26,10 +26,15 @@ impl System<'_> {
             local: path.local,
             world: path.transform,
         };
-        self.read
-            .instances
-            .push(instance.project(file, self.capture)?);
-        Ok(())
+        let row = instance.project(file, self.capture)?;
+        match &mut self.container_rows {
+            ContainerRows::Spool(writer) => writer.append(&row, self.cancel).map_err(Into::into),
+            #[cfg(test)]
+            ContainerRows::Typed => {
+                self.read.instances.push(row);
+                Ok(())
+            }
+        }
     }
 
     pub(super) fn record_location(

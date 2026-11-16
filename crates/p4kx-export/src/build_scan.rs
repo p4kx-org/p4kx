@@ -42,6 +42,7 @@ pub(super) fn scan<'f>(
                 &EntryCapture::for_input(projection.original()),
                 scope,
                 &endpoints,
+                &std::env::temp_dir(),
             )?
         }
         None => Placements::default(),

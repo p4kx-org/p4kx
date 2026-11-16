@@ -4,12 +4,14 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use p4kx_extraction::{Archive, CancelToken, Guid, SourceUse, SourceValue, SourcedValue};
+use p4kx_extraction::{Archive, CancelToken, Guid, SourceUse, SourcedValue};
 
 use crate::catalog_read::original::{AuthoredEntryPath, EntryCapture};
-use crate::entry_source::EntrySource;
+use crate::catalog_rows::spool::RowSpoolWriter;
 use crate::starmap_containers::Limits;
-use crate::starmap_containers::instance::{ContainerFile, ContainerInstance};
+use crate::starmap_containers::instance::ContainerFile;
+#[cfg(test)]
+use crate::starmap_containers::instance::ContainerInstance;
 use crate::starmap_containers::jump_class::JumpEndpointRecords;
 use crate::starmap_containers::jump_endpoint::JumpEndpoint;
 use crate::starmap_containers::location_instance::LocationInstance;
@@ -30,6 +32,9 @@ mod jump;
 #[path = "starmap_walk_report.rs"]
 mod report;
 
+#[path = "starmap_walk_run.rs"]
+mod run;
+
 #[derive(Default)]
 pub(crate) struct SystemRead {
     pub(crate) placed: Vec<(Guid, Placement)>,
@@ -41,6 +46,7 @@ pub(crate) struct SystemRead {
     pub(crate) deepest: usize,
     pub(crate) report: StarmapReport,
     pub(crate) containers: Vec<Opened>,
+    #[cfg(test)]
     pub(crate) instances: Vec<ContainerInstance>,
     pub(crate) locations: Vec<LocationInstance>,
     pub(crate) jump_endpoints: Vec<JumpEndpoint>,
@@ -115,6 +121,12 @@ impl WalkPath {
     }
 }
 
+pub(crate) enum ContainerRows<'writer> {
+    Spool(&'writer mut RowSpoolWriter),
+    #[cfg(test)]
+    Typed,
+}
+
 /// The walk through one star system, over containers that are already parsed.
 pub(crate) struct System<'a> {
     archive: &'a Archive,
@@ -128,60 +140,14 @@ pub(crate) struct System<'a> {
     capture: &'a EntryCapture<'a>,
     endpoints: Option<&'a JumpEndpointRecords>,
     read: SystemRead,
+    container_rows: ContainerRows<'a>,
     limits: Limits,
     budget: usize,
     open: Vec<usize>,
     seen: [usize; 3],
 }
 
-impl<'a> System<'a> {
-    pub(crate) fn run(
-        index: &'a Index<'a>,
-        bodies: &'a HashMap<usize, Body>,
-        name: &Arc<str>,
-        entry: usize,
-        cancel: Option<&'a CancelToken>,
-        limits: Limits,
-        (archive, capture, endpoints): (
-            &'a Archive,
-            &'a EntryCapture<'a>,
-            Option<&'a JumpEndpointRecords>,
-        ),
-    ) -> Result<SystemRead, CatalogError> {
-        let root = index
-            .entries
-            .get(entry)
-            .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
-        let source = EntrySource::outer(capture, archive, root)?;
-        let directory = source.receipt().physical_reference(capture)?;
-        let SourceValue::Present(reference) = directory.value() else {
-            return Err(ExportAccountingError::ConflictingSourceDatum.into());
-        };
-        let mut system = Self {
-            archive,
-            index,
-            bodies,
-            cancel,
-            name: Arc::clone(name),
-            name_cell: capture.source_uses().value(
-                SourceValue::Present(HealthText::new(name)),
-                directory.contributions().0,
-                true,
-            ),
-            root: Arc::from(directory.contributions().0),
-            root_entry: reference.entry_index,
-            capture,
-            endpoints,
-            read: SystemRead::default(),
-            limits,
-            budget: limits.children,
-            open: Vec::new(),
-            seen: [0; 3],
-        };
-        system.container(entry, &WalkPath::ROOT)?;
-        Ok(system.read)
-    }
-
+impl System<'_> {
     /// Counts a Child, or a limit, that left objects without a position, and reports it.
     fn skipped(&mut self, line: &str) {
         self.read.malformed += 1;

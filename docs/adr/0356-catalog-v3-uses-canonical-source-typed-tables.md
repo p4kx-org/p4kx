@@ -155,6 +155,17 @@ Keep the existing atomic catalog file adapter and its cancellation/change/cleanu
 frontend-specific writer. Source preparation peak memory and serialization streaming are measured
 separately. Deduplicate common sources/texts/use sets without collapsing physical provenance.
 
+The prepared result can hold immutable tables in private temporary storage.
+Emit a finished row there as soon as it has its final wire fields and source-use
+IDs. Retain only the facts needed by later joins in the active projection. For
+container placements those facts include the physical root Entry and Child
+ordinals, the Record lookup and the opened containers. The normal writer
+replays the stored rows in their original order. The same prepared rows serve
+the size and write passes, with one source traversal and one published document.
+Publication still requires complete health. A staging, cancellation or output
+failure preserves the previous committed document and releases temporary storage.
+Record both peak memory and temporary writes in the 16 GiB system acceptance.
+
 Retain one complete document per Export. Measure transfer size, decoded size and peak memory with
 complete fields, languages and provenance. The standard size notices are advisory. A transport split
 needs a separate versioned contract with the same logical snapshot and measured resource needs.

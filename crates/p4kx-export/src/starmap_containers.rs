@@ -1,30 +1,29 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::{CancelToken, Guid};
 use std::collections::hash_map::Entry as MapEntry;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-use std::time::Instant;
-
-use p4kx_extraction::{Archive, CancelToken, Guid};
-use rayon::prelude::*;
 
 use crate::CatalogError;
-use crate::catalog_read::original::EntryCapture;
+use crate::catalog_rows::spool::RowSpool;
 use crate::catalog_table::{CatalogTable, DatasetAvailability};
 use crate::export_ledger::ExportLedger;
 use crate::starmap_index::{Index, unreferenced};
-use crate::starmap_parse::Read;
 use crate::starmap_report::{ContainerCounts, Placement, StarmapReport, apart, clip};
-use crate::starmap_walk::{Opened, System, SystemRead};
+use crate::starmap_walk::{Opened, SystemRead};
 
-use jump_class::JumpEndpointRecords;
 use jump_endpoint::JumpEndpoint;
 use jump_operating::OperatingResolver;
 
+#[cfg(test)]
 use self::instance::ContainerInstance;
 use self::location_instance::LocationInstance;
 use self::proof::{PlacementEvidence, PlacementProof};
+
+#[path = "starmap_container_read.rs"]
+mod read;
 
 #[path = "starmap_jump_class.rs"]
 pub(crate) mod jump_class;
@@ -94,6 +93,8 @@ pub(crate) struct Placements {
     ambiguous: HashMap<Guid, Arc<[PlacementProof; 2]>>,
     pub(crate) counts: ContainerCounts,
     pub(crate) report: StarmapReport,
+    instance_spool: Option<RowSpool>,
+    #[cfg(test)]
     instances: Vec<ContainerInstance>,
     locations: Vec<LocationInstance>,
     jump_endpoints: Vec<JumpEndpoint>,
@@ -110,6 +111,15 @@ impl Placements {
         self.ambiguous = HashMap::new();
     }
 
+    pub(crate) fn take_instance_spool(&mut self) -> (DatasetAvailability, Option<RowSpool>) {
+        (
+            self.instance_availability
+                .unwrap_or(DatasetAvailability::Unavailable),
+            self.instance_spool.take(),
+        )
+    }
+
+    #[cfg(test)]
     pub(crate) fn take_instances(&mut self) -> CatalogTable<ContainerInstance> {
         CatalogTable {
             availability: self
@@ -177,119 +187,6 @@ impl Placements {
             .map(|proof| PlacementEvidence::Ambiguous(Arc::clone(proof)))
     }
 
-    /// Reads the container of every star system of `archive` and the external containers it
-    /// names, each container once, then composes each Child's position with the positions and
-    /// rotations of the Children above it. A record placed more than once keeps its first
-    /// placement in document order, the systems taken in the order of their folder names; one
-    /// that more than one Child places at places more than `SAME_PLACE` metres apart has no
-    /// position.
-    #[cfg(test)]
-    pub(crate) fn read(
-        archive: &Archive,
-        cancel: Option<&CancelToken>,
-        capture: &EntryCapture<'_>,
-        scope: PlacementScope,
-    ) -> Result<Self, CatalogError> {
-        Self::read_within(archive, cancel, Limits::default(), capture, scope)
-    }
-
-    pub(crate) fn read_for_catalog(
-        archive: &Archive,
-        cancel: Option<&CancelToken>,
-        capture: &EntryCapture<'_>,
-        scope: PlacementScope,
-        endpoints: &JumpEndpointRecords,
-    ) -> Result<Self, CatalogError> {
-        Self::read_scoped(
-            archive,
-            cancel,
-            Limits::default(),
-            capture,
-            scope,
-            Some(endpoints),
-        )
-    }
-
-    #[cfg(test)]
-    pub(crate) fn read_within(
-        archive: &Archive,
-        cancel: Option<&CancelToken>,
-        limits: Limits,
-        capture: &EntryCapture<'_>,
-        scope: PlacementScope,
-    ) -> Result<Self, CatalogError> {
-        Self::read_scoped(archive, cancel, limits, capture, scope, None)
-    }
-
-    fn read_scoped(
-        archive: &Archive,
-        cancel: Option<&CancelToken>,
-        limits: Limits,
-        capture: &EntryCapture<'_>,
-        scope: PlacementScope,
-        endpoints: Option<&JumpEndpointRecords>,
-    ) -> Result<Self, CatalogError> {
-        if cancel.is_some_and(CancelToken::is_cancelled) {
-            return Err(CatalogError::Cancelled);
-        }
-        let started = Instant::now();
-        let index = Index::new(archive);
-        let systems = index.systems();
-        if systems.is_empty() && matches!(scope, PlacementScope::ArchiveInventory) {
-            return Ok(Self {
-                instance_availability: Some(DatasetAvailability::Absent),
-                endpoint_inventory_complete: endpoints.is_some_and(|records| records.complete),
-                ..Self::default()
-            });
-        }
-        let roots: Vec<usize> = systems.iter().map(|(_, entry)| *entry).collect();
-        let Read { bodies, ledger, .. } = crate::starmap_parse::read_all_with_jumps(
-            archive,
-            &index,
-            &roots,
-            cancel,
-            limits.external,
-            (limits.depth, limits.children, endpoints.is_some()),
-            capture,
-        )?;
-        if cancel.is_some_and(CancelToken::is_cancelled) {
-            return Err(CatalogError::Cancelled);
-        }
-        let read = systems
-            .par_iter()
-            .map(|(name, entry)| {
-                System::run(
-                    &index,
-                    &bodies,
-                    name,
-                    *entry,
-                    cancel,
-                    limits,
-                    (archive, capture, endpoints),
-                )
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        drop(bodies);
-        if cancel.is_some_and(CancelToken::is_cancelled) {
-            return Err(CatalogError::Cancelled);
-        }
-        let endpoint_scope_complete = !ledger
-            .incomplete_inventories
-            .contains(&crate::Kind::StarmapObjects)
-            && read.iter().all(|system| !system.routes_incomplete);
-        let mut placements = Self {
-            ledger,
-            ..Self::default()
-        };
-        placements.finish(&index, systems.len(), read, scope);
-        placements.endpoint_inventory_complete = endpoint_scope_complete
-            && endpoints.is_some_and(|records| records.complete)
-            && placements.counts.unreadable == 0
-            && placements.counts.missing == 0;
-        placements.report.elapsed = started.elapsed();
-        Ok(placements)
-    }
-
     fn finish(
         &mut self,
         index: &Index<'_>,
@@ -337,6 +234,7 @@ impl Placements {
             if matches!(scope, PlacementScope::RecordSelection) {
                 append_owned(&mut self.opened, system.containers);
             }
+            #[cfg(test)]
             append_owned(&mut self.instances, system.instances);
             append_owned(&mut self.locations, system.locations);
             append_owned(&mut self.jump_endpoints, system.jump_endpoints);
