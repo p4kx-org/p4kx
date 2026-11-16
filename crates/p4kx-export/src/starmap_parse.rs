@@ -10,7 +10,6 @@ use rayon::prelude::*;
 
 use crate::catalog_read::original::{AuthoredEntryPath, EntryCapture, EntryRead, EntryXml};
 use crate::entry_source::EntrySource;
-use crate::export_entry_ledger::EntryOperation;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
 use crate::starmap_containers::instance::ContainerFile;
 use crate::starmap_containers::jump_gate::{GateFiles, JumpGate};
@@ -247,16 +246,13 @@ pub(crate) struct Read {
     pub(crate) parsed: usize,
 }
 
-/// Reads every container that the containers `roots` name, directly or through other containers
-/// within `chain` steps, once each, the containers of one step in parallel. Together the
-/// containers keep at most `children` Children and nest their lists at most `depth` deep.
+/// Reads each physically distinct container reachable from the roots in breadth-first order.
 #[cfg(test)]
 pub(crate) fn read_all(
     archive: &Archive,
     index: &Index<'_>,
     roots: &[usize],
     cancel: Option<&CancelToken>,
-    chain: usize,
     (depth, children): (usize, usize),
     capture: &EntryCapture<'_>,
 ) -> Result<Read, CatalogError> {
@@ -265,7 +261,6 @@ pub(crate) fn read_all(
         index,
         roots,
         cancel,
-        chain,
         (depth, children, false),
         capture,
     )
@@ -276,7 +271,6 @@ pub(crate) fn read_all_with_jumps(
     index: &Index<'_>,
     roots: &[usize],
     cancel: Option<&CancelToken>,
-    chain: usize,
     (depth, children, jump_endpoints): (usize, usize, bool),
     capture: &EntryCapture<'_>,
 ) -> Result<Read, CatalogError> {
@@ -295,10 +289,7 @@ pub(crate) fn read_all_with_jumps(
         .collect::<HashSet<_>>()
         .into_iter()
         .collect();
-    for _ in 0..=chain {
-        if frontier.is_empty() || cancel.is_some_and(CancelToken::is_cancelled) {
-            break;
-        }
+    while !frontier.is_empty() && !cancel.is_some_and(CancelToken::is_cancelled) {
         let read: Vec<_> = frontier
             .par_iter()
             .filter(|_| !cancel.is_some_and(CancelToken::is_cancelled))
@@ -314,9 +305,6 @@ pub(crate) fn read_all_with_jumps(
             .into_iter()
             .filter(|entry| !bodies.contains_key(entry))
             .collect();
-    }
-    if !cancel.is_some_and(CancelToken::is_cancelled) {
-        record_unread(archive, &frontier, capture, &mut ledger)?;
     }
     Ok(Read {
         ledger,
@@ -348,26 +336,6 @@ fn next_sources<'a>(
         }
     }
     next
-}
-
-fn record_unread(
-    archive: &Archive,
-    entries: &[usize],
-    capture: &EntryCapture<'_>,
-    ledger: &mut ExportLedger,
-) -> Result<(), CatalogError> {
-    if !entries.is_empty() {
-        ledger.incomplete_inventory(Kind::StarmapObjects);
-    }
-    for index in entries {
-        if let Some(entry) = archive.entries().get(*index) {
-            EntrySource::outer(capture, archive, entry)?
-                .dependency()
-                .operation(EntryOperation::Enumeration)
-                .record(ledger, Kind::StarmapObjects, SourceDisposition::ReadFailed);
-        }
-    }
-    Ok(())
 }
 
 #[cfg(test)]

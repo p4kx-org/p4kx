@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use p4kx_extraction::{Archive, CancelToken, Guid, SourceUse, SourcedValue};
@@ -9,7 +9,6 @@ use p4kx_extraction::{Archive, CancelToken, Guid, SourceUse, SourcedValue};
 use crate::catalog_read::original::{AuthoredEntryPath, EntryCapture};
 use crate::catalog_rows::spool::RowSpoolWriter;
 use crate::starmap_containers::Limits;
-use crate::starmap_containers::instance::ContainerFile;
 #[cfg(test)]
 use crate::starmap_containers::instance::ContainerInstance;
 use crate::starmap_containers::jump_class::JumpEndpointRecords;
@@ -18,11 +17,14 @@ use crate::starmap_containers::jump_endpoint::JumpEndpoint;
 use crate::starmap_containers::location_instance::LocationInstance;
 use crate::starmap_containers::proof::{PlacementProof, PlacementStep};
 use crate::starmap_index::Index;
-use crate::starmap_parse::{Body, Child, Level, Pose};
-use crate::starmap_report::{Placement, StarmapReport, clip};
+use crate::starmap_parse::{Body, Child};
+use crate::starmap_report::{Placement, StarmapReport};
 use crate::starmap_transform::Transform;
 use crate::starmap_xml::AuthoredPose;
 use crate::{CatalogError, ExportAccountingError, HealthText};
+
+#[path = "starmap_walk_frames.rs"]
+mod frames;
 
 #[path = "starmap_walk_location.rs"]
 mod location;
@@ -148,7 +150,7 @@ pub(crate) struct System<'a> {
     rows: PlacementRows<'a>,
     limits: Limits,
     budget: usize,
-    open: Vec<usize>,
+    open: HashSet<usize>,
     seen: [usize; 3],
 }
 
@@ -180,151 +182,6 @@ impl System<'_> {
             under,
         });
         self.read.deepest = self.read.deepest.max(external);
-    }
-
-    /// Walks the original Children of one readable container instance.
-    fn container(&mut self, entry: usize, path: &WalkPath) -> Result<(), CatalogError> {
-        if self.cancel.is_some_and(CancelToken::is_cancelled) {
-            return Ok(());
-        }
-        let label = self
-            .index
-            .entries
-            .get(entry)
-            .map_or_else(String::new, |socpak| socpak.path().to_owned());
-        if self.open.contains(&entry) {
-            self.skip_route(&format!("{label}: names a container that is open above it"));
-            return Ok(());
-        }
-        let bodies = self.bodies;
-        let Some(body) = bodies.get(&entry) else {
-            self.read.unreadable += 1;
-            self.issue(&format!("{label}: not read"));
-            return Ok(());
-        };
-        let before = self.seen;
-        match body {
-            Body::Unreadable(reason) => {
-                self.read.unreadable += 1;
-                self.issue(&format!("{label}: {reason}"));
-                return Ok(());
-            }
-            Body::Unparsed => {
-                self.opened(entry, path.under, path.external);
-                self.read.unreadable += 1;
-                self.issue(&format!("{label}: the XML cannot be parsed"));
-                return Ok(());
-            }
-            Body::Parsed {
-                root,
-                file,
-                fallback,
-                ..
-            } => {
-                self.opened(entry, path.under, path.external);
-                self.record_instance(path, file)?;
-                if let Some(taken) = fallback {
-                    self.issue(&format!(
-                        "{label}: no XML named like the container, read {} instead",
-                        clip(taken)
-                    ));
-                }
-                self.open.push(entry);
-                self.children(root, &path.within_container(), &label, file)?;
-                self.open.pop();
-            }
-        }
-        self.report_placements(before, &label);
-        Ok(())
-    }
-
-    fn children(
-        &mut self,
-        level: &Level,
-        parent: &WalkPath,
-        label: &str,
-        file: &ContainerFile,
-    ) -> Result<(), CatalogError> {
-        if level.capped {
-            let limit = self.limits.depth;
-            self.skip_route(&format!("{label}: Children nested deeper than {limit}"));
-            return Ok(());
-        }
-        for child in &level.children {
-            if self.budget == 0 {
-                let limit = self.limits.children;
-                self.skip_route(&format!("{label}: more than {limit} Children in a system"));
-                return Ok(());
-            }
-            self.budget -= 1;
-            self.seen[0] += 1;
-            let pose = match &child.pose {
-                Pose::Valid(pose) => *pose,
-                Pose::Malformed { pos, rot, entity } => {
-                    let occurrence = parent.child(child, None, parent.transform);
-                    self.record_jump(child, &occurrence, file, None)?;
-                    self.note_blocked_descendants(child);
-                    self.skipped(&format!(
-                        "{label}: malformed pos {pos} rot {rot} of {entity}"
-                    ));
-                    continue;
-                }
-            };
-            let local = pose.transform();
-            let world = parent.transform.place(local.position, local.rotation);
-            let mut child_path = parent.child(child, Some(pose), world);
-            let sane = world.is_sane();
-            self.record_jump(child, &child_path, file, sane.then_some(world))?;
-            if !sane {
-                self.note_blocked_descendants(child);
-                self.skipped(&format!(
-                    "{label}: out of range: pos {:?} places {:?} of {}",
-                    local.position,
-                    world.position,
-                    clip(child.entity_name())
-                ));
-                continue;
-            }
-            self.note(child, &child_path, parent.under)?;
-            self.record_location(child, &mut child_path, pose, file)?;
-            if let Some(path) = &child.external {
-                self.follow(path, &child_path, label)?;
-            }
-            self.children(&child.below, &child_path, label, file)?;
-        }
-        if level.truncated {
-            let limit = self.limits.children;
-            self.skip_route(&format!(
-                "{label}: more than {limit} Children in the containers of the Archive"
-            ));
-        }
-        Ok(())
-    }
-
-    fn follow(
-        &mut self,
-        path: &AuthoredEntryPath,
-        parent: &WalkPath,
-        label: &str,
-    ) -> Result<(), CatalogError> {
-        self.seen[2] += 1;
-        let declared = path.as_str();
-        if parent.external >= self.limits.external {
-            let limit = self.limits.external;
-            self.skip_route(&format!(
-                "{label}: external containers nested deeper than {limit}: {}",
-                clip(declared)
-            ));
-        } else if let Some(entry) = self.index.find(declared) {
-            self.container(entry, &parent.external(path))?;
-        } else {
-            self.read.missing += 1;
-            self.issue(&format!(
-                "{label}: the Archive holds no container {}",
-                clip(declared)
-            ));
-        }
-        Ok(())
     }
 
     fn note(

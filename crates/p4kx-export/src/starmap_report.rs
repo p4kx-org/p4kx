@@ -70,8 +70,7 @@ impl StarmapReport {
         &self.unreferenced
     }
 
-    /// The longest chain of external containers the walk followed, counted from the system
-    /// container (0); the limit is 32.
+    /// The longest chain of external containers the walk followed, counting the system container as zero.
     #[must_use]
     pub const fn deepest_external(&self) -> usize {
         self.deepest_external

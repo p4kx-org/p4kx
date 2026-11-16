@@ -1942,7 +1942,9 @@ the XML. No per-component mapping to one area entity is defined.
 Placement selection follows the existing container inventory scope. An unrestricted catalog
 or any selected Starmap or HarvestableProviderPreset path requests the walk. Other Record
 filters leave this table unavailable. Walk and archive diagnostics report incomplete source
-discovery separately from whether the table is available.
+discovery separately from whether the table is available. Discovery reads each reachable
+physical container once. Placement follows every authored occurrence in document order and
+reports a cycle when an external link points back to a container already on that route.
 
 
 **Where a position comes from.** The main container of a star system is

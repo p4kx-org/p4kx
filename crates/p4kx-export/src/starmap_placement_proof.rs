@@ -167,6 +167,15 @@ pub(crate) struct PlacementStep {
     pub(crate) has_record: bool,
 }
 
+impl Drop for PlacementStep {
+    fn drop(&mut self) {
+        let mut preceding = self.preceding.take();
+        while let Some(mut step) = preceding.and_then(Arc::into_inner) {
+            preceding = step.preceding.take();
+        }
+    }
+}
+
 impl PlacementStep {
     pub(crate) fn steps(&self) -> impl Iterator<Item = &Self> {
         iter::successors(Some(self), |step| step.preceding.as_deref())

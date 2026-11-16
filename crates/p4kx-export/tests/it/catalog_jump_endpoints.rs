@@ -72,7 +72,6 @@ fn skipped_routes_make_jump_inventory_unavailable_without_discarding_rows() -> T
     for (scenario, reason) in [
         (Scenario::ContainerCycle, "cycle"),
         (Scenario::InvalidAncestorPose, "invalid ancestor pose"),
-        (Scenario::WalkDepth, "walk depth only"),
     ] {
         let catalog = build(Some(&filter), scenario)?;
         assert_eq!(
@@ -91,6 +90,39 @@ fn skipped_routes_make_jump_inventory_unavailable_without_discarding_rows() -> T
             receipt::cell(row, "declaredPartner", "absent")?;
         }
     }
+    Ok(())
+}
+
+#[test]
+fn long_external_routes_keep_jump_inventory_and_both_endpoint_occurrences() -> TestResult {
+    let catalog = build(Some(&Filter::new("jump_")), Scenario::LongExternalRoutes)?;
+    let endpoints = receipt::rows(&catalog, ROWS)?;
+    let [_, _, _, _, deep, direct] = endpoints else {
+        return Err(format!("expected six endpoint occurrences, got {}", endpoints.len()).into());
+    };
+    assert_ne!(
+        receipt::at(deep, "/instanceId/value")?,
+        receipt::at(direct, "/instanceId/value")?,
+        "the same physical endpoint keeps each authored route",
+    );
+    assert_eq!(
+        receipt::at(deep, "/worldPosition/value")?,
+        receipt::at(direct, "/worldPosition/value")?,
+        "both routes have the fixture's original transform",
+    );
+    for endpoint in [deep, direct] {
+        receipt::cell(endpoint, "declaredPartner", "absent")?;
+    }
+    assert_eq!(
+        receipt::at(&catalog, "/placements/jumpEndpoints/availability")?,
+        "available",
+        "the complete external chain is included",
+    );
+    assert_eq!(
+        receipt::at(&catalog, "/projections/jumpConnections/availability")?,
+        "absent",
+        "the complete readable endpoint scope can prove partner absence",
+    );
     Ok(())
 }
 

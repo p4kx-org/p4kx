@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use p4kx_extraction::{Archive, CancelToken, SourceValue};
 
-use super::{PlacementRows, System, SystemRead, WalkPath};
+use super::{PlacementRows, System, SystemRead};
 use crate::catalog_read::original::EntryCapture;
 use crate::entry_source::EntrySource;
 use crate::starmap_containers::Limits;
@@ -83,10 +83,10 @@ impl<'a> System<'a> {
             rows,
             limits,
             budget: limits.children,
-            open: Vec::new(),
+            open: HashSet::new(),
             seen: [0; 3],
         };
-        system.container(entry, &WalkPath::ROOT)?;
+        system.walk(entry)?;
         Ok(system.read)
     }
 }

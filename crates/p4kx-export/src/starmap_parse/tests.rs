@@ -46,15 +46,7 @@ fn a_valid_empty_source_does_not_hit_a_nonexistent_child_depth_limit() -> TestRe
     ] {
         let (_folder, archive) = opened(vec![container(ROOT, text)])?;
         let source = with_entry_capture(&archive, |capture| {
-            super::read_all(
-                &archive,
-                &Index::new(&archive),
-                &[0],
-                None,
-                0,
-                (0, 0),
-                capture,
-            )
+            super::read_all(&archive, &Index::new(&archive), &[0], None, (0, 0), capture)
         })?;
         assert!(
             source.ledger.incomplete_inventories.is_empty(),
@@ -99,7 +91,6 @@ fn readable_bytes_with_invalid_xml_are_a_projection_failure() -> TestResult {
             &Index::new(&archive),
             &[0],
             None,
-            0,
             (64, 10),
             capture,
         )
@@ -134,7 +125,6 @@ fn a_truncated_projection_keeps_its_readable_children_and_its_failure() -> TestR
             &Index::new(&archive),
             &[0],
             None,
-            0,
             (64, 1),
             capture,
         )
@@ -168,7 +158,7 @@ fn a_truncated_projection_keeps_its_readable_children_and_its_failure() -> TestR
 }
 
 #[test]
-fn a_known_container_beyond_the_walk_limit_is_not_claimed_as_read() -> TestResult {
+fn a_reachable_container_records_an_actual_directory_read() -> TestResult {
     let xml = format!(
         r#"<ObjectContainer><ChildObjectContainers><Child pos="0,0,0" external="1" name="{NEXT}"/></ChildObjectContainers></ObjectContainer>"#
     );
@@ -182,41 +172,34 @@ fn a_known_container_beyond_the_walk_limit_is_not_claimed_as_read() -> TestResul
             &Index::new(&archive),
             &[0],
             None,
-            0,
             (64, 10),
             capture,
         )
     })?;
     assert!(
-        !source.bodies.contains_key(&1),
-        "the bounded walk did not parse the next container"
+        matches!(source.bodies.get(&1), Some(Body::Parsed { .. })),
+        "the reachable original target is read",
     );
     assert!(
-        source
-            .ledger
-            .incomplete_inventories
-            .contains(&Kind::StarmapObjects),
-        "unwalked sources make the inventory incomplete"
+        source.ledger.incomplete_inventories.is_empty(),
+        "there is no incomplete source frontier",
     );
-    let unread = source
+    let directory = source
         .ledger
         .entries
         .iter()
-        .find(|entry| entry.entry_index == Some(1))
-        .ok_or("unread known source identity")?;
+        .find(|entry| {
+            entry.entry_index == Some(1) && entry.operation == EntryOperation::ContainerDirectory
+        })
+        .ok_or("original directory operation")?;
     assert_eq!(
-        unread.operation,
-        EntryOperation::Enumeration,
-        "limit loss is separate from a directory operation"
+        directory.disposition,
+        SourceDisposition::Projected,
+        "the reachable directory was actually observed",
     );
     assert_eq!(
-        unread.disposition,
-        SourceDisposition::ReadFailed,
-        "the required source was not read"
-    );
-    assert_eq!(
-        unread.container_entry_index, None,
-        "no invented inner source"
+        directory.container_entry_index, None,
+        "the directory operation does not claim an inner source",
     );
     Ok(())
 }
@@ -233,7 +216,6 @@ fn a_missing_external_container_preserves_the_authored_path() -> TestResult {
             &Index::new(&archive),
             &[0],
             None,
-            3,
             (64, 10),
             capture,
         )
@@ -265,7 +247,6 @@ fn a_missing_external_uses_the_actual_case_insensitive_first_attribute() -> Test
             &Index::new(&archive),
             &[0],
             None,
-            3,
             (64, 10),
             capture,
         )

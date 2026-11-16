@@ -12,6 +12,8 @@ use crate::starmap_parse::read_all;
 
 const FOLDER: &str = "Data\\ObjectContainers\\PU\\system\\t\\";
 
+#[path = "starmap_external_chain_tests.rs"]
+mod external_chain;
 #[path = "starmap_placement_storage_tests.rs"]
 mod placement_storage;
 
@@ -171,33 +173,6 @@ fn children_beyond_the_budget_of_a_system_are_counted() {
 }
 
 #[test]
-fn external_containers_beyond_the_chain_limit_are_counted() {
-    let dir = tempfile::tempdir().expect("a directory");
-    let entries = system(
-        &root(vec![external("a")]),
-        &[
-            ("a", root(vec![child("1,0,0", 1), external("b")])),
-            ("b", root(vec![child("2,0,0", 2)])),
-        ],
-    );
-    let limits = Limits {
-        external: 1,
-        ..Limits::default()
-    };
-    let placements = read(dir.path(), entries, limits);
-    assert!(
-        placed(&placements, 1).is_some(),
-        "the first external container"
-    );
-    assert_eq!(
-        placed(&placements, 2),
-        None,
-        "the second one is beyond the limit"
-    );
-    assert_eq!(placements.counts.malformed, 1, "counted once");
-}
-
-#[test]
 fn a_container_that_names_itself_is_read_once_and_counted() {
     let dir = tempfile::tempdir().expect("a directory");
     let entries = system(
@@ -288,7 +263,6 @@ fn a_container_instanced_several_times_is_parsed_once() {
             &index,
             &roots,
             None,
-            limits.external,
             (limits.depth, limits.children),
             capture,
         )

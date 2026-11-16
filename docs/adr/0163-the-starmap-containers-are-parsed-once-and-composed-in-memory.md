@@ -13,9 +13,9 @@ container on the chain (up to 128 MiB each) was held at once. Only the systems r
   from the system containers: the containers of one level are read and parsed in parallel
   (rayon), each exactly once for the whole Archive, into a tree of Children (pose, record,
   entity name of a placed Child, external path, nested Children). The raw XML is dropped after the
-  parse. `starmap_walk` then composes the positions per system, in parallel, over those trees,
-  in the same document order, with the same limits and counts as before. The levels are bounded
-  by the external chain limit (32); a cycle ends because a container is read once.
+  parse. Discovery continues until no new physical source remains. The placement walk uses
+  an explicit stack to compose positions in authored depth-first order. A physical container
+  can contribute under multiple positions. Only a link to an active ancestor is a cycle.
 - **Memory bound.** The parse keeps at most `Limits::children` (4,194,304) Children in all
   containers together, counted by one shared counter, and nests lists at most `Limits::depth`
   (64) deep. A list cut by the counter is marked and reported as a skipped Child; which

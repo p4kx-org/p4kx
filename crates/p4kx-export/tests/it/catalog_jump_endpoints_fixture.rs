@@ -26,7 +26,7 @@ pub(super) enum Scenario {
     ContainerCycle,
     InvalidAncestorPose,
     InvalidEndpointPose,
-    WalkDepth,
+    LongExternalRoutes,
 }
 
 pub(super) fn build(filter: Option<&Filter>, scenario: Scenario) -> TestResult<Value> {
@@ -47,7 +47,7 @@ pub(super) fn build(filter: Option<&Filter>, scenario: Scenario) -> TestResult<V
     } else {
         archive
     };
-    let archive = if matches!(scenario, Scenario::WalkDepth) {
+    let archive = if matches!(scenario, Scenario::LongExternalRoutes) {
         with_long_chain(archive)
     } else {
         archive
@@ -82,7 +82,7 @@ fn system(scenario: Scenario) -> TestElement {
                 .attribute("pos", "invalid")
                 .attribute("starMapRecord", common::guid(LOGICAL)),
         ),
-        Scenario::WalkDepth => {
+        Scenario::LongExternalRoutes => {
             children.push(external_child(&chain_path(0)));
             children.push(external_child(&chain_path(LONG_CHAIN_CONTAINERS - 1)));
         }
@@ -104,11 +104,12 @@ fn chain_path(index: usize) -> String {
 fn with_long_chain(archive: ArchiveBuilder) -> ArchiveBuilder {
     (0..LONG_CHAIN_CONTAINERS).fold(archive, |archive, index| {
         let mut xml = TestElement::new("ObjectContainer");
-        if index + 1 < LONG_CHAIN_CONTAINERS {
-            xml = xml.child(starmap_fixture::children(vec![external_child(
-                &chain_path(index + 1),
-            )]));
-        }
+        let next = if index + 1 < LONG_CHAIN_CONTAINERS {
+            external_child(&chain_path(index + 1))
+        } else {
+            child("logical", LOGICAL, "deep_logical_endpoint")
+        };
+        xml = xml.child(starmap_fixture::children(vec![next]));
         let descriptor = format!("chain{index}.xml");
         archive.entry(TestEntry::stored(
             chain_path(index),

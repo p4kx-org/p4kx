@@ -65,8 +65,6 @@ pub(crate) struct Limits {
     pub(crate) children: usize,
     /// The deepest chain of Child elements that is followed.
     pub(crate) depth: usize,
-    /// The deepest chain of external containers that is opened.
-    pub(crate) external: usize,
 }
 
 impl Default for Limits {
@@ -74,7 +72,6 @@ impl Default for Limits {
         Self {
             children: 1 << 22,
             depth: 64,
-            external: 32,
         }
     }
 }

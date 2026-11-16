@@ -104,7 +104,6 @@ impl Placements {
             &index,
             &roots,
             cancel,
-            limits.external,
             (limits.depth, limits.children, endpoints.is_some()),
             capture,
         )?;
