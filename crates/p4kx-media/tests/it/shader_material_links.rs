@@ -194,3 +194,36 @@ fn same_definition_name_case_collision_in_one_directory_is_ambiguous() -> TestRe
     );
     Ok(())
 }
+
+#[test]
+fn shader_names_fold_ascii_without_folding_non_ascii_bytes() -> TestResult {
+    let result = support::run(
+        vec![
+            support::material("dÉMO", "%A"),
+            support::container("Data/upper.pak", "DÉmo", FLAGS),
+            support::container("Data/lower.pak", "démo", FLAGS),
+        ],
+        &support::options(),
+    )?;
+    let links = support::links(&result)?;
+    assert_eq!(
+        links.len(),
+        2,
+        "the shader and flag remain independently addressable"
+    );
+    for link in links {
+        let resolution = &link["reference"]["resolution"];
+        assert_eq!(
+            resolution["status"], "resolved",
+            "a different Unicode spelling is not a candidate"
+        );
+        assert_eq!(
+            resolution
+                .pointer("/target/source/entry/path")
+                .and_then(serde_json::Value::as_str),
+            Some(r"Data\DÉmo.ext"),
+            "ASCII-only case-insensitivity retains the exact Unicode target"
+        );
+    }
+    Ok(())
+}

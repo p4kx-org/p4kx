@@ -82,8 +82,8 @@ impl<'run> ShaderLookup<'run> {
         };
         let index = self.index(writer)?;
         let matches = index.matching(name, self, writer)?;
-        let mut candidates = index.candidates(&matches, writer)?;
-        let read = self.unique_read(index, &matches, use_at, writer)?;
+        let mut candidates = index.candidates(matches, writer)?;
+        let read = self.unique_read(index, matches, use_at, writer)?;
         if let (Some(value), Some(candidate)) = (read, candidates.first_mut()) {
             if value.supported {
                 candidate.value.target.subresource = Some(Subresource::new(

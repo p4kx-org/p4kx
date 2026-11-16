@@ -2,9 +2,11 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_extraction::ConflictPolicy;
+use p4kx_extraction::model::MaterialSourceLimits;
 use p4kx_media::MediaError;
 use serde_json::{Value, json};
 
+use super::material_origin_support::Fixture;
 use super::shader_material_support::{self as support, TestResult};
 
 const FLAGS: &[u8] = b"Property { Name = %A\n }\n";
@@ -13,23 +15,91 @@ const FLAGS: &[u8] = b"Property { Name = %A\n }\n";
 fn candidate_limit_remains_unavailable_and_never_selects_one_duplicate() -> TestResult {
     let mut options = support::options();
     options.limits.reference_candidates = 1;
-    let result = support::run(
-        vec![
+    let first = "Data/z-first.pak";
+    let fixture = Fixture::with(
+        [
             support::material("demo", "%A"),
-            support::container("Data/a.pak", "demo", FLAGS),
-            support::container("Data/b.pak", "demo", FLAGS),
+            support::container(first, "Demo", FLAGS),
+            support::container("Data/unrelated.pak", "unrelated", FLAGS),
+            support::container("Data/a-overage.pak", "DEMO", FLAGS),
+            support::container("Data/m-unseen.pak", "demo", FLAGS),
         ],
-        &options,
+        options,
+        MaterialSourceLimits::default(),
     )?;
-    let links = support::links(&result)?;
-    for link in links {
-        assert_eq!(link["reference"]["resolution"]["status"], "unavailable");
-        assert_eq!(
-            link["reference"]["resolution"]["reason"]["type"],
-            "candidate-limit"
-        );
-        assert_eq!(link["reference"]["candidates_complete"], false);
+    let material = "Data/materials.mtl";
+    let prefix = "/data/payload/shader_references";
+    let links = fixture
+        .record(material)?
+        .1
+        .pointer(prefix)
+        .and_then(Value::as_array)
+        .ok_or("shader links")?;
+    assert_eq!(links.len(), 2, "the definition and flag are both checked");
+    for (ordinal, link) in links.iter().enumerate() {
+        check_cutoff_reference(&link["reference"], first)?;
+        let field = format!("{prefix}/{ordinal}/reference/resolution/status");
+        check_cutoff_contributors(&fixture, material, &field)?;
     }
+    Ok(())
+}
+
+fn check_cutoff_reference(reference: &Value, first: &str) -> TestResult {
+    let resolution = &reference["resolution"];
+    assert_eq!(
+        resolution["status"], "unavailable",
+        "cutoff remains unavailable"
+    );
+    assert_eq!(
+        resolution.pointer("/reason/type").and_then(Value::as_str),
+        Some("candidate-limit"),
+        "cutoff reason"
+    );
+    assert_eq!(
+        reference["candidates_complete"], false,
+        "coverage past the cutoff is unknown"
+    );
+    assert_eq!(
+        reference["observed_candidates"], 2,
+        "only one overage was examined"
+    );
+    let [retained] = resolution["known_candidates"]
+        .as_array()
+        .ok_or("retained candidate list")?
+        .as_slice()
+    else {
+        return Err("one retained candidate before the cutoff".into());
+    };
+    assert_eq!(
+        retained
+            .pointer("/target/source/containers/0/path")
+            .and_then(Value::as_str),
+        Some(first),
+        "the admitted candidate is the earliest physical occurrence"
+    );
+    Ok(())
+}
+
+fn check_cutoff_contributors(fixture: &Fixture, material: &str, field: &str) -> TestResult {
+    for path in [r"Data\Demo.ext", r"Data\DEMO.ext"] {
+        assert!(
+            fixture.has_use(
+                material,
+                field,
+                path,
+                "archiveDirectoryMetadata",
+                "selector"
+            )?,
+            "the retained and first discarded occurrences contribute: {path}"
+        );
+    }
+    assert!(
+        !fixture
+            .contributions(material, field)?
+            .iter()
+            .any(|used| fixture.input_path(used) == Some(r"Data\demo.ext")),
+        "the third candidate's identity is outside the consulted prefix"
+    );
     Ok(())
 }
 

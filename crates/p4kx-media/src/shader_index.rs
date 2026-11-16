@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::borrow::Cow;
 use std::cell::{Cell, OnceCell};
+use std::collections::HashMap;
 use std::io;
 
 use p4kx_extraction::{Archive, Entry, EntryOrigin, EntryOriginStep};
@@ -19,7 +21,6 @@ use crate::{
 use crate::{shader_source, source};
 
 pub(crate) struct ShaderTarget {
-    pub(crate) name: String,
     pub(crate) source: Source,
     pub(crate) origin: EntryOrigin,
     pub(crate) state: CandidateState,
@@ -28,6 +29,7 @@ pub(crate) struct ShaderTarget {
 
 pub(crate) struct ShaderIndex {
     pub(crate) targets: Vec<ShaderTarget>,
+    names: HashMap<String, Vec<usize>>,
     pub(crate) inventory: CandidateInventory,
     pub(crate) inventory_origins: crate::origin_contributions::OriginContributions,
 }
@@ -40,6 +42,7 @@ impl ShaderIndex {
         let mut collector = Collector {
             index: Self {
                 targets: Vec::new(),
+                names: HashMap::new(),
                 inventory: CandidateInventory::Complete,
                 inventory_origins: crate::origin_contributions::OriginContributions::independent(
                     &writer.origins.owner,
@@ -94,24 +97,51 @@ impl ShaderIndex {
         name: &str,
         lookup: &ShaderLookup<'_>,
         writer: &MediaWriter<'_>,
-    ) -> Result<Vec<usize>, MediaError> {
-        let mut matches = Vec::new();
-        for (index, target) in self.targets.iter().enumerate() {
-            lookup.work(target.name.len().min(name.len()).saturating_add(1), writer)?;
-            if !target.name.eq_ignore_ascii_case(name) {
-                continue;
-            }
-            matches
+    ) -> Result<&[usize], MediaError> {
+        lookup.work(name.len().saturating_add(1), writer)?;
+        let name = if name.as_bytes().iter().any(u8::is_ascii_uppercase) {
+            Cow::Owned(fold_name(name, writer)?)
+        } else {
+            Cow::Borrowed(name)
+        };
+        let Some(positions) = self.names.get(name.as_ref()) else {
+            return Ok(&[]);
+        };
+        // The resolver uses the first position after its limit as an overage witness.
+        let admitted = usize::try_from(writer.limits().reference_candidates)
+            .unwrap_or(usize::MAX)
+            .saturating_add(1);
+        let count = positions.len().min(admitted);
+        lookup.work(count, writer)?;
+        positions.get(..count).ok_or_else(|| {
+            MediaError::Contract("shader candidate prefix exceeds its name bucket".into())
+        })
+    }
+
+    fn index_name(
+        &mut self,
+        name: &str,
+        lookup: &DirectoryLookup<'_>,
+        writer: &MediaWriter<'_>,
+    ) -> Result<(), MediaError> {
+        let name = fold_name(name, writer)?;
+        if !self.names.contains_key(&name) {
+            lookup.input_state()?.budget.metadata(
+                0,
+                crate::shader_values::count(size_of::<(String, Vec<usize>)>())?,
+                writer.limits(),
+                writer.checkpoint,
+            )?;
+            self.names
                 .try_reserve(1)
                 .map_err(|cause| allocation(writer, cause))?;
-            matches.push(index);
-            if crate::shader_values::count(matches.len())?
-                > u64::from(writer.limits().reference_candidates)
-            {
-                break;
-            }
         }
-        Ok(matches)
+        let positions = self.names.entry(name).or_default();
+        positions
+            .try_reserve(1)
+            .map_err(|cause| allocation(writer, cause))?;
+        positions.push(self.targets.len());
+        Ok(())
     }
 }
 
@@ -187,7 +217,7 @@ impl TraversalVisit for Collector {
         )?;
         self.index
             .targets
-            .try_reserve_exact(1)
+            .try_reserve(1)
             .map_err(|cause| allocation(writer, cause))?;
         let origin = lookup.index.archive.entry_origin(entry).ok_or_else(|| {
             MediaError::Contract("shader inventory Entry has no owned origin".into())
@@ -203,9 +233,10 @@ impl TraversalVisit for Collector {
         } else {
             CandidateState::Selected
         };
+        let source = source::entry(lookup.root, lookup.index.archive, entry, lookup.chain)?;
+        self.index.index_name(name, lookup, writer)?;
         self.index.targets.push(ShaderTarget {
-            name: name.to_owned(),
-            source: source::entry(lookup.root, lookup.index.archive, entry, lookup.chain)?,
+            source,
             origin,
             state,
             read: OnceCell::new(),
@@ -240,6 +271,7 @@ fn identity_work(
         1,
     )?;
     add(name.len(), 1)?;
+    add(size_of::<usize>(), 1)?;
     add(entry.path().len(), 2)?;
     add(lookup.root.hex.len(), 1)?;
     if let Some(raw) = lookup.index.archive.raw_path(entry.index()) {
@@ -253,9 +285,141 @@ fn identity_work(
     }
     Ok(work)
 }
+fn fold_name(name: &str, writer: &MediaWriter<'_>) -> Result<String, MediaError> {
+    let mut key = String::new();
+    key.try_reserve_exact(name.len())
+        .map_err(|cause| allocation(writer, cause))?;
+    key.push_str(name);
+    key.make_ascii_lowercase();
+    Ok(key)
+}
+
 fn allocation(writer: &MediaWriter<'_>, cause: std::collections::TryReserveError) -> MediaError {
     MediaError::Io {
         path: writer.root.clone(),
         source: io::Error::new(io::ErrorKind::OutOfMemory, cause),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io;
+    use std::path::Path;
+
+    use p4kx_extraction::{
+        Archive, ArchiveWatch, ArchiveWriteProtection, CancelToken, Exclusion, Filter,
+    };
+    use p4kx_testkit::{ArchiveBuilder, TestEntry};
+
+    use super::{ShaderIndex, ShaderLookup};
+    use crate::artifact::StreamObserver;
+    use crate::checkpoint::Checkpoint;
+    use crate::input_budget::InputBudget;
+    use crate::origin_test_support::TestResult;
+    use crate::source_selection::SourceSelection;
+    use crate::{ByteScope, Limits, MediaWriter, hashing};
+
+    const UNRELATED: u32 = 128;
+
+    #[test]
+    fn shader_lookup_work_ignores_unrelated_names_and_unused_duplicates() -> TestResult {
+        let folder = tempfile::tempdir()?;
+        let archive = fixture(folder.path())?;
+        let cancel = CancelToken::new();
+        let watch = ArchiveWatch::new(&archive);
+        let protection = ArchiveWriteProtection::new(archive.path(), cancel.flag())?;
+        let checkpoint = Checkpoint {
+            cancel: &cancel,
+            watch: &watch,
+            protection: &protection,
+        };
+        let limits = Limits {
+            reference_candidates: 1,
+            ..Limits::default()
+        };
+        let (root, size) = hashing::file(
+            archive.path(),
+            ByteScope::RootArchiveFile,
+            limits.root_bytes,
+            &checkpoint,
+        )?;
+        let budget = InputBudget::default();
+        let include = Filter::parse("*")?;
+        let exclude = Exclusion::default();
+        let lookup = ShaderLookup::new(
+            &archive,
+            &root,
+            SourceSelection {
+                include: &include,
+                exclude: &exclude,
+            },
+            &budget,
+        );
+        let mut writer = MediaWriter::observed(
+            folder.path(),
+            Vec::new(),
+            limits,
+            checkpoint,
+            false,
+            &Discard,
+        )?;
+        writer.origins.observe_root(&archive, size)?;
+        let index = ShaderIndex::build(&lookup, &mut writer)?;
+        check_work(&index, &lookup, &writer)
+    }
+
+    fn check_work(
+        index: &ShaderIndex,
+        lookup: &ShaderLookup<'_>,
+        writer: &MediaWriter<'_>,
+    ) -> TestResult {
+        let budget = lookup.budget;
+        let before = budget.work_count()?;
+        let query = "EXPECTED";
+        let matches = index.matching(query, lookup, writer)?;
+        assert_eq!(
+            matches,
+            [0, usize::try_from(UNRELATED)? + 1],
+            "the bounded physical prefix"
+        );
+        assert_eq!(
+            budget.work_count()? - before,
+            u64::try_from(query.len() + 1 + matches.len())?,
+            "charge only one key and the admitted prefix"
+        );
+
+        let before = budget.work_count()?;
+        let query = "missing";
+        assert!(
+            index.matching(query, lookup, writer)?.is_empty(),
+            "missing remains an empty candidate list"
+        );
+        assert_eq!(
+            budget.work_count()? - before,
+            u64::try_from(query.len() + 1)?,
+            "a miss only charges its own key"
+        );
+        Ok(())
+    }
+
+    fn fixture(root: &Path) -> Result<Archive, Box<dyn std::error::Error>> {
+        let path = root.join("Data.p4k");
+        let mut archive = ArchiveBuilder::new().entry(TestEntry::stored("Data/expected.ext", b""));
+        for index in 0..UNRELATED {
+            archive = archive.entry(TestEntry::stored(format!("Data/extra-{index}.ext"), b""));
+        }
+        archive
+            .entry(TestEntry::stored("Data/Expected.ext", b""))
+            .entry(TestEntry::stored("Data/ExPeCtEd.ext", b""))
+            .write_to(&path)?;
+        Ok(Archive::open(&path)?)
+    }
+
+    struct Discard;
+
+    impl StreamObserver for Discard {
+        fn write(&self, _relative: &str, _bytes: &[u8]) -> io::Result<()> {
+            Ok(())
+        }
     }
 }
