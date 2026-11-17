@@ -11,14 +11,14 @@ use std::sync::Arc;
 use p4kx_dataforge::{Guid, Record, StructValue, TreeBuilder, Value};
 
 use crate::LoadoutError;
-use crate::assortment_group::Group;
+use crate::assortment_group::{Alternative, Group};
 use crate::assortment_requirement::{Verdict, evaluate};
 use crate::loadout_path::PathRead;
 use crate::loadout_reference::LoadoutReference;
 use crate::pick::LoadoutPicks;
 use crate::read::{as_struct, struct_items, text};
 use crate::resolver::{Entries, LoadoutResolver};
-use crate::spec::{LoadoutSpec, TargetSpec, read_loadout};
+use crate::spec::{LoadoutSpec, TargetSpec};
 use crate::target_spec;
 
 const ASSORTMENT_TYPE: &str = "SLoadoutAssortment";
@@ -181,7 +181,7 @@ fn read_assorted_tree(
                 continue;
             }
             let alternatives = struct_items(group, "Loadouts")
-                .map(|loadout| read_loadout(loadout, &path, paths))
+                .map(|loadout| Alternative::read(loadout, &path, paths))
                 .collect();
             groups.push(Group::new(name.to_owned(), alternatives));
         }

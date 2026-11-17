@@ -34,10 +34,10 @@ Creature base Entities (`libs/foundry/records/actor/actors/*`) whose root geomet
   random; the first alternative is the deterministic default, so an export is reproducible. A
   pick option is deliberately not offered here: #954 tracks one. The `Requirement` of an
   assortment or group is read as ADR-0302 states.
-- **The first alternative is not replaced by the next readable one.** A group without
-  alternatives gives nothing. A first alternative that is no Loadout is an `assortment` issue and
-  the group gives nothing; the later alternatives are not tried, so an export never silently
-  shows an alternative the default does not name.
+- **Each group keeps the selected alternative.** A group without alternatives gives nothing.
+  Selecting an XML alternative with an authored empty String path adds no file or layer.
+  An unreadable alternative or a malformed XML path still produces an `assortment` issue.
+  The selected index and the application of other groups stay independent.
 - **Assortments are read once per resolver and a cycle ends.** An assortment names assortments
   through its alternatives; one that is used while it is being resolved, alone or through
   another, is an `assortment` issue and is skipped. The other assortments still apply.

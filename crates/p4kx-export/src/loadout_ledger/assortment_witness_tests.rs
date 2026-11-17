@@ -72,7 +72,7 @@ fn witness_data() -> Vec<u8> {
             &[(
                 "Body",
                 vec![
-                    TestLoadout::Xml(String::new()),
+                    TestLoadout::UnreadableXmlPath,
                     TestLoadout::Manual(Vec::new()),
                 ],
             )],

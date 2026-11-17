@@ -211,6 +211,8 @@ pub trait LoadoutPathObserver {
     fn record_name(&self, selection: &LoadoutSelection, tree: &RecordTree<'_>) -> ControlFlow<()>;
 }
 
+pub(crate) const XML_LOADOUT_PATH: &str = "loadoutPath";
+
 pub(crate) struct PathRead<'scope> {
     observer: Option<&'scope dyn LoadoutPathObserver>,
     observation: Option<&'scope Observation<'scope>>,
@@ -262,7 +264,7 @@ impl<'scope> PathRead<'scope> {
     pub(crate) fn xml_loadout(&self, parent: &StructValue<'_>) -> LoadoutPath {
         self.field_value(
             parent,
-            parent.field("loadoutPath"),
+            parent.field(XML_LOADOUT_PATH),
             LoadoutPathOperation::Copy,
             self.xml_record_paths,
         )

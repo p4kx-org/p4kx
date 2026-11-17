@@ -13,7 +13,7 @@ use crate::read;
 use crate::spec::{EntrySpec, LoadoutOrigin, LoadoutSpec, TargetSpec};
 use crate::target_spec;
 
-const XML_LOADOUT: &str = "SItemPortLoadoutXMLParams";
+pub(crate) const XML_LOADOUT: &str = "SItemPortLoadoutXMLParams";
 const OUTFIT_LOADOUT: &str = "SItemPortLoadoutOutfitParams";
 const GENERATED_LOADOUT: &str = "SItemPortLoadoutRandomGeneratedParams";
 

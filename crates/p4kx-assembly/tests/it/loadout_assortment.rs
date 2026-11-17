@@ -229,7 +229,7 @@ fn an_unreadable_first_alternative_is_an_issue_and_the_later_ones_are_not_tried(
         "unreadable",
         &[(
             "Body",
-            vec![TestLoadout::Xml(String::new()), body("Body_Blue")],
+            vec![TestLoadout::UnreadableXmlPath, body("Body_Blue")],
         )],
     );
     let tree = resolve(generated(&[ASSORTMENT]), None, vec![record])?;
@@ -240,6 +240,31 @@ fn an_unreadable_first_alternative_is_an_issue_and_the_later_ones_are_not_tried(
     Ok(())
 }
 
+#[test]
+fn a_first_empty_xml_choice_keeps_its_slot_and_the_other_group_applies() -> TestResult {
+    let record = assortment_record(
+        ASSORTMENT,
+        "empty_path",
+        &[
+            (
+                "Body",
+                vec![TestLoadout::Xml(String::new()), body("Body_Blue")],
+            ),
+            (
+                "Egg",
+                vec![TestLoadout::Manual(vec![TestLoadoutEntry::class(
+                    "Egg_ItemPort",
+                    "Egg",
+                )])],
+            ),
+        ],
+    );
+    let files = Files(HashMap::new());
+    let tree = resolve(generated(&[ASSORTMENT]), Some(&files), vec![record])?;
+    assert!(tree.issues().is_empty(), "empty path has no file or issue");
+    assert_eq!(attached(&tree), [pair("Egg_ItemPort", "Egg")]);
+    Ok(())
+}
 #[test]
 fn a_later_assortment_replaces_the_port_of_an_earlier_one() -> TestResult {
     let second = assortment_record(OTHER, "second", &[("Body", vec![body("Body_Blue")])]);
@@ -264,6 +289,19 @@ fn an_xml_alternative_without_an_archive_is_an_issue() -> TestResult {
     let tree = resolve(generated(&[ASSORTMENT]), None, vec![beast_assortment()])?;
 
     assert_eq!(kinds(&tree), ["no_loadout_files"]);
+    assert_eq!(attached(&tree), [pair("Body_ItemPort", "Body_Red")]);
+    Ok(())
+}
+
+#[test]
+fn a_missing_nonempty_xml_path_keeps_the_file_issue() -> TestResult {
+    let files = Files(HashMap::new());
+    let tree = resolve(
+        generated(&[ASSORTMENT]),
+        Some(&files),
+        vec![beast_assortment()],
+    )?;
+    assert_eq!(kinds(&tree), ["xml_loadout"]);
     assert_eq!(attached(&tree), [pair("Body_ItemPort", "Body_Red")]);
     Ok(())
 }

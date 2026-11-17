@@ -10,6 +10,8 @@ pub enum TestLoadout {
     Manual(Vec<TestLoadoutEntry>),
     /// An XML Loadout naming the file that holds it.
     Xml(String),
+    /// An XML Loadout with an invalid String table offset.
+    UnreadableXmlPath,
     /// A Loadout generated at random from the `SLoadoutAssortment` Records with these GUIDs, see
     /// [`assortment_record`](crate::assortment_record).
     RandomGenerated(Vec<u128>),
@@ -31,6 +33,10 @@ impl TestLoadout {
             ),
             Self::Xml(path) => TestInstance::new("SItemPortLoadoutXMLParams")
                 .value("loadoutPath", TestValue::text(path.clone())),
+            Self::UnreadableXmlPath => TestInstance::new("SItemPortLoadoutXMLParams").value(
+                "loadoutPath",
+                TestValue::Raw(u32::MAX.to_le_bytes().to_vec()),
+            ),
             Self::RandomGenerated(assortments) => {
                 TestInstance::new("SItemPortLoadoutRandomGeneratedParams").value(
                     "LoadoutAssortments",
