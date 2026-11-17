@@ -1884,6 +1884,14 @@ a malformed Opus WEM prints no JSON; it fails with exit code 1 and an error givi
 
 Also `p4kx bnk list <file> --json` for a soundbank file on disk.
 
+The JSON response includes `fieldOrigins`, keyed by JSON Pointer from the report root.
+Each marker's `sourceUsesRefs` resolves in the shared `provenance` inventory. The soundbank
+name uses the selected Archive directory Entry or observed
+standalone file metadata. The bank header and embedded media values refer to their original
+decoded positions. A standalone file can have complete source positions with unknown original
+Archive encryption. A WEM parse failure preserves the attempted source and marks the evidence
+incomplete. A proven non-sound class or prefetch explains the absent parsed values.
+
 ```json
 {"soundbank": "Data\\Sounds\\wwise\\SSAM_Test.bnk", "version": 154, "bank_id": 3512036681,
  "wems": [{"id": 100, "size": 4852, "class": "wem", "codec": "pcm", "codec_name": "PCM",

@@ -151,6 +151,12 @@ impl<'a> EmbeddedWem<'a> {
         MediaClass::of(self.bytes)
     }
 
+    /// Returns the media class and the original fields used to choose it.
+    #[must_use]
+    pub fn class_with_source(&self) -> (MediaClass, crate::BankMediaClassSource) {
+        MediaClass::inspect(self.bytes)
+    }
+
     /// Returns the length the RIFF or RIFX header declares for the whole WEM, if there is one.
     #[must_use]
     pub fn declared_len(&self) -> Option<u64> {

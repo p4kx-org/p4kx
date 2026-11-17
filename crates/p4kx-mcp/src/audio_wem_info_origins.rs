@@ -8,7 +8,7 @@ use p4kx_extraction::{
 
 use crate::audio_wem_input::{Candidate, LanguageInput, Source};
 
-use super::super::payload_origins::{DidxWord, EvidenceError, metadata, put};
+use super::super::payload_origins::{DidxWord, EvidenceError, MCP_FIELDS, metadata, put};
 use super::Selection;
 
 const ROOT: &str = "/structuredContent";
@@ -69,7 +69,7 @@ impl Evidence<'_> {
         let payload = self.uses.observe(binding, InputScope::Payload)?;
         description
             .payload
-            .record(&self.uses, &payload, complete, WEM, fields)?;
+            .record(&self.uses, &payload, complete, WEM, fields, MCP_FIELDS)?;
         let summary = description
             .payload
             .summary_origin(&self.uses, &payload, complete)?;

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{AudioError, EmbeddedWem, Wem};
+use p4kx_extraction::bank_wem_evidence::{BankWemRead, BankWemReadMode};
 
 use crate::archives::Opened;
 use crate::audio_params::{MAX_NAME_LEN, SoundbankParams};
@@ -30,7 +30,7 @@ pub(crate) fn soundbank_wems(
     let candidates: Vec<_> = wems
         .skip(page.offset())
         .take(page.limit())
-        .map(ListedWem::read)
+        .map(|wem| BankWemRead::read(wem, BankWemReadMode::AllNonPrefetched))
         .collect();
     let response = |count| {
         let rows = candidates
@@ -44,7 +44,7 @@ pub(crate) fn soundbank_wems(
             version: soundbank.header().version,
             bank_id: soundbank.header().id,
             total,
-            wems: rows.iter().map(ListedWem::shape).collect(),
+            wems: rows.iter().map(shape).collect(),
             next_cursor,
             field_origins,
             provenance,
@@ -53,43 +53,17 @@ pub(crate) fn soundbank_wems(
     let (_, result) = fit_prefix(candidates.len(), response, || {
         candidates.first().map_or_else(
             || "soundbank WEM listing".to_owned(),
-            |row| format!("WEM {}", row.wem.id()),
+            |row| format!("WEM {}", row.media().id()),
         )
     })?;
     Ok(result)
 }
 
-struct ListedWem<'a> {
-    wem: EmbeddedWem<'a>,
-    outcome: Outcome<'a>,
-}
-
-enum Outcome<'a> {
-    Prefetch,
-    Parsed(Wem<&'a [u8]>),
-    Unreadable(AudioError),
-}
-
-impl<'a> ListedWem<'a> {
-    fn read(wem: EmbeddedWem<'a>) -> Self {
-        let outcome = if wem.is_prefetch() {
-            Outcome::Prefetch
-        } else {
-            match wem.parse() {
-                Ok(parsed) => Outcome::Parsed(parsed),
-                Err(error) => Outcome::Unreadable(error),
-            }
-        };
-        Self { wem, outcome }
-    }
-
-    fn shape(&self) -> WemShape {
-        let id = Some(self.wem.id());
-        let size = self.wem.bytes().len() as u64;
-        match &self.outcome {
-            Outcome::Prefetch => super::unreadable(id, size, None),
-            Outcome::Parsed(parsed) => parsed.shape(id, size),
-            Outcome::Unreadable(error) => super::unreadable(id, size, Some(error)),
-        }
-    }
+fn shape(row: &BankWemRead<'_>) -> WemShape {
+    let id = Some(row.media().id());
+    let size = row.media().bytes().len() as u64;
+    row.parsed().map_or_else(
+        || super::unreadable(id, size, row.error()),
+        |parsed| parsed.shape(id, size),
+    )
 }

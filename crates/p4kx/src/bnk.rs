@@ -6,13 +6,18 @@ use std::path::Path;
 use std::process::ExitCode;
 
 use anyhow::Result;
+use p4kx_extraction::bank_wem_evidence::{BankWemRead, BankWemReadMode};
 use p4kx_extraction::{
-    Archive, Bank, BankExtraction, ConversionError, EmbeddedWem, MediaClass, WemFormat,
+    Archive, Bank, BankExtraction, ConversionError, FieldOrigins, MediaClass, SourceInventory,
+    WemFormat,
 };
 use serde::Serialize;
 
 use crate::cli::{BnkAction, BnkArgs, BnkFormat, BnkSource};
 use crate::{bnk_objects, exit, json};
+
+#[path = "bnk_list_evidence.rs"]
+mod list_evidence;
 
 const UNKNOWN: &str = "unknown";
 
@@ -22,6 +27,9 @@ struct ListJson<'a> {
     version: u32,
     bank_id: u32,
     wems: Vec<WemJson>,
+    #[serde(rename = "fieldOrigins")]
+    field_origins: FieldOrigins,
+    provenance: SourceInventory,
 }
 
 #[derive(Serialize)]
@@ -66,7 +74,11 @@ struct FailedJson {
 pub(crate) fn run(args: &BnkArgs, as_json: bool) -> Result<ExitCode> {
     match &args.action {
         BnkAction::List(source) => {
-            list(&open(source)?, as_json)?;
+            if as_json {
+                list_json(&open_observed(source)?)?;
+            } else {
+                list(&open(source)?)?;
+            }
             Ok(ExitCode::from(exit::SUCCESS))
         }
         BnkAction::Objects(objects) => bnk_objects::run(objects, as_json),
@@ -101,8 +113,9 @@ fn open_with(
     })
 }
 
-fn describe(wem: &EmbeddedWem<'_>) -> WemJson {
-    let class = wem.class();
+fn describe(read: &BankWemRead<'_>) -> WemJson {
+    let wem = read.media();
+    let class = read.class();
     let mut json = WemJson {
         id: wem.id(),
         size: wem.bytes().len() as u64,
@@ -111,37 +124,39 @@ fn describe(wem: &EmbeddedWem<'_>) -> WemJson {
         codec_name: None,
         sample_count: None,
         duration_seconds: None,
-        prefetch: wem.is_prefetch(),
-        error: None,
+        prefetch: read.is_prefetch(),
+        error: read.error().map(ToString::to_string),
         media: class,
     };
-    if json.prefetch || class.is_non_sound() {
-        return json;
-    }
-    match wem.parse() {
-        Ok(parsed) => {
-            json.codec = Some(parsed.codec().id());
-            json.codec_name = Some(parsed.codec().to_string());
-            json.sample_count = parsed.sample_count();
-            json.duration_seconds = parsed.duration().map(|duration| duration.as_secs_f64());
-        }
-        Err(error) => json.error = Some(error.to_string()),
+    if let Some(parsed) = read.parsed() {
+        json.codec = Some(parsed.codec().id());
+        json.codec_name = Some(parsed.codec().to_string());
+        json.sample_count = parsed.sample_count();
+        json.duration_seconds = parsed.duration().map(|duration| duration.as_secs_f64());
     }
     json
 }
 
-fn list(bank: &Bank, as_json: bool) -> Result<()> {
+fn list_json(bank: &Bank) -> Result<()> {
     let soundbank = bank.soundbank();
-    let wems: Vec<WemJson> = soundbank.wems().map(|wem| describe(&wem)).collect();
-    if as_json {
-        json::print(&ListJson {
-            soundbank: bank.name(),
-            version: soundbank.header().version,
-            bank_id: soundbank.header().id,
-            wems,
-        })?;
-        return Ok(());
-    }
+    let listing = list_evidence::list(bank)?;
+    json::print(&ListJson {
+        soundbank: bank.name(),
+        version: soundbank.header().version,
+        bank_id: soundbank.header().id,
+        wems: listing.wems,
+        field_origins: listing.field_origins,
+        provenance: listing.provenance,
+    })?;
+    Ok(())
+}
+
+fn list(bank: &Bank) -> Result<()> {
+    let soundbank = bank.soundbank();
+    let wems: Vec<_> = soundbank
+        .wems()
+        .map(|wem| describe(&BankWemRead::read(wem, BankWemReadMode::SoundCandidates)))
+        .collect();
     let mut out = BufWriter::new(io::stdout().lock());
     writeln!(out, "Soundbank:   {}", bank.name())?;
     writeln!(out, "Version:     {}", soundbank.header().version)?;
