@@ -133,6 +133,8 @@ pub(crate) fn components(bytes: &[u8], anchors: &Anchors) -> Scan {
 
 #[path = "shop_soc_observation.rs"]
 mod observation;
+#[cfg(test)]
+pub(crate) use observation::CapturedScan;
 pub(crate) use observation::read_components;
 
 impl<Inventory> Default for Scan<Inventory> {

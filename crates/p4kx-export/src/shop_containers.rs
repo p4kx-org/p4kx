@@ -107,6 +107,8 @@ pub(crate) fn verdict(states: &[Component]) -> Inventory<'_> {
 #[derive(Debug, Default)]
 pub(crate) struct Containers {
     pub(crate) ledger: ExportLedger,
+    #[cfg(test)]
+    pub(crate) soc_findings: Vec<crate::shop_container_scan::soc_subtypes::EntryFindings>,
     pub(crate) unattributed_declarations: bool,
     by_entity: HashMap<String, Named>,
     pub(crate) listed: usize,
@@ -157,6 +159,8 @@ impl Containers {
             self.other_scanned += 1;
         }
         self.ledger.merge(scanned.ledger);
+        #[cfg(test)]
+        self.soc_findings.extend(scanned.soc_findings);
         self.unattributed_declarations |= scanned.unattributed_declarations;
         let mut observations = scanned.observations;
         let Some((entities, rejected)) = scanned.entities else {

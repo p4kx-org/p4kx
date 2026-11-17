@@ -19,6 +19,10 @@ use crate::shop_inventory_observations::InventoryObservations;
 use crate::shop_soc::{self, Anchors};
 use crate::starmap_index::key;
 
+#[cfg(test)]
+#[path = "shop_soc_subtypes.rs"]
+pub(crate) mod soc_subtypes;
+
 const SHOP_METADATA: &str = "\\metadata\\entitycomponentshop.xml";
 const EDITOR_SUFFIX: &str = "_editor.xml";
 const MAX_METADATA_LEN: u64 = 1 << 20;
@@ -35,11 +39,15 @@ pub(crate) struct Scanned {
     pub(crate) observations: HashMap<String, InventoryObservations>,
     pub(crate) unattributed_declarations: bool,
     pub(crate) ledger: ExportLedger,
+    #[cfg(test)]
+    pub(crate) soc_findings: Vec<soc_subtypes::EntryFindings>,
 }
 
 #[derive(Default)]
 struct PreparedShops {
     shops: Shops,
+    #[cfg(test)]
+    soc_findings: Vec<soc_subtypes::EntryFindings>,
     rejected: usize,
     observations: HashMap<String, InventoryObservations>,
     unattributed_declarations: bool,
@@ -59,6 +67,8 @@ pub(crate) fn shop_entities(
     };
     Ok(Scanned {
         entities: Some((prepared.shops, prepared.rejected)),
+        #[cfg(test)]
+        soc_findings: prepared.soc_findings,
         observations: prepared.observations,
         unattributed_declarations: prepared.unattributed_declarations,
         ledger,
@@ -132,6 +142,8 @@ fn finish(
     }
     Ok(PreparedShops {
         shops,
+        #[cfg(test)]
+        soc_findings: components.soc_findings,
         rejected: components.rejected,
         observations: components.observations,
         unattributed_declarations: components.unattributed_declarations,
@@ -140,6 +152,8 @@ fn finish(
 
 #[derive(Default)]
 struct Components {
+    #[cfg(test)]
+    soc_findings: Vec<soc_subtypes::EntryFindings>,
     found: HashMap<String, Vec<Component>>,
     observations: HashMap<String, InventoryObservations>,
     unattributed_declarations: bool,
@@ -191,6 +205,10 @@ fn scan_components(
             continue;
         };
         let observed = shop_soc::read_components(&bytes, capture, anchors)?;
+        #[cfg(test)]
+        components
+            .soc_findings
+            .extend(soc_subtypes::findings(&source, &observed)?);
         let scan = observed.scan;
         components.unattributed_declarations |=
             observed.unattributed_declarations || scan.rejected > 0;
