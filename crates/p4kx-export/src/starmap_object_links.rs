@@ -48,13 +48,20 @@ impl<'source> StarmapObjectLinks<'source> {
             )?,
             location_hierarchy_tag: fields.record_link_to("locationHierarchyTag", "Tag", notes)?,
             r#type: fields.record_link_to("type", starmap_type_definition::SOURCE_TYPE, notes)?,
-            parent: fields.record_link_to("parent", SOURCE_TYPE, notes)?,
+            parent: Self::parent(fields, notes)?,
             amenities: fields.record_link_array_to(
                 "amenities",
                 starmap_amenity_definition::SOURCE_TYPE,
                 notes,
             )?,
         })
+    }
+
+    pub(super) fn parent(
+        fields: Observed<'_, '_, '_, 'source>,
+        notes: &mut Vec<FieldError>,
+    ) -> Result<SourcedValue<Box<SourceRecordReference<'source>>>, CatalogError> {
+        fields.record_link_to("parent", SOURCE_TYPE, notes)
     }
 
     pub(super) const fn projected(&self) -> [(&'static str, SourceValueState); 6] {

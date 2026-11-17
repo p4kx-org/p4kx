@@ -102,6 +102,8 @@ pub struct MiningLocationCoverage {
     pub unreadable_record_bodies: usize,
     /// Original text fields that could not be projected.
     pub unreadable_text_fields: usize,
+    /// Authored Starmap relationship fields with projection diagnostics.
+    pub unreadable_starmap_relationships: usize,
     /// Original mining definition fields with projection diagnostics.
     pub unreadable_mining_fields: usize,
     /// Observed element resource and ore refinement links with no compatible physical target.
@@ -148,7 +150,9 @@ pub struct MiningStarmapObject {
     pub system: SourcedValue<String>,
     /// The entity name of the selected placement.
     pub entity_name: SourcedValue<String>,
-    /// The nearest authored enclosing Starmap object.
+    /// The original DataForge parent reference, including unresolved targets.
+    pub parent: SourcedValue<CatalogRecordReference>,
+    /// The nearest enclosing Starmap object in the physical container route.
     pub placed_under_guid: SourcedValue<Guid>,
     /// The selected world position in metres, to millimetre precision.
     pub position: SourcedValue<[f64; 3]>,

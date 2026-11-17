@@ -9,7 +9,6 @@ use p4kx_extraction::{
 };
 
 use super::original_input::OriginalCatalogInput;
-use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::{CatalogProjection, CatalogTextRegistry};
 use crate::catalog_query_session::{
@@ -18,21 +17,17 @@ use crate::catalog_query_session::{
 use crate::catalog_read::original::EntryCapture;
 use crate::catalog_v3::catalog_harvest_modules::harvest_provider;
 use crate::catalog_v3::catalog_harvest_modules::harvest_provider_dependencies::ProviderDependencies;
-use crate::catalog_v3::{
-    authored_fields, mineable_composition_definition, mineable_element_definition,
-};
-use crate::contract_starmap::StarmapObject;
+use crate::catalog_v3::{mineable_composition_definition, mineable_element_definition};
 use crate::entity_selection::{self, Selected};
 use crate::harvest_locations::{HarvestSurvey, Objects};
 use crate::mining_locations::{
     HarvestableProviderPreset, MineableComposition, MineableElement, MiningLocationCoverage,
-    MiningLocationOptions, MiningLocationSnapshot, MiningRecordSource, MiningStarmapObject,
+    MiningLocationOptions, MiningLocationSnapshot, MiningStarmapObject,
 };
 use crate::record_observation::RecordObservation;
-use crate::starmap::TypeNames;
 use crate::starmap_containers::Placements;
 use crate::texts::{TextSources, Texts};
-use crate::{CatalogError, ExportAccountingError, Kind, starmap};
+use crate::{CatalogError, ExportAccountingError, Kind};
 
 #[path = "mining_location_rows.rs"]
 mod rows;
@@ -198,15 +193,15 @@ fn read_world<'source>(
     coverage.placement_inventory_incomplete = !placements.ledger.incomplete_inventories.is_empty();
     coverage.unavailable_placement_occurrences =
         placements.counts.unreadable + placements.counts.missing + placements.counts.malformed;
-    let objects = place_starmap(input, projection, records, &placements, cancel, coverage)?;
+    let objects = rows::place_starmap(input, projection, records, &placements, cancel, coverage)?;
     let locations = harvest_locations(
         archive, cancel, &capture, placements, survey, &objects, coverage,
     )?;
     let starmap_objects = objects
         .into_iter()
-        .map(|(source, object)| {
+        .map(|object| {
             checkpoint(cancel)?;
-            rows::starmap(object, source, input.origins())
+            object.into_sdk(input.origins())
         })
         .collect::<Result<_, _>>()?;
     Ok(WorldRows {
@@ -311,55 +306,19 @@ fn selected_kind(record: &Record<'_>) -> Result<Option<Kind>, p4kx_extraction::D
     })
 }
 
-fn place_starmap<'source>(
-    input: &'source OriginalCatalogInput<'source, 'source>,
-    projection: &CatalogProjection<'_, 'source>,
-    records: Vec<Record<'source>>,
-    placements: &Placements,
-    cancel: Option<&CancelToken>,
-    coverage: &mut MiningLocationCoverage,
-) -> Result<Vec<(MiningRecordSource, StarmapObject<'source>)>, CatalogError> {
-    let forge = input.forge();
-    let mut trees = TreeBuilder::new();
-    let types = TypeNames::default();
-    let projection = projection.for_kind(Kind::StarmapObjects);
-    let mut objects = Vec::with_capacity(records.len());
-    for record in records {
-        checkpoint(cancel)?;
-        let Ok(tree) = trees.build(&record) else {
-            coverage.unreadable_record_bodies += 1;
-            continue;
-        };
-        let source = CanonicalRecordHeader::read(&tree, input.origins())?.into();
-        let admission = RecordObservation::capture(input, &record)?;
-        let (name, notes) = authored_fields::read_root_locale_or_legacy_key(
-            &tree,
-            &projection,
-            &admission,
-            cancel,
-            "name",
-        )?;
-        coverage.unreadable_text_fields += notes.len();
-        let object = starmap::starmap_object(&mut trees, &tree, name, forge, &types, placements);
-        objects.push((source, object));
-    }
-    objects.sort_by_cached_key(|(_, row)| (row.guid.text(), row.record_index));
-    Ok(objects)
-}
-
 fn harvest_locations(
     archive: &Archive,
     cancel: Option<&CancelToken>,
     capture: &EntryCapture<'_>,
     mut placements: Placements,
     survey: HarvestSurvey<'_>,
-    starmap_objects: &[(MiningRecordSource, StarmapObject<'_>)],
+    starmap_objects: &[rows::PlacedObject<'_>],
     coverage: &mut MiningLocationCoverage,
 ) -> Result<HarvestLocationsRead, CatalogError> {
     let opened = std::mem::take(&mut placements.opened);
     let routed = std::mem::take(&mut placements.harvest_occurrences);
     drop(placements);
-    let objects = Objects::new(starmap_objects.iter().map(|(_, row)| row));
+    let objects = Objects::new(starmap_objects.iter().map(|row| &row.object));
     let (located, positives) = survey.finish(archive, &opened, &objects, cancel, capture)?;
     coverage.unreadable_harvest_containers = located.unreadable.len();
     coverage.locations_with_unresolved_parent =

@@ -13,6 +13,7 @@ use super::starmap_object_owned::StarmapObjectOwned;
 use super::starmap_visibility::VisibilityFields;
 use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_projection::CatalogProjection;
+use crate::catalog_record_reference::CatalogRecordReference;
 use crate::catalog_text_contract::GameTextRef;
 use crate::contract_starmap::StarmapObject;
 use crate::record_observation::RecordObservation;
@@ -50,6 +51,40 @@ pub(crate) fn read<'source>(
     )?;
     let object = project_object(definition.definition().text.name.clone());
     Ok((StarmapObjectRead { definition, object }, notes))
+}
+
+pub(crate) struct AuthoredNavigation<'source> {
+    pub(crate) source: CanonicalRecordHeader<'source>,
+    pub(crate) name: SourcedValue<GameTextRef>,
+    pub(crate) parent: SourcedValue<CatalogRecordReference>,
+    pub(crate) unreadable_name_fields: usize,
+}
+
+pub(crate) fn read_navigation<'source>(
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    cancel: Option<&CancelToken>,
+) -> Result<(AuthoredNavigation<'source>, Vec<FieldError>), CatalogError> {
+    let (prepared, notes) = PreparedDefinition::read(
+        tree,
+        projection,
+        admission,
+        cancel,
+        |source, fields, projection, notes| {
+            let name = ObjectText::name(fields, projection, notes)?;
+            let unreadable_name_fields = notes.len();
+            let parent =
+                StarmapObjectLinks::parent(fields, notes)?.map(|link| (*link).into_catalog());
+            Ok(AuthoredNavigation {
+                source,
+                name,
+                parent,
+                unreadable_name_fields,
+            })
+        },
+    )?;
+    Ok((prepared.into_definition(), notes))
 }
 
 /// One physical starmap object with its authored settings and relationships.
@@ -124,13 +159,21 @@ struct ObjectText {
 }
 
 impl ObjectText {
+    fn name<'source>(
+        fields: Observed<'_, '_, '_, 'source>,
+        projection: &CatalogProjection<'_, 'source>,
+        notes: &mut Vec<FieldError>,
+    ) -> Result<SourcedValue<GameTextRef>, CatalogError> {
+        fields.protected_locale_or_legacy_key("name", projection, notes)
+    }
+
     fn read<'source>(
         fields: Observed<'_, '_, '_, 'source>,
         projection: &CatalogProjection<'_, 'source>,
         notes: &mut Vec<FieldError>,
     ) -> Result<Self, CatalogError> {
         Ok(Self {
-            name: fields.protected_locale_or_legacy_key("name", projection, notes)?,
+            name: Self::name(fields, projection, notes)?,
             callout1: fields.protected_locale("callout1", projection, notes)?,
             callout2: fields.protected_locale("callout2", projection, notes)?,
             callout3: fields.protected_locale("callout3", projection, notes)?,

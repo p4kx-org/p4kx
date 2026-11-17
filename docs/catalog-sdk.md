@@ -88,6 +88,14 @@ and use the snapshot's own `source_inventory` for the selected language and fiel
 A missing name can retain its original localization key. Consult `coverage` for unresolved
 resource references and unreadable ResourceType Records when converting the snapshot to a cache.
 
+## Mining Starmap ancestry
+
+Use `MiningStarmapObject::parent` to follow the original DataForge parent declaration.
+Its reference preserves the original target GUID and resolution state. Use
+`placed_under_guid` to follow the nearest enclosing Starmap object in the selected
+physical container route. Both relationships carry their own source evidence. They can
+refer to different objects within the same Build.
+
 ## Authored item ports
 
 Use `with_item_ports` or `with_item_ports_from` to read `configurations.itemPorts`
