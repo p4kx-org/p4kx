@@ -789,6 +789,8 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   rules of `extract`; `--exclude` alone leaves out of all Entries, and a pair that leaves nothing is
   invalid input. `p4kx socpak verify <archive> <containerÃ¢â‚¬Â¦> [--filter <filter>] [--exclude
   <filter>]` selects the same way. `if-changed` compares with the CRC-32 containers store.
+  A container path matching several physical Entries fails with exit code 2 and reports the
+  requested path, Archive layer and all matching Entry indexes.
   Containers nest at most 8 deep; a container whose Entries overlap, whose stored sizes disagree or
   which declares more than 2048 times its stored size for an Entry is refused, as are compressed
   containers that together decode to more than 512 MiB along one chain. A container that cannot be

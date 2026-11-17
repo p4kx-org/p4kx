@@ -68,6 +68,7 @@ mod cli_verify;
 mod cli_wwise;
 mod compare;
 mod compare_schema;
+mod container_selection;
 mod convert;
 mod coverage;
 mod coverage_json;

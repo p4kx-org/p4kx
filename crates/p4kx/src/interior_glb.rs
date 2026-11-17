@@ -5,16 +5,16 @@ use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
-use p4kx_assembly::{ContainerAmbiguity, Interior, InteriorOptions, Issue};
+use p4kx_assembly::{Interior, InteriorOptions, Issue};
 use p4kx_extraction::{
     Archive, ArchiveDefaultMaterial, ConversionError, DefaultMaterialReceipt, GlbOptions,
-    GlbSummary, GltfError, MaterialMode, UnknownEntries, is_same_file, select_entries,
-    write_replacing_protected,
+    GlbSummary, GltfError, MaterialMode, is_same_file, write_replacing_protected,
 };
 use serde::Serialize;
 use thiserror::Error;
 
 use crate::cli_interior::{InteriorGlbArgs, InteriorMaterialsArg};
+use crate::container_selection;
 use crate::entity_glb_json::IssueJson;
 use crate::json;
 use crate::layers_json::LayersJson;
@@ -67,12 +67,7 @@ pub(crate) fn open(archive: &Path, containers: &[String]) -> Result<(Vec<Archive
         let Some(current) = layers.last() else {
             break;
         };
-        let found = select_entries(current, &[path])?;
-        let entry = match found.as_slice() {
-            [entry] => entry,
-            [] => return Err(UnknownEntries(vec![path.clone()]).into()),
-            matches => return Err(ContainerAmbiguity::new(path, chain.len(), matches).into()),
-        };
+        let entry = container_selection::select(current, path, chain.len())?;
         chain.push(entry.path().to_owned());
         let next = current.open_container(entry)?;
         layers.push(next);

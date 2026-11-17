@@ -4,7 +4,7 @@
 use p4kx_extraction::Entry;
 use thiserror::Error;
 
-/// An Interior selector matches several physical Entries in its owning layer.
+/// A container selector matches several physical Entries in its owning Archive.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 #[error("container {name:?} is ambiguous in Archive layer {depth} (Entry indexes {entries:?})")]
 pub struct ContainerAmbiguity {

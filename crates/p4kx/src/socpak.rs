@@ -7,7 +7,6 @@ use anyhow::{Context as _, Result};
 use p4kx_extraction::{
     Archive, AudioConversion, Entry, FieldOrigins, FieldPath, InputScope, SourceInput,
     SourceInventory, SourceLocation, SourceUse, SourceUseRole, SourceUses, TextureConversion,
-    UnknownEntries, select_entries,
 };
 use serde::Serialize;
 
@@ -15,7 +14,7 @@ use crate::cli::{SocpakAction, SocpakArgs, SocpakSource};
 use crate::entry_listing_json::EntryRows;
 use crate::extract::{self, Settings};
 use crate::json;
-use crate::{exit, filter_pair, list, verify};
+use crate::{container_selection, exit, filter_pair, list, verify};
 
 #[derive(Serialize)]
 struct ListJson<'a> {
@@ -94,7 +93,7 @@ impl ListOrigins {
     }
 }
 
-/// Runs `p4kx socpak list` or `p4kx socpak extract`.
+/// Runs the selected `p4kx socpak` action.
 pub(crate) fn run(args: &SocpakArgs, as_json: bool) -> Result<ExitCode> {
     match &args.action {
         SocpakAction::List(source) => {
@@ -168,10 +167,7 @@ fn extracted<'a>(
 fn open(source: &SocpakSource, mut listing: Option<&mut ListOrigins>) -> Result<Archive> {
     let mut current = crate::key::open(&source.archive)?;
     for (position, path) in source.containers.iter().enumerate() {
-        let found = select_entries(&current, &[path])?;
-        let Some(entry) = found.first() else {
-            return Err(UnknownEntries(vec![path.clone()]).into());
-        };
+        let entry = container_selection::select(&current, path, position)?;
         if let Some(listing) = &mut listing {
             listing.retain(&current, entry, position + 1 < source.containers.len())?;
         }
