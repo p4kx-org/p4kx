@@ -8,6 +8,7 @@ use p4kx_extraction::CancelToken;
 use zstd::Encoder;
 
 use crate::CatalogError;
+use crate::catalog_rows::spool::RowSpoolError;
 use crate::contract::Catalog;
 use crate::options::{CatalogRun, CatalogStage};
 
@@ -107,6 +108,12 @@ fn staged_row_bytes(catalog: &Catalog<'_>) -> u128 {
         + u128::from(catalog.loadouts.stored_bytes())
         + u128::from(catalog.configurations.durability.stored_bytes())
         + u128::from(catalog.declarations.entity_tags.stored_bytes())
+        + u128::from(
+            catalog
+                .declarations
+                .loot_entity_container_documents
+                .stored_bytes(),
+        )
         + u128::from(catalog.definitions.items.stored_bytes())
         + u128::from(catalog.definitions.blueprints.stored_bytes())
         + u128::from(catalog.definitions.particle_libraries.stored_bytes())
@@ -153,6 +160,55 @@ fn encoder<'a, W: Write>(sink: W, level: i32, length: u64) -> io::Result<Encoder
     Ok(encoder)
 }
 
+fn take_row_spool_failure(catalog: &Catalog<'_>) -> Option<RowSpoolError> {
+    catalog
+        .placements
+        .take_row_spool_failure()
+        .or_else(|| catalog.loadouts.take_failure())
+        .or_else(|| catalog.configurations.durability.take_failure())
+        .or_else(|| catalog.declarations.entity_tags.take_failure())
+        .or_else(|| {
+            catalog
+                .declarations
+                .loot_entity_container_documents
+                .take_failure()
+        })
+        .or_else(|| catalog.definitions.items.take_failure())
+        .or_else(|| catalog.definitions.blueprints.take_failure())
+        .or_else(|| catalog.definitions.contract_generators.take_failure())
+        .or_else(|| catalog.definitions.contract_templates.take_failure())
+        .or_else(|| catalog.definitions.mission_broker_entries.take_failure())
+        .or_else(|| catalog.definitions.particle_libraries.take_failure())
+        .or_else(|| {
+            catalog
+                .configurations
+                .entity_configurations
+                .alignment
+                .item_ports
+                .take_failure()
+        })
+        .or_else(|| {
+            catalog
+                .configurations
+                .entity_configurations
+                .interactions
+                .take_failure()
+        })
+        .or_else(|| {
+            catalog
+                .configurations
+                .entity_configurations
+                .item_bounds()
+                .take_failure()
+        })
+        .or_else(|| {
+            catalog
+                .projections
+                .weapon_player_animation_candidates
+                .take_failure()
+        })
+}
+
 fn write_json(
     catalog: &Catalog<'_>,
     out: &mut impl Write,
@@ -161,46 +217,7 @@ fn write_json(
     let mut buffered = BufWriter::with_capacity(BUFFER, out);
     let written = serde_json::to_writer(&mut buffered, catalog)
         .map_err(|error| {
-            let failure = catalog
-                .placements
-                .take_row_spool_failure()
-                .or_else(|| catalog.loadouts.take_failure())
-                .or_else(|| catalog.configurations.durability.take_failure())
-                .or_else(|| catalog.declarations.entity_tags.take_failure())
-                .or_else(|| catalog.definitions.items.take_failure())
-                .or_else(|| catalog.definitions.blueprints.take_failure())
-                .or_else(|| catalog.definitions.contract_generators.take_failure())
-                .or_else(|| catalog.definitions.contract_templates.take_failure())
-                .or_else(|| catalog.definitions.mission_broker_entries.take_failure())
-                .or_else(|| catalog.definitions.particle_libraries.take_failure())
-                .or_else(|| {
-                    catalog
-                        .configurations
-                        .entity_configurations
-                        .alignment
-                        .item_ports
-                        .take_failure()
-                })
-                .or_else(|| {
-                    catalog
-                        .configurations
-                        .entity_configurations
-                        .interactions
-                        .take_failure()
-                })
-                .or_else(|| {
-                    catalog
-                        .configurations
-                        .entity_configurations
-                        .item_bounds()
-                        .take_failure()
-                })
-                .or_else(|| {
-                    catalog
-                        .projections
-                        .weapon_player_animation_candidates
-                        .take_failure()
-                });
+            let failure = take_row_spool_failure(catalog);
             if let Some(failure) = failure {
                 return CatalogError::from(failure);
             }

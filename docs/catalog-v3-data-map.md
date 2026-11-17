@@ -115,6 +115,7 @@ Source inventory is current contract.rs:69-181 and generated schema's top requir
 | subHarvestableMultiConfigs | D.subHarvestableMultiConfigs | ordered slots/configs/themes; not current server contents |
 | harvestableLocations | P.harvestableLocations | original preset/container/system/object relation, contextual identity |
 | lootContainers | P.lootContainers | original config/container/system/object relation, contextual identity |
+| reached Loot EntXML container-link documents | A.lootEntityContainerDocuments | intrinsic containing/nested physical Entry identity; normalized original XML nodes and per-attribute link/config sites; exact sourced directory candidates, no global GUID ownership or invented placement; limited to documents reached by the existing Loot walk ([contract](catalog-loot-source.md#original-container-link-documents-reached-by-the-loot-walk)) |
 | shops | D.shops; A.shopInventoryResolution | registry identity/type/brand/place, conservative all-sources-agree resolution |
 | factionReputations | D.factionReputations; C.reputationTriggers | physical reputation owners, distinct from Faction/FactionIdentity, with authored presentation, blackboard, relation markers and perk-list links |
 | factionIdentities | D.factionIdentities | [physical FactionIdentity owners](catalog-faction-identities.md) with protected Locale, security and Tag links, exact ordered encounter weights and original NPC joins |

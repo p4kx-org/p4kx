@@ -235,6 +235,7 @@ pub(crate) fn minimal_catalog() -> Value {
             "tagRoots": tags::roots(),
             "shopInventoryResolution": absent_table(),
             "entityTags": tags::entities(),
+            "lootEntityContainerDocuments": absent_table(),
             "ammoBindings": absent_table(),
             "contractScenarioRequirements": absent_table(),
             "resourceNetworkLinks": absent_table(),

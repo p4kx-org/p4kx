@@ -247,3 +247,15 @@ canonical interpreter needs their typed lookup. Check coverage before replacing 
 
 See [Contract queries](catalog-contract-queries.md) for callback lifetimes, parsed-session reuse,
 global duplicate and intro semantics, complete original views and source-inventory ownership.
+
+## Loot container-document source scope
+
+Catalog v3 `declarations.lootEntityContainerDocuments` retains original attribute sites only from
+EntXML documents actually reached by the existing Loot container walk. It is not a whole-Archive
+Entity inventory. The source strategy is the physical containing Entry plus nested Entry and local
+node/attribute ordinals; repeated placement roots and equal GUIDs do not replace that identity.
+The normalized nodes/configuration references and exact lookup candidates are documented in
+[the Loot source contract](catalog-loot-source.md#original-container-link-documents-reached-by-the-loot-walk).
+This additive table has no direct-query SDK adapter yet. A future adapter must reuse the same
+source-owned reader, reached scope, original content/directory surveys and failure handling. The
+existing global first-pair convenience derivation remains a separate limitation.

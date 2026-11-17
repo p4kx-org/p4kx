@@ -86,21 +86,26 @@ impl<'stage, Key: Ord> IndexedCatalogRows<'stage, Key> {
         forge: &DataForge<'_>,
         source_types: &[&str],
     ) -> Result<StagedCatalogTable, CatalogError> {
-        if let Some(writer) = self.writer {
-            let spool = writer.finish(self.cancel)?;
-            Ok(StagedCatalogTable::new(
-                DatasetAvailability::Available,
-                Some(spool),
-                self.cancel,
-            ))
+        let availability = if self.writer.is_some() {
+            DatasetAvailability::Available
         } else {
-            checkpoint(self.cancel)?;
-            Ok(StagedCatalogTable::empty(
-                DatasetAvailability::from_source_declarations(forge, |name| {
-                    source_types.contains(&name)
-                }),
-            ))
-        }
+            DatasetAvailability::from_source_declarations(forge, |name| {
+                source_types.contains(&name)
+            })
+        };
+        self.finish_with_availability(availability)
+    }
+
+    pub(crate) fn finish_with_availability(
+        self,
+        availability: DatasetAvailability,
+    ) -> Result<StagedCatalogTable, CatalogError> {
+        let spool = self
+            .writer
+            .map(|writer| writer.finish(self.cancel))
+            .transpose()?;
+        checkpoint(self.cancel)?;
+        Ok(StagedCatalogTable::new(availability, spool, self.cancel))
     }
 }
 

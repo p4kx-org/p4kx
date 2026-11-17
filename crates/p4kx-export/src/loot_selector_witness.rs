@@ -222,7 +222,7 @@ fn read_member(
     if xml.is_lossy() {
         return Ok((State::ParseUnavailable, false));
     }
-    let (_, Some(admitted)) = super::read_document(&xml)?.into_parts() else {
+    let (_, Some(admitted)) = super::read_document(&xml, None)?.into_parts() else {
         return Ok((State::DifferentSelection, false));
     };
     if !expected.contains(admitted.as_str()) {

@@ -51,3 +51,11 @@ reached external Child whose target lookup has zero or multiple winning candidat
 occurrence's `parentInstanceId.value` to `placements.containerInstances.rows[].instanceId.value`
 within the same Catalog. Resolve source-use IDs in that Catalog. Use `exportHealth` alongside
 selection completeness for decisions about previously imported rows.
+
+Schema v3 also adds `declarations.lootEntityContainerDocuments` for original container-link
+attributes in the EntXML documents actually reached by the Loot walk. Document identity is the
+containing/nested physical Entry, with document-local node and attribute ordinals. Normalized
+nodes and configuration-reference sites are stored once per document; each link keeps its exact
+selector, sourced lookup status and physical candidate set. This exposes configless and repeated
+original occurrences without inventing Loot placements or changing normal-publication Health.
+See [the original Loot document contract](catalog-loot-source.md#original-container-link-documents-reached-by-the-loot-walk).

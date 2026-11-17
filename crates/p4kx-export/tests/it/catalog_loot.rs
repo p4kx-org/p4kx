@@ -4,6 +4,11 @@
 //! Loot tables, archetypes, pool filters, the loot of a slot and the containers placed with a
 //! multi config, in the P4KX catalog.
 
+#[path = "loot_entity_container_publication.rs"]
+mod entity_container_publication;
+#[path = "loot_unreadable_root_publication.rs"]
+mod unreadable_root_publication;
+
 use crate::catalog_loot_filter_assertions;
 use crate::loot_fixture::{
     ARCHETYPE, AREA, CONFIG, ENTITY, FILTER, FILTER_LEAF, GHOST, LEGACY_TABLE, NESTED, PLANET,

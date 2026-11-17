@@ -179,3 +179,40 @@ test checks stored type and target, array shape and the physical Record
 census on a configured Archive with complete Build identity. A declared
 type can have zero physical Records. The source census is independent of
 catalogue export and runtime selection.
+
+## Original container-link documents reached by the Loot walk
+
+`declarations.lootEntityContainerDocuments` is a `CatalogTable` of the physical
+`entdata/*.entxml` documents reached by the existing Loot walk that contain at least one
+`objectContainer` attribute. This scope is not a whole-Archive Entity inventory and does not
+include unvisited target bodies. See [ADR-0402](adr/0402-loot-walk-retains-original-entity-container-documents.md).
+
+A row's `containingContainer` and `document` are sourced physical Entry references. These identify
+an intrinsic document, independently of how many placement roots reached it. Distinct Entries with
+equal paths or bytes remain distinct. `nodes.value` stores each relevant XML node and actual XML `Entity`
+owner once, with sourced `nodeIndex`, `parentNodeIndex`, `entityNodeIndex`, `name` and ordered
+attributes. The parent index is an original document coordinate; the parent may not be emitted.
+The Entity index denotes the nearest actual XML `Entity` ancestor or self, never a GUID-based owner.
+
+`links.value` contains each original `objectContainer` attribute in document preorder and original
+attribute order. Its `nodeIndex` and `attributeOrdinal` identify the exact site. `declaredPath` is
+unchanged, including empty or invalid text. `targetStatus` and `targetCandidates` describe the exact
+Archive directory lookup, with original selector and directory-survey provenance. Resolved means
+one actual directory candidate, not read/decode/placement success. The other states are notFound,
+ambiguous, unsupportedSelector and incompleteDirectory. Recovered membership and unsupported syntax
+never certify a complete lookup; actual duplicate candidates remain ambiguous.
+
+`configReferences.value` independently preserves each original `multiConfigRef` site once, with
+its node/attribute coordinates and parsed `guid` state. The exact original text is the `value`
+cell of `nodes.value` at the matching `nodeIndex`, then `attributes[attributeOrdinal]`; the raw
+attribute is stored only once. Authored zero GUID,
+invalid/empty text and no attribute remain distinguishable. Configurations are not inferred
+onto links. Read the corresponding normalized node's `entityNodeIndex` for original XML ownership.
+Collection surveys and each immediate datum retain their own encryption/completeness/source-use
+fields. Local positions and rotations remain exact raw attributes; no world pose is invented.
+
+Availability describes only the reached family: available when a matching document was observed,
+absent after a successful reached-scope inspection with none, or unavailable when failed sources
+prevent establishing absence. Normal Health refusal remains unchanged. The existing Loot
+convenience projection still uses the first document-wide path/config pair and does not establish
+per-Entity pairing. The new source carrier exposes that limitation; it does not fix it implicitly.

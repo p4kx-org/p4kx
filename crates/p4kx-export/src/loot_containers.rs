@@ -7,6 +7,7 @@ use p4kx_extraction::{Archive, CancelToken};
 use rayon::prelude::*;
 
 use crate::catalog_read::original::EntryCapture;
+use crate::catalog_rows::staged::StagedCatalogTable;
 use crate::contract_loot::{LootContainer, TagCount};
 use crate::export_ledger::ExportLedger;
 use crate::guid_text::{CatalogGuid, GuidText};
@@ -25,6 +26,7 @@ type Tags = Result<EntityTags, Unreadable>;
 pub(crate) struct Located {
     pub(crate) ledger: ExportLedger,
     pub(crate) containers: Vec<LootContainer>,
+    pub(crate) original_documents: StagedCatalogTable,
     /// The containers and entity files that cannot be read, ordered by path.
     pub(crate) unreadable: Vec<UnreadableContainer>,
     /// The entity files that name several different containers or configs, as `container: file`,
@@ -48,6 +50,7 @@ pub(crate) fn locate(
     let Explored {
         summaries,
         mut ledger,
+        original_documents,
     } = explore(archive, &index, opened, cancel, capture)?;
     let (tags, observed) = read_tags(archive, &summaries, cancel, capture)?;
     ledger.merge(observed);
@@ -58,6 +61,7 @@ pub(crate) fn locate(
     Ok(Located {
         ledger,
         containers,
+        original_documents,
         unreadable: unreadable(archive, &summaries, &tags),
         several: several(archive, &summaries),
     })

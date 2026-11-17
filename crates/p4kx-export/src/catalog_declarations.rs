@@ -12,6 +12,7 @@ use super::resource_topology_declarations::ItemRoomAssociation;
 use super::room_associations::RoomAssociations;
 use super::tag_catalog::{EntityTags, TagRoots};
 use crate::catalog_rows::staged::StagedCatalogTable;
+use crate::loot_entxml::documents::LootEntityContainerDocument;
 use crate::schema_fields::every_field_required;
 use crate::shop_inventory_resolution::ShopInventoryResolution;
 
@@ -25,6 +26,8 @@ pub(crate) struct CatalogDeclarations<'source> {
     pub(crate) shop_inventory_resolution: CatalogTable<ShopInventoryResolution>,
     #[schemars(with = "CatalogTable<EntityTags<'source>>")]
     pub(crate) entity_tags: StagedCatalogTable,
+    #[schemars(with = "CatalogTable<LootEntityContainerDocument>")]
+    pub(crate) loot_entity_container_documents: StagedCatalogTable,
     pub(crate) ammo_bindings: CatalogTable<AmmoBinding<'source>>,
     pub(crate) contract_scenario_requirements: CatalogTable<
         super::mission_sources::contract_scenario_requirements::ContractScenarioRequirements<

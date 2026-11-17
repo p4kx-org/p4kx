@@ -5,13 +5,16 @@
 
 use std::collections::{HashMap, HashSet};
 
-use p4kx_extraction::{Archive, CancelToken, Guid};
+use p4kx_extraction::{Archive, CancelToken, Guid, SourceUse};
 use rayon::prelude::*;
 
 use crate::catalog_read::original::{AuthoredEntryPath, EntryCapture};
+use crate::catalog_rows::staged::{IndexedCatalogRows, StagedCatalogTable};
+use crate::catalog_table::DatasetAvailability;
 use crate::entry_source::{self, EntrySource};
 use crate::export_ledger::{ExportLedger, SourceDisposition};
 use crate::loot_entxml::EntityLink;
+use crate::loot_entxml::documents::LootEntityContainerDocument;
 use crate::loot_unreadable::Unreadable;
 use crate::starmap_index::Index;
 use crate::starmap_walk::Opened;
@@ -58,6 +61,7 @@ pub(crate) struct Summary {
 pub(crate) struct Explored {
     pub(crate) ledger: ExportLedger,
     pub(crate) summaries: HashMap<usize, Summary>,
+    pub(crate) original_documents: StagedCatalogTable,
 }
 
 /// Reads the containers in `opened` and every container their entities place, breadth first.
@@ -70,6 +74,13 @@ pub(crate) fn explore(
     capture: &EntryCapture<'_>,
 ) -> Result<Explored, CatalogError> {
     let mut ledger = ExportLedger::default();
+    let directory = capture
+        .source_uses()
+        .observe_root_directory_paths(archive)?;
+    let scratch = std::env::temp_dir();
+    let mut originals = IndexedCatalogRows::new(&scratch, cancel);
+    let mut available = false;
+    let mut unknown = crate::export_archive_health::inventory(archive).is_some();
     let mut summaries: HashMap<usize, Summary> = HashMap::new();
     let mut frontier: Vec<usize> = opened.iter().map(|root| root.entry).collect();
     while !frontier.is_empty() && !cancel.is_some_and(CancelToken::is_cancelled) {
@@ -80,19 +91,43 @@ pub(crate) fn explore(
             .par_iter()
             .filter(|_| !cancel.is_some_and(CancelToken::is_cancelled))
             .map(|&entry| {
-                summarise(archive, index, entry, cancel, capture).map(|read| (entry, read))
+                summarise(archive, index, entry, cancel, capture, directory.as_ref())
+                    .map(|read| (entry, read))
             })
             .collect::<Result<Vec<_>, _>>()?;
         frontier = read
             .iter()
-            .flat_map(|(_, (summary, _))| summary.nested.iter().copied())
+            .flat_map(|(_, read)| read.summary.nested.iter().copied())
             .collect();
-        for (entry, (summary, observed)) in read {
-            summaries.insert(entry, summary);
-            ledger.merge(observed);
+        for (entry, read) in read {
+            for document in read.documents {
+                originals.append((entry, document.physical_index()?), &document)?;
+                available = true;
+            }
+            unknown |= read.scope_unknown;
+            summaries.insert(entry, read.summary);
+            ledger.merge(read.ledger);
         }
     }
-    Ok(Explored { ledger, summaries })
+    let availability = if available {
+        DatasetAvailability::Available
+    } else if unknown {
+        DatasetAvailability::Unavailable
+    } else {
+        DatasetAvailability::Absent
+    };
+    Ok(Explored {
+        ledger,
+        summaries,
+        original_documents: originals.finish_with_availability(availability)?,
+    })
+}
+
+struct ContainerRead {
+    summary: Summary,
+    ledger: ExportLedger,
+    documents: Vec<LootEntityContainerDocument>,
+    scope_unknown: bool,
 }
 
 fn summarise(
@@ -101,14 +136,20 @@ fn summarise(
     entry: usize,
     cancel: Option<&CancelToken>,
     capture: &EntryCapture<'_>,
-) -> Result<(Summary, ExportLedger), CatalogError> {
+    directory: Option<&SourceUse>,
+) -> Result<ContainerRead, CatalogError> {
     let read = crate::loot_container_source::read(archive, entry, cancel, capture)?;
     let mut ledger = read.ledger;
+    let scope_unknown = read.unreadable.is_some() || read.original_scope_unknown;
+    let mut documents = Vec::new();
     let mut summary = Summary {
         unreadable: read.unreadable,
         ..Summary::default()
     };
-    for (path, link) in read.links {
+    for (path, mut link) in read.links {
+        if let Some(original) = link.take_original() {
+            documents.push(original.project(archive, index, directory, capture, cancel)?);
+        }
         let (link, selected) = link.into_parts();
         let EntityLink {
             container: written,
@@ -133,20 +174,36 @@ fn summarise(
             summary.nested.push(found);
         }
         if let Some(config) = config {
-            let path = match (found, written) {
-                (Some(found), _) => path_of(archive, found).to_owned(),
-                (None, written) => written.unwrap_or_default(),
-            };
-            summary.placed.push(Placed {
-                config,
-                path,
-                target,
-            });
+            summary
+                .placed
+                .push(configured_placement(archive, config, written, target));
         }
     }
     summary.nested.sort_unstable();
     summary.nested.dedup();
-    Ok((summary, ledger))
+    Ok(ContainerRead {
+        summary,
+        ledger,
+        documents,
+        scope_unknown,
+    })
+}
+
+fn configured_placement(
+    archive: &Archive,
+    config: Guid,
+    written: Option<String>,
+    target: PlacedTarget,
+) -> Placed {
+    let path = target.entry().map_or_else(
+        || written.unwrap_or_default(),
+        |found| path_of(archive, found).to_owned(),
+    );
+    Placed {
+        config,
+        path,
+        target,
+    }
 }
 
 fn resolve_target(

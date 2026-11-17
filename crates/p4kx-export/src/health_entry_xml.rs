@@ -9,7 +9,6 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::OriginalDatum;
-use super::entry_selection_input::{EntrySelectionUse, SelectionSource};
 use super::health_entry_frame::EntryCapture;
 use super::health_entry_metadata::EntryMetadata;
 use super::health_entry_read::EntryRead;
@@ -18,6 +17,11 @@ use super::health_entry_selection::AuthoredEntryPath;
 use crate::schema_fields::every_field_required;
 use crate::starmap_xml::{Document, Node, Root, XmlError};
 use crate::{CatalogError, ExportAccountingError};
+
+#[path = "health_entry_xml_attribute.rs"]
+mod attribute;
+
+pub(crate) use attribute::XmlAttribute;
 
 /// One original XML attribute occurrence.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
@@ -30,7 +34,7 @@ pub(crate) struct SourcedXmlAttribute {
 
 /// One actual parse borrowing only bytes from its sealed original Entry read.
 pub(crate) struct EntryXml<'read, 'capture, 'input> {
-    receipt: &'read EntryReceipt,
+    read: &'read EntryRead,
     entry: Arc<EntryMetadata>,
     capture: &'capture EntryCapture<'input>,
     document: Document<'read>,
@@ -63,7 +67,7 @@ impl<'read, 'capture, 'input> EntryXml<'read, 'capture, 'input> {
             Err(error) => return Ok(Err(error)),
         };
         Ok(Ok(Self {
-            receipt: read.receipt(),
+            read,
             entry: Arc::new(read.receipt().payload_entry()?.clone()),
             capture,
             document,
@@ -71,13 +75,13 @@ impl<'read, 'capture, 'input> EntryXml<'read, 'capture, 'input> {
     }
 
     pub(crate) fn containing_entry(&self) -> Result<EntryReceipt, ExportAccountingError> {
-        self.receipt.containing_entry()
+        self.read.receipt().containing_entry()
     }
 
     pub(crate) fn payload_reference(
         &self,
     ) -> Result<OriginalDatum<PhysicalEntryRef>, CatalogError> {
-        self.receipt.payload_reference(self.capture)
+        self.read.receipt().payload_reference(self.capture)
     }
 
     pub(crate) const fn is_lossy(&self) -> bool {
@@ -86,6 +90,12 @@ impl<'read, 'capture, 'input> EntryXml<'read, 'capture, 'input> {
 
     pub(crate) const fn capture(&self) -> &EntryCapture<'input> {
         self.capture
+    }
+
+    /// Selects the original content of this successfully parsed physical document.
+    pub(crate) fn document_source(&self) -> Result<SourceUse, CatalogError> {
+        self.read.complete_bytes()?;
+        self.entry.payload_read(SourceUseRole::Selector)
     }
 
     pub(crate) fn root(&self) -> Root<'_> {
@@ -128,6 +138,25 @@ impl<'read, 'capture, 'input> EntryXml<'read, 'capture, 'input> {
         };
         self.capture_value(index, &format!("@{name}"), value)
             .map(Some)
+    }
+
+    /// Visits each actual original attribute once in source order.
+    pub(crate) fn visit_attributes<'node>(
+        &self,
+        node: impl Node<'node>,
+        mut visit: impl FnMut(XmlAttribute<'_, 'node>) -> Result<(), CatalogError>,
+    ) -> Result<(), CatalogError> {
+        let (node, index) = self.checked_node(node)?;
+        for (ordinal, (name, value)) in node.attributes().enumerate() {
+            visit(XmlAttribute::new(
+                self.entry.as_ref(),
+                index,
+                ordinal,
+                name,
+                value,
+            )?)?;
+        }
+        Ok(())
     }
 
     pub(crate) fn attribute_at<'node>(
@@ -255,23 +284,7 @@ impl<'read, 'capture, 'input> EntryXml<'read, 'capture, 'input> {
         location: SourceLocation,
         value: &str,
     ) -> Result<AuthoredEntryPath, CatalogError> {
-        let origin = self.entry.as_ref().clone();
-        AuthoredEntryPath::captured(
-            self.capture,
-            value,
-            vec![
-                EntrySelectionUse {
-                    source: SelectionSource::Entry(origin.clone()),
-                    location: location.clone(),
-                    role: SourceUseRole::Payload,
-                },
-                EntrySelectionUse {
-                    source: SelectionSource::Entry(origin),
-                    location,
-                    role: SourceUseRole::Conversion,
-                },
-            ],
-        )
+        attribute::capture_value(self.entry.as_ref(), self.capture, location, value)
     }
 }
 

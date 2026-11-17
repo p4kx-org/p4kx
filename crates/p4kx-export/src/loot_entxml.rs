@@ -4,7 +4,7 @@
 #[cfg(test)]
 use std::convert::Infallible;
 
-use p4kx_extraction::Guid;
+use p4kx_extraction::{CancelToken, Guid};
 
 use crate::catalog_read::original::{AuthoredEntryPath, EntryCapture, EntryRead, EntryXml};
 use crate::{CatalogError, ExportAccountingError};
@@ -12,6 +12,9 @@ use crate::{CatalogError, ExportAccountingError};
 #[cfg(test)]
 use crate::starmap_xml::Document;
 use crate::starmap_xml::{Node, XmlError, attribute};
+
+#[path = "loot_entity_container_document.rs"]
+pub(crate) mod documents;
 
 /// The attribute of an entity component that names the container the entity places.
 const CONTAINER_ATTRIBUTE: &str = "objectContainer";
@@ -37,11 +40,21 @@ pub(crate) struct EntityLink {
 pub(crate) struct CapturedEntityLink {
     value: EntityLink,
     selected: Option<AuthoredEntryPath>,
+    original: Option<documents::CapturedDocument>,
+    original_complete: bool,
 }
 
 impl CapturedEntityLink {
     pub(crate) const fn value(&self) -> &EntityLink {
         &self.value
+    }
+
+    pub(crate) const fn original_complete(&self) -> bool {
+        self.original_complete
+    }
+
+    pub(crate) const fn take_original(&mut self) -> Option<documents::CapturedDocument> {
+        self.original.take()
     }
 
     pub(crate) fn into_parts(self) -> (EntityLink, Option<AuthoredEntryPath>) {
@@ -86,20 +99,25 @@ pub(crate) fn read(bytes: &[u8]) -> Result<EntityLink, XmlError> {
 pub(crate) fn read_original(
     read: &EntryRead,
     capture: &EntryCapture<'_>,
+    cancel: Option<&CancelToken>,
 ) -> Result<Result<CapturedEntityLink, XmlError>, CatalogError> {
     let document = match EntryXml::parse(read, capture)? {
         Ok(document) => document,
         Err(error) => return Ok(Err(error)),
     };
-    Ok(Ok(read_document(&document)?))
+    Ok(Ok(read_document(&document, cancel)?))
 }
 
-fn read_document(document: &EntryXml<'_, '_, '_>) -> Result<CapturedEntityLink, CatalogError> {
-    let link = link_below(document.root(), |node, name| {
+fn read_document(
+    document: &EntryXml<'_, '_, '_>,
+    cancel: Option<&CancelToken>,
+) -> Result<CapturedEntityLink, CatalogError> {
+    let mut has_container_attribute = false;
+    let mut link = link_below(document.root(), |node, name| -> Result<_, CatalogError> {
         if name == CONTAINER_ATTRIBUTE {
-            document
-                .attribute(node, name)
-                .map(|value| value.map(AttributeValue::Captured))
+            let value = document.attribute(node, name)?;
+            has_container_attribute |= value.is_some();
+            Ok(value.map(AttributeValue::Captured))
         } else {
             Ok(attribute(node, name).map(AttributeValue::Plain))
         }
@@ -107,6 +125,10 @@ fn read_document(document: &EntryXml<'_, '_, '_>) -> Result<CapturedEntityLink, 
     if link.value.container.is_some() && link.selected.is_none() {
         return Err(ExportAccountingError::UnboundHealthSubject.into());
     }
+    if has_container_attribute {
+        link.original = documents::capture(document, cancel)?;
+    }
+    link.original_complete = !document.is_lossy();
     Ok(link)
 }
 
@@ -117,6 +139,8 @@ fn link_below<'document, N: Node<'document>, E>(
     let mut link = CapturedEntityLink {
         value: EntityLink::default(),
         selected: None,
+        original: None,
+        original_complete: true,
     };
     let mut pending = vec![root];
     while let Some(node) = pending.pop() {

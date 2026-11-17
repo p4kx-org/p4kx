@@ -199,6 +199,7 @@ pub(super) fn assemble<R>(
             shop_inventory_resolution: collected.shop_inventory_resolution,
             tag_roots: CatalogTable::new(&forge, &["TagDatabase"], collected.tags.roots),
             entity_tags: collected.entity_tags,
+            loot_entity_container_documents: collected.loot_entity_container_documents,
         },
         placements: catalog_placements,
         definitions: CatalogDefinitions {

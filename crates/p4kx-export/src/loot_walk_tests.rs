@@ -287,6 +287,20 @@ fn a_cancelled_walk_reads_nothing() {
     let root = root_of(&archive, "a");
     let cancel = CancelToken::new();
     cancel.cancel();
-    let explored = explore(&archive, &index, &[root], Some(&cancel));
-    assert!(explored.summaries.is_empty());
+    crate::catalog_read::original::with_entry_capture(&archive, |capture| {
+        let result = super::explore(&archive, &index, &[root], Some(&cancel), capture);
+        assert!(
+            matches!(result, Err(CatalogError::Cancelled)),
+            "a cancelled source walk must not become a complete empty result"
+        );
+        let inventory = capture.source_uses().freeze()?;
+        assert!(
+            inventory
+                .iter_uses()
+                .all(|used| used.scope() != p4kx_extraction::InputScope::Payload),
+            "a pre-cancelled walk does not read or attempt any container payload"
+        );
+        Ok(())
+    })
+    .expect("cancelled walk source evidence");
 }

@@ -44,6 +44,7 @@ pub(crate) fn add_loot_containers(
     let Located {
         ledger,
         containers,
+        original_documents,
         unreadable,
         several,
     } = located;
@@ -69,5 +70,6 @@ pub(crate) fn add_loot_containers(
             });
     }
     collected.loot_containers = containers;
+    collected.loot_entity_container_documents = original_documents;
     Ok(())
 }

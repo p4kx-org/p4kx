@@ -238,6 +238,7 @@ const GROUPS: &[Group] = &[
             "contractScenarioRequirements",
             "entityTags",
             "itemRoomAssociations",
+            "lootEntityContainerDocuments",
             "resourceGroupMembers",
             "resourceNetworkLinks",
             "roomAssociations",

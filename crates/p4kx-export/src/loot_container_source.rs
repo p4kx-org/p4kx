@@ -20,6 +20,7 @@ use crate::{CatalogError, Kind};
 pub(crate) struct Read {
     pub(crate) links: Vec<(String, CapturedEntityLink)>,
     pub(crate) unreadable: Option<Unreadable>,
+    pub(crate) original_scope_unknown: bool,
     pub(crate) ledger: ExportLedger,
 }
 
@@ -86,8 +87,9 @@ fn read_entity(
         read.unreadable = Some(Unreadable::EntityFile);
         return Ok(());
     };
-    match loot_entxml::read_original(&bytes, capture)? {
+    match loot_entxml::read_original(&bytes, capture, cancel)? {
         Ok(link) => {
+            read.original_scope_unknown |= !link.original_complete();
             if link.value().malformed_config {
                 source.diagnosed(
                     &mut read.ledger,
