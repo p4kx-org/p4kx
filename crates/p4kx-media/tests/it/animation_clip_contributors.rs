@@ -16,6 +16,9 @@ mod fixture;
 #[path = "animation_clip_contributor_bank.rs"]
 mod bank;
 
+#[path = "animation_clip_contributor_scope.rs"]
+mod scope;
+
 use self::fixture::{
     CHILD_ADB, ENTITY, EXACT_WILDCARD_CAF, FOLDED_WILDCARD_CAF, INCLUDE_SHARED_CAF, INCLUDED_CAF,
     INCLUDED_PARAMS, PART_ADB, PART_CAF, PART_ONLY_CAF, PART_PARAMS, ROOT_ADB, ROOT_CAF,
@@ -30,15 +33,17 @@ fn clip_contributors_join_only_their_physical_rig_placement_and_authored_closure
     let archive = fixture::open(scratch.path())?;
     let output = scratch.path().join("out");
     let options = ExportOptions {
-        kinds: vec![MediaKind::AnimationDefinition],
+        kinds: vec![MediaKind::Animation, MediaKind::AnimationDefinition],
         animation_entity: Some(ENTITY.into()),
         ..ExportOptions::default()
     };
     let index = support::published(p4kx_media::export(&archive, &output, &options)?)?;
     let rows = support::records(&output, &index, "animation-definition.jsonl")?;
-    let origins = Origins::read(&output.join(index.artifact_base))?;
+    let origins = Origins::read(&output.join(&index.artifact_base))?;
     verify_placements(&archive, &rows)?;
-    verify_contributors(&archive, &rows, &origins)
+    verify_contributors(&archive, &rows, &origins)?;
+    let clips = support::records(&output, &index, "animation.jsonl")?;
+    scope::verify(&archive, &rows, &clips)
 }
 
 fn verify_placements(archive: &Archive, rows: &[MediaRecord]) -> TestResult {

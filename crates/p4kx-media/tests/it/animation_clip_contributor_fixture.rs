@@ -6,9 +6,9 @@ use std::path::Path;
 
 use p4kx_extraction::Archive;
 use p4kx_testkit::{
-    ArchiveBuilder, DataForgeBuilder, TestEntity, TestEntry, TestInstance, TestLoadout,
-    TestLoadoutEntry, TestModel, TestPort, TestStruct, TestType, TestValue, entity_schema,
-    test_key,
+    ArchiveBuilder, DataForgeBuilder, TestAnimation, TestEntity, TestEntry, TestInstance,
+    TestLoadout, TestLoadoutEntry, TestModel, TestPort, TestSkeleton, TestStruct, TestTrack,
+    TestType, TestValue, entity_schema, test_key,
 };
 
 pub(super) const ENTITY: &str = "FixtureClipOwner";
@@ -33,7 +33,7 @@ pub(super) const EXACT_WILDCARD_CAF: &str = "Data/Animations/Contributor/Parts/l
 pub(super) const FOLDED_WILDCARD_CAF: &str = "Data/Animations/Contributor/Parts/load_SHARED.caf";
 
 const ROOT_XML: &str = concat!(
-    "<AnimDB><FragmentList><Idle><Fragment><AnimLayer>",
+    r#"<AnimDB><FragmentList><Idle><Fragment Tags="Root" OptionWeight="0.25"><AnimLayer>"#,
     r#"<Animation name="shared"/><Animation name="shared"/><Animation name="PartOnly"/>"#,
     "</AnimLayer></Fragment></Idle></FragmentList><SubADBs>",
     r#"<SubADB File="Animations/Contributor/child.adb"/>"#,
@@ -47,7 +47,7 @@ const CHILD_XML: &str = concat!(
     r#"<SubADBs><SubADB File="Animations/Contributor/root.adb"/></SubADBs></AnimDB>"#,
 );
 const PART_XML: &str = concat!(
-    "<AnimDB><FragmentList><Idle><Fragment><AnimLayer>",
+    r#"<AnimDB><FragmentList><Idle><Fragment Tags="Attachment" OptionWeight="0.75"><AnimLayer>"#,
     r#"<Animation name="shared"/><Animation name="RootOnly"/><Animation name="PartOnly"/>"#,
     "</AnimLayer></Fragment></Idle></FragmentList></AnimDB>",
 );
@@ -77,8 +77,8 @@ pub(super) fn open(folder: &Path) -> Result<Archive, Box<dyn Error>> {
     let path = folder.join("contributors.p4k");
     let mut archive = ArchiveBuilder::new()
         .entry(TestEntry::stored("Data/Game2.dcb", entities()))
-        .entry(TestEntry::stored(ROOT_CHR, TestModel::cube().cgf()))
-        .entry(TestEntry::stored(PART_CHR, TestModel::cube().cgf()))
+        .entry(TestEntry::stored(ROOT_CHR, rig()))
+        .entry(TestEntry::stored(PART_CHR, rig()))
         .entry(TestEntry::stored(
             ROOT_PARAMS,
             ROOT_PARAMETER_XML.as_bytes(),
@@ -101,10 +101,30 @@ pub(super) fn open(folder: &Path) -> Result<Archive, Box<dyn Error>> {
         EXACT_WILDCARD_CAF,
         FOLDED_WILDCARD_CAF,
     ] {
-        archive = archive.entry(TestEntry::stored(target, b"directory-only CAF").with_crc32(0));
+        archive = archive.entry(TestEntry::stored(target, clip(target)));
     }
     archive.write_to(&path)?;
     Ok(Archive::open_with_key(path, Some(test_key()))?)
+}
+
+fn rig() -> Vec<u8> {
+    TestModel::cube()
+        .with_skeleton(&TestSkeleton::two_bones())
+        .cgf()
+}
+
+fn clip(path: &str) -> Vec<u8> {
+    let (rate, end_frame) = match path {
+        ROOT_CAF => (24, 12),
+        PART_CAF => (60, 48),
+        _ => (30, 30),
+    };
+    TestAnimation::new("shared", rate)
+        .track(
+            TestTrack::new(TestSkeleton::controller_id(0))
+                .positions(&[(0, [0.0; 3]), (end_frame, [1.0, 0.0, 0.0])]),
+        )
+        .caf()
 }
 
 fn entities() -> Vec<u8> {
