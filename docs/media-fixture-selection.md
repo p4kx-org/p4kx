@@ -208,9 +208,10 @@ gloss-map X as its initial smoothness. The optional detail step multiplies that 
 `1 + processedDetailSample.w × DetailGloss`. The palette step then multiplies by
 the layer gloss and, when the packed palette selector and palette ID are nonzero,
 by the palette gloss unpacked from the palette's half-precision pair. The palette
-stage receives the detail result before saturation. Selection of the active shader permutation,
-detail sampling before this step and the final conversion to BRDF roughness remain
-open for the reported painted surface.
+stage receives the detail result before saturation. The verified GBuffer path passes
+material attributes to the encoder. A separate lighting path calls `GlossToRoughness`
+before shading. The active permutation, detail sample preprocessing, GBuffer encoding
+and the definition of the final roughness function remain open for the reported surface.
 
 The following synthetic comparison uses base roughness `0.48`, smoothness
 `1 − 0.48²`, neutral layer gloss and the trial final transform `sqrt(1 − S)` with
@@ -231,10 +232,10 @@ before the palette multiplication.
 The LayerBlend_V2 decoder trace reads the packed tint index before multiplying the
 smoothness by sampled gloss X. The palette library extracts the one-based slot with
 `packedTint & 0x3`, the diffuse flag with `packedTint & 0x4` and the specular flag
-with `packedTint & 0x8`. With the specular flag set, the library multiplies
-Reflectance by the palette specular value. The shader consumes the packed value.
-The mapping from authored MTL `TintMode` to that value and the remaining specular
-branch are open. The stencil palette function has its own mode.
+with `packedTint & 0x8`. The library multiplies Reflectance by the palette specular
+factor when that flag is set and by the original layer specular factor otherwise.
+The mapping from authored MTL `TintMode` to the packed value remains open. The
+stencil palette function has its own mode.
 [Painted surface investigation](https://github.com/p4kx-org/p4kx/issues/1155)
 · [Independent tint flags](https://github.com/p4kx-org/p4kx/issues/1156)
 
