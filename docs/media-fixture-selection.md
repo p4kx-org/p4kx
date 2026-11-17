@@ -176,6 +176,16 @@ linear probe measured `0.231372461` with the multiplier absent and
 `0.615686238` with `0.5`. The shared stencil probe also verified all eight
 painted and eight fallback samples.
 
+For an unlayered HardSurface material, the GLB uses the explicit `_gloss` map when the
+normal map supplies no readable smoothness alpha. It chooses the first usable authored
+Gloss slot. Both consumers sample the decoded RGB as data and use the Blender 5.3
+default Linear Rec.709 luminance for the explicit map. The GLB quantizes the inverse
+to its packed green channel and keeps the existing specular map's dimensions and blue
+channel when present. The paired numeric rule applies to the same texel under the
+default Blender colour configuration and neutral own-material multiplier. Blender
+can sample a separate UV transform per map. The GLB combines channels into one texture.
+[Blender default colour configuration](https://github.com/blender/blender/blob/v5.3.0/release/datafiles/colormanagement/config.ocio)
+
 ## LayerBlend palette tint modes
 
 The LayerBlend fixture exports both a GLB and Blender package from one synthetic Archive.

@@ -109,6 +109,7 @@ pub(crate) fn layer_job(
         diffuse: None,
         normal: own.cloned(),
         specular: None,
+        explicit_gloss: Vec::new(),
         tints,
         layered: Some(layered.clone()),
     }

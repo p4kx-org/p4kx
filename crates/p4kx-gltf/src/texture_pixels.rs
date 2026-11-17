@@ -273,25 +273,43 @@ pub(crate) struct MetallicRoughness {
     pub(crate) metallic: bool,
 }
 
+#[derive(Clone, Copy)]
+pub(crate) enum Smoothness<'a> {
+    NormalAlpha(&'a RgbaImage),
+    ExplicitRgb(&'a RgbaImage),
+}
+
+impl Smoothness<'_> {
+    fn roughness(self, at: (usize, usize), size: (usize, usize)) -> u8 {
+        match self {
+            Self::NormalAlpha(image) => OPAQUE - sampled(image, at, size)[3],
+            Self::ExplicitRgb(image) => {
+                let [red, green, blue, _] = sampled(image, at, size);
+                OPAQUE - encode_share(luminance([red, green, blue].map(unit)))
+            }
+        }
+    }
+}
+
 /// Returns the metallic-roughness image, glTF's roughness in green and metalness in blue, from the
-/// smoothness in the alpha channel of `gloss` (roughness is its inverse) and the metalness of the
-/// specular map `specular` tinted with `tint`; a channel without source is full, for the
-/// material's factor to scale. The image has the size of `gloss`, or of `specular` without it;
-/// `None` when both are absent.
+/// inverse of selected smoothness and the tinted specular map. An unused channel stays full for
+/// the material factor. The size comes from normal-derived smoothness, specular or explicit gloss
+/// in that order; returns `None` when both inputs are absent.
 pub(crate) fn metallic_roughness(
-    gloss: Option<&RgbaImage>,
+    gloss: Option<Smoothness<'_>>,
     specular: Option<&LoadedTexture>,
     tint: [f32; 3],
 ) -> Result<Option<MetallicRoughness>, TextureError> {
-    let Some(size) = gloss.or_else(|| specular.map(|image| &image.image)) else {
-        return Ok(None);
+    let size = match (gloss, specular) {
+        (Some(Smoothness::NormalAlpha(image)), _)
+        | (Some(Smoothness::ExplicitRgb(image)), None) => image,
+        (_, Some(texture)) => &texture.image,
+        (None, None) => return Ok(None),
     };
     let dimensions = (size.width() as usize, size.height() as usize);
     let image = fill(size.width(), size.height(), |y, out| {
         for (x, target) in out.as_chunks_mut::<RGBA>().0.iter_mut().enumerate() {
-            let roughness = gloss.map_or(OPAQUE, |gloss| {
-                OPAQUE - sampled(gloss, (x, y), dimensions)[3]
-            });
+            let roughness = gloss.map_or(OPAQUE, |gloss| gloss.roughness((x, y), dimensions));
             let metallic = specular.map_or(OPAQUE, |specular| {
                 let [red, green, blue, _] = sampled_colour(specular, (x, y), dimensions);
                 encode_share(metal_share(specular_of(

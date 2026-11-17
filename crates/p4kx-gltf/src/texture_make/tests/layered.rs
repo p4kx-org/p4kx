@@ -76,6 +76,7 @@ fn layered_job_of(prefix: &str, with_mask: bool) -> Job {
         diffuse: None,
         normal: None,
         specular: None,
+        explicit_gloss: Vec::new(),
         tints: TINTS,
         layered: Some(layered),
     }

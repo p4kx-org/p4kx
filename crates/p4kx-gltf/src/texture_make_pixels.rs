@@ -6,7 +6,9 @@ use p4kx_texture::DdsTransfer;
 use super::{Made, Outcome, encode, load};
 use crate::texture_cache::Decoded;
 use crate::texture_origins::{TextureComponents, TexturePaletteUse};
-use crate::texture_pixels::{base_colour, metallic_roughness, normal_map, opacity_colour};
+use crate::texture_pixels::{
+    Smoothness, base_colour, metallic_roughness, normal_map, opacity_colour,
+};
 use crate::texture_plan::{Failure, Job};
 use crate::texture_report::TextureRole;
 
@@ -89,27 +91,43 @@ pub(super) fn make_packed(
     outcome: &mut Outcome,
     failures: &mut Vec<Failure>,
 ) -> Made {
-    let gloss = load(decoded, TextureRole::Normal, job.normal.as_ref(), failures)
-        .filter(|gloss| gloss.has_alpha);
+    let normal = load(decoded, TextureRole::Normal, job.normal.as_ref(), failures)
+        .filter(|normal| normal.has_alpha);
+    let explicit = if normal.is_none() {
+        job.explicit_gloss
+            .iter()
+            .find_map(|source| load(decoded, TextureRole::Gloss, Some(source), failures))
+    } else {
+        None
+    };
+    let smoothness = normal
+        .as_ref()
+        .map(|normal| Smoothness::NormalAlpha(&normal.image))
+        .or_else(|| {
+            explicit
+                .as_ref()
+                .map(|gloss| Smoothness::ExplicitRgb(&gloss.image))
+        });
     let specular = load(
         decoded,
         TextureRole::Specular,
         job.specular.as_ref(),
         failures,
     );
-    match metallic_roughness(
-        gloss.as_ref().map(|gloss| &gloss.image),
-        specular.as_deref(),
-        job.tints.specular,
-    ) {
+    match metallic_roughness(smoothness, specular.as_deref(), job.tints.specular) {
         Ok(Some(packed)) => {
             if specular.is_some() {
                 outcome.palette_use = TexturePaletteUse::Specular;
             }
             outcome.texture_sources.extend(
-                gloss
+                normal
                     .iter()
                     .map(|texture| texture.contribution(TextureComponents::Alpha)),
+            );
+            outcome.texture_sources.extend(
+                explicit
+                    .iter()
+                    .map(|texture| texture.contribution(TextureComponents::Color)),
             );
             outcome.texture_sources.extend(
                 specular

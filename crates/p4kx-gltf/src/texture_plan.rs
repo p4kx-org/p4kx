@@ -17,7 +17,9 @@ use crate::texture_make::{Budget, run_guarded};
 use crate::texture_origins::{TextureMaterialSource, TextureReadUse};
 use crate::texture_pixels::Tints;
 use crate::texture_report::{TextureFallback, TextureRole};
-use crate::texture_roles::{Source, Sources, draws_by_opacity_map, sources_with};
+use crate::texture_roles::{
+    Source, Sources, draws_by_opacity_map, explicit_gloss_sources, sources_with,
+};
 
 /// The most images one GLB embeds.
 pub const MAX_TEXTURE_IMAGES: usize = 256;
@@ -47,6 +49,7 @@ pub(crate) enum Key {
     },
     MetallicRoughness {
         gloss: Option<String>,
+        explicit_gloss: Vec<String>,
         specular: Option<(String, [u8; 3])>,
     },
     LayerBase {
@@ -65,6 +68,7 @@ pub(crate) struct Job {
     pub(crate) diffuse: Option<Source>,
     pub(crate) normal: Option<Source>,
     pub(crate) specular: Option<Source>,
+    pub(crate) explicit_gloss: Vec<Source>,
     pub(crate) tints: Tints,
     pub(crate) layered: Option<Layered>,
 }
@@ -107,13 +111,12 @@ impl Job {
                 .and_then(|layered| layered.sizing(true))
                 .or(self.normal.as_ref())
                 .map(|s| (TextureRole::Normal, s)),
-            Key::MetallicRoughness { gloss, .. } => {
-                if gloss.is_some() {
-                    self.normal.as_ref().map(|s| (TextureRole::Normal, s))
-                } else {
-                    self.specular.as_ref().map(|s| (TextureRole::Specular, s))
-                }
-            }
+            Key::MetallicRoughness { .. } => self
+                .normal
+                .as_ref()
+                .map(|s| (TextureRole::Normal, s))
+                .or_else(|| self.explicit_gloss.first().map(|s| (TextureRole::Gloss, s)))
+                .or_else(|| self.specular.as_ref().map(|s| (TextureRole::Specular, s))),
         }
     }
 }
@@ -312,6 +315,7 @@ fn base_job(
         diffuse: Some(diffuse.clone()),
         normal: None,
         specular: found.specular.clone(),
+        explicit_gloss: Vec::new(),
         tints,
         layered: None,
     }
@@ -327,6 +331,7 @@ fn jobs_of(
     if found.diffuse.as_ref().is_none_or(|diffuse| diffuse.opacity) {
         found.specular = None;
     }
+    let explicit_gloss = explicit_gloss_sources(material, &mut found.refused);
     let mut refused = refusals(&found.refused);
     let tints = tints_of(material);
     let specular_key = found
@@ -352,6 +357,7 @@ fn jobs_of(
             diffuse: None,
             normal: found.normal.clone(),
             specular: None,
+            explicit_gloss: Vec::new(),
             tints,
             layered: None,
         })
@@ -360,18 +366,21 @@ fn jobs_of(
         (Some(add(layered)), plain_normal)
     });
     let gloss = found.normal.as_ref().filter(|normal| normal.gloss);
-    let packed = (gloss.is_some() || specular_key.is_some()).then(|| {
-        add(Job {
-            key: Key::MetallicRoughness {
-                gloss: gloss.map(Source::identity),
-                specular: specular_key.clone(),
-            },
-            diffuse: None,
-            normal: gloss.cloned(),
-            specular: found.specular.clone(),
-            tints,
-            layered: None,
-        })
-    });
+    let packed =
+        (gloss.is_some() || !explicit_gloss.is_empty() || specular_key.is_some()).then(|| {
+            add(Job {
+                key: Key::MetallicRoughness {
+                    gloss: gloss.map(Source::identity),
+                    explicit_gloss: explicit_gloss.iter().map(Source::identity).collect(),
+                    specular: specular_key,
+                },
+                diffuse: None,
+                normal: gloss.cloned(),
+                specular: found.specular.clone(),
+                explicit_gloss,
+                tints,
+                layered: None,
+            })
+        });
     ([base, normal, packed], fallback, refused)
 }

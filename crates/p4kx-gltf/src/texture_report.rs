@@ -13,16 +13,19 @@ pub enum TextureRole {
     Normal,
     /// The specular map, which gives the metalness.
     Specular,
+    /// The explicit gloss map, whose RGB gives the smoothness.
+    Gloss,
 }
 
 impl TextureRole {
-    /// Returns the role's name: `diffuse`, `normal` or `specular`.
+    /// Returns the name used in texture diagnostics.
     #[must_use]
     pub const fn name(self) -> &'static str {
         match self {
             Self::Diffuse => "diffuse",
             Self::Normal => "normal",
             Self::Specular => "specular",
+            Self::Gloss => "gloss",
         }
     }
 }

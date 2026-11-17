@@ -91,13 +91,13 @@ impl Tally {
         self.pixels = self.pixels.saturating_sub(size);
     }
 
-    fn reserve(&mut self, (width, height): (u32, u32)) -> Verdict {
+    fn reserve(&mut self, (width, height): (u32, u32), if_too_large: Verdict) -> Verdict {
         let size = u64::from(width) * u64::from(height);
         if self.fits(size) {
             self.take(size);
             Verdict::Reserved(size)
         } else {
-            Verdict::Refused
+            if_too_large
         }
     }
 
@@ -112,11 +112,21 @@ impl Tally {
         if job.layered.is_some() {
             return self.plan_layered(job, store);
         }
+        if job.normal.is_none()
+            && !job.explicit_gloss.is_empty()
+            && let Some(specular) = &job.specular
+        {
+            // A failed specular decode can leave a smaller gloss-only image.
+            return match store.dimensions(&specular.path) {
+                Ok(Some(size)) => self.reserve(size, Verdict::Unknown),
+                Ok(None) | Err(_) => Verdict::Unknown,
+            };
+        }
         let Some((role, source)) = sized_by(job) else {
             return Verdict::Unknown;
         };
         match store.dimensions(&source.path) {
-            Ok(Some(size)) => self.reserve(size),
+            Ok(Some(size)) => self.reserve(size, Verdict::Refused),
             Ok(None) => Verdict::Unknown,
             Err(error) => Verdict::Failed(Failure {
                 role,
@@ -145,7 +155,7 @@ impl Tally {
         let mut failure = None;
         for source in layered.size_sources(normal) {
             match store.dimensions(&source.path) {
-                Ok(Some(size)) => return self.reserve(size),
+                Ok(Some(size)) => return self.reserve(size, Verdict::Refused),
                 Ok(None) => return Verdict::Unknown,
                 Err(error) => {
                     failure.get_or_insert_with(|| Failure {
@@ -169,9 +179,14 @@ fn sized_by(job: &Job) -> Option<(TextureRole, &Source)> {
         Key::LayerBase { .. } | Key::LayerNormal { .. } => None,
         Key::Base { .. } => diffuse,
         Key::Normal { .. } => normal,
-        Key::MetallicRoughness { .. } => match (normal, specular) {
-            (Some(only), None) | (None, Some(only)) => Some(only),
-            _ => None,
-        },
+        Key::MetallicRoughness { .. } => {
+            let mut candidates = normal.into_iter().chain(specular).chain(
+                job.explicit_gloss
+                    .iter()
+                    .map(|source| (TextureRole::Gloss, source)),
+            );
+            let first = candidates.next()?;
+            candidates.next().is_none().then_some(first)
+        }
     }
 }

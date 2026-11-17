@@ -22,8 +22,12 @@ pub(crate) type Loaded = Result<Arc<LoadedTexture>, TextureLoadError>;
 /// The decoded sources one group of jobs is made from, by path.
 pub(crate) type Decoded = HashMap<String, Loaded>;
 
-/// Returns the paths of the source textures `job` loads.
+/// Returns the paths of the source textures `job` may load.
 pub(crate) fn paths(job: &Job) -> impl Iterator<Item = &str> {
+    primary_paths(job).chain(job.explicit_gloss.iter().map(|source| source.path.as_str()))
+}
+
+fn primary_paths(job: &Job) -> impl Iterator<Item = &str> {
     let normal = matches!(job.key, Key::LayerNormal { .. });
     [&job.diffuse, &job.normal, &job.specular]
         .into_iter()
@@ -34,6 +38,14 @@ pub(crate) fn paths(job: &Job) -> impl Iterator<Item = &str> {
                 .iter()
                 .flat_map(move |layered| layered.paths(normal)),
         )
+}
+
+fn has_ddna_smoothness(job: &Job, decoded: &Decoded) -> bool {
+    job.normal
+        .as_ref()
+        .and_then(|source| decoded.get(&source.path))
+        .and_then(|loaded| loaded.as_ref().ok())
+        .is_some_and(|texture| texture.has_alpha)
 }
 
 /// Decodes the source textures of a build a group of jobs at a time, each once per group however
@@ -77,10 +89,31 @@ impl<'l> SourceStore<'l> {
 
     /// Returns the decoded sources of `jobs`, taking the held ones and decoding the rest in
     /// parallel.
-    pub(crate) fn prepare<'a>(&mut self, jobs: impl IntoIterator<Item = &'a Job>) -> Decoded {
+    pub(crate) fn prepare<'a, Jobs>(&mut self, jobs: Jobs) -> Decoded
+    where
+        Jobs: IntoIterator<Item = &'a Job>,
+        Jobs::IntoIter: Clone,
+    {
+        let jobs = jobs.into_iter();
         let mut decoded = Decoded::new();
+        self.load_paths(jobs.clone().flat_map(primary_paths), &mut decoded);
+        for job in jobs.filter(|job| !job.explicit_gloss.is_empty()) {
+            if has_ddna_smoothness(job, &decoded) {
+                continue;
+            }
+            for source in &job.explicit_gloss {
+                self.load_paths(std::iter::once(source.path.as_str()), &mut decoded);
+                if decoded.get(&source.path).is_some_and(Result::is_ok) {
+                    break;
+                }
+            }
+        }
+        decoded
+    }
+
+    fn load_paths<'a>(&mut self, paths: impl Iterator<Item = &'a str>, decoded: &mut Decoded) {
         let mut missing: Vec<&str> = Vec::new();
-        for path in jobs.into_iter().flat_map(paths) {
+        for path in paths {
             if decoded.contains_key(path) || missing.contains(&path) {
                 continue;
             }
@@ -97,7 +130,6 @@ impl<'l> SourceStore<'l> {
             .map(|path| ((*path).to_owned(), loader.load(path, mip).map(Arc::new)))
             .collect();
         decoded.extend(fresh);
-        decoded
     }
 
     /// Keeps the sources, held before or in `decoded`, that `next` uses, as many as fit the cap.

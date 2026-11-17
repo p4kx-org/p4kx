@@ -2,7 +2,8 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_model::{
-    DIFFUSE_SLOT, Material, TextureSlot, is_diffuse_map, texture_suffix_lowercase as suffix,
+    DIFFUSE_SLOT, Material, TextureRole as MaterialTextureRole, TextureSlot, is_diffuse_map,
+    texture_suffix_lowercase as suffix,
 };
 
 use crate::material_alpha::is_hair_cards;
@@ -154,6 +155,37 @@ fn collect(textures: &[TextureSlot], opacity_suffix: Option<&str>) -> Sources {
     found.normal = normal;
     found.specular = specular;
     found
+}
+
+/// Finds the explicit gloss candidates of an unlayered `HardSurface` material in authored order.
+pub(crate) fn explicit_gloss_sources(
+    material: &Material,
+    refused: &mut Vec<(TextureRole, String)>,
+) -> Vec<Source> {
+    if !material.layers.is_empty() || !material.shader.eq_ignore_ascii_case("HardSurface") {
+        return Vec::new();
+    }
+    material
+        .textures
+        .iter()
+        .filter(|slot| {
+            !slot.file.trim_start().starts_with('$')
+                && material.texture_role(&slot.map, &slot.file) == MaterialTextureRole::Gloss
+        })
+        .filter_map(|slot| {
+            let file = slot.file.clone();
+            let Some(path) = canonical(&file) else {
+                refused.push((TextureRole::Gloss, file));
+                return None;
+            };
+            Some(Source {
+                path,
+                file,
+                gloss: false,
+                opacity: false,
+            })
+        })
+        .collect()
 }
 
 /// Returns the path of the diffuse map of `material` as a [`TextureLoader`](crate::TextureLoader)
