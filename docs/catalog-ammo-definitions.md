@@ -22,7 +22,7 @@ independently of the number of selected rows.
 | `BulletProjectileParams` | Per-channel damage and falloff, impact radii, ignition and keep-alive flags, impulse falloff, penetration, pierceability and electron settings. Authored visual, extra-projectile and ordered hit-behavior inputs |
 | `TachyonProjectileParams` | Hit type/effect, per-channel damage, full- and zero-damage ranges, penetration and ordered beam effects |
 | `CounterMeasureProjectileParams` | `typeParams` keeps `base`, `chaff` and `flare` distinct, including their applicable start/end signature profiles and trail/explosion audio |
-| `physicsControllerParams.PhysType` | Shared authored physics fields and the concrete `base` or `particle` branch, with particle dimensions, pierceability, drag and collision/gravity flags |
+| `physicsControllerParams.PhysType` | Shared authored physics fields and the concrete `base`, `particle` or `rigid` branch. Particle retains dimensions, pierceability, drag and collision/gravity flags. Rigid retains remaining original members in its ordered `kind.additionalFields` arena with per-member provenance |
 | `AmmoParams.conversionRate` | `base` has no quantity. `standard` retains `standardCargoUnits` as a Single, while `centi` and `micro` retain the signed `centiScu` and `microScu` quantities in their respective source units |
 
 The original struct selects each branch. The declarations for

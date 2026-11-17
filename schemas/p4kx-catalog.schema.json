@@ -1292,6 +1292,22 @@
             "value"
           ],
           "type": "object"
+        },
+        {
+          "properties": {
+            "additionalFields": {
+              "$ref": "#/$defs/SourceArenaOutput"
+            },
+            "type": {
+              "const": "rigid",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "additionalFields"
+          ],
+          "type": "object"
         }
       ],
       "required": []

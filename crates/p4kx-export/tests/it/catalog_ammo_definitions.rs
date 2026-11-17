@@ -15,6 +15,8 @@ mod fixture;
 mod geometry;
 #[path = "catalog_ammo_radar_declaration.rs"]
 mod radar_declaration;
+#[path = "catalog_ammo_rigid.rs"]
+mod rigid;
 
 #[path = "catalog_ammo_filter_dependencies.rs"]
 mod filter_dependencies;

@@ -17,6 +17,7 @@ const CONVERSIONS: &[(&str, &str)] = &[
 const CONTROLLERS: &[(&str, &str)] = &[
     ("SEntityBasePhysicsControllerParams", "base"),
     ("SEntityParticlePhysicsControllerParams", "particle"),
+    ("SEntityRigidPhysicsControllerParams", "rigid"),
 ];
 const CONTROLLER_WRAPPER: &[(&str, &str)] = &[("SEntityPhysicsControllerParams", "wrapper")];
 

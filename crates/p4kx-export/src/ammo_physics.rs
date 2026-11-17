@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::SourcedValue;
+use p4kx_extraction::{SourceValueState, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -11,6 +11,7 @@ use crate::catalog_v3::authored_fields::Observed;
 use crate::resource_float::ResourceFloat32;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
+use crate::source_value_catalog::SourceArenaOutput;
 
 #[path = "ammo_particle_physics.rs"]
 mod particle;
@@ -19,6 +20,7 @@ use particle::AmmoParticlePhysics;
 
 const BASE: &str = "SEntityBasePhysicsControllerParams";
 const PARTICLE: &str = "SEntityParticlePhysicsControllerParams";
+const RIGID: &str = "SEntityRigidPhysicsControllerParams";
 
 /// The original physics controller wrapper and its owned `PhysType`.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -34,7 +36,12 @@ impl<'source> AmmoPhysics<'source> {
         notes: &mut Vec<FieldError>,
     ) -> Result<Self, CatalogError> {
         Ok(Self {
-            phys_type: source.owned("PhysType", &[BASE, PARTICLE], notes, AmmoPhysicsType::read)?,
+            phys_type: source.owned(
+                "PhysType",
+                &[BASE, PARTICLE, RIGID],
+                notes,
+                AmmoPhysicsType::read,
+            )?,
         })
     }
 }
@@ -60,6 +67,9 @@ impl<'source> AmmoPhysicsType<'source> {
             PARTICLE => AmmoPhysicsKind::Particle {
                 value: Box::new(AmmoParticlePhysics::read(source, notes)?),
             },
+            RIGID => AmmoPhysicsKind::Rigid {
+                additional_fields: source.authored_members_except(common.projected())?,
+            },
             _ => return Err(ExportAccountingError::ConflictingSourceDatum.into()),
         };
         Ok(Self { common, kind })
@@ -79,6 +89,9 @@ pub(crate) enum AmmoPhysicsKind<'source> {
     Particle {
         value: Box<AmmoParticlePhysics<'source>>,
     },
+    Rigid {
+        additional_fields: SourceArenaOutput<'source>,
+    },
 }
 
 /// Original fields inherited by supported physics controllers.
@@ -94,6 +107,16 @@ pub(crate) struct AmmoPhysicsBase {
 }
 
 impl AmmoPhysicsBase {
+    const fn projected(&self) -> [(&'static str, SourceValueState); 5] {
+        [
+            ("Mass", self.mass.state()),
+            ("compoundingAllowed", self.compounding_allowed.state()),
+            ("breakableParams", self.breakable_params.state()),
+            ("gameCollisionClass", self.game_collision_class.state()),
+            ("spawnBoxScale", self.spawn_box_scale.state()),
+        ]
+    }
+
     pub(in crate::catalog_v3) fn read(
         source: Observed<'_, '_, '_, '_>,
         notes: &mut Vec<FieldError>,
