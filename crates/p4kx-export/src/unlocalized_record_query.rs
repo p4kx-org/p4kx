@@ -2,13 +2,14 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_extraction::{
-    Archive, CancelToken, DataForgeEntry, Record, RecordTree, SourceInventory, TreeBuilder,
+    Archive, CancelToken, DataForge, DataForgeEntry, Record, RecordTree, SourceInventory,
+    TreeBuilder,
 };
 
 use super::{CatalogRecordCoverage, CatalogRecordSelection};
-use crate::archive_dataforge_query::checkpoint;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_origins::CatalogOrigins;
+use crate::catalog_query_session::checkpoint;
 use crate::catalog_table::{CatalogTable, DatasetAvailability};
 use crate::entity_selection::{self, Selected};
 use crate::guid_text::{CatalogGuid, sort_by_guid};
@@ -27,22 +28,22 @@ pub(super) struct RecordRows<Row> {
 pub(super) fn read<Row>(
     archive: &Archive,
     entry: &DataForgeEntry,
+    forge: &DataForge<'_>,
     kind: Kind,
     selection: CatalogRecordSelection,
     cancel: Option<&CancelToken>,
     mut project: impl for<'source> FnMut(
         &RecordTree<'source>,
-        &OriginalCatalogInput<'_, 'source>,
+        &OriginalCatalogInput<'source, 'source>,
         &RecordObservation<'_, 'source>,
     ) -> Result<(Row, Vec<FieldError>), CatalogError>,
 ) -> Result<RecordRows<Row>, CatalogError> {
     let origins = CatalogOrigins::for_archive_records(archive, entry)?;
-    let forge = entry.open().map_err(CatalogError::DataForge)?;
-    let input = OriginalCatalogInput::new(&forge, &origins);
+    let input = OriginalCatalogInput::new(forge, &origins);
     let mut coverage = CatalogRecordCoverage::default();
     let mut trees = TreeBuilder::new();
     let mut rows = Vec::new();
-    selection.for_each(&forge, cancel, |record| {
+    selection.for_each(forge, cancel, |record| {
         if !selected(record, kind, &mut coverage) {
             return Ok(());
         }
@@ -67,7 +68,7 @@ pub(super) fn read<Row>(
     })?;
     sort_by_guid(&mut rows, |row| row.guid);
     let table = CatalogTable::new(
-        &forge,
+        forge,
         &[kind.records().type_name],
         rows.into_iter().map(|row| row.row).collect(),
     );

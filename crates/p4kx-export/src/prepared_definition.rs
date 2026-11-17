@@ -6,6 +6,7 @@ use std::cell::RefCell;
 use p4kx_extraction::{CancelToken, DataForge, Guid, RecordTree};
 
 use super::authored_fields::Observed;
+use crate::build::original_input::OriginalCatalogInput;
 use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_number_capture::CapturedNumber;
 use crate::catalog_projection::CatalogProjection;
@@ -40,15 +41,34 @@ impl<'source, T> PreparedDefinition<'source, T> {
             &mut Vec<FieldError>,
         ) -> Result<T, CatalogError>,
     ) -> Result<(Self, Vec<FieldError>), CatalogError> {
-        let input = projection.original();
+        Self::read_original(
+            tree,
+            projection.original(),
+            admission,
+            cancel,
+            |source, fields, notes| project(source, fields, projection, notes),
+        )
+    }
+
+    pub(super) fn read_original(
+        tree: &RecordTree<'source>,
+        input: &OriginalCatalogInput<'_, 'source>,
+        admission: &RecordObservation<'_, 'source>,
+        cancel: Option<&CancelToken>,
+        project: impl FnOnce(
+            CanonicalRecordHeader<'source>,
+            Observed<'_, '_, '_, 'source>,
+            &mut Vec<FieldError>,
+        ) -> Result<T, CatalogError>,
+    ) -> Result<(Self, Vec<FieldError>), CatalogError> {
         let scope = input.record_scope(admission.record(), tree)?;
         let originals = OriginalFlowFields::read(&scope, cancel)?;
         let capture = TemplateFieldCapture::new(&originals, input, admission)?;
         let numbers = RefCell::new(Vec::new());
         let fields = Observed::definition(&originals, input, &capture, &numbers);
         let mut notes = Vec::new();
-        let source = CanonicalRecordHeader::read(tree, projection.origins())?;
-        let definition = project(source, fields, projection, &mut notes)?;
+        let source = CanonicalRecordHeader::read(tree, input.origins())?;
+        let definition = project(source, fields, &mut notes)?;
         Ok((
             Self {
                 definition,

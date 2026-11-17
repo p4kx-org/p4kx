@@ -10,6 +10,17 @@ pub use crate::canonical_record_header::CatalogRecordSource as MiningRecordSourc
 pub use crate::catalog_read::original::PhysicalEntryRef;
 pub use crate::catalog_record_reference::CatalogRecordReference;
 pub use crate::catalog_text_contract::GameTextRef;
+pub use crate::catalog_v3::catalog_harvest_modules::harvest_dependency_selection::EntitySelection;
+pub use crate::catalog_v3::catalog_harvest_modules::harvest_provider::{
+    AreaModifier, HarvestableArea, HarvestableAreaType, HarvestableElement, HarvestableGeometry,
+    HarvestableGroup, HarvestableProviderPreset,
+};
+pub use crate::catalog_v3::catalog_harvest_modules::harvest_provider_dependencies::{
+    HarvestEntity, HarvestMiningParams, SpawnSelection,
+};
+pub use crate::catalog_v3::catalog_harvest_modules::harvest_provider_override::{
+    ModifierInstance, ModifierTarget, ProviderSlot,
+};
 pub use crate::catalog_v3::mineable_composition_definition::{
     CompositionPart, MineableComposition,
 };
@@ -140,90 +151,6 @@ pub struct MiningTextForms {
     pub source_text: SourcedValue<String>,
     /// The display text from the same source.
     pub display_text: SourcedValue<String>,
-}
-
-/// One provider Record with authored groups, areas and resolved mining links.
-#[derive(Debug)]
-#[non_exhaustive]
-pub struct HarvestableProviderPreset {
-    /// The authored Record identity.
-    pub source: MiningRecordSource,
-    /// The groups in authored order.
-    pub groups: Vec<HarvestableGroup>,
-    /// The areas in authored order.
-    pub areas: Vec<HarvestableArea>,
-}
-
-/// One authored group of harvestables.
-#[derive(Debug)]
-#[non_exhaustive]
-pub struct HarvestableGroup {
-    /// The authored group name.
-    pub group_name: Option<String>,
-    /// The authored group probability.
-    pub group_probability: Option<f32>,
-    /// The harvestables in authored order.
-    pub harvestables: Vec<HarvestableElement>,
-}
-
-/// One harvestable occurrence in a provider group.
-#[derive(Debug)]
-#[non_exhaustive]
-pub struct HarvestableElement {
-    /// The authored preset or entity link, when present.
-    pub harvestable: Option<HarvestableLink>,
-    /// The linked harvestable setup.
-    pub setup_guid: Option<Guid>,
-    /// The linked clustering preset.
-    pub clustering_guid: Option<Guid>,
-    /// The authored relative probability.
-    pub relative_probability: Option<f32>,
-    /// The linked geometry tags in authored order.
-    pub geometry_tag_guids: Vec<Guid>,
-}
-
-/// The provider's authored preset and resolved spawn and mining relationships.
-#[derive(Debug)]
-#[non_exhaustive]
-pub struct HarvestableLink {
-    /// The linked harvestable preset.
-    pub preset_guid: Option<Guid>,
-    /// The class name of the resolved harvestable preset.
-    pub preset_class_name: Option<String>,
-    /// The explicit group-element entity or the preset's linked entity.
-    pub entity_guid: Option<Guid>,
-    /// The resolved entity's linked mineable composition.
-    pub mineable_composition_guid: Option<Guid>,
-    /// The resolved entity's linked global mining parameters.
-    pub mining_global_params_guid: Option<Guid>,
-}
-
-/// One authored area of a harvestable provider.
-#[derive(Debug)]
-#[non_exhaustive]
-pub struct HarvestableArea {
-    /// The authored area name.
-    pub name: Option<String>,
-    /// The global modifier.
-    pub global_modifier: Option<f32>,
-    /// The declared object preset paths in authored order.
-    pub object_preset_paths: Vec<String>,
-    /// The area modifiers in authored order.
-    pub modifiers: Vec<AreaModifier>,
-}
-
-/// One modifier of an authored harvestable area.
-#[derive(Debug)]
-#[non_exhaustive]
-pub struct AreaModifier {
-    /// The position of the target group in the provider.
-    pub group_index: Option<u32>,
-    /// The position of the target element in its group.
-    pub harvestable_index: Option<u32>,
-    /// The authored harvestable modifier.
-    pub modifier: Option<f32>,
-    /// The linked geometry tags in authored order.
-    pub geometry_tag_guids: Vec<Guid>,
 }
 
 /// One logical Catalog location for a provider preset.

@@ -10,6 +10,10 @@ mod unlocalized_record_query;
 
 #[path = "gameplay_property_query.rs"]
 mod gameplay_properties;
+#[path = "harvest_provider_query.rs"]
+mod harvest_provider_presets;
+#[path = "item_port_query.rs"]
+mod item_ports;
 
 use p4kx_extraction::{
     Archive, Build, CancelToken, DataForge, DataForgeEntry, Guid, Record, SourceInventory,
@@ -17,14 +21,21 @@ use p4kx_extraction::{
 };
 use serde::Serialize;
 
-use crate::archive_dataforge_query::{self, checkpoint};
+use crate::catalog_query_session::checkpoint;
 use crate::catalog_v3::blueprint_category_list_read;
 use crate::{CatalogError, Kind};
 
 pub use crate::canonical_record_header::CatalogRecordSource;
+pub use crate::catalog_query_session::{
+    CatalogLanguageSelection, CatalogQuerySession, ParsedCatalogQueries,
+};
 pub use crate::catalog_record_reference::CatalogRecordReference;
 pub use crate::catalog_table::DatasetAvailability;
 pub use crate::catalog_text_contract::{PublicNameRef, TextForms};
+pub use crate::catalog_v3::authored_fields::AuthoredRestriction;
+pub use crate::catalog_v3::catalog_item_alignment::{
+    ItemPort, ItemPortContainer, PortItemType, PortRestrictions,
+};
 pub use crate::catalog_v3::gameplay_property_catalog::{
     DisplayTransformationNodeRef, DisplayTransformationNodeSource, DisplayTransformationPayload,
     DisplayTransformationSource, GameplayProperty, GameplayPropertyFields,
@@ -33,14 +44,22 @@ pub use crate::catalog_v3::gameplay_property_catalog::{
 };
 pub use crate::definition_reference::DefinitionStatus;
 pub use crate::resource_number::ResourceNumber;
+pub use crate::source_value_catalog::SourceArenaOutput;
 pub use blueprint_categories::{
     BlueprintCategory, BlueprintCategorySnapshot, read_blueprint_categories,
     read_blueprint_categories_from,
 };
 pub use gameplay_properties::{
-    CatalogLanguageSelection, CatalogPublicName, GameplayPropertySnapshot,
-    read_gameplay_properties, read_gameplay_properties_from,
+    CatalogPublicName, GameplayPropertySnapshot, read_gameplay_properties,
+    read_gameplay_properties_from,
 };
+
+pub use harvest_provider_presets::{
+    HarvestableProviderPresetSnapshot, read_harvestable_provider_presets,
+    read_harvestable_provider_presets_from,
+};
+
+pub use item_ports::{ItemPortSnapshot, with_item_ports, with_item_ports_from};
 
 /// Selects physical Records within the queried dataset and supplied DataForge.
 #[derive(Debug, Clone, Copy)]
@@ -135,9 +154,8 @@ pub fn read_blueprint_category_lists(
     selection: CatalogRecordSelection,
     cancel: Option<&CancelToken>,
 ) -> Result<BlueprintCategoryListSnapshot, CatalogError> {
-    archive_dataforge_query::read(archive, None, cancel, |entry| {
-        read_archive(archive, entry, selection, cancel)
-    })
+    CatalogQuerySession::open(archive, CatalogLanguageSelection::Selected(&[]), cancel)?
+        .read_blueprint_category_lists(selection, cancel)
 }
 
 /// Reads category-list declarations from an already decoded entry of the same Archive.
@@ -152,20 +170,59 @@ pub fn read_blueprint_category_lists_from(
     selection: CatalogRecordSelection,
     cancel: Option<&CancelToken>,
 ) -> Result<BlueprintCategoryListSnapshot, CatalogError> {
-    archive_dataforge_query::read(archive, Some(entry), cancel, |entry| {
-        read_archive(archive, entry, selection, cancel)
-    })
+    CatalogQuerySession::from_entry(
+        archive,
+        entry,
+        CatalogLanguageSelection::Selected(&[]),
+        cancel,
+    )?
+    .read_blueprint_category_lists(selection, cancel)
+}
+
+impl CatalogQuerySession<'_> {
+    /// Reads category-list declarations and their original ordered references.
+    ///
+    /// # Errors
+    ///
+    /// Returns input, source evidence or cancellation errors. Recoverable gaps appear in coverage.
+    pub fn read_blueprint_category_lists(
+        &self,
+        selection: CatalogRecordSelection,
+        cancel: Option<&CancelToken>,
+    ) -> Result<BlueprintCategoryListSnapshot, CatalogError> {
+        self.parsed(cancel)?
+            .read_blueprint_category_lists(selection, cancel)
+    }
+}
+
+impl ParsedCatalogQueries<'_> {
+    /// Reads category-list declarations and their original ordered references.
+    ///
+    /// # Errors
+    ///
+    /// Returns input, source evidence or cancellation errors. Recoverable gaps appear in coverage.
+    pub fn read_blueprint_category_lists(
+        &self,
+        selection: CatalogRecordSelection,
+        cancel: Option<&CancelToken>,
+    ) -> Result<BlueprintCategoryListSnapshot, CatalogError> {
+        self.project(cancel, |archive, entry, forge| {
+            read_archive(archive, entry, forge, selection, cancel)
+        })
+    }
 }
 
 fn read_archive(
     archive: &Archive,
     entry: &DataForgeEntry,
+    forge: &DataForge<'_>,
     selection: CatalogRecordSelection,
     cancel: Option<&CancelToken>,
 ) -> Result<BlueprintCategoryListSnapshot, CatalogError> {
     let projected = unlocalized_record_query::read(
         archive,
         entry,
+        forge,
         Kind::BlueprintCategoryLists,
         selection,
         cancel,

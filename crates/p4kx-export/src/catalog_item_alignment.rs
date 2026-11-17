@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{DataForge, DataType, SourceUse, SourcedValue, StructValue, Value};
+use p4kx_extraction::{DataForge, DataType, Guid, SourceUse, SourcedValue, StructValue, Value};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -9,7 +9,7 @@ use super::authored_fields::{AuthoredRestriction, Observed};
 use super::item_alignment_options::AlignmentAxis;
 pub(crate) use super::item_alignment_options::AlignmentOptions;
 use super::item_component_owner::ComponentOwner;
-use super::port_restrictions::PortRestrictions;
+pub use super::port_restrictions::{PortItemType, PortRestrictions};
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_projection::{CatalogProjection, TextOwner};
 use crate::catalog_rows::staged::StagedCatalogTable;
@@ -32,7 +32,7 @@ pub(crate) use staging::ItemPortStaging;
 
 use self::staging::{PortContainerFacts, StagedItemPorts};
 
-const CONTAINER: &str = "SItemPortContainerComponentParams";
+pub(crate) const CONTAINER: &str = "SItemPortContainerComponentParams";
 const ATTACHABLE: &str = "SAttachableComponentParams";
 const PORT: &str = "SItemPortDef";
 const DEFINITION: &str = "SItemDefinition";
@@ -51,6 +51,10 @@ pub(crate) struct ItemAlignmentRows<'source> {
 }
 
 impl<'source> ItemAlignmentRows<'source> {
+    pub(crate) fn into_port_containers(self) -> Vec<ItemPortContainer<'source>> {
+        self.ports
+    }
+
     pub(crate) fn extend(&mut self, other: Self) {
         self.ports.extend(other.ports);
         self.attachments.extend(other.attachments);
@@ -175,10 +179,11 @@ pub(crate) struct ItemAlignmentTables<'source> {
     item_attachment_constraints: CatalogTable<ItemAttachmentComponent<'source>>,
 }
 
+/// One authored port-container component and its physical owner.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct ItemPortContainer<'source> {
+pub struct ItemPortContainer<'source> {
     #[serde(flatten)]
     owner: ComponentOwner,
     ports: SourcedValue<Vec<SourcedValue<ItemPort<'source>>>>,
@@ -186,10 +191,11 @@ struct ItemPortContainer<'source> {
     ports_use: Option<SourceUse>,
 }
 
+/// One authored slot in its port-container component.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct ItemPort<'source> {
+pub struct ItemPort<'source> {
     port_ordinal: SourcedValue<u32>,
     name: SourcedValue<&'source str>,
     display_name: SourcedValue<PublicNameRef>,
@@ -267,6 +273,30 @@ fn owns_item_definition(source: &StructValue<'_>, input: &OriginalCatalogInput<'
 }
 
 impl<'source> ItemPortContainer<'source> {
+    /// Returns the nominal owner GUID with its original header origin.
+    #[must_use]
+    pub fn owner_guid(&self) -> SourcedValue<Guid> {
+        self.owner.guid().map_ref(|guid| guid.0)
+    }
+
+    /// Borrows the physical Record index in the queried DataForge.
+    #[must_use]
+    pub const fn owner_record_index(&self) -> &SourcedValue<u32> {
+        self.owner.record_index()
+    }
+
+    /// Borrows the original Components array ordinal.
+    #[must_use]
+    pub const fn component_ordinal(&self) -> &SourcedValue<u32> {
+        self.owner.component_ordinal()
+    }
+
+    /// Borrows the authored ordered slots, including unavailable values.
+    #[must_use]
+    pub const fn ports(&self) -> &SourcedValue<Vec<SourcedValue<ItemPort<'source>>>> {
+        &self.ports
+    }
+
     fn read(
         owner: ComponentOwner,
         source: Observed<'_, '_, '_, 'source>,
@@ -290,6 +320,38 @@ impl<'source> ItemPortContainer<'source> {
             ports,
             ports_use: source.selector_use("Ports")?,
         })
+    }
+}
+
+impl<'source> ItemPort<'source> {
+    /// Borrows this port's authored position in the component.
+    #[must_use]
+    pub const fn port_ordinal(&self) -> &SourcedValue<u32> {
+        &self.port_ordinal
+    }
+
+    /// Borrows the original port name.
+    #[must_use]
+    pub const fn name(&self) -> &SourcedValue<&'source str> {
+        &self.name
+    }
+
+    /// Borrows the public-name reference for the display label.
+    #[must_use]
+    pub const fn display_name(&self) -> &SourcedValue<PublicNameRef> {
+        &self.display_name
+    }
+
+    /// Borrows the original port constraints and rules.
+    #[must_use]
+    pub const fn restrictions(&self) -> &PortRestrictions<'source> {
+        &self.restrictions
+    }
+
+    /// Borrows the authored alignment axis label.
+    #[must_use]
+    pub const fn alignment_axis(&self) -> &SourcedValue<&'source str> {
+        &self.attach_axes_to_align.label
     }
 }
 

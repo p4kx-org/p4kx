@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{Archive, Build, CancelToken, DataForgeEntry, SourceInventory};
+use p4kx_extraction::{Archive, Build, CancelToken, DataForge, DataForgeEntry, SourceInventory};
 use serde::Serialize;
 
 use super::unlocalized_record_query;
 use super::{
-    CatalogRecordCoverage, CatalogRecordSelection, CatalogRecordSource, DatasetAvailability,
+    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordCoverage, CatalogRecordSelection,
+    CatalogRecordSource, DatasetAvailability, ParsedCatalogQueries,
 };
-use crate::archive_dataforge_query;
 use crate::{CatalogError, Kind, blueprint_category};
 
 /// One physical Blueprint Category with its eight original header fields.
@@ -48,9 +48,8 @@ pub fn read_blueprint_categories(
     selection: CatalogRecordSelection,
     cancel: Option<&CancelToken>,
 ) -> Result<BlueprintCategorySnapshot, CatalogError> {
-    archive_dataforge_query::read(archive, None, cancel, |entry| {
-        read_archive(archive, entry, selection, cancel)
-    })
+    CatalogQuerySession::open(archive, CatalogLanguageSelection::Selected(&[]), cancel)?
+        .read_blueprint_categories(selection, cancel)
 }
 
 /// Reads canonical Blueprint Categories using an already decoded entry of the same Archive.
@@ -65,20 +64,59 @@ pub fn read_blueprint_categories_from(
     selection: CatalogRecordSelection,
     cancel: Option<&CancelToken>,
 ) -> Result<BlueprintCategorySnapshot, CatalogError> {
-    archive_dataforge_query::read(archive, Some(entry), cancel, |entry| {
-        read_archive(archive, entry, selection, cancel)
-    })
+    CatalogQuerySession::from_entry(
+        archive,
+        entry,
+        CatalogLanguageSelection::Selected(&[]),
+        cancel,
+    )?
+    .read_blueprint_categories(selection, cancel)
+}
+
+impl CatalogQuerySession<'_> {
+    /// Reads Blueprint Categories and their original physical identities.
+    ///
+    /// # Errors
+    ///
+    /// Returns input, source evidence or cancellation errors. Recoverable gaps appear in coverage.
+    pub fn read_blueprint_categories(
+        &self,
+        selection: CatalogRecordSelection,
+        cancel: Option<&CancelToken>,
+    ) -> Result<BlueprintCategorySnapshot, CatalogError> {
+        self.parsed(cancel)?
+            .read_blueprint_categories(selection, cancel)
+    }
+}
+
+impl ParsedCatalogQueries<'_> {
+    /// Reads Blueprint Categories and their original physical identities.
+    ///
+    /// # Errors
+    ///
+    /// Returns input, source evidence or cancellation errors. Recoverable gaps appear in coverage.
+    pub fn read_blueprint_categories(
+        &self,
+        selection: CatalogRecordSelection,
+        cancel: Option<&CancelToken>,
+    ) -> Result<BlueprintCategorySnapshot, CatalogError> {
+        self.project(cancel, |archive, entry, forge| {
+            read_archive(archive, entry, forge, selection, cancel)
+        })
+    }
 }
 
 fn read_archive(
     archive: &Archive,
     entry: &DataForgeEntry,
+    forge: &DataForge<'_>,
     selection: CatalogRecordSelection,
     cancel: Option<&CancelToken>,
 ) -> Result<BlueprintCategorySnapshot, CatalogError> {
     let projected = unlocalized_record_query::read(
         archive,
         entry,
+        forge,
         Kind::BlueprintCategories,
         selection,
         cancel,

@@ -13,6 +13,7 @@ use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_crafting::CraftingKinds;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_v3::catalog_entity_configurations;
+use crate::catalog_v3::catalog_harvest_modules::harvest_provider_dependencies::ProviderDependencies;
 use crate::catalog_v3::catalog_item_alignment::AlignmentOptions;
 use crate::collected::Collected;
 use crate::entity_selection::{Selected, select};
@@ -33,8 +34,8 @@ use crate::{CatalogError, CatalogOptions, CatalogPhase, CatalogProgress, Kind};
 
 const PROGRESS_STEP: usize = 1024;
 const RESOURCE_TYPE: &str = "ResourceType";
-const CRAFTER_FIELD: &str = "Components";
-const CRAFTER_STRUCT: &str = "CrafterComponentParams";
+pub(crate) const CRAFTER_FIELD: &str = "Components";
+pub(crate) const CRAFTER_STRUCT: &str = "CrafterComponentParams";
 
 #[path = "scan_ammo.rs"]
 mod ammo;
@@ -74,6 +75,7 @@ pub(crate) struct Scan<'o, 'a, 'f> {
     domain: ScanDomain<'o>,
     types: TypeNames<'f>,
     links: Links<'f>,
+    provider_dependencies: ProviderDependencies,
     crafters: Option<PointerProbe<'f>>,
     groups: Groups,
     evidence: Evidence,
@@ -128,6 +130,7 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
             domain,
             types: TypeNames::default(),
             links: Links::default(),
+            provider_dependencies: ProviderDependencies::default(),
             crafters: forge.pointer_probe(CRAFTER_FIELD, CRAFTER_STRUCT),
             groups,
             evidence,

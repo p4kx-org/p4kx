@@ -21,14 +21,24 @@ use serde_json::{Value, json};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
+#[path = "harvest_provider_sdk.rs"]
+mod provider_sdk;
+
 fn build(filter: Option<&Filter>) -> Result<(BuiltCatalog, Value), Box<dyn Error>> {
     let dir = tempfile::tempdir()?;
     let archive =
         Archive::open_with_key(write_archive(dir.path())?, Some(p4kx_testkit::test_key()))?;
+    build_archive(&archive, filter)
+}
+
+fn build_archive(
+    archive: &Archive,
+    filter: Option<&Filter>,
+) -> Result<(BuiltCatalog, Value), Box<dyn Error>> {
     let mut options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
     options.filter = filter;
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(archive, &options)?;
     let json = serde_json::from_slice(built.json())?;
     Ok((built, json))
 }
@@ -166,51 +176,6 @@ fn a_record_without_the_mass_multiplier_leaves_it_null() -> TestResult {
     let params = entry(&catalog, "miningGlobalParams", PARAMS)?;
     assert_eq!(params["compositionMassMultiplier"], Value::Null);
     assert_eq!(params["defaultMass"], 100.0);
-    Ok(())
-}
-
-#[test]
-fn a_provider_preset_follows_each_harvestable_to_its_composition() -> TestResult {
-    let (_, catalog) = build(None)?;
-    let preset = entry(&catalog, "harvestableProviderPresets", PRESET_PLACED)?;
-    assert_eq!(preset["className"], "HPP_Placed");
-    let group = &preset["groups"][0];
-    assert_eq!(group["groupName"], "SpaceShip_Mineables");
-    let via_preset = json!({
-        "presetGuid": guid(HARVESTABLE),
-        "presetClassName": "Mining_Iron",
-        "entityGuid": guid(ENTITY),
-        "mineableCompositionGuid": guid(COMPOSITION),
-        "miningGlobalParamsGuid": guid(PARAMS),
-    });
-    assert_eq!(group["harvestables"][0]["harvestable"], via_preset);
-    assert_eq!(group["harvestables"][0]["relativeProbability"], 22.0);
-    assert_eq!(
-        group["harvestables"][0]["geometryTagGuids"],
-        json!([guid(RESOURCE)])
-    );
-    assert_eq!(
-        group["harvestables"][1]["harvestable"],
-        json!({
-            "presetGuid": null,
-            "presetClassName": null,
-            "entityGuid": guid(ENTITY),
-            "mineableCompositionGuid": guid(COMPOSITION),
-            "miningGlobalParamsGuid": guid(PARAMS),
-        }),
-        "an element that names the entity only"
-    );
-    assert_eq!(
-        preset["areas"],
-        json!([{
-            "name": "Acidic",
-            "globalModifier": 1.0,
-            "objectPresetPaths": [
-                "Libs/ObjectPresets/PU/system/stanton/hurston/acidic_pools_01.opr"
-            ],
-            "modifiers": []
-        }])
-    );
     Ok(())
 }
 

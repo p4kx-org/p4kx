@@ -12,6 +12,8 @@ use crate::health_origin_assertions as proof;
 mod display_names;
 #[path = "catalog_item_alignment_links.rs"]
 mod links;
+#[path = "catalog_item_port_sdk.rs"]
+mod sdk;
 
 const ENUM: &str = "EItemPortAttachRotationLimitAxis";
 const OWNER: u128 = 0x1087;
@@ -25,6 +27,7 @@ enum Layout {
     Localized,
     Absent,
     Unreadable,
+    UnrelatedInvalid,
 }
 
 #[test]
@@ -226,9 +229,14 @@ fn entity(guid: u128, name: &str, filename: &str, layout: Layout) -> TestRecord 
         .value("SubType", TestValue::text("Power"))
         .value("Size", TestValue::UInt32(1));
     if alignment {
+        let ignored = if matches!(layout, Layout::UnrelatedInvalid) {
+            TestValue::Raw((u32::MAX - 1).to_le_bytes().to_vec())
+        } else {
+            TestValue::text("FixtureStoredDefault")
+        };
         definition = definition
             .value("attachAxesToAlign", TestValue::text("FixtureItemAxis"))
-            .value("ignoredAttachAxis", TestValue::text("FixtureStoredDefault"))
+            .value("ignoredAttachAxis", ignored)
             .value("attachCheckCenterOfMass", TestValue::Bool(false));
     }
     let ports = if guid == OWNER {

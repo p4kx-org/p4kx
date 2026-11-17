@@ -39,7 +39,7 @@ pub(crate) fn add_harvest_locations(
     let presets: HashSet<_> = collected
         .harvestable_provider_presets
         .iter()
-        .map(|preset| preset.guid.0)
+        .filter_map(|preset| preset.source.guid.value().copied())
         .collect();
     let located = locate(
         archive,

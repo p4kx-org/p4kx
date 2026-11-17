@@ -23,6 +23,8 @@ mod alignment;
 mod array;
 #[path = "authored_float_fields.rs"]
 mod float_fields;
+#[path = "harvest_provider_fields.rs"]
+mod harvest_provider_fields;
 #[path = "authored_field_links.rs"]
 mod links;
 #[path = "authored_number_fields.rs"]
@@ -48,8 +50,11 @@ type Fact<'scope, 'read, 'source> = OriginalValueFact<'scope, 'read, 'source>;
 #[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(untagged)]
 #[schemars(rename = "AuthoredRestrictionOf{T}")]
-pub(super) enum AuthoredRestriction<'source, T> {
+#[non_exhaustive]
+pub enum AuthoredRestriction<'source, T> {
+    /// The original value uses the expected typed storage.
     Typed(T),
+    /// The original value uses another representation retained as source data.
     Original(crate::source_value_catalog::SourceArenaOutput<'source>),
 }
 

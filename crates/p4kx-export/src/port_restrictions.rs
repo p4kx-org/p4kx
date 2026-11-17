@@ -18,7 +18,7 @@ type OriginalMembers<'source> = SourcedValue<SourceArenaOutput<'source>>;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct PortRestrictions<'source> {
+pub struct PortRestrictions<'source> {
     types: SourcedValue<Vec<SourcedValue<PortItemType<'source>>>>,
     min_size: SourcedValue<AuthoredRestriction<'source, ResourceNumber>>,
     max_size: SourcedValue<AuthoredRestriction<'source, ResourceNumber>>,
@@ -31,6 +31,60 @@ pub(super) struct PortRestrictions<'source> {
 }
 
 impl<'source> PortRestrictions<'source> {
+    /// Borrows the original ordered item type restrictions.
+    #[must_use]
+    pub const fn types(&self) -> &SourcedValue<Vec<SourcedValue<PortItemType<'source>>>> {
+        &self.types
+    }
+
+    /// Borrows the minimum size or its retained original shape.
+    #[must_use]
+    pub const fn min_size(&self) -> &SourcedValue<AuthoredRestriction<'source, ResourceNumber>> {
+        &self.min_size
+    }
+
+    /// Borrows the maximum size or its retained original shape.
+    #[must_use]
+    pub const fn max_size(&self) -> &SourcedValue<AuthoredRestriction<'source, ResourceNumber>> {
+        &self.max_size
+    }
+
+    /// Borrows the original Tag reference inventory.
+    #[must_use]
+    pub const fn tag_references(&self) -> &SourcedValue<SourceArenaOutput<'source>> {
+        &self.tag_references
+    }
+
+    /// Borrows the original port rule inventory.
+    #[must_use]
+    pub const fn item_port_rules(&self) -> &SourcedValue<SourceArenaOutput<'source>> {
+        &self.item_port_rules
+    }
+
+    /// Borrows the original port flags.
+    #[must_use]
+    pub const fn flags(&self) -> &SourcedValue<&'source str> {
+        &self.flags
+    }
+
+    /// Borrows the port's authored tags.
+    #[must_use]
+    pub const fn port_tags(&self) -> &SourcedValue<&'source str> {
+        &self.port_tags
+    }
+
+    /// Borrows the tags an attachment must satisfy.
+    #[must_use]
+    pub const fn required_port_tags(&self) -> &SourcedValue<&'source str> {
+        &self.required_port_tags
+    }
+
+    /// Borrows the original resource-link setting.
+    #[must_use]
+    pub const fn resource_link_to_parent(&self) -> &SourcedValue<bool> {
+        &self.resource_link_to_parent
+    }
+
     #[cfg(test)]
     pub(super) fn fixture(sources: &p4kx_extraction::SourceUses) -> Self {
         use p4kx_extraction::SourceValue;
@@ -75,12 +129,24 @@ impl<'source> PortRestrictions<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct PortItemType<'source> {
+pub struct PortItemType<'source> {
     r#type: SourcedValue<AuthoredRestriction<'source, &'source str>>,
     sub_types: OriginalMembers<'source>,
 }
 
 impl<'source> PortItemType<'source> {
+    /// Borrows the item type or its retained original shape.
+    #[must_use]
+    pub const fn item_type(&self) -> &SourcedValue<AuthoredRestriction<'source, &'source str>> {
+        &self.r#type
+    }
+
+    /// Borrows the original subtype inventory.
+    #[must_use]
+    pub const fn sub_types(&self) -> &SourcedValue<SourceArenaOutput<'source>> {
+        &self.sub_types
+    }
+
     fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

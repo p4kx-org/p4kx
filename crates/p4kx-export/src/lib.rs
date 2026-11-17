@@ -68,7 +68,6 @@ mod action_map_source;
 #[cfg(test)]
 mod action_map_tests;
 mod action_map_write;
-mod archive_dataforge_query;
 mod archive_key_use;
 mod blueprint;
 mod blueprint_backfill_source;
@@ -106,6 +105,7 @@ mod catalog_crafting;
 mod catalog_file;
 mod catalog_file_write;
 mod catalog_output;
+mod catalog_query_session;
 mod catalog_reference;
 mod catalog_reference_health;
 mod catalog_reference_texts;

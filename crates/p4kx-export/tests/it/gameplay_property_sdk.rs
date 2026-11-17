@@ -2,12 +2,13 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogRecordSelection, DisplayTransformationPayload,
-    GameplayPropertySnapshot, read_gameplay_properties, read_gameplay_properties_from,
+    CatalogLanguageSelection, CatalogRecordSelection, DatasetAvailability,
+    DisplayTransformationPayload, GameplayPropertySnapshot, read_gameplay_properties,
+    read_gameplay_properties_from,
 };
 use p4kx_export::{CatalogError, build_catalog_from};
 use p4kx_extraction::{Archive, DataForgeEntry, FieldOrigin, Language, LocalizationNote};
-use p4kx_testkit::{ArchiveBuilder, TestEntry, TestValue};
+use p4kx_testkit::{ArchiveBuilder, TestEntry, TestRecord, TestStruct, TestValue};
 use serde_json::Value;
 
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
@@ -99,11 +100,24 @@ fn assert_field_origins(snapshot: &GameplayPropertySnapshot, origins: [&FieldOri
 }
 
 fn localization_selection_archive() -> TestResult<(tempfile::TempDir, Archive)> {
-    let database = values::simple().record(values::record(
-        values::FIRST,
-        "Second",
-        values::scale(TestValue::Single(2.5)),
-    ));
+    let database = values::simple()
+        .structure(TestStruct::new("OtherRecord"))
+        .record(values::record(
+            values::FIRST,
+            "Second",
+            values::scale(TestValue::Single(2.5)),
+        ))
+        .record(TestRecord::new(
+            0xd201,
+            "OtherRecord",
+            "OtherRecord.Unrelated",
+            "libs/foundry/records/unrelated.xml",
+        ))
+        .record(values::record(
+            0xd202,
+            "Test_Leftover",
+            values::scale(TestValue::Single(3.5)),
+        ));
     let folder = tempfile::tempdir()?;
     let path = folder.path().join("fixture.p4k");
     ArchiveBuilder::new()
@@ -174,5 +188,55 @@ fn gameplay_queries_keep_physical_aliases_and_skip_unselected_languages() -> Tes
                 .is_empty()
         );
     }
+    Ok(())
+}
+
+#[test]
+fn scopes_without_admitted_gameplay_properties_skip_localization_payloads() -> TestResult {
+    let (_folder, archive) = localization_selection_archive()?;
+    let entry = DataForgeEntry::read(&archive)?;
+    let forge = entry.open()?;
+    let other = forge.record(2).ok_or("out-of-family Record fixture")?;
+    assert_eq!(other.type_name()?, "OtherRecord");
+    let leftover = forge.record(3).ok_or("leftover Record fixture")?;
+    let missing = "a1000000-0000-4000-8000-000000000099".parse()?;
+    let languages = [Language::English, Language::German];
+    let selection = CatalogLanguageSelection::Selected(&languages);
+    for (record, skipped_leftovers) in [
+        (CatalogRecordSelection::RecordIndex(u32::MAX), 0),
+        (CatalogRecordSelection::RecordIndex(other.index()), 0),
+        (CatalogRecordSelection::Guid(missing), 0),
+        (CatalogRecordSelection::Guid(other.guid()), 0),
+        (CatalogRecordSelection::RecordIndex(leftover.index()), 1),
+        (CatalogRecordSelection::Guid(leftover.guid()), 1),
+    ] {
+        let result = read_gameplay_properties_from(&archive, &entry, record, selection, None)?;
+        assert!(result.rows.is_empty(), "no projected gameplay property");
+        assert!(matches!(
+            result.availability,
+            DatasetAvailability::Available
+        ));
+        assert!(result.public_names.is_empty(), "no requested text keys");
+        assert_eq!(result.coverage.skipped_leftovers, skipped_leftovers);
+        assert_eq!(result.requested_languages, languages);
+        assert!(
+            result.available_languages.is_empty(),
+            "no locale was opened"
+        );
+        assert!(
+            result.localization_notes.is_empty(),
+            "no locale was decoded"
+        );
+        assert_eq!(
+            result.source_inventory.source_count(),
+            1,
+            "only DataForge evidence"
+        );
+    }
+    assert_eq!(
+        archive.key_demand().snapshot().unread(),
+        0,
+        "the locked locale was never attempted"
+    );
     Ok(())
 }

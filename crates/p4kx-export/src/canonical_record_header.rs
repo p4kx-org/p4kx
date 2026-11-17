@@ -99,7 +99,7 @@ pub struct CatalogRecordSource {
     pub metadata_tag: SourcedValue<String>,
 }
 
-fn serialize_guid<S: Serializer>(
+pub(crate) fn serialize_guid<S: Serializer>(
     value: &SourcedValue<Guid>,
     serializer: S,
 ) -> Result<S::Ok, S::Error> {

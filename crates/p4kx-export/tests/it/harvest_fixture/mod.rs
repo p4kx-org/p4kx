@@ -15,9 +15,11 @@ use p4kx_testkit::{
 use crate::starmap_fixture::{child, children, guid_text};
 
 mod mineables;
+mod provider;
 mod structures;
 
 pub(crate) use mineables::Radar;
+use provider::provider;
 use structures::structures;
 
 pub(crate) const RESOURCE: u128 = 0x7000_0000_0000_4000_8000_0000_0000_0001;
@@ -115,65 +117,6 @@ fn ship_params(mass_multiplier: bool) -> TestRecord {
         "MiningGlobalParamsShip",
         100.0,
         mass_multiplier.then_some(1.5),
-    )
-}
-
-fn harvestable_entry(harvestable: Option<u128>, entity: Option<u128>) -> TestValue {
-    let mut element = TestInstance::new("HarvestableElement")
-        .value("relativeProbability", TestValue::Single(22.0))
-        .value("clustering", TestValue::Reference(RESOURCE))
-        .value(
-            "geometries",
-            TestValue::Array(vec![TestValue::Struct(
-                TestInstance::new("HarvestableGeometry")
-                    .value("tag", TestValue::Reference(RESOURCE)),
-            )]),
-        );
-    if let Some(harvestable) = harvestable {
-        element = element.value("harvestable", TestValue::Reference(harvestable));
-    }
-    if let Some(entity) = entity {
-        element = element.value("harvestableEntityClass", TestValue::Reference(entity));
-    }
-    TestValue::Struct(element)
-}
-
-fn provider(guid: u128, name: &str, with_entity_only: bool) -> TestRecord {
-    let mut elements = vec![harvestable_entry(Some(HARVESTABLE), None)];
-    if with_entity_only {
-        elements.push(harvestable_entry(None, Some(ENTITY)));
-    }
-    record(
-        guid,
-        "HarvestableProviderPreset",
-        name,
-        &format!("{PRESETS}{}", name.to_lowercase()),
-    )
-    .value(
-        "harvestableGroups",
-        TestValue::Array(vec![TestValue::Struct(
-            TestInstance::new("HarvestableElementGroup")
-                .value("groupName", TestValue::text("SpaceShip_Mineables"))
-                .value("groupProbability", TestValue::Single(6.0))
-                .value("harvestables", TestValue::Array(elements)),
-        )]),
-    )
-    .value(
-        "areas",
-        TestValue::Array(vec![TestValue::Struct(
-            TestInstance::new("HarvestableAreaPreset")
-                .value("debugGroupName", TestValue::text("Acidic"))
-                .value("globalModifier", TestValue::Single(1.0))
-                .value(
-                    "areaType",
-                    TestValue::Struct(TestInstance::new("HarvestableAreaTypeObjectPreset").value(
-                        "objectPresetPaths",
-                        TestValue::Array(vec![TestValue::text(
-                            "Libs/ObjectPresets/PU/system/stanton/hurston/acidic_pools_01.opr",
-                        )]),
-                    )),
-                ),
-        )]),
     )
 }
 

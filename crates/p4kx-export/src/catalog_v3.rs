@@ -24,6 +24,9 @@ mod authored_link;
 #[path = "authored_nodes.rs"]
 mod authored_nodes;
 
+#[path = "catalog_harvest_modules.rs"]
+pub(crate) mod catalog_harvest_modules;
+
 #[path = "mineable_composition_definition.rs"]
 pub(crate) mod mineable_composition_definition;
 #[path = "mineable_element_definition.rs"]

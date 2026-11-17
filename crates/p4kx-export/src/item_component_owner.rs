@@ -76,6 +76,10 @@ impl ComponentOwner {
             .into_cell(original.sources()))
     }
 
+    pub(super) const fn guid(&self) -> &SourcedValue<CatalogGuid> {
+        &self.owner_guid
+    }
+
     pub(super) const fn component_ordinal(&self) -> &SourcedValue<u32> {
         &self.component_ordinal
     }

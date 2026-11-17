@@ -56,40 +56,79 @@ pub(super) fn mineable_entities() -> serde_json::Value {
 }
 
 pub(super) fn presets() -> serde_json::Value {
-    let harvestable = json!({
-        "presetGuid": "a6000000-0000-4000-8000-000000000002",
-        "presetClassName": "Mining_Common_Aluminum",
-        "entityGuid": "a6000000-0000-4000-8000-000000000003",
-        "mineableCompositionGuid": "a5000000-0000-4000-8000-000000000001",
-        "miningGlobalParamsGuid": "a6000000-0000-4000-8000-000000000004"
-    });
+    let present = super::source_values::present;
+    let empty = || super::source_values::source(p4kx_extraction::SourceValue::Absent);
+    let link = |index: u32, guid: &str, path: &str, source_type: &str| {
+        present(json!({
+            "targetRecordIndex": present(json!(index)),
+            "guid": present(json!(guid)),
+            "recordPath": present(json!(path)),
+            "targetType": present(json!(source_type)),
+            "status": "present",
+        }))
+    };
+    let entity_guid = "a6000000-0000-4000-8000-000000000003";
+    let entity_path = "libs/foundry/records/entities/mineable/mineablerock_asteroid";
+    let provider_path = "libs/foundry/records/harvestable/providerpresets/hpp_lagrange_a";
     json!([{
-        "guid": "a6000000-0000-4000-8000-000000000001",
-        "className": "HPP_Lagrange_A",
-        "recordPath": "libs/foundry/records/harvestable/providerpresets/system/stanton/asteroidfield/hpp_lagrange_a",
-        "groups": [{
-            "groupName": "SpaceShip_Mineables",
-            "groupProbability": 6.0,
-            "harvestables": [{
-                "harvestable": harvestable,
-                "setupGuid": null,
-                "clusteringGuid": "a6000000-0000-4000-8000-000000000005",
-                "relativeProbability": 22.0,
-                "geometryTagGuids": ["a6000000-0000-4000-8000-000000000006"]
-            }]
-        }],
-        "areas": [{
-            "name": "Acidic",
-            "globalModifier": 1.0,
-            "objectPresetPaths": ["Libs/ObjectPresets/PU/system/stanton/hurston/acidic_pools_01.opr"],
-            "modifiers": [{
-                "groupIndex": 0,
-                "harvestableIndex": 0,
-                "modifier": 0.0,
-                "geometryTagGuids": []
-            }]
-        }]
+        "guid": present(json!("a6000000-0000-4000-8000-000000000001")),
+        "recordName": present(json!("HarvestableProviderPreset.HPP_Lagrange_A")),
+        "className": present(json!("HPP_Lagrange_A")),
+        "recordPath": present(json!(provider_path)),
+        "sourceType": present(json!("HarvestableProviderPreset")),
+        "fileName": present(json!(format!("{provider_path}.xml"))),
+        "recordIndex": present(json!(4)),
+        "metadataTag": empty(),
+        "groups": present(json!([present(json!({
+            "groupName": present(json!("SpaceShip_Mineables")),
+            "groupProbability": single(6.0),
+            "harvestables": present(json!([present(json!({
+                "harvestable": link(5, "a6000000-0000-4000-8000-000000000002",
+                    "libs/foundry/records/harvestable/mining_common_aluminum", "HarvestablePreset"),
+                "harvestableEntityClass": empty(),
+                "harvestableSetup": empty(),
+                "clustering": empty(),
+                "relativeProbability": single(22.0),
+                "geometries": present(json!([])),
+                "spawn": {
+                    "entitySelection": present(json!("presetFallback")),
+                    "presetClassName": present(json!("Mining_Common_Aluminum")),
+                    "presetEntityClass": link(6, entity_guid, entity_path, "EntityClassDefinition"),
+                    "entity": present(json!({
+                        "recordIndex": present(json!(6)),
+                        "guid": present(json!(entity_guid)),
+                        "miningParams": present(json!({
+                            "componentIndex": present(json!(0)),
+                            "composition": link(2, "a5000000-0000-4000-8000-000000000001",
+                                "libs/foundry/records/mining/rockcompositionpresets/asteroid_ctype_iron",
+                                "MineableComposition"),
+                            "globalParams": empty(),
+                        })),
+                    })),
+                },
+            }))])),
+        }))])),
+        "areas": provider_areas(),
     }])
+}
+
+fn single(finite: f32) -> serde_json::Value {
+    super::source_values::present(json!({
+        "type": "f32", "finite": finite, "rawBits": format!("{:08x}", finite.to_bits()),
+    }))
+}
+
+fn provider_areas() -> serde_json::Value {
+    let present = super::source_values::present;
+    present(json!([present(json!({
+        "name": present(json!("Acidic")),
+        "globalModifier": single(1.0),
+        "areaType": present(json!({
+            "sourceType": present(json!("HarvestableAreaTypeObjectPreset")),
+            "objectPresetPaths": present(json!([present(json!("Libs/ObjectPresets/example.opr"))])),
+        })),
+        "modifiers": present(json!([])),
+    }))]))
 }
 
 pub(super) fn multi_configs() -> serde_json::Value {

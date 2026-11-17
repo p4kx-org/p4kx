@@ -2115,25 +2115,32 @@ order; a number that is not a finite 32-bit float is exported as 0. Entities are
 record path and type alone, so one without the components has `null` links and empty
 `signatures`.
 
-**Provider presets (`harvestableProviderPresets`).** The `HarvestableProviderPreset` Records under
-`harvestable/providerpresets` (49 on LIVE). `groups` keep `groupName`, `groupProbability` and the
-`harvestables`; each has `relativeProbability`, `clusteringGuid`, `setupGuid`, the GUIDs of its
-geometry tags and `harvestable`, which follows the element to what it spawns: the
-`HarvestablePreset` Record (`presetGuid`, `presetClassName`), the entity (`entityGuid`, the
-element's `harvestableEntityClass`, else the preset's `entityClass`) and the `MineableParams` of
-that entity (`mineableCompositionGuid`, `miningGlobalParamsGuid`). A harvestable that is no rock
-has both `null`. `areas` keep `debugGroupName` as `name`, `globalModifier`, the `objectPresetPaths`
-of the area type and the `modifiers`, whose weak pointer gives `groupIndex` and `harvestableIndex`
-into `groups` (`null` for a pointer into another Record). The surface presets of the planets and
-moons (`HPP_Stanton1a`, `HPP_Pyro5b`, 25 of the 49) are tied to a place by these object preset
-paths (for Hurston they name the star system and the body, for the others no body) and by no
-container.
+**Provider presets (`harvestableProviderPresets`).** The provider Record identity and all authored
+fields use sourced cells. The groups, elements, geometries, areas, object preset paths and
+modifiers are arrays of sourced slots in authored order. This retains the positions of null,
+unreadable and unsupported elements. Probabilities and modifiers retain their declared numeric
+width and raw representation. Original Record references are available as `harvestable`,
+`harvestableEntityClass`, `harvestableSetup`, `clustering` and geometry `tag`.
+
+Each element's `spawn` reports the selected preset class and how its entity was selected. A
+resolved explicit entity reference takes precedence. When the preset's `entityClass` is
+consulted, `presetEntityClass` also retains that selector. The selected entity has a physical
+Record index and GUID and contains the first authored `MineableParams` occurrence. Its
+`miningParams` cell carries the component position and its original `composition` and
+`globalParams` references. The source uses of the nested values include the selector route
+that chose this entity.
+
+An area's `areaType` retains the concrete declared type and ordered object preset path cells.
+Each modifier retains its original Record or instance pointer and, for an exact pointer to a
+group element in the same physical provider Record, the zero-based group and element positions.
+The original pointer's Record identity and instance path remain available when that slot projection
+is absent.
 
 **Multi configs (`subHarvestableMultiConfigs`).** The `SubHarvestableMultiConfigRecord` Records
 under `harvestable/slotpresets` (103 on LIVE). `defaultConfigGuid` is the Reference of a default
 config that is a reference, `taggedConfigs` keep `name`, the tag GUIDs, `configGuid` for a config
 that is a reference, and for a config written out `respawnTimeMultiplier`,
-`initialSlotsProbability` and the `subHarvestables` (`harvestable` as above, `setupGuid`, multiplier,
+`initialSlotsProbability` and the `subHarvestables` (`harvestable` with preset, entity and mining Record GUIDs, `setupGuid`, multiplier,
 `relativeProbability`, `relativeProbabilityDeepest`, geometry tags and `lootConfig`).
 
 **Locations (`harvestableLocations`).** ScDataDumper's `SocpakMappingGenerator` finds the preset

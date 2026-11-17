@@ -66,18 +66,12 @@ impl<'f> Scan<'_, '_, 'f> {
             staging.entity_tags.append(tags.order_key(), &tags)?;
         }
         inspections.merge(&mut ledger, resources.ledger);
-        if let Some(warning) = self.links.warning() {
-            collected.take(Picked::Warned(warning), &mut staging.item_definitions)?;
-        }
-        if self.options.filter.is_none()
-            && evidence.has_signatures
-            && let Some(problem) = slot_problem
-        {
-            collected.take(
-                Picked::Warned(problem.warning()),
-                &mut staging.item_definitions,
-            )?;
-        }
+        self.stage_projection_warnings(
+            &mut collected,
+            &mut staging.item_definitions,
+            evidence.has_signatures,
+            slot_problem,
+        )?;
         let inventories = Kind::ALL.into_iter().filter(|kind| {
             !kind.has_dedicated_reader() && !kind.is_derived() && self.domain.includes(*kind)
         });
@@ -96,6 +90,28 @@ impl<'f> Scan<'_, '_, 'f> {
         inspections.merge(&mut ledger, ammo_ledger);
         collected.ledger.merge(ledger);
         Ok(collected)
+    }
+
+    fn stage_projection_warnings(
+        &self,
+        collected: &mut Collected<'f>,
+        item_definitions: &mut ItemDefinitionStaging<'_, 'f>,
+        has_signatures: bool,
+        slot_problem: Option<SlotProblem>,
+    ) -> Result<(), CatalogError> {
+        for warning in [self.links.warning(), self.provider_dependencies.warning()?]
+            .into_iter()
+            .flatten()
+        {
+            collected.take(Picked::Warned(warning), item_definitions)?;
+        }
+        if self.options.filter.is_none()
+            && has_signatures
+            && let Some(problem) = slot_problem
+        {
+            collected.take(Picked::Warned(problem.warning()), item_definitions)?;
+        }
+        Ok(())
     }
 
     fn collect_records(

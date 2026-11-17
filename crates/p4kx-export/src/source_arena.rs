@@ -37,7 +37,7 @@ struct SourceArena<'source> {
 /// The complete root fields and flat values of one physical original owner.
 #[derive(Debug, Serialize, JsonSchema)]
 #[schemars(transform = every_field_required)]
-pub(crate) struct SourceArenaOutput<'source> {
+pub struct SourceArenaOutput<'source> {
     #[serde(rename = "roots")]
     pub(crate) fields: Vec<SourceField<'source>>,
     pub(crate) values: Vec<SourceNode<'source>>,

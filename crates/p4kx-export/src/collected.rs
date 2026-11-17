@@ -135,7 +135,7 @@ pub(crate) struct Collected<'f> {
     pub(crate) mineable_compositions: Vec<MineableComposition>,
     pub(crate) mining_global_params: Vec<MiningGlobalParams<'f>>,
     pub(crate) mineable_entities: Vec<MineableEntity<'f>>,
-    pub(crate) harvestable_provider_presets: Vec<HarvestableProviderPreset<'f>>,
+    pub(crate) harvestable_provider_presets: Vec<HarvestableProviderPreset>,
     pub(crate) sub_harvestable_multi_configs: Vec<SubHarvestableMultiConfig<'f>>,
     pub(crate) harvestable_locations: Vec<HarvestableLocation>,
     pub(crate) loot_containers: Vec<LootContainer>,
@@ -323,7 +323,7 @@ impl<'f> Collected<'f> {
             Picked::Composition(entity) => self.mineable_compositions.push(*entity),
             Picked::MiningParams(entity) => self.mining_global_params.push(entity),
             Picked::MineableEntity(entity) => self.mineable_entities.push(entity),
-            Picked::Provider(entity) => self.harvestable_provider_presets.push(entity),
+            Picked::Provider(entity) => self.harvestable_provider_presets.push(*entity),
             Picked::MultiConfig {
                 definition,
                 projection,

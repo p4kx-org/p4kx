@@ -5,43 +5,27 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 
 use p4kx_extraction::{
-    Archive, Build, CancelToken, DataForgeEntry, Language, LocalizationNote, Record,
+    Archive, Build, CancelToken, DataForge, DataForgeEntry, Language, LocalizationNote, Record,
     SourceInventory, SourcedValue, TreeBuilder,
 };
 use serde::Serialize;
 
-use super::{CatalogRecordCoverage, CatalogRecordSelection, DatasetAvailability, GameplayProperty};
-use crate::archive_dataforge_query::{self, checkpoint};
+use super::{
+    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordCoverage, CatalogRecordSelection,
+    DatasetAvailability, GameplayProperty, ParsedCatalogQueries,
+};
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::{CatalogProjection, CatalogTextRegistry};
+use crate::catalog_query_session::checkpoint;
 use crate::catalog_text_contract::{CanonicalText, PublicNameRef, TextForms};
 use crate::catalog_v3::gameplay_property_catalog;
 use crate::crafting::ledger;
 use crate::entity_selection::Selected;
 use crate::guid_text::sort_by_guid;
 use crate::record_observation::RecordObservation;
-use crate::texts::{CATALOG_LANGUAGES, TextSources, Texts};
+use crate::texts::{TextSources, Texts};
 use crate::{CatalogError, Kind};
-
-/// Selects the localization payloads consulted by a catalog query.
-#[derive(Debug, Clone, Copy)]
-#[non_exhaustive]
-pub enum CatalogLanguageSelection<'query> {
-    /// Consults every supported language with a source present in the Archive.
-    AllAvailable,
-    /// Consults these languages only; an empty slice returns public-name keys without translations.
-    Selected(&'query [Language]),
-}
-
-impl CatalogLanguageSelection<'_> {
-    fn includes(self, language: Language) -> bool {
-        match self {
-            Self::AllAvailable => true,
-            Self::Selected(languages) => languages.contains(&language),
-        }
-    }
-}
 
 /// A public-name definition with its selected source and display forms.
 #[derive(Debug, Serialize)]
@@ -71,7 +55,8 @@ pub struct GameplayPropertySnapshot {
     pub public_names: Vec<CatalogPublicName>,
     /// Requested languages in canonical order, including languages absent in this Archive.
     pub requested_languages: Vec<Language>,
-    /// The requested languages with available localization payloads.
+    /// The requested localization languages whose payloads this query read successfully.
+    /// Empty when no gameplay-property Record was admitted.
     pub available_languages: Vec<Language>,
     /// Lossy decoding and skipped lines in localization payloads used by the query.
     pub localization_notes: Vec<LocalizationNote>,
@@ -93,9 +78,8 @@ pub fn read_gameplay_properties(
     languages: CatalogLanguageSelection<'_>,
     cancel: Option<&CancelToken>,
 ) -> Result<GameplayPropertySnapshot, CatalogError> {
-    archive_dataforge_query::read(archive, None, cancel, |entry| {
-        read_archive(archive, entry, selection, languages, cancel)
-    })
+    CatalogQuerySession::open(archive, languages, cancel)?
+        .read_gameplay_properties(selection, cancel)
 }
 
 /// Reads gameplay properties using an already decoded entry of the same Archive.
@@ -111,9 +95,41 @@ pub fn read_gameplay_properties_from(
     languages: CatalogLanguageSelection<'_>,
     cancel: Option<&CancelToken>,
 ) -> Result<GameplayPropertySnapshot, CatalogError> {
-    archive_dataforge_query::read(archive, Some(entry), cancel, |entry| {
-        read_archive(archive, entry, selection, languages, cancel)
-    })
+    CatalogQuerySession::from_entry(archive, entry, languages, cancel)?
+        .read_gameplay_properties(selection, cancel)
+}
+
+impl CatalogQuerySession<'_> {
+    /// Reads gameplay properties and public names in the session languages.
+    ///
+    /// # Errors
+    ///
+    /// Returns input, source evidence or cancellation errors. Recoverable gaps appear in coverage.
+    pub fn read_gameplay_properties(
+        &self,
+        selection: CatalogRecordSelection,
+        cancel: Option<&CancelToken>,
+    ) -> Result<GameplayPropertySnapshot, CatalogError> {
+        self.parsed(cancel)?
+            .read_gameplay_properties(selection, cancel)
+    }
+}
+
+impl ParsedCatalogQueries<'_> {
+    /// Reads gameplay properties and public names in the session languages.
+    ///
+    /// # Errors
+    ///
+    /// Returns input, source evidence or cancellation errors. Recoverable gaps appear in coverage.
+    pub fn read_gameplay_properties(
+        &self,
+        selection: CatalogRecordSelection,
+        cancel: Option<&CancelToken>,
+    ) -> Result<GameplayPropertySnapshot, CatalogError> {
+        self.project(cancel, |archive, entry, forge| {
+            read_archive(archive, entry, forge, selection, self.languages(), cancel)
+        })
+    }
 }
 
 const KIND: Kind = Kind::GameplayProperties;
@@ -121,30 +137,111 @@ const KIND: Kind = Kind::GameplayProperties;
 fn read_archive(
     archive: &Archive,
     entry: &DataForgeEntry,
+    forge: &DataForge<'_>,
     selection: CatalogRecordSelection,
-    languages: CatalogLanguageSelection<'_>,
+    requested_languages: &[Language],
     cancel: Option<&CancelToken>,
 ) -> Result<GameplayPropertySnapshot, CatalogError> {
-    let requested_languages: Vec<_> = CATALOG_LANGUAGES
-        .into_iter()
-        .filter(|language| languages.includes(*language))
-        .collect();
-    let text_sources = TextSources::read_languages(archive, &requested_languages)?;
+    let mut coverage = CatalogRecordCoverage::default();
+    let records = select_records(forge, selection, &mut coverage, cancel)?;
     checkpoint(cancel)?;
-    let origins = CatalogOrigins::new(archive, entry, &text_sources)?;
-    let forge = entry.open().map_err(CatalogError::DataForge)?;
-    let input = OriginalCatalogInput::new(&forge, &origins);
-    let texts = Texts::parse(&text_sources)?;
+    let text_sources = if records.is_empty() {
+        None
+    } else {
+        Some(TextSources::read_languages(archive, requested_languages)?)
+    };
+    checkpoint(cancel)?;
+    let origins = match &text_sources {
+        Some(sources) => CatalogOrigins::new(archive, entry, sources)?,
+        None => CatalogOrigins::for_archive_records(archive, entry)?,
+    };
+    let projected = match &text_sources {
+        Some(sources) => read_selected(
+            forge,
+            records,
+            &mut coverage,
+            sources,
+            requested_languages,
+            &origins,
+            cancel,
+        )?,
+        None => ProjectedProperties::default(),
+    };
+    let table = gameplay_property_catalog::table(forge, projected.rows);
+    let source_inventory = origins.uses.finish_with(|| checkpoint(cancel))?;
+    Ok(GameplayPropertySnapshot {
+        build: archive.build().cloned(),
+        availability: table.availability,
+        rows: table.rows,
+        public_names: projected.public_names,
+        requested_languages: requested_languages.to_vec(),
+        available_languages: projected.available_languages,
+        localization_notes: projected.localization_notes,
+        source_inventory,
+        coverage,
+    })
+}
+
+fn select_records<'source>(
+    forge: &'source DataForge<'_>,
+    selection: CatalogRecordSelection,
+    coverage: &mut CatalogRecordCoverage,
+    cancel: Option<&CancelToken>,
+) -> Result<Vec<Record<'source>>, CatalogError> {
+    let mut records = Vec::new();
+    selection.for_each(forge, cancel, |record| {
+        match ledger::gameplay_property(record) {
+            Err(_) => coverage.unreadable_headers.push(record.index()),
+            Ok(Some(Selected::Leftover(KIND))) => coverage.skipped_leftovers += 1,
+            Ok(Some(Selected::Entity(KIND))) => records.push(*record),
+            Ok(_) => {}
+        }
+        Ok(())
+    })?;
+    Ok(records)
+}
+
+#[derive(Default)]
+struct ProjectedProperties {
+    rows: Vec<GameplayProperty>,
+    public_names: Vec<CatalogPublicName>,
+    available_languages: Vec<Language>,
+    localization_notes: Vec<LocalizationNote>,
+}
+
+fn read_selected<'source>(
+    forge: &'source DataForge<'source>,
+    records: Vec<Record<'source>>,
+    coverage: &mut CatalogRecordCoverage,
+    text_sources: &'source TextSources,
+    requested_languages: &[Language],
+    origins: &CatalogOrigins,
+    cancel: Option<&CancelToken>,
+) -> Result<ProjectedProperties, CatalogError> {
+    let input = OriginalCatalogInput::new(forge, origins);
+    let texts = Texts::parse(text_sources)?;
     let registry = CatalogTextRegistry::default();
     let projection = CatalogProjection::new(&texts, &input, &registry).for_kind(KIND);
-    let mut state = SelectedProperties::default();
     let mut trees = TreeBuilder::new();
-    selection.for_each(&forge, cancel, |record| {
-        state.read(record, &projection, &mut trees, cancel)
-    })?;
-    sort_by_guid(&mut state.rows, |row| row.physical_guid);
-    let table = gameplay_property_catalog::table(&forge, state.rows);
-    let rows = table.rows.into_iter().map(GameplayProperty::from).collect();
+    let mut rows = Vec::new();
+    for record in records {
+        checkpoint(cancel)?;
+        let Ok(tree) = trees.build(&record) else {
+            coverage.unreadable_bodies.push(record.index());
+            continue;
+        };
+        let admission = RecordObservation::capture(projection.original(), &record)?;
+        let decoded = gameplay_property_catalog::read(&tree, &projection, &admission, cancel)?;
+        if decoded
+            .notes
+            .iter()
+            .any(|note| note.description().issue.blocks_projection())
+        {
+            coverage.incomplete_fields.push(record.index());
+        }
+        rows.push(decoded.value);
+    }
+    sort_by_guid(&mut rows, |row| row.physical_guid);
     let public_names = projection
         .finish_public_names()?
         .into_iter()
@@ -155,59 +252,12 @@ fn read_archive(
         .copied()
         .filter(|language| text_sources.entry(*language).is_some())
         .collect();
-    let source_inventory = origins.uses.finish_with(|| checkpoint(cancel))?;
-    Ok(GameplayPropertySnapshot {
-        build: archive.build().cloned(),
-        availability: table.availability,
-        rows,
+    Ok(ProjectedProperties {
+        rows: rows.into_iter().map(GameplayProperty::from).collect(),
         public_names,
-        requested_languages,
         available_languages,
         localization_notes: texts.notes().to_vec(),
-        source_inventory,
-        coverage: state.coverage,
     })
-}
-
-#[derive(Default)]
-struct SelectedProperties<'source> {
-    rows: Vec<gameplay_property_catalog::GameplayPropertyDefinition<'source>>,
-    coverage: CatalogRecordCoverage,
-}
-
-impl<'source> SelectedProperties<'source> {
-    fn read(
-        &mut self,
-        record: &Record<'source>,
-        projection: &CatalogProjection<'_, 'source>,
-        trees: &mut TreeBuilder<'source>,
-        cancel: Option<&CancelToken>,
-    ) -> Result<(), CatalogError> {
-        match ledger::gameplay_property(record) {
-            Err(_) => self.coverage.unreadable_headers.push(record.index()),
-            Ok(Some(Selected::Leftover(KIND))) => self.coverage.skipped_leftovers += 1,
-            Ok(Some(Selected::Entity(KIND))) => {
-                checkpoint(cancel)?;
-                let Ok(tree) = trees.build(record) else {
-                    self.coverage.unreadable_bodies.push(record.index());
-                    return Ok(());
-                };
-                let admission = RecordObservation::capture(projection.original(), record)?;
-                let decoded =
-                    gameplay_property_catalog::read(&tree, projection, &admission, cancel)?;
-                if decoded
-                    .notes
-                    .iter()
-                    .any(|note| note.description().issue.blocks_projection())
-                {
-                    self.coverage.incomplete_fields.push(record.index());
-                }
-                self.rows.push(decoded.value);
-            }
-            Ok(_) => {}
-        }
-        Ok(())
-    }
 }
 
 impl From<CanonicalText<'_, PublicNameRef>> for CatalogPublicName {

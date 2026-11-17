@@ -6,6 +6,7 @@ use p4kx_extraction::{RecordTree, TreeBuilder};
 use super::Scan;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_v3::authored_fields::ship_presentation;
+use crate::catalog_v3::catalog_harvest_modules::harvest_provider;
 use crate::catalog_v3::catalog_item_components::item_definition::ItemDefinition;
 use crate::catalog_v3::catalog_item_components::{self, ItemComponentsRead, resolution};
 use crate::catalog_v3::catalog_weapon_projectile_ammo::{self, LinkedAmmunitionReader};
@@ -15,7 +16,6 @@ use crate::contract_stats::ItemStats;
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_ledger::ExportLedger;
 use crate::harvest_config::{is_slotpreset_path, multi_config};
-use crate::harvest_preset::provider_preset;
 use crate::loot_kinds::LootPick;
 use crate::mining::mineable_entity;
 use crate::picked::Picked;
@@ -57,13 +57,7 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
             return Ok(Some(picked));
         }
         if kind == Kind::HarvestableProviderPresets {
-            let picked = Picked::Provider(provider_preset(
-                trees,
-                tree,
-                self.scan.forge,
-                &self.scan.links,
-            ));
-            return Ok(Some(picked));
+            return self.provider(admission, tree, ledger).map(Some);
         }
         if kind == Kind::MineableEntities {
             let entity = Picked::MineableEntity(mineable_entity(tree, self.scan.signature_slot));
@@ -103,6 +97,31 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
             ));
         }
         Ok(Picked::entity(kind, tree).map(|picked| picked.crafted(tree)))
+    }
+
+    fn provider(
+        &self,
+        admission: &RecordObservation<'_, 'f>,
+        tree: &RecordTree<'f>,
+        ledger: &mut ExportLedger,
+    ) -> Result<Picked<'f>, ScanError> {
+        let (row, notes) = harvest_provider::read(
+            tree,
+            self.scan.forge,
+            self.projection.original(),
+            admission,
+            self.scan.options.cancel,
+            &self.scan.provider_dependencies,
+        )?;
+        crate::source_projection_notes::record(
+            Kind::HarvestableProviderPresets,
+            ExportSourceRole::Selected,
+            admission,
+            tree,
+            notes,
+            ledger,
+        )?;
+        Ok(Picked::Provider(Box::new(row)))
     }
 
     fn starmap(

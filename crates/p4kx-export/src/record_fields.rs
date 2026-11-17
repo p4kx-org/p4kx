@@ -8,8 +8,15 @@ use crate::guid_text::CatalogGuid;
 /// Returns the Record name without the leading `<type>.`, e.g. `ACAS` for
 /// `SCItemManufacturer.ACAS`; a name without that start is returned whole.
 pub(crate) fn class_name<'f>(tree: &RecordTree<'f>) -> &'f str {
-    let name = tree.name();
-    name.strip_prefix(tree.type_name())
+    unqualified_class_name(tree.name(), tree.type_name())
+}
+
+/// Returns the normalized class label from the original name and type.
+pub(crate) fn unqualified_class_name<'source>(
+    name: &'source str,
+    source_type: &str,
+) -> &'source str {
+    name.strip_prefix(source_type)
         .and_then(|rest| rest.strip_prefix('.'))
         .filter(|rest| !rest.is_empty())
         .unwrap_or(name)

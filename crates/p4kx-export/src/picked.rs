@@ -95,7 +95,7 @@ pub(crate) enum Picked<'f> {
     /// A mineable entity.
     MineableEntity(MineableEntity<'f>),
     /// A harvestable provider preset.
-    Provider(HarvestableProviderPreset<'f>),
+    Provider(Box<HarvestableProviderPreset>),
     /// A physical multi config with an optional slot-preset projection.
     MultiConfig {
         definition: Box<LootDefinition<'f>>,

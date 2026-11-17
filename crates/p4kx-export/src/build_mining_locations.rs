@@ -4,21 +4,25 @@
 use std::collections::HashSet;
 use std::slice;
 
-use p4kx_extraction::{Archive, CancelToken, DataForgeEntry, Record, TreeBuilder};
+use p4kx_extraction::{
+    Archive, CancelToken, DataForge, DataForgeEntry, Language, Record, TreeBuilder,
+};
 
 use super::original_input::OriginalCatalogInput;
-use crate::archive_dataforge_query::{self, checkpoint};
 use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::{CatalogProjection, CatalogTextRegistry};
+use crate::catalog_query_session::{
+    CatalogLanguageSelection, CatalogQuerySession, ParsedCatalogQueries, checkpoint,
+};
 use crate::catalog_read::original::EntryCapture;
+use crate::catalog_v3::catalog_harvest_modules::harvest_provider;
+use crate::catalog_v3::catalog_harvest_modules::harvest_provider_dependencies::ProviderDependencies;
 use crate::catalog_v3::{
     authored_fields, mineable_composition_definition, mineable_element_definition,
 };
 use crate::contract_starmap::StarmapObject;
 use crate::entity_selection::{self, Selected};
-use crate::guid_text::CatalogGuid;
-use crate::harvest_link::Links;
 use crate::harvest_locations::{HarvestSurvey, Objects};
 use crate::mining_locations::{
     HarvestableProviderPreset, MineableComposition, MineableElement, MiningLocationCoverage,
@@ -28,7 +32,7 @@ use crate::record_observation::RecordObservation;
 use crate::starmap::TypeNames;
 use crate::starmap_containers::Placements;
 use crate::texts::{TextSources, Texts};
-use crate::{CatalogError, ExportAccountingError, Kind, harvest_preset, starmap};
+use crate::{CatalogError, ExportAccountingError, Kind, starmap};
 
 #[path = "mining_location_rows.rs"]
 mod rows;
@@ -54,9 +58,8 @@ pub fn read_mining_locations(
     archive: &Archive,
     options: MiningLocationOptions<'_>,
 ) -> Result<MiningLocationSnapshot, CatalogError> {
-    archive_dataforge_query::read(archive, None, options.cancel, |entry| {
-        read_archive(archive, entry, options)
-    })
+    let languages = CatalogLanguageSelection::Selected(slice::from_ref(&options.language));
+    CatalogQuerySession::open(archive, languages, options.cancel)?.read_mining_locations(options)
 }
 
 /// Reads the local mining projection using already decoded bytes from this Archive.
@@ -70,22 +73,58 @@ pub fn read_mining_locations_from(
     entry: &DataForgeEntry,
     options: MiningLocationOptions<'_>,
 ) -> Result<MiningLocationSnapshot, CatalogError> {
-    archive_dataforge_query::read(archive, Some(entry), options.cancel, |entry| {
-        read_archive(archive, entry, options)
-    })
+    let languages = CatalogLanguageSelection::Selected(slice::from_ref(&options.language));
+    CatalogQuerySession::from_entry(archive, entry, languages, options.cancel)?
+        .read_mining_locations(options)
+}
+
+impl CatalogQuerySession<'_> {
+    /// Reads the mining projection and localizes it when its requested language is selected.
+    ///
+    /// # Errors
+    ///
+    /// Returns input, source evidence or cancellation errors. Recoverable gaps appear in coverage.
+    pub fn read_mining_locations(
+        &self,
+        options: MiningLocationOptions<'_>,
+    ) -> Result<MiningLocationSnapshot, CatalogError> {
+        self.parsed(options.cancel)?.read_mining_locations(options)
+    }
+}
+
+impl ParsedCatalogQueries<'_> {
+    /// Reads the mining projection and localizes it when its requested language is selected.
+    ///
+    /// # Errors
+    ///
+    /// Returns input, source evidence or cancellation errors. Recoverable gaps appear in coverage.
+    pub fn read_mining_locations(
+        &self,
+        options: MiningLocationOptions<'_>,
+    ) -> Result<MiningLocationSnapshot, CatalogError> {
+        let languages = if self.languages().contains(&options.language) {
+            slice::from_ref(&options.language)
+        } else {
+            &[]
+        };
+        self.project(options.cancel, |archive, entry, forge| {
+            read_archive(archive, entry, forge, options, languages)
+        })
+    }
 }
 
 fn read_archive(
     archive: &Archive,
     entry: &DataForgeEntry,
+    forge: &DataForge<'_>,
     options: MiningLocationOptions<'_>,
+    languages: &[Language],
 ) -> Result<MiningLocationSnapshot, CatalogError> {
     let cancel = options.cancel;
-    let forge = entry.open().map_err(CatalogError::DataForge)?;
-    let sources = TextSources::read_languages(archive, slice::from_ref(&options.language))?;
+    let sources = TextSources::read_languages(archive, languages)?;
     let texts = Texts::parse(&sources)?;
     let origins = CatalogOrigins::new(archive, entry, &sources)?;
-    let input = OriginalCatalogInput::new(&forge, &origins);
+    let input = OriginalCatalogInput::new(forge, &origins);
     let registry = CatalogTextRegistry::default();
     let projection = CatalogProjection::new(&texts, &input, &registry);
     let mut coverage = MiningLocationCoverage {
@@ -187,7 +226,7 @@ impl<'source> DefinitionRows<'source> {
     ) -> Result<Self, CatalogError> {
         let mut out = Self::default();
         let mut trees = TreeBuilder::new();
-        let links = Links::default();
+        let providers = ProviderDependencies::default();
         for record in input.forge().records() {
             checkpoint(cancel)?;
             let kind = match selected_kind(&record) {
@@ -206,17 +245,15 @@ impl<'source> DefinitionRows<'source> {
                 coverage.unreadable_record_bodies += 1;
                 continue;
             };
-            if kind == Kind::MineableElements {
-                let admission = RecordObservation::capture(input, &record)?;
-                let (row, notes) =
-                    mineable_element_definition::read(&tree, projection, &admission, cancel)?;
-                coverage.unreadable_mining_fields += notes.len();
-                out.mineable_elements.push(row);
-                continue;
-            }
+            let admission = RecordObservation::capture(input, &record)?;
             match kind {
+                Kind::MineableElements => {
+                    let (row, notes) =
+                        mineable_element_definition::read(&tree, projection, &admission, cancel)?;
+                    coverage.unreadable_mining_fields += notes.len();
+                    out.mineable_elements.push(row);
+                }
                 Kind::MineableCompositions => {
-                    let admission = RecordObservation::capture(input, &record)?;
                     let read = mineable_composition_definition::read(
                         &tree,
                         &projection.for_kind(kind),
@@ -229,18 +266,21 @@ impl<'source> DefinitionRows<'source> {
                     out.mineable_compositions.push(read.value);
                 }
                 Kind::HarvestableProviderPresets => {
-                    let source = MiningRecordSource::from(CanonicalRecordHeader::read(
+                    let (row, notes) = harvest_provider::read(
                         &tree,
-                        input.origins(),
-                    )?);
-                    let row =
-                        harvest_preset::provider_preset(&mut trees, &tree, input.forge(), &links);
-                    out.harvestable_provider_presets.push((row, source).into());
+                        input.forge(),
+                        input,
+                        &admission,
+                        cancel,
+                        &providers,
+                    )?;
+                    coverage.unreadable_mining_fields += notes.len();
+                    out.harvestable_provider_presets.push(row);
                 }
                 _ => return Err(ExportAccountingError::ConflictingSourceDatum.into()),
             }
         }
-        coverage.unreadable_provider_links = links.unreadable_count();
+        coverage.unreadable_provider_links = providers.unreadable_count()?;
         out.order();
         Ok(out)
     }
@@ -248,13 +288,8 @@ impl<'source> DefinitionRows<'source> {
     fn order(&mut self) {
         MineableElement::order(&mut self.mineable_elements);
         MineableComposition::order(&mut self.mineable_compositions);
-        self.harvestable_provider_presets
-            .sort_by_cached_key(|row| source_guid(&row.source));
+        HarvestableProviderPreset::order(&mut self.harvestable_provider_presets);
     }
-}
-
-fn source_guid(source: &MiningRecordSource) -> Option<crate::guid_text::GuidText> {
-    source.guid.value().map(|guid| CatalogGuid(*guid).text())
 }
 
 fn selected_kind(record: &Record<'_>) -> Result<Option<Kind>, p4kx_extraction::DataForgeError> {

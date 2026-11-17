@@ -8,9 +8,7 @@ use crate::catalog_text_contract::{CanonicalText, GameTextRef, TextForms};
 use crate::catalog_v3::starmap_placement::PlacementBinding;
 use crate::contract_starmap::StarmapObject;
 use crate::mining_locations::{
-    AreaModifier, HarvestableArea, HarvestableElement, HarvestableGroup, HarvestableLink,
-    HarvestableLocation, HarvestableProviderPreset, MiningGameText, MiningRecordSource,
-    MiningStarmapObject, MiningTextForms,
+    HarvestableLocation, MiningGameText, MiningRecordSource, MiningStarmapObject, MiningTextForms,
 };
 use crate::starmap_containers::proof::PlacementField;
 use crate::{CatalogError, contract_harvest};
@@ -55,94 +53,6 @@ impl From<TextForms<'_>> for MiningTextForms {
         Self {
             source_text: forms.source_text.map(Cow::into_owned),
             display_text: forms.display_text.map(Cow::into_owned),
-        }
-    }
-}
-
-impl
-    From<(
-        contract_harvest::HarvestableProviderPreset<'_>,
-        MiningRecordSource,
-    )> for HarvestableProviderPreset
-{
-    fn from(
-        (row, source): (
-            contract_harvest::HarvestableProviderPreset<'_>,
-            MiningRecordSource,
-        ),
-    ) -> Self {
-        Self {
-            source,
-            groups: row.groups.into_iter().map(Into::into).collect(),
-            areas: row.areas.into_iter().map(Into::into).collect(),
-        }
-    }
-}
-
-impl From<contract_harvest::HarvestableGroup<'_>> for HarvestableGroup {
-    fn from(row: contract_harvest::HarvestableGroup<'_>) -> Self {
-        Self {
-            group_name: row.group_name.map(str::to_owned),
-            group_probability: row.group_probability,
-            harvestables: row.harvestables.into_iter().map(Into::into).collect(),
-        }
-    }
-}
-
-impl From<contract_harvest::HarvestableElement<'_>> for HarvestableElement {
-    fn from(row: contract_harvest::HarvestableElement<'_>) -> Self {
-        Self {
-            harvestable: row.harvestable.map(Into::into),
-            setup_guid: row.setup_guid.map(|guid| guid.0),
-            clustering_guid: row.clustering_guid.map(|guid| guid.0),
-            relative_probability: row.relative_probability,
-            geometry_tag_guids: row
-                .geometry_tag_guids
-                .into_iter()
-                .map(|guid| guid.0)
-                .collect(),
-        }
-    }
-}
-
-impl From<contract_harvest::HarvestableLink<'_>> for HarvestableLink {
-    fn from(row: contract_harvest::HarvestableLink<'_>) -> Self {
-        Self {
-            preset_guid: row.preset_guid.map(|guid| guid.0),
-            preset_class_name: row.preset_class_name.map(str::to_owned),
-            entity_guid: row.entity_guid.map(|guid| guid.0),
-            mineable_composition_guid: row.mineable_composition_guid.map(|guid| guid.0),
-            mining_global_params_guid: row.mining_global_params_guid.map(|guid| guid.0),
-        }
-    }
-}
-
-impl From<contract_harvest::HarvestableArea<'_>> for HarvestableArea {
-    fn from(row: contract_harvest::HarvestableArea<'_>) -> Self {
-        Self {
-            name: row.name.map(str::to_owned),
-            global_modifier: row.global_modifier,
-            object_preset_paths: row
-                .object_preset_paths
-                .into_iter()
-                .map(str::to_owned)
-                .collect(),
-            modifiers: row.modifiers.into_iter().map(Into::into).collect(),
-        }
-    }
-}
-
-impl From<contract_harvest::AreaModifier> for AreaModifier {
-    fn from(row: contract_harvest::AreaModifier) -> Self {
-        Self {
-            group_index: row.group_index,
-            harvestable_index: row.harvestable_index,
-            modifier: row.modifier,
-            geometry_tag_guids: row
-                .geometry_tag_guids
-                .into_iter()
-                .map(|guid| guid.0)
-                .collect(),
         }
     }
 }

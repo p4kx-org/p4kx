@@ -35,7 +35,7 @@ impl Collected<'_> {
         sort_by_guid(&mut self.mining_global_params, |entity| entity.guid);
         sort_by_guid(&mut self.mineable_entities, |entity| entity.guid);
         sort_by_guid(&mut self.crafters, |entity| entity.guid);
-        sort_by_guid(&mut self.harvestable_provider_presets, |entity| entity.guid);
+        crate::contract::HarvestableProviderPreset::order(&mut self.harvestable_provider_presets);
         sort_by_guid(&mut self.sub_harvestable_multi_configs, |entity| {
             entity.guid
         });

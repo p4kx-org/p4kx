@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::cell::RefCell;
-
-use p4kx_extraction::{CancelToken, DataForge, RecordTree, SourceUses, StructValue, Value};
+use p4kx_extraction::{DataForge, SourceUses, StructValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -31,14 +29,15 @@ use super::{inventory_owner_bounds, inventory_owner_storage};
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_number_capture::CapturedNumber;
 use crate::catalog_projection::CatalogProjection;
-use crate::catalog_read::original::OriginalFlowFields;
 use crate::catalog_rows::staged::{OrderedComponentRows, StagedCatalogTable};
 use crate::catalog_table::CatalogTable;
-use crate::record_observation::RecordObservation;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
-use crate::template_field_capture::TemplateFieldCapture;
 use crate::{CatalogError, CatalogOptions, ExportAccountingError};
+
+#[path = "catalog_configuration_record_read.rs"]
+mod record_read;
+pub(crate) use record_read::{read, read_item_ports};
 
 #[derive(Default)]
 pub(crate) struct EntityConfigurationRows<'source> {
@@ -301,62 +300,4 @@ impl ConfigurationKind {
             .or_else(|| FuelConfigurationKind::of(value.type_name()).map(Self::Fuel))
             .or_else(|| ConnectionKind::of(value.type_name()).map(Self::Connection))
     }
-}
-
-pub(crate) fn read<'source>(
-    tree: &RecordTree<'source>,
-    projection: &CatalogProjection<'_, 'source>,
-    admission: &RecordObservation<'_, 'source>,
-    options: &AlignmentOptions<'_>,
-    cancel: Option<&CancelToken>,
-) -> Result<(EntityConfigurationRows<'source>, Vec<FieldError>), CatalogError> {
-    let input = projection.original();
-    let mut rows = EntityConfigurationRows::default();
-    let mut notes = Vec::new();
-    let Some(authored_components @ Value::Array(components)) = tree.field("Components") else {
-        return Ok((rows, notes));
-    };
-    let mut components = components
-        .iter()
-        .filter_map(|component| {
-            let Value::Struct(value) = component else {
-                return None;
-            };
-            ConfigurationKind::of(value, input).map(|kind| (component, kind))
-        })
-        .peekable();
-    if components.peek().is_none() {
-        return Ok((rows, notes));
-    }
-    let scope = input.record_scope(admission.record(), tree)?;
-    let originals = OriginalFlowFields::read(&scope, cancel)?;
-    let capture = TemplateFieldCapture::new(&originals, input, admission)?;
-    let context = input
-        .origins()
-        .record(tree.record_index())
-        .with_cancel(cancel);
-    let numbers = RefCell::new(Vec::new());
-    for (component, configuration) in components {
-        originals.check_cancel()?;
-        let component = originals.fact(component)?;
-        let owner = ComponentOwner::read(tree, &context, &originals, component)?;
-        let source = Observed::new(&originals, input, component, &capture, &numbers);
-        rows.push_configuration(
-            configuration,
-            owner,
-            source,
-            options,
-            projection,
-            &mut notes,
-        )?;
-    }
-    if rows.facilities.iter().any(Facility::cargo_grid) {
-        rows.cargo_owners.push(OwnerComponents::read(
-            tree.record_index(),
-            &originals,
-            authored_components,
-        )?);
-    }
-    rows.numbers = numbers.into_inner();
-    Ok((rows, notes))
 }

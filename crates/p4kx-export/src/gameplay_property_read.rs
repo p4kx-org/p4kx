@@ -130,9 +130,6 @@ pub(crate) fn payload<T>(
 }
 
 /// Emits the one canonical source table independently of selected row count.
-pub(crate) fn table<'source>(
-    forge: &DataForge<'_>,
-    rows: Vec<GameplayPropertyDefinition<'source>>,
-) -> CatalogTable<GameplayPropertyDefinition<'source>> {
+pub(crate) fn table<Row>(forge: &DataForge<'_>, rows: Vec<Row>) -> CatalogTable<Row> {
     CatalogTable::new(forge, &["CraftingGameplayPropertyDef"], rows)
 }

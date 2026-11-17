@@ -12,6 +12,7 @@ use crate::catalog_projections::CatalogProjections;
 use crate::catalog_text_contract::CatalogTexts;
 use crate::loadout::staging::StagedLoadouts;
 
+pub(crate) use crate::catalog_v3::catalog_harvest_modules::harvest_provider::HarvestableProviderPreset;
 pub(crate) use crate::catalog_v3::mineable_composition_definition::MineableComposition;
 pub(crate) use crate::catalog_v3::mineable_element_definition::MineableElement;
 pub(crate) use crate::catalog_v3::resource_group_catalog::ResourceGroup;
@@ -20,7 +21,7 @@ pub(crate) use crate::contract_cargo::CargoManifest;
 pub(crate) use crate::contract_completeness::{Completeness, KindCompleteness};
 pub(crate) use crate::contract_crafter::Crafter;
 pub(crate) use crate::contract_entities::{Item, Paint, Ship};
-pub(crate) use crate::contract_harvest::{HarvestableLocation, HarvestableProviderPreset};
+pub(crate) use crate::contract_harvest::HarvestableLocation;
 pub(crate) use crate::contract_harvest_config::SubHarvestableMultiConfig;
 pub(crate) use crate::contract_loadout::Loadout;
 pub(crate) use crate::contract_loot::{LootArchetype, LootContainer, LootTable};
@@ -101,7 +102,7 @@ pub(crate) struct Catalog<'a> {
     /// The mining parameters of each kind of miner, ordered by GUID.
     pub(crate) mining_global_params: Vec<MiningGlobalParams<'a>>,
     /// The harvestable provider presets, what a place can spawn, ordered by GUID.
-    pub(crate) harvestable_provider_presets: Vec<HarvestableProviderPreset<'a>>,
+    pub(crate) harvestable_provider_presets: Vec<HarvestableProviderPreset>,
     /// The sub harvestable multi configs, what the slots of an object can hold, ordered by GUID.
     pub(crate) sub_harvestable_multi_configs: Vec<SubHarvestableMultiConfig<'a>>,
     /// The containers whose `.soc` names a provider preset, with the starmap object they hang
