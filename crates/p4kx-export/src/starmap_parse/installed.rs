@@ -12,6 +12,9 @@ use crate::catalog_read::original::{AuthoredEntryPath, EntryCapture, EntryXml};
 use crate::starmap_index::Index;
 use crate::starmap_xml::{Node, Root};
 
+#[path = "selector_scope.rs"]
+mod selector_scope;
+
 pub(crate) fn read_jump_witness_body(
     archive: &Archive,
     index: &Index<'_>,
