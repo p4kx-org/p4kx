@@ -206,9 +206,17 @@ fn scan_components(
         };
         let observed = shop_soc::read_components(&bytes, capture, anchors)?;
         #[cfg(test)]
-        components
-            .soc_findings
-            .extend(soc_subtypes::findings(&source, &observed)?);
+        if let Some(mut findings) = soc_subtypes::findings(&source, &observed)? {
+            let probe = soc_subtypes::Probe {
+                capture,
+                source: &source,
+                container,
+                inner,
+                anchors,
+            };
+            findings.inspect(&probe, &bytes, &observed);
+            components.soc_findings.push(findings);
+        }
         let scan = observed.scan;
         components.unattributed_declarations |=
             observed.unattributed_declarations || scan.rejected > 0;

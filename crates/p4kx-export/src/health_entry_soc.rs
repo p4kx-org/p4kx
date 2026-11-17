@@ -47,6 +47,11 @@ impl EntrySocChunk<'_> {
         self.chunk.document().is_lossy()
     }
 
+    #[cfg(test)]
+    pub(crate) const fn original(&self) -> &SocEntityChunk<'_> {
+        &self.chunk
+    }
+
     pub(crate) fn entities(&self) -> impl Iterator<Item = EntrySocEntity<'_>> {
         self.chunk.entities().map(|entity| EntrySocEntity {
             entity,
@@ -82,6 +87,21 @@ pub(crate) struct SocSourceAttribute {
 }
 
 impl<'read> EntrySocEntity<'read> {
+    #[cfg(test)]
+    pub(crate) const fn original(&self) -> SocEntity<'read> {
+        self.entity
+    }
+
+    #[cfg(test)]
+    pub(crate) fn attribute_receipt(
+        &self,
+        attribute: &SourceAttribute<'_>,
+    ) -> Result<SourceUse, CatalogError> {
+        let location =
+            self.attribute_location(ordinal(self.index)?, attribute.name(), attribute.position())?;
+        self.origin.payload_at(location, SourceUseRole::Payload)
+    }
+
     pub(crate) fn class_guids(&self) -> impl Iterator<Item = &'read str> {
         self.entity.element().attributes().filter_map(|attribute| {
             (attribute.namespace().is_none() && attribute.name() == "EntityClassGUID")

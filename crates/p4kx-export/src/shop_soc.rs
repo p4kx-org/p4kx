@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashSet, VecDeque};
 
-use crate::catalog_read::original::AuthoredEntryPath;
 use crate::shop_inventory_name::stem as inventory_stem;
 use crate::shop_registry::is_guid;
 
@@ -24,82 +23,10 @@ const KNOWN: [&str; 10] = [
 const MAX_BACK: usize = 12;
 const MAX_PLAUSIBLE_PROPERTY_NAME_LEN: usize = 256;
 
-/// The identifiers a shop component can be tied to inside one container: the `CryGUID`s of its
-/// `entitycomponentshop.xml` and the names of its `SCShop` objects, both of which the container
-/// states for the same Entities.
-#[derive(Debug, Default)]
-pub(crate) struct Anchors {
-    guids: HashSet<String>,
-    names: HashMap<String, String>,
-    guid_selectors: HashMap<String, Vec<AuthoredEntryPath>>,
-    name_selectors: HashMap<String, Vec<AuthoredEntryPath>>,
-}
-
-impl Anchors {
-    /// Anchors for the lower-case `guids`, with the `names` of the objects that are unique in the
-    /// container, each mapped to its lower-case `CryGUID`.
-    #[cfg(test)]
-    pub(crate) fn new(guids: &[String], names: HashMap<String, String>) -> Self {
-        let guids: HashSet<String> = guids.iter().cloned().collect();
-        let names = names
-            .into_iter()
-            .filter(|(_, guid)| guids.contains(guid))
-            .collect();
-        Self {
-            guids,
-            names,
-            ..Self::default()
-        }
-    }
-
-    pub(crate) fn captured(
-        guids: Vec<(String, AuthoredEntryPath)>,
-        names: HashMap<String, (String, Vec<AuthoredEntryPath>)>,
-    ) -> Self {
-        let mut captured: HashMap<String, Vec<AuthoredEntryPath>> = HashMap::new();
-        for (guid, path) in guids {
-            captured.entry(guid).or_default().push(path);
-        }
-        let guids = captured.keys().cloned().collect();
-        let mut selectors = HashMap::new();
-        let names = names
-            .into_iter()
-            .filter_map(|(name, (guid, mut inputs))| {
-                inputs.extend(captured.get(&guid)?.iter().cloned());
-                selectors.insert(name.clone(), inputs);
-                Some((name, guid))
-            })
-            .collect();
-        Self {
-            guids,
-            names,
-            guid_selectors: captured,
-            name_selectors: selectors,
-        }
-    }
-
-    pub(crate) fn guid_receipts(&self, guid: &str) -> &[AuthoredEntryPath] {
-        self.guid_selectors.get(guid).map_or(&[], Vec::as_slice)
-    }
-
-    fn entity(&self, text: &str) -> Option<Anchor<'_>> {
-        if let Some(guid) = self.names.get(text) {
-            return Some(Anchor {
-                entity: guid,
-                selectors: self.name_selectors.get(text).map_or(&[], Vec::as_slice),
-            });
-        }
-        if is_guid(text) {
-            let lower = text.to_ascii_lowercase();
-            let guid = self.guids.get(&lower)?;
-            return Some(Anchor {
-                entity: guid,
-                selectors: self.guid_selectors.get(guid).map_or(&[], Vec::as_slice),
-            });
-        }
-        None
-    }
-}
+#[path = "shop_soc_anchors.rs"]
+mod anchors;
+use anchors::Anchor;
+pub(crate) use anchors::Anchors;
 
 /// One shop component found in a container's `.soc`: the Entity it belongs to and the inventory
 /// file its parameters name.
@@ -117,6 +44,22 @@ pub(crate) struct Scan<Inventory = String> {
     pub(crate) rejected: usize,
     /// A populated inventory value could not be represented.
     pub(crate) malformed: bool,
+    #[cfg(test)]
+    pub(crate) raw_findings: Vec<RawFinding>,
+}
+
+#[cfg(test)]
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct RawFinding {
+    pub(crate) value_offset: usize,
+    pub(crate) invalid: Option<RawInvalid>,
+}
+
+#[cfg(test)]
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct RawInvalid {
+    pub(crate) property_offset: usize,
+    pub(crate) owner: Option<String>,
 }
 
 /// Projects the shared shop-component scanner without source-cell materialization.
@@ -143,6 +86,8 @@ impl<Inventory> Default for Scan<Inventory> {
             components: Vec::new(),
             rejected: 0,
             malformed: false,
+            #[cfg(test)]
+            raw_findings: Vec::new(),
         }
     }
 }
@@ -151,10 +96,6 @@ impl<Inventory> Default for Scan<Inventory> {
 struct Token<'bytes> {
     text: &'bytes str,
     offset: usize,
-}
-struct Anchor<'anchors> {
-    entity: &'anchors str,
-    selectors: &'anchors [AuthoredEntryPath],
 }
 struct Owner<'anchors> {
     anchor: Anchor<'anchors>,
@@ -207,11 +148,28 @@ fn scan<'bytes, 'anchors, Inventory, Error>(
             } else {
                 state.rejected += 1;
                 state.uncertain(at);
+                #[cfg(test)]
+                state.raw_findings.push(RawFinding {
+                    value_offset: token.offset,
+                    invalid: None,
+                });
             }
         } else if window.back().is_some_and(|last| is_property(last.text))
             && invalid_inventory_value(part)
         {
             let selected = owner(&window, anchors);
+            #[cfg(test)]
+            if let Some(property) = window.back() {
+                state.raw_findings.push(RawFinding {
+                    value_offset: token.offset,
+                    invalid: Some(RawInvalid {
+                        property_offset: property.offset,
+                        owner: selected
+                            .as_ref()
+                            .map(|owner| owner.anchor.entity.to_owned()),
+                    }),
+                });
+            }
             observe(Notice::Rejected, token, &window, selected.as_ref())?;
             state.malformed = true;
             state.uncertain(at);
@@ -231,6 +189,8 @@ struct State<Inventory> {
     last_mark: Option<(usize, usize)>,
     rejected: usize,
     malformed: bool,
+    #[cfg(test)]
+    raw_findings: Vec<RawFinding>,
 }
 
 impl<Inventory> State<Inventory> {
@@ -241,6 +201,8 @@ impl<Inventory> State<Inventory> {
             last_mark: None,
             rejected: 0,
             malformed: false,
+            #[cfg(test)]
+            raw_findings: Vec::new(),
         }
     }
 
@@ -298,6 +260,8 @@ impl<Inventory> State<Inventory> {
             components,
             rejected: self.rejected,
             malformed: self.malformed,
+            #[cfg(test)]
+            raw_findings: self.raw_findings,
         }
     }
 }
