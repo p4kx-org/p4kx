@@ -18,6 +18,8 @@ mod direct_depth;
 mod external_chain;
 #[path = "starmap_placement_storage_tests.rs"]
 mod placement_storage;
+#[path = "starmap_unresolved_container_tests.rs"]
+mod unresolved_container_links;
 
 fn guid(value: u128) -> Guid {
     let text = format!("{value:032x}");

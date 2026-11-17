@@ -276,6 +276,7 @@ fn walk_spooled_systems(
 ) -> Result<(Vec<SystemRead>, PlacementSpools), CatalogError> {
     let mut containers = RowSpoolWriter::new(directory)?;
     let mut locations = RowSpoolWriter::new(directory)?;
+    let mut unresolved = RowSpoolWriter::new(directory)?;
     let mut reads = Vec::with_capacity(systems.len());
     for (name, entry) in systems {
         reads.push(System::run_with_output(
@@ -292,6 +293,7 @@ fn walk_spooled_systems(
                 PlacementRows::Spool {
                     containers: &mut containers,
                     locations: &mut locations,
+                    unresolved: &mut unresolved,
                 },
             ),
         )?);
@@ -299,6 +301,7 @@ fn walk_spooled_systems(
     let spools = PlacementSpools {
         containers: Some(containers.finish(cancel)?),
         locations: Some(locations.finish(cancel)?),
+        unresolved: Some(unresolved.finish(cancel)?),
     };
     Ok((reads, spools))
 }

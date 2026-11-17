@@ -14,6 +14,8 @@ use crate::catalog_read::original::{AuthoredEntryPath, EntryXml, XmlNodeSource};
 use crate::export_ledger::ExportLedger;
 use crate::starmap_containers::location_declaration::ChildLocation;
 use crate::starmap_containers::proof::ChildOrigins;
+use crate::starmap_containers::unresolved::UnresolvedChild;
+use crate::starmap_index::Index;
 use crate::starmap_report::clip;
 use crate::starmap_xml::{Node, Root, attribute, first_below, pose};
 use crate::{CatalogError, ExportAccountingError};
@@ -22,6 +24,7 @@ pub(super) struct ChildReader<'a, 'read, 'capture, 'input, 'archive, 'cancel> {
     bounds: &'a Bounds<'cancel>,
     xml: &'a EntryXml<'read, 'capture, 'input>,
     hcd: &'a mut HcdReader<'archive, 'capture, 'input>,
+    index: &'a Index<'archive>,
     ledger: &'a mut ExportLedger,
     pub(super) entity_guids: HashSet<Guid>,
 }
@@ -33,12 +36,14 @@ impl<'a, 'read, 'capture, 'input, 'archive, 'cancel>
         bounds: &'a Bounds<'cancel>,
         xml: &'a EntryXml<'read, 'capture, 'input>,
         hcd: &'a mut HcdReader<'archive, 'capture, 'input>,
+        index: &'a Index<'archive>,
         ledger: &'a mut ExportLedger,
     ) -> Self {
         Self {
             bounds,
             xml,
             hcd,
+            index,
             ledger,
             entity_guids: HashSet::new(),
         }
@@ -115,10 +120,18 @@ impl<'a, 'read, 'capture, 'input, 'archive, 'cancel>
         let origins = named
             .then(|| ChildOrigins::capture(xml, list, child).map(Arc::new))
             .transpose()?;
+        let unresolved_external = external
+            .as_ref()
+            .filter(|path| {
+                self.bounds.scope.companions && self.index.candidates(path.as_str()).len() != 1
+            })
+            .map(|path| UnresolvedChild::capture(xml, child, path, self.bounds.directory.clone()))
+            .transpose()?;
         Ok(Child {
             pose,
             record,
             external,
+            unresolved_external,
             origins,
             location: location.map(Arc::new),
             below,

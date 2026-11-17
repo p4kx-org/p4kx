@@ -96,6 +96,10 @@ Its reference preserves the original target GUID and resolution state. Use
 physical container route. Both relationships carry their own source evidence. They can
 refer to different objects within the same Build.
 
+The mining reader supplies mining-specific placements and coverage. Read
+`placements.unresolvedContainerLinks` from the Catalog snapshot for original unresolved
+external Child occurrences and their Archive lookup states.
+
 ## Authored item ports
 
 Use `with_item_ports` or `with_item_ports_from` to read `configurations.itemPorts`

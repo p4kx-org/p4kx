@@ -8,11 +8,12 @@ use p4kx_extraction::{SourceLocation, SourceUse, SourceUseRole, SourceValue, Sou
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use super::OriginalDatum;
 use super::entry_selection_input::{EntrySelectionUse, SelectionSource};
 use super::health_entry_frame::EntryCapture;
 use super::health_entry_metadata::EntryMetadata;
 use super::health_entry_read::EntryRead;
-use super::health_entry_receipt::EntryReceipt;
+use super::health_entry_receipt::{EntryReceipt, PhysicalEntryRef};
 use super::health_entry_selection::AuthoredEntryPath;
 use crate::schema_fields::every_field_required;
 use crate::starmap_xml::{Document, Node, Root, XmlError};
@@ -71,6 +72,12 @@ impl<'read, 'capture, 'input> EntryXml<'read, 'capture, 'input> {
 
     pub(crate) fn containing_entry(&self) -> Result<EntryReceipt, ExportAccountingError> {
         self.receipt.containing_entry()
+    }
+
+    pub(crate) fn payload_reference(
+        &self,
+    ) -> Result<OriginalDatum<PhysicalEntryRef>, CatalogError> {
+        self.receipt.payload_reference(self.capture)
     }
 
     pub(crate) const fn is_lossy(&self) -> bool {

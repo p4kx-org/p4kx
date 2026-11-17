@@ -259,6 +259,7 @@ const GROUPS: &[Group] = &[
             "resourceNetworkNodes",
             "roomAssociationBindings",
             "starmapPlacements",
+            "unresolvedContainerLinks",
         ],
     },
     Group {

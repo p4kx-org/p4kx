@@ -19,6 +19,9 @@ use crate::catalog_table::CatalogTable;
 use crate::starmap_containers::jump_class::JumpEndpointRecords;
 use crate::starmap_containers::{PlacementScope, Placements};
 
+#[path = "starmap_unresolved_storage_checks.rs"]
+mod unresolved;
+
 const REPEATED_TILES: usize = 8;
 
 #[test]
@@ -147,6 +150,8 @@ fn spool_entries() -> Vec<TestEntry> {
             .attribute("pos", "1,0,0")
             .attribute("starMapRecord", guid(2).to_string())
             .attribute("locationType", "2"),
+        external_at("ghost", " 2, 0, 0 ").attribute("starMapRecord", guid(3).to_string()),
+        external_at("ghost", " 3, 0, 0 ").attribute("rot", "broken authored quaternion"),
     ]);
     let mut entries = system(&system_xml, &[("tile", tile)]);
     entries.push(TestEntry::stored(
@@ -182,17 +187,12 @@ fn catalog_spool_replays_the_original_order_and_every_row_origin() -> Result<(),
     })?;
 
     let (availability, spools) = spooled.take_spools();
-    assert_eq!(
-        spooled.take_instances().rows.len(),
-        0,
-        "no retained typed container rows"
-    );
-    assert_eq!(
-        spooled.take_locations().rows.len(),
-        0,
-        "no retained typed location rows"
-    );
+    verify_spool_storage_only(&mut spooled);
+
     let containers = StagedCatalogTable::new(availability, spools.containers, None);
+    let unresolved_cancel = CancelToken::new();
+    let unresolved =
+        StagedCatalogTable::new(availability, spools.unresolved, Some(&unresolved_cancel));
     let cancel = CancelToken::new();
     let locations = StagedCatalogTable::new(availability, spools.locations, Some(&cancel));
     assert_eq!(
@@ -208,14 +208,35 @@ fn catalog_spool_replays_the_original_order_and_every_row_origin() -> Result<(),
     let container_rows = verify_spooled_table(&containers, &typed.take_instances(), &inventory)?;
     let location_rows = verify_spooled_table(&locations, &typed.take_locations(), &inventory)?;
     verify_placement_links(&container_rows, &location_rows)?;
+    let unresolved_rows = verify_spooled_table(&unresolved, &typed.take_unresolved(), &inventory)?;
+    unresolved::verify_links(&unresolved_rows)?;
+    unresolved::verify_parents(&container_rows, &unresolved_rows)?;
+    verify_location_cancel(&unresolved, &unresolved_cancel);
     verify_location_cancel(&locations, &cancel);
-    drop((containers, locations));
+    drop((containers, locations, unresolved));
     assert_eq!(
         fs::read_dir(scratch.path())?.count(),
         0,
         "scratch is removed"
     );
     Ok(())
+}
+
+fn verify_spool_storage_only(placements: &mut Placements) {
+    assert_eq!(
+        placements.take_instances().rows.len(),
+        0,
+        "no retained typed container rows"
+    );
+    assert_eq!(
+        placements.take_locations().rows.len(),
+        0,
+        "no retained typed location rows"
+    );
+    assert!(
+        placements.take_unresolved().rows.is_empty(),
+        "no retained typed unresolved rows"
+    );
 }
 
 fn verify_spooled_table(

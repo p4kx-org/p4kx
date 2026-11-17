@@ -49,6 +49,9 @@ pub(crate) mod location_declaration;
 #[path = "starmap_location_instance.rs"]
 pub(crate) mod location_instance;
 
+#[path = "starmap_unresolved_container_link.rs"]
+pub(crate) mod unresolved;
+
 #[cfg(test)]
 #[path = "starmap_installed_witness.rs"]
 mod installed_witness;
@@ -89,6 +92,7 @@ pub(crate) enum PlacementScope {
 pub(crate) struct PlacementSpools {
     pub(crate) containers: Option<RowSpool>,
     pub(crate) locations: Option<RowSpool>,
+    pub(crate) unresolved: Option<RowSpool>,
 }
 
 /// The placements of the Starmap Records in the system containers of an Archive.
@@ -104,6 +108,8 @@ pub(crate) struct Placements {
     instances: Vec<ContainerInstance>,
     #[cfg(test)]
     locations: Vec<LocationInstance>,
+    #[cfg(test)]
+    unresolved: Vec<unresolved::UnresolvedContainerLink>,
     pub(crate) harvest_occurrences: Vec<HarvestOccurrence>,
     jump_endpoints: Vec<JumpEndpoint>,
     endpoint_inventory_complete: bool,
@@ -144,6 +150,16 @@ impl Placements {
                 .instance_availability
                 .unwrap_or(DatasetAvailability::Unavailable),
             rows: std::mem::take(&mut self.locations),
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn take_unresolved(&mut self) -> CatalogTable<unresolved::UnresolvedContainerLink> {
+        CatalogTable {
+            availability: self
+                .instance_availability
+                .unwrap_or(DatasetAvailability::Unavailable),
+            rows: std::mem::take(&mut self.unresolved),
         }
     }
 
@@ -250,6 +266,8 @@ impl Placements {
             append_owned(&mut self.instances, system.instances);
             #[cfg(test)]
             append_owned(&mut self.locations, system.locations);
+            #[cfg(test)]
+            append_owned(&mut self.unresolved, system.unresolved);
             append_owned(&mut self.harvest_occurrences, system.harvest_occurrences);
             append_owned(&mut self.jump_endpoints, system.jump_endpoints);
             for (record, placement) in system.placed {

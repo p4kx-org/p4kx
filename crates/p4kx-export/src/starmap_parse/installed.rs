@@ -25,6 +25,9 @@ pub(crate) fn read_jump_witness_body(
         cancel: None,
         children: AtomicUsize::new(usize::MAX),
         scope: DescriptorScope::catalog(true),
+        directory: capture
+            .source_uses()
+            .observe_root_directory_paths(archive)?,
     };
     parse(archive, index, entry, &bounds, capture).map(|(body, _)| body)
 }

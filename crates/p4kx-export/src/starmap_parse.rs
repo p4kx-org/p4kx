@@ -6,7 +6,7 @@ use std::mem;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use p4kx_extraction::{Archive, CancelToken, Guid};
+use p4kx_extraction::{Archive, CancelToken, Guid, SourceUse};
 use rayon::prelude::*;
 
 use crate::catalog_read::original::{AuthoredEntryPath, EntryCapture, EntryRead, EntryXml};
@@ -15,6 +15,7 @@ use crate::starmap_containers::instance::ContainerFile;
 use crate::starmap_containers::jump_gate::{GateFiles, JumpGate};
 use crate::starmap_containers::location_declaration::ChildLocation;
 use crate::starmap_containers::proof::ChildOrigins;
+use crate::starmap_containers::unresolved::UnresolvedChild;
 use crate::starmap_index::Index;
 use crate::starmap_read::main_xml;
 use crate::starmap_xml::{AuthoredPose, XmlError};
@@ -50,6 +51,7 @@ pub(crate) struct Child {
     pub(crate) record: Option<Guid>,
     /// The path of the external container the Child names.
     pub(crate) external: Option<AuthoredEntryPath>,
+    pub(crate) unresolved_external: Option<Arc<UnresolvedChild>>,
     pub(crate) origins: Option<Arc<ChildOrigins>>,
     pub(crate) location: Option<Arc<ChildLocation>>,
     pub(crate) below: Level,
@@ -136,6 +138,7 @@ struct Bounds<'a> {
     cancel: Option<&'a CancelToken>,
     children: AtomicUsize,
     scope: DescriptorScope,
+    directory: Option<SourceUse>,
 }
 
 impl Bounds<'_> {
@@ -193,7 +196,7 @@ fn parse_body(
         entities,
         gate,
         gate_proof,
-    }) = parsed_root(&main.bytes, bounds, &files, ledger)?
+    }) = parsed_root(&main.bytes, bounds, &files, index, ledger)?
     else {
         ledger.incomplete_inventory(Kind::StarmapObjects);
         main.source.record(
@@ -235,6 +238,7 @@ fn parsed_root(
     read: &EntryRead,
     bounds: &Bounds<'_>,
     files: &entxml::EntXmlFiles<'_, '_>,
+    index: &Index<'_>,
     ledger: &mut ExportLedger,
 ) -> Result<Result<ParsedRoot, XmlError>, CatalogError> {
     let xml = match EntryXml::parse_starmap_main(read, files.capture)? {
@@ -248,7 +252,7 @@ fn parsed_root(
         files.capture,
         files.cancel,
     );
-    let mut reader = children::ChildReader::new(bounds, &xml, &mut hcd, ledger);
+    let mut reader = children::ChildReader::new(bounds, &xml, &mut hcd, index, ledger);
     let root = reader.level(xml.root())?;
     let guids = reader.entity_guids;
     let entities = files.scan(&guids, &xml, ledger)?;
@@ -318,6 +322,9 @@ pub(crate) fn read_all_scoped(
         cancel,
         children: AtomicUsize::new(children),
         scope,
+        directory: capture
+            .source_uses()
+            .observe_root_directory_paths(archive)?,
     };
     let mut bodies: HashMap<usize, Body> = HashMap::new();
     let mut ledger = ExportLedger::default();

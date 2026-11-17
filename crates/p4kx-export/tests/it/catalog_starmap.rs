@@ -18,6 +18,8 @@ mod definitions;
 mod objects;
 #[path = "starmap_placement_origins.rs"]
 mod placement_origins;
+#[path = "starmap_unresolved_publication.rs"]
+mod unresolved_publication;
 
 use std::error::Error;
 use std::time::{Duration, UNIX_EPOCH};

@@ -5723,6 +5723,9 @@
         },
         "starmapPlacements": {
           "$ref": "#/$defs/CatalogTableOfStarmapPlacement"
+        },
+        "unresolvedContainerLinks": {
+          "$ref": "#/$defs/CatalogTableOfUnresolvedContainerLink"
         }
       },
       "required": [
@@ -5735,7 +5738,8 @@
         "resourceNetworkLinkBindings",
         "resourceNetworkNodes",
         "roomAssociationBindings",
-        "starmapPlacements"
+        "starmapPlacements",
+        "unresolvedContainerLinks"
       ],
       "type": "object"
     },
@@ -8689,6 +8693,25 @@
       ],
       "type": "object"
     },
+    "CatalogTableOfUnresolvedContainerLink": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/UnresolvedContainerLink"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
     "CatalogTableOfVehicleArmor": {
       "description": "One named typed dataset with its measured source-family availability.",
       "properties": {
@@ -11485,6 +11508,16 @@
         "rootEntryIndex"
       ],
       "type": "object"
+    },
+    "ContainerTargetStatus": {
+      "enum": [
+        "notFound",
+        "ambiguous",
+        "unsupportedSelector",
+        "incompleteDirectory"
+      ],
+      "type": "string",
+      "x-p4kx-vocabularyClass": "control"
     },
     "Contents": {
       "description": "Concrete source type and the original members outside its typed fields.",
@@ -74057,6 +74090,136 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfContainerTargetStatus": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ContainerTargetStatus"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfContents": {
       "allOf": [
         {
@@ -131534,6 +131697,85 @@
       "required": [
         "additionalFields",
         "sourceType"
+      ],
+      "type": "object"
+    },
+    "UnresolvedChild": {
+      "description": "Source attributes shared by every placement of a physical Child.",
+      "properties": {
+        "attributes": {
+          "items": {
+            "$ref": "#/$defs/SourcedXmlAttribute"
+          },
+          "type": "array"
+        },
+        "childNodeIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "declaredPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "descriptor": {
+          "$ref": "#/$defs/SourcedValueOfPhysicalEntryRef"
+        },
+        "localPosition": {
+          "$ref": "#/$defs/SourcedValueOfArray_size_3_of_double"
+        },
+        "localRotation": {
+          "$ref": "#/$defs/SourcedValueOfArray_size_4_of_double"
+        },
+        "starmapRecordGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        }
+      },
+      "required": [
+        "attributes",
+        "childNodeIndex",
+        "declaredPath",
+        "descriptor",
+        "localPosition",
+        "localRotation",
+        "starmapRecordGuid"
+      ],
+      "type": "object"
+    },
+    "UnresolvedContainerLink": {
+      "description": "One admitted external Child with no unique target Entry.",
+      "properties": {
+        "declaration": {
+          "$ref": "#/$defs/UnresolvedChild"
+        },
+        "declaringContainer": {
+          "$ref": "#/$defs/SourcedValueOfPhysicalEntryRef"
+        },
+        "instanceId": {
+          "$ref": "#/$defs/SourcedValueOfContainerInstanceKey"
+        },
+        "parentInstanceId": {
+          "$ref": "#/$defs/SourcedValueOfContainerInstanceKey"
+        },
+        "targetCandidates": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfPhysicalEntryRef"
+        },
+        "targetStatus": {
+          "$ref": "#/$defs/SourcedValueOfContainerTargetStatus"
+        },
+        "worldPosition": {
+          "$ref": "#/$defs/SourcedValueOfArray_size_3_of_double"
+        },
+        "worldRotation": {
+          "$ref": "#/$defs/SourcedValueOfArray_size_4_of_double"
+        }
+      },
+      "required": [
+        "declaration",
+        "declaringContainer",
+        "instanceId",
+        "parentInstanceId",
+        "targetCandidates",
+        "targetStatus",
+        "worldPosition",
+        "worldRotation"
       ],
       "type": "object"
     },

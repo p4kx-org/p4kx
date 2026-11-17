@@ -235,13 +235,13 @@ impl AuthoredPose {
 /// Reads Child positions as x, y, z metres and quaternion rotations as w, x, y, z.
 pub(crate) fn pose<'d>(child: impl Node<'d>) -> Option<AuthoredPose> {
     let position = match attribute(child, "pos") {
-        Some(text) => Some(numbers::<3>(text)?),
+        Some(text) => Some(child_position(text)?),
         None => None,
     };
     let (rotation, unit) = match attribute(child, "rot") {
         Some(text) => {
-            let parts = numbers::<4>(text)?;
-            (Some(parts), Rotation::from_parts(parts)?)
+            let (parts, unit) = child_rotation(text)?;
+            (Some(parts), unit)
         }
         None => (None, Rotation::IDENTITY),
     };
@@ -250,6 +250,15 @@ pub(crate) fn pose<'d>(child: impl Node<'d>) -> Option<AuthoredPose> {
         rotation,
         unit,
     })
+}
+
+pub(crate) fn child_position(text: &str) -> Option<[f64; 3]> {
+    numbers(text)
+}
+
+pub(crate) fn child_rotation(text: &str) -> Option<([f64; 4], Rotation)> {
+    let parts = numbers(text)?;
+    Some((parts, Rotation::from_parts(parts)?))
 }
 
 fn numbers<const N: usize>(text: &str) -> Option<[f64; N]> {

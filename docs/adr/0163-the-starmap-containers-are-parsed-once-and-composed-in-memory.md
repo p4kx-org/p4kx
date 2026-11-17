@@ -90,6 +90,32 @@ as `declaredLabel` and `declaredEntityName`. Empty attributes remain present.
 The label retains its literal text or localization key and carries `x-gameText`.
 Each name cites its own original attribute or the observed absence at that Child.
 
+## Unresolved declared container occurrences
+
+The separate additive `placements.unresolvedContainerLinks` table retains each reached
+external Child whose normal path lookup has zero or multiple winning physical candidates.
+A row uses the system root and original Child route for its occurrence identity and the
+enclosing physical container occurrence for its parent. Its immutable declaration retains the
+exact descriptor input, Child node position, raw authored path, independent local pose fields,
+original Starmap Record GUID and every original attribute occurrence with per-value evidence.
+
+Typed target states distinguish an exhausted supported lookup, ambiguous candidates,
+unsupported authored syntax and uncertain root directory membership. Candidate-set cells cite
+the original consulted root directory path range and the authored selector. One directory
+survey is shared by the source walk. The survey establishes the admitted path domain without
+reading target payloads or using a basename as a source join. Recovered membership keeps
+candidate-set completeness false.
+
+The source walk captures only the sparse unresolved declarations while their XML is borrowed.
+A shared declaration is reused for every reached route. The production row writer uses its own
+staged stream with the same cancellation and cleanup behavior as the existing placement tables.
+Resolved occurrence membership and intrinsic read failures retain their current meanings.
+
+A retained unresolved occurrence provides source evidence. Configured dependency failures,
+unknown descendant inventory and incomplete derived projections still affect export health.
+Normal publication continues to require complete export health. Consumer removal decisions
+continue to require the intended Build, complete selection and complete overall health.
+
 ## Authored location context
 
 The typed location tree is an owned placement table. Its occurrence key is the

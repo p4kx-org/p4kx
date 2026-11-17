@@ -251,7 +251,8 @@ pub(crate) fn minimal_catalog() -> Value {
             "starmapPlacements": absent_table(),
             "facilityInstances": absent_table(),
             "facilityInteriorCoverage": [],
-            "containerInstances": absent_table()
+            "containerInstances": absent_table(),
+            "unresolvedContainerLinks": absent_table()
         },
         "texts": {
             "languagePolicy": {"selection": "availableSupported", "fallback": "none"},

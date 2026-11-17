@@ -30,6 +30,9 @@ mod frames;
 #[path = "starmap_walk_location.rs"]
 mod location;
 
+#[path = "starmap_walk_unresolved.rs"]
+mod unresolved;
+
 #[path = "starmap_walk_jump.rs"]
 mod jump;
 
@@ -56,6 +59,8 @@ pub(crate) struct SystemRead {
     pub(crate) instances: Vec<ContainerInstance>,
     #[cfg(test)]
     pub(crate) locations: Vec<LocationInstance>,
+    #[cfg(test)]
+    pub(crate) unresolved: Vec<crate::starmap_containers::unresolved::UnresolvedContainerLink>,
     pub(crate) jump_endpoints: Vec<JumpEndpoint>,
 }
 
@@ -144,6 +149,7 @@ pub(crate) enum PlacementRows<'writer> {
     Spool {
         containers: &'writer mut RowSpoolWriter,
         locations: &'writer mut RowSpoolWriter,
+        unresolved: &'writer mut RowSpoolWriter,
     },
     #[cfg(test)]
     Typed,

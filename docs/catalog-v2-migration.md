@@ -43,3 +43,11 @@ and the [shared Record header](catalog-record-headers.md).
 
 For the Commodity GUID join, resource fallbacks and exact presentation rules, see the
 [Commodity contract](catalog-commodity-types.md).
+
+## External container links
+
+Schema v3 includes `placements.unresolvedContainerLinks` as additive source evidence for a
+reached external Child whose target lookup has zero or multiple winning candidates. Join an
+occurrence's `parentInstanceId.value` to `placements.containerInstances.rows[].instanceId.value`
+within the same Catalog. Resolve source-use IDs in that Catalog. Use `exportHealth` alongside
+selection completeness for decisions about previously imported rows.

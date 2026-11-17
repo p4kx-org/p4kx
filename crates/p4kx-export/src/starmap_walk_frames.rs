@@ -154,6 +154,7 @@ impl<'a> System<'a> {
         self.seen[0] += 1;
         let file = cursor.file;
         let placed = self.place_child(child, &cursor)?;
+        self.record_unresolved_container(child, &cursor.parent, placed.as_ref(), file)?;
         stack.push(Frame::Children(cursor));
         if let Some(path) = placed {
             let external = self.external(child, &path, label);

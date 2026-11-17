@@ -25,6 +25,7 @@ use crate::starmap_containers::Placements;
 use crate::starmap_containers::instance::ContainerInstance;
 use crate::starmap_containers::jump_endpoint::JumpEndpoint;
 use crate::starmap_containers::location_instance::LocationInstance;
+use crate::starmap_containers::unresolved::UnresolvedContainerLink;
 
 /// Contextual placements and relationships keyed by their physical definitions.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -41,6 +42,8 @@ pub(crate) struct CatalogPlacements {
     container_instances: StagedCatalogTable,
     #[schemars(with = "CatalogTable<LocationInstance>")]
     location_instances: StagedCatalogTable,
+    #[schemars(with = "CatalogTable<UnresolvedContainerLink>")]
+    unresolved_container_links: StagedCatalogTable,
     jump_endpoints: CatalogTable<JumpEndpoint>,
 }
 
@@ -48,12 +51,14 @@ impl CatalogPlacements {
     pub(crate) fn staged_row_bytes(&self) -> u128 {
         u128::from(self.container_instances.stored_bytes())
             + u128::from(self.location_instances.stored_bytes())
+            + u128::from(self.unresolved_container_links.stored_bytes())
     }
 
     pub(crate) fn take_row_spool_failure(&self) -> Option<RowSpoolError> {
         self.container_instances
             .take_failure()
             .or_else(|| self.location_instances.take_failure())
+            .or_else(|| self.unresolved_container_links.take_failure())
     }
 }
 
@@ -107,6 +112,11 @@ impl<'source> Collected<'source> {
             installed_configurations,
             container_instances: StagedCatalogTable::new(availability, spools.containers, cancel),
             location_instances: StagedCatalogTable::new(availability, spools.locations, cancel),
+            unresolved_container_links: StagedCatalogTable::new(
+                availability,
+                spools.unresolved,
+                cancel,
+            ),
             jump_endpoints: placements.take_jump_endpoints(),
         };
         Ok((placements, topology.declarations))
