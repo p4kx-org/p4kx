@@ -33,15 +33,17 @@ completion-tag requirements, logical variants and authored text tokens. The Cata
 distinct owners for those facts. All 70 authored reward amount Records and all 380 queried
 standing Records match the prior PTU in their selected value fields. The 58 rewards shared
 with LIVE also agree. This establishes nominal source amounts. The effective PTU 25×
-multiplier requires an independent configuration or runtime witness.
+multiplier requires an independent configuration or runtime witness. The directory filename scan found
+zero changed `.cfg` Entries and zero changed XML, JSON, INI or text Entries with `reputation`
+or `multiplier` in the filename. The effective scaling remains unverified.
 
 | Area | Observed source and export status |
 | --- | --- |
 | Inventory occupancy | The physical Record comparison reports 1,956 changed volume selections in the shared armour path cohort, 1,968 in clothing and 54 in the magazine path cohort. Selected magazine ammunition counts agree. The shared backpack path cohort has no changed occupancy or dimensions against the prior PTU. The recorded volume units and vectors already have separate Catalog v3 cells. Concrete equipment fit also depends on the selected container's limits and filters. [Inventory contract](catalog-inventory-storage.md) |
-| Client settings | A new profile attribute document contains 39 ordered declarations. 35 carry an optional CVar association. The existing ActionMap covers the single added action with its Hold mode and empty default bindings. The separate settings document and authored ActionMap description need structured carriers. [#1157](https://github.com/p4kx-org/p4kx/issues/1157) |
-| Contract item results | Six added result occurrences use an authored entity reference, quantity, ordered outcome flags and a weak instance reference to a MissionProperty. The source arena keeps these values and the separate Blueprint result. The typed contract projection needs item rewards and exact location selectors. [#1158](https://github.com/p4kx-org/p4kx/issues/1158) |
-| Interior companions | A verified changed SOCPAK contains both a room mapping tree and a distinct room connector metadata file. The connector owner joins to the original SOC entity in the same container. The existing positioned SOC export does not admit either companion. The sampled extraction tile descriptor changed only its editor Build marker. [#1159](https://github.com/p4kx-org/p4kx/issues/1159) |
-| Purchasable names | The selected module cohort has five changed Purchasable name selectors, three accompanied by separate changed attachable name and description selectors. The magazine Record comparison finds two independently changed Purchasable names. The canonical item definition currently omits this authored field. The tracked shop inventory path family had no changed Entry. [#1160](https://github.com/p4kx-org/p4kx/issues/1160) |
+| Client settings | A new profile attribute document contains 39 ordered declarations. 35 carry an optional CVar association. The existing ActionMap covers the single added action with its Hold mode and empty default bindings. `configurations.clientProfileSettings` carries the ordered settings with individual origins. The ActionMap keeps the authored description. [#1157](https://github.com/p4kx-org/p4kx/issues/1157) |
+| Contract item results | Six added result occurrences use an authored entity reference, quantity, ordered outcome flags and a weak instance reference to a MissionProperty. The source arena keeps these values and the separate Blueprint result. `itemRewardResults` carries the authored result rows and original selectors. The contract projection exposes the exact location targets it can bind. [#1158](https://github.com/p4kx-org/p4kx/issues/1158) |
+| Interior companions | A verified changed SOCPAK contains both a room mapping tree and a distinct room connector metadata file. The connector owner joins to the original SOC entity in the same container. The authored SOC scene exports both companions, retaining the original documents and positioned entity join. The sampled extraction tile descriptor changed only its editor Build marker. [#1159](https://github.com/p4kx-org/p4kx/issues/1159) |
+| Purchasable names | The selected module cohort has five changed Purchasable name selectors, three accompanied by separate changed attachable name and description selectors. The magazine Record comparison finds two independently changed Purchasable names. The canonical item definition carries the Purchasable name and its origin separately from AttachDef text. The tracked shop inventory path family had no changed Entry. [#1160](https://github.com/p4kx-org/p4kx/issues/1160) |
 | Climate and audio | The sampled changed climate asset exercises existing size, light and growth fields, including removed optional arrays. The sampled ATL environment library remains in the existing environment, auxiliary bus and RTPC control families. The engine's runtime terrain and audio behavior remains outside these source checks. |
 
 The `actionmap settings` CLI verified 316 general declarations in each PTU. The VR
@@ -52,13 +54,22 @@ occurrences from one selected `13201184` ContractGenerator to their original
 outcomes, amounts and physical references. The normal `interior source` CLI
 verified the selected RoomMapping and connector documents in both PTUs directly
 against the retained CryXmlB node, attribute and string tables. The semantic
-owner link resolves to the same-container SOC entity.
+owner link resolves to the same-container SOC entity. Its sampled inline loadout selector agrees
+between the two PTUs. The inspected Starchitect members establish no typed link for the new
+AI closet or loot changes. The relationship requires a matching positioned entity and class Record.
 
 An exact Item Filter verified the old and new purchase-name Locale, its
 DataForge selector and the separate unchanged attachable name. The normal
 Catalog writer refused the older filtered export with one `shopInventories`
 `MalformedSource` projection failure. The purchase-name witnesses use explicit
 diagnostic Catalogs with independent source checks for the selected Item.
+
+The scoped prerequisite delta contains 50 current `ContractPrerequisite_CompletedContractTags`
+occurrences with both count fields and one required tag each. Of the 52 old occurrences in the
+same delta, 12 had an empty required-tag list. `requiredIntros` presents the ordered tags and
+matching intro grants. The original Generator arena retains prerequisite grouping, empty lists,
+`requiredCountValue`, `excludedCountValue` and `includePrerequisiteWhenSharing`.
+[ContractGenerator catalog contract](catalog-contract-generators.md#intro-prerequisites)
 
 The raw source receipts are private. This section records source structure, exact scope counts
 and implementation ownership. The complete packaged export and 16 GiB system acceptance are
