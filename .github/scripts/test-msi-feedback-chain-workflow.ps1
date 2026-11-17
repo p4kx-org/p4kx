@@ -9,7 +9,7 @@ function Get-ChainWorkflowStep([string]$Workflow,[string]$Name) {
     if($matches.Count -ne 1){throw "Expected one actual workflow step: $Name"}
     return $matches[0].Value
 }
-$release=Get-Content -Raw -LiteralPath (Join-Path $Repository '.github/workflows/release-windows.yml')
+$release=Get-Content -Raw -LiteralPath (Join-Path $Repository '.github/workflows/release-windows-execute.yml')
 $prepare=Get-ChainWorkflowStep $release 'Prepare installer inputs and the independent step allowance'
 $installer=Get-ChainWorkflowStep $release 'Installer metadata, upgrade, downgrade, rollback, CPU replacement and preservation'
 $early=Get-ChainWorkflowStep $release 'Preserve prepared allowance, inputs and executed parent controls'

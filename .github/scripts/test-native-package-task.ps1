@@ -33,7 +33,7 @@ foreach ($arguments in @(@{Directory='relative'}, @{RunId='../escape'}, @{Attemp
     if (-not $rejected) { throw 'Invalid native task identity was accepted.' }
 }
 $repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
-foreach ($workflow in @('release-linux.yml', 'release-windows.yml')) {
+foreach ($workflow in @('release-linux.yml', 'release-windows.yml', 'release-windows-execute.yml')) {
     foreach ($line in Get-Content -LiteralPath (Join-Path $repository ".github/workflows/$workflow")) {
         if ($line -match '\btarget/' -and -not $line.Contains('target/$env:P4KX_TARGET/release')) {
             throw "Non-Cargo native package state remains in cached target/: $workflow"

@@ -37,7 +37,7 @@ foreach($minutes in @('','0','01','1.5','13','360','6')){
 Assert-FeedbackBudgetFailure {Assert-P4kxMsiStepAdmission $late '5' ($now.AddSeconds(1).ToString('o')) $now} 'Future preparation was admitted.'
 
 $repository=Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
-$workflow=Get-Content -Raw -LiteralPath (Join-Path $repository '.github/workflows/release-windows.yml')
+$workflow=Get-Content -Raw -LiteralPath (Join-Path $repository '.github/workflows/release-windows-execute.yml')
 $step=[regex]::Match($workflow,'(?ms)^      - name: Installer metadata, upgrade, downgrade, rollback, CPU replacement and preservation\r?\n.*?        run: \|\r?\n(?<body>.*?)(?=^      - |\z)')
 if(-not $step.Success){throw 'Actual installer step body is missing.'}
 $body=($step.Groups['body'].Value -split '\r?\n' | ForEach-Object {$_ -replace '^          ',''}) -join [char]10

@@ -9,6 +9,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'msi-observer-evidence.ps1')
+. (Join-Path $PSScriptRoot 'msi-observer-progress.ps1')
 $root = [IO.Path]::GetFullPath($Directory)
 if ($Stage -ceq 'Start') {
     if ([string]::IsNullOrEmpty($Invocation)) { throw 'Observer start requires its original invocation file.' }
@@ -16,17 +17,31 @@ if ($Stage -ceq 'Start') {
     Start-P4kxMsiObservedParent $request
     return
 }
+Write-P4kxMsiObserverProgress readRequest begin
 $request = Read-P4kxDetachedReceipt (Join-Path $root 'request.json')
+Write-P4kxMsiObserverProgress readRequest end
+Write-P4kxMsiObserverProgress binding begin
 Assert-P4kxMsiObserverBinding $request $root
+Write-P4kxMsiObserverProgress binding end
+Write-P4kxMsiObserverProgress readHandle begin
 $handle = Read-P4kxDetachedReceipt (Join-Path $root 'handle.json')
+Write-P4kxMsiObserverProgress readHandle end
+Write-P4kxMsiObserverProgress parentState begin
 $state = Get-P4kxMsiObserverParentState $request $handle
+Write-P4kxMsiObserverProgress parentState end
 if ($Stage -ceq 'Snapshot') {
+    Write-P4kxMsiObserverProgress wait begin
     $state = Wait-P4kxMsiObserverParent $request $handle $WaitMilliseconds
+    Write-P4kxMsiObserverProgress wait end
     if (-not $state.lifetime_ended -and [DateTimeOffset]::UtcNow -ge (ConvertFrom-P4kxMsiBudgetTimestamp $request.observer_deadline_utc)) {
         $state=Stop-P4kxMsiObserverExpiredParent $request $handle
     }
+    Write-P4kxMsiObserverProgress saveCheckpoint begin
     [void](Save-P4kxMsiObserverCheckpoint $request $handle $Sequence $state)
+    Write-P4kxMsiObserverProgress saveCheckpoint end
+    Write-P4kxMsiObserverProgress workflowOutput begin
     if ($state.lifetime_ended -and $env:GITHUB_ENV) { 'P4KX_MSI_OBSERVER_FINISHED=true' >> $env:GITHUB_ENV }
+    Write-P4kxMsiObserverProgress workflowOutput end
     return
 }
 $failure=$null;$snapshot=$null;$proved=$false
@@ -34,12 +49,16 @@ try {
     if (-not $state.lifetime_ended) {
         $deadline=ConvertFrom-P4kxMsiBudgetTimestamp $request.observer_deadline_utc
         $remaining=[Math]::Max(0,($deadline-[DateTimeOffset]::UtcNow).TotalMilliseconds)
+        Write-P4kxMsiObserverProgress wait begin
         $state=Wait-P4kxMsiObserverParent $request $handle ([int]$remaining)
+        Write-P4kxMsiObserverProgress wait end
     }
     if (-not $state.lifetime_ended) {
         $state=Stop-P4kxMsiObserverExpiredParent $request $handle
     }
+    Write-P4kxMsiObserverProgress saveCheckpoint begin
     $snapshot=Save-P4kxMsiObserverCheckpoint $request $handle 9 $state
+    Write-P4kxMsiObserverProgress saveCheckpoint end
     if (-not $state.lifetime_ended -or $state.state -ceq 'stoppedAfterDeadline' -or [IO.File]::Exists((Join-Path $root 'deadline-stop.json'))) { throw 'Original diagnostic parent did not complete before observer cleanup.' }
     Assert-P4kxMsiObserverOriginalResult $request $handle $snapshot
     $proved=$true

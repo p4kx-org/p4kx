@@ -119,6 +119,7 @@ and the existing installed runtime checks. The ten-minute worker cap, thirty-fiv
 absolute deadline and forty-five-minute job limit remain unchanged. Checkpoint uploads consume
 the original observer allowance; a delayed upload can delay the next parent observation.
 Expiry can stop only the bound parent and cannot prove installer or descendant cleanup.
+Each checkpoint captures and uploads in separate runner steps within a combined three-minute allowance. Fixed unproven progress markers identify request validation, process observation and file preservation. The original result remains the acceptance authority.
 
 Before checksums and release notes are assembled, `check-release-matrix.ps1` requires:
 

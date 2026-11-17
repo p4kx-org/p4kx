@@ -1,7 +1,8 @@
 param(
     [Parameter(Mandatory)][string]$Directory,
     [ValidateSet('Complete','Timeout','Admission')][string]$Case='Complete',
-    [ValidateRange(1000,10000)][int]$Milliseconds=3000
+    [ValidateRange(1000,10000)][int]$Milliseconds=3000,
+    [ValidateRange(0,1000)][int]$SnapshotWaitMilliseconds=0
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'msi-observer-evidence.ps1')
@@ -48,7 +49,9 @@ try {
             Assert-Observer ([DateTimeOffset]::UtcNow -lt (ConvertFrom-P4kxMsiBudgetTimestamp $request.observer_deadline_utc)) 'Harmless active phase marker exceeded its original deadline.'
             Start-Sleep -Milliseconds 20
         }
-        & $entry -Stage Snapshot -Directory $observer -Sequence 1 -WaitMilliseconds 0
+        $snapshotTimer=[Diagnostics.Stopwatch]::StartNew()
+        & $entry -Stage Snapshot -Directory $observer -Sequence 1 -WaitMilliseconds $SnapshotWaitMilliseconds
+        Assert-Observer ($snapshotTimer.ElapsedMilliseconds -ge $SnapshotWaitMilliseconds) 'Snapshot returned before its nonzero original observation interval.'
         $checkpoint=Read-P4kxDetachedReceipt (Join-Path $observer 'checkpoints/01/checkpoint.json')
         Assert-Observer (-not $checkpoint.parent.lifetime_ended -and $checkpoint.request_sha256 -ceq $handle.request_sha256 -and
             $checkpoint.journal.events -eq 2 -and $checkpoint.journal.active.Count -eq 2 -and $null -eq $checkpoint.journal.terminal -and

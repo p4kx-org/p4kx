@@ -11,7 +11,7 @@ function Get-FeedbackWorkflowStep([string]$Text,[string]$Name) {
     return $matches[0].Value
 }
 
-$workflow=Get-Content -Raw -LiteralPath (Join-Path $Repository '.github/workflows/release-windows.yml')
+$workflow=Get-Content -Raw -LiteralPath (Join-Path $Repository '.github/workflows/release-windows-execute.yml')
 $verify=[regex]::Match($workflow,'(?ms)^  verify:\r?\n.*\z').Value
 Assert-FeedbackWorkflow ($verify.Length -gt 0) 'Native Windows consumer job is missing.'
 Assert-FeedbackWorkflow ($verify -cmatch '(?m)^    timeout-minutes: 45\r?$') 'The native consumer job must remain bounded to 45 minutes.'
@@ -46,11 +46,23 @@ Assert-FeedbackWorkflow ($installer.Contains('id: msi-launch') -and $installer.C
     -not $observerFinish.Contains('continue-on-error')) 'Original lifecycle completion lost its source-bound deadline or failure gate.'
 $checkpoints=@([regex]::Matches($verify,'(?ms)^      - name: Preserve original MSI phase checkpoint [1-8]\r?\n.*?(?=^      - |\z)'))
 Assert-FeedbackWorkflow ($checkpoints.Count -eq 8) 'Expected eight bounded pre-terminal file checkpoints.'
-foreach($checkpoint in $checkpoints){
-    Assert-FeedbackWorkflow ($checkpoint.Value.Contains('always() && !cancelled()') -and $checkpoint.Value.Contains("steps.msi-launch.outcome == 'success'") -and
-        $checkpoint.Value.Contains("env.P4KX_MSI_OBSERVER_FINISHED != 'true'") -and $checkpoint.Value.Contains('uses: ./.github/actions/msi-observer-checkpoint') -and
-        $checkpoint.Value -cmatch '(?m)^        timeout-minutes: 3\r?$' -and -not $checkpoint.Value.Contains('continue-on-error')) 'Checkpoint can restart work, mask failure or bypass its bounded original observation.'
+for($index=0;$index -lt $checkpoints.Count;$index++){
+    $checkpoint=$checkpoints[$index].Value
+    $ordinal=$index+1
+    $uploaded=Get-FeedbackWorkflowStep $verify "Upload original MSI phase checkpoint $ordinal"
+    Assert-FeedbackWorkflow ($checkpoint.Contains('always() && !cancelled()') -and $checkpoint.Contains("steps.msi-launch.outcome == 'success'") -and
+        $checkpoint.Contains("env.P4KX_MSI_OBSERVER_FINISHED != 'true'") -and $checkpoint.Contains('invoke-msi-observer.ps1 -Stage Snapshot') -and
+        $checkpoint.Contains("-Sequence $ordinal -WaitMilliseconds 75000") -and $checkpoint -cmatch '(?m)^        timeout-minutes: 2\r?$' -and
+        -not ($checkpoint -match '(?m)^        (continue-on-error|uses):')) 'Direct checkpoint can restart work, mask failure or bypass its bounded original observation.'
+    Assert-FeedbackWorkflow ($uploaded.Contains('always() && !cancelled()') -and $uploaded.Contains("steps.msi-checkpoint-$ordinal.outcome != 'skipped'") -and
+        $uploaded.Contains('actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9') -and
+        $uploaded -cmatch '(?m)^        timeout-minutes: 1\r?$' -and -not $uploaded.Contains('continue-on-error')) 'Checkpoint upload lost its separate existing transport budget or failure gate.'
+    Assert-FeedbackWorkflow ($verify.IndexOf($checkpoint,[StringComparison]::Ordinal) -lt $verify.IndexOf($uploaded,[StringComparison]::Ordinal)) 'Checkpoint must be frozen before its independent upload.'
 }
+$entryWorkflow=Get-Content -Raw -LiteralPath (Join-Path $Repository '.github/workflows/release-windows.yml')
+$delegation=[regex]::Match($entryWorkflow,'(?ms)^  verify:\r?\n.*\z').Value
+Assert-FeedbackWorkflow ($delegation.Contains('needs: build') -and $delegation.Contains("needs.build.result == 'success'") -and
+    $delegation.Contains('uses: ./.github/workflows/release-windows-execute.yml') -and $delegation.Contains('matrix: ${{ inputs.matrix }}')) 'Native verification lost its build-success admission or shared platform matrix.'
 
 $uploads=@([regex]::Matches($verify,'(?ms)^      - uses: actions/upload-artifact@[^\r\n]+\r?\n.*?(?=^      - |\z)') |
     Where-Object {$_.Value.Contains('name: windows-package-logs-')})
