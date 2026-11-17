@@ -236,6 +236,11 @@ independent. A bank can have a complete name inventory even when controller read
 Filtered, missing and damaged banks have explicit states. The loose CAF lookup has its own
 row. The catalogue records candidates without choosing runtime playback precedence.
 
-This catalogue resolves DataForge Loadouts. External XML Loadout dependencies and unresolved
-branches are reported through the incomplete-loadout disposition. To retain usable observed
-records alongside an incomplete scope, run with `--diagnostic`.
+The catalogue follows external XML and CryXml Loadouts in the root Archive, including authored
+Includes. Each target must resolve to one selected physical Entry with a verified retention
+receipt. The staged bytes are checked against the original Entry before replay.
+
+Missing, ambiguous, unselected, malformed and refused routes are recorded on the Entity catalogue
+row with the observed placement origins. A failed included payload read or verification prevents
+complete publication. Use `--diagnostic` to retain usable records from incomplete scopes.
+[Entity scope and Loadout resolution](media-export.md#animation-definition-source)
