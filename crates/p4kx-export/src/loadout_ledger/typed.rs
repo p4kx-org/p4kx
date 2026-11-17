@@ -201,3 +201,7 @@ pub(super) fn diagnostics(
         Ok::<_, CatalogError>(diagnostic)
     }))
 }
+
+#[cfg(test)]
+#[path = "assortment_witness.rs"]
+mod assortment_witness;
