@@ -91,6 +91,10 @@ pub(crate) fn read_original(
         Ok(document) => document,
         Err(error) => return Ok(Err(error)),
     };
+    Ok(Ok(read_document(&document)?))
+}
+
+fn read_document(document: &EntryXml<'_, '_, '_>) -> Result<CapturedEntityLink, CatalogError> {
     let link = link_below(document.root(), |node, name| {
         if name == CONTAINER_ATTRIBUTE {
             document
@@ -103,7 +107,7 @@ pub(crate) fn read_original(
     if link.value.container.is_some() && link.selected.is_none() {
         return Err(ExportAccountingError::UnboundHealthSubject.into());
     }
-    Ok(Ok(link))
+    Ok(link)
 }
 
 fn link_below<'document, N: Node<'document>, E>(
@@ -147,6 +151,14 @@ fn link_below<'document, N: Node<'document>, E>(
     }
     Ok(link)
 }
+
+#[cfg(test)]
+#[path = "loot_selector_shape.rs"]
+mod selector_shape;
+
+#[cfg(test)]
+#[path = "loot_selector_witness.rs"]
+mod selector_witness;
 
 #[cfg(test)]
 mod tests {
