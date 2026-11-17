@@ -6,10 +6,11 @@ use std::path::Path;
 use std::process::ExitCode;
 
 use anyhow::Result;
+use p4kx_extraction::bank::RawBankExtraction;
 use p4kx_extraction::bank_wem_evidence::{BankWemRead, BankWemReadMode};
 use p4kx_extraction::{
-    Archive, Bank, BankExtraction, ConversionError, FieldOrigins, MediaClass, SourceInventory,
-    WemFormat,
+    Archive, Bank, BankExtraction, ConversionError, FieldOrigins, MediaClass, OriginArtifactDigest,
+    SourceInventory, WemFormat,
 };
 use serde::Serialize;
 
@@ -52,16 +53,25 @@ struct ExtractJson<'a> {
     soundbank: &'a str,
     target: String,
     format: &'static str,
-    extracted: Vec<WrittenJson>,
+    extracted: Vec<WrittenJson<'a>>,
     failed: Vec<FailedJson>,
 }
 
 #[derive(Serialize)]
-struct WrittenJson {
+struct WrittenJson<'a> {
     id: u32,
     file: String,
     size: u64,
     prefetch: bool,
+    #[serde(rename = "originReceipt", skip_serializing_if = "Option::is_none")]
+    origin_receipt: Option<String>,
+    #[serde(
+        rename = "originReceiptDigest",
+        skip_serializing_if = "Option::is_none"
+    )]
+    origin_receipt_digest: Option<&'a OriginArtifactDigest>,
+    #[serde(rename = "originReceiptErrors", skip_serializing_if = "Vec::is_empty")]
+    origin_receipt_errors: Vec<String>,
 }
 
 #[derive(Serialize)]
@@ -86,7 +96,13 @@ pub(crate) fn run(args: &BnkArgs, as_json: bool) -> Result<ExitCode> {
             source,
             out,
             format,
-        } => extract(&open(source)?, out, *format, as_json),
+        } => {
+            let bank = match format {
+                BnkFormat::Wem => open_observed(source)?,
+                BnkFormat::Wav | BnkFormat::Ogg => open(source)?,
+            };
+            extract(&bank, out, *format, as_json)
+        }
     }
 }
 
@@ -200,14 +216,31 @@ fn extract(bank: &Bank, out: &Path, format: BnkFormat, as_json: bool) -> Result<
         BnkFormat::Wav => WemFormat::Wav,
         BnkFormat::Ogg => WemFormat::Ogg,
     };
-    let extraction = bank.extract_wems(out, format)?;
+    let raw;
+    let converted;
+    let (extraction, origins) = if format == WemFormat::Wem {
+        raw = bank.extract_raw_wems_with_origins(out)?;
+        (&raw.extraction, Some(&raw))
+    } else {
+        converted = bank.extract_wems(out, format)?;
+        (&converted, None)
+    };
     let total = extraction.written.len() + extraction.failures.len();
     if as_json {
-        json::print(&extract_json(bank, out, format, &extraction))?;
+        json::print(&extract_json(bank, out, format, extraction, origins))?;
     } else {
         let mut stderr = io::stderr().lock();
         for failure in &extraction.failures {
             writeln!(stderr, "error: {}", chain(&failure.error))?;
+        }
+        if let Some(origins) = origins {
+            for written in &extraction.written {
+                if let Some(publication) = origins.publication(written.id) {
+                    for error in &publication.errors {
+                        writeln!(stderr, "error: {}", chain(error))?;
+                    }
+                }
+            }
         }
         let prefetched = extraction
             .written
@@ -230,10 +263,12 @@ fn extract(bank: &Bank, out: &Path, format: BnkFormat, as_json: bool) -> Result<
         }
         writeln!(stdout)?;
     }
-    Ok(ExitCode::from(if extraction.failures.is_empty() {
-        exit::SUCCESS
-    } else {
+    let failed = !extraction.failures.is_empty()
+        || origins.is_some_and(RawBankExtraction::has_publication_failures);
+    Ok(ExitCode::from(if failed {
         exit::PARTIAL_FAILURE
+    } else {
+        exit::SUCCESS
     }))
 }
 
@@ -242,6 +277,7 @@ fn extract_json<'a>(
     out: &Path,
     format: WemFormat,
     extraction: &BankExtraction,
+    origins: Option<&'a RawBankExtraction>,
 ) -> ExtractJson<'a> {
     ExtractJson {
         soundbank: bank.name(),
@@ -250,11 +286,24 @@ fn extract_json<'a>(
         extracted: extraction
             .written
             .iter()
-            .map(|written| WrittenJson {
-                id: written.id,
-                file: json::path(&written.path),
-                size: written.size,
-                prefetch: written.prefetch,
+            .map(|written| {
+                let publication = origins.and_then(|origin| origin.publication(written.id));
+                let receipt = publication.and_then(|publication| publication.receipt.as_ref());
+                WrittenJson {
+                    id: written.id,
+                    file: json::path(&written.path),
+                    size: written.size,
+                    prefetch: written.prefetch,
+                    origin_receipt: receipt.map(|receipt| json::path(&receipt.name)),
+                    origin_receipt_digest: receipt.map(|receipt| &receipt.digest),
+                    origin_receipt_errors: publication.map_or_else(Vec::new, |publication| {
+                        publication
+                            .errors
+                            .iter()
+                            .map(|error| chain(error))
+                            .collect()
+                    }),
+                }
             })
             .collect(),
         failed: extraction

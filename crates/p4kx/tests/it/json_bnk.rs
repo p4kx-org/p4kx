@@ -94,7 +94,16 @@ fn bnk_extract() -> TestResult {
         ],
     )?;
 
-    insta::assert_snapshot!(json);
+    let mut value: Value = serde_json::from_str(&json)?;
+    let extracted = value["extracted"]
+        .as_array_mut()
+        .ok_or("extracted raw media")?;
+    for row in extracted {
+        let row = row.as_object_mut().ok_or("raw media row")?;
+        row.remove("originReceipt");
+        row.remove("originReceiptDigest");
+    }
+    insta::assert_snapshot!(serde_json::to_string_pretty(&value)?);
     Ok(())
 }
 

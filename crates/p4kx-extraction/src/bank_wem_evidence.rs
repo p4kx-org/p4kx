@@ -3,10 +3,12 @@
 
 //! Common source bindings for a soundbank's embedded WEM list.
 
-use crate::wem_payload_evidence::{DidxWord, EvidenceError, PayloadField, put, range_use};
+use crate::wem_payload_evidence::{
+    DidxWord, EvidenceError, PayloadField, embedded_extent, put, range_use,
+};
 use crate::{
-    Bank, FieldOrigin, FieldOrigins, InputScope, SectionId, SourceInput, SourceInventory,
-    SourceLocation, SourceScope, SourceUseRole, SourceUses,
+    Bank, EmbeddedWem, FieldOrigin, FieldOrigins, InputScope, SectionId, SourceInput,
+    SourceInventory, SourceLocation, SourceScope, SourceUseRole, SourceUses,
 };
 
 #[path = "bank_wem_read.rs"]
@@ -157,18 +159,7 @@ impl<'bank> BankWemEvidence<'bank> {
         fields: &mut FieldOrigins,
     ) -> Result<(), EvidenceError> {
         let wem = read.media();
-        let admitted = self
-            .bank
-            .soundbank()
-            .wem(wem.id())
-            .ok_or(EvidenceError::InvalidPrefix)?;
-        if !std::ptr::eq(admitted.bytes(), wem.bytes())
-            || admitted.source().triplet_offset() != wem.source().triplet_offset()
-        {
-            return Err(EvidenceError::Source(
-                crate::SourceEvidenceError::ForeignEvidence,
-            ));
-        }
+        self.check_member(wem)?;
         let triplet = wem.source().triplet_offset();
         for (name, field) in [("id", DidxWord::Id), ("size", DidxWord::Length)] {
             let word = field.bind(&self.scope, triplet, SourceUseRole::Payload)?;
@@ -187,6 +178,42 @@ impl<'bank> BankWemEvidence<'bank> {
             fields,
             selection,
         )
+    }
+
+    pub(crate) fn raw_payload(
+        self,
+        wem: &EmbeddedWem<'_>,
+    ) -> Result<(SourceInventory, FieldOrigin), EvidenceError> {
+        self.check_member(wem)?;
+        let placement = wem.source();
+        let triplet = placement.triplet_offset();
+        let mut uses = embedded_extent(&self.scope, triplet, placement.data_body_offset())?;
+        uses.push(DidxWord::Id.bind(&self.scope, triplet, SourceUseRole::Selector)?);
+        uses.push(range_use(
+            &self.scope,
+            "bnkEmbeddedWem",
+            "payload",
+            placement.byte_range(),
+            SourceUseRole::Payload,
+        )?);
+        let origin = self.uses.origin(&uses, self.complete);
+        Ok((self.finish()?, origin))
+    }
+
+    fn check_member(&self, wem: &EmbeddedWem<'_>) -> Result<(), EvidenceError> {
+        let admitted = self
+            .bank
+            .soundbank()
+            .wem(wem.id())
+            .ok_or(EvidenceError::InvalidPrefix)?;
+        if !std::ptr::eq(admitted.bytes(), wem.bytes())
+            || admitted.source().triplet_offset() != wem.source().triplet_offset()
+        {
+            return Err(EvidenceError::Source(
+                crate::SourceEvidenceError::ForeignEvidence,
+            ));
+        }
+        Ok(())
     }
 
     /// Returns an origin for a tool argument with no original source use.

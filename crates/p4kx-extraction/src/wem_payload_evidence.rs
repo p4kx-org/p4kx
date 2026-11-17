@@ -201,7 +201,7 @@ impl PayloadPlan {
         let Some(site) = &self.placement else {
             return Ok(vec![metadata(scope, "path", SourceUseRole::Selector)?]);
         };
-        let mut read = Self::embedded_extent(scope, site)?;
+        let mut read = embedded_extent(scope, site.triplet, site.data)?;
         if self.extent.end - self.extent.start >= 2 * WORD_BYTES {
             read.push(self.riff_word(scope, 0, "signature")?);
         }
@@ -211,26 +211,12 @@ impl PayloadPlan {
         Ok(read)
     }
 
-    fn embedded_extent(scope: &SourceScope, site: &EmbeddedPlacement) -> Result<Vec<SourceUse>> {
-        Ok(vec![
-            DidxWord::Offset.bind(scope, site.triplet, SourceUseRole::Selector)?,
-            DidxWord::Length.bind(scope, site.triplet, SourceUseRole::Selector)?,
-            range_use(
-                scope,
-                "bnkData",
-                "bodyLength",
-                site.data - WORD_BYTES..site.data,
-                SourceUseRole::Selector,
-            )?,
-        ])
-    }
-
     fn class(&self, scope: &SourceScope) -> Result<Vec<SourceUse>> {
         let site = self
             .placement
             .as_ref()
             .ok_or(EvidenceError::InvalidPrefix)?;
-        let mut actual = Self::embedded_extent(scope, site)?;
+        let mut actual = embedded_extent(scope, site.triplet, site.data)?;
         match site.class {
             BankMediaClassSource::TooShort => {}
             BankMediaClassSource::Signature | BankMediaClassSource::MissingForm => {
@@ -302,6 +288,24 @@ impl PayloadPlan {
         }
         Ok(())
     }
+}
+
+pub(crate) fn embedded_extent(
+    scope: &SourceScope,
+    triplet: u64,
+    data: u64,
+) -> Result<Vec<SourceUse>> {
+    Ok(vec![
+        DidxWord::Offset.bind(scope, triplet, SourceUseRole::Selector)?,
+        DidxWord::Length.bind(scope, triplet, SourceUseRole::Selector)?,
+        range_use(
+            scope,
+            "bnkData",
+            "bodyLength",
+            data - WORD_BYTES..data,
+            SourceUseRole::Selector,
+        )?,
+    ])
 }
 
 fn incomplete(scope: &SourceScope) -> Result<SourceUse> {

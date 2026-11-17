@@ -105,8 +105,12 @@ use rayon::prelude::*;
 #[path = "bank_decision_witness.rs"]
 mod decision_witness;
 
+#[path = "bank_raw_extract.rs"]
+mod raw_extract;
 #[path = "bank_read.rs"]
 mod read;
+
+pub use self::raw_extract::{RawBankExtraction, RawWemPublication, RawWemReceipt};
 
 use self::read::BankReadOrigin;
 
@@ -172,6 +176,11 @@ pub struct BankExtraction {
     pub failures: Vec<WemFailure>,
 }
 
+struct WemWriteOutcome<T> {
+    id: u32,
+    result: Result<T, ConversionError>,
+}
+
 /// A Wwise BNK soundbank read from an Entry of an Archive or from a file on disk.
 #[derive(Debug)]
 pub struct Bank {
@@ -228,21 +237,35 @@ impl Bank {
         folder: &Path,
         format: WemFormat,
     ) -> Result<BankExtraction, ConversionError> {
-        crate::check_protected_output(folder, self.protection.context()?, None)?;
-        fs::create_dir_all(folder).map_err(|source| write_error(folder, source))?;
-        let wems: Vec<EmbeddedWem<'_>> = self.soundbank.wems().collect();
-        let outcomes: Vec<(u32, Result<WrittenWem, ConversionError>)> = wems
-            .par_iter()
-            .map(|wem| (wem.id(), self.write_wem(wem, folder, format)))
-            .collect();
+        let outcomes = self.write_wems(folder, |wem| self.write_wem(wem, folder, format))?;
         let mut extraction = BankExtraction::default();
-        for (id, outcome) in outcomes {
-            match outcome {
+        for outcome in outcomes {
+            match outcome.result {
                 Ok(written) => extraction.written.push(written),
-                Err(error) => extraction.failures.push(WemFailure { id, error }),
+                Err(error) => extraction.failures.push(WemFailure {
+                    id: outcome.id,
+                    error,
+                }),
             }
         }
         Ok(extraction)
+    }
+
+    fn write_wems<T: Send>(
+        &self,
+        folder: &Path,
+        write: impl Fn(&EmbeddedWem<'_>) -> Result<T, ConversionError> + Sync,
+    ) -> Result<Vec<WemWriteOutcome<T>>, ConversionError> {
+        crate::check_protected_output(folder, self.protection.context()?, None)?;
+        fs::create_dir_all(folder).map_err(|source| write_error(folder, source))?;
+        let wems: Vec<EmbeddedWem<'_>> = self.soundbank.wems().collect();
+        Ok(wems
+            .par_iter()
+            .map(|wem| WemWriteOutcome {
+                id: wem.id(),
+                result: write(wem),
+            })
+            .collect())
     }
 
     fn write_wem(
@@ -257,12 +280,7 @@ impl Bank {
                 id: wem.id(),
             });
         }
-        let extension = if format == WemFormat::Wem && wem.class() == MediaClass::Midi {
-            "mid"
-        } else {
-            format.extension()
-        };
-        let path = folder.join(format!("{}.{}", wem.id(), extension));
+        let path = wem_output_path(folder, wem, format);
         let audio_error = |source| match source {
             AudioError::Write(source) => write_error(&path, source),
             source => ConversionError::Audio {
@@ -301,4 +319,13 @@ impl Bank {
             prefetch: wem.is_prefetch(),
         })
     }
+}
+
+fn wem_output_path(folder: &Path, wem: &EmbeddedWem<'_>, format: WemFormat) -> PathBuf {
+    let extension = if format == WemFormat::Wem && wem.class() == MediaClass::Midi {
+        "mid"
+    } else {
+        format.extension()
+    };
+    folder.join(format!("{}.{}", wem.id(), extension))
 }

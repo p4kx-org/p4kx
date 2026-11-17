@@ -84,6 +84,19 @@ fn extract_as_wem_writes_midi_media_with_the_mid_extension() -> TestResult {
         .map(|entry| entry.map(|entry| entry.file_name().to_string_lossy().into_owned()))
         .collect::<Result<_, _>>()?;
     names.sort();
-    assert_eq!(names, ["100.wem", "200.mid", "300.wem", "400.wem"]);
+    assert_eq!(
+        names,
+        [
+            "100.wem",
+            "100.wem.p4kx-origin.jsonl",
+            "200.mid",
+            "200.mid.p4kx-origin.jsonl",
+            "300.wem",
+            "300.wem.p4kx-origin.jsonl",
+            "400.wem",
+            "400.wem.p4kx-origin.jsonl",
+        ],
+        "raw media and their matched companion filenames",
+    );
     Ok(())
 }
