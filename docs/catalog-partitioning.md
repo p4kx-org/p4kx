@@ -304,8 +304,22 @@ provenance. The first PTU provenance sample rose by 4.85 GiB in private bytes. T
 array for 72,144,536 rows at 72 bytes each accounts for 4.84 GiB of that reserve.
 The packed source-use counts grew by 17,325,165 and 17,974,970 between the Record scan
 and health. The pair logged 0.756 GiB of logical process writes and produced
-no Catalog file or encoder sizes. The later compaction checkpoints, smaller rows and
-ownership transfer at sealing require a new measurement on a producer that includes them.
+no Catalog file or encoder sizes.
+
+The follow-up discard-sink witness at `0d10b5901` used the same installed Builds, four Rayon
+threads and stable Archive stamps. It included the later compaction checkpoints, 48-byte
+packed rows and ownership transfer at sealing. The key census was disabled.
+
+| Build | Record scan working set | Record scan private bytes | Peak working set | Peak private bytes | Packed source uses at health |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| LIVE `13165946` | 13.51 | 14.10 | 21.75 | 22.72 | 68,904,364 |
+| PTU `13201184` | 14.27 | 14.87 | 22.70 | 23.71 | 72,126,576 |
+
+Both sampled peaks occurred during facility interior projection. Minimum sampled host
+available RAM was 28.81 GiB for LIVE and 24.65 GiB for PTU. The pair logged 0.756 GiB of
+logical process writes. Both Builds reached the normal health decision and refused publication
+before serialization. Encoder sizes and the complete normal run on a 16 GiB system remain
+unmeasured.
 
 The compressed writer prepares a typed Catalog once. It first counts serialized bytes for the
 frame header and then streams serialization into the encoder. A second raw file adds storage
