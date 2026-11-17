@@ -45,6 +45,21 @@ impl SourceUses {
             .packed_len())
     }
 
+    /// Packs unheld DataForge coordinate uses registered since the preceding compaction.
+    /// Call after draining a batch of projected records. The checkpoint runs under the
+    /// inventory lock and must not re-enter it.
+    ///
+    /// # Errors
+    /// Returns the checkpoint error or an error when the registry is sealed or interrupted.
+    pub fn compact_record_uses<E: From<SourceEvidenceError>>(
+        &self,
+        check: impl FnMut() -> Result<(), E>,
+    ) -> Result<(), E> {
+        source_evidence_error::lock(&self.registry)?
+            .uses
+            .compact_pending(check)
+    }
+
     /// Freezes sorted source/use rows after projection for repeatable serialization passes.
     ///
     /// # Errors

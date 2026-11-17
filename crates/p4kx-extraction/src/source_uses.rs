@@ -61,21 +61,6 @@ impl SourceUses {
         Self { registry, identity }
     }
 
-    /// Packs unheld DataForge coordinate uses registered since the preceding compaction.
-    /// Call after draining a batch of projected records. The checkpoint runs under the
-    /// inventory lock and must not re-enter it.
-    ///
-    /// # Errors
-    /// Returns the checkpoint error or an error when the registry is sealed or interrupted.
-    pub fn compact_record_uses<E: From<SourceEvidenceError>>(
-        &self,
-        check: impl FnMut() -> Result<(), E>,
-    ) -> Result<(), E> {
-        source_evidence_error::lock(&self.registry)?
-            .uses
-            .compact_pending(check)
-    }
-
     /// Retains a complete survey of the admitted paths in this root Archive directory.
     /// Call after consulting every admitted path. A nested Archive returns no root survey.
     ///
