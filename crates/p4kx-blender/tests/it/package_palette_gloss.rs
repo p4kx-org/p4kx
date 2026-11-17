@@ -21,6 +21,9 @@ use crate::support::{TestResult, fixture, glb_options};
 #[path = "package_palette_gloss_source.rs"]
 mod source;
 
+#[path = "package_palette_gloss_layers.rs"]
+mod layers;
+
 use source::{
     EXPLICIT_GLOSS_CASES, EXPLICIT_GLOSS_PATH, FINISH_PALETTE_BYTE, Multiplier, NORMAL_ALPHA,
     PALETTE_BYTES, ROOT_CLASS, TEXTURE_PATH,
@@ -40,7 +43,9 @@ fn palette_gloss_fixture_compares_glb_and_blender_package_inputs() -> TestResult
         summary.texture_fallbacks.is_empty(),
         "the authored normal and gloss inputs are readable"
     );
-    verify_glb(&check_glb(&glb)?)?;
+    let glb = check_glb(&glb)?;
+    verify_glb(&glb)?;
+    layers::verify_glb(&glb)?;
 
     let temporary = tempfile::tempdir()?;
     let package = std::env::var_os("P4KX_SYNTHETIC_PALETTE_GLOSS_PACKAGE")
@@ -62,7 +67,8 @@ fn palette_gloss_fixture_compares_glb_and_blender_package_inputs() -> TestResult
     verify_palette(&manifest)?;
     verify_layer_tokens(&manifest)?;
     verify_image(&manifest, &package)?;
-    verify_explicit_gloss_package(&manifest)
+    verify_explicit_gloss_package(&manifest)?;
+    layers::verify_package(&manifest)
 }
 
 fn assemble(archive: &Archive, models: &ArchiveModels<'_>) -> Result<Assembly, Box<dyn Error>> {

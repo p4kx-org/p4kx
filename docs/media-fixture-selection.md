@@ -195,6 +195,13 @@ That case exports green `59` and measures `0.231372461` in Blender. The measured
 agree within half an 8-bit step. These Windows AMD64 measurements use Blender 5.3.0
 (`02f0899d78e3`) and the package from the ordinary Rust producer.
 
+The same fixture supplies two layered HardSurface materials with a texture only on the child.
+With palette byte `184` and `GlossMult=0.5`, the GLB uses the scalar `163 / 255` for both
+materials. The child DDNA supplies the GLB normal map. Blender samples the child textures
+for roughness and measures `0.615686178` from DDNA alpha and `0.820329666` from RGB Gloss.
+The package verifies the exact child slots and their image origins. These measurements show
+where the two P4KX paths use different inputs for the same synthetic material.
+
 ### Decoded LIVE shader operations
 
 A bounded read of the installed LIVE `13165946` Vulkan shader cache verified the
@@ -267,6 +274,18 @@ returned `0.41352269` for both authored modes `1` and `2`, within one 8-bit step
 The unselected control used the original material colours. These observations measure
 the P4KX projection. The engine's CPU flag packing and matched installed comparisons
 are separate acceptance evidence.
+
+A second fixture gives two layers distinct child `Diffuse`, wrapper `TintColor` and palette
+slots, then blends them with a shared fractional mask. All four GLB texels measure linear
+Base Color `(0.06124607, 0.16513222, 0.08437622)`. On the same Blender build, the imported
+package measures `(0.11842261, 0.24393596, 0.37463924)`. The GLB bake uses child `Diffuse`
+as its authored colour factor. Blender uses wrapper `TintColor`. The Blender probe also
+measures Specular IOR Level `0.69820887` from the first resolved layer and Metallic `0`.
+
+`masked_layer_tint_preserves_distinct_authored_inputs_and_measures_glb` writes the package
+when `P4KX_SYNTHETIC_LAYER_TINT_MASK_PACKAGE` names a fresh directory in the isolated profile.
+Use `blender_addon/tests/blender_layer_tint_mask_package.py -- <package>/scene.json` for the
+one-thread native EXR probe.
 
 ## Forward Illum and explicit Emittance
 

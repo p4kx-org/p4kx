@@ -17,6 +17,8 @@ use serde_json::Value;
 
 use crate::support::{TestResult, fixture, glb_options};
 
+#[path = "package_layer_tint_mask.rs"]
+mod mask;
 #[path = "package_layer_tint_modes_source.rs"]
 mod source;
 
@@ -27,7 +29,7 @@ fn layer_tint_mode_baseline_preserves_raw_values_and_matches_glb_colour() -> Tes
     let fixture = fixture(source::entries()?)?;
     let archive = Archive::open_with_key(&fixture.path, Some(test_key()))?;
     let models = ArchiveModels::new(&archive);
-    let assembly = assemble(&archive, &models)?;
+    let assembly = assemble(&archive, &models, ROOT_CLASS)?;
     let textures = models.textures();
     let mut glb = Vec::new();
     assembly.write_glb_with(&glb_options(0), &textures, &mut glb)?;
@@ -55,11 +57,15 @@ fn layer_tint_mode_baseline_preserves_raw_values_and_matches_glb_colour() -> Tes
     verify_palette_fields(&manifest)
 }
 
-fn assemble(archive: &Archive, models: &ArchiveModels<'_>) -> Result<Assembly, Box<dyn Error>> {
+fn assemble(
+    archive: &Archive,
+    models: &ArchiveModels<'_>,
+    root_class: &str,
+) -> Result<Assembly, Box<dyn Error>> {
     let dcb = DataForgeEntry::read(archive)?;
     let forge = dcb.open()?;
     let mut resolver = LoadoutResolver::new(&forge).with_forge_entry(&dcb);
-    let record = resolver.entities().find(ROOT_CLASS)?;
+    let record = resolver.entities().find(root_class)?;
     let root = resolver.resolve(&record)?;
     let palettes = ForgePalettes::new(&forge).with_entry(&dcb);
     Ok(Assembly::build_with_palettes(

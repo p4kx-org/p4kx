@@ -17,6 +17,28 @@ pub(super) const EXPLICIT_GLOSS_PATH: &str = "Objects/Test/palette_explicit_glos
 const ALPHA_FREE_NORMAL: &str = "Objects/Test/palette_rgb_ddna.dds";
 const EXPLICIT_GLOSS_GREEN: u8 = 163;
 
+pub(super) struct LayerOnlyCase {
+    pub(super) name: &'static str,
+    pub(super) path: &'static str,
+    pub(super) slot: &'static str,
+    layer: &'static str,
+}
+
+pub(super) const LAYER_ONLY_CASES: [LayerOnlyCase; 2] = [
+    LayerOnlyCase {
+        name: "LayerOnlyDdna",
+        path: TEXTURE_PATH,
+        slot: "TexSlot2",
+        layer: SAMPLED_LAYER,
+    },
+    LayerOnlyCase {
+        name: "LayerOnlyGloss",
+        path: EXPLICIT_GLOSS_PATH,
+        slot: "TexSlot6",
+        layer: GLOSS_LAYER,
+    },
+];
+
 pub(super) struct ExplicitGlossCase {
     pub(super) name: &'static str,
     pub(super) normal: Option<&'static str>,
@@ -42,6 +64,9 @@ pub(super) const EXPLICIT_GLOSS_CASES: [ExplicitGlossCase; 3] = [
 ];
 const MODEL: &str = "Objects/Test/palette_sample.cgf";
 const SAMPLED_LAYER: &str = "Objects/Test/palette_sample.mtl";
+const GLOSS_LAYER: &str = "Objects/Test/palette_gloss_only.mtl";
+const LAYER_ONLY_CLASS: &str = "TEST_LayerOnlyGloss";
+const LAYER_ONLY_LIBRARY: &str = "Objects/Test/layer_only_gloss";
 const CONSTANT_LAYER: &str = "Objects/Test/palette_constant.mtl";
 const FIRST_PALETTE_GUID: u128 = 0x9500;
 const FIRST_ENTITY_GUID: u128 = 0x9600;
@@ -114,6 +139,20 @@ pub(super) fn entries() -> Result<Vec<TestEntry>, Box<dyn Error>> {
         ),
         TestEntry::stored(format!("Data/{SAMPLED_LAYER}"), layer(true)),
         TestEntry::stored(format!("Data/{CONSTANT_LAYER}"), layer(false)),
+        TestEntry::stored(
+            format!("Data/{GLOSS_LAYER}"),
+            TestMtl::single(
+                &TestMtlMaterial::new("gloss")
+                    .shader("Layer")
+                    .diffuse([1.0; 3])
+                    .texture("TexSlot6", EXPLICIT_GLOSS_PATH),
+            )
+            .cryxml(),
+        ),
+        TestEntry::stored(
+            format!("Data/{LAYER_ONLY_LIBRARY}.mtl"),
+            layer_only_library(),
+        ),
     ];
     let database = database(&mut entries);
     entries.push(TestEntry::zstd("Data/Game2.dcb", database).encrypted());
@@ -142,7 +181,7 @@ fn database(entries: &mut Vec<TestEntry>) -> Vec<u8> {
             database = database.record(entity.record());
         }
     }
-    for (case, id) in EXPLICIT_GLOSS_CASES.iter().zip(ids) {
+    for (case, id) in EXPLICIT_GLOSS_CASES.iter().zip(ids.by_ref()) {
         let class = format!("TEST_{}", case.name);
         let library = format!("Objects/Test/{}", case.name);
         let mut material = TestMtlMaterial::new(case.name)
@@ -162,6 +201,8 @@ fn database(entries: &mut Vec<TestEntry>) -> Vec<u8> {
                 .record(),
         );
     }
+    children.push(TestLoadoutEntry::class(LAYER_ONLY_CLASS, LAYER_ONLY_CLASS));
+    database = database.record(layer_only_entity(ids.start).record());
     for byte in PALETTE_BYTES {
         database = database.record(tint_palette_record(
             FIRST_PALETTE_GUID + u128::from(byte),
@@ -175,6 +216,16 @@ fn database(entries: &mut Vec<TestEntry>) -> Vec<u8> {
         database = database.record(root.loadout(TestLoadout::Manual(children)).record());
     }
     database.build()
+}
+
+fn layer_only_entity(id: u128) -> TestEntity {
+    TestEntity::new(
+        id,
+        LAYER_ONLY_CLASS,
+        format!("entities/scitem/{LAYER_ONLY_CLASS}.xml"),
+    )
+    .geometry(MODEL, Some(LAYER_ONLY_LIBRARY))
+    .palette(FIRST_PALETTE_GUID + u128::from(FINISH_PALETTE_BYTE), "")
 }
 
 fn library(byte: u8, multiplier: Multiplier) -> Vec<u8> {
@@ -198,6 +249,26 @@ fn library(byte: u8, multiplier: Multiplier) -> Vec<u8> {
         }
     };
     TestMtl::multi(&[TestMtlMaterial::new("unused"), make(true), make(false)]).cryxml()
+}
+
+fn layer_only_library() -> Vec<u8> {
+    let [ddna, gloss] = &LAYER_ONLY_CASES;
+    let material = |case: &LayerOnlyCase| {
+        TestMtlMaterial::new(case.name)
+            .shader("HardSurface")
+            .layer_with(&[
+                ("Name", "Paint"),
+                ("PaletteTint", "1"),
+                ("Path", case.layer),
+                ("GlossMult", "0.5"),
+            ])
+    };
+    TestMtl::multi(&[
+        TestMtlMaterial::new("unused"),
+        material(ddna),
+        material(gloss),
+    ])
+    .cryxml()
 }
 
 fn layer(sampled: bool) -> Vec<u8> {

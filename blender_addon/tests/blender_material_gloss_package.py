@@ -47,6 +47,13 @@ def verify(location: Path) -> None:
     packed = principled(bpy.data.materials["ExplicitGlossPackedDdna"]).inputs
     assert packed["Normal"].is_linked
     verify_sample(packed["Roughness"], 1.0)
+    for name, has_normal in (("LayerOnlyDdna", True), ("LayerOnlyGloss", False)):
+        inputs = principled(bpy.data.materials[name]).inputs
+        assert inputs["Normal"].is_linked == has_normal, name
+        if has_normal:
+            verify_sample(_roughness(name), 0.5)
+        else:
+            verify_explicit_gloss(_roughness(name), 0.5)
     _measure_exact_finish(location)
 
 
@@ -64,22 +71,23 @@ def verify_constant(socket: bpy.types.NodeSocket, byte: int, multiplier: float) 
     assert math.isclose(socket.default_value, 1.0 - (byte / 255.0) * multiplier, abs_tol=1e-6)
 
 
-def _smoothness(socket: bpy.types.NodeSocket) -> bpy.types.NodeLink:
+def _smoothness(socket: bpy.types.NodeSocket, multiplier: float) -> bpy.types.NodeLink:
     subtract = _input(socket).from_node
     assert subtract.bl_idname == "ShaderNodeMath" and subtract.operation == "SUBTRACT"
     assert subtract.use_clamp
     assert subtract.inputs[0].default_value == 1.0
-    return _input(subtract.inputs[1])
-
-
-def verify_sample(socket: bpy.types.NodeSocket, multiplier: float) -> None:
-    alpha = _smoothness(socket)
+    smoothness = _input(subtract.inputs[1])
     if multiplier != 1.0:
-        scale = alpha.from_node
+        scale = smoothness.from_node
         assert scale.bl_idname == "ShaderNodeMath" and scale.operation == "MULTIPLY"
         assert not scale.inputs[1].is_linked
         assert scale.inputs[1].default_value == multiplier
-        alpha = _input(scale.inputs[0])
+        smoothness = _input(scale.inputs[0])
+    return smoothness
+
+
+def verify_sample(socket: bpy.types.NodeSocket, multiplier: float) -> None:
+    alpha = _smoothness(socket, multiplier)
     assert alpha.from_socket.name == "Alpha"
     assert alpha.from_node.bl_idname == "ShaderNodeTexImage"
     image = alpha.from_node.image
@@ -88,8 +96,8 @@ def verify_sample(socket: bpy.types.NodeSocket, multiplier: float) -> None:
     assert image.alpha_mode == "CHANNEL_PACKED"
 
 
-def verify_explicit_gloss(socket: bpy.types.NodeSocket) -> None:
-    luminance = _smoothness(socket).from_node
+def verify_explicit_gloss(socket: bpy.types.NodeSocket, multiplier: float = 1.0) -> None:
+    luminance = _smoothness(socket, multiplier).from_node
     assert luminance.bl_idname == "ShaderNodeRGBToBW"
     colour = _input(luminance.inputs["Color"])
     assert colour.from_socket.name == "Color"
@@ -121,14 +129,18 @@ def _measure_exact_finish(location: Path) -> None:
     cases = (
         ("neutral", f"Gloss_{FINISH_PALETTE_BYTE}_Neutral_Sample", 0.75,
          59 / 255, EXACT_SAMPLE_TOLERANCE),
-        ("authored_half", f"Gloss_{FINISH_PALETTE_BYTE}_Half_Sample", 0.375,
+        ("authored_half", f"Gloss_{FINISH_PALETTE_BYTE}_Half_Sample", 0.5,
          157 / 255, EXACT_SAMPLE_TOLERANCE),
-        ("explicit_gloss", "ExplicitGloss", 0.0,
+        ("explicit_gloss", "ExplicitGloss", 0.25,
          EXPLICIT_GLOSS_GREEN / 255, GLOSS_QUANTIZATION_TOLERANCE),
-        ("alpha_free_normal", "ExplicitGlossAlphaFree", -0.375,
+        ("alpha_free_normal", "ExplicitGlossAlphaFree", 0.0,
          EXPLICIT_GLOSS_GREEN / 255, GLOSS_QUANTIZATION_TOLERANCE),
-        ("packed_ddna_precedence", "ExplicitGlossPackedDdna", -0.75,
+        ("packed_ddna_precedence", "ExplicitGlossPackedDdna", -0.25,
          59 / 255, GLOSS_QUANTIZATION_TOLERANCE),
+        ("child_ddna", "LayerOnlyDdna", -0.5,
+         1.0 - 0.5 * NORMAL_ALPHA / 255, EXACT_SAMPLE_TOLERANCE),
+        ("child_gloss", "LayerOnlyGloss", -0.75,
+         (1.0 + EXPLICIT_GLOSS_GREEN / 255) * 0.5, GLOSS_QUANTIZATION_TOLERANCE),
     )
     probes = tuple((bpy.data.materials[name], "Roughness", y) for _, name, y, _, _ in cases)
     target = location.parent.with_name(f"{location.parent.name}-roughness.exr")
