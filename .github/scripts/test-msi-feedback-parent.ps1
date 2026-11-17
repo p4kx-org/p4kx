@@ -25,6 +25,7 @@ function Test-FeedbackParentCase([string]$Mode) {
     $output=Join-Path $root $Mode
     New-Item -ItemType Directory -Path $output | Out-Null
     $parameters=[ordered]@{Target=$target;Msi=$Mode;FixtureDirectory=$SourceDirectory;OutputDirectory=$output}
+    if($Mode -ceq 'admission'){$parameters.AdmissionOnly=$true}
     $env:P4KX_MSI_DIAGNOSTIC_DEADLINE_UTC=[DateTimeOffset]::UtcNow.AddSeconds(3).ToString('o')
     $failure=$null
     try{Invoke-P4kxMsiDiagnosticWorker (Join-Path $SourceDirectory 'msi-feedback-worker-fixture.ps1') $parameters}
@@ -32,7 +33,8 @@ function Test-FeedbackParentCase([string]$Mode) {
     $diagnostics=Join-Path $output 'diagnostics'
     $result=Get-Content -Raw -LiteralPath (Join-Path $diagnostics 'diagnostic-result.json') | ConvertFrom-Json -AsHashtable
     $start=Get-Content -Raw -LiteralPath (Join-Path $diagnostics 'diagnostic-start.json') | ConvertFrom-Json -AsHashtable
-    Assert-FeedbackParent ($start.role -ceq 'native-msi-diagnostic-start' -and $start.completed_success -eq $false -and
+    $startRole=if($Mode -ceq 'admission'){'native-msi-admission-start'}else{'native-msi-diagnostic-start'}
+    Assert-FeedbackParent ($start.role -ceq $startRole -and $start.completed_success -eq $false -and
         $start.native_completion_unproven -eq $true -and $start.mutation_authority -eq $false) 'Actual parent-start receipt invented completion or mutation authority.'
     Assert-FeedbackParent ($start.target -ceq $target -and $start.deadline_utc -ceq $result.deadline_utc -and $start.budget_ms -eq $result.budget_ms -and
         $start.worker_script -ceq 'msi-feedback-worker-fixture.ps1' -and $start.worker_sha256 -ceq (Get-FileHash -LiteralPath (Join-Path $SourceDirectory 'msi-feedback-worker-fixture.ps1') -Algorithm SHA256).Hash.ToLowerInvariant()) 'Actual parent-start receipt lost original budget, target or worker source binding.'
@@ -49,7 +51,14 @@ function Test-FeedbackParentCase([string]$Mode) {
         Assert-FeedbackParent ($result.completed_success -eq $false -and $result.native_completion_unproven -eq $true -and $result.worker_result_returned -eq $false) 'Timed-out worker was falsely classified as successful or returned.'
         Assert-FeedbackParent ($journal.complete -and $journal.events -eq 2 -and $journal.active.Count -eq 2 -and $journal.active -ccontains 'worker' -and $journal.active -ccontains 'fixture/wait' -and $null -eq $journal.terminal) 'Timeout failed to retain both original open scopes without terminal completion.'
     }else{
-        Assert-FeedbackParent ($null -eq $failure -and $result.completed_success -eq $true -and $result.native_completion_unproven -eq $false -and $result.worker_result_returned -eq $true) 'Completed actual worker was not proven successful.'
+        Assert-FeedbackParent ($null -eq $failure -and $result.worker_result_returned -eq $true) 'Actual worker did not return successfully.'
+        if($Mode -ceq 'admission'){
+            Assert-FeedbackParent ($result.role -ceq 'native-msi-admission-result' -and $result.admission_passed -eq $true -and
+                $result.completed_success -eq $false -and $result.native_completion_unproven -eq $true) 'Admission success invented installer lifecycle evidence.'
+        }else{
+            Assert-FeedbackParent ($result.role -ceq 'native-msi-diagnostic-result' -and $result.completed_success -eq $true -and
+                $result.native_completion_unproven -eq $false) 'Completed actual worker was not proven successful.'
+        }
         Assert-FeedbackParent ($journal.complete -and $journal.events -eq 4 -and $journal.active.Count -eq 0 -and $journal.terminal -ceq 'end') 'Completed actual worker lacks the inverse closed phase proof.'
     }
     Write-Host ('PASS: actual parent/Portal/phase chain '+$Mode)
@@ -59,6 +68,7 @@ try{
     $env:GITHUB_ACTIONS='true';$env:RUNNER_ENVIRONMENT='github-hosted'
     Test-FeedbackParentCase 'complete'
     Test-FeedbackParentCase 'timeout'
+    Test-FeedbackParentCase 'admission'
 }finally{
     $env:GITHUB_ACTIONS=$saved.actions;$env:RUNNER_ENVIRONMENT=$saved.runner;$env:P4KX_MSI_DIAGNOSTIC_DEADLINE_UTC=$saved.deadline
 }

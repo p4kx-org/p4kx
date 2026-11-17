@@ -199,7 +199,7 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'Opt-in Registry fixture compilation failed.' }
           } finally { $env:P4KX_FIXTURE_SOURCE_REVISION = $original }
       - name: Prepare installer inputs and the independent step allowance
-        id: msi-budget
+        id: msi-preflight
         timeout-minutes: 1
         run: |
           . .github/scripts/platform-contract.ps1
@@ -244,6 +244,31 @@ jobs:
             ${{ env.P4KX_PACKAGE_TASK }}/contracts/msi-feedback-parent/**/*.jsonl
             ${{ env.P4KX_PACKAGE_TASK }}/contracts/msi-feedback-parent/**/*.log
           if-no-files-found: error
+      - name: Observe native MSI worker admission without installing
+        id: msi-admission
+        timeout-minutes: 2
+        continue-on-error: true
+        run: |
+          $invocation = Join-Path $env:P4KX_PACKAGE_TASK 'msi-invocation.json'
+          $parameters = Get-Content -LiteralPath $invocation -Raw | ConvertFrom-Json -AsHashtable
+          $parameters.OutputDirectory = Join-Path $env:P4KX_PACKAGE_TASK 'msi-admission'
+          .github/scripts/check-msi.ps1 @parameters -AdmissionOnly
+      - name: Preserve native MSI worker admission evidence
+        if: ${{ always() && !cancelled() && steps.msi-admission.outcome != 'skipped' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        timeout-minutes: 1
+        continue-on-error: true
+        with:
+          name: windows-msi-admission-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.target }}
+          path: |
+            ${{ env.P4KX_PACKAGE_TASK }}/msi-admission/diagnostics/*.json
+            ${{ env.P4KX_PACKAGE_TASK }}/msi-admission/diagnostics/*.jsonl
+            ${{ env.P4KX_PACKAGE_TASK }}/msi-admission/diagnostics/*.log
+          if-no-files-found: error
+      - name: Refresh installer allowance against the original deadline
+        id: msi-budget
+        timeout-minutes: 1
+        run: .github/scripts/prepare-msi-feedback.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/lifecycle-feedback')
       - name: Installer metadata, upgrade, downgrade, rollback, CPU replacement and preservation
         timeout-minutes: ${{ fromJSON(steps.msi-budget.outputs.minutes) }}
         run: |

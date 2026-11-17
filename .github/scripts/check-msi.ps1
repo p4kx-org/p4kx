@@ -11,6 +11,7 @@ param(
     [Parameter(Mandatory)][string]$RegistryFixtureSha256,
     [Parameter(Mandatory)][string]$HelperExecutable,
     [string]$PreviousMsi,
+    [switch]$AdmissionOnly,
     [switch]$LifecycleWorker,
     [string]$WorkerLocation,
     [string]$WorkerProcessDirectory
@@ -70,9 +71,6 @@ $shortcut=Join-Path ([Environment]::GetFolderPath('Programs')) 'P4KX.lnk'
 $profileFolder=Join-Path ([Environment]::GetFolderPath('ApplicationData')) 'P4KX'
 $logs=[IO.Path]::GetFullPath($OutputDirectory)
 New-Item -ItemType Directory -Force -Path $logs | Out-Null
-$fixturePhase = Start-P4kxMsiPhase $diagnostics 'preamble/fixture-create'
-$fixture=New-P4kxRawMsiFixture $row $RegistryFixture $RegistryFixtureSha256 (Join-Path $logs 'raw-registry')
-Stop-P4kxMsiPhase $diagnostics $fixturePhase
 $helperPhase = Start-P4kxMsiPhase $diagnostics 'preamble/helper-binding'
 $helperHash=(Get-FileHash -LiteralPath $HelperExecutable -Algorithm SHA256).Hash.ToLowerInvariant()
 if((Get-ImageMachine $HelperExecutable windows) -ne $row.pe_machine){throw 'Executed helper differs from the actual MSI Binary payload or native CPU.'}
@@ -90,6 +88,13 @@ Write-P4kxMsiDiagnosticInputs $PSBoundParameters $diagnosticDirectory
 @{current=@{version=$current.version;template=$current.template}; next=@{version=$next.version;template=$next.template}; opposite=@{version=$other.version;template=$other.template}} |
     ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $diagnosticDirectory 'metadata-identities.json') -Encoding utf8NoBOM
 Stop-P4kxMsiPhase $diagnostics $bindingPhase
+if ($AdmissionOnly) {
+    Stop-P4kxMsiPhase $diagnostics $workerPhase
+    return
+}
+$fixturePhase = Start-P4kxMsiPhase $diagnostics 'preamble/fixture-create'
+$fixture=New-P4kxRawMsiFixture $row $RegistryFixture $RegistryFixtureSha256 (Join-Path $logs 'raw-registry')
+Stop-P4kxMsiPhase $diagnostics $fixturePhase
 $context=@{msi=$Msi;metadata=$current;upgrade=$UpgradeCode;folder=$folder;shortcut=$shortcut;logs=$logs;helper=[IO.Path]::GetFullPath($HelperExecutable);helper_sha256=$helperHash;helper_calls=0;legacy_keys=@()}
 $capturePhase = Start-P4kxMsiPhase $diagnostics 'preamble/original-path'
 $originalPath=Get-P4kxUserPathState

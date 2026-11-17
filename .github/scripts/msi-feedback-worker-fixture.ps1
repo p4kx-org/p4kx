@@ -2,10 +2,11 @@ param(
     [string]$Target,[string]$Msi,[string]$NextMsi,[string]$NextVersion,[string]$UpgradeCode,
     [string]$OtherArchitectureMsi,[string]$FixtureDirectory,[string]$OutputDirectory,
     [string]$RegistryFixture,[string]$RegistryFixtureSha256,[string]$HelperExecutable,[string]$PreviousMsi,
-    [switch]$LifecycleWorker,[string]$WorkerLocation,[string]$WorkerProcessDirectory
+    [switch]$AdmissionOnly,[switch]$LifecycleWorker,[string]$WorkerLocation,[string]$WorkerProcessDirectory
 )
 $ErrorActionPreference='Stop'
-if(-not $LifecycleWorker -or $Msi -cnotin @('complete','timeout','outer-runner')){throw 'Invalid diagnostic-only fixture invocation.'}
+if(-not $LifecycleWorker -or $Msi -cnotin @('complete','timeout','outer-runner','admission') -or
+    [bool]$AdmissionOnly -ne ($Msi -ceq 'admission')){throw 'Invalid diagnostic-only fixture invocation.'}
 [Console]::OutputEncoding=[Text.UTF8Encoding]::new($false,$true)
 Set-Location -LiteralPath $WorkerLocation
 [IO.Directory]::SetCurrentDirectory($WorkerProcessDirectory)

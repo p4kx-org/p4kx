@@ -10,6 +10,7 @@ function Get-P4kxMsiWorkerArguments {
     foreach ($name in @('Target','Msi','NextMsi','NextVersion','UpgradeCode','OtherArchitectureMsi','FixtureDirectory','OutputDirectory','RegistryFixture','RegistryFixtureSha256','HelperExecutable','PreviousMsi')) {
         if ($Parameters.Keys -contains $name) { $arguments.Add('-'+$name); $arguments.Add([string]$Parameters[$name]) }
     }
+    if ($Parameters.Keys -contains 'AdmissionOnly' -and $Parameters['AdmissionOnly']) { $arguments.Add('-AdmissionOnly') }
     foreach ($value in @('-LifecycleWorker','-WorkerLocation',$Location,'-WorkerProcessDirectory',$NativeDirectory)) { $arguments.Add($value) }
     return ,$arguments.ToArray()
 }
@@ -42,7 +43,12 @@ function Invoke-P4kxMsiDiagnosticWorker {
     param([string]$Script, [System.Collections.IDictionary]$Parameters)
     if (-not $IsWindows -or $env:GITHUB_ACTIONS -cne 'true' -or $env:RUNNER_ENVIRONMENT -cne 'github-hosted') { throw 'MSI verification requires a disposable native Windows runner.' }
     if ((Get-Location).Provider.Name -cne 'FileSystem') { throw 'MSI worker requires a filesystem PowerShell location.' }
+    $admissionOnly = $Parameters.Keys -contains 'AdmissionOnly' -and [bool]$Parameters['AdmissionOnly']
     $milliseconds = Get-P4kxMsiWorkerBudget $env:P4KX_MSI_DIAGNOSTIC_DEADLINE_UTC
+    if ($admissionOnly) {
+        $admissionWatchdogMilliseconds = 90000
+        $milliseconds = [Math]::Min($milliseconds, $admissionWatchdogMilliseconds)
+    }
     $output = [IO.Path]::GetFullPath($Parameters['OutputDirectory'])
     $directory = Join-Path $output 'diagnostics'
     New-Item -ItemType Directory -Path $directory -ErrorAction Stop | Out-Null
@@ -50,7 +56,8 @@ function Invoke-P4kxMsiDiagnosticWorker {
     $observation = @{}
     $timer = [Diagnostics.Stopwatch]::StartNew()
     $result=$null; $failure=$null; $journal=$null; $inspectionFailure=$null
-    @{schema=1;role='native-msi-diagnostic-start';revision=$env:GITHUB_SHA;run=$env:GITHUB_RUN_ID;attempt=$env:GITHUB_RUN_ATTEMPT;
+    $startRole = if ($admissionOnly) {'native-msi-admission-start'} else {'native-msi-diagnostic-start'}
+    @{schema=1;role=$startRole;revision=$env:GITHUB_SHA;run=$env:GITHUB_RUN_ID;attempt=$env:GITHUB_RUN_ATTEMPT;
         target=$Parameters['Target'];process_arch=[Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString();
         deadline_utc=$env:P4KX_MSI_DIAGNOSTIC_DEADLINE_UTC;budget_ms=$milliseconds;parent_pid=$PID;
         worker_script=[IO.Path]::GetFileName($Script);worker_sha256=(Get-FileHash -LiteralPath $Script -Algorithm SHA256).Hash.ToLowerInvariant();
@@ -65,11 +72,15 @@ function Invoke-P4kxMsiDiagnosticWorker {
         $journal.present -and $journal.complete -and $journal.terminal -ceq 'end' -and $journal.active.Count -eq 0
     $persistenceFailure=$null
     try {
-    @{schema=1; role='native-msi-diagnostic-result'; revision=$env:GITHUB_SHA; run=$env:GITHUB_RUN_ID; attempt=$env:GITHUB_RUN_ATTEMPT; target=$Parameters['Target'];
-        deadline_utc=$env:P4KX_MSI_DIAGNOSTIC_DEADLINE_UTC; budget_ms=$milliseconds; elapsed_ms=$timer.ElapsedMilliseconds;
-        worker=$observation; completed_success=$proven; native_completion_unproven=(-not $proven); worker_result_returned=($null -ne $result); mutation_authority=$false;
-        journal=$journal; journal_invalid=($null -ne $inspectionFailure)} |
-        ConvertTo-Json -Depth 7 | Set-Content -LiteralPath (Join-Path $directory 'diagnostic-result.json') -Encoding utf8NoBOM
+        $resultRole = if ($admissionOnly) {'native-msi-admission-result'} else {'native-msi-diagnostic-result'}
+        $lifecycleComplete = $proven -and -not $admissionOnly
+        $receipt = @{schema=1; role=$resultRole; revision=$env:GITHUB_SHA; run=$env:GITHUB_RUN_ID; attempt=$env:GITHUB_RUN_ATTEMPT; target=$Parameters['Target'];
+            deadline_utc=$env:P4KX_MSI_DIAGNOSTIC_DEADLINE_UTC; budget_ms=$milliseconds; elapsed_ms=$timer.ElapsedMilliseconds;
+            worker=$observation; completed_success=$lifecycleComplete; native_completion_unproven=(-not $lifecycleComplete);
+            worker_result_returned=($null -ne $result); mutation_authority=$false;
+            journal=$journal; journal_invalid=($null -ne $inspectionFailure)}
+        if ($admissionOnly) { $receipt.admission_passed = $proven }
+        $receipt | ConvertTo-Json -Depth 7 | Set-Content -LiteralPath (Join-Path $directory 'diagnostic-result.json') -Encoding utf8NoBOM
     } catch { $persistenceFailure=$_.Exception }
     $diagnosticFailures=[Collections.Generic.List[Exception]]::new()
     foreach($originalFailure in @($failure,$inspectionFailure,$persistenceFailure)){if($null -ne $originalFailure){$diagnosticFailures.Add($originalFailure)}}

@@ -26,6 +26,11 @@ $prepared=New-P4kxMsiStepBudget $late $now
 Assert-FeedbackBudget ($prepared.minutes -eq 5) 'Late installer received a fresh twelve-minute allowance.'
 Assert-P4kxMsiStepAdmission $late '5' $prepared.computed_at_utc ($now.AddSeconds(30))
 Assert-FeedbackBudgetFailure {Assert-P4kxMsiStepAdmission $late '5' $prepared.computed_at_utc ($now.AddSeconds(31))} 'Stale preparation extended the original deadline.'
+$afterAdmission=$now.AddSeconds(140)
+$refreshed=New-P4kxMsiStepBudget $late $afterAdmission
+Assert-FeedbackBudget ($refreshed.deadline_utc -ceq $prepared.deadline_utc -and $refreshed.minutes -eq 3) 'Refreshing after admission must reduce the allowance under the same deadline.'
+Assert-P4kxMsiStepAdmission $late ([string]$refreshed.minutes) $refreshed.computed_at_utc ($afterAdmission.AddSeconds(5))
+Assert-FeedbackBudgetFailure {Assert-P4kxMsiStepAdmission $late '3' $refreshed.computed_at_utc ($afterAdmission.AddSeconds(11))} 'Refreshed allowance extended the original deadline.'
 foreach($minutes in @('','0','01','1.5','13','360','6')){
     Assert-FeedbackBudgetFailure {Assert-P4kxMsiStepAdmission $late $minutes $prepared.computed_at_utc $now} 'Invalid or rebound installer allowance was admitted.'
 }
