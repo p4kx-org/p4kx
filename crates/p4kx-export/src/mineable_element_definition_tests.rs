@@ -4,8 +4,9 @@
 use p4kx_extraction::{SourceLocation, SourceUseRole, SourceValueState};
 use p4kx_testkit::{DataForgeBuilder, TestRecord, TestStruct, TestType, TestValue};
 
-use super::read;
+use super::{MineableElement, read};
 use crate::build::original_input::test_support::{self, TestResult};
+use crate::catalog_projection::CatalogProjection;
 use crate::definition_reference::DefinitionStatus;
 use crate::record_observation::RecordObservation;
 
@@ -91,23 +92,7 @@ fn numeric_receipts_keep_source_bits_and_legacy_values() -> TestResult {
             SourceValueState::Absent,
             "a missing declaration retains an explicit absence state"
         );
-        let evidence = row.instability.origin();
-        let inventory = projection.origins().uses.freeze()?;
-        assert!(evidence.source_set_complete(), "known field evidence");
-        assert!(
-            inventory.uses().iter().any(|used| {
-                evidence.source_uses_refs().contains(used.id())
-                    && used.role() == SourceUseRole::Payload
-                    && matches!(
-                        used.location(),
-                        SourceLocation::Subresource { namespace, indices, field }
-                            if namespace == "dataforgeValue"
-                                && indices.first() == Some(&u64::from(record.index()))
-                                && field == "$value"
-                    )
-            }),
-            "the raw scalar uses its actual physical Record and original field occurrence"
-        );
+        check_instability_origin(&row, projection, record.index())?;
         let wire = serde_json::to_value(&row)?;
         assert_eq!(wire["guid"]["state"], "present", "direct sourced identity");
         assert!(
@@ -128,6 +113,31 @@ fn numeric_receipts_keep_source_bits_and_legacy_values() -> TestResult {
         );
         Ok(())
     })
+}
+
+fn check_instability_origin(
+    row: &MineableElement,
+    projection: &CatalogProjection<'_, '_>,
+    record_index: u32,
+) -> TestResult {
+    let evidence = row.instability.origin();
+    let inventory = projection.origins().uses.freeze()?;
+    assert!(evidence.source_set_complete(), "known field evidence");
+    assert!(
+        inventory.uses().iter().any(|used| {
+            evidence.source_uses_refs().contains(used.id())
+                && used.role() == SourceUseRole::Payload
+                && matches!(
+                    used.location(),
+                    SourceLocation::Subresource { namespace, indices, field }
+                        if namespace == "dataforgeValue"
+                            && indices.first() == Some(&u64::from(record_index))
+                            && field == "$value"
+                )
+        }),
+        "the raw scalar uses its actual physical Record and original field occurrence"
+    );
+    Ok(())
 }
 
 #[test]

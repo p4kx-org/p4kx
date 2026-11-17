@@ -4,7 +4,8 @@
 use std::collections::HashSet;
 
 use p4kx_extraction::{
-    Archive, Guid, InputScope, SourceEncryptionState, SourceLocation, SourceUseRole, SourceValue,
+    Archive, FieldOrigin, Guid, InputScope, PhysicalSourceRef, SourceEncryptionState,
+    SourceInventory, SourceLocation, SourceUseDescription, SourceUseRole, SourceValue,
 };
 use p4kx_testkit::{ArchiveBuilder, TestContainer, TestEntry};
 
@@ -173,7 +174,14 @@ fn verified_ranges_are_bound_to_the_selected_inner_entry() -> TestResult {
     assert_eq!(read.fact, Soc::Preset(preset), "verified first result");
     let selected = read.selected.ok_or("selected original GUID")?;
     assert_eq!(selected.value(), Some(&preset), "same verified token");
-    let origin = selected.origin();
+    assert_selected_preset_origin(selected.origin(), inner.input_ref(), &inventory)
+}
+
+fn assert_selected_preset_origin(
+    origin: &FieldOrigin,
+    inner: &PhysicalSourceRef,
+    inventory: &SourceInventory,
+) -> TestResult {
     assert!(
         origin.source_set_complete(),
         "both authentic token uses present"
@@ -190,11 +198,7 @@ fn verified_ranges_are_bound_to_the_selected_inner_entry() -> TestResult {
             .iter()
             .find(|used| used.id() == reference)
             .ok_or("registered token use not found")?;
-        assert_eq!(
-            observed.source(),
-            inner.input_ref(),
-            "same physically selected member"
-        );
+        assert_eq!(observed.source(), inner, "same physically selected member");
         assert!(
             inventory
                 .sources()
@@ -212,37 +216,42 @@ fn verified_ranges_are_bound_to_the_selected_inner_entry() -> TestResult {
             SourceEncryptionState::Encrypted,
             "payload encryption is inherited from the actual outer container"
         );
-        let SourceLocation::Subresource {
-            namespace,
-            indices,
-            field,
-        } = observed.location()
-        else {
-            return Err("original SOC coordinates expected".into());
-        };
-        assert_eq!(
-            namespace, "socHarvestPreset",
-            "preserved token coordinate namespace"
-        );
-        match field.as_str() {
-            "key" => {
-                assert_eq!(indices.as_slice(), &[2, 15], "whole key");
-                assert_eq!(
-                    observed.role(),
-                    SourceUseRole::Selector,
-                    "authored selection"
-                );
-            }
-            "guid" => {
-                assert_eq!(
-                    indices.as_slice(),
-                    &[16, 52],
-                    "whole GUID including its final byte"
-                );
-                assert_eq!(observed.role(), SourceUseRole::Payload, "authored value");
-            }
-            _ => return Err("unexpected SOC preset evidence field".into()),
+        assert_preset_coordinates(observed)?;
+    }
+    Ok(())
+}
+
+fn assert_preset_coordinates(observed: &SourceUseDescription) -> TestResult {
+    let SourceLocation::Subresource {
+        namespace,
+        indices,
+        field,
+    } = observed.location()
+    else {
+        return Err("original SOC coordinates expected".into());
+    };
+    assert_eq!(
+        namespace, "socHarvestPreset",
+        "preserved token coordinate namespace"
+    );
+    match field.as_str() {
+        "key" => {
+            assert_eq!(indices.as_slice(), &[2, 15], "whole key");
+            assert_eq!(
+                observed.role(),
+                SourceUseRole::Selector,
+                "authored selection"
+            );
         }
+        "guid" => {
+            assert_eq!(
+                indices.as_slice(),
+                &[16, 52],
+                "whole GUID including its final byte"
+            );
+            assert_eq!(observed.role(), SourceUseRole::Payload, "authored value");
+        }
+        _ => return Err("unexpected SOC preset evidence field".into()),
     }
     Ok(())
 }

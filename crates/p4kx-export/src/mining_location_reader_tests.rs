@@ -10,8 +10,9 @@ use fixture::archive;
 
 use crate::CatalogError;
 use crate::mining_locations::{
-    HarvestableOccurrenceRoute, MiningLocationOptions, MiningLocationSnapshot,
-    read_mining_locations, read_mining_locations_from,
+    ContainerInstanceKey, HarvestableOccurrenceRoute, MiningLocationOptions,
+    MiningLocationSnapshot, ReachedHarvestableOccurrence, read_mining_locations,
+    read_mining_locations_from,
 };
 
 const PLANET: &str = "10000000-0000-4000-8000-000000000001";
@@ -147,7 +148,7 @@ fn reads_installed_mining_locations_without_catalog_publication() -> TestResult 
     )?;
     Ok(())
 }
-fn check_links(result: &MiningLocationSnapshot) -> TestResult {
+fn check_composition(result: &MiningLocationSnapshot) -> TestResult {
     let element = result.mineable_elements.first().ok_or("element")?;
     let composition = result.mineable_compositions.first().ok_or("composition")?;
     let slot = composition
@@ -157,12 +158,6 @@ fn check_links(result: &MiningLocationSnapshot) -> TestResult {
         .ok_or("authored slot")?;
     let part = slot.value().ok_or("authored share")?;
     let link = part.mineable_element.value().ok_or("element reference")?;
-    let provider = result
-        .harvestable_provider_presets
-        .first()
-        .ok_or("provider")?;
-    let planet = result.starmap_objects.first().ok_or("planet")?;
-    let planet_guid: Guid = PLANET.parse()?;
     assert_eq!(
         link.guid().value(),
         element.source.guid.value(),
@@ -188,12 +183,23 @@ fn check_links(result: &MiningLocationSnapshot) -> TestResult {
         "the SDK proves clear Game2.dcb provenance"
     );
     assert!(
-        closed(&planet.position, result),
-        "position source use references resolve"
-    );
-    assert!(
         closed(&element.source.guid, result),
         "header source use references resolve"
+    );
+    Ok(())
+}
+
+fn check_links(result: &MiningLocationSnapshot) -> TestResult {
+    check_composition(result)?;
+    let provider = result
+        .harvestable_provider_presets
+        .first()
+        .ok_or("provider")?;
+    let planet = result.starmap_objects.first().ok_or("planet")?;
+    let planet_guid: Guid = PLANET.parse()?;
+    assert!(
+        closed(&planet.position, result),
+        "position source use references resolve"
     );
     for row in &result.harvestable_locations {
         assert_eq!(
@@ -244,35 +250,7 @@ fn check_occurrences(result: &MiningLocationSnapshot) -> TestResult {
         );
         match &row.route {
             HarvestableOccurrenceRoute::Reached(route) => {
-                for value in [&route.id, &route.parent] {
-                    assert!(closed(value, result), "route and parent selectors resolve");
-                }
-                assert!(
-                    closed(&route.root, result),
-                    "physical system root selectors resolve"
-                );
-                assert!(
-                    closed(&route.containing_record_guid, result),
-                    "original owner selector resolves"
-                );
-                let root = route.root.value().ok_or("root identity")?;
-                let id = route.id.value().ok_or("physical occurrence ID")?;
-                let parent = route.parent.value().ok_or("direct root parent")?;
-                assert_eq!(
-                    id.root_entry_index(),
-                    root.entry_index(),
-                    "the route uses the exact root"
-                );
-                assert_eq!(
-                    parent.root_entry_index(),
-                    root.entry_index(),
-                    "the parent uses the same root"
-                );
-                assert!(
-                    parent.child_node_indices().is_empty(),
-                    "parent is the root container"
-                );
-                reached.push((row, id));
+                reached.push((row, check_reached_route(route, result)?));
             }
             HarvestableOccurrenceRoute::Unreached => {
                 assert!(
@@ -302,6 +280,41 @@ fn check_occurrences(result: &MiningLocationSnapshot) -> TestResult {
         "the independent inventory-only Entry has no route"
     );
     Ok(())
+}
+
+fn check_reached_route<'route>(
+    route: &'route ReachedHarvestableOccurrence,
+    result: &MiningLocationSnapshot,
+) -> Result<&'route ContainerInstanceKey, Box<dyn std::error::Error>> {
+    for value in [&route.id, &route.parent] {
+        assert!(closed(value, result), "route and parent selectors resolve");
+    }
+    assert!(
+        closed(&route.root, result),
+        "physical system root selectors resolve"
+    );
+    assert!(
+        closed(&route.containing_record_guid, result),
+        "original owner selector resolves"
+    );
+    let root = route.root.value().ok_or("root identity")?;
+    let id = route.id.value().ok_or("physical occurrence ID")?;
+    let parent = route.parent.value().ok_or("direct root parent")?;
+    assert_eq!(
+        id.root_entry_index(),
+        root.entry_index(),
+        "the route uses the exact root"
+    );
+    assert_eq!(
+        parent.root_entry_index(),
+        root.entry_index(),
+        "the parent uses the same root"
+    );
+    assert!(
+        parent.child_node_indices().is_empty(),
+        "parent is the root container"
+    );
+    Ok(id)
 }
 
 fn check_localization(result: &MiningLocationSnapshot) -> TestResult {

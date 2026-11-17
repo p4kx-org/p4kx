@@ -60,6 +60,19 @@ fn harvest_walk_keeps_location_parity_without_general_placement_outputs()
         (&parallel, &parallel_locations),
     )?;
 
+    assert_harvest_route_parity(&archive, &full, &harvest, claim);
+    assert_retained_locations(&harvest_locations, &full_locations, planet)?;
+    assert_minimal_outputs(&full, &harvest, full_uses, harvest_uses);
+    assert_routes(&archive, &harvest, claim)?;
+    Ok(())
+}
+
+fn assert_harvest_route_parity(
+    archive: &Archive,
+    full: &Placements,
+    harvest: &Placements,
+    claim: Guid,
+) {
     assert_eq!(
         harvest.opened,
         full.opened
@@ -84,6 +97,13 @@ fn harvest_walk_keeps_location_parity_without_general_placement_outputs()
         full.get(claim).map(|placement| placement.position),
         "the same authored claim placement",
     );
+}
+
+fn assert_retained_locations(
+    harvest_locations: &Located,
+    full_locations: &Located,
+    planet: Guid,
+) -> Result<(), serde_json::Error> {
     assert_eq!(
         serde_json::to_value(&harvest_locations.locations)?,
         serde_json::to_value(&full_locations.locations)?,
@@ -109,18 +129,27 @@ fn harvest_walk_keeps_location_parity_without_general_placement_outputs()
         "the mining marker resolves through its actual parent"
     );
     assert_eq!(
-        observed_reads(&harvest_locations),
-        observed_reads(&full_locations),
+        observed_reads(harvest_locations),
+        observed_reads(full_locations),
         "same physical SOC reads"
     );
-    assert_unreadable_membership(&harvest_locations, &full_locations);
+    assert_unreadable_membership(harvest_locations, full_locations);
+    Ok(())
+}
+
+fn assert_minimal_outputs(
+    full: &Placements,
+    harvest: &Placements,
+    full_uses: usize,
+    harvest_uses: usize,
+) {
     assert_eq!(
-        companion_reads(&full),
+        companion_reads(full),
         (true, true),
         "the baseline actually reads both companions"
     );
     assert_eq!(
-        companion_reads(&harvest),
+        companion_reads(harvest),
         (false, false),
         "the harvest survey never reads companions"
     );
@@ -141,8 +170,6 @@ fn harvest_walk_keeps_location_parity_without_general_placement_outputs()
         2,
         "only the two reached occurrences of the admitted provider retain routes",
     );
-    assert_routes(&archive, &harvest, claim)?;
-    Ok(())
 }
 
 fn assert_unreadable_membership(harvest: &Located, full: &Located) {

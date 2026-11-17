@@ -11,29 +11,7 @@ use crate::record_observation::RecordObservation;
 
 #[test]
 fn a_manufacturer_reference_array_retains_each_authored_slot() -> TestResult {
-    let data = DataForgeBuilder::new()
-        .structure(TestStruct::new("FixtureOwner").array(
-            "manufacturer",
-            TestType::ReferenceTo("SCItemManufacturer".to_owned()),
-        ))
-        .structure(TestStruct::new("SCItemManufacturer"))
-        .record(
-            TestRecord::new(1, "FixtureOwner", "FixtureOwner.Ship", "ship.xml").value(
-                "manufacturer",
-                TestValue::Array(vec![
-                    TestValue::Reference(2),
-                    TestValue::Null,
-                    TestValue::Reference(2),
-                ]),
-            ),
-        )
-        .record(TestRecord::new(
-            2,
-            "SCItemManufacturer",
-            "SCItemManufacturer.Vendor",
-            "vendor.xml",
-        ))
-        .build();
+    let data = reference_array_fixture();
     test_support::with_projection(&data, |forge, projection| {
         let record = forge.record(0).ok_or("original manufacturer owner")?;
         let tree = record.tree()?;
@@ -77,4 +55,30 @@ fn a_manufacturer_reference_array_retains_each_authored_slot() -> TestResult {
         }
         Ok(())
     })
+}
+
+fn reference_array_fixture() -> Vec<u8> {
+    DataForgeBuilder::new()
+        .structure(TestStruct::new("FixtureOwner").array(
+            "manufacturer",
+            TestType::ReferenceTo("SCItemManufacturer".to_owned()),
+        ))
+        .structure(TestStruct::new("SCItemManufacturer"))
+        .record(
+            TestRecord::new(1, "FixtureOwner", "FixtureOwner.Ship", "ship.xml").value(
+                "manufacturer",
+                TestValue::Array(vec![
+                    TestValue::Reference(2),
+                    TestValue::Null,
+                    TestValue::Reference(2),
+                ]),
+            ),
+        )
+        .record(TestRecord::new(
+            2,
+            "SCItemManufacturer",
+            "SCItemManufacturer.Vendor",
+            "vendor.xml",
+        ))
+        .build()
 }

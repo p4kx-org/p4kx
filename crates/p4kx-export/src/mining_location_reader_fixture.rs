@@ -90,23 +90,7 @@ fn dataforge() -> Vec<u8> {
             )
             .value("elementInstability", TestValue::Single(0.75)),
         )
-        .record(
-            TestRecord::new(
-                COMPOSITION_RECORD,
-                "MineableComposition",
-                "MineableComposition.Synthetic",
-                "libs/foundry/records/mining/rockcompositionpresets/synthetic.xml",
-            )
-            .value("depositName", TestValue::text("@deposit_name"))
-            .value(
-                "compositionArray",
-                TestValue::Array(vec![TestValue::Struct(
-                    TestInstance::new("CompositionPart")
-                        .value("mineableElement", TestValue::Reference(ELEMENT_RECORD))
-                        .value("minPercentage", TestValue::Single(20.0)),
-                )]),
-            ),
-        )
+        .record(composition_record())
         .record(TestRecord::new(
             PRESET_RECORD,
             "HarvestableProviderPreset",
@@ -123,4 +107,22 @@ fn dataforge() -> Vec<u8> {
             .value("name", TestValue::text("@planetoid_name")),
         )
         .build()
+}
+
+fn composition_record() -> TestRecord {
+    TestRecord::new(
+        COMPOSITION_RECORD,
+        "MineableComposition",
+        "MineableComposition.Synthetic",
+        "libs/foundry/records/mining/rockcompositionpresets/synthetic.xml",
+    )
+    .value("depositName", TestValue::text("@deposit_name"))
+    .value(
+        "compositionArray",
+        TestValue::Array(vec![TestValue::Struct(
+            TestInstance::new("CompositionPart")
+                .value("mineableElement", TestValue::Reference(ELEMENT_RECORD))
+                .value("minPercentage", TestValue::Single(20.0)),
+        )]),
+    )
 }
