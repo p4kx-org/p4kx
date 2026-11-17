@@ -20,6 +20,11 @@ fn every_kind_states_its_completeness() -> TestResult {
         json!({"status": "partial", "filter": "*/spaceships/*"}),
         "partial"
     );
+    assert_eq!(
+        catalog["completeness"]["clientProfileSettings"],
+        json!({"status": "partial", "filter": "*/spaceships/*"}),
+        "client profile selection respects the Archive filter"
+    );
     assert_eq!(class_names(&catalog, "items"), Vec::<&str>::new(), "none");
     assert_eq!(class_names(&catalog, "ships"), ["ACAS_Ship"], "the ship");
     assert_eq!(
@@ -38,121 +43,12 @@ fn every_kind_states_its_completeness() -> TestResult {
     Ok(())
 }
 
-#[expect(
-    clippy::too_many_lines,
-    reason = "one expected entry per exported kind"
-)]
 fn expected_completeness() -> Value {
-    [
-        "manufacturers",
-        "items",
-        "ships",
-        "commodities",
-        "blueprints",
-        "resourceGroups",
-        "resourceTypes",
-        "tags",
-        "blueprintCategories",
-        "blueprintCategoryLists",
-        "gameplayProperties",
-        "qualityDistributions",
-        "qualityQuantizations",
-        "blueprintPools",
-        "dismantleProcesses",
-        "paints",
-        "loadouts",
-        "starmapObjects",
-        "contracts",
-        "mineableElements",
-        "refiningProcesses",
-        "mineableCompositions",
-        "miningGlobalParams",
-        "harvestableProviderPresets",
-        "subHarvestableMultiConfigs",
-        "harvestableLocations",
-        "shops",
-        "shopInventories",
-        "cargoLoadingGlobals",
-        "shopCommodityGlobals",
-        "particleLibraries",
-        "planetResources",
-        "creatures",
-        "climateAssets",
-        "geologyAssets",
-        "ecosystems",
-        "geologySets",
-        "geologyTextureSets",
-        "soils",
-        "soilTextureSets",
-        "shadingClasses",
-        "explosionDefinitions",
-        "ammoDefinitions",
-        "factions",
-        "reputationPerks",
-        "reputationTriggerRecords",
-        "reputationRewardAmounts",
-        "infractions",
-        "infractionSets",
-        "jurisdictions",
-        "securityNetworkManifests",
-        "locationClasses",
-        "locationFunctions",
-        "locationSizes",
-        "locationResourceSlots",
-        "locationClassRegistries",
-        "locationFunctionRegistries",
-        "locationSizeRegistries",
-        "npcArchetypes",
-        "npcClassPools",
-        "factionIdentities",
-        "autoSpawns",
-        "autoSpawnSets",
-        "encounterIndices",
-        "inventoryContainers",
-        "medicalItemTierConfigs",
-        "proceduralPlanetAudio",
-        "resourceNetworkGlobals",
-        "starmapTypes",
-        "starmapPresets",
-        "starmapAmenities",
-        "factionReputations",
-        "reputationScopes",
-        "reputationStandings",
-        "reputationContexts",
-        "missionTypes",
-        "missionLocalities",
-        "contractScenarios",
-        "missionScenarios",
-        "missionModuleDeclarations",
-        "missionItems",
-        "contractScopes",
-        "cargoManifests",
-        "missionLocationTemplates",
-        "contractShipSpawns",
-        "contractLocationQueries",
-        "contractTemplates",
-        "missionBrokerEntries",
-        "contractNpcSpawns",
-        "contractEntitySpawns",
-        "missionPropertySets",
-        "lootTables",
-        "lootArchetypes",
-        "lootPoolFilters",
-        "lootSecondaryChoiceSingleLayers",
-        "lootSecondaryChoiceMultiLayers",
-        "lootThemes",
-        "hierarchicalContextualDataPresets",
-        "lootGenerationGlobalParams",
-        "subHarvestableConfigs",
-        "legacyLootTables",
-        "legacyLootArchetypes",
-        "lootContainers",
-        "mineableEntities",
-        "crafters",
-        "shipStoreSlugs",
-    ]
-    .into_iter()
-    .map(|kind| (kind.to_owned(), json!({"status": "complete"})))
-    .collect::<serde_json::Map<_, _>>()
-    .into()
+    Kind::ALL
+        .into_iter()
+        .map(Kind::name)
+        .chain(["shipStoreSlugs"])
+        .map(|kind| (kind.to_owned(), json!({"status": "complete"})))
+        .collect::<serde_json::Map<_, _>>()
+        .into()
 }
