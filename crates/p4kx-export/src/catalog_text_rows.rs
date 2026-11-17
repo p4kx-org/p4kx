@@ -42,6 +42,12 @@ impl<'source> CatalogProjection<'_, 'source> {
         Ok(self.finish_rows()?.game_texts)
     }
 
+    pub(crate) fn finish_public_names(
+        &self,
+    ) -> Result<Vec<CanonicalText<'source, PublicNameRef>>, CatalogError> {
+        Ok(self.finish_rows()?.public_names)
+    }
+
     fn finish_rows(&self) -> Result<CanonicalRows<'source>, CatalogError> {
         let RegistryState {
             pending: rows,

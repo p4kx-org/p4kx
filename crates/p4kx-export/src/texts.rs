@@ -111,6 +111,10 @@ impl<'e> Texts<'e> {
             .map(p4kx_extraction::GlobalIni::skipped)
     }
 
+    pub(crate) fn notes(&self) -> &[LocalizationNote] {
+        &self.notes
+    }
+
     /// Drops the lookup indexes and returns the language counts and localization notes.
     pub(crate) fn into_summary(self) -> (Vec<TextSummary>, Vec<LocalizationNote>) {
         let summary = self.summary();

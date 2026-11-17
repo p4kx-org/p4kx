@@ -16,6 +16,7 @@ use super::Crafting;
 
 pub(crate) use mode::ReadMode;
 pub(crate) use read::{read, read_catalog};
+pub(crate) use selection::gameplay_property;
 
 /// The public crafting result and actual production-source observations.
 pub(crate) struct ReadCrafting<'f> {

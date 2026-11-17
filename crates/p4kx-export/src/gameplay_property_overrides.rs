@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::borrow::Cow;
+
 use p4kx_extraction::{SourcedValue, StructValue, Value};
 
 use crate::CatalogError;
@@ -56,7 +58,7 @@ fn entry<'source>(
     notes: &mut Vec<FieldError>,
 ) -> Result<PropertyNameOverrideSource<'source>, CatalogError> {
     let fields = CatalogFields::observed(source, path, context, capture)?;
-    let source_type = fields.source_type()?;
+    let source_type = fields.source_type()?.map(Cow::Borrowed);
     let payload = if source.type_name() == "CraftingPropertyNameOverride" {
         fields.check_observed(&["propertyName", "condition"], notes)?;
         Some(PropertyNameOverrideFields {
@@ -96,7 +98,7 @@ fn condition<'source>(
     notes: &mut Vec<FieldError>,
 ) -> Result<PropertyNameOverrideConditionSource<'source>, CatalogError> {
     let fields = CatalogFields::observed(source, path, context, capture)?;
-    let source_type = fields.source_type()?;
+    let source_type = fields.source_type()?.map(Cow::Borrowed);
     let (payload, known): (_, &[&str]) = match source.type_name() {
         "CraftingPropertyNameOverrideCondition_Base"
         | "CraftingPropertyNameOverrideCondition_Base_NonRef" => {
@@ -123,7 +125,7 @@ fn labels<'source>(
     fields: &CatalogFields<'_, 'source, '_>,
     name: &str,
     notes: &mut Vec<FieldError>,
-) -> Result<SourcedValue<Vec<SourcedValue<&'source str>>>, CatalogError> {
+) -> Result<SourcedValue<Vec<SourcedValue<Cow<'source, str>>>>, CatalogError> {
     fields.array(name, notes)?.try_map(|values| {
         values
             .iter()
@@ -136,7 +138,7 @@ fn labels<'source>(
                     "a nullable Enum",
                     notes,
                     |value| match value {
-                        Value::Enum(value) => Some(*value),
+                        Value::Enum(value) => Some(Cow::Borrowed(*value)),
                         _ => None,
                     },
                 )

@@ -13832,6 +13832,7 @@
       "description": "A structural link into this property's transformation arena.",
       "properties": {
         "nodeIndex": {
+          "description": "The zero-based index into the arena.",
           "format": "uint32",
           "maximum": 4294967295,
           "minimum": 0,
@@ -13847,10 +13848,12 @@
       "description": "The independently sourced class and payload of one original owned occurrence.",
       "properties": {
         "payload": {
-          "$ref": "#/$defs/SourcedValueOfDisplayTransformationPayload"
+          "$ref": "#/$defs/SourcedValueOfDisplayTransformationPayload",
+          "description": "Fields recognized for this class."
         },
         "sourceType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The concrete source class."
         }
       },
       "required": [
@@ -13863,6 +13866,7 @@
       "description": "Supported authored transformation forms without arithmetic evaluation.",
       "oneOf": [
         {
+          "description": "The base transformation has no fields.",
           "properties": {
             "type": {
               "const": "emptyBase",
@@ -13875,6 +13879,7 @@
           "type": "object"
         },
         {
+          "description": "Converts a factor to the negated percentage change.",
           "properties": {
             "type": {
               "const": "convertFactorToNegatedPercentChange",
@@ -13887,6 +13892,7 @@
           "type": "object"
         },
         {
+          "description": "Converts a factor to a percentage change.",
           "properties": {
             "type": {
               "const": "convertFactorToPercentChange",
@@ -13899,6 +13905,7 @@
           "type": "object"
         },
         {
+          "description": "Converts a value to a factor relative to the base value.",
           "properties": {
             "type": {
               "const": "convertValueToFactorOfBaseValue",
@@ -13911,9 +13918,11 @@
           "type": "object"
         },
         {
+          "description": "Provides an authored scale.",
           "properties": {
             "scale": {
-              "$ref": "#/$defs/SourcedValueOfResourceNumber"
+              "$ref": "#/$defs/SourcedValueOfResourceNumber",
+              "description": "The stored scale with its original numeric representation."
             },
             "type": {
               "const": "scale",
@@ -13927,9 +13936,11 @@
           "type": "object"
         },
         {
+          "description": "Provides a sequence of transformation links.",
           "properties": {
             "transformations": {
-              "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfDisplayTransformationNodeRef"
+              "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfDisplayTransformationNodeRef",
+              "description": "The ordered links to the sequence's transformation occurrences."
             },
             "type": {
               "const": "sequence",
@@ -13949,13 +13960,15 @@
       "description": "An owner-local preorder arena of original transformation occurrences.",
       "properties": {
         "nodes": {
+          "description": "The source occurrences in preorder.",
           "items": {
             "$ref": "#/$defs/DisplayTransformationNodeSource"
           },
           "type": "array"
         },
         "root": {
-          "$ref": "#/$defs/DisplayTransformationNodeRef"
+          "$ref": "#/$defs/DisplayTransformationNodeRef",
+          "description": "The arena index of the outermost transformation."
         }
       },
       "required": [
@@ -17906,7 +17919,8 @@
           "$ref": "#/$defs/SourcedValueOfstring"
         },
         "displayTransformation": {
-          "$ref": "#/$defs/SourcedValueOfDisplayTransformationSource"
+          "$ref": "#/$defs/SourcedValueOfDisplayTransformationSource",
+          "description": "The ordered declarations for displaying a value."
         },
         "fileName": {
           "$ref": "#/$defs/SourcedValueOfstring"
@@ -17918,10 +17932,12 @@
           "$ref": "#/$defs/SourcedValueOfstring"
         },
         "nameOverrides": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfPropertyNameOverrideSource"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfPropertyNameOverrideSource",
+          "description": "Original override slots in authored order."
         },
         "propertyName": {
-          "$ref": "#/$defs/SourcedValueOfPublicNameRef"
+          "$ref": "#/$defs/SourcedValueOfPublicNameRef",
+          "description": "The default public name reference."
         },
         "recordIndex": {
           "$ref": "#/$defs/SourcedValueOfuint32"
@@ -17936,7 +17952,8 @@
           "$ref": "#/$defs/SourcedValueOfstring"
         },
         "unitFormat": {
-          "$ref": "#/$defs/SourcedValueOfPublicNameRef"
+          "$ref": "#/$defs/SourcedValueOfPublicNameRef",
+          "description": "The public unit format reference."
         }
       },
       "required": [
@@ -34637,6 +34654,7 @@
       "description": "Supported condition declarations without executing a match.",
       "oneOf": [
         {
+          "description": "The base condition has no fields.",
           "properties": {
             "type": {
               "const": "emptyBase",
@@ -34649,12 +34667,15 @@
           "type": "object"
         },
         {
+          "description": "An authored item-type and subtype condition.",
           "properties": {
             "matchItemTypes": {
-              "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfstring"
+              "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfstring",
+              "description": "Original accepted type slots."
             },
             "matchSubTypes": {
-              "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfstring"
+              "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfstring",
+              "description": "Original accepted subtype slots."
             },
             "type": {
               "const": "itemType",
@@ -34675,10 +34696,12 @@
       "description": "An original condition class with its separately sourced interpretation state.",
       "properties": {
         "payload": {
-          "$ref": "#/$defs/SourcedValueOfPropertyNameOverrideConditionPayload"
+          "$ref": "#/$defs/SourcedValueOfPropertyNameOverrideConditionPayload",
+          "description": "The condition fields of the concrete source class."
         },
         "sourceType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The concrete source condition class."
         }
       },
       "required": [
@@ -34691,10 +34714,12 @@
       "description": "The authored name and condition of one override occurrence.",
       "properties": {
         "condition": {
-          "$ref": "#/$defs/SourcedValueOfPropertyNameOverrideConditionSource"
+          "$ref": "#/$defs/SourcedValueOfPropertyNameOverrideConditionSource",
+          "description": "The authored condition attached to this override."
         },
         "propertyName": {
-          "$ref": "#/$defs/SourcedValueOfPublicNameRef"
+          "$ref": "#/$defs/SourcedValueOfPublicNameRef",
+          "description": "The public name supplied by this override."
         }
       },
       "required": [
@@ -34707,10 +34732,12 @@
       "description": "A concrete authored name override independently of condition evaluation.",
       "properties": {
         "payload": {
-          "$ref": "#/$defs/SourcedValueOfPropertyNameOverrideFields"
+          "$ref": "#/$defs/SourcedValueOfPropertyNameOverrideFields",
+          "description": "The authored override fields."
         },
         "sourceType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The concrete source class."
         }
       },
       "required": [
@@ -128454,10 +128481,12 @@
       "description": "The exact decoded source text and its derived display form for one language.",
       "properties": {
         "displayText": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The text formatted for display."
         },
         "sourceText": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The decoded text, with the original markup and escapes."
         }
       },
       "required": [

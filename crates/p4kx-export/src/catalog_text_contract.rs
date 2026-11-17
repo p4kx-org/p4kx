@@ -20,7 +20,15 @@ pub(crate) use language_sources::{
 /// A reference into the public short-name domain.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(transparent)]
-pub(crate) struct PublicNameRef(pub(crate) String);
+pub struct PublicNameRef(pub(crate) String);
+
+impl PublicNameRef {
+    /// Borrows the canonical public-name identifier.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
 
 /// A reference into the protected description domain.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
@@ -50,9 +58,12 @@ pub(crate) struct CanonicalText<'source, R> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct TextForms<'source> {
-    pub(crate) source_text: SourcedValue<Cow<'source, str>>,
-    pub(crate) display_text: SourcedValue<Cow<'source, str>>,
+#[non_exhaustive]
+pub struct TextForms<'source> {
+    /// The decoded text, with the original markup and escapes.
+    pub source_text: SourcedValue<Cow<'source, str>>,
+    /// The text formatted for display.
+    pub display_text: SourcedValue<Cow<'source, str>>,
 }
 
 /// Separate public-name and protected game-text definition tables.

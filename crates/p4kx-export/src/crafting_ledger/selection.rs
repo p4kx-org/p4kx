@@ -129,6 +129,26 @@ pub(super) fn choose(
     choose_observed(record, filter, |_, _| {})
 }
 
+pub(crate) fn gameplay_property(
+    record: &Record<'_>,
+) -> Result<Option<crate::entity_selection::Selected>, DataForgeError> {
+    use crate::entity_selection::Selected;
+
+    if record.type_name()? != PROPERTIES.type_name {
+        return Ok(None);
+    }
+    Ok(choose(record, None)?.and_then(|selected| {
+        if selected.action != Action::Property {
+            return None;
+        }
+        Some(if selected.policy == ReadPolicy::SkipAfter {
+            Selected::Leftover(Kind::GameplayProperties)
+        } else {
+            Selected::Entity(Kind::GameplayProperties)
+        })
+    }))
+}
+
 pub(super) fn choose_observed(
     record: &Record<'_>,
     filter: Option<&Filter>,

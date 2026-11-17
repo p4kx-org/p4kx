@@ -5,6 +5,8 @@
 mod contract;
 #[path = "gameplay_property_overrides.rs"]
 mod overrides;
+#[path = "gameplay_property_owned.rs"]
+mod owned;
 #[path = "gameplay_property_read.rs"]
 mod read;
 #[path = "gameplay_property_rows.rs"]
@@ -15,5 +17,13 @@ mod transformation;
 mod transformation_contract;
 
 pub(crate) use contract::GameplayPropertyDefinition;
+pub use contract::{
+    GameplayProperty, GameplayPropertyFields, PropertyNameOverrideConditionPayload,
+    PropertyNameOverrideConditionSource, PropertyNameOverrideFields, PropertyNameOverrideSource,
+};
 pub(crate) use read::{read, table};
 pub(crate) use rows::{GameplayPropertyInput, GameplayPropertyRows};
+pub use transformation_contract::{
+    DisplayTransformationNodeRef, DisplayTransformationNodeSource, DisplayTransformationPayload,
+    DisplayTransformationSource,
+};

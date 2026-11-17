@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_export::catalog_queries::{
-    BlueprintCategoryListSelection, BlueprintCategoryListSnapshot, read_blueprint_category_lists,
+    BlueprintCategoryListSnapshot, CatalogRecordSelection, read_blueprint_category_lists,
     read_blueprint_category_lists_from,
 };
 use p4kx_export::{CatalogError, build_catalog, build_catalog_from};
@@ -19,12 +19,8 @@ fn category_list_queries_match_the_catalog_and_close_encrypted_source_uses() -> 
     let entry = DataForgeEntry::read(&archive)?;
     let full = build_catalog_from(&archive, &entry, &common::options())?;
     let catalog: Value = serde_json::from_slice(full.json())?;
-    let snapshot = read_blueprint_category_lists_from(
-        &archive,
-        &entry,
-        BlueprintCategoryListSelection::All,
-        None,
-    )?;
+    let snapshot =
+        read_blueprint_category_lists_from(&archive, &entry, CatalogRecordSelection::All, None)?;
     let expected = fixture::rows(&catalog)?;
     let projected = snapshot
         .rows
@@ -47,8 +43,8 @@ fn category_list_queries_match_the_catalog_and_close_encrypted_source_uses() -> 
     );
     let (source_guid, position) = selected_record(&snapshot)?;
     for selection in [
-        BlueprintCategoryListSelection::Guid(source_guid),
-        BlueprintCategoryListSelection::RecordIndex(position),
+        CatalogRecordSelection::Guid(source_guid),
+        CatalogRecordSelection::RecordIndex(position),
     ] {
         let selected = read_blueprint_category_lists_from(&archive, &entry, selection, None)?;
         assert_eq!(
@@ -113,7 +109,7 @@ fn category_list_queries_retain_duplicate_guids_and_refuse_foreign_evidence() ->
     let selected = read_blueprint_category_lists_from(
         &archive,
         &entry,
-        BlueprintCategoryListSelection::Guid(guid),
+        CatalogRecordSelection::Guid(guid),
         None,
     )?;
     let positions: Vec<_> = selected
@@ -129,12 +125,7 @@ fn category_list_queries_retain_duplicate_guids_and_refuse_foreign_evidence() ->
     let (_other_folder, other) = common::open(&database, DcbOrigin::Plain)?;
     assert!(
         matches!(
-            read_blueprint_category_lists_from(
-                &other,
-                &entry,
-                BlueprintCategoryListSelection::All,
-                None
-            ),
+            read_blueprint_category_lists_from(&other, &entry, CatalogRecordSelection::All, None),
             Err(CatalogError::SourceOriginMismatch)
         ),
         "equal bytes at another location cannot supply the selected Archive's evidence"
@@ -143,11 +134,7 @@ fn category_list_queries_retain_duplicate_guids_and_refuse_foreign_evidence() ->
     cancel.cancel();
     assert!(
         matches!(
-            read_blueprint_category_lists(
-                &archive,
-                BlueprintCategoryListSelection::All,
-                Some(&cancel)
-            ),
+            read_blueprint_category_lists(&archive, CatalogRecordSelection::All, Some(&cancel)),
             Err(CatalogError::Cancelled)
         ),
         "cancellation returns no snapshot"
@@ -177,11 +164,8 @@ fn category_list_queries_are_independent_of_unreadable_localization_payloads() -
         ),
         "the unrelated localization is present and actually unreadable"
     );
-    let selected = read_blueprint_category_lists(
-        &archive,
-        BlueprintCategoryListSelection::RecordIndex(0),
-        None,
-    )?;
+    let selected =
+        read_blueprint_category_lists(&archive, CatalogRecordSelection::RecordIndex(0), None)?;
     assert_eq!(
         selected.rows.len(),
         1,

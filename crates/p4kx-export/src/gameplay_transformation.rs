@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::borrow::Cow;
+
 use p4kx_extraction::{DataType, Field, SourcedValue, StructValue, Value};
 
 use crate::catalog_read::{CatalogFields, CatalogRecordContext};
@@ -24,7 +26,7 @@ struct Node<'tree, 'source> {
 
 struct Sequence<'tree, 'source> {
     node: Node<'tree, 'source>,
-    source_type: SourcedValue<&'source str>,
+    source_type: SourcedValue<Cow<'source, str>>,
     array: SourcedValue<&'tree [Value<'source>]>,
     slots: Vec<SourcedValue<DisplayTransformationNodeRef>>,
     path_len: usize,
@@ -117,7 +119,7 @@ impl<'source> Arena<'_, 'source> {
         path: &str,
     ) -> Result<Option<Sequence<'tree, 'source>>, CatalogError> {
         let fields = CatalogFields::observed(node.source, path, self.context, self.capture)?;
-        let source_type = fields.source_type()?;
+        let source_type = fields.source_type()?.map(Cow::Borrowed);
         if node.source.type_name() == SEQUENCE {
             let array = sequence_array(node.source, &fields, self.notes)?;
             return Ok(Some(Sequence {

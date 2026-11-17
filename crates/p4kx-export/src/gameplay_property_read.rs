@@ -16,7 +16,7 @@ use crate::record_observation::RecordObservation;
 use crate::source_fields::FieldError;
 use crate::template_field_capture::TemplateFieldCapture;
 
-use super::contract::GameplayPropertyDefinition;
+use super::contract::{GameplayPropertyDefinition, GameplayPropertyFields};
 use super::{overrides, transformation};
 
 const AUTHORED_FIELDS: [&str; 4] = [
@@ -89,10 +89,12 @@ pub(crate) fn read<'source>(
             physical_path: tree.record_path(),
             numbers: numbers.finish(),
             source: CanonicalRecordHeader::read(tree, projection.origins())?,
-            property_name,
-            display_transformation,
-            unit_format,
-            name_overrides,
+            fields: GameplayPropertyFields {
+                property_name,
+                display_transformation,
+                unit_format,
+                name_overrides,
+            },
         },
         notes,
     })
