@@ -15,6 +15,16 @@ fn original_reload_options_join_only_through_their_physical_scopes() -> TestResu
     let fixture = Fixture::open(&database(), Input::Encrypted, documents())?;
     let (built, catalog) = fixture.diagnostic()?;
     check_compressed_replay(&fixture, built.json())?;
+    let items = origin::rows(&catalog, "/definitions/items/rows")?;
+    let physical: Vec<_> = items
+        .iter()
+        .map(|item| item.pointer("/recordIndex/value").and_then(Value::as_u64))
+        .collect();
+    assert_eq!(
+        physical,
+        [Some(2), Some(1)],
+        "item definition order follows canonical GUIDs across physical scan order"
+    );
     let schema = jsonschema::validator_for(&p4kx_export::catalog_schema())?;
     schema
         .validate(&catalog)
@@ -254,6 +264,15 @@ fn database() -> Vec<u8> {
                     ),
                 )]),
             ),
+        )
+        .record(
+            TestRecord::new(
+                0x1052,
+                ENTITY,
+                "EntityClassDefinition.SyntheticOtherItem",
+                "libs/foundry/records/entities/scitem/weapons/synthetic_other.xml",
+            )
+            .value("Components", TestValue::Array(Vec::new())),
         )
         .build()
 }

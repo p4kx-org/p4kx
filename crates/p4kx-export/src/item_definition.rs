@@ -8,19 +8,25 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::Observed;
-use crate::CatalogError;
 use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_number_capture::CapturedNumber;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::original::{OriginalFlowFields, OriginalValuePart};
 use crate::catalog_record_reference::CatalogRecordReference;
 use crate::catalog_text_contract::{GameTextRef, PublicNameRef};
+use crate::guid_text::{CatalogGuid, GuidText};
 use crate::resource_float::ResourceFloat32;
 use crate::resource_number::ResourceNumber;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 use crate::source_value_catalog::{SourceArenaOutput, SourceRecordReference};
 use crate::template_field_capture::TemplateFieldCapture;
+use crate::{CatalogError, ExportAccountingError};
+
+#[path = "item_definition_staging.rs"]
+mod staging;
+
+pub(crate) use self::staging::{ItemDefinitionStaging, StagedItemDefinitions};
 
 const ATTACHABLE: &str = "SAttachableComponentParams";
 const PHYSICS: &str = "SEntityPhysicsControllerParams";
@@ -107,11 +113,12 @@ struct WeaponAttachmentMotion<'source> {
     tags: SourcedValue<&'source str>,
 }
 
-pub(crate) struct WeaponAttachment<'item, 'source> {
-    pub(crate) record: &'item SourcedValue<u32>,
-    pub(crate) slot: &'item SourcedValue<u32>,
-    pub(crate) item_type: &'item SourcedValue<&'source str>,
-    pub(crate) tags: &'item SourcedValue<&'source str>,
+/// The original sourced attachment cells needed by the weapon animation join.
+pub(crate) struct WeaponAttachment<'source> {
+    pub(crate) record: SourcedValue<u32>,
+    pub(crate) slot: SourcedValue<u32>,
+    pub(crate) item_type: SourcedValue<&'source str>,
+    pub(crate) tags: SourcedValue<&'source str>,
 }
 
 impl<'source> ItemDefinition<'source> {
@@ -119,7 +126,7 @@ impl<'source> ItemDefinition<'source> {
         &self.header.record_index
     }
 
-    pub(crate) fn weapon_attachments(&self) -> impl Iterator<Item = WeaponAttachment<'_, 'source>> {
+    fn weapon_attachments(&self) -> impl Iterator<Item = WeaponAttachment<'source>> {
         self.components
             .value()
             .into_iter()
@@ -130,10 +137,10 @@ impl<'source> ItemDefinition<'source> {
                 };
                 let source = attachment.value()?.weapon_motion.as_ref()?;
                 Some(WeaponAttachment {
-                    record: &self.header.record_index,
-                    slot: &component.component_ordinal,
-                    item_type: &source.item_type,
-                    tags: &source.tags,
+                    record: self.header.record_index.clone(),
+                    slot: component.component_ordinal.clone(),
+                    item_type: source.item_type.clone(),
+                    tags: source.tags.clone(),
                 })
             })
     }
@@ -152,17 +159,11 @@ impl<'source> ItemDefinition<'source> {
         })
     }
 
-    pub(crate) fn order(rows: &mut [Self]) {
-        rows.sort_by_cached_key(|row| {
-            (
-                row.header
-                    .guid
-                    .value()
-                    .copied()
-                    .map(crate::guid_text::CatalogGuid::text),
-                row.header.record_index.value().copied(),
-            )
-        });
+    fn order_key(&self) -> Result<(GuidText, u32), ExportAccountingError> {
+        let guid = self.header.guid.value().copied().map(CatalogGuid::text);
+        let index = self.header.record_index.value().copied();
+        guid.zip(index)
+            .ok_or(ExportAccountingError::ConflictingSourceDatum)
     }
 }
 

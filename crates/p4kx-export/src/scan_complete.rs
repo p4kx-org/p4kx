@@ -9,6 +9,7 @@ use crate::catalog_read_failure::CatalogReadFailure;
 use crate::catalog_rows::staged::OrderedComponentRows;
 use crate::catalog_v3::catalog_durability;
 use crate::catalog_v3::catalog_item_alignment::ItemPortStaging;
+use crate::catalog_v3::catalog_item_components::item_definition::ItemDefinitionStaging;
 use crate::collected::Collected;
 use crate::commodity_backfill::CommodityPresence;
 use crate::export_field_inspection::ScanInspectionFold;
@@ -35,6 +36,7 @@ impl<'f> Scan<'_, '_, 'f> {
         let scratch = std::env::temp_dir();
         let mut staging = RecordStaging {
             item_ports: ItemPortStaging::new(&scratch, self.options.cancel),
+            item_definitions: ItemDefinitionStaging::new(&scratch, self.options.cancel),
             interactions: OrderedComponentRows::new(&scratch, self.options.cancel),
             health: OrderedComponentRows::new(&scratch, self.options.cancel),
         };
@@ -53,23 +55,24 @@ impl<'f> Scan<'_, '_, 'f> {
             .entity_configurations
             .install_staged_interactions(staging.interactions, self.forge)?;
         collected.item_health = catalog_durability::finish_health(staging.health, self.forge)?;
-        for failure in failures {
-            collected.take(Picked::Failed(failure));
-        }
+        collected.failures.extend(failures);
         let resources = self.resource_commodities(evidence.commodities, &collected, &ledger)?;
         for pick in resources.picked {
-            collected.take(pick);
+            collected.take(pick, &mut staging.item_definitions)?;
         }
         collected.tags.entity_tags.extend(resources.entity_tags);
         inspections.merge(&mut ledger, resources.ledger);
         if let Some(warning) = self.links.warning() {
-            collected.take(Picked::Warned(warning));
+            collected.take(Picked::Warned(warning), &mut staging.item_definitions)?;
         }
         if self.options.filter.is_none()
             && evidence.has_signatures
             && let Some(problem) = slot_problem
         {
-            collected.take(Picked::Warned(problem.warning()));
+            collected.take(
+                Picked::Warned(problem.warning()),
+                &mut staging.item_definitions,
+            )?;
         }
         let inventories = Kind::ALL.into_iter().filter(|kind| {
             !kind.has_dedicated_reader() && !kind.is_derived() && self.domain.includes(*kind)
@@ -78,8 +81,11 @@ impl<'f> Scan<'_, '_, 'f> {
             ledger.inventory(kind);
         }
         let mut ammo_ledger = ExportLedger::default();
-        self.ammo
-            .dependencies(|pick| collected.take(pick), &mut ammo_ledger)?;
+        self.ammo.dependencies(
+            |pick| collected.take(pick, &mut staging.item_definitions),
+            &mut ammo_ledger,
+        )?;
+        collected.item_definitions = staging.item_definitions.finish(self.forge)?;
         inspections.merge(&mut ledger, ammo_ledger);
         collected.ledger.merge(ledger);
         Ok(collected)
@@ -113,7 +119,7 @@ impl<'f> Scan<'_, '_, 'f> {
                     if let Some(mut pick) = record.picked {
                         evidence.observe(&mut pick);
                         staging.stage_health(&mut pick)?;
-                        collected.take(pick);
+                        collected.take(pick, &mut staging.item_definitions)?;
                     }
                     collected.tags.entity_tags.extend(record.entity.tags);
                     let mut configurations = record.entity.configurations;
@@ -132,6 +138,7 @@ impl<'f> Scan<'_, '_, 'f> {
 
 struct RecordStaging<'stage, 'source> {
     item_ports: ItemPortStaging<'stage, 'source>,
+    item_definitions: ItemDefinitionStaging<'stage, 'source>,
     interactions: OrderedComponentRows<'stage>,
     health: OrderedComponentRows<'stage>,
 }

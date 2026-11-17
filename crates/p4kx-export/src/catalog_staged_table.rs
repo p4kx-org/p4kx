@@ -8,7 +8,7 @@ use p4kx_extraction::{CancelToken, DataForge};
 use serde::ser::SerializeStruct;
 use serde::{Serialize, Serializer};
 
-use super::spool::{RowSpool, RowSpoolError, RowSpoolWriter, checkpoint};
+use super::spool::{IndexedRowSpoolWriter, RowSpool, RowSpoolError, RowSpoolWriter, checkpoint};
 use crate::catalog_table::DatasetAvailability;
 use crate::{CatalogError, ExportAccountingError};
 
@@ -49,6 +49,58 @@ impl<'a> StagedCatalogRows<'a> {
             None
         };
         Ok(StagedCatalogTable::new(availability, spool, self.cancel))
+    }
+}
+
+/// A private spool that admits rows in physical order and emits them stably by key.
+pub(crate) struct IndexedCatalogRows<'stage, Key> {
+    directory: &'stage Path,
+    cancel: Option<&'stage CancelToken>,
+    writer: Option<IndexedRowSpoolWriter<Key>>,
+}
+
+impl<'stage, Key: Ord> IndexedCatalogRows<'stage, Key> {
+    pub(crate) const fn new(directory: &'stage Path, cancel: Option<&'stage CancelToken>) -> Self {
+        Self {
+            directory,
+            cancel,
+            writer: None,
+        }
+    }
+
+    pub(crate) fn append(&mut self, key: Key, row: &impl Serialize) -> Result<(), CatalogError> {
+        let writer = if let Some(writer) = &mut self.writer {
+            writer
+        } else {
+            checkpoint(self.cancel)?;
+            self.writer
+                .insert(IndexedRowSpoolWriter::new(self.directory)?)
+        };
+        writer
+            .append(key, row, self.cancel)
+            .map_err(CatalogError::from)
+    }
+
+    pub(crate) fn finish(
+        self,
+        forge: &DataForge<'_>,
+        source_types: &[&str],
+    ) -> Result<StagedCatalogTable, CatalogError> {
+        if let Some(writer) = self.writer {
+            let spool = writer.finish(self.cancel)?;
+            Ok(StagedCatalogTable::new(
+                DatasetAvailability::Available,
+                Some(spool),
+                self.cancel,
+            ))
+        } else {
+            checkpoint(self.cancel)?;
+            Ok(StagedCatalogTable::empty(
+                DatasetAvailability::from_source_declarations(forge, |name| {
+                    source_types.contains(&name)
+                }),
+            ))
+        }
     }
 }
 

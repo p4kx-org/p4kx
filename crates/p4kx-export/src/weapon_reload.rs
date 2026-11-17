@@ -13,9 +13,7 @@ use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_read::original::{EntryCapture, PhysicalEntryRef};
 use crate::catalog_rows::staged::{StagedCatalogRows, StagedCatalogTable};
 use crate::catalog_table::DatasetAvailability;
-use crate::catalog_v3::catalog_item_components::item_definition::{
-    ItemDefinition, WeaponAttachment,
-};
+use crate::catalog_v3::catalog_item_components::item_definition::WeaponAttachment;
 use crate::export_ledger::ExportLedger;
 use crate::schema_fields::every_field_required;
 
@@ -75,14 +73,10 @@ pub(crate) fn read<'source>(
     archive: &Archive,
     entities: &Entities<'source>,
     input: &OriginalCatalogInput<'_, 'source>,
-    items: &[ItemDefinition<'source>],
+    weapons: &[WeaponAttachment<'source>],
     cancel: Option<&CancelToken>,
     ledger: &mut ExportLedger,
 ) -> Result<WeaponAnimation<'source>, CatalogError> {
-    let weapons = items
-        .iter()
-        .flat_map(ItemDefinition::weapon_attachments)
-        .collect::<Vec<_>>();
     if weapons.is_empty() {
         return Ok(WeaponAnimation {
             sources: WeaponAnimationSources::default(),
@@ -107,7 +101,7 @@ pub(crate) fn read<'source>(
         &branches,
         &scopes,
         &assets,
-        &weapons,
+        weapons,
         (sources, cancel),
         &mut candidates,
     )?;
@@ -162,7 +156,7 @@ fn build_rows(
     branches: &[BranchLink],
     scopes: &[DatabaseScopes],
     assets: &Assets<'_, '_, '_>,
-    weapons: &[WeaponAttachment<'_, '_>],
+    weapons: &[WeaponAttachment<'_>],
     (sources, cancel): (&SourceUses, Option<&CancelToken>),
     candidates: &mut StagedCatalogRows<'_>,
 ) -> Result<Vec<FragmentMatch>, CatalogError> {
@@ -250,7 +244,7 @@ fn reachable(
     false
 }
 
-fn weapons_by_tag(weapons: &[WeaponAttachment<'_, '_>]) -> BTreeMap<String, Vec<usize>> {
+fn weapons_by_tag(weapons: &[WeaponAttachment<'_>]) -> BTreeMap<String, Vec<usize>> {
     let mut names = BTreeMap::<_, Vec<_>>::new();
     for (index, weapon) in weapons.iter().enumerate() {
         if let Some(tags) = weapon.tags.value() {

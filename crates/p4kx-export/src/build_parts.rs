@@ -10,7 +10,6 @@ use crate::catalog_output::Written;
 use crate::catalog_projections::weapon_reload::{self, WeaponAnimation};
 use crate::catalog_read::original::EntryCapture;
 use crate::catalog_table::CatalogTable;
-use crate::catalog_v3::catalog_item_components::item_definition::ItemDefinition;
 use crate::catalog_v3::faction_identity_definition::{
     self, FactionIdentityDefinition, PreparedFactionIdentity,
 };
@@ -86,13 +85,6 @@ pub(super) fn blueprint_tables(
     )
 }
 
-pub(super) fn item_definitions<'source>(
-    forge: &DataForge<'_>,
-    rows: Vec<ItemDefinition<'source>>,
-) -> CatalogTable<ItemDefinition<'source>> {
-    CatalogTable::new(forge, &[crate::Kind::Items.records().type_name], rows)
-}
-
 pub(super) fn faction_identities<'source>(
     forge: &DataForge<'_>,
     rows: Vec<PreparedFactionIdentity<'source>>,
@@ -107,11 +99,12 @@ pub(super) fn capture_weapon_animation<'source>(
     options: &crate::CatalogOptions<'_>,
     collected: &mut Collected<'source>,
 ) -> Result<WeaponAnimation<'source>, crate::CatalogError> {
+    let weapons = std::mem::take(&mut collected.item_definitions.weapons);
     weapon_reload::read(
         archive,
         entities,
         input,
-        &collected.item_definitions,
+        &weapons,
         options.cancel,
         &mut collected.ledger,
     )

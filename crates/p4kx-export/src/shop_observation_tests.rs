@@ -75,24 +75,21 @@ fn corrupt_zstd(path: &str) -> TestEntry {
 }
 
 fn empty_collected() -> Collected<'static> {
-    Collected::new(
-        Vec::new(),
-        CraftingKinds {
-            blueprints: Vec::new(),
-            properties: Vec::new(),
-            quality: crate::quality_catalog::QualityRows::default(),
-            pools: Vec::new(),
-            dismantle: Vec::new(),
-            skipped: Vec::new(),
-            failures: Vec::new(),
-            warnings: Vec::new(),
-            ledger: ExportLedger::default(),
-            global: CraftingGlobal {
-                dismantle_excluded_resource_guids: Vec::new(),
-                dismantle_excluded_item_guids: Vec::new(),
-            },
+    Collected::from_crafting(CraftingKinds {
+        blueprints: Vec::new(),
+        properties: Vec::new(),
+        quality: crate::quality_catalog::QualityRows::default(),
+        pools: Vec::new(),
+        dismantle: Vec::new(),
+        skipped: Vec::new(),
+        failures: Vec::new(),
+        warnings: Vec::new(),
+        ledger: ExportLedger::default(),
+        global: CraftingGlobal {
+            dismantle_excluded_resource_guids: Vec::new(),
+            dismantle_excluded_item_guids: Vec::new(),
         },
-    )
+    })
 }
 
 #[test]

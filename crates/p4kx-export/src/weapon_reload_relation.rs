@@ -177,7 +177,7 @@ fn fragment_status<'a>(
 }
 
 pub(super) struct CandidateInput<'a, 'source> {
-    pub(super) weapon: &'a WeaponAttachment<'a, 'source>,
+    pub(super) weapon: &'a WeaponAttachment<'source>,
     pub(super) actor: &'a SourcedValue<u32>,
     pub(super) component: &'a SourcedValue<u32>,
     pub(super) edge: &'a BranchLink,

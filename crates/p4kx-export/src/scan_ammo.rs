@@ -134,14 +134,14 @@ impl<'options, 'input, 'source> AmmoReads<'options, 'input, 'source> {
     /// Releases canonical rows for required ammunition and magazine dependencies.
     pub(super) fn dependencies(
         &self,
-        mut collect: impl FnMut(Picked<'source>),
+        mut collect: impl FnMut(Picked<'source>) -> Result<(), CatalogError>,
         ledger: &mut ExportLedger,
     ) -> Result<(), CatalogError> {
         for row in self.dependency_rows(ledger)? {
-            collect(Picked::AmmoDefinition(Box::new(row)));
+            collect(Picked::AmmoDefinition(Box::new(row)))?;
         }
         for row in self.magazines.take(ledger)? {
-            collect(Picked::AmmoMagazineDependency(Box::new(row)));
+            collect(Picked::AmmoMagazineDependency(Box::new(row)))?;
         }
         Ok(())
     }

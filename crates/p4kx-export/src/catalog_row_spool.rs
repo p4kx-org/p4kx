@@ -16,6 +16,11 @@ use zstd::stream::{read, write};
 
 use crate::CatalogError;
 
+#[path = "catalog_indexed_row_spool.rs"]
+mod indexed;
+
+pub(crate) use self::indexed::IndexedRowSpoolWriter;
+
 const BUFFER_BYTES: usize = 64 * 1024;
 const SPOOL_ZSTD_LEVEL: i32 = 1;
 
@@ -81,19 +86,16 @@ impl RowSpoolWriter {
         let mut encoder = self.encoder.take().ok_or(RowSpoolError::Closed)?;
         checkpoint(cancel)?;
         let rows = self.rows.checked_add(1).ok_or(RowSpoolError::Overflow)?;
-        self.row.bytes.clear();
-        let serialized = serde_json::to_writer(CheckedIo::new(&mut self.row, cancel), row);
-        checkpoint(cancel)?;
-        serialized.map_err(RowSpoolError::Encode)?;
-        let length = u64::try_from(self.row.bytes.len()).map_err(|_| RowSpoolError::Overflow)?;
+        let bytes = self.row.encode(row, cancel)?;
+        let length = u64::try_from(bytes.len()).map_err(|_| RowSpoolError::Overflow)?;
         let mut output = CheckedIo::new(&mut encoder, cancel);
         let written = output
             .write_all(&length.to_le_bytes())
-            .and_then(|()| output.write_all(&self.row.bytes));
+            .and_then(|()| output.write_all(bytes));
         checkpoint(cancel)?;
         written?;
         self.rows = rows;
-        self.largest_row = self.largest_row.max(self.row.bytes.len());
+        self.largest_row = self.largest_row.max(bytes.len());
         self.encoder = Some(encoder);
         Ok(())
     }
@@ -120,6 +122,7 @@ impl RowSpoolWriter {
             rows: self.rows,
             largest_row: self.largest_row,
             bytes,
+            frames: None,
         })
     }
 }
@@ -131,6 +134,7 @@ pub(crate) struct RowSpool {
     rows: usize,
     largest_row: usize,
     bytes: u64,
+    frames: Option<Vec<indexed::Frame>>,
 }
 
 impl RowSpool {
@@ -164,6 +168,9 @@ impl RowSpool {
         })?;
         if file.metadata().map_err(RowSpoolError::Io)?.len() != self.bytes {
             return Err(RowSpoolError::Corrupt("compressed length changed").into());
+        }
+        if let Some(frames) = &self.frames {
+            return indexed::replay(&mut file, frames, cancel, visit);
         }
         file.rewind().map_err(RowSpoolError::Io)?;
         let input = CheckedIo::new(&mut *file, cancel);
@@ -280,6 +287,20 @@ fn checked_read(
 #[derive(Default)]
 struct RowBuffer {
     bytes: Vec<u8>,
+}
+
+impl RowBuffer {
+    fn encode(
+        &mut self,
+        row: &(impl Serialize + ?Sized),
+        cancel: Option<&CancelToken>,
+    ) -> Result<&[u8], RowSpoolError> {
+        self.bytes.clear();
+        let serialized = serde_json::to_writer(CheckedIo::new(&mut *self, cancel), row);
+        checkpoint(cancel)?;
+        serialized.map_err(RowSpoolError::Encode)?;
+        Ok(&self.bytes)
+    }
 }
 
 impl Write for RowBuffer {

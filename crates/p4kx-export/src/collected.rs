@@ -19,6 +19,9 @@ use crate::catalog_v3::blueprint_category_list::PreparedBlueprintCategoryList;
 use crate::catalog_v3::cargo_globals::CargoGlobals;
 use crate::catalog_v3::catalog_entity_configurations::EntityConfigurationRows;
 use crate::catalog_v3::catalog_item_components::ItemComponentRows;
+use crate::catalog_v3::catalog_item_components::item_definition::{
+    ItemDefinitionStaging, StagedItemDefinitions,
+};
 use crate::catalog_v3::catalog_resource_network_read::resource_network_global::PreparedResourceNetworkGlobal;
 use crate::catalog_v3::explosion_definition::PreparedExplosionDefinition;
 use crate::catalog_v3::faction_definition::PreparedFaction;
@@ -79,7 +82,7 @@ pub(crate) struct Collected<'f> {
     pub(crate) location_vocabulary: LocationVocabulary<'f>,
     pub(crate) npc_spawn_definitions: NpcSpawnDefinitions<'f>,
     pub(crate) items: Vec<Item<'f>>,
-    pub(crate) item_definitions: Vec<crate::catalog_v3::catalog_item_components::item_definition::ItemDefinition<'f>>,
+    pub(crate) item_definitions: StagedItemDefinitions<'f>,
     pub(crate) item_components: ItemComponentRows<'f>,
     pub(crate) item_health: StagedCatalogTable,
     pub(crate) entity_configurations: EntityConfigurationRows<'f>,
@@ -153,17 +156,6 @@ pub(crate) struct Collected<'f> {
 }
 
 impl<'f> Collected<'f> {
-    /// Collects picked Records and crafting rows in GUID order.
-    #[cfg(test)]
-    pub(crate) fn new(picked: Vec<Picked<'f>>, crafting: CraftingKinds<'f>) -> Self {
-        let mut collected = Self::from_crafting(crafting);
-        for pick in picked {
-            collected.take(pick);
-        }
-        collected.finish_selection();
-        collected
-    }
-
     /// Orders the completed selection and retains category skip and failure identities.
     pub(crate) fn finish_selection(&mut self) {
         self.missing_blueprint_categories.extend(
@@ -198,7 +190,7 @@ impl<'f> Collected<'f> {
             faction_identities: Vec::new(),
             factions: Vec::new(),
             items: Vec::new(),
-            item_definitions: Vec::new(),
+            item_definitions: StagedItemDefinitions::default(),
             item_components: ItemComponentRows::default(),
             item_health: StagedCatalogTable::empty(DatasetAvailability::Absent),
             entity_configurations: EntityConfigurationRows::default(),
@@ -277,7 +269,11 @@ impl<'f> Collected<'f> {
         clippy::too_many_lines,
         reason = "one exhaustive dispatch arm per selected row"
     )]
-    pub(crate) fn take(&mut self, pick: Picked<'f>) {
+    pub(crate) fn take(
+        &mut self,
+        pick: Picked<'f>,
+        definitions: &mut ItemDefinitionStaging<'_, 'f>,
+    ) -> Result<(), crate::CatalogError> {
         match pick {
             Picked::Manufacturer(entity) => self.manufacturers.push(*entity),
             Picked::FactionIdentity(entity) => self.faction_identities.push(*entity),
@@ -289,11 +285,11 @@ impl<'f> Collected<'f> {
                 components,
                 definition,
             } => {
+                definitions.append(&definition)?;
                 self.item_classes.count(line);
                 self.port_items.extend(ports);
                 self.playability.items.count(entity.playability);
                 self.items.push(entity);
-                self.item_definitions.push(*definition);
                 self.item_components.extend(components);
             }
             Picked::Ship(entity, vehicle) => {
@@ -343,7 +339,7 @@ impl<'f> Collected<'f> {
             Picked::Crafter(entity) => self.crafters.push(entity),
             Picked::Crafted(pick, entity) => {
                 self.crafters.push(entity);
-                self.take(*pick);
+                self.take(*pick, definitions)?;
             }
             Picked::Skipped(kind, guid) => {
                 if kind == Kind::BlueprintCategories {
@@ -358,6 +354,7 @@ impl<'f> Collected<'f> {
             Picked::Failed(failure) => self.failures.push(failure),
             Picked::Warned(warning) => self.warnings.push(warning),
         }
+        Ok(())
     }
 
     fn skip(&mut self, kind: Kind) {

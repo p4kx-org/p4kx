@@ -104,8 +104,10 @@ use crate::template_definition::TemplateDefinition;
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct CatalogDefinitions<'source> {
-    pub(crate) items:
-        CatalogTable<super::catalog_item_components::item_definition::ItemDefinition<'source>>,
+    #[schemars(
+        with = "CatalogTable<super::catalog_item_components::item_definition::ItemDefinition<'source>>"
+    )]
+    pub(crate) items: StagedCatalogTable,
     #[schemars(with = "CatalogTable<crate::blueprint_definition::BlueprintDefinition<'source>>")]
     pub(crate) blueprints: StagedCatalogTable,
     #[schemars(with = "CatalogTable<GeneratorDefinition<'source>>")]

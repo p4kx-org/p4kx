@@ -214,7 +214,7 @@ fn assemble<R>(
         },
         placements: catalog_placements,
         definitions: CatalogDefinitions {
-            items: parts::item_definitions(&forge, collected.item_definitions),
+            items: collected.item_definitions.table,
             blueprints: blueprint_definitions,
             shop_inventories: collected.shop_inventories,
             particle_libraries: collected.particle_libraries,
