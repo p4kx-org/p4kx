@@ -108,9 +108,11 @@ unit of raw canvases. The rules are read from the Records and the field names; t
 - **Sizes of automatic widgets** come from the content: a text as large as its glyphs, a
   container as large as its children (the sum along the axis of a flex, stack or grid container
   with the spacing, the largest child across and in an overlay), over the children whose size
-  does not depend on the parent. A widget without such a content takes the size of its parent,
-  and says so. Measuring is bounded by the widget limit and each result is kept per widget,
-  ancestor chain and parent size.
+  does not depend on the parent. An automatic leaf without measurable content contributes
+  zero before margins, as it does during placement. When a container's children supply no
+  independent extent on an axis, that axis takes the size of its parent and is reported.
+  Measuring is bounded by the widget limit and each result is kept per widget, ancestor chain
+  and parent size.
 - **Corners.** Rounded and chamfered corners of the box are drawn for the background, and a
   border of one width and colour follows the outline as a ring between two contours; borders that
   differ are drawn straight and listed. A radius is held at half the shorter side. Gradient

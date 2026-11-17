@@ -170,18 +170,14 @@ and 365 Secondary instances. The selected General source produced 359,840
 frame pixels and 301 label pixels. The MFD footer proof found two original
 Secondary frames with 5,680 visible pixels each.
 
-The selected GeneralLarge Canvas resolved its original label and mounted
-both original frame widgets. None of the label's 14 glyph bounds overlapped
-the raster stage. Their transforms were nonsingular and the solid paint
-had visible alpha. The glyphs remained invisible in an isolated raster
-with the masks removed. Neither original frame widget submitted a draw
-item. Both frame styles resolved to SVGs. The holder entered a finite,
-vertical flex layout with positive resolved dimensions, a second in-flow
-sibling, and no margins or explicit size bounds. The layout had negative
-free space and assigned the holder zero height before mounting the
-template. Neither frame reached an SVG request. The expected allocation
-for this authored layout remains unverified, so the candidate does not
-establish visible default GeneralLarge rendering.
+In the selected GeneralLarge Canvas a nonshrinking automatic flex sibling
+has one active leaf with no measurable content. The leaf has zero height
+when placed. Including that same extent in intrinsic measurement prevents
+the sibling from taking the whole parent height. The holder retains space
+after the row gap and mounts its original template in the stage. Both
+original frame widgets read their SVGs from the Archive. Removing the
+tracked frame and label items from separate passes changes 372,218 and
+50,532 pixels respectively.
 
 ## Guesses, unverified against the game
 

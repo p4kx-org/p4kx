@@ -259,7 +259,43 @@ fn a_container_of_automatic_size_is_as_large_as_its_children() -> TestResult {
 }
 
 #[test]
-fn a_container_whose_children_ask_for_nothing_takes_the_size_of_its_parent() -> TestResult {
+fn a_measurable_empty_child_leaves_space_for_a_shrinkable_sibling() -> TestResult {
+    let image = render(
+        &canvas()
+            .widget(TestWidget::display("column").flex("Column", "Start", "Start", 4.0))
+            .widget(
+                TestWidget::display("auto")
+                    .parent("column")
+                    .size(TestDim::Fixed(20.0), TestDim::Auto),
+            )
+            .widget(
+                TestWidget::display("empty")
+                    .parent("auto")
+                    .size(TestDim::Fixed(20.0), TestDim::Auto)
+                    .background(BLUE),
+            )
+            .widget(
+                TestWidget::display("holder")
+                    .parent("column")
+                    .size(TestDim::Fixed(20.0), TestDim::Percent(1.0))
+                    .shrink(1.0)
+                    .background(RED),
+            ),
+    )?;
+    assert!(
+        empty_at(&image, 5, 2),
+        "the only space above the holder is the gap"
+    );
+    assert!(red_at(&image, 5, 6), "the holder starts below the gap");
+    assert!(
+        red_at(&image, 5, 47),
+        "the holder keeps the remaining height"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_container_with_only_relative_children_takes_the_size_of_its_parent() -> TestResult {
     let composed = compose(
         &canvas()
             .widget(

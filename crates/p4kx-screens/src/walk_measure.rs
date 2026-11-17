@@ -243,7 +243,7 @@ impl Walk<'_, '_, '_, '_> {
         {
             let own = match dim {
                 Dim::Fixed(value) => Some(value),
-                Dim::Auto => content,
+                Dim::Auto => content.or((!child.has_children).then_some(0.0)),
                 Dim::Percent(_) | Dim::OfWidth(_) | Dim::OfHeight(_) => None,
             };
             *slot = own
