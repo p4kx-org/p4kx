@@ -20,6 +20,11 @@ on:
       - "blender_addon/**"
   workflow_dispatch:
     inputs:
+      windows-observation-control-only:
+        description: Observe harmless native Windows worker lifetime without builds or installation
+        type: boolean
+        default: false
+        required: false
       linux-only:
         description: Validate native Linux packages without Windows, external scans or publication
         type: boolean
@@ -41,7 +46,14 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  windows-observation-control:
+    if: github.event_name == 'workflow_dispatch' && inputs.windows-observation-control-only
+    permissions:
+      contents: read
+    uses: ./.github/workflows/windows-msi-detached-control.yml
+
   prepare:
+    if: github.event_name != 'workflow_dispatch' || !inputs.windows-observation-control-only
     name: Release identity and package plan
     runs-on: ubuntu-24.04
     timeout-minutes: 15

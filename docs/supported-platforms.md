@@ -97,6 +97,20 @@ CPUs and package formats for that OS without external scans or publication. The 
 mutually exclusive. These scoped checks do not replace the final full release matrix from one
 source commit.
 
+The manual Release option `windows-observation-control-only` runs a small process-lifetime
+control on both native Windows CPUs. Set `$releaseCandidateRef` to the candidate branch:
+
+```powershell
+gh workflow run release.yml --ref $releaseCandidateRef -f windows-observation-control-only=true
+```
+
+The control verifies a source-bound worker across separate workflow steps, uploads its active
+phase checkpoint, and requires a closed journal after release or a failed terminal on deadline
+expiry. Receipts bind the original request, PID and start time, target, source hashes and
+unchanged runner tracking fingerprint. Their scope is process observation and owned cleanup.
+MSI package acceptance still requires the original installation and runtime proofs.
+The control's checkpoint and completion artifacts retain `native_completion_unproven: true`.
+
 Before checksums and release notes are assembled, `check-release-matrix.ps1` requires:
 
 - Thirteen non-empty native packages, comprising four for Windows, eight for Linux and one DMG for macOS.
