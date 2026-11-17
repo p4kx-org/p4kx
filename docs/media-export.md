@@ -619,6 +619,14 @@ independent of content, while filenames retain metadata origins. Actual parsed d
 syntax failures keep their consumed payload contributions. Literal configuration bounds and null
 counts do not acquire contributions from unused retained bytes.
 
+Compiled cache inventory uses the `shaderCacheInventory` profile within `field-origins/2`.
+The selected physical Entry path contributes to the cache family and inventory count.
+Compiled payload decoding remains unsupported. Its decoder status and zero counters have
+complete empty contribution sets. Raw digest provenance continues to follow the actual bytes.
+The profile adds one vocabulary value with the same occurrence shape and reference rules.
+Readers with this vocabulary also accept older `unmigrated` rows. Readers with an older
+closed profile vocabulary need the updated vocabulary for new cache inventory rows.
+
 Other RootSource and general Index fields, compiled shader-cache semantics and other provider
 carriers retain explicitly incomplete or unknown coverage in this slice. A profile name and
 per-occurrence coverage are separate from existing payload health and record status.

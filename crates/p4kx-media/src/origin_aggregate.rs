@@ -198,6 +198,7 @@ const fn known_members(profile: OriginProfile) -> &'static [&'static str] {
         OriginProfile::MaterialConfigurationFailure => &["/data/record_type"],
         OriginProfile::ArchiveLayout
         | OriginProfile::Unmigrated
+        | OriginProfile::ShaderCacheInventory
         | OriginProfile::AudioWem
         | OriginProfile::AudioBank
         | OriginProfile::AudioControl
@@ -238,6 +239,7 @@ fn explicit_data(resolver: &OriginResolver<'_>) -> bool {
             OriginProfile::AudioWem
                 | OriginProfile::AudioBank
                 | OriginProfile::AudioControl
+                | OriginProfile::ShaderCacheInventory
                 | OriginProfile::Animation
                 | OriginProfile::AnimationDefinition
                 | OriginProfile::Model

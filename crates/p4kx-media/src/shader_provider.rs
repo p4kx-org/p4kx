@@ -1,12 +1,18 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::{FieldPath, InputScope, SourceUseRole};
+
+use crate::origin_capture::OriginSite;
+use crate::origin_contract::OriginProfile;
+use crate::origin_prepared::PreparedRecordOrigins;
+use crate::origin_resolver::BuiltinOrigins;
 use crate::shader_payload::{ShaderCache, ShaderCacheDecode, ShaderCacheKind, ShaderPayload};
 use crate::{
     Capability, FieldGroup, MediaError, MediaIssue, MediaKind, MediaWriter, Projection, Provider,
     Severity, SourceContext, Status, Subresource,
 };
-use crate::{shader_projection, shader_source};
+use crate::{origin_error, shader_projection, shader_source};
 
 /// Stateless projection of source extension declarations and explicit compiled-cache inventory.
 #[derive(Debug, Clone, Copy, Default)]
@@ -91,7 +97,8 @@ impl Provider for ShaderProvider {
             definitions: 0,
             properties: 0,
         });
-        writer.record(
+        let origins = cache_origins(context, writer)?;
+        writer.record_with_origins(
             &Subresource::new(shader_projection::CACHE_NAMESPACE, Vec::new()),
             Status::Complete,
             &data,
@@ -101,7 +108,38 @@ impl Provider for ShaderProvider {
                 Severity::Info,
                 "Raw cache inventory is complete; compiled shader semantics are not decoded.",
             )],
+            origins,
         )?;
         Ok(Projection::Written)
     }
+}
+
+fn cache_origins(
+    context: &SourceContext<'_>,
+    writer: &MediaWriter<'_>,
+) -> Result<PreparedRecordOrigins, MediaError> {
+    let input = context.origin_input(writer)?;
+    let mut origins = writer.record_origins();
+    let scope = InputScope::ArchiveDirectoryMetadata;
+    for (path, role) in [
+        ("/data/payload/family", SourceUseRole::Selector),
+        ("/data/payload/compiled_caches", SourceUseRole::Conversion),
+    ] {
+        let mut capture = writer.capture_origins();
+        capture.add(
+            &input,
+            scope,
+            OriginSite::new("media-physical-input", &[], "path"),
+            role,
+            writer,
+        )?;
+        let field = FieldPath::parse(path).map_err(|error| origin_error::address(&error))?;
+        origins.insert(&field, capture.finish(), writer)?;
+    }
+    origins.set_builtin(BuiltinOrigins {
+        profile: OriginProfile::ShaderCacheInventory,
+        input,
+        scope,
+    })?;
+    Ok(origins)
 }

@@ -8,6 +8,9 @@ use p4kx_testkit::{TestContainer, TestEntry};
 
 use super::shader_support::{self as support, TestResult};
 
+#[path = "shader_cache_origins.rs"]
+mod cache_origins;
+
 const FIRST: &str = "Version(1)\nUsesCommonGlobalFlags\nProperty { Name=%A; Mask(0x20000000000001); Hidden; Unknown { Nested(\"})\") } }\nProperty { Name=%A; Name(); Hidden(); DependencySet($A); DependencySet=($B|$C); }";
 const SECOND: &str = "\u{feff}Version = synthetic\r\nMystery { Child = %X; }\r\nProperty { Description(\"工具\"); Mask(0); }";
 

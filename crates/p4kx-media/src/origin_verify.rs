@@ -189,6 +189,7 @@ fn record_profile(kind: MediaKind, profile: OriginProfile) -> bool {
             OriginProfile::ShaderDefinition
                 | OriginProfile::ShaderProperty
                 | OriginProfile::ShaderDeclaration
+                | OriginProfile::ShaderCacheInventory
                 | OriginProfile::ShaderFailure
                 | OriginProfile::ShaderSourceLimit
                 | OriginProfile::ShaderConfigurationFailure

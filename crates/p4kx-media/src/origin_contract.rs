@@ -67,6 +67,8 @@ pub enum OriginProfile {
     ShaderProperty,
     /// Original shader declaration.
     ShaderDeclaration,
+    /// One compiled-cache inventory occurrence selected by original Entry path.
+    ShaderCacheInventory,
     /// Shader parser failure after consuming actual source bytes.
     ShaderFailure,
     /// Source-size failure derived from directory metadata before shader parsing.

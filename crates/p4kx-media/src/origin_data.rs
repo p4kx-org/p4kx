@@ -38,6 +38,7 @@ pub(crate) fn scope(profile: OriginProfile, pointer: &str) -> ScopeMapping {
             crate::origin_material_profile::scope(profile, data)
         }
         OriginProfile::Unmigrated
+        | OriginProfile::ShaderCacheInventory
         | OriginProfile::ArchiveBuild
         | OriginProfile::IndexBuild
         | OriginProfile::AudioWem
@@ -120,6 +121,16 @@ pub(crate) fn independent(profile: OriginProfile, pointer: &str) -> bool {
                 || pointer.ends_with("/span/basis")
                 || pointer == "/data/payload/name_origin"
                 || failure_control(profile, pointer)
+        }
+        OriginProfile::ShaderCacheInventory => {
+            matches!(
+                pointer,
+                "/data/record_type"
+                    | "/data/payload/semantic_decode"
+                    | "/data/payload/definitions"
+                    | "/data/payload/properties"
+            ) || origin_resolver::within(pointer, "/subresource")
+                || origin_resolver::within(pointer, "/issues")
         }
         OriginProfile::MaterialLibrary
         | OriginProfile::MaterialFailure

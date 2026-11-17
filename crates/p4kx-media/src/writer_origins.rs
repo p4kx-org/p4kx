@@ -94,6 +94,7 @@ impl MediaWriter<'_> {
             OriginProfile::ArchiveEntry
             | OriginProfile::ArchiveLayout
             | OriginProfile::Unmigrated
+            | OriginProfile::ShaderCacheInventory
             | OriginProfile::AudioWem
             | OriginProfile::AudioBank
             | OriginProfile::AudioControl
