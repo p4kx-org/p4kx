@@ -37,16 +37,16 @@ use crate::catalog_v3::procedural_planet_audio::PreparedPlanetAudio;
 use crate::catalog_v3::starmap_definition_kinds::StarmapDefinitions;
 use crate::contract::{
     BlueprintPool, Commodity, ContractEntry, Crafter, CraftingGlobal, DismantleProcess,
-    HarvestableLocation, HarvestableProviderPreset, Item, Loadout, LootContainer,
-    MineableComposition, MineableElement, MineableEntity, MiningGlobalParams, Paint,
-    RefiningProcess, ResourceGroup, ResourceType, Ship, Shop, StarmapObject,
-    SubHarvestableMultiConfig,
+    HarvestableLocation, HarvestableProviderPreset, Item, LootContainer, MineableComposition,
+    MineableElement, MineableEntity, MiningGlobalParams, Paint, RefiningProcess, ResourceGroup,
+    ResourceType, Ship, Shop, StarmapObject, SubHarvestableMultiConfig,
 };
 use crate::crafting_warning::CraftingWarning;
 use crate::entity_spawn_model::EntitySpawnPool;
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_ledger::ExportLedger;
 use crate::guid_text::CatalogGuid;
+use crate::loadout::staging::StagedLoadouts;
 use crate::location_template::MissionLocationTemplate;
 use crate::loot_kinds::LootKinds;
 use crate::manufacturer::Manufacturer;
@@ -110,7 +110,7 @@ pub(crate) struct Collected<'f> {
     pub(crate) dismantle_processes: Vec<DismantleProcess<'f>>,
     pub(crate) crafting_global: CraftingGlobal,
     pub(crate) paints: Vec<Paint>,
-    pub(crate) loadouts: Vec<Loadout>,
+    pub(crate) loadouts: StagedLoadouts,
     pub(crate) contracts: Vec<ContractEntry<'f>>,
     pub(crate) mission_titles: Vec<MissionTitles<'f>>,
     pub(crate) contract_generators: StagedCatalogTable,
@@ -218,7 +218,7 @@ impl<'f> Collected<'f> {
             dismantle_processes: crafting.dismantle,
             crafting_global: crafting.global,
             paints: Vec::new(),
-            loadouts: Vec::new(),
+            loadouts: StagedLoadouts::default(),
             contracts: Vec::new(),
             mission_titles: Vec::new(),
             contract_generators: StagedCatalogTable::empty(DatasetAvailability::Absent),

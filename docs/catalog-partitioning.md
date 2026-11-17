@@ -218,7 +218,7 @@ fixed export time, default text selection, `--progress-phases` and one private `
 The completed writer reports `catalog storage:` on stderr. It sums the logical bytes of the
 temporary row spools for container instances, locations, Entity tag declarations,
 Item and Blueprint definitions, particle libraries,
-contract generators, contract templates, mission broker entries, item ports,
+contract generators, contract templates, mission broker entries, item loadouts, item ports,
 interactions, inventory item bounds, durability and weapon animation candidates, plus the
 final bytes of the publication temporary. The spools stay
 open until publication. The measurement includes open spools with no visible file name. On an
@@ -253,6 +253,12 @@ attachment fields in memory.
 Measure both the spool bytes and the cost of seeking to the ordered frames.
 Inventory item bounds are staged during the same scan in physical Record and Component order.
 Inventory storage selections stay in memory for the capacity and facility joins.
+
+Item loadout rows use one sequential compressed spool. Ship loadouts keep their
+original Catalog array position and their source-bearing port data for the facility
+and resource topology joins. The writer interleaves both sets in canonical GUID
+order. To measure the trade-off, record the write-counter change during
+loadout resolution and the retained private bytes on entry to location projection.
 
 After each Record and ContractGenerator window and at selected projection boundaries, the
 source registry packs unheld DataForge uses into compact coordinates. It keeps live handles and their original authority. A later observation

@@ -10,6 +10,7 @@ use crate::CatalogProvenance;
 use crate::catalog_definitions::CatalogDefinitions;
 use crate::catalog_projections::CatalogProjections;
 use crate::catalog_text_contract::CatalogTexts;
+use crate::loadout::staging::StagedLoadouts;
 
 pub(crate) use crate::catalog_v3::resource_group_catalog::ResourceGroup;
 pub(crate) use crate::commodity_contract::Commodity;
@@ -88,7 +89,8 @@ pub(crate) struct Catalog<'a> {
     pub(crate) paints: Vec<Paint>,
     /// The ports of every ship and of every item that has ports, with what the Default Loadout
     /// attaches to each, ordered by the GUID of the entity.
-    pub(crate) loadouts: Vec<Loadout>,
+    #[schemars(with = "Vec<Loadout>")]
+    pub(crate) loadouts: StagedLoadouts,
 
     /// The mineable elements, ordered by GUID. Several may link to one `ResourceType`.
     pub(crate) mineable_elements: Vec<MineableElement<'a>>,

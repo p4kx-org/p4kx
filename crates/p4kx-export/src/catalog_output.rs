@@ -104,6 +104,7 @@ pub(crate) fn emit<W: Write>(
 
 fn staged_row_bytes(catalog: &Catalog<'_>) -> u128 {
     catalog.placements.staged_row_bytes()
+        + u128::from(catalog.loadouts.stored_bytes())
         + u128::from(catalog.configurations.durability.stored_bytes())
         + u128::from(catalog.declarations.entity_tags.stored_bytes())
         + u128::from(catalog.definitions.items.stored_bytes())
@@ -163,6 +164,7 @@ fn write_json(
             let failure = catalog
                 .placements
                 .take_row_spool_failure()
+                .or_else(|| catalog.loadouts.take_failure())
                 .or_else(|| catalog.configurations.durability.take_failure())
                 .or_else(|| catalog.declarations.entity_tags.take_failure())
                 .or_else(|| catalog.definitions.items.take_failure())

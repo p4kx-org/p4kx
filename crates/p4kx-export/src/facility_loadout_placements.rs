@@ -26,8 +26,9 @@ use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_read::original::EntryCapture;
 use crate::catalog_table::CatalogTable;
 use crate::contract_entities::Ship;
-use crate::contract_loadout::{EntityKind, Loadout, LoadoutPort};
+use crate::contract_loadout::{Loadout, LoadoutPort};
 use crate::loadout::alignment::AttachmentIdentity;
+use crate::loadout::staging::StagedLoadouts;
 use crate::options::{CatalogRun, CatalogStage};
 use crate::record_header_field::RecordHeaderField;
 use crate::{CatalogError, ExportAccountingError};
@@ -76,7 +77,7 @@ pub(super) fn table(
     archive: &Archive,
     forge: &DataForge<'_>,
     ships: &[Ship<'_>],
-    loadouts: &[Loadout],
+    loadouts: &StagedLoadouts,
     configurations: ConfigurationSources<'_, '_>,
     input: &OriginalCatalogInput<'_, '_>,
     run: CatalogRun<'_, '_>,
@@ -91,17 +92,15 @@ pub(super) fn table(
             Vec::new()
         } else {
             let mut attachments = Vec::new();
-            for (ordinal, loadout) in loadouts.iter().enumerate() {
+            for ship in loadouts.ships() {
                 project.check_cancel()?;
-                if loadout.entity_kind == EntityKind::Ship {
-                    project.loadout(
-                        loadout,
-                        loadout_position::ordinal(ordinal)?,
-                        &rooms,
-                        &mut attachments,
-                        &mut flight_instances,
-                    )?;
-                }
+                project.loadout(
+                    &ship.loadout,
+                    loadout_position::ordinal(ship.ordinal)?,
+                    &rooms,
+                    &mut attachments,
+                    &mut flight_instances,
+                )?;
             }
             run.begin(CatalogStage::ProjectFacilityInteriors);
             let capture = EntryCapture::for_input(input);

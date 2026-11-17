@@ -24,6 +24,9 @@ use crate::Kind;
 use crate::export_ledger::ExportLedger;
 use ledger::Capture;
 
+#[path = "staged_loadouts.rs"]
+pub(crate) mod staging;
+
 const DEFAULT_LOADOUT: &str = "SEntityComponentDefaultLoadoutParams";
 const PORT_CONTAINER: &str = "SItemPortContainerComponentParams";
 

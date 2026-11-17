@@ -16,8 +16,9 @@ use super::resource_network_placements::{
 use super::resource_topology_index::{TopologyIndex, TopologySource};
 use crate::CatalogError;
 use crate::collected::Collected;
-use crate::contract_loadout::{EntityKind, Loadout, LoadoutPort};
+use crate::contract_loadout::LoadoutPort;
 use crate::loadout::alignment::AttachmentIdentity;
+use crate::loadout::staging::StagedLoadouts;
 
 struct Context<'loadout> {
     position: LoadoutPosition,
@@ -58,20 +59,18 @@ impl<'source> Collected<'source> {
 }
 
 fn project(
-    loadouts: &[Loadout],
+    loadouts: &StagedLoadouts,
     selected: &EntityConfigurationRows<'_>,
     sources: &SourceUses,
     cancel: Option<&CancelToken>,
 ) -> Result<ResourceNetworkPlacements, CatalogError> {
     let index = TopologyIndex::new(selected)?;
     let mut graph = ResourceNetworkPlacements::default();
-    for (ordinal, loadout) in loadouts.iter().enumerate() {
+    for ship in loadouts.ships() {
         check_cancel(cancel)?;
-        if loadout.entity_kind != EntityKind::Ship {
-            continue;
-        }
+        let loadout = &ship.loadout;
         let position = LoadoutPosition {
-            loadout_ordinal: loadout_position::ordinal(ordinal)?,
+            loadout_ordinal: loadout_position::ordinal(ship.ordinal)?,
             port_ordinals: Vec::new(),
         };
         let record = loadout.root_record_index;

@@ -16,6 +16,7 @@ use crate::contract_loadout::EntityKind;
 use crate::contract_template_read::ContractTemplates;
 use crate::crafter_hosts::link_hosts;
 use crate::crafting_warning::CraftingWarning;
+use crate::loadout::staging::StagedLoadouts;
 use crate::loadout::{Wanted, loadouts};
 use crate::missions;
 use crate::options::CatalogRun;
@@ -181,8 +182,8 @@ pub(crate) fn add_loadouts<'f>(
         cancel,
     )?;
     collected.ledger.merge(built.ledger);
-    collected.loadouts = built.entries;
-    link_hosts(&mut collected.crafters, &collected.loadouts);
+    link_hosts(&mut collected.crafters, &built.entries);
+    collected.loadouts = StagedLoadouts::stage(built.entries, &std::env::temp_dir(), cancel)?;
     collected.add_failures(built.failures);
     Ok(built.summary)
 }

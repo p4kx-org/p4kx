@@ -8,7 +8,7 @@ use std::path::Path;
 use std::sync::Mutex;
 
 use p4kx_extraction::CancelToken;
-use serde::ser::{Error as _, SerializeSeq as _};
+use serde::ser::SerializeSeq as _;
 use serde::{Serialize, Serializer};
 use serde_json::value::RawValue;
 use thiserror::Error;
@@ -225,24 +225,31 @@ impl SpoolRows<'_> {
     pub(crate) fn take_failure(&self) -> Option<RowSpoolError> {
         self.failure.take()
     }
+
+    /// Streams verified rows into an existing JSON sequence.
+    pub(crate) fn visit<E: serde::ser::Error>(
+        &self,
+        visit: impl FnMut(&RawValue) -> Result<(), E>,
+    ) -> Result<(), E> {
+        *self.failure.borrow_mut() = None;
+        match self.spool.replay(self.cancel, visit) {
+            Ok(()) => Ok(()),
+            Err(ReplayError::Output(error)) => Err(error),
+            Err(ReplayError::Spool(error)) => {
+                let reported = E::custom(&error);
+                *self.failure.borrow_mut() = Some(error);
+                Err(reported)
+            }
+        }
+    }
 }
 
 impl Serialize for SpoolRows<'_> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         *self.failure.borrow_mut() = None;
         let mut sequence = serializer.serialize_seq(Some(self.spool.rows()))?;
-        match self
-            .spool
-            .replay(self.cancel, |row| sequence.serialize_element(row))
-        {
-            Ok(()) => sequence.end(),
-            Err(ReplayError::Output(error)) => Err(error),
-            Err(ReplayError::Spool(error)) => {
-                let reported = S::Error::custom(&error);
-                *self.failure.borrow_mut() = Some(error);
-                Err(reported)
-            }
-        }
+        self.visit(|row| sequence.serialize_element(row))?;
+        sequence.end()
     }
 }
 
@@ -354,7 +361,7 @@ impl<T: Write> Write for CheckedIo<'_, T> {
     }
 }
 
-pub(super) fn checkpoint(cancel: Option<&CancelToken>) -> Result<(), RowSpoolError> {
+pub(crate) fn checkpoint(cancel: Option<&CancelToken>) -> Result<(), RowSpoolError> {
     if cancel.is_some_and(CancelToken::is_cancelled) {
         return Err(RowSpoolError::Cancelled);
     }
