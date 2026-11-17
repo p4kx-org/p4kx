@@ -16,9 +16,9 @@ use crate::catalog_text_contract::{
 use crate::catalog_v3::catalog_text_forms;
 use crate::texts::CATALOG_LANGUAGES;
 
-struct CanonicalRows<'source> {
-    public_names: Vec<CanonicalText<'source, PublicNameRef>>,
-    game_texts: Vec<CanonicalText<'source, GameTextRef>>,
+pub(crate) struct CanonicalRows<'source> {
+    pub(crate) public_names: Vec<CanonicalText<'source, PublicNameRef>>,
+    pub(crate) game_texts: Vec<CanonicalText<'source, GameTextRef>>,
     kind_coverage: Vec<KindTextSummary>,
 }
 
@@ -48,7 +48,7 @@ impl<'source> CatalogProjection<'_, 'source> {
         Ok(self.finish_rows()?.public_names)
     }
 
-    fn finish_rows(&self) -> Result<CanonicalRows<'source>, CatalogError> {
+    pub(crate) fn finish_rows(&self) -> Result<CanonicalRows<'source>, CatalogError> {
         let RegistryState {
             pending: rows,
             coverage,

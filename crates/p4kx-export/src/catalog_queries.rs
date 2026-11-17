@@ -14,6 +14,8 @@ mod gameplay_properties;
 mod harvest_provider_presets;
 #[path = "item_port_query.rs"]
 mod item_ports;
+#[path = "manufacturer_query.rs"]
+mod manufacturers;
 
 use p4kx_extraction::{
     Archive, Build, CancelToken, DataForge, DataForgeEntry, Guid, Record, SourceInventory,
@@ -25,13 +27,13 @@ use crate::catalog_query_session::checkpoint;
 use crate::catalog_v3::blueprint_category_list_read;
 use crate::{CatalogError, Kind};
 
-pub use crate::canonical_record_header::CatalogRecordSource;
+pub use crate::canonical_record_header::{CanonicalRecordHeader, CatalogRecordSource};
 pub use crate::catalog_query_session::{
     CatalogLanguageSelection, CatalogQuerySession, ParsedCatalogQueries,
 };
 pub use crate::catalog_record_reference::CatalogRecordReference;
 pub use crate::catalog_table::DatasetAvailability;
-pub use crate::catalog_text_contract::{PublicNameRef, TextForms};
+pub use crate::catalog_text_contract::{CanonicalText, GameTextRef, PublicNameRef, TextForms};
 pub use crate::catalog_v3::authored_fields::AuthoredRestriction;
 pub use crate::catalog_v3::catalog_item_alignment::{
     ItemPort, ItemPortContainer, PortItemType, PortRestrictions,
@@ -43,6 +45,10 @@ pub use crate::catalog_v3::gameplay_property_catalog::{
     PropertyNameOverrideFields, PropertyNameOverrideSource,
 };
 pub use crate::definition_reference::DefinitionStatus;
+pub use crate::manufacturer::{
+    ManufacturerAudioTrigger, ManufacturerDefinition, ManufacturerDisplayFeatures,
+    ManufacturerLocalization,
+};
 pub use crate::resource_number::ResourceNumber;
 pub use crate::source_value_catalog::SourceArenaOutput;
 pub use blueprint_categories::{
@@ -60,6 +66,7 @@ pub use harvest_provider_presets::{
 };
 
 pub use item_ports::{ItemPortSnapshot, with_item_ports, with_item_ports_from};
+pub use manufacturers::{ManufacturerSnapshot, with_manufacturers, with_manufacturers_from};
 
 /// Selects physical Records within the queried dataset and supplied DataForge.
 #[derive(Debug, Clone, Copy)]

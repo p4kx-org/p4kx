@@ -3,6 +3,8 @@
 
 #[path = "manufacturer_v3_display_features.rs"]
 mod display_features;
+#[path = "manufacturer_query.rs"]
+mod manufacturer_query;
 
 use p4kx_export::{CatalogPublicationMode, Filter, Kind};
 use p4kx_testkit::{DataForgeBuilder, TestStruct};

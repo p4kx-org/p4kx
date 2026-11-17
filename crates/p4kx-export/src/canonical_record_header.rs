@@ -15,7 +15,7 @@ use crate::{CatalogError, source_header};
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct CanonicalRecordHeader<'source> {
+pub struct CanonicalRecordHeader<'source> {
     pub(crate) guid: SourcedValue<CatalogGuid>,
     pub(crate) record_name: SourcedValue<&'source str>,
     pub(crate) class_name: SourcedValue<&'source str>,
@@ -62,6 +62,56 @@ impl<'source> CanonicalRecordHeader<'source> {
                 text_value(metadata.metadata_tag()),
             )?,
         })
+    }
+}
+
+impl<'source> CanonicalRecordHeader<'source> {
+    /// The original Record GUID with its source evidence.
+    #[must_use]
+    pub fn guid(&self) -> SourcedValue<Guid> {
+        self.guid.map_ref(|guid| guid.0)
+    }
+
+    /// The original Record name.
+    #[must_use]
+    pub const fn record_name(&self) -> &SourcedValue<&'source str> {
+        &self.record_name
+    }
+
+    /// The normalized class name.
+    #[must_use]
+    pub const fn class_name(&self) -> &SourcedValue<&'source str> {
+        &self.class_name
+    }
+
+    /// The normalized Record path.
+    #[must_use]
+    pub const fn record_path(&self) -> &SourcedValue<&'source str> {
+        &self.record_path
+    }
+
+    /// The physical Record index.
+    #[must_use]
+    pub const fn record_index(&self) -> &SourcedValue<u32> {
+        &self.record_index
+    }
+
+    /// The declared Record type.
+    #[must_use]
+    pub const fn source_type(&self) -> &SourcedValue<&'source str> {
+        &self.source_type
+    }
+
+    /// The original file name.
+    #[must_use]
+    pub const fn file_name(&self) -> &SourcedValue<&'source str> {
+        &self.file_name
+    }
+
+    /// The original metadata tag.
+    #[must_use]
+    pub const fn metadata_tag(&self) -> &SourcedValue<&'source str> {
+        &self.metadata_tag
     }
 }
 

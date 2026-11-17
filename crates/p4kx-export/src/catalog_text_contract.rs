@@ -48,10 +48,30 @@ impl GameTextRef {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(rename = "CanonicalTextOf{R}", transform = every_field_required)]
-pub(crate) struct CanonicalText<'source, R> {
+pub struct CanonicalText<'source, R> {
     pub(crate) id: SourcedValue<R>,
     pub(crate) key: SourcedValue<&'source str>,
     pub(crate) translations: SourcedValue<BTreeMap<String, TextForms<'source>>>,
+}
+
+impl<'source, R> CanonicalText<'source, R> {
+    /// The canonical identifier in the reference's text domain.
+    #[must_use]
+    pub const fn id(&self) -> &SourcedValue<R> {
+        &self.id
+    }
+
+    /// The original localization key.
+    #[must_use]
+    pub const fn key(&self) -> &SourcedValue<&'source str> {
+        &self.key
+    }
+
+    /// Available original and display forms by language code.
+    #[must_use]
+    pub const fn translations(&self) -> &SourcedValue<BTreeMap<String, TextForms<'source>>> {
+        &self.translations
+    }
 }
 
 /// The exact decoded source text and its derived display form for one language.

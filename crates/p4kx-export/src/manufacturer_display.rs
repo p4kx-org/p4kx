@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_extraction::{SourcedValue, StructValue, Value};
-use schemars::JsonSchema;
+use schemars::{JsonSchema, Schema};
 use serde::Serialize;
 
 use crate::CatalogError;
@@ -14,10 +14,11 @@ use crate::source_fields::{FieldCapture, FieldError};
 
 const DISPLAY: &str = "Localization.displayFeatures";
 
+/// Owned manufacturer display feature fields with original evidence.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct ManufacturerDisplayFeatures<'source> {
+#[schemars(transform = require_fields)]
+pub struct ManufacturerDisplayFeatures<'source> {
     source_type: SourcedValue<&'source str>,
     #[schemars(extend("x-gameText" = true))]
     callout1: SourcedValue<GameTextRef>,
@@ -34,12 +35,100 @@ pub(crate) struct ManufacturerDisplayFeatures<'source> {
     ui_priority: SourcedValue<i32>,
 }
 
+/// An authored manufacturer audio trigger.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-struct ManufacturerAudioTrigger<'source> {
+#[schemars(transform = require_fields)]
+pub struct ManufacturerAudioTrigger<'source> {
     source_type: SourcedValue<&'source str>,
     audio_trigger: SourcedValue<&'source str>,
+}
+
+impl<'source> ManufacturerDisplayFeatures<'source> {
+    /// The original display feature struct type.
+    #[must_use]
+    pub const fn source_type(&self) -> &SourcedValue<&'source str> {
+        &self.source_type
+    }
+
+    /// The first callout in the protected text domain.
+    #[must_use]
+    pub const fn callout1(&self) -> &SourcedValue<GameTextRef> {
+        &self.callout1
+    }
+
+    /// The second callout in the protected text domain.
+    #[must_use]
+    pub const fn callout2(&self) -> &SourcedValue<GameTextRef> {
+        &self.callout2
+    }
+
+    /// The third callout in the protected text domain.
+    #[must_use]
+    pub const fn callout3(&self) -> &SourcedValue<GameTextRef> {
+        &self.callout3
+    }
+
+    /// The original frontend background asset path.
+    #[must_use]
+    pub const fn frontend_background(&self) -> &SourcedValue<&'source str> {
+        &self.frontend_background
+    }
+
+    /// The manufacturer history in the protected text domain.
+    #[must_use]
+    pub const fn history(&self) -> &SourcedValue<GameTextRef> {
+        &self.history
+    }
+
+    /// The original trigger that starts location audio.
+    #[must_use]
+    pub const fn location_audio_play_trigger(
+        &self,
+    ) -> &SourcedValue<ManufacturerAudioTrigger<'source>> {
+        &self.location_audio_play_trigger
+    }
+
+    /// The original trigger that stops location audio.
+    #[must_use]
+    pub const fn location_audio_stop_trigger(
+        &self,
+    ) -> &SourcedValue<ManufacturerAudioTrigger<'source>> {
+        &self.location_audio_stop_trigger
+    }
+
+    /// The original simplified white logo asset path.
+    #[must_use]
+    pub const fn logo_simplified_white(&self) -> &SourcedValue<&'source str> {
+        &self.logo_simplified_white
+    }
+
+    /// The original UI priority.
+    #[must_use]
+    pub const fn ui_priority(&self) -> &SourcedValue<i32> {
+        &self.ui_priority
+    }
+}
+
+impl<'source> ManufacturerAudioTrigger<'source> {
+    /// The original audio trigger struct type.
+    #[must_use]
+    pub const fn source_type(&self) -> &SourcedValue<&'source str> {
+        &self.source_type
+    }
+
+    /// The original trigger identifier.
+    #[must_use]
+    pub const fn audio_trigger(&self) -> &SourcedValue<&'source str> {
+        &self.audio_trigger
+    }
+}
+
+fn require_fields(schema: &mut Schema) {
+    every_field_required(schema);
+    if let Some(object) = schema.as_object_mut() {
+        object.remove("description");
+    }
 }
 
 pub(super) fn read<'source>(

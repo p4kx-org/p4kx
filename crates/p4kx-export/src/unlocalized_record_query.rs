@@ -85,7 +85,11 @@ struct RowWithIdentity<Row> {
     row: Row,
 }
 
-fn selected(record: &Record<'_>, kind: Kind, coverage: &mut CatalogRecordCoverage) -> bool {
+pub(super) fn selected(
+    record: &Record<'_>,
+    kind: Kind,
+    coverage: &mut CatalogRecordCoverage,
+) -> bool {
     let classified = record.type_name().and_then(|source_type| {
         if source_type == kind.records().type_name {
             entity_selection::select(record, None)

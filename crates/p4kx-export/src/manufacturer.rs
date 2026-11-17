@@ -8,5 +8,7 @@ mod manufacturer_definition;
 #[path = "manufacturer_read.rs"]
 mod manufacturer_read;
 
-pub(crate) use manufacturer_definition::{Manufacturer, ManufacturerDefinition};
+pub use display::{ManufacturerAudioTrigger, ManufacturerDisplayFeatures};
+pub(crate) use manufacturer_definition::Manufacturer;
+pub use manufacturer_definition::{ManufacturerDefinition, ManufacturerLocalization};
 pub(crate) use manufacturer_read::{read, table};

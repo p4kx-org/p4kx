@@ -89,3 +89,16 @@ The snapshot carries Record, component and port positions, original value states
 scope coverage, public labels in the selected languages, and the field origin
 inventory. The query reads the selected components and requested localization.
 The archive-backed loadout resolver supplies equipped-item and XML-override data.
+
+## Manufacturers
+
+Use `with_manufacturers`, `with_manufacturers_from` or the parsed session's
+`with_manufacturers` to read `definitions.manufacturers`. Supply `All` for canonical GUID
+order, `Guid` to retain every physical declaration for that GUID, or `RecordIndex` to follow
+a resolved manufacturer reference. Inspect the supplied row in the callback and return
+consumer-owned results.
+
+Use `snapshot.public_name` and `snapshot.game_text` for the typed references of a selected
+manufacturer. The returned text entries preserve the original key, source and display forms
+in the requested languages, and per-value origin. Resolve source-use IDs in that snapshot's
+inventory. A lookup with no admitted manufacturer opens no localization payloads.
