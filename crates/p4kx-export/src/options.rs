@@ -210,8 +210,11 @@ pub(crate) struct CatalogRun<'run, 'inputs> {
     pub(crate) options: &'run CatalogOptions<'inputs>,
     report: Option<&'run dyn Fn(CatalogStage)>,
     #[cfg(test)]
-    retention: Option<&'run dyn Fn(CatalogRetention)>,
+    retention: Option<&'run RetentionObserver<'run>>,
 }
+
+#[cfg(test)]
+type RetentionObserver<'a> = dyn Fn(CatalogRetention, &SourceUses) -> Result<(), CatalogError> + 'a;
 
 #[cfg(test)]
 #[derive(Debug, Clone, Copy)]
@@ -238,7 +241,7 @@ impl<'run, 'inputs> CatalogRun<'run, 'inputs> {
     }
 
     #[cfg(test)]
-    pub(crate) const fn with_retention(mut self, report: &'run dyn Fn(CatalogRetention)) -> Self {
+    pub(crate) const fn with_retention(mut self, report: &'run RetentionObserver<'run>) -> Self {
         self.retention = Some(report);
         self
     }
@@ -258,7 +261,7 @@ impl<'run, 'inputs> CatalogRun<'run, 'inputs> {
                 field_inspections += ledger.field_inspections.len();
                 inspection_capacity += ledger.field_inspections.capacity();
             }
-            report(CatalogRetention {
+            let sample = CatalogRetention {
                 stage,
                 source_uses,
                 packed_source_uses: uses.packed_use_count()?,
@@ -266,7 +269,8 @@ impl<'run, 'inputs> CatalogRun<'run, 'inputs> {
                 inspection_capacity,
                 inline_inspection_bytes: inspection_capacity
                     * size_of::<crate::export_field_inspection::FieldInspection>(),
-            });
+            };
+            report(sample, uses)?;
         }
         Ok(())
     }

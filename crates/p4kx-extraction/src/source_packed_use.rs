@@ -29,6 +29,10 @@ const _: () = assert!(
 );
 
 impl PackedSourceUse {
+    pub(crate) const fn has_direct_field(&self) -> bool {
+        self.location.has_direct_field()
+    }
+
     pub(crate) fn pack(
         row: &SourceUseDescription,
         sources: &mut BTreeSet<Arc<PhysicalSourceRef>>,

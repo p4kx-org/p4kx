@@ -338,6 +338,11 @@ The witness reports decoded and encoded sizes on stdout without creating a catal
 cargo test --release --locked -p p4kx-export --lib -- build::api::size_witness::normal_catalog_size_phases_for_installed_pair --ignored --exact --nocapture
 ```
 
+Set `P4KX_CATALOG_PACKED_KEY_CENSUS=1` on the sink-only witness for the packed key count and
+UTF-8 bytes at export health. The counters distinguish direct fields and typed sites, and keys
+held solely by the registry or shared by a source reference. This pass can affect timing and
+resident memory. Measure the producer's peak with the key census disabled.
+
 Set `P4KX_CATALOG_SECTION_CENSUS=1` for section sizes and provenance counts in the same run.
 The writer sends the finished Zstd stream through a bounded pipe. The reader checks the
 encoded and decoded lengths, counts rows in both provenance inventories, and reports the exact

@@ -46,6 +46,35 @@ impl SourceUses {
             .packed_len())
     }
 
+    /// Counts packed key rows and UTF-8 bytes by site and ownership.
+    /// Buckets are direct registry-only, direct shared, typed registry-only and typed shared.
+    /// The checkpoint runs under the registry lock and must not re-enter it.
+    ///
+    /// # Errors
+    /// Returns a checkpoint error or an error when the registry is unavailable.
+    #[doc(hidden)]
+    pub fn packed_key_storage_census<E: From<SourceEvidenceError>>(
+        &self,
+        mut check: impl FnMut() -> Result<(), E>,
+    ) -> Result<[(usize, usize); 4], E> {
+        let registry = source_evidence_error::lock(&self.registry)?;
+        let mut buckets = [(0, 0); 4];
+        let [direct_only, direct_shared, typed_only, typed_shared] = &mut buckets;
+        for (key, row) in registry.uses.packed_values() {
+            check()?;
+            let (rows, bytes) = match (row.has_direct_field(), Arc::strong_count(key) == 1) {
+                (true, true) => &mut *direct_only,
+                (true, false) => &mut *direct_shared,
+                (false, true) => &mut *typed_only,
+                (false, false) => &mut *typed_shared,
+            };
+            *rows += 1;
+            *bytes += key.len();
+        }
+        drop(registry);
+        Ok(buckets)
+    }
+
     /// Packs unheld DataForge coordinate uses registered since the preceding compaction.
     /// Call after draining a batch of projected records. The checkpoint runs under the
     /// inventory lock and must not re-enter it.

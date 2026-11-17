@@ -4,7 +4,7 @@
 use std::cell::RefCell;
 use std::time::UNIX_EPOCH;
 
-use p4kx_extraction::{Archive, DataForgeEntry};
+use p4kx_extraction::{Archive, DataForgeEntry, SourceUses};
 use p4kx_testkit::{
     ArchiveBuilder, DataForgeBuilder, TestEntry, TestRecord, TestStruct, TestType, TestValue,
 };
@@ -97,7 +97,10 @@ fn capture(
         let phases = RefCell::new(Vec::new());
         let phase_report = |stage| phases.borrow_mut().push(stage);
         let retained = RefCell::new(Vec::new());
-        let retention_report = |sample| retained.borrow_mut().push(sample);
+        let retention_report = |sample, _: &SourceUses| {
+            retained.borrow_mut().push(sample);
+            Ok(())
+        };
         let run = CatalogRun::new(options, Some(&phase_report)).with_retention(&retention_report);
         let (_, output) =
             write_catalog_from_with_run(archive, entry, run, Compression::ZSTD, || Ok(Vec::new()))

@@ -56,6 +56,10 @@ impl RetainedLocation {
 }
 
 impl PackedDataForgeLocation {
+    pub(crate) const fn has_direct_field(&self) -> bool {
+        matches!(self.coordinate, PackedCoordinate::Field { .. })
+    }
+
     /// Restores the coordinate with the immutable source-use ID it was packed beside.
     pub(crate) fn retain(&self, id: &SourceUseRef) -> RetainedLocation {
         let site = match self.coordinate {
