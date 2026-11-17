@@ -135,6 +135,16 @@ impl ArchiveSourceIdentity {
         host: &Path,
         owned: bool,
     ) -> Result<(), WriteProtectionError> {
+        self.check_content_with(target, host, owned, || Handle::from_path(host))
+    }
+
+    fn check_content_with(
+        &self,
+        target: &Path,
+        host: &Path,
+        owned: bool,
+        open_host: impl FnOnce() -> io::Result<Handle>,
+    ) -> Result<(), WriteProtectionError> {
         let absolute =
             std::path::absolute(host).map_err(|error| WriteProtectionError::TargetIdentity {
                 target: target.to_path_buf(),
@@ -165,7 +175,11 @@ impl ArchiveSourceIdentity {
         if owned {
             return Ok(());
         }
-        let native = Handle::from_path(host).map_err(|error| target_error(target, error))?;
+        let native = if target.as_os_str() == host.as_os_str() {
+            None
+        } else {
+            Some(open_host().map_err(|error| target_error(target, error))?)
+        };
         let Some(source) = &self.host_handle else {
             return Err(WriteProtectionError::TargetIdentity {
                 target: target.to_path_buf(),
@@ -175,10 +189,10 @@ impl ArchiveSourceIdentity {
                     .unwrap_or_else(|| UnknownAlias::new(AliasUncertainty::HostFileIdentity)),
             });
         };
-        if visible != native {
+        if native.is_some_and(|native| visible != native) {
             return Err(unavailable_identity(target));
         }
-        if **source == native {
+        if **source == visible {
             return Err(self.refusal(target));
         }
         Ok(())
