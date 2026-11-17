@@ -3,8 +3,8 @@
 
 use thiserror::Error;
 
-use crate::LoadoutError;
 use crate::issue_text::{animations_left_out, attachments_left_out};
+use crate::{ContainerAmbiguity, LoadoutError};
 
 /// What went wrong with a part of an Assembly.
 #[derive(Debug, Clone, PartialEq, Error)]
@@ -110,6 +110,9 @@ pub enum IssueKind {
         /// The name the description gives.
         name: String,
     },
+    /// A nested container has several physical matches and is left out.
+    #[error(transparent)]
+    ContainerAmbiguous(ContainerAmbiguity),
     /// A nested container cannot be opened, so it and what is in it are left out.
     #[error("the container {name} cannot be opened: {reason}")]
     ContainerUnreadable {

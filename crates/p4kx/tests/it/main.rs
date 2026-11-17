@@ -104,6 +104,7 @@ mod filter_bounds;
 mod grep;
 mod info;
 mod info_layout;
+mod interior_ambiguous_containers;
 mod interior_glb;
 mod interior_included_objects;
 mod interior_package;

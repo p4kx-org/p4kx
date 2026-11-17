@@ -623,9 +623,10 @@ or wrong exits with code 7.
 
 `default_material` is the same lookup receipt as in `entity glb`. The canonical fallback comes from the outer game Archive.
 
-`containers` are the Entry paths of the chain as for `p4kx socpak list`, with the same exit codes
-(an Entry the Archive lacks is 2, a container that cannot be opened 3). `parts` counts the root
-container, the `.soc` files, the nested containers, the placed models, the props and the lights;
+`containers` are the Entry paths of the requested chain. A missing or ambiguous Entry in any
+explicit segment causes exit code 2. A container that cannot be opened causes exit code 3.
+`parts` counts the root container, the `.soc` files, the nested containers, the placed models,
+the props and the lights;
 `containers_opened` the containers that were opened, the root included; `model_parts` the placed
 models and props, `modelled_parts` those whose model was read, `props` the props among the model
 parts and `lights` the lights written with `KHR_lights_punctual`; their intensity is the raw
@@ -638,8 +639,9 @@ Record, and the parts are drawn with their tint palettes. The other
 counts are those of `entity glb`. An
 **Issue** has the fields of the `entity glb` Issue: `path` is the names of the containers from the
 root joined by `/`, `name` the container, `.soc` file or model, and the kinds are
-`container_missing`, `container_unreadable`, `container_cycle` (the container is nested in
-itself and not entered again), `file_missing`, `file_unreadable`, `invalid_placement`,
+`container_missing`, `container_ambiguous`, `container_unreadable`, `container_cycle` (the
+container is nested in itself and not entered again), `file_missing`, `file_unreadable`,
+`invalid_placement`,
 `objects_left_out`, `unsupported_objects`, `entities_left_out` (props or lights without a usable
 placement), `light_unsupported` (ambient, planar or unknown lights, which glTF cannot express; the
 `name` is the `.soc` file and the message gives the type and count), `geometry_missing`,
@@ -647,13 +649,15 @@ placement), `light_unsupported` (ambient, planar or unknown lights, which glTF c
 part keeps the next choice), `too_many_parts`, `too_many_containers`,
 `too_many_vertices` and `too_deep`
 ([ADR-0081](adr/0081-an-interior-is-the-socpaks-soc-files-placed-in-nested-containers.md)). The
-file is written even when parts are skipped.
+file is written even when parts are skipped. For `container_ambiguous`, the message gives the
+layer and Entry indexes of every physical match at the first applicable path.
 
 ## `p4kx interior source <archive> <container>... --out <file>`
 
 The JSON document is written to the requested file. It uses the independently versioned
 [authored SOC scene schema](../schemas/soc-scene.schema.json). See [SOC scene](soc-scene.md)
-for occurrence ownership, source coordinates and origin fields.
+for occurrence ownership, source coordinates and origin fields. Missing or ambiguous explicit
+container paths cause exit code 2 before the source file is written.
 
 ## `p4kx interior package <archive> <container>... --out <folder> --json`
 

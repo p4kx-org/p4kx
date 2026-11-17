@@ -27,6 +27,7 @@ impl IssueKind {
             Self::TooManyVertices { .. } => "too_many_vertices",
             Self::TooDeep { .. } => "too_deep",
             Self::ContainerMissing { .. } => "container_missing",
+            Self::ContainerAmbiguous(_) => "container_ambiguous",
             Self::ContainerUnreadable { .. } => "container_unreadable",
             Self::ContainerCycle { .. } => "container_cycle",
             Self::TooManyContainers { .. } => "too_many_containers",
@@ -83,6 +84,7 @@ impl IssueKind {
                 | Self::TooManyVertices { .. }
                 | Self::TooDeep { .. }
                 | Self::ContainerMissing { .. }
+                | Self::ContainerAmbiguous(_)
                 | Self::ContainerUnreadable { .. }
                 | Self::ContainerCycle { .. }
                 | Self::TooManyContainers { .. }

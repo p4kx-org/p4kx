@@ -9,15 +9,15 @@ use p4kx_model::{ChildContainer, MaterialStatus, SocContainerDescriptor, Transfo
 
 use super::child_container_path::ChildContainerPath;
 use super::classes::ClassLookup;
-use super::files::{find_first, path_key, stem};
-use super::layers::Layers;
+use super::files::{path_key, stem};
+use super::layers::{ChildMatches, Layers};
 use super::scan::{Scan, scan_container};
 use super::tile_light::{TileLightOwner, TileLightPlacement};
 use super::{
     InteriorOptions, InteriorPart, InteriorPartKind, InteriorWatch, MAX_INTERIOR_CONTAINERS,
     MAX_INTERIOR_DEPTH,
 };
-use crate::{AssemblyError, Geometry, Issue, IssueKind, PaletteRef};
+use crate::{AssemblyError, ContainerAmbiguity, Geometry, Issue, IssueKind, PaletteRef};
 
 mod classes;
 mod entities;
@@ -142,7 +142,7 @@ pub(super) fn walk<'a>(
             )
         });
         walker.add_streams(&todo, scan.streams, tile.as_ref());
-        let mut nested = walker.add_children(&todo, scan.children)?;
+        let mut nested = walker.add_children(&todo, scan.children, watch)?;
         nested.reverse();
         stack.extend(nested);
     }
@@ -220,6 +220,7 @@ impl<'a> Walker<'a> {
         &mut self,
         todo: &Todo,
         children: Vec<ChildContainer>,
+        watch: &InteriorWatch<'_>,
     ) -> Result<Vec<Todo>, AssemblyError> {
         let mut nested = Vec::new();
         for child in children {
@@ -259,7 +260,7 @@ impl<'a> Walker<'a> {
             if !self.room(todo) {
                 break;
             }
-            if let Some(next) = self.enter(todo, &child, &name, local)? {
+            if let Some(next) = self.enter(todo, &child, &name, local, watch)? {
                 nested.push(next);
             }
         }
@@ -273,25 +274,27 @@ impl<'a> Walker<'a> {
         todo: &Todo,
         child: &ChildContainer,
         name: &str,
+        watch: &InteriorWatch<'_>,
     ) -> Result<Option<(Archive, String, String)>, AssemblyError> {
-        let found = ChildContainerPath::new(&child.name).and_then(|path| {
-            todo.chain.iter().rev().find_map(|&layer| {
-                let archive = self.layers.get(layer)?;
-                let keys = self.layers.keys.get(layer)?;
-                let index = keys.index(archive);
-                let entry = if layer == 0 {
-                    find_first(&index, path.root_candidates())
-                } else {
-                    index.find(path.relative())
-                };
-                entry.map(|entry| (layer, entry))
-            })
-        });
-        let Some((layer, entry)) = found else {
+        let found = match ChildContainerPath::new(&child.name) {
+            Some(path) => self.layers.child_matches(&todo.chain, &path, watch)?,
+            None => None,
+        };
+        let Some(ChildMatches {
+            layer,
+            depth,
+            entries,
+        }) = found
+        else {
             let kind = IssueKind::ContainerMissing {
                 name: child.name.clone(),
             };
             self.note(&todo.path, name, kind);
+            return Ok(None);
+        };
+        let [entry] = entries.as_slice() else {
+            let ambiguity = ContainerAmbiguity::new(&child.name, depth, &entries);
+            self.note(&todo.path, name, IssueKind::ContainerAmbiguous(ambiguity));
             return Ok(None);
         };
         let entry_path = entry.path().to_owned();
@@ -334,8 +337,9 @@ impl<'a> Walker<'a> {
         child: &ChildContainer,
         name: &str,
         local: Transform,
+        watch: &InteriorWatch<'_>,
     ) -> Result<Option<Todo>, AssemblyError> {
-        let Some((archive, entry_path, id)) = self.open_child(todo, child, name)? else {
+        let Some((archive, entry_path, id)) = self.open_child(todo, child, name, watch)? else {
             return Ok(None);
         };
         let layer = self.layers.push(archive);

@@ -5,7 +5,7 @@ use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
-use p4kx_assembly::{Interior, InteriorOptions, Issue};
+use p4kx_assembly::{ContainerAmbiguity, Interior, InteriorOptions, Issue};
 use p4kx_extraction::{
     Archive, ArchiveDefaultMaterial, ConversionError, DefaultMaterialReceipt, GlbOptions,
     GlbSummary, GltfError, MaterialMode, UnknownEntries, is_same_file, select_entries,
@@ -68,8 +68,10 @@ pub(crate) fn open(archive: &Path, containers: &[String]) -> Result<(Vec<Archive
             break;
         };
         let found = select_entries(current, &[path])?;
-        let Some(entry) = found.first() else {
-            return Err(UnknownEntries(vec![path.clone()]).into());
+        let entry = match found.as_slice() {
+            [entry] => entry,
+            [] => return Err(UnknownEntries(vec![path.clone()]).into()),
+            matches => return Err(ContainerAmbiguity::new(path, chain.len(), matches).into()),
         };
         chain.push(entry.path().to_owned());
         let next = current.open_container(entry)?;

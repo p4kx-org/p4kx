@@ -3,7 +3,9 @@
 
 use std::process::ExitCode;
 
-use p4kx_assembly::{AssemblyError, ChangeError, EntityLookupError, HeadError, LoadoutError};
+use p4kx_assembly::{
+    AssemblyError, ChangeError, ContainerAmbiguity, EntityLookupError, HeadError, LoadoutError,
+};
 use p4kx_blender::PackageError;
 use p4kx_comparison::LineDiffError;
 use p4kx_export::{ActionMapError, CatalogError};
@@ -217,6 +219,7 @@ fn code_for(error: &anyhow::Error) -> u8 {
     {
         DATAFORGE_ERROR
     } else if error.downcast_ref::<UnknownEntries>().is_some()
+        || error.downcast_ref::<ContainerAmbiguity>().is_some()
         || error.downcast_ref::<InvalidPath>().is_some()
         || is_filter_refusal(error)
         || error.downcast_ref::<NoRecordMatch>().is_some()

@@ -65,6 +65,7 @@
 
 mod animation_budget;
 mod animation_folders;
+mod archive_member_selection;
 mod armour;
 mod assembly;
 mod assortment;
@@ -95,6 +96,7 @@ mod character_path;
 mod chf_name_sources;
 mod chf_names;
 mod compat;
+mod container_ambiguity;
 mod creature_animation;
 mod creature_rig;
 mod entities;
@@ -211,6 +213,7 @@ pub use changes::{ChangeError, ChangedLoadout, LoadoutChanges, PortChange, Repla
 pub use chf_name_sources::{ChfNameContributions, ObservedChfNames};
 pub use chf_names::{archive_names, archive_names_observed};
 pub use compat::{AcceptedType, Incompatibility, ItemFacts, PortConstraints};
+pub use container_ambiguity::ContainerAmbiguity;
 pub use creature_animation::{
     CreatureAnimationClipSource, CreatureAnimationOwner, CreatureAnimationSourceReport,
     CreatureAnimations, CreatureClips, creature_animations,

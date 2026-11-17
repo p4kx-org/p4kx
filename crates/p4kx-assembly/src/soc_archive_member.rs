@@ -7,6 +7,8 @@ use p4kx_extraction::{Archive, ArchiveError, Entry, EntryOrigin, PathIndex};
 use p4kx_extraction::{PathIndexBuildError, PathIndexError};
 use thiserror::Error;
 
+use crate::archive_member_selection;
+
 /// A physical SOC input with its verified payload or the original read failure.
 #[derive(Debug)]
 pub struct SocArchiveMember {
@@ -97,19 +99,9 @@ pub(super) fn origin(
 pub(super) fn select<'archive>(
     index: &PathIndex<'archive>,
     paths: impl IntoIterator<Item = impl AsRef<str>>,
-    mut check: impl FnMut() -> Result<(), super::SocCaptureError>,
+    check: impl FnMut() -> Result<(), super::SocCaptureError>,
 ) -> Result<Vec<&'archive Entry>, super::SocCaptureError> {
-    for path in paths {
-        let found = index
-            .matching_entries_with(path.as_ref(), |_| check())
-            .map_err(path_error)?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(path_error)?;
-        if !found.is_empty() {
-            return Ok(found);
-        }
-    }
-    Ok(Vec::new())
+    archive_member_selection::first_matching(index, paths, check).map_err(path_error)
 }
 
 pub(super) fn path_error(
