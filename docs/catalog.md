@@ -2509,6 +2509,12 @@ and protected authored text. An undecodable value has an unreadable path state. 
 declarations make the candidate source set incomplete. `physicalTargets` links to actual directory
 occurrences by `inputRef` and `entryIndex`.
 
+In decoded SOC entity chunks, shop inventory references are read from the original XML
+attribute slots and joined to one matching Entity GUID in the same container metadata.
+The declaration evidence identifies the exact CryXML attribute or text XML byte range.
+Repeated placements and declaration slots retain their source positions. Unsupported or
+unreadable entity declarations leave the inventory evidence incomplete.
+
 | Status | Observed resolution |
 |---|---|
 | `resolved` | The component and prefab declarations agree on one readable inventory. An authored empty list resolves. |

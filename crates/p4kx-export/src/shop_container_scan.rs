@@ -3,11 +3,13 @@
 
 use std::collections::HashMap;
 
-use p4kx_extraction::{Archive, Entry};
+use p4kx_extraction::{Archive, CancelToken, Entry};
 
 use crate::CatalogError;
-use crate::catalog_read::original::{AuthoredEntryPath, EntryCapture, EntryRead, EntryXml};
-use crate::container_read::{MAX_SOC_LEN, soc_entries};
+use crate::catalog_read::original::{
+    AuthoredEntryPath, EntryCapture, EntryRead, EntryReadError, EntryXml,
+};
+use crate::container_read::soc_entries;
 use crate::entry_source::EntrySource;
 use crate::export_diagnostic::ExportDiagnosticCode;
 use crate::export_entry_ledger::EntryOperation;
@@ -16,7 +18,7 @@ use crate::shop_container_xml;
 use crate::shop_containers::{Component, Inventory, verdict};
 use crate::shop_entry_read;
 use crate::shop_inventory_observations::InventoryObservations;
-use crate::shop_soc::{self, Anchors};
+use crate::shop_soc::{self, Anchors, CapturedScan};
 use crate::starmap_index::key;
 
 #[cfg(test)]
@@ -56,10 +58,11 @@ struct PreparedShops {
 pub(crate) fn shop_entities(
     archive: &Archive,
     socpak: &Entry,
+    cancel: Option<&CancelToken>,
     capture: &EntryCapture<'_>,
 ) -> Result<Scanned, CatalogError> {
     let mut ledger = ExportLedger::default();
-    let Some(prepared) = scan(archive, socpak, &mut ledger, capture)? else {
+    let Some(prepared) = scan(archive, socpak, &mut ledger, cancel, capture)? else {
         return Ok(Scanned {
             ledger,
             ..Scanned::default()
@@ -79,6 +82,7 @@ fn scan(
     archive: &Archive,
     socpak: &Entry,
     ledger: &mut ExportLedger,
+    cancel: Option<&CancelToken>,
     capture: &EntryCapture<'_>,
 ) -> Result<Option<PreparedShops>, CatalogError> {
     let source = EntrySource::outer(capture, archive, socpak)?.dependency();
@@ -116,7 +120,16 @@ fn scan(
     };
     let entities = shop_container_xml::captured_guids(&xml)?;
     projected(source, ledger, entities.malformed, "Entity.CryGUID");
-    finish(archive, socpak, &container, entities.guids, ledger, capture).map(Some)
+    finish(
+        archive,
+        socpak,
+        &container,
+        entities.guids,
+        ledger,
+        cancel,
+        capture,
+    )
+    .map(Some)
 }
 
 fn finish(
@@ -125,6 +138,7 @@ fn finish(
     container: &Archive,
     guids: Vec<(String, AuthoredEntryPath)>,
     ledger: &mut ExportLedger,
+    cancel: Option<&CancelToken>,
     capture: &EntryCapture<'_>,
 ) -> Result<PreparedShops, CatalogError> {
     // Output order includes repeated declarations; the anchor index consumes their receipts.
@@ -134,7 +148,9 @@ fn finish(
         guids,
         object_names(archive, container, socpak, ledger, capture)?.unwrap_or_default(),
     );
-    let mut components = scan_components(archive, container, socpak, &anchors, ledger, capture)?;
+    let mut components = scan_components(
+        archive, container, socpak, &anchors, ledger, cancel, capture,
+    )?;
     let mut shops = Vec::with_capacity(entity_ids.len());
     for guid in entity_ids {
         let state = components.resolve(&guid, &anchors)?;
@@ -161,6 +177,52 @@ struct Components {
 }
 
 impl Components {
+    fn retain(
+        &mut self,
+        observed: CapturedScan,
+        source: EntrySource,
+        ledger: &mut ExportLedger,
+    ) -> Result<(), CatalogError> {
+        if observed.source_incomplete {
+            ledger.incomplete_inventory(crate::Kind::Shops);
+        }
+        let scan = observed.scan;
+        self.unattributed_declarations |= observed.unattributed_declarations || scan.rejected > 0;
+        for (entity, rejected) in observed.rejected {
+            self.observations
+                .entry(entity)
+                .or_default()
+                .merge(InventoryObservations {
+                    rejected,
+                    ..InventoryObservations::default()
+                })?;
+        }
+        for (entity, no_file) in observed.no_file {
+            self.observations
+                .entry(entity)
+                .or_default()
+                .merge(InventoryObservations {
+                    no_file,
+                    ..InventoryObservations::default()
+                })?;
+        }
+        projected(
+            source,
+            ledger,
+            scan.rejected > 0 || scan.malformed,
+            "offlineInventory",
+        );
+        self.rejected += scan.rejected;
+        for component in scan.components {
+            self.found.entry(component.entity).or_default().push(
+                component
+                    .inventory
+                    .map_or(Component::NoFile, Component::File),
+            );
+        }
+        Ok(())
+    }
+
     fn resolve(&mut self, guid: &str, anchors: &Anchors) -> Result<Component, CatalogError> {
         let states = self.found.get(guid).map_or(&[][..], Vec::as_slice);
         let result = if states.is_empty() {
@@ -194,6 +256,7 @@ fn scan_components(
     socpak: &Entry,
     anchors: &Anchors,
     ledger: &mut ExportLedger,
+    cancel: Option<&CancelToken>,
     capture: &EntryCapture<'_>,
 ) -> Result<Components, CatalogError> {
     let mut components = Components::default();
@@ -201,59 +264,24 @@ fn scan_components(
         let source = EntrySource::inner(capture, archive, socpak, container, inner)?
             .operation(EntryOperation::ShopSoc)
             .dependency();
-        let Some(bytes) = read(container, inner, MAX_SOC_LEN, &source, ledger, capture)? else {
-            continue;
+        let bytes = match shop_entry_read::read_soc(capture, &source, container, inner, cancel)? {
+            Ok(bytes) => bytes,
+            Err(error) => {
+                record_read_error(source, ledger, &error);
+                continue;
+            }
         };
         let observed = shop_soc::read_components(&bytes, capture, anchors)?;
         #[cfg(test)]
-        if let Some(mut findings) = soc_subtypes::findings(&source, &observed)? {
-            let probe = soc_subtypes::Probe {
-                capture,
-                source: &source,
-                container,
-                inner,
-                anchors,
-            };
-            findings.inspect(&probe, &bytes, &observed);
-            components.soc_findings.push(findings);
+        {
+            let raw = shop_soc::read_legacy_components(&bytes, capture, anchors)?;
+            if let Some(mut findings) = soc_subtypes::findings(&source, &raw)? {
+                let probe = soc_subtypes::Probe { capture, anchors };
+                findings.inspect(&probe, &bytes, &raw);
+                components.soc_findings.push(findings);
+            }
         }
-        let scan = observed.scan;
-        components.unattributed_declarations |=
-            observed.unattributed_declarations || scan.rejected > 0;
-        for (entity, rejected) in observed.rejected {
-            components
-                .observations
-                .entry(entity)
-                .or_default()
-                .merge(InventoryObservations {
-                    rejected,
-                    ..InventoryObservations::default()
-                })?;
-        }
-        for (entity, no_file) in observed.no_file {
-            components
-                .observations
-                .entry(entity)
-                .or_default()
-                .merge(InventoryObservations {
-                    no_file,
-                    ..InventoryObservations::default()
-                })?;
-        }
-        projected(
-            source,
-            ledger,
-            scan.rejected > 0 || scan.malformed,
-            "offlineInventory",
-        );
-        components.rejected += scan.rejected;
-        for component in scan.components {
-            components.found.entry(component.entity).or_default().push(
-                component
-                    .inventory
-                    .map_or(Component::NoFile, Component::File),
-            );
-        }
+        components.retain(observed, source, ledger)?;
     }
     Ok(components)
 }
@@ -322,16 +350,20 @@ fn read(
     match shop_entry_read::read(capture, source, container, entry, limit)? {
         Ok(bytes) => Ok(Some(bytes)),
         Err(error) => {
-            ledger.incomplete_inventory(crate::Kind::Shops);
-            source.clone().diagnosed(
-                ledger,
-                crate::Kind::Shops,
-                SourceDisposition::ReadFailed,
-                error.diagnosis(),
-            );
+            record_read_error(source.clone(), ledger, &error);
             Ok(None)
         }
     }
+}
+
+fn record_read_error(source: EntrySource, ledger: &mut ExportLedger, error: &EntryReadError) {
+    ledger.incomplete_inventory(crate::Kind::Shops);
+    source.diagnosed(
+        ledger,
+        crate::Kind::Shops,
+        SourceDisposition::ReadFailed,
+        error.diagnosis(),
+    );
 }
 
 fn rejected(source: EntrySource, ledger: &mut ExportLedger, field: &'static str) {

@@ -62,8 +62,7 @@ pub(crate) struct RawInvalid {
     pub(crate) owner: Option<String>,
 }
 
-/// Projects the shared shop-component scanner without source-cell materialization.
-#[cfg(test)]
+/// Scans legacy shop tokens without creating source cells.
 pub(crate) fn components(bytes: &[u8], anchors: &Anchors) -> Scan {
     scan(
         bytes,
@@ -76,9 +75,12 @@ pub(crate) fn components(bytes: &[u8], anchors: &Anchors) -> Scan {
 
 #[path = "shop_soc_observation.rs"]
 mod observation;
-#[cfg(test)]
+#[path = "shop_soc_xml.rs"]
+mod xml;
 pub(crate) use observation::CapturedScan;
-pub(crate) use observation::read_components;
+#[cfg(test)]
+pub(crate) use observation::read_components as read_legacy_components;
+pub(crate) use xml::read_components;
 
 impl<Inventory> Default for Scan<Inventory> {
     fn default() -> Self {

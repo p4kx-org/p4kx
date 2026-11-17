@@ -14,7 +14,6 @@ use p4kx_testkit::{
 
 use crate::catalog_read::original::with_entry_capture;
 use crate::entry_source::EntrySource;
-use crate::export_diagnostic::{ExportDiagnosticCode, ExportSourceRole};
 use crate::export_entry_ledger::EntryOperation;
 use crate::export_ledger::SourceDisposition;
 use crate::shop_containers::Containers;
@@ -82,26 +81,7 @@ pub(super) fn findings(
     }))
 }
 
-fn subtype_groups(containers: &Containers) -> TestResult<BTreeMap<Subtypes, usize>> {
-    let reportable: BTreeSet<_> = containers
-        .ledger
-        .entries
-        .iter()
-        .filter(|entry| {
-            entry.kind == Kind::Shops
-                && entry.role == ExportSourceRole::Dependency
-                && entry.operation == EntryOperation::ShopSoc
-                && entry.disposition == SourceDisposition::ProjectionFailed
-                && entry.diagnosis.code == Some(ExportDiagnosticCode::MalformedSource)
-        })
-        .map(|entry| {
-            let outer = entry.entry_index.ok_or("shop SOC outer receipt")?;
-            let inner = entry
-                .container_entry_index
-                .ok_or("shop SOC nested receipt")?;
-            Ok::<_, Box<dyn Error>>(NestedEntry { outer, inner })
-        })
-        .collect::<Result<_, _>>()?;
+fn subtype_groups(containers: &Containers) -> BTreeMap<Subtypes, usize> {
     let findings = &containers.soc_findings;
     let identities: BTreeSet<_> = findings.iter().map(|item| item.entry).collect();
     assert_eq!(
@@ -109,15 +89,56 @@ fn subtype_groups(containers: &Containers) -> TestResult<BTreeMap<Subtypes, usiz
         findings.len(),
         "one subtype row per physical Entry"
     );
-    assert!(
-        identities == reportable,
-        "subtypes reconcile with the normal health ledger"
-    );
     let mut groups = BTreeMap::new();
     for item in findings {
         *groups.entry(item.subtypes).or_insert(0) += 1;
     }
-    Ok(groups)
+    groups
+}
+
+struct ProductionCounts {
+    previously_flagged_readable: usize,
+    previously_flagged_failed: usize,
+    other_failures: usize,
+}
+
+fn production_counts(containers: &Containers) -> TestResult<ProductionCounts> {
+    let previously_flagged: BTreeSet<_> = containers
+        .soc_findings
+        .iter()
+        .map(|finding| finding.entry)
+        .collect();
+    let mut accounted = BTreeSet::new();
+    let mut result = ProductionCounts {
+        previously_flagged_readable: 0,
+        previously_flagged_failed: 0,
+        other_failures: 0,
+    };
+    for source in &containers.ledger.entries {
+        if source.kind != Kind::Shops || source.operation != EntryOperation::ShopSoc {
+            continue;
+        }
+        let outer = source.entry_index.ok_or("Shop SOC outer receipt")?;
+        let inner = source
+            .container_entry_index
+            .ok_or("Shop SOC nested receipt")?;
+        let identity = NestedEntry { outer, inner };
+        assert!(
+            accounted.insert(identity),
+            "each physical source has one terminal disposition"
+        );
+        match (previously_flagged.contains(&identity), source.disposition) {
+            (true, SourceDisposition::Projected) => result.previously_flagged_readable += 1,
+            (true, disposition) if disposition.failed() => result.previously_flagged_failed += 1,
+            (false, disposition) if disposition.failed() => result.other_failures += 1,
+            _ => {}
+        }
+    }
+    assert!(
+        previously_flagged.is_subset(&accounted),
+        "each lexical finding has a bound production disposition"
+    );
+    Ok(result)
 }
 
 fn structural_groups(
@@ -147,7 +168,7 @@ fn shop_soc_subtypes_distinguish_rejection_and_malformed_values() -> TestResult 
         .write_to(&path)?;
     let archive = Archive::open(path)?;
     let observed = read(&archive)?;
-    let groups = subtype_groups(&observed)?;
+    let groups = subtype_groups(&observed);
     for (unattached_valid_path, attached_invalid_value, unattached_invalid_value) in [
         (true, false, false),
         (false, true, false),
@@ -189,7 +210,7 @@ fn the_structural_probe_matches_original_slots_and_distinguishes_pooled_adjacenc
         .write_to(&path)?;
     let archive = Archive::open(path)?;
     let observed = read(&archive)?;
-    assert_eq!(subtype_groups(&observed)?.values().sum::<usize>(), 4);
+    assert_eq!(subtype_groups(&observed).values().sum::<usize>(), 4);
     let groups = structural_groups(&observed);
     let subtype = |valid_path| Subtypes {
         unattached_valid_path: valid_path,
@@ -335,14 +356,21 @@ fn installed_shop_soc_subtypes_report_has_no_record_or_path_values() -> TestResu
     let observed = read(&archive).map_err(|_| "canonical Shop SOC walk failed");
     watch.check()?;
     let observed = observed?;
-    let groups = subtype_groups(&observed)?;
+    let groups = subtype_groups(&observed);
     let change = build.change_number();
     let mut out = io::stdout().lock();
     writeln!(
         out,
-        "shopSocSummary channel={channel} change={change} failedEntries={} elapsedMs={}",
+        "shopSocSummary channel={channel} change={change} lexicalFindings={} elapsedMs={}",
         observed.soc_findings.len(),
         start.elapsed().as_millis()
+    )?;
+    let counts = production_counts(&observed)?;
+    writeln!(
+        out,
+        "shopSocProduction channel={channel} change={change} previouslyFlaggedReadable={} \
+         previouslyFlaggedFailed={} otherFailures={}",
+        counts.previously_flagged_readable, counts.previously_flagged_failed, counts.other_failures,
     )?;
     for (subtypes, count) in groups {
         writeln!(

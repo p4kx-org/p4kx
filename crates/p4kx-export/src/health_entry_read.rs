@@ -73,6 +73,23 @@ impl EntryRead {
         )
     }
 
+    pub(crate) fn read_bounded_complete(
+        receipt: EntryReceipt,
+        archive: &Archive,
+        entry: &Entry,
+        limit: u64,
+        cancel: Option<&CancelToken>,
+    ) -> Result<Result<Self, EntryReadError>, CatalogError> {
+        if entry.uncompressed_size() > limit {
+            receipt.check_entry(archive, entry)?;
+            if cancel.is_some_and(CancelToken::is_cancelled) {
+                return Err(CatalogError::Cancelled);
+            }
+            return Ok(Err(EntryReadError::Limit { limit }));
+        }
+        Self::read_all(receipt, archive, entry, cancel)
+    }
+
     pub(crate) fn read_all(
         receipt: EntryReceipt,
         archive: &Archive,

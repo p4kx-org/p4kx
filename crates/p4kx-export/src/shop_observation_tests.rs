@@ -150,7 +150,7 @@ fn editor_and_soc_failures_keep_exact_nested_identities_and_valid_components() -
     ])?;
     let source = archive.entries().get(1).ok_or("outer source")?;
     let read = crate::catalog_read::original::with_entry_capture(&archive, |capture| {
-        crate::shop_container_scan::shop_entities(&archive, source, capture)
+        crate::shop_container_scan::shop_entities(&archive, source, None, capture)
     })?;
     assert!(
         read.ledger.incomplete_inventories.contains(&Kind::Shops),
@@ -221,7 +221,7 @@ fn unreadable_metadata_does_not_invent_a_soc_or_editor_read() -> TestResult {
     let (_folder, archive) = opened(vec![TestEntry::stored(CONTAINER, container.build())])?;
     let container = archive.entries().first().ok_or("container")?;
     let read = crate::catalog_read::original::with_entry_capture(&archive, |capture| {
-        crate::shop_container_scan::shop_entities(&archive, container, capture)
+        crate::shop_container_scan::shop_entities(&archive, container, None, capture)
     })?;
     assert!(
         read.entities.is_none(),

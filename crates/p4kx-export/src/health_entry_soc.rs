@@ -1,13 +1,19 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::cryxml::{SourceAttribute, SourceAttributePosition, SourceElementPosition};
+use p4kx_extraction::cryxml::{
+    SourceAttribute, SourceAttributePosition, SourceElement, SourceElementPosition,
+};
 use p4kx_extraction::model::{SocEntity, SocEntityChunk, SocEntityFile, SocEntitySourceError};
 use p4kx_extraction::{SourceLocation, SourceUse, SourceUseRole, SourceValue};
 
 use super::health_entry_metadata::EntryMetadata;
 use super::{EntryCapture, EntryRead, OriginalDatum};
 use crate::{CatalogError, ExportAccountingError};
+
+#[path = "health_entry_soc_shop.rs"]
+mod shop;
+pub(crate) use shop::ShopDeclarations;
 
 /// Original SOC entities bound to one admitted archive payload.
 pub(crate) struct EntrySoc<'read> {
@@ -23,6 +29,10 @@ impl<'read> EntrySoc<'read> {
         read.receipt().check_capture(capture)?;
         let origin = read.receipt().payload_entry()?;
         Ok(SocEntityFile::parse(read.complete_bytes()?).map(|file| Self { file, origin }))
+    }
+
+    pub(crate) fn non_entity_chunk_payloads(&self) -> impl Iterator<Item = &[u8]> {
+        self.file.non_entity_chunk_payloads()
     }
 
     pub(crate) fn chunks(
@@ -181,7 +191,15 @@ impl<'read> EntrySocEntity<'read> {
     }
 
     fn node_location(&self, chunk: u32) -> Result<SourceLocation, CatalogError> {
-        Ok(match self.entity.element().position() {
+        self.element_location(chunk, self.entity.element())
+    }
+
+    fn element_location(
+        &self,
+        chunk: u32,
+        element: SourceElement<'_>,
+    ) -> Result<SourceLocation, CatalogError> {
+        Ok(match element.position() {
             SourceElementPosition::CryXml(node) => soc_location(
                 "socCryXml",
                 vec![u64::from(chunk), u64::from(node)],

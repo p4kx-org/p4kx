@@ -139,7 +139,7 @@ impl Containers {
                     if cancel.is_some_and(CancelToken::is_cancelled) {
                         return Err(CatalogError::Cancelled);
                     }
-                    shop_entities(archive, entry, capture)
+                    shop_entities(archive, entry, cancel, capture)
                 })
                 .collect::<Result<Vec<_>, CatalogError>>()?;
             for ((_, class), entities) in window.iter().zip(scanned) {

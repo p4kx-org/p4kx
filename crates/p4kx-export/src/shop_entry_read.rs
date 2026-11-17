@@ -5,6 +5,7 @@ use p4kx_extraction::{Archive, CancelToken, Entry};
 
 use crate::CatalogError;
 use crate::catalog_read::original::{EntryCapture, EntryDiagnosis, EntryRead, EntryReadError};
+use crate::container_read::MAX_SOC_LEN;
 use crate::entry_source::EntrySource;
 use crate::export_diagnostic::ExportDiagnosticCode;
 
@@ -29,6 +30,24 @@ pub(crate) fn read(
 ) -> Result<Result<EntryRead, EntryReadError>, CatalogError> {
     source.receipt().check_capture(capture)?;
     EntryRead::read(source.receipt().clone(), archive, entry, limit)
+}
+
+/// Reads the complete admitted SOC within the existing container read bound.
+pub(crate) fn read_soc(
+    capture: &EntryCapture<'_>,
+    source: &EntrySource,
+    archive: &Archive,
+    entry: &Entry,
+    cancel: Option<&CancelToken>,
+) -> Result<Result<EntryRead, EntryReadError>, CatalogError> {
+    source.receipt().check_capture(capture)?;
+    EntryRead::read_bounded_complete(
+        source.receipt().clone(),
+        archive,
+        entry,
+        MAX_SOC_LEN,
+        cancel,
+    )
 }
 
 /// Reads the complete Entry with the same admission as the source observation.

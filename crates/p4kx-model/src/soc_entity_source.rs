@@ -84,6 +84,16 @@ impl<'input> SocEntityFile<'input> {
             .map(|(index, header)| self.read_chunk(index, header))
     }
 
+    /// Borrows payloads outside the entity chunk kind in physical table order.
+    pub fn non_entity_chunk_payloads(&self) -> impl Iterator<Item = &[u8]> {
+        self.chunks
+            .chunks()
+            .iter()
+            .enumerate()
+            .filter(|(_, chunk)| chunk.chunk_type() != ENTITIES)
+            .filter_map(|(index, _)| self.chunks.chunk_data(index))
+    }
+
     /// Visits binary `IncludedObjects` chunks in physical table order.
     pub fn included_objects_chunks(&self) -> impl Iterator<Item = IncludedObjectsChunk<'_>> {
         included_objects_chunk::chunks(&self.chunks)

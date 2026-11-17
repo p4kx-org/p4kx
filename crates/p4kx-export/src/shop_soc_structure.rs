@@ -4,23 +4,22 @@
 use std::collections::BTreeMap;
 use std::ops::Range;
 
+use crate::catalog_read::original::{EntryCapture, EntryRead, EntrySoc, EntrySocEntity};
+use crate::shop_inventory_name;
+use crate::shop_registry;
+use crate::shop_soc::{Anchors, RawFinding};
 use p4kx_extraction::chunks::{Chunk, ChunkFile, ChunkType, Container};
 use p4kx_extraction::cryxml::{
     Format, SourceAttribute, SourceContent, SourceElement, SourceElementPosition,
 };
-use p4kx_extraction::{Archive, Entry};
-
-use crate::catalog_read::original::{EntryCapture, EntryRead, EntrySoc, EntrySocEntity};
-use crate::entry_source::EntrySource;
-use crate::shop_entry_read;
-use crate::shop_inventory_name;
-use crate::shop_registry;
-use crate::shop_soc::{Anchors, RawFinding};
 
 #[path = "shop_soc_structure_evidence.rs"]
 mod evidence;
+#[path = "shop_soc_invalid_shape.rs"]
+mod invalid_shape;
 use evidence::Scope;
 pub(super) use evidence::{Evidence, InventoryValue, Metric, RawKind, Relation};
+use invalid_shape::InvalidShape;
 
 const ENTITY_CHUNK: ChunkType = ChunkType::new(Container::CrCh, 0x0004);
 const SHOP_COMPONENT: &str = "EntityComponentShop";
@@ -28,9 +27,6 @@ const SHOP_PARAMETERS: &str = "SShopComponentParams";
 
 pub(crate) struct Probe<'scope, 'archive> {
     pub(in super::super) capture: &'scope EntryCapture<'archive>,
-    pub(in super::super) source: &'scope EntrySource,
-    pub(in super::super) container: &'scope Archive,
-    pub(in super::super) inner: &'scope Entry,
     pub(in super::super) anchors: &'scope Anchors,
 }
 
@@ -40,22 +36,12 @@ impl Probe<'_, '_> {
         for hit in raw {
             evidence.add(Metric::Raw(kind(hit), Relation::Total));
         }
-        let result =
-            shop_entry_read::read_all(self.capture, self.source, self.container, self.inner, None);
-        let Ok(Ok(verified)) = result else {
-            evidence.add(Metric::FailedCompleteRead);
-            return evidence;
-        };
-        if verified.bytes() != original.bytes() {
-            evidence.add(Metric::DifferentReread);
-            return evidence;
-        }
-        let Ok(Ok(soc)) = EntrySoc::parse(&verified, self.capture) else {
+        let Ok(Ok(soc)) = EntrySoc::parse(original, self.capture) else {
             evidence.add(Metric::UnparsedSoc);
             return evidence;
         };
         evidence.add(Metric::VerifiedSoc);
-        let mut comparison = Comparison::new(verified.bytes(), raw, self.anchors, &mut evidence);
+        let mut comparison = Comparison::new(original.bytes(), raw, self.anchors, &mut evidence);
         comparison.inspect(&soc);
         evidence
     }
@@ -252,6 +238,13 @@ impl<'source, 'evidence> Comparison<'source, 'evidence> {
                     kind(hit),
                     Relation::ExactInventoryPropertyAndValue,
                 ));
+                if value == InventoryValue::Invalid && same_owner(hit, guid) {
+                    self.evidence
+                        .add(Metric::MatchingInvalidShape(InvalidShape::of(
+                            attribute.name(),
+                            attribute.value(),
+                        )));
+                }
             }
         }
     }

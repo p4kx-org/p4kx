@@ -9,11 +9,13 @@ use crate::shop_inventory_observations::RejectedInventoryPath;
 use crate::shop_inventory_path::InventoryStem;
 use crate::{CatalogError, ExportAccountingError};
 
+#[derive(Default)]
 pub(crate) struct CapturedScan {
     pub(crate) scan: Scan<InventoryStem>,
     pub(crate) no_file: HashMap<String, Vec<AuthoredEntryPath>>,
     pub(crate) rejected: HashMap<String, Vec<RejectedInventoryPath>>,
     pub(crate) unattributed_declarations: bool,
+    pub(crate) source_incomplete: bool,
 }
 
 pub(crate) fn read_components(
@@ -62,6 +64,7 @@ pub(crate) fn read_components(
         no_file,
         rejected,
         unattributed_declarations,
+        source_incomplete: false,
     })
 }
 

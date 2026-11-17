@@ -3,10 +3,10 @@
 
 use std::collections::BTreeMap;
 
+use super::invalid_shape::InvalidShape;
+
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub(in super::super) enum Metric {
-    FailedCompleteRead,
-    DifferentReread,
     UnparsedSoc,
     VerifiedSoc,
     ParsedTextEntityChunk,
@@ -19,6 +19,7 @@ pub(in super::super) enum Metric {
     ParameterNode,
     InventoryAttribute(InventoryValue),
     InventoryAttributeWithUniqueMetadataGuid(InventoryValue),
+    MatchingInvalidShape(InvalidShape),
     AttributeWithoutReceipt,
     InventoryPropertyInOtherEntityScope,
     InventoryElementInEntity,
