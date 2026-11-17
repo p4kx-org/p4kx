@@ -188,7 +188,7 @@ fn write_private_receipt(
     clippy::print_stdout,
     reason = "the private witness reports aggregate counts on stdout"
 )]
-fn installed_live_loadout_assortment_warning_has_exact_source_subjects() -> Result {
+fn installed_live_empty_xml_alternatives_leave_complete_default_resolution() -> Result {
     let receipt = env::var_os(PRIVATE_RECEIPT)
         .map(PathBuf::from)
         .ok_or("set P4KX_ASSORTMENT_WITNESS_FILE to a new private scratch file")?;
@@ -222,10 +222,19 @@ fn installed_live_loadout_assortment_warning_has_exact_source_subjects() -> Resu
         census.resolution_failures,
         census.matches.len()
     );
+    assert!(
+        census.roots > 0,
+        "eligible installed default roots were exercised"
+    );
     assert_eq!(
-        census.matches.len(),
-        1,
-        "exact measured LIVE warning occurrences"
+        [
+            census.header_failures,
+            census.eligibility_failures,
+            census.resolution_failures,
+            census.matches.len()
+        ],
+        [0; 4],
+        "complete installed resolution without the empty-path warning"
     );
     Ok(())
 }
