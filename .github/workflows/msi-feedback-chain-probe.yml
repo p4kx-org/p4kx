@@ -70,6 +70,22 @@ jobs:
           "P4KX_PACKAGE_TASK=$task" >> $env:GITHUB_ENV
       - name: Exercise actual completed and inner-watchdog parent controls
         run: .github/scripts/test-msi-feedback-parent.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/msi-feedback-parent')
+      - name: Require owned child termination before forwarding
+        if: ${{ matrix.mode == 'complete' }}
+        timeout-minutes: 1
+        run: .github/scripts/test-msi-feedback-forwarding-watchdog.ps1 -Target $env:P4KX_TARGET -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/forwarding-watchdog')
+      - name: Preserve the forwarding watchdog control
+        if: ${{ always() && matrix.mode == 'complete' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        timeout-minutes: 1
+        with:
+          name: msi-forwarding-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.platform.target }}
+          path: |
+            ${{ env.P4KX_PACKAGE_TASK }}/contracts/forwarding-watchdog/forwarding-watchdog.json
+            ${{ env.P4KX_PACKAGE_TASK }}/contracts/forwarding-watchdog/*/phase-journal.jsonl
+            ${{ env.P4KX_PACKAGE_TASK }}/contracts/forwarding-watchdog/*/forwarding-stdout.log
+            ${{ env.P4KX_PACKAGE_TASK }}/contracts/forwarding-watchdog/*/worker-alive-past-budget
+          if-no-files-found: error
       - name: Prepare original dynamic chain allowance
         id: msi-budget
         timeout-minutes: 1

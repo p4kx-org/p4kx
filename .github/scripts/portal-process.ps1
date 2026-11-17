@@ -14,7 +14,7 @@ function New-P4kxPortalChannels {
 }
 
 function Update-P4kxPortalChannels {
-    param([object[]]$Channels, [int]$MaximumBytes, [scriptblock]$OnOutput=$null)
+    param([object[]]$Channels, [int]$MaximumBytes)
     $bytes = [long]0
     foreach ($channel in $Channels) { $bytes += $channel.bytes }
     foreach ($channel in $Channels) {
@@ -27,7 +27,6 @@ function Update-P4kxPortalChannels {
         if ($bytes -gt $MaximumBytes) { throw 'Portal measurement output limit exceeded.' }
         [void]$channel.text.Append($chunk)
         $channel.bytes += $size
-        if ($null -ne $OnOutput) { & $OnOutput $channel.stream $chunk | Out-Null }
         $channel.pending = $channel.reader.ReadAsync($channel.buffer, 0, $channel.buffer.Length)
     }
 }
@@ -40,10 +39,10 @@ function Wait-P4kxPortalChannels {
 }
 
 function Receive-P4kxPortalChannels {
-    param([object[]]$Channels, [Diagnostics.Stopwatch]$Timer, [int]$Milliseconds, [int]$MaximumBytes, [scriptblock]$OnOutput=$null)
+    param([object[]]$Channels, [Diagnostics.Stopwatch]$Timer, [int]$Milliseconds, [int]$MaximumBytes)
     while (@($Channels | Where-Object { $null -ne $_.pending }).Count -ne 0) {
         if ($Timer.ElapsedMilliseconds -ge $Milliseconds) { throw 'Portal measurement timed out.' }
-        Update-P4kxPortalChannels $Channels $MaximumBytes -OnOutput $OnOutput
+        Update-P4kxPortalChannels $Channels $MaximumBytes
         Wait-P4kxPortalChannels $Channels
     }
 }
@@ -77,7 +76,9 @@ function Close-P4kxPortalProcess {
 function Invoke-P4kxPortalProcess {
     <#
     .SYNOPSIS
-    Captures bounded stdout, stderr and actual exit status without classifying it as success.
+    Captures bounded stdout, stderr and actual exit status.
+    .PARAMETER OnOutput
+    Replays each captured stream after its log is saved and the owned child exits.
     #>
     param([string]$Executable, [string[]]$Arguments, [string]$Directory, [string]$Name,
         [int]$Milliseconds = 5000, [int]$MaximumBytes = 131072, [hashtable]$Environment = @{},
@@ -95,13 +96,27 @@ function Invoke-P4kxPortalProcess {
         $process.StandardInput.Close()
         $timer = [Diagnostics.Stopwatch]::StartNew()
         $channels = New-P4kxPortalChannels $process
-        Receive-P4kxPortalChannels $channels $timer $Milliseconds $MaximumBytes -OnOutput $OnOutput
+        Receive-P4kxPortalChannels $channels $timer $Milliseconds $MaximumBytes
         $remaining = [Math]::Max(1, $Milliseconds - [int]$timer.ElapsedMilliseconds)
         if (-not $process.WaitForExit($remaining)) { throw 'Portal measurement timed out.' }
         $result = @{exit_code=$process.ExitCode; stdout=$channels[0].text.ToString(); stderr=$channels[1].text.ToString()}
     }
     catch { $failures.Add($_.Exception) }
-    finally { Close-P4kxPortalProcess $process $started $channels $Directory $Name $failures -Observation $Observation }
+    finally {
+        $failuresBeforeClose = $failures.Count
+        Close-P4kxPortalProcess $process $started $channels $Directory $Name $failures -Observation $Observation
+    }
+    if ($null -ne $OnOutput -and $Observation['exited'] -eq $true -and $channels.Count -eq 2 -and
+        $failures.Count -eq $failuresBeforeClose) {
+        try {
+            foreach ($channel in $channels) {
+                if ($channel.text.Length -ne 0) {
+                    & $OnOutput $channel.stream $channel.text.ToString() | Out-Null
+                }
+            }
+        }
+        catch { $failures.Add($_.Exception) }
+    }
     if ($failures.Count -ne 0) { throw [AggregateException]::new('Portal measurement or cleanup failed.', $failures) }
     return $result
 }

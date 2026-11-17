@@ -175,10 +175,12 @@ consumer validates those paths as part of the existing per-CPU lifecycle, not th
 `check-msi.ps1` runs its existing lifecycle in one hidden native PowerShell worker, preserving
 both the original PowerShell location and the separate native process directory. The first
 owned workflow step establishes a 35-minute deadline inside the 45-minute job. The worker's
-allowance is the smaller of ten minutes and the remaining deadline. Its parent uses the existing
-direct-process watchdog and five-second termination wait; process startup, synchronous console
-or file IO and callbacks are not a hard elapsed-time guarantee. Existing inner installer and
-fixture limits, source/CPU guards and uncertainty fences remain required.
+allowance is the smaller of ten minutes and the remaining deadline. Its parent drains the worker
+output under the direct-process watchdog and five-second termination wait. The owned child
+terminates and its captured logs are written before optional replay. The package verifier uses
+the persisted journal without a console replay. Native process startup, termination and
+filesystem availability can still affect when evidence reaches the runner. Existing inner
+installer and fixture limits, source/CPU guards and uncertainty fences remain required.
 
 An independent runner limit also surrounds the installer step. Its allowance is the smaller of
 12 minutes and the remaining whole minutes of the original deadline. Preparation and admission
@@ -204,9 +206,11 @@ The diagnostic-only `MSI feedback runner-fuse probe` workflow runs native AMD64 
 complete/timeout controls through the same phase writer. Its separate verifier downloads the
 actual artifacts and checks the service's failed-step and timeout annotations, source revision,
 run/attempt, CPU, original source hashes and phase closure. Only the expected timeout probe may
-tolerate failure; the verifier and real installer jobs retain strict failure gating. Successful
-probe evidence establishes feedback transport. Installer correctness remains owned by the real
-MSI lifecycle. Both capture readers use one bounded byte reader and strict UTF-8 decoding; only
+tolerate failure; the verifier and real installer jobs retain strict failure gating. The dynamic
+parent-chain probe also checks both native CPUs with deliberately blocked replay. Its synthetic
+witness requires process exit and captured logs before replay begins. Installer correctness
+remains owned by the real MSI lifecycle. Both capture readers use one bounded byte reader and
+strict UTF-8 decoding; only
 a UTF-8 byte order mark is accepted. The journal keeps its 1-MiB bound and diagnostic JSON its
 64-KiB bound. The diagnostic JSON reader requires PowerShell 7.5 or newer and preserves timestamp
 strings with `ConvertFrom-Json -DateKind String`; original precision and offsets reach the strict

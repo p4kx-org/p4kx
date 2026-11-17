@@ -56,10 +56,8 @@ function Invoke-P4kxMsiDiagnosticWorker {
         worker_script=[IO.Path]::GetFileName($Script);worker_sha256=(Get-FileHash -LiteralPath $Script -Algorithm SHA256).Hash.ToLowerInvariant();
         completed_success=$false;native_completion_unproven=$true;mutation_authority=$false} |
         ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $directory 'diagnostic-start.json') -Encoding utf8NoBOM
-    [Console]::Out.WriteLine('[P4KX-MSI-WORKER] launch-begin')
-    [Console]::Out.Flush()
     try {
-        $result = Invoke-P4kxPortalProcess (Get-Process -Id $PID).Path $arguments $directory 'lifecycle-worker' -Milliseconds $milliseconds -MaximumBytes 4MB -OnOutput (New-P4kxMsiPhaseForwarder) -Observation $observation
+        $result = Invoke-P4kxPortalProcess (Get-Process -Id $PID).Path $arguments $directory 'lifecycle-worker' -Milliseconds $milliseconds -MaximumBytes 4MB -Observation $observation
         if ($result.exit_code -ne 0) { throw "Native MSI worker exited $($result.exit_code); see captured diagnostics." }
     } catch { $failure=$_.Exception }
     try { $journal=Read-P4kxMsiPhaseJournal (Join-Path $directory 'phase-journal.jsonl') } catch { $inspectionFailure=$_.Exception }
