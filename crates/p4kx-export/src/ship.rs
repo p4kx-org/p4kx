@@ -3,14 +3,14 @@
 
 use p4kx_extraction::{RecordTree, StructValue, Value};
 
-use crate::catalog_v3::authored_fields::ship_texts::ShipTexts;
+use crate::catalog_v3::authored_fields::ship_presentation::ShipPresentation;
 use crate::contract::Ship;
 use crate::contract_insurance::ShipInsurance;
 use crate::guid_text::CatalogGuid;
 use crate::paint_port::{PaintPort, VehicleFacts};
 use crate::playability_rules::{self, Evidence};
 use crate::record_fields::{
-    boolean, class_name, component, element, elements, integer, number, reference, structure, text,
+    boolean, class_name, component, element, elements, integer, number, structure, text,
 };
 use crate::ship_base::ShipRead;
 use crate::variants::ShipKey;
@@ -53,13 +53,13 @@ fn takes_paints(port: &StructValue<'_>) -> bool {
     })
 }
 
-/// Returns the ship the Record tree `tree` describes, its texts resolved by `texts` and its
+/// Returns the ship the Record tree `tree` describes, its presentation resolved by `presentation` and its
 /// playability decided by `evidence` and its mass, hull, cargo, size and kind taken from `read`,
 /// with the vehicle facts its paints and variant group are derived from.
 pub(crate) fn ship<'f>(
     tree: &RecordTree<'f>,
     vehicle: Option<&StructValue<'f>>,
-    texts: ShipTexts,
+    presentation: ShipPresentation<'f>,
     evidence: &Evidence,
     read: &ShipRead,
 ) -> (Ship<'f>, VehicleFacts) {
@@ -70,12 +70,13 @@ pub(crate) fn ship<'f>(
         guid,
         class_name: class_name(tree),
         record_path: tree.record_path(),
-        name: texts.name,
-        description: texts.description,
-        role: texts.role,
-        career: texts.career,
+        name: presentation.name,
+        description: presentation.description,
+        role: presentation.role,
+        career: presentation.career,
         crew_size: integer(vehicle, "crewSize"),
-        manufacturer_guid: reference(vehicle, "manufacturer"),
+        vehicle_manufacturer: presentation.vehicle_manufacturer,
+        attachment_manufacturer: presentation.attachment_manufacturer,
         vehicle_definition: text(vehicle, "vehicleDefinition"),
         playability: playability_rules::ship(tree, vehicle, evidence),
         vehicle_kind: base.vehicle_kind,

@@ -96,7 +96,15 @@ pub(crate) fn minimal_catalog() -> Value {
             "role": source_values::present(json!("name:27:@vehicle_class_lightfreight")),
             "career": source_values::source(SourceValue::Absent),
             "crewSize": 2,
-            "manufacturerGuid": null,
+            "vehicleManufacturer": {
+                "componentOrdinal": source_values::source(SourceValue::Absent),
+                "manufacturer": source_values::source(SourceValue::Absent),
+            },
+            "attachmentManufacturer": {
+                "componentOrdinal": source_values::source(SourceValue::Absent),
+                "attachDefPresent": source_values::source(SourceValue::Absent),
+                "manufacturer": source_values::source(SourceValue::Absent),
+            },
             "vehicleDefinition": null,
             "vehicleKind": "spaceship",
             "size": 3,

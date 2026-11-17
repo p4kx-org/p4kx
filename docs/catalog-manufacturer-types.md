@@ -89,11 +89,23 @@ unknown; read success or a supplied key cannot manufacture unencrypted proof.
 
 ## Inbound links and verification
 
-Items keep the authored `AttachDef.Manufacturer` GUID, and ships keep `Vehicle.manufacturer`.
-The existing final-row snapshot, target-kind classification and physical target index resolve them
-against actual emitted Manufacturer rows. Filtered, policy-excluded, outside-scope, failed and
-ambiguous targets retain their distinct statuses. Reading a link never auto-includes its target or
-changes item-variant identity inputs. Shop path brands are not inferred as Manufacturer GUIDs.
+Items keep the authored `AttachDef.Manufacturer` GUID. Ships expose both authored roles.
+`vehicleManufacturer.manufacturer` reads `VehicleComponentParams.manufacturer`.
+`attachmentManufacturer.manufacturer` reads `SAttachableComponentParams.AttachDef.Manufacturer`.
+Each role carries the sourced zero-based `componentOrdinal`. The attachment role also carries
+the original `attachDefPresent` state, including a present definition with a missing manufacturer.
+
+For a Reference, either role's `manufacturer.value.guid.value` is its stored GUID. The value
+retains the actual target Record index, type, path and resolution status. Other storage forms
+retain the original value arena in `manufacturer.value.authored`. The two role fields can
+disagree. Each manufacturer value uses its own field and component selection evidence.
+
+When migrating the v2 `ships[].manufacturerGuid`, read
+`ship.vehicleManufacturer.manufacturer.value.guid.value` for the Reference case.
+Join manufacturer labels through `definitions.manufacturers.rows`, then resolve their text
+references into `texts.publicNames`. The final-row snapshot, target-kind classification and
+physical target index distinguish filtered, policy-excluded, outside-scope, failed and ambiguous
+targets. Reading a link leaves the selected definition rows and item-variant identity unchanged.
 
 Synthetic producer checks cover raw/state/identity fields, text and source-use closure, mixed
 plain/encrypted/unknown origin, available languages, filtered joins, aliases, required schema

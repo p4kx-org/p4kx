@@ -9,7 +9,7 @@ use crate::catalog_fixture;
 use std::error::Error;
 use std::time::{Duration, UNIX_EPOCH};
 
-use catalog_fixture::{Maker, english, write_archive, write_archive_with};
+use catalog_fixture::{english, write_archive};
 use p4kx_export::{BuiltCatalog, CatalogOptions, ItemClass, ItemClassSummary, Kind, build_catalog};
 use p4kx_extraction::Archive;
 use serde_json::{Value, json};
@@ -20,6 +20,8 @@ type TestResult = Result<(), Box<dyn Error>>;
 mod completeness;
 #[path = "catalog_item_definitions.rs"]
 mod definitions;
+#[path = "catalog_ship_manufacturers.rs"]
+mod ship_manufacturers;
 #[path = "catalog_ship_texts.rs"]
 mod ship_texts;
 
@@ -38,87 +40,6 @@ fn catalog_with(options: &CatalogOptions<'_>) -> Result<(BuiltCatalog, Value), B
     let built = build_catalog(&archive, options)?;
     let json = serde_json::from_slice(built.json())?;
     Ok((built, json))
-}
-
-fn catalog_of(maker: Maker) -> Result<Value, Box<dyn Error>> {
-    let dir = tempfile::tempdir()?;
-    let archive = Archive::open_with_key(
-        write_archive_with(dir.path(), &[english()], maker)?,
-        Some(p4kx_testkit::test_key()),
-    )?;
-    let built = build_catalog(&archive, &options())?;
-    Ok(serde_json::from_slice(built.json())?)
-}
-
-fn manufacturer_guids<'c>(catalog: &'c Value, kind: &str) -> Vec<&'c Value> {
-    catalog[kind].as_array().map_or_default(|list| {
-        list.iter()
-            .filter(|entry| entry["className"] != "Counter_Shop")
-            .map(|entry| &entry["manufacturerGuid"])
-            .collect()
-    })
-}
-
-#[test]
-fn a_manufacturer_given_by_reference_is_its_guid() -> TestResult {
-    let catalog = catalog_of(Maker::Reference)?;
-    assert!(catalog.get("manufacturers").is_none());
-    let maker = &catalog["definitions"]["manufacturers"]["rows"][0]["guid"]["value"];
-    assert_eq!(maker, "10000000-0000-4000-8000-000000000001");
-    for kind in ["items", "ships"] {
-        let guids = manufacturer_guids(&catalog, kind);
-        assert!(!guids.is_empty(), "{kind} present");
-        assert!(guids.iter().all(|guid| *guid == maker), "{kind}: {guids:?}");
-    }
-    Ok(())
-}
-
-#[test]
-fn a_manufacturer_given_by_a_strong_or_weak_pointer_is_null() -> TestResult {
-    for maker in [Maker::StrongPointer, Maker::WeakPointer] {
-        let catalog = catalog_of(maker)?;
-        let rows = catalog["definitions"]["items"]["rows"]
-            .as_array()
-            .ok_or("canonical items")?;
-        let item = rows
-            .iter()
-            .find(|row| row.pointer("/className/value") == Some(&json!("POWR_ACAS_S01")))
-            .ok_or("canonical item")?;
-        let attachment = item
-            .pointer("/components/value")
-            .and_then(Value::as_array)
-            .and_then(|rows| rows.iter().find(|row| row["kind"] == "attachment"))
-            .ok_or("source attachment")?;
-        let manufacturer = attachment
-            .pointer("/value/value/manufacturer")
-            .ok_or("authored manufacturer pointer")?;
-        let raw = manufacturer
-            .pointer("/value/value/values/0")
-            .ok_or("original pointer fact")?;
-        assert_eq!(
-            manufacturer["kind"], "authored",
-            "retain the original pointer shape"
-        );
-        match maker {
-            Maker::StrongPointer => assert_eq!(
-                raw.pointer("/value/value/type"),
-                Some(&json!("struct")),
-                "retain an owned manufacturer value without inventing a Record reference",
-            ),
-            Maker::WeakPointer => assert_eq!(
-                raw.pointer("/originalError/type"),
-                Some(&json!("outsideRecord")),
-                "retain the original outside-owner fact without blocking publication",
-            ),
-            Maker::Reference => return Err("a pointer fixture is required".into()),
-        }
-        for kind in ["items", "ships"] {
-            let guids = manufacturer_guids(&catalog, kind);
-            assert!(!guids.is_empty(), "{kind} present");
-            assert!(guids.iter().all(|guid| guid.is_null()), "{kind}: {guids:?}");
-        }
-    }
-    Ok(())
 }
 
 fn class_names<'c>(catalog: &'c Value, kind: &str) -> Vec<&'c str> {
@@ -352,11 +273,18 @@ fn ships_are_entity_class_definitions_under_spaceships_and_groundvehicles_withou
 }
 
 #[test]
-fn a_ship_carries_crew_manufacturer_and_vehicle_definition() -> TestResult {
+fn a_ship_carries_crew_and_vehicle_definition() -> TestResult {
     let (_, catalog) = catalog_with(&options())?;
     let mut ship = catalog["ships"][0].as_object().ok_or("ship")?.clone();
-    for text in ["name", "description", "role", "career"] {
-        ship.remove(text);
+    for field in [
+        "name",
+        "description",
+        "role",
+        "career",
+        "vehicleManufacturer",
+        "attachmentManufacturer",
+    ] {
+        ship.remove(field);
     }
     assert_eq!(
         Value::Object(ship),
@@ -365,7 +293,6 @@ fn a_ship_carries_crew_manufacturer_and_vehicle_definition() -> TestResult {
             "className": "ACAS_Ship",
             "recordPath": "libs/foundry/records/entities/spaceships/acas_ship",
             "crewSize": 2,
-            "manufacturerGuid": "10000000-0000-4000-8000-000000000001",
             "vehicleDefinition": "scripts/entities/vehicles/implementations/xml/acas_ship.xml",
             "playability": null,
             "variantOf": null,

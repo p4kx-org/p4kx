@@ -10,15 +10,32 @@ use crate::CatalogError;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::original::{ComponentSelection, OriginalFlowFields, OriginalValuePart};
 use crate::catalog_text_contract::{GameTextRef, PublicNameRef};
+use crate::record_fields;
 use crate::record_observation::RecordObservation;
 use crate::source_fields::FieldError;
 use crate::template_field_capture::TemplateFieldCapture;
 
-pub(crate) struct ShipTexts {
+#[path = "ship_manufacturers.rs"]
+mod manufacturers;
+
+pub(crate) use self::manufacturers::{ShipAttachmentManufacturer, ShipVehicleManufacturer};
+
+const ATTACHABLE: &str = "SAttachableComponentParams";
+
+pub(crate) struct ShipPresentation<'source> {
+    pub(crate) vehicle_manufacturer: ShipVehicleManufacturer<'source>,
+    pub(crate) attachment_manufacturer: ShipAttachmentManufacturer<'source>,
     pub(crate) name: SourcedValue<PublicNameRef>,
     pub(crate) description: SourcedValue<GameTextRef>,
     pub(crate) role: SourcedValue<PublicNameRef>,
     pub(crate) career: SourcedValue<PublicNameRef>,
+}
+
+struct ShipTexts {
+    name: SourcedValue<PublicNameRef>,
+    description: SourcedValue<GameTextRef>,
+    role: SourcedValue<PublicNameRef>,
+    career: SourcedValue<PublicNameRef>,
 }
 
 pub(crate) fn read<'source>(
@@ -26,17 +43,17 @@ pub(crate) fn read<'source>(
     projection: &CatalogProjection<'_, 'source>,
     admission: &RecordObservation<'_, 'source>,
     cancel: Option<&CancelToken>,
-    selected: Option<&Value<'source>>,
-) -> Result<(ShipTexts, Vec<FieldError>), CatalogError> {
+    vehicle: Option<&Value<'source>>,
+) -> Result<(ShipPresentation<'source>, Vec<FieldError>), CatalogError> {
     let input = projection.original();
     let scope = input.record_scope(admission.record(), tree)?;
     let originals = OriginalFlowFields::read(&scope, cancel)?;
-    let selection = originals.component_selection(selected)?;
+    let selection = originals.component_selection(vehicle)?;
     let capture = TemplateFieldCapture::new(&originals, input, admission)?;
     let numbers = RefCell::new(Vec::new());
     let fields = Observed::definition(&originals, input, &capture, &numbers);
     let mut notes = Vec::new();
-    let texts = match selected {
+    let texts = match vehicle {
         Some(selected) => read_component_texts(
             fields.at_owner(originals.fact(selected)?),
             &selection,
@@ -50,7 +67,20 @@ pub(crate) fn read<'source>(
             career: missing_component(&originals, &selection),
         },
     };
-    Ok((texts, notes))
+    let vehicle_manufacturer = manufacturers::vehicle(fields, vehicle, &selection, &mut notes)?;
+    let attachment = record_fields::component_occurrence(tree, ATTACHABLE).map(|(value, _)| value);
+    let attachment_manufacturer = manufacturers::attachment(fields, attachment, &mut notes)?;
+    Ok((
+        ShipPresentation {
+            vehicle_manufacturer,
+            attachment_manufacturer,
+            name: texts.name,
+            description: texts.description,
+            role: texts.role,
+            career: texts.career,
+        },
+        notes,
+    ))
 }
 
 fn missing_component<T>(

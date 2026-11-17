@@ -541,7 +541,8 @@ its key and has absent translation forms.
 | `name`, `role`, `career` | `vehicleName`, `vehicleRole`, `vehicleCareer` → `texts.publicNames` |
 | `description` | `vehicleDescription` → `texts.gameTexts` (`x-gameText`) |
 | `crewSize` | `crewSize`, an integer |
-| `manufacturerGuid` | The GUID the Reference `manufacturer` links to, `null` for a null Reference |
+| `vehicleManufacturer` | The selected `VehicleComponentParams.manufacturer`, with its original component ordinal |
+| `attachmentManufacturer` | The independently authored `AttachDef.Manufacturer`, with the original attachment component ordinal and AttachDef state |
 | `vehicleDefinition` | `vehicleDefinition`, the path of the vehicle XML |
 | `playability` | `player`, `ai`, `mission` or `special`, or `null`; see "Playability" below |
 | `variantOf` | The `guid` of the base of the ship's variant group, `null` for a base and an ungrouped ship; see "Variant groups" below |
@@ -2962,8 +2963,9 @@ on `P4KX_DATA_P4K` and `P4KX_DATA_P4K_B`.
   item, and the manufacturers are complete by decision. The rest of the vocabulary
   (`fake`, `old`, `legacy`, `temp`, `prototype`) names real Records and stays in the catalog by
   decision.
-- Every `manufacturerGuid` of an item or ship, every `producedItemGuid`, every ingredient
-  `resourceGuid` and `itemGuid` resolves to a catalog entry; no GUID occurs twice.
+- Every item's `manufacturerGuid` and the ship's vehicle manufacturer link resolve to a
+  Manufacturer entry. Every `producedItemGuid`, ingredient `resourceGuid` and `itemGuid`
+  resolves to a catalog entry. No GUID occurs twice.
 - Every commodity `typeGuid` resolves to a `definitions.resourceGroups` entry, every chosen group
   parent in `projections.resourceGroupParents` to another one, and every blueprint `categoryGuid`
   to a `definitions.blueprintCategories.rows` entry. On LIVE the

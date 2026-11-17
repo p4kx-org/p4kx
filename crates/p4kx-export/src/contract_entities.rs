@@ -6,6 +6,9 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::catalog_text_contract::{GameTextRef, PublicNameRef};
+use crate::catalog_v3::authored_fields::ship_presentation::{
+    ShipAttachmentManufacturer, ShipVehicleManufacturer,
+};
 use crate::contract::every_field_required;
 use crate::contract_insurance::ShipInsurance;
 use crate::guid_text::CatalogGuid;
@@ -100,9 +103,10 @@ pub(crate) struct Ship<'a> {
     pub(crate) career: SourcedValue<PublicNameRef>,
     /// The crew size, `null` without one.
     pub(crate) crew_size: Option<i64>,
-    /// The GUID of the manufacturer the Reference `manufacturer` links to, `null` for a null
-    /// Reference.
-    pub(crate) manufacturer_guid: Option<CatalogGuid>,
+    /// The selected `VehicleComponentParams` occurrence and its manufacturer field.
+    pub(crate) vehicle_manufacturer: ShipVehicleManufacturer<'a>,
+    /// The selected `AttachDef` on the ship and its independent `Manufacturer` field.
+    pub(crate) attachment_manufacturer: ShipAttachmentManufacturer<'a>,
     /// The path of the vehicle definition XML, `null` without one.
     pub(crate) vehicle_definition: Option<&'a str>,
     /// Spaceship or ground vehicle, `null` when the record path and the vehicle implementation

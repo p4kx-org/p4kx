@@ -23,6 +23,20 @@ impl SourceUses {
         Ok(SourcedValue::new(value, origin))
     }
 
+    /// Adds already captured contributions to a value while retaining its state and payload.
+    ///
+    /// # Errors
+    /// Returns an error when any origin is foreign or its original observations are unavailable.
+    pub fn add_value_origins<T>(
+        &self,
+        value: SourcedValue<T>,
+        origins: &[&FieldOrigin],
+    ) -> Result<SourcedValue<T>, SourceEvidenceError> {
+        let origins = std::iter::once(value.origin()).chain(origins.iter().copied());
+        let origin = self.origin_with_origins(origins, true)?;
+        Ok(value.with_origin(origin))
+    }
+
     /// Binds an aggregate to its already registered contributors and local completeness.
     ///
     /// # Errors

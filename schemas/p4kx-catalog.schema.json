@@ -23977,6 +23977,7 @@
       "type": "object"
     },
     "ItemManufacturer": {
+      "description": "A manufacturer field with its original Reference or other declared storage.",
       "oneOf": [
         {
           "properties": {
@@ -28309,6 +28310,26 @@
         "sourceType"
       ],
       "type": "object"
+    },
+    "ManufacturerValue": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/CatalogRecordReference"
+        },
+        {
+          "properties": {
+            "authored": {
+              "$ref": "#/$defs/SourceArenaOutput"
+            }
+          },
+          "required": [
+            "authored"
+          ],
+          "type": "object"
+        }
+      ],
+      "description": "The value of a ship manufacturer's selected source member.",
+      "required": []
     },
     "MaterialEffect": {
       "properties": {
@@ -42555,6 +42576,10 @@
     "Ship": {
       "description": "A ship or ground vehicle: an `EntityClassDefinition` Record under `entities/spaceships` or\n`entities/groundvehicles`.",
       "properties": {
+        "attachmentManufacturer": {
+          "$ref": "#/$defs/ShipAttachmentManufacturer",
+          "description": "The selected `AttachDef` on the ship and its independent `Manufacturer` field."
+        },
         "career": {
           "$ref": "#/$defs/SourcedValueOfPublicNameRef",
           "description": "The career, from `vehicleCareer`, e.g. `@vehicle_focus_transporter`."
@@ -42612,17 +42637,6 @@
             }
           ],
           "description": "The claim and expedite values of the ship's `SEntityInsuranceProperties`; `null` when the\nRecord has none."
-        },
-        "manufacturerGuid": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Guid"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The GUID of the manufacturer the Reference `manufacturer` links to, `null` for a null\nReference."
         },
         "mass": {
           "description": "The hull mass in kilograms, without the Loadout, the docked vehicles and the landing gear:\nthe sum of the `mass` of the parts of the vehicle implementation after the Modification\nthe ship selects, rounded to four decimals. `null` when neither the parts nor the physics\ncontroller state one, never 0.",
@@ -42690,9 +42704,14 @@
             "string",
             "null"
           ]
+        },
+        "vehicleManufacturer": {
+          "$ref": "#/$defs/ShipVehicleManufacturer",
+          "description": "The selected `VehicleComponentParams` occurrence and its manufacturer field."
         }
       },
       "required": [
+        "attachmentManufacturer",
         "career",
         "cargoGridsWithIssue",
         "cargoScu",
@@ -42702,7 +42721,6 @@
         "guid",
         "hullHealth",
         "insurance",
-        "manufacturerGuid",
         "mass",
         "massBasis",
         "name",
@@ -42712,7 +42730,28 @@
         "size",
         "variantOf",
         "vehicleDefinition",
-        "vehicleKind"
+        "vehicleKind",
+        "vehicleManufacturer"
+      ],
+      "type": "object"
+    },
+    "ShipAttachmentManufacturer": {
+      "description": "The authored `AttachDef` manufacturer of the selected ship attachment component.",
+      "properties": {
+        "attachDefPresent": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "componentOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "manufacturer": {
+          "$ref": "#/$defs/SourcedValueOfManufacturerValue"
+        }
+      },
+      "required": [
+        "attachDefPresent",
+        "componentOrdinal",
+        "manufacturer"
       ],
       "type": "object"
     },
@@ -43021,6 +43060,22 @@
         "shipGuid",
         "slug",
         "storeName"
+      ],
+      "type": "object"
+    },
+    "ShipVehicleManufacturer": {
+      "description": "The authored manufacturer on the selected vehicle component.",
+      "properties": {
+        "componentOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "manufacturer": {
+          "$ref": "#/$defs/SourcedValueOfManufacturerValue"
+        }
+      },
+      "required": [
+        "componentOrdinal",
+        "manufacturer"
       ],
       "type": "object"
     },
@@ -93312,6 +93367,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/ManufacturerLocalization"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfManufacturerValue": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ManufacturerValue"
               }
             }
           }

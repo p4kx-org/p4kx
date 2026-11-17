@@ -78,7 +78,13 @@ fn builds_items_and_ships_of_a_real_archive() -> TestResult {
         );
         let linked: Vec<&str> = entities
             .iter()
-            .filter_map(|e| e["manufacturerGuid"].as_str())
+            .filter_map(|entity| {
+                if kind == "ships" {
+                    crate::real_archive_catalog_links::vehicle_manufacturer(entity)
+                } else {
+                    entity["manufacturerGuid"].as_str()
+                }
+            })
             .collect();
         let resolved = linked
             .iter()
@@ -157,7 +163,10 @@ fn check_ships(catalog: &Value) -> TestResult {
             .is_some_and(|path| path.to_ascii_lowercase().ends_with(".xml")),
         "vehicle definition"
     );
-    assert!(titan["manufacturerGuid"].is_string(), "manufacturer");
+    assert!(
+        crate::real_archive_catalog_links::vehicle_manufacturer(titan).is_some(),
+        "authored vehicle manufacturer"
+    );
     for text in ["name", "role", "career"] {
         assert!(
             titan

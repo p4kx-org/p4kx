@@ -12,14 +12,13 @@ use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_number_capture::CapturedNumber;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::original::{OriginalFlowFields, OriginalValuePart};
-use crate::catalog_record_reference::CatalogRecordReference;
 use crate::catalog_text_contract::{GameTextRef, PublicNameRef};
+use crate::catalog_v3::authored_fields::authored_manufacturer::AuthoredManufacturer;
 use crate::guid_text::{CatalogGuid, GuidText};
 use crate::resource_float::ResourceFloat32;
 use crate::resource_number::ResourceNumber;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
-use crate::source_value_catalog::{SourceArenaOutput, SourceRecordReference};
 use crate::template_field_capture::TemplateFieldCapture;
 use crate::{CatalogError, ExportAccountingError};
 
@@ -66,18 +65,9 @@ enum ItemDefinitionComponentKind<'source> {
 #[schemars(transform = every_field_required)]
 struct ItemAttachmentPresentation<'source> {
     grade: SourcedValue<ResourceNumber>,
-    manufacturer: ItemManufacturer<'source>,
+    manufacturer: AuthoredManufacturer<'source>,
     localization: SourcedValue<ItemLocalization>,
     weapon_motion: Option<WeaponAttachmentMotion<'source>>,
-}
-
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(tag = "kind", content = "value", rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-enum ItemManufacturer<'source> {
-    #[schemars(with = "SourcedValue<CatalogRecordReference>")]
-    Record(SourcedValue<Box<SourceRecordReference<'source>>>),
-    Authored(SourcedValue<SourceArenaOutput<'source>>),
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
@@ -269,14 +259,7 @@ impl<'source> ItemAttachmentPresentation<'source> {
         Ok(Self {
             weapon_motion: WeaponAttachmentMotion::read(source, notes)?,
             grade: source.authored_number("Grade", notes)?,
-            manufacturer: match source.storage_type("Manufacturer")? {
-                None | Some(DataType::Reference) => {
-                    ItemManufacturer::Record(source.record_link("Manufacturer", notes)?)
-                }
-                _ => {
-                    ItemManufacturer::Authored(source.authored_member_with_errors("Manufacturer")?)
-                }
-            },
+            manufacturer: AuthoredManufacturer::read(source, "Manufacturer", notes)?,
             localization: source.declared_class("Localization", notes, |source, notes| {
                 Ok(ItemLocalization {
                     name: source.public_name("Name", projection, notes)?,

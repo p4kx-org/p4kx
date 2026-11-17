@@ -108,6 +108,10 @@ impl<T> SourcedValue<T> {
         &self.origin
     }
 
+    pub(crate) fn with_origin(self, origin: FieldOrigin) -> Self {
+        Self { origin, ..self }
+    }
+
     /// Maps only a present value and retains its state and shared contribution set.
     #[must_use]
     pub fn map<U>(self, map: impl FnOnce(T) -> U) -> SourcedValue<U> {

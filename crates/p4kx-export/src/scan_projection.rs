@@ -5,7 +5,7 @@ use p4kx_extraction::{RecordTree, TreeBuilder};
 
 use super::Scan;
 use crate::catalog_projection::CatalogProjection;
-use crate::catalog_v3::authored_fields::ship_texts;
+use crate::catalog_v3::authored_fields::ship_presentation;
 use crate::catalog_v3::catalog_item_components::item_definition::ItemDefinition;
 use crate::catalog_v3::catalog_item_components::{self, ItemComponentsRead, resolution};
 use crate::catalog_v3::catalog_weapon_projectile_ammo::{self, LinkedAmmunitionReader};
@@ -298,7 +298,7 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
         ledger.merge(read.ledger);
         let mut picked = Picked::of_ship(read.read, |read| {
             let vehicle = record_fields::component_occurrence(tree, VEHICLE_COMPONENT);
-            let (texts, notes) = ship_texts::read(
+            let (presentation, notes) = ship_presentation::read(
                 tree,
                 &self.projection,
                 admission,
@@ -316,7 +316,7 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
             Ok(ship::ship(
                 tree,
                 vehicle.map(|(_, fields)| fields),
-                texts,
+                presentation,
                 &self.scan.evidence,
                 read,
             ))

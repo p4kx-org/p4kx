@@ -28,11 +28,21 @@ pub(crate) fn check(catalog: &Value) -> TestResult {
     check_blueprint_links(catalog)
 }
 
+pub(super) fn vehicle_manufacturer(ship: &Value) -> Option<&str> {
+    ship.pointer("/vehicleManufacturer/manufacturer/value/guid/value")?
+        .as_str()
+}
+
 fn check_manufacturer_links(catalog: &Value) -> TestResult {
     let manufacturers = real_archive_verification::guids(catalog, Kind::Manufacturers.name())?;
     for kind in [Kind::Items, Kind::Ships] {
         for entity in real_archive_verification::list(catalog, kind)? {
-            if let Some(guid) = entity.get("manufacturerGuid").and_then(Value::as_str) {
+            let guid = if kind == Kind::Ships {
+                vehicle_manufacturer(entity)
+            } else {
+                entity.get("manufacturerGuid").and_then(Value::as_str)
+            };
+            if let Some(guid) = guid {
                 assert!(manufacturers.contains(guid), "{kind} manufacturer {guid}");
             }
         }
