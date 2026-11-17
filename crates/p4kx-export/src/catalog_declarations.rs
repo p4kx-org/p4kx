@@ -11,6 +11,7 @@ use super::resource_network_links::ResourceNetworkLinks;
 use super::resource_topology_declarations::ItemRoomAssociation;
 use super::room_associations::RoomAssociations;
 use super::tag_catalog::{EntityTags, TagRoots};
+use crate::catalog_rows::staged::StagedCatalogTable;
 use crate::schema_fields::every_field_required;
 use crate::shop_inventory_resolution::ShopInventoryResolution;
 
@@ -22,7 +23,8 @@ pub(crate) struct CatalogDeclarations<'source> {
     pub(crate) blueprint_category_lists: CatalogTable<BlueprintCategoryList<'source>>,
     pub(crate) tag_roots: CatalogTable<TagRoots<'source>>,
     pub(crate) shop_inventory_resolution: CatalogTable<ShopInventoryResolution>,
-    pub(crate) entity_tags: CatalogTable<EntityTags<'source>>,
+    #[schemars(with = "CatalogTable<EntityTags<'source>>")]
+    pub(crate) entity_tags: StagedCatalogTable,
     pub(crate) ammo_bindings: CatalogTable<AmmoBinding<'source>>,
     pub(crate) contract_scenario_requirements: CatalogTable<
         super::mission_sources::contract_scenario_requirements::ContractScenarioRequirements<

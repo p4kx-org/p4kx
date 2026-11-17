@@ -49,8 +49,7 @@ pub(crate) fn add_tags<'context, 'source>(
         )?,
         paints: collected.items.iter().any(is_paint),
     };
-    let mut tags = crate::catalog_v3::tag_catalog::read(forge, input, options.cancel, consumers)?;
-    tags.rows.entity_tags = std::mem::take(&mut collected.tags.entity_tags);
+    let tags = crate::catalog_v3::tag_catalog::read(forge, input, options.cancel, consumers)?;
     collected.tags = tags.rows;
     collected.ledger.merge(tags.ledger);
     collected.add_failures(tags.failures);

@@ -192,6 +192,15 @@ fn selected_entities_keep_root_guids_separate_from_attach_words_and_each_other()
         3,
         "item, ship and canonical commodity owners"
     );
+    let physical: Vec<_> = entities
+        .iter()
+        .map(|row| row.pointer("/recordIndex/value").and_then(Value::as_u64))
+        .collect();
+    assert_eq!(
+        physical,
+        [Some(5), Some(4), Some(6)],
+        "Entity tag rows use physical GUID order even when the scan sees the ship first"
+    );
     let item = entities
         .iter()
         .find(|row| row["guid"]["value"] == fixture::guid(fixture::ITEM))
@@ -218,6 +227,28 @@ fn selected_entities_keep_root_guids_separate_from_attach_words_and_each_other()
         commodity.get("tags").is_none(),
         "no duplicate root-tag payload in another flat view"
     );
+    Ok(())
+}
+
+#[test]
+fn empty_entity_tag_table_retains_original_source_availability() -> TestResult {
+    let filter = Filter::new("no_selected_entities");
+    for (database, availability) in [
+        (fixture::entities(), "available"),
+        (fixture::clean(), "absent"),
+    ] {
+        let (_, catalog) = fixture::build(
+            &database,
+            DcbOrigin::Plain,
+            CatalogPublicationMode::DiagnosticPartial,
+            Some(&filter),
+        )?;
+        assert_eq!(
+            at(&catalog, "/declarations/entityTags")?,
+            &json!({"availability": availability, "rows": []}),
+            "empty selection preserves the Entity source declaration outcome"
+        );
+    }
     Ok(())
 }
 

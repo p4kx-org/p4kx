@@ -213,7 +213,8 @@ For each Build, record the full Build identity, exporter revision and hash, and 
 and modification time before and after the export. Run the normal `p4kx catalog` writer with a
 fixed export time, default text selection, `--progress-phases` and one private `.json.zst` output.
 The completed writer reports `catalog storage:` on stderr. It sums the logical bytes of the
-temporary row spools for container instances, locations, Item and Blueprint definitions, particle libraries,
+temporary row spools for container instances, locations, Entity tag declarations,
+Item and Blueprint definitions, particle libraries,
 contract generators, contract templates, mission broker entries, item ports,
 interactions, durability and weapon animation candidates, plus the final bytes
 of the publication temporary. The spools stay
@@ -242,9 +243,10 @@ diagnostic vectors only when they contain findings. Captured Record subjects sha
 key with the original header receipt and clone the handle. Layout tests verify both
 representations and preserve the original evidence and authority checks.
 
-Item definitions are compressed individually as the Record scan produces them. The
-publisher replays the indexed frames in canonical GUID and Record order for each JSON
-pass. The weapon animation join keeps its original sourced attachment fields in memory.
+Item definitions and Entity tag declarations are compressed individually as the Record
+scan produces them. The publisher replays the indexed frames in canonical GUID and
+Record order for each JSON pass. The weapon animation join keeps its original sourced
+attachment fields in memory.
 Measure both the spool bytes and the cost of seeking to the ordered frames.
 
 Record peak working set and peak private bytes separately.

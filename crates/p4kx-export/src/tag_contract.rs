@@ -8,7 +8,7 @@ use serde::Serialize;
 use super::header::TagHeader;
 use super::path_row::TagPath;
 use crate::catalog_record_reference::CatalogRecordReference;
-use crate::guid_text::CatalogGuid;
+use crate::guid_text::{CatalogGuid, GuidText};
 use crate::schema_fields::every_field_required;
 
 /// One physical Tag definition, independently of convenience-tree cuts.
@@ -43,26 +43,25 @@ pub(crate) struct EntityTags<'source> {
     pub(crate) tags: SourcedValue<Vec<SourcedValue<CatalogRecordReference>>>,
 }
 
+impl EntityTags<'_> {
+    pub(crate) fn order_key(&self) -> (GuidText, u32) {
+        (
+            CatalogGuid(self.source.physical.guid).text(),
+            self.source.physical.record_index,
+        )
+    }
+}
+
 /// Prepared rows and stable source keys used for accounting and sorting.
 #[derive(Debug, Default)]
 pub(crate) struct TagRows<'source> {
     pub(crate) definitions: Vec<TagDefinition<'source>>,
     pub(crate) roots: Vec<TagRoots<'source>>,
     pub(crate) paths: Vec<TagPath>,
-    pub(crate) entity_tags: Vec<EntityTags<'source>>,
 }
 
 impl TagRows<'_> {
     pub(crate) const fn count(&self) -> usize {
         self.definitions.len()
-    }
-
-    pub(crate) fn order_entities(&mut self) {
-        self.entity_tags.sort_by_key(|row| {
-            (
-                CatalogGuid(row.source.physical.guid).text(),
-                row.source.physical.record_index,
-            )
-        });
     }
 }

@@ -69,35 +69,7 @@ pub(crate) fn emit<W: Write>(
     run: CatalogRun<'_, '_>,
 ) -> Result<Written<W>, CatalogError> {
     let cancel = run.options.cancel;
-    let staged_row_bytes = catalog.placements.staged_row_bytes()
-        + u128::from(catalog.configurations.durability.stored_bytes())
-        + u128::from(catalog.definitions.items.stored_bytes())
-        + u128::from(catalog.definitions.blueprints.stored_bytes())
-        + u128::from(catalog.definitions.particle_libraries.stored_bytes())
-        + u128::from(catalog.definitions.contract_generators.stored_bytes())
-        + u128::from(catalog.definitions.contract_templates.stored_bytes())
-        + u128::from(catalog.definitions.mission_broker_entries.stored_bytes())
-        + u128::from(
-            catalog
-                .configurations
-                .entity_configurations
-                .alignment
-                .item_ports
-                .stored_bytes(),
-        )
-        + u128::from(
-            catalog
-                .configurations
-                .entity_configurations
-                .interactions
-                .stored_bytes(),
-        )
-        + u128::from(
-            catalog
-                .projections
-                .weapon_player_animation_candidates
-                .stored_bytes(),
-        );
+    let staged_row_bytes = staged_row_bytes(catalog);
     match compression {
         Compression::None => {
             run.begin(CatalogStage::WriteJson);
@@ -130,6 +102,39 @@ pub(crate) fn emit<W: Write>(
     }
 }
 
+fn staged_row_bytes(catalog: &Catalog<'_>) -> u128 {
+    catalog.placements.staged_row_bytes()
+        + u128::from(catalog.configurations.durability.stored_bytes())
+        + u128::from(catalog.declarations.entity_tags.stored_bytes())
+        + u128::from(catalog.definitions.items.stored_bytes())
+        + u128::from(catalog.definitions.blueprints.stored_bytes())
+        + u128::from(catalog.definitions.particle_libraries.stored_bytes())
+        + u128::from(catalog.definitions.contract_generators.stored_bytes())
+        + u128::from(catalog.definitions.contract_templates.stored_bytes())
+        + u128::from(catalog.definitions.mission_broker_entries.stored_bytes())
+        + u128::from(
+            catalog
+                .configurations
+                .entity_configurations
+                .alignment
+                .item_ports
+                .stored_bytes(),
+        )
+        + u128::from(
+            catalog
+                .configurations
+                .entity_configurations
+                .interactions
+                .stored_bytes(),
+        )
+        + u128::from(
+            catalog
+                .projections
+                .weapon_player_animation_candidates
+                .stored_bytes(),
+        )
+}
+
 fn encoder<'a, W: Write>(sink: W, level: i32, length: u64) -> io::Result<Encoder<'a, W>> {
     let mut encoder = Encoder::new(sink, level)?;
     encoder.set_pledged_src_size(Some(length))?;
@@ -152,6 +157,7 @@ fn write_json(
                 .placements
                 .take_row_spool_failure()
                 .or_else(|| catalog.configurations.durability.take_failure())
+                .or_else(|| catalog.declarations.entity_tags.take_failure())
                 .or_else(|| catalog.definitions.items.take_failure())
                 .or_else(|| catalog.definitions.blueprints.take_failure())
                 .or_else(|| catalog.definitions.contract_generators.take_failure())

@@ -75,6 +75,7 @@ mod order;
 pub(crate) struct Collected<'f> {
     pub(crate) ledger: ExportLedger,
     pub(crate) tags: crate::catalog_v3::tag_catalog::TagRows<'f>,
+    pub(crate) entity_tags: StagedCatalogTable,
     pub(crate) manufacturers: Vec<Manufacturer<'f>>,
     pub(crate) faction_identities: Vec<crate::catalog_v3::faction_identity_definition::PreparedFactionIdentity<'f>>,
     pub(crate) factions: Vec<PreparedFaction<'f>>,
@@ -186,6 +187,7 @@ impl<'f> Collected<'f> {
             skipped: Self::crafting_skipped(&crafting),
             ledger: crafting.ledger,
             tags: crate::catalog_v3::tag_catalog::TagRows::default(),
+            entity_tags: StagedCatalogTable::empty(DatasetAvailability::Absent),
             manufacturers: Vec::new(),
             faction_identities: Vec::new(),
             factions: Vec::new(),

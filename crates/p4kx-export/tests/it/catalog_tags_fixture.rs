@@ -156,16 +156,16 @@ pub(crate) fn entity(id: u128, name: &str, path: &str, tags: Option<TestValue>) 
 pub(crate) fn entities() -> DataForgeBuilder {
     entity_schema(clean(), Some(TestType::ReferenceTo("Tag".to_owned())), true)
         .record(entity(
-            ITEM,
-            "Item",
-            "scitem/ships/powerplant/included",
-            Some(references(&[LEAF, LEAF, OTHER])),
-        ))
-        .record(entity(
             SHIP,
             "Ship",
             "spaceships/excluded",
             Some(references(&[ROOT])),
+        ))
+        .record(entity(
+            ITEM,
+            "Item",
+            "scitem/ships/powerplant/included",
+            Some(references(&[LEAF, LEAF, OTHER])),
         ))
         .record(entity(
             COMMODITY,
