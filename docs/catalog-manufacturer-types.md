@@ -100,8 +100,16 @@ retains the actual target Record index, type, path and resolution status. Other 
 retain the original value arena in `manufacturer.value.authored`. The two role fields can
 disagree. Each manufacturer value uses its own field and component selection evidence.
 
-When migrating the v2 `ships[].manufacturerGuid`, read
-`ship.vehicleManufacturer.manufacturer.value.guid.value` for the Reference case.
+The v2 `ships[].manufacturerGuid` used the vehicle component. To preserve that field's
+semantics, read `ship.vehicleManufacturer.manufacturer.value.guid.value` for the Reference case.
+
+For a ship list that displays the model's attachable-item brand, use the resolved Reference
+in `ship.attachmentManufacturer.manufacturer`. The two declarations can point to different
+manufacturers on the same ship Record, so a list migrating its display from the v2 field can
+show a different brand. A consumer that uses the vehicle manufacturer when the attachment
+manufacturer cannot be resolved should identify that value as a vehicle-component fallback.
+For lists that mix player models and other variants, evaluate the selected record's own field.
+
 Join manufacturer labels through `definitions.manufacturers.rows`, then resolve their text
 references into `texts.publicNames`. The final-row snapshot, target-kind classification and
 physical target index distinguish filtered, policy-excluded, outside-scope, failed and ambiguous
