@@ -26,6 +26,7 @@ const CONTROL_TYPES: &[&str] = &[
     "DefinitionStatus",
     "DistanceUnit",
     "DpsUnit",
+    "EntitySelection",
     "ExportDiagnosticSeverity",
     "ExportDiagnosticStage",
     "ExportDiagnosticUnit",
