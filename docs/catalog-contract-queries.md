@@ -137,3 +137,40 @@ titles cannot leak into the result's text definitions. Published place names are
 the actual Place lookups of the final owner attempt. Required body errors retain their original
 physical identity in forward coverage and canonical failure diagnostics. The complete producer
 uses its existing fully prepared inputs and does not perform the selective preparation protocol.
+
+## Opt-in installed source witness
+
+The ignored test
+`real_archive_contract_sdk::selected_contract_sdk_matches_original_owner_and_logical_slots`
+checks one explicitly selected physical Generator and two parent/sub-contract identities selected
+from its original source. Set `P4KX_DATA_P4K` and `P4KX_CONTRACT_SDK_SELECTOR_FILE`; the latter names
+a private JSON object with `recordIndex`, `branch`, `version`, `changeNumber` and `buildId`.
+All four Build strings must match the opened Archive. Missing selectors and insufficient source
+features are errors rather than a skipped or empty successful witness. The selected source must
+exercise a parent, a sub-contract, an effective property-set link and a direct Record reference.
+
+The witness decodes one DataForge Entry, shares one parsed SDK session across the three queries,
+and opens an independent original view over those same bytes. It checks exact original handler,
+contract and sub-contract value positions, logical IDs, direct source fields and reference targets,
+property-set source locations and typed Boolean values when present. Source-use references and
+per-cell encryption markers are checked against the independently observed physical Entry. A
+shadowed owner must be explicitly covered; a logical query's actual winner is compared to its own
+original physical body. Known source-coverage gaps fail this focused acceptance run.
+
+The requested language list is empty. With an existing selector, the test emits one aggregate success line of at most 256
+bytes and writes no files. It does not build or serialize a Catalog and does not read localization,
+world placements or media payloads. Canonical reverse surveys still examine Generator sources and
+the needed closure can include outside owners. This source witness does not establish an all-data
+parity result or a memory guarantee for a machine with 16 GB total RAM.
+
+If no suitable private selector exists, set
+`P4KX_CONTRACT_SDK_DISCOVER_SELECTOR_FILE` instead to a new absolute private file path. The same
+ignored test then examines Generator headers and one original candidate tree at a time until the
+first source owner supplies all required witness features. It retains that exact tree and continues
+the SDK comparisons using the same decoded Entry and parsed session. There is no separate full
+payload pass. Discovery writes at most 4 KiB of private selector JSON with the full Build identity
+and optional typed `discovery` counters for inspected headers, candidate bodies and source gaps.
+The file is created without replacing an existing path and is immediately re-read through the
+strict ordinary selector reader. Discovery records source selection; only the subsequent completed
+SDK check establishes an acceptance result. Setting both selector modes, setting neither mode,
+or finding no suitable source owner is an error.

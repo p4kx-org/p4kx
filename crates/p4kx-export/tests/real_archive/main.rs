@@ -38,6 +38,7 @@ mod real_archive_contract_facts;
 mod real_archive_contract_gaps;
 mod real_archive_contract_item_rewards;
 mod real_archive_contract_scopes;
+mod real_archive_contract_sdk;
 mod real_archive_contract_template_parts;
 mod real_archive_contract_templates;
 mod real_archive_contracts;
