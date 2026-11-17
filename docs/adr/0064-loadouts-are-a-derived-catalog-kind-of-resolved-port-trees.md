@@ -52,8 +52,8 @@ size is handled by `.json.zst`.
 - The ship entries repeat the trees of the items they carry. The repetition compresses well
   (`.json.zst`) and keeps every entry self-contained for the import.
 - The catalog build resolves every ship and every port-carrying item with one `LoadoutResolver`
-  taken from a pool, so a resolver keeps its caches across the splits of the parallel run; the
-  measurements are in `docs/catalog.md`. A ship whose own Record cannot be resolved stays
-  in `ships` without a loadout and is listed in the failures.
+  in stable GUID order. The resolver records the first actual file read and reuses its cache
+  for later roots. Each resolved row is staged before the next root. A ship whose own Record cannot
+  be resolved stays in `ships` without a loadout and is listed in the failures.
 - A port is not identified across entries: a consumer that wants the ports of a turret under a
   specific ship reads the tree of that ship.

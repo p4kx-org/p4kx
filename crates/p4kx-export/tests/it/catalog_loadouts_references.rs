@@ -13,6 +13,7 @@ use std::error::Error;
 
 use p4kx_export::{Filter, Kind, LoadoutSummary};
 use p4kx_extraction::{Archive, ArchiveWatch, DataForgeEntry};
+use rayon::ThreadPoolBuilder;
 use serde_json::{Value, json};
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -209,12 +210,30 @@ fn compare_reused_catalog(
 ) -> Result<Value, Box<dyn Error>> {
     let filter = Filter::new(pattern);
     let options = loadouts_support::options(Some(&filter));
-    let direct = p4kx_export::build_catalog(archive, &options)?;
-    let reused = p4kx_export::build_catalog_from(archive, entry, &options)?;
-    assert!(
-        reused.json() == direct.json(),
-        "{pattern} preserves all catalog bytes, including source metadata"
-    );
+    let serial = ThreadPoolBuilder::new().num_threads(1).build()?;
+    let parallel = ThreadPoolBuilder::new().num_threads(4).build()?;
+    let direct = serial.install(|| p4kx_export::build_catalog(archive, &options))?;
+    let reused = parallel.install(|| p4kx_export::build_catalog_from(archive, entry, &options))?;
+    let reused_bytes = reused.json();
+    let direct_bytes = direct.json();
+    if reused_bytes != direct_bytes {
+        let offset = reused_bytes
+            .iter()
+            .zip(direct_bytes)
+            .position(|(reused, direct)| reused != direct)
+            .unwrap_or_else(|| reused_bytes.len().min(direct_bytes.len()));
+        let context = |bytes: &[u8]| {
+            let start = offset.saturating_sub(72);
+            let end = offset.saturating_add(128).min(bytes.len());
+            String::from_utf8_lossy(bytes.get(start..end).unwrap_or_default()).into_owned()
+        };
+        return Err(format!(
+            "{pattern} catalog bytes diverged at {offset}: reused {:?}, direct {:?}",
+            context(reused_bytes),
+            context(direct_bytes)
+        )
+        .into());
+    }
     assert_eq!(reused.summary(), direct.summary(), "{pattern} summary");
     Ok(serde_json::from_slice(reused.json())?)
 }

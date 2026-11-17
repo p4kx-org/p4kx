@@ -2,11 +2,10 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::collections::HashSet;
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::Arc;
 
 use p4kx_assembly::{ArchiveFiles, Entities, LoadoutResolver};
 use p4kx_extraction::{CancelToken, DataForge, Guid, RecordTree, Value};
-use rayon::prelude::*;
 
 use crate::catalog_rows::spool::{RowSpoolError, checkpoint};
 use crate::catalog_v3::catalog_item_alignment::{AlignmentIndex, ItemAlignmentRows};
@@ -48,45 +47,6 @@ pub(crate) fn carries_ports(tree: &RecordTree<'_>) -> bool {
     })
 }
 
-/// The resolvers and port readers not in use. A resolver keeps the Records it has read, so one
-/// taken for an entity and given back for the next keeps its caches across the splits of the
-/// parallel run.
-struct Pool<'source, 'worker> {
-    forge: &'source DataForge<'source>,
-    entities: Arc<Entities<'worker>>,
-    files: &'worker ArchiveFiles<'worker>,
-    idle: Mutex<Vec<(LoadoutResolver<'worker>, PortReader<'worker>)>>,
-    alignment: &'worker AlignmentIndex<'worker>,
-    capture: Arc<Capture<'worker>>,
-}
-
-impl<'source: 'worker, 'worker> Pool<'source, 'worker> {
-    fn read(&self, want: Wanted) -> Result<Option<Loadout>, CatalogReadFailure<'source>> {
-        let taken = self
-            .idle
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .pop();
-        let (mut resolver, mut reader) = taken.unwrap_or_else(|| {
-            (
-                LoadoutResolver::with_observed_entities(
-                    Arc::clone(&self.entities),
-                    self.capture.clone(),
-                )
-                .with_files(self.files)
-                .stopping_at_docked_vehicles(),
-                PortReader::with_alignment(self.alignment),
-            )
-        });
-        let result = read_with(&mut resolver, &mut reader, self.forge, want, &self.capture);
-        self.idle
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .push((resolver, reader));
-        result
-    }
-}
-
 /// An entry of `ships` or `items` whose ports are wanted.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Wanted {
@@ -110,7 +70,7 @@ pub(crate) struct SelectedSources<'rows, 'source> {
 }
 
 /// Resolves the Default Loadout of every entity in `wanted` and returns the ports of each,
-/// ordered by GUID.
+/// ordered by GUID. The first resolver request in that order owns each cold read.
 ///
 /// A ship always gets a loadout; an item gets one only when its tree holds a port. The tree stops
 /// at docked vehicles (`LoadoutResolver::stopping_at_docked_vehicles`). `known` holds the GUIDs of
@@ -138,29 +98,25 @@ pub(crate) fn loadouts<'f>(
         Kind::Loadouts,
     ));
     let alignment = AlignmentIndex::new(sources.alignment)?;
-    let pool = Pool {
-        forge: entities.forge(),
-        entities: Arc::clone(entities),
-        files,
-        idle: Mutex::new(Vec::new()),
-        alignment: &alignment,
-        capture: Arc::clone(&capture),
-    };
+    let mut resolver =
+        LoadoutResolver::with_observed_entities(Arc::clone(entities), capture.clone())
+            .with_files(files)
+            .stopping_at_docked_vehicles();
+    let mut reader = PortReader::with_alignment(&alignment);
     let scratch = std::env::temp_dir();
     let mut entries = StagedLoadoutWriter::new(&scratch, cancel);
     let mut summary = LoadoutSummary::default();
     let mut outside = HashSet::new();
-    let failures = resolve_windows(
+    let failures = resolve_ordered(
         wanted,
-        rayon::current_num_threads(),
         cancel,
-        |want| pool.read(want),
+        |want| read_with(&mut resolver, &mut reader, entities.forge(), want, &capture),
         |entry| {
             summary.add_entry(&entry, known, &mut outside);
             entries.append(entry)
         },
     );
-    drop(pool);
+    drop(resolver);
     let mut ledger = capture.finish()?;
     drop(capture);
     let failures = failures?;
@@ -174,32 +130,21 @@ pub(crate) fn loadouts<'f>(
     })
 }
 
-fn resolve_windows<'source>(
+fn resolve_ordered<'source>(
     wanted: impl Iterator<Item = Wanted>,
-    width: usize,
     cancel: Option<&CancelToken>,
-    read: impl Fn(Wanted) -> Result<Option<Loadout>, CatalogReadFailure<'source>> + Sync,
+    mut read: impl FnMut(Wanted) -> Result<Option<Loadout>, CatalogReadFailure<'source>>,
     mut accept: impl FnMut(Loadout) -> Result<(), RowSpoolError>,
 ) -> Result<Vec<CatalogReadFailure<'source>>, CatalogError> {
     let mut ordered: Vec<_> = wanted.enumerate().collect();
     guid_text::sort_by_guid(&mut ordered, |(_, want)| want.guid);
     let mut failures = Vec::new();
-    let mut reads = Vec::with_capacity(width.min(ordered.len()));
-    for window in ordered.chunks(width) {
-        window
-            .par_iter()
-            .map(|(_, want)| checkpoint(cancel).map(|()| read(*want)))
-            .collect_into_vec(&mut reads);
-        #[expect(
-            clippy::iter_with_drain,
-            reason = "reuse the indexed Rayon result buffer across loadout windows"
-        )]
-        for ((position, _), result) in window.iter().zip(reads.drain(..)) {
-            match result? {
-                Ok(Some(entry)) => accept(entry)?,
-                Ok(None) => {}
-                Err(failure) => failures.push((*position, failure)),
-            }
+    for (position, want) in ordered {
+        checkpoint(cancel)?;
+        match read(want) {
+            Ok(Some(entry)) => accept(entry)?,
+            Ok(None) => {}
+            Err(failure) => failures.push((position, failure)),
         }
     }
     // Equal-GUID failures are deduplicated in input order by the collector.
@@ -251,8 +196,8 @@ fn read_with<'f: 'worker, 'worker>(
 }
 
 #[cfg(test)]
-#[path = "loadout_window_tests.rs"]
-mod window_tests;
+#[path = "loadout_order_tests.rs"]
+mod order_tests;
 
 impl LoadoutSummary {
     fn add_entry(&mut self, entry: &Loadout, known: &HashSet<Guid>, outside: &mut HashSet<Guid>) {

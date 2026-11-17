@@ -5,7 +5,7 @@ use std::collections::HashSet;
 
 use p4kx_extraction::Guid;
 
-use super::{Wanted, resolve_windows};
+use super::{Wanted, resolve_ordered};
 use crate::LoadoutSummary;
 use crate::contract_loadout::{EntityKind, Loadout, LoadoutPort};
 use crate::guid_text::CatalogGuid;
@@ -39,8 +39,7 @@ fn resolved(want: Wanted) -> Loadout {
 }
 
 #[test]
-fn a_guid_tie_across_windows_preserves_wire_order_and_ship_ordinals()
--> Result<(), Box<dyn std::error::Error>> {
+fn a_guid_tie_preserves_wire_order_and_ship_ordinals() -> Result<(), Box<dyn std::error::Error>> {
     let scratch = tempfile::tempdir()?;
     let same = guid(2);
     let known = HashSet::new();
@@ -55,9 +54,8 @@ fn a_guid_tie_across_windows_preserves_wire_order_and_ship_ordinals()
         wanted(4, same, EntityKind::Item),
     ];
 
-    let failures = resolve_windows(
+    let failures = resolve_ordered(
         wanted.into_iter(),
-        2,
         None,
         |want| Ok((want.record_index != 4).then(|| resolved(want))),
         |entry| {
@@ -71,7 +69,7 @@ fn a_guid_tie_across_windows_preserves_wire_order_and_ship_ordinals()
     assert_eq!(
         serde_json::to_vec(&staged)?,
         serde_json::to_vec(&expected)?,
-        "canonical stable order survives the window and Item spool boundaries",
+        "canonical stable order includes emitted Item rows",
     );
     assert_eq!(
         staged
@@ -85,10 +83,6 @@ fn a_guid_tie_across_windows_preserves_wire_order_and_ship_ordinals()
     assert_eq!(summary.items, 2, "both emitted Item rows are counted");
     assert_eq!(summary.ships, 2, "both Ship rows are counted");
     assert_eq!(summary.attached, 4, "each occurrence contributes");
-    assert_eq!(
-        outside.len(),
-        1,
-        "one outside GUID is shared by all windows"
-    );
+    assert_eq!(outside.len(), 1, "one outside GUID is shared by all rows");
     Ok(())
 }

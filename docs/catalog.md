@@ -1041,6 +1041,8 @@ A loadout (`loadouts`) is the Default Loadout of one ship or of one item that ha
 into a tree (ADR-0064). The kind refers to the entity and adds no name, no description and no
 media: name and record stay on the entry in `ships` or `items`, so no GUID occurs twice among the
 `guid` fields of the catalog. Loadouts are ordered by `entityGuid`.
+A single resolver visits selected roots in that order and stages each completed row immediately.
+The first request owns each original file-read observation. Later requests reuse the cached read.
 
 | Field | Source |
 |-------|--------|

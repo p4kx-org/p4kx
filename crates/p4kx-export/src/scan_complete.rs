@@ -14,16 +14,18 @@ use crate::catalog_v3::catalog_item_alignment::ItemPortStaging;
 use crate::catalog_v3::catalog_item_components::item_definition::ItemDefinitionStaging;
 use crate::collected::Collected;
 use crate::commodity_backfill::CommodityPresence;
+use crate::entity_selection::{Selected, select};
 use crate::export_field_inspection::ScanInspectionFold;
 use crate::export_ledger::ExportLedger;
 use crate::guid_text::GuidText;
 use crate::picked::Picked;
 use crate::record_read;
+use crate::scan_health::{RecordEntityRows, RecordScan};
 
 use crate::scan_signature::SlotProblem;
 use crate::{CatalogError, Kind};
 
-use super::Scan;
+use super::{Scan, ScanCandidate};
 
 impl<'f> Scan<'_, '_, 'f> {
     pub(super) fn complete(
@@ -110,33 +112,41 @@ impl<'f> Scan<'_, '_, 'f> {
         };
         let window_size = record_read::window_size(records.len());
         let mut checked = Vec::new();
+        let mut ship_trees = TreeBuilder::new();
         for window in records.chunks(window_size) {
             window
                 .par_iter()
-                .map_init(TreeBuilder::new, |trees, record| self.check(trees, record))
+                .map_init(TreeBuilder::new, |trees, record| {
+                    let selection = select(record, self.options.filter);
+                    if matches!(selection, Ok(Some(Selected::Entity(Kind::Ships)))) {
+                        // The observed ship reader attributes the first file read to its caller.
+                        return None;
+                    }
+                    Some(self.check(trees, ScanCandidate { record, selection }))
+                })
                 .collect_into_vec(&mut checked);
             #[expect(
                 clippy::iter_with_drain,
                 reason = "reuse the indexed Rayon result buffer across scan windows"
             )]
-            for result in checked.drain(..) {
+            for (record, result) in window.iter().zip(checked.drain(..)) {
+                let result = result.unwrap_or_else(|| {
+                    self.check(
+                        &mut ship_trees,
+                        ScanCandidate {
+                            record,
+                            selection: Ok(Some(Selected::Entity(Kind::Ships))),
+                        },
+                    )
+                });
                 if let Some(record) = result? {
-                    if let Some(mut pick) = record.picked {
-                        evidence.observe(&mut pick);
-                        staging.stage_health(&mut pick)?;
-                        collected.take(pick, &mut staging.item_definitions)?;
-                    }
-                    if let Some(tags) = record.entity.tags {
-                        staging.entity_tags.append(tags.order_key(), &tags)?;
-                    }
-                    let mut configurations = record.entity.configurations;
-                    configurations
-                        .alignment
-                        .stage_ports(&mut staging.item_ports)?;
-                    configurations.stage_interactions(&mut staging.interactions)?;
-                    configurations.stage_inventory_bounds(&mut staging.inventory_bounds)?;
-                    collected.entity_configurations.extend(configurations);
-                    inspections.merge(ledger, record.ledger);
+                    let RecordScan {
+                        picked,
+                        entity,
+                        ledger: observed,
+                    } = record;
+                    staging.append(picked, entity, &mut evidence, collected)?;
+                    inspections.merge(ledger, observed);
                 }
             }
             self.original.origins().uses.compact_record_uses(|| {
@@ -160,7 +170,7 @@ struct RecordStaging<'stage, 'source> {
     health: OrderedComponentRows<'stage>,
 }
 
-impl<'stage> RecordStaging<'stage, '_> {
+impl<'stage, 'source> RecordStaging<'stage, 'source> {
     const fn new(directory: &'stage Path, cancel: Option<&'stage CancelToken>) -> Self {
         Self {
             item_ports: ItemPortStaging::new(directory, cancel),
@@ -170,6 +180,29 @@ impl<'stage> RecordStaging<'stage, '_> {
             inventory_bounds: OrderedComponentRows::new(directory, cancel),
             health: OrderedComponentRows::new(directory, cancel),
         }
+    }
+
+    fn append(
+        &mut self,
+        picked: Option<Picked<'source>>,
+        entity: RecordEntityRows<'source>,
+        evidence: &mut RecordEvidence,
+        collected: &mut Collected<'source>,
+    ) -> Result<(), CatalogError> {
+        if let Some(mut pick) = picked {
+            evidence.observe(&mut pick);
+            self.stage_health(&mut pick)?;
+            collected.take(pick, &mut self.item_definitions)?;
+        }
+        if let Some(tags) = entity.tags {
+            self.entity_tags.append(tags.order_key(), &tags)?;
+        }
+        let mut configurations = entity.configurations;
+        configurations.alignment.stage_ports(&mut self.item_ports)?;
+        configurations.stage_interactions(&mut self.interactions)?;
+        configurations.stage_inventory_bounds(&mut self.inventory_bounds)?;
+        collected.entity_configurations.extend(configurations);
+        Ok(())
     }
 
     fn stage_health(&mut self, mut pick: &mut Picked<'_>) -> Result<(), CatalogError> {

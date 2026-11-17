@@ -62,7 +62,7 @@ fn selects_group(record: &Record<'_>, filter: Option<&Filter>) -> bool {
     )
 }
 
-/// The parallel check of every Record, with its progress.
+/// Checks all eligible Records and reports scan progress.
 pub(crate) struct Scan<'o, 'a, 'f> {
     forge: &'f DataForge<'f>,
     original: &'f OriginalCatalogInput<'f, 'f>,
@@ -83,9 +83,13 @@ pub(crate) struct Scan<'o, 'a, 'f> {
     total: usize,
 }
 
+struct ScanCandidate<'record, 'f> {
+    record: &'record Record<'f>,
+    selection: Result<Option<Selected>, DataForgeError>,
+}
+
 impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
-    /// Checks every Record of `forge` in parallel and returns those a kind selected; a ship's base
-    /// data is read here, once, by the worker that checks it.
+    /// Projects selected Records and reads each ship base in physical Record order.
     pub(crate) fn run(
         original: &'f OriginalCatalogInput<'f, 'f>,
         files: &'f ArchiveFiles<'f>,
@@ -152,12 +156,13 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
     fn check(
         &self,
         trees: &mut TreeBuilder<'f>,
-        record: &Record<'f>,
+        candidate: ScanCandidate<'_, 'f>,
     ) -> Result<Option<RecordScan<'f>>, CatalogError> {
         if self.options.cancel.is_some_and(CancelToken::is_cancelled) {
             return Err(CatalogError::Cancelled);
         }
         self.tick();
+        let record = candidate.record;
         let mut trace = SourceTrace::new(record);
         let mut ledger = ExportLedger::default();
         let capture = Arc::new(
@@ -171,7 +176,7 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
         let mut entity = RecordEntityRows::default();
         let result = self.select(
             trees,
-            record,
+            candidate,
             &mut trace,
             &mut ledger,
             &capture,
@@ -238,13 +243,14 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
     fn select(
         &self,
         trees: &mut TreeBuilder<'f>,
-        record: &Record<'f>,
+        candidate: ScanCandidate<'_, 'f>,
         trace: &mut SourceTrace,
         ledger: &mut ExportLedger,
         capture: &crate::export_builder_capture::BuilderCapture<'_>,
         entity: &mut RecordEntityRows<'f>,
     ) -> Result<Option<Picked<'f>>, ScanError> {
-        let kind = match select(record, self.options.filter)? {
+        let ScanCandidate { record, selection } = candidate;
+        let kind = match selection? {
             None => return Ok(None),
             Some(Selected::Leftover(kind)) => {
                 if kind == Kind::Crafters {

@@ -270,10 +270,11 @@ Measure both the spool bytes and the cost of seeking to the ordered frames.
 Inventory item bounds are staged during the same scan in physical Record and Component order.
 Inventory storage selections stay in memory for the capacity and facility joins.
 
-Loadout resolution reads roots in stable GUID order. Each parallel window holds
-at most as many results as there are Rayon workers. Item rows go straight into
-one sequential compressed spool. Ship loadouts keep their original Catalog array
-position and source-bearing port data for facility and resource topology joins.
+The observed ship base reader visits selected ships in physical Record order. Other entity checks
+run in parallel within each scan window. The first ship to read a shared file owns the observation.
+One observed loadout resolver visits roots in stable GUID order and stages each result before the
+next root. Item rows go straight into one sequential compressed spool. Ship loadouts keep their
+original Catalog array position and source-bearing port data for facility and resource topology joins.
 The writer interleaves both sets in canonical GUID order. Record the write-counter
 change during loadout resolution and the retained private bytes on entry to
 location projection.
