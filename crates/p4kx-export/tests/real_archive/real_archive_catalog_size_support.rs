@@ -4,6 +4,7 @@
 //! Verifies source identity and reports the normal encoder's measured sizes.
 
 use std::error::Error;
+use std::fmt;
 use std::path::Path;
 use std::time::{Instant, UNIX_EPOCH};
 
@@ -11,7 +12,10 @@ use p4kx_channels::channel_name;
 use p4kx_extraction::{Archive, ArchiveKey, ArchiveWatch, Build, DataForgeEntry};
 use p4kx_testkit::{real_archive_key, real_archive_pair};
 
-use super::{CatalogError, CatalogOptions, CatalogStage, CatalogSummary};
+use super::{CatalogError, CatalogOptions, CatalogStage, CatalogSummary, export};
+
+#[path = "real_archive_catalog_size_refusal.rs"]
+mod refusal;
 
 pub(super) type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
@@ -124,7 +128,8 @@ fn measure<T>(
         .map_err(|_| format!("{channel} input changed during catalog sizing"))?;
     let (summary, extra) = result.map_err(|error| {
         let reason = match error.downcast_ref::<CatalogError>() {
-            Some(CatalogError::IncompleteExport(_)) => {
+            Some(CatalogError::IncompleteExport(refusal)) => {
+                refusal::report(channel, change, refusal.health(), print_refusal_line);
                 "normal publication refused by export health"
             }
             None => "normal catalog section census failed",
@@ -147,6 +152,14 @@ fn measure<T>(
         elapsed.as_millis()
     ));
     Ok((summary, extra))
+}
+
+#[expect(
+    clippy::print_stderr,
+    reason = "refusal diagnostics accompany external sizing phase measurements"
+)]
+fn print_refusal_line(line: fmt::Arguments<'_>) {
+    eprintln!("{line}");
 }
 
 #[expect(

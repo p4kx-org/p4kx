@@ -5,6 +5,7 @@
 
 use std::io;
 
+use p4kx_export as export;
 use p4kx_export::{
     CatalogError, CatalogOptions, CatalogStage, CatalogSummary, Compression, write_catalog_from,
 };

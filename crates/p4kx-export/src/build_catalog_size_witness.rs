@@ -7,6 +7,7 @@ use std::{env, io};
 
 use p4kx_extraction::{Archive, DataForgeEntry, SourceUses};
 
+use crate as export;
 use crate::options::{CatalogRetention, CatalogRun, CatalogStage};
 use crate::{CatalogError, CatalogOptions, CatalogSummary, Compression};
 
