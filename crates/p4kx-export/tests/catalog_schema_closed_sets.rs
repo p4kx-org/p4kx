@@ -53,6 +53,8 @@ const CONTROL_TYPES: &[&str] = &[
     "OwnedReferenceStatus",
     "Playback",
     "ProbabilityInterpretation",
+    "ProfileKind",
+    "ProfileState",
     "ProjectileAmmoRole",
     "PropertyInterpretation",
     "PropertyReferenceStatus",

@@ -3,6 +3,7 @@
 
 //! A synthetic catalog for structural schema checks.
 
+use p4kx_export::Kind;
 use p4kx_extraction::SourceValue;
 use serde_json::{Value, json};
 
@@ -34,6 +35,24 @@ mod tags;
 
 use self::public_fixtures::{manufacturer, public_names};
 
+fn selection_completeness() -> Value {
+    let mut kinds: serde_json::Map<String, Value> = Kind::ALL
+        .into_iter()
+        .map(|kind| (kind.name().to_owned(), json!({"status": "complete"})))
+        .collect();
+    for (kind, filter) in [
+        (Kind::Ships, "*/spaceships/*"),
+        (Kind::BlueprintCategories, "*/blueprintcategories/*"),
+    ] {
+        kinds.insert(
+            kind.name().to_owned(),
+            json!({"status": "partial", "filter": filter}),
+        );
+    }
+    kinds.insert("shipStoreSlugs".into(), json!({"status": "complete"}));
+    Value::Object(kinds)
+}
+
 pub(crate) fn minimal_catalog() -> Value {
     let mut catalog = json!({
         "schemaVersion": p4kx_export::SCHEMA_VERSION,
@@ -47,87 +66,7 @@ pub(crate) fn minimal_catalog() -> Value {
             "toolVersion": "0.1.0",
             "exportedAt": "2026-10-18T00:00:00Z"
         },
-        "completeness": {
-            "manufacturers": {"status": "complete"},
-            "tags": {"status": "complete"},
-            "items": {"status": "complete"},
-            "ships": {"status": "partial", "filter": "*/spaceships/*"},
-            "commodities": {"status": "complete"},
-            "blueprints": {"status": "complete"},
-            "resourceGroups": {"status": "complete"},
-            "resourceTypes": {"status": "complete"},
-            "blueprintCategories": {"status": "partial", "filter": "*/blueprintcategories/*"},
-            "blueprintCategoryLists": {"status": "complete"},
-            "gameplayProperties": {"status": "complete"},
-            "qualityDistributions": {"status": "complete"},
-            "qualityQuantizations": {"status": "complete"},
-            "blueprintPools": {"status": "complete"},
-            "dismantleProcesses": {"status": "complete"},
-            "paints": {"status": "complete"},
-            "loadouts": {"status": "complete"},
-            "starmapObjects": {"status": "complete"},
-            "contracts": {"status": "complete"},
-            "mineableElements": {"status": "complete"},
-            "refiningProcesses": {"status": "complete"},
-            "mineableCompositions": {"status": "complete"},
-            "miningGlobalParams": {"status": "complete"},
-            "harvestableProviderPresets": {"status": "complete"},
-            "subHarvestableMultiConfigs": {"status": "complete"},
-            "harvestableLocations": {"status": "complete"},
-            "shops": {"status": "complete"},
-            "shopInventories": {"status": "complete"},
-            "explosionDefinitions": {"status": "complete"},
-            "inventoryContainers": {"status": "complete"},
-            "medicalItemTierConfigs": {"status": "complete"},
-            "ammoDefinitions": {"status": "complete"},
-            "factions": {"status": "complete"},
-            "reputationPerks": {"status": "complete"},
-            "reputationTriggerRecords": {"status": "complete"},
-            "reputationRewardAmounts": {"status": "complete"},
-            "infractions": {"status": "complete"},
-            "infractionSets": {"status": "complete"},
-            "jurisdictions": {"status": "complete"},
-            "locationClasses": {"status": "complete"},
-            "locationFunctions": {"status": "complete"},
-            "locationSizes": {"status": "complete"},
-            "locationClassRegistries": {"status": "complete"},
-            "locationFunctionRegistries": {"status": "complete"},
-            "locationSizeRegistries": {"status": "complete"},
-            "npcArchetypes": {"status": "complete"},
-            "npcClassPools": {"status": "complete"},
-            "autoSpawns": {"status": "complete"},
-            "autoSpawnSets": {"status": "complete"},
-            "encounterIndices": {"status": "complete"},
-            "starmapTypes": {"status": "complete"},
-            "starmapPresets": {"status": "complete"},
-            "starmapAmenities": {"status": "complete"},
-            "factionReputations": {"status": "complete"},
-            "reputationScopes": {"status": "complete"},
-            "reputationStandings": {"status": "complete"},
-            "reputationContexts": {"status": "complete"},
-            "missionTypes": {"status": "complete"},
-            "missionLocalities": {"status": "complete"},
-            "contractScenarios": {"status": "complete"},
-            "missionScenarios": {"status": "complete"},
-            "missionLocationTemplates": {"status": "complete"},
-            "contractShipSpawns": {"status": "complete"},
-            "contractLocationQueries": {"status": "complete"},
-            "contractTemplates": {"status": "complete"},
-            "missionBrokerEntries": {"status": "complete"},
-            "missionPropertySets": {"status": "complete"},
-            "contractNpcSpawns": {"status": "complete"},
-            "contractEntitySpawns": {"status": "complete"},
-            "lootTables": {"status": "complete"},
-            "lootArchetypes": {"status": "complete"},
-            "lootPoolFilters": {"status": "complete"},
-            "legacyLootTables": {"status": "complete"},
-            "legacyLootArchetypes": {"status": "complete"},
-            "lootContainers": {"status": "complete"},
-            "mineableEntities": {"status": "complete"},
-            "crafters": {"status": "complete"},
-            "cargoManifests": {"status": "complete"},
-            "shipStoreSlugs": {"status": "complete"}
-        },
+        "completeness": selection_completeness(),
         "items": [{
             "recordIndex": source_values::present(json!(1)),
             "guid": "30000000-0000-4000-8000-000000000001",

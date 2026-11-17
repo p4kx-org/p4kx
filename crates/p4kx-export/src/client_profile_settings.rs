@@ -29,6 +29,7 @@ const VR: &str = "Data/Libs/Config/Profiles/default/attributesVR.xml";
 
 #[derive(Clone, Copy, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
 enum ProfileKind {
     General,
     VirtualReality,
@@ -45,6 +46,7 @@ impl ProfileKind {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
 enum ProfileState {
     Read,
     Missing,

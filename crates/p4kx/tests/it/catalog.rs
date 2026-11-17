@@ -16,6 +16,7 @@ use std::path::{Path, PathBuf};
 
 use assert_cmd::Command;
 use catalog_support::{EXPORTED_AT, english, origins, write_archive, write_archive_with};
+use p4kx_export::Kind;
 use p4kx_extraction::Language;
 use p4kx_testkit::TestEntry;
 
@@ -129,6 +130,19 @@ fn catalog_writes_a_catalog_that_the_schema_accepts() -> TestResult {
         .map(|error| error.to_string())
         .collect();
     assert!(errors.is_empty(), "valid against the schema: {errors:?}");
+    let completeness = instance
+        .get("completeness")
+        .ok_or("catalog selection completeness")?;
+    for kind in Kind::ALL {
+        assert_eq!(
+            completeness
+                .get(kind.name())
+                .and_then(|selection| selection.get("status"))
+                .and_then(serde_json::Value::as_str),
+            Some("complete"),
+            "unfiltered coverage of {kind}"
+        );
+    }
     assert!(instance.get("manufacturers").is_none());
     assert_eq!(
         instance["definitions"]["manufacturers"]["availability"],

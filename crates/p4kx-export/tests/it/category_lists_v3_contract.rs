@@ -215,7 +215,7 @@ fn assert_header(catalog: &Value) -> TestResult {
     Ok(())
 }
 
-const EXPECTED_KINDS: [&str; 105] = [
+const EXPECTED_KINDS: &[&str] = &[
     "manufacturers",
     "items",
     "ships",
@@ -321,11 +321,16 @@ const EXPECTED_KINDS: [&str; 105] = [
     "contractScopes",
     "cargoLoadingGlobals",
     "shopCommodityGlobals",
+    "clientProfileSettings",
 ];
 
 fn assert_kind_order() {
     assert_eq!(
-        Kind::ALL.iter().map(|kind| kind.name()).collect::<Vec<_>>(),
+        Kind::ALL
+            .iter()
+            .map(|kind| kind.name())
+            .collect::<Vec<_>>()
+            .as_slice(),
         EXPECTED_KINDS,
         "the catalog Kind order preserves the category-list index before shop inventories"
     );

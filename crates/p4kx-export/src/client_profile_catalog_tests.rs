@@ -29,6 +29,11 @@ fn catalog_selects_profile_documents_and_counts_only_read_physical_entries() -> 
     options.filter = Some(&filter);
     let result = build_catalog(&archive, &options)?;
     let document: Value = serde_json::from_slice(result.json())?;
+    assert_eq!(
+        at(&document, "/completeness/clientProfileSettings")?,
+        &json!({"status": "partial", "filter": VR}),
+        "a profile Archive Entry filter must be visible in selection coverage"
+    );
     let profiles = at(&document, "/configurations/clientProfileSettings/documents")?;
     assert_eq!(
         at(profiles, "/0/status/value")?,

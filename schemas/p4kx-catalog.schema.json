@@ -10251,6 +10251,10 @@
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `cargoManifests`."
         },
+        "clientProfileSettings": {
+          "$ref": "#/$defs/KindCompleteness",
+          "description": "The physical client profile document selection."
+        },
         "climateAssets": {
           "$ref": "#/$defs/KindCompleteness"
         },
@@ -10629,6 +10633,7 @@
         "blueprints",
         "cargoLoadingGlobals",
         "cargoManifests",
+        "clientProfileSettings",
         "climateAssets",
         "commodities",
         "contractEntitySpawns",
@@ -34049,7 +34054,8 @@
         "general",
         "virtualReality"
       ],
-      "type": "string"
+      "type": "string",
+      "x-p4kx-vocabularyClass": "control"
     },
     "ProfileState": {
       "enum": [
@@ -34062,7 +34068,8 @@
         "malformed",
         "unsupported"
       ],
-      "type": "string"
+      "type": "string",
+      "x-p4kx-vocabularyClass": "control"
     },
     "ProfileText": {
       "properties": {

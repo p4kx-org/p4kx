@@ -201,6 +201,8 @@ pub(crate) struct Completeness<'a> {
     pub(crate) mission_property_sets: KindCompleteness<'a>,
     /// The completeness of `shipStoreSlugs`.
     pub(crate) ship_store_slugs: KindCompleteness<'a>,
+    /// The physical client profile document selection.
+    pub(crate) client_profile_settings: KindCompleteness<'a>,
 }
 
 impl<'a> Completeness<'a> {
@@ -314,6 +316,7 @@ impl<'a> Completeness<'a> {
             contract_entity_spawns: completeness,
             mission_property_sets: completeness,
             ship_store_slugs: completeness,
+            client_profile_settings: completeness,
         }
     }
 }

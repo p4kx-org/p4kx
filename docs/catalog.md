@@ -2478,7 +2478,8 @@ retain their original form.
 
 `configurations.clientProfileSettings` contains the original general and VR profile
 documents with independent selection and read outcomes, authoring order and source
-origins. [Client profile settings](client-profile-settings.md)
+origins. `completeness.clientProfileSettings` records whether a Filter scoped the Archive
+Entry selection. Each document reports its own availability. [Client profile settings](client-profile-settings.md)
 
 ### Shop inventory resolution
 
