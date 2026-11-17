@@ -55,7 +55,7 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
             Kind::BlueprintCategories => {
                 let read = crate::blueprint_category::read(
                     tree,
-                    &self.projection,
+                    self.scan.original,
                     admission,
                     self.scan.options.cancel,
                 )?;

@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+#[path = "blueprint_category_sdk.rs"]
+mod sdk;
+
 use p4kx_export::{CatalogPublicationMode, Filter, Kind};
 use p4kx_extraction::{DataForge, Value as SourceValue};
 use p4kx_testkit::{DataForgeBuilder, TestRecord, TestStruct, TestType, TestValue};

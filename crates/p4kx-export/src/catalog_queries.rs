@@ -3,23 +3,22 @@
 
 //! Selective access to canonical catalog data in an opened game Archive.
 
+#[path = "blueprint_category_query.rs"]
+mod blueprint_categories;
+#[path = "unlocalized_record_query.rs"]
+mod unlocalized_record_query;
+
 #[path = "gameplay_property_query.rs"]
 mod gameplay_properties;
 
 use p4kx_extraction::{
     Archive, Build, CancelToken, DataForge, DataForgeEntry, Guid, Record, SourceInventory,
-    SourcedValue, TreeBuilder,
+    SourcedValue,
 };
 use serde::Serialize;
 
 use crate::archive_dataforge_query::{self, checkpoint};
-use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_origins::CatalogOrigins;
-use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::blueprint_category_list_read;
-use crate::entity_selection::{self, Selected};
-use crate::guid_text::{CatalogGuid, sort_by_guid};
-use crate::record_observation::RecordObservation;
 use crate::{CatalogError, Kind};
 
 pub use crate::canonical_record_header::CatalogRecordSource;
@@ -34,6 +33,10 @@ pub use crate::catalog_v3::gameplay_property_catalog::{
 };
 pub use crate::definition_reference::DefinitionStatus;
 pub use crate::resource_number::ResourceNumber;
+pub use blueprint_categories::{
+    BlueprintCategory, BlueprintCategorySnapshot, read_blueprint_categories,
+    read_blueprint_categories_from,
+};
 pub use gameplay_properties::{
     CatalogLanguageSelection, CatalogPublicName, GameplayPropertySnapshot,
     read_gameplay_properties, read_gameplay_properties_from,
@@ -154,89 +157,32 @@ pub fn read_blueprint_category_lists_from(
     })
 }
 
-const KIND: Kind = Kind::BlueprintCategoryLists;
-
 fn read_archive(
     archive: &Archive,
     entry: &DataForgeEntry,
     selection: CatalogRecordSelection,
     cancel: Option<&CancelToken>,
 ) -> Result<BlueprintCategoryListSnapshot, CatalogError> {
-    let origins = CatalogOrigins::for_archive_records(archive, entry)?;
-    let forge = entry.open().map_err(CatalogError::DataForge)?;
-    let input = OriginalCatalogInput::new(&forge, &origins);
-    let mut out = SelectedLists::default();
-    let mut trees = TreeBuilder::new();
-    selection.for_each(&forge, cancel, |record| {
-        out.read(record, &input, &mut trees, cancel)
-    })?;
-    sort_by_guid(&mut out.rows, |row| row.guid);
-    let rows = out.rows.into_iter().map(|row| row.data).collect();
-    let table = CatalogTable::new(&forge, &[KIND.records().type_name], rows);
-    let source_inventory = origins.uses.finish_with(|| checkpoint(cancel))?;
+    let projected = unlocalized_record_query::read(
+        archive,
+        entry,
+        Kind::BlueprintCategoryLists,
+        selection,
+        cancel,
+        |tree, input, admission| {
+            let read = blueprint_category_list_read::read(tree, input, admission, cancel)?;
+            let row = BlueprintCategoryList {
+                source: read.value.declaration.source.into(),
+                categories: read.value.declaration.categories,
+            };
+            Ok((row, read.notes))
+        },
+    )?;
     Ok(BlueprintCategoryListSnapshot {
         build: archive.build().cloned(),
-        availability: table.availability,
-        rows: table.rows,
-        source_inventory,
-        coverage: out.coverage,
+        availability: projected.availability,
+        rows: projected.rows,
+        source_inventory: projected.source_inventory,
+        coverage: projected.coverage,
     })
-}
-
-struct CategoryListWithIdentity {
-    guid: CatalogGuid,
-    data: BlueprintCategoryList,
-}
-
-#[derive(Default)]
-struct SelectedLists {
-    rows: Vec<CategoryListWithIdentity>,
-    coverage: CatalogRecordCoverage,
-}
-
-impl SelectedLists {
-    fn read<'source>(
-        &mut self,
-        record: &Record<'source>,
-        input: &OriginalCatalogInput<'_, 'source>,
-        trees: &mut TreeBuilder<'source>,
-        cancel: Option<&CancelToken>,
-    ) -> Result<(), CatalogError> {
-        let classified = record.type_name().and_then(|source_type| {
-            if source_type == KIND.records().type_name {
-                entity_selection::select(record, None)
-            } else {
-                Ok(None)
-            }
-        });
-        match classified {
-            Err(_) => self.coverage.unreadable_headers.push(record.index()),
-            Ok(Some(Selected::Leftover(KIND))) => self.coverage.skipped_leftovers += 1,
-            Ok(Some(Selected::Entity(KIND))) => {
-                checkpoint(cancel)?;
-                let Ok(tree) = trees.build(record) else {
-                    self.coverage.unreadable_bodies.push(record.index());
-                    return Ok(());
-                };
-                let admission = RecordObservation::capture(input, record)?;
-                let decoded = blueprint_category_list_read::read(&tree, input, &admission, cancel)?;
-                if decoded
-                    .notes
-                    .iter()
-                    .any(|note| note.description().issue.blocks_projection())
-                {
-                    self.coverage.incomplete_fields.push(record.index());
-                }
-                self.rows.push(CategoryListWithIdentity {
-                    guid: decoded.value.guid,
-                    data: BlueprintCategoryList {
-                        source: decoded.value.declaration.source.into(),
-                        categories: decoded.value.declaration.categories,
-                    },
-                });
-            }
-            Ok(_) => {}
-        }
-        Ok(())
-    }
 }

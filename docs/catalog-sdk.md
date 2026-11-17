@@ -13,6 +13,11 @@ slots and dangling links match `declarations.blueprintCategoryLists` in the comp
 The snapshot carries family availability, unreadable Record positions and a source inventory for
 the returned cells. The query opens no localization or placement payloads.
 
+Use `read_blueprint_categories` or `read_blueprint_categories_from` to read the physical
+Blueprint Category definitions in `definitions.blueprintCategories`. The result has the same
+eight directly sourced header fields and category selection policy as the full Catalog.
+Both Blueprint readers share the DataForge-only read path.
+
 Use `read_gameplay_properties` or `read_gameplay_properties_from` to query
 `definitions.gameplayProperties` with the same Record selection. The query reads the authored
 name, unit format, transformation and ordered name overrides with their source evidence. It
