@@ -3,6 +3,8 @@
 Working notes for Claude Code (and human contributors) in this repo. Keep this file current when
 the build, architecture, or the rules below change.
 
+@AGENTS.md
+
 ## What this is
 
 **P4KX** — a Rust desktop tool with a native Rust GUI that opens, browses and extracts the
