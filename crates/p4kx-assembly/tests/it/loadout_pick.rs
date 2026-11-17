@@ -219,3 +219,5 @@ fn picking_an_empty_xml_choice_preserves_the_following_index() -> TestResult {
     assert_eq!(attached(&tree), [pair("Body_ItemPort", "Body_Blue")]);
     Ok(())
 }
+#[path = "loadout_pick_pointer_slots.rs"]
+mod pointer_slots;

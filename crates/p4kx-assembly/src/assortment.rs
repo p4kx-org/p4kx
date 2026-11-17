@@ -16,7 +16,7 @@ use crate::assortment_requirement::{Verdict, evaluate};
 use crate::loadout_path::PathRead;
 use crate::loadout_reference::LoadoutReference;
 use crate::pick::LoadoutPicks;
-use crate::read::{as_struct, struct_items, text};
+use crate::read::{as_struct, text};
 use crate::resolver::{Entries, LoadoutResolver};
 use crate::spec::{LoadoutSpec, TargetSpec};
 use crate::target_spec;
@@ -180,9 +180,16 @@ fn read_assorted_tree(
             if !undecided.applies(Some(name), group.field("Requirement")) {
                 continue;
             }
-            let alternatives = struct_items(group, "Loadouts")
-                .map(|loadout| Alternative::read(loadout, &path, paths))
-                .collect();
+            let alternatives = match group.field("Loadouts") {
+                Some(Value::Array(loadouts)) => loadouts
+                    .iter()
+                    .map(|loadout| match loadout {
+                        Value::Struct(loadout) => Alternative::read(loadout, &path, paths),
+                        _ => Alternative::Unreadable,
+                    })
+                    .collect(),
+                _ => Vec::new(),
+            };
             groups.push(Group::new(name.to_owned(), alternatives));
         }
     }
