@@ -9,7 +9,7 @@ use serde::{Serialize, Serializer};
 
 use crate::projection_schema;
 use crate::source_inventory::SourceEncryptionState;
-use crate::source_use::{SourceUse, SourceUseDescription, SourceUseRef};
+use crate::source_use::{SourceUse, SourceUseDescription, SourceUseRef, SourceUseRole};
 
 #[path = "field_origin_refs.rs"]
 mod refs;
@@ -194,39 +194,78 @@ struct OriginFacts {
 impl OriginFacts {
     fn measure<'a>(
         uses: impl IntoIterator<Item = &'a SourceUseDescription>,
-        mut complete: bool,
+        complete: bool,
     ) -> Self {
-        let mut refs = Vec::new();
-        let mut encrypted = false;
-        let mut unknown = !complete;
-        let contributing = uses
-            .into_iter()
-            .filter(|source| source.role().contributes());
-        for source in contributing {
-            if source.is_opaque() {
-                complete = false;
-                unknown = true;
-            }
-            refs.push(source.id().clone());
-            match source.effective_encryption() {
-                SourceEncryptionState::Encrypted => encrypted = true,
-                SourceEncryptionState::Unknown => unknown = true,
-                SourceEncryptionState::Unencrypted => {}
-            }
+        let mut accumulator = OriginAccumulator::new(complete);
+        for description in uses {
+            accumulator.observe(OriginContribution::from(description));
         }
-        refs.sort();
-        refs.dedup();
-        let contains_encrypted_source = if encrypted {
-            Some(true)
-        } else if unknown {
-            None
-        } else {
-            Some(false)
-        };
+        accumulator.into_facts()
+    }
+}
+
+#[derive(Clone, Copy)]
+pub(crate) struct OriginContribution<'a> {
+    pub(crate) id: &'a SourceUseRef,
+    pub(crate) role: SourceUseRole,
+    pub(crate) encryption: SourceEncryptionState,
+    pub(crate) opaque: bool,
+}
+
+impl<'a> From<&'a SourceUseDescription> for OriginContribution<'a> {
+    fn from(description: &'a SourceUseDescription) -> Self {
         Self {
+            id: description.id(),
+            role: description.role(),
+            encryption: description.effective_encryption(),
+            opaque: description.is_opaque(),
+        }
+    }
+}
+
+pub(crate) struct OriginAccumulator {
+    references: Vec<SourceUseRef>,
+    encryption: SourceEncryptionState,
+    complete: bool,
+}
+
+impl OriginAccumulator {
+    pub(crate) const fn new(complete: bool) -> Self {
+        Self {
+            references: Vec::new(),
+            encryption: SourceEncryptionState::Unencrypted,
+            complete,
+        }
+    }
+
+    pub(crate) const fn include_completeness(&mut self, complete: bool) {
+        self.complete &= complete;
+    }
+
+    pub(crate) fn observe(&mut self, contribution: OriginContribution<'_>) {
+        if contribution.role.contributes() {
+            self.include_completeness(!contribution.opaque);
+            self.references.push(contribution.id.clone());
+            self.encryption = self.encryption.combine(contribution.encryption);
+        }
+    }
+
+    pub(crate) fn finish(self, identity: Arc<()>) -> FieldOrigin {
+        FieldOrigin::from_facts(identity, self.into_facts())
+    }
+
+    fn into_facts(mut self) -> OriginFacts {
+        self.references.sort();
+        self.references.dedup();
+        let contains_encrypted_source = match self.encryption {
+            SourceEncryptionState::Encrypted => Some(true),
+            SourceEncryptionState::Unencrypted if self.complete => Some(false),
+            _ => None,
+        };
+        OriginFacts {
             contains_encrypted_source,
-            references: refs,
-            source_set_complete: complete,
+            references: self.references,
+            source_set_complete: self.complete,
         }
     }
 }
@@ -249,7 +288,10 @@ impl FieldOrigin {
         uses: impl IntoIterator<Item = &'a SourceUseDescription>,
         complete: bool,
     ) -> Self {
-        let facts = OriginFacts::measure(uses, complete);
+        Self::from_facts(identity, OriginFacts::measure(uses, complete))
+    }
+
+    fn from_facts(identity: Arc<()>, facts: OriginFacts) -> Self {
         Self {
             identity: Some(identity),
             fields: OriginFields::from_refs(

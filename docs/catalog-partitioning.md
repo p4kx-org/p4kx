@@ -61,21 +61,24 @@ limits separately. Retain the complete single-file Export.
 ## Consumer reference limits
 
 Basetool at `470f3bc` admits LIVE Catalog v2 with a 64,000,000-byte upload limit.
-Its default decoded limit is 1,000,000,000 bytes and its default retained JSON span limit
-is 128,000,000 bytes. These are reference values for the v3 sizing work. Basetool's
-v3 importer and its acceptance run are tracked in its own repository. Its issue
-lists P4KX 0.5.0 as a prerequisite. A revision-bound release candidate is needed
-to run the cross-repository acceptance before final publication.
+Its default decoded limit is 1,000,000,000 bytes. The separate 128,000,000-byte default
+limits the aggregate JSON spans the reader retains for known kinds. These are reference
+values for the v3 sizing work. Basetool's v3 importer and its acceptance run are tracked
+in its own repository. Its issue lists P4KX 0.5.0 as a prerequisite and keeps the LIVE
+channel policy. Use a revision-bound LIVE release candidate for the positive import
+and verify the expected PTU channel refusal separately.
 [Upload gate](https://github.com/krt-profit/basetool/blob/470f3bc09a7a01bc7054da7a53243bc3f351b1aa/backend/src/main/java/de/greluc/krt/profit/basetool/backend/catalogue/internal/P4kUploadGate.java)
 · [Import properties](https://github.com/krt-profit/basetool/blob/470f3bc09a7a01bc7054da7a53243bc3f351b1aa/backend/src/main/java/de/greluc/krt/profit/basetool/backend/catalogue/internal/P4kImportProperties.java)
 · [Basetool v3 migration](https://github.com/krt-profit/basetool/issues/3107)
 
-VerseKit at `1523a9a` depends on P4KX 0.4.2. It reads Blueprints and Item values from
-DataForge and builds filtered catalogs through the Rust library for data such as contracts
-and ship slots. Its v3 consumer verification needs to identify the actual library or
-artifact path, with the exact producer and consumer revisions.
-[VerseKit dependency](https://github.com/Xharig/VerseKit/blob/1523a9a8887324914ba3bfba966c4b1babc45bbf/Cargo.toml)
-· [Game data code](https://github.com/Xharig/VerseKit/blob/1523a9a8887324914ba3bfba966c4b1babc45bbf/crates/versekit-gamedata/src/lib.rs)
+VerseKit 5.4.1 at `e526984` still pins P4KX 0.4.2. It reads Blueprints and Item values
+from DataForge and builds filtered catalogs through the Rust library for data such as
+contracts and ship slots. Its `GameData::catalog_all` library path returns a `Vec<u8>`
+and refuses encrypted DataForge Entries. A v3 compatibility witness needs the actual
+library or artifact path, exact producer and consumer revisions, measured size and
+peak consumer memory.
+[VerseKit dependency](https://github.com/Xharig/VerseKit/blob/e526984b7ee1946403670b193740de5a49fe2434/Cargo.lock#L2808-L2810)
+· [Game data code](https://github.com/Xharig/VerseKit/blob/e526984b7ee1946403670b193740de5a49fe2434/crates/versekit-gamedata/src/lib.rs#L376-L402)
 
 ## Proposed domains
 
@@ -251,6 +254,12 @@ Measure both the spool bytes and the cost of seeking to the ordered frames.
 Inventory item bounds are staged during the same scan in physical Record and Component order.
 Inventory storage selections stay in memory for the capacity and facility joins.
 
+After each Record scan window, the source registry packs unheld DataForge uses into
+compact coordinates. It keeps live handles and their original authority. A later observation
+at the same coordinate reuses the original ID and evidence. The publisher streams the
+sorted live and packed rows together with the same IDs, scope, role and encryption.
+This storage uses RAM and adds no provenance spool.
+
 Record peak working set and peak private bytes separately.
 Sample host commit and paging counters alongside the process write counter to distinguish process
 writes from system memory pressure. Record the exit status, elapsed time, file length and decoded
@@ -296,8 +305,9 @@ revision and binary hash separately.
 The sink-only library witness also reports the channel, Build change number and producer
 phase on stderr. Use those events to align process memory samples with the producer stages.
 At the start of `records`, `projections` and `export-health`, a `catalog retained:` line
-reports distinct registered source uses, live field inspections, their capacity and reserved
-inline bytes. The inline bytes cover the inspection vectors. Each inspection's nested allocations
+reports distinct registered source uses, the packed subset, live field inspections,
+their capacity and reserved inline bytes. The inline bytes cover the inspection vectors.
+Each inspection's nested allocations
 and the source registry's own allocation footprint require separate measurements.
 The witness reports decoded and encoded sizes on stdout without creating a catalog file.
 

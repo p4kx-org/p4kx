@@ -3,25 +3,51 @@
 
 use std::borrow::Borrow;
 use std::cmp::Ordering;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
+use crate::field_origin::OriginContribution;
+use crate::source_packed_use::PackedSourceUse;
 use crate::source_use::{SourceUseDescription, SourceUseRef};
 
 /// Sorted source-use rows indexed by their own immutable IDs.
-pub(crate) struct RegisteredUses(BTreeSet<RegisteredUse>);
+pub(crate) struct RegisteredUses {
+    live: BTreeSet<RegisteredUse>,
+    packed: BTreeMap<SourceUseRef, PackedSourceUse>,
+    pending_compaction: Option<Vec<SourceUseRef>>,
+}
 
 impl RegisteredUses {
-    pub(crate) const fn new() -> Self {
-        Self(BTreeSet::new())
+    pub(crate) const fn new(compact_coordinates: bool) -> Self {
+        Self {
+            live: BTreeSet::new(),
+            packed: BTreeMap::new(),
+            pending_compaction: if compact_coordinates {
+                Some(Vec::new())
+            } else {
+                None
+            },
+        }
     }
 
     pub(crate) fn len(&self) -> usize {
-        self.0.len()
+        self.live.len() + self.packed.len()
+    }
+
+    pub(crate) fn packed_len(&self) -> usize {
+        self.packed.len()
     }
 
     pub(crate) fn get(&self, id: &SourceUseRef) -> Option<&Arc<SourceUseDescription>> {
-        self.0.get(id.as_str()).map(|registered| &registered.0)
+        self.live.get(id.as_str()).map(|registered| &registered.0)
+    }
+
+    pub(crate) fn contribution(&self, id: &SourceUseRef) -> Option<OriginContribution<'_>> {
+        if let Some(live) = self.get(id) {
+            return Some(OriginContribution::from(live.as_ref()));
+        }
+        let (id, packed) = self.packed.get_key_value(id)?;
+        Some(packed.contribution(id))
     }
 
     pub(crate) fn get_or_insert_with(
@@ -32,23 +58,73 @@ impl RegisteredUses {
         if let Some(registered) = self.get(&id) {
             return Arc::clone(registered);
         }
-        let row = Arc::new(build(id));
-        self.0.insert(RegisteredUse(Arc::clone(&row)));
+        let row = match self.packed.remove_entry(&id) {
+            Some((original, packed)) => packed.restore(&original),
+            None => build(id),
+        };
+        if let Some(pending) = &mut self.pending_compaction
+            && row.location.pack_dataforge().is_some()
+        {
+            pending.push(row.id().clone());
+        }
+        let row = Arc::new(row);
+        self.live.insert(RegisteredUse(Arc::clone(&row)));
         row
     }
 
-    pub(crate) fn values(&self) -> impl ExactSizeIterator<Item = &Arc<SourceUseDescription>> {
-        self.0.iter().map(|registered| &registered.0)
+    pub(crate) fn compact_pending<E>(
+        &mut self,
+        mut check: impl FnMut() -> Result<(), E>,
+    ) -> Result<(), E> {
+        let Some(pending) = &mut self.pending_compaction else {
+            return Ok(());
+        };
+        while let Some(id) = pending.pop() {
+            if let Err(error) = check() {
+                pending.push(id);
+                return Err(error);
+            }
+            let Some(registered) = self.live.get(id.as_str()) else {
+                continue;
+            };
+            // A held use must keep the allocation that proves its registration.
+            if Arc::strong_count(&registered.0) != 1 {
+                continue;
+            }
+            if let Some(packed) = PackedSourceUse::pack(&registered.0) {
+                self.live.remove(id.as_str());
+                self.packed.insert(id, packed);
+            }
+        }
+        Ok(())
     }
 
-    pub(crate) fn into_values(self) -> impl ExactSizeIterator<Item = Arc<SourceUseDescription>> {
-        self.0.into_iter().map(|registered| registered.0)
+    pub(crate) fn values(&self) -> impl ExactSizeIterator<Item = &Arc<SourceUseDescription>> {
+        self.live.iter().map(|registered| &registered.0)
+    }
+
+    pub(crate) fn packed_values(
+        &self,
+    ) -> impl ExactSizeIterator<Item = (&SourceUseRef, &PackedSourceUse)> {
+        self.packed.iter()
+    }
+
+    pub(crate) fn into_parts(
+        self,
+    ) -> (
+        impl ExactSizeIterator<Item = Arc<SourceUseDescription>>,
+        impl ExactSizeIterator<Item = (SourceUseRef, PackedSourceUse)>,
+    ) {
+        (
+            self.live.into_iter().map(|registered| registered.0),
+            self.packed.into_iter(),
+        )
     }
 }
 
 impl Default for RegisteredUses {
     fn default() -> Self {
-        Self::new()
+        Self::new(false)
     }
 }
 

@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::convert::Infallible;
-use std::sync::Arc;
 
 use thiserror::Error;
 
@@ -36,6 +35,16 @@ impl SourceUses {
         Ok(source_evidence_error::lock(&self.registry)?.uses.len())
     }
 
+    /// Counts registered uses stored as compact DataForge coordinates.
+    ///
+    /// # Errors
+    /// Returns an error when the evidence registry is unavailable.
+    pub fn packed_use_count(&self) -> Result<usize, SourceEvidenceError> {
+        Ok(source_evidence_error::lock(&self.registry)?
+            .uses
+            .packed_len())
+    }
+
     /// Freezes sorted source/use rows after projection for repeatable serialization passes.
     ///
     /// # Errors
@@ -62,8 +71,13 @@ impl SourceUses {
         let registry = source_evidence_error::lock(&self.registry)?;
         let sources = collect_rows(registry.sources.values().cloned(), &mut check)?;
         let uses = collect_rows(registry.uses.values().cloned(), &mut check)?;
+        let packed = registry
+            .uses
+            .packed_values()
+            .map(|(id, row)| (id.clone(), row.clone()));
+        let packed = collect_rows(packed, &mut check)?;
         drop(registry);
-        Ok(SourceInventory::new(sources, uses))
+        Ok(SourceInventory::new(sources, uses, packed))
     }
 
     /// Seals the registry and moves its sorted source and use rows into an immutable inventory.
@@ -80,18 +94,21 @@ impl SourceUses {
         let mut registry = source_evidence_error::lock(&self.registry)?;
         registry.seal();
         let sources = std::mem::take(&mut registry.sources);
-        let uses = std::mem::take(&mut registry.uses);
+        let mut uses = std::mem::take(&mut registry.uses);
         drop(registry);
+        uses.compact_pending(&mut check)?;
         let sources = collect_rows(sources.into_values(), &mut check)?;
-        let uses = collect_rows(uses.into_values(), &mut check)?;
-        Ok(SourceInventory::new(sources, uses))
+        let (uses, packed) = uses.into_parts();
+        let uses = collect_rows(uses, &mut check)?;
+        let packed = collect_rows(packed, &mut check)?;
+        Ok(SourceInventory::new(sources, uses, packed))
     }
 }
 
 fn collect_rows<Row, E>(
-    rows: impl ExactSizeIterator<Item = Arc<Row>>,
+    rows: impl ExactSizeIterator<Item = Row>,
     check: &mut impl FnMut() -> Result<(), E>,
-) -> Result<Vec<Arc<Row>>, E> {
+) -> Result<Vec<Row>, E> {
     let mut snapshot = Vec::with_capacity(rows.len());
     for row in rows {
         check()?;

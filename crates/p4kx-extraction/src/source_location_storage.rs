@@ -8,6 +8,10 @@ use serde::{Serialize, Serializer};
 use super::location::DataForgeField;
 use super::{LocationView, SourceLocation, SourceUseRef, Subresource};
 
+#[path = "source_packed_dataforge_location.rs"]
+mod packed_dataforge_location;
+pub(crate) use self::packed_dataforge_location::PackedDataForgeLocation;
+
 #[path = "source_reference_subresource_storage.rs"]
 mod reference_subresource;
 #[path = "source_xml_location_storage.rs"]

@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_testkit::{ArchiveBuilder, TestEntry};
+
 use crate::{
-    InputScope, SourceEvidenceError, SourceInput, SourceLocation, SourceScope, SourceUse,
+    Archive, InputScope, SourceEvidenceError, SourceInput, SourceLocation, SourceScope, SourceUse,
     SourceUseRole, SourceUses, SourceValue,
 };
 
@@ -79,6 +81,161 @@ fn finishing_moves_sorted_rows_and_preserves_captured_value_binding() -> TestRes
         "the terminal finish seals every cloned registry handle"
     );
     Ok(())
+}
+
+#[test]
+fn compacted_and_held_uses_keep_wire_order_identity_and_origin_facts() -> TestResult {
+    let sources = SourceUses::with_compact_coordinates();
+    let scope = sources.observe(SourceInput::Unknown, InputScope::Payload)?;
+    let held = observe_in(&scope, 100)?;
+    let cold = observe_in(&scope, 1)?;
+    let held_origin = sources.origin(std::slice::from_ref(&held), true);
+    let cold_origin = sources.origin(std::slice::from_ref(&cold), false);
+    let expected_origin = sources.origin(&[held.clone(), cold.clone()], false);
+    let expected_wire = serde_json::to_vec(&sources.freeze()?)?;
+    drop(cold);
+
+    assert_interruption_keeps_pending_uses(&sources)?;
+    sources.compact_record_uses(|| Ok::<(), SourceEvidenceError>(()))?;
+    assert_eq!(
+        sources.packed_use_count()?,
+        1,
+        "only the unheld row is packed"
+    );
+    assert_eq!(sources.registered_use_count()?, 2);
+    let aggregate = sources.origin_with_origins([&held_origin, &cold_origin], true)?;
+    assert_eq!(
+        aggregate, expected_origin,
+        "packed uses apply the same origin facts"
+    );
+
+    let repeated = observe_in(&scope, 1)?;
+    let cold_ref = cold_origin
+        .source_uses_refs()
+        .first()
+        .ok_or("packed reference")?;
+    assert!(
+        std::ptr::eq(repeated.reference().as_str(), cold_ref.as_str()),
+        "re-registration reuses the canonical reference"
+    );
+    let same_held = observe_in(&scope, 100)?;
+    assert!(std::ptr::eq(same_held.description(), held.description()));
+    drop(repeated);
+    sources.compact_record_uses(|| Ok::<(), SourceEvidenceError>(()))?;
+    assert_eq!(sources.packed_use_count()?, 1);
+
+    let other = SourceUses::with_compact_coordinates();
+    let foreign = use_at(&other, 1)?;
+    let foreign_origin = other.origin(&[foreign], true);
+    assert_eq!(
+        foreign_origin.source_uses_refs(),
+        cold_origin.source_uses_refs()
+    );
+    assert!(matches!(
+        sources.origin_with_origins([&foreign_origin], true),
+        Err(SourceEvidenceError::ForeignEvidence)
+    ));
+
+    let snapshot = sources.freeze()?;
+    let finished = sources.finish_with(|| Ok::<(), SourceEvidenceError>(()))?;
+    assert_eq!(serde_json::to_vec(&snapshot)?, expected_wire);
+    assert_eq!(serde_json::to_vec(&finished)?, expected_wire);
+    assert_eq!(snapshot, finished);
+    assert!(
+        finished
+            .iter_uses()
+            .any(|row| std::ptr::eq(row, held.description()))
+    );
+    assert_eq!(finished.iter_uses().len(), finished.uses().len());
+    Ok(())
+}
+
+fn assert_interruption_keeps_pending_uses(sources: &SourceUses) -> TestResult {
+    let interrupted =
+        sources.compact_record_uses(|| Err(SourceInventoryFreezeError::Interrupted(())));
+    assert!(matches!(
+        interrupted,
+        Err(SourceInventoryFreezeError::Interrupted(()))
+    ));
+    assert_eq!(sources.packed_use_count()?, 0);
+    Ok(())
+}
+
+#[test]
+fn packed_origins_preserve_encrypted_clear_and_unknown_source_evidence() -> TestResult {
+    let directory = tempfile::tempdir()?;
+    let archive = encryption_fixture(directory.path())?;
+    let sources = SourceUses::with_compact_coordinates();
+    let observe = |input, role| -> Result<_, SourceEvidenceError> {
+        let used = sources.observe(input, InputScope::Payload)?.at(
+            SourceLocation::DataForge {
+                record_index: 7,
+                field: "source".into(),
+            },
+            role,
+        )?;
+        Ok(sources.origin(&[used], true))
+    };
+    let clear = observe(
+        archive_input(&archive, "clear.dcb")?,
+        SourceUseRole::Payload,
+    )?;
+    let encrypted = observe(
+        archive_input(&archive, "encrypted.dcb")?,
+        SourceUseRole::Selector,
+    )?;
+    let unknown = observe(SourceInput::Unknown, SourceUseRole::Payload)?;
+    let cases: [(&[_], bool, Option<bool>); 5] = [
+        (&[&clear], true, Some(false)),
+        (&[&unknown], true, None),
+        (&[&clear, &unknown], true, None),
+        (&[&clear, &encrypted, &unknown], true, Some(true)),
+        (&[&encrypted, &unknown], false, Some(true)),
+    ];
+    let previous = cases
+        .iter()
+        .map(|(parts, complete, _)| sources.origin_with_origins(parts.iter().copied(), *complete))
+        .collect::<Result<Vec<_>, _>>()?;
+    let previous_wire = serde_json::to_vec(&sources.freeze()?)?;
+
+    sources.compact_record_uses(|| Ok::<(), SourceEvidenceError>(()))?;
+    assert_eq!(sources.packed_use_count()?, 3, "all three uses are packed");
+    for ((parts, complete, marker), original) in cases.into_iter().zip(previous) {
+        let origin = sources.origin_with_origins(parts.iter().copied(), complete)?;
+        assert_eq!(origin.contains_encrypted_source(), marker, "source marker");
+        assert_eq!(
+            origin.source_set_complete(),
+            complete,
+            "source completeness"
+        );
+        assert_eq!(origin, original, "exact contributing source references");
+    }
+    let finished = sources.finish_with(|| Ok::<(), SourceEvidenceError>(()))?;
+    assert_eq!(
+        serde_json::to_vec(&finished)?,
+        previous_wire,
+        "the packed inventory retains each original role and encryption state"
+    );
+    Ok(())
+}
+
+fn archive_input<'a>(archive: &'a Archive, path: &str) -> Result<SourceInput<'a>, &'static str> {
+    archive
+        .entries()
+        .iter()
+        .find(|entry| entry.path() == path)
+        .and_then(|entry| archive.observed_entry(entry))
+        .map(SourceInput::ArchiveView)
+        .ok_or("owned Archive Entry")
+}
+
+fn encryption_fixture(directory: &std::path::Path) -> Result<Archive, Box<dyn std::error::Error>> {
+    let path = directory.join("encryption.p4k");
+    ArchiveBuilder::new()
+        .entry(TestEntry::stored("clear.dcb", b"clear fixture"))
+        .entry(TestEntry::deflated("encrypted.dcb", b"encrypted fixture").encrypted())
+        .write_to(&path)?;
+    Ok(Archive::open(&path)?)
 }
 
 #[test]

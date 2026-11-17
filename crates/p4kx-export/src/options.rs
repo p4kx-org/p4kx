@@ -217,6 +217,7 @@ pub(crate) struct CatalogRun<'run, 'inputs> {
 pub(crate) struct CatalogRetention {
     pub(crate) stage: CatalogStage,
     pub(crate) source_uses: usize,
+    pub(crate) packed_source_uses: usize,
     pub(crate) field_inspections: usize,
     pub(crate) inspection_capacity: usize,
     pub(crate) inline_inspection_bytes: usize,
@@ -259,6 +260,7 @@ impl<'run, 'inputs> CatalogRun<'run, 'inputs> {
             report(CatalogRetention {
                 stage,
                 source_uses,
+                packed_source_uses: uses.packed_use_count()?,
                 field_inspections,
                 inspection_capacity,
                 inline_inspection_bytes: inspection_capacity

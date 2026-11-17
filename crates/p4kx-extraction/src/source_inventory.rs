@@ -11,12 +11,16 @@ use serde::{Serialize, Serializer};
 
 #[path = "source_inventory_rows.rs"]
 mod rows;
+#[path = "source_inventory_use_rows.rs"]
+mod use_rows;
 
 use self::rows::FrozenRows;
+use self::use_rows::FrozenUseRows;
 use crate::projection_schema;
 use crate::source_archive_binding::ArchiveSourceBinding;
 use crate::source_details::SourceDetails;
-use crate::source_use::SourceUseDescription;
+use crate::source_packed_use::PackedSourceUse;
+use crate::source_use::{SourceUseDescription, SourceUseRef};
 use crate::source_value::SourcedValue;
 use crate::{ArchiveByteRange, DecimalU64};
 
@@ -282,17 +286,18 @@ pub struct SourceInventory {
     #[schemars(with = "Vec<PhysicalSource>")]
     sources: FrozenRows<PhysicalSource>,
     #[schemars(with = "Vec<SourceUseDescription>")]
-    uses: FrozenRows<SourceUseDescription>,
+    uses: FrozenUseRows,
 }
 
 impl SourceInventory {
     pub(crate) fn new(
         sources: Vec<Arc<PhysicalSource>>,
         uses: Vec<Arc<SourceUseDescription>>,
+        packed: Vec<(SourceUseRef, PackedSourceUse)>,
     ) -> Self {
         Self {
             sources: FrozenRows::new(sources),
-            uses: FrozenRows::new(uses),
+            uses: FrozenUseRows::new(uses, packed),
         }
     }
 

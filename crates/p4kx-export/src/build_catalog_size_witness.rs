@@ -42,12 +42,13 @@ fn measure_writer(
 )]
 fn report_retention(sample: CatalogRetention) {
     eprintln!(
-        "catalog retained: stage={} source_uses={} field_inspections={} inspection_capacity={} inline_inspection_bytes={}",
+        "catalog retained: stage={} source_uses={} field_inspections={} inspection_capacity={} inline_inspection_bytes={} packed_source_uses={}",
         sample.stage.as_str(),
         sample.source_uses,
         sample.field_inspections,
         sample.inspection_capacity,
         sample.inline_inspection_bytes,
+        sample.packed_source_uses,
     );
 }
 

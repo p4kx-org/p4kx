@@ -139,6 +139,13 @@ impl<'f> Scan<'_, '_, 'f> {
                     inspections.merge(ledger, record.ledger);
                 }
             }
+            self.original.origins().uses.compact_record_uses(|| {
+                if self.options.cancel.is_some_and(CancelToken::is_cancelled) {
+                    Err(CatalogError::Cancelled)
+                } else {
+                    Ok(())
+                }
+            })?;
         }
         Ok(evidence)
     }

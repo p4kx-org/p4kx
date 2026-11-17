@@ -140,6 +140,7 @@ mod source_encryption_evidence;
 mod source_evidence_error;
 mod source_file_input;
 mod source_inventory;
+mod source_packed_use;
 mod source_protection;
 mod source_provenance;
 mod source_registration;

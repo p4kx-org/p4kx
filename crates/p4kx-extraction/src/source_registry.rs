@@ -118,7 +118,7 @@ impl SourceRegistry {
             identity,
             inputs: Vec::new(),
             sources: BTreeMap::new(),
-            uses: RegisteredUses::new(),
+            uses: RegisteredUses::new(matches!(use_references, UseReferences::CompactCoordinates)),
             use_references,
             sealed: false,
         }

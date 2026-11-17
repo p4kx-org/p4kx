@@ -150,6 +150,11 @@ pub(super) fn export_health(
     run: CatalogRun<'_, '_>,
 ) -> Result<crate::ExportHealth, crate::CatalogError> {
     run.begin(CatalogStage::ExportHealth);
+    run.check_cancelled()?;
+    input
+        .origins()
+        .uses
+        .compact_record_uses(|| run.check_cancelled())?;
     #[cfg(test)]
     run.capture_retention(
         CatalogStage::ExportHealth,

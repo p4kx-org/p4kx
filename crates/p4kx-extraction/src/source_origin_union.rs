@@ -3,6 +3,7 @@
 
 use std::sync::Arc;
 
+use crate::field_origin::OriginAccumulator;
 use crate::source_evidence_error::{self, SourceEvidenceError};
 use crate::{FieldOrigin, SourceValue, SourcedValue};
 
@@ -29,26 +30,25 @@ impl SourceUses {
     pub fn origin_with_origins<'a>(
         &self,
         origins: impl IntoIterator<Item = &'a FieldOrigin>,
-        mut complete: bool,
+        complete: bool,
     ) -> Result<FieldOrigin, SourceEvidenceError> {
         let registry = source_evidence_error::lock(&self.registry)?;
-        let mut uses = Vec::new();
+        let mut accumulator = OriginAccumulator::new(complete);
         for origin in origins {
             if !origin.belongs_to(&self.identity) {
                 return Err(SourceEvidenceError::ForeignEvidence);
             }
-            complete &= origin.source_set_complete();
+            accumulator.include_completeness(origin.source_set_complete());
             for reference in origin.iter_source_use_refs() {
-                let description = registry
+                let contribution = registry
                     .uses
-                    .get(reference)
+                    .contribution(reference)
                     .ok_or(SourceEvidenceError::ForeignEvidence)?;
-                uses.push(description.as_ref());
+                accumulator.observe(contribution);
             }
         }
-        let result = FieldOrigin::from_descriptions(Arc::clone(&self.identity), uses, complete);
         drop(registry);
-        Ok(result)
+        Ok(accumulator.finish(Arc::clone(&self.identity)))
     }
 }
 
