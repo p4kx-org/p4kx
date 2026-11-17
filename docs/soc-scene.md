@@ -121,6 +121,45 @@ with each row's original local coordinate. The document carries their common
 `sourceSetComplete`. The declaration state stays separate from the encryption
 state.
 
+## Entity reference overrides
+
+An occurrence with admitted physical override members has an optional
+`entityReferenceOverrides` array in the owning Archive's directory order.
+Independent members have separate source references even when their recorded
+paths are equal. An unreadable or invalid member retains its own source
+identity. A well-formed unexpected root keeps its raw document index and has
+state `unsupported`.
+
+The optional top-level `entityReferenceOverrideSources` array stores each
+verified member payload once in first-occurrence order. Match its `source`
+to the member's physical source reference. Its `raw.value` is the entire
+decoded member in standard padded Base64, including original XML text or
+bytes a parser cannot interpret. The `raw` origin addresses the half-open
+decoded byte range in `socEntityReferenceOverride` and carries the same
+per-value encryption marker. An unreadable member has no raw payload row.
+
+A present member's `data.xml` identifies the complete original node and
+attribute table in `documents`. `data.entities` preserves direct `Entity`
+positions. Each entity carries its original `cryGuid` string and ordered
+`autoSpawnOverrides` groups. Each group's `elements` preserves direct
+`AutoSpawnOverrideElement` positions and the sourced `autoSpawnIdx`,
+`target` and `aa` strings. Ordinals count all direct elements at that level.
+A blank attribute stays present. Repeated attributes have no unique typed
+value and retain each occurrence in the raw XML. Unfamiliar attributes and
+nodes remain accessible through the same document.
+
+The owner link uses the declared `CryGUID` and the entity index from the same
+container occurrence. A unique match requires a complete census of its
+declared SOC streams. Known ambiguous candidates retain their positions.
+Each raw field retains its original XML source. A matched owner also carries
+the separate SOC entity evidence. The index, `Target` and `AA` strings
+remain authored inputs without runtime interpretation.
+
+Both `interior source` and the optional authored scene of `interior package`
+use this SOC scene schema v1 addition. The raw container extraction commands
+keep their existing access to original member bytes. See
+[ADR-0399](adr/0399-soc-entity-reference-overrides-retain-physical-payloads.md).
+
 ## Binary placements
 
 When a selected stream has binary IncludedObjects chunks, its

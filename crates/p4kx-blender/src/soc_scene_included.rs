@@ -4,7 +4,6 @@
 use std::collections::BTreeMap;
 use std::ops::Range;
 
-use base64::engine::general_purpose::STANDARD;
 use p4kx_extraction::{
     CancelToken, DecimalU64, PhysicalSourceRef, SourceLocation, SourceUseRole, SourceValue,
     SourcedValue,
@@ -20,6 +19,7 @@ use crate::soc_scene::SocSceneError;
 use crate::soc_scene_classes::check;
 use crate::soc_scene_included_row::ObjectRow;
 use crate::soc_scene_origin::XmlOrigin;
+use crate::soc_scene_raw;
 
 #[derive(Default)]
 pub(crate) struct IncludedSources {
@@ -82,7 +82,7 @@ impl IncludedSource {
             base: header.offset(),
             ordinal: chunk.chunk_index(),
         };
-        let raw = encode_raw(chunk.bytes(), cancel)?;
+        let raw = soc_scene_raw::encode(chunk.bytes(), cancel)?;
         let (data, complete) = match chunk.tables() {
             Ok(tables) => {
                 let data = Tables::read(&tables, length, &origin, cancel)?;
@@ -103,20 +103,6 @@ impl IncludedSource {
             tables: origin.cell(0..length, "tables", data, complete)?,
         })
     }
-}
-
-fn encode_raw(bytes: &[u8], cancel: &CancelToken) -> Result<String, SocSceneError> {
-    use base64::Engine as _;
-
-    const BLOCK_LEN: usize = 3 * 16_384;
-    let mut result = String::new();
-    let encoded_len = base64::encoded_len(bytes.len(), true).ok_or(SocSceneError::Position)?;
-    result.try_reserve_exact(encoded_len)?;
-    for block in bytes.chunks(BLOCK_LEN) {
-        check(cancel)?;
-        STANDARD.encode_string(block, &mut result);
-    }
-    Ok(result)
 }
 
 #[derive(Debug, Serialize, JsonSchema)]

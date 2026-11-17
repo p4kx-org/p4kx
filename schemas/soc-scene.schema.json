@@ -140,6 +140,59 @@
       ],
       "type": "object"
     },
+    "AutoSpawnOverrideElement": {
+      "properties": {
+        "aa": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "autoSpawnIdx": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "ordinal": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "position": {
+          "$ref": "#/$defs/SocXmlPosition"
+        },
+        "target": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "ordinal",
+        "position",
+        "autoSpawnIdx",
+        "target",
+        "aa"
+      ],
+      "type": "object"
+    },
+    "AutoSpawnOverrideGroup": {
+      "properties": {
+        "elements": {
+          "items": {
+            "$ref": "#/$defs/AutoSpawnOverrideElement"
+          },
+          "type": "array"
+        },
+        "ordinal": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "position": {
+          "$ref": "#/$defs/SocXmlPosition"
+        }
+      },
+      "required": [
+        "ordinal",
+        "position",
+        "elements"
+      ],
+      "type": "object"
+    },
     "BakedLight": {
       "properties": {
         "components": {
@@ -1145,6 +1198,74 @@
         "areas",
         "components",
         "links"
+      ],
+      "type": "object"
+    },
+    "EntityReferenceOverrideDocument": {
+      "properties": {
+        "entities": {
+          "items": {
+            "$ref": "#/$defs/EntityReferenceOverrideEntity"
+          },
+          "type": "array"
+        },
+        "xml": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "xml",
+        "entities"
+      ],
+      "type": "object"
+    },
+    "EntityReferenceOverrideEntity": {
+      "properties": {
+        "autoSpawnOverrides": {
+          "items": {
+            "$ref": "#/$defs/AutoSpawnOverrideGroup"
+          },
+          "type": "array"
+        },
+        "cryGuid": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "ordinal": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "owner": {
+          "$ref": "#/$defs/SourcedValueOfEntityTarget"
+        },
+        "position": {
+          "$ref": "#/$defs/SocXmlPosition"
+        }
+      },
+      "required": [
+        "ordinal",
+        "position",
+        "cryGuid",
+        "owner",
+        "autoSpawnOverrides"
+      ],
+      "type": "object"
+    },
+    "EntityReferenceOverrideSource": {
+      "properties": {
+        "raw": {
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original verified member payload encoded with standard padded Base64."
+        },
+        "source": {
+          "$ref": "#/$defs/PhysicalSourceRef"
+        }
+      },
+      "required": [
+        "source",
+        "raw"
       ],
       "type": "object"
     },
@@ -2445,6 +2566,127 @@
         }
       ]
     },
+    "Member5": {
+      "oneOf": [
+        {
+          "properties": {
+            "state": {
+              "const": "unusableSelector",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "state": {
+              "const": "missing",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "candidates": {
+              "items": {
+                "$ref": "#/$defs/PhysicalSourceRef"
+              },
+              "type": "array"
+            },
+            "state": {
+              "const": "ambiguous",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "candidates"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "source": {
+              "$ref": "#/$defs/PhysicalSourceRef"
+            },
+            "state": {
+              "const": "unreadable",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "source"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "source": {
+              "$ref": "#/$defs/PhysicalSourceRef"
+            },
+            "state": {
+              "const": "invalid",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "source"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "source": {
+              "$ref": "#/$defs/PhysicalSourceRef"
+            },
+            "state": {
+              "const": "unsupported",
+              "type": "string"
+            },
+            "xml": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "state",
+            "source",
+            "xml"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/EntityReferenceOverrideDocument"
+            },
+            "source": {
+              "$ref": "#/$defs/PhysicalSourceRef"
+            },
+            "state": {
+              "const": "present",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "source",
+            "data"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "Mode": {
       "properties": {
         "colours": {
@@ -2603,6 +2845,12 @@
         },
         "descriptor": {
           "$ref": "#/$defs/Member"
+        },
+        "entityReferenceOverrides": {
+          "items": {
+            "$ref": "#/$defs/Member5"
+          },
+          "type": "array"
         },
         "placement": {
           "maxItems": 2,
@@ -9698,6 +9946,12 @@
     "documents": {
       "items": {
         "$ref": "#/$defs/XmlDocument"
+      },
+      "type": "array"
+    },
+    "entityReferenceOverrideSources": {
+      "items": {
+        "$ref": "#/$defs/EntityReferenceOverrideSource"
       },
       "type": "array"
     },

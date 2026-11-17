@@ -12,6 +12,9 @@ use p4kx_extraction::{Archive, CancelToken, GlbOptions};
 use p4kx_testkit::{ArchiveBuilder, TestChunkFile, TestContainer, TestEntry};
 use serde_json::Value;
 
+#[path = "soc_scene_entity_reference_overrides.rs"]
+mod entity_reference_overrides;
+
 #[path = "soc_scene_room_companions.rs"]
 mod room_companions;
 

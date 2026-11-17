@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_assembly::{SocEntitySite, SocEntityTarget};
+use p4kx_assembly::{SocEntitySite, SocEntityTarget, SocSourceGuid};
 use p4kx_extraction::cryxml::{SourceAttribute, SourceElement};
 use p4kx_extraction::{PhysicalSourceRef, SourceUseRole, SourceValue, SourcedValue};
 use p4kx_model::{SocEntity, SocEntityComponent, SocEntityComponentKind, SocEntityLink};
@@ -248,6 +248,24 @@ pub(crate) struct EntitySite {
 }
 
 impl EntityTarget {
+    pub(crate) fn read_guid<'document>(
+        element: SourceElement<'_>,
+        attributes: impl IntoIterator<Item = SourceAttribute<'document>>,
+        guid: SocSourceGuid,
+        index: &IndexedStream<'_>,
+        origin: &XmlOrigin<'_>,
+    ) -> Result<SourcedValue<Self>, SocSceneError> {
+        let target = index.index.target_guid(guid);
+        let known = index.complete
+            || matches!(
+                target,
+                SocEntityTarget::Absent
+                    | SocEntityTarget::Invalid
+                    | SocEntityTarget::Ambiguous { .. }
+            );
+        Self::read(element, attributes, index, origin, known.then_some(target))
+    }
+
     pub(crate) fn read<'document>(
         element: SourceElement<'_>,
         attributes: impl IntoIterator<Item = SourceAttribute<'document>>,

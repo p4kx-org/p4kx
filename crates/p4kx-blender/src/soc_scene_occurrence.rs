@@ -2,7 +2,8 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_assembly::{
-    SocChildInput, SocChildState, SocContainerOccurrence, SocMemberSelection, SocMemberSelector,
+    SocArchiveMember, SocChildInput, SocChildState, SocContainerOccurrence, SocMemberSelection,
+    SocMemberSelector,
 };
 use p4kx_extraction::{
     CancelToken, EntryOrigin, InputScope, PhysicalSourceRef, SourceInput, SourceUses, SourceValue,
@@ -21,12 +22,19 @@ use crate::soc_scene_stream::{IndexedStream, Stream};
 use crate::soc_scene_tile_ports::TilePorts;
 use crate::soc_scene_xml::XmlDocuments;
 
+#[path = "soc_scene_companion_xml.rs"]
+mod companion_xml;
+
+#[path = "soc_scene_entity_reference_overrides.rs"]
+mod entity_reference_overrides;
+
 #[path = "soc_scene_room_companions.rs"]
 mod room_companions;
 
 #[path = "soc_scene_stream_index.rs"]
 mod stream_index;
 
+use entity_reference_overrides::EntityReferenceOverrideDocument;
 use room_companions::RoomCompanions;
 
 #[derive(Debug, Serialize, JsonSchema)]
@@ -40,6 +48,8 @@ pub(super) struct Occurrence {
     streams: Vec<Stream>,
     #[serde(skip_serializing_if = "Option::is_none")]
     room_companions: Option<RoomCompanions>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    entity_reference_overrides: Vec<Member<EntityReferenceOverrideDocument>>,
 }
 
 impl Occurrence {
@@ -51,9 +61,10 @@ impl Occurrence {
         cancel: &CancelToken,
     ) -> Result<Self, SocSceneError> {
         let container = physical(&original.origin, sources)?;
-        let descriptor_input = read_xml(&original.descriptor, sources, |bytes| {
-            SocContainerDescriptor::parse(bytes).ok()
-        })?;
+        let descriptor_input =
+            companion_xml::read_selected(&original.descriptor, sources, |bytes| {
+                SocContainerDescriptor::parse(bytes).ok()
+            })?;
         let mut children = Vec::new();
         let descriptor = Member::read(&original.descriptor, sources, |_, origin| {
             let (descriptor, _) = descriptor_input.as_ref().ok_or(InputState::Invalid)?;
@@ -73,7 +84,7 @@ impl Occurrence {
                 .bind(descriptor.document(), origin)
                 .map_err(InputState::Capture)
         })?;
-        let room_input = read_xml(&original.registry, sources, |bytes| {
+        let room_input = companion_xml::read_selected(&original.registry, sources, |bytes| {
             SocRoomRegistry::parse(bytes).ok()
         })?;
         let registry = Member::read(&original.registry, sources, |_, _| {
@@ -100,30 +111,15 @@ impl Occurrence {
             children,
             streams: inputs.streams,
             room_companions: inputs.room_companions,
+            entity_reference_overrides: inputs.entity_reference_overrides,
         })
     }
-}
-
-fn read_xml<'a, T>(
-    selection: &'a SocMemberSelection,
-    sources: &'a SourceUses,
-    parse: impl FnOnce(&'a [u8]) -> Option<T>,
-) -> Result<Option<(T, XmlOrigin<'a>)>, SocSceneError> {
-    let Some(member) = selection.selected() else {
-        return Ok(None);
-    };
-    let Some(document) = member.payload().ok().and_then(parse) else {
-        return Ok(None);
-    };
-    Ok(Some((
-        document,
-        XmlOrigin::new(sources, member.origin(), None)?,
-    )))
 }
 
 struct OccurrenceInputs {
     streams: Vec<Stream>,
     room_companions: Option<RoomCompanions>,
+    entity_reference_overrides: Vec<Member<EntityReferenceOverrideDocument>>,
 }
 
 fn read_streams(
@@ -173,9 +169,12 @@ fn read_streams(
         })
         .collect::<Result<_, _>>()?;
     let room_companions = RoomCompanions::read(occurrence, sources, &indexed, documents, cancel)?;
+    let entity_reference_overrides =
+        EntityReferenceOverrideDocument::read(occurrence, sources, &indexed, documents, cancel)?;
     Ok(OccurrenceInputs {
         streams,
         room_companions,
+        entity_reference_overrides,
     })
 }
 
@@ -224,20 +223,26 @@ impl<T> Member<T> {
             SocMemberSelection::Ambiguous(origins) => Ok(Self::Ambiguous {
                 candidates: physical_list(origins, sources)?,
             }),
-            SocMemberSelection::Selected(member) => {
-                let origin = XmlOrigin::new(sources, member.origin(), None)?;
-                let source = origin.source();
-                let Ok(payload) = member.payload() else {
-                    return Ok(Self::Unreadable { source });
-                };
-                match read(payload, &origin) {
-                    Ok(data) => Ok(Self::Present { source, data }),
-                    Err(InputState::Invalid) => Ok(Self::Invalid { source }),
-                    Err(InputState::Unsupported(xml)) => Ok(Self::Unsupported { source, xml }),
-                    Err(InputState::Capture(error)) => Err(error),
-                }
-            }
+            SocMemberSelection::Selected(member) => Self::read_physical(member, sources, read),
             _ => Err(SocSceneError::Position),
+        }
+    }
+
+    pub(super) fn read_physical(
+        member: &SocArchiveMember,
+        sources: &SourceUses,
+        read: impl FnOnce(&[u8], &XmlOrigin<'_>) -> Result<T, InputState>,
+    ) -> Result<Self, SocSceneError> {
+        let origin = XmlOrigin::new(sources, member.origin(), None)?;
+        let source = origin.source();
+        let Ok(payload) = member.payload() else {
+            return Ok(Self::Unreadable { source });
+        };
+        match read(payload, &origin) {
+            Ok(data) => Ok(Self::Present { source, data }),
+            Err(InputState::Invalid) => Ok(Self::Invalid { source }),
+            Err(InputState::Unsupported(xml)) => Ok(Self::Unsupported { source, xml }),
+            Err(InputState::Capture(error)) => Err(error),
         }
     }
 }

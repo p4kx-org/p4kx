@@ -103,6 +103,8 @@ mod soc_scene_lights;
 mod soc_scene_loadouts;
 mod soc_scene_occurrence;
 mod soc_scene_origin;
+mod soc_scene_override_source;
+mod soc_scene_raw;
 mod soc_scene_rooms;
 mod soc_scene_stream;
 mod soc_scene_tile_ports;

@@ -14,6 +14,8 @@ use thiserror::Error;
 mod soc_archive_member;
 #[path = "soc_descriptor_member.rs"]
 mod soc_descriptor_member;
+#[path = "soc_entity_reference_overrides.rs"]
+mod soc_entity_reference_overrides;
 #[path = "soc_geometry_capture.rs"]
 mod soc_geometry_capture;
 #[path = "soc_nested_capture.rs"]
@@ -93,6 +95,8 @@ pub struct SocContainerOccurrence {
     pub room_mapping: SocMemberSelection,
     /// Selection of the authored room connector document in its physical container.
     pub room_connectors: SocMemberSelection,
+    /// Physical Entity Reference Override members in owning Archive order.
+    pub entity_reference_overrides: Vec<SocArchiveMember>,
     /// Original stream declarations and their physical selections.
     pub streams: Vec<SocStreamInput>,
     /// Original nested placements, including failed and repeated declarations.
@@ -177,6 +181,8 @@ fn scan(
         [format!(r"{stem}\metadata\entitycomponentroomconnector.xml")],
         || check.poll(),
     )?;
+    let entity_reference_overrides =
+        soc_entity_reference_overrides::read(index.archive(), || check.poll())?;
     let parsed = soc_descriptor_member::parsed(&descriptor);
     let streams = parsed
         .as_ref()
@@ -193,6 +199,7 @@ fn scan(
         registry,
         room_mapping,
         room_connectors,
+        entity_reference_overrides,
         streams,
         children,
     })

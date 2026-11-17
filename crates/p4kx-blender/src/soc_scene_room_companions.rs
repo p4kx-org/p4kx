@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_assembly::{SocContainerOccurrence, SocEntityTarget, SocMemberSelection, SocSourceGuid};
-use p4kx_extraction::cryxml::{SourceDocument, SourceReadOptions};
+use p4kx_assembly::{SocContainerOccurrence, SocMemberSelection, SocSourceGuid};
+use p4kx_extraction::cryxml::SourceDocument;
 use p4kx_extraction::{CancelToken, SourceUses, SourcedValue};
 use p4kx_model::SocRoomConnector;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use super::{InputState, Member};
+use super::{Member, companion_xml};
 use crate::soc_scene::SocSceneError;
 use crate::soc_scene_classes;
 use crate::soc_scene_entities::EntityTarget;
@@ -69,17 +69,7 @@ fn read_member<T>(
     read: impl FnOnce(usize, &SourceDocument<'_>, &XmlOrigin<'_>) -> Result<T, SocSceneError>,
 ) -> Result<Member<T>, SocSceneError> {
     Member::read(selection, sources, |bytes, origin| {
-        soc_scene_classes::check(cancel).map_err(InputState::Capture)?;
-        let document = SourceDocument::parse(bytes, SourceReadOptions::default())
-            .map_err(|_| InputState::Invalid)?;
-        let xml = documents
-            .bind_checked(&document, origin, || soc_scene_classes::check(cancel))
-            .map_err(InputState::Capture)?;
-        let element = document.root();
-        if document.is_lossy() || element.namespace().is_some() || element.name() != root {
-            return Err(InputState::Unsupported(xml));
-        }
-        read(xml, &document, origin).map_err(InputState::Capture)
+        companion_xml::read(bytes, origin, root, documents, cancel, read)
     })
 }
 
@@ -129,14 +119,6 @@ impl Connector {
     ) -> Result<Self, SocSceneError> {
         let element = connector.element();
         let guid = SocSourceGuid::read(connector.guid_attributes());
-        let target = index.index.target_guid(guid);
-        let known = index.complete
-            || matches!(
-                target,
-                SocEntityTarget::Absent
-                    | SocEntityTarget::Invalid
-                    | SocEntityTarget::Ambiguous { .. }
-            );
         Ok(Self {
             ordinal: connector.ordinal(),
             position: soc_scene_rooms::position(element)?,
@@ -145,12 +127,12 @@ impl Connector {
                 connector.guid_attributes(),
                 soc_scene_rooms::guid_value(connector.guid_attributes()),
             )?,
-            owner: EntityTarget::read(
+            owner: EntityTarget::read_guid(
                 element,
                 connector.guid_attributes(),
+                guid,
                 index,
                 origin,
-                known.then_some(target),
             )?,
             pivot_relative_position: origin.named(
                 element,

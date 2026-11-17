@@ -13,6 +13,7 @@ use crate::soc_scene_classes::{Classes, SocClass};
 use crate::soc_scene_included::{IncludedSource, IncludedSources};
 use crate::soc_scene_light_classes::DefaultClass;
 pub use crate::soc_scene_origin::SocXmlPosition;
+use crate::soc_scene_override_source::{self, EntityReferenceOverrideSource};
 use crate::soc_scene_xml::{XmlDocument, XmlDocuments};
 
 /// Independently versioned contract of the authored SOC scene document.
@@ -30,6 +31,8 @@ pub struct SocScene {
     documents: Vec<XmlDocument>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     included_objects: Vec<IncludedSource>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    entity_reference_override_sources: Vec<EntityReferenceOverrideSource>,
     classes: Vec<SocClass>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     light_classes: Vec<DefaultClass>,
@@ -112,6 +115,8 @@ impl SocScene {
                 )
             })
             .collect::<Result<_, _>>()?;
+        let entity_reference_override_sources =
+            soc_scene_override_source::read(capture, &sources, cancel)?;
         let (classes, light_classes) = classes.finish();
         Ok(Self {
             format: "p4kx-soc-scene",
@@ -119,6 +124,7 @@ impl SocScene {
             source_inventory: sources.freeze()?,
             documents: documents.finish(),
             included_objects: included.finish(),
+            entity_reference_override_sources,
             classes,
             light_classes,
             occurrences,
