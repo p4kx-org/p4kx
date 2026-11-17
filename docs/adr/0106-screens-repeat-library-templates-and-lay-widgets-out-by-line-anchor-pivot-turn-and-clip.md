@@ -109,7 +109,9 @@ unit of raw canvases. The rules are read from the Records and the field names; t
   container as large as its children (the sum along the axis of a flex, stack or grid container
   with the spacing, the largest child across and in an overlay), over the children whose size
   does not depend on the parent. An automatic leaf without measurable content contributes
-  zero before margins, as it does during placement. When a container's children supply no
+  zero before margins, as it does during placement. The independent extent of a child is
+  constrained by its fixed minimum and maximum sizes before margins are added. When a
+  container's children supply no
   independent extent on an axis, that axis takes the size of its parent and is reported.
   Measuring is bounded by the widget limit and each result is kept per widget, ancestor chain
   and parent size.

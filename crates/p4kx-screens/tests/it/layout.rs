@@ -146,6 +146,66 @@ fn items_share_the_free_space_by_their_grow() -> TestResult {
 }
 
 #[test]
+fn fixed_child_bounds_leave_the_right_space_for_a_flex_sibling() -> TestResult {
+    let image = render(
+        TestCanvas::new(CANVAS, "layout", 80.0, 100.0)
+            .widget(
+                TestWidget::display("root")
+                    .size(TestDim::Fixed(80.0), TestDim::Fixed(100.0))
+                    .flex("Column", "Start", "Start", 0.0),
+            )
+            .widget(
+                TestWidget::display("auto")
+                    .parent("root")
+                    .size(TestDim::Fixed(80.0), TestDim::Auto)
+                    .flex("Column", "Start", "Start", 0.0),
+            )
+            .widget(
+                TestWidget::display("capped")
+                    .parent("auto")
+                    .size(TestDim::Fixed(80.0), TestDim::Fixed(120.0))
+                    .max_height(TestDim::Fixed(40.0))
+                    .background(RED),
+            )
+            .widget(
+                TestWidget::display("minimum")
+                    .parent("auto")
+                    .size(TestDim::Fixed(80.0), TestDim::Fixed(10.0))
+                    .min_height(TestDim::Fixed(20.0))
+                    .background(BLUE),
+            )
+            .widget(
+                TestWidget::display("sibling")
+                    .parent("root")
+                    .size(TestDim::Fixed(80.0), TestDim::Fixed(40.0))
+                    .shrink(1.0)
+                    .background(GREEN),
+            ),
+    )?;
+    assert_eq!(
+        pixel(&image, 5, 39),
+        [255, 0, 0, 255],
+        "the first child ends at its maximum",
+    );
+    assert_eq!(
+        pixel(&image, 5, 59),
+        [0, 0, 255, 255],
+        "the second child occupies its minimum",
+    );
+    assert_eq!(
+        pixel(&image, 5, 60),
+        [0, 255, 0, 255],
+        "the sibling starts after both bounded children",
+    );
+    assert_eq!(
+        pixel(&image, 5, 99),
+        [0, 255, 0, 255],
+        "the sibling keeps its full height",
+    );
+    Ok(())
+}
+
+#[test]
 fn margin_and_padding_move_boxes_inwards() -> TestResult {
     let canvas = TestCanvas::new(CANVAS, "layout", 100.0, 50.0)
         .widget(TestWidget::display("outer").padding([10.0, 0.0, 0.0, 20.0]))

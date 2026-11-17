@@ -40,6 +40,18 @@ fn edges(geometry: &Geometry, axis: usize) -> (f32, f32) {
     }
 }
 
+fn limit_intrinsic(size: f32, min: Option<Dim>, max: Option<Dim>) -> f32 {
+    let absolute = |bound, fallback| match bound {
+        Some(Dim::Fixed(value)) if value.is_finite() => Some(value),
+        None | Some(Dim::Auto | Dim::Fixed(_)) => Some(fallback),
+        _ => None,
+    };
+    match (absolute(min, 0.0), absolute(max, f32::INFINITY)) {
+        (Some(min), Some(max)) => flex::limit(size, min, max),
+        _ => size.max(0.0),
+    }
+}
+
 impl Walk<'_, '_, '_, '_> {
     /// Returns the size along each axis that the content of a widget asks for where its size is
     /// automatic: a text as large as its glyphs, a container as large as its children. An axis
@@ -236,19 +248,19 @@ impl Walk<'_, '_, '_, '_> {
         };
         let content = self.content_of(&child, parent, (depth + 1, false));
         let mut outer = [None; 2];
-        for (axis, (slot, (dim, content))) in outer
-            .iter_mut()
-            .zip(geometry.size.into_iter().zip(content))
-            .enumerate()
+        let sizes = geometry.size.into_iter().zip(content);
+        let bounds = geometry.bounds.min.into_iter().zip(geometry.bounds.max);
+        for (axis, ((slot, (dim, content)), (min, max))) in
+            outer.iter_mut().zip(sizes).zip(bounds).enumerate()
         {
             let own = match dim {
                 Dim::Fixed(value) => Some(value),
-                Dim::Auto => content.or((!child.has_children).then_some(0.0)),
+                Dim::Auto => content.or_else(|| (!child.has_children).then_some(0.0)),
                 Dim::Percent(_) | Dim::OfWidth(_) | Dim::OfHeight(_) => None,
             };
             *slot = own
                 .filter(|own| own.is_finite())
-                .map(|own| own.max(0.0) + edges(&geometry, axis).1);
+                .map(|own| limit_intrinsic(own, min, max) + edges(&geometry, axis).1);
         }
         Some(outer)
     }

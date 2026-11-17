@@ -7,3 +7,5 @@
 - Render GeneralLarge buttons from their original scene root and ordered frame, icon and label
   parts. Empty automatic leaves take zero space before margins during flex measurement, so
   their containers leave room for neighbouring buttons.
+- Apply fixed minimum and maximum child sizes when measuring an automatic container so
+  adjacent widgets get the intended space.
