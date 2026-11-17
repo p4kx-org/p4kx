@@ -10,6 +10,8 @@
 #[path = "catalog_schema/additive.rs"]
 mod additive;
 mod catalog_schema_support;
+#[path = "catalog_schema/dataset_ownership.rs"]
+mod dataset_ownership;
 #[path = "catalog_schema/gameplay_properties.rs"]
 mod gameplay_properties;
 #[path = "catalog_schema/health.rs"]
