@@ -250,8 +250,8 @@ with `packedTint & 0x8`. The library multiplies Reflectance by the palette specu
 factor when that flag is set and by the original layer specular factor otherwise.
 The mapping from authored MTL `TintMode` to the packed value remains open. The
 stencil palette function has its own mode.
-[Painted surface investigation](https://github.com/p4kx-org/p4kx/issues/1155)
-· [Independent tint flags](https://github.com/p4kx-org/p4kx/issues/1156)
+[Painted surface investigation](https://github.com/p4kx-org/p4kx/issues/1162)
+· [Independent tint flags](https://github.com/p4kx-org/p4kx/issues/1163)
 
 ## LayerBlend palette tint modes
 
