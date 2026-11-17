@@ -99,7 +99,7 @@ matching intro grants. The original Generator arena retains prerequisite groupin
 [ContractGenerator catalog contract](catalog-contract-generators.md#intro-prerequisites)
 
 The raw source receipts are private. This section records source structure, exact scope counts
-and implementation ownership. The complete packaged export and 16 GiB system acceptance are
+and implementation ownership. The full packaged export and the 16 GiB local-workflow test are
 separate requirements.
 
 ## PTU 13189690 follow-through

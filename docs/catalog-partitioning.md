@@ -67,18 +67,30 @@ values for the v3 sizing work. Basetool's v3 importer and its acceptance run are
 in its own repository. Its issue lists P4KX 0.5.0 as a prerequisite and keeps the LIVE
 channel policy. Use a revision-bound LIVE release candidate for the positive import
 and verify the expected PTU channel refusal separately.
-[Upload gate](https://github.com/krt-profit/basetool/blob/470f3bc09a7a01bc7054da7a53243bc3f351b1aa/backend/src/main/java/de/greluc/krt/profit/basetool/backend/catalogue/internal/P4kUploadGate.java)
-· [Import properties](https://github.com/krt-profit/basetool/blob/470f3bc09a7a01bc7054da7a53243bc3f351b1aa/backend/src/main/java/de/greluc/krt/profit/basetool/backend/catalogue/internal/P4kImportProperties.java)
-· [Basetool v3 migration](https://github.com/krt-profit/basetool/issues/3107)
 
-VerseKit 5.4.1 at `e526984` still pins P4KX 0.4.2. It reads Blueprints and Item values
-from DataForge and builds filtered catalogs through the Rust library for data such as
-contracts and ship slots. Its `GameData::catalog_all` library path returns a `Vec<u8>`
-and refuses encrypted DataForge Entries. A v3 compatibility witness needs the actual
-library or artifact path, exact producer and consumer revisions, measured size and
-peak consumer memory.
-[VerseKit dependency](https://github.com/Xharig/VerseKit/blob/e526984b7ee1946403670b193740de5a49fe2434/Cargo.lock#L2808-L2810)
-· [Game data code](https://github.com/Xharig/VerseKit/blob/e526984b7ee1946403670b193740de5a49fe2434/crates/versekit-gamedata/src/lib.rs#L376-L402)
+### Local consumer refresh
+
+VerseKit 5.4.1 embeds the P4KX 0.4.2 Rust libraries. It uses raw DataForge and
+localization readers and path-filtered calls for contracts, mission locations
+and ship inventory. Its overlay also rebuilds the local mining-location cache
+when the installed Archive stamp or cache format changes. That refresh uses
+`GameData::catalog_all` to build the entire v2 JSON in memory. Its mining projection
+uses mineable elements, compositions, provider presets, harvestable locations
+and Starmap objects, plus names from DataForge and localization.
+
+For v3, read the authored Starmap definition and its parent chain from
+`definitions.starmapObjects`. Resolve placement rows where the projection needs
+the physical placement. The existing path Filter selects Records and still
+permits substantial world and shared data preparation. Streaming the full
+Catalog removes the in-memory JSON buffer while retaining full preparation.
+
+A selective local mining-location reader can reuse the existing original-source
+readers and resolve the required Starmap dependencies. Compare its results and
+per-value origins with the same Build's complete Catalog. An alternative is a
+Build-bound derived cache produced on the producer host and imported locally.
+Measure cold generation or import, changed Build, unchanged cache, failure
+recovery and peak process and system memory. Keep this gate separate from the
+full Catalog upload and interchange checks.
 
 ## Proposed domains
 
@@ -182,17 +194,21 @@ Smaller files alone leave that producer preparation cost in place. If the prepar
 exceeds memory before publishing, profile source reading and materialization as their own
 work. Keep those measurements distinct from the package reader and the transfer benchmark.
 
-## 16 GiB total system RAM
+## System memory acceptance
 
-P4KX 0.5.0 release acceptance requires a complete unfiltered LIVE Catalog and
-a complete unfiltered current PTU Catalog on a system with 16 GiB of total
-physical or assigned RAM. The operating system, desktop, background services
-and every other running process share that RAM with P4KX. Use the normal
-packaged command and ordinary OS paging settings. Keep the usual desktop
-and background workload active throughout each run and record those
-conditions with the baseline. Each result must retain every field,
-language, cross-domain reference and source marker of the complete v3
-document.
+Verify normal packaged CLI, GUI and MCP operation and the local consumer
+workflow on a system with 16 GiB total physical or assigned RAM. The operating
+system, desktop, background services and all running processes share those
+16 GiB. Measure cold-cache, changed-Build and warm-cache runs. Verify that the
+local path reads only the required data and its dependencies, keeps the previous
+cache on failure and leaves the desktop usable during refresh.
+
+Run the complete unfiltered LIVE and current PTU Catalog exports with the
+normal packaged command on a producer host with at least 64 GiB total RAM.
+The producer may use more than 16 GiB. This host class defines the verification
+environment. Each result retains every field, language, cross-domain reference
+and per-value origin of the complete schema-v3 document. Use ordinary OS
+paging settings and record the baseline and background workload.
 
 Record total system RAM, OS, CPU and the running system's baseline memory
 before launch. Measure the producer's peak working set and private bytes,
@@ -298,8 +314,8 @@ for the two Builds.
 The older unfiltered LIVE trial at `bed4144d` peaked at 22.53 GiB working set and
 23.31 GiB private bytes during the Record scan, then 33.09 GiB working set and
 34.36 GiB private bytes during facility interior projection. It refused publication
-after preparing the catalog and recording health. The 16 GiB acceptance still requires a
-complete normal export with the current packaged producer on the specified system.
+after preparing the catalog and recording health. Producer acceptance still requires a
+complete normal export with the current packaged producer on the specified producer host.
 
 The discard-sink witness at `4c601317a` checked both installed Archives with four Rayon
 threads and stable Archive stamps. It refused normal publication for each Build after health
@@ -330,7 +346,7 @@ packed rows and ownership transfer at sealing. The key census was disabled.
 Both sampled peaks occurred during facility interior projection. Minimum sampled host
 available RAM was 28.81 GiB for LIVE and 24.65 GiB for PTU. The pair logged 0.756 GiB of
 logical process writes. Both Builds reached the normal health decision and refused publication
-before serialization. Encoder sizes and the complete normal run on a 16 GiB system remain
+before serialization. Encoder sizes and the complete normal run on the producer host remain
 unmeasured.
 
 The compressed writer prepares a typed Catalog once. It first counts serialized bytes for the

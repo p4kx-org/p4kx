@@ -164,7 +164,7 @@ replays the stored rows in their original order. The same prepared rows serve
 the size and write passes, with one source traversal and one published document.
 Publication still requires complete health. A staging, cancellation or output
 failure preserves the previous committed document and releases temporary storage.
-Record both peak memory and temporary writes in the 16 GiB system acceptance.
+Record both peak memory and temporary writes in the full producer acceptance.
 
 Retain one complete document per Export. Measure transfer size, decoded size and peak memory with
 complete fields, languages and provenance. The standard size notices are advisory. A transport split
