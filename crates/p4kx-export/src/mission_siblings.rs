@@ -47,7 +47,11 @@ pub(crate) fn read<'f>(
         cancel,
         &mut inspections,
     )?;
-    run.begin(CatalogStage::ProjectMissionBrokerEntries);
+    run.begin_compacted(
+        CatalogStage::ProjectMissionBrokerEntries,
+        &projection.origins().uses,
+        &contract_templates.read.ledger,
+    )?;
     let broker_entries = broker_entry_read::read(
         forge,
         &projection.for_kind(Kind::MissionBrokerEntries),
@@ -56,7 +60,11 @@ pub(crate) fn read<'f>(
         cancel,
         &mut inspections,
     )?;
-    run.begin(CatalogStage::ProjectMissionLocationTemplates);
+    run.begin_compacted(
+        CatalogStage::ProjectMissionLocationTemplates,
+        &projection.origins().uses,
+        &broker_entries.read.ledger,
+    )?;
     let location_templates = location_template::read(
         forge,
         &projection.for_kind(Kind::MissionLocationTemplates),

@@ -16,6 +16,19 @@ use crate::export_field_inspection::FieldInspection;
 use crate::options::{CatalogRetention, CatalogRun, CatalogStage};
 use crate::{CatalogOptions, Compression};
 
+const RETENTION_STAGES: &[CatalogStage] = &[
+    CatalogStage::Records,
+    CatalogStage::Projections,
+    CatalogStage::ProjectLocations,
+    CatalogStage::ProjectMissionBrokerEntries,
+    CatalogStage::ProjectMissionLocationTemplates,
+    CatalogStage::ProjectContractGenerators,
+    CatalogStage::LinkMissionFactions,
+    CatalogStage::ProjectParticleLibraries,
+    CatalogStage::FinalizeProjections,
+    CatalogStage::ExportHealth,
+];
+
 #[test]
 fn retention_witness_preserves_the_compressed_catalog_and_phase_sequence() -> TestResult {
     let folder = tempfile::tempdir()?;
@@ -34,12 +47,16 @@ fn retention_witness_preserves_the_compressed_catalog_and_phase_sequence() -> Te
     );
 
     let retained = two.retained;
-    let [before_records, after_records, before_health] = retained.as_slice() else {
-        return Err("expected exactly three retention measurements".into());
+    assert_eq!(
+        retained
+            .iter()
+            .map(|sample| sample.stage)
+            .collect::<Vec<_>>(),
+        RETENTION_STAGES,
+    );
+    let [before_records, after_records, ..] = retained.as_slice() else {
+        return Err("missing Record retention measurements".into());
     };
-    assert_eq!(before_records.stage, CatalogStage::Records);
-    assert_eq!(after_records.stage, CatalogStage::Projections);
-    assert_eq!(before_health.stage, CatalogStage::ExportHealth);
     assert!(
         after_records.source_uses > before_records.source_uses,
         "the selected record registers proof"

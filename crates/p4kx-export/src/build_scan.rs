@@ -111,7 +111,11 @@ pub(super) fn project_locations(
     capture: &EntryCapture<'_>,
     run: CatalogRun<'_, '_>,
 ) -> Result<StarmapSummary, CatalogError> {
-    run.begin(CatalogStage::ProjectLocations);
+    run.begin_compacted(
+        CatalogStage::ProjectLocations,
+        capture.source_uses(),
+        &collected.ledger,
+    )?;
     let summary = add_starmap(collected, placements.counts);
     let cancel = run.options.cancel;
     add_harvest_locations(archive, placements, collected, cancel, capture)?;

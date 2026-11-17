@@ -254,8 +254,8 @@ Measure both the spool bytes and the cost of seeking to the ordered frames.
 Inventory item bounds are staged during the same scan in physical Record and Component order.
 Inventory storage selections stay in memory for the capacity and facility joins.
 
-After each Record scan window, the source registry packs unheld DataForge uses into
-compact coordinates. It keeps live handles and their original authority. A later observation
+After each Record and ContractGenerator window and at selected projection boundaries, the
+source registry packs unheld DataForge uses into compact coordinates. It keeps live handles and their original authority. A later observation
 at the same coordinate reuses the original ID and evidence. The publisher streams the
 sorted live and packed rows together with the same IDs, scope, role and encryption.
 This storage uses RAM and adds no provenance spool.
@@ -304,9 +304,10 @@ revision and binary hash separately.
 
 The sink-only library witness also reports the channel, Build change number and producer
 phase on stderr. Use those events to align process memory samples with the producer stages.
-At the start of `records`, `projections` and `export-health`, a `catalog retained:` line
-reports distinct registered source uses, the packed subset, live field inspections,
-their capacity and reserved inline bytes. The inline bytes cover the inspection vectors.
+A `catalog retained:` line reports distinct registered source uses and the packed subset
+at the start of `records`, `projections`, selected projection phases and `export-health`.
+The inspected ledgers at each checkpoint supply the field inspection count, capacity
+and reserved inline bytes.
 Each inspection's nested allocations
 and the source registry's own allocation footprint require separate measurements.
 The witness reports decoded and encoded sizes on stdout without creating a catalog file.

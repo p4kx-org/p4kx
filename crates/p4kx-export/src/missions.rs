@@ -28,6 +28,7 @@ use crate::mission_property_set::MissionPropertySets;
 use crate::mission_property_set_registry::MissionPropertySetRegistry;
 use crate::mission_siblings::{self, Siblings};
 use crate::mission_text_inputs::{LayerKind, LayerTexts};
+use crate::options::CatalogStage::ProjectContractGenerators;
 use crate::options::{CatalogRun, CatalogStage};
 use crate::record_fields::{identity, text};
 use crate::selection::{Kind, is_leftover};
@@ -195,6 +196,7 @@ pub(crate) fn read<'f>(
     let filter = run.options.filter;
     let cancel = run.options.cancel;
     let input = projection.original();
+    let uses = &input.origins().uses;
     let mut grants = Grants::new(projection.origins());
     let records = selected_generators(forge, input, filter, cancel, &mut grants)?;
     run.begin(CatalogStage::ReadMissionDependencies);
@@ -224,8 +226,7 @@ pub(crate) fn read<'f>(
         property_sets: MissionPropertySets::default(),
     };
     crate::mission_ledger::inventory(&mut missions.ledger);
-    run.begin(CatalogStage::ProjectContractGenerators);
-    run.check_cancelled()?;
+    run.begin_compacted(ProjectContractGenerators, uses, &missions.ledger)?;
     if records.is_empty() {
         return Ok(missions);
     }
@@ -244,6 +245,7 @@ pub(crate) fn read<'f>(
         for piece in record_read::read(window, input, &context, cancel)? {
             missions.take(piece, &mut pending, &mut grants, &mut generators)?;
         }
+        uses.compact_record_uses(|| run.check_cancelled())?;
     }
     drop(index);
     missions.generators = generators.finish(availability)?;

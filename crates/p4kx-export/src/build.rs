@@ -23,6 +23,9 @@ use crate::catalog_v3::procedural_planet_audio;
 use crate::catalog_v3::weapon_combat_base;
 use crate::contract::{Catalog, Completeness, KindCompleteness, SCHEMA_VERSION};
 use crate::mission_data::link_scenario_factions;
+use crate::options::CatalogStage::{
+    FinalizeProjections, LinkMissionFactions, ProjectParticleLibraries,
+};
 use crate::options::{CatalogRun, CatalogStage};
 use crate::ship_store_slugs::StoreSlugs;
 use crate::shops::add_shops;
@@ -97,7 +100,7 @@ fn assemble<R>(
     )?;
     run.begin(CatalogStage::ProjectMissions);
     add_contracts(&forge, &projection, tags, run, &mut collected)?;
-    run.begin(CatalogStage::LinkMissionFactions);
+    run.begin_compacted(LinkMissionFactions, &origins.uses, &collected.ledger)?;
     collected.ledger.merge(link_scenario_factions(
         &forge,
         &mut collected.mission_kinds.scenarios,
@@ -119,13 +122,13 @@ fn assemble<R>(
         &mut collected,
         &jump_owners,
     )?;
-    run.begin(CatalogStage::ProjectParticleLibraries);
+    run.begin_compacted(ProjectParticleLibraries, &origins.uses, &collected.ledger)?;
     particle_library::collect(archive, &entry_capture, options, &mut collected)?;
     run.begin(CatalogStage::ProjectWeaponAnimation);
     let weapon_animation =
         parts::capture_weapon_animation(archive, &entities, &input, options, &mut collected)?;
     drop(entities);
-    run.begin(CatalogStage::FinalizeProjections);
+    run.begin_compacted(FinalizeProjections, &origins.uses, &collected.ledger)?;
     let kinds = collected.summary(options.filter.is_none());
     parts::capture_rows(
         &mut collected,

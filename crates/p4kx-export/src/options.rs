@@ -5,9 +5,10 @@ use std::fmt;
 use std::time::SystemTime;
 
 use p4kx_channels::PublicPatches;
-use p4kx_extraction::{CancelToken, Filter};
+use p4kx_extraction::{CancelToken, Filter, SourceUses};
 
 use crate::CatalogError;
+use crate::export_ledger::ExportLedger;
 
 /// The step of a catalog build that a [`CatalogProgress`] reports, in the order the steps run.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord)]
@@ -246,8 +247,8 @@ impl<'run, 'inputs> CatalogRun<'run, 'inputs> {
     pub(crate) fn capture_retention(
         self,
         stage: CatalogStage,
-        uses: &p4kx_extraction::SourceUses,
-        ledgers: &[&crate::export_ledger::ExportLedger],
+        uses: &SourceUses,
+        ledgers: &[&ExportLedger],
     ) -> Result<(), CatalogError> {
         if let Some(report) = self.retention {
             let source_uses = uses.registered_use_count()?;
@@ -274,6 +275,22 @@ impl<'run, 'inputs> CatalogRun<'run, 'inputs> {
         if self.options.cancel.is_some_and(CancelToken::is_cancelled) {
             return Err(CatalogError::Cancelled);
         }
+        Ok(())
+    }
+
+    pub(crate) fn begin_compacted(
+        self,
+        stage: CatalogStage,
+        uses: &SourceUses,
+        ledger: &ExportLedger,
+    ) -> Result<(), CatalogError> {
+        self.check_cancelled()?;
+        uses.compact_record_uses(|| self.check_cancelled())?;
+        self.begin(stage);
+        #[cfg(test)]
+        self.capture_retention(stage, uses, &[ledger])?;
+        #[cfg(not(test))]
+        let _ = ledger;
         Ok(())
     }
 
