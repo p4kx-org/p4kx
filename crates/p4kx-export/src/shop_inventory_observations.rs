@@ -3,11 +3,12 @@
 
 use crate::CatalogError;
 use crate::catalog_read::original::AuthoredEntryPath;
+use crate::shop_inventory_path::InventoryDeclaration;
 
 /// Original component evidence beyond a single resolved inventory stem.
 #[derive(Debug, Default)]
 pub(crate) struct InventoryObservations {
-    pub(crate) conflict_paths: Vec<AuthoredEntryPath>,
+    pub(crate) conflict_paths: Vec<InventoryDeclaration>,
     pub(crate) rejected: Vec<RejectedInventoryPath>,
     pub(crate) no_file: Vec<AuthoredEntryPath>,
     pub(crate) unscanned: Vec<AuthoredEntryPath>,
@@ -32,7 +33,7 @@ impl InventoryObservations {
         Ok(())
     }
 
-    pub(crate) fn conflict(&mut self, paths: &[AuthoredEntryPath]) -> Result<(), CatalogError> {
+    pub(crate) fn conflict(&mut self, paths: &[InventoryDeclaration]) -> Result<(), CatalogError> {
         reserve(&mut self.conflict_paths, paths.len())?;
         self.conflict_paths.extend_from_slice(paths);
         Ok(())

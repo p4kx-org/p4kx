@@ -8,8 +8,8 @@ use serde::Serialize;
 use crate::catalog_read::original::{AuthoredEntryPath, EntryCapture, OriginalDatum};
 use crate::schema_fields::every_field_required;
 use crate::shop_containers::Component;
-use crate::shop_inventory_name;
 use crate::shop_inventory_observations::{InventoryObservations, RejectedInventoryPath};
+use crate::shop_inventory_path::InventoryDeclaration;
 use crate::{CatalogError, ExportAccountingError, HealthText};
 
 /// One original occurrence consulted for the shop inventory declaration.
@@ -76,15 +76,15 @@ impl CapturedCandidates {
 
     fn file(
         &mut self,
-        path: &AuthoredEntryPath,
+        path: &InventoryDeclaration,
         capture: &EntryCapture<'_>,
     ) -> Result<(), CatalogError> {
-        let original = path.retain_in(capture)?;
-        let normalized = path
-            .clone()
-            .convert(capture, shop_inventory_name::stem)?
-            .ok_or(ExportAccountingError::ConflictingSourceDatum)?
-            .retain_in(capture)?;
+        let original = path.original.retain_in(capture)?;
+        let mut normalized = path.stem.retain_in(capture)?;
+        if let Some(selector) = &path.directory_selector {
+            normalized.contribute(selector.clone());
+            extend(&mut self.uses, std::slice::from_ref(selector))?;
+        }
         let sources = capture.source_uses();
         let candidate = InventoryCandidate::File {
             source_path: text_cell(&original, sources)?,

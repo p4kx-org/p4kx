@@ -19,6 +19,8 @@ use crate::starmap_fixture;
 mod ambiguous_targets;
 #[path = "shop_inventory_duplicate_physical.rs"]
 mod duplicate_physical;
+#[path = "shop_inventory_jsonn.rs"]
+mod jsonn;
 #[path = "shop_inventory_rejected_path.rs"]
 mod rejected_path;
 #[path = "shop_inventory_resolution_sources.rs"]

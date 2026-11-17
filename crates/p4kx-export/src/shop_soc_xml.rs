@@ -3,6 +3,7 @@
 
 use p4kx_extraction::chunks::Container;
 use p4kx_extraction::model::SocEntitySourceError;
+use p4kx_extraction::{Archive, CancelToken};
 
 use super::observation::{self, CapturedScan};
 use super::{Anchors, ShopComponent};
@@ -11,13 +12,17 @@ use crate::catalog_read::original::{
 };
 use crate::shop_inventory_name;
 use crate::shop_inventory_observations::RejectedInventoryPath;
-use crate::shop_inventory_path::InventoryStem;
 use crate::{CatalogError, shop_registry};
+
+#[path = "shop_soc_path_recovery.rs"]
+mod recovery;
 
 pub(crate) fn read_components(
     read: &EntryRead,
     capture: &EntryCapture<'_>,
     anchors: &Anchors,
+    archive: &Archive,
+    cancel: Option<&CancelToken>,
 ) -> Result<CapturedScan, CatalogError> {
     let soc = match EntrySoc::parse(read, capture)? {
         Ok(soc) => soc,
@@ -27,6 +32,7 @@ pub(crate) fn read_components(
         Err(_) => return Ok(unavailable()),
     };
     let mut found = CapturedScan::default();
+    let paths = recovery::Reader::new(archive, capture, cancel);
     for chunk in soc.chunks() {
         if let Ok(chunk) = chunk
             && !chunk.is_lossy()
@@ -36,7 +42,7 @@ pub(crate) fn read_components(
                     &mut found,
                     entity.shop_declarations(capture)?,
                     anchors,
-                    capture,
+                    &paths,
                 )?;
             }
         } else {
@@ -56,7 +62,7 @@ fn take_declaration(
     found: &mut CapturedScan,
     declaration: ShopDeclarations<'_>,
     anchors: &Anchors,
-    capture: &EntryCapture<'_>,
+    paths: &recovery::Reader<'_, '_>,
 ) -> Result<(), CatalogError> {
     let (guid, markers, values, unsupported) = match declaration {
         ShopDeclarations::Absent => return Ok(()),
@@ -87,12 +93,12 @@ fn take_declaration(
         incomplete(found);
         return Ok(());
     }
-    capture_paths(found, capture, guid, metadata, markers, values, unsupported)
+    capture_paths(found, paths, guid, metadata, markers, values, unsupported)
 }
 
 fn capture_paths(
     found: &mut CapturedScan,
-    capture: &EntryCapture<'_>,
+    paths: &recovery::Reader<'_, '_>,
     guid: String,
     metadata: &AuthoredEntryPath,
     markers: Vec<AuthoredEntryPath>,
@@ -108,8 +114,7 @@ fn capture_paths(
             continue;
         }
         populated = true;
-        if let Some(stem) = shop_inventory_name::stem(value.as_str()) {
-            let inventory = InventoryStem::captured(capture, &value, stem)?;
+        if let Some(inventory) = paths.inventory(&value)? {
             found.scan.components.push(ShopComponent {
                 entity: guid.clone(),
                 inventory: Some(inventory),

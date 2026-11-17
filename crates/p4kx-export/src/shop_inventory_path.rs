@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::SourceUse;
+
 use crate::catalog_read::original::{AuthoredEntryPath, EntryCapture};
 use crate::entry_source::EntrySource;
 use crate::{CatalogError, ExportAccountingError};
@@ -12,7 +14,15 @@ pub(super) const FOLDER: &str = "data\\scripts\\shopinventories\\";
 pub(crate) struct InventoryStem {
     value: String,
     source: Option<Box<EntrySource>>,
-    declarations: Vec<AuthoredEntryPath>,
+    declarations: Vec<InventoryDeclaration>,
+}
+
+/// One original inventory declaration and the exact supported stem it selects.
+#[derive(Debug, Clone)]
+pub(crate) struct InventoryDeclaration {
+    pub(crate) original: AuthoredEntryPath,
+    pub(crate) stem: AuthoredEntryPath,
+    pub(crate) directory_selector: Option<SourceUse>,
 }
 
 impl InventoryStem {
@@ -21,11 +31,35 @@ impl InventoryStem {
         token: &AuthoredEntryPath,
         value: String,
     ) -> Result<Self, CatalogError> {
-        let path = AuthoredEntryPath::derived(capture, &[token], &format!("{FOLDER}{value}.json"))?;
+        Self::with_selector(capture, token, value, None)
+    }
+
+    pub(super) fn corrected(
+        capture: &EntryCapture<'_>,
+        original: &AuthoredEntryPath,
+        value: String,
+        target: SourceUse,
+    ) -> Result<Self, CatalogError> {
+        Self::with_selector(capture, original, value, Some(target))
+    }
+
+    fn with_selector(
+        capture: &EntryCapture<'_>,
+        original: &AuthoredEntryPath,
+        value: String,
+        directory_selector: Option<SourceUse>,
+    ) -> Result<Self, CatalogError> {
+        let path =
+            AuthoredEntryPath::derived(capture, &[original], &format!("{FOLDER}{value}.json"))?;
+        let stem = AuthoredEntryPath::derived(capture, &[original], &value)?;
         Ok(Self {
             value,
             source: Some(Box::new(EntrySource::authored_missing(path))),
-            declarations: vec![token.clone()],
+            declarations: vec![InventoryDeclaration {
+                original: original.clone(),
+                stem,
+                directory_selector,
+            }],
         })
     }
 
@@ -40,7 +74,7 @@ impl InventoryStem {
             .ok_or_else(|| ExportAccountingError::UnboundHealthSubject.into())
     }
 
-    pub(crate) fn declarations(&self) -> &[AuthoredEntryPath] {
+    pub(crate) fn declarations(&self) -> &[InventoryDeclaration] {
         &self.declarations
     }
 

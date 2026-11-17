@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{PhysicalSourceRef, SourceUseRole, SourceValue, SourcedValue};
+use p4kx_extraction::{PhysicalSourceRef, SourceUse, SourceUseRole, SourceValue, SourcedValue};
 
 use super::{
     AuthoredEntryPath, EntryCapture, EntryMetadata, EntryReceipt, OriginalDatum, PathRecipe,
@@ -107,6 +107,12 @@ impl EntryReceipt {
     pub(crate) fn physical_path(&self) -> Result<OriginalDatum<HealthText>, CatalogError> {
         self.outer_directory()?;
         self.directory_path()
+    }
+
+    /// The exact outer Entry path used as a directory lookup selector.
+    pub(crate) fn directory_path_selector(&self) -> Result<SourceUse, CatalogError> {
+        self.outer_directory()?
+            .metadata("path", SourceUseRole::Selector)
     }
 
     fn outer_directory(&self) -> Result<&EntryMetadata, ExportAccountingError> {

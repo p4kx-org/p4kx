@@ -93,7 +93,7 @@ fn assert_audited_entities(
             "physical slots are not collapsed"
         );
         for declaration in stem.declarations() {
-            assert_attribute(declaration, capture, &mut slots)?;
+            assert_attribute(&declaration.original, capture, &mut slots)?;
         }
     }
     Ok(())

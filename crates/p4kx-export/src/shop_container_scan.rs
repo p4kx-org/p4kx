@@ -271,7 +271,7 @@ fn scan_components(
                 continue;
             }
         };
-        let observed = shop_soc::read_components(&bytes, capture, anchors)?;
+        let observed = shop_soc::read_components(&bytes, capture, anchors, archive, cancel)?;
         #[cfg(test)]
         {
             let raw = shop_soc::read_legacy_components(&bytes, capture, anchors)?;

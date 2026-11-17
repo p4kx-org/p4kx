@@ -2501,6 +2501,13 @@ Entry selection. Each document reports its own availability. [Client profile set
 
 ### Shop inventory resolution
 
+A structured SOC `offlineInventoryJSON` attribute with a direct shop-inventory path ending in
+`.jsonn` can select the same-stem `.json` Entry. The Archive directory must establish that the
+original path is absent, exactly one canonical JSON Entry exists, and no same-stem XML or path
+alias competes. The candidate retains the original attribute value and the selected stem cites
+the physical directory path that supported the correction. Inventory contents pass through the
+ordinary JSON reader. Other malformed attributes retain their source diagnostics.
+
 `declarations.shopInventoryResolution` has one row for each emitted shop. Its `shopKey` is
 derived from the actual registry `ID` attribute. `candidates` retains the original declared
 paths and normalized stems. A readable component with no declaration and an unscanned
