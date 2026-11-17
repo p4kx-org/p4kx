@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BinaryHeap, HashMap, HashSet};
 use std::sync::Arc;
 
 use p4kx_assembly::ChildContainerPath;
@@ -10,6 +10,7 @@ use p4kx_extraction::{Archive, Entry};
 pub(crate) const SYSTEM_FOLDER: &str = "data\\objectcontainers\\pu\\system\\";
 pub(crate) const SOCPAK: &str = ".socpak";
 const SYSTEM_SUFFIX: &str = "system.socpak";
+const UNREFERENCED_SAMPLE: usize = 200;
 
 /// The socpak Entries of an Archive by normalised path.
 pub(crate) struct Index<'a> {
@@ -145,15 +146,62 @@ pub(crate) fn key(path: &str) -> String {
 
 /// Returns the system containers that were not opened, up to 200, and the total.
 pub(crate) fn unreferenced(index: &Index<'_>, opened: &HashSet<usize>) -> Vec<String> {
-    let mut paths: Vec<String> = index
-        .by_path
-        .iter()
-        .filter(|(path, at)| path.starts_with(SYSTEM_FOLDER) && !opened.contains(at))
-        .map(|(path, _)| path.clone())
+    let mut sample = BinaryHeap::new();
+    let mut total = 0;
+    for (path, at) in &index.by_path {
+        if !path.starts_with(SYSTEM_FOLDER) || opened.contains(at) {
+            continue;
+        }
+        total += 1;
+        let candidate = path.as_str();
+        if sample.len() < UNREFERENCED_SAMPLE {
+            sample.push(candidate);
+        } else if let Some(mut greatest) = sample.peek_mut()
+            && candidate < *greatest
+        {
+            *greatest = candidate;
+        }
+    }
+    let mut paths: Vec<_> = sample
+        .into_sorted_vec()
+        .into_iter()
+        .map(str::to_owned)
         .collect();
-    paths.sort_unstable();
-    let total = paths.len();
-    paths.truncate(200);
     paths.push(format!("{total} in total"));
     paths
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::{HashMap, HashSet};
+
+    use super::{Index, SYSTEM_FOLDER, UNREFERENCED_SAMPLE, unreferenced};
+
+    #[test]
+    fn the_unreferenced_report_keeps_the_sorted_sample_and_full_count() {
+        let count = UNREFERENCED_SAMPLE + 50;
+        let visited = HashSet::from([1, UNREFERENCED_SAMPLE - 1, count - 1]);
+        let path = |ordinal| format!("{SYSTEM_FOLDER}fixture\\item-{ordinal:04}.socpak");
+        let mut by_path: HashMap<_, _> = (0..count)
+            .rev()
+            .map(|ordinal| (path(ordinal), ordinal))
+            .collect();
+        by_path.insert("data\\other\\excluded.socpak".to_owned(), count);
+        let index = Index {
+            entries: &[],
+            by_path,
+            duplicates: HashMap::new(),
+        };
+        let mut expected: Vec<_> = (0..count)
+            .filter(|ordinal| !visited.contains(ordinal))
+            .take(UNREFERENCED_SAMPLE)
+            .map(path)
+            .collect();
+        expected.push(format!("{} in total", count - visited.len()));
+        assert_eq!(
+            unreferenced(&index, &visited),
+            expected,
+            "retain the smallest reported paths and count every eligible entry"
+        );
+    }
 }
