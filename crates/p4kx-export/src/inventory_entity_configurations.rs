@@ -11,16 +11,24 @@ use super::inventory_owner_bounds::{self, InventoryOwnerBounds};
 use super::inventory_owner_storage::{self, InventoryOwnerStorage};
 use super::item_component_owner::ComponentOwner;
 use super::room_associations;
-use crate::CatalogError;
+use crate::catalog_rows::staged::{OrderedComponentRows, StagedCatalogTable};
 use crate::catalog_table::CatalogTable;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
+use crate::{CatalogError, ExportAccountingError};
+
+const BOUNDS_SOURCE_TYPES: &[&str] = &[
+    inventory_item_occupancy::ITEM_DEFINITION,
+    room_associations::VEHICLE,
+    inventory_owner_bounds::METADATA_COMPONENT,
+];
 
 /// Authored storage selection and bounds rows collected from selected entities.
 #[derive(Default)]
 pub(super) struct InventoryEntityRows<'source> {
     storage: Vec<InventoryOwnerStorage<'source>>,
     bounds: Vec<InventoryOwnerBounds<'source>>,
+    staged_bounds: Option<StagedCatalogTable>,
 }
 
 impl<'source> InventoryEntityRows<'source> {
@@ -92,10 +100,40 @@ impl<'source> InventoryEntityRows<'source> {
         Ok(())
     }
 
-    pub(super) fn into_tables(mut self, forge: &DataForge<'_>) -> InventoryEntityTables<'source> {
+    pub(super) fn stage_bounds(
+        &mut self,
+        staging: &mut OrderedComponentRows<'_>,
+    ) -> Result<(), CatalogError> {
+        for row in std::mem::take(&mut self.bounds) {
+            staging.append(row.owner.key(), &row)?;
+        }
+        Ok(())
+    }
+
+    pub(super) fn install_staged_bounds(
+        &mut self,
+        staging: OrderedComponentRows<'_>,
+        forge: &DataForge<'_>,
+    ) -> Result<(), CatalogError> {
+        if !self.bounds.is_empty() || self.staged_bounds.is_some() {
+            return Err(ExportAccountingError::ConflictingSourceDatum.into());
+        }
+        self.staged_bounds = Some(staging.finish(forge, BOUNDS_SOURCE_TYPES)?);
+        Ok(())
+    }
+
+    pub(super) fn into_tables(
+        mut self,
+        forge: &DataForge<'_>,
+    ) -> Result<InventoryEntityTables<'source>, CatalogError> {
+        if !self.bounds.is_empty() {
+            return Err(ExportAccountingError::ConflictingSourceDatum.into());
+        }
+        let item_bounds = self
+            .staged_bounds
+            .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
         self.storage.sort_by_key(|row| row.owner.key());
-        self.bounds.sort_by_key(|row| row.owner.key());
-        InventoryEntityTables {
+        Ok(InventoryEntityTables {
             inventory_configurations: CatalogTable::new(
                 forge,
                 &[
@@ -104,16 +142,8 @@ impl<'source> InventoryEntityRows<'source> {
                 ],
                 self.storage,
             ),
-            item_bounds: CatalogTable::new(
-                forge,
-                &[
-                    inventory_item_occupancy::ITEM_DEFINITION,
-                    room_associations::VEHICLE,
-                    inventory_owner_bounds::METADATA_COMPONENT,
-                ],
-                self.bounds,
-            ),
-        }
+            item_bounds,
+        })
     }
 }
 
@@ -123,5 +153,6 @@ impl<'source> InventoryEntityRows<'source> {
 #[schemars(transform = every_field_required)]
 pub(super) struct InventoryEntityTables<'source> {
     inventory_configurations: CatalogTable<InventoryOwnerStorage<'source>>,
-    item_bounds: CatalogTable<InventoryOwnerBounds<'source>>,
+    #[schemars(with = "CatalogTable<InventoryOwnerBounds<'source>>")]
+    pub(super) item_bounds: StagedCatalogTable,
 }

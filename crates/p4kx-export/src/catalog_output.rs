@@ -129,6 +129,13 @@ fn staged_row_bytes(catalog: &Catalog<'_>) -> u128 {
         )
         + u128::from(
             catalog
+                .configurations
+                .entity_configurations
+                .item_bounds()
+                .stored_bytes(),
+        )
+        + u128::from(
+            catalog
                 .projections
                 .weapon_player_animation_candidates
                 .stored_bytes(),
@@ -177,6 +184,13 @@ fn write_json(
                         .configurations
                         .entity_configurations
                         .interactions
+                        .take_failure()
+                })
+                .or_else(|| {
+                    catalog
+                        .configurations
+                        .entity_configurations
+                        .item_bounds()
                         .take_failure()
                 })
                 .or_else(|| {

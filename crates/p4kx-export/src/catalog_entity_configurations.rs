@@ -152,16 +152,25 @@ impl<'source> EntityConfigurationRows<'source> {
         Ok(())
     }
 
-    pub(crate) fn install_staged_interactions(
+    pub(crate) fn install_staged_rows(
         &mut self,
-        staging: OrderedComponentRows<'_>,
+        interactions: OrderedComponentRows<'_>,
+        bounds: OrderedComponentRows<'_>,
         forge: &DataForge<'_>,
     ) -> Result<(), CatalogError> {
         if !self.interactions.is_empty() || self.staged_interactions.is_some() {
             return Err(ExportAccountingError::ConflictingSourceDatum.into());
         }
-        self.staged_interactions = Some(staging.finish(forge, catalog_interactions::SOURCE_TYPES)?);
-        Ok(())
+        self.staged_interactions =
+            Some(interactions.finish(forge, catalog_interactions::SOURCE_TYPES)?);
+        self.inventory.install_staged_bounds(bounds, forge)
+    }
+
+    pub(crate) fn stage_inventory_bounds(
+        &mut self,
+        staging: &mut OrderedComponentRows<'_>,
+    ) -> Result<(), CatalogError> {
+        self.inventory.stage_bounds(staging)
     }
 
     pub(super) fn resolve_cargo_capacities(
@@ -196,7 +205,7 @@ impl<'source> EntityConfigurationRows<'source> {
         Ok(EntityConfigurationTables {
             alignment: self.alignment.into_tables(forge)?,
             fuel: self.fuel.into_tables(forge),
-            inventory: self.inventory.into_tables(forge),
+            inventory: self.inventory.into_tables(forge)?,
             interactions: self.staged_interactions.unwrap_or_else(|| {
                 StagedCatalogTable::empty(catalog_interactions::empty_availability(forge))
             }),
@@ -236,6 +245,12 @@ pub(crate) struct EntityConfigurationTables<'source> {
     resource_components: CatalogTable<ResourceComponent<'source>>,
     resource_connections: CatalogTable<ResourceConnection<'source>>,
     vehicle_armor: CatalogTable<VehicleArmor<'source>>,
+}
+
+impl EntityConfigurationTables<'_> {
+    pub(crate) const fn item_bounds(&self) -> &StagedCatalogTable {
+        &self.inventory.item_bounds
+    }
 }
 
 #[derive(Clone, Copy)]

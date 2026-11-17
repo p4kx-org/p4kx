@@ -216,8 +216,8 @@ The completed writer reports `catalog storage:` on stderr. It sums the logical b
 temporary row spools for container instances, locations, Entity tag declarations,
 Item and Blueprint definitions, particle libraries,
 contract generators, contract templates, mission broker entries, item ports,
-interactions, durability and weapon animation candidates, plus the final bytes
-of the publication temporary. The spools stay
+interactions, inventory item bounds, durability and weapon animation candidates, plus the
+final bytes of the publication temporary. The spools stay
 open until publication. The measurement includes open spools with no visible file name. On an
 interrupted run, a dedicated scratch volume can provide sampled allocation evidence.
 Capture stderr line by line to align process memory samples with preparation, health, provenance,
@@ -248,6 +248,8 @@ scan produces them. The publisher replays the indexed frames in canonical GUID a
 Record order for each JSON pass. The weapon animation join keeps its original sourced
 attachment fields in memory.
 Measure both the spool bytes and the cost of seeking to the ordered frames.
+Inventory item bounds are staged during the same scan in physical Record and Component order.
+Inventory storage selections stay in memory for the capacity and facility joins.
 
 Record peak working set and peak private bytes separately.
 Sample host commit and paging counters alongside the process write counter to distinguish process
@@ -263,8 +265,16 @@ A read-only source audit at `bfc242553` followed the original authoring routes a
 root and containing directories. The three Starmap selectors had no candidate in those
 directories. Twelve Loot selectors shared a basename with a root Entry. Basename equality
 alone does not establish a valid authored target. The verifier inspected the refusal directly
-and created no Catalog file. These checks establish the failed operations and their scope.
-The complete LIVE size and memory measurements still require normal publication.
+and created no Catalog file. The comparable probe on PTU `13201184` at `bfc242553`
+found ten required Starmap enumerations and 37 distinct Loot enumerations. Twelve Loot
+selectors shared a basename with a root Entry. The attempts establish the failure scopes
+for the two Builds.
+
+The older unfiltered LIVE trial at `bed4144d` peaked at 22.53 GiB working set and
+23.31 GiB private bytes during the Record scan, then 33.09 GiB working set and
+34.36 GiB private bytes during facility interior projection. It refused publication
+after preparing the catalog and recording health. The 16 GiB acceptance still requires a
+complete normal export with the current packaged producer on the specified system.
 
 The compressed writer prepares a typed Catalog once. It first counts serialized bytes for the
 frame header and then streams serialization into the encoder. A second raw file adds storage

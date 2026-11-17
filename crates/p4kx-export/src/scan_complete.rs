@@ -49,9 +49,11 @@ impl<'f> Scan<'_, '_, 'f> {
             .entity_configurations
             .alignment
             .install_staged_ports(staging.item_ports, self.forge)?;
-        collected
-            .entity_configurations
-            .install_staged_interactions(staging.interactions, self.forge)?;
+        collected.entity_configurations.install_staged_rows(
+            staging.interactions,
+            staging.inventory_bounds,
+            self.forge,
+        )?;
         collected.item_health = catalog_durability::finish_health(staging.health, self.forge)?;
         collected.failures.extend(failures);
         let resources = self.resource_commodities(evidence.commodities, &collected, &ledger)?;
@@ -132,6 +134,7 @@ impl<'f> Scan<'_, '_, 'f> {
                         .alignment
                         .stage_ports(&mut staging.item_ports)?;
                     configurations.stage_interactions(&mut staging.interactions)?;
+                    configurations.stage_inventory_bounds(&mut staging.inventory_bounds)?;
                     collected.entity_configurations.extend(configurations);
                     inspections.merge(ledger, record.ledger);
                 }
@@ -146,6 +149,7 @@ struct RecordStaging<'stage, 'source> {
     item_definitions: ItemDefinitionStaging<'stage, 'source>,
     entity_tags: IndexedCatalogRows<'stage, (GuidText, u32)>,
     interactions: OrderedComponentRows<'stage>,
+    inventory_bounds: OrderedComponentRows<'stage>,
     health: OrderedComponentRows<'stage>,
 }
 
@@ -156,6 +160,7 @@ impl<'stage> RecordStaging<'stage, '_> {
             item_definitions: ItemDefinitionStaging::new(directory, cancel),
             entity_tags: IndexedCatalogRows::new(directory, cancel),
             interactions: OrderedComponentRows::new(directory, cancel),
+            inventory_bounds: OrderedComponentRows::new(directory, cancel),
             health: OrderedComponentRows::new(directory, cancel),
         }
     }

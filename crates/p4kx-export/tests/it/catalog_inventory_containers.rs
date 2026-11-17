@@ -158,6 +158,9 @@ fn single(row: &Value, field: &str, original: f32, encrypted: bool) -> TestResul
 #[path = "catalog_inventory_entities_fixture.rs"]
 mod entities;
 
+#[path = "catalog_inventory_bounds_staging.rs"]
+mod bounds_staging;
+
 #[test]
 fn inventory_owner_rows_keep_references_bounds_and_storage_policies_separate() -> TestResult {
     let (_directory, archive) = common::open(&entities::database(), DcbOrigin::Encrypted)?;
