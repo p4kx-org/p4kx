@@ -12,9 +12,9 @@ Decided for issue #320. Evidence: LIVE 4.10, ScDataDumper `SocpakMappingGenerato
   parameters of its `MineableParams`, so a consumer reads which rocks a place can spawn without
   the `HarvestablePreset` Records, which are not a kind.
 - A location is a container below `ObjectContainers/PU/system` whose first `.soc` holds the GUID of
-  a kept provider preset after the string `preset`. The `.soc` is scanned as a stream, because a
-  container holds a `.soc` of over 100 MB; the scan stops at 256 MiB and a container that hits
-  the limit is warned about, never taken for one without a preset. The starmap object is the
+  a kept provider preset after the string `preset`. The `.soc` is read in bounded chunks
+  until the first match or end of the entry. Check cancellation between chunks and report
+  read failures as unreadable containers. The starmap object is the
   nearest one at or above the Child element that reaches the container in the walk of the system
   containers, a mining claim marker giving way to the object above it. A marker is a starmap
   object by its `description` key `@MiningClaims_Desc_001` (all 188 `PrivateMiningPoint_*`

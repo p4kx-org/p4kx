@@ -186,7 +186,7 @@ fn read_sources(
         .par_iter()
         .filter(|_| !cancel.is_some_and(CancelToken::is_cancelled))
         .map(|&entry| {
-            crate::harvest_source::read(archive, entry, capture).map(|read| (entry, read))
+            crate::harvest_source::read(archive, entry, capture, cancel).map(|read| (entry, read))
         })
         .collect::<Result<Vec<_>, _>>()?;
     let mut ledger = ExportLedger::default();

@@ -2130,9 +2130,10 @@ that is a reference, and for a config written out `respawnTimeMultiplier`,
 of a container in the first `.soc` file of the container: the GUID in the string that follows the
 string `preset` (strings are separated by a zero byte). The catalog does the same for every
 container below `Data/ObjectContainers/PU/system` and keeps the rows whose GUID is a kept
-provider preset. The `.soc` is scanned as a stream, up to 256 MiB (the largest of LIVE holds
-116 MB); a container with a larger `.soc` and no preset in the first 256 MiB is warned about, not
-taken for one without a preset. A row has `presetGuid`, `system` (the folder of the star system), `container` (the Archive
+provider preset. The `.soc` is read in bounded chunks up to the first preset match or end of
+the entry, with cancellation checked between chunks. The finding can be anywhere in the
+stream. A read failure is reported as an unreadable container. A row has `presetGuid`,
+`system` (the folder of the star system), `container` (the Archive
 path) and `starmapObjectGuid`: the walk through the system containers (see "Starmap objects")
 reaches a container through a Child element, and the nearest object at or above that Child names the
 location. A mining claim marker gives way to the object above it (ScDataDumper skips the private

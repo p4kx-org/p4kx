@@ -23,7 +23,7 @@ fn opened(payload: Vec<u8>) -> Result<(tempfile::TempDir, Archive), Box<dyn std:
 fn an_empty_container_is_a_successful_source_without_an_invented_soc() -> TestResult {
     let (_folder, archive) = opened(TestContainer::new().build())?;
     let (soc, ledger) = crate::catalog_read::original::with_entry_capture(&archive, |capture| {
-        super::read(&archive, 1, capture)
+        super::read(&archive, 1, capture, None)
     })?;
     assert_eq!(soc, Soc::Plain, "empty is a valid source result");
     let [outer] = ledger.entries.as_slice() else {
@@ -46,7 +46,7 @@ fn an_empty_container_is_a_successful_source_without_an_invented_soc() -> TestRe
 fn a_failed_outer_open_does_not_claim_an_inner_read() -> TestResult {
     let (_folder, archive) = opened(b"invalid container".to_vec())?;
     let (soc, ledger) = crate::catalog_read::original::with_entry_capture(&archive, |capture| {
-        super::read(&archive, 1, capture)
+        super::read(&archive, 1, capture, None)
     })?;
     assert!(matches!(soc, Soc::Unreadable(_)), "the container failed");
     let [outer] = ledger.entries.as_slice() else {
@@ -73,7 +73,7 @@ fn only_the_selected_first_soc_is_observed() -> TestResult {
         .entry(TestEntry::zstd("second.soc", "unread source").with_payload(b"bad".to_vec()));
     let (_folder, archive) = opened(container.build())?;
     let (soc, ledger) = crate::catalog_read::original::with_entry_capture(&archive, |capture| {
-        super::read(&archive, 1, capture)
+        super::read(&archive, 1, capture, None)
     })?;
     assert_eq!(soc, Soc::Plain, "a successful scan can find no preset");
     let [outer, inner] = ledger.entries.as_slice() else {
@@ -108,7 +108,7 @@ fn a_corrupt_selected_soc_retains_its_nested_identity() -> TestResult {
         .entry(TestEntry::zstd("bad.soc", "expected source").with_payload(b"bad".to_vec()));
     let (_folder, archive) = opened(container.build())?;
     let (soc, ledger) = crate::catalog_read::original::with_entry_capture(&archive, |capture| {
-        super::read(&archive, 1, capture)
+        super::read(&archive, 1, capture, None)
     })?;
     assert!(matches!(soc, Soc::Unreadable(_)), "selected source failed");
     let [outer, inner] = ledger.entries.as_slice() else {

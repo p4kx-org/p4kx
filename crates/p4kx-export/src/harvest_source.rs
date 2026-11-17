@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::io::ErrorKind;
-
-use p4kx_extraction::{Archive, Entry};
+use p4kx_extraction::{Archive, CancelToken, Entry};
 
 use crate::catalog_read::original::EntryCapture;
 use crate::entry_source::EntrySource;
@@ -19,7 +17,11 @@ pub(crate) fn read(
     archive: &Archive,
     entry: usize,
     capture: &EntryCapture<'_>,
+    cancel: Option<&CancelToken>,
 ) -> Result<(Soc, ExportLedger), CatalogError> {
+    if cancel.is_some_and(CancelToken::is_cancelled) {
+        return Err(CatalogError::Cancelled);
+    }
     let mut ledger = ExportLedger::default();
     let Some(socpak) = archive.entries().get(entry) else {
         return Ok((Soc::Unreadable("no such entry"), ledger));
@@ -39,7 +41,7 @@ pub(crate) fn read(
         Kind::HarvestableLocations,
         SourceDisposition::Projected,
     );
-    let soc = scan(archive, &container, socpak, &mut ledger, capture)?;
+    let soc = scan(archive, &container, socpak, &mut ledger, capture, cancel)?;
     Ok((soc, ledger))
 }
 
@@ -49,6 +51,7 @@ fn scan(
     socpak: &Entry,
     ledger: &mut ExportLedger,
     capture: &EntryCapture<'_>,
+    cancel: Option<&CancelToken>,
 ) -> Result<Soc, CatalogError> {
     let Some(soc) = crate::container_read::soc_entries(container).next() else {
         return Ok(Soc::Plain);
@@ -64,20 +67,22 @@ fn scan(
         );
         return Ok(Soc::Unreadable("its .soc cannot be opened"));
     };
-    let (soc, disposition) = match PresetScan::read(reader) {
-        Ok(preset) => (
-            preset.map_or(Soc::Plain, Soc::Preset),
-            SourceDisposition::Projected,
-        ),
-        Err(error) if error.kind() == ErrorKind::FileTooLarge => (
-            Soc::Unreadable("its .soc is over the scan limit"),
-            SourceDisposition::ReadFailed,
-        ),
-        Err(_) => (
+    let preset = PresetScan::read(reader, cancel);
+    if cancel.is_some_and(CancelToken::is_cancelled) {
+        return Err(CatalogError::Cancelled);
+    }
+    let (soc, disposition) = preset.map_or(
+        (
             Soc::Unreadable("its .soc cannot be read"),
             SourceDisposition::ReadFailed,
         ),
-    };
+        |preset| {
+            (
+                preset.map_or(Soc::Plain, Soc::Preset),
+                SourceDisposition::Projected,
+            )
+        },
+    );
     source.record(ledger, Kind::HarvestableLocations, disposition);
     Ok(soc)
 }

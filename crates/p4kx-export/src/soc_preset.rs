@@ -3,7 +3,7 @@
 
 use std::io::{self, Read};
 
-use p4kx_extraction::Guid;
+use p4kx_extraction::{CancelToken, Guid};
 
 /// The string a container's `.soc` stores right before the GUID of its provider preset.
 const PRESET_KEY: &[u8] = b"preset";
@@ -21,9 +21,6 @@ const _: () = assert!(
 /// The size of the pieces a `.soc` is read in.
 const CHUNK_LEN: usize = 64 << 10;
 
-/// The most bytes of one `.soc` that are scanned, 256 MiB; the largest of LIVE 4.10 holds 116 MB.
-const MAX_SCAN_LEN: u64 = 256 << 20;
-
 /// Finds the GUID that follows the first string ending in `preset` in a `.soc` file, which stores
 /// its strings separated by a zero byte. The file is fed piece by piece and never held whole.
 #[derive(Default)]
@@ -34,27 +31,23 @@ pub(crate) struct PresetScan {
 }
 
 impl PresetScan {
-    /// Scans the whole of `reader`, at most [`MAX_SCAN_LEN`] bytes, and stops at the first
-    /// preset.
+    /// Reads to the first preset or the end of the stream.
     ///
     /// # Errors
     ///
-    /// Returns the error of `reader`, and [`io::ErrorKind::FileTooLarge`] when no preset is found
-    /// in the first [`MAX_SCAN_LEN`] bytes and more follow.
-    pub(crate) fn read(reader: impl Read) -> io::Result<Option<Guid>> {
-        Self::read_within(reader, MAX_SCAN_LEN)
-    }
-
-    fn read_within(reader: impl Read, limit: u64) -> io::Result<Option<Guid>> {
-        let mut reader = reader.take(limit);
+    /// Returns a read failure or [`io::ErrorKind::Interrupted`] on cancellation.
+    pub(crate) fn read(
+        mut reader: impl Read,
+        cancel: Option<&CancelToken>,
+    ) -> io::Result<Option<Guid>> {
         let mut scan = Self::default();
         let mut chunk = vec![0; CHUNK_LEN];
         loop {
+            if cancel.is_some_and(CancelToken::is_cancelled) {
+                return Err(io::ErrorKind::Interrupted.into());
+            }
             let read = reader.read(&mut chunk)?;
             if read == 0 {
-                if reader.limit() == 0 && reader.into_inner().read(&mut [0; 1])? > 0 {
-                    return Err(io::ErrorKind::FileTooLarge.into());
-                }
                 return Ok(scan.finish());
             }
             if let Some(guid) = chunk.get(..read).and_then(|piece| scan.feed(piece)) {
@@ -99,7 +92,11 @@ impl PresetScan {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::io::{self, Read};
+
+    use p4kx_extraction::{CancelToken, Guid};
+
+    use super::PresetScan;
 
     const PRESET: &str = "1f712a22-c9d5-438e-8605-fac7651e30fc";
 
@@ -108,7 +105,7 @@ mod tests {
     }
 
     fn scan(bytes: &[u8]) -> Option<Guid> {
-        PresetScan::read(bytes).expect("a slice reads")
+        PresetScan::read(bytes, None).expect("a slice reads")
     }
 
     #[test]
@@ -172,18 +169,40 @@ mod tests {
     }
 
     #[test]
-    fn a_file_over_the_limit_is_an_error_not_no_preset() {
-        let bytes = [b"preset\0".as_slice(), PRESET.as_bytes(), b"\0"].concat();
-        let over = PresetScan::read_within(bytes.as_slice(), 10);
+    fn a_preset_after_a_256_mib_prefix_is_read() -> io::Result<()> {
+        let prefix = io::repeat(b'x').take(256 << 20);
+        let suffix = [b"\0preset\0".as_slice(), PRESET.as_bytes(), b"\0"].concat();
+        let reader = prefix.chain(suffix.as_slice());
+        assert_eq!(PresetScan::read(reader, None)?, Some(guid(PRESET)));
+        Ok(())
+    }
+
+    struct CancelDuringRead<'a> {
+        cancel: &'a CancelToken,
+    }
+
+    impl Read for CancelDuringRead<'_> {
+        fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+            assert!(
+                !self.cancel.is_cancelled(),
+                "no extra read after cancellation"
+            );
+            self.cancel.cancel();
+            let Some(first) = buffer.first_mut() else {
+                return Ok(0);
+            };
+            *first = b'x';
+            Ok(1)
+        }
+    }
+
+    #[test]
+    fn a_cancelled_stream_stops_between_chunks() {
+        let cancel = CancelToken::new();
+        let result = PresetScan::read(CancelDuringRead { cancel: &cancel }, Some(&cancel));
         assert_eq!(
-            over.map_err(|error| error.kind()),
-            Err(io::ErrorKind::FileTooLarge)
-        );
-        let exact = u64::try_from(bytes.len()).expect("a small length");
-        assert_eq!(
-            PresetScan::read_within(bytes.as_slice(), exact).ok(),
-            Some(Some(guid(PRESET))),
-            "a file of exactly the limit is scanned whole"
+            result.expect_err("cancelled scan").kind(),
+            io::ErrorKind::Interrupted
         );
     }
 
