@@ -56,7 +56,10 @@ verified the selected RoomMapping and connector documents in both PTUs directly
 against the retained CryXmlB node, attribute and string tables. The semantic
 owner link resolves to the same-container SOC entity. Its sampled inline loadout selector agrees
 between the two PTUs. The inspected Starchitect members establish no typed link for the new
-AI closet or loot changes. The relationship requires a matching positioned entity and class Record.
+AI closet or loot changes. A separate changed maintenance SOCPAK yielded 18 complete XML
+documents on each PTU. Both contain the same empty `EntityComponentSpawnCloset` declaration
+under `ObjectContainer.ComponentMetadata`. This occurrence identifies container metadata. A
+positioned spawn or loot relationship requires its own entity and configuration evidence.
 
 An exact Item Filter verified the old and new purchase-name Locale, its
 DataForge selector and the separate unchanged attachable name. The normal
