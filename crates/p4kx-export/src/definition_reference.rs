@@ -11,17 +11,18 @@ use crate::guid_text::CatalogGuid;
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = contract::every_field_required)]
-pub(crate) struct DefinitionReference {
+#[non_exhaustive]
+pub struct DefinitionReference {
     /// The resolved target position in this Build, null when no physical target is known.
-    pub(crate) target_record_index: Option<u32>,
+    pub target_record_index: Option<u32>,
     /// The target GUID, retained when its Record is missing.
-    pub(crate) guid: CatalogGuid,
+    pub guid: CatalogGuid,
     /// The target Record path when its source identity is available.
-    pub(crate) record_path: Option<String>,
+    pub record_path: Option<String>,
     /// The source target struct name when available.
-    pub(crate) target_type: Option<String>,
+    pub target_type: Option<String>,
     /// The source availability and declared-type compatibility of the target.
-    pub(crate) status: DefinitionStatus,
+    pub status: DefinitionStatus,
 }
 
 /// Source availability of a Record Reference, independently of catalog selection.

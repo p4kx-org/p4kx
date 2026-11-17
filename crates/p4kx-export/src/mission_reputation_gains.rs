@@ -15,6 +15,7 @@ use crate::mission_facts::choice;
 use crate::mission_index::MissionIndex;
 use crate::mission_layers::items_value;
 use crate::mission_results;
+use crate::record_read::ReadError;
 use crate::resource_integer::ResourceInt64;
 
 const LEGACY_REPUTATION: &str = "ContractResult_LegacyReputation";
@@ -26,7 +27,7 @@ pub(crate) fn gains<'source>(
     index: &MissionIndex<'source>,
     parent: &StructValue<'source>,
     sub: Option<&StructValue<'source>>,
-) -> Result<SourcedValue<Vec<ReputationGain<'source>>>, CatalogError> {
+) -> Result<SourcedValue<Vec<ReputationGain<'source>>>, ReadError> {
     let reader = Reader { fields };
     let mut path = Vec::new();
     let results =
@@ -94,7 +95,7 @@ impl<'fields, 'scope, 'read, 'source> Reader<'fields, 'scope, 'read, 'source> {
         path: &[SourceUse],
         dependencies: (&OriginalCatalogInput<'_, 'source>, &MissionIndex<'source>),
         (gains, membership): (&mut Vec<ReputationGain<'source>>, &mut Vec<SourceUse>),
-    ) -> Result<(), CatalogError> {
+    ) -> Result<(), ReadError> {
         for value in items_value(amounts.value()) {
             let entry = self.fields.fact(value)?;
             let mut branch = Vec::new();
@@ -116,7 +117,7 @@ impl<'fields, 'scope, 'read, 'source> Reader<'fields, 'scope, 'read, 'source> {
         entry: Fact<'fields, 'scope, 'read, 'source>,
         path: &[SourceUse],
         (input, index): (&OriginalCatalogInput<'_, 'source>, &MissionIndex<'source>),
-    ) -> Result<ReputationGain<'source>, CatalogError> {
+    ) -> Result<ReputationGain<'source>, ReadError> {
         let (faction_reputation_guid, faction_reputation_name) =
             self.link(entry, "factionReputation", path)?;
         let (scope_guid, scope_name) = self.link(entry, "reputationScope", path)?;
@@ -124,7 +125,7 @@ impl<'fields, 'scope, 'read, 'source> Reader<'fields, 'scope, 'read, 'source> {
         choice::extend(&mut uses, path)?;
         let amount = match self.reference(entry, "reward", &mut uses)? {
             ReferenceRead::Present(reference) => {
-                index.nominal_reward_amount(input, &reference, &mut uses)?
+                index.lookup_nominal_reward_amount(input, &reference, &mut uses)?
             }
             ReferenceRead::Missing(state) => state.value(),
         };

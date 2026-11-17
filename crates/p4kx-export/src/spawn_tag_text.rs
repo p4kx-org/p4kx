@@ -11,8 +11,11 @@ use crate::catalog_v3::tag_catalog::OriginalTagPath;
 
 /// Content text storage; this value alone carries no original-source admission.
 #[derive(Clone)]
-pub(crate) enum SpawnTagText {
+#[non_exhaustive]
+pub enum SpawnTagText {
+    /// A canonical shared tag path.
     Shared(OriginalTagPath),
+    /// An independently owned tag-path string.
     Owned(String),
 }
 

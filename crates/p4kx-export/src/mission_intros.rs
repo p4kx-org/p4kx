@@ -18,7 +18,7 @@ mod read;
 #[path = "mission_intro_requirements.rs"]
 mod requirements;
 
-pub(crate) use self::grants::{Candidates, Grants, INTRO_CONTRACTS};
+pub(crate) use self::grants::{Grants, INTRO_CONTRACTS};
 pub(crate) use self::requirements::Requirements;
 
 use self::read::Lookup;
@@ -28,6 +28,12 @@ pub(crate) struct AuthoredIntro {
     level: SourcedValue<StandingLevel>,
     tag_guid: SourcedValue<CatalogGuid>,
     lookup: Lookup,
+}
+
+impl AuthoredIntro {
+    pub(crate) fn tag_guid(&self) -> Option<p4kx_extraction::Guid> {
+        self.tag_guid.value().map(|guid| guid.0)
+    }
 }
 
 /// A contract row whose authored prerequisites still need the admitted grant join.
@@ -74,3 +80,7 @@ pub(crate) fn resolve(
         })
         .collect()
 }
+
+#[cfg(test)]
+#[path = "mission_generator_entries_tests.rs"]
+mod generator_entries_tests;

@@ -11,17 +11,19 @@ use crate::mission_property_source::SourceTagList;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = crate::contract::every_field_required)]
-pub(crate) struct AutoSpawns {
+#[non_exhaustive]
+pub struct AutoSpawns {
     /// The declared `AutoSpawns` Record without following it.
-    pub(crate) auto_spawns: Option<DefinitionReference>,
+    pub auto_spawns: Option<DefinitionReference>,
     /// The authored closet-search configuration.
-    pub(crate) search_options: Option<SpawnClosetSearchOptions>,
+    pub search_options: Option<SpawnClosetSearchOptions>,
 }
 
 /// The concrete authored closet-search variant.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "camelCase")]
-pub(crate) enum SpawnClosetSearchOptions {
+#[non_exhaustive]
+pub enum SpawnClosetSearchOptions {
     /// The fieldless `SpawnClosetSearchOptionsBase`.
     Base,
     /// `SpawnClosetSearchOptions_EntityDeclaration`.

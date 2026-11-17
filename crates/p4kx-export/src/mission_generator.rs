@@ -16,6 +16,9 @@ use crate::schema_fields::every_field_required;
 use crate::source_value_catalog::{SourceArenaOutput, SourceValueRef};
 use crate::{CatalogError, ExportAccountingError};
 
+#[path = "mission_generator_entries.rs"]
+pub(crate) mod entries;
+
 #[path = "contract_completion_tag_result.rs"]
 pub(crate) mod completion_tag_results;
 
@@ -81,12 +84,44 @@ impl<'source> GeneratorDefinition<'source> {
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ContractOccurrence {
+pub struct ContractOccurrence {
     input_ref: PhysicalSourceRef,
     record_index: u32,
     handler: SourceValueRef,
     contract: SourceValueRef,
     sub_contract: Option<SourceValueRef>,
+}
+
+impl ContractOccurrence {
+    /// The original physical input in the query's source inventory.
+    #[must_use]
+    pub const fn input_ref(&self) -> &PhysicalSourceRef {
+        &self.input_ref
+    }
+
+    /// The actual source owner position in this DataForge.
+    #[must_use]
+    pub const fn record_index(&self) -> u32 {
+        self.record_index
+    }
+
+    /// The original handler occurrence in the owner's source arena.
+    #[must_use]
+    pub const fn handler(&self) -> SourceValueRef {
+        self.handler
+    }
+
+    /// The original parent contract occurrence in the owner's source arena.
+    #[must_use]
+    pub const fn contract(&self) -> SourceValueRef {
+        self.contract
+    }
+
+    /// The original sub-contract occurrence, absent on a parent row.
+    #[must_use]
+    pub const fn sub_contract(&self) -> Option<SourceValueRef> {
+        self.sub_contract
+    }
 }
 
 /// The physical row sites and their immediate original identifier cells.

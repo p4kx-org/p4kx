@@ -16,7 +16,8 @@ use crate::guid_text::CatalogGuid;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = crate::schema_vocabulary::open_string_vocabulary)]
-pub(crate) enum SpawnLevel {
+#[non_exhaustive]
+pub enum SpawnLevel {
     /// The overrides of the sub contract.
     SubContract,
     /// The overrides of the contract.
@@ -31,7 +32,7 @@ pub(crate) enum SpawnLevel {
 
 /// A set of tags written as their full tag paths, e.g. `AI.Ship.SpawnFlags.PoweredOff`, in
 /// stored order.
-pub(crate) type TagPaths = Vec<crate::spawn_tag_text::SpawnTagText>;
+pub type TagPaths = Vec<crate::spawn_tag_text::SpawnTagText>;
 
 /// An [`io::Write`] that feeds what it is given to a SHA-256 hasher.
 struct HashWriter(Sha256);
@@ -69,49 +70,52 @@ pub(crate) fn content_guid(content: &impl Serialize) -> Result<CatalogGuid, serd
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ShipSpawnOption {
+#[non_exhaustive]
+pub struct ShipSpawnOption {
     /// The `weight` of the alternative among its slot; `null` when absent.
-    pub(crate) weight: Option<f32>,
+    pub weight: Option<f32>,
     /// The `concurrentAmount`: how many of the ship are alive at once; `null` when absent.
-    pub(crate) concurrent_amount: Option<i64>,
+    pub concurrent_amount: Option<i64>,
     /// The `includeLocationAISpawnTags` flag; `null` when absent.
     #[serde(rename = "includeLocationAISpawnTags")]
-    pub(crate) include_location_ai_spawn_tags: Option<bool>,
+    pub include_location_ai_spawn_tags: Option<bool>,
     /// The authored `crewInheritsLocationFaction` flag.
-    pub(crate) crew_inherits_location_faction: Option<bool>,
+    pub crew_inherits_location_faction: Option<bool>,
     /// The `tags` the game searches ships and crew by: ship model, role, faction, cargo, spawn
     /// flags.
-    pub(crate) tags: TagPaths,
+    pub tags: TagPaths,
     /// The `negativeTags` a match must not carry.
-    pub(crate) negative_tags: TagPaths,
+    pub negative_tags: TagPaths,
     /// The `markupTags`.
-    pub(crate) markup_tags: TagPaths,
+    pub markup_tags: TagPaths,
     /// The `entityTags`.
-    pub(crate) entity_tags: TagPaths,
+    pub entity_tags: TagPaths,
     /// The `initialDamageSettings` Record, `null` when absent.
-    pub(crate) initial_damage_guid: Option<CatalogGuid>,
+    pub initial_damage_guid: Option<CatalogGuid>,
     /// The `missionVariableName` of the property the `nameProperty` points to, `null` when absent.
-    pub(crate) name_property_variable: Option<String>,
+    pub name_property_variable: Option<String>,
 }
 
 /// The alternatives for one ship (`SpawnDescription_ShipOptions`): the game spawns one of them.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ShipSpawnSlot {
+#[non_exhaustive]
+pub struct ShipSpawnSlot {
     /// The alternatives in stored order.
-    pub(crate) options: Vec<ShipSpawnOption>,
+    pub options: Vec<ShipSpawnOption>,
 }
 
 /// A group of ships that spawn together (`SpawnDescription_ShipGroup`).
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ShipSpawnGroup {
+#[non_exhaustive]
+pub struct ShipSpawnGroup {
     /// The `Name` of the group, `null` when empty.
-    pub(crate) name: Option<String>,
+    pub name: Option<String>,
     /// The ships of the group, one slot each.
-    pub(crate) slots: Vec<ShipSpawnSlot>,
+    pub slots: Vec<ShipSpawnSlot>,
 }
 
 /// A ship spawn description of a contract: what a `MissionPropertyValue_ShipSpawnDescriptions`
@@ -119,31 +123,34 @@ pub(crate) struct ShipSpawnGroup {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ShipSpawnPool {
+#[non_exhaustive]
+pub struct ShipSpawnPool {
     /// The identifier of the content (see the catalog documentation); not a GUID of the Archive.
-    pub(crate) guid: CatalogGuid,
+    pub guid: CatalogGuid,
     /// The `allowedForMissionRestrictedDeliveries` flag; `null` when absent.
-    pub(crate) allowed_for_mission_restricted_deliveries: Option<bool>,
+    pub allowed_for_mission_restricted_deliveries: Option<bool>,
     /// The groups in stored order.
-    pub(crate) groups: Vec<ShipSpawnGroup>,
+    pub groups: Vec<ShipSpawnGroup>,
 }
 
 /// The positive and negative tags of a tag search term.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct TagTerm {
+#[non_exhaustive]
+pub struct TagTerm {
     /// The tags a match carries.
-    pub(crate) positive_tags: TagPaths,
+    pub positive_tags: TagPaths,
     /// The tags a match must not carry.
-    pub(crate) negative_tags: TagPaths,
+    pub negative_tags: TagPaths,
 }
 
 /// One match condition of a location query (`DataSetMatchCondition_*`), as stored.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(tag = "condition", rename_all = "camelCase")]
 #[schemars(transform = crate::condition_schema::with_deprecated_other)]
-pub(crate) enum LocationCondition {
+#[non_exhaustive]
+pub enum LocationCondition {
     /// `DataSetMatchCondition_TagSearch`: the location must satisfy one of the terms.
     #[serde(rename_all = "camelCase")]
     TagSearch {
@@ -212,7 +219,8 @@ pub(crate) enum LocationCondition {
 #[derive(Debug, Clone, Copy, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = crate::schema_vocabulary::open_string_vocabulary)]
-pub(crate) enum LocationCount {
+#[non_exhaustive]
+pub enum LocationCount {
     /// `MissionPropertyValue_Location`.
     One,
     /// `MissionPropertyValue_Locations`.
@@ -225,56 +233,59 @@ pub(crate) enum LocationCount {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct LocationQuery {
+#[non_exhaustive]
+pub struct LocationQuery {
     /// The identifier of the content (see the catalog documentation); not a GUID of the Archive.
-    pub(crate) guid: CatalogGuid,
+    pub guid: CatalogGuid,
     /// One location or several.
-    pub(crate) count: LocationCount,
+    pub count: LocationCount,
     /// The `minLocationsToFind` of a multiple query, `null` for a single one.
-    pub(crate) min_locations: Option<i64>,
+    pub min_locations: Option<i64>,
     /// The `maxLocationsToFind` of a multiple query, `null` for a single one.
-    pub(crate) max_locations: Option<i64>,
+    pub max_locations: Option<i64>,
     /// The `failIfMinAmountNotFound` flag of a multiple query, `null` for a single one.
-    pub(crate) fail_if_min_not_found: Option<bool>,
+    pub fail_if_min_not_found: Option<bool>,
     /// The `logErrorOnSearchFail` flag, `null` when absent.
-    pub(crate) log_error_on_search_fail: Option<bool>,
+    pub log_error_on_search_fail: Option<bool>,
     /// The `resourceTags`: the mission type tags the search is made for.
-    pub(crate) resource_tags: TagPaths,
+    pub resource_tags: TagPaths,
     /// The `matchConditions` in stored order; a location satisfies all of them.
-    pub(crate) conditions: Vec<LocationCondition>,
+    pub conditions: Vec<LocationCondition>,
 }
 
 /// The ship, NPC or entity spawn description a contract states for a variable.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct SpawnPoolLink {
+#[non_exhaustive]
+pub struct SpawnPoolLink {
     /// The `missionVariableName` of the property.
-    pub(crate) variable: String,
+    pub variable: String,
     /// The `extendedTextToken` of the property, `null` when empty.
-    pub(crate) token: Option<String>,
+    pub token: Option<String>,
     /// The level that states the property: the first of sub contract, contract, handler and
     /// template.
-    pub(crate) level: SpawnLevel,
+    pub level: SpawnLevel,
     /// The `guid` of the entry of `contractShipSpawns`, `contractNpcSpawns` or
     /// `contractEntitySpawns`, by the field the link is in.
-    pub(crate) pool_guid: CatalogGuid,
+    pub pool_guid: CatalogGuid,
 }
 
 /// The location query a contract states for a variable.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct LocationQueryLink {
+#[non_exhaustive]
+pub struct LocationQueryLink {
     /// The `missionVariableName` of the property.
-    pub(crate) variable: String,
+    pub variable: String,
     /// The `extendedTextToken` of the property, `null` when empty.
-    pub(crate) token: Option<String>,
+    pub token: Option<String>,
     /// The level that states the property: the first of sub contract, contract, handler and
     /// template.
-    pub(crate) level: SpawnLevel,
+    pub level: SpawnLevel,
     /// The `guid` of the entry of `contractLocationQueries`.
-    pub(crate) query_guid: CatalogGuid,
+    pub query_guid: CatalogGuid,
 }
 
 /// A `ContractPrerequisite_LocationProperty`: the contract is offered at the location another
@@ -282,15 +293,16 @@ pub(crate) struct LocationQueryLink {
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct LocationPrerequisite {
+#[non_exhaustive]
+pub struct LocationPrerequisite {
     /// The level that states the prerequisite: `handler`, `contract` or `subContract`.
-    pub(crate) level: SpawnLevel,
+    pub level: SpawnLevel,
     /// The `propertyVariableName`, the `variable` of an entry of `locationQueries`.
-    pub(crate) variable: String,
+    pub variable: String,
     /// The `propertyExtendedTextToken`, `null` when empty.
-    pub(crate) token: Option<String>,
+    pub token: Option<String>,
     /// The `locationLevelType` as stored (an enum name), `null` when absent.
-    pub(crate) location_level_type: Option<String>,
+    pub location_level_type: Option<String>,
 }
 
 #[cfg(test)]

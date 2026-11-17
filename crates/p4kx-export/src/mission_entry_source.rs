@@ -4,7 +4,6 @@
 use p4kx_extraction::{CancelToken, Guid, RecordTree, SourcedValue, StructValue};
 
 use crate::CatalogError;
-use crate::blueprint::as_struct;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::original::OriginalFlowFields;
 use crate::catalog_text_contract::GameTextRef;
@@ -18,7 +17,7 @@ use crate::mission_giver;
 use crate::mission_hauling_levels::HaulingLevels;
 use crate::mission_index::{Broker, MissionIndex, Template};
 use crate::mission_intros::PendingContract;
-use crate::mission_layers::{Layer, items, one};
+use crate::mission_layers::{Layer, one};
 use crate::mission_places::{Places, Prerequisites, Where};
 use crate::mission_property_set_registry::MissionPropertySetRegistry;
 use crate::mission_results::link;
@@ -27,9 +26,8 @@ use crate::mission_text_inputs::{
     BrokerTexts, LayerKind, LayerTexts, TemplateTexts, TextDependencyLinks,
 };
 use crate::mission_titles::{self, Dependencies, Inputs, Layers, MissionTitles};
-use crate::record_fields::{boolean, identity, reference, text};
+use crate::record_fields::{boolean, reference, text};
 use crate::record_read::ReadError;
-use crate::selection::is_leftover;
 use crate::spawn_layers::HandlerSpawns;
 
 /// Shared source context for deriving contract rows.
@@ -64,10 +62,8 @@ impl<'t, 'f> MissionEntrySource<'t, 'f> {
     ) -> Result<usize, ReadError> {
         let contract_where = Where::read(Some(self.contract), "additionalPrerequisites");
         let template = reference(Some(self.contract), "template").map(|guid| guid.0);
-        let template_data = template.and_then(|guid| context.index.template(guid));
+        let (template_data, broker) = self.linked_dependencies(context, template)?;
         let contract_layer = Layer::read(one(Some(self.contract), "paramOverrides"));
-        let broker = reference(Some(self.contract), "missionBrokerEntry")
-            .and_then(|guid| context.index.broker(guid.0));
         let shared = Shared::read(owner.fields(), self.handler, self.contract)?;
         let spawn_levels = self.spawns.contract(
             self.contract,
@@ -88,7 +84,7 @@ impl<'t, 'f> MissionEntrySource<'t, 'f> {
             };
             let facts = shared.facts.facts(prepared_facts.resolve(sub)?);
             let requirements = shared.facts.requirements.row(owner.fields(), sub)?;
-            let (pickup, offered_at) = self.places(sub, &contract_where, broker, context);
+            let (pickup, offered_at) = self.places(sub, &contract_where, broker, context)?;
             let selection = owner.selection(sub)?;
             let (titles, contractor) =
                 prepared_texts.project(selection.source.clone(), sub, owner, context)?;
@@ -120,6 +116,22 @@ impl<'t, 'f> MissionEntrySource<'t, 'f> {
         self.append_entries(out, make)
     }
 
+    fn linked_dependencies<'context>(
+        &self,
+        context: &'context MissionEntryContext<'_, 'f>,
+        template: Option<Guid>,
+    ) -> Result<(Option<&'context Template<'f>>, Option<&'context Broker<'f>>), ReadError> {
+        let template = template
+            .map(|guid| context.index.lookup_template(guid))
+            .transpose()?
+            .flatten();
+        let broker = reference(Some(self.contract), "missionBrokerEntry")
+            .map(|guid| context.index.lookup_broker(guid.0))
+            .transpose()?
+            .flatten();
+        Ok((template, broker))
+    }
+
     fn prepare_facts<'fields, 'scope, 'read>(
         &self,
         owner: &ContractOwner<'fields, 'scope, 'read, 'f>,
@@ -129,7 +141,7 @@ impl<'t, 'f> MissionEntrySource<'t, 'f> {
             PreparedCooldown<'fields, 'scope, 'read, 'f>,
             PreparedFacts<'fields, 'scope, 'read, 'f>,
         ),
-        CatalogError,
+        ReadError,
     > {
         let fields = owner.fields();
         let cooldown = PreparedCooldown::read(fields, self.handler, self.contract)?;
@@ -146,22 +158,11 @@ impl<'t, 'f> MissionEntrySource<'t, 'f> {
         out: &mut Vec<PendingContract<'f>>,
         make: impl Fn(Option<&'t StructValue<'f>>) -> Result<PendingContract<'f>, ReadError>,
     ) -> Result<usize, ReadError> {
-        out.push(make(None)?);
-        let mut skipped = 0_usize;
-        for sub in items(Some(self.contract), "subContracts")
-            .iter()
-            .filter_map(as_struct)
-        {
-            let name = text(Some(sub), "debugName").unwrap_or_default();
-            if identity(sub).is_none() || is_leftover(self.tree.record_path(), name) {
-                skipped = skipped.saturating_add(1);
-            } else {
-                out.push(make(Some(sub))?);
-            }
-        }
-        Ok(skipped)
+        crate::mission_generator::entries::rows(self.tree, self.contract, |sub| {
+            out.push(make(sub)?);
+            Ok(())
+        })
     }
-
     /// Returns the pickup places and where the contract or its sub contract `sub` is offered.
     fn places(
         &self,
@@ -169,7 +170,7 @@ impl<'t, 'f> MissionEntrySource<'t, 'f> {
         contract_where: &Where,
         broker: Option<&Broker<'f>>,
         context: &MissionEntryContext<'_, 'f>,
-    ) -> (Vec<PickupPlace<'f>>, OfferedAt<'f>) {
+    ) -> Result<(Vec<PickupPlace<'f>>, OfferedAt<'f>), ReadError> {
         let own = sub.map(|sub| Where::read(Some(sub), "additionalPrerequisites"));
         context.places.locate(
             context.index,
@@ -192,7 +193,7 @@ impl<'t, 'f> MissionEntrySource<'t, 'f> {
             &MissionEntryContext<'_, 'f>,
             &OriginalFlowFields<'_, '_, 'f>,
         ),
-    ) -> Result<ContractBase<'f>, CatalogError> {
+    ) -> Result<ContractBase<'f>, ReadError> {
         let Found {
             pickup,
             offered_at,
@@ -224,7 +225,9 @@ impl<'t, 'f> MissionEntrySource<'t, 'f> {
             work_in_progress: boolean(Some(self.contract), "workInProgress"),
             mission_type_guid: mission_type.map(CatalogGuid),
             mission_type: mission_type
-                .and_then(|guid| index.mission_type_name(guid))
+                .map(|guid| index.lookup_mission_type_name(guid))
+                .transpose()?
+                .flatten()
                 .map(|key| context.projection.finish_protected_key(key.clone()))
                 .transpose()?,
             contractor,
@@ -255,7 +258,7 @@ impl<'t, 'f> MissionEntrySource<'t, 'f> {
     fn faction(
         &self,
         context: &MissionEntryContext<'_, 'f>,
-    ) -> Result<Option<ContractFaction<'f>>, CatalogError> {
+    ) -> Result<Option<ContractFaction<'f>>, ReadError> {
         link(self.handler, "factionReputation")
             .map(|link| mission_giver::faction(link, context.index, context.projection))
             .transpose()
@@ -301,7 +304,7 @@ impl<'read, 'source> PreparedContractTexts<'read, 'source> {
         sub: Option<&StructValue<'source>>,
         owner: &ContractOwner<'_, '_, '_, 'source>,
         context: &MissionEntryContext<'_, 'source>,
-    ) -> Result<(MissionTitles<'source>, SourcedValue<GameTextRef>), CatalogError> {
+    ) -> Result<(MissionTitles<'source>, SourcedValue<GameTextRef>), ReadError> {
         let origins = context.projection.origins();
         let sub_texts = sub
             .map(|sub| LayerTexts::read(owner.fields(), origins, sub, LayerKind::SubContract))

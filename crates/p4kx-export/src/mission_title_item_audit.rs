@@ -15,10 +15,14 @@ use crate::schema_fields::every_field_required;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct ItemToken {
-    pub(super) name: SourcedValue<String>,
-    pub(super) variant: SourcedValue<Option<String>>,
-    pub(super) outcome: SourcedValue<ItemTokenOutcome>,
+#[non_exhaustive]
+pub struct ItemToken {
+    /// The name of this projection.
+    pub name: SourcedValue<String>,
+    /// The variant of this projection.
+    pub variant: SourcedValue<Option<String>>,
+    /// The outcome of this projection.
+    pub outcome: SourcedValue<ItemTokenOutcome>,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
@@ -28,12 +32,19 @@ pub(super) struct ItemToken {
     rename_all_fields = "camelCase"
 )]
 #[schemars(transform = every_field_required)]
-pub(super) enum ItemTokenOutcome {
+/// The static rendering decision for one original mission-item token.
+#[non_exhaustive]
+pub enum ItemTokenOutcome {
+    /// One exact item source provides a static text preview.
     StaticPreview {
+        /// The selected original item GUID.
         item_guid: CatalogGuid,
+        /// The selected item's exact physical source position.
         item_record_index: u32,
     },
+    /// Runtime or incomplete source state prevents a unique static preview.
     Unresolved {
+        /// The source condition preventing a unique static preview.
         reason: MissionItemGap,
     },
 }

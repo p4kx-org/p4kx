@@ -8,9 +8,10 @@ use serde::Serialize;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = crate::contract::every_field_required)]
-pub(crate) struct SourcePointer {
+#[non_exhaustive]
+pub struct SourcePointer {
     /// The stored struct index.
-    pub(crate) struct_index: u32,
+    pub struct_index: u32,
     /// The stored instance index.
-    pub(crate) instance_index: u32,
+    pub instance_index: u32,
 }

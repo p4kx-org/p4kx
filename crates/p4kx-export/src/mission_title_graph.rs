@@ -44,13 +44,13 @@ pub(super) struct Graph<'source> {
 }
 
 impl<'source> Graph<'source> {
-    pub(super) fn build(
+    pub(super) fn build<E: From<CatalogError>>(
         key: &'source str,
         root: Cow<'source, str>,
         localise: &mut Localise<'_, 'source>,
-        resolve: &mut Resolve<'_, 'source>,
+        resolve: &mut Resolve<'_, 'source, E>,
         cancel: Option<&CancelToken>,
-    ) -> Result<Self, CatalogError> {
+    ) -> Result<Self, E> {
         let mut graph = Self {
             nodes: Vec::new(),
             keys: HashMap::new(),
@@ -122,14 +122,14 @@ impl<'source> Graph<'source> {
         Ok(target)
     }
 
-    fn segments(
+    fn segments<E: From<CatalogError>>(
         &mut self,
         source_key: &'source str,
         text: &str,
         localise: &mut Localise<'_, 'source>,
-        resolve: &mut Resolve<'_, 'source>,
+        resolve: &mut Resolve<'_, 'source, E>,
         cancel: Option<&CancelToken>,
-    ) -> Result<Vec<Segment<'source>>, CatalogError> {
+    ) -> Result<Vec<Segment<'source>>, E> {
         let mut segments = Vec::new();
         let mut rest = text;
         while let Some((before, suffix)) = rest.split_once(OPEN) {

@@ -15,13 +15,21 @@ const SPECIFIC_ITEMS: &str = "DataSetMatchCondition_SpecificItemsDef";
 #[derive(Debug, Clone, Copy, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
-pub(crate) enum MissionItemGap {
+#[non_exhaustive]
+pub enum MissionItemGap {
+    /// The item is selected by a runtime query.
     RuntimeQuery,
+    /// The source declares no candidate item.
     EmptyCandidates,
+    /// The source declares multiple candidate items.
     AmbiguousCandidates,
+    /// The selected item source is unavailable.
     MissingItem,
+    /// The selected item does not supply this text variant.
     MissingVariant,
+    /// Multiple source variants match the requested text.
     AmbiguousVariants,
+    /// The selected key has no text in this language.
     MissingTranslation,
 }
 

@@ -77,9 +77,33 @@ impl CatalogOrigins {
             _ => SourceInput::Unknown,
         };
         let dataforge = uses.observe(input, InputScope::Payload)?;
+        let entry_frame = Arc::new(EntryFrame::new(archive, &uses));
+        let mut origins = Self {
+            uses,
+            entry_frame,
+            dataforge,
+            locales: BTreeMap::new(),
+            locale_directory: None,
+            locale_directory_complete: false,
+            health_texts: HealthTextCapture::new(),
+        };
+        if let Some(texts) = texts {
+            origins.attach_texts(archive, texts)?;
+        }
+        Ok(origins)
+    }
+
+    pub(crate) fn attach_texts(
+        &mut self,
+        archive: &Archive,
+        texts: &TextSources,
+    ) -> Result<(), CatalogError> {
+        if !self.locales.is_empty() || self.locale_directory.is_some() {
+            return Err(crate::ExportAccountingError::ConflictingSourceDatum.into());
+        }
         let mut locales = BTreeMap::new();
         for language in Language::ALL {
-            if let Some(entry) = texts.and_then(|texts| texts.entry(language)) {
+            if let Some(entry) = texts.entry(language) {
                 let input = entry
                     .origin()
                     .map_or(SourceInput::Unknown, SourceInput::Archive);
@@ -92,29 +116,23 @@ impl CatalogOrigins {
                 locales.insert(
                     language,
                     CatalogLocaleInput {
-                        scope: uses.observe(input, InputScope::Payload)?,
+                        scope: self.uses.observe(input, InputScope::Payload)?,
                         decoded,
                     },
                 );
             }
         }
-        let locale_directory = if texts.is_some() && locales.len() < Language::ALL.len() {
-            uses.observe_root_directory_paths(archive)?
+        let locale_directory = if locales.len() < Language::ALL.len() {
+            self.uses.observe_root_directory_paths(archive)?
         } else {
             None
         };
         let locale_directory_complete = locale_directory.is_some()
             && crate::export_archive_health::inventory(archive).is_none();
-        let entry_frame = Arc::new(EntryFrame::new(archive, &uses));
-        Ok(Self {
-            uses,
-            entry_frame,
-            dataforge,
-            locales,
-            locale_directory,
-            locale_directory_complete,
-            health_texts: HealthTextCapture::new(),
-        })
+        self.locales = locales;
+        self.locale_directory = locale_directory;
+        self.locale_directory_complete = locale_directory_complete;
+        Ok(())
     }
 
     pub(crate) const fn record(&self, record_index: u32) -> CatalogRecordContext<'_> {

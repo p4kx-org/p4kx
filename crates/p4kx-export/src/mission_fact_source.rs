@@ -188,21 +188,21 @@ impl<'fields, 'scope, 'read, 'source> Reader<'fields, 'scope, 'read, 'source> {
         })
     }
 
-    pub(super) fn with_template(
+    pub(super) fn with_template<E: From<CatalogError>>(
         &self,
         field: &Field<bool>,
         layers: &mut ParentLayers<'_, 'fields, 'scope, 'read, 'source>,
-        fallback: impl FnOnce(&mut Evidence) -> Result<Option<Selected<bool>>, CatalogError>,
-    ) -> Result<Choice<bool>, CatalogError> {
+        fallback: impl FnOnce(&mut Evidence) -> Result<Option<Selected<bool>>, E>,
+    ) -> Result<Choice<bool>, E> {
         self.with_fallback(field, &mut layers.overrides, fallback)
     }
 
-    fn with_fallback<T: Copy>(
+    fn with_fallback<T: Copy, E: From<CatalogError>>(
         &self,
         field: &Field<T>,
         overrides: &mut [DeferredLayer<'_, 'fields, 'scope, 'read, 'source>],
-        fallback: impl FnOnce(&mut Evidence) -> Result<Option<Selected<T>>, CatalogError>,
-    ) -> Result<Choice<T>, CatalogError> {
+        fallback: impl FnOnce(&mut Evidence) -> Result<Option<Selected<T>>, E>,
+    ) -> Result<Choice<T>, E> {
         let mut evidence = Evidence::default();
         for layer in overrides {
             if let Some(selected) = self.override_value(field, layer.read(self)?, &mut evidence)? {

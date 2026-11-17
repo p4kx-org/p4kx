@@ -19,17 +19,22 @@ use crate::mission_title;
 use crate::mission_title_origin::{
     self, ProjectedMissionText, ResolvedToken, SelectedItemKey, SelectedMissionText,
 };
+use crate::record_read::ReadError;
 use crate::schema_fields::every_field_required;
 
 /// The title and description of the same physically identified projected contract.
 #[derive(Debug, Serialize, JsonSchema)]
 #[schemars(transform = every_field_required)]
-pub(crate) struct MissionTitles<'source> {
-    pub(crate) contract: ContractOccurrence,
+#[non_exhaustive]
+pub struct MissionTitles<'source> {
+    /// The contract of this projection.
+    pub contract: ContractOccurrence,
+    /// The title of this projection.
     #[schemars(extend("x-gameText" = true))]
-    pub(crate) title: ProjectedMissionText<'source>,
+    pub title: ProjectedMissionText<'source>,
+    /// The description of this projection.
     #[schemars(extend("x-gameText" = true))]
-    pub(crate) description: ProjectedMissionText<'source>,
+    pub description: ProjectedMissionText<'source>,
 }
 
 pub(crate) struct Layers<'read, 'source> {
@@ -68,7 +73,7 @@ pub(crate) fn titles<'read, 'source>(
     layers: &Layers<'read, 'source>,
     dependencies: &Dependencies<'read, 'source>,
     inputs: &Inputs<'read, '_, 'source>,
-) -> Result<MissionTitles<'source>, CatalogError> {
+) -> Result<MissionTitles<'source>, ReadError> {
     let mut resolve = |token: &str, variant: Option<&str>, evidence: &mut Consulted<'read>| {
         resolve_token(layers, dependencies, inputs, token, variant, evidence)
     };
@@ -196,7 +201,7 @@ fn resolve_token<'read, 'source>(
     token: &str,
     variant: Option<&str>,
     evidence: &mut Consulted<'read>,
-) -> Result<Option<ResolvedToken<'read, 'source>>, CatalogError> {
+) -> Result<Option<ResolvedToken<'read, 'source>>, ReadError> {
     let origins = inputs.projection.origins();
     for layer in layers.iter() {
         mission_title::check_cancel(inputs.cancel)?;
@@ -220,14 +225,14 @@ fn resolve_choice<'read, 'source>(
     variant: Option<&str>,
     inputs: &Inputs<'read, '_, 'source>,
     evidence: &mut Consulted<'read>,
-) -> Result<Option<ResolvedToken<'read, 'source>>, CatalogError> {
+) -> Result<Option<ResolvedToken<'read, 'source>>, ReadError> {
     Ok(match choice {
         TokenChoice::Key(key) => Some(ResolvedToken::Key(key)),
         TokenChoice::MissionItem(choice) => Some(resolve_item(choice, variant, inputs, evidence)?),
         TokenChoice::Runtime(label) => Some(ResolvedToken::Runtime(label)),
         TokenChoice::Organization(guid) => inputs
             .index
-            .organization(*guid)
+            .lookup_organization(*guid)?
             .map(|source| source.select(variant, inputs.projection.origins(), evidence))
             .transpose()?
             .flatten()
@@ -241,12 +246,12 @@ fn resolve_item<'read, 'source>(
     variant: Option<&str>,
     inputs: &Inputs<'read, '_, 'source>,
     evidence: &mut Consulted<'read>,
-) -> Result<ResolvedToken<'read, 'source>, CatalogError> {
+) -> Result<ResolvedToken<'read, 'source>, ReadError> {
     let (guid, record_index) = match *choice {
         MissionItemChoice::Unresolved(reason) => return Ok(ResolvedToken::ItemGap(reason)),
         MissionItemChoice::Static { guid, record_index } => (guid, record_index),
     };
-    let Some(item) = inputs.index.item(guid, record_index) else {
+    let Some(item) = inputs.index.lookup_item(guid, record_index)? else {
         return Ok(ResolvedToken::ItemGap(MissionItemGap::MissingItem));
     };
     Ok(

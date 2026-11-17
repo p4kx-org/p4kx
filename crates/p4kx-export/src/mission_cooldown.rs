@@ -23,38 +23,40 @@ const ABANDONED_TIME_VARIATION: &str = "abandonedCooldownTimeVariation";
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct CooldownLayers {
+#[non_exhaustive]
+pub struct CooldownLayers {
     /// The level of `hasPersonalCooldown`.
-    pub(crate) has_personal_cooldown: SourcedValue<FactLayer>,
+    pub has_personal_cooldown: SourcedValue<FactLayer>,
     /// The level of `personalCooldownTime`.
-    pub(crate) personal_cooldown_time: SourcedValue<FactLayer>,
+    pub personal_cooldown_time: SourcedValue<FactLayer>,
     /// The level of `personalCooldownTimeVariation`.
-    pub(crate) personal_cooldown_time_variation: SourcedValue<FactLayer>,
+    pub personal_cooldown_time_variation: SourcedValue<FactLayer>,
     /// The level of `abandonedCooldownTime`.
-    pub(crate) abandoned_cooldown_time: SourcedValue<FactLayer>,
+    pub abandoned_cooldown_time: SourcedValue<FactLayer>,
     /// The level of `abandonedCooldownTimeVariation`.
-    pub(crate) abandoned_cooldown_time_variation: SourcedValue<FactLayer>,
+    pub abandoned_cooldown_time_variation: SourcedValue<FactLayer>,
 }
 
 /// The resolved cooldown values and level decisions for a contract occurrence.
 #[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ContractCooldown {
+#[non_exhaustive]
+pub struct ContractCooldown {
     /// The nearest selected level among the five cooldown fields.
-    pub(crate) cooldown_layer: SourcedValue<FactLayer>,
+    pub cooldown_layer: SourcedValue<FactLayer>,
     /// The level that states each of the five fields.
-    pub(crate) cooldown_layers: CooldownLayers,
+    pub cooldown_layers: CooldownLayers,
     /// Whether the contract has a personal cooldown.
-    pub(crate) has_personal_cooldown: SourcedValue<bool>,
+    pub has_personal_cooldown: SourcedValue<bool>,
     /// The personal cooldown time in the original unit.
-    pub(crate) personal_cooldown_time: SourcedValue<f32>,
+    pub personal_cooldown_time: SourcedValue<f32>,
     /// The personal cooldown variation in the original unit.
-    pub(crate) personal_cooldown_time_variation: SourcedValue<f32>,
+    pub personal_cooldown_time_variation: SourcedValue<f32>,
     /// The cooldown after abandoning the contract, in the original unit.
-    pub(crate) abandoned_cooldown_time: SourcedValue<f32>,
+    pub abandoned_cooldown_time: SourcedValue<f32>,
     /// The abandoned cooldown variation in the original unit.
-    pub(crate) abandoned_cooldown_time_variation: SourcedValue<f32>,
+    pub abandoned_cooldown_time_variation: SourcedValue<f32>,
 }
 
 /// The inherited choices of one original contract and the facts needed to read its sub contracts.

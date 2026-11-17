@@ -17,13 +17,14 @@ pub(crate) use self::read::fixed_rewards;
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct FixedReward<'source> {
+#[non_exhaustive]
+pub struct FixedReward<'source> {
     /// The original currency type, when stated.
-    pub(crate) currency: SourcedValue<&'source str>,
+    pub currency: SourcedValue<&'source str>,
     /// The original reward amount.
-    pub(crate) amount: SourcedValue<ResourceInt64>,
+    pub amount: SourcedValue<ResourceInt64>,
     /// The original maximum amount, with zero for a fixed payout.
-    pub(crate) max: SourcedValue<ResourceInt64>,
+    pub max: SourcedValue<ResourceInt64>,
     /// Whether the reward specifies bonuses on top.
-    pub(crate) plus_bonuses: SourcedValue<bool>,
+    pub plus_bonuses: SourcedValue<bool>,
 }

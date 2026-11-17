@@ -28,7 +28,10 @@ pub(super) fn finalize<'read, 'source: 'read>(
         if !ledger.sources.iter().any(|source| {
             source.record_index == owner.record_index
                 && source.kind == Some(Kind::MissionPropertySets)
-                && source.role == ExportSourceRole::DerivedInput
+                && matches!(
+                    source.role,
+                    ExportSourceRole::DerivedInput | ExportSourceRole::Dependency
+                )
                 && source.disposition == crate::export_ledger::SourceDisposition::Projected
         }) {
             return Err(ExportAccountingError::UnobservedFailure);
@@ -58,9 +61,11 @@ fn failure(
         target_guid: None,
         body: crate::record_source_status::DiagnosisBody::Captured(body.clone()),
     };
+    let contract_role = source_role(ledger, owner.record_index, Kind::Contracts)?;
+    let property_role = source_role(ledger, owner.record_index, Kind::MissionPropertySets)?;
     for (affected_kind, role) in [
-        (Kind::Contracts, ExportSourceRole::Selected),
-        (Kind::MissionPropertySets, ExportSourceRole::DerivedInput),
+        (Kind::Contracts, contract_role),
+        (Kind::MissionPropertySets, property_role),
     ] {
         ledger.derived_failure(DerivedFailure::of_operation(
             owner.subject().clone(),
@@ -76,7 +81,7 @@ fn failure(
         stage: ExportDiagnosticStage::DerivedProjection,
         code: ExportDiagnosticCode::AmbiguousIdentity,
         severity: ExportDiagnosticSeverity::Error,
-        source_role: Some(ExportSourceRole::DerivedInput),
+        source_role: Some(property_role),
         warning_code: Some(CODE.to_owned()),
         count: 1,
         count_unit: ExportDiagnosticUnit::Values,
@@ -89,4 +94,21 @@ fn failure(
         )?],
     });
     Ok(())
+}
+
+fn source_role(
+    ledger: &ExportLedger,
+    record: u32,
+    kind: Kind,
+) -> Result<ExportSourceRole, ExportAccountingError> {
+    ledger
+        .sources
+        .iter()
+        .find(|source| {
+            source.record_index == record
+                && source.kind == Some(kind)
+                && source.disposition == crate::export_ledger::SourceDisposition::Projected
+        })
+        .map(|source| source.role)
+        .ok_or(ExportAccountingError::UnobservedFailure)
 }

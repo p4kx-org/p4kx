@@ -227,6 +227,14 @@ impl<'context, 'source> CatalogProjection<'context, 'source> {
         key: &MissionKey<'source>,
         render: impl FnOnce(&Translations<'source>, &SelectedKey) -> Result<T, CatalogError>,
     ) -> Result<(GameTextRef, T), CatalogError> {
+        self.mission_key_fallible(key, render)
+    }
+
+    pub(crate) fn mission_key_fallible<T, E: From<CatalogError>>(
+        &self,
+        key: &MissionKey<'source>,
+        render: impl FnOnce(&Translations<'source>, &SelectedKey) -> Result<T, E>,
+    ) -> Result<(GameTextRef, T), E> {
         let observed = key.retain(self.origins())?;
         let translations = self.translations(key.text);
         let value = render(&translations, &observed)?;

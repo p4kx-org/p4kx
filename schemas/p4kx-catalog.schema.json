@@ -17335,7 +17335,7 @@
         },
         "displayName": {
           "$ref": "#/$defs/SourcedValueOfGameTextRef",
-          "description": "The protected text reference derived from this option's original key.",
+          "description": "The protected text reference derived from this option's original key.\nThe display name of this projection.",
           "x-gameText": true
         },
         "textId": {
@@ -21887,7 +21887,7 @@
         },
         "displayName": {
           "$ref": "#/$defs/SourcedValueOfGameTextRef",
-          "description": "The protected text reference derived from this option's original key.",
+          "description": "The protected text reference derived from this option's original key.\nThe display name of this projection.",
           "x-gameText": true
         },
         "textId": {
@@ -23589,6 +23589,7 @@
       "description": "An investigation name with its established presentation and original source identities.",
       "properties": {
         "chanceOfNickName": {
+          "description": "The chance of nick name of this projection.",
           "format": "float",
           "type": [
             "number",
@@ -23618,21 +23619,25 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "The name data guid of this projection."
         },
         "randomLastName": {
+          "description": "The random last name of this projection.",
           "type": [
             "boolean",
             "null"
           ]
         },
         "randomName": {
+          "description": "The random name of this projection.",
           "type": [
             "boolean",
             "null"
           ]
         },
         "randomNickName": {
+          "description": "The random nick name of this projection.",
           "type": [
             "boolean",
             "null"
@@ -24412,13 +24417,16 @@
       "description": "One authored `MissionItem` token and the outcome of its static text projection.",
       "properties": {
         "name": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The name of this projection."
         },
         "outcome": {
-          "$ref": "#/$defs/SourcedValueOfItemTokenOutcome"
+          "$ref": "#/$defs/SourcedValueOfItemTokenOutcome",
+          "description": "The outcome of this projection."
         },
         "variant": {
-          "$ref": "#/$defs/SourcedValueOfNullable_string"
+          "$ref": "#/$defs/SourcedValueOfNullable_string",
+          "description": "The variant of this projection."
         }
       },
       "required": [
@@ -24429,13 +24437,17 @@
       "type": "object"
     },
     "ItemTokenOutcome": {
+      "description": "The static rendering decision for one original mission-item token.",
       "oneOf": [
         {
+          "description": "One exact item source provides a static text preview.",
           "properties": {
             "itemGuid": {
-              "$ref": "#/$defs/Guid"
+              "$ref": "#/$defs/Guid",
+              "description": "The selected original item GUID."
             },
             "itemRecordIndex": {
+              "description": "The selected item's exact physical source position.",
               "format": "uint32",
               "minimum": 0,
               "type": "integer"
@@ -24453,9 +24465,11 @@
           "type": "object"
         },
         {
+          "description": "Runtime or incomplete source state prevents a unique static preview.",
           "properties": {
             "reason": {
-              "$ref": "#/$defs/MissionItemGap"
+              "$ref": "#/$defs/MissionItemGap",
+              "description": "The source condition preventing a unique static preview."
             },
             "type": {
               "const": "unresolved",
@@ -30021,16 +30035,43 @@
     },
     "MissionItemGap": {
       "description": "A reason why the authored `MissionItem` token cannot be rendered statically.",
-      "enum": [
-        "runtimeQuery",
-        "emptyCandidates",
-        "ambiguousCandidates",
-        "missingItem",
-        "missingVariant",
-        "ambiguousVariants",
-        "missingTranslation"
+      "oneOf": [
+        {
+          "const": "runtimeQuery",
+          "description": "The item is selected by a runtime query.",
+          "type": "string"
+        },
+        {
+          "const": "emptyCandidates",
+          "description": "The source declares no candidate item.",
+          "type": "string"
+        },
+        {
+          "const": "ambiguousCandidates",
+          "description": "The source declares multiple candidate items.",
+          "type": "string"
+        },
+        {
+          "const": "missingItem",
+          "description": "The selected item source is unavailable.",
+          "type": "string"
+        },
+        {
+          "const": "missingVariant",
+          "description": "The selected item does not supply this text variant.",
+          "type": "string"
+        },
+        {
+          "const": "ambiguousVariants",
+          "description": "Multiple source variants match the requested text.",
+          "type": "string"
+        },
+        {
+          "const": "missingTranslation",
+          "description": "The selected key has no text in this language.",
+          "type": "string"
+        }
       ],
-      "type": "string",
       "x-p4kx-vocabularyClass": "control"
     },
     "MissionLocality": {
@@ -30747,14 +30788,17 @@
       "description": "The title and description of the same physically identified projected contract.",
       "properties": {
         "contract": {
-          "$ref": "#/$defs/ContractOccurrence"
+          "$ref": "#/$defs/ContractOccurrence",
+          "description": "The contract of this projection."
         },
         "description": {
           "$ref": "#/$defs/ProjectedMissionText",
+          "description": "The description of this projection.",
           "x-gameText": true
         },
         "title": {
           "$ref": "#/$defs/ProjectedMissionText",
+          "description": "The title of this projection.",
           "x-gameText": true
         }
       },
@@ -31691,6 +31735,7 @@
       "description": "Protected text references and settings of an NPC name.",
       "properties": {
         "chanceOfNickName": {
+          "description": "The chance of nick name of this projection.",
           "format": "float",
           "type": [
             "number",
@@ -31720,21 +31765,25 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "The name data guid of this projection."
         },
         "randomLastName": {
+          "description": "The random last name of this projection.",
           "type": [
             "boolean",
             "null"
           ]
         },
         "randomName": {
+          "description": "The random name of this projection.",
           "type": [
             "boolean",
             "null"
           ]
         },
         "randomNickName": {
+          "description": "The random nick name of this projection.",
           "type": [
             "boolean",
             "null"
@@ -34452,17 +34501,20 @@
             },
             "type": "array"
           },
+          "description": "The item tokens of this projection.",
           "type": "object",
           "x-gameText": true
         },
         "key": {
           "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "description": "The key of this projection.",
           "x-gameText": true
         },
         "translations": {
           "additionalProperties": {
             "$ref": "#/$defs/SourcedValueOfstring"
           },
+          "description": "The translations of this projection.",
           "type": "object",
           "x-gameText": true
         }
@@ -129424,7 +129476,7 @@
         },
         "displayName": {
           "$ref": "#/$defs/SourcedValueOfGameTextRef",
-          "description": "The protected text reference derived from this option's original key.",
+          "description": "The protected text reference derived from this option's original key.\nThe display name of this projection.",
           "x-gameText": true
         },
         "textId": {
@@ -129829,7 +129881,7 @@
         },
         "displayName": {
           "$ref": "#/$defs/SourcedValueOfGameTextRef",
-          "description": "The protected text reference derived from this option's original key.",
+          "description": "The protected text reference derived from this option's original key.\nThe display name of this projection.",
           "x-gameText": true
         },
         "negativeTags": {

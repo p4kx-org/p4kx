@@ -330,7 +330,12 @@ impl<'a> Writer<'a> {
             }
             put_u32(&mut rows, struct_index);
             rows.extend_from_slice(&guid_bytes(record.guid));
-            put_u16(&mut rows, to_u16(instance as usize));
+            put_u16(
+                &mut rows,
+                record
+                    .instance_index
+                    .unwrap_or_else(|| to_u16(instance as usize)),
+            );
             put_u16(&mut rows, to_u16(size as usize));
         }
         rows

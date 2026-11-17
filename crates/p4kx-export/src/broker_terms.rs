@@ -13,17 +13,18 @@ use crate::record_fields::{boolean, integer, linked, text};
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct MissionReward {
+#[non_exhaustive]
+pub struct MissionReward {
     /// The `currencyType` as stored, e.g. `UEC`.
-    pub(crate) currency: Option<String>,
+    pub currency: Option<String>,
     /// The `reward`.
-    pub(crate) reward: Option<i64>,
+    pub reward: Option<i64>,
     /// The `max`.
-    pub(crate) max: Option<i64>,
+    pub max: Option<i64>,
     /// The `plusBonuses` flag.
-    pub(crate) plus_bonuses: Option<bool>,
+    pub plus_bonuses: Option<bool>,
     /// The `reputationBonus` Record.
-    pub(crate) reputation_bonus_guid: Option<CatalogGuid>,
+    pub reputation_bonus_guid: Option<CatalogGuid>,
 }
 
 /// Reads a reward definition struct (the `missionReward` of an entry, the `rewardDef` of a

@@ -12,33 +12,36 @@ use crate::mission_property_name::InvestigationName;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = crate::contract::every_field_required)]
-pub(crate) struct Investigation<'f> {
+#[non_exhaustive]
+pub struct Investigation<'f> {
     /// The initial journal-entry References in source order.
-    pub(crate) starting_journal_entries: Option<Vec<Option<DefinitionReference>>>,
+    pub starting_journal_entries: Option<Vec<Option<DefinitionReference>>>,
     /// Suspects in source order, retaining null declarations.
-    pub(crate) suspects: Option<Vec<Option<InvestigationSuspect<'f>>>>,
+    pub suspects: Option<Vec<Option<InvestigationSuspect<'f>>>>,
     /// Location configurations in source order, retaining null declarations.
-    pub(crate) locations: Option<Vec<Option<InvestigationLocation<'f>>>>,
+    pub locations: Option<Vec<Option<InvestigationLocation<'f>>>>,
 }
 
 /// One authored investigation suspect.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = crate::contract::every_field_required)]
-pub(crate) struct InvestigationSuspect<'f> {
+#[non_exhaustive]
+pub struct InvestigationSuspect<'f> {
     /// The authored name configuration.
-    pub(crate) name: Option<Box<InvestigationName<'f>>>,
+    pub name: Option<Box<InvestigationName<'f>>>,
     /// Whether this is an initial suspect.
-    pub(crate) initial_suspect: Option<bool>,
+    pub initial_suspect: Option<bool>,
     /// The authored guilt flag, without deriving a result.
-    pub(crate) is_guilty: Option<bool>,
+    pub is_guilty: Option<bool>,
 }
 
 /// The clue-item configuration of an investigation location.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = crate::contract::every_field_required)]
-pub(crate) struct InvestigationLocation<'f> {
+#[non_exhaustive]
+pub struct InvestigationLocation<'f> {
     /// Clue items in source order, retaining null pointers.
-    pub(crate) clue_items: Option<Vec<Option<InvestigationClueItem<'f>>>>,
+    pub clue_items: Option<Vec<Option<InvestigationClueItem<'f>>>>,
 }

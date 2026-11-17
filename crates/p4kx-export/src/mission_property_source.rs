@@ -16,9 +16,10 @@ use crate::spawn_read::Reader;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = crate::contract::every_field_required)]
-pub(crate) struct SourceTagList {
+#[non_exhaustive]
+pub struct SourceTagList {
     /// The raw tag References, null for an absent array.
-    pub(crate) tags: Option<Vec<Option<DefinitionReference>>>,
+    pub tags: Option<Vec<Option<DefinitionReference>>>,
 }
 
 pub(crate) fn check_context<'source>(

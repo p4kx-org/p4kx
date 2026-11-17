@@ -10,77 +10,81 @@ use crate::spawn_model::{TagPaths, TagTerm};
 
 #[path = "npc_spawn_names.rs"]
 mod names;
-pub(crate) use names::{NpcSpawnName, PendingNpcName};
+pub use names::NpcSpawnName;
+pub(crate) use names::PendingNpcName;
 
 pub(crate) type DraftNpcPool<'source> = NpcSpawnPool<PendingNpcName<'source>>;
-pub(crate) type PublishedNpcPool = NpcSpawnPool<NpcSpawnName>;
+/// An NPC spawn pool whose original name keys have been published as protected text cells.
+pub type PublishedNpcPool = NpcSpawnPool<NpcSpawnName>;
 
 /// An item an NPC carries (`SpawnSettingsInventoryItem`).
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct SpawnInventoryItem {
+#[non_exhaustive]
+pub struct SpawnInventoryItem {
     /// The `entityClass` Record, `null` when absent.
-    pub(crate) entity_class_guid: Option<CatalogGuid>,
+    pub entity_class_guid: Option<CatalogGuid>,
     /// The `quantity`; `null` when absent.
-    pub(crate) quantity: Option<i64>,
+    pub quantity: Option<i64>,
     /// The `amountInventoriesToFill`; `null` when absent.
-    pub(crate) amount_inventories_to_fill: Option<i64>,
+    pub amount_inventories_to_fill: Option<i64>,
     /// The `markAsMissionItem` flag; `null` when absent.
-    pub(crate) mark_as_mission_item: Option<bool>,
+    pub mark_as_mission_item: Option<bool>,
 }
 
 /// The `AutoSpawnSettings` of an NPC option: how many NPCs spawn, where and with what.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct AutoSpawnSettings {
+#[non_exhaustive]
+pub struct AutoSpawnSettings {
     /// The `name`, a developer's label such as `SC_CE -> DA_I (Grenadier x1)`; `null` when empty.
-    pub(crate) name: Option<String>,
+    pub name: Option<String>,
     /// The `initialActivity` as stored (`Sentry`, `Guard`, `GuardPatrolling`, ...); `null` when
     /// empty.
-    pub(crate) initial_activity: Option<String>,
+    pub initial_activity: Option<String>,
     /// The `excludeShipCrew` flag; `null` when absent.
-    pub(crate) exclude_ship_crew: Option<bool>,
+    pub exclude_ship_crew: Option<bool>,
     /// The `excludeSpawnGender` as the enum `EExcludeSpawnGender` stores it.
     #[schemars(extend("x-values" = [
         {"value": "Male"},
         {"value": "Female"},
         {"value": "None"}
     ]))]
-    pub(crate) exclude_spawn_gender: Option<String>,
+    pub exclude_spawn_gender: Option<String>,
     /// The `minGroupSize`; `-1` as stored means no minimum.
-    pub(crate) min_group_size: Option<i64>,
+    pub min_group_size: Option<i64>,
     /// The `maxGroupSize`.
-    pub(crate) max_group_size: Option<i64>,
+    pub max_group_size: Option<i64>,
     /// The `maxConcurrentSpawns`.
-    pub(crate) max_concurrent_spawns: Option<i64>,
+    pub max_concurrent_spawns: Option<i64>,
     /// The `maxSpawns`.
-    pub(crate) max_spawns: Option<i64>,
+    pub max_spawns: Option<i64>,
     /// The `minSpawnDelay`; the Archive states no unit.
-    pub(crate) min_spawn_delay: Option<i64>,
+    pub min_spawn_delay: Option<i64>,
     /// The `maxSpawnDelay`; the Archive states no unit.
-    pub(crate) max_spawn_delay: Option<i64>,
+    pub max_spawn_delay: Option<i64>,
     /// The `missionAlliedMarker` flag; `null` when absent.
-    pub(crate) mission_allied_marker: Option<bool>,
+    pub mission_allied_marker: Option<bool>,
     /// The `isCritical` flag; `null` when absent.
-    pub(crate) is_critical: Option<bool>,
+    pub is_critical: Option<bool>,
     /// The `positiveCharacterTags` and `negativeCharacterTags` the character is searched by.
-    pub(crate) character_tags: TagTerm,
+    pub character_tags: TagTerm,
     /// The `closetPositiveTags` and `closetNegativeTags`.
-    pub(crate) closet_tags: TagTerm,
+    pub closet_tags: TagTerm,
     /// The `roomPositiveTags` and `roomNegativeTags`.
-    pub(crate) room_tags: TagTerm,
+    pub room_tags: TagTerm,
     /// The `defendAreaPositiveTags` and `defendAreaNegativeTags`.
-    pub(crate) defend_area_tags: TagTerm,
+    pub defend_area_tags: TagTerm,
     /// The `scheduleAreaPositiveTags` and `scheduleAreaNegativeTags`.
-    pub(crate) schedule_area_tags: TagTerm,
+    pub schedule_area_tags: TagTerm,
     /// The `entityTags`.
-    pub(crate) entity_tags: TagPaths,
+    pub entity_tags: TagPaths,
     /// The `inventoryItems` in stored order.
-    pub(crate) inventory_items: Vec<SpawnInventoryItem>,
+    pub inventory_items: Vec<SpawnInventoryItem>,
     /// The `factionOverride` `Faction` Record, `null` when absent; no kind lists these Records.
-    pub(crate) faction_override_guid: Option<CatalogGuid>,
+    pub faction_override_guid: Option<CatalogGuid>,
 }
 
 /// The name settings and authored keys used to identify an NPC pool.
@@ -109,33 +113,35 @@ pub(crate) struct AiName<'a> {
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(rename = "NpcSpawnOption", transform = every_field_required)]
-pub(crate) struct NpcSpawnOption<Name> {
+#[non_exhaustive]
+pub struct NpcSpawnOption<Name> {
     /// The `priority`; `-1` as stored means none.
-    pub(crate) priority: Option<i64>,
+    pub priority: Option<i64>,
     /// The `includeLocationAISpawnTags` flag; `null` when absent.
     #[serde(rename = "includeLocationAISpawnTags")]
-    pub(crate) include_location_ai_spawn_tags: Option<bool>,
+    pub include_location_ai_spawn_tags: Option<bool>,
     /// The `weight` of the alternative among its group; `null` when absent.
-    pub(crate) weight: Option<f32>,
+    pub weight: Option<f32>,
     /// The `autoSpawnSettings`, `null` when absent.
-    pub(crate) auto_spawn_settings: Option<AutoSpawnSettings>,
+    pub auto_spawn_settings: Option<AutoSpawnSettings>,
     /// The `identifierTags`.
-    pub(crate) identifier_tags: TagPaths,
+    pub identifier_tags: TagPaths,
     /// The `missionVariableName` of the property the `nameProperty` points to, `null` when absent.
-    pub(crate) name_property_variable: Option<String>,
+    pub name_property_variable: Option<String>,
     /// The `embeddedName`, `null` when absent.
-    pub(crate) embedded_name: Option<Name>,
+    pub embedded_name: Option<Name>,
 }
 
 /// A group of NPCs that spawn together (`SpawnDescription_NPC_Group`).
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(rename = "NpcSpawnGroup", transform = every_field_required)]
-pub(crate) struct NpcSpawnGroup<Name> {
+#[non_exhaustive]
+pub struct NpcSpawnGroup<Name> {
     /// The `Name` of the group, `null` when empty.
-    pub(crate) name: Option<String>,
+    pub name: Option<String>,
     /// The alternatives in stored order.
-    pub(crate) options: Vec<NpcSpawnOption<Name>>,
+    pub options: Vec<NpcSpawnOption<Name>>,
 }
 
 /// An NPC spawn description of a contract: what a `MissionPropertyValue_NPCSpawnDescriptions`
@@ -143,9 +149,10 @@ pub(crate) struct NpcSpawnGroup<Name> {
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(rename = "NpcSpawnPool", transform = every_field_required)]
-pub(crate) struct NpcSpawnPool<Name> {
+#[non_exhaustive]
+pub struct NpcSpawnPool<Name> {
     /// The identifier of the content (see the catalog documentation); not a GUID of the Archive.
-    pub(crate) guid: CatalogGuid,
+    pub guid: CatalogGuid,
     /// The groups in stored order.
-    pub(crate) groups: Vec<NpcSpawnGroup<Name>>,
+    pub groups: Vec<NpcSpawnGroup<Name>>,
 }

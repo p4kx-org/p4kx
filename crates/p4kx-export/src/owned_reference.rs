@@ -11,30 +11,32 @@ use crate::source_pointer::SourcePointer;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = crate::contract::every_field_required)]
-pub(crate) struct OwnedReference {
+#[non_exhaustive]
+pub struct OwnedReference {
     /// The actual target Record-table index when known.
-    pub(crate) target_record_index: Option<u32>,
+    pub target_record_index: Option<u32>,
     /// The target Record GUID when known.
-    pub(crate) record_guid: Option<CatalogGuid>,
+    pub record_guid: Option<CatalogGuid>,
     /// The target Record path when known.
-    pub(crate) record_path: Option<String>,
+    pub record_path: Option<String>,
     /// The target struct name when known.
-    pub(crate) target_type: Option<String>,
+    pub target_type: Option<String>,
     /// The canonical source location in the target Record.
-    pub(crate) location: Option<String>,
+    pub location: Option<String>,
     /// Availability within the original owner.
-    pub(crate) status: OwnedReferenceStatus,
+    pub status: OwnedReferenceStatus,
     /// Raw coordinates retained when the pointer cannot resolve.
-    pub(crate) source_pointer: Option<SourcePointer>,
+    pub source_pointer: Option<SourcePointer>,
     /// The source decoding error when available.
-    pub(crate) source_error: Option<String>,
+    pub source_error: Option<String>,
 }
 
 /// The source availability of an owner-local weak link.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
-pub(crate) enum OwnedReferenceStatus {
+#[non_exhaustive]
+pub enum OwnedReferenceStatus {
     /// The original owner contains the target node.
     Resolved,
     /// The declared target is absent.

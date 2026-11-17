@@ -219,6 +219,50 @@ impl Grants {
         Ok(())
     }
 
+    pub(crate) fn incomplete_record(
+        &mut self,
+        context: &CatalogRecordContext<'_>,
+        path_role: SourceUseRole,
+        type_role: SourceUseRole,
+    ) -> Result<(), CatalogError> {
+        if !self.uses.is_same_inventory(context.sources())
+            || &self.source != context.dataforge().source_ref()
+            || context.record_position().is_none()
+        {
+            return Err(SourceEvidenceError::ForeignEvidence.into());
+        }
+        self.scope
+            .retain(context.observe_header(RecordHeaderField::FileName, path_role)?)?;
+        self.scope
+            .retain(context.observe_header(RecordHeaderField::SourceType, type_role)?)?;
+        self.scope.incomplete();
+        Ok(())
+    }
+
+    pub(crate) fn take(&mut self) -> Self {
+        let empty = Self {
+            source: self.source.clone(),
+            uses: self.uses.clone(),
+            scope: Evidence::default(),
+            matches: HashMap::new(),
+            record: None,
+        };
+        std::mem::replace(self, empty)
+    }
+
+    pub(crate) fn tag_guids(&self) -> impl Iterator<Item = Guid> {
+        self.matches.keys().copied()
+    }
+
+    pub(crate) fn contains_tag(&self, tag: Guid) -> bool {
+        self.matches.contains_key(&tag)
+    }
+
+    pub(crate) fn scope_only(mut self) -> Self {
+        self.matches.clear();
+        self
+    }
+
     pub(crate) const fn incomplete(&mut self) {
         self.scope.incomplete();
     }

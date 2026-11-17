@@ -1,14 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{
-    CancelToken, DataForge, Filter, Record, RecordTree, SourceUseRole, StructValue, Value,
-};
+use p4kx_extraction::{CancelToken, DataForge, Filter, Record, SourceUseRole};
 
-use crate::blueprint::as_struct;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_projection::CatalogProjection;
-use crate::catalog_read::original::OriginalFlowFields;
 use crate::catalog_rows::staged::{StagedCatalogRows, StagedCatalogTable};
 use crate::catalog_table::DatasetAvailability;
 use crate::catalog_v3::mission_sources::contract_scenario_requirements::ContractScenarioRequirements;
@@ -18,36 +14,24 @@ use crate::contract_missions::ContractWithTitles;
 use crate::contract_starmap::StarmapObject;
 use crate::export_ledger::ExportLedger;
 use crate::guid_text::CatalogGuid;
-use crate::mission_entry_source::{MissionEntryContext, MissionEntrySource};
-use crate::mission_generator::{ContractOwner, GeneratorDefinition};
+use crate::mission_entry_source::MissionEntryContext;
 use crate::mission_index::MissionIndex;
-use crate::mission_intros::{self, Candidates, Grants, INTRO_CONTRACTS, PendingContract};
-use crate::mission_layers::{Layer, items, one};
-use crate::mission_places::{Places, Where};
+use crate::mission_intros::{self, Grants, PendingContract};
+use crate::mission_places::Places;
 use crate::mission_property_set::MissionPropertySets;
-use crate::mission_property_set_registry::MissionPropertySetRegistry;
 use crate::mission_siblings::{self, Siblings};
-use crate::mission_text_inputs::{LayerKind, LayerTexts};
 use crate::options::CatalogStage::ProjectContractGenerators;
 use crate::options::{CatalogRun, CatalogStage};
-use crate::record_fields::{identity, text};
-use crate::selection::{Kind, is_leftover};
-use crate::spawn_layers::RecordSpawns;
+use crate::selection::Kind;
 use crate::spawn_pools::SpawnPools;
 use crate::{CatalogError, CatalogReadFailure};
 
 #[path = "mission_record_read.rs"]
-mod record_read;
+pub(crate) mod record_read;
+use self::record_read::{ContractPiece, ObservedPiece, Piece};
 
 #[path = "mission_property_set_collision.rs"]
 mod property_set_collision;
-
-const CONTAINERS: [&str; 4] = [
-    "contracts",
-    INTRO_CONTRACTS,
-    "legacyContracts",
-    "PVPBountyContract",
-];
 
 /// The contracts of a DataForge and what was left out.
 pub(crate) struct Missions<'f> {
@@ -61,119 +45,6 @@ pub(crate) struct Missions<'f> {
     pub(crate) pools: SpawnPools<'f>,
     pub(crate) siblings: Siblings<'f>,
     pub(crate) property_sets: MissionPropertySets<'f>,
-}
-
-/// A source Record that cannot be read or projected into contract rows.
-type PieceError = Box<dyn std::error::Error + Send + Sync>;
-
-struct ContractPiece<'f> {
-    contracts: Vec<PendingContract<'f>>,
-    skipped: usize,
-    grants: Grants,
-    pools: SpawnPools<'f>,
-    property_sets: MissionPropertySets<'f>,
-}
-
-struct ContractSource<'t, 'f> {
-    tree: &'t RecordTree<'f>,
-    spawns: &'t RecordSpawns<'t, 'f>,
-    property_sets: &'t MissionPropertySetRegistry<'t, 'f>,
-}
-
-impl<'t, 'f> ContractSource<'t, 'f> {
-    fn handler(
-        &self,
-        handler: &'t StructValue<'f>,
-        context: &MissionEntryContext<'_, 'f>,
-        fields: &OriginalFlowFields<'_, '_, 'f>,
-        contracts: &mut Vec<PendingContract<'f>>,
-        grants: &mut Grants,
-    ) -> Result<usize, PieceError> {
-        let handler_layer = Layer::read(one(Some(handler), "contractParams"));
-        let handler_texts = LayerTexts::read(
-            fields,
-            context.projection.origins(),
-            handler,
-            LayerKind::Handler,
-        )?;
-        let handler_where = Where::read(one(Some(handler), "defaultAvailability"), "prerequisites");
-        let handler_spawns = self.spawns.handler(handler)?;
-        let mut skipped = 0_usize;
-        for container in CONTAINERS {
-            let intro = (container == INTRO_CONTRACTS)
-                .then(|| grants.candidates(fields, handler))
-                .transpose()?;
-            for value in items(Some(handler), container) {
-                let Some(Candidate {
-                    contract,
-                    name,
-                    admitted,
-                }) = self.candidate(fields, grants, intro.as_ref(), value)?
-                else {
-                    continue;
-                };
-                if !admitted {
-                    skipped = skipped.saturating_add(1);
-                    continue;
-                }
-                let parent = MissionEntrySource {
-                    tree: self.tree,
-                    handler,
-                    handler_layer: &handler_layer,
-                    handler_texts: &handler_texts,
-                    handler_where: &handler_where,
-                    spawns: &handler_spawns,
-                    contract,
-                    name,
-                    property_sets: self.property_sets,
-                };
-                let owner = ContractOwner::read(fields, handler, container, contract)?;
-                skipped = skipped.saturating_add(parent.entries(context, &owner, contracts)?);
-            }
-        }
-        Ok(skipped)
-    }
-
-    fn candidate<'scope, 'read>(
-        &self,
-        fields: &OriginalFlowFields<'scope, 'read, 'f>,
-        grants: &mut Grants,
-        intro: Option<&Candidates<'_, 'scope, 'read, 'f>>,
-        value: &'t Value<'f>,
-    ) -> Result<Option<Candidate<'t, 'f>>, CatalogError> {
-        let contract = as_struct(value);
-        let name = text(contract, "debugName");
-        let id = contract
-            .and_then(identity)
-            .filter(|_| !is_leftover(self.tree.record_path(), name.unwrap_or_default()));
-        if let Some(intro) = intro {
-            grants.candidate(fields, intro, value, id)?;
-        }
-        Ok(contract.map(|contract| Candidate {
-            contract,
-            name,
-            admitted: id.is_some(),
-        }))
-    }
-}
-
-struct Candidate<'read, 'source> {
-    contract: &'read StructValue<'source>,
-    name: Option<&'source str>,
-    admitted: bool,
-}
-
-enum Piece<'f> {
-    Contracts(Box<ContractPiece<'f>>),
-    Failed(CatalogReadFailure<'f>),
-}
-
-struct ObservedPiece<'f> {
-    piece: Piece<'f>,
-    definition: Option<GeneratorDefinition<'f>>,
-    scenario_requirements: Vec<ContractScenarioRequirements<'f>>,
-    local_generators: Vec<LocalContractGeneratorConfiguration<'f>>,
-    ledger: ExportLedger,
 }
 
 /// Reads the contracts of the `ContractGenerator` Records `filter` matches: for each contract an
@@ -200,7 +71,15 @@ pub(crate) fn read<'f>(
     let mut grants = Grants::new(projection.origins());
     let records = selected_generators(forge, input, filter, cancel, &mut grants)?;
     run.begin(CatalogStage::ReadMissionDependencies);
-    let mut index = MissionIndex::read_captured(forge, input, filter, cancel, dependencies, tags)?;
+    let mut index = MissionIndex::read_captured(
+        forge,
+        input,
+        filter,
+        cancel,
+        dependencies,
+        tags,
+        forge.records(),
+    )?;
     let (pools, failures, mut ledger) = index.take_template_results();
     run.begin(CatalogStage::ProjectMissionDefinitions);
     let siblings = mission_siblings::read(
@@ -213,18 +92,7 @@ pub(crate) fn read<'f>(
     let generator_type = Kind::Contracts.records().type_name;
     let availability =
         DatasetAvailability::from_source_declarations(forge, |name| name == generator_type);
-    let mut missions = Missions {
-        ledger,
-        contracts: Vec::new(),
-        generators: StagedCatalogTable::empty(availability),
-        scenario_requirements: Vec::new(),
-        local_generators: Vec::new(),
-        skipped: 0,
-        failures,
-        pools,
-        siblings,
-        property_sets: MissionPropertySets::default(),
-    };
+    let mut missions = Missions::empty(availability, pools, failures, ledger, siblings);
     crate::mission_ledger::inventory(&mut missions.ledger);
     run.begin_compacted(ProjectContractGenerators, uses, &missions.ledger)?;
     if records.is_empty() {
@@ -284,22 +152,39 @@ fn selected_generators<'source>(
 }
 
 impl<'f> Missions<'f> {
-    fn complete_contracts(
-        &mut self,
-        mut contracts: Vec<PendingContract<'f>>,
-        grants: Grants,
-    ) -> Result<(), CatalogError> {
-        property_set_collision::finalize(
-            &self.property_sets,
-            contracts.iter_mut().map(|contract| &mut contract.base),
-            &mut self.ledger,
-        )?;
-        self.skipped = self.skipped.saturating_add(order(&mut contracts));
-        self.ledger.skipped_rows(Kind::Contracts, self.skipped);
-        self.contracts = mission_intros::resolve(contracts, grants)?;
-        Ok(())
+    fn empty(
+        availability: DatasetAvailability,
+        pools: SpawnPools<'f>,
+        failures: Vec<CatalogReadFailure<'f>>,
+        ledger: ExportLedger,
+        siblings: Siblings<'f>,
+    ) -> Self {
+        Self {
+            ledger,
+            contracts: Vec::new(),
+            generators: StagedCatalogTable::empty(availability),
+            scenario_requirements: Vec::new(),
+            local_generators: Vec::new(),
+            skipped: 0,
+            failures,
+            pools,
+            siblings,
+            property_sets: MissionPropertySets::default(),
+        }
     }
 
+    fn complete_contracts(
+        &mut self,
+        contracts: Vec<PendingContract<'f>>,
+        grants: Grants,
+    ) -> Result<(), CatalogError> {
+        let completed =
+            finalize_contracts(contracts, &self.property_sets, grants, &mut self.ledger)?;
+        self.skipped = self.skipped.saturating_add(completed.duplicates);
+        self.ledger.skipped_rows(Kind::Contracts, self.skipped);
+        self.contracts = completed.rows;
+        Ok(())
+    }
     fn take(
         &mut self,
         observed: ObservedPiece<'f>,
@@ -336,6 +221,42 @@ impl<'f> Missions<'f> {
         }
         Ok(())
     }
+}
+
+/// Canonical rows and the logical duplicates removed by finalization.
+pub(crate) struct FinalizedContracts<'source> {
+    pub(crate) rows: Vec<ContractWithTitles<'source>>,
+    pub(crate) duplicates: usize,
+}
+
+/// Resolves shared property identities, canonical duplicate order and intro dependencies.
+pub(crate) fn finalize_contracts<'source>(
+    contracts: Vec<PendingContract<'source>>,
+    sets: &MissionPropertySets<'source>,
+    grants: Grants,
+    ledger: &mut ExportLedger,
+) -> Result<FinalizedContracts<'source>, CatalogError> {
+    finalize_contracts_scoped(contracts, sets, grants, ledger, |_| true)
+}
+
+pub(crate) fn finalize_contracts_scoped<'source>(
+    mut contracts: Vec<PendingContract<'source>>,
+    sets: &MissionPropertySets<'source>,
+    grants: Grants,
+    ledger: &mut ExportLedger,
+    mut retain: impl FnMut(&PendingContract<'source>) -> bool,
+) -> Result<FinalizedContracts<'source>, CatalogError> {
+    property_set_collision::finalize(
+        sets,
+        contracts.iter_mut().map(|contract| &mut contract.base),
+        ledger,
+    )?;
+    let duplicates = order(&mut contracts);
+    contracts.retain(|row| retain(row));
+    Ok(FinalizedContracts {
+        rows: mission_intros::resolve(contracts, grants)?,
+        duplicates,
+    })
 }
 
 /// Orders rows by GUID and counts duplicates removed by the logical ID pair.

@@ -14,7 +14,10 @@ use crate::{CatalogError, ExportAccountingError};
 
 /// A mission text before owner selection or after protected publication.
 #[derive(Debug)]
-pub(crate) enum MissionPropertyText<'source> {
+pub struct MissionPropertyText<'source>(State<'source>);
+
+#[derive(Debug)]
+enum State<'source> {
     Pending {
         token: Option<&'source str>,
         key: Option<ProtectedKey<'source>>,
@@ -23,11 +26,20 @@ pub(crate) enum MissionPropertyText<'source> {
 }
 
 impl<'source> MissionPropertyText<'source> {
+    /// The published protected text cell, retaining absence and original source evidence.
+    #[must_use]
+    pub const fn published(&self) -> Option<&SourcedValue<GameTextRef>> {
+        match &self.0 {
+            State::Published(value) => Some(value),
+            State::Pending { .. } => None,
+        }
+    }
+
     pub(crate) const fn pending(token: Option<&'source str>, key: ProtectedKey<'source>) -> Self {
-        Self::Pending {
+        Self(State::Pending {
             token,
             key: Some(key),
-        }
+        })
     }
 
     pub(crate) fn read_key(
@@ -57,13 +69,13 @@ impl<'source> MissionPropertyText<'source> {
         &mut self,
         projection: &CatalogProjection<'_, 'source>,
     ) -> Result<(), CatalogError> {
-        let Self::Pending { key, .. } = self else {
+        let State::Pending { key, .. } = &mut self.0 else {
             return Err(ExportAccountingError::ConflictingSourceDatum.into());
         };
         let key = key
             .take()
             .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
-        *self = Self::Published(projection.finish_protected_key(key)?);
+        self.0 = State::Published(projection.finish_protected_key(key)?);
         Ok(())
     }
 }
@@ -81,9 +93,9 @@ impl<'source> NpcSpawnName<MissionPropertyText<'source>> {
 
 impl Serialize for MissionPropertyText<'_> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Self::Pending { token, .. } => token.serialize(serializer),
-            Self::Published(text) => text.serialize(serializer),
+        match &self.0 {
+            State::Pending { token, .. } => token.serialize(serializer),
+            State::Published(text) => text.serialize(serializer),
         }
     }
 }

@@ -225,7 +225,11 @@ The selected DataForge is the only payload input. `requested_languages` retains 
 policy. Reference payloads preserve their target header and resolution state without opening
 the target Record's body.
 
-This endpoint supplies the source-definition dataset. The remaining Contracts SDK work covers
-contracts, selected `contractLocationQueries` and spawn pools, `missionPropertySets`,
-resolved introductions, template and Broker dependencies, and canonical projected title texts.
-Those domain projectors require their own selected source and dependency closure.
+This endpoint supplies the source-definition dataset. Use `with_contracts` for canonical contracts
+by physical Generator owner, or `with_contract` with `ContractKey` for one parent/sub-contract
+identity. Both return the selected titles, property sets, location queries and spawn pools with
+their actual source and dependency closure. Forward inputs are prepared only when the shared
+canonical interpreter needs their typed lookup. Check coverage before replacing a consumer cache.
+
+See [Contract queries](catalog-contract-queries.md) for callback lifetimes, parsed-session reuse,
+global duplicate and intro semantics, complete original views and source-inventory ownership.

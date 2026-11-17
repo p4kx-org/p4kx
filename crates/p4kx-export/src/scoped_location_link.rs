@@ -14,32 +14,34 @@ pub(crate) use crate::source_pointer::SourcePointer;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct PropertyReference {
+#[non_exhaustive]
+pub struct PropertyReference {
     /// The resolved target position in this Build, null when no physical target is known.
-    pub(crate) target_record_index: Option<u32>,
+    pub target_record_index: Option<u32>,
     /// The target Record GUID when known.
-    pub(crate) record_guid: Option<CatalogGuid>,
+    pub record_guid: Option<CatalogGuid>,
     /// The target Record path when known.
-    pub(crate) record_path: Option<String>,
+    pub record_path: Option<String>,
     /// The source target struct name when known.
-    pub(crate) target_type: Option<String>,
+    pub target_type: Option<String>,
     /// The canonical source location within the target Record.
-    pub(crate) location: Option<String>,
+    pub location: Option<String>,
     /// The resolved `missionVariableName`, retaining an empty source string.
-    pub(crate) variable: Option<String>,
+    pub variable: Option<String>,
     /// The owner-scoped resolution outcome.
-    pub(crate) status: PropertyReferenceStatus,
+    pub status: PropertyReferenceStatus,
     /// Raw instance coordinates retained for an unresolved source pointer.
-    pub(crate) source_pointer: Option<SourcePointer>,
+    pub source_pointer: Option<SourcePointer>,
     /// The source read error when available, without a fabricated target value.
-    pub(crate) source_error: Option<String>,
+    pub source_error: Option<String>,
 }
 
 /// The result of resolving a weak link within its original owner.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
-pub(crate) enum PropertyReferenceStatus {
+#[non_exhaustive]
+pub enum PropertyReferenceStatus {
     /// The original owner contains the linked mission property.
     Resolved,
     /// The declared target cannot be located.

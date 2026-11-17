@@ -201,6 +201,15 @@ impl<'source> MissionPropertySets<'source> {
             .iter()
             .flat_map(|(&guid, owners)| owners.values().map(move |owner| (guid, owner)))
     }
+    pub(crate) fn retain_guids(&mut self, guids: &std::collections::BTreeSet<Guid>) {
+        self.rows.retain(|guid, _| guids.contains(guid));
+    }
+
+    pub(crate) fn retain_owners(&mut self, owners: &std::collections::BTreeSet<u32>) {
+        self.rows
+            .retain(|_, row| row.owners.keys().any(|index| owners.contains(index)));
+    }
+
     pub(crate) fn publish(
         self,
         projection: &CatalogProjection<'_, 'source>,

@@ -19,7 +19,8 @@ mod organization;
 mod token_inputs;
 
 pub(crate) use self::evidence::{Consulted, Decisions, MissionKey, SelectedKey};
-pub(crate) use self::item_choice::{MissionItemChoice, MissionItemGap};
+pub(crate) use self::item_choice::MissionItemChoice;
+pub use self::item_choice::MissionItemGap;
 pub(crate) use self::item_texts::MissionItemTexts;
 pub(crate) use self::organization::OrganizationTexts;
 pub(crate) use self::token_inputs::TokenChoice;

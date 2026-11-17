@@ -7,7 +7,7 @@ mod rows;
 mod text;
 
 pub(crate) use rows::{MissionPropertySets, SetOwner};
-pub(crate) use text::MissionPropertyText;
+pub use text::MissionPropertyText;
 
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -34,34 +34,36 @@ pub enum MissionPropertyLevel {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct MissionPropertyDeclaration<'f> {
+#[non_exhaustive]
+pub struct MissionPropertyDeclaration<'f> {
     /// The exact source `missionVariableName`, including an empty string.
-    pub(crate) variable: Option<String>,
+    pub variable: Option<String>,
     /// The exact source `extendedTextToken`, including an empty string.
-    pub(crate) token: Option<String>,
+    pub token: Option<String>,
     /// The concrete source value type without its `MissionPropertyValue_` prefix.
-    pub(crate) value_type: Option<String>,
+    pub value_type: Option<String>,
     /// The complete typed value, null for an absent or null value pointer.
-    pub(crate) value: Option<PropertyValue<'f>>,
+    pub value: Option<PropertyValue<'f>>,
 }
 
 /// One authored `propertyOverrides` array, identified independently of its mutable payload.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct MissionPropertySet<'f> {
+#[non_exhaustive]
+pub struct MissionPropertySet<'f> {
     /// The stable identifier derived from source Record GUID and authored location.
-    pub(crate) guid: CatalogGuid,
+    pub guid: CatalogGuid,
     /// The original owning Record GUID.
-    pub(crate) record_guid: CatalogGuid,
+    pub record_guid: CatalogGuid,
     /// The original owning Record path, without .xml.
-    pub(crate) record_path: &'f str,
+    pub record_path: &'f str,
     /// The original owning Record struct.
-    pub(crate) source_type: &'f str,
+    pub source_type: &'f str,
     /// The canonical location of the authored `propertyOverrides` array within its Record.
-    pub(crate) source_location: String,
+    pub source_location: String,
     /// The authoring level, without resolving which declaration wins at runtime.
-    pub(crate) level: MissionPropertyLevel,
+    pub level: MissionPropertyLevel,
     /// Declarations in source order, retaining null pointer elements.
-    pub(crate) properties: Vec<Option<MissionPropertyDeclaration<'f>>>,
+    pub properties: Vec<Option<MissionPropertyDeclaration<'f>>>,
 }

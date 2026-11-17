@@ -9,7 +9,8 @@ use crate::CatalogFailure;
 
 /// A catalog read failure retaining its original Record until header capture.
 #[derive(Clone)]
-pub(crate) struct CatalogReadFailure<'source> {
+#[non_exhaustive]
+pub struct CatalogReadFailure<'source> {
     record: Record<'source>,
     canonical: Option<Box<DataForgeError>>,
     record_path: &'source str,
@@ -32,19 +33,27 @@ impl<'source> CatalogReadFailure<'source> {
         failure
     }
 
-    pub(crate) const fn guid(&self) -> Guid {
+    /// The original owning Record GUID.
+    #[must_use]
+    pub const fn guid(&self) -> Guid {
         self.record.guid()
     }
 
-    pub(crate) const fn reason(&self) -> &str {
+    /// The rendered cause chain from the actual source failure.
+    #[must_use]
+    pub const fn reason(&self) -> &str {
         self.reason.as_str()
     }
 
-    pub(crate) const fn record(&self) -> &Record<'source> {
+    /// The original physical Record retaining its source metadata.
+    #[must_use]
+    pub const fn record(&self) -> &Record<'source> {
         &self.record
     }
 
-    pub(crate) fn canonical_error(&self) -> Option<&DataForgeError> {
+    /// The canonical DataForge cause, when the failure carries one.
+    #[must_use]
+    pub fn canonical_error(&self) -> Option<&DataForgeError> {
         self.canonical.as_deref()
     }
 

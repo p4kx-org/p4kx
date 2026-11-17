@@ -7,6 +7,7 @@ use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_read::original::OriginalFlowFields;
 use crate::contract_facts::{LayeredFacts, Stated};
 use crate::mission_index::MissionIndex;
+use crate::record_read::ReadError;
 use crate::{CatalogError, ExportAccountingError};
 
 use super::choice::{Choice, Selected};
@@ -43,7 +44,7 @@ impl<'fields, 'scope, 'read, 'source> PreparedFacts<'fields, 'scope, 'read, 'sou
         fields: &'fields OriginalFlowFields<'scope, 'read, 'source>,
         (handler, contract): (&StructValue<'source>, &StructValue<'source>),
         (index, origins): (&MissionIndex<'source>, &CatalogOrigins),
-    ) -> Result<Self, CatalogError> {
+    ) -> Result<Self, ReadError> {
         fields.check_context(&origins.uses, &origins.dataforge, fields.record_index())?;
         index.check_template_source(origins)?;
         let reader = Reader::new(fields);
@@ -138,7 +139,7 @@ impl<'source> TemplateDefaults<'_, 'source> {
         reader: &Reader<'fields, 'scope, 'read, 'source>,
         layers: &mut ParentLayers<'_, 'fields, 'scope, 'read, 'source>,
         field: TemplateField,
-    ) -> Result<Choice<bool>, CatalogError> {
+    ) -> Result<Choice<bool>, ReadError> {
         reader.with_template(field.parameter(), layers, |evidence| {
             let caller = match &mut self.caller {
                 Some(caller) => caller,
@@ -156,6 +157,7 @@ impl<'source> TemplateDefaults<'_, 'source> {
             selected
                 .map(|(value, payload)| Selected::template(value, payload))
                 .transpose()
+                .map_err(Into::into)
         })
     }
 
@@ -164,8 +166,8 @@ impl<'source> TemplateDefaults<'_, 'source> {
         guid: Guid,
         field: TemplateField,
         consulted: &mut Vec<SourceUse>,
-    ) -> Result<Option<(bool, SourceUse)>, CatalogError> {
-        let Some(template) = self.index.template(guid) else {
+    ) -> Result<Option<(bool, SourceUse)>, ReadError> {
+        let Some(template) = self.index.lookup_template(guid)? else {
             for failure in self.index.failed_templates(guid) {
                 failure.retain_attempted(self.origins, consulted)?;
             }
@@ -174,10 +176,14 @@ impl<'source> TemplateDefaults<'_, 'source> {
         let facts = template
             .facts
             .as_deref()
-            .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+            .ok_or_else(|| CatalogError::from(ExportAccountingError::ConflictingSourceDatum))?;
         match field {
-            TemplateField::Sharing => facts.retain_can_be_shared(self.origins, consulted),
-            TemplateField::Legality => facts.retain_illegal(self.origins, consulted),
+            TemplateField::Sharing => facts
+                .retain_can_be_shared(self.origins, consulted)
+                .map_err(Into::into),
+            TemplateField::Legality => facts
+                .retain_illegal(self.origins, consulted)
+                .map_err(Into::into),
         }
     }
 }

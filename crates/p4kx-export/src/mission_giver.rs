@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use crate::CatalogError;
 use crate::catalog_projection::CatalogProjection;
 use crate::contract_missions::{ContractFaction, ReputationGain};
 use crate::contract_offer::{GiverFaction, GiverSource};
 use crate::guid_text::CatalogGuid;
 use crate::mission_index::MissionIndex;
+use crate::record_read::ReadError;
 
 /// A faction as a Reference states it: its GUID and the Record name from the path.
 pub(crate) type FactionLink<'f> = (CatalogGuid, &'f str);
@@ -16,9 +16,9 @@ pub(crate) fn faction<'f>(
     (guid, name): FactionLink<'f>,
     index: &MissionIndex<'f>,
     projection: &CatalogProjection<'_, 'f>,
-) -> Result<ContractFaction<'f>, CatalogError> {
+) -> Result<ContractFaction<'f>, ReadError> {
     let display_name = index
-        .faction_name(guid.0)
+        .lookup_faction_name(guid.0)?
         .map(|key| projection.finish_protected_key(key.clone()))
         .transpose()?;
     Ok(ContractFaction {
@@ -38,7 +38,7 @@ pub(crate) fn giver<'f>(
     prerequisite: Option<FactionLink<'f>>,
     index: &MissionIndex<'f>,
     projection: &CatalogProjection<'_, 'f>,
-) -> Result<Option<GiverFaction<'f>>, CatalogError> {
+) -> Result<Option<GiverFaction<'f>>, ReadError> {
     if let Some(faction) = handler {
         return Ok(Some(GiverFaction {
             source: GiverSource::Handler,

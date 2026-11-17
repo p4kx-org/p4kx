@@ -3,26 +3,29 @@
 
 use std::cell::RefCell;
 
-use p4kx_extraction::{RecordTree, StructValue, TagTree, Value};
+use p4kx_extraction::{RecordTree, StructValue, TagTree};
 
 use crate::catalog_read::original::RecordSubject;
 use crate::guid_text::CatalogGuid;
-use crate::mission_property_fields as fields;
 use crate::mission_property_set::{MissionPropertyLevel, MissionPropertySet, MissionPropertySets};
-use crate::mission_property_set_index::MissionPropertySetIndex;
 use crate::record_observation::RecordObservation;
 use crate::record_read::ReadError;
 use crate::source_fields::FieldCapture;
-use crate::spawn_model::content_guid;
 use crate::spawn_pools::SpawnPools;
 use crate::spawn_read::Reader;
 use crate::template_property_read::PropertyReader;
+
+#[path = "mission_property_set_links.rs"]
+pub(crate) mod links;
+
+use links::MissionPropertySetLinks;
+pub(crate) use links::identity;
 
 /// Canonical property-set registration for one immutable owning Record.
 pub(crate) struct MissionPropertySetRegistry<'r, 'f> {
     tree: &'r RecordTree<'f>,
     subject: RecordSubject,
-    index: MissionPropertySetIndex<'r, 'f>,
+    links: MissionPropertySetLinks<'r, 'f>,
     reader: Reader<'r, 'f>,
     capture: &'r dyn FieldCapture<'f>,
     spawns: RefCell<SpawnPools<'f>>,
@@ -50,7 +53,7 @@ impl<'r, 'f> MissionPropertySetRegistry<'r, 'f> {
         let registry = Self {
             tree,
             subject,
-            index: MissionPropertySetIndex::new(tree.root())?,
+            links: MissionPropertySetLinks::new(tree)?,
             reader: Reader::for_observed(tags, tree, capture)?,
             capture,
             spawns: RefCell::new(SpawnPools::default()),
@@ -69,23 +72,10 @@ impl<'r, 'f> MissionPropertySetRegistry<'r, 'f> {
         contract: &'r StructValue<'f>,
         sub: Option<&'r StructValue<'f>>,
     ) -> Result<Vec<CatalogGuid>, ReadError> {
-        let handler = fields::parameter(handler, "contractParams", self.capture)?;
-        let contract = fields::parameter(contract, "paramOverrides", self.capture)?;
-        let sub = sub
-            .map(|sub| {
-                fields::parameter(sub, "paramOverrides", self.capture)
-                    .map(|params| params.or(Some(sub)))
-            })
-            .transpose()?
-            .flatten();
-        [
-            (MissionPropertyLevel::Handler, handler),
-            (MissionPropertyLevel::Contract, contract),
-            (MissionPropertyLevel::SubContract, sub),
-        ]
-        .into_iter()
-        .filter_map(|(level, params)| self.register(level, params).transpose())
-        .collect()
+        links::row_scopes(handler, contract, sub, self.capture)?
+            .into_iter()
+            .filter_map(|scope| self.register(scope.level, scope.parameters).transpose())
+            .collect()
     }
 
     fn register(
@@ -93,44 +83,18 @@ impl<'r, 'f> MissionPropertySetRegistry<'r, 'f> {
         level: MissionPropertyLevel,
         params: Option<&'r StructValue<'f>>,
     ) -> Result<Option<CatalogGuid>, ReadError> {
-        let Some(params) = params else {
+        let Some(source) = self.links.source(params, self.capture)? else {
             return Ok(None);
         };
-        let Some(value) = params.field("propertyOverrides") else {
-            return Ok(None);
-        };
-        if matches!(value, Value::Null) {
-            return Ok(None);
-        }
-        let location = self
-            .index
-            .location(params)
-            .ok_or("property source is outside its original Record")?;
-        let source_location = if location.is_empty() {
-            "propertyOverrides".to_owned()
-        } else {
-            format!("{location}.propertyOverrides")
-        };
-        let guid = content_guid(&(
-            "missionPropertySet",
-            CatalogGuid(self.tree.guid()),
-            &source_location,
-        ))?;
+        let guid = source.guid;
         if self.sets.borrow().contains(guid) {
             return Ok(Some(guid));
         }
-        let Value::Array(values) = value else {
-            return Err(fields::malformed(
-                params,
-                "propertyOverrides",
-                value,
-                "an authored property array",
-                self.capture,
-            ));
-        };
         let reader = PropertyReader::new(&self.reader, &self.spawns);
-        let properties = reader.source_properties(params, values)?;
-        let body = self.capture.record_field(params, value, &source_location)?;
+        let properties = reader.source_properties(source.parameters, source.values)?;
+        let body = self
+            .capture
+            .record_field(source.parameters, source.value, &source.location)?;
         self.sets.borrow_mut().insert_subject(
             self.subject.clone(),
             MissionPropertySet {
@@ -138,7 +102,7 @@ impl<'r, 'f> MissionPropertySetRegistry<'r, 'f> {
                 record_guid: CatalogGuid(self.tree.guid()),
                 record_path: self.tree.record_path(),
                 source_type: self.tree.type_name(),
-                source_location,
+                source_location: source.location,
                 level,
                 properties,
             },

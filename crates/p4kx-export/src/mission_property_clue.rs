@@ -19,21 +19,23 @@ mod text;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = crate::contract::every_field_required)]
-pub(crate) struct InvestigationClueItem<'f> {
+#[non_exhaustive]
+pub struct InvestigationClueItem<'f> {
     /// The declared item Entity without following its Record.
-    pub(crate) entity_class: Option<DefinitionReference>,
+    pub entity_class: Option<DefinitionReference>,
     /// The authored spawn tags.
-    pub(crate) spawn_tags: Option<SourceTagList>,
+    pub spawn_tags: Option<SourceTagList>,
     /// Ordered clue declarations, retaining null pointers.
-    pub(crate) clues: Option<Vec<Option<InvestigationClue<'f>>>>,
+    pub clues: Option<Vec<Option<InvestigationClue<'f>>>>,
     /// The concrete subtype-specific fields.
-    pub(crate) details: ClueItemDetails,
+    pub details: ClueItemDetails,
 }
 
 /// The subtype-specific source fields of an investigation clue item.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "camelCase")]
-pub(crate) enum ClueItemDetails {
+#[non_exhaustive]
+pub enum ClueItemDetails {
     /// `Investigation_ClueItem` has no subtype fields.
     Base,
     /// `Investigation_ClueItem_Corpse`.
@@ -53,21 +55,23 @@ pub(crate) enum ClueItemDetails {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = crate::contract::every_field_required)]
-pub(crate) struct InvestigationClue<'f> {
+#[non_exhaustive]
+pub struct InvestigationClue<'f> {
     /// The authored long objective text.
     #[schemars(with = "SourcedValue<GameTextRef>", extend("x-gameText" = true))]
-    pub(crate) objective_long_description: MissionPropertyText<'f>,
+    pub objective_long_description: MissionPropertyText<'f>,
     /// The authored short objective text.
     #[schemars(with = "SourcedValue<GameTextRef>", extend("x-gameText" = true))]
-    pub(crate) objective_short_description: MissionPropertyText<'f>,
+    pub objective_short_description: MissionPropertyText<'f>,
     /// The concrete subtype-specific fields.
-    pub(crate) details: ClueDetails<'f>,
+    pub details: ClueDetails<'f>,
 }
 
 /// The subtype-specific source fields of an investigation clue.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "camelCase")]
-pub(crate) enum ClueDetails<'f> {
+#[non_exhaustive]
+pub enum ClueDetails<'f> {
     /// `Investigation_Clue` has no subtype fields.
     Base,
     /// `Investigation_Clue_CorpseScanInfo`.

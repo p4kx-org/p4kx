@@ -21,6 +21,7 @@ use crate::mission_index::MissionIndex;
 use crate::mission_layers::one;
 use crate::mission_results::{entry_results, gains};
 use crate::mission_standing::{Standing, required_faction};
+use crate::record_read::ReadError;
 use crate::source_value_catalog::SourceValueRef;
 use crate::spawn_layers::Resolved;
 
@@ -73,7 +74,7 @@ impl<'f> Rewards<'f> {
         handler_faction: Option<&ContractFaction<'f>>,
         index: &MissionIndex<'f>,
         (fields, projection): (&OriginalFlowFields<'_, '_, 'f>, &CatalogProjection<'_, 'f>),
-    ) -> Result<Self, CatalogError> {
+    ) -> Result<Self, ReadError> {
         let block = entry_results(contract, sub);
         let gains = gains(fields, projection.original(), index, contract, sub)?;
         let giver_faction = giver(

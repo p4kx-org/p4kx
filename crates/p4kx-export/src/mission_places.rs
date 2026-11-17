@@ -10,8 +10,10 @@ use crate::contract_offer::OfferedAt;
 use crate::contract_starmap::StarmapObject;
 use crate::guid_text::CatalogGuid;
 use crate::mission_index::MissionIndex;
+use crate::mission_index::demand::{DependencyKey, PreparedDependencies};
 use crate::mission_layers::items;
 use crate::record_fields::linked;
+use crate::record_read::ReadError;
 
 const LOCALITY: &str = "ContractPrerequisite_Locality";
 const LOCATION: &str = "ContractPrerequisite_Location";
@@ -55,13 +57,22 @@ impl Where {
 /// The starmap objects by GUID, to turn the places of a contract into names.
 pub(crate) struct Places<'s, 'f> {
     objects: HashMap<Guid, &'s StarmapObject<'f>>,
+    prepared: PreparedDependencies,
 }
 
 impl<'s, 'f> Places<'s, 'f> {
     pub(crate) fn new(objects: &'s [StarmapObject<'f>]) -> Self {
+        Self::with_dependencies(objects.iter(), PreparedDependencies::default())
+    }
+
+    pub(crate) fn with_dependencies(
+        objects: impl IntoIterator<Item = &'s StarmapObject<'f>>,
+        prepared: PreparedDependencies,
+    ) -> Self {
         Self {
+            prepared,
             objects: objects
-                .iter()
+                .into_iter()
                 .map(|object| (object.guid.0, object))
                 .collect(),
         }
@@ -74,16 +85,18 @@ impl<'s, 'f> Places<'s, 'f> {
         &self,
         index: &MissionIndex<'f>,
         levels: &[&Where],
-    ) -> Vec<PickupPlace<'f>> {
-        let listed = unique(levels.iter().flat_map(|level| {
-            level
-                .localities
-                .iter()
-                .flat_map(|locality| index.locality(*locality).iter().copied())
-                .chain(level.locations.iter().copied())
-        }));
+    ) -> Result<Vec<PickupPlace<'f>>, ReadError> {
+        let mut available = Vec::new();
+        for level in levels {
+            for locality in &level.localities {
+                available.extend(index.lookup_locality(*locality)?.iter().copied());
+            }
+            available.extend(level.locations.iter().copied());
+        }
+        let listed = unique(available.into_iter());
         let mut ranked: Vec<(u8, Guid, &StarmapObject<'f>)> = Vec::new();
         for guid in listed {
+            self.prepared.require(DependencyKey::Place(guid))?;
             let Some(object) = self.objects.get(&guid).copied() else {
                 continue;
             };
@@ -103,10 +116,10 @@ impl<'s, 'f> Places<'s, 'f> {
             ranked.push((rank, guid, object));
         }
         ranked.sort_by_key(|(rank, _, _)| *rank);
-        ranked
+        Ok(ranked
             .into_iter()
             .map(|(_, guid, object)| describe(guid, Some(object)))
-            .collect()
+            .collect())
     }
 
     /// Returns the pickup places and everywhere the contract is offered. A contract left without
@@ -117,9 +130,9 @@ impl<'s, 'f> Places<'s, 'f> {
         index: &MissionIndex<'f>,
         prerequisites: &Prerequisites<'_>,
         broker: Option<Guid>,
-    ) -> (Vec<PickupPlace<'f>>, OfferedAt<'f>) {
+    ) -> Result<(Vec<PickupPlace<'f>>, OfferedAt<'f>), ReadError> {
         let levels = prerequisites.levels();
-        let mut pickup = self.pickup(index, &levels);
+        let mut pickup = self.pickup(index, &levels)?;
         if pickup.is_empty()
             && let Some(location) = broker
         {
@@ -127,15 +140,19 @@ impl<'s, 'f> Places<'s, 'f> {
                 localities: Vec::new(),
                 locations: vec![location],
             };
-            pickup = self.pickup(index, &[&at_broker]);
+            pickup = self.pickup(index, &[&at_broker])?;
         }
-        (pickup, self.offered(&levels, broker))
+        Ok((pickup, self.offered(&levels, broker)?))
     }
 
     /// Returns every place the levels `levels` name, uncapped: their localities and their
     /// location objects, each in stored order and none twice. When they name no place at all the
     /// location `fallback` is the only one and `broker_fallback` is set.
-    fn offered(&self, levels: &[&Where], fallback: Option<Guid>) -> OfferedAt<'f> {
+    fn offered(
+        &self,
+        levels: &[&Where],
+        fallback: Option<Guid>,
+    ) -> Result<OfferedAt<'f>, ReadError> {
         let localities = unique(
             levels
                 .iter()
@@ -150,14 +167,18 @@ impl<'s, 'f> Places<'s, 'f> {
         if broker_fallback {
             locations.extend(fallback);
         }
-        OfferedAt {
+        let locations = locations
+            .into_iter()
+            .map(|guid| {
+                self.prepared.require(DependencyKey::Place(guid))?;
+                Ok(describe(guid, self.objects.get(&guid).copied()))
+            })
+            .collect::<Result<_, ReadError>>()?;
+        Ok(OfferedAt {
             locality_guids: localities.into_iter().map(CatalogGuid).collect(),
-            locations: locations
-                .into_iter()
-                .map(|guid| describe(guid, self.objects.get(&guid).copied()))
-                .collect(),
+            locations,
             broker_fallback,
-        }
+        })
     }
 }
 

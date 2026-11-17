@@ -25,21 +25,27 @@ pub(crate) struct PendingNpcName<'source> {
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(rename = "NpcSpawnName", transform = every_field_required)]
-pub(crate) struct NpcSpawnName<Text = SourcedValue<GameTextRef>> {
-    pub(crate) random_name: Option<bool>,
-    pub(crate) random_last_name: Option<bool>,
-    pub(crate) random_nick_name: Option<bool>,
+#[non_exhaustive]
+pub struct NpcSpawnName<Text = SourcedValue<GameTextRef>> {
+    /// The random name of this projection.
+    pub random_name: Option<bool>,
+    /// The random last name of this projection.
+    pub random_last_name: Option<bool>,
+    /// The random nick name of this projection.
+    pub random_nick_name: Option<bool>,
     /// The original `characterGivenName`.
     #[schemars(extend("x-gameText" = true))]
-    pub(crate) given_name: Text,
+    pub given_name: Text,
     /// The original `characterGivenLastName`.
     #[schemars(extend("x-gameText" = true))]
-    pub(crate) given_last_name: Text,
+    pub given_last_name: Text,
     /// The original `characterGivenNickName`.
     #[schemars(extend("x-gameText" = true))]
-    pub(crate) given_nick_name: Text,
-    pub(crate) chance_of_nick_name: Option<f32>,
-    pub(crate) name_data_guid: Option<CatalogGuid>,
+    pub given_nick_name: Text,
+    /// The chance of nick name of this projection.
+    pub chance_of_nick_name: Option<f32>,
+    /// The name data guid of this projection.
+    pub name_data_guid: Option<CatalogGuid>,
 }
 
 impl<'source> PendingNpcName<'source> {

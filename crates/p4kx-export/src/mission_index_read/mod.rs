@@ -3,7 +3,7 @@
 
 mod catalog_scope;
 mod projection;
-mod selection;
+pub(crate) mod selection;
 
 #[cfg(test)]
 use p4kx_extraction::DataForge;
@@ -127,9 +127,25 @@ pub(super) fn read<'f>(
     captured_tags: Option<&CapturedTags<'_, 'f>>,
     cancel: Option<&CancelToken>,
 ) -> Result<Option<ReadPiece<'f>>, CatalogError> {
-    if cancel.is_some_and(CancelToken::is_cancelled) {
-        return Err(CatalogError::Cancelled);
-    }
+    read_cached(trees, record, tags, input, captured_tags, cancel, None)
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum CachedTree<'tree, 'source> {
+    Read(&'tree p4kx_extraction::RecordTree<'source>),
+    Failed(&'tree p4kx_extraction::DataForgeError),
+}
+
+pub(super) fn read_cached<'f>(
+    trees: &mut TreeBuilder<'f>,
+    record: &Record<'f>,
+    tags: &TagTree,
+    input: Option<&OriginalCatalogInput<'_, '_>>,
+    captured_tags: Option<&CapturedTags<'_, 'f>>,
+    cancel: Option<&CancelToken>,
+    cached: Option<CachedTree<'_, 'f>>,
+) -> Result<Option<ReadPiece<'f>>, CatalogError> {
+    crate::catalog_query_session::checkpoint(cancel)?;
     let Some((admission, selection)) = RecordObservation::capture_selected(input, record, || {
         selection::choose_dependency(record)
     })?
@@ -148,33 +164,44 @@ pub(super) fn read<'f>(
             return candidate(&admission, &error, None).map(Some);
         }
     };
-    let tree = match trees.build(record) {
-        Ok(tree) => tree,
-        Err(error) => {
+    let decoded;
+    let tree = match cached {
+        Some(CachedTree::Failed(error)) => {
             return failed(
                 ExportLedger::default(),
                 action,
                 &admission,
                 SourceDisposition::ReadFailed,
-                &error,
+                error,
                 input,
             )
             .map(Some);
         }
-    };
-    let (ledger, name) = inspect_dependency(action, input, &tree, &admission, cancel)?;
-    let projected = name.map_or_else(
-        || {
-            project(
-                action,
-                &admission,
-                &tree,
-                tags,
-                input,
-                captured_tags,
-                cancel,
-            )
+        Some(CachedTree::Read(tree)) => {
+            admission.check_tree(tree)?;
+            tree
+        }
+        None => match trees.build(record) {
+            Ok(tree) => {
+                decoded = tree;
+                &decoded
+            }
+            Err(error) => {
+                return failed(
+                    ExportLedger::default(),
+                    action,
+                    &admission,
+                    SourceDisposition::ReadFailed,
+                    &error,
+                    input,
+                )
+                .map(Some);
+            }
         },
+    };
+    let (ledger, name) = inspect_dependency(action, input, tree, &admission, cancel)?;
+    let projected = name.map_or_else(
+        || project(action, &admission, tree, tags, input, captured_tags, cancel),
         |name| Ok(Some(Piece::Faction(tree.guid(), name))),
     );
     finish_projection(projected, ledger, action, &admission, input).map(Some)

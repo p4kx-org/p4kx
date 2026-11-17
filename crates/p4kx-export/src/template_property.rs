@@ -49,7 +49,8 @@ impl PropertyKind {
 /// The value of a mission property (`MissionPropertyValue_*`), tagged by `type`.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "camelCase")]
-pub(crate) enum PropertyValue<'a> {
+#[non_exhaustive]
+pub enum PropertyValue<'a> {
     /// `MissionPropertyValue_ScopedLocation` with all declared source filters.
     ScopedLocation(Box<ScopedLocation>),
     /// `MissionPropertyValue_AutoSpawns` without computing runtime spawns.

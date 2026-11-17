@@ -13,8 +13,8 @@ const LOCALITIES: &str = "libs/foundry/records/missiondata/pu_missionlocality/";
 const BROKERS: &str = "libs/foundry/records/missionbroker/";
 const FACTIONS: &str = "libs/foundry/records/factions/factionreputation/";
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum Action {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum Action {
     Template,
     Type,
     Organization,
@@ -44,12 +44,12 @@ pub(super) fn choose(record: &Record<'_>) -> Result<Option<Action>, DataForgeErr
     choose_at_path(record, record.record_path()?)
 }
 
-pub(super) enum SelectionError {
+pub(crate) enum SelectionError {
     Path(DataForgeError),
     SourceType(DataForgeError),
 }
 
-pub(super) fn choose_dependency(record: &Record<'_>) -> Option<Result<Action, SelectionError>> {
+pub(crate) fn choose_dependency(record: &Record<'_>) -> Option<Result<Action, SelectionError>> {
     match record.record_path() {
         Ok(path) => choose_at_path(record, path)
             .map_err(SelectionError::SourceType)

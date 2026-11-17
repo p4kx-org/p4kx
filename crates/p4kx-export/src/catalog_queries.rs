@@ -8,6 +8,34 @@ mod blueprint_categories;
 #[path = "unlocalized_record_query.rs"]
 mod unlocalized_record_query;
 
+#[path = "contract_query.rs"]
+mod contracts;
+pub use contracts::{
+    AutoSpawnSettings, AutoSpawns, BlueprintReward, BlueprintSource, CatalogRecordFailure,
+    ClassFilter, ClassTarget, ClassTargets, ClueDetails, ClueItemDetails, ContractBase,
+    ContractCooldown, ContractDependencyCoverage, ContractDiagnosticExample, ContractEntry,
+    ContractFaction, ContractFacts, ContractKey, ContractOccurrence, ContractQueryCoverage,
+    ContractQueryDiagnostic, ContractSnapshot, ContractWithTitles, CooldownLayers,
+    DefinitionReference, DependentProperty, EntitySpawnGroup, EntitySpawnOption, EntitySpawnPool,
+    EntitySpawnSlot, FactLayer, FactionFilter, FixedReward, FloatOption, FunctionFilter,
+    FunctionTarget, FunctionTargets, GiverFaction, GiverSource, HaulingItem, HaulingItemKind,
+    HaulingOrder, HaulingRequirement, HaulingSource, Hostility, IntegerOption, Investigation,
+    InvestigationClue, InvestigationClueItem, InvestigationLocation, InvestigationName,
+    InvestigationNameSource, InvestigationSuspect, ItemToken, ItemTokenOutcome, LayeredFacts,
+    LocationCondition, LocationCount, LocationPrerequisite, LocationQuery, LocationQueryLink,
+    MissionItemGap, MissionPropertyDeclaration, MissionPropertySet, MissionPropertyText,
+    MissionReward, MissionTitles, NpcSpawnGroup, NpcSpawnName, NpcSpawnOption, NpcSpawnPool,
+    OfferedAt, OptionMetadata, OtherLocationFilter, OwnedReference, OwnedReferenceStatus,
+    PickupPlace, ProjectedMissionText, PropertyReference, PropertyReferenceStatus, PropertyTarget,
+    PropertyTargets, PropertyValue, PublishedNpcPool, RelativeLocationFilter, RelativeTarget,
+    ReputationGain, RequiredIntro, ScopedLocation, ShadowedContract, ShipSpawnGroup,
+    ShipSpawnOption, ShipSpawnPool, ShipSpawnSlot, SizeFilter, SizeTarget, SizeTargets,
+    SourcePointer, SourceTagList, SpawnClosetSearchOptions, SpawnInventoryItem, SpawnLevel,
+    SpawnPoolLink, SpawnTagText, StandingLevel, StandingRequirement, Stated, StringOption,
+    TagOption, TagPaths, TagTerm, TimeTrialSplit, with_contract, with_contract_from,
+    with_contracts, with_contracts_from,
+};
+
 #[path = "contract_generator_query.rs"]
 mod contract_generators;
 

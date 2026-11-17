@@ -9,12 +9,13 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::CatalogError;
+use crate::record_read::ReadError;
 
 #[path = "mission_title_item_audit.rs"]
 mod item_audit;
 
 pub(crate) use self::item_audit::SelectedItemKey;
-use self::item_audit::{ItemToken, ItemTokenOutcome};
+pub use self::item_audit::{ItemToken, ItemTokenOutcome};
 use crate::catalog_origins::CatalogLocaleInput;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_text_contract::GameTextRef;
@@ -27,14 +28,18 @@ use crate::texts::TextProjection;
 /// One authored key and the derived text of each actually available language.
 #[derive(Debug, Serialize, JsonSchema)]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ProjectedMissionText<'source> {
+#[non_exhaustive]
+pub struct ProjectedMissionText<'source> {
+    /// The key of this projection.
     #[schemars(extend("x-gameText" = true))]
-    pub(crate) key: SourcedValue<GameTextRef>,
+    pub key: SourcedValue<GameTextRef>,
+    /// The translations of this projection.
     #[schemars(extend("x-gameText" = true))]
-    pub(crate) translations: BTreeMap<&'static str, SourcedValue<Cow<'source, str>>>,
+    pub translations: BTreeMap<&'static str, SourcedValue<Cow<'source, str>>>,
+    /// The item tokens of this projection.
     #[serde(rename = "itemTokens")]
     #[schemars(extend("x-gameText" = true))]
-    item_tokens: BTreeMap<&'static str, Vec<ItemToken>>,
+    pub item_tokens: BTreeMap<&'static str, Vec<ItemToken>>,
 }
 
 pub(crate) enum ResolvedToken<'read, 'source> {
@@ -54,7 +59,7 @@ type Resolve<'query, 'read, 'source> = dyn FnMut(
         &str,
         Option<&str>,
         &mut Consulted<'read>,
-    ) -> Result<Option<ResolvedToken<'read, 'source>>, CatalogError>
+    ) -> Result<Option<ResolvedToken<'read, 'source>>, ReadError>
     + 'query;
 
 pub(crate) fn project<'read, 'source>(
@@ -62,7 +67,7 @@ pub(crate) fn project<'read, 'source>(
     selected: &SelectedMissionText<'read, 'source>,
     resolve: &mut Resolve<'_, 'read, 'source>,
     cancel: Option<&CancelToken>,
-) -> Result<ProjectedMissionText<'source>, CatalogError> {
+) -> Result<ProjectedMissionText<'source>, ReadError> {
     mission_title::check_cancel(cancel)?;
     let origins = projection.origins();
     let Some(key) = selected.key else {
@@ -80,7 +85,7 @@ pub(crate) fn project<'read, 'source>(
         });
     };
     let (reference, (translations, item_tokens)) =
-        projection.mission_key(key, |prepared, evidence| {
+        projection.mission_key_fallible(key, |prepared, evidence| {
             let mut translations = BTreeMap::new();
             let mut item_tokens = BTreeMap::new();
             for (&language, text) in prepared {
@@ -101,7 +106,7 @@ pub(crate) fn project<'read, 'source>(
                     item_tokens.insert(language.code(), rendered.item_tokens);
                 }
             }
-            Ok((translations, item_tokens))
+            Ok::<_, ReadError>((translations, item_tokens))
         })?;
     Ok(ProjectedMissionText {
         key: origins
@@ -183,7 +188,7 @@ impl<'source> LanguageInputs<'_, '_, 'source> {
         decisions: &[SourceUse],
         resolve: &mut Resolve<'_, 'read, 'source>,
         cancel: Option<&CancelToken>,
-    ) -> Result<RenderedLanguage<'source>, CatalogError> {
+    ) -> Result<RenderedLanguage<'source>, ReadError> {
         let mut used = Consulted::new(decisions)?;
         let state = LookupState::read(text);
         state.retain(self.locale, self.language, self.selector, used.uses_mut())?;
@@ -216,7 +221,7 @@ impl<'source> LanguageInputs<'_, '_, 'source> {
         item_tokens: &mut Vec<ItemToken>,
         resolve: &mut Resolve<'_, 'read, 'source>,
         cancel: Option<&CancelToken>,
-    ) -> Result<Cow<'source, str>, CatalogError> {
+    ) -> Result<Cow<'source, str>, ReadError> {
         let mut lookups = HashMap::new();
 
         let mut keys = Vec::new();
@@ -245,7 +250,7 @@ impl<'source> LanguageInputs<'_, '_, 'source> {
                     item_tokens,
                 )?;
             }
-            Ok(match selected {
+            Ok::<_, ReadError>(match selected {
                 Some(
                     ResolvedToken::Key(key) | ResolvedToken::ItemKey(SelectedItemKey { key, .. }),
                 ) => {
@@ -265,8 +270,13 @@ impl<'source> LanguageInputs<'_, '_, 'source> {
                 Some(ResolvedToken::ItemGap(_)) | None => None,
             })
         };
-        let display =
-            mission_title::render_language(self.key, text, &mut localise, &mut token, cancel)?;
+        let display = mission_title::render_language_fallible(
+            self.key,
+            text,
+            &mut localise,
+            &mut token,
+            cancel,
+        )?;
         self.retain_lookups(keys, &lookups, root, used, cancel)?;
         Ok(display)
     }
@@ -299,7 +309,7 @@ impl<'source> LanguageInputs<'_, '_, 'source> {
         (source_key, name, variant): (&str, &str, Option<&str>),
         resolve: &mut Resolve<'_, 'read, 'source>,
         item_tokens: &mut Vec<ItemToken>,
-    ) -> Result<(), CatalogError> {
+    ) -> Result<(), ReadError> {
         let token_selector = if AsciiKey::locale(source_key) == AsciiKey::locale(self.key) {
             self.selector
         } else {
@@ -330,7 +340,7 @@ impl<'source> LanguageInputs<'_, '_, 'source> {
                 }
             }
             Some(ResolvedToken::ItemGap(reason)) => ItemTokenOutcome::Unresolved { reason },
-            _ => return Err(CatalogError::MissionTextPlan),
+            _ => return Err(CatalogError::MissionTextPlan.into()),
         };
         let row = ItemToken::new(origins, name, variant, &original, selected.uses(), outcome)?;
         item_tokens

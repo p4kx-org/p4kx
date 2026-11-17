@@ -18,8 +18,8 @@ mod render;
 
 pub(crate) use key::AsciiKey;
 
-type Resolve<'query, 'source> = dyn FnMut(&'source str, &str, Option<&str>) -> Result<Option<Token<'source>>, CatalogError>
-    + 'query;
+type Resolve<'query, 'source, E = CatalogError> =
+    dyn FnMut(&'source str, &str, Option<&str>) -> Result<Option<Token<'source>>, E> + 'query;
 type Localise<'query, 'source> =
     dyn FnMut(&'source str) -> Result<Option<Cow<'source, str>>, CatalogError> + 'query;
 
@@ -32,19 +32,32 @@ pub(crate) enum Token<'source> {
 }
 
 /// Expands one actual language with fallible source lookup and token selection.
-pub(crate) fn render_language<'source>(
+pub(crate) fn render_language_fallible<'source, E: From<CatalogError>>(
     key: &'source str,
     text: Cow<'source, str>,
     localise: &mut Localise<'_, 'source>,
-    resolve: &mut Resolve<'_, 'source>,
+    resolve: &mut Resolve<'_, 'source, E>,
     cancel: Option<&CancelToken>,
-) -> Result<Cow<'source, str>, CatalogError> {
+) -> Result<Cow<'source, str>, E> {
     if !text.contains(graph::OPEN) {
         return Ok(text);
     }
-    render_key(key, text, localise, resolve, cancel).map(Cow::Owned)
+    render_key_fallible(key, text, localise, resolve, cancel).map(Cow::Owned)
 }
 
+fn render_key_fallible<'source, E: From<CatalogError>>(
+    key: &'source str,
+    text: Cow<'source, str>,
+    localise: &mut Localise<'_, 'source>,
+    resolve: &mut Resolve<'_, 'source, E>,
+    cancel: Option<&CancelToken>,
+) -> Result<String, E> {
+    let graph = graph::Graph::build(key, text, localise, resolve, cancel)?;
+    let plan = plan::analyze(&graph, cancel)?;
+    render::write(&graph, &plan, cancel).map_err(E::from)
+}
+
+#[cfg(test)]
 fn render_key<'source>(
     key: &'source str,
     text: Cow<'source, str>,
@@ -52,9 +65,7 @@ fn render_key<'source>(
     resolve: &mut Resolve<'_, 'source>,
     cancel: Option<&CancelToken>,
 ) -> Result<String, CatalogError> {
-    let graph = graph::Graph::build(key, text, localise, resolve, cancel)?;
-    let plan = plan::analyze(&graph, cancel)?;
-    render::write(&graph, &plan, cancel)
+    render_key_fallible(key, text, localise, resolve, cancel)
 }
 
 pub(super) fn check_cancel(cancel: Option<&CancelToken>) -> Result<(), CatalogError> {

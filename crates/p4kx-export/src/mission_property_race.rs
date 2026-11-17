@@ -13,9 +13,10 @@ use crate::source_fields::{FieldCapture, FieldChecks};
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = crate::contract::every_field_required)]
-pub(crate) struct TimeTrialSplit {
+#[non_exhaustive]
+pub struct TimeTrialSplit {
     /// The finite source `Single` target split, without changing its unit.
-    pub(crate) target_split: Option<f32>,
+    pub target_split: Option<f32>,
 }
 
 pub(crate) fn read<'source>(
