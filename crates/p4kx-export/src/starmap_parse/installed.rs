@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::sync::atomic::AtomicUsize;
-
 use p4kx_extraction::Archive;
 
 use super::children::{child_lists, external};
@@ -23,7 +21,7 @@ pub(crate) fn read_jump_witness_body(
 ) -> Result<Body, CatalogError> {
     let bounds = Bounds {
         cancel: None,
-        children: AtomicUsize::new(usize::MAX),
+        children: None,
         scope: DescriptorScope::catalog(true),
         directory: capture
             .source_uses()

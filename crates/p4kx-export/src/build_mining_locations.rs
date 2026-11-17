@@ -145,7 +145,7 @@ fn read_archive(
         &projection,
         starmap_records,
         &harvestable_provider_presets,
-        cancel,
+        options,
         &mut coverage,
     )?;
     let text_rows = projection.finish_rows()?;
@@ -180,16 +180,18 @@ fn read_world<'source>(
     projection: &CatalogProjection<'_, 'source>,
     records: Vec<Record<'source>>,
     providers: &[HarvestableProviderPreset],
-    cancel: Option<&CancelToken>,
+    options: MiningLocationOptions<'_>,
     coverage: &mut MiningLocationCoverage,
 ) -> Result<WorldRows, CatalogError> {
+    let cancel = options.cancel;
     let capture = EntryCapture::for_input(input);
     let presets: HashSet<_> = providers
         .iter()
         .filter_map(|preset| preset.source.guid.value().copied())
         .collect();
     let survey = HarvestSurvey::new(&presets);
-    let placements = Placements::read_for_harvest(archive, cancel, &capture, &survey)?;
+    let placements =
+        Placements::read_for_harvest(archive, cancel, options.starmap_budget, &capture, &survey)?;
     coverage.placement_inventory_incomplete = !placements.ledger.incomplete_inventories.is_empty();
     coverage.unavailable_placement_occurrences =
         placements.counts.unreadable + placements.counts.missing + placements.counts.malformed;

@@ -335,6 +335,7 @@ mod starmap_report;
 #[cfg(test)]
 mod starmap_tests;
 mod starmap_transform;
+mod starmap_traversal_budget;
 mod starmap_walk;
 mod starmap_xml;
 mod store_slug_summary;

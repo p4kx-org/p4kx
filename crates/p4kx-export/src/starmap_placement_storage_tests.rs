@@ -176,6 +176,7 @@ fn catalog_spool_replays_the_original_order_and_every_row_origin() -> Result<(),
         let spooled = Placements::read_for_catalog(
             &archive,
             None,
+            Limits::default(),
             capture,
             scope,
             &JumpEndpointRecords::default(),

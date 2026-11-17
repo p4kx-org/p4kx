@@ -88,6 +88,24 @@ and use the snapshot's own `source_inventory` for the selected language and fiel
 A missing name can retain its original localization key. Consult `coverage` for unresolved
 resource references and unreadable ResourceType Records when converting the snapshot to a cache.
 
+## Container traversal allowances
+
+`CatalogOptions::starmap_budget` and `MiningLocationOptions::starmap_budget` use
+`StarmapTraversalBudget`. The default reads all selected Child declarations and placement
+occurrences without a fixed count quota. Cancellation remains available during both walks.
+
+`source_children` optionally counts declarations once per physical descriptor, shared across
+roots. `placed_children_per_system` independently counts Child visits per system, including
+repeated instances of the same source. For example, two references to a one-Child tile consume
+three physical declarations and four instantiated visits. `Some(0)` is an explicit zero allowance;
+`None` imposes no count quota. The builder methods set each allowance independently.
+
+An exhausted allowance never certifies a complete snapshot. Catalog normal publication refuses
+before the output callback and preserves the last complete generation; explicit diagnostic mode
+retains readable rows with incomplete health. The local mining snapshot reports the affected
+placement inventory or unavailable occurrences in its coverage. The allowances do not change
+cycle detection, original source evidence, coordinate validation or cancellation.
+
 ## Mining Starmap ancestry
 
 Use `MiningStarmapObject::parent` to follow the original DataForge parent declaration.

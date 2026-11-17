@@ -10,7 +10,8 @@ use anyhow::{Context, Result};
 use p4kx_export::{
     CatalogError, CatalogFailures, CatalogFile, CatalogOptions, CatalogPublicationMode,
     CatalogStage, CatalogSummary, Compression, CraftingWarning, ExportDiagnosticSeverity,
-    ExportHealth, Filter, Kind, catalog_schema, write_catalog_file_with_phases,
+    ExportHealth, Filter, Kind, StarmapTraversalBudget, catalog_schema,
+    write_catalog_file_with_phases,
 };
 use p4kx_extraction::Archive;
 
@@ -60,6 +61,7 @@ pub(crate) fn run(args: &CatalogArgs, as_json: bool) -> Result<ExitCode> {
             Some(&show)
         },
         public_patches: Some(&patches),
+        starmap_budget: StarmapTraversalBudget::default(),
         publication_mode: if args.diagnostic_partial {
             CatalogPublicationMode::DiagnosticPartial
         } else {

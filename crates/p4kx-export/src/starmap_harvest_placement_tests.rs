@@ -8,13 +8,13 @@ use rayon::ThreadPoolBuilder;
 
 use super::instance::ContainerInstanceKey;
 use super::{PlacementScope, Placements};
-use crate::CatalogError;
 use crate::catalog_read::original::{EntryCapture, with_entry_capture};
 use crate::contract::StarmapObject;
 use crate::export_entry_ledger::{ArchiveEntryObservation, EntryOperation};
 use crate::export_ledger::SourceDisposition;
 use crate::guid_text::CatalogGuid;
 use crate::harvest_locations::{self, HarvestSurvey, Located, Objects};
+use crate::{CatalogError, StarmapTraversalBudget};
 
 #[path = "starmap_harvest_placement_fixture.rs"]
 mod fixture;
@@ -37,7 +37,13 @@ fn harvest_walk_keeps_location_parity_without_general_placement_outputs()
     let read_harvest = || {
         with_entry_capture(&archive, |capture| {
             let survey = HarvestSurvey::new(&presets);
-            let harvest = Placements::read_for_harvest(&archive, None, capture, &survey)?;
+            let harvest = Placements::read_for_harvest(
+                &archive,
+                None,
+                StarmapTraversalBudget::default(),
+                capture,
+                &survey,
+            )?;
             let objects = objects(planet, claim, &harvest, capture);
             let (located, _) = survey.finish(&archive, &harvest.opened, &objects, None, capture)?;
             Ok((

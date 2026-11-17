@@ -68,18 +68,7 @@ mod collect_tests;
 #[path = "starmap_harvest_placement_tests.rs"]
 mod harvest_placement_tests;
 
-/// What bounds the walk through a star system.
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct Limits {
-    /// The most Child elements one star system may place, itself and its external containers.
-    pub(crate) children: usize,
-}
-
-impl Default for Limits {
-    fn default() -> Self {
-        Self { children: 1 << 22 }
-    }
-}
+pub(crate) use crate::StarmapTraversalBudget as Limits;
 
 /// The catalog scope that requires reading system containers.
 #[derive(Clone, Copy)]

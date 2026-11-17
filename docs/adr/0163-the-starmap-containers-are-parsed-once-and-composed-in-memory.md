@@ -16,15 +16,17 @@ container on the chain (up to 128 MiB each) was held at once. Only the systems r
   parse. Discovery continues until no new physical source remains. The placement walk uses
   an explicit stack to compose positions in authored depth-first order. A physical container
   can contribute under multiple positions. Only a link to an active ancestor is a cycle.
-- **Memory bound.** The parse keeps at most `Limits::children` (4,194,304) Children in all
-  containers together, counted by one shared counter. The source tree is read, visited, and
-  freed iteratively using cursors proportional to the current ancestry. The main descriptor uses
-  the text parser's node bound and rejects DTDs. A list cut by the Child counter produces a skipped
-  Child entry. Which
-  container is cut when the bound is hit depends on the thread order, which only matters for an
-  Archive that is already reported as over the limit. The raw XML and its DOM are alive only
-  while one container is parsed, so the peak is the kept Children plus, per rayon thread, one
-  XML of up to 128 MiB and its DOM.
+- **Complete by default, with optional caller allowances.** `StarmapTraversalBudget` defaults
+  to no Child-count quota. `source_children` optionally bounds declarations across uniquely parsed
+  physical descriptors; `placed_children_per_system` separately bounds instantiated Child visits
+  for each root, including reused containers. A zero allowance accepts an empty source or walk.
+  Exhaustion retains readable rows, marks the affected source inventory or placement routes
+  incomplete and refuses normal publication before output creation. Diagnostic partial publication
+  remains explicit. Parallel parse order can determine which descriptor reaches an exhausted
+  shared source allowance; no budgeted partial result claims complete selection.
+  The source tree is read, visited and freed iteratively, while the placement walk detects cycles
+  on its active physical ancestry. Cooperative cancellation, format validation and coordinate
+  overflow checks remain in force. Raw XML and its DOM live only while one descriptor is parsed.
 - **A container whose XML is not named like it is reported.** When no `<stem>.xml` exists and the
   first eligible XML entry is taken, the report names it. Any directory segment
   named `hcd` marks a companion and excludes it from both main XML selection and fallback.

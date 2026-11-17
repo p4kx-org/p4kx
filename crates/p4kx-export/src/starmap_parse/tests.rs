@@ -46,7 +46,14 @@ fn a_valid_empty_source_can_be_read_with_a_zero_child_budget() -> TestResult {
     ] {
         let (_folder, archive) = opened(vec![container(ROOT, text)])?;
         let source = with_entry_capture(&archive, |capture| {
-            super::read_all(&archive, &Index::new(&archive), &[0], None, 0, capture)
+            super::read_all(
+                &archive,
+                &Index::new(&archive),
+                &[0],
+                None,
+                Some(0),
+                capture,
+            )
         })?;
         assert!(
             source.ledger.incomplete_inventories.is_empty(),
@@ -86,7 +93,14 @@ fn readable_bytes_with_invalid_xml_are_a_projection_failure() -> TestResult {
         "<ObjectContainer><broken></ObjectContainer>",
     )])?;
     let source = with_entry_capture(&archive, |capture| {
-        super::read_all(&archive, &Index::new(&archive), &[0], None, 10, capture)
+        super::read_all(
+            &archive,
+            &Index::new(&archive),
+            &[0],
+            None,
+            Some(10),
+            capture,
+        )
     })?;
     assert!(
         matches!(source.bodies.get(&0), Some(Body::Unparsed)),
@@ -113,7 +127,14 @@ fn a_truncated_projection_keeps_its_readable_children_and_its_failure() -> TestR
     let xml = r#"<ObjectContainer><ChildObjectContainers><Child pos="0,0,0"/><Child pos="1,0,0"/></ChildObjectContainers></ObjectContainer>"#;
     let (_folder, archive) = opened(vec![container(ROOT, xml)])?;
     let source = with_entry_capture(&archive, |capture| {
-        super::read_all(&archive, &Index::new(&archive), &[0], None, 1, capture)
+        super::read_all(
+            &archive,
+            &Index::new(&archive),
+            &[0],
+            None,
+            Some(1),
+            capture,
+        )
     })?;
     let Some(Body::Parsed { root, .. }) = source.bodies.get(&0) else {
         return Err("readable partial tree expected".into());
@@ -153,7 +174,14 @@ fn a_reachable_container_records_an_actual_directory_read() -> TestResult {
         container(NEXT, "<ObjectContainer/>"),
     ])?;
     let source = with_entry_capture(&archive, |capture| {
-        super::read_all(&archive, &Index::new(&archive), &[0], None, 10, capture)
+        super::read_all(
+            &archive,
+            &Index::new(&archive),
+            &[0],
+            None,
+            Some(10),
+            capture,
+        )
     })?;
     assert!(
         matches!(source.bodies.get(&1), Some(Body::Parsed { .. })),
@@ -190,7 +218,14 @@ fn a_missing_external_container_preserves_the_authored_path() -> TestResult {
     );
     let (_folder, archive) = opened(vec![container(ROOT, &xml)])?;
     let source = with_entry_capture(&archive, |capture| {
-        super::read_all(&archive, &Index::new(&archive), &[0], None, 10, capture)
+        super::read_all(
+            &archive,
+            &Index::new(&archive),
+            &[0],
+            None,
+            Some(10),
+            capture,
+        )
     })?;
     let missing = source
         .ledger
@@ -214,7 +249,14 @@ fn a_missing_external_uses_the_actual_case_insensitive_first_attribute() -> Test
     );
     let (_folder, archive) = opened(vec![container(ROOT, &xml)])?;
     let source = with_entry_capture(&archive, |capture| {
-        super::read_all(&archive, &Index::new(&archive), &[0], None, 10, capture)
+        super::read_all(
+            &archive,
+            &Index::new(&archive),
+            &[0],
+            None,
+            Some(10),
+            capture,
+        )
     })?;
     let Some(Body::Parsed { root, .. }) = source.bodies.get(&0) else {
         return Err("actual parsed original Child".into());

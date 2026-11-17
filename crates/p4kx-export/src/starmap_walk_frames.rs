@@ -6,10 +6,10 @@ use std::slice::Iter;
 use p4kx_extraction::CancelToken;
 
 use super::{System, WalkPath};
-use crate::CatalogError;
 use crate::starmap_containers::instance::ContainerFile;
 use crate::starmap_parse::{Body, Child, Level, Pose};
 use crate::starmap_report::clip;
+use crate::{CatalogError, ExportAccountingError};
 
 enum Frame<'a> {
     Enter {
@@ -138,20 +138,31 @@ impl<'a> System<'a> {
         let label = cursor.label;
         let Some(child) = cursor.remaining.next() else {
             if cursor.truncated {
-                let limit = self.limits.children;
+                let limit = self
+                    .limits
+                    .source_children
+                    .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
                 self.skip_route(&format!(
-                    "{label}: more than {limit} Children in the containers of the Archive"
+                    "{label}: caller-selected source Child budget {limit} exhausted"
                 ));
             }
             return Ok(());
         };
-        if self.budget == 0 {
-            let limit = self.limits.children;
-            self.skip_route(&format!("{label}: more than {limit} Children in a system"));
+        if let Some(limit) = self.limits.placed_children_per_system
+            && self.budget == Some(0)
+        {
+            self.read.placement_budget_exhausted = true;
+            self.skip_route(&format!(
+                "{label}: caller-selected per-system Child placement budget {limit} exhausted"
+            ));
             return Ok(());
         }
-        self.budget -= 1;
-        self.seen[0] += 1;
+        if let Some(remaining) = &mut self.budget {
+            *remaining -= 1;
+        }
+        self.seen[0] = self.seen[0]
+            .checked_add(1)
+            .ok_or(ExportAccountingError::CounterOverflow)?;
         let file = cursor.file;
         let placed = self.place_child(child, &cursor)?;
         self.record_unresolved_container(child, &cursor.parent, placed.as_ref(), file)?;

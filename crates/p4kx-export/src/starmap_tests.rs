@@ -12,6 +12,8 @@ use crate::starmap_parse::read_all;
 
 const FOLDER: &str = "Data\\ObjectContainers\\PU\\system\\t\\";
 
+#[path = "starmap_budget_tests.rs"]
+mod budgets;
 #[path = "starmap_direct_depth_tests.rs"]
 mod direct_depth;
 #[path = "starmap_external_chain_tests.rs"]
@@ -149,7 +151,7 @@ fn children_beyond_the_budget_of_a_system_are_counted() {
         child("2,0,0", 2),
         child("3,0,0", 3),
     ]);
-    let limits = Limits { children: 2 };
+    let limits = Limits::new().with_placed_children_per_system(2);
     let placements = read(dir.path(), system(&xml, &[]), limits);
     assert!(placed(&placements, 2).is_some(), "within the budget");
     assert_eq!(placed(&placements, 3), None, "beyond the budget");
@@ -242,7 +244,14 @@ fn a_container_instanced_several_times_is_parsed_once() {
     let roots: Vec<usize> = index.systems().iter().map(|(_, entry)| *entry).collect();
     let limits = Limits::default();
     let read = crate::catalog_read::original::with_entry_capture(&archive, |capture| {
-        read_all(&archive, &index, &roots, None, limits.children, capture)
+        read_all(
+            &archive,
+            &index,
+            &roots,
+            None,
+            limits.source_children,
+            capture,
+        )
     })
     .expect("original Entry capture");
     assert_eq!(read.parsed, 3, "the system, the ring and the leaf");

@@ -97,6 +97,7 @@ fn read_placements(
     Placements::read_for_catalog(
         archive,
         options.cancel,
+        options.starmap_budget,
         &EntryCapture::for_input(original),
         scope,
         &endpoints,

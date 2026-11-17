@@ -60,6 +60,7 @@ pub use crate::ship_base::{
 };
 pub use crate::shop_summary::ShopSummary;
 pub use crate::starmap_report::StarmapReport;
+pub use crate::starmap_traversal_budget::StarmapTraversalBudget;
 pub use crate::store_slug_summary::StoreSlugSummary;
 pub use crate::summary::{
     CatalogSummary, DECOMPRESSED_LIMIT, DECOMPRESSED_WARNING_SIZE, KindSummary, LoadoutSummary,

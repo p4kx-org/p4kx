@@ -136,18 +136,20 @@ impl DescriptorScope {
 /// The shared Child count and read controls for the discovered containers.
 struct Bounds<'a> {
     cancel: Option<&'a CancelToken>,
-    children: AtomicUsize,
+    children: Option<AtomicUsize>,
     scope: DescriptorScope,
     directory: Option<SourceUse>,
 }
 
 impl Bounds<'_> {
     fn take(&self) -> bool {
-        self.children
-            .try_update(Ordering::Relaxed, Ordering::Relaxed, |left| {
-                left.checked_sub(1)
-            })
-            .is_ok()
+        self.children.as_ref().is_none_or(|remaining| {
+            remaining
+                .try_update(Ordering::Relaxed, Ordering::Relaxed, |left| {
+                    left.checked_sub(1)
+                })
+                .is_ok()
+        })
     }
 }
 
@@ -297,7 +299,7 @@ pub(crate) fn read_all(
     index: &Index<'_>,
     roots: &[usize],
     cancel: Option<&CancelToken>,
-    children: usize,
+    children: Option<usize>,
     capture: &EntryCapture<'_>,
 ) -> Result<Read, CatalogError> {
     read_all_scoped(
@@ -315,12 +317,12 @@ pub(crate) fn read_all_scoped(
     index: &Index<'_>,
     roots: &[usize],
     cancel: Option<&CancelToken>,
-    (children, scope): (usize, DescriptorScope),
+    (children, scope): (Option<usize>, DescriptorScope),
     capture: &EntryCapture<'_>,
 ) -> Result<Read, CatalogError> {
     let bounds = Bounds {
         cancel,
-        children: AtomicUsize::new(children),
+        children: children.map(AtomicUsize::new),
         scope,
         directory: capture
             .source_uses()

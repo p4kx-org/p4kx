@@ -10,7 +10,8 @@ use std::time::SystemTime;
 
 use p4kx_export::{
     CancelToken, CatalogError, CatalogFile, CatalogOptions, CatalogProgress,
-    CatalogPublicationMode, CatalogSummary, Compression, ExportHealth, write_catalog_file_from,
+    CatalogPublicationMode, CatalogSummary, Compression, ExportHealth, StarmapTraversalBudget,
+    write_catalog_file_from,
 };
 use p4kx_extraction::{ArchiveWriteProtection, SourceInventory, is_same_file};
 
@@ -303,6 +304,7 @@ impl Job {
             cancel: Some(&self.cancel),
             progress: Some(&progress),
             public_patches: Some(&patches),
+            starmap_budget: StarmapTraversalBudget::default(),
             publication_mode: self.options.publication_mode,
         };
         let protection = match ArchiveWriteProtection::new(archive.path(), self.cancel.flag()) {

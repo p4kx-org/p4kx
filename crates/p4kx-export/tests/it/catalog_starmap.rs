@@ -12,6 +12,8 @@ use crate::commodity_v3_fixture::{at, guid, text_row};
 use crate::health_origin_assertions as proof;
 use crate::starmap_fixture;
 
+#[path = "starmap_child_budget.rs"]
+mod child_budget;
 #[path = "starmap_definitions_contract.rs"]
 mod definitions;
 #[path = "starmap_objects_contract.rs"]

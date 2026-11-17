@@ -8,6 +8,10 @@ the types drift apart; `P4KX_BLESS=1 cargo test -p p4kx-export --test catalog_sc
 it.
 
 The [Rust SDK](catalog-sdk.md) also reads supported catalog data directly from an opened Archive.
+`CatalogOptions::starmap_budget` defaults to complete Child traversal without a fixed count quota.
+Callers may independently limit physical declarations and instantiated visits per system with
+`StarmapTraversalBudget`; exhaustion remains incomplete and normal publication is refused before
+output creation. The CLI and GUI select no Child-count allowance.
 
 ## Versioning and consumers
 

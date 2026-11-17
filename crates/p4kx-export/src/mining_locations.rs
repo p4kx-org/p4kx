@@ -35,7 +35,9 @@ pub use crate::resource_number::ResourceNumber;
 pub use crate::starmap_containers::instance::ContainerInstanceKey;
 use p4kx_extraction::{Build, CancelToken, Guid, Language, SourceInventory, SourcedValue};
 
-/// Selects one requested language and supports cooperative cancellation.
+use crate::StarmapTraversalBudget;
+
+/// Selects a language, cancellation and optional container traversal allowances.
 #[derive(Debug, Clone, Copy)]
 #[non_exhaustive]
 pub struct MiningLocationOptions<'a> {
@@ -43,13 +45,19 @@ pub struct MiningLocationOptions<'a> {
     pub language: Language,
     /// The caller's cancellation signal.
     pub cancel: Option<&'a CancelToken>,
+    /// Optional physical-source and per-system placement work allowances.
+    pub starmap_budget: StarmapTraversalBudget,
 }
 
 impl<'a> MiningLocationOptions<'a> {
     /// Selects the language and the optional cancellation signal for one read.
     #[must_use]
     pub const fn new(language: Language, cancel: Option<&'a CancelToken>) -> Self {
-        Self { language, cancel }
+        Self {
+            language,
+            cancel,
+            starmap_budget: StarmapTraversalBudget::new(),
+        }
     }
 }
 

@@ -49,6 +49,7 @@ pub(crate) struct SystemRead {
     pub(crate) missing: usize,
     pub(crate) malformed: usize,
     pub(crate) routes_incomplete: bool,
+    pub(crate) placement_budget_exhausted: bool,
     pub(crate) named: usize,
     pub(crate) deepest: usize,
     pub(crate) report: StarmapReport,
@@ -172,7 +173,7 @@ pub(crate) struct System<'a> {
     read: SystemRead,
     rows: PlacementRows<'a>,
     limits: Limits,
-    budget: usize,
+    budget: Option<usize>,
     open: HashSet<usize>,
     seen: [usize; 3],
 }
@@ -239,7 +240,9 @@ impl System<'_> {
             .route
             .as_ref()
             .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
-        self.seen[1] += 1;
+        self.seen[1] = self.seen[1]
+            .checked_add(1)
+            .ok_or(ExportAccountingError::CounterOverflow)?;
         self.read.placed.push((
             record,
             Placement {

@@ -83,7 +83,7 @@ impl<'a> System<'a> {
             read: SystemRead::default(),
             rows,
             limits,
-            budget: limits.children,
+            budget: limits.placed_children_per_system,
             open: HashSet::new(),
             seen: [0; 3],
         };

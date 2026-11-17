@@ -45,6 +45,7 @@ impl Placements {
     pub(crate) fn read_for_catalog(
         archive: &Archive,
         cancel: Option<&CancelToken>,
+        limits: Limits,
         capture: &EntryCapture<'_>,
         scope: PlacementScope,
         endpoints: &JumpEndpointRecords,
@@ -53,7 +54,7 @@ impl Placements {
         Self::read_scoped(
             archive,
             cancel,
-            Limits::default(),
+            limits,
             capture,
             scope,
             Some(endpoints),
@@ -83,13 +84,14 @@ impl Placements {
     pub(crate) fn read_for_harvest(
         archive: &Archive,
         cancel: Option<&CancelToken>,
+        limits: Limits,
         capture: &EntryCapture<'_>,
         harvest: &HarvestSurvey<'_>,
     ) -> Result<Self, CatalogError> {
         Self::read_scoped(
             archive,
             cancel,
-            Limits::default(),
+            limits,
             capture,
             PlacementScope::RecordSelection,
             None,
@@ -133,7 +135,7 @@ impl Placements {
             &index,
             &roots,
             cancel,
-            (limits.children, descriptor_scope),
+            (limits.source_children, descriptor_scope),
             capture,
         )?;
         check_cancelled(cancel)?;
@@ -148,7 +150,7 @@ impl Placements {
         )?;
         drop(bodies);
         check_cancelled(cancel)?;
-        let routes_complete = read.iter().all(|system| !system.routes_incomplete);
+        let routes_complete = finish_route_coverage(&read, &mut ledger);
         ledger.merge(root_ledger);
         let mut placements = Self {
             ledger,
@@ -167,6 +169,13 @@ impl Placements {
         placements.report.elapsed = started.elapsed();
         Ok(placements)
     }
+}
+
+fn finish_route_coverage(read: &[SystemRead], ledger: &mut ExportLedger) -> bool {
+    if read.iter().any(|system| system.placement_budget_exhausted) {
+        ledger.incomplete_inventory(Kind::StarmapObjects);
+    }
+    read.iter().all(|system| !system.routes_incomplete)
 }
 
 fn check_cancelled(cancel: Option<&CancelToken>) -> Result<(), CatalogError> {

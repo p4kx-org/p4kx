@@ -8,12 +8,12 @@ mod fixture;
 
 use fixture::archive;
 
-use crate::CatalogError;
 use crate::mining_locations::{
     ContainerInstanceKey, HarvestableOccurrenceRoute, MiningLocationOptions,
     MiningLocationSnapshot, ReachedHarvestableOccurrence, read_mining_locations,
     read_mining_locations_from,
 };
+use crate::{CatalogError, StarmapTraversalBudget};
 
 const PLANET: &str = "10000000-0000-4000-8000-000000000001";
 const PRESET: &str = "10000000-0000-4000-8000-000000000004";
@@ -26,10 +26,7 @@ fn reads_five_linked_tables_and_keeps_selected_locale_evidence() -> TestResult {
     let archive = archive(&dir.path().join("Data.p4k"))?;
     let result = read_mining_locations(
         &archive,
-        MiningLocationOptions {
-            language: Language::English,
-            cancel: None,
-        },
+        MiningLocationOptions::new(Language::English, None),
     )?;
     assert_eq!(
         result.mineable_elements.len(),
@@ -66,6 +63,29 @@ fn reads_five_linked_tables_and_keeps_selected_locale_evidence() -> TestResult {
 }
 
 #[test]
+fn caller_selected_child_budgets_keep_mining_coverage_incomplete() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let archive = archive(&dir.path().join("Data.p4k"))?;
+    let mut options = MiningLocationOptions::new(Language::English, None);
+    for budget in [
+        StarmapTraversalBudget::new().with_source_children(0),
+        StarmapTraversalBudget::new().with_placed_children_per_system(0),
+    ] {
+        options.starmap_budget = budget;
+        let result = read_mining_locations(&archive, options)?;
+        assert!(
+            result.coverage.placement_inventory_incomplete,
+            "selected quota cannot certify complete placement inventory"
+        );
+        assert!(
+            result.coverage.unavailable_placement_occurrences > 0,
+            "coverage reports the actual unvisited occurrence scope"
+        );
+    }
+    Ok(())
+}
+
+#[test]
 fn rejects_foreign_decoded_input_and_cancellation() -> TestResult {
     let dir = tempfile::tempdir()?;
     let first = archive(&dir.path().join("first.p4k"))?;
@@ -76,10 +96,7 @@ fn rejects_foreign_decoded_input_and_cancellation() -> TestResult {
             read_mining_locations_from(
                 &second,
                 &first_entry,
-                MiningLocationOptions {
-                    language: Language::English,
-                    cancel: None
-                },
+                MiningLocationOptions::new(Language::English, None),
             ),
             Err(CatalogError::SourceOriginMismatch)
         ),
@@ -91,10 +108,7 @@ fn rejects_foreign_decoded_input_and_cancellation() -> TestResult {
         matches!(
             read_mining_locations(
                 &first,
-                MiningLocationOptions {
-                    language: Language::English,
-                    cancel: Some(&cancel)
-                },
+                MiningLocationOptions::new(Language::English, Some(&cancel)),
             ),
             Err(CatalogError::Cancelled)
         ),
