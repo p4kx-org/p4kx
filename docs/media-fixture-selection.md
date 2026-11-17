@@ -208,10 +208,17 @@ gloss-map X as its initial smoothness. The optional detail step multiplies that 
 `1 + processedDetailSample.w × DetailGloss`. The palette step then multiplies by
 the layer gloss and, when the packed palette selector and palette ID are nonzero,
 by the palette gloss unpacked from the palette's half-precision pair. The palette
-stage receives the detail result before saturation. The verified GBuffer path passes
-material attributes to the encoder. A separate lighting path calls `GlossToRoughness`
-before shading. The active permutation, detail sample preprocessing, GBuffer encoding
-and the definition of the final roughness function remain open for the reported surface.
+stage receives the detail result before saturation.
+
+In the verified `MaterialAttribs_WriteGBuffer` route, `EncodeGBuffer` stores the incoming
+`MaterialAttribs.Smoothness` directly in `GBufferC.x`. The normal encoder for `GBufferA`
+takes the same value as an input. A separate lighting path converts `Pixel.Gloss` before
+shading. With its default upper clamp enabled, the decoded `GlossToRoughness` returns
+`(1 - min(gloss, 251/255))²`.
+
+For the reported surface, the active permutation and detail sample preprocessing still
+require verification. The route from `GBufferC.x` to `Pixel.Gloss` and the corresponding
+glTF or Blender roughness coordinate remain open.
 
 The following synthetic comparison uses base roughness `0.48`, smoothness
 `1 − 0.48²`, neutral layer gloss and the trial final transform `sqrt(1 − S)` with
