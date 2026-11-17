@@ -285,6 +285,22 @@ The older unfiltered LIVE trial at `bed4144d` peaked at 22.53 GiB working set an
 after preparing the catalog and recording health. The 16 GiB acceptance still requires a
 complete normal export with the current packaged producer on the specified system.
 
+The discard-sink witness at `4c601317a` checked both installed Archives with four Rayon
+threads and stable Archive stamps. It refused normal publication for each Build after health
+assessment. The values below are sampled process memory in GiB on a larger host.
+
+| Build | Record scan working set | Record scan private bytes | Peak working set | Peak private bytes | Packed source uses at health |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| LIVE `13165946` | 15.47 | 16.08 | 26.22 | 27.60 | 68,920,610 |
+| PTU `13201184` | 16.30 | 16.95 | 28.02 | 31.73 | 72,144,536 |
+
+LIVE reached a sampled 26.22 GiB working set during health assessment. PTU reached its
+peak working set during provenance. Both sampled private-byte peaks occurred during
+provenance. The packed source-use counts grew by 17,325,165 and 17,974,970 between the
+Record scan and health. The pair logged 0.756 GiB of logical process writes and produced
+no Catalog file or encoder sizes. The later projection compaction checkpoints require
+a new measurement on a producer that includes them.
+
 The compressed writer prepares a typed Catalog once. It first counts serialized bytes for the
 frame header and then streams serialization into the encoder. A second raw file adds storage
 without changing the measured decoded bytes. A comparison with raw writer timing is a separate
