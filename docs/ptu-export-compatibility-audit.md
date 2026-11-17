@@ -61,6 +61,19 @@ documents on each PTU. Both contain the same empty `EntityComponentSpawnCloset` 
 under `ObjectContainer.ComponentMetadata`. This occurrence identifies container metadata. A
 positioned spawn or loot relationship requires its own entity and configuration evidence.
 
+An exact extraction-container path matched one physical Entry in each PTU. Its directory
+grew from 17 to 20 members, with one added `.rmxml` and two added `.xml` members.
+Seven shared paths changed size metadata. The count remained one SOC member and seven
+EntXML members. Every listed member passed CRC verification and both Archive stamps
+stayed stable. The new `.rmxml` decodes as `RoomMapping`. The two new `.xml` documents use
+`EntityComponentEntityReferenceOverride`. Each has an authored `Entity@CryGUID` and one
+`AutoSpawnOverrideElement` with `AutoSpawnIdx`, `Target` and `AA`. In both documents,
+`AutoSpawnIdx` is unsigned decimal text, `AA` is a UUID, and `Target` is an ordered chain of
+four comma-separated UUIDs. The first token equals the document's `CryGUID`. None of these
+selectors alone equals one of the eight `SuperGUID` attributes in the new room mapping.
+The owning placed entities and the remaining target semantics require separate join evidence.
+The typed companion export is tracked in [#1161](https://github.com/p4kx-org/p4kx/issues/1161).
+
 An exact Item Filter verified the old and new purchase-name Locale, its
 DataForge selector and the separate unchanged attachable name. The normal
 Catalog writer refused the older filtered export with one `shopInventories`

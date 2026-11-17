@@ -149,16 +149,19 @@ its containing Archives and its byte ranges. It releases each Entry's uses
 after that check and keeps exact digest counts across the selected family.
 Diagnostic rows are verified and an incomplete census fails the check.
 
-The census passed on installed LIVE change `13165946` at source revision
-[`d21d94bef`](https://github.com/p4kx-org/p4kx/tree/d21d94befff1abb057d6e9155aa944eeee4f83dd).
-The Build and Archive stayed stable. All families had zero partial rows and zero header
-budget refusals.
+The census passed on installed LIVE change `13165946` and PTU change `13201184` at
+source revision [`d21d94bef`](https://github.com/p4kx-org/p4kx/tree/d21d94befff1abb057d6e9155aa944eeee4f83dd).
+Both Builds and Archive stamps stayed stable. All families had zero partial rows and zero
+header budget refusals. [Acceptance evidence](https://github.com/p4kx-org/p4kx/issues/1093#issuecomment-6938446055)
 
-| Family | Original Entries | Original chunks | Clips | Declared and decoded keys |
-| --- | ---: | ---: | ---: | ---: |
-| CAF | 54,602 | 109,799 | 54,602 | 489,743,518 |
-| DBA | 546 | 1,115 | 15,897 | 71,222,712 |
-| AIM | 551 | 1,107 | 0 | 0 |
+| Build | Family | Original Entries | Original chunks | Clips | Declared and decoded keys |
+| --- | --- | ---: | ---: | ---: | ---: |
+| LIVE `13165946` | CAF | 54,602 | 109,799 | 54,602 | 489,743,518 |
+| LIVE `13165946` | DBA | 546 | 1,115 | 15,897 | 71,222,712 |
+| LIVE `13165946` | AIM | 551 | 1,107 | 0 | 0 |
+| PTU `13201184` | CAF | 54,548 | 109,691 | 54,548 | 489,438,440 |
+| PTU `13201184` | DBA | 546 | 1,115 | 15,921 | 72,882,184 |
+| PTU `13201184` | AIM | 551 | 1,107 | 0 | 0 |
 
 The AIM census verifies the physical Entry and chunk inventory. Each nonzero key count
 agrees independently with the original declaration and the decoded stream.
