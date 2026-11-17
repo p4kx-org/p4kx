@@ -149,6 +149,20 @@ its containing Archives and its byte ranges. It releases each Entry's uses
 after that check and keeps exact digest counts across the selected family.
 Diagnostic rows are verified and an incomplete census fails the check.
 
+The census passed on installed LIVE change `13165946` at source revision
+[`d21d94bef`](https://github.com/p4kx-org/p4kx/tree/d21d94befff1abb057d6e9155aa944eeee4f83dd).
+The Build and Archive stayed stable. All families had zero partial rows and zero header
+budget refusals.
+
+| Family | Original Entries | Original chunks | Clips | Declared and decoded keys |
+| --- | ---: | ---: | ---: | ---: |
+| CAF | 54,602 | 109,799 | 54,602 | 489,743,518 |
+| DBA | 546 | 1,115 | 15,897 | 71,222,712 |
+| AIM | 551 | 1,107 | 0 | 0 |
+
+The AIM census verifies the physical Entry and chunk inventory. Each nonzero key count
+agrees independently with the original declaration and the decoded stream.
+
 The separate global-image export replay selects the two original root image families and
 excludes nested containers. It compares the retained SHA-256 artifacts byte-for-byte against
 verified original Entries, checks the CAF prefix, record and trailer extents, and reconciles
