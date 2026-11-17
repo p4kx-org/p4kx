@@ -632,7 +632,6 @@ mesh before appending the per-node meshes. An earlier node can then point to
 the replacement at that index. The same builder creates a mesh after
 filtering hidden submeshes even if no primitive remains. These are source
 findings, independent of a reproduction of the reported ship.
-[Issue #59](https://github.com/diogotr7/StarBreaker/issues/59) ·
 [v0.3.2 release](https://github.com/diogotr7/StarBreaker/releases/tag/v0.3.2) ·
 [Child call](https://github.com/diogotr7/StarBreaker/blob/450fa284d4b1cbed6832675297dfb02579c0abd3/crates/starbreaker-3d/src/gltf/glb_builder.rs#L574-L625) ·
 [Cache hit](https://github.com/diogotr7/StarBreaker/blob/450fa284d4b1cbed6832675297dfb02579c0abd3/crates/starbreaker-3d/src/gltf/glb_builder.rs#L915-L925) ·
