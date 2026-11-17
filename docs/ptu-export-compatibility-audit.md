@@ -71,8 +71,19 @@ stayed stable. The new `.rmxml` decodes as `RoomMapping`. The two new `.xml` doc
 `AutoSpawnIdx` is unsigned decimal text, `AA` is a UUID, and `Target` is an ordered chain of
 four comma-separated UUIDs. The first token equals the document's `CryGUID`. None of these
 selectors alone equals one of the eight `SuperGUID` attributes in the new room mapping.
-The owning placed entities and the remaining target semantics require separate join evidence.
-The typed companion export is tracked in [#1161](https://github.com/p4kx-org/p4kx/issues/1161).
+A placement check on PTU `13201184` found one exact EntXML root identity per selector
+among the seven EntXML members. The selected descriptor declares one matching SOC stream.
+The stream's independently decoded Entities chunk contains 230 placed Entity rows, all
+with valid IDs. Neither override selector occurs among those IDs. The Entity document
+matches establish identity within the selected container. A placed owner and the remaining
+target semantics require separate evidence.
+
+The standalone authored SOC scene reports zero override companions on the older
+PTU and two on the current PTU. Independent CryXmlB table decoding agrees with
+all eight nodes, eight attributes, six typed declarations and eight typed values.
+The verifier matched all 16 typed field source uses and both full payload sources.
+The two raw rows replay the 1,092 original decoded bytes exactly.
+[Override companion contract](soc-scene.md#entity-reference-overrides)
 
 An exact Item Filter verified the old and new purchase-name Locale, its
 DataForge selector and the separate unchanged attachable name. The normal
