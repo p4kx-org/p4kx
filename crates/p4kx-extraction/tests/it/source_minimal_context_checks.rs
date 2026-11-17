@@ -13,7 +13,7 @@ use crate::source_minimal_proof as support;
 use crate::source_minimal_proof::TestResult;
 
 pub(super) fn upgraded_unknown_source(sources: &SourceUses, sparse: &SourceScope) -> TestResult {
-    support::assert_closed(&sources.freeze()?)?;
+    support::assert_closed(&sources.freeze()?);
     let wire = serde_json::to_value(sources.freeze()?)?;
     let rows = wire
         .get("sources")
@@ -85,7 +85,7 @@ pub(super) fn prefix_domains(
 }
 
 pub(super) fn prefix_rows(sources: &SourceUses) -> TestResult {
-    support::assert_closed(&sources.freeze()?)?;
+    support::assert_closed(&sources.freeze()?);
     let wire = serde_json::to_value(sources.freeze()?)?;
     let rows = wire
         .get("sources")

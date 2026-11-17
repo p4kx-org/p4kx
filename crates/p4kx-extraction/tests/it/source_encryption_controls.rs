@@ -6,8 +6,8 @@
 use std::fs;
 
 use p4kx_extraction::{
-    Archive, SourceDeclarationKind, SourceDetails, SourceEncryptionState, SourceRecordFormat,
-    SourceUses,
+    Archive, PhysicalSourceKind, SourceDeclarationKind, SourceDetails, SourceEncryptionState,
+    SourceRecordFormat, SourceUses,
 };
 use p4kx_testkit::{ArchiveBuilder, TestEntry};
 
@@ -95,11 +95,61 @@ fn observed(word: u16, layout: Layout, expected: SourceEncryptionState) -> TestR
         actual, expected,
         "the original parser/observed source follows the declared policy for word {word}"
     );
+    retained_declarations(&sources, format, flags, expected)?;
     let declared = kind.interpret(block, Some(word));
     assert_eq!(
         SourceEncryptionState::from_declarations(format, flags, [declared]),
         expected,
         "descriptive validation uses the same policy without original-input authority"
+    );
+    Ok(())
+}
+
+fn retained_declarations(
+    sources: &SourceUses,
+    format: SourceRecordFormat,
+    flags: Option<u16>,
+    expected: SourceEncryptionState,
+) -> TestResult {
+    let inventory = sources.freeze()?;
+    let source = inventory
+        .iter_sources()
+        .next()
+        .ok_or("observed physical source")?;
+    let PhysicalSourceKind::ArchiveEntry(entry) = source.kind() else {
+        return Err("full observation retains original Entry metadata".into());
+    };
+    assert_eq!(
+        entry.record_format(),
+        format,
+        "the original directory layout"
+    );
+    assert_eq!(
+        entry.zip_flags().value().copied(),
+        flags,
+        "authored flags stay distinct"
+    );
+    assert_eq!(
+        source.stored_encryption(),
+        expected,
+        "stored source proof agrees with the original parsed declarations"
+    );
+    let declarations = entry
+        .declarations()
+        .value()
+        .ok_or("retained declaration inventory")?;
+    let mut states = Vec::new();
+    for declaration in declarations {
+        let declaration = declaration.value().ok_or("readable original declaration")?;
+        states.push(declaration.kind().interpret(
+            declaration.declared_block_length().value().copied(),
+            declaration.raw_word().value().copied(),
+        ));
+    }
+    assert_eq!(
+        SourceEncryptionState::from_declarations(entry.record_format(), flags, states),
+        expected,
+        "the public original facts reproduce the parser's conservative declaration policy"
     );
     Ok(())
 }

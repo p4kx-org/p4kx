@@ -13,6 +13,8 @@ use serde::{Serialize, Serializer};
 mod rows;
 #[path = "source_inventory_use_rows.rs"]
 mod use_rows;
+#[path = "source_inventory_views.rs"]
+mod views;
 
 use self::rows::FrozenRows;
 use self::use_rows::FrozenUseRows;

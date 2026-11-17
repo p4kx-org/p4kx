@@ -7,12 +7,12 @@ use std::ptr;
 use std::slice;
 
 use p4kx_extraction::{
-    Archive, InputScope, SourceCoordinateOmission, SourceDetails, SourceEncryptionState,
-    SourceEvidenceError, SourceInput, SourceLocation, SourceScope, SourceUse, SourceUseRole,
-    SourceUses, SourceValue,
+    Archive, InputScope, PhysicalSourceKind, SourceCoordinateOmission, SourceDetails,
+    SourceEncryptionState, SourceEvidenceError, SourceInput, SourceInventory, SourceLocation,
+    SourceScope, SourceUse, SourceUseRole, SourceUses, SourceValue,
 };
 use p4kx_testkit::{ArchiveBuilder, TestEntry};
-use serde_json::{Error as JsonError, Value};
+use serde_json::Error as JsonError;
 
 use crate::source_minimal_proof as support;
 use crate::source_use_encryption as evidence;
@@ -36,7 +36,7 @@ fn unknown_inputs_and_actual_unknown_ancestors_retain_distinct_metadata_evidence
     evidence::assert_domains(&sources, &ancestor, Unknown, None, Unencrypted, Some(false))?;
     evidence::assert_domains(&sources, &leaf, Unknown, None, Unknown, None)?;
     assert_ne!(unknown.source_ref(), ancestor.source_ref());
-    let inventory = serde_json::to_value(sources.freeze()?)?;
+    let inventory = sources.freeze()?;
     assert_unknown_kind(&inventory, &unknown)?;
     assert_unknown_kind(&inventory, &ancestor)?;
     Ok(())
@@ -271,21 +271,18 @@ fn description_bytes(uses: &[SourceUse]) -> Result<Vec<Vec<u8>>, JsonError> {
         .collect()
 }
 
-fn assert_unknown_kind(inventory: &Value, scope: &SourceScope) -> TestResult {
-    let row = inventory["sources"]
-        .as_array()
-        .ok_or("physical rows")?
-        .iter()
-        .find(|row| row["id"] == scope.source_ref().as_str())
+fn assert_unknown_kind(inventory: &SourceInventory, scope: &SourceScope) -> TestResult {
+    let row = inventory
+        .iter_sources()
+        .find(|row| row.id() == scope.source_ref())
         .ok_or("unknown row")?;
-    assert_eq!(
-        row.get("kind").and_then(Value::as_str),
-        Some("unknown"),
+    assert!(
+        matches!(row.kind(), PhysicalSourceKind::Unknown),
         "the physical kind remains explicitly unknown"
     );
     assert_eq!(
-        row.get("storedEncryption").and_then(Value::as_str),
-        Some("unknown"),
+        row.stored_encryption(),
+        SourceEncryptionState::Unknown,
         "the unknown physical row does not invent a stored declaration"
     );
     Ok(())

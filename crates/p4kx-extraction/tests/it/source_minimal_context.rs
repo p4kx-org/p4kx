@@ -136,7 +136,7 @@ fn minimal_proofs_use_conservative_original_declarations_instead_of_boolean_read
                 marker,
                 "stored word {word} in v2={v2} keeps its original conservative meaning"
             );
-            support::assert_closed(&sources.freeze()?)?;
+            support::assert_closed(&sources.freeze()?);
             let wire = serde_json::to_value(sources.freeze()?)?;
             assert_eq!(
                 wire["sources"][0]["storedEncryption"], stored,

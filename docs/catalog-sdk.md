@@ -32,6 +32,22 @@ with no admitted gameplay-property Record opens no localization payloads and ret
 available list. Compare physical Record indices only within the same DataForge input and resolve
 source uses through each result's own inventory.
 
+## Resolve field origins
+
+Use each query's own `SourceInventory`. `SourcedValue::origin` supplies the encryption filter,
+completeness state and contributor IDs. Match those IDs to `iter_uses()`, then join each use's
+`source()` to `iter_sources()` by `PhysicalSource::id`. Follow `ancestors()` within the same
+inventory. `kind()` exposes the immutable original Entry, limited proof, directory, whole-Archive
+file, standalone file or unknown variant. `stored_encryption()` describes the stored source;
+`SourceUseDescription::effective_encryption()` describes the actual use's byte domain.
+
+The original Entry/declaration views retain typed states, complete integer widths and available
+raw bytes. Byte ranges and declaration value offsets are relative to the immediately owning
+Archive, including nested containers. A limited proof retains `SourceDetails::CaptureLimited`;
+it supplies no invented full path or declaration fields. An unavailable or unknown source never
+becomes unencrypted merely because a detail was omitted. These views expose the retained facts
+without serialization or changes to Catalog v3.
+
 ## Reuse an Archive session
 
 Open `CatalogQuerySession` to decode the original DataForge once for several queries. Use

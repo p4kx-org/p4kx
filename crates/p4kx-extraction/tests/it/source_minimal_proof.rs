@@ -8,8 +8,9 @@ use std::error::Error;
 
 use p4kx_archive::Entry;
 use p4kx_extraction::{
-    Archive, InputScope, SourceDetails, SourceInput, SourceInventory, SourceLocation, SourceScope,
-    SourceUse, SourceUseRole, SourceUses, SourceValue,
+    Archive, InputScope, PhysicalSource, PhysicalSourceKind, SourceDetails, SourceInput,
+    SourceInventory, SourceLocation, SourceScope, SourceUse, SourceUseRole, SourceUses,
+    SourceValue,
 };
 use p4kx_testkit::{ArchiveBuilder, TestEntry};
 use serde_json::{Value, json};
@@ -188,7 +189,7 @@ fn sparse_to_full_upgrades_original_row_and_never_downgrades_or_rebinds_uses() -
         "field marker and original contribution closure are independent of retained detail level"
     );
     let full_snapshot = sources.freeze()?;
-    assert_closed(&full_snapshot)?;
+    assert_closed(&full_snapshot);
     let full_wire = serde_json::to_vec(&full_snapshot)?;
     assert_physical_row_upgraded(&initial, &initial_wire, &full_snapshot)?;
     let again = source(&sources, &archive, SourceDetails::CaptureLimited)?;
@@ -243,6 +244,45 @@ fn assert_physical_row_upgraded(
         !std::ptr::eq(sparse_source, full_source),
         "upgraded physical facts replace the row only for new snapshots"
     );
+    assert_retention_views(sparse_source, full_source)?;
+    Ok(())
+}
+
+fn assert_retention_views(
+    sparse_source: &PhysicalSource,
+    full_source: &PhysicalSource,
+) -> TestResult {
+    let PhysicalSourceKind::ArchiveEntryProof(proof) = sparse_source.kind() else {
+        return Err("the frozen limited snapshot retains its proof-only variant".into());
+    };
+    let PhysicalSourceKind::ArchiveEntry(entry) = full_source.kind() else {
+        return Err("the new full snapshot exposes the admitted Entry facts".into());
+    };
+    assert_eq!(
+        proof.details(),
+        SourceDetails::CaptureLimited,
+        "the old snapshot retains its explicit detail omission"
+    );
+    assert_eq!(
+        proof.entry_index().get(),
+        u64::try_from(entry.entry_index())?,
+        "the same physical directory ordinal survives the upgrade"
+    );
+    assert_eq!(
+        sparse_source.stored_encryption(),
+        full_source.stored_encryption(),
+        "detail retention does not change the stored encryption proof"
+    );
+    assert_eq!(
+        sparse_source.ancestors(),
+        full_source.ancestors(),
+        "detail retention preserves the original ancestry"
+    );
+    assert_eq!(
+        entry.path().value().map(String::as_str),
+        Some("full.bin"),
+        "only the admitted full snapshot supplies its original path"
+    );
     Ok(())
 }
 
@@ -258,46 +298,32 @@ fn opaque_conversion_preserves_original_owner_domain_role_and_known_encrypted_wi
     checks::opaque_conversion_preserves_original_owner_domain_role_and_known_encrypted_witness()
 }
 
-pub(super) fn assert_closed(inventory: &SourceInventory) -> TestResult {
-    let wire = serde_json::to_value(inventory)?;
-    let rows = wire
-        .get("sources")
-        .and_then(Value::as_array)
-        .ok_or("physical source rows")?;
-    let ids: BTreeSet<_> = rows
-        .iter()
-        .map(|row| {
-            row.get("id")
-                .and_then(Value::as_str)
-                .ok_or("physical source ID")
-        })
-        .collect::<Result<_, _>>()?;
+pub(super) fn assert_closed(inventory: &SourceInventory) {
+    let ids: BTreeSet<_> = inventory
+        .iter_sources()
+        .map(|row| row.id().as_str())
+        .collect();
     assert_eq!(
         ids.len(),
-        rows.len(),
+        inventory.source_count(),
         "one original physical row per identifier"
     );
-    for row in rows {
-        for ancestor in row
-            .get("ancestors")
-            .and_then(Value::as_array)
-            .ok_or("source ancestry")?
-        {
+    for row in inventory.iter_sources() {
+        for ancestor in row.ancestors() {
             assert!(
-                ids.contains(ancestor.as_str().ok_or("ancestor ID")?),
-                "every original ancestor ref resolves within the same frozen inventory"
+                ids.contains(ancestor.as_str()),
+                "every original ancestor resolves within the same typed frozen inventory"
             );
         }
     }
     let mut uses = BTreeSet::new();
-    for used in inventory.uses() {
+    for used in inventory.iter_uses() {
         assert!(
             ids.contains(used.source().as_str()),
             "every original use has a retained physical source"
         );
         assert!(uses.insert(used.id().as_str()), "original uses are unique");
     }
-    Ok(())
 }
 
 #[path = "source_minimal_proof_checks.rs"]

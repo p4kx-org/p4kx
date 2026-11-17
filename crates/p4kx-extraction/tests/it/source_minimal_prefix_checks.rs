@@ -82,7 +82,7 @@ pub(super) fn known_first_observation(
         "different.bin",
         "the unrelated source's actual details remain distinct"
     );
-    support::assert_closed(&sources.freeze()?)?;
+    support::assert_closed(&sources.freeze()?);
     Ok(())
 }
 
@@ -142,6 +142,6 @@ pub(super) fn selected_sibling_refs(
                 && used.source() == second_duplicate.source_ref()),
         "the unselected historical duplicate's source/use relation remains retained"
     );
-    support::assert_closed(&inventory)?;
+    support::assert_closed(&inventory);
     Ok(())
 }

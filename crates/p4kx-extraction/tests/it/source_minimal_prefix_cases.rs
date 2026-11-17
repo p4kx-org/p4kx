@@ -214,7 +214,7 @@ fn upgraded_middle(
         full_bytes,
         "limited capture neither downgrades nor duplicates a Full prefix"
     );
-    support::assert_closed(&sources.freeze()?)?;
+    support::assert_closed(&sources.freeze()?);
     Ok(())
 }
 
@@ -268,7 +268,7 @@ fn upgraded_root(
         full_bytes,
         "limited root capture cannot downgrade or duplicate the Full row"
     );
-    support::assert_closed(&sources.freeze()?)?;
+    support::assert_closed(&sources.freeze()?);
     Ok(())
 }
 
@@ -317,6 +317,6 @@ fn selected_legacy_root(
         5,
         "two legacy unknown leaves keep separate unknown rows but share one proved root"
     );
-    support::assert_closed(&sources.freeze()?)?;
+    support::assert_closed(&sources.freeze()?);
     Ok(())
 }
