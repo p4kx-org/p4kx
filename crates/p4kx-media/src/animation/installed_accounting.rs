@@ -20,6 +20,8 @@ use crate::{
 
 use super::AnimationProvider;
 
+#[path = "installed_failure.rs"]
+mod failure;
 #[path = "../../tests/real_archive/animation_fixture.rs"]
 mod fixture;
 #[path = "installed_origin_batches.rs"]
@@ -164,15 +166,31 @@ impl Census<'_> {
             shaders: None,
         };
         let mut visit = Visit::new(family, &providers, &budget, &observation, self.schema);
-        traversal.visit(self.archive, &mut Vec::new(), &mut writer, &mut visit)?;
-        writer.index_build(&root)?;
-        observation.origins.finish_build(&root, &writer)?;
-        let finished = writer.finish()?;
+        failure::checked(
+            family,
+            "traversal",
+            traversal.visit(self.archive, &mut Vec::new(), &mut writer, &mut visit),
+        )?;
+        failure::checked(family, "index-build", writer.index_build(&root))?;
+        failure::checked(
+            family,
+            "reconcile-build-origins",
+            observation.origins.finish_build(&root, &writer),
+        )?;
+        let finished = failure::checked(family, "finish-writer", writer.finish())?;
         let [kind] = finished.kinds.as_slice() else {
             return Err("one original animation provider required".into());
         };
-        let totals = visit.finish(&traversal.entries, kind)?;
-        observation.finish_census(&kind.counts.converted_outputs)?;
+        let totals = failure::checked(
+            family,
+            "reconcile-census",
+            visit.finish(&traversal.entries, kind),
+        )?;
+        failure::checked(
+            family,
+            "reconcile-artifacts",
+            observation.finish_census(&kind.counts.converted_outputs),
+        )?;
         report(family, &totals);
         Ok(totals)
     }
@@ -182,7 +200,7 @@ fn require(condition: bool, message: &'static str) -> TestResult {
     if condition {
         Ok(())
     } else {
-        Err(message.into())
+        Err(failure::VerificationCheck(message).into())
     }
 }
 

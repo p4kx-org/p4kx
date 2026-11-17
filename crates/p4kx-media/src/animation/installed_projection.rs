@@ -20,7 +20,7 @@ use crate::{
 
 use super::rows::{AnimationRows, Family, Totals};
 use super::stream::Observation;
-use super::{TestResult, require};
+use super::{TestResult, failure, require};
 
 pub(super) struct Visit<'a> {
     family: Family,
@@ -116,11 +116,17 @@ impl<'a> Visit<'a> {
         })?;
         writer.end_source(projected)?;
         self.check_source(entry, &source, &payload.bytes)
-            .map_err(|cause| invalid(cause.to_string()))?;
+            .map_err(|cause| {
+                failure::report(self.family, "reconcile-entry", cause.as_ref());
+                invalid(cause.to_string())
+            })?;
         self.observation
             .origins
             .finish_entry(archive, entry, &input, writer)
-            .map_err(|cause| invalid(cause.to_string()))?;
+            .map_err(|cause| {
+                failure::report(self.family, "reconcile-entry-origins", cause.as_ref());
+                invalid(cause.to_string())
+            })?;
         Ok(raw)
     }
 
