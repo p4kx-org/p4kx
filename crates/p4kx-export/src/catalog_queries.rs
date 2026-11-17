@@ -73,15 +73,26 @@ pub use crate::catalog_v3::authored_fields::AuthoredRestriction;
 pub use crate::catalog_v3::catalog_item_alignment::{
     ItemPort, ItemPortContainer, PortItemType, PortRestrictions,
 };
+pub use crate::catalog_v3::faction_definition::FactionText;
 pub use crate::catalog_v3::gameplay_property_catalog::{
     DisplayTransformationNodeRef, DisplayTransformationNodeSource, DisplayTransformationPayload,
     DisplayTransformationSource, GameplayProperty, GameplayPropertyFields,
     PropertyNameOverrideConditionPayload, PropertyNameOverrideConditionSource,
     PropertyNameOverrideFields, PropertyNameOverrideSource,
 };
-pub use crate::catalog_v3::reputation_faction_definition::FactionReputationDefinition;
-pub use crate::catalog_v3::reputation_scope_definition::{ScopeDefinition, StandingLink};
-pub use crate::catalog_v3::reputation_standing_definition::StandingDefinition;
+pub use crate::catalog_v3::reputation_blackboard::{
+    BlackboardProperty, BlackboardPropertyBody, BlackboardValue,
+};
+pub use crate::catalog_v3::reputation_faction_definition::{
+    FactionReputationDefinition, FactionReputationPresentation, FactionReputationRelations,
+};
+pub use crate::catalog_v3::reputation_relation::{RelationMarker, ReputationRelation};
+pub use crate::catalog_v3::reputation_scope_definition::{
+    ScopeDefinition, ScopeStandingMap, StandingLink,
+};
+pub use crate::catalog_v3::reputation_standing_definition::{
+    StandingDefinition, StandingPresentation, StandingProgression,
+};
 pub use crate::catalog_v3::tag_catalog::OriginalTagPath;
 pub use crate::definition_reference::DefinitionStatus;
 pub use crate::location_template::{LocationName, MissionLocationTemplate};
@@ -129,6 +140,7 @@ pub use crate::mission_generator::item_reward_results::{
     ContractItemRewardResult, ItemRewardTarget,
 };
 pub use crate::mission_property_set::MissionPropertyLevel;
+pub use crate::resource_float::{ResourceFloat32, ResourceFloat64};
 pub use crate::resource_integer::ResourceInt64;
 pub use crate::template_source_refs::{DeclarationBinding, SourceFieldRef};
 pub use crate::template_value_meaning::{

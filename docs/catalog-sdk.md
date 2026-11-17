@@ -185,6 +185,20 @@ available translations and source evidence. An application can independently app
 display and key-conflict rules. Return consumer-owned results from the callback and publish
 them after the query succeeds. A selection that admits no Record opens no localization payloads.
 
+The three reputation row types expose their complete original values. Use
+`FactionReputationDefinition::presentation`, `relations`, `properties_bb` and `authored_fields`
+to inspect the original presentation, typed references, dynamic Blackboard values and retained
+additional occurrences. `FactionText` preserves a protected locale reference separately from a
+literal String. Unknown Blackboard variants remain `BlackboardValue::Authored` with their
+complete original fields in the body's arena.
+
+`ScopeDefinition::standing_map` exposes the map's source state, original ceiling, initial value,
+ordered standing links and retained extras. `StandingDefinition::presentation`, `progression`
+and `additional_fields` expose the complete original standing. `drift_time_hours` remains the
+original Single in hours; no conversion to days or ordinary floating-point normalization is
+performed. Exact integer widths, IEEE bits, source states and result-local origin references
+remain available through the borrowed values. These accessors add no new query families or
+Catalog fields.
 
 ## Manufacturers
 

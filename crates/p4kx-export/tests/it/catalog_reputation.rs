@@ -4,6 +4,9 @@
 //! Factions, reputation scopes, standings and contexts, mission types and localities and contract
 //! scenarios in the P4KX catalog.
 
+#[path = "reputation_faction_owner_fixture.rs"]
+mod owner_fixture;
+
 #[path = "catalog_faction.rs"]
 mod catalog_faction;
 #[path = "catalog_faction_modifier.rs"]

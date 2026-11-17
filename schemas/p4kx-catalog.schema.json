@@ -2876,15 +2876,18 @@
       "type": "object"
     },
     "BlackboardPropertyBody": {
+      "description": "The original dynamic blackboard value and retained additional fields.",
       "oneOf": [
         {
+          "description": "An original Boolean value.",
           "properties": {
             "kind": {
               "const": "boolean",
               "type": "string"
             },
             "value": {
-              "$ref": "#/$defs/SourcedValueOfboolean"
+              "$ref": "#/$defs/SourcedValueOfboolean",
+              "description": "The authored Boolean and its source state."
             }
           },
           "required": [
@@ -2894,13 +2897,15 @@
           "type": "object"
         },
         {
+          "description": "An original IEEE754 Single with exact bits.",
           "properties": {
             "kind": {
               "const": "float",
               "type": "string"
             },
             "value": {
-              "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+              "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+              "description": "The original IEEE 754 bits, finite projection and source state."
             }
           },
           "required": [
@@ -2910,13 +2915,15 @@
           "type": "object"
         },
         {
+          "description": "An original signed 32-bit integer.",
           "properties": {
             "kind": {
               "const": "integer",
               "type": "string"
             },
             "value": {
-              "$ref": "#/$defs/SourcedValueOfint32"
+              "$ref": "#/$defs/SourcedValueOfint32",
+              "description": "The authored integer and its source state."
             }
           },
           "required": [
@@ -2926,6 +2933,7 @@
           "type": "object"
         },
         {
+          "description": "An original protected localization reference.",
           "properties": {
             "kind": {
               "const": "localized",
@@ -2933,6 +2941,7 @@
             },
             "value": {
               "$ref": "#/$defs/SourcedValueOfGameTextRef",
+              "description": "The protected locale reference and its source state.",
               "x-gameText": true
             }
           },
@@ -2943,13 +2952,15 @@
           "type": "object"
         },
         {
+          "description": "An original string literal.",
           "properties": {
             "kind": {
               "const": "string",
               "type": "string"
             },
             "value": {
-              "$ref": "#/$defs/SourcedValueOfstring"
+              "$ref": "#/$defs/SourcedValueOfstring",
+              "description": "The authored literal and its source state."
             }
           },
           "required": [
@@ -2959,6 +2970,7 @@
           "type": "object"
         },
         {
+          "description": "Additional original fields retain an unclassified dynamic variant.",
           "properties": {
             "kind": {
               "const": "authored",
@@ -16829,9 +16841,11 @@
       "description": "One locale key in its canonical domain or a directly stored string.",
       "oneOf": [
         {
+          "description": "The original locale key registered in its declared text domain.",
           "properties": {
             "reference": {
-              "$ref": "#/$defs/GameTextRef"
+              "$ref": "#/$defs/GameTextRef",
+              "description": "The canonical identifier in the original text domain."
             },
             "type": {
               "const": "localized",
@@ -16845,8 +16859,10 @@
           "type": "object"
         },
         {
+          "description": "A directly authored literal without localization-key inference.",
           "properties": {
             "text": {
+              "description": "The original String, including a key-looking prefix.",
               "type": "string"
             },
             "type": {
@@ -16867,9 +16883,11 @@
       "description": "One locale key in its canonical domain or a directly stored string.",
       "oneOf": [
         {
+          "description": "The original locale key registered in its declared text domain.",
           "properties": {
             "reference": {
-              "$ref": "#/$defs/PublicNameRef"
+              "$ref": "#/$defs/PublicNameRef",
+              "description": "The canonical identifier in the original text domain."
             },
             "type": {
               "const": "localized",
@@ -16883,8 +16901,10 @@
           "type": "object"
         },
         {
+          "description": "A directly authored literal without localization-key inference.",
           "properties": {
             "text": {
+              "description": "The original String, including a key-looking prefix.",
               "type": "string"
             },
             "type": {
@@ -38079,6 +38099,7 @@
       "type": "object"
     },
     "RelationMarker": {
+      "description": "The original protected marker description and icon of a relationship.",
       "properties": {
         "authoredFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -41537,6 +41558,7 @@
       "type": "object"
     },
     "ScopeStandingMap": {
+      "description": "The original owned standing map with exact numeric storage.",
       "properties": {
         "authoredFields": {
           "$ref": "#/$defs/SourceArenaOutput"

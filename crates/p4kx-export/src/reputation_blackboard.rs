@@ -21,7 +21,7 @@ const BASE: &str = "SBBDynamicPropertyBase";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct BlackboardProperty<'source> {
+pub struct BlackboardProperty<'source> {
     source_type: SourcedValue<&'source str>,
     name: SourcedValue<&'source str>,
     dynamic_property: SourcedValue<BlackboardPropertyBody<'source>>,
@@ -64,10 +64,11 @@ impl<'source> BlackboardProperty<'source> {
     }
 }
 
+/// The original dynamic blackboard value and retained additional fields.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct BlackboardPropertyBody<'source> {
+pub struct BlackboardPropertyBody<'source> {
     source_type: SourcedValue<&'source str>,
     #[serde(flatten)]
     value: BlackboardValue<'source>,
@@ -90,6 +91,7 @@ impl<'source> BlackboardPropertyBody<'source> {
     }
 }
 
+/// A typed original blackboard value without condition evaluation.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(
     tag = "kind",
@@ -97,23 +99,35 @@ impl<'source> BlackboardPropertyBody<'source> {
     rename_all_fields = "camelCase"
 )]
 #[schemars(transform = every_field_required)]
-enum BlackboardValue<'source> {
+#[non_exhaustive]
+pub enum BlackboardValue<'source> {
+    /// An original Boolean value.
     Boolean {
+        /// The authored Boolean and its source state.
         value: SourcedValue<bool>,
     },
+    /// An original IEEE754 Single with exact bits.
     Float {
+        /// The original IEEE 754 bits, finite projection and source state.
         value: SourcedValue<ResourceFloat32>,
     },
+    /// An original signed 32-bit integer.
     Integer {
+        /// The authored integer and its source state.
         value: SourcedValue<i32>,
     },
+    /// An original protected localization reference.
     Localized {
         #[schemars(extend("x-gameText" = true))]
+        /// The protected locale reference and its source state.
         value: SourcedValue<GameTextRef>,
     },
+    /// An original string literal.
     String {
+        /// The authored literal and its source state.
         value: SourcedValue<&'source str>,
     },
+    /// Additional original fields retain an unclassified dynamic variant.
     Authored,
 }
 
@@ -156,5 +170,51 @@ impl<'source> BlackboardValue<'source> {
             Self::String { value } => value.state(),
             Self::Authored => return None,
         })
+    }
+}
+
+impl<'source> BlackboardProperty<'source> {
+    /// The concrete original blackboard property type.
+    #[must_use]
+    pub const fn source_type(&self) -> &SourcedValue<&'source str> {
+        &self.source_type
+    }
+
+    /// The authored blackboard property name.
+    #[must_use]
+    pub const fn name(&self) -> &SourcedValue<&'source str> {
+        &self.name
+    }
+
+    /// The original owned dynamic-property declaration.
+    #[must_use]
+    pub const fn dynamic_property(&self) -> &SourcedValue<BlackboardPropertyBody<'source>> {
+        &self.dynamic_property
+    }
+
+    /// The remaining original blackboard property field occurrences.
+    #[must_use]
+    pub const fn authored_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.authored_fields
+    }
+}
+
+impl<'source> BlackboardPropertyBody<'source> {
+    /// The concrete original dynamic-property type.
+    #[must_use]
+    pub const fn source_type(&self) -> &SourcedValue<&'source str> {
+        &self.source_type
+    }
+
+    /// The typed value or explicit authored variant.
+    #[must_use]
+    pub const fn value(&self) -> &BlackboardValue<'source> {
+        &self.value
+    }
+
+    /// The remaining original dynamic-property occurrences, including unknown variants.
+    #[must_use]
+    pub const fn authored_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.authored_fields
     }
 }

@@ -3,6 +3,9 @@
 
 use std::cell::RefCell;
 
+#[path = "reputation_faction_views.rs"]
+mod views;
+
 use p4kx_extraction::{
     CancelToken, DataForge, DecimalU64, Guid, RecordTree, SourceValueState, SourcedValue,
 };
@@ -100,10 +103,11 @@ impl<'source> FactionReputationDefinition<'source> {
     }
 }
 
+/// Original presentation fields of one faction reputation definition.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct FactionReputationPresentation<'source> {
+pub struct FactionReputationPresentation<'source> {
     name: SourcedValue<&'source str>,
     #[schemars(extend("x-gameText" = true))]
     display_name: SourcedValue<GameTextRef>,
@@ -161,10 +165,11 @@ impl<'source> FactionReputationPresentation<'source> {
     }
 }
 
+/// Original faction reputation relationships and their resolution evidence.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct FactionReputationRelations<'source> {
+pub struct FactionReputationRelations<'source> {
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
     reputation_context_properties_ui: Link<'source>,
     #[schemars(with = "SourcedValue<Vec<SourcedValue<CatalogRecordReference>>>")]

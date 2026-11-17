@@ -3,6 +3,9 @@
 
 use std::cell::RefCell;
 
+#[path = "reputation_scope_views.rs"]
+mod views;
+
 use p4kx_extraction::{
     CancelToken, DataForge, FieldOrigin, Guid, RecordTree, SourceValueState, SourcedValue,
 };
@@ -49,10 +52,11 @@ pub struct ScopeDefinition<'source> {
     authored_fields: SourceArenaOutput<'source>,
 }
 
+/// The original owned standing map with exact numeric storage.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct ScopeStandingMap<'source> {
+pub struct ScopeStandingMap<'source> {
     source_type: SourcedValue<&'source str>,
     reputation_ceiling: SourcedValue<ResourceNumber>,
     initial_reputation: SourcedValue<ResourceNumber>,

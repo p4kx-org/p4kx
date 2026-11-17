@@ -43,7 +43,7 @@ mod reputation_perk;
 #[path = "reputation_perk_list.rs"]
 pub(crate) mod reputation_perk_list;
 #[path = "reputation_relation.rs"]
-mod reputation_relation;
+pub(crate) mod reputation_relation;
 #[path = "reputation_reward_amount_definition.rs"]
 pub(crate) mod reputation_reward_amount_definition;
 #[path = "reputation_trigger_configuration.rs"]
@@ -92,7 +92,7 @@ pub(crate) mod npc_spawn_definitions;
 #[path = "prepared_definition.rs"]
 mod prepared_definition;
 #[path = "reputation_blackboard.rs"]
-mod reputation_blackboard;
+pub(crate) mod reputation_blackboard;
 #[path = "reputation_context_definition.rs"]
 pub(crate) mod reputation_context_definition;
 #[path = "reputation_scope_definition.rs"]

@@ -24,7 +24,7 @@ const STANDING: &str = "SReputationStandingParams";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct ReputationRelation<'source> {
+pub struct ReputationRelation<'source> {
     source_type: SourcedValue<&'source str>,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
     scope: SourcedValue<Box<SourceRecordReference<'source>>>,
@@ -61,10 +61,11 @@ impl<'source> ReputationRelation<'source> {
     }
 }
 
+/// The original protected marker description and icon of a relationship.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct RelationMarker<'source> {
+pub struct RelationMarker<'source> {
     source_type: SourcedValue<&'source str>,
     #[schemars(extend("x-gameText" = true))]
     description: SourcedValue<FactionText<'source, GameTextRef>>,
@@ -92,5 +93,63 @@ impl<'source> RelationMarker<'source> {
             icon,
             authored_fields,
         })
+    }
+}
+
+impl<'source> ReputationRelation<'source> {
+    /// The concrete original relation structure type.
+    #[must_use]
+    pub const fn source_type(&self) -> &SourcedValue<&'source str> {
+        &self.source_type
+    }
+
+    /// The original scope reference and retained physical target.
+    #[must_use]
+    pub const fn scope(&self) -> &SourcedValue<Box<SourceRecordReference<'source>>> {
+        &self.scope
+    }
+
+    /// The original standing reference and retained physical target.
+    #[must_use]
+    pub const fn standing(&self) -> &SourcedValue<Box<SourceRecordReference<'source>>> {
+        &self.standing
+    }
+
+    /// The original owned relationship marker.
+    #[must_use]
+    pub const fn marker_params(&self) -> &SourcedValue<RelationMarker<'source>> {
+        &self.marker_params
+    }
+
+    /// The remaining original relation field occurrences.
+    #[must_use]
+    pub const fn authored_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.authored_fields
+    }
+}
+
+impl<'source> RelationMarker<'source> {
+    /// The concrete original marker structure type.
+    #[must_use]
+    pub const fn source_type(&self) -> &SourcedValue<&'source str> {
+        &self.source_type
+    }
+
+    /// The protected marker text as an original locale reference or literal.
+    #[must_use]
+    pub const fn description(&self) -> &SourcedValue<FactionText<'source, GameTextRef>> {
+        &self.description
+    }
+
+    /// The original marker icon asset path.
+    #[must_use]
+    pub const fn icon(&self) -> &SourcedValue<&'source str> {
+        &self.icon
+    }
+
+    /// The remaining original marker field occurrences.
+    #[must_use]
+    pub const fn authored_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.authored_fields
     }
 }

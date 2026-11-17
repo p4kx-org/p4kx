@@ -15,8 +15,7 @@ use crate::commodity_v3_fixture::{
     self as archive_fixture, DcbOrigin, TestResult, at, guid, text_row,
 };
 
-#[path = "reputation_faction_owner_fixture.rs"]
-mod fixture;
+use super::owner_fixture as fixture;
 
 const MAIN: &str = "/definitions/factionReputations/rows/0";
 const PROPERTIES: &str = "/propertiesBb/value";

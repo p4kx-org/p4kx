@@ -3,6 +3,9 @@
 
 use std::cell::RefCell;
 
+#[path = "reputation_standing_views.rs"]
+mod views;
+
 use p4kx_extraction::{CancelToken, DataForge, Guid, RecordTree, SourceValueState, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -59,10 +62,11 @@ impl<'source> StandingDefinition<'source> {
     }
 }
 
+/// Original protected presentation and technical labels of one standing.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct StandingPresentation<'source> {
+pub struct StandingPresentation<'source> {
     name: SourcedValue<&'source str>,
     #[schemars(extend("x-gameText" = true))]
     description: SourcedValue<&'source str>,
@@ -74,10 +78,11 @@ struct StandingPresentation<'source> {
     mission_board_icon: SourcedValue<&'source str>,
 }
 
+/// Original progression values; drift time remains measured in hours.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct StandingProgression {
+pub struct StandingProgression {
     min_reputation: SourcedValue<ResourceNumber>,
     drift_reputation: SourcedValue<ResourceNumber>,
     /// The original number of hours between reputation drifts.

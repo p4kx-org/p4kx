@@ -61,9 +61,18 @@ pub(crate) struct FactionDefinition<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "camelCase")]
 #[schemars(rename = "FactionTextOf{Reference}", transform = every_field_required)]
-pub(super) enum FactionText<'source, Reference> {
-    Localized { reference: Reference },
-    Literal { text: &'source str },
+#[non_exhaustive]
+pub enum FactionText<'source, Reference> {
+    /// The original locale key registered in its declared text domain.
+    Localized {
+        /// The canonical identifier in the original text domain.
+        reference: Reference,
+    },
+    /// A directly authored literal without localization-key inference.
+    Literal {
+        /// The original String, including a key-looking prefix.
+        text: &'source str,
+    },
 }
 
 impl<'source, Reference> FactionText<'source, Reference> {

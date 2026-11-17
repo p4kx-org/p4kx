@@ -4,6 +4,9 @@
 use std::error::Error;
 use std::time::UNIX_EPOCH;
 
+#[path = "catalog_reputation_sdk_views.rs"]
+mod views;
+
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, ReputationSelection,
     ReputationSnapshot, ResourceNumber, with_reputation_from,
@@ -42,6 +45,7 @@ fn reputation_queries_preserve_canonical_rows_and_scope_links() -> TestResult {
         compare_rows(&scopes.rows, &catalog, "reputationScopes")?;
         compare_rows(&standings.rows, &catalog, "reputationStandings")?;
         check_faction_name(&snapshot)?;
+        views::check_scope_progression(&snapshot)?;
         check_scope_links(&snapshot)
     })??;
     let selections = [
