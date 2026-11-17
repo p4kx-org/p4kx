@@ -36,12 +36,6 @@ impl<'source> CatalogProjection<'_, 'source> {
         })
     }
 
-    pub(crate) fn finish_game_texts(
-        &self,
-    ) -> Result<Vec<CanonicalText<'source, GameTextRef>>, CatalogError> {
-        Ok(self.finish_rows()?.game_texts)
-    }
-
     pub(crate) fn finish_public_names(
         &self,
     ) -> Result<Vec<CanonicalText<'source, PublicNameRef>>, CatalogError> {

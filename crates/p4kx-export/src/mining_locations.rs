@@ -5,11 +5,14 @@
 
 use std::collections::BTreeMap;
 
+use serde::Serialize;
+
 pub use crate::build::mining_locations::{read_mining_locations, read_mining_locations_from};
 pub use crate::canonical_record_header::CatalogRecordSource as MiningRecordSource;
+pub use crate::catalog_queries::CatalogPublicName;
 pub use crate::catalog_read::original::PhysicalEntryRef;
 pub use crate::catalog_record_reference::CatalogRecordReference;
-pub use crate::catalog_text_contract::GameTextRef;
+pub use crate::catalog_text_contract::{GameTextRef, PublicNameRef};
 pub use crate::catalog_v3::catalog_harvest_modules::harvest_dependency_selection::EntitySelection;
 pub use crate::catalog_v3::catalog_harvest_modules::harvest_provider::{
     AreaModifier, HarvestableArea, HarvestableAreaType, HarvestableElement, HarvestableGeometry,
@@ -73,6 +76,10 @@ pub struct MiningLocationSnapshot {
     pub harvestable_occurrences: Vec<HarvestableOccurrence>,
     /// The Starmap object definitions and their selected placements.
     pub starmap_objects: Vec<MiningStarmapObject>,
+    /// Resource types physically referenced by the elements and their first refined products.
+    pub resource_types: Vec<MiningResourceType>,
+    /// Canonical public names referenced by the selected resource types.
+    pub public_names: Vec<CatalogPublicName>,
     /// Canonical protected text associated with the selected records.
     pub game_texts: Vec<MiningGameText>,
     /// The physical sources and uses captured by this read.
@@ -97,6 +104,10 @@ pub struct MiningLocationCoverage {
     pub unreadable_text_fields: usize,
     /// Original mining definition fields with projection diagnostics.
     pub unreadable_mining_fields: usize,
+    /// Observed element resource and ore refinement links with no compatible physical target.
+    pub unresolved_resource_links: usize,
+    /// Distinct physically linked `ResourceType` Records whose bodies could not be read.
+    pub unreadable_resource_types: usize,
     /// Distinct provider links that could not be resolved.
     pub unreadable_provider_links: usize,
     /// True when the world placement traversal reported incomplete inventory.
@@ -107,6 +118,20 @@ pub struct MiningLocationCoverage {
     pub unreadable_harvest_containers: usize,
     /// Locations for which a malformed or incomplete parent chain prevented a known link.
     pub locations_with_unresolved_parent: usize,
+}
+
+/// A directly linked resource and its original name and refinement fields.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct MiningResourceType {
+    /// The resource's physical Record identity and header fields.
+    #[serde(flatten)]
+    pub source: MiningRecordSource,
+    /// The unmodified reference into the public-name rows of the mining result.
+    pub name: SourcedValue<PublicNameRef>,
+    /// The original refined `ResourceType` reference and its source state.
+    pub refined_version: SourcedValue<CatalogRecordReference>,
 }
 
 /// The Starmap object used by the logical location join.

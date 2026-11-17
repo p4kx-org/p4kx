@@ -37,6 +37,9 @@ use crate::{CatalogError, ExportAccountingError, Kind, starmap};
 #[path = "mining_location_rows.rs"]
 mod rows;
 
+#[path = "mining_resource_rows.rs"]
+mod resource_rows;
+
 #[path = "mining_location_occurrences.rs"]
 mod occurrences;
 use occurrences::HarvestLocationsRead;
@@ -139,6 +142,8 @@ fn read_archive(
         harvestable_provider_presets,
         starmap_records,
     } = DefinitionRows::read(&input, &projection, cancel, &mut coverage)?;
+    let resource_types =
+        resource_rows::read(&projection, &mineable_elements, cancel, &mut coverage)?;
     let world = read_world(
         archive,
         &input,
@@ -148,11 +153,9 @@ fn read_archive(
         cancel,
         &mut coverage,
     )?;
-    let game_texts = projection
-        .finish_game_texts()?
-        .into_iter()
-        .map(Into::into)
-        .collect();
+    let text_rows = projection.finish_rows()?;
+    let public_names = text_rows.public_names.into_iter().map(Into::into).collect();
+    let game_texts = text_rows.game_texts.into_iter().map(Into::into).collect();
     let source_inventory = origins.uses.finish_with(|| checkpoint(cancel))?;
     Ok(MiningLocationSnapshot {
         build: archive.build().cloned(),
@@ -163,6 +166,8 @@ fn read_archive(
         harvestable_locations: world.locations.logical,
         harvestable_occurrences: world.locations.physical,
         starmap_objects: world.starmap_objects,
+        resource_types,
+        public_names,
         game_texts,
         source_inventory,
         coverage,

@@ -9,6 +9,8 @@ use crate::catalog_number_capture::NumberCapture;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::original::OriginalFlowFields;
 use crate::catalog_read::{CatalogFields, CatalogRecordContext};
+use crate::catalog_record_reference::CatalogRecordReference;
+use crate::catalog_text_contract::PublicNameRef;
 use crate::guid_text::CatalogGuid;
 use crate::record_observation::RecordObservation;
 use crate::resource_density_read;
@@ -49,18 +51,13 @@ pub(crate) fn read<'source>(
 ) -> Result<ResourceRead<'source>, CatalogError> {
     let mut notes = Vec::new();
     let numbers = NumberCapture::default();
-    let scope = projection
-        .original()
-        .record_scope(admission.record(), tree)?;
-    let original = OriginalFlowFields::read(&scope, cancel)?;
-    let capture = TemplateFieldCapture::new(&original, projection.original(), admission)?;
-    let data = definition(
+    let data = with_fields(
         tree,
         projection,
-        memberships,
-        &numbers,
-        &mut notes,
-        &capture,
+        admission,
+        cancel,
+        Some(&numbers),
+        |fields, capture| definition(tree, projection, memberships, &mut notes, fields, capture),
     )?;
     Ok(ResourceRead {
         value: ResourceType {
@@ -73,44 +70,98 @@ pub(crate) fn read<'source>(
     })
 }
 
-fn definition<'source>(
+pub(crate) struct NameAndRefinement {
+    pub(crate) name: SourcedValue<PublicNameRef>,
+    pub(crate) refined_version: SourcedValue<CatalogRecordReference>,
+}
+
+pub(crate) fn read_name_and_refinement<'source>(
     tree: &RecordTree<'source>,
     projection: &CatalogProjection<'_, 'source>,
-    memberships: ResourceMemberships,
-    numbers: &NumberCapture,
-    notes: &mut Vec<FieldError>,
-    capture: &dyn FieldCapture<'source>,
-) -> Result<ResourceDefinition<'source>, CatalogError> {
-    let origins = projection.origins();
-    let context = origins.record(tree.record_index()).with_numbers(numbers);
-    let fields = CatalogFields::observed(tree.root(), "", &context, capture)?;
-    fields.check_observed(RESOURCE_FIELDS, notes)?;
-    let density = fields.structure("densityType", notes)?.try_map(|value| {
-        resource_density_read::read(value, "densityType", &context, notes, capture)
+    admission: &RecordObservation<'_, 'source>,
+    cancel: Option<&CancelToken>,
+) -> Result<(NameAndRefinement, Vec<FieldError>), CatalogError> {
+    let mut notes = Vec::new();
+    let value = with_fields(tree, projection, admission, cancel, None, |fields, _| {
+        name_and_refinement(tree, projection, fields, &mut notes)
     })?;
-    let containers = fields
-        .structure("defaultCargoContainers", notes)?
-        .try_map(|value| cargo_slots(value, &context, notes, capture))?;
-    let properties = properties(&fields, &context, notes, capture)?;
-    Ok(ResourceDefinition {
-        source: CanonicalRecordHeader::read(tree, origins)?,
+    Ok((value, notes))
+}
+
+fn with_fields<'source, T>(
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    cancel: Option<&CancelToken>,
+    numbers: Option<&NumberCapture>,
+    read: impl FnOnce(
+        &CatalogFields<'_, 'source, '_>,
+        &dyn FieldCapture<'source>,
+    ) -> Result<T, CatalogError>,
+) -> Result<T, CatalogError> {
+    let input = projection.original();
+    let scope = input.record_scope(admission.record(), tree)?;
+    let original = OriginalFlowFields::read(&scope, cancel)?;
+    let capture = TemplateFieldCapture::new(&original, input, admission)?;
+    let context = projection.origins().record(tree.record_index());
+    let context = numbers.map_or(context, |capture| context.with_numbers(capture));
+    let fields = CatalogFields::observed(tree.root(), "", &context, &capture)?;
+    read(&fields, &capture)
+}
+
+fn name_and_refinement<'source>(
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    fields: &CatalogFields<'_, 'source, '_>,
+    notes: &mut Vec<FieldError>,
+) -> Result<NameAndRefinement, CatalogError> {
+    Ok(NameAndRefinement {
         name: projection.name(
             fields.locale("displayName", notes)?,
             tree.record_index(),
             "displayName",
         )?,
+        refined_version: resource_value_read::reference(fields, "refinedVersion", notes)?,
+    })
+}
+
+fn definition<'source>(
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    memberships: ResourceMemberships,
+    notes: &mut Vec<FieldError>,
+    fields: &CatalogFields<'_, 'source, '_>,
+    capture: &dyn FieldCapture<'source>,
+) -> Result<ResourceDefinition<'source>, CatalogError> {
+    let origins = projection.origins();
+    let context = fields.context();
+    fields.check_observed(RESOURCE_FIELDS, notes)?;
+    let density = fields.structure("densityType", notes)?.try_map(|value| {
+        resource_density_read::read(value, "densityType", context, notes, capture)
+    })?;
+    let containers = fields
+        .structure("defaultCargoContainers", notes)?
+        .try_map(|value| cargo_slots(value, context, notes, capture))?;
+    let properties = properties(fields, context, notes, capture)?;
+    let NameAndRefinement {
+        name,
+        refined_version,
+    } = name_and_refinement(tree, projection, fields, notes)?;
+    Ok(ResourceDefinition {
+        source: CanonicalRecordHeader::read(tree, origins)?,
+        name,
         description: projection.description(
             fields.locale("description", notes)?,
             tree.record_index(),
             "description",
         )?,
         group_guids: resource_memberships::values(memberships, origins, tree.record_index())?,
-        refined_version: resource_value_read::reference(&fields, "refinedVersion", notes)?,
+        refined_version,
         density,
         default_thumbnail_path: fields.text("defaultThumbnailPath", notes)?,
         default_thumbnail_path_svg: fields.text("defaultThumbnailPathSVG", notes)?,
         rtt_thumbnail_entity_class: resource_value_read::reference(
-            &fields,
+            fields,
             "rttThumbnailEntityClass",
             notes,
         )?,

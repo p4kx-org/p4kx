@@ -77,6 +77,17 @@ provider's actual preset, entity and mining component selectors. It reads no loc
 Starmap or placement payloads. The mining locations query also returns these canonical provider
 rows and adds logical and physical placements.
 
+## Mining resource names
+
+The mining-location query includes the `resource_types` reached from its mineable elements.
+Join by the physical `targetRecordIndex` in the element's `resourceType` reference and
+the ResourceType row's source `recordIndex`. The same snapshot includes the physical target
+of each admitted ore's `refinedVersion` reference. Resolve the short-name IDs in `public_names`
+and use the snapshot's own `source_inventory` for the selected language and field evidence.
+
+A missing name can retain its original localization key. Consult `coverage` for unresolved
+resource references and unreadable ResourceType Records when converting the snapshot to a cache.
+
 ## Authored item ports
 
 Use `with_item_ports` or `with_item_ports_from` to read `configurations.itemPorts`
