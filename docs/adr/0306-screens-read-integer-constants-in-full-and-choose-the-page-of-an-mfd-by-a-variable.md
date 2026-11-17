@@ -163,6 +163,21 @@ inputs and authored numeric anchor and scale parameters. The template evaluates 
 geometry and defaults. This template has no matching fill or icon-position switches. A value
 for either setting stays an unevaluated input.
 
+## Installed default-button checks
+
+The LIVE source census at change 13165946 found 483 General, 48 GeneralLarge,
+and 365 Secondary instances. The selected General source produced 359,840
+frame pixels and 301 label pixels. The MFD footer proof found two original
+Secondary frames with 5,680 visible pixels each.
+
+The selected GeneralLarge Canvas resolved its original label and mounted
+both original frame widgets. None of the label's 14 glyph bounds overlapped
+the raster stage. Their transforms were nonsingular and the solid paint
+had visible alpha. The glyphs remained invisible in an isolated raster
+with the masks removed. Neither original frame widget submitted a draw
+item. Verify the authored Canvas placement and style context before using
+this candidate as evidence of visible default GeneralLarge rendering.
+
 ## Guesses, unverified against the game
 
 - That the pale fill of a runtime image is not drawn, or is the tint of the hologram and not a
