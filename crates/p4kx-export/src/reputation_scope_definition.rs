@@ -3,7 +3,9 @@
 
 use std::cell::RefCell;
 
-use p4kx_extraction::{CancelToken, DataForge, Guid, RecordTree, SourcedValue};
+use p4kx_extraction::{
+    CancelToken, DataForge, FieldOrigin, Guid, RecordTree, SourceValueState, SourcedValue,
+};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -27,13 +29,14 @@ const SOURCE_TYPE: &str = "SReputationScopeParams";
 const MAP_TYPE: &str = "SReputationStandingMapParams";
 const STANDING_TYPE: &str = "SReputationStandingParams";
 
-type StandingLink<'source> = SourcedValue<Box<SourceRecordReference<'source>>>;
+/// An original standing slot and its retained target header.
+pub type StandingLink<'source> = SourcedValue<Box<SourceRecordReference<'source>>>;
 
 /// An authored reputation scope and its ordered standing map.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ScopeDefinition<'source> {
+pub struct ScopeDefinition<'source> {
     #[serde(flatten)]
     source: CanonicalRecordHeader<'source>,
     scope_name: SourcedValue<&'source str>,
@@ -130,6 +133,36 @@ pub(crate) fn read<'source>(
 }
 
 impl<'source> ScopeDefinition<'source> {
+    /// The original physical Record identity and header.
+    #[must_use]
+    pub const fn source(&self) -> &CanonicalRecordHeader<'source> {
+        &self.source
+    }
+
+    /// The original scope label in the protected text domain.
+    #[must_use]
+    pub const fn display_name(&self) -> &SourcedValue<GameTextRef> {
+        &self.display_name
+    }
+
+    /// The source state of the owned standing map.
+    #[must_use]
+    pub const fn standing_map_state(&self) -> SourceValueState {
+        self.standing_map.state()
+    }
+
+    /// The source evidence of the owned standing map.
+    #[must_use]
+    pub const fn standing_map_origin(&self) -> &FieldOrigin {
+        self.standing_map.origin()
+    }
+
+    /// The ordered standing references of a readable standing map.
+    #[must_use]
+    pub fn standings(&self) -> Option<&SourcedValue<Vec<StandingLink<'source>>>> {
+        self.standing_map.value().map(|map| &map.standings)
+    }
+
     fn read(
         source: CanonicalRecordHeader<'source>,
         fields: Observed<'_, '_, '_, 'source>,

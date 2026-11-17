@@ -22,6 +22,8 @@ mod reputation_perks;
 mod reputation_sandbox;
 #[path = "catalog_reputation_scope.rs"]
 mod reputation_scope;
+#[path = "catalog_reputation_sdk.rs"]
+mod sdk;
 
 use crate::reputation_fixture::{
     CONTEXT, FACTION, LEGACY_FACTION, LOCALITY, MISSION_TYPE, PLAIN_A, PLAIN_B, SCENARIO, SCOPE,

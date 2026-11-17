@@ -16,6 +16,8 @@ mod harvest_provider_presets;
 mod item_ports;
 #[path = "manufacturer_query.rs"]
 mod manufacturers;
+#[path = "reputation_query.rs"]
+mod reputation;
 
 use p4kx_extraction::{
     Archive, Build, CancelToken, DataForge, DataForgeEntry, Guid, Record, SourceInventory,
@@ -44,13 +46,16 @@ pub use crate::catalog_v3::gameplay_property_catalog::{
     PropertyNameOverrideConditionPayload, PropertyNameOverrideConditionSource,
     PropertyNameOverrideFields, PropertyNameOverrideSource,
 };
+pub use crate::catalog_v3::reputation_faction_definition::FactionReputationDefinition;
+pub use crate::catalog_v3::reputation_scope_definition::{ScopeDefinition, StandingLink};
+pub use crate::catalog_v3::reputation_standing_definition::StandingDefinition;
 pub use crate::definition_reference::DefinitionStatus;
 pub use crate::manufacturer::{
     ManufacturerAudioTrigger, ManufacturerDefinition, ManufacturerDisplayFeatures,
     ManufacturerLocalization,
 };
 pub use crate::resource_number::ResourceNumber;
-pub use crate::source_value_catalog::SourceArenaOutput;
+pub use crate::source_value_catalog::{SourceArenaOutput, SourceRecordReference};
 pub use blueprint_categories::{
     BlueprintCategory, BlueprintCategorySnapshot, read_blueprint_categories,
     read_blueprint_categories_from,
@@ -67,6 +72,9 @@ pub use harvest_provider_presets::{
 
 pub use item_ports::{ItemPortSnapshot, with_item_ports, with_item_ports_from};
 pub use manufacturers::{ManufacturerSnapshot, with_manufacturers, with_manufacturers_from};
+pub use reputation::{
+    ReputationRows, ReputationSelection, ReputationSnapshot, with_reputation, with_reputation_from,
+};
 
 /// Selects physical Records within the queried dataset and supplied DataForge.
 #[derive(Debug, Clone, Copy)]

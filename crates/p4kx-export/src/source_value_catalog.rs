@@ -39,7 +39,8 @@ pub(crate) use arena::{
 };
 pub(crate) use field::SourceField;
 pub(crate) use field_read::read as read_field;
-pub(crate) use reference::{SourceRecordReference, SourceWeakReference, SourceWeakTarget};
+pub use reference::SourceRecordReference;
+pub(crate) use reference::{SourceWeakReference, SourceWeakTarget};
 pub(crate) use reference_read::read as read_reference_payload;
 pub(crate) use scalar_read::{read as read_scalar, read_reference};
 pub(crate) use text::SourceText;

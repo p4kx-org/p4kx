@@ -40,7 +40,7 @@ type ProjectedField = (&'static str, SourceValueState);
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct FactionReputationDefinition<'source> {
+pub struct FactionReputationDefinition<'source> {
     #[serde(flatten)]
     source: CanonicalRecordHeader<'source>,
     #[serde(flatten)]
@@ -52,6 +52,24 @@ pub(crate) struct FactionReputationDefinition<'source> {
 }
 
 impl<'source> FactionReputationDefinition<'source> {
+    /// The original physical Record identity and header.
+    #[must_use]
+    pub const fn source(&self) -> &CanonicalRecordHeader<'source> {
+        &self.source
+    }
+
+    /// The original nonlocalized reputation name.
+    #[must_use]
+    pub const fn name(&self) -> &SourcedValue<&'source str> {
+        &self.presentation.name
+    }
+
+    /// The original reputation label in the protected text domain.
+    #[must_use]
+    pub const fn display_name(&self) -> &SourcedValue<GameTextRef> {
+        &self.presentation.display_name
+    }
+
     fn read(
         source: CanonicalRecordHeader<'source>,
         fields: Observed<'_, '_, '_, 'source>,

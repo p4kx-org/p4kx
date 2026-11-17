@@ -29,7 +29,7 @@ const SOURCE_TYPE: &str = "SReputationStandingParams";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct StandingDefinition<'source> {
+pub struct StandingDefinition<'source> {
     #[serde(flatten)]
     source: CanonicalRecordHeader<'source>,
     #[serde(flatten)]
@@ -37,6 +37,26 @@ pub(crate) struct StandingDefinition<'source> {
     #[serde(flatten)]
     progression: StandingProgression,
     additional_fields: SourceArenaOutput<'source>,
+}
+
+impl<'source> StandingDefinition<'source> {
+    /// The original physical Record identity and header.
+    #[must_use]
+    pub const fn source(&self) -> &CanonicalRecordHeader<'source> {
+        &self.source
+    }
+
+    /// The original standing label in the protected text domain.
+    #[must_use]
+    pub const fn display_name(&self) -> &SourcedValue<GameTextRef> {
+        &self.presentation.display_name
+    }
+
+    /// The original minimum reputation with its exact numeric storage.
+    #[must_use]
+    pub const fn min_reputation(&self) -> &SourcedValue<ResourceNumber> {
+        &self.progression.min_reputation
+    }
 }
 
 #[derive(Debug, Serialize, JsonSchema)]

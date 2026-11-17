@@ -109,6 +109,28 @@ scope coverage, public labels in the selected languages, and the field origin
 inventory. The query reads the selected components and requested localization.
 The archive-backed loadout resolver supplies equipped-item and XML-override data.
 
+## Reputation
+
+Use `with_reputation`, `with_reputation_from` or the parsed session's `with_reputation` to
+read `definitions.factionReputations`, `definitions.reputationScopes` and
+`definitions.reputationStandings`. Each requested family supports `All`, `Guid` and
+`RecordIndex`. A requested family can return an empty result with its own availability and
+coverage. The faction reputation Records carry a separate identity from the game's Faction
+definitions.
+
+For a rank index, `ReputationSelection::ranks()` supplies scopes and the complete standing
+inventory. A scope's `standings()` retains authored slot order and source states. Use
+`snapshot.standing(link)` to join a compatible in-scope link by its original Record index and
+GUID. For a separate lookup on the same session, use the compatible link's
+`resolved_index()` as a `RecordIndex` selection on standings. The minimum reputation
+retains its original numeric storage.
+
+Resolve `display_name()` through `snapshot.game_text()`. The text retains its original key,
+available translations and source evidence. An application can independently apply its rank
+display and key-conflict rules. Return consumer-owned results from the callback and publish
+them after the query succeeds. A selection that admits no Record opens no localization payloads.
+
+
 ## Manufacturers
 
 Use `with_manufacturers`, `with_manufacturers_from` or the parsed session's
