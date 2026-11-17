@@ -16,6 +16,8 @@ mod dataset_ownership;
 mod gameplay_properties;
 #[path = "catalog_schema/health.rs"]
 mod health;
+#[path = "catalog_schema/legacy_v2_migration.rs"]
+mod legacy_v2_migration;
 #[path = "catalog_schema/mission_values.rs"]
 mod mission_values;
 #[path = "catalog_schema/quality_contract.rs"]
@@ -24,6 +26,8 @@ mod quality_contract;
 mod resource_groups;
 #[path = "catalog_schema/revision.rs"]
 mod revision;
+#[path = "catalog_schema/schema_navigation.rs"]
+mod schema_navigation;
 
 use std::error::Error;
 use std::path::PathBuf;

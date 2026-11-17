@@ -11,6 +11,8 @@ The [Rust SDK](catalog-sdk.md) also reads supported catalog data directly from a
 
 ## Versioning and consumers
 
+See the [released field migration](catalog-v2-migration.md) for the Blueprint Category and Gameplay Property mappings.
+
 Version 3 is the only catalog output contract for 0.5.0 (ADR-0339). There is no version-2
 export mode, adapter or fallback. Consumers must accept version 3 before importing it. Tagged payload unions are closed: a new variant requires a version decision, unlike
 an unknown additive field or kind. The schema describes serialization, so emitted nullable payload
@@ -396,7 +398,7 @@ the owning tables and source carriers.
 | `recordPath` | The record path, without `.xml` |
 | `name`, `description` | Text references where documented for the family. The original key and language forms are in the canonical registry. |
 
-A resource group carries `name` and protected `description`. A blueprint category carries `name`.
+A resource group carries `name` and protected `description`.
 
 Manufacturers use [their canonical definition contract](catalog-manufacturer-types.md). The authored
 `Code` string and owned `Localization` retain their source states independently of resolved text.
