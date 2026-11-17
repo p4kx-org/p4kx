@@ -31,7 +31,7 @@ impl Collected<'_> {
         self.starmap_definitions.order();
         crate::contract::MineableElement::order(&mut self.mineable_elements);
         sort_by_guid(&mut self.refining_processes, |entity| entity.guid);
-        sort_by_guid(&mut self.mineable_compositions, |entity| entity.guid);
+        crate::contract::MineableComposition::order(&mut self.mineable_compositions);
         sort_by_guid(&mut self.mining_global_params, |entity| entity.guid);
         sort_by_guid(&mut self.mineable_entities, |entity| entity.guid);
         sort_by_guid(&mut self.crafters, |entity| entity.guid);

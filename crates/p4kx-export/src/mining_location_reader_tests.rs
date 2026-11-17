@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::path::Path;
-
 use p4kx_extraction::{Archive, CancelToken, DataForgeEntry, Guid, Language, SourcedValue};
-use p4kx_testkit::{
-    ArchiveBuilder, DataForgeBuilder, TestContainer, TestEntry, TestInstance, TestRecord,
-    TestStruct, TestType, TestValue,
-};
+
+#[path = "mining_location_reader_fixture.rs"]
+mod fixture;
+
+use fixture::archive;
 
 use crate::CatalogError;
 use crate::mining_locations::{
@@ -17,11 +16,6 @@ use crate::mining_locations::{
 
 const PLANET: &str = "10000000-0000-4000-8000-000000000001";
 const PRESET: &str = "10000000-0000-4000-8000-000000000004";
-const PLANET_RECORD: u128 = 0x1000_0000_0000_4000_8000_0000_0000_0001;
-const PRESET_RECORD: u128 = 0x1000_0000_0000_4000_8000_0000_0000_0004;
-const ELEMENT_RECORD: u128 = 0x1000_0000_0000_4000_8000_0000_0000_0005;
-const COMPOSITION_RECORD: u128 = 0x1000_0000_0000_4000_8000_0000_0000_0006;
-const REGION: &str = "Data/ObjectContainers/PU/system/t/";
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -156,7 +150,13 @@ fn reads_installed_mining_locations_without_catalog_publication() -> TestResult 
 fn check_links(result: &MiningLocationSnapshot) -> TestResult {
     let element = result.mineable_elements.first().ok_or("element")?;
     let composition = result.mineable_compositions.first().ok_or("composition")?;
-    let part = composition.parts.first().ok_or("authored share")?;
+    let slot = composition
+        .parts
+        .value()
+        .and_then(|parts| parts.first())
+        .ok_or("authored slot")?;
+    let part = slot.value().ok_or("authored share")?;
+    let link = part.mineable_element.value().ok_or("element reference")?;
     let provider = result
         .harvestable_provider_presets
         .first()
@@ -164,14 +164,28 @@ fn check_links(result: &MiningLocationSnapshot) -> TestResult {
     let planet = result.starmap_objects.first().ok_or("planet")?;
     let planet_guid: Guid = PLANET.parse()?;
     assert_eq!(
-        part.mineable_element_guid.as_ref(),
+        link.guid().value(),
         element.source.guid.value(),
         "the composition preserves its original reference"
     );
+    assert!(
+        matches!(
+            part.min_percentage.value(),
+            Some(crate::resource_number::ResourceNumber::Single(value))
+                if value.raw_bits() == 20.0_f32.to_bits()
+        ),
+        "the authored share keeps its value and type"
+    );
+    assert!(
+        closed(&composition.parts, result)
+            && closed(slot, result)
+            && closed(&part.min_percentage, result),
+        "array, slot and field source use references resolve"
+    );
     assert_eq!(
-        part.min_percentage.map(f32::to_bits),
-        Some(20.0_f32.to_bits()),
-        "the authored share is unchanged"
+        part.min_percentage.origin().contains_encrypted_source(),
+        Some(false),
+        "the SDK proves clear Game2.dcb provenance"
     );
     assert!(
         closed(&planet.position, result),
@@ -330,112 +344,4 @@ fn closed<T>(value: &SourcedValue<T>, result: &MiningLocationSnapshot) -> bool {
                 .iter()
                 .any(|used| used.id() == reference)
         })
-}
-
-fn archive(path: &Path) -> Result<Archive, Box<dyn std::error::Error>> {
-    let tile = format!("{REGION}tile.socpak");
-    let root_xml = format!(
-        r#"<ObjectContainer><ChildObjectContainers>
-        <Child starMapRecord="{PLANET}" pos="10,0,0"><ChildObjectContainers>
-        <Child name="{tile}" external="1" pos="1,0,0"/>
-        <Child name="{tile}" external="1" pos="2,0,0"/>
-        </ChildObjectContainers></Child>
-        </ChildObjectContainers></ObjectContainer>"#,
-    );
-    let root = TestContainer::new().entry(TestEntry::stored("tsystem.xml", root_xml.as_bytes()));
-    let marker = format!("\0preset\0{PRESET}\0");
-    let body = |name| {
-        TestContainer::new()
-            .entry(TestEntry::stored(
-                format!("{name}.xml"),
-                b"<ObjectContainer/>",
-            ))
-            .entry(TestEntry::stored(format!("{name}.soc"), marker.as_bytes()))
-            .build()
-    };
-    ArchiveBuilder::new()
-        .entry(TestEntry::stored("Data/Game2.dcb", dataforge()))
-        .entry(TestEntry::stored(
-            "Data/Localization/english/global.ini",
-            b"planetoid_name=Synthetic planet\ndeposit_name=Synthetic deposit\n",
-        ))
-        .entry(TestEntry::stored(
-            "Data/Localization/german/global.ini",
-            b"planetoid_name=Testplanet\n",
-        ))
-        .entry(TestEntry::stored(
-            format!("{REGION}tsystem.socpak"),
-            root.build(),
-        ))
-        .entry(TestEntry::stored(tile, body("tile")))
-        .entry(TestEntry::stored(
-            format!("{REGION}unreached.socpak"),
-            body("unreached"),
-        ))
-        .write_to(path)?;
-    Ok(Archive::open(path)?)
-}
-
-fn dataforge() -> Vec<u8> {
-    let element = TestStruct::new("MineableElement").field("elementInstability", TestType::Single);
-    let part = TestStruct::new("CompositionPart")
-        .field("mineableElement", TestType::Reference)
-        .field("minPercentage", TestType::Single);
-    let composition = TestStruct::new("MineableComposition")
-        .field("depositName", TestType::Locale)
-        .array(
-            "compositionArray",
-            TestType::Class("CompositionPart".to_owned()),
-        );
-    let provider = TestStruct::new("HarvestableProviderPreset").field("unused", TestType::Bool);
-    let starmap = TestStruct::new("StarMapObject").field("name", TestType::String);
-    DataForgeBuilder::new()
-        .version(8)
-        .structure(element)
-        .structure(part)
-        .structure(composition)
-        .structure(provider)
-        .structure(starmap)
-        .record(
-            TestRecord::new(
-                ELEMENT_RECORD,
-                "MineableElement",
-                "MineableElement.Synthetic",
-                "libs/foundry/records/mining/mineableelements/synthetic.xml",
-            )
-            .value("elementInstability", TestValue::Single(0.75)),
-        )
-        .record(
-            TestRecord::new(
-                COMPOSITION_RECORD,
-                "MineableComposition",
-                "MineableComposition.Synthetic",
-                "libs/foundry/records/mining/rockcompositionpresets/synthetic.xml",
-            )
-            .value("depositName", TestValue::text("@deposit_name"))
-            .value(
-                "compositionArray",
-                TestValue::Array(vec![TestValue::Struct(
-                    TestInstance::new("CompositionPart")
-                        .value("mineableElement", TestValue::Reference(ELEMENT_RECORD))
-                        .value("minPercentage", TestValue::Single(20.0)),
-                )]),
-            ),
-        )
-        .record(TestRecord::new(
-            PRESET_RECORD,
-            "HarvestableProviderPreset",
-            "HarvestableProviderPreset.Synthetic",
-            "libs/foundry/records/harvestable/providerpresets/synthetic.xml",
-        ))
-        .record(
-            TestRecord::new(
-                PLANET_RECORD,
-                "StarMapObject",
-                "StarMapObject.Synthetic",
-                "libs/foundry/records/starmap/pu/synthetic.xml",
-            )
-            .value("name", TestValue::text("@planetoid_name")),
-        )
-        .build()
 }

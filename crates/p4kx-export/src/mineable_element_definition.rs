@@ -9,7 +9,6 @@ use super::prepared_definition::PreparedDefinition;
 use crate::CatalogError;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_record_reference::CatalogRecordReference;
-use crate::guid_text::CatalogGuid;
 use crate::mining_locations::MiningRecordSource;
 use crate::record_observation::RecordObservation;
 use crate::resource_float::ResourceFloat32;
@@ -53,15 +52,7 @@ impl MineableElement {
     }
 
     pub(crate) fn order(rows: &mut [Self]) {
-        rows.sort_by_cached_key(|row| {
-            (
-                row.source
-                    .guid
-                    .value()
-                    .map(|guid| CatalogGuid(*guid).text()),
-                row.source.record_index.value().copied(),
-            )
-        });
+        rows.sort_by_cached_key(|row| row.source.order_key());
     }
 }
 

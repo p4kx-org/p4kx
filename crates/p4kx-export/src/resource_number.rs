@@ -11,31 +11,62 @@ use crate::resource_integer::ResourceInt64;
 /// A numeric source value retaining its original integer width or IEEE bits.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(tag = "type")]
-pub(crate) enum ResourceNumber {
+#[non_exhaustive]
+pub enum ResourceNumber {
+    /// A source 8-bit signed integer.
     #[serde(rename = "int8")]
-    Int8 { value: i8 },
+    Int8 {
+        /// The stored integer.
+        value: i8,
+    },
+    /// A source 16-bit signed integer.
     #[serde(rename = "int16")]
-    Int16 { value: i16 },
+    Int16 {
+        /// The stored integer.
+        value: i16,
+    },
+    /// A source 32-bit signed integer.
     #[serde(rename = "int32")]
     Int32 {
+        /// The stored integer.
         #[schemars(range(min = i32::MIN, max = i32::MAX))]
         value: i32,
     },
+    /// A source 64-bit signed integer.
     #[serde(rename = "int64")]
-    Int64 { value: ResourceInt64 },
+    Int64 {
+        /// The stored integer.
+        value: ResourceInt64,
+    },
+    /// A source 8-bit unsigned integer.
     #[serde(rename = "uint8")]
-    UInt8 { value: u8 },
+    UInt8 {
+        /// The stored integer.
+        value: u8,
+    },
+    /// A source 16-bit unsigned integer.
     #[serde(rename = "uint16")]
-    UInt16 { value: u16 },
+    UInt16 {
+        /// The stored integer.
+        value: u16,
+    },
+    /// A source 32-bit unsigned integer.
     #[serde(rename = "uint32")]
     UInt32 {
+        /// The stored integer.
         #[schemars(range(min = u32::MIN, max = u32::MAX))]
         value: u32,
     },
+    /// A source 64-bit unsigned integer.
     #[serde(rename = "uint64")]
-    UInt64 { value: DecimalU64 },
+    UInt64 {
+        /// The stored integer.
+        value: DecimalU64,
+    },
+    /// A source IEEE 754 binary32 value.
     #[serde(rename = "f32")]
     Single(ResourceFloat32),
+    /// A source IEEE 754 binary64 value.
     #[serde(rename = "f64")]
     Double(ResourceFloat64),
 }

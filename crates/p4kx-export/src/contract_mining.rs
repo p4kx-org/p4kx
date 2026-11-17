@@ -33,28 +33,6 @@ pub(crate) struct RefiningProcess<'a> {
     pub(crate) refining_quality: Option<&'a str>,
 }
 
-/// A mineable composition: a `MineableComposition` Record under `mining/rockcompositionpresets`,
-/// the elements one rock or deposit is made of.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct MineableComposition<'a> {
-    /// The GUID of the Record.
-    pub(crate) guid: CatalogGuid,
-    /// The Record name without its type, e.g. `Asteroid_CType_Iron`.
-    pub(crate) class_name: &'a str,
-    /// The record path, without `.xml`.
-    pub(crate) record_path: &'a str,
-    /// The HUD label of the deposit, from `depositName`. The localisation key and the texts are
-    /// game texts.
-    #[schemars(extend("x-gameText" = true))]
-    pub(crate) deposit_name: SourcedValue<GameTextRef>,
-    /// `minimumDistinctElements`, from 1 to 4 on LIVE; `null` when the Record states none.
-    pub(crate) minimum_distinct_elements: Option<i64>,
-    /// The parts, from `compositionArray` in stored order.
-    pub(crate) parts: Vec<CompositionPart>,
-}
-
 /// A mineable entity: an `EntityClassDefinition` Record under `entities/mineable`, one kind of
 /// rock or deposit. Many entities share a composition; a provider preset reaches an entity through
 /// the `entityGuid` of its harvestables. Entities are selected by record path and type alone, so
@@ -85,24 +63,4 @@ pub(crate) struct MineableEntity<'a> {
     pub(crate) signatures: Vec<f32>,
     /// The GUID of the `RadarContactTypeEntry` Record `radarProperties.contactType` links to.
     pub(crate) radar_contact_type_guid: Option<CatalogGuid>,
-}
-
-/// One part of a mineable composition: an element with the range of its share.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct CompositionPart {
-    /// The GUID of the `MineableElement` Record the Reference `mineableElement` links to; `null`
-    /// for a null Reference. The catalog lists the element only when it is kept.
-    pub(crate) mineable_element_guid: Option<CatalogGuid>,
-    /// `minPercentage`, from 1 to 100 on LIVE.
-    pub(crate) min_percentage: Option<f32>,
-    /// `maxPercentage`, from 5 to 100 on LIVE.
-    pub(crate) max_percentage: Option<f32>,
-    /// `probability` that the part occurs, from 0.02 to 1 on LIVE.
-    pub(crate) probability: Option<f32>,
-    /// `curveExponent`, from 1 to 5 on LIVE.
-    pub(crate) curve_exponent: Option<f32>,
-    /// `qualityScale`, from 0.49 to 1 on LIVE.
-    pub(crate) quality_scale: Option<f32>,
 }

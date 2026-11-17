@@ -46,61 +46,89 @@ fn guid(value: u128) -> String {
 }
 
 fn entry<'a>(catalog: &'a Value, kind: &str, record: u128) -> Result<&'a Value, Box<dyn Error>> {
+    let requested = guid(record);
     catalog[kind]
         .as_array()
         .into_iter()
         .flatten()
-        .find(|entry| entry["guid"] == guid(record).as_str())
-        .ok_or_else(|| format!("{kind} has no {}", guid(record)).into())
+        .find(|entry| {
+            let identity = &entry["guid"];
+            identity == requested.as_str() || identity["value"] == requested.as_str()
+        })
+        .ok_or_else(|| format!("{kind} has no {requested}").into())
 }
 
 #[test]
-fn a_composition_lists_its_parts_and_leaves_a_dangling_element_null() -> TestResult {
+fn a_composition_preserves_authored_order_widths_and_dangling_reference() -> TestResult {
     let (built, catalog) = build(None)?;
     let source = entry(&catalog, "mineableCompositions", COMPOSITION)?;
-    crate::catalog_mining::verify_name(
-        &catalog,
-        source,
-        "depositName",
-        "@hud_mining_asteroid_name_5",
-        Some("Iron Deposit"),
-    )?;
-    let mut row = source.clone();
-    row.as_object_mut()
-        .ok_or("composition row")?
-        .remove("depositName");
+    verify_composition_header(&catalog, source)?;
     assert_eq!(
-        row,
-        json!({
-            "guid": guid(COMPOSITION),
-            "className": "Asteroid_CType_Iron",
-            "recordPath": "libs/foundry/records/mining/rockcompositionpresets/asteroid_ctype_iron",
-            "minimumDistinctElements": 2,
-            "parts": [
-                {
-                    "mineableElementGuid": guid(ELEMENT),
-                    "minPercentage": 30.0,
-                    "maxPercentage": 70.0,
-                    "probability": 0.8,
-                    "curveExponent": null,
-                    "qualityScale": null
-                },
-                {
-                    "mineableElementGuid": null,
-                    "minPercentage": 20.0,
-                    "maxPercentage": 70.0,
-                    "probability": 0.8,
-                    "curveExponent": null,
-                    "qualityScale": null
-                }
-            ]
-        })
+        source["minimumDistinctElements"]["value"],
+        json!({"type": "int32", "value": 2})
+    );
+    let parts = source["parts"]["value"].as_array().ok_or("parts")?;
+    assert_eq!(parts.len(), 2, "authored length");
+    let first = &parts[0]["value"];
+    let second = &parts[1]["value"];
+    let link = &first["mineableElement"]["value"];
+    assert_eq!(link["status"], "present");
+    assert_eq!(link["guid"]["value"], guid(ELEMENT));
+    let dangling = &second["mineableElement"]["value"];
+    assert_eq!(dangling["status"], "dangling");
+    assert_eq!(dangling["guid"]["value"], guid(RESOURCE + 0xff));
+    assert_eq!(dangling["targetRecordIndex"]["state"], "absent");
+    assert_eq!(first["minPercentage"]["value"]["finite"], 30.0);
+    assert_eq!(second["minPercentage"]["value"]["finite"], 20.0);
+    assert_eq!(
+        first["qualityScale"]["value"],
+        json!({"type": "f64", "rawBits": "3fe0000000000001", "finite": 0.500_000_000_000_000_1})
+    );
+    assert_eq!(first["curveExponent"]["state"], "absent");
+    for value in [
+        &source["parts"],
+        &parts[0],
+        &parts[1],
+        &first["maxPercentage"],
+    ] {
+        assert_eq!(value["containsEncryptedSource"], true);
+        assert!(
+            value["sourceUsesRefs"]
+                .as_array()
+                .is_some_and(|ids| !ids.is_empty()),
+            "each original array and field occurrence has direct evidence"
+        );
+    }
+    assert_ne!(
+        first["maxPercentage"]["sourceUsesRefs"], second["maxPercentage"]["sourceUsesRefs"],
+        "equal values at different positions keep distinct uses"
     );
     let kind = built.summary().kind(Kind::MineableCompositions);
     assert_eq!(
         kind.map(|kind| (kind.count, kind.skipped)),
         Some((1, 1)),
         "the test composition is a leftover"
+    );
+    Ok(())
+}
+
+fn verify_composition_header(catalog: &Value, source: &Value) -> TestResult {
+    crate::catalog_mining::verify_name(
+        catalog,
+        source,
+        "depositName",
+        "@hud_mining_asteroid_name_5",
+        Some("Iron Deposit"),
+    )?;
+    assert_eq!(
+        source.pointer("/className/value").and_then(Value::as_str),
+        Some("Asteroid_CType_Iron"),
+        "original composition class name",
+    );
+    assert_eq!(
+        source.pointer("/recordPath/value").and_then(Value::as_str),
+        Some("libs/foundry/records/mining/rockcompositionpresets/asteroid_ctype_iron"),
+        "original composition Record path",
     );
     Ok(())
 }

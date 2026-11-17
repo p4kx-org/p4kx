@@ -2070,10 +2070,14 @@ are not exported and no media. The loot of a slot is its `lootConfig` (see "Loot
 mining labels, the carrier's `value` matches the text row's `id.value`. The row holds the original
 `key.value` and per-language `sourceText` and `displayText` in `translations.value`. These
 references replace the inline `key/en/de` values of the v2 catalog.
-`minimumDistinctElements` and each part
-of `compositionArray` are as stored: `mineableElementGuid` (the element of `mineableElements`;
-`null` for a null or dangling Reference), `minPercentage`, `maxPercentage`, `probability`,
-`curveExponent` and `qualityScale`, in stored order.
+The original Record header and `minimumDistinctElements` carry direct source evidence. `parts`
+is the sourced `compositionArray`. Each array index is the original zero-based position, including
+slots with a non-present source state. Each part has its own origin and sourced `mineableElement`,
+`minPercentage`, `maxPercentage`, `probability`, `curveExponent` and `qualityScale`.
+`mineableElement.value.guid.value` preserves the authored Reference GUID even when its target is
+dangling. Target metadata carries its own source evidence alongside the resolution status. Values
+use their source width. Floating-point values retain `rawBits` and a nullable `finite` number,
+and 64-bit integers use decimal strings. The local mining reader shares this sourced shape.
 
 **Parameters (`miningGlobalParams`).** The `MiningGlobalParams` Records under `mining` (7 on LIVE,
 6 entries). Every number of the Record is a field of the same name in camel case (`cScuPerVolume`

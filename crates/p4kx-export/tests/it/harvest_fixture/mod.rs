@@ -60,6 +60,7 @@ fn part(minimum: f32, element: u128) -> TestValue {
             .value("minPercentage", TestValue::Single(minimum))
             .value("maxPercentage", TestValue::Single(70.0))
             .value("probability", TestValue::Single(0.8))
+            .value("qualityScale", TestValue::Double(0.500_000_000_000_000_1))
             .value("mineableElement", TestValue::Reference(element)),
     )
 }

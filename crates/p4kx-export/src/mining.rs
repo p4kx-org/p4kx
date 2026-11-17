@@ -5,23 +5,18 @@ use p4kx_extraction::{CancelToken, RecordTree, SourcedValue, Value};
 
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_text_contract::GameTextRef;
-use crate::catalog_v3::authored_fields;
-
-use crate::contract::{CompositionPart, MineableComposition, MineableEntity, RefiningProcess};
+use crate::catalog_v3::{authored_fields, mineable_composition_definition};
+use crate::contract::{MineableEntity, RefiningProcess};
 use crate::guid_text::CatalogGuid;
 use crate::harvest_link::MINEABLE_PARAMS;
 use crate::picked::Picked;
-use crate::record_fields::{
-    class_name, component, elements, integer, number, reference, structs, structure, text,
-};
+use crate::record_fields::{class_name, component, elements, reference, structure, text};
 use crate::record_observation::RecordObservation;
 use crate::scan_signature::SignatureSlot;
 use crate::source_fields::FieldError;
 use crate::{CatalogError, ExportAccountingError, Kind};
 
 const SIGNATURE_SYSTEM_PARAMS: &str = "SSCSignatureSystemParams";
-
-type Projection<'source> = fn(&RecordTree<'source>, SourcedValue<GameTextRef>) -> Picked<'source>;
 
 pub(crate) fn named_definition<'source>(
     kind: Kind,
@@ -30,18 +25,23 @@ pub(crate) fn named_definition<'source>(
     admission: &RecordObservation<'_, 'source>,
     cancel: Option<&CancelToken>,
 ) -> Result<(Picked<'source>, Vec<FieldError>), CatalogError> {
-    let (field, project): (&str, Projection<'source>) = match kind {
-        Kind::RefiningProcesses => ("processName", |tree, name| {
-            Picked::Refining(refining_process(tree, name))
-        }),
-        Kind::MineableCompositions => ("depositName", |tree, name| {
-            Picked::Composition(mineable_composition(tree, name))
-        }),
-        _ => return Err(ExportAccountingError::ConflictingSourceDatum.into()),
-    };
-    let (name, notes) =
-        authored_fields::read_root_locale(tree, projection, admission, cancel, field)?;
-    Ok((project(tree, name), notes))
+    match kind {
+        Kind::RefiningProcesses => {
+            let (name, notes) = authored_fields::read_root_locale(
+                tree,
+                projection,
+                admission,
+                cancel,
+                "processName",
+            )?;
+            Ok((Picked::Refining(refining_process(tree, name)), notes))
+        }
+        Kind::MineableCompositions => {
+            let read = mineable_composition_definition::read(tree, projection, admission, cancel)?;
+            Ok((Picked::Composition(Box::new(read.value)), read.notes))
+        }
+        _ => Err(ExportAccountingError::ConflictingSourceDatum.into()),
+    }
 }
 
 /// Returns the mineable entity the Record tree `tree` describes, its scan signature taken from
@@ -69,33 +69,6 @@ pub(crate) fn mineable_entity<'f>(
         scan_signature: slot.value(&signatures),
         radar_contact_type_guid: reference(radar, "contactType"),
         signatures,
-    }
-}
-
-fn mineable_composition<'f>(
-    tree: &RecordTree<'f>,
-    deposit_name: SourcedValue<GameTextRef>,
-) -> MineableComposition<'f> {
-    let root = Some(tree.root());
-    MineableComposition {
-        guid: CatalogGuid(tree.guid()),
-        class_name: class_name(tree),
-        record_path: tree.record_path(),
-        deposit_name,
-        minimum_distinct_elements: integer(root, "minimumDistinctElements"),
-        parts: structs(root, "compositionArray")
-            .map(|part| {
-                let part = Some(part);
-                CompositionPart {
-                    mineable_element_guid: reference(part, "mineableElement"),
-                    min_percentage: number(part, "minPercentage"),
-                    max_percentage: number(part, "maxPercentage"),
-                    probability: number(part, "probability"),
-                    curve_exponent: number(part, "curveExponent"),
-                    quality_scale: number(part, "qualityScale"),
-                }
-            })
-            .collect(),
     }
 }
 

@@ -46,7 +46,7 @@ impl ResourceFloat32 {
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = schema_fields::every_field_required)]
-pub(crate) struct ResourceFloat64 {
+pub struct ResourceFloat64 {
     #[serde(serialize_with = "bits64")]
     #[schemars(
         with = "String",
@@ -58,6 +58,18 @@ pub(crate) struct ResourceFloat64 {
 }
 
 impl ResourceFloat64 {
+    /// Returns the original IEEE 754 bits.
+    #[must_use]
+    pub const fn raw_bits(&self) -> u64 {
+        self.raw_bits
+    }
+
+    /// Returns the finite decimal projection of the source value.
+    #[must_use]
+    pub const fn finite(&self) -> Option<f64> {
+        self.finite
+    }
+
     pub(crate) fn new(value: f64) -> Self {
         let bits = value.to_bits();
         Self {

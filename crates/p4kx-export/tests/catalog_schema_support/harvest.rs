@@ -6,20 +6,39 @@
 use serde_json::json;
 
 pub(super) fn compositions() -> serde_json::Value {
+    let present = super::source_values::present;
+    let guid = "a5000000-0000-4000-8000-000000000001";
+    let path = "libs/foundry/records/mining/rockcompositionpresets/asteroid_ctype_iron";
+    let single = |finite: f32| {
+        present(json!({
+            "type": "f32", "finite": finite, "rawBits": format!("{:08x}", finite.to_bits()),
+        }))
+    };
     json!([{
-        "guid": "a5000000-0000-4000-8000-000000000001",
-        "className": "Asteroid_CType_Iron",
-        "recordPath": "libs/foundry/records/mining/rockcompositionpresets/asteroid_ctype_iron",
-        "depositName": super::source_values::present(json!("text:fixture:deposit")),
-        "minimumDistinctElements": 2,
-        "parts": [{
-            "mineableElementGuid": "a3000000-0000-4000-8000-000000000001",
-            "minPercentage": 30.0,
-            "maxPercentage": 70.0,
-            "probability": 1.0,
-            "curveExponent": 1.0,
-            "qualityScale": 1.0
-        }]
+        "guid": present(json!(guid)),
+        "recordName": present(json!("MineableComposition.Asteroid_CType_Iron")),
+        "className": present(json!("Asteroid_CType_Iron")),
+        "recordPath": present(json!(path)),
+        "sourceType": present(json!("MineableComposition")),
+        "fileName": present(json!(format!("{path}.xml"))),
+        "recordIndex": present(json!(2)),
+        "metadataTag": super::source_values::source(p4kx_extraction::SourceValue::Absent),
+        "depositName": present(json!("text:fixture:deposit")),
+        "minimumDistinctElements": present(json!({"type": "int32", "value": 2})),
+        "parts": present(json!([present(json!({
+            "mineableElement": present(json!({
+                "targetRecordIndex": present(json!(1)),
+                "guid": present(json!("a4000000-0000-4000-8000-000000000001")),
+                "recordPath": present(json!("libs/foundry/records/mining/mineableelements/iron")),
+                "targetType": present(json!("MineableElement")),
+                "status": "present",
+            })),
+            "minPercentage": single(30.0),
+            "maxPercentage": single(70.0),
+            "probability": single(1.0),
+            "curveExponent": single(1.0),
+            "qualityScale": single(1.0),
+        }))])),
     }])
 }
 

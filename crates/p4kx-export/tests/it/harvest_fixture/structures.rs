@@ -38,6 +38,7 @@ pub(super) fn structures(builder: DataForgeBuilder, mass_multiplier: bool) -> Da
             .field("minPercentage", TestType::Single)
             .field("maxPercentage", TestType::Single)
             .field("probability", TestType::Single)
+            .field("qualityScale", TestType::Double)
             .field("mineableElement", TestType::Reference),
         TestStruct::new("MineableComposition")
             .field("depositName", TestType::Locale)

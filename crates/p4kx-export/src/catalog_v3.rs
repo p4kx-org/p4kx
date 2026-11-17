@@ -1,14 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-#[path = "catalog_number_capture.rs"]
-pub(crate) mod catalog_number_capture;
-#[path = "catalog_number_diagnostics.rs"]
-pub(crate) mod catalog_number_diagnostics;
-#[path = "catalog_number_health.rs"]
-pub(crate) mod catalog_number_health;
-#[path = "number_position.rs"]
-pub(crate) mod number_position;
+#[path = "catalog_numeric_modules.rs"]
+mod catalog_numeric_modules;
+pub(crate) use catalog_numeric_modules::{
+    catalog_number_capture, catalog_number_diagnostics, catalog_number_health, number_position,
+    resource_float, resource_integer, resource_number, resource_value_read,
+};
 
 #[path = "blueprint_category_list.rs"]
 pub(crate) mod blueprint_category_list;
@@ -26,6 +24,8 @@ mod authored_link;
 #[path = "authored_nodes.rs"]
 mod authored_nodes;
 
+#[path = "mineable_composition_definition.rs"]
+pub(crate) mod mineable_composition_definition;
 #[path = "mineable_element_definition.rs"]
 pub(crate) mod mineable_element_definition;
 
@@ -351,20 +351,14 @@ pub(crate) mod quality_source_read;
 pub(crate) mod resource_density_read;
 #[path = "resource_density_source.rs"]
 pub(crate) mod resource_density_source;
-#[path = "resource_float.rs"]
-pub(crate) mod resource_float;
 #[path = "resource_group.rs"]
 pub(crate) mod resource_group;
 #[path = "resource_group_catalog.rs"]
 pub(crate) mod resource_group_catalog;
 #[path = "resource_group_read.rs"]
 pub(crate) mod resource_group_read;
-#[path = "resource_integer.rs"]
-pub(crate) mod resource_integer;
 #[path = "resource_memberships.rs"]
 pub(crate) mod resource_memberships;
-#[path = "resource_number.rs"]
-pub(crate) mod resource_number;
 #[path = "resource_property_contract.rs"]
 pub(crate) mod resource_property_contract;
 #[path = "resource_property_read.rs"]
@@ -375,8 +369,6 @@ pub(crate) mod resource_raw_policy;
 pub(crate) mod resource_read;
 #[path = "resource_type_contract.rs"]
 pub(crate) mod resource_type_contract;
-#[path = "resource_value_read.rs"]
-pub(crate) mod resource_value_read;
 #[path = "source_value_catalog.rs"]
 pub(crate) mod source_value_catalog;
 

@@ -9,16 +9,21 @@ use p4kx_extraction::{Build, CancelToken, Guid, Language, SourceInventory, Sourc
 use schemars::JsonSchema;
 use serde::{Serialize, Serializer};
 
-use crate::guid_text::CatalogGuid;
+use crate::guid_text::{CatalogGuid, GuidText};
 use crate::schema_fields::every_field_required;
 
 pub use crate::build::mining_locations::{read_mining_locations, read_mining_locations_from};
 pub use crate::catalog_read::original::PhysicalEntryRef;
 pub use crate::catalog_record_reference::CatalogRecordReference;
 pub use crate::catalog_text_contract::GameTextRef;
+pub use crate::catalog_v3::mineable_composition_definition::{
+    CompositionPart, MineableComposition,
+};
 pub use crate::catalog_v3::mineable_element_definition::MineableElement;
 pub use crate::definition_reference::DefinitionStatus;
-pub use crate::resource_float::ResourceFloat32;
+pub use crate::resource_float::{ResourceFloat32, ResourceFloat64};
+pub use crate::resource_integer::ResourceInt64;
+pub use crate::resource_number::ResourceNumber;
 pub use crate::starmap_containers::instance::ContainerInstanceKey;
 
 /// Selects one requested language and supports cooperative cancellation.
@@ -41,9 +46,8 @@ impl<'a> MiningLocationOptions<'a> {
 
 /// Owned typed rows from the selected mining and placement readers.
 ///
-/// Record identity, protected text and selected Starmap placements carry original evidence.
-/// Plain DataForge body and logical-location fields use the Catalog's convenience semantics.
-/// A provenance-aware cache also needs exact evidence for those fields.
+/// Record identity, mineable elements, compositions, protected text and selected placements
+/// carry original evidence. Logical location aggregates use the Catalog's convenience semantics.
 #[derive(Debug)]
 #[non_exhaustive]
 pub struct MiningLocationSnapshot {
@@ -134,6 +138,15 @@ fn serialize_guid<S: Serializer>(
         .serialize(serializer)
 }
 
+impl MiningRecordSource {
+    pub(crate) fn order_key(&self) -> (Option<GuidText>, Option<u32>) {
+        (
+            self.guid.value().map(|guid| CatalogGuid(*guid).text()),
+            self.record_index.value().copied(),
+        )
+    }
+}
+
 /// The Starmap object used by the logical location join.
 #[derive(Debug)]
 #[non_exhaustive]
@@ -176,38 +189,6 @@ pub struct MiningTextForms {
     pub source_text: SourcedValue<String>,
     /// The display text from the same source.
     pub display_text: SourcedValue<String>,
-}
-
-/// One composition of a rock or deposit.
-#[derive(Debug)]
-#[non_exhaustive]
-pub struct MineableComposition {
-    /// The authored Record identity.
-    pub source: MiningRecordSource,
-    /// The canonical protected-text ID for the HUD label.
-    pub deposit_name: SourcedValue<GameTextRef>,
-    /// The authored minimum number of distinct elements.
-    pub minimum_distinct_elements: Option<i64>,
-    /// The composition parts in authored order.
-    pub parts: Vec<CompositionPart>,
-}
-
-/// One authored part of a mineable composition.
-#[derive(Debug)]
-#[non_exhaustive]
-pub struct CompositionPart {
-    /// The linked element, when it resolves.
-    pub mineable_element_guid: Option<Guid>,
-    /// The minimum share expressed as a percentage.
-    pub min_percentage: Option<f32>,
-    /// The maximum share expressed as a percentage.
-    pub max_percentage: Option<f32>,
-    /// The probability that the part occurs.
-    pub probability: Option<f32>,
-    /// The exponent of the share distribution curve.
-    pub curve_exponent: Option<f32>,
-    /// The quality scale.
-    pub quality_scale: Option<f32>,
 }
 
 /// One provider Record with authored groups, areas and resolved mining links.

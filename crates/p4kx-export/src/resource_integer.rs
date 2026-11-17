@@ -8,14 +8,16 @@ use serde::{Serialize, Serializer};
 
 /// A signed source Int64 encoded as range-checked canonical decimal text.
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct ResourceInt64(i64);
+pub struct ResourceInt64(i64);
 
 impl ResourceInt64 {
     pub(crate) const fn new(value: i64) -> Self {
         Self(value)
     }
 
-    pub(crate) const fn get(self) -> i64 {
+    /// Returns the original signed integer.
+    #[must_use]
+    pub const fn get(self) -> i64 {
         self.0
     }
 }

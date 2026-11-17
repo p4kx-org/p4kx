@@ -89,7 +89,7 @@ pub(crate) enum Picked<'f> {
     /// A refining process.
     Refining(RefiningProcess<'f>),
     /// A mineable composition.
-    Composition(MineableComposition<'f>),
+    Composition(Box<MineableComposition>),
     /// The mining parameters of a kind of miner.
     MiningParams(MiningGlobalParams<'f>),
     /// A mineable entity.

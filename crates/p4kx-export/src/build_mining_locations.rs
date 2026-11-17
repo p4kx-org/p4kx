@@ -13,7 +13,9 @@ use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::{CatalogProjection, CatalogTextRegistry};
 use crate::catalog_read::original::EntryCapture;
-use crate::catalog_v3::{authored_fields, mineable_element_definition};
+use crate::catalog_v3::{
+    authored_fields, mineable_composition_definition, mineable_element_definition,
+};
 use crate::contract_starmap::StarmapObject;
 use crate::entity_selection::{self, Selected};
 use crate::guid_text::CatalogGuid;
@@ -23,12 +25,11 @@ use crate::mining_locations::{
     HarvestableProviderPreset, MineableComposition, MineableElement, MiningLocationCoverage,
     MiningLocationOptions, MiningLocationSnapshot, MiningRecordSource, MiningStarmapObject,
 };
-use crate::picked::Picked;
 use crate::record_observation::RecordObservation;
 use crate::starmap::TypeNames;
 use crate::starmap_containers::Placements;
 use crate::texts::{TextSources, Texts};
-use crate::{CatalogError, ExportAccountingError, Kind, harvest_preset, mining, starmap};
+use crate::{CatalogError, ExportAccountingError, Kind, harvest_preset, starmap};
 
 #[path = "mining_location_rows.rs"]
 mod rows;
@@ -249,25 +250,25 @@ impl<'source> DefinitionRows<'source> {
                 out.mineable_elements.push(row);
                 continue;
             }
-            let source =
-                MiningRecordSource::from(CanonicalRecordHeader::read(&tree, input.origins())?);
             match kind {
                 Kind::MineableCompositions => {
                     let admission = RecordObservation::capture(input, &record)?;
-                    let (row, notes) = mining::named_definition(
-                        kind,
+                    let read = mineable_composition_definition::read(
                         &tree,
                         &projection.for_kind(kind),
                         &admission,
                         cancel,
                     )?;
-                    let Picked::Composition(row) = row else {
-                        return Err(ExportAccountingError::ConflictingSourceDatum.into());
-                    };
-                    coverage.unreadable_text_fields += notes.len();
-                    out.mineable_compositions.push((row, source).into());
+                    coverage.unreadable_text_fields += read.unreadable_text_fields;
+                    coverage.unreadable_mining_fields +=
+                        read.notes.len() - read.unreadable_text_fields;
+                    out.mineable_compositions.push(read.value);
                 }
                 Kind::HarvestableProviderPresets => {
+                    let source = MiningRecordSource::from(CanonicalRecordHeader::read(
+                        &tree,
+                        input.origins(),
+                    )?);
                     let row =
                         harvest_preset::provider_preset(&mut trees, &tree, input.forge(), &links);
                     out.harvestable_provider_presets.push((row, source).into());
@@ -282,8 +283,7 @@ impl<'source> DefinitionRows<'source> {
 
     fn order(&mut self) {
         MineableElement::order(&mut self.mineable_elements);
-        self.mineable_compositions
-            .sort_by_cached_key(|row| source_guid(&row.source));
+        MineableComposition::order(&mut self.mineable_compositions);
         self.harvestable_provider_presets
             .sort_by_cached_key(|row| source_guid(&row.source));
     }

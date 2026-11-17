@@ -16,6 +16,8 @@ use serde_json::Value;
 
 use crate::catalog_v3_consumer;
 
+#[path = "real_archive_mining_composition.rs"]
+mod composition;
 #[path = "real_archive_mining_names.rs"]
 mod names;
 
@@ -185,7 +187,10 @@ fn the_mineable_elements_and_refining_processes_of_a_real_archive_are_plausible(
 fn named<'c>(catalog: &'c Value, kind: &str, class: &str) -> Result<&'c Value, Box<dyn Error>> {
     list(catalog, kind)?
         .iter()
-        .find(|entry| entry["className"] == class)
+        .find(|entry| {
+            entry.get("className").and_then(Value::as_str) == Some(class)
+                || entry.pointer("/className/value").and_then(Value::as_str) == Some(class)
+        })
         .ok_or_else(|| format!("{kind} has no {class}").into())
 }
 
@@ -193,7 +198,7 @@ fn guids<'c>(catalog: &'c Value, kind: &str) -> Result<HashSet<&'c str>, Box<dyn
     Ok(list(catalog, kind)?
         .iter()
         .filter_map(|entry| {
-            if kind == "mineableElements" {
+            if matches!(kind, "mineableElements" | "mineableCompositions") {
                 entry.pointer("/guid/value").and_then(Value::as_str)
             } else {
                 entry["guid"].as_str()
@@ -318,18 +323,24 @@ fn an_asteroid_composition_and_a_location_of_a_real_archive_are_linked() -> Test
     let object_rows = catalog_v3_consumer::named_rows(&catalog, "starmapObjects")?;
 
     let iron = named(&catalog, "mineableCompositions", "Asteroid_CType_Iron")?;
-    let parts = iron["parts"].as_array().ok_or("the parts")?;
+    let parts = catalog_v3_consumer::present(&iron["parts"])?
+        .as_array()
+        .ok_or("the parts")?;
     print_line(&format!("composition sample: {iron}"));
     assert!(parts.len() >= 3, "an iron asteroid has several parts");
-    for part in parts {
-        let element = part["mineableElementGuid"].as_str().ok_or("an element")?;
+    for slot in parts {
+        let part = catalog_v3_consumer::present(slot)?;
+        let link = catalog_v3_consumer::present(&part["mineableElement"])?;
+        let element = catalog_v3_consumer::present(&link["guid"])?
+            .as_str()
+            .ok_or("an element")?;
         assert!(
             elements.contains(element),
             "{element} is a mineable element"
         );
         let (min, max) = (
-            part["minPercentage"].as_f64().ok_or("a minimum")?,
-            part["maxPercentage"].as_f64().ok_or("a maximum")?,
+            composition::decimal(&part["minPercentage"])?,
+            composition::decimal(&part["maxPercentage"])?,
         );
         assert!(min <= max, "the range of a part: {min} to {max}");
     }

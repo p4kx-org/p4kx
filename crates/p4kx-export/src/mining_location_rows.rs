@@ -9,12 +9,12 @@ use crate::catalog_text_contract::{CanonicalText, GameTextRef, TextForms};
 use crate::catalog_v3::starmap_placement::PlacementBinding;
 use crate::contract_starmap::StarmapObject;
 use crate::mining_locations::{
-    AreaModifier, CompositionPart, HarvestableArea, HarvestableElement, HarvestableGroup,
-    HarvestableLink, HarvestableLocation, HarvestableProviderPreset, MineableComposition,
-    MiningGameText, MiningRecordSource, MiningStarmapObject, MiningTextForms,
+    AreaModifier, HarvestableArea, HarvestableElement, HarvestableGroup, HarvestableLink,
+    HarvestableLocation, HarvestableProviderPreset, MiningGameText, MiningRecordSource,
+    MiningStarmapObject, MiningTextForms,
 };
 use crate::starmap_containers::proof::PlacementField;
-use crate::{CatalogError, contract_harvest, contract_mining};
+use crate::{CatalogError, contract_harvest};
 
 pub(super) fn starmap(
     row: StarmapObject<'_>,
@@ -71,30 +71,6 @@ impl From<TextForms<'_>> for MiningTextForms {
         Self {
             source_text: forms.source_text.map(Cow::into_owned),
             display_text: forms.display_text.map(Cow::into_owned),
-        }
-    }
-}
-
-impl From<(contract_mining::MineableComposition<'_>, MiningRecordSource)> for MineableComposition {
-    fn from((row, source): (contract_mining::MineableComposition<'_>, MiningRecordSource)) -> Self {
-        Self {
-            source,
-            deposit_name: row.deposit_name,
-            minimum_distinct_elements: row.minimum_distinct_elements,
-            parts: row.parts.into_iter().map(Into::into).collect(),
-        }
-    }
-}
-
-impl From<contract_mining::CompositionPart> for CompositionPart {
-    fn from(row: contract_mining::CompositionPart) -> Self {
-        Self {
-            mineable_element_guid: row.mineable_element_guid.map(|guid| guid.0),
-            min_percentage: row.min_percentage,
-            max_percentage: row.max_percentage,
-            probability: row.probability,
-            curve_exponent: row.curve_exponent,
-            quality_scale: row.quality_scale,
         }
     }
 }

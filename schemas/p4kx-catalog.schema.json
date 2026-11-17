@@ -10778,65 +10778,38 @@
       "type": "object"
     },
     "CompositionPart": {
-      "description": "One part of a mineable composition: an element with the range of its share.",
+      "description": "An original composition member with independently sourced reference and tuning fields.",
       "properties": {
         "curveExponent": {
-          "description": "`curveExponent`, from 1 to 5 on LIVE.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber",
+          "description": "The exponent of the share distribution curve."
         },
         "maxPercentage": {
-          "description": "`maxPercentage`, from 5 to 100 on LIVE.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber",
+          "description": "The maximum share expressed as a percentage."
         },
         "minPercentage": {
-          "description": "`minPercentage`, from 1 to 100 on LIVE.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber",
+          "description": "The minimum share expressed as a percentage."
         },
-        "mineableElementGuid": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Guid"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The GUID of the `MineableElement` Record the Reference `mineableElement` links to; `null`\nfor a null Reference. The catalog lists the element only when it is kept."
+        "mineableElement": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference",
+          "description": "The authored element reference, including a retained dangling target."
         },
         "probability": {
-          "description": "`probability` that the part occurs, from 0.02 to 1 on LIVE.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber",
+          "description": "The probability that the part occurs."
         },
         "qualityScale": {
-          "description": "`qualityScale`, from 0.49 to 1 on LIVE.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber",
+          "description": "The scale applied to the element quality."
         }
       },
       "required": [
         "curveExponent",
         "maxPercentage",
         "minPercentage",
-        "mineableElementGuid",
+        "mineableElement",
         "probability",
         "qualityScale"
       ],
@@ -28680,48 +28653,66 @@
       "type": "object"
     },
     "MineableComposition": {
-      "description": "A mineable composition: a `MineableComposition` Record under `mining/rockcompositionpresets`,\nthe elements one rock or deposit is made of.",
+      "description": "A mineable composition and its authored element shares.",
       "properties": {
         "className": {
-          "description": "The Record name without its type, e.g. `Asteroid_CType_Iron`.",
-          "type": "string"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The normalized class name."
         },
         "depositName": {
           "$ref": "#/$defs/SourcedValueOfGameTextRef",
-          "description": "The HUD label of the deposit, from `depositName`. The localisation key and the texts are\ngame texts.",
+          "description": "The protected HUD label from the original `depositName` Locale.",
           "x-gameText": true
         },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The original file name."
+        },
         "guid": {
-          "$ref": "#/$defs/Guid",
-          "description": "The GUID of the Record."
+          "$ref": "#/$defs/SourcedValueOfGuid",
+          "description": "The Record GUID."
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The original metadata tag."
         },
         "minimumDistinctElements": {
-          "description": "`minimumDistinctElements`, from 1 to 4 on LIVE; `null` when the Record states none.",
-          "format": "int64",
-          "type": [
-            "integer",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber",
+          "description": "The authored minimum number of distinct elements."
         },
         "parts": {
-          "description": "The parts, from `compositionArray` in stored order.",
-          "items": {
-            "$ref": "#/$defs/CompositionPart"
-          },
-          "type": "array"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCompositionPart",
+          "description": "The members of `compositionArray` at their original zero-based positions."
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32",
+          "description": "The physical Record index."
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The original Record name."
         },
         "recordPath": {
-          "description": "The record path, without `.xml`.",
-          "type": "string"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The normalized Record path."
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The declared Record type."
         }
       },
       "required": [
         "className",
         "depositName",
+        "fileName",
         "guid",
+        "metadataTag",
         "minimumDistinctElements",
         "parts",
-        "recordPath"
+        "recordIndex",
+        "recordName",
+        "recordPath",
+        "sourceType"
       ],
       "type": "object"
     },
@@ -39664,12 +39655,14 @@
       "description": "A numeric source value retaining its original integer width or IEEE bits.",
       "oneOf": [
         {
+          "description": "A source 8-bit signed integer.",
           "properties": {
             "type": {
               "const": "int8",
               "type": "string"
             },
             "value": {
+              "description": "The stored integer.",
               "format": "int8",
               "maximum": 127,
               "minimum": -128,
@@ -39683,12 +39676,14 @@
           "type": "object"
         },
         {
+          "description": "A source 16-bit signed integer.",
           "properties": {
             "type": {
               "const": "int16",
               "type": "string"
             },
             "value": {
+              "description": "The stored integer.",
               "format": "int16",
               "maximum": 32767,
               "minimum": -32768,
@@ -39702,12 +39697,14 @@
           "type": "object"
         },
         {
+          "description": "A source 32-bit signed integer.",
           "properties": {
             "type": {
               "const": "int32",
               "type": "string"
             },
             "value": {
+              "description": "The stored integer.",
               "format": "int32",
               "maximum": 2147483647,
               "minimum": -2147483648,
@@ -39721,13 +39718,15 @@
           "type": "object"
         },
         {
+          "description": "A source 64-bit signed integer.",
           "properties": {
             "type": {
               "const": "int64",
               "type": "string"
             },
             "value": {
-              "$ref": "#/$defs/ResourceInt64"
+              "$ref": "#/$defs/ResourceInt64",
+              "description": "The stored integer."
             }
           },
           "required": [
@@ -39737,12 +39736,14 @@
           "type": "object"
         },
         {
+          "description": "A source 8-bit unsigned integer.",
           "properties": {
             "type": {
               "const": "uint8",
               "type": "string"
             },
             "value": {
+              "description": "The stored integer.",
               "format": "uint8",
               "maximum": 255,
               "minimum": 0,
@@ -39756,12 +39757,14 @@
           "type": "object"
         },
         {
+          "description": "A source 16-bit unsigned integer.",
           "properties": {
             "type": {
               "const": "uint16",
               "type": "string"
             },
             "value": {
+              "description": "The stored integer.",
               "format": "uint16",
               "maximum": 65535,
               "minimum": 0,
@@ -39775,12 +39778,14 @@
           "type": "object"
         },
         {
+          "description": "A source 32-bit unsigned integer.",
           "properties": {
             "type": {
               "const": "uint32",
               "type": "string"
             },
             "value": {
+              "description": "The stored integer.",
               "format": "uint32",
               "maximum": 4294967295,
               "minimum": 0,
@@ -39794,13 +39799,15 @@
           "type": "object"
         },
         {
+          "description": "A source 64-bit unsigned integer.",
           "properties": {
             "type": {
               "const": "uint64",
               "type": "string"
             },
             "value": {
-              "$ref": "#/$defs/DecimalU64"
+              "$ref": "#/$defs/DecimalU64",
+              "description": "The stored integer."
             }
           },
           "required": [
@@ -39811,6 +39818,7 @@
         },
         {
           "$ref": "#/$defs/ResourceFloat32",
+          "description": "A source IEEE 754 binary32 value.",
           "properties": {
             "type": {
               "const": "f32",
@@ -39824,6 +39832,7 @@
         },
         {
           "$ref": "#/$defs/ResourceFloat64",
+          "description": "A source IEEE 754 binary64 value.",
           "properties": {
             "type": {
               "const": "f64",
@@ -51195,6 +51204,139 @@
               "value": {
                 "items": {
                   "$ref": "#/$defs/SourcedValueOfCompositionEntry"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_of_SourcedValueOfCompositionPart": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfCompositionPart"
                 },
                 "type": "array"
               }
@@ -71980,6 +72122,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/CompositionEntry"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfCompositionPart": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/CompositionPart"
               }
             }
           }
