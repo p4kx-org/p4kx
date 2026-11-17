@@ -14,6 +14,10 @@ use crate::shop_inventory_observations::InventoryObservations;
 use crate::shop_inventory_path::InventoryStem;
 use crate::starmap_index::key;
 
+#[cfg(test)]
+#[path = "shop_invalid_suffix_witness.rs"]
+mod invalid_suffix_witness;
+
 const SHOPS: &str = "data\\objectcontainers\\pu\\shops\\";
 const LOC: &str = "data\\objectcontainers\\pu\\loc\\";
 const LOC_KINDS: [&str; 2] = ["shopcomm", "shopfood"];
