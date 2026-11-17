@@ -8,7 +8,8 @@ use std::path::{Path, PathBuf};
 
 use p4kx_assembly::{ArchiveModels, Assembly, AssemblyOptions, ForgePalettes, LoadoutResolver};
 use p4kx_blender::{
-    AlphaMeaning, Manifest, PackageInfo, PackageWriteContext, write_package_with_context,
+    AlphaMeaning, Manifest, PackageInfo, PackageWriteContext, Texture, TextureEncoding, TextureUse,
+    write_package_with_context,
 };
 use p4kx_extraction::{Archive, ArchiveWriteProtection, CancelToken, DataForgeEntry, FieldPath};
 use p4kx_gltf::MaterialMode;
@@ -21,7 +22,8 @@ use crate::support::{TestResult, fixture, glb_options};
 mod source;
 
 use source::{
-    FINISH_PALETTE_BYTE, Multiplier, NORMAL_ALPHA, PALETTE_BYTES, ROOT_CLASS, TEXTURE_PATH,
+    EXPLICIT_GLOSS_CASES, EXPLICIT_GLOSS_PATH, FINISH_PALETTE_BYTE, Multiplier, NORMAL_ALPHA,
+    PALETTE_BYTES, ROOT_CLASS, TEXTURE_PATH,
 };
 
 #[test]
@@ -36,7 +38,7 @@ fn palette_gloss_fixture_compares_glb_and_blender_package_inputs() -> TestResult
     let summary = assembly.write_glb_with(&options, &textures, &mut glb)?;
     assert!(
         summary.texture_fallbacks.is_empty(),
-        "actual DDNA is sampled"
+        "the authored normal and gloss inputs are readable"
     );
     verify_glb(&check_glb(&glb)?)?;
 
@@ -59,7 +61,8 @@ fn palette_gloss_fixture_compares_glb_and_blender_package_inputs() -> TestResult
     let manifest = serde_json::from_slice(&fs::read(package.join("scene.json"))?)?;
     verify_palette(&manifest)?;
     verify_layer_tokens(&manifest)?;
-    verify_image(&manifest, &package)
+    verify_image(&manifest, &package)?;
+    verify_explicit_gloss_package(&manifest)
 }
 
 fn assemble(archive: &Archive, models: &ArchiveModels<'_>) -> Result<Assembly, Box<dyn Error>> {
@@ -86,14 +89,16 @@ fn cases() -> impl Iterator<Item = (u8, Multiplier, bool)> {
 }
 
 fn verify_glb(glb: &CheckedGlb) -> TestResult {
+    let pbr_of = |name: &str| {
+        glb.document
+            .materials()
+            .find(|material| material.name() == Some(name))
+            .map(|material| material.pbr_metallic_roughness())
+            .ok_or_else(|| format!("exported material {name}"))
+    };
     for (byte, multiplier, sampled) in cases() {
         let name = source::material_name(byte, multiplier, sampled);
-        let pbr = glb
-            .document
-            .materials()
-            .find(|material| material.name() == Some(name.as_str()))
-            .ok_or_else(|| format!("exported material {name}"))?
-            .pbr_metallic_roughness();
+        let pbr = pbr_of(&name)?;
         assert_eq!(
             pbr.base_color_factor().map(f32::to_bits),
             [1.0_f32, 0.0, 0.0, 1.0].map(f32::to_bits),
@@ -104,11 +109,7 @@ fn verify_glb(glb: &CheckedGlb) -> TestResult {
                 .metallic_roughness_texture()
                 .ok_or("packed roughness texture")?;
             let image = glb.decode(&packed.texture().source())?;
-            assert_eq!(
-                pbr.roughness_factor().to_bits(),
-                1.0_f32.to_bits(),
-                "{name}: roughness is in the packed image"
-            );
+            expect_unit_roughness_factor(pbr.roughness_factor(), &name);
             let [_, green, _, _] = image.pixel(0, 0).ok_or("decoded packed texel")?;
             assert_eq!(green, 255 - NORMAL_ALPHA, "{name}: inverse original alpha");
             if byte == FINISH_PALETTE_BYTE {
@@ -132,7 +133,27 @@ fn verify_glb(glb: &CheckedGlb) -> TestResult {
             );
         }
     }
+    for case in EXPLICIT_GLOSS_CASES {
+        let pbr = pbr_of(case.name)?;
+        let packed = pbr
+            .metallic_roughness_texture()
+            .ok_or("authored roughness texture")?;
+        let image = glb.decode(&packed.texture().source())?;
+        let [_, green, _, _] = image
+            .pixel(0, 0)
+            .ok_or("decoded authored roughness texel")?;
+        expect_unit_roughness_factor(pbr.roughness_factor(), case.name);
+        assert_eq!(green, case.green, "{}", case.name);
+    }
     Ok(())
+}
+
+fn expect_unit_roughness_factor(factor: f32, name: &str) {
+    assert_eq!(
+        factor.to_bits(),
+        1.0_f32.to_bits(),
+        "{name}: roughness is in the packed image"
+    );
 }
 
 fn verify_palette(manifest: &Manifest) -> TestResult {
@@ -265,20 +286,7 @@ fn verify_image(manifest: &Manifest, package: &Path) -> TestResult {
         AlphaMeaning::Smoothness,
         "the file declares exact alpha use"
     );
-    let metadata = image
-        .source_metadata
-        .as_deref()
-        .ok_or("measured source DDS")?;
-    let origin = metadata
-        .field_origins
-        .get(&FieldPath::parse("/image")?)
-        .ok_or("actual output image uses")?;
-    assert_eq!(
-        origin.contains_encrypted_source(),
-        Some(false),
-        "actual sample comes from clear DDS, independent of the palette"
-    );
-    assert!(origin.source_set_complete(), "exact image origin");
+    verify_image_origin(image, false)?;
     let input = fs::File::open(package.join(&image.file))?;
     let mut png = png::Decoder::new(io::BufReader::new(input)).read_info()?;
     let mut bytes = vec![0; png.output_buffer_size().ok_or("pixel length")?];
@@ -298,6 +306,64 @@ fn verify_image(manifest: &Manifest, package: &Path) -> TestResult {
             .iter()
             .all(|pixel| pixel.last() == Some(&NORMAL_ALPHA)),
         "original packed alpha is carried unchanged"
+    );
+    Ok(())
+}
+
+fn verify_explicit_gloss_package(manifest: &Manifest) -> TestResult {
+    let image = manifest
+        .textures
+        .iter()
+        .find(|texture| texture.source.eq_ignore_ascii_case(EXPLICIT_GLOSS_PATH))
+        .ok_or("bound authored gloss image")?;
+    assert_eq!(
+        image.encoding,
+        Some(TextureEncoding::Data),
+        "Gloss samples are data"
+    );
+    verify_image_origin(image, true)?;
+    for case in EXPLICIT_GLOSS_CASES {
+        let material = manifest
+            .materials
+            .iter()
+            .find(|material| material.name == case.name)
+            .ok_or_else(|| format!("package material {}", case.name))?;
+        assert!(material.layers.is_empty(), "{} is unlayered", case.name);
+        let slot = material
+            .textures
+            .iter()
+            .find(|slot| slot.usage == TextureUse::Gloss)
+            .ok_or("authored Gloss slot")?;
+        assert_eq!(slot.file, EXPLICIT_GLOSS_PATH, "{}", case.name);
+        assert_eq!(
+            slot.texture.as_deref(),
+            Some(image.id.as_str()),
+            "{}",
+            case.name
+        );
+    }
+    Ok(())
+}
+
+fn verify_image_origin(image: &Texture, encrypted: bool) -> TestResult {
+    let metadata = image
+        .source_metadata
+        .as_deref()
+        .ok_or("measured source DDS")?;
+    let origin = metadata
+        .field_origins
+        .get(&FieldPath::parse("/image")?)
+        .ok_or("actual output image uses")?;
+    assert_eq!(
+        origin.contains_encrypted_source(),
+        Some(encrypted),
+        "{}: source encryption is independent of the palette",
+        image.source
+    );
+    assert!(
+        origin.source_set_complete(),
+        "{}: exact image origin",
+        image.source
     );
     Ok(())
 }

@@ -13,6 +13,33 @@ pub(super) const FINISH_PALETTE_BYTE: u8 = 184;
 pub(super) const PALETTE_BYTES: [u8; 5] = [0, 1, 128, 255, FINISH_PALETTE_BYTE];
 pub(super) const NORMAL_ALPHA: u8 = 196;
 pub(super) const TEXTURE_PATH: &str = "Objects/Test/palette_sample_ddna.dds";
+pub(super) const EXPLICIT_GLOSS_PATH: &str = "Objects/Test/palette_explicit_gloss.dds";
+const ALPHA_FREE_NORMAL: &str = "Objects/Test/palette_rgb_ddna.dds";
+const EXPLICIT_GLOSS_GREEN: u8 = 163;
+
+pub(super) struct ExplicitGlossCase {
+    pub(super) name: &'static str,
+    pub(super) normal: Option<&'static str>,
+    pub(super) green: u8,
+}
+
+pub(super) const EXPLICIT_GLOSS_CASES: [ExplicitGlossCase; 3] = [
+    ExplicitGlossCase {
+        name: "ExplicitGloss",
+        normal: None,
+        green: EXPLICIT_GLOSS_GREEN,
+    },
+    ExplicitGlossCase {
+        name: "ExplicitGlossAlphaFree",
+        normal: Some(ALPHA_FREE_NORMAL),
+        green: EXPLICIT_GLOSS_GREEN,
+    },
+    ExplicitGlossCase {
+        name: "ExplicitGlossPackedDdna",
+        normal: Some(TEXTURE_PATH),
+        green: u8::MAX - NORMAL_ALPHA,
+    },
+];
 const MODEL: &str = "Objects/Test/palette_sample.cgf";
 const SAMPLED_LAYER: &str = "Objects/Test/palette_sample.mtl";
 const CONSTANT_LAYER: &str = "Objects/Test/palette_constant.mtl";
@@ -69,7 +96,22 @@ pub(super) fn entries() -> Result<Vec<TestEntry>, Box<dyn Error>> {
     let mut entries = vec![
         TestEntry::stored(format!("Data/{MODEL}"), model.cgf()),
         TestEntry::stored("Data/Objects/Test/palette_sample.cgfm", model.cgfm()),
-        TestEntry::stored(format!("Data/{TEXTURE_PATH}"), texture()?),
+        TestEntry::stored(
+            format!("Data/{TEXTURE_PATH}"),
+            texture(
+                TestTextureFormat::LegacyBgra8,
+                [255, 128, 128, NORMAL_ALPHA],
+            )?,
+        ),
+        TestEntry::zstd(
+            format!("Data/{EXPLICIT_GLOSS_PATH}"),
+            texture(TestTextureFormat::LegacyBgra8, [224, 96, 32, 17])?,
+        )
+        .encrypted(),
+        TestEntry::stored(
+            format!("Data/{ALPHA_FREE_NORMAL}"),
+            texture(TestTextureFormat::LegacyBgr8, [255, 128, 128])?,
+        ),
         TestEntry::stored(format!("Data/{SAMPLED_LAYER}"), layer(true)),
         TestEntry::stored(format!("Data/{CONSTANT_LAYER}"), layer(false)),
     ];
@@ -82,7 +124,8 @@ fn database(entries: &mut Vec<TestEntry>) -> Vec<u8> {
     let mut database = entity_schema(DataForgeBuilder::new());
     let mut root = None;
     let mut children = Vec::new();
-    for (id, (byte, multiplier)) in (FIRST_ENTITY_GUID..).zip(palette_cases()) {
+    let mut ids = FIRST_ENTITY_GUID..;
+    for ((byte, multiplier), id) in palette_cases().zip(ids.by_ref()) {
         let class = format!("TEST_Gloss_{byte}_{}", multiplier.label);
         let material = format!("Objects/Test/gloss_{byte}_{}", multiplier.label);
         entries.push(TestEntry::stored(
@@ -98,6 +141,26 @@ fn database(entries: &mut Vec<TestEntry>) -> Vec<u8> {
             children.push(TestLoadoutEntry::class(class.as_str(), class.as_str()));
             database = database.record(entity.record());
         }
+    }
+    for (case, id) in EXPLICIT_GLOSS_CASES.iter().zip(ids) {
+        let class = format!("TEST_{}", case.name);
+        let library = format!("Objects/Test/{}", case.name);
+        let mut material = TestMtlMaterial::new(case.name)
+            .shader("HardSurface")
+            .texture("TexSlot6", EXPLICIT_GLOSS_PATH);
+        if let Some(normal) = case.normal {
+            material = material.texture("TexSlot2", normal);
+        }
+        entries.push(TestEntry::stored(
+            format!("Data/{library}.mtl"),
+            TestMtl::multi(&[TestMtlMaterial::new("unused"), material]).cryxml(),
+        ));
+        children.push(TestLoadoutEntry::class(class.as_str(), class.as_str()));
+        database = database.record(
+            TestEntity::new(id, &class, format!("entities/scitem/{class}.xml"))
+                .geometry(MODEL, Some(&library))
+                .record(),
+        );
     }
     for byte in PALETTE_BYTES {
         database = database.record(tint_palette_record(
@@ -149,16 +212,18 @@ fn layer(sampled: bool) -> Vec<u8> {
     TestMtl::single(&layer).cryxml()
 }
 
-fn texture() -> Result<Vec<u8>, Box<dyn Error>> {
-    const PIXEL_BGRA: [u8; 4] = [255, 128, 128, NORMAL_ALPHA];
-    let dds = SplitDds::new(TestTextureFormat::LegacyBgra8, 2, 2).mips(1);
+fn texture<const CHANNELS: usize>(
+    format: TestTextureFormat,
+    pixel_bgr: [u8; CHANNELS],
+) -> Result<Vec<u8>, Box<dyn Error>> {
+    let dds = SplitDds::new(format, 2, 2).mips(1);
     let mut bytes = dds.merged_bytes();
     let sample = bytes
         .get_mut(dds.header_len()..)
-        .ok_or("original DDS colour and alpha")?;
-    let (pixels, []) = sample.as_chunks_mut::<{ PIXEL_BGRA.len() }>() else {
-        return Err("the original DDS has whole BGRA texels".into());
+        .ok_or("original DDS pixels")?;
+    let (pixels, []) = sample.as_chunks_mut::<CHANNELS>() else {
+        return Err("the original DDS has whole texels".into());
     };
-    pixels.fill(PIXEL_BGRA);
+    pixels.fill(pixel_bgr);
     Ok(bytes)
 }

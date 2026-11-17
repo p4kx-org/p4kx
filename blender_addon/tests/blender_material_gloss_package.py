@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 # SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-"""Checks the imported roughness graph against the authored palette and DDNA fixture."""
+"""Checks imported roughness against authored palette, DDNA and RGB Gloss inputs."""
 
 from __future__ import annotations
 
@@ -23,6 +23,9 @@ from p4kx_importer.package import load_package  # noqa: E402
 FINISH_PALETTE_BYTE = 184
 NORMAL_ALPHA = 196
 EXACT_SAMPLE_TOLERANCE = 1.0 / 255.0
+GLOSS_QUANTIZATION_TOLERANCE = 0.5 / 255.0
+EXPLICIT_GLOSS_RGBA = (32, 96, 224, 17)
+EXPLICIT_GLOSS_GREEN = 163
 
 
 def verify(location: Path) -> None:
@@ -37,6 +40,13 @@ def verify(location: Path) -> None:
             name = f"Gloss_{byte}_{label}"
             verify_constant(_roughness(f"{name}_Constant"), byte, multiplier)
             verify_sample(_roughness(f"{name}_Sample"), multiplier)
+    for name in ("ExplicitGloss", "ExplicitGlossAlphaFree"):
+        inputs = principled(bpy.data.materials[name]).inputs
+        assert inputs["Normal"].is_linked == (name == "ExplicitGlossAlphaFree"), name
+        verify_explicit_gloss(inputs["Roughness"])
+    packed = principled(bpy.data.materials["ExplicitGlossPackedDdna"]).inputs
+    assert packed["Normal"].is_linked
+    verify_sample(packed["Roughness"], 1.0)
     _measure_exact_finish(location)
 
 
@@ -54,12 +64,16 @@ def verify_constant(socket: bpy.types.NodeSocket, byte: int, multiplier: float) 
     assert math.isclose(socket.default_value, 1.0 - (byte / 255.0) * multiplier, abs_tol=1e-6)
 
 
-def verify_sample(socket: bpy.types.NodeSocket, multiplier: float) -> None:
+def _smoothness(socket: bpy.types.NodeSocket) -> bpy.types.NodeLink:
     subtract = _input(socket).from_node
     assert subtract.bl_idname == "ShaderNodeMath" and subtract.operation == "SUBTRACT"
     assert subtract.use_clamp
     assert subtract.inputs[0].default_value == 1.0
-    alpha = _input(subtract.inputs[1])
+    return _input(subtract.inputs[1])
+
+
+def verify_sample(socket: bpy.types.NodeSocket, multiplier: float) -> None:
+    alpha = _smoothness(socket)
     if multiplier != 1.0:
         scale = alpha.from_node
         assert scale.bl_idname == "ShaderNodeMath" and scale.operation == "MULTIPLY"
@@ -70,11 +84,20 @@ def verify_sample(socket: bpy.types.NodeSocket, multiplier: float) -> None:
     assert alpha.from_node.bl_idname == "ShaderNodeTexImage"
     image = alpha.from_node.image
     assert image is not None
-    _verify_pixels(image)
-    assert image.has_data
-    assert tuple(image.size) == (2, 2)
+    _verify_pixels(image, (128, 127, 255, NORMAL_ALPHA))
     assert image.alpha_mode == "CHANNEL_PACKED"
-    assert image.colorspace_settings.name == "Non-Color"
+
+
+def verify_explicit_gloss(socket: bpy.types.NodeSocket) -> None:
+    luminance = _smoothness(socket).from_node
+    assert luminance.bl_idname == "ShaderNodeRGBToBW"
+    colour = _input(luminance.inputs["Color"])
+    assert colour.from_socket.name == "Color"
+    assert colour.from_node.bl_idname == "ShaderNodeTexImage"
+    image = colour.from_node.image
+    assert image is not None
+    _verify_pixels(image, EXPLICIT_GLOSS_RGBA)
+    assert image.alpha_mode == "STRAIGHT"
 
 
 def _input(socket: bpy.types.NodeSocket) -> bpy.types.NodeLink:
@@ -82,29 +105,40 @@ def _input(socket: bpy.types.NodeSocket) -> bpy.types.NodeLink:
     return link
 
 
-def _verify_pixels(image: bpy.types.Image) -> None:
-    expected = tuple(value / 255.0 for value in (128, 127, 255, NORMAL_ALPHA))
+def _verify_pixels(image: bpy.types.Image, rgba: tuple[int, int, int, int]) -> None:
     pixels = tuple(image.pixels)
+    assert image.has_data
+    assert tuple(image.size) == (2, 2)
+    assert image.colorspace_settings.name == "Non-Color"
+    expected = tuple(value / 255.0 for value in rgba)
     assert len(pixels) == len(expected) * 4
     assert all(math.isclose(actual, authored, abs_tol=1e-6)
                for actual, authored in zip(pixels, expected * 4, strict=True)), pixels
 
 
 def _measure_exact_finish(location: Path) -> None:
-    width, height = 64, 24
-    neutral = bpy.data.materials[f"Gloss_{FINISH_PALETTE_BYTE}_Neutral_Sample"]
-    half = bpy.data.materials[f"Gloss_{FINISH_PALETTE_BYTE}_Half_Sample"]
-    probes = ((neutral, "Roughness", 0.1875), (half, "Roughness", -0.1875))
+    width = height = 64
+    cases = (
+        ("neutral", f"Gloss_{FINISH_PALETTE_BYTE}_Neutral_Sample", 0.75,
+         59 / 255, EXACT_SAMPLE_TOLERANCE),
+        ("authored_half", f"Gloss_{FINISH_PALETTE_BYTE}_Half_Sample", 0.375,
+         157 / 255, EXACT_SAMPLE_TOLERANCE),
+        ("explicit_gloss", "ExplicitGloss", 0.0,
+         EXPLICIT_GLOSS_GREEN / 255, GLOSS_QUANTIZATION_TOLERANCE),
+        ("alpha_free_normal", "ExplicitGlossAlphaFree", -0.375,
+         EXPLICIT_GLOSS_GREEN / 255, GLOSS_QUANTIZATION_TOLERANCE),
+        ("packed_ddna_precedence", "ExplicitGlossPackedDdna", -0.75,
+         59 / 255, GLOSS_QUANTIZATION_TOLERANCE),
+    )
+    probes = tuple((bpy.data.materials[name], "Roughness", y) for _, name, y, _, _ in cases)
     target = location.parent.with_name(f"{location.parent.name}-roughness.exr")
     pixels = render_linear_signals(probes, target, width, height)
     observed = {}
-    for label, row, expected in (
-        ("neutral", 3 * height // 4, 59 / 255),
-        ("authored_half", height // 4, 157 / 255),
-    ):
+    for label, _, y, expected, tolerance in cases:
+        row = height // 2 + round(y * width / 2)
         start = (row * width + width // 2) * 4
         sample = pixels[start : start + 3]
-        assert all(math.isclose(value, expected, abs_tol=EXACT_SAMPLE_TOLERANCE)
+        assert all(math.isclose(value, expected, abs_tol=tolerance)
                    for value in sample), (label, sample, expected)
         observed[label] = sample
     print(json.dumps({
@@ -113,10 +147,13 @@ def _measure_exact_finish(location: Path) -> None:
         "palette_byte": FINISH_PALETTE_BYTE,
         "ddna_alpha_byte": NORMAL_ALPHA,
         "abs_tolerance": EXACT_SAMPLE_TOLERANCE,
+        "explicit_gloss_rgba": EXPLICIT_GLOSS_RGBA,
+        "explicit_gloss_glb_green_byte": EXPLICIT_GLOSS_GREEN,
+        "gloss_quantization_tolerance": GLOSS_QUANTIZATION_TOLERANCE,
         "roughness": observed,
     }))
 
 
 if __name__ == "__main__":
     verify(Path(sys.argv[-1]))
-    print(f"Blender {bpy.app.version_string} verified packed-alpha and palette roughness inputs.")
+    print(f"Blender {bpy.app.version_string} verified packed-alpha, RGB Gloss and palette roughness inputs.")

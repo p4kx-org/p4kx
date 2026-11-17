@@ -161,7 +161,7 @@ cargo test --locked -p p4kx-blender --test it -- palette_gloss_fixture_compares_
 Use a new package directory and the isolated Blender profile above. The GLB test reads the
 packed roughness channel from the embedded image and multiplies it by the exported factor.
 Blender checks the packed alpha pixels and the linked Roughness graph. For palette byte `184`,
-a one-thread 64x24 linear EXR probe samples the imported Roughness inputs through emission.
+a one-thread 64x64 linear EXR probe samples the imported Roughness inputs through emission.
 The probe keeps a fixed orthographic camera and excludes reflectance and display grading.
 The sampled neutral and authored-half GLB cases expect `59 / 255` after the factor.
 Blender expects `59 / 255` with the
@@ -185,6 +185,15 @@ channel when present. The paired numeric rule applies to the same texel under th
 default Blender colour configuration and neutral own-material multiplier. Blender
 can sample a separate UV transform per map. The GLB combines channels into one texture.
 [Blender default colour configuration](https://github.com/blender/blender/blob/v5.3.0/release/datafiles/colormanagement/config.ocio)
+
+The shared synthetic Archive also supplies an encrypted explicit Gloss texture with RGBA
+`[32, 96, 224, 17]`. The package verifies the original PNG's data encoding and encrypted
+source. Both the gloss-only case and the alpha-free normal case export GLB green `163`,
+or `0.639215686`, and measure Blender roughness `0.640659332`. The alpha-free case keeps
+its Normal input linked. Adding a usable DDNA alpha byte `196` selects it ahead of Gloss.
+That case exports green `59` and measures `0.231372461` in Blender. The measured pairs
+agree within half an 8-bit step. These Windows AMD64 measurements use Blender 5.3.0
+(`02f0899d78e3`) and the package from the ordinary Rust producer.
 
 ## LayerBlend palette tint modes
 

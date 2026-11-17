@@ -146,6 +146,13 @@ normal map of the shader families that use layers), so the role comes from the s
 | diffuse | `TexSlot1` | anything but `ao`, `blend`, `mask`, `opac`, `id`, `scalp`, `dir`, `dirm`, `hal`, `wear`, `displ`, `disp`, `detail`, `gloss`, `ddna`, `ddn` | `_diff` 49,803 `Illum`, 4,073 `HardSurface`, 3,764 `MeshDecal` |
 | normal | `TexSlot2`, else `TexSlot3` | `_ddna` (smoothness in the alpha tail) or `_ddn` | 39,267 + 16,021 `Illum`, 17,626 + 13,907 `LayerBlend_V2` |
 | specular | `TexSlot4` | `_spec` | 18,499 `Illum`, 997 `LayerBlend_V2` |
+| explicit gloss | authored gloss role | `_gloss` on unlayered `HardSurface` | |
+
+For unlayered `HardSurface` materials, smoothness comes from usable `_ddna` alpha, then
+from the first readable authored `_gloss` texture. The explicit map uses Linear Rec.709
+luminance of the decoded RGB data. When a specular map is present, explicit gloss is sampled
+at the specular map's dimensions and leaves the blue channel intact. A gloss-only image
+uses the gloss map's dimensions. [Material verification](media-fixture-selection.md#palette-gloss-and-packed-normal-alpha)
 
 A hair cap (`HairPBR` with `%HAIR_CAP` in its generation mask) has its `_scalp` density map in
 `TexSlot1`; it is written like an opacity map (white, the red channel as alpha) and the material is
@@ -174,7 +181,7 @@ cubemap, array or volume is no surface texture and is listed as unreadable.
 | --- | --- |
 | base colour texture | the diffuse map; alpha only for `MASK` and `BLEND` materials, else opaque (an opaque material ignores the alpha channel, and an opaque image compresses better) |
 | normal texture | the `_ddna`/`_ddn` map: X and the reconstructed Z (BC5 stores X and Y only, Z is `V(1-x�-y�)`) as decoded, **green inverted**, opaque |
-| metallic-roughness texture | green = roughness = 1 - smoothness (the alpha tail of a `_ddna`), blue = metalness from the specular map, red full |
+| metallic-roughness texture | green = 1 - smoothness, blue = metalness from the specular map, red full |
 | factors | with a metallic-roughness texture that carries the channel 1, else the plain value of the table above; with a diffuse map the `Diffuse` colour is the base colour factor |
 
 *Roughness.* The smoothness is a linear 0 to 1 value, the same scale as the plain `Shininess`
