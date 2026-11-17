@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::Guid;
+use p4kx_extraction::{Guid, SourceUse};
 
 use super::{CONFIG_ATTRIBUTE, CONTAINER_ATTRIBUTE};
 use crate::CatalogError;
@@ -59,6 +59,7 @@ impl Sites {
         node: Root<'_>,
         site: Site,
         admitted: &AuthoredEntryPath,
+        selected_uses: &[SourceUse],
     ) -> Result<(), CatalogError> {
         self.add_configs(node, site);
         let selectors = node.attributes().filter(|(field, value)| {
@@ -72,11 +73,7 @@ impl Sites {
             }
         }
         self.selector_count += count;
-        if count > 0
-            && xml
-                .attribute(node, CONTAINER_ATTRIBUTE)?
-                .is_some_and(|candidate| candidate.is_same_recipe(admitted))
-        {
+        if matches_selected_attribute(xml, node, count, selected_uses)? {
             if self.selected.is_some() {
                 return Err(crate::ExportAccountingError::ConflictingSourceDatum.into());
             }
@@ -142,6 +139,10 @@ pub(super) fn inspect(
     xml: &EntryXml<'_, '_, '_>,
     admitted: &AuthoredEntryPath,
 ) -> Result<Option<Shape>, CatalogError> {
+    let (selected_uses, complete) = admitted.selector_inputs()?;
+    if !complete || selected_uses.is_empty() {
+        return Ok(None);
+    }
     let mut sites = Sites::default();
     let mut pending = vec![(xml.root(), None)];
     while let Some((node, entity)) = pending.pop() {
@@ -155,10 +156,30 @@ pub(super) fn inspect(
             index: index_in_xml,
             entity,
         };
-        sites.add(index, xml, node, site, admitted)?;
+        sites.add(index, xml, node, site, admitted, &selected_uses)?;
         pending.extend(node.children().map(|child| (child, entity)));
     }
     Ok(sites.finish())
+}
+
+fn matches_selected_attribute(
+    xml: &EntryXml<'_, '_, '_>,
+    node: Root<'_>,
+    populated_selectors: usize,
+    selected_uses: &[SourceUse],
+) -> Result<bool, CatalogError> {
+    if populated_selectors == 0 {
+        return Ok(false);
+    }
+    let Some(candidate) = xml.attribute(node, CONTAINER_ATTRIBUTE)? else {
+        return Ok(false);
+    };
+    let (candidate_uses, complete) = candidate.selector_inputs()?;
+    Ok(complete
+        && candidate_uses
+            .iter()
+            .map(SourceUse::reference)
+            .eq(selected_uses.iter().map(SourceUse::reference)))
 }
 
 fn scope(node: Root<'_>) -> Scope {
