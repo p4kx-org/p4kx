@@ -2,6 +2,6 @@
 
 ## External GitHub references
 
-All agents and subagents must omit links and cross-references to external tools from P4KX content published on GitHub. This applies to issues, pull requests, comments, reviews, discussions, commit messages, and repository files. GitHub URLs and shorthand references to external repositories, issues, pull requests, and releases can notify maintainers and create backlinks.
+All agents and subagents must keep P4KX publications on GitHub free of links to external tools and references to any GitHub repository other than `p4kx-org/p4kx`. This applies to issues, pull requests, comments, reviews, discussions, commit messages, and repository files.
 
-Use P4KX reproduction steps, source facts, and links within P4KX to explain findings. Check the full outgoing text before publishing or pushing and remove external tool links and auto-linking references. External tools may be inspected privately.
+Before creating or updating a P4KX issue, review the final title and body, including any template text. Remove cross-repository URLs, Markdown link targets, and GitHub shorthand such as `owner/repo#123`. Check all other outgoing text before publishing or pushing. Use P4KX reproduction steps, source facts, and links within P4KX. External tools may be inspected privately.
