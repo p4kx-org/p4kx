@@ -152,6 +152,22 @@ fragments, the lint set, exact tool pins and the Archive key. After a dependency
 The tests against a real Archive are ignored by default; see
 [Real-Archive suite](#real-archive-suite).
 
+### Platform-specific test fixtures
+
+| Windows fixture | Platform behavior under test |
+| --- | --- |
+| [Profile locations](crates/p4kx-settings/tests/it/locations.rs) | The configuration folder follows the Windows Known Folder. |
+| [Archive installation protection](crates/p4kx-guard/tests/installation.rs), [output-name validation](crates/p4kx-gui/src/output_target/tests.rs) and [junction exports](crates/p4kx-media/tests/it/junctions.rs) | Windows path case and verbatim prefixes, drive and UNC path spelling, and directory junctions used by installation, cleanup and output protection. The [owned-output](crates/p4kx-guard/src/owned_output_cleanup/tests.rs) and [reference path](crates/p4kx-extraction/tests/reference/mutation_manifest_paths.rs) fixtures exercise junction handling in those callers. |
+| [GUI software adapter](crates/p4kx-gui/tests/it/software_wgpu_setup.rs) and [render backend](crates/p4kx-render/src/gpu/tests.rs) | Direct3D 12 backend selection and enumeration of the Windows WARP adapter. |
+| [MSI fixture lane](.github/workflows/tests.yml) and [Windows package verification](docs/windows-packages.md) | The opt-in Registry-fixture codec is tested on native Windows without accessing the Registry. The package workflow exercises Windows Installer and the actual Registry and PATH lifecycle. |
+
+The [Wine-prefix fixtures](crates/p4kx-channels/tests/wine_prefix.rs) share test logic across
+Windows and Linux. Unix symlink checks use the host filesystem, and the Linux profile fixtures exercise
+XDG and stored-key lookup. Both native Linux rows use the common synthetic Nextest suite and
+execute X11 and HiDPI Wayland software-rendered GUI checks. The separate #1113 device gate
+requires native desktop and audio observations. [Native test workflow](.github/workflows/tests.yml)
+[Desktop verification](docs/supported-platforms.md#windows-and-linux-arm64-desktop-verification)
+
 ### Real-Archive suite
 
 Real-Archive tests use the owner's read-only `Data.p4k` and are ignored by ordinary local
