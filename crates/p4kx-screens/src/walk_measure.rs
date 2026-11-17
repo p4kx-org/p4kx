@@ -6,6 +6,7 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use p4kx_dataforge::Guid;
 
 use crate::canvas::Canvas;
+use crate::flex;
 use crate::geometry::{Dim, Geometry};
 use crate::look::Look;
 use crate::paint::Area;
@@ -158,7 +159,7 @@ impl Walk<'_, '_, '_, '_> {
             (probe.kids, probe.own),
         );
         let mut extents = [Extent::default(); 2];
-        let mut flowing = 0_u16;
+        let mut flowing = 0_usize;
         for (position, &kid) in probe.kids.iter().enumerate() {
             let instance = position >= probe.own;
             if instance {
@@ -171,7 +172,7 @@ impl Walk<'_, '_, '_, '_> {
             let Some(outer) = outer else {
                 continue;
             };
-            flowing = flowing.saturating_add(1);
+            flowing += 1;
             for (extent, size) in extents.iter_mut().zip(outer) {
                 if let Some(size) = size {
                     extent.add(size);
@@ -185,14 +186,7 @@ impl Walk<'_, '_, '_, '_> {
         self.chain.pop();
         let flex = probe.geometry.flex;
         let column = flex.is_some_and(|flex| flex.column);
-        let gap = flex.map_or(0.0, |flex| {
-            if column {
-                flex.row_gap
-            } else {
-                flex.column_gap
-            }
-        });
-        let spacing = gap * f32::from(flowing.saturating_sub(1));
+        let spacing = flex.map_or(0.0, |policy| policy.main_gap() * flex::gap_count(flowing));
         let mut size = [None; 2];
         for (axis, (slot, extent)) in size.iter_mut().zip(extents).enumerate() {
             if !extent.seen {

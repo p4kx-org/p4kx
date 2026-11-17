@@ -5,6 +5,10 @@ use std::ops::Range;
 
 use super::{Align, ContainerKind, Flex, Justify, Wrap};
 
+#[cfg(test)]
+#[path = "flex_arrangement_tests.rs"]
+mod tests;
+
 /// A child of a container with its outer size, margins included, and how it may grow, shrink
 /// and be bounded along the axes.
 #[derive(Debug, Clone, Copy)]
@@ -75,8 +79,17 @@ fn set(pair: &mut [f32; 2], axis: usize, value: f32) {
     }
 }
 
-fn number(count: usize) -> f32 {
-    f32::from(u16::try_from(count).unwrap_or(u16::MAX))
+#[expect(
+    clippy::cast_precision_loss,
+    reason = "layout distances and fractions use f32"
+)]
+const fn count_as_f32(count: usize) -> f32 {
+    count as f32
+}
+
+/// Returns the number of gaps between adjacent items.
+pub(crate) const fn gap_count(items: usize) -> f32 {
+    count_as_f32(items.saturating_sub(1))
 }
 
 /// Holds `value` between `min` and `max`, the minimum winning, and above zero.
@@ -116,14 +129,14 @@ fn distribute(
 ) -> Vec<f32> {
     let members = items.get(line.clone()).unwrap_or(&[]);
     let mut sizes: Vec<f32> = members.iter().map(|item| at(item.size, main)).collect();
-    let gaps = flex.main_gap() * (number(members.len()) - 1.0).max(0.0);
+    let gaps = flex.main_gap() * gap_count(members.len());
     let free = extent - sizes.iter().sum::<f32>() - gaps;
     if free > 0.0 {
         let total: f32 = members.iter().map(|item| item.grow.max(0.0)).sum();
         let stretch = flex.justify == Justify::Stretch && total <= 0.0;
         for (size, item) in sizes.iter_mut().zip(members) {
             let share = if stretch {
-                free / number(members.len())
+                free / count_as_f32(members.len())
             } else if total > 0.0 {
                 free * item.grow.max(0.0) / total
             } else {
@@ -155,13 +168,18 @@ fn distribute(
 
 fn spread(how: Justify, spare: f32, count: usize) -> (f32, f32) {
     let spare = spare.max(0.0);
-    let count = number(count);
     match how {
         Justify::Center => (spare / 2.0, 0.0),
         Justify::End => (spare, 0.0),
-        Justify::SpaceBetween if count > 1.0 => (0.0, spare / (count - 1.0)),
-        Justify::SpaceAround => (spare / count.max(1.0) / 2.0, spare / count.max(1.0)),
-        Justify::SpaceEvenly => (spare / (count + 1.0), spare / (count + 1.0)),
+        Justify::SpaceBetween if count > 1 => (0.0, spare / gap_count(count)),
+        Justify::SpaceAround => {
+            let between = spare / count_as_f32(count.max(1));
+            (between / 2.0, between)
+        }
+        Justify::SpaceEvenly => {
+            let between = spare / count_as_f32(count.saturating_add(1));
+            (between, between)
+        }
         Justify::Start | Justify::SpaceBetween | Justify::Stretch => (0.0, 0.0),
     }
 }
@@ -256,10 +274,10 @@ fn cross_spans(
                 .fold(0.0_f32, f32::max)
         })
         .collect();
-    let gaps = flex.cross_gap() * (number(lines.len()) - 1.0).max(0.0);
+    let gaps = flex.cross_gap() * gap_count(lines.len());
     let free = extent - spans.iter().sum::<f32>() - gaps;
     if flex.lines == Justify::Stretch && free > 0.0 {
-        let share = free / number(lines.len());
+        let share = free / count_as_f32(lines.len());
         for span in &mut spans {
             *span += share;
         }
@@ -304,10 +322,9 @@ fn place_line(
 ) {
     let main = usize::from(flex.column);
     let cross = 1 - main;
-    let used = flex.main_gap().mul_add(
-        (number(sizes.len()) - 1.0).max(0.0),
-        sizes.iter().sum::<f32>(),
-    );
+    let used = flex
+        .main_gap()
+        .mul_add(gap_count(sizes.len()), sizes.iter().sum::<f32>());
     let (lead, between) = spread(flex.justify, extent - used, sizes.len());
     let indices: Vec<usize> = if flex.reverse {
         line.clone().rev().collect()

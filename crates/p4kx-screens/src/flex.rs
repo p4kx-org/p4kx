@@ -8,7 +8,7 @@ use crate::reader::{float, text};
 #[path = "flex_arrangement.rs"]
 mod arrangement;
 
-pub(crate) use arrangement::{Item, LayoutApproximation, Slot, arrange, limit};
+pub(crate) use arrangement::{Item, LayoutApproximation, Slot, arrange, gap_count, limit};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Justify {
@@ -60,7 +60,7 @@ pub(crate) struct Flex {
 }
 
 impl Flex {
-    const fn main_gap(&self) -> f32 {
+    pub(crate) const fn main_gap(&self) -> f32 {
         if self.column {
             self.row_gap
         } else {
