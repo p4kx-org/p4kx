@@ -257,6 +257,15 @@ decoder. Reconcile section totals and JSON framing with the writer's byte count.
 memory in a separate process. Diagnostic results and build or source changes invalidate the
 complete measurements.
 
+A normal publication check on LIVE `13165946` at `c9066f14a` refused three required
+Starmap container enumeration operations and 30 separate Loot container enumeration operations.
+A read-only source audit at `bfc242553` followed the original authoring routes and checked the
+root and containing directories. The three Starmap selectors had no candidate in those
+directories. Twelve Loot selectors shared a basename with a root Entry. Basename equality
+alone does not establish a valid authored target. The verifier inspected the refusal directly
+and created no Catalog file. These checks establish the failed operations and their scope.
+The complete LIVE size and memory measurements still require normal publication.
+
 The compressed writer prepares a typed Catalog once. It first counts serialized bytes for the
 frame header and then streams serialization into the encoder. A second raw file adds storage
 without changing the measured decoded bytes. A comparison with raw writer timing is a separate
