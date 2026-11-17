@@ -10,7 +10,6 @@ use p4kx_extraction::{Archive, CancelToken, Guid};
 use rayon::prelude::*;
 
 use crate::catalog_read::original::{AuthoredEntryPath, EntryCapture, EntryRead, EntryXml};
-use crate::entry_source::{self, EntrySource};
 use crate::export_ledger::{ExportLedger, SourceDisposition};
 use crate::starmap_containers::instance::ContainerFile;
 use crate::starmap_containers::jump_gate::{GateFiles, JumpGate};
@@ -22,6 +21,9 @@ use crate::starmap_xml::{AuthoredPose, XmlError};
 use crate::{CatalogError, Kind};
 #[path = "starmap_children.rs"]
 mod children;
+
+#[path = "starmap_external_sources.rs"]
+mod external_sources;
 
 #[path = "starmap_hcd.rs"]
 pub(crate) mod hcd;
@@ -273,24 +275,6 @@ fn parsed_root(
         gate_proof,
     }))
 }
-fn externals<'level>(level: &'level Level, out: &mut Vec<&'level AuthoredEntryPath>) {
-    let mut parents = Vec::new();
-    let mut children = level.children.iter();
-    loop {
-        if let Some(child) = children.next() {
-            out.extend(child.external.as_ref());
-            if !child.below.children.is_empty() {
-                parents.push(children);
-                children = child.below.children.iter();
-            }
-        } else if let Some(parent) = parents.pop() {
-            children = parent;
-        } else {
-            return;
-        }
-    }
-}
-
 /// The containers read, and how many parses that took.
 pub(crate) struct Read {
     pub(crate) ledger: ExportLedger,
@@ -351,7 +335,7 @@ pub(crate) fn read_all_scoped(
             .map(|&entry| parse(archive, index, entry, &bounds, capture).map(|read| (entry, read)))
             .collect::<Result<_, _>>()?;
         parsed += read.len();
-        let next = next_sources(
+        let next = external_sources::next_sources(
             read.iter().map(|(_, (body, _))| body),
             index,
             archive,
@@ -372,42 +356,6 @@ pub(crate) fn read_all_scoped(
         bodies,
         parsed,
     })
-}
-
-fn next_sources<'a>(
-    bodies: impl Iterator<Item = &'a Body>,
-    index: &Index<'_>,
-    archive: &Archive,
-    capture: &EntryCapture<'_>,
-    ledger: &mut ExportLedger,
-) -> Result<HashSet<usize>, CatalogError> {
-    let mut next = HashSet::new();
-    let mut paths = Vec::new();
-    for body in bodies {
-        if let Body::Parsed { root, .. } = body {
-            paths.clear();
-            externals(root, &mut paths);
-            for path in &paths {
-                match index.candidates(path.as_str()) {
-                    [entry] => {
-                        next.insert(*entry);
-                    }
-                    [] => EntrySource::authored_missing(AuthoredEntryPath::clone(path))
-                        .dependency()
-                        .record(ledger, Kind::StarmapObjects, SourceDisposition::ReadFailed),
-                    candidates => entry_source::record_ambiguous_outer_entries(
-                        archive,
-                        capture,
-                        ledger,
-                        Kind::StarmapObjects,
-                        Some(path),
-                        candidates,
-                    )?,
-                }
-            }
-        }
-    }
-    Ok(next)
 }
 
 #[cfg(test)]
