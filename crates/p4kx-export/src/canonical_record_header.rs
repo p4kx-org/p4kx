@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{RecordText, RecordTree, SourceValue, SourcedValue};
+use p4kx_extraction::{Guid, RecordText, RecordTree, SourceValue, SourcedValue};
 use schemars::JsonSchema;
-use serde::Serialize;
+use serde::{Serialize, Serializer};
 
 use crate::catalog_origins::CatalogOrigins;
-use crate::guid_text::CatalogGuid;
+use crate::guid_text::{CatalogGuid, GuidText};
 use crate::record_header_field::RecordHeaderField;
 use crate::schema_fields::every_field_required;
 use crate::{CatalogError, source_header};
@@ -71,4 +71,63 @@ fn text_value(value: RecordText<'_>) -> SourceValue<&str> {
         || SourceValue::Null,
         SourceValue::Present,
     )
+}
+
+/// The physical Record identity captured independently from the body.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(transform = every_field_required)]
+#[non_exhaustive]
+pub struct CatalogRecordSource {
+    /// The Record GUID.
+    #[serde(serialize_with = "serialize_guid")]
+    #[schemars(with = "SourcedValue<CatalogGuid>")]
+    pub guid: SourcedValue<Guid>,
+    /// The original Record name.
+    pub record_name: SourcedValue<String>,
+    /// The normalized class name.
+    pub class_name: SourcedValue<String>,
+    /// The normalized Record path.
+    pub record_path: SourcedValue<String>,
+    /// The physical Record index.
+    pub record_index: SourcedValue<u32>,
+    /// The declared Record type.
+    pub source_type: SourcedValue<String>,
+    /// The original file name.
+    pub file_name: SourcedValue<String>,
+    /// The original metadata tag.
+    pub metadata_tag: SourcedValue<String>,
+}
+
+fn serialize_guid<S: Serializer>(
+    value: &SourcedValue<Guid>,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    value
+        .map_ref(|guid| CatalogGuid(*guid))
+        .serialize(serializer)
+}
+
+impl CatalogRecordSource {
+    pub(crate) fn order_key(&self) -> (Option<GuidText>, Option<u32>) {
+        (
+            self.guid.value().map(|guid| CatalogGuid(*guid).text()),
+            self.record_index.value().copied(),
+        )
+    }
+}
+
+impl From<CanonicalRecordHeader<'_>> for CatalogRecordSource {
+    fn from(source: CanonicalRecordHeader<'_>) -> Self {
+        Self {
+            guid: source.guid.map(|guid| guid.0),
+            record_name: source.record_name.map(str::to_owned),
+            class_name: source.class_name.map(str::to_owned),
+            record_path: source.record_path.map(str::to_owned),
+            record_index: source.record_index,
+            source_type: source.source_type.map(str::to_owned),
+            file_name: source.file_name.map(str::to_owned),
+            metadata_tag: source.metadata_tag.map(str::to_owned),
+        }
+    }
 }

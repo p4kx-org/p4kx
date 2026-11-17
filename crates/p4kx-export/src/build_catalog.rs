@@ -136,7 +136,7 @@ fn assemble<R>(
     run: CatalogRun<'_, '_>,
     emit: impl FnOnce(&Catalog<'_>) -> Result<R, CatalogError>,
 ) -> Result<(Parts, R), CatalogError> {
-    match super::assemble(archive, entry, run, emit)? {
+    match super::assembly::assemble(archive, entry, run, emit)? {
         ControlFlow::Continue(built) => Ok(built),
         ControlFlow::Break(refusal) => Err(CatalogError::IncompleteExport(refusal.freeze(run)?)),
     }

@@ -11,9 +11,13 @@ use crate::schema_fields::every_field_required;
 #[derive(Debug, Clone, Copy, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
-pub(crate) enum DatasetAvailability {
+#[non_exhaustive]
+pub enum DatasetAvailability {
+    /// At least one matching source declaration was observed.
     Available,
+    /// The source declared no matching type.
     Absent,
+    /// Source declaration faults prevent establishing availability.
     Unavailable,
 }
 

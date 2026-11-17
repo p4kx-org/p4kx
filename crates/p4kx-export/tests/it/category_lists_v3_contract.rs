@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+#[path = "category_lists_sdk.rs"]
+mod sdk;
+
 use std::collections::BTreeSet;
 
 use p4kx_export::{CatalogPublicationMode, Kind};

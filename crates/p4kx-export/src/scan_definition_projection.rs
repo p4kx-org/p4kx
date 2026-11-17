@@ -109,7 +109,7 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
     ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
         let read = crate::catalog_v3::blueprint_category_list_read::read(
             tree,
-            &self.projection,
+            self.scan.original,
             admission,
             self.scan.options.cancel,
         )?;

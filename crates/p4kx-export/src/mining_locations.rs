@@ -5,14 +5,8 @@
 
 use std::collections::BTreeMap;
 
-use p4kx_extraction::{Build, CancelToken, Guid, Language, SourceInventory, SourcedValue};
-use schemars::JsonSchema;
-use serde::{Serialize, Serializer};
-
-use crate::guid_text::{CatalogGuid, GuidText};
-use crate::schema_fields::every_field_required;
-
 pub use crate::build::mining_locations::{read_mining_locations, read_mining_locations_from};
+pub use crate::canonical_record_header::CatalogRecordSource as MiningRecordSource;
 pub use crate::catalog_read::original::PhysicalEntryRef;
 pub use crate::catalog_record_reference::CatalogRecordReference;
 pub use crate::catalog_text_contract::GameTextRef;
@@ -25,6 +19,7 @@ pub use crate::resource_float::{ResourceFloat32, ResourceFloat64};
 pub use crate::resource_integer::ResourceInt64;
 pub use crate::resource_number::ResourceNumber;
 pub use crate::starmap_containers::instance::ContainerInstanceKey;
+use p4kx_extraction::{Build, CancelToken, Guid, Language, SourceInventory, SourcedValue};
 
 /// Selects one requested language and supports cooperative cancellation.
 #[derive(Debug, Clone, Copy)]
@@ -101,50 +96,6 @@ pub struct MiningLocationCoverage {
     pub unreadable_harvest_containers: usize,
     /// Locations for which a malformed or incomplete parent chain prevented a known link.
     pub locations_with_unresolved_parent: usize,
-}
-
-/// The physical Record identity captured independently from the body.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-#[non_exhaustive]
-pub struct MiningRecordSource {
-    /// The Record GUID.
-    #[serde(serialize_with = "serialize_guid")]
-    #[schemars(with = "SourcedValue<CatalogGuid>")]
-    pub guid: SourcedValue<Guid>,
-    /// The original Record name.
-    pub record_name: SourcedValue<String>,
-    /// The normalized class name.
-    pub class_name: SourcedValue<String>,
-    /// The normalized Record path.
-    pub record_path: SourcedValue<String>,
-    /// The physical Record index.
-    pub record_index: SourcedValue<u32>,
-    /// The declared Record type.
-    pub source_type: SourcedValue<String>,
-    /// The original file name.
-    pub file_name: SourcedValue<String>,
-    /// The original metadata tag.
-    pub metadata_tag: SourcedValue<String>,
-}
-
-fn serialize_guid<S: Serializer>(
-    value: &SourcedValue<Guid>,
-    serializer: S,
-) -> Result<S::Ok, S::Error> {
-    value
-        .map_ref(|guid| CatalogGuid(*guid))
-        .serialize(serializer)
-}
-
-impl MiningRecordSource {
-    pub(crate) fn order_key(&self) -> (Option<GuidText>, Option<u32>) {
-        (
-            self.guid.value().map(|guid| CatalogGuid(*guid).text()),
-            self.record_index.value().copied(),
-        )
-    }
 }
 
 /// The Starmap object used by the logical location join.

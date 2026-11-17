@@ -4,8 +4,8 @@
 use p4kx_extraction::{CancelToken, DataForge, RecordTree};
 
 use crate::CatalogError;
+use crate::build::original_input::OriginalCatalogInput;
 use crate::canonical_record_header::CanonicalRecordHeader;
-use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::CatalogFields;
 use crate::catalog_read::original::OriginalFlowFields;
 use crate::catalog_table::CatalogTable;
@@ -26,16 +26,15 @@ pub(crate) struct BlueprintCategoryListRead<'source> {
 /// Reads one database without changing its authored member order or source states.
 pub(crate) fn read<'source>(
     tree: &RecordTree<'source>,
-    projection: &CatalogProjection<'_, 'source>,
+    input: &OriginalCatalogInput<'_, 'source>,
     admission: &RecordObservation<'_, 'source>,
     cancel: Option<&CancelToken>,
 ) -> Result<BlueprintCategoryListRead<'source>, CatalogError> {
-    let input = projection.original();
     let scope = input.record_scope(admission.record(), tree)?;
     let original = OriginalFlowFields::read(&scope, cancel)?;
     let capture = TemplateFieldCapture::new(&original, input, admission)?;
     let mut notes = Vec::new();
-    let context = projection
+    let context = input
         .origins()
         .record(tree.record_index())
         .with_cancel(cancel);
@@ -57,7 +56,7 @@ pub(crate) fn read<'source>(
         value: PreparedBlueprintCategoryList {
             guid: CatalogGuid(tree.guid()),
             declaration: BlueprintCategoryList {
-                source: CanonicalRecordHeader::read(tree, projection.origins())?,
+                source: CanonicalRecordHeader::read(tree, input.origins())?,
                 categories,
             },
         },

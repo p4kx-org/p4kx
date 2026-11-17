@@ -47,6 +47,24 @@ impl CatalogOrigins {
         entry: &DataForgeEntry,
         texts: &TextSources,
     ) -> Result<Self, CatalogError> {
+        Self::from_inputs(archive, entry, Some(texts))
+    }
+
+    pub(crate) fn for_archive_records(
+        archive: &Archive,
+        entry: &DataForgeEntry,
+    ) -> Result<Self, CatalogError> {
+        if !entry.origin().matches_archive(archive) {
+            return Err(CatalogError::SourceOriginMismatch);
+        }
+        Self::from_inputs(archive, entry, None)
+    }
+
+    fn from_inputs(
+        archive: &Archive,
+        entry: &DataForgeEntry,
+        texts: Option<&TextSources>,
+    ) -> Result<Self, CatalogError> {
         if matches!(entry.origin(), DataForgeOrigin::Archive(_))
             && !entry.origin().matches_archive(archive)
         {
@@ -61,7 +79,7 @@ impl CatalogOrigins {
         let dataforge = uses.observe(input, InputScope::Payload)?;
         let mut locales = BTreeMap::new();
         for language in Language::ALL {
-            if let Some(entry) = texts.entry(language) {
+            if let Some(entry) = texts.and_then(|texts| texts.entry(language)) {
                 let input = entry
                     .origin()
                     .map_or(SourceInput::Unknown, SourceInput::Archive);
@@ -80,7 +98,7 @@ impl CatalogOrigins {
                 );
             }
         }
-        let locale_directory = if locales.len() < Language::ALL.len() {
+        let locale_directory = if texts.is_some() && locales.len() < Language::ALL.len() {
             uses.observe_root_directory_paths(archive)?
         } else {
             None

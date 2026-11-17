@@ -66,6 +66,7 @@ mod action_map_source;
 #[cfg(test)]
 mod action_map_tests;
 mod action_map_write;
+mod archive_dataforge_query;
 mod archive_key_use;
 mod blueprint;
 mod blueprint_backfill_source;
@@ -392,5 +393,6 @@ pub(crate) use catalog_v3::{
     resource_type_contract, resource_value_read, source_header, source_value_catalog,
 };
 
+pub use build::catalog_queries;
 pub use export_health_api::*;
 pub use public_api::*;

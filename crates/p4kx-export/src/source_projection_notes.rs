@@ -11,7 +11,7 @@ use crate::export_ledger::ExportLedger;
 use crate::health_diagnostic_observation::DiagnosticObservation;
 use crate::record_observation::RecordObservation;
 use crate::selection::Kind;
-use crate::source_fields::{FieldError, FieldIssue};
+use crate::source_fields::FieldError;
 
 /// Retains projected-field diagnostics with the actual owning Record admission.
 pub(crate) fn record(
@@ -60,9 +60,10 @@ fn record_notes(
             kind,
             stage: ExportDiagnosticStage::Projection,
             code,
-            severity: match description.issue {
-                FieldIssue::RetainedVariant => ExportDiagnosticSeverity::Information,
-                _ => ExportDiagnosticSeverity::Error,
+            severity: if description.issue.blocks_projection() {
+                ExportDiagnosticSeverity::Error
+            } else {
+                ExportDiagnosticSeverity::Information
             },
             source_role: Some(role),
             warning_code: None,

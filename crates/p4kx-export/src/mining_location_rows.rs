@@ -3,7 +3,6 @@
 
 use std::borrow::Cow;
 
-use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_text_contract::{CanonicalText, GameTextRef, TextForms};
 use crate::catalog_v3::starmap_placement::PlacementBinding;
@@ -34,21 +33,6 @@ pub(super) fn starmap(
         position: proof.cell(row.position, PlacementField::Position)?,
         mining_claim: row.mining_claim,
     })
-}
-
-impl From<CanonicalRecordHeader<'_>> for MiningRecordSource {
-    fn from(source: CanonicalRecordHeader<'_>) -> Self {
-        Self {
-            guid: source.guid.map(|guid| guid.0),
-            record_name: source.record_name.map(str::to_owned),
-            class_name: source.class_name.map(str::to_owned),
-            record_path: source.record_path.map(str::to_owned),
-            record_index: source.record_index,
-            source_type: source.source_type.map(str::to_owned),
-            file_name: source.file_name.map(str::to_owned),
-            metadata_tag: source.metadata_tag.map(str::to_owned),
-        }
-    }
 }
 
 impl From<CanonicalText<'_, GameTextRef>> for MiningGameText {

@@ -11,6 +11,12 @@ pub(crate) enum FieldIssue {
     RetainedVariant,
 }
 
+impl FieldIssue {
+    pub(crate) const fn blocks_projection(self) -> bool {
+        !matches!(self, Self::RetainedVariant)
+    }
+}
+
 /// Borrowed technical classification, independently of the original body receipt.
 pub(crate) struct FieldDescription<'error> {
     pub(crate) issue: FieldIssue,

@@ -7,6 +7,8 @@ the Rust types in `crates/p4kx-export/src/contract.rs`. A test fails when the ch
 the types drift apart; `P4KX_BLESS=1 cargo test -p p4kx-export --test catalog_schema` regenerates
 it.
 
+The [Rust SDK](catalog-sdk.md) also reads supported catalog data directly from an opened Archive.
+
 ## Versioning and consumers
 
 Version 3 is the only catalog output contract for 0.5.0 (ADR-0339). There is no version-2

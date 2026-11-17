@@ -4,11 +4,10 @@
 use std::collections::HashSet;
 use std::slice;
 
-use p4kx_extraction::{
-    Archive, ArchiveWatch, CancelToken, DataForgeEntry, DataForgeLoadError, Record, TreeBuilder,
-};
+use p4kx_extraction::{Archive, CancelToken, DataForgeEntry, Record, TreeBuilder};
 
 use super::original_input::OriginalCatalogInput;
+use crate::archive_dataforge_query::{self, checkpoint};
 use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::{CatalogProjection, CatalogTextRegistry};
@@ -55,12 +54,9 @@ pub fn read_mining_locations(
     archive: &Archive,
     options: MiningLocationOptions<'_>,
 ) -> Result<MiningLocationSnapshot, CatalogError> {
-    checkpoint(options.cancel)?;
-    let watch = ArchiveWatch::new(archive);
-    check_archive(&watch)?;
-    let entry = DataForgeEntry::read_until(archive, &|| cancelled(options.cancel))
-        .map_err(dataforge_load_error)?;
-    read_watched(archive, &entry, options, &watch)
+    archive_dataforge_query::read(archive, None, options.cancel, |entry| {
+        read_archive(archive, entry, options)
+    })
 }
 
 /// Reads the local mining projection using already decoded bytes from this Archive.
@@ -74,22 +70,17 @@ pub fn read_mining_locations_from(
     entry: &DataForgeEntry,
     options: MiningLocationOptions<'_>,
 ) -> Result<MiningLocationSnapshot, CatalogError> {
-    let watch = ArchiveWatch::new(archive);
-    read_watched(archive, entry, options, &watch)
+    archive_dataforge_query::read(archive, Some(entry), options.cancel, |entry| {
+        read_archive(archive, entry, options)
+    })
 }
 
-fn read_watched(
+fn read_archive(
     archive: &Archive,
     entry: &DataForgeEntry,
     options: MiningLocationOptions<'_>,
-    watch: &ArchiveWatch,
 ) -> Result<MiningLocationSnapshot, CatalogError> {
     let cancel = options.cancel;
-    checkpoint(cancel)?;
-    check_archive(watch)?;
-    if !entry.origin().matches_archive(archive) {
-        return Err(CatalogError::SourceOriginMismatch);
-    }
     let forge = entry.open().map_err(CatalogError::DataForge)?;
     let sources = TextSources::read_languages(archive, slice::from_ref(&options.language))?;
     let texts = Texts::parse(&sources)?;
@@ -124,8 +115,6 @@ fn read_watched(
         .map(Into::into)
         .collect();
     let source_inventory = origins.uses.finish_with(|| checkpoint(cancel))?;
-    check_archive(watch)?;
-    checkpoint(cancel)?;
     Ok(MiningLocationSnapshot {
         build: archive.build().cloned(),
         language: options.language,
@@ -181,31 +170,6 @@ fn read_world<'source>(
         starmap_objects,
     })
 }
-fn check_archive(watch: &ArchiveWatch) -> Result<(), CatalogError> {
-    watch
-        .check()
-        .map_err(|error| CatalogError::Load(DataForgeLoadError::ArchiveChanged(error)))
-}
-
-fn dataforge_load_error(error: DataForgeLoadError) -> CatalogError {
-    match error {
-        DataForgeLoadError::Cancelled => CatalogError::Cancelled,
-        other => CatalogError::Load(other),
-    }
-}
-
-fn cancelled(cancel: Option<&CancelToken>) -> bool {
-    cancel.is_some_and(CancelToken::is_cancelled)
-}
-
-fn checkpoint(cancel: Option<&CancelToken>) -> Result<(), CatalogError> {
-    if cancelled(cancel) {
-        Err(CatalogError::Cancelled)
-    } else {
-        Ok(())
-    }
-}
-
 #[derive(Default)]
 struct DefinitionRows<'source> {
     mineable_elements: Vec<MineableElement>,

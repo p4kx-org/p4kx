@@ -13120,12 +13120,23 @@
     },
     "DatasetAvailability": {
       "description": "Availability of a declared source family independently of successful row count.",
-      "enum": [
-        "available",
-        "absent",
-        "unavailable"
+      "oneOf": [
+        {
+          "const": "available",
+          "description": "At least one matching source declaration was observed.",
+          "type": "string"
+        },
+        {
+          "const": "absent",
+          "description": "The source declared no matching type.",
+          "type": "string"
+        },
+        {
+          "const": "unavailable",
+          "description": "Source declaration faults prevent establishing availability.",
+          "type": "string"
+        }
       ],
-      "type": "string",
       "x-p4kx-vocabularyClass": "control"
     },
     "DecimalU64": {
