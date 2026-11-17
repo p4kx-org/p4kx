@@ -195,6 +195,49 @@ That case exports green `59` and measures `0.231372461` in Blender. The measured
 agree within half an 8-bit step. These Windows AMD64 measurements use Blender 5.3.0
 (`02f0899d78e3`) and the package from the ordinary Rust producer.
 
+### Decoded LIVE shader operations
+
+A bounded read of the installed LIVE `13165946` Vulkan shader cache verified the
+descriptor sizes and CRCs for HardSurface, LayerBlend_V2, and the shared layer and palette
+libraries. All four descriptors decoded with the `0x00b222be` grammar from StarBreaker
+`041e559215e18e1b13b124cab0e3ecb0f3aa50d4`.
+[Pinned StarBreaker decoder](https://github.com/diogotr7/StarBreaker/blob/041e559215e18e1b13b124cab0e3ecb0f3aa50d4/crates/starbreaker-shadercache/examples/reconstruct.rs#L11-L34)
+
+In the HardSurface branch with separate Primary and Wear layers, each layer takes
+gloss-map X as its initial smoothness. The optional detail step multiplies that by
+`1 + processedDetailSample.w × DetailGloss`. The palette step then multiplies by
+the layer gloss and, when the packed palette selector and palette ID are nonzero,
+by the palette gloss unpacked from the palette's half-precision pair. The palette
+stage receives the detail result before saturation. Selection of the active shader permutation,
+detail sampling before this step and the final conversion to BRDF roughness remain
+open for the reported painted surface.
+
+The following synthetic comparison uses base roughness `0.48`, smoothness
+`1 − 0.48²`, neutral layer gloss and the trial final transform `sqrt(1 − S)` with
+saturation at the end. The detail column is the effective product of the processed
+sample and the authored factor. The early-clamp column saturates the detail result
+before the palette multiplication.
+
+| Palette gloss | Effective detail | Reported roughness-space scale | Decoded smoothness order with trial final transform | Early clamp with same transform |
+| ---: | ---: | ---: | ---: | ---: |
+| 0.72 | 0 | 0.253992 | 0.667748 | 0.667748 |
+| 0.72 | 0.1 | 0 | 0.624881 | 0.624881 |
+| 0.72 | 0.5 | 0 | 0.410892 | 0.529150 |
+| 0 | 0 | 0.480000 | 1 | 1 |
+| 1 | 0 | 0 | 0.480000 | 0.480000 |
+
+### Packed palette selectors
+
+The LayerBlend_V2 decoder trace reads the packed tint index before multiplying the
+smoothness by sampled gloss X. The palette library extracts the one-based slot with
+`packedTint & 0x3`, the diffuse flag with `packedTint & 0x4` and the specular flag
+with `packedTint & 0x8`. With the specular flag set, the library multiplies
+Reflectance by the palette specular value. The shader consumes the packed value.
+The mapping from authored MTL `TintMode` to that value and the remaining specular
+branch are open. The stencil palette function has its own mode.
+[Painted surface investigation](https://github.com/p4kx-org/p4kx/issues/1155)
+· [Independent tint flags](https://github.com/p4kx-org/p4kx/issues/1156)
+
 ## LayerBlend palette tint modes
 
 The LayerBlend fixture exports both a GLB and Blender package from one synthetic Archive.
