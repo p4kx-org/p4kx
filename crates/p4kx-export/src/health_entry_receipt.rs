@@ -18,8 +18,7 @@ use crate::{CatalogError, ExportAccountingError, HealthText};
 #[path = "health_entry_reference.rs"]
 mod reference;
 
-pub(crate) use reference::PhysicalEntryIdentity;
-pub use reference::PhysicalEntryRef;
+pub use reference::{PhysicalEntryIdentity, PhysicalEntryRef};
 
 #[derive(Debug, Clone)]
 enum PathRecipe {

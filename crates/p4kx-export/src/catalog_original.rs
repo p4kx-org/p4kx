@@ -192,8 +192,8 @@ pub(crate) use health_entry_frame::with_entry_capture;
 pub(crate) use health_entry_json::{EntryJson, JsonEvent};
 pub(crate) use health_entry_observation::FailedEntryObservation;
 pub(crate) use health_entry_read::{EntryRead, EntryReadError};
-pub use health_entry_receipt::PhysicalEntryRef;
-pub(crate) use health_entry_receipt::{EntryReceipt, PhysicalEntryIdentity};
+pub(crate) use health_entry_receipt::EntryReceipt;
+pub use health_entry_receipt::{PhysicalEntryIdentity, PhysicalEntryRef};
 pub(crate) use health_entry_soc::{EntrySoc, EntrySocEntity, SocSourceFields};
 pub(crate) use health_entry_xml::{
     EntryXml, SourcedXmlAttribute, XmlAttributeSource, XmlNodeSource,

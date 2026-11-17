@@ -58,7 +58,9 @@
 mod action_map;
 mod client_profile_settings;
 pub use client_profile_settings::{
-    ClientProfileSettings, ClientProfileSettingsReport, read_client_profile_settings,
+    ClientProfileSettings, ClientProfileSettingsReport, PhysicalEntryIdentity, ProfileDeclaration,
+    ProfileDocument, ProfileElement, ProfileKind, ProfileState, ProfileText,
+    read_client_profile_settings, read_client_profile_settings_for,
 };
 mod action_map_origin;
 mod action_map_profile;

@@ -1,12 +1,20 @@
 # Client profile settings
 
 `p4kx actionmap settings <archive>` writes a JSON report to stdout.
-The SDK uses `read_client_profile_settings` from `p4kx-export`.
+The Rust SDK uses `read_client_profile_settings` for both documents and
+`read_client_profile_settings_for` with a `ProfileKind` for a single payload.
+Both calls need the opened Archive directory and selected profile XML. Settings,
+physical candidates, elements, declarations and text are accessible as typed values.
+The report also provides the checked Archive's Build when available and its own
+source inventory for resolving the returned origin references.
 Catalog schema v3 exposes the same documents under `configurations.clientProfileSettings`.
 The CLI report wraps them in `settings` and includes its own `provenance` inventory.
 Catalog references use the Catalog's shared inventory.
 
 The `documents` array places the general client profile first and the VR client profile second.
+A single-profile SDK call retains both selection outcomes and marks the sibling
+`filtered` using directory evidence. An ambiguous profile lists every physical
+candidate and exposes no decoded elements.
 Each document records its requested path and the physically matched directory candidates.
 The `status` cell distinguishes `read`, `missing`, `filtered`, `unavailable`, `ambiguous`,
 `unreadable`, `malformed` and `unsupported`. A normal Catalog uses its existing publication

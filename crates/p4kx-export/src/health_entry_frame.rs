@@ -121,7 +121,7 @@ pub(crate) fn with_entry_capture<T>(
     archive: &Archive,
     read: impl FnOnce(&EntryCapture<'_>) -> Result<T, CatalogError>,
 ) -> Result<T, CatalogError> {
-    let sources = SourceUses::new();
+    let sources = SourceUses::with_compact_coordinates();
     let frame = Arc::new(EntryFrame::new(archive, &sources));
     let texts = super::HealthTextCapture::new();
     read(&EntryCapture {

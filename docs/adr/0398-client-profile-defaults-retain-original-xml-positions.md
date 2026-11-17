@@ -16,3 +16,12 @@ payload or directory evidence.
 
 A client profile export describes authored defaults. Consumer projections may interpret a
 setting once another source establishes its unit or symbolic values.
+
+## SDK selection
+
+Use the profile role as the stable lookup identity for
+`/configurations/clientProfileSettings/documents`. Each result preserves
+the matched physical Entry ordinals and source references within its Archive.
+The directory establishes missing, filtered and ambiguous outcomes. A scoped
+query only opens the selected profile payload and returns its own source inventory
+after checking Archive freshness. It does not load DataForge or localization.

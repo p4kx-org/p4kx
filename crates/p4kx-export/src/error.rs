@@ -3,7 +3,7 @@
 
 use p4kx_assembly::LoadoutFileError;
 use p4kx_extraction::{
-    DataForgeError, DataForgeLoadError, LocalizationError, LocalizationLoadError,
+    ArchiveChanged, DataForgeError, DataForgeLoadError, LocalizationError, LocalizationLoadError,
 };
 use thiserror::Error;
 
@@ -16,6 +16,9 @@ pub enum CatalogError {
     /// Building or querying the original Archive directory index failed.
     #[error(transparent)]
     ArchivePathIndex(#[from] p4kx_extraction::PathIndexError),
+    /// The original Archive or its Build changed during a scoped query.
+    #[error(transparent)]
+    ArchiveChanged(#[from] ArchiveChanged),
     /// Shared field-origin evidence was interrupted during mutation.
     #[error(transparent)]
     SourceEvidence(#[from] p4kx_extraction::SourceEvidenceError),

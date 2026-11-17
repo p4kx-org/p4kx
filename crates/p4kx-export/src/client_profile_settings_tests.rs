@@ -27,6 +27,8 @@ mod catalog;
 
 #[path = "client_profile_namespaces_tests.rs"]
 mod namespaces;
+#[path = "client_profile_query_tests.rs"]
+mod query;
 
 fn archive(
     entries: Vec<TestEntry>,

@@ -33999,6 +33999,7 @@
       "type": "object"
     },
     "ProfileDeclaration": {
+      "description": "An original attribute or namespace declaration.",
       "properties": {
         "name": {
           "$ref": "#/$defs/SourcedValueOfstring"
@@ -34014,6 +34015,7 @@
       "type": "object"
     },
     "ProfileDocument": {
+      "description": "One requested profile with its physical candidates and decoded contents.",
       "properties": {
         "candidates": {
           "items": {
@@ -34047,6 +34049,7 @@
       "type": "object"
     },
     "ProfileElement": {
+      "description": "An authored XML element with its position, declarations and direct text content.",
       "properties": {
         "content": {
           "items": {
@@ -34080,28 +34083,69 @@
       "type": "object"
     },
     "ProfileKind": {
-      "enum": [
-        "general",
-        "virtualReality"
+      "description": "Selects an authored profile by its archive document role.",
+      "oneOf": [
+        {
+          "const": "general",
+          "description": "Default general client attributes.",
+          "type": "string"
+        },
+        {
+          "const": "virtualReality",
+          "description": "Default virtual-reality client attributes.",
+          "type": "string"
+        }
       ],
-      "type": "string",
       "x-p4kx-vocabularyClass": "control"
     },
     "ProfileState": {
-      "enum": [
-        "read",
-        "missing",
-        "filtered",
-        "unavailable",
-        "ambiguous",
-        "unreadable",
-        "malformed",
-        "unsupported"
+      "description": "The observed outcome of selecting and reading a profile.",
+      "oneOf": [
+        {
+          "const": "read",
+          "description": "The physical profile was decoded.",
+          "type": "string"
+        },
+        {
+          "const": "missing",
+          "description": "The complete Archive directory has no matching Entry.",
+          "type": "string"
+        },
+        {
+          "const": "filtered",
+          "description": "The request excluded the payload.",
+          "type": "string"
+        },
+        {
+          "const": "unavailable",
+          "description": "Directory evidence was insufficient to confirm the source.",
+          "type": "string"
+        },
+        {
+          "const": "ambiguous",
+          "description": "Several physical directory occurrences match the requested path.",
+          "type": "string"
+        },
+        {
+          "const": "unreadable",
+          "description": "A selected physical payload could not be read or verified.",
+          "type": "string"
+        },
+        {
+          "const": "malformed",
+          "description": "The payload could not be decoded as lossless XML.",
+          "type": "string"
+        },
+        {
+          "const": "unsupported",
+          "description": "The decoded XML uses an unsupported root element.",
+          "type": "string"
+        }
       ],
-      "type": "string",
       "x-p4kx-vocabularyClass": "control"
     },
     "ProfileText": {
+      "description": "An authored text value and any distinct original lexical spelling.",
       "properties": {
         "lexeme": {
           "anyOf": [

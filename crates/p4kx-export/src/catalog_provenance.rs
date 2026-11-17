@@ -72,6 +72,7 @@ impl CatalogError {
             | Self::SourceOriginMismatch
             | Self::CleanupFailed { .. }
             | Self::Accounting(_)
+            | Self::ArchiveChanged(_)
             | Self::Load(_)
             | Self::DataForge(_)
             | Self::LoadTexts(_)

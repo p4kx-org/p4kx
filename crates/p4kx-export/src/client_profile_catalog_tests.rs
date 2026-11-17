@@ -117,7 +117,7 @@ fn ambiguous_profile_candidates_are_selection_failures_without_read_counts() -> 
     Ok(())
 }
 
-fn dataforge() -> TestEntry {
+pub(super) fn dataforge() -> TestEntry {
     TestEntry::stored(
         "Data/Game2.dcb",
         DataForgeBuilder::new()

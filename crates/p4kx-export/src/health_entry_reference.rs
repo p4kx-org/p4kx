@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{SourceUseRole, SourceValue, SourcedValue};
+use p4kx_extraction::{PhysicalSourceRef, SourceUseRole, SourceValue, SourcedValue};
 
 use super::{
     AuthoredEntryPath, EntryCapture, EntryMetadata, EntryReceipt, OriginalDatum, PathRecipe,
@@ -12,11 +12,37 @@ use crate::{CatalogError, ExportAccountingError, HealthText};
 #[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = crate::schema_fields::every_field_required)]
-pub(crate) struct PhysicalEntryIdentity {
-    pub(crate) input_ref: p4kx_extraction::PhysicalSourceRef,
+pub struct PhysicalEntryIdentity {
+    pub(crate) input_ref: PhysicalSourceRef,
     pub(crate) entry_index: u32,
     pub(crate) source_path: SourcedValue<String>,
     pub(crate) normalized_path: SourcedValue<String>,
+}
+
+impl PhysicalEntryIdentity {
+    /// Borrows the source identity in the originating report's inventory.
+    #[must_use]
+    pub const fn input_ref(&self) -> &PhysicalSourceRef {
+        &self.input_ref
+    }
+
+    /// Returns the physical directory ordinal.
+    #[must_use]
+    pub const fn entry_index(&self) -> u32 {
+        self.entry_index
+    }
+
+    /// Borrows the sourced path with its original directory spelling.
+    #[must_use]
+    pub const fn source_path(&self) -> &SourcedValue<String> {
+        &self.source_path
+    }
+
+    /// Borrows the sourced normalized path.
+    #[must_use]
+    pub const fn normalized_path(&self) -> &SourcedValue<String> {
+        &self.normalized_path
+    }
 }
 
 /// Structural navigation to one actual physical Archive Entry.
@@ -24,14 +50,14 @@ pub(crate) struct PhysicalEntryIdentity {
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = crate::schema_fields::every_field_required)]
 pub struct PhysicalEntryRef {
-    pub(crate) input_ref: p4kx_extraction::PhysicalSourceRef,
+    pub(crate) input_ref: PhysicalSourceRef,
     pub(crate) entry_index: u32,
 }
 
 impl PhysicalEntryRef {
     /// Returns the observed Archive input identity of this Entry.
     #[must_use]
-    pub const fn input_ref(&self) -> &p4kx_extraction::PhysicalSourceRef {
+    pub const fn input_ref(&self) -> &PhysicalSourceRef {
         &self.input_ref
     }
 

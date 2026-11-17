@@ -2,147 +2,104 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_extraction::{
-    Archive, CancelToken, Entry, Filter, SourceInventory, SourceUse, SourceValue, SourcedValue,
+    Archive, ArchiveWatch, CancelToken, Entry, Filter, SourceUse, SourceValue, SourcedValue,
 };
-use schemars::JsonSchema;
-use serde::Serialize;
 
 use crate::catalog_read::original::{
-    EntryCapture, EntryDiagnosis, EntryRead, EntrySourceXml, PhysicalEntryIdentity,
-    with_entry_capture,
+    EntryCapture, EntryDiagnosis, EntryRead, EntrySourceXml, with_entry_capture,
 };
 use crate::entry_source::EntrySource;
 use crate::export_diagnostic::ExportDiagnosticCode;
 use crate::export_entry_ledger::EntryOperation;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
-use crate::schema_fields::every_field_required;
 use crate::{CatalogError, Kind, starmap_index};
 
+#[path = "client_profile_document.rs"]
+mod document;
 #[path = "client_profile_tree.rs"]
 mod tree;
 
-use self::tree::ProfileElement;
+pub use self::document::{
+    ClientProfileSettings, ClientProfileSettingsReport, ProfileDocument, ProfileKind, ProfileState,
+};
+pub use self::tree::{ProfileDeclaration, ProfileElement, ProfileText};
+pub use crate::catalog_read::original::PhysicalEntryIdentity;
 
 const KIND: Kind = Kind::ClientProfileSettings;
 const GENERAL: &str = "Data/Libs/Config/Profiles/default/attributes.xml";
 const VR: &str = "Data/Libs/Config/Profiles/default/attributesVR.xml";
 
-#[derive(Clone, Copy, Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
-enum ProfileKind {
-    General,
-    VirtualReality,
-}
-
-impl ProfileKind {
-    const fn path(self) -> &'static str {
-        match self {
-            Self::General => GENERAL,
-            Self::VirtualReality => VR,
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
-enum ProfileState {
-    Read,
-    Missing,
-    Filtered,
-    Unavailable,
-    Ambiguous,
-    Unreadable,
-    Malformed,
-    Unsupported,
-}
-
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-struct ProfileDocument {
-    kind: ProfileKind,
-    requested_path: &'static str,
-    status: SourcedValue<ProfileState>,
-    candidates: Vec<PhysicalEntryIdentity>,
-    elements: Vec<ProfileElement>,
-}
-
-/// The authored General and VR client profile documents.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub struct ClientProfileSettings {
-    documents: [ProfileDocument; 2],
-}
-
-impl ClientProfileSettings {
-    /// Returns whether a document could not be selected or decoded safely.
-    #[must_use]
-    pub fn has_failed_inputs(&self) -> bool {
-        self.documents.iter().any(|document| {
-            !matches!(
-                document.status.value(),
-                Some(ProfileState::Read | ProfileState::Missing | ProfileState::Filtered)
-            )
-        })
-    }
-
-    /// Returns the number of documents successfully decoded.
-    #[must_use]
-    pub fn decoded_documents(&self) -> usize {
-        self.documents
-            .iter()
-            .filter(|document| document.status.value() == Some(&ProfileState::Read))
-            .count()
-    }
-}
-
-/// A standalone client profile result with its complete source inventory.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub struct ClientProfileSettingsReport {
-    settings: ClientProfileSettings,
-    provenance: SourceInventory,
-}
-
-impl ClientProfileSettingsReport {
-    /// Returns the observed profile documents.
-    #[must_use]
-    pub const fn settings(&self) -> &ClientProfileSettings {
-        &self.settings
-    }
-
-    /// Returns the inventory addressed by the profile fields.
-    #[must_use]
-    pub const fn provenance(&self) -> &SourceInventory {
-        &self.provenance
-    }
-}
-
 /// Reads the authored client profile documents in one root Archive.
 ///
 /// # Errors
-/// Returns an error if source accounting fails or the caller cancels the operation.
+/// Returns an error if the Archive changes, source accounting fails or the caller cancels.
 pub fn read_client_profile_settings(
     archive: &Archive,
     cancel: Option<&CancelToken>,
 ) -> Result<ClientProfileSettingsReport, CatalogError> {
-    with_entry_capture(archive, |capture| {
-        let settings = read(archive, capture, None, cancel, &mut ExportLedger::default())?;
+    read_profile_report(archive, |_| true, cancel)
+}
+
+/// Reads one profile's payload and retains both directory selection outcomes.
+///
+/// # Errors
+/// Returns the same errors as [`read_client_profile_settings`].
+pub fn read_client_profile_settings_for(
+    archive: &Archive,
+    kind: ProfileKind,
+    cancel: Option<&CancelToken>,
+) -> Result<ClientProfileSettingsReport, CatalogError> {
+    read_profile_report(archive, |candidate| candidate == kind, cancel)
+}
+
+fn read_profile_report(
+    archive: &Archive,
+    selected: impl Fn(ProfileKind) -> bool,
+    cancel: Option<&CancelToken>,
+) -> Result<ClientProfileSettingsReport, CatalogError> {
+    check_cancel(cancel)?;
+    let watch = ArchiveWatch::new(archive);
+    watch.check()?;
+    let report = with_entry_capture(archive, |capture| {
+        let settings = read_selected(
+            archive,
+            capture,
+            selected,
+            cancel,
+            &mut ExportLedger::default(),
+        )?;
+        let provenance = capture.source_uses().finish_with(|| check_cancel(cancel))?;
         Ok(ClientProfileSettingsReport {
             settings,
-            provenance: capture.source_uses().freeze()?,
+            provenance,
+            build: archive.build().cloned(),
         })
-    })
+    });
+    watch.check()?;
+    check_cancel(cancel)?;
+    report
 }
 
 pub(crate) fn read(
     archive: &Archive,
     capture: &EntryCapture<'_>,
     filter: Option<&Filter>,
+    cancel: Option<&CancelToken>,
+    ledger: &mut ExportLedger,
+) -> Result<ClientProfileSettings, CatalogError> {
+    read_selected(
+        archive,
+        capture,
+        |kind| filter.is_none_or(|filter| filter.matches(kind.path())),
+        cancel,
+        ledger,
+    )
+}
+
+fn read_selected(
+    archive: &Archive,
+    capture: &EntryCapture<'_>,
+    selected: impl Fn(ProfileKind) -> bool,
     cancel: Option<&CancelToken>,
     ledger: &mut ExportLedger,
 ) -> Result<ClientProfileSettings, CatalogError> {
@@ -167,14 +124,22 @@ pub(crate) fn read(
         capture,
         directory: directory.as_slice(),
         complete,
-        filter,
         cancel,
     };
+    let general = inputs.document(
+        ProfileKind::General,
+        &general,
+        selected(ProfileKind::General),
+        ledger,
+    )?;
+    let vr = inputs.document(
+        ProfileKind::VirtualReality,
+        &vr,
+        selected(ProfileKind::VirtualReality),
+        ledger,
+    )?;
     Ok(ClientProfileSettings {
-        documents: [
-            inputs.document(ProfileKind::General, &general, ledger)?,
-            inputs.document(ProfileKind::VirtualReality, &vr, ledger)?,
-        ],
+        documents: [general, vr],
     })
 }
 
@@ -183,7 +148,6 @@ struct Inputs<'a, 'input> {
     capture: &'a EntryCapture<'input>,
     directory: &'a [SourceUse],
     complete: bool,
-    filter: Option<&'a Filter>,
     cancel: Option<&'a CancelToken>,
 }
 
@@ -192,6 +156,7 @@ impl Inputs<'_, '_> {
         &self,
         kind: ProfileKind,
         entries: &[&Entry],
+        selected: bool,
         ledger: &mut ExportLedger,
     ) -> Result<ProfileDocument, CatalogError> {
         let candidates = entries
@@ -203,15 +168,10 @@ impl Inputs<'_, '_> {
             })
             .collect::<Result<Vec<_>, _>>()?;
         let (status, elements) = match entries {
-            _ if self
-                .filter
-                .is_some_and(|filter| !filter.matches(kind.path())) =>
-            {
-                (
-                    self.directory_status(ProfileState::Filtered, &candidates)?,
-                    Vec::new(),
-                )
-            }
+            _ if !selected => (
+                self.directory_status(ProfileState::Filtered, &candidates)?,
+                Vec::new(),
+            ),
             [entry] if self.complete && self.archive.raw_path(entry.index()).is_none() => {
                 self.decode(entry, ledger)?
             }

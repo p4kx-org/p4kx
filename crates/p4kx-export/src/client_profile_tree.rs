@@ -14,10 +14,11 @@ use crate::catalog_read::original::EntrySourceXml;
 use crate::schema_fields::every_field_required;
 use crate::{CatalogError, ExportAccountingError};
 
+/// An authored XML element with its position, declarations and direct text content.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct ProfileElement {
+pub struct ProfileElement {
     parent: SourcedValue<Option<u32>>,
     position: SourcedValue<SourceLocation>,
     name: SourcedValue<String>,
@@ -25,24 +26,86 @@ pub(super) struct ProfileElement {
     content: Vec<ProfileText>,
 }
 
+impl ProfileElement {
+    /// Borrows the parent element index, with an explicit null for the root.
+    #[must_use]
+    pub const fn parent(&self) -> &SourcedValue<Option<u32>> {
+        &self.parent
+    }
+
+    /// Borrows the physical XML extent or CryXml element index.
+    #[must_use]
+    pub const fn position(&self) -> &SourcedValue<SourceLocation> {
+        &self.position
+    }
+
+    /// Borrows the authored qualified element name.
+    #[must_use]
+    pub const fn name(&self) -> &SourcedValue<String> {
+        &self.name
+    }
+
+    /// Lists attributes and namespace declarations in original order.
+    #[must_use]
+    pub fn declarations(&self) -> &[ProfileDeclaration] {
+        &self.declarations
+    }
+
+    /// Lists the element's direct text values in original order.
+    #[must_use]
+    pub fn content(&self) -> &[ProfileText] {
+        &self.content
+    }
+}
+
+/// An original attribute or namespace declaration.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct ProfileDeclaration {
+pub struct ProfileDeclaration {
     name: SourcedValue<String>,
 
     value: ProfileText,
 }
 
+impl ProfileDeclaration {
+    /// Borrows the authored qualified declaration name.
+    #[must_use]
+    pub const fn name(&self) -> &SourcedValue<String> {
+        &self.name
+    }
+
+    /// Borrows the protected value and any alternate lexical spelling.
+    #[must_use]
+    pub const fn value(&self) -> &ProfileText {
+        &self.value
+    }
+}
+
+/// An authored text value and any distinct original lexical spelling.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct ProfileText {
+pub struct ProfileText {
     #[schemars(extend("x-gameText" = true))]
     value: SourcedValue<String>,
     #[schemars(extend("x-gameText" = true))]
     // The alternate lexical spelling is needed only when XML decoding changes it.
     lexeme: Option<SourcedValue<String>>,
+}
+
+impl ProfileText {
+    /// Borrows the protected decoded value with its own origin.
+    #[must_use]
+    pub const fn value(&self) -> &SourcedValue<String> {
+        &self.value
+    }
+
+    /// Borrows the protected source spelling when it differs from the decoded value.
+    #[must_use]
+    pub const fn lexeme(&self) -> Option<&SourcedValue<String>> {
+        self.lexeme.as_ref()
+    }
 }
 
 pub(super) fn read(
