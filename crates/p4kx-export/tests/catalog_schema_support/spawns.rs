@@ -22,16 +22,29 @@ pub(super) fn location_templates() -> serde_json::Value {
             "sourceSetComplete": true, "containsEncryptedSource": false
         },
         "isSecurityNetworkHost": null,
-        "tags": ["Missions.LocationType.HijackedShip"],
-        "producesTags": {"positiveTags": [], "negativeTags": []},
-        "consumesTags": {"positiveTags": ["Missions.Produced"], "negativeTags": []},
-        "aiSpawnTags": [],
+        "tags": source_values::present(json!([location_tag("Missions.LocationType.HijackedShip")])),
+        "producesTags": source_values::present(json!({
+            "positiveTags": source_values::present(json!([])),
+            "negativeTags": source_values::present(json!([]))
+        })),
+        "consumesTags": source_values::present(json!({
+            "positiveTags": source_values::present(json!([location_tag("Missions.Produced")])),
+            "negativeTags": source_values::present(json!([]))
+        })),
+        "aiSpawnTags": source_values::present(json!([])),
         "names": [{
-            "tag": "Missions.Text.Name",
+            "tag": location_tag("Missions.Text.Name"),
             "displayName": source_values::present(json!("text:23:@fixture_location_title"))
         }],
         "entityClusterMemberGuid": null
     }])
+}
+
+fn location_tag(path: &str) -> serde_json::Value {
+    json!({
+        "path": source_values::present(json!(path)),
+        "danglingGuid": null
+    })
 }
 
 pub(super) fn location_name_text() -> serde_json::Value {

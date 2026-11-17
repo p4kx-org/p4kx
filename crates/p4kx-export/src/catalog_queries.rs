@@ -16,6 +16,8 @@ mod harvest_provider_presets;
 mod item_ports;
 #[path = "manufacturer_query.rs"]
 mod manufacturers;
+#[path = "mission_location_query.rs"]
+mod mission_location_templates;
 #[path = "reputation_query.rs"]
 mod reputation;
 
@@ -49,11 +51,14 @@ pub use crate::catalog_v3::gameplay_property_catalog::{
 pub use crate::catalog_v3::reputation_faction_definition::FactionReputationDefinition;
 pub use crate::catalog_v3::reputation_scope_definition::{ScopeDefinition, StandingLink};
 pub use crate::catalog_v3::reputation_standing_definition::StandingDefinition;
+pub use crate::catalog_v3::tag_catalog::OriginalTagPath;
 pub use crate::definition_reference::DefinitionStatus;
+pub use crate::location_template::{LocationName, MissionLocationTemplate};
 pub use crate::manufacturer::{
     ManufacturerAudioTrigger, ManufacturerDefinition, ManufacturerDisplayFeatures,
     ManufacturerLocalization,
 };
+pub use crate::mission_location_tag::{MissionLocationTag, MissionLocationTagTerm};
 pub use crate::resource_number::ResourceNumber;
 pub use crate::source_value_catalog::{SourceArenaOutput, SourceRecordReference};
 pub use blueprint_categories::{
@@ -72,6 +77,10 @@ pub use harvest_provider_presets::{
 
 pub use item_ports::{ItemPortSnapshot, with_item_ports, with_item_ports_from};
 pub use manufacturers::{ManufacturerSnapshot, with_manufacturers, with_manufacturers_from};
+pub use mission_location_templates::{
+    MissionLocationTemplateSnapshot, with_mission_location_templates,
+    with_mission_location_templates_from,
+};
 pub use reputation::{
     ReputationRows, ReputationSelection, ReputationSnapshot, with_reputation, with_reputation_from,
 };

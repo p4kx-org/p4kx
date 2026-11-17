@@ -1588,10 +1588,16 @@ object only through the pickup `MissionLocality` Records (see "Contracts").
 not part of the kind): `guid`, `className`, `recordPath`, `disabled`, `isSecurityNetworkHost`, the
 `tags` (`generalTags`) a query matches, `producesTags`, `consumesTags` (`positiveTags` and
 `negativeTags`), `aiSpawnTags`, `names` and `entityClusterMemberGuid`. Each `names` entry keeps
-its `tag` and a sourced protected `displayName` reference from that original string variant.
-Join its `value` to `texts.gameTexts[].id.value` to read the original key and the available
-source and display forms. Repeated keys share a text row and retain their individual occurrences.
-The sourced `classification` holds the three
+its `tag` operand and a sourced protected `displayName` reference from that original string variant.
+The four tag fields are sourced cells. Each list preserves the original slot order, including
+null, repeated and dangling entries. Each operand carries a sourced `path` and an optional sourced
+`danglingGuid`. A present path cites its original operand and the Tag graph inputs that produced it.
+When the original operand supplies the fallback GUID because the graph has no readable path,
+the original GUID is the payload. An incomplete lookup retains `sourceSetComplete: false`.
+Each `producesTags` and `consumesTags` term carries sourced positive and negative operand lists.
+Join each `displayName.value` to `texts.gameTexts[].id.value` to read the original key and the
+available source and display forms. Repeated keys share a text row and retain their individual
+occurrences. The sourced `classification` holds the three
 original location class, function and size References. See [the location vocabulary contract](catalog-location-vocabulary.md).
 The sourced location configuration retains authored NPC auto-spawn settings, mission limits and
 the default Reference to [security network manifests](catalog-security-network-manifests.md),

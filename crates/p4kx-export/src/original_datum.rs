@@ -38,6 +38,10 @@ impl<T> OriginalDatum<T> {
         self.inputs.push(input);
     }
 
+    pub(crate) fn into_parts(self) -> (SourceValue<T>, Vec<SourceUse>, bool) {
+        (self.value, self.inputs, self.complete)
+    }
+
     pub(crate) fn into_cell(self, sources: &SourceUses) -> SourcedValue<T> {
         sources.value(self.value, &self.inputs, self.complete)
     }

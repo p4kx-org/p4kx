@@ -35,11 +35,6 @@ impl<'x, 'f> Reader<'x, 'f> {
             .collect()
     }
 
-    /// Returns the tag path of the tag Reference in the field `name`.
-    pub(crate) fn tag_path(&self, parent: Option<&StructValue<'f>>, name: &str) -> Option<String> {
-        self.path(parent?.field(name)?)
-    }
-
     /// Returns the path of the tag `value` links to; the GUID text for a tag the tag database
     /// does not hold.
     pub(super) fn path(&self, value: &Value<'f>) -> Option<String> {

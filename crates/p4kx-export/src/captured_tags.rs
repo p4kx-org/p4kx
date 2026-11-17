@@ -20,7 +20,7 @@ use crate::guid_text::CatalogGuid;
 #[path = "original_tag_path.rs"]
 mod path;
 
-pub(crate) use path::OriginalTagPath;
+pub use path::OriginalTagPath;
 
 #[path = "tag_dependent_datum.rs"]
 mod datum;

@@ -27,6 +27,9 @@ mod fields;
 #[path = "location_module_fields.rs"]
 mod modules;
 
+#[path = "mission_location_sdk.rs"]
+mod sdk;
+
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 const KIND: Kind = Kind::MissionLocationTemplates;

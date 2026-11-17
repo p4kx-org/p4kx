@@ -68,7 +68,7 @@ pub(crate) fn read<'f>(
     let location_templates = location_template::read(
         forge,
         &projection.for_kind(Kind::MissionLocationTemplates),
-        index.tags(),
+        captured_tags,
         filter,
         cancel,
     )?;

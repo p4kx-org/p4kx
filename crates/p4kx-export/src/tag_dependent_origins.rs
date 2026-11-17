@@ -132,10 +132,11 @@ impl<T> Debug for ContextualSourcedValue<T> {
     }
 }
 
-impl<T: Clone + Serialize> Serialize for ContextualSourcedValue<T> {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+impl<T: Clone> ContextualSourcedValue<T> {
+    /// Materializes the sourced cell from uses already captured in its inventory.
+    pub(crate) fn sourced(&self) -> Result<Cow<'_, SourcedValue<T>>, CatalogError> {
         match &self.value {
-            Cell::Immediate(value) => value.serialize(serializer),
+            Cell::Immediate(value) => Ok(Cow::Borrowed(value)),
             Cell::Deferred {
                 value,
                 inputs,
@@ -150,21 +151,28 @@ impl<T: Clone + Serialize> Serialize for ContextualSourcedValue<T> {
                                 .lineage(selected.first, PathUse::Construction),
                         );
                     } else {
-                        selected
-                            .receipts
-                            .append_path_union(
-                                std::iter::once(selected.first)
-                                    .chain(selected.other.iter().copied()),
-                                &mut uses,
-                            )
-                            .map_err(serde::ser::Error::custom)?;
+                        selected.receipts.append_path_union(
+                            std::iter::once(selected.first).chain(selected.other.iter().copied()),
+                            &mut uses,
+                        )?;
                     }
                 }
-                sources
-                    .value(value.clone(), &uses, inputs.complete)
-                    .serialize(serializer)
+                Ok(Cow::Owned(sources.value(
+                    value.clone(),
+                    &uses,
+                    inputs.complete,
+                )))
             }
         }
+    }
+}
+
+impl<T: Clone + Serialize> Serialize for ContextualSourcedValue<T> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.sourced()
+            .map_err(serde::ser::Error::custom)?
+            .as_ref()
+            .serialize(serializer)
     }
 }
 

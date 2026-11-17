@@ -138,6 +138,29 @@ pub(crate) fn read_kind_with_notes<'f, T: Send>(
     Ok(read.into_read(items))
 }
 
+pub(crate) enum RecordAdmission {
+    Selected,
+    Leftover,
+    Other,
+}
+
+/// Classifies a Record by the dedicated reader's path, source type and leftover rules.
+pub(crate) fn classify(
+    record: &Record<'_>,
+    kind: Kind,
+) -> Result<RecordAdmission, p4kx_extraction::DataForgeError> {
+    let rule = kind.records();
+    let path = record.record_path()?;
+    if !rule.matches_path(path) || record.type_name()? != rule.type_name {
+        return Ok(RecordAdmission::Other);
+    }
+    Ok(if is_kind_leftover(kind, path, record.name()?) {
+        RecordAdmission::Leftover
+    } else {
+        RecordAdmission::Selected
+    })
+}
+
 fn piece<'f, T>(
     input: &OriginalCatalogInput<'_, '_>,
     kind: Kind,
@@ -149,18 +172,12 @@ fn piece<'f, T>(
     ) -> Result<RecordProjection<T>, ReadError>,
     cancel: Option<&CancelToken>,
 ) -> Result<Option<Observed<'f, T>>, CatalogError> {
-    let rule = kind.records();
-    let selection: Result<Option<bool>, p4kx_extraction::DataForgeError> = (|| {
-        let path = record.record_path()?;
-        if record.type_name()? != rule.type_name {
-            return Ok(None);
+    let picked = match classify(record, kind) {
+        Ok(RecordAdmission::Other) => return Ok(None),
+        Ok(RecordAdmission::Selected) => {
+            return project(input, kind, trees, record, build, cancel).map(Some);
         }
-        Ok(Some(is_kind_leftover(kind, path, record.name()?)))
-    })();
-    let picked = match selection {
-        Ok(None) => return Ok(None),
-        Ok(Some(false)) => return project(input, kind, trees, record, build, cancel).map(Some),
-        Ok(Some(true)) => {
+        Ok(RecordAdmission::Leftover) => {
             let admission = RecordObservation::capture(input, record)?;
             Observed {
                 piece: Piece::Skipped,

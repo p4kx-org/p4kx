@@ -230,6 +230,7 @@ mod mission_intros;
 mod mission_kinds;
 mod mission_layers;
 mod mission_ledger;
+mod mission_location_tag;
 mod mission_places;
 mod mission_pool_ledger;
 mod mission_property_auto;

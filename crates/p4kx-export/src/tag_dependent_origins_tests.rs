@@ -59,7 +59,7 @@ fn repeated_physical_tag_operands_stay_compact_until_the_value_is_written() -> T
             sources.freeze()?,
             "serialization retains only already observed uses"
         );
-        Ok(())
+        check_sealed_projection(&cells, sources)
     })
 }
 
@@ -146,10 +146,37 @@ fn check_writers(
             first,
             "serialization can be repeated"
         );
-        assert_eq!(first.get("sourceSetComplete"), Some(&Value::Bool(true)));
+        assert_eq!(
+            first.get("sourceSetComplete"),
+            Some(&Value::Bool(true)),
+            "every contributor is bound"
+        );
         assert_eq!(
             first.get("containsEncryptedSource"),
-            Some(&Value::Bool(false))
+            Some(&Value::Bool(false)),
+            "all contributors are unencrypted"
+        );
+    }
+    Ok(())
+}
+
+fn check_sealed_projection(
+    cells: &[ContextualSourcedValue<usize>],
+    sources: &SourceUses,
+) -> TestResult {
+    let cell = cells.first().ok_or("one selected cell")?;
+    let expected = serde_json::to_value(cell)?;
+    let inventory = sources.finish_with(|| Ok::<_, crate::CatalogError>(()))?;
+    let projected = cell.sourced()?;
+    assert_eq!(
+        serde_json::to_value(projected.as_ref())?,
+        expected,
+        "the typed cell matches the writer after the inventory is sealed"
+    );
+    for reference in projected.origin().source_uses_refs() {
+        assert!(
+            inventory.iter_uses().any(|used| used.id() == reference),
+            "each occurrence and its path ancestry resolve in the sealed inventory"
         );
     }
     Ok(())

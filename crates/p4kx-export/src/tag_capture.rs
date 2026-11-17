@@ -26,9 +26,10 @@ use crate::{CatalogError, CatalogReadFailure, Kind};
 #[path = "captured_tags.rs"]
 mod captured;
 
+pub use captured::OriginalTagPath;
 pub(crate) use captured::{
-    CapturedTagTree, CapturedTags, ContextualTagPath, OriginalTagPath, TagDatum, TagNameSelector,
-    TagPathLookup, TagPathMeaning,
+    CapturedTagTree, CapturedTags, ContextualTagPath, TagDatum, TagNameSelector, TagPathLookup,
+    TagPathMeaning,
 };
 
 pub(crate) struct TagRead<'context, 'source> {

@@ -12,6 +12,9 @@ use serde_json::Value;
 
 use crate::spawns_fixture;
 
+#[path = "catalog_mission_location_sdk.rs"]
+mod sdk;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 fn build() -> Result<Value, Box<dyn Error>> {
@@ -181,12 +184,12 @@ fn check_location_template_names(catalog: &Value, template: &Value) -> TestResul
         return Err("expected two named variants and one placeholder".into());
     };
     assert_eq!(
-        proof::at(first, "/tag")?.as_str(),
+        proof::at(first, "/tag/path/value")?.as_str(),
         Some("Missions.Hijacked"),
         "the first variant keeps its original tag",
     );
     assert_eq!(
-        proof::at(second, "/tag")?.as_str(),
+        proof::at(second, "/tag/path/value")?.as_str(),
         Some("ShipModel"),
         "the repeated key keeps its own tag",
     );
@@ -259,23 +262,8 @@ fn location_templates_carry_their_tags_and_leave_out_leftovers() -> TestResult {
         .as_array()
         .ok_or("templates")?;
     assert_eq!(templates.len(), 2, "the dev leftover is left out");
-    assert_eq!(
-        templates[0]["tags"],
-        serde_json::json!(["Missions.Hijacked"])
-    );
-    assert_eq!(
-        templates[0]["producesTags"]["positiveTags"],
-        serde_json::json!(["ShipModel"])
-    );
-    assert_eq!(
-        templates[0]["consumesTags"]["negativeTags"],
-        serde_json::json!(["Kill"])
-    );
-    assert_eq!(
-        templates[0]["aiSpawnTags"],
-        serde_json::json!(["ShipModel"])
-    );
     let first = templates.first().ok_or("first location template")?;
+    sdk::verify_wire_tags(&catalog, first)?;
     check_location_template_names(&catalog, first)?;
     assert!(
         templates

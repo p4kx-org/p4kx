@@ -109,6 +109,23 @@ scope coverage, public labels in the selected languages, and the field origin
 inventory. The query reads the selected components and requested localization.
 The archive-backed loadout resolver supplies equipped-item and XML-override data.
 
+## Mission location templates
+
+Use `with_mission_location_templates`, its `_from` variant or the parsed session method
+to read `missionLocationTemplates` for the dataset, a GUID or a physical Record index.
+The canonical rows retain authored flags, tag terms and name variants. The query
+resolves each original operand against the captured DataForge Tag graph. Use
+`MissionLocationTag::path` to read the path and its occurrence-local source evidence.
+The snapshot reports Tag graph issues. Its source inventory resolves the operand and the
+actual ancestry of each path.
+It reads no ContractGenerator, Broker, world placement or mission-query payloads.
+The tags describe authored templates. Their use in a search belongs to the consumer.
+
+A selection without an admitted template opens no locale payloads and builds no Tag graph.
+The snapshot carries protected name rows for the requested locales and the source
+inventory for the returned sourced cells. Read the callback's data into consumer-owned
+values and publish them after the query succeeds.
+
 ## Reputation
 
 Use `with_reputation`, `with_reputation_from` or the parsed session's `with_reputation` to

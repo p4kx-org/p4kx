@@ -67,6 +67,7 @@ pub(crate) const TAG_KILL: u128 = 0x9000_0000_0000_4000_8000_0000_0000_0005;
 pub(crate) const LOCATION_A: u128 = 0xa000_0000_0000_4000_8000_0000_0000_0001;
 pub(crate) const LOCATION_B: u128 = 0xa000_0000_0000_4000_8000_0000_0000_0002;
 pub(crate) const LOCATION_DEV: u128 = 0xa000_0000_0000_4000_8000_0000_0000_0003;
+pub(crate) const LOCATION_DANGLING_TAG: u128 = 0xa000_0000_0000_4000_8000_0000_0000_0004;
 
 const TAG_PATH: &str = "libs/foundry/records/tagdatabase/tagdatabase.tagdatabase.xml";
 
@@ -276,10 +277,15 @@ fn location_template(guid: u128, name: &str, disabled: bool) -> TestRecord {
                 .value("isSecurityNetworkHost", TestValue::Bool(false))
                 .value(
                     "generalTags",
-                    TestValue::Struct(
-                        TestInstance::new("MissionLocationTags")
-                            .value("tags", array(vec![reference(TAG_HIJACKED), reference(0)])),
-                    ),
+                    TestValue::Struct(TestInstance::new("MissionLocationTags").value(
+                        "tags",
+                        array(vec![
+                            reference(TAG_HIJACKED),
+                            reference(0),
+                            reference(TAG_HIJACKED),
+                            reference(LOCATION_DANGLING_TAG),
+                        ]),
+                    )),
                 )
                 .value("producesTags", TestValue::Struct(term(&[TAG_SHIP], &[])))
                 .value("consumesTags", TestValue::Struct(term(&[], &[TAG_KILL])))
@@ -312,7 +318,7 @@ fn location_template(guid: u128, name: &str, disabled: bool) -> TestRecord {
     )
 }
 
-fn database() -> DataForgeBuilder {
+pub(crate) fn database() -> DataForgeBuilder {
     let builder = structures::structures(DataForgeBuilder::new().version(8)).instance(
         "outside",
         TestInstance::new("ObjectiveToken").value("id", TestValue::Guid(OBJECTIVE_C)),

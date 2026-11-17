@@ -14,7 +14,7 @@ use p4kx_extraction::TagTree;
 
 /// Shared immutable lookup text selected from the actual Tag build.
 #[derive(Clone)]
-pub(crate) struct OriginalTagPath {
+pub struct OriginalTagPath {
     value: Text,
 }
 
@@ -40,7 +40,7 @@ impl OriginalTagPath {
         })
     }
 
-    pub(super) const fn fallback(guid: CatalogGuid) -> Self {
+    pub(crate) const fn fallback(guid: CatalogGuid) -> Self {
         Self {
             value: Text::Guid(guid),
         }
@@ -52,6 +52,18 @@ impl fmt::Debug for OriginalTagPath {
         formatter
             .debug_struct("OriginalTagPath")
             .finish_non_exhaustive()
+    }
+}
+
+impl fmt::Display for OriginalTagPath {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.value {
+            Text::Guid(guid) => fmt::Display::fmt(&guid.0, formatter),
+            Text::Path { tree, position } => {
+                let tag = tree.at(*position).ok_or(fmt::Error)?;
+                fmt::Display::fmt(&tag.path_view(), formatter)
+            }
+        }
     }
 }
 

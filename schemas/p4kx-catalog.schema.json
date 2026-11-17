@@ -27227,11 +27227,8 @@
           "x-gameText": true
         },
         "tag": {
-          "description": "The tag path of the variant, e.g. `Missions.Text.Name`; `null` when it names none.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "$ref": "#/$defs/MissionLocationTag",
+          "description": "The original tag operand for this variant."
         }
       },
       "required": [
@@ -30024,15 +30021,53 @@
       ],
       "type": "object"
     },
+    "MissionLocationTag": {
+      "description": "One original operand and the source evidence of its projected Tag path.",
+      "properties": {
+        "danglingGuid": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourcedValueOfGuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "path": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "danglingGuid",
+        "path"
+      ],
+      "type": "object"
+    },
+    "MissionLocationTagTerm": {
+      "description": "The positive and negative operands of one authored mission location term.",
+      "properties": {
+        "negativeTags": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_MissionLocationTag",
+          "description": "The negative operands in source order."
+        },
+        "positiveTags": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_MissionLocationTag",
+          "description": "The positive operands in source order."
+        }
+      },
+      "required": [
+        "negativeTags",
+        "positiveTags"
+      ],
+      "type": "object"
+    },
     "MissionLocationTemplate": {
       "description": "A mission location template: a `MissionLocationTemplate` Record under\n`missiondata/pu_locations`, a place a location query can match by its tags.",
       "properties": {
         "aiSpawnTags": {
-          "description": "The `aiSpawnTags`.",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
+          "$ref": "#/$defs/SourcedValueOfArray_of_MissionLocationTag",
+          "description": "The `aiSpawnTags`."
         },
         "className": {
           "description": "The Record name without its type, e.g. `AEGS_Reclaimer_Space_Stanton2c`.",
@@ -30046,7 +30081,7 @@
           "$ref": "#/$defs/SourcedValueOfMissionLocationConfiguration"
         },
         "consumesTags": {
-          "$ref": "#/$defs/TagTerm",
+          "$ref": "#/$defs/SourcedValueOfMissionLocationTagTerm",
           "description": "The `consumesTags`."
         },
         "disabled": {
@@ -30086,7 +30121,7 @@
           "type": "array"
         },
         "producesTags": {
-          "$ref": "#/$defs/TagTerm",
+          "$ref": "#/$defs/SourcedValueOfMissionLocationTagTerm",
           "description": "The `producesTags`."
         },
         "recordPath": {
@@ -30094,11 +30129,8 @@
           "type": "string"
         },
         "tags": {
-          "description": "The `generalTags`: what the queries of `contractLocationQueries` match.",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
+          "$ref": "#/$defs/SourcedValueOfArray_of_MissionLocationTag",
+          "description": "The `generalTags`: what the queries of `contractLocationQueries` match."
         }
       },
       "required": [
@@ -48963,6 +48995,139 @@
               "value": {
                 "items": {
                   "$ref": "#/$defs/LocationMetadataElement"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_of_MissionLocationTag": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/MissionLocationTag"
                 },
                 "type": "array"
               }
@@ -97649,6 +97814,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/MissionLocationConfiguration"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfMissionLocationTagTerm": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/MissionLocationTagTerm"
               }
             }
           }
