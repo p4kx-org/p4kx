@@ -5,17 +5,20 @@ use std::collections::BTreeMap;
 
 use p4kx_export::catalog_queries::{ContractOccurrence, ContractSnapshot, SourceValueRef};
 use p4kx_extraction::{
-    DataForgeEntry, DataForgeOrigin, FieldOrigin, InputScope, RecordTree, SourceEncryption,
-    SourceInput, SourceLocation, SourceScope, SourceUseDescription, SourceUseRef, SourceUseRole,
-    SourceUses, Value,
+    DataForgeEntry, DataForgeOrigin, FieldOrigin, InputScope, PhysicalSourceRef, RecordTree,
+    SourceEncryption, SourceInput, SourceLocation, SourceUseDescription, SourceUseRef,
+    SourceUseRole, SourceUses, Value,
 };
 
 use super::TestResult;
 use super::source::Rows;
+
+#[path = "contract_sdk_physical_sources.rs"]
+mod physical;
 use crate::real_archive_auto_spawns::original::Locations;
 
 pub(super) struct Evidence<'read, 'source> {
-    pub(super) scope: SourceScope,
+    source: PhysicalSourceRef,
     pub(super) locations: Locations<'source>,
     uses: BTreeMap<SourceUseRef, &'read SourceUseDescription>,
     owner: u32,
@@ -36,18 +39,12 @@ impl<'read, 'source> Evidence<'read, 'source> {
         let inventory = SourceUses::new();
         let scope = inventory.observe(SourceInput::Archive(original), InputScope::Payload)?;
         let observed = inventory.freeze()?;
-        if observed.iter_sources().any(|physical| {
-            !snapshot
-                .source_inventory
-                .iter_sources()
-                .any(|actual| actual == physical)
-        }) {
-            return Err("SDK inventory differs from the independently observed original Entry or its ancestors".into());
-        }
+        let source =
+            physical::original_source(&observed, &snapshot.source_inventory, scope.source_ref())?;
         let locations = Locations::read(tree.root());
         let sites = original_sites(sources, &locations)?;
         Ok(Self {
-            scope,
+            source,
             locations,
             sites,
             owner: tree.record_index(),
@@ -62,6 +59,10 @@ impl<'read, 'source> Evidence<'read, 'source> {
                 _ => None,
             },
         })
+    }
+
+    pub(super) const fn source_ref(&self) -> &PhysicalSourceRef {
+        &self.source
     }
 
     pub(super) fn site(&self, occurrence: &ContractOccurrence) -> TestResult<usize> {
@@ -86,7 +87,7 @@ impl<'read, 'source> Evidence<'read, 'source> {
                 .uses
                 .get(reference)
                 .ok_or("identity has a dangling source-use reference")?;
-            if used.source() != self.scope.source_ref()
+            if used.source() != &self.source
                 || used.scope() != InputScope::Payload
                 || !matches!(
                     used.role(),

@@ -113,7 +113,7 @@ fn verify<'source>(
     evidence: &Evidence<'_, 'source>,
     counts: &mut Counts,
 ) -> TestResult {
-    if row.base.source.input_ref() != evidence.scope.source_ref() {
+    if row.base.source.input_ref() != evidence.source_ref() {
         return Err("the physical occurrence belongs to a foreign Entry".into());
     }
     let site = sources
@@ -144,7 +144,7 @@ fn verify<'source>(
     counts.identity_cells += 2;
     direct_values(contract, handler, row)?;
     let definition = definition(snapshot, tree)?;
-    if definition.input_ref() != evidence.scope.source_ref() {
+    if definition.input_ref() != evidence.source_ref() {
         return Err("retained definition belongs to a different original Entry".into());
     }
     for (name, projected) in [
