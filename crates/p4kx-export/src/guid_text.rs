@@ -15,9 +15,15 @@ pub(crate) type GuidText = [u8; TEXT_LEN];
 
 /// A GUID written as its canonical lower-case UUID text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub(crate) struct CatalogGuid(pub(crate) Guid);
+pub struct CatalogGuid(pub(crate) Guid);
 
 impl CatalogGuid {
+    /// Returns the original binary GUID.
+    #[must_use]
+    pub const fn get(self) -> Guid {
+        self.0
+    }
+
     /// Returns the canonical text as bytes, whose order is the order of the catalog.
     pub(crate) fn text(self) -> GuidText {
         let mut text = Text {

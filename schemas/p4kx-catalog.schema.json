@@ -13190,9 +13190,11 @@
       "description": "Actual declaration presence or its original declaration-survey evidence.",
       "oneOf": [
         {
+          "description": "The original declaration is present.",
           "properties": {
             "field": {
-              "$ref": "#/$defs/SourceFieldRef"
+              "$ref": "#/$defs/SourceFieldRef",
+              "description": "The original field binding."
             },
             "state": {
               "const": "present",
@@ -13278,6 +13280,7 @@
               }
             }
           ],
+          "description": "The original owner has no such declaration.",
           "properties": {
             "containsEncryptedSource": {
               "type": [
@@ -27057,17 +27060,48 @@
     },
     "LocationConditionKind": {
       "description": "The existing dataset-condition interpretation independently of its original values.",
-      "enum": [
-        "tagSearch",
-        "excludeNearbyLocations",
-        "excludeDistantLocations",
-        "excludeProperty",
-        "propertyTags",
-        "specificOrganizations",
-        "specificItems",
-        "factionIdentity"
+      "oneOf": [
+        {
+          "const": "tagSearch",
+          "description": "Matches authored Tag terms.",
+          "type": "string"
+        },
+        {
+          "const": "excludeNearbyLocations",
+          "description": "Excludes locations within an authored distance.",
+          "type": "string"
+        },
+        {
+          "const": "excludeDistantLocations",
+          "description": "Excludes locations outside an authored distance.",
+          "type": "string"
+        },
+        {
+          "const": "excludeProperty",
+          "description": "Excludes a location selected by another property.",
+          "type": "string"
+        },
+        {
+          "const": "propertyTags",
+          "description": "Matches tags supplied by another property.",
+          "type": "string"
+        },
+        {
+          "const": "specificOrganizations",
+          "description": "Matches the authored organization candidates.",
+          "type": "string"
+        },
+        {
+          "const": "specificItems",
+          "description": "Matches the authored item candidates.",
+          "type": "string"
+        },
+        {
+          "const": "factionIdentity",
+          "description": "Matches the authored faction identity.",
+          "type": "string"
+        }
       ],
-      "type": "string",
       "x-p4kx-vocabularyClass": "control"
     },
     "LocationCount": {
@@ -32284,12 +32318,15 @@
       "description": "Complete typed original error parameters at one source occurrence.",
       "oneOf": [
         {
+          "description": "An original string offset outside its parser table.",
           "properties": {
             "offset": {
-              "$ref": "#/$defs/SourcedValueOfuint32"
+              "$ref": "#/$defs/SourcedValueOfuint32",
+              "description": "The original string offset."
             },
             "table": {
-              "$ref": "#/$defs/OriginalErrorTable"
+              "$ref": "#/$defs/OriginalErrorTable",
+              "description": "The parser table named by the original error."
             },
             "type": {
               "const": "invalidString",
@@ -32304,9 +32341,11 @@
           "type": "object"
         },
         {
+          "description": "An original enum index without a matching declaration.",
           "properties": {
             "index": {
-              "$ref": "#/$defs/SourcedValueOfuint16"
+              "$ref": "#/$defs/SourcedValueOfuint16",
+              "description": "The original enum index."
             },
             "type": {
               "const": "unknownEnum",
@@ -32320,9 +32359,11 @@
           "type": "object"
         },
         {
+          "description": "An original structure index without a matching declaration.",
           "properties": {
             "index": {
-              "$ref": "#/$defs/SourcedValueOfuint16"
+              "$ref": "#/$defs/SourcedValueOfuint16",
+              "description": "The original structure index."
             },
             "type": {
               "const": "unknownStruct",
@@ -32336,9 +32377,11 @@
           "type": "object"
         },
         {
+          "description": "An original Boolean byte outside the supported representation.",
           "properties": {
             "byte": {
-              "$ref": "#/$defs/SourcedValueOfuint8"
+              "$ref": "#/$defs/SourcedValueOfuint8",
+              "description": "The original byte."
             },
             "type": {
               "const": "invalidBool",
@@ -32352,12 +32395,15 @@
           "type": "object"
         },
         {
+          "description": "An original pointer without a valid structure instance.",
           "properties": {
             "instanceIndex": {
-              "$ref": "#/$defs/SourcedValueOfuint32"
+              "$ref": "#/$defs/SourcedValueOfuint32",
+              "description": "The original target instance index."
             },
             "structIndex": {
-              "$ref": "#/$defs/SourcedValueOfuint32"
+              "$ref": "#/$defs/SourcedValueOfuint32",
+              "description": "The original target structure index."
             },
             "type": {
               "const": "invalidPointer",
@@ -32372,18 +32418,23 @@
           "type": "object"
         },
         {
+          "description": "An original array range outside its parser pool.",
           "properties": {
             "count": {
-              "$ref": "#/$defs/SourcedValueOfuint32"
+              "$ref": "#/$defs/SourcedValueOfuint32",
+              "description": "The original element count."
             },
             "first": {
-              "$ref": "#/$defs/SourcedValueOfuint32"
+              "$ref": "#/$defs/SourcedValueOfuint32",
+              "description": "The original first element position."
             },
             "len": {
-              "$ref": "#/$defs/SourcedValueOfDecimalU64"
+              "$ref": "#/$defs/SourcedValueOfDecimalU64",
+              "description": "The parser pool's available element count."
             },
             "pool": {
-              "$ref": "#/$defs/OriginalErrorPool"
+              "$ref": "#/$defs/OriginalErrorPool",
+              "description": "The parser pool named by the original error."
             },
             "type": {
               "const": "arrayOutOfRange",
@@ -32400,12 +32451,15 @@
           "type": "object"
         },
         {
+          "description": "An owned structure instance reached more than once.",
           "properties": {
             "instanceIndex": {
-              "$ref": "#/$defs/SourcedValueOfuint32"
+              "$ref": "#/$defs/SourcedValueOfuint32",
+              "description": "The original target instance index."
             },
             "structIndex": {
-              "$ref": "#/$defs/SourcedValueOfuint32"
+              "$ref": "#/$defs/SourcedValueOfuint32",
+              "description": "The original target structure index."
             },
             "type": {
               "const": "ownedTwice",
@@ -32420,9 +32474,11 @@
           "type": "object"
         },
         {
+          "description": "An inline class ownership cycle.",
           "properties": {
             "structIndex": {
-              "$ref": "#/$defs/SourcedValueOfuint32"
+              "$ref": "#/$defs/SourcedValueOfuint32",
+              "description": "The original structure index."
             },
             "type": {
               "const": "inlineClassCycle",
@@ -32436,9 +32492,11 @@
           "type": "object"
         },
         {
+          "description": "An original Reference whose GUID has no available target.",
           "properties": {
             "guid": {
-              "$ref": "#/$defs/SourcedValueOfGuid"
+              "$ref": "#/$defs/SourcedValueOfGuid",
+              "description": "The original target GUID."
             },
             "type": {
               "const": "danglingReference",
@@ -32452,12 +32510,15 @@
           "type": "object"
         },
         {
+          "description": "An owned instance outside the available Record scope.",
           "properties": {
             "instanceIndex": {
-              "$ref": "#/$defs/SourcedValueOfuint32"
+              "$ref": "#/$defs/SourcedValueOfuint32",
+              "description": "The original target instance index."
             },
             "structIndex": {
-              "$ref": "#/$defs/SourcedValueOfuint32"
+              "$ref": "#/$defs/SourcedValueOfuint32",
+              "description": "The original target structure index."
             },
             "type": {
               "const": "outsideRecord",
@@ -32472,12 +32533,15 @@
           "type": "object"
         },
         {
+          "description": "An original pointer whose target type disagrees with its declaration.",
           "properties": {
             "declared": {
-              "$ref": "#/$defs/SourcedValueOfuint32"
+              "$ref": "#/$defs/SourcedValueOfuint32",
+              "description": "The original declared target structure index."
             },
             "structIndex": {
-              "$ref": "#/$defs/SourcedValueOfuint32"
+              "$ref": "#/$defs/SourcedValueOfuint32",
+              "description": "The original target structure index."
             },
             "type": {
               "const": "unexpectedPointerType",
@@ -32492,15 +32556,19 @@
           "type": "object"
         },
         {
+          "description": "An original Reference whose target type disagrees with its declaration.",
           "properties": {
             "declared": {
-              "$ref": "#/$defs/SourcedValueOfuint32"
+              "$ref": "#/$defs/SourcedValueOfuint32",
+              "description": "The original declared target structure index."
             },
             "guid": {
-              "$ref": "#/$defs/SourcedValueOfGuid"
+              "$ref": "#/$defs/SourcedValueOfGuid",
+              "description": "The original target GUID."
             },
             "structIndex": {
-              "$ref": "#/$defs/SourcedValueOfuint32"
+              "$ref": "#/$defs/SourcedValueOfuint32",
+              "description": "The original target structure index."
             },
             "type": {
               "const": "unexpectedReferenceType",
@@ -32516,9 +32584,11 @@
           "type": "object"
         },
         {
+          "description": "A source path beyond the decoder's representable width.",
           "properties": {
             "limit": {
-              "$ref": "#/$defs/DecimalU64"
+              "$ref": "#/$defs/DecimalU64",
+              "description": "The decoder's reported representable path limit."
             },
             "type": {
               "const": "pathTooWide",
@@ -32532,15 +32602,19 @@
           "type": "object"
         },
         {
+          "description": "An original instance shorter than its declaration requires.",
           "properties": {
             "needed": {
-              "$ref": "#/$defs/SourcedValueOfDecimalU64"
+              "$ref": "#/$defs/SourcedValueOfDecimalU64",
+              "description": "The declaration's required byte length."
             },
             "size": {
-              "$ref": "#/$defs/SourcedValueOfDecimalU64"
+              "$ref": "#/$defs/SourcedValueOfDecimalU64",
+              "description": "The available instance byte length."
             },
             "structIndex": {
-              "$ref": "#/$defs/SourcedValueOfuint32"
+              "$ref": "#/$defs/SourcedValueOfuint32",
+              "description": "The original target structure index."
             },
             "type": {
               "const": "instanceTooShort",
@@ -44245,28 +44319,103 @@
     },
     "SourceDataType": {
       "description": "Closed wire names for original field element storage types.",
-      "enum": [
-        "bool",
-        "int8",
-        "int16",
-        "int32",
-        "int64",
-        "uint8",
-        "uint16",
-        "uint32",
-        "uint64",
-        "string",
-        "single",
-        "double",
-        "locale",
-        "guid",
-        "enum",
-        "class",
-        "strongPointer",
-        "weakPointer",
-        "reference"
+      "oneOf": [
+        {
+          "const": "bool",
+          "description": "An original Boolean element.",
+          "type": "string"
+        },
+        {
+          "const": "int8",
+          "description": "An original signed 8-bit integer element.",
+          "type": "string"
+        },
+        {
+          "const": "int16",
+          "description": "An original signed 16-bit integer element.",
+          "type": "string"
+        },
+        {
+          "const": "int32",
+          "description": "An original signed 32-bit integer element.",
+          "type": "string"
+        },
+        {
+          "const": "int64",
+          "description": "An original signed 64-bit integer element.",
+          "type": "string"
+        },
+        {
+          "const": "uint8",
+          "description": "An original unsigned 8-bit integer element.",
+          "type": "string"
+        },
+        {
+          "const": "uint16",
+          "description": "An original unsigned 16-bit integer element.",
+          "type": "string"
+        },
+        {
+          "const": "uint32",
+          "description": "An original unsigned 32-bit integer element.",
+          "type": "string"
+        },
+        {
+          "const": "uint64",
+          "description": "An original unsigned 64-bit integer element.",
+          "type": "string"
+        },
+        {
+          "const": "string",
+          "description": "An original string-table element.",
+          "type": "string"
+        },
+        {
+          "const": "single",
+          "description": "An original IEEE 754 binary32 element.",
+          "type": "string"
+        },
+        {
+          "const": "double",
+          "description": "An original IEEE 754 binary64 element.",
+          "type": "string"
+        },
+        {
+          "const": "locale",
+          "description": "An original localization-key element.",
+          "type": "string"
+        },
+        {
+          "const": "guid",
+          "description": "An original GUID element.",
+          "type": "string"
+        },
+        {
+          "const": "enum",
+          "description": "An original enum-option element.",
+          "type": "string"
+        },
+        {
+          "const": "class",
+          "description": "An original inline owned-class element.",
+          "type": "string"
+        },
+        {
+          "const": "strongPointer",
+          "description": "An original strong pointer to an owned instance.",
+          "type": "string"
+        },
+        {
+          "const": "weakPointer",
+          "description": "An original weak pointer to a Record or owned instance.",
+          "type": "string"
+        },
+        {
+          "const": "reference",
+          "description": "An original Reference to a Record.",
+          "type": "string"
+        }
       ],
-      "type": "string",
       "x-p4kx-vocabularyClass": "control"
     },
     "SourceDeclaration": {
@@ -44399,9 +44548,11 @@
       "description": "A source field stored once at an arena root or in an original Struct.",
       "oneOf": [
         {
+          "description": "An original root declaration position.",
           "properties": {
             "rootFieldIndex": {
-              "$ref": "#/$defs/DecimalU64"
+              "$ref": "#/$defs/DecimalU64",
+              "description": "The root field's original position."
             },
             "type": {
               "const": "root",
@@ -44415,12 +44566,15 @@
           "type": "object"
         },
         {
+          "description": "An original Struct member position.",
           "properties": {
             "fieldIndex": {
-              "$ref": "#/$defs/DecimalU64"
+              "$ref": "#/$defs/DecimalU64",
+              "description": "The member's original declaration position."
             },
             "parent": {
-              "$ref": "#/$defs/SourceValueRef"
+              "$ref": "#/$defs/SourceValueRef",
+              "description": "The owning Struct occurrence."
             },
             "type": {
               "const": "field",
@@ -44663,15 +44817,18 @@
       "description": "Typed original contents whose scalar representation shares its node's sourced cell.",
       "oneOf": [
         {
+          "description": "An owned structure with its concrete type and ordered field occurrences.",
           "properties": {
             "fields": {
+              "description": "Fields in their original declaration order.",
               "items": {
                 "$ref": "#/$defs/SourceField"
               },
               "type": "array"
             },
             "sourceType": {
-              "$ref": "#/$defs/SourcedValueOfstring"
+              "$ref": "#/$defs/SourcedValueOfstring",
+              "description": "The concrete source structure type with its evidence."
             },
             "type": {
               "const": "struct",
@@ -44686,8 +44843,10 @@
           "type": "object"
         },
         {
+          "description": "An ordered list whose links belong to the same owner's arena.",
           "properties": {
             "elements": {
+              "description": "Original element positions, including null and unreadable occurrences.",
               "items": {
                 "$ref": "#/$defs/SourceValueRef"
               },
@@ -44705,12 +44864,14 @@
           "type": "object"
         },
         {
+          "description": "An original Boolean.",
           "properties": {
             "type": {
               "const": "boolean",
               "type": "string"
             },
             "value": {
+              "description": "The decoded value.",
               "type": "boolean"
             }
           },
@@ -44721,13 +44882,15 @@
           "type": "object"
         },
         {
+          "description": "An exact numeric value with its original storage kind.",
           "properties": {
             "type": {
               "const": "number",
               "type": "string"
             },
             "value": {
-              "$ref": "#/$defs/ResourceNumber"
+              "$ref": "#/$defs/ResourceNumber",
+              "description": "The original integer width or IEEE representation."
             }
           },
           "required": [
@@ -44737,13 +44900,15 @@
           "type": "object"
         },
         {
+          "description": "An original string with its text domain.",
           "properties": {
             "type": {
               "const": "string",
               "type": "string"
             },
             "value": {
-              "$ref": "#/$defs/SourceText"
+              "$ref": "#/$defs/SourceText",
+              "description": "The authored text."
             }
           },
           "required": [
@@ -44753,13 +44918,15 @@
           "type": "object"
         },
         {
+          "description": "An original localization key with its text domain.",
           "properties": {
             "type": {
               "const": "locale",
               "type": "string"
             },
             "value": {
-              "$ref": "#/$defs/SourceText"
+              "$ref": "#/$defs/SourceText",
+              "description": "The authored localization key."
             }
           },
           "required": [
@@ -44769,12 +44936,14 @@
           "type": "object"
         },
         {
+          "description": "An original enum option.",
           "properties": {
             "type": {
               "const": "enum",
               "type": "string"
             },
             "value": {
+              "description": "The decoded option text.",
               "type": "string"
             }
           },
@@ -44785,13 +44954,15 @@
           "type": "object"
         },
         {
+          "description": "An original GUID value.",
           "properties": {
             "type": {
               "const": "guid",
               "type": "string"
             },
             "value": {
-              "$ref": "#/$defs/Guid"
+              "$ref": "#/$defs/Guid",
+              "description": "The stored GUID."
             }
           },
           "required": [
@@ -44801,13 +44972,15 @@
           "type": "object"
         },
         {
+          "description": "An original Reference with its captured target header and resolution state.",
           "properties": {
             "type": {
               "const": "recordReference",
               "type": "string"
             },
             "value": {
-              "$ref": "#/$defs/CatalogRecordReference"
+              "$ref": "#/$defs/CatalogRecordReference",
+              "description": "The physically resolved or unresolved target."
             }
           },
           "required": [
@@ -44817,13 +44990,15 @@
           "type": "object"
         },
         {
+          "description": "An original weak pointer to a Record or an owned instance.",
           "properties": {
             "type": {
               "const": "weakReference",
               "type": "string"
             },
             "value": {
-              "$ref": "#/$defs/SourceWeakReference"
+              "$ref": "#/$defs/SourceWeakReference",
+              "description": "The original owner, coordinate and target facts."
             }
           },
           "required": [
@@ -44908,8 +45083,10 @@
       "description": "The exact original string or key with its public or protected text domain.",
       "oneOf": [
         {
+          "description": "An original text classified in the public domain.",
           "properties": {
             "sourceText": {
+              "description": "The exact original text or localization key.",
               "type": "string"
             },
             "type": {
@@ -44924,8 +45101,10 @@
           "type": "object"
         },
         {
+          "description": "An original text classified in the protected game-text domain.",
           "properties": {
             "sourceText": {
+              "description": "The exact original text or localization key.",
               "type": "string",
               "x-gameText": true
             },
@@ -45086,9 +45265,11 @@
       "description": "Actual Record versus owned-instance applicability from the original admission.",
       "oneOf": [
         {
+          "description": "A weak pointer targeting a Record header.",
           "properties": {
             "sourceType": {
-              "$ref": "#/$defs/SourcedValueOfstring"
+              "$ref": "#/$defs/SourcedValueOfstring",
+              "description": "The original target Record type."
             },
             "type": {
               "const": "record",
@@ -45102,12 +45283,15 @@
           "type": "object"
         },
         {
+          "description": "A weak pointer targeting an owned instance.",
           "properties": {
             "location": {
-              "$ref": "#/$defs/SourcedValueOfstring"
+              "$ref": "#/$defs/SourcedValueOfstring",
+              "description": "The original field and element route within the target owner."
             },
             "sourceType": {
-              "$ref": "#/$defs/SourcedValueOfstring"
+              "$ref": "#/$defs/SourcedValueOfstring",
+              "description": "The original instance type."
             },
             "type": {
               "const": "instance",

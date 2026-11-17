@@ -19,17 +19,39 @@ use super::text::SourceText;
 #[derive(Debug, Clone, Copy, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct SourceValueRef {
+pub struct SourceValueRef {
     pub(crate) value_index: DecimalU64,
+}
+
+impl SourceValueRef {
+    /// Returns the occurrence's position in its owner's value arena.
+    #[must_use]
+    pub const fn value_index(self) -> u64 {
+        self.value_index.get()
+    }
 }
 
 /// A source value and the complete error facts of that same original occurrence.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct SourceNode<'source> {
+pub struct SourceNode<'source> {
     pub(crate) value: SourcedValue<SourcePayload<'source>>,
     pub(crate) original_error: Option<Box<OriginalValueErrorFacts>>,
+}
+
+impl<'source> SourceNode<'source> {
+    /// Borrows the original state, typed contents and source evidence.
+    #[must_use]
+    pub const fn value(&self) -> &SourcedValue<SourcePayload<'source>> {
+        &self.value
+    }
+
+    /// Borrows the original decoder error when this occurrence was unreadable.
+    #[must_use]
+    pub fn original_error(&self) -> Option<&OriginalValueErrorFacts> {
+        self.original_error.as_deref()
+    }
 }
 
 /// Typed original contents whose scalar representation shares its node's sourced cell.
@@ -40,37 +62,59 @@ pub(crate) struct SourceNode<'source> {
     rename_all_fields = "camelCase"
 )]
 #[schemars(transform = every_field_required)]
-pub(crate) enum SourcePayload<'source> {
+#[non_exhaustive]
+pub enum SourcePayload<'source> {
+    /// An owned structure with its concrete type and ordered field occurrences.
     Struct {
+        /// The concrete source structure type with its evidence.
         source_type: SourcedValue<&'source str>,
+        /// Fields in their original declaration order.
         fields: Vec<SourceField<'source>>,
     },
+    /// An ordered list whose links belong to the same owner's arena.
     Array {
+        /// Original element positions, including null and unreadable occurrences.
         elements: Vec<SourceValueRef>,
     },
+    /// An original Boolean.
     Boolean {
+        /// The decoded value.
         value: bool,
     },
+    /// An exact numeric value with its original storage kind.
     Number {
+        /// The original integer width or IEEE representation.
         value: ResourceNumber,
     },
+    /// An original string with its text domain.
     String {
+        /// The authored text.
         value: SourceText<'source>,
     },
+    /// An original localization key with its text domain.
     Locale {
+        /// The authored localization key.
         value: SourceText<'source>,
     },
+    /// An original enum option.
     Enum {
+        /// The decoded option text.
         value: &'source str,
     },
+    /// An original GUID value.
     Guid {
+        /// The stored GUID.
         value: CatalogGuid,
     },
+    /// An original Reference with its captured target header and resolution state.
     RecordReference {
+        /// The physically resolved or unresolved target.
         #[schemars(with = "CatalogRecordReference")]
         value: Box<SourceRecordReference<'source>>,
     },
+    /// An original weak pointer to a Record or an owned instance.
     WeakReference {
+        /// The original owner, coordinate and target facts.
         value: Box<SourceWeakReference<'source>>,
     },
 }

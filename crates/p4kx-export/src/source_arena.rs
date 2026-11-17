@@ -43,6 +43,26 @@ pub struct SourceArenaOutput<'source> {
     pub(crate) values: Vec<SourceNode<'source>>,
 }
 
+impl<'source> SourceArenaOutput<'source> {
+    /// Borrows the ordered original root fields.
+    #[must_use]
+    pub fn roots(&self) -> &[SourceField<'source>] {
+        &self.fields
+    }
+
+    /// Borrows all owner-local occurrences in their stored order.
+    #[must_use]
+    pub fn values(&self) -> &[SourceNode<'source>] {
+        &self.values
+    }
+
+    /// Resolves a link originating in this owner's arena.
+    #[must_use]
+    pub fn value(&self, reference: SourceValueRef) -> Option<&SourceNode<'source>> {
+        self.values
+            .get(usize::try_from(reference.value_index()).ok()?)
+    }
+}
 /// Retains one actual Record's complete ordered source inventory.
 pub(crate) fn read<'scope, 'read, 'source>(
     scope: &'scope OriginalRecordScope<'read, 'source>,

@@ -25,12 +25,18 @@ pub(crate) struct PhysicalTemplateRef {
     rename_all_fields = "camelCase"
 )]
 #[schemars(transform = every_field_required)]
-pub(crate) enum SourceFieldRef {
+#[non_exhaustive]
+pub enum SourceFieldRef {
+    /// An original root declaration position.
     Root {
+        /// The root field's original position.
         root_field_index: DecimalU64,
     },
+    /// An original Struct member position.
     Field {
+        /// The owning Struct occurrence.
         parent: SourceValueRef,
+        /// The member's original declaration position.
         field_index: DecimalU64,
     },
 }
@@ -39,12 +45,17 @@ pub(crate) enum SourceFieldRef {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(tag = "state", rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) enum DeclarationBinding {
+#[non_exhaustive]
+pub enum DeclarationBinding {
+    /// The original declaration is present.
     Present {
+        /// The original field binding.
         field: SourceFieldRef,
     },
+    /// The original owner has no such declaration.
     Absent {
         #[serde(flatten)]
+        /// The original declaration-survey evidence.
         origin: FieldOrigin,
     },
 }
@@ -65,4 +76,30 @@ pub(crate) enum FlowFieldBinding {
         #[serde(flatten)]
         origin: FieldOrigin,
     },
+}
+
+impl SourceFieldRef {
+    /// Resolves this arena-local binding against its original owner.
+    #[must_use]
+    pub fn resolve<'arena, 'source>(
+        self,
+        arena: &'arena crate::source_value_catalog::SourceArenaOutput<'source>,
+    ) -> Option<&'arena crate::source_value_catalog::SourceField<'source>> {
+        use crate::source_value_catalog::SourcePayload;
+
+        let (fields, index) = match self {
+            Self::Root { root_field_index } => (arena.roots(), root_field_index),
+            Self::Field {
+                parent,
+                field_index,
+            } => {
+                let SourcePayload::Struct { fields, .. } = arena.value(parent)?.value().value()?
+                else {
+                    return None;
+                };
+                (fields.as_slice(), field_index)
+            }
+        };
+        fields.get(usize::try_from(index.get()).ok()?)
+    }
 }

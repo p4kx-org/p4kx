@@ -5,6 +5,9 @@
 
 use crate::contracts_fixture;
 
+#[path = "catalog_contract_generator_sdk.rs"]
+mod generator_sdk;
+
 #[path = "catalog_contractor.rs"]
 mod contractor;
 #[path = "catalog_faction_identity.rs"]

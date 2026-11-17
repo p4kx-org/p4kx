@@ -8,14 +8,23 @@ use serde::Serialize;
 #[derive(Debug, Clone, Copy, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
-pub(crate) enum LocationConditionKind {
+#[non_exhaustive]
+pub enum LocationConditionKind {
+    /// Matches authored Tag terms.
     TagSearch,
+    /// Excludes locations within an authored distance.
     ExcludeNearbyLocations,
+    /// Excludes locations outside an authored distance.
     ExcludeDistantLocations,
+    /// Excludes a location selected by another property.
     ExcludeProperty,
+    /// Matches tags supplied by another property.
     PropertyTags,
+    /// Matches the authored organization candidates.
     SpecificOrganizations,
+    /// Matches the authored item candidates.
     SpecificItems,
+    /// Matches the authored faction identity.
     FactionIdentity,
 }
 

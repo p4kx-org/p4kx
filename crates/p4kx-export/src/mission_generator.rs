@@ -29,7 +29,7 @@ pub(crate) mod item_properties;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct GeneratorDefinition<'source> {
+pub struct GeneratorDefinition<'source> {
     pub(crate) input_ref: PhysicalSourceRef,
     #[serde(flatten)]
     pub(crate) header: CanonicalRecordHeader<'source>,
@@ -37,6 +37,44 @@ pub(crate) struct GeneratorDefinition<'source> {
     pub(crate) completion_tag_results: Vec<completion_tag_results::ContractCompletionTagResult>,
     pub(crate) item_reward_results: Vec<item_reward_results::ContractItemRewardResult<'source>>,
     pub(crate) mission_item_properties: Vec<item_properties::GeneratorMissionItemProperty>,
+}
+
+impl<'source> GeneratorDefinition<'source> {
+    /// The original physical input in this result's source inventory.
+    #[must_use]
+    pub const fn input_ref(&self) -> &PhysicalSourceRef {
+        &self.input_ref
+    }
+
+    /// The canonical source identity and Record header.
+    #[must_use]
+    pub const fn header(&self) -> &CanonicalRecordHeader<'source> {
+        &self.header
+    }
+
+    /// The complete original ordered fields and linked values.
+    #[must_use]
+    pub const fn source(&self) -> &SourceArenaOutput<'source> {
+        &self.source
+    }
+
+    /// The original completion-tag result declarations.
+    #[must_use]
+    pub fn completion_tag_results(&self) -> &[completion_tag_results::ContractCompletionTagResult] {
+        &self.completion_tag_results
+    }
+
+    /// The original physical-item reward declarations.
+    #[must_use]
+    pub fn item_reward_results(&self) -> &[item_reward_results::ContractItemRewardResult<'source>] {
+        &self.item_reward_results
+    }
+
+    /// The original mission-item property declarations.
+    #[must_use]
+    pub fn mission_item_properties(&self) -> &[item_properties::GeneratorMissionItemProperty] {
+        &self.mission_item_properties
+    }
 }
 
 /// The actual owner-local sites of one projected contract or sub contract.

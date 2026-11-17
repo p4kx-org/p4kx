@@ -20,7 +20,7 @@ use crate::template_value_meaning::{
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct GeneratorMissionItemProperty {
+pub struct GeneratorMissionItemProperty {
     level: MissionPropertyLevel,
     property_set: SourceValueRef,
     property: SourceValueRef,
@@ -72,4 +72,42 @@ fn collect<'source>(
         });
     }
     Ok(())
+}
+
+impl GeneratorMissionItemProperty {
+    /// The authored handler, contract or sub-contract level.
+    #[must_use]
+    pub const fn level(&self) -> MissionPropertyLevel {
+        self.level
+    }
+
+    /// The owning property-set occurrence.
+    #[must_use]
+    pub const fn property_set(&self) -> SourceValueRef {
+        self.property_set
+    }
+
+    /// The original property declaration occurrence.
+    #[must_use]
+    pub const fn property(&self) -> SourceValueRef {
+        self.property
+    }
+
+    /// The original property value occurrence.
+    #[must_use]
+    pub const fn source(&self) -> SourceValueRef {
+        self.source
+    }
+
+    /// The authored mission-item selection bindings.
+    #[must_use]
+    pub const fn mission_item(&self) -> &TemplateMissionItemSelection {
+        &self.mission_item
+    }
+
+    /// The original dataset-condition interpretations.
+    #[must_use]
+    pub fn conditions(&self) -> &[TemplateDatasetCondition] {
+        &self.conditions
+    }
 }

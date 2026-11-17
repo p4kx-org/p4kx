@@ -17,7 +17,7 @@ use crate::{CatalogError, ExportAccountingError};
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct TemplateMissionItemSelection {
+pub struct TemplateMissionItemSelection {
     min_items_to_find: DeclarationBinding,
     max_items_to_find: DeclarationBinding,
     debug_force_chosen_item: DeclarationBinding,
@@ -45,7 +45,7 @@ impl TemplateMissionItemSelection {
 /// Navigates every original candidate slot of one `SpecificItems` condition.
 #[derive(Debug, Serialize, JsonSchema)]
 #[schemars(transform = every_field_required)]
-pub(crate) struct TemplateSpecificItems {
+pub struct TemplateSpecificItems {
     items: DeclarationBinding,
     candidates: Vec<SourceValueRef>,
 }
@@ -136,4 +136,44 @@ pub(crate) fn dataset_conditions<'scope, 'read, 'source>(
             })
         })
         .collect()
+}
+
+impl TemplateMissionItemSelection {
+    /// The original minimum item count declaration.
+    #[must_use]
+    pub const fn min_items_to_find(&self) -> &DeclarationBinding {
+        &self.min_items_to_find
+    }
+
+    /// The original maximum item count declaration.
+    #[must_use]
+    pub const fn max_items_to_find(&self) -> &DeclarationBinding {
+        &self.max_items_to_find
+    }
+
+    /// The original forced-item declaration.
+    #[must_use]
+    pub const fn debug_force_chosen_item(&self) -> &DeclarationBinding {
+        &self.debug_force_chosen_item
+    }
+
+    /// The original dataset-condition declaration.
+    #[must_use]
+    pub const fn match_conditions(&self) -> &DeclarationBinding {
+        &self.match_conditions
+    }
+}
+
+impl TemplateSpecificItems {
+    /// The original item-list declaration.
+    #[must_use]
+    pub const fn items(&self) -> &DeclarationBinding {
+        &self.items
+    }
+
+    /// The original candidate slots, retaining every source position.
+    #[must_use]
+    pub fn candidates(&self) -> &[SourceValueRef] {
+        &self.candidates
+    }
 }

@@ -71,7 +71,7 @@ mod original_reward_read;
 pub(crate) use original_flow_fields::{
     ComponentSelection, OriginalFlowFields, OriginalMissingField,
 };
-pub(crate) use original_instance_location::OriginalInstanceLocation;
+pub use original_instance_location::OriginalInstanceLocation;
 pub(crate) use original_reference_capture::OriginalReferenceObservation;
 pub(crate) use original_reward_read::RewardRead;
 pub(crate) use original_target_shape::{OriginalReferenceCapture, OriginalTargetShape};

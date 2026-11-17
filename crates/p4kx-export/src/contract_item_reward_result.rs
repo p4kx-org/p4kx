@@ -26,7 +26,7 @@ const RESULT: &str = "ContractResult_Item";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ContractItemRewardResult<'source> {
+pub struct ContractItemRewardResult<'source> {
     source: SourceValueRef,
     mission_results: SourcedValue<Vec<SourcedValue<bool>>>,
     #[schemars(with = "SourcedValue<Box<CatalogRecordReference>>")]
@@ -42,7 +42,7 @@ pub(crate) struct ContractItemRewardResult<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct ItemRewardTarget<'source> {
+pub struct ItemRewardTarget<'source> {
     reference: Box<SourceWeakReference<'source>>,
     target_value: Option<SourceValueRef>,
 }
@@ -253,4 +253,68 @@ fn target_selector<'scope, 'read, 'source>(
         }),
         _ => SourceValue::Unsupported,
     })
+}
+
+impl<'source> ContractItemRewardResult<'source> {
+    /// The result's occurrence in its Generator source arena.
+    #[must_use]
+    pub const fn source(&self) -> SourceValueRef {
+        self.source
+    }
+
+    /// The original outcome flags in source order.
+    #[must_use]
+    pub const fn mission_results(&self) -> &SourcedValue<Vec<SourcedValue<bool>>> {
+        &self.mission_results
+    }
+
+    /// The original rewarded-item reference and its header resolution.
+    #[must_use]
+    pub const fn entity_class(&self) -> &SourcedValue<Box<SourceRecordReference<'source>>> {
+        &self.entity_class
+    }
+
+    /// The original signed reward count.
+    #[must_use]
+    pub const fn amount(&self) -> &SourcedValue<ResourceInt64> {
+        &self.amount
+    }
+
+    /// The original mission-owner restriction.
+    #[must_use]
+    pub const fn award_only_to_mission_owner(&self) -> &SourcedValue<bool> {
+        &self.award_only_to_mission_owner
+    }
+
+    /// The original home-location delivery flag.
+    #[must_use]
+    pub const fn send_to_player_home_location(&self) -> &SourcedValue<bool> {
+        &self.send_to_player_home_location
+    }
+
+    /// The original location pointer and any owned target occurrence.
+    #[must_use]
+    pub const fn target_location(&self) -> &SourcedValue<ItemRewardTarget<'source>> {
+        &self.target_location
+    }
+
+    /// The original notification occurrence in the Generator source arena.
+    #[must_use]
+    pub const fn notification(&self) -> &SourcedValue<SourceValueRef> {
+        &self.notification
+    }
+}
+
+impl<'source> ItemRewardTarget<'source> {
+    /// The original weak target and its physical resolution.
+    #[must_use]
+    pub fn reference(&self) -> &SourceWeakReference<'source> {
+        &self.reference
+    }
+
+    /// The target occurrence when the pointer names an owned value.
+    #[must_use]
+    pub const fn target_value(&self) -> Option<SourceValueRef> {
+        self.target_value
+    }
 }

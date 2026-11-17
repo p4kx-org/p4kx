@@ -78,7 +78,7 @@ impl<'source> SourceRecordReference<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct SourceWeakReference<'source> {
+pub struct SourceWeakReference<'source> {
     pub(crate) target_record_index: SourcedValue<u32>,
     pub(crate) record_guid: SourcedValue<CatalogGuid>,
     pub(crate) record_path: SourcedValue<&'source str>,
@@ -86,7 +86,33 @@ pub(crate) struct SourceWeakReference<'source> {
 }
 
 impl<'source> SourceWeakReference<'source> {
-    pub(crate) fn instance_steps(&self) -> Option<&[Step<'source>]> {
+    /// Borrows the original target Record position when available.
+    #[must_use]
+    pub const fn target_record_index(&self) -> &SourcedValue<u32> {
+        &self.target_record_index
+    }
+
+    /// Borrows the original target owner's GUID.
+    #[must_use]
+    pub const fn record_guid(&self) -> &SourcedValue<CatalogGuid> {
+        &self.record_guid
+    }
+
+    /// Borrows the original target owner's Record path.
+    #[must_use]
+    pub const fn record_path(&self) -> &SourcedValue<&'source str> {
+        &self.record_path
+    }
+
+    /// Borrows the original Record or owned-instance target facts.
+    #[must_use]
+    pub const fn target(&self) -> &SourceWeakTarget<'source> {
+        &self.target
+    }
+
+    /// Borrows the original steps when the weak pointer targets an owned instance.
+    #[must_use]
+    pub fn instance_steps(&self) -> Option<&[Step<'source>]> {
         match &self.target {
             SourceWeakTarget::Instance { location, .. } => Some(location.value()?.steps()),
             SourceWeakTarget::Record { .. } => None,
@@ -115,12 +141,18 @@ impl<'source> SourceWeakReference<'source> {
     rename_all_fields = "camelCase"
 )]
 #[schemars(transform = every_field_required)]
-pub(crate) enum SourceWeakTarget<'source> {
+#[non_exhaustive]
+pub enum SourceWeakTarget<'source> {
+    /// A weak pointer targeting a Record header.
     Record {
+        /// The original target Record type.
         source_type: SourcedValue<&'source str>,
     },
+    /// A weak pointer targeting an owned instance.
     Instance {
+        /// The original instance type.
         source_type: SourcedValue<&'source str>,
+        /// The original field and element route within the target owner.
         #[schemars(with = "SourcedValue<String>")]
         location: SourcedValue<OriginalInstanceLocation<'source>>,
     },

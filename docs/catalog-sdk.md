@@ -164,3 +164,34 @@ Use `snapshot.public_name` and `snapshot.game_text` for the typed references of 
 manufacturer. The returned text entries preserve the original key, source and display forms
 in the requested languages, and per-value origin. Resolve source-use IDs in that snapshot's
 inventory. A lookup with no admitted manufacturer opens no localization payloads.
+
+## Contract Generator sources
+
+Use `with_contract_generators`, its `_from` form or the parsed session method to read
+`definitions.contractGenerators` for the dataset, a Generator GUID or a physical Record
+index. This selection addresses the owning Record. Contract and sub-contract IDs belong
+to the derived contract rows.
+
+The result retains every selected physical declaration in original Record order, including
+development source owners and equal GUIDs. The definition has the same complete source arena
+and completion-tag, physical-item reward and mission-item property interpretations as the
+full Catalog. The query uses the shared canonical projector. A field interpretation can fail
+while its original source remains in the returned arena. Check `coverage`, `projection_notes`
+and `projection_failures` before publishing a consumer cache.
+
+Read the arena's `roots()` and `values()`, then follow each field's `value()` through
+`SourceArenaOutput::value`. A `SourceNode` provides its original `SourcedValue` and any typed
+original error. Struct fields and array elements preserve order, repeated occurrences,
+null values and unresolved links. Declaration bindings can resolve their original field with
+`SourceFieldRef::resolve`. Each link is local to its originating arena. Resolve source-use
+references through the snapshot's own `source_inventory`.
+
+Raw text values preserve their original public or protected domain and localization key.
+The selected DataForge is the only payload input. `requested_languages` retains the session's language
+policy. Reference payloads preserve their target header and resolution state without opening
+the target Record's body.
+
+This endpoint supplies the source-definition dataset. The remaining Contracts SDK work covers
+contracts, selected `contractLocationQueries` and spawn pools, `missionPropertySets`,
+resolved introductions, template and Broker dependencies, and canonical projected title texts.
+Those domain projectors require their own selected source and dependency closure.

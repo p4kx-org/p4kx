@@ -126,6 +126,7 @@ mod contract_completeness;
 mod contract_crafter;
 mod contract_entities;
 mod contract_facts;
+mod contract_generator_definition;
 mod contract_harvest;
 mod contract_harvest_config;
 mod contract_hauling;

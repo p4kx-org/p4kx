@@ -8,7 +8,7 @@ use serde::{Serialize, Serializer};
 
 /// A retained view of the decoder's immutable original instance location text.
 #[derive(Debug)]
-pub(crate) struct OriginalInstanceLocation<'source> {
+pub struct OriginalInstanceLocation<'source> {
     location: Arc<Location<'source>>,
 }
 
@@ -17,7 +17,9 @@ impl<'source> OriginalInstanceLocation<'source> {
         Self { location }
     }
 
-    pub(crate) fn steps(&self) -> &[Step<'source>] {
+    /// Borrows the original field and element steps within the owning Record.
+    #[must_use]
+    pub fn steps(&self) -> &[Step<'source>] {
         self.location.steps()
     }
 }

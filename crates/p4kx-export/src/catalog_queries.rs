@@ -8,6 +8,9 @@ mod blueprint_categories;
 #[path = "unlocalized_record_query.rs"]
 mod unlocalized_record_query;
 
+#[path = "contract_generator_query.rs"]
+mod contract_generators;
+
 #[path = "gameplay_property_query.rs"]
 mod gameplay_properties;
 #[path = "harvest_provider_query.rs"]
@@ -60,7 +63,12 @@ pub use crate::manufacturer::{
 };
 pub use crate::mission_location_tag::{MissionLocationTag, MissionLocationTagTerm};
 pub use crate::resource_number::ResourceNumber;
-pub use crate::source_value_catalog::{SourceArenaOutput, SourceRecordReference};
+pub use crate::source_value_catalog::{
+    CatalogGuid, OriginalErrorPool, OriginalErrorTable, OriginalInstanceLocation,
+    OriginalValueErrorFacts, SourceArenaOutput, SourceDataType, SourceDeclaration, SourceField,
+    SourceNode, SourcePayload, SourceRecordReference, SourceText, SourceValueRef,
+    SourceWeakReference, SourceWeakTarget,
+};
 pub use blueprint_categories::{
     BlueprintCategory, BlueprintCategorySnapshot, read_blueprint_categories,
     read_blueprint_categories_from,
@@ -83,6 +91,24 @@ pub use mission_location_templates::{
 };
 pub use reputation::{
     ReputationRows, ReputationSelection, ReputationSnapshot, with_reputation, with_reputation_from,
+};
+
+pub use crate::location_condition_kind::LocationConditionKind;
+pub use crate::mission_generator::GeneratorDefinition as ContractGeneratorDefinition;
+pub use crate::mission_generator::completion_tag_results::ContractCompletionTagResult;
+pub use crate::mission_generator::item_properties::GeneratorMissionItemProperty;
+pub use crate::mission_generator::item_reward_results::{
+    ContractItemRewardResult, ItemRewardTarget,
+};
+pub use crate::mission_property_set::MissionPropertyLevel;
+pub use crate::resource_integer::ResourceInt64;
+pub use crate::template_source_refs::{DeclarationBinding, SourceFieldRef};
+pub use crate::template_value_meaning::{
+    TemplateDatasetCondition, TemplateMissionItemSelection, TemplateSpecificItems,
+};
+pub use contract_generators::{
+    ContractGeneratorProjectionFailure, ContractGeneratorProjectionNote, ContractGeneratorSnapshot,
+    with_contract_generators, with_contract_generators_from,
 };
 
 /// Selects physical Records within the queried dataset and supplied DataForge.

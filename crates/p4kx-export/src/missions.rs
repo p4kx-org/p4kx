@@ -276,7 +276,7 @@ fn selected_generators<'source>(
             grants.unreadable_path(&context, source_type)?;
             continue;
         };
-        if rule.matches_path(path) && filter.is_none_or(|filter| filter.matches(path)) {
+        if crate::contract_generator_definition::matches_path(path, filter) {
             selected.push(record);
         }
     }

@@ -20,7 +20,7 @@ const EXPECTED: &str = "a scalar Bool";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ContractCompletionTagResult {
+pub struct ContractCompletionTagResult {
     source: SourceValueRef,
     split_points_for_party: SourcedValue<bool>,
 }
@@ -111,4 +111,18 @@ fn note<'source>(
     let body = capture.field_failure(&violation)?;
     notes.push(violation.into_error().with_body(body));
     Ok(())
+}
+
+impl ContractCompletionTagResult {
+    /// The result's occurrence in its Generator source arena.
+    #[must_use]
+    pub const fn source(&self) -> SourceValueRef {
+        self.source
+    }
+
+    /// The original party-sharing flag and its source state.
+    #[must_use]
+    pub const fn split_points_for_party(&self) -> &SourcedValue<bool> {
+        &self.split_points_for_party
+    }
 }

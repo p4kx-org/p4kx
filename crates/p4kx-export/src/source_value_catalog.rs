@@ -33,15 +33,18 @@ mod text;
 #[path = "source_value.rs"]
 mod value;
 
+pub use crate::catalog_read::original::OriginalInstanceLocation;
+pub use crate::guid_text::CatalogGuid;
 pub use arena::SourceArenaOutput;
 pub(crate) use arena::{
     read as read_arena, read_indexed as read_indexed_arena, read_members, read_subtree,
 };
-pub(crate) use field::SourceField;
+pub use data_type::SourceDataType;
+pub use error::{OriginalErrorPool, OriginalErrorTable, OriginalValueErrorFacts};
+pub use field::{SourceDeclaration, SourceField};
 pub(crate) use field_read::read as read_field;
-pub use reference::SourceRecordReference;
-pub(crate) use reference::{SourceWeakReference, SourceWeakTarget};
+pub use reference::{SourceRecordReference, SourceWeakReference, SourceWeakTarget};
 pub(crate) use reference_read::read as read_reference_payload;
 pub(crate) use scalar_read::{read as read_scalar, read_reference};
-pub(crate) use text::SourceText;
-pub(crate) use value::{SourceNode, SourcePayload, SourceValueRef};
+pub use text::SourceText;
+pub use value::{SourceNode, SourcePayload, SourceValueRef};

@@ -20,7 +20,8 @@ use crate::template_property::PropertyValue;
 #[derive(Debug, Clone, Copy, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = crate::schema_vocabulary::open_string_vocabulary)]
-pub(crate) enum MissionPropertyLevel {
+#[non_exhaustive]
+pub enum MissionPropertyLevel {
     /// The handler's `contractParams`.
     Handler,
     /// The contract's `paramOverrides`.
