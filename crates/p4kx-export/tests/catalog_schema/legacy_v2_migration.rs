@@ -7,11 +7,18 @@ use std::error::Error;
 use p4kx_extraction::Language;
 use serde_json::Value;
 
-use super::schema_navigation::{escape, resolve};
+use super::legacy_v2_inventory::{Inventory, released_schema};
+use super::schema_navigation::resolve;
+
+#[path = "legacy_v2_commodity.rs"]
+mod commodity;
+#[path = "legacy_v2_manufacturer.rs"]
+mod manufacturer;
+#[path = "legacy_v2_text_routes.rs"]
+mod text_routes;
 
 type Result<T = ()> = std::result::Result<T, Box<dyn Error>>;
 
-const RELEASED: &str = include_str!("../fixtures/catalog-v0.4.2.schema.json");
 const CATEGORY: &str = "blueprintCategories";
 const PROPERTY: &str = "gameplayProperties";
 const HEADER: &[&str] = &["/className", "/guid", "/recordPath"];
@@ -74,15 +81,16 @@ fn header_mappings() -> Vec<Mapping> {
 
 #[test]
 fn released_v2_category_and_gameplay_property_fields_have_explicit_dispositions() -> Result {
-    let old: Value = serde_json::from_str(RELEASED)?;
+    let old = released_schema()?;
+    let inventory = Inventory::collect(&old)?;
     let current = p4kx_export::catalog_schema();
     assert_eq!(old["properties"]["schemaVersion"]["const"], 2);
     for (family, rows) in [
         (CATEGORY, category_mappings()),
         (PROPERTY, property_mappings()),
     ] {
-        let discovered = old_fields(&old, family)?;
-        let classified: BTreeSet<_> = rows.iter().map(|row| row.old.to_owned()).collect();
+        let discovered = family_fields(&inventory, family)?;
+        let classified: BTreeSet<_> = rows.iter().map(|row| row.old).collect();
         assert_eq!(
             classified.len(),
             rows.len(),
@@ -101,18 +109,13 @@ fn released_v2_category_and_gameplay_property_fields_have_explicit_dispositions(
 
 #[test]
 fn an_unclassified_released_field_is_reported_by_the_inventory() -> Result {
-    let mut old: Value = serde_json::from_str(RELEASED)?;
+    let mut old = released_schema()?;
     old["$defs"]["BlueprintCategory"]["properties"]["fixtureAdditionalField"] =
         serde_json::json!({"type": "boolean"});
-    let discovered = old_fields(&old, CATEGORY)?;
-    let classified: BTreeSet<_> = category_mappings()
-        .into_iter()
-        .map(|row| row.old.to_owned())
-        .collect();
-    let unknown: Vec<_> = discovered
-        .difference(&classified)
-        .map(String::as_str)
-        .collect();
+    let inventory = Inventory::collect(&old)?;
+    let discovered = family_fields(&inventory, CATEGORY)?;
+    let classified: BTreeSet<_> = category_mappings().into_iter().map(|row| row.old).collect();
+    let unknown: Vec<_> = discovered.difference(&classified).copied().collect();
     assert_eq!(unknown, ["/fixtureAdditionalField"]);
     Ok(())
 }
@@ -184,43 +187,21 @@ fn present_value(node: &Value) -> Option<&Value> {
         .pointer("/then/properties/value")
 }
 
-fn old_fields(schema: &Value, family: &str) -> Result<BTreeSet<String>> {
-    let mut fields = BTreeSet::new();
-    let rows = schema_at(schema, &format!("/{family}/[]"))?;
-    collect_declarations(schema, rows, "", &mut Vec::new(), &mut fields)?;
-    Ok(fields)
-}
-
-fn collect_declarations<'schema>(
-    schema: &'schema Value,
-    node: &'schema Value,
-    path: &str,
-    active: &mut Vec<&'schema Value>,
-    fields: &mut BTreeSet<String>,
-) -> Result {
-    let node = resolve(schema, node)?;
-    if active.iter().any(|prior| std::ptr::eq(*prior, node)) {
-        return Ok(());
-    }
-    if ["allOf", "anyOf", "oneOf"]
-        .into_iter()
-        .any(|keyword| node.get(keyword).is_some())
-    {
-        return Err(format!("migration classification needs branch-aware paths at {path}").into());
-    }
-    active.push(node);
-    if let Some(properties) = node.get("properties").and_then(Value::as_object) {
-        for (name, child) in properties {
-            let path = format!("{path}/{}", escape(name));
-            fields.insert(path.clone());
-            collect_declarations(schema, child, &path, active, fields)?;
+fn family_fields<'inventory>(
+    inventory: &'inventory Inventory,
+    family: &str,
+) -> Result<BTreeSet<&'inventory str>> {
+    let prefix = format!("/{family}/[]");
+    let mut declared = BTreeSet::new();
+    for field in &inventory.fields {
+        if let Some(relative) = field
+            .wire
+            .strip_prefix(&prefix)
+            .filter(|relative| relative.starts_with('/'))
+            && !declared.insert(relative)
+        {
+            return Err(format!("migration needs schema addresses for {}", field.wire).into());
         }
     }
-    for (schema_key, suffix) in [("items", "[]"), ("additionalProperties", "*")] {
-        if let Some(child) = node.get(schema_key).filter(|value| value.is_object()) {
-            collect_declarations(schema, child, &format!("{path}/{suffix}"), active, fields)?;
-        }
-    }
-    active.pop();
-    Ok(())
+    Ok(declared)
 }

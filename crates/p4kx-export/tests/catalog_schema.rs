@@ -16,6 +16,10 @@ mod dataset_ownership;
 mod gameplay_properties;
 #[path = "catalog_schema/health.rs"]
 mod health;
+#[path = "catalog_schema/legacy_v2_inventory.rs"]
+mod legacy_v2_inventory;
+#[path = "catalog_schema/legacy_v2_inventory_tests.rs"]
+mod legacy_v2_inventory_tests;
 #[path = "catalog_schema/legacy_v2_migration.rs"]
 mod legacy_v2_migration;
 #[path = "catalog_schema/mission_values.rs"]
