@@ -175,8 +175,13 @@ both original frame widgets. None of the label's 14 glyph bounds overlapped
 the raster stage. Their transforms were nonsingular and the solid paint
 had visible alpha. The glyphs remained invisible in an isolated raster
 with the masks removed. Neither original frame widget submitted a draw
-item. Verify the authored Canvas placement and style context before using
-this candidate as evidence of visible default GeneralLarge rendering.
+item. Both frame styles resolved to SVGs. The holder entered a finite,
+vertical flex layout with positive resolved dimensions, a second in-flow
+sibling, and no margins or explicit size bounds. The layout had negative
+free space and assigned the holder zero height before mounting the
+template. Neither frame reached an SVG request. The expected allocation
+for this authored layout remains unverified, so the candidate does not
+establish visible default GeneralLarge rendering.
 
 ## Guesses, unverified against the game
 
