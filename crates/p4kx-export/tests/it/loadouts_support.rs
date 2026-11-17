@@ -8,7 +8,7 @@ use crate::loadouts_fixture::write_archive;
 use std::error::Error;
 use std::time::{Duration, UNIX_EPOCH};
 
-use p4kx_export::{BuiltCatalog, CatalogOptions, Filter, build_catalog};
+use p4kx_export::{BuiltCatalog, CatalogOptions, CatalogPublicationMode, Filter, build_catalog};
 use p4kx_extraction::Archive;
 use serde_json::Value;
 
@@ -18,12 +18,17 @@ pub(crate) fn build(filter: Option<&Filter>) -> Result<(BuiltCatalog, Value), Bo
     let dir = tempfile::tempdir()?;
     let archive =
         Archive::open_with_key(write_archive(dir.path())?, Some(p4kx_testkit::test_key()))?;
-    let mut options = CatalogOptions::new(UNIX_EPOCH + EXPORTED_AT);
-    options.publication_mode = p4kx_export::CatalogPublicationMode::DiagnosticPartial;
-    options.filter = filter;
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, &options(filter))?;
     let json = serde_json::from_slice(built.json())?;
     Ok((built, json))
+}
+
+pub(super) fn options(filter: Option<&Filter>) -> CatalogOptions<'_> {
+    CatalogOptions {
+        publication_mode: CatalogPublicationMode::DiagnosticPartial,
+        filter,
+        ..CatalogOptions::new(UNIX_EPOCH + EXPORTED_AT)
+    }
 }
 
 pub(crate) fn guid(value: u128) -> String {

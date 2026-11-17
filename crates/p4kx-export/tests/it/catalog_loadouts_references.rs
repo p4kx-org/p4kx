@@ -4,12 +4,15 @@
 //! Loadouts of ships and items in the P4KX catalog, through the public API: the references
 //! of the ports, the summary, the Filter and the order.
 
-use crate::loadouts_fixture::{ALPHA, BROKEN, GUN_TEMPLATE, MISSING, SNUB};
-use crate::loadouts_support::{build, guid, known, loadout, names, port};
+use crate::loadouts_fixture::{
+    self, ALPHA, BROKEN, GUN_DEFAULT, GUN_OVERRIDE, GUN_TEMPLATE, MISSING, SNUB, TURRET,
+};
+use crate::loadouts_support::{self, build, guid, known, loadout, names, port};
 
 use std::error::Error;
 
 use p4kx_export::{Filter, Kind, LoadoutSummary};
+use p4kx_extraction::{Archive, ArchiveWatch, DataForgeEntry};
 use serde_json::{Value, json};
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -162,6 +165,58 @@ fn a_filter_limits_the_loadouts_to_the_selected_entities_and_marks_the_kind_part
         "no item loadout under the Filter"
     );
     Ok(())
+}
+
+#[test]
+fn a_shared_dataforge_preserves_sequential_ship_and_item_catalogs() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let path = loadouts_fixture::write_archive(dir.path())?;
+    let archive = Archive::open_with_key(path, Some(p4kx_testkit::test_key()))?;
+    let watch = ArchiveWatch::new(&archive);
+    watch.check()?;
+    let entry = DataForgeEntry::read(&archive)?;
+
+    {
+        let ships = compare_reused_catalog(&archive, &entry, "*/spaceships/*")?;
+        let ports = &loadout(&ships, ALPHA)?["ports"];
+        let empty = port(ports, "hardpoint_empty")?;
+        assert_eq!(empty["itemGuid"], Value::Null, "the empty vehicle port");
+        let turret = port(ports, "hardpoint_turret")?;
+        let nested = port(&turret["ports"], "gun_1")?;
+        assert_eq!(
+            nested["itemGuid"],
+            json!(guid(GUN_OVERRIDE)),
+            "the ship's nested attachment override"
+        );
+    }
+    watch.check()?;
+
+    let items = compare_reused_catalog(&archive, &entry, "*/scitem/*")?;
+    let own = port(&loadout(&items, TURRET)?["ports"], "gun_1")?;
+    assert_eq!(
+        own["itemGuid"],
+        json!(guid(GUN_DEFAULT)),
+        "the next filtered read retains the item's own default attachment"
+    );
+    watch.check()?;
+    Ok(())
+}
+
+fn compare_reused_catalog(
+    archive: &Archive,
+    entry: &DataForgeEntry,
+    pattern: &str,
+) -> Result<Value, Box<dyn Error>> {
+    let filter = Filter::new(pattern);
+    let options = loadouts_support::options(Some(&filter));
+    let direct = p4kx_export::build_catalog(archive, &options)?;
+    let reused = p4kx_export::build_catalog_from(archive, entry, &options)?;
+    assert!(
+        reused.json() == direct.json(),
+        "{pattern} preserves all catalog bytes, including source metadata"
+    );
+    assert_eq!(reused.summary(), direct.summary(), "{pattern} summary");
+    Ok(serde_json::from_slice(reused.json())?)
 }
 
 #[test]

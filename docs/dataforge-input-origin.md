@@ -13,6 +13,19 @@ Identical decoded bytes from an Archive and a standalone file retain different o
 An additional Archive supplied for text lookup does not establish that an external database came
 from that Archive. A display filename or path-like stream label does not establish physical origin.
 
+## Reusing an installed Archive in a Rust consumer
+
+Open the Archive once and take an `ArchiveWatch`. Use `DataForgeEntry::read_until` with the
+caller's cancellation signal. Pass the same Archive and Entry to sequential
+`p4kx_export::build_catalog_from` calls, each with its own `CatalogOptions::filter`. Consume each
+result before building the next. Each call prepares its own filtered schema-v3 Catalog and
+reads its localization inputs. The shared Entry avoids rereading and decompressing the DCB.
+
+Use `ArchiveWatch::check` before starting the read and before committing the refreshed cache.
+The watch compares file metadata and the opened Build. Keep the last usable cache when a
+read is cancelled, a required result fails or the Archive changes. Open a fresh Archive and
+read its Entry for the next Build. [Catalog selection](catalog.md#selection)
+
 ## Archive ownership and containing Entries
 
 `Archive::entry_origin(&Entry)` requires the actual borrowed indexed slot of that Archive. A foreign
