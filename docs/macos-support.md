@@ -92,9 +92,10 @@ same tag for the **Validate macOS device evidence** workflow. Give it the origin
 the observed current stable version and the receipt. Keep the receipt to technical checks and
 digests. Keep local game data and paths out of it.
 
-After the device evidence workflow succeeds, re-run only the failed jobs of the original Release
-run. Assembly verifies the attested receipt against the DMG and revision from that run. Rebuilding
-the candidate can change its bytes and requires matching device evidence.
+After this intake and the [Windows/Linux ARM64 device intake](supported-platforms.md#validate-the-recorded-arm64-desktop-evidence)
+succeed, re-run only the failed jobs of the original Release run. Assembly verifies the attested
+receipt against the DMG and revision from that run. Rebuilding the candidate can change its bytes
+and requires matching device evidence.
 
 ## References
 

@@ -1,5 +1,5 @@
 $ErrorActionPreference = 'Stop'
-. (Join-Path $PSScriptRoot 'macos-device-evidence-github.ps1')
+. (Join-Path $PSScriptRoot 'release-device-evidence-github.ps1')
 . (Join-Path $PSScriptRoot 'package-release-evidence.ps1')
 
 function Get-P4kxIntakeMacosPlatform {
@@ -21,54 +21,22 @@ function Resolve-P4kxMacosIntakeCandidate([string]$RunId, [string]$MacosCurrentV
     if (-not (Test-P4kxWorkflowRunId $RunId)) { throw 'A positive candidate workflow run ID is required.' }
     $platform = Get-P4kxIntakeMacosPlatform
     Assert-P4kxIntakeCurrentVersion $MacosCurrentVersion $platform
-    Assert-P4kxIntakeTag
-    $run = Invoke-P4kxIntakeApi "repos/$env:GITHUB_REPOSITORY/actions/runs/$RunId"
-    if (-not (Test-P4kxIntakeRun $run $RunId '.github/workflows/release.yml' 'push') -or
-        $run.conclusion -cnotin @('failure', 'success')) {
-        throw 'Device evidence requires a completed owning release workflow run at the exact pushed tag and commit.'
-    }
+    Assert-P4kxIntakeCandidateRun $RunId
     return @{
         'run-id' = $RunId
         'artifact-name' = "macos-device-evidence-candidate-$RunId"
         'version' = $env:GITHUB_REF_NAME.Substring(1)
         'current-version' = $MacosCurrentVersion
-        'packages-id' = Get-P4kxMacosCandidateArtifact $RunId "release-$($platform.target)"
-        'bundles-id' = Get-P4kxMacosCandidateArtifact $RunId "attestations-$($platform.target)"
-        'extension-id' = Get-P4kxMacosCandidateArtifact $RunId 'release-addon'
-        'extension-bundle-id' = Get-P4kxMacosCandidateArtifact $RunId 'attestations-addon'
+        'packages-id' = Get-P4kxCandidateArtifact $RunId "release-$($platform.target)"
+        'bundles-id' = Get-P4kxCandidateArtifact $RunId "attestations-$($platform.target)"
+        'extension-id' = Get-P4kxCandidateArtifact $RunId 'release-addon'
+        'extension-bundle-id' = Get-P4kxCandidateArtifact $RunId 'attestations-addon'
     }
-}
-
-function Get-P4kxIntakeFile([string]$Directory, [string]$Name) {
-    $file = Get-Item -LiteralPath (Join-Path $Directory $Name)
-    if ($file -isnot [IO.FileInfo] -or $file.Name -cne $Name -or $file.Length -le 0 -or
-        ($file.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
-        throw "Device evidence input '$Name' is not an exact non-empty regular file."
-    }
-    return $file.FullName
-}
-
-function Get-P4kxIntakeHash([string]$Path) {
-    return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
 }
 
 function Get-P4kxIntakeDmg([string]$Assets, [string]$Version, $Platform) {
     $name = Get-P4kxAssetName -Target $Platform.target -Version $Version -Package dmg
     return Get-P4kxIntakeFile $Assets $name
-}
-
-function Read-P4kxIntakeRuntime([string]$Path, [string]$Assets, [string]$Version, [string]$RunId, $Platform) {
-    $runtime = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
-    if ($runtime.workflow_run -cne "https://github.com/$env:GITHUB_REPOSITORY/actions/runs/$RunId") {
-        throw 'Native macOS runtime evidence belongs to another workflow run.'
-    }
-    $pins = & (Join-Path $PSScriptRoot 'check-build-tools.ps1')
-    $compiler = ($pins | Where-Object { $_.StartsWith('rust-version=') }).Substring('rust-version='.Length)
-    $nextest = ($pins | Where-Object { $_.StartsWith('nextest-version=') }).Substring('nextest-version='.Length)
-    Assert-P4kxArchiveEvidence $runtime $Platform $env:GITHUB_SHA $compiler $nextest
-    Assert-P4kxRuntimeEvidence $runtime $Platform $Version $env:GITHUB_SHA
-    Assert-P4kxPackageRuntime $runtime $Platform $Assets $Version
-    return $runtime
 }
 
 function Save-P4kxIntakeReceipt([string]$Directory, $Runtime, $Platform, [string]$CurrentVersion, [string]$ExtensionHash) {
@@ -124,23 +92,11 @@ function Save-P4kxMacosDeviceIntake([string]$Assets, [string]$Bundles, [string]$
     $extensionBundle = Get-P4kxIntakeFile $ExtensionBundles "P4KX-$Version-addon-provenance.sigstore.json"
     Assert-P4kxIntakeAttestation $extension $extensionBundle '.github/workflows/release.yml' $trust $CandidateRunId 'push'
     $extensionHash = Get-P4kxIntakeHash $extension
-    $runtime = Read-P4kxIntakeRuntime $runtimePath $Assets $Version $CandidateRunId $platform
+    $runtime = Read-P4kxIntakeRuntime $runtimePath $Version $CandidateRunId $platform
+    Assert-P4kxPackageRuntime $runtime $platform $Assets $Version
     $receipt = Save-P4kxIntakeReceipt $Directory $runtime $platform $CurrentVersion $extensionHash
     $binding = New-P4kxIntakeBinding $CandidateRunId $env:GITHUB_RUN_ID $CurrentVersion $runtime.archive_sha256 $extensionHash (Get-P4kxIntakeHash $receipt) $platform
     $binding | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $Directory 'binding.json') -Encoding utf8NoBOM
-}
-
-function Assert-P4kxIntakeBinding($Binding, $Expected) {
-    if ($Binding -isnot [pscustomobject] -or @($Binding.PSObject.Properties).Count -ne $Expected.Count) {
-        throw 'Native macOS device receipt binding has the wrong field set.'
-    }
-    foreach ($field in $Expected.Keys) {
-        $property = $Binding.PSObject.Properties[$field]
-        if ($null -eq $property -or $property.Name -cne $field -or
-            $property.Value -isnot ($Expected[$field].GetType()) -or $property.Value -cne $Expected[$field]) {
-            throw "Native macOS device receipt binding differs in '$field'."
-        }
-    }
 }
 
 function Read-P4kxMacosDeviceIntake([string]$Directory, [string]$Assets, [string]$Version,

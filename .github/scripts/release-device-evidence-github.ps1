@@ -74,7 +74,7 @@ function Test-P4kxIntakeArtifactOwner($Artifact, [string]$RunId) {
         $owner.head_sha -ceq $env:GITHUB_SHA
 }
 
-function Get-P4kxMacosCandidateArtifact([string]$RunId, [string]$Name) {
+function Get-P4kxCandidateArtifact([string]$RunId, [string]$Name) {
     $listed = Invoke-P4kxIntakeApi "repos/$env:GITHUB_REPOSITORY/actions/runs/$RunId/artifacts?name=$Name"
     $artifacts = @($listed.artifacts)
     if ($listed.total_count -ne 1 -or $artifacts.Count -ne 1 -or
@@ -85,13 +85,13 @@ function Get-P4kxMacosCandidateArtifact([string]$RunId, [string]$Name) {
     return [string]$artifacts[0].id
 }
 
-function Find-P4kxDeviceIntakeArtifact([string]$CandidateRunId) {
+function Find-P4kxDeviceIntakeArtifact([string]$CandidateRunId, [ValidateSet('macos', 'arm64')][string]$Family = 'macos') {
     Assert-P4kxIntakeTagContext 'push'
     Assert-P4kxIntakeTag
     if (-not (Test-P4kxWorkflowRunId $CandidateRunId) -or $CandidateRunId -cne $env:GITHUB_RUN_ID) {
         throw 'Device receipt lookup requires the active candidate run ID.'
     }
-    $name = "macos-device-evidence-candidate-$CandidateRunId"
+    $name = "$Family-device-evidence-candidate-$CandidateRunId"
     $pages = @(Invoke-P4kxIntakeApi "repos/$env:GITHUB_REPOSITORY/actions/artifacts?name=$name" -Paginate)
     $candidates = @(foreach ($page in $pages) {
         foreach ($artifact in $page.artifacts) {
@@ -105,12 +105,12 @@ function Find-P4kxDeviceIntakeArtifact([string]$CandidateRunId) {
     foreach ($artifact in ($candidates | Sort-Object { [long]$_.id } -Descending)) {
         $runId = [string]$artifact.workflow_run.id
         $run = Invoke-P4kxIntakeApi "repos/$env:GITHUB_REPOSITORY/actions/runs/$runId"
-        if ((Test-P4kxIntakeRun $run $runId '.github/workflows/macos-device-evidence.yml' 'workflow_dispatch') -and
+        if ((Test-P4kxIntakeRun $run $runId ".github/workflows/$Family-device-evidence.yml" 'workflow_dispatch') -and
             $run.conclusion -ceq 'success') {
             return @{ 'run-id' = $runId; 'artifact-id' = [string]$artifact.id }
         }
     }
-    throw 'No successful macOS device receipt intake exists for this candidate run. Submit the receipt, then re-run failed jobs.'
+    throw "No successful $Family device receipt intake exists for this candidate run. Submit the receipt, then re-run failed jobs."
 }
 
 function Save-P4kxIntakeTrustedRoot([string]$Path) {
@@ -158,4 +158,52 @@ function Assert-P4kxIntakeAttestation([string]$Subject, [string]$Bundle, [string
         }
     }
     throw "Signed provenance for '$([IO.Path]::GetFileName($Subject))' has the wrong workflow run identity."
+}
+
+function Get-P4kxIntakeFile([string]$Directory, [string]$Name) {
+    $file = Get-Item -LiteralPath (Join-Path $Directory $Name)
+    if ($file -isnot [IO.FileInfo] -or $file.Name -cne $Name -or $file.Length -le 0 -or
+        ($file.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+        throw "Device evidence input '$Name' is not an exact non-empty regular file."
+    }
+    return $file.FullName
+}
+
+function Get-P4kxIntakeHash([string]$Path) {
+    return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+}
+
+function Assert-P4kxIntakeBinding($Binding, $Expected) {
+    if ($Binding -isnot [pscustomobject] -or @($Binding.PSObject.Properties).Count -ne $Expected.Count) {
+        throw 'Native device receipt binding has the wrong field set.'
+    }
+    foreach ($field in $Expected.Keys) {
+        $property = $Binding.PSObject.Properties[$field]
+        if ($null -eq $property -or $property.Name -cne $field -or
+            $property.Value -isnot ($Expected[$field].GetType()) -or $property.Value -cne $Expected[$field]) {
+            throw "Native device receipt binding differs in '$field'."
+        }
+    }
+}
+
+function Read-P4kxIntakeRuntime([string]$Path, [string]$Version, [string]$RunId, $Platform) {
+    $runtime = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
+    if ($runtime.workflow_run -cne "https://github.com/$env:GITHUB_REPOSITORY/actions/runs/$RunId") {
+        throw 'Native runtime evidence belongs to another workflow run.'
+    }
+    $pins = & (Join-Path $PSScriptRoot 'check-build-tools.ps1')
+    $compiler = ($pins | Where-Object { $_.StartsWith('rust-version=') }).Substring('rust-version='.Length)
+    $nextest = ($pins | Where-Object { $_.StartsWith('nextest-version=') }).Substring('nextest-version='.Length)
+    Assert-P4kxArchiveEvidence $runtime $Platform $env:GITHUB_SHA $compiler $nextest
+    Assert-P4kxRuntimeEvidence $runtime $Platform $Version $env:GITHUB_SHA
+    return $runtime
+}
+
+function Assert-P4kxIntakeCandidateRun([string]$RunId) {
+    Assert-P4kxIntakeTag
+    $run = Invoke-P4kxIntakeApi "repos/$env:GITHUB_REPOSITORY/actions/runs/$RunId"
+    if (-not (Test-P4kxIntakeRun $run $RunId '.github/workflows/release.yml' 'push') -or
+        $run.conclusion -cnotin @('failure', 'success')) {
+        throw 'Device evidence requires a completed owning release workflow run at the exact pushed tag and commit.'
+    }
 }

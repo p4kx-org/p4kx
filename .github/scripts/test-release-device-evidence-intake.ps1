@@ -1,5 +1,7 @@
+param([Parameter(Mandatory)][string]$Directory)
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'macos-device-evidence-intake.ps1')
+. (Join-Path $PSScriptRoot 'arm64-device-evidence-intake.ps1')
 
 function Assert-Rejected([scriptblock]$Action, [string]$Message) {
     $failure = try { & $Action } catch { $_.Exception.Message }
@@ -61,6 +63,22 @@ function Invoke-P4kxIntakeApi([string]$Resource, [switch]$Paginate) {
                 @{ artifacts = @((New-Artifact 997 47 314), (New-Artifact 996 46 314), (New-Artifact 995 45 314)) }
             )
         }
+        "$base/actions/artifacts?name=arm64-device-evidence-candidate-$env:GITHUB_RUN_ID" {
+            if (-not $Paginate) { throw 'ARM64 desktop intake lookup must cover all artifact result pages.' }
+            $name = "arm64-device-evidence-candidate-$env:GITHUB_RUN_ID"
+            return @(
+                @{ artifacts = @((New-Artifact 1004 50 315 $name), (New-Artifact 1003 46 314 $name)) },
+                @{ artifacts = @((New-Artifact 1002 51 314 $name), (New-Artifact 1001 50 314 $name)) }
+            )
+        }
+        "$base/actions/runs/51" { return New-Run 51 'arm64-device-evidence.yml' 'failure' 'workflow_dispatch' }
+        "$base/actions/runs/50" { return New-Run 50 'arm64-device-evidence.yml' 'success' 'workflow_dispatch' }
+        "$base/actions/runs/456/artifacts?name=arm64-device-runtime-aarch64-pc-windows-msvc" {
+            return @{ total_count = 1; artifacts = @((New-Artifact 105 456 314 'arm64-device-runtime-aarch64-pc-windows-msvc')) }
+        }
+        "$base/actions/runs/456/artifacts?name=arm64-device-runtime-aarch64-unknown-linux-gnu" {
+            return @{ total_count = 1; artifacts = @((New-Artifact 106 456 314 'arm64-device-runtime-aarch64-unknown-linux-gnu')) }
+        }
         "$base/actions/runs/456" { return New-Run 456 'release.yml' 'failure' 'push' }
         "$base/actions/runs/456/artifacts?name=release-aarch64-apple-darwin" {
             return @{ total_count = 1; artifacts = @((New-Artifact 101 456 314 'release-aarch64-apple-darwin')) }
@@ -86,6 +104,10 @@ if ($selected['run-id'] -cne '46' -or $selected['artifact-id'] -cne '996') {
     throw 'Lookup must select the newest successfully completed exact intake run.'
 }
 Assert-Rejected { Find-P4kxDeviceIntakeArtifact '457' } 'active candidate run'
+$arm64 = Find-P4kxDeviceIntakeArtifact '456' 'arm64'
+if ($arm64['run-id'] -cne '50' -or $arm64['artifact-id'] -cne '1001') {
+    throw 'ARM64 lookup must ignore unrelated owners, workflows and unsuccessful runs.'
+}
 
 $platform = Get-P4kxIntakeMacosPlatform
 $minimum = [version]$platform.deployment_target
@@ -99,6 +121,11 @@ $candidate = Resolve-P4kxMacosIntakeCandidate '456' $current
 if ($candidate['packages-id'] -cne '101' -or $candidate['bundles-id'] -cne '102' -or
     $candidate['extension-id'] -cne '103' -or $candidate['extension-bundle-id'] -cne '104') {
     throw 'Intake must use the same tagged candidate for the DMG and Blender extension.'
+}
+$arm64 = Resolve-P4kxArm64IntakeCandidate '456'
+if ($arm64['run-id'] -cne '456' -or $arm64['runtime-ids'] -cne '105,106' -or
+    $arm64['artifact-name'] -cne 'arm64-device-evidence-candidate-456' -or $arm64.version -cne '0.5.0') {
+    throw 'ARM64 intake must bind the runtime receipts of both platforms to the original tag run.'
 }
 $env:GITHUB_EVENT_NAME = 'push'
 
@@ -117,3 +144,46 @@ $binding | Add-Member -NotePropertyName 'unknown' -NotePropertyValue $true
 Assert-Rejected { Assert-P4kxIntakeBinding $binding $expected } 'wrong field set'
 
 'Offline intake checks passed: annotated tag, paginated artifact owner and success, exact run binding, platform minimum and all critical digest mismatches.'
+
+if (Test-Path -LiteralPath $Directory) { throw 'Use a fresh device-intake fixture directory.' }
+$assets = Join-Path $Directory 'assets'
+$intake = Join-Path $Directory 'intake'
+New-Item -ItemType Directory -Path $assets, $intake | Out-Null
+$env:RUNNER_TEMP = $Directory
+function Save-P4kxIntakeTrustedRoot([string]$Path) {
+    Set-Content -LiteralPath $Path -Value 'synthetic trusted root'
+}
+function Assert-P4kxIntakeAttestation([string]$Subject, [string]$Bundle, [string]$Workflow, [string]$TrustedRoot,
+    [string]$RunId, [string]$Event) {
+    if ((Split-Path -Leaf $Subject) -cne 'binding.json' -or (Split-Path -Leaf $Bundle) -cne 'binding.sigstore.json' -or
+        $Workflow -cne '.github/workflows/arm64-device-evidence.yml' -or $RunId -cne '50' -or
+        $Event -cne 'workflow_dispatch' -or -not (Test-Path -LiteralPath $TrustedRoot -PathType Leaf)) {
+        throw 'Wrong ARM64 binding attestation policy.'
+    }
+}
+$hashes = @{}
+foreach ($target in Get-P4kxArm64IntakeTargets) {
+    $runtime = Join-Path $assets "P4KX-0.5.0-$($target.target)-runtime.json"
+    Set-Content -LiteralPath $runtime -Value $target.target
+    $hashes[$target.os] = Get-P4kxIntakeHash $runtime
+}
+$receipt = Join-Path $intake 'device-evidence.json'
+Set-Content -LiteralPath $receipt -Value '["synthetic native observations"]'
+$bundle = Join-Path $intake 'binding.sigstore.json'
+Set-Content -LiteralPath $bundle -Value 'synthetic attestation'
+$bindingPath = Join-Path $intake 'binding.json'
+$expected = New-P4kxArm64IntakeBinding '456' '50' (Get-P4kxIntakeHash $receipt) $hashes
+$expected | ConvertTo-Json | Set-Content -LiteralPath $bindingPath
+if ((Read-P4kxArm64DeviceIntake $intake $assets '0.5.0' '456' '50') -cne $receipt) {
+    throw 'The reader must return the exact signed ARM64 receipt path.'
+}
+foreach ($field in @('candidate_run_id', 'intake_run_id', 'ref', 'revision', 'windows_runtime_sha256', 'linux_runtime_sha256', 'receipt_sha256')) {
+    $changed = $expected | ConvertTo-Json | ConvertFrom-Json
+    $changed.$field = 'different'
+    $changed | ConvertTo-Json | Set-Content -LiteralPath $bindingPath
+    Assert-Rejected { Read-P4kxArm64DeviceIntake $intake $assets '0.5.0' '456' '50' } $field
+}
+Assert-Rejected { Read-P4kxArm64DeviceIntake $intake $assets '0.5.0' '457' '50' } 'active tagged candidate'
+Assert-Rejected { Read-P4kxArm64DeviceIntake $intake $assets '0.5.0' '456' '49' } 'Wrong ARM64 binding attestation policy.'
+
+'Offline ARM64 intake checks passed: exact cross-platform runtime artifacts, tag/run ownership, signer policy and signed runtime/receipt digests.'

@@ -124,7 +124,22 @@ foreach ($fixture in Get-ChildItem -LiteralPath $Directory -File) {
 $notesInput = Join-Path $notesFixture 'changes.md'
 $notesOutput = Join-Path $notesFixture 'notes.md'
 Set-Content -LiteralPath $notesInput -Value 'Synthetic release notes' -Encoding utf8NoBOM
-& (Join-Path $PSScriptRoot 'assemble-release.ps1') -AssetDirectory $notesAssets -NotesPath $notesInput -OutputNotesPath $notesOutput -Repository 'p4kx-org/p4kx' -Version $version -Revision $revision
+$assembler = Join-Path $PSScriptRoot 'assemble-release.ps1'
+$assembly = @{
+    AssetDirectory = $notesAssets; NotesPath = $notesInput; OutputNotesPath = $notesOutput
+    Repository = 'p4kx-org/p4kx'; Version = $version; Revision = $revision
+}
+& $assembler @assembly
+$failure = try { & $assembler @assembly -TagAttestations } catch { $_.Exception.Message }
+if ($failure -cnotmatch 'requires signed Windows and Linux ARM64 device evidence') {
+    throw 'Tagged assembly accepted an absent ARM64 device receipt.'
+}
+$emptyReceipt = Join-Path $notesFixture 'arm64-device-evidence.json'
+Set-Content -LiteralPath $emptyReceipt -Value '[]' -Encoding utf8NoBOM
+$failure = try { & $assembler @assembly -TagAttestations -Arm64DeviceEvidencePath $emptyReceipt -ReleaseRunId 1 } catch { $_.Exception.Message }
+if ($failure -cnotmatch 'verified package receipt does not identify the required release revision, target, run and attempt') {
+    throw 'Tagged assembly failed to forward ARM64 evidence into the native receipt gate.'
+}
 $notes = Get-Content -LiteralPath $notesOutput -Raw
 if ($notes -cnotmatch 'ad-hoc signed because Developer ID was unavailable' -or $notes -cnotmatch 'Open Anyway') {
     throw 'Release notes omitted the macOS ad-hoc signing disclosure.'

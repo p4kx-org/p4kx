@@ -221,6 +221,18 @@ ARM64 target. Supply the original release run ID for the selected package artifa
 This command verifies recorded outcomes against the candidate. Device observations still come from
 the native desktop checks above.
 
+For a tagged release, use the original tagged Release run's Windows and Linux ARM64
+packages. Submit the combined Windows and Linux receipt array to **Validate Windows and Linux
+ARM64 device evidence** on that same tag and enter the original Release run ID. The intake
+checks the signed runtime receipts from the original build and attests their binding to the
+desktop evidence. Keep local paths and clipboard contents out of the submitted receipts.
+
+After both this intake and the [macOS device intake](macos-support.md#submit-the-native-device-receipt)
+succeed, re-run only the failed jobs of the original Release workflow. Tagged assembly
+authenticates both receipts and rechecks the Windows and Linux observations against the
+exact release packages and original producer attempts. A rebuilt package requires matching
+device evidence.
+
 ## Desktop audio verification
 
 On each matching native CPU, use a usable default audio output on the desktop under test.
