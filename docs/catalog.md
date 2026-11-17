@@ -250,7 +250,7 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `configurations.missionBoards` | Authored mission-board components with physical Entity and component identity, declared board type, and ordered faction reputation links. [Mission location vocabulary](catalog-location-vocabulary.md) |
 | `configurations.localContractGenerators` | Ordered authored Handler scope and mission-board availability. [Contract generator sources](catalog-contract-generators.md#local-generator-configuration) |
 | `declarations.contractScenarioRequirements` | Ordered authored scenario references at their original Generator, Handler and Contract slots. [Contract generator sources](catalog-contract-generators.md#authored-scenario-requirements) |
-| `mineableElements` | The mineable elements with their instability and other plain numbers, each linked to a `ResourceType`, ordered by GUID |
+| `mineableElements` | Mineable elements with their original tuning values and sourced `resourceType` links, ordered by GUID and physical Record index |
 | `refiningProcesses` | The refining processes (speed and quality pairs of a refinery), ordered by GUID |
 | `mineableCompositions` | The elements a rock or deposit is made of, with the range and chance of each, ordered by GUID |
 | `miningGlobalParams` | The mining parameters of each kind of miner (ship, ground vehicle, FPS), ordered by GUID |
@@ -2026,16 +2026,15 @@ Consumers can use `system`, `position`, `hideInStarmap` and `type` in a display 
 The raw facts only (ADR-0065): the catalog states no instability per commodity, because the
 relation is not one to one.
 
-A mineable element (`mineableElements`) is a `MineableElement` Record under `mining/mineableelements`
-(46 Records on LIVE, 43 entries). `resourceTypeGuid` is the `ResourceType` its Reference
-`resourceType` links to; `null` for a null or dangling Reference. It equals a commodity's
-`subtypeGuid` only when the catalog has that commodity: commodities are backfilled only for the
-`ResourceType`s that a blueprint ingredient uses or that a kept quality quantization links to, so a
-mined `ResourceType` that neither does has none (LIVE: 25 of the 43 linked `ResourceType`s were backfilled for a quantization alone).
-Several elements may share one `ResourceType` (41 distinct for the 43 entries), so a commodity can
-have several elements with different values; every element is listed and none is picked. The numbers
-are those of the Record, unchanged, and `null` when it states none. The ranges are those of the 43
-entries on LIVE:
+A mineable element (`mineableElements`) is a `MineableElement` Record under `mining/mineableelements`.
+The Record header and each tuning property are sourced cells. The `resourceType` cell retains the
+authored Reference, including its GUID and resolution status when the target is missing. A resolved
+resource GUID can overlap a commodity's `subtypeGuid` when that commodity was included in the
+catalog. Several elements may share one ResourceType, so every element retains its own tuning.
+
+For numeric presentation use each property's `value.finite`. Its `value.rawBits` preserves the
+original IEEE 754 Single, including nonfinite values. Read the sourced cell's `state` to distinguish
+absence, null and unreadable source facts. The table gives the observed finite ranges on LIVE.
 
 | Field | Record field | LIVE range |
 |-------|--------------|------------|

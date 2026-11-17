@@ -22,7 +22,14 @@ pub(crate) struct TextSources {
 impl TextSources {
     /// Reads the `global.ini` of every catalog language from `archive`.
     pub(crate) fn read(archive: &Archive) -> Result<Self, CatalogError> {
-        let set = LocalizationSet::read_all(archive).map_err(CatalogError::LoadTexts)?;
+        Self::read_languages(archive, &CATALOG_LANGUAGES)
+    }
+
+    pub(crate) fn read_languages(
+        archive: &Archive,
+        languages: &[Language],
+    ) -> Result<Self, CatalogError> {
+        let set = LocalizationSet::read(archive, languages).map_err(CatalogError::LoadTexts)?;
         Ok(Self { set })
     }
 

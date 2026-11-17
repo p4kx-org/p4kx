@@ -34,6 +34,8 @@ use crate::{CatalogError, catalog_crafting};
 #[path = "build_catalog.rs"]
 pub(crate) mod api;
 pub use api::{build_catalog, build_catalog_from, write_catalog, write_catalog_from};
+#[path = "build_mining_locations.rs"]
+pub(crate) mod mining_locations;
 #[path = "original_catalog_inputs.rs"]
 pub(crate) mod original_input;
 #[path = "build_parts.rs"]

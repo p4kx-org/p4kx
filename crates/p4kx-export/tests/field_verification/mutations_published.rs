@@ -200,13 +200,13 @@ fn a_shared_resource_key_retains_every_distinct_commodity_or_mineable_member() -
         .ok_or("field mapping absent")?
         .resource_join = Some(ResourceJoin {
         reference: Path::fields(&["resourceGuid"]),
-        catalog: Path::fields(&["resourceTypeGuid"]),
+        catalog: Path::fields(&["resourceType", "value", "guid", "value"]),
     });
     fixture.save()?;
     let mut first = fixtures::item(GUID, json!(4));
-    first["resourceTypeGuid"] = json!(RESOURCE);
+    first["resourceType"] = json!({"value": {"guid": {"value": RESOURCE}}});
     let mut second = fixtures::item(OTHER, json!(4));
-    second["resourceTypeGuid"] = json!(RESOURCE);
+    second["resourceType"] = json!({"value": {"guid": {"value": RESOURCE}}});
     let report = verify(&fixture, &fixtures::catalog(vec![first, second]))?;
     let summary = report
         .fields

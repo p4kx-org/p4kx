@@ -26,6 +26,9 @@ mod authored_link;
 #[path = "authored_nodes.rs"]
 mod authored_nodes;
 
+#[path = "mineable_element_definition.rs"]
+pub(crate) mod mineable_element_definition;
+
 #[path = "faction_definition.rs"]
 pub(crate) mod faction_definition;
 #[path = "faction_identity_definition.rs"]
@@ -108,7 +111,7 @@ mod starmap_object_links;
 #[path = "starmap_object_owned.rs"]
 mod starmap_object_owned;
 #[path = "starmap_placement.rs"]
-mod starmap_placement;
+pub(crate) mod starmap_placement;
 #[path = "starmap_preset_definition.rs"]
 pub(crate) mod starmap_preset_definition;
 #[path = "starmap_radar.rs"]

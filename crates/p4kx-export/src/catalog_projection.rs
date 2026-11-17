@@ -61,6 +61,12 @@ pub(crate) struct FinishedTexts<'source> {
     pub(crate) kind_coverage: Vec<KindTextSummary>,
 }
 
+struct CanonicalRows<'source> {
+    public_names: Vec<CanonicalText<'source, PublicNameRef>>,
+    game_texts: Vec<CanonicalText<'source, GameTextRef>>,
+    kind_coverage: Vec<KindTextSummary>,
+}
+
 /// Per-catalog projection inputs and canonical text rows with precise source uses.
 pub(crate) struct CatalogProjection<'context, 'source> {
     texts: &'context Texts<'source>,
@@ -315,6 +321,25 @@ impl<'context, 'source> CatalogProjection<'context, 'source> {
     }
 
     pub(crate) fn finish(&self) -> Result<FinishedTexts<'source>, CatalogError> {
+        let rows = self.finish_rows()?;
+        Ok(FinishedTexts {
+            texts: CatalogTexts {
+                language_policy: CatalogLanguagePolicy::AVAILABLE_SUPPORTED,
+                language_sources: language_sources(self.texts, self.origins())?,
+                public_names: rows.public_names,
+                game_texts: rows.game_texts,
+            },
+            kind_coverage: rows.kind_coverage,
+        })
+    }
+
+    pub(crate) fn finish_game_texts(
+        &self,
+    ) -> Result<Vec<CanonicalText<'source, GameTextRef>>, CatalogError> {
+        Ok(self.finish_rows()?.game_texts)
+    }
+
+    fn finish_rows(&self) -> Result<CanonicalRows<'source>, CatalogError> {
         let RegistryState {
             pending: rows,
             coverage,
@@ -333,13 +358,9 @@ impl<'context, 'source> CatalogProjection<'context, 'source> {
                 }
             }
         }
-        Ok(FinishedTexts {
-            texts: CatalogTexts {
-                language_policy: CatalogLanguagePolicy::AVAILABLE_SUPPORTED,
-                language_sources: language_sources(self.texts, self.origins())?,
-                public_names,
-                game_texts,
-            },
+        Ok(CanonicalRows {
+            public_names,
+            game_texts,
             kind_coverage: coverage.finish(),
         })
     }

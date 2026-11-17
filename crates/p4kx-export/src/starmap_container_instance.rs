@@ -5,7 +5,7 @@ use p4kx_extraction::{SourceUse, SourceUseRole, SourceValue, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use super::proof::{ChildNames, PlacementStep};
+use super::proof::{ChildNames, PlacementStep, container_route_uses};
 use crate::catalog_read::original::{
     AuthoredEntryPath, EntryCapture, EntryXml, PhysicalEntryRef, XmlNodeSource,
 };
@@ -54,15 +54,26 @@ pub(crate) struct ContainerOccurrence<'route> {
 }
 
 /// The system root and document-local Child ordinals in root-to-leaf order.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ContainerInstanceKey {
+pub struct ContainerInstanceKey {
     root_entry_index: u32,
     child_node_indices: Vec<u32>,
 }
 
 impl ContainerInstanceKey {
+    /// Returns the original system root Entry ordinal.
+    #[must_use]
+    pub const fn root_entry_index(&self) -> u32 {
+        self.root_entry_index
+    }
+
+    /// Returns the original document-local Child ordinals in root-to-leaf order.
+    #[must_use]
+    pub fn child_node_indices(&self) -> &[u32] {
+        &self.child_node_indices
+    }
     #[cfg(test)]
     pub(crate) fn matches_route(&self, root: u32, parent: &[u32], child: u32) -> bool {
         self.root_entry_index == root
@@ -199,16 +210,9 @@ impl ContainerOccurrence<'_> {
     }
 
     fn selection(&self, file: &ContainerFile) -> Result<(Vec<SourceUse>, bool), CatalogError> {
-        let mut inputs = self.root_inputs.to_vec();
-        let mut complete = true;
-        for step in self.route.into_iter().flat_map(PlacementStep::steps) {
-            complete &= step.selection(&mut inputs)?;
-        }
-        if let Some(declared) = self.declared {
-            let (selectors, known) = declared.selector_inputs()?;
-            inputs.extend(selectors);
-            complete &= known;
-        } else {
+        let (mut inputs, complete) =
+            container_route_uses(self.root_inputs, self.route, self.declared)?;
+        if self.declared.is_none() {
             inputs.push(file.root.selected()?);
         }
         Ok((inputs, complete))

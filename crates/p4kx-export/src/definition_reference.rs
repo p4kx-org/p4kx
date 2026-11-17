@@ -28,7 +28,8 @@ pub(crate) struct DefinitionReference {
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
-pub(crate) enum DefinitionStatus {
+#[non_exhaustive]
+pub enum DefinitionStatus {
     /// The `DataForge` identifies the target Record.
     Present,
     /// The declared target GUID has no Record.

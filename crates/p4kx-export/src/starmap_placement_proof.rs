@@ -214,6 +214,25 @@ impl PlacementStep {
     }
 }
 
+/// Observes the source selectors for one reached container route.
+pub(crate) fn container_route_uses(
+    root_inputs: &[SourceUse],
+    route: Option<&PlacementStep>,
+    declared: Option<&AuthoredEntryPath>,
+) -> Result<(Vec<SourceUse>, bool), CatalogError> {
+    let mut inputs = root_inputs.to_vec();
+    let mut complete = true;
+    for step in route.into_iter().flat_map(PlacementStep::steps) {
+        complete &= step.selection(&mut inputs)?;
+    }
+    if let Some(declared) = declared {
+        let (selectors, known) = declared.selector_inputs()?;
+        inputs.extend(selectors);
+        complete &= known;
+    }
+    Ok((inputs, complete))
+}
+
 /// The actual root choice and ordered Child route of one placement occurrence.
 #[derive(Debug, Clone)]
 pub(crate) struct PlacementProof {

@@ -6,6 +6,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::catalog_read::original::OriginalInstanceLocation;
+use crate::catalog_record_reference::CatalogRecordReference;
 use crate::definition_reference::DefinitionStatus;
 use crate::guid_text::CatalogGuid;
 use crate::schema_fields::every_field_required;
@@ -22,6 +23,16 @@ pub(crate) struct SourceRecordReference<'source> {
 }
 
 impl SourceRecordReference<'_> {
+    /// Owns the original target text while retaining its existing field origins.
+    pub(crate) fn into_catalog(self) -> CatalogRecordReference {
+        CatalogRecordReference {
+            target_record_index: self.target_record_index,
+            guid: self.guid,
+            record_path: self.record_path.map(str::to_owned),
+            target_type: self.target_type.map(str::to_owned),
+            status: self.status,
+        }
+    }
     /// Returns the physical Record index for a resolved compatible target.
     pub(crate) const fn resolved_index(&self) -> Option<u32> {
         if matches!(self.status, DefinitionStatus::Present) {

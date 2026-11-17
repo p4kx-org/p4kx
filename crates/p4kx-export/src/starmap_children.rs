@@ -98,7 +98,11 @@ impl<'a, 'read, 'capture, 'input, 'archive, 'cancel>
             pose,
             node: child,
         } = authored;
-        let mut location = ChildLocation::read(xml, child, xml.capture())?;
+        let mut location = if self.bounds.scope.companions {
+            ChildLocation::read(xml, child, xml.capture())?
+        } else {
+            None
+        };
         if let Some(location) = &mut location {
             location.read_context(self.hcd, xml, child, self.ledger)?;
             self.entity_guids

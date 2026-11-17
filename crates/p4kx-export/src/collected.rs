@@ -130,7 +130,7 @@ pub(crate) struct Collected<'f> {
     pub(crate) port_items: Vec<crate::loadout::Wanted>,
     pub(crate) starmap_objects: Vec<StarmapObject<'f>>,
     pub(crate) starmap_definitions: StarmapDefinitions<'f>,
-    pub(crate) mineable_elements: Vec<MineableElement<'f>>,
+    pub(crate) mineable_elements: Vec<MineableElement>,
     pub(crate) refining_processes: Vec<RefiningProcess<'f>>,
     pub(crate) mineable_compositions: Vec<MineableComposition<'f>>,
     pub(crate) mining_global_params: Vec<MiningGlobalParams<'f>>,
@@ -318,7 +318,7 @@ impl<'f> Collected<'f> {
                 self.starmap_objects.push(read.object);
             }
             Picked::StarmapDefinition(entity) => self.starmap_definitions.push(entity),
-            Picked::Mineable(entity) => self.mineable_elements.push(entity),
+            Picked::Mineable(entity) => self.mineable_elements.push(*entity),
             Picked::Refining(entity) => self.refining_processes.push(entity),
             Picked::Composition(entity) => self.mineable_compositions.push(entity),
             Picked::MiningParams(entity) => self.mining_global_params.push(entity),

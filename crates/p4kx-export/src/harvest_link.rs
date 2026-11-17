@@ -64,6 +64,14 @@ impl<'f> Links<'f> {
         })
     }
 
+    /// Counts distinct missing or unreadable linked Records.
+    pub(crate) fn unreadable_count(&self) -> usize {
+        self.unreadable
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .len()
+    }
+
     /// Returns the warning for the Records that were missing or could not be built, `None` when
     /// every Record was read.
     pub(crate) fn warning(&self) -> Option<CraftingWarning> {

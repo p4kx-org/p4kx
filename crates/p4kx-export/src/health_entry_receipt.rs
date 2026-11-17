@@ -4,12 +4,15 @@
 use std::sync::Arc;
 
 use p4kx_assembly::{LoadoutFileError, LoadoutFileRead};
-use p4kx_extraction::{Archive, Entry, SourceUseRole, SourceValue};
+use p4kx_extraction::{
+    Archive, Entry, Guid, SourceLocation, SourceUseRole, SourceValue, SourcedValue,
+};
 
 use super::health_entry_frame::{EntryCapture, EntryFrame};
 use super::health_entry_metadata::{self, EntryMetadata};
 use super::{AuthoredEntryPath, LoadoutBodyReceipt, OriginalDatum};
 use crate::build::original_input::OriginalCatalogInput;
+use crate::soc_preset::PresetMatch;
 use crate::{CatalogError, ExportAccountingError, HealthText};
 
 #[path = "health_entry_reference.rs"]
@@ -40,17 +43,31 @@ pub(crate) struct EntryReceipt {
 pub(crate) struct PhysicalEntryIdentity {
     pub(crate) input_ref: p4kx_extraction::PhysicalSourceRef,
     pub(crate) entry_index: u32,
-    pub(crate) source_path: p4kx_extraction::SourcedValue<String>,
-    pub(crate) normalized_path: p4kx_extraction::SourcedValue<String>,
+    pub(crate) source_path: SourcedValue<String>,
+    pub(crate) normalized_path: SourcedValue<String>,
 }
 
 /// Structural navigation to one actual physical Archive Entry.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = crate::schema_fields::every_field_required)]
-pub(crate) struct PhysicalEntryRef {
+pub struct PhysicalEntryRef {
     pub(crate) input_ref: p4kx_extraction::PhysicalSourceRef,
     pub(crate) entry_index: u32,
+}
+
+impl PhysicalEntryRef {
+    /// Returns the observed Archive input identity of this Entry.
+    #[must_use]
+    pub const fn input_ref(&self) -> &p4kx_extraction::PhysicalSourceRef {
+        &self.input_ref
+    }
+
+    /// Returns its physical directory ordinal.
+    #[must_use]
+    pub const fn entry_index(&self) -> u32 {
+        self.entry_index
+    }
 }
 
 impl EntryReceipt {
@@ -366,6 +383,31 @@ impl EntryReceipt {
             .as_ref()
             .or(self.outer.as_ref())
             .ok_or(ExportAccountingError::ConflictingSourceDatum)
+    }
+
+    /// Binds the selector and GUID ranges from a verified nested SOC read.
+    pub(crate) fn harvest_preset(
+        &self,
+        capture: &EntryCapture<'_>,
+        matched: PresetMatch,
+    ) -> Result<SourcedValue<Guid>, CatalogError> {
+        self.check_capture(capture)?;
+        let inner = self
+            .inner
+            .as_ref()
+            .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+        let location = |range: std::ops::Range<u64>, field: &str| SourceLocation::Subresource {
+            namespace: "socHarvestPreset".to_owned(),
+            indices: vec![range.start, range.end],
+            field: field.to_owned(),
+        };
+        let uses = [
+            inner.payload_at(location(matched.key, "key"), SourceUseRole::Selector)?,
+            inner.payload_at(location(matched.value, "guid"), SourceUseRole::Payload)?,
+        ];
+        Ok(capture
+            .source_uses()
+            .value(SourceValue::Present(matched.guid), &uses, true))
     }
 
     pub(crate) fn attempted_payload(&self) -> Result<(), CatalogError> {

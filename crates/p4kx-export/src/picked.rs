@@ -31,7 +31,6 @@ use crate::crafting_warning::CraftingWarning;
 use crate::item_class::ClassLine;
 use crate::loot_kinds::LootPick;
 use crate::manufacturer::Manufacturer;
-use crate::mining::mineable_element;
 use crate::mining_params::mining_global_params;
 use crate::mission_kinds::MissionPick;
 use crate::paint_port::VehicleFacts;
@@ -86,7 +85,7 @@ pub(crate) enum Picked<'f> {
     Starmap(Box<StarmapObjectRead<'f>>),
     StarmapDefinition(StarmapDefinitionPick<'f>),
     /// A mineable element.
-    Mineable(MineableElement<'f>),
+    Mineable(Box<MineableElement>),
     /// A refining process.
     Refining(RefiningProcess<'f>),
     /// A mineable composition.
@@ -129,7 +128,6 @@ impl<'f> Picked<'f> {
     pub(crate) fn entity(kind: Kind, tree: &RecordTree<'f>) -> Option<Self> {
         Some(match kind {
             Kind::Crafters => return crafter(tree).map(Self::Crafter),
-            Kind::MineableElements => Self::Mineable(mineable_element(tree)),
             Kind::MiningGlobalParams => Self::MiningParams(mining_global_params(tree)),
             Kind::MissionLocalities | Kind::ContractScenarios | Kind::CargoManifests => {
                 return MissionPick::entity(kind, tree).map(Self::Mission);
@@ -142,6 +140,7 @@ impl<'f> Picked<'f> {
             }
             Kind::Items
             | Kind::RefiningProcesses
+            | Kind::MineableElements
             | Kind::MineableCompositions
             | Kind::LootPoolFilters
             | Kind::LootSecondaryChoiceSingleLayers

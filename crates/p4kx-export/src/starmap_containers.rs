@@ -24,6 +24,7 @@ use self::instance::ContainerInstance;
 #[cfg(test)]
 use self::location_instance::LocationInstance;
 use self::proof::{PlacementEvidence, PlacementProof};
+use crate::starmap_walk::HarvestOccurrence;
 
 #[path = "starmap_container_read.rs"]
 mod read;
@@ -59,6 +60,10 @@ mod installed_jump_endpoints;
 #[cfg(test)]
 #[path = "starmap_collect_tests.rs"]
 mod collect_tests;
+
+#[cfg(test)]
+#[path = "starmap_harvest_placement_tests.rs"]
+mod harvest_placement_tests;
 
 /// What bounds the walk through a star system.
 #[derive(Debug, Clone, Copy)]
@@ -99,6 +104,7 @@ pub(crate) struct Placements {
     instances: Vec<ContainerInstance>,
     #[cfg(test)]
     locations: Vec<LocationInstance>,
+    pub(crate) harvest_occurrences: Vec<HarvestOccurrence>,
     jump_endpoints: Vec<JumpEndpoint>,
     endpoint_inventory_complete: bool,
     instance_availability: Option<DatasetAvailability>,
@@ -229,6 +235,7 @@ impl Placements {
         let mut named = 0;
         for system in systems {
             opened.extend(system.containers.iter().map(|container| container.entry));
+            opened.extend(system.harvest_reached);
             self.report.deepest_external = self.report.deepest_external.max(system.deepest);
             named += system.named;
             self.counts.unreadable += system.unreadable;
@@ -243,6 +250,7 @@ impl Placements {
             append_owned(&mut self.instances, system.instances);
             #[cfg(test)]
             append_owned(&mut self.locations, system.locations);
+            append_owned(&mut self.harvest_occurrences, system.harvest_occurrences);
             append_owned(&mut self.jump_endpoints, system.jump_endpoints);
             for (record, placement) in system.placed {
                 self.add(record, placement);

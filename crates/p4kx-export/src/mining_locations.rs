@@ -1,0 +1,351 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// SPDX-FileCopyrightText: 2026 the P4KX contributors
+
+//! Typed local projection of mineable data and logical harvestable locations.
+
+use std::collections::BTreeMap;
+
+use p4kx_extraction::{Build, CancelToken, Guid, Language, SourceInventory, SourcedValue};
+use schemars::JsonSchema;
+use serde::{Serialize, Serializer};
+
+use crate::guid_text::CatalogGuid;
+use crate::schema_fields::every_field_required;
+
+pub use crate::build::mining_locations::{read_mining_locations, read_mining_locations_from};
+pub use crate::catalog_read::original::PhysicalEntryRef;
+pub use crate::catalog_record_reference::CatalogRecordReference;
+pub use crate::catalog_text_contract::GameTextRef;
+pub use crate::catalog_v3::mineable_element_definition::MineableElement;
+pub use crate::definition_reference::DefinitionStatus;
+pub use crate::resource_float::ResourceFloat32;
+pub use crate::starmap_containers::instance::ContainerInstanceKey;
+
+/// Selects one requested language and supports cooperative cancellation.
+#[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
+pub struct MiningLocationOptions<'a> {
+    /// The only language inspected for protected display text.
+    pub language: Language,
+    /// The caller's cancellation signal.
+    pub cancel: Option<&'a CancelToken>,
+}
+
+impl<'a> MiningLocationOptions<'a> {
+    /// Selects the language and the optional cancellation signal for one read.
+    #[must_use]
+    pub const fn new(language: Language, cancel: Option<&'a CancelToken>) -> Self {
+        Self { language, cancel }
+    }
+}
+
+/// Owned typed rows from the selected mining and placement readers.
+///
+/// Record identity, protected text and selected Starmap placements carry original evidence.
+/// Plain DataForge body and logical-location fields use the Catalog's convenience semantics.
+/// A provenance-aware cache also needs exact evidence for those fields.
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct MiningLocationSnapshot {
+    /// The build identified by the installed Archive, when a manifest is available.
+    pub build: Option<Build>,
+    /// The requested language.
+    pub language: Language,
+    /// The mineable element definitions.
+    pub mineable_elements: Vec<MineableElement>,
+    /// The mineable compositions, including their authored shares.
+    pub mineable_compositions: Vec<MineableComposition>,
+    /// The harvestable provider presets and their resolved mining links.
+    pub harvestable_provider_presets: Vec<HarvestableProviderPreset>,
+    /// The logical locations that use a known provider preset.
+    pub harvestable_locations: Vec<HarvestableLocation>,
+    /// The selected physical harvest occurrences, with their original routes where reached.
+    pub harvestable_occurrences: Vec<HarvestableOccurrence>,
+    /// The Starmap object definitions and their selected placements.
+    pub starmap_objects: Vec<MiningStarmapObject>,
+    /// Canonical protected text associated with the selected records.
+    pub game_texts: Vec<MiningGameText>,
+    /// The physical sources and uses captured by this read.
+    pub source_inventory: SourceInventory,
+    /// Observed read gaps and diagnostics.
+    pub coverage: MiningLocationCoverage,
+}
+
+/// Observed availability of the original inputs for this projection.
+#[derive(Debug, Default)]
+#[non_exhaustive]
+pub struct MiningLocationCoverage {
+    /// True when the requested localization entry was loaded.
+    pub language_available: bool,
+    /// True when the Archive directory reported a known inventory problem.
+    pub archive_inventory_incomplete: bool,
+    /// Records whose path or selected header could not be read.
+    pub unreadable_record_headers: usize,
+    /// Selected Record bodies that could not be read.
+    pub unreadable_record_bodies: usize,
+    /// Original text fields that could not be projected.
+    pub unreadable_text_fields: usize,
+    /// Original mining definition fields with projection diagnostics.
+    pub unreadable_mining_fields: usize,
+    /// Distinct provider links that could not be resolved.
+    pub unreadable_provider_links: usize,
+    /// True when the world placement traversal reported incomplete inventory.
+    pub placement_inventory_incomplete: bool,
+    /// Unreadable, missing or malformed container occurrences reported by the world reader.
+    pub unavailable_placement_occurrences: usize,
+    /// Distinct container preset scans that failed.
+    pub unreadable_harvest_containers: usize,
+    /// Locations for which a malformed or incomplete parent chain prevented a known link.
+    pub locations_with_unresolved_parent: usize,
+}
+
+/// The physical Record identity captured independently from the body.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(transform = every_field_required)]
+#[non_exhaustive]
+pub struct MiningRecordSource {
+    /// The Record GUID.
+    #[serde(serialize_with = "serialize_guid")]
+    #[schemars(with = "SourcedValue<CatalogGuid>")]
+    pub guid: SourcedValue<Guid>,
+    /// The original Record name.
+    pub record_name: SourcedValue<String>,
+    /// The normalized class name.
+    pub class_name: SourcedValue<String>,
+    /// The normalized Record path.
+    pub record_path: SourcedValue<String>,
+    /// The physical Record index.
+    pub record_index: SourcedValue<u32>,
+    /// The declared Record type.
+    pub source_type: SourcedValue<String>,
+    /// The original file name.
+    pub file_name: SourcedValue<String>,
+    /// The original metadata tag.
+    pub metadata_tag: SourcedValue<String>,
+}
+
+fn serialize_guid<S: Serializer>(
+    value: &SourcedValue<Guid>,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    value
+        .map_ref(|guid| CatalogGuid(*guid))
+        .serialize(serializer)
+}
+
+/// The Starmap object used by the logical location join.
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct MiningStarmapObject {
+    /// The authored Record identity.
+    pub source: MiningRecordSource,
+    /// The canonical protected-text ID for the Starmap name.
+    pub name: SourcedValue<GameTextRef>,
+    /// The name of the linked Starmap type, when available.
+    pub type_name: Option<String>,
+    /// The selected system folder.
+    pub system: SourcedValue<String>,
+    /// The entity name of the selected placement.
+    pub entity_name: SourcedValue<String>,
+    /// The nearest authored enclosing Starmap object.
+    pub placed_under_guid: SourcedValue<Guid>,
+    /// The selected world position in metres, to millimetre precision.
+    pub position: SourcedValue<[f64; 3]>,
+    /// True when the object is a mining claim marker.
+    pub mining_claim: bool,
+}
+
+/// One protected canonical text row used by the projection.
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct MiningGameText {
+    /// The canonical protected text identifier.
+    pub id: SourcedValue<GameTextRef>,
+    /// The original localization key.
+    pub key: SourcedValue<String>,
+    /// Translation forms for the requested language, keyed by language code.
+    pub translations: SourcedValue<BTreeMap<String, MiningTextForms>>,
+}
+
+/// The exact decoded localization value and the rendered text form.
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct MiningTextForms {
+    /// The source text as decoded from the localization entry.
+    pub source_text: SourcedValue<String>,
+    /// The display text from the same source.
+    pub display_text: SourcedValue<String>,
+}
+
+/// One composition of a rock or deposit.
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct MineableComposition {
+    /// The authored Record identity.
+    pub source: MiningRecordSource,
+    /// The canonical protected-text ID for the HUD label.
+    pub deposit_name: SourcedValue<GameTextRef>,
+    /// The authored minimum number of distinct elements.
+    pub minimum_distinct_elements: Option<i64>,
+    /// The composition parts in authored order.
+    pub parts: Vec<CompositionPart>,
+}
+
+/// One authored part of a mineable composition.
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct CompositionPart {
+    /// The linked element, when it resolves.
+    pub mineable_element_guid: Option<Guid>,
+    /// The minimum share expressed as a percentage.
+    pub min_percentage: Option<f32>,
+    /// The maximum share expressed as a percentage.
+    pub max_percentage: Option<f32>,
+    /// The probability that the part occurs.
+    pub probability: Option<f32>,
+    /// The exponent of the share distribution curve.
+    pub curve_exponent: Option<f32>,
+    /// The quality scale.
+    pub quality_scale: Option<f32>,
+}
+
+/// One provider Record with authored groups, areas and resolved mining links.
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct HarvestableProviderPreset {
+    /// The authored Record identity.
+    pub source: MiningRecordSource,
+    /// The groups in authored order.
+    pub groups: Vec<HarvestableGroup>,
+    /// The areas in authored order.
+    pub areas: Vec<HarvestableArea>,
+}
+
+/// One authored group of harvestables.
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct HarvestableGroup {
+    /// The authored group name.
+    pub group_name: Option<String>,
+    /// The authored group probability.
+    pub group_probability: Option<f32>,
+    /// The harvestables in authored order.
+    pub harvestables: Vec<HarvestableElement>,
+}
+
+/// One harvestable occurrence in a provider group.
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct HarvestableElement {
+    /// The authored preset or entity link, when present.
+    pub harvestable: Option<HarvestableLink>,
+    /// The linked harvestable setup.
+    pub setup_guid: Option<Guid>,
+    /// The linked clustering preset.
+    pub clustering_guid: Option<Guid>,
+    /// The authored relative probability.
+    pub relative_probability: Option<f32>,
+    /// The linked geometry tags in authored order.
+    pub geometry_tag_guids: Vec<Guid>,
+}
+
+/// The provider's authored preset and resolved spawn and mining relationships.
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct HarvestableLink {
+    /// The linked harvestable preset.
+    pub preset_guid: Option<Guid>,
+    /// The class name of the resolved harvestable preset.
+    pub preset_class_name: Option<String>,
+    /// The explicit group-element entity or the preset's linked entity.
+    pub entity_guid: Option<Guid>,
+    /// The resolved entity's linked mineable composition.
+    pub mineable_composition_guid: Option<Guid>,
+    /// The resolved entity's linked global mining parameters.
+    pub mining_global_params_guid: Option<Guid>,
+}
+
+/// One authored area of a harvestable provider.
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct HarvestableArea {
+    /// The authored area name.
+    pub name: Option<String>,
+    /// The global modifier.
+    pub global_modifier: Option<f32>,
+    /// The declared object preset paths in authored order.
+    pub object_preset_paths: Vec<String>,
+    /// The area modifiers in authored order.
+    pub modifiers: Vec<AreaModifier>,
+}
+
+/// One modifier of an authored harvestable area.
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct AreaModifier {
+    /// The position of the target group in the provider.
+    pub group_index: Option<u32>,
+    /// The position of the target element in its group.
+    pub harvestable_index: Option<u32>,
+    /// The authored harvestable modifier.
+    pub modifier: Option<f32>,
+    /// The linked geometry tags in authored order.
+    pub geometry_tag_guids: Vec<Guid>,
+}
+
+/// One logical Catalog location for a provider preset.
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct HarvestableLocation {
+    /// The provider GUID.
+    pub preset_guid: Guid,
+    /// The associated non-claim Starmap object, when one is known.
+    pub starmap_object_guid: Option<Guid>,
+    /// The owning system folder name.
+    pub system: String,
+    /// The archive path of the selected physical container.
+    pub container: String,
+}
+
+/// One confirmed physical use of an admitted provider preset.
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct HarvestableOccurrence {
+    /// The first provider GUID in the verified original SOC member.
+    pub preset_guid: SourcedValue<Guid>,
+    /// The physical container Entry.
+    pub container: SourcedValue<PhysicalEntryRef>,
+    /// The same authored container path carried by the logical location.
+    pub container_path: SourcedValue<String>,
+    /// The owning system folder.
+    pub system: String,
+    /// The nearest resolved non-claim object in the logical join.
+    pub starmap_object_guid: Option<Guid>,
+    /// The observed traversal classification and reached identity.
+    pub route: HarvestableOccurrenceRoute,
+}
+
+/// Whether the original world walk reached the container it inspected.
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum HarvestableOccurrenceRoute {
+    /// A route reached this occurrence.
+    Reached(ReachedHarvestableOccurrence),
+    /// The occurrence came from directory inventory outside the routes reached by this walk.
+    Unreached,
+}
+
+/// The original route and parent of a reached physical occurrence.
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct ReachedHarvestableOccurrence {
+    /// The exact system root Entry.
+    pub root: SourcedValue<PhysicalEntryRef>,
+    /// The root and ordered Child coordinates of this occurrence.
+    pub id: SourcedValue<ContainerInstanceKey>,
+    /// The original immediate containing occurrence, when present.
+    pub parent: SourcedValue<ContainerInstanceKey>,
+    /// The nearest original record selector along the route, including mining claim markers.
+    pub containing_record_guid: SourcedValue<Guid>,
+}

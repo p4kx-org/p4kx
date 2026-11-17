@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{SourceValue, SourcedValue};
+use p4kx_extraction::{Guid, SourceValue, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -16,7 +16,7 @@ use crate::schema_fields;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = schema_fields::every_field_required)]
-pub(crate) struct CatalogRecordReference {
+pub struct CatalogRecordReference {
     pub(crate) target_record_index: SourcedValue<u32>,
     pub(crate) guid: SourcedValue<CatalogGuid>,
     pub(crate) record_path: SourcedValue<String>,
@@ -25,6 +25,35 @@ pub(crate) struct CatalogRecordReference {
 }
 
 impl CatalogRecordReference {
+    /// Returns the exact target physical Record index, when known.
+    #[must_use]
+    pub const fn target_record_index(&self) -> &SourcedValue<u32> {
+        &self.target_record_index
+    }
+
+    /// Returns the original referenced GUID.
+    #[must_use]
+    pub fn guid(&self) -> SourcedValue<Guid> {
+        self.guid.map_ref(|guid| guid.0)
+    }
+
+    /// Returns the target Record path, when known.
+    #[must_use]
+    pub const fn record_path(&self) -> &SourcedValue<String> {
+        &self.record_path
+    }
+
+    /// Returns the target Record type, when known.
+    #[must_use]
+    pub const fn target_type(&self) -> &SourcedValue<String> {
+        &self.target_type
+    }
+
+    /// Returns the original target resolution state.
+    #[must_use]
+    pub const fn status(&self) -> &DefinitionStatus {
+        &self.status
+    }
     pub(crate) fn resolved(
         context: &CatalogRecordContext<'_>,
         path: &str,

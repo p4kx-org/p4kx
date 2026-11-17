@@ -211,6 +211,7 @@ mod loot_walk;
 mod manufacturer;
 mod memo;
 mod mining;
+pub mod mining_locations;
 mod mining_params;
 mod mission_blueprints;
 mod mission_cooldown;

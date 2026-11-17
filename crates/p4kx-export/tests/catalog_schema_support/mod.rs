@@ -271,19 +271,7 @@ pub(crate) fn minimal_catalog() -> Value {
             "shipGuids": ["90000000-0000-4000-8000-000000000001"]
         }],
         "loadouts": loadouts::loadouts(),
-        "mineableElements": [{
-            "guid": "a3000000-0000-4000-8000-000000000001",
-            "className": "agricium_ore",
-            "recordPath": "libs/foundry/records/mining/mineableelements/agricium_ore",
-            "resourceTypeGuid": "b1000000-0000-4000-8000-000000000001",
-            "instability": 350.0,
-            "resistance": 0.5,
-            "optimalWindowMidpoint": 0.5,
-            "optimalWindowMidpointRandomness": 0.15,
-            "optimalWindowThinness": 2.0,
-            "explosionMultiplier": 4.0,
-            "clusterFactor": 0.2
-        }],
+        "mineableElements": [mineable_element()],
         "refiningProcesses": [{
             "guid": "a4000000-0000-4000-8000-000000000001",
             "className": "processingtype-fastcareful",
@@ -329,4 +317,39 @@ pub(crate) fn minimal_catalog() -> Value {
 
 fn absent_table() -> Value {
     json!({"availability": "absent", "rows": []})
+}
+
+fn mineable_element() -> Value {
+    let present = source_values::present;
+    let path = "libs/foundry/records/mining/mineableelements/agricium_ore";
+    let single = |finite: f32| {
+        present(json!({
+            "rawBits": format!("{:08x}", finite.to_bits()),
+            "finite": finite,
+        }))
+    };
+    json!({
+        "guid": present(json!("a3000000-0000-4000-8000-000000000001")),
+        "recordName": present(json!("MineableElement.agricium_ore")),
+        "className": present(json!("agricium_ore")),
+        "recordPath": present(json!(path)),
+        "recordIndex": present(json!(0)),
+        "sourceType": present(json!("MineableElement")),
+        "fileName": present(json!(format!("{path}.xml"))),
+        "metadataTag": source_values::source(SourceValue::Absent),
+        "resourceType": present(json!({
+            "targetRecordIndex": present(json!(1)),
+            "guid": present(json!("b1000000-0000-4000-8000-000000000001")),
+            "recordPath": present(json!("libs/foundry/records/resourcetypedatabase/agricium")),
+            "targetType": present(json!("ResourceType")),
+            "status": "present",
+        })),
+        "instability": single(350.0),
+        "resistance": single(0.5),
+        "optimalWindowMidpoint": single(0.5),
+        "optimalWindowMidpointRandomness": single(0.15),
+        "optimalWindowThinness": single(2.0),
+        "explosionMultiplier": single(4.0),
+        "clusterFactor": single(0.2),
+    })
 }

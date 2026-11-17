@@ -24,6 +24,40 @@ pub(crate) fn read_root_locale<'source>(
     cancel: Option<&CancelToken>,
     field: &str,
 ) -> Result<(SourcedValue<GameTextRef>, Vec<FieldError>), CatalogError> {
+    read_root_text(tree, projection, admission, cancel, field, RootText::Locale)
+}
+
+pub(crate) fn read_root_locale_or_legacy_key<'source>(
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    cancel: Option<&CancelToken>,
+    field: &str,
+) -> Result<(SourcedValue<GameTextRef>, Vec<FieldError>), CatalogError> {
+    read_root_text(
+        tree,
+        projection,
+        admission,
+        cancel,
+        field,
+        RootText::LocaleOrLegacyKey,
+    )
+}
+
+#[derive(Clone, Copy)]
+enum RootText {
+    Locale,
+    LocaleOrLegacyKey,
+}
+
+fn read_root_text<'source>(
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    cancel: Option<&CancelToken>,
+    field: &str,
+    domain: RootText,
+) -> Result<(SourcedValue<GameTextRef>, Vec<FieldError>), CatalogError> {
     let input = projection.original();
     let scope = input.record_scope(admission.record(), tree)?;
     let originals = OriginalFlowFields::read(&scope, cancel)?;
@@ -31,7 +65,12 @@ pub(crate) fn read_root_locale<'source>(
     let numbers = RefCell::new(Vec::new());
     let fields = Observed::definition(&originals, input, &capture, &numbers);
     let mut notes = Vec::new();
-    let locale = fields.protected_locale(field, projection, &mut notes)?;
+    let locale = match domain {
+        RootText::Locale => fields.protected_locale(field, projection, &mut notes)?,
+        RootText::LocaleOrLegacyKey => {
+            fields.protected_locale_or_legacy_key(field, projection, &mut notes)?
+        }
+    };
     Ok((locale, notes))
 }
 

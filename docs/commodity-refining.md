@@ -38,8 +38,9 @@ Only the `MineableElement` Record holds `elementInstability` (with resistance an
 window), so it belongs to a mineable element, not to the commodity. 27 of the 46 elements link to
 a `ResourceType` that has a `refinedVersion`. Several elements may share a `ResourceType`, which
 makes a flat commodity field ambiguous, so the catalog carries no such field. The kind
-`mineableElements` exports every element with its `resourceTypeGuid`. Consumers choose an
-aggregation rule when they need one (ADR-0065, #460). One `ResourceType` carries `properties/ResourceTypeVolatility` (1 Record,
+`definitions.mineableElements` exports each element with its sourced `resourceType` link
+and original tuning. Consumers join a resolved link by its target Record identity and choose
+an aggregation rule when needed (ADR-0065, #460). One `ResourceType` carries `properties/ResourceTypeVolatility` (1 Record,
 with a `healthDecayPerSecond`), a decay of cargo, not the instability of a rock. The mining laser
 `laserInstability` modifiers (names matching `*nstab*`) are item stats, not commodity data.
 

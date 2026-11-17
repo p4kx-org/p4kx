@@ -17,8 +17,9 @@ use crate::catalog_rows::spool::RowSpoolWriter;
 use crate::catalog_table::DatasetAvailability;
 use crate::entry_source;
 use crate::export_ledger::ExportLedger;
+use crate::harvest_locations::HarvestSurvey;
 use crate::starmap_index::Index;
-use crate::starmap_parse::{Body, Read};
+use crate::starmap_parse::{Body, DescriptorScope, Read};
 use crate::starmap_walk::{PlacementRows, System, SystemRead};
 use crate::{CatalogError, ExportAccountingError, Kind};
 
@@ -27,6 +28,7 @@ enum PlacementStorage<'directory> {
     Spool(&'directory Path),
     #[cfg(test)]
     Typed,
+    Harvest(&'directory HarvestSurvey<'directory>),
 }
 
 impl Placements {
@@ -78,6 +80,23 @@ impl Placements {
         )
     }
 
+    pub(crate) fn read_for_harvest(
+        archive: &Archive,
+        cancel: Option<&CancelToken>,
+        capture: &EntryCapture<'_>,
+        harvest: &HarvestSurvey<'_>,
+    ) -> Result<Self, CatalogError> {
+        Self::read_scoped(
+            archive,
+            cancel,
+            Limits::default(),
+            capture,
+            PlacementScope::RecordSelection,
+            None,
+            PlacementStorage::Harvest(harvest),
+        )
+    }
+
     fn read_scoped(
         archive: &Archive,
         cancel: Option<&CancelToken>,
@@ -102,14 +121,19 @@ impl Placements {
         let mut root_ledger = ExportLedger::default();
         let systems = unique_system_roots(archive, &index, capture, systems, &mut root_ledger)?;
         let roots: Vec<usize> = systems.iter().map(|(_, entry)| *entry).collect();
+        let descriptor_scope = if matches!(storage, PlacementStorage::Harvest(_)) {
+            DescriptorScope::HARVEST
+        } else {
+            DescriptorScope::catalog(endpoints.is_some())
+        };
         let Read {
             bodies, mut ledger, ..
-        } = crate::starmap_parse::read_all_with_jumps(
+        } = crate::starmap_parse::read_all_scoped(
             archive,
             &index,
             &roots,
             cancel,
-            (limits.children, endpoints.is_some()),
+            (limits.children, descriptor_scope),
             capture,
         )?;
         check_cancelled(cancel)?;
@@ -194,34 +218,31 @@ fn walk_systems(
         return Ok((Vec::new(), PlacementSpools::default()));
     }
     match storage {
-        PlacementStorage::Spool(directory) => {
-            let mut containers = RowSpoolWriter::new(directory)?;
-            let mut locations = RowSpoolWriter::new(directory)?;
-            let mut reads = Vec::with_capacity(systems.len());
-            for (name, entry) in systems {
-                reads.push(System::run_with_output(
-                    index,
-                    bodies,
-                    name,
-                    *entry,
-                    cancel,
-                    limits,
-                    (
-                        archive,
-                        capture,
-                        endpoints,
-                        PlacementRows::Spool {
-                            containers: &mut containers,
-                            locations: &mut locations,
-                        },
-                    ),
-                )?);
-            }
-            let spools = PlacementSpools {
-                containers: Some(containers.finish(cancel)?),
-                locations: Some(locations.finish(cancel)?),
-            };
-            Ok((reads, spools))
+        PlacementStorage::Spool(directory) => walk_spooled_systems(
+            index,
+            bodies,
+            systems,
+            cancel,
+            limits,
+            (archive, capture, endpoints),
+            directory,
+        ),
+        PlacementStorage::Harvest(harvest) => {
+            let reads = systems
+                .iter()
+                .map(|(name, entry)| {
+                    System::run_with_output(
+                        index,
+                        bodies,
+                        name,
+                        *entry,
+                        cancel,
+                        limits,
+                        (archive, capture, None, PlacementRows::Harvest(harvest)),
+                    )
+                })
+                .collect::<Result<_, _>>()?;
+            Ok((reads, PlacementSpools::default()))
         }
         #[cfg(test)]
         PlacementStorage::Typed => {
@@ -242,4 +263,42 @@ fn walk_systems(
             Ok((reads, PlacementSpools::default()))
         }
     }
+}
+
+fn walk_spooled_systems(
+    index: &Index<'_>,
+    bodies: &HashMap<usize, Body>,
+    systems: &[(Arc<str>, usize)],
+    cancel: Option<&CancelToken>,
+    limits: Limits,
+    (archive, capture, endpoints): (&Archive, &EntryCapture<'_>, Option<&JumpEndpointRecords>),
+    directory: &Path,
+) -> Result<(Vec<SystemRead>, PlacementSpools), CatalogError> {
+    let mut containers = RowSpoolWriter::new(directory)?;
+    let mut locations = RowSpoolWriter::new(directory)?;
+    let mut reads = Vec::with_capacity(systems.len());
+    for (name, entry) in systems {
+        reads.push(System::run_with_output(
+            index,
+            bodies,
+            name,
+            *entry,
+            cancel,
+            limits,
+            (
+                archive,
+                capture,
+                endpoints,
+                PlacementRows::Spool {
+                    containers: &mut containers,
+                    locations: &mut locations,
+                },
+            ),
+        )?);
+    }
+    let spools = PlacementSpools {
+        containers: Some(containers.finish(cancel)?),
+        locations: Some(locations.finish(cancel)?),
+    };
+    Ok((reads, spools))
 }

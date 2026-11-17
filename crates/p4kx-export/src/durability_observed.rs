@@ -35,7 +35,7 @@ pub(super) use room_offset::{RoomOffset, RoomTransformUnavailable};
 pub(crate) mod ship_texts;
 #[path = "authored_text_fields.rs"]
 mod text_fields;
-pub(crate) use text_fields::read_root_locale;
+pub(crate) use text_fields::{read_root_locale, read_root_locale_or_legacy_key};
 #[path = "authored_unsigned_fields.rs"]
 mod unsigned;
 

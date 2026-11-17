@@ -62,13 +62,13 @@ pub(super) fn table(
     Ok(CatalogTable::new(forge, &[SOURCE_TYPE], rows))
 }
 
-struct PlacementBinding<'catalog> {
+pub(crate) struct PlacementBinding<'catalog> {
     sources: &'catalog SourceUses,
     placed: Option<(&'catalog PlacementEvidence, SharedFieldOrigin)>,
 }
 
 impl<'catalog> PlacementBinding<'catalog> {
-    fn new(
+    pub(crate) fn new(
         sources: &'catalog SourceUses,
         proof: Option<&'catalog PlacementEvidence>,
     ) -> Result<Self, CatalogError> {
@@ -78,7 +78,7 @@ impl<'catalog> PlacementBinding<'catalog> {
         Ok(Self { sources, placed })
     }
 
-    fn cell<T>(
+    pub(crate) fn cell<T>(
         &self,
         value: Option<T>,
         field: PlacementField,

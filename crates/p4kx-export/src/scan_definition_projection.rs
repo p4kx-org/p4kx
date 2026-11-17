@@ -9,6 +9,7 @@ use crate::catalog_v3::cargo_globals;
 use crate::catalog_v3::law_kinds::LawPick;
 use crate::catalog_v3::location_vocabulary::{self, LocationVocabularyPick};
 use crate::catalog_v3::medical::medical_tier_config;
+use crate::catalog_v3::mineable_element_definition;
 use crate::catalog_v3::npc_spawn_definitions::NpcSpawnDefinitionsPick;
 use crate::catalog_v3::procedural_planet_audio;
 use crate::catalog_v3::starmap_definition_kinds::StarmapDefinitionPick;
@@ -71,6 +72,7 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
             }
             Kind::ResourceTypes => self.resource_type_definition(admission, tree)?,
             Kind::ResourceGroups => self.resource_group(admission, tree)?,
+            Kind::MineableElements => self.mineable_element(admission, tree)?,
             Kind::RefiningProcesses | Kind::MineableCompositions => {
                 crate::mining::named_definition(
                     kind,
@@ -87,6 +89,19 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
         Ok(Some(projection))
     }
 
+    fn mineable_element(
+        &self,
+        admission: &RecordObservation<'_, 'f>,
+        tree: &RecordTree<'f>,
+    ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
+        let (value, notes) = mineable_element_definition::read(
+            tree,
+            &self.projection,
+            admission,
+            self.scan.options.cancel,
+        )?;
+        Ok((Picked::Mineable(Box::new(value)), notes))
+    }
     fn blueprint_category_list(
         &self,
         admission: &RecordObservation<'_, 'f>,

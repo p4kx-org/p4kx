@@ -29,7 +29,7 @@ impl Collected<'_> {
         self.starmap_objects
             .sort_by_cached_key(|row| (row.guid.text(), row.record_index));
         self.starmap_definitions.order();
-        sort_by_guid(&mut self.mineable_elements, |entity| entity.guid);
+        crate::contract::MineableElement::order(&mut self.mineable_elements);
         sort_by_guid(&mut self.refining_processes, |entity| entity.guid);
         sort_by_guid(&mut self.mineable_compositions, |entity| entity.guid);
         sort_by_guid(&mut self.mining_global_params, |entity| entity.guid);

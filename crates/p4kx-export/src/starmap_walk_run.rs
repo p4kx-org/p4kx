@@ -77,6 +77,7 @@ impl<'a> System<'a> {
             ),
             root: Arc::from(directory.contributions().0),
             root_entry: reference.entry_index,
+            root_reference: reference.clone(),
             capture,
             endpoints,
             read: SystemRead::default(),

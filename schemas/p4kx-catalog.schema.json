@@ -28726,100 +28726,90 @@
       "type": "object"
     },
     "MineableElement": {
-      "description": "A mineable element: a `MineableElement` Record under `mining/mineableelements`. Several\nelements may link to the same `ResourceType`, so none is picked for a commodity.",
+      "description": "One original mineable element and its authored resource link and tuning.",
       "properties": {
         "className": {
-          "description": "The Record name without its type, e.g. `agricium_ore`.",
-          "type": "string"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The normalized class name."
         },
         "clusterFactor": {
-          "description": "`elementClusterFactor`, from 0 to 1 on LIVE.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "The authored cluster factor."
         },
         "explosionMultiplier": {
-          "description": "`elementExplosionMultiplier`, from -1000 to 260 on LIVE.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "The authored explosion multiplier."
+        },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The original file name."
         },
         "guid": {
-          "$ref": "#/$defs/Guid",
-          "description": "The GUID of the Record."
+          "$ref": "#/$defs/SourcedValueOfGuid",
+          "description": "The Record GUID."
         },
         "instability": {
-          "description": "`elementInstability`, from 0 to 1000 on LIVE; `null` when the Record states none.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "The authored element instability."
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The original metadata tag."
         },
         "optimalWindowMidpoint": {
-          "description": "`elementOptimalWindowMidpoint`, from 0.3 to 1 on LIVE.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "The authored midpoint of the optimal window."
         },
         "optimalWindowMidpointRandomness": {
-          "description": "`elementOptimalWindowMidpointRandomness`, from 0 to 0.3 on LIVE.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "The authored random variation of the midpoint."
         },
         "optimalWindowThinness": {
-          "description": "`elementOptimalWindowThinness`, from -1 to 10 on LIVE.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "The authored width adjustment of the optimal window."
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32",
+          "description": "The physical Record index."
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The original Record name."
         },
         "recordPath": {
-          "description": "The record path, without `.xml`.",
-          "type": "string"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The normalized Record path."
         },
         "resistance": {
-          "description": "`elementResistance`, from -1 to 1 on LIVE.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "The authored element resistance."
         },
-        "resourceTypeGuid": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Guid"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The GUID of the `ResourceType` Record the Reference `resourceType` links to. It equals a\ncommodity's `subtypeGuid` only when the catalog has that commodity (20 of the 41 linked\n`ResourceType`s on LIVE). `null` for a null or dangling Reference."
+        "resourceType": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference",
+          "description": "The authored resource reference, including a retained dangling target."
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The declared Record type."
         }
       },
       "required": [
         "className",
         "clusterFactor",
         "explosionMultiplier",
+        "fileName",
         "guid",
         "instability",
+        "metadataTag",
         "optimalWindowMidpoint",
         "optimalWindowMidpointRandomness",
         "optimalWindowThinness",
+        "recordIndex",
+        "recordName",
         "recordPath",
         "resistance",
-        "resourceTypeGuid"
+        "resourceType",
+        "sourceType"
       ],
       "type": "object"
     },

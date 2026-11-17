@@ -38,6 +38,13 @@ struct OnDisk {
     unresolved: usize,
 }
 
+fn resolved_resource(element: &Value) -> Option<&str> {
+    element
+        .pointer("/resourceType/value/targetRecordIndex/value")?
+        .as_u64()?;
+    element.pointer("/resourceType/value/guid/value")?.as_str()
+}
+
 fn on_disk(archive: &Archive, elements: &[Value]) -> Result<OnDisk, Box<dyn Error>> {
     let entry = DataForgeEntry::read(archive)?;
     let forge = entry.open()?;
@@ -50,8 +57,7 @@ fn on_disk(archive: &Archive, elements: &[Value]) -> Result<OnDisk, Box<dyn Erro
     }
     let mut unresolved = 0;
     for element in elements {
-        let linked = element["resourceTypeGuid"]
-            .as_str()
+        let linked = resolved_resource(element)
             .and_then(|text| text.parse::<Guid>().ok())
             .and_then(|guid| forge.record_by_guid(guid))
             .map(|record| record.type_name().is_ok_and(|name| name == "ResourceType"));
@@ -75,7 +81,7 @@ fn verify(path: &Path) -> TestResult {
     let disk = on_disk(&archive, elements)?;
     let written: HashSet<&str> = elements
         .iter()
-        .filter_map(|element| element["className"].as_str())
+        .filter_map(|element| element.pointer("/className/value").and_then(Value::as_str))
         .collect();
     let skipped: Vec<&str> = disk
         .names
@@ -83,10 +89,7 @@ fn verify(path: &Path) -> TestResult {
         .map(|name| name.split_once('.').map_or(name.as_str(), |(_, rest)| rest))
         .filter(|class| !written.contains(class))
         .collect();
-    let resources: HashSet<&str> = elements
-        .iter()
-        .filter_map(|element| element["resourceTypeGuid"].as_str())
-        .collect();
+    let resources: HashSet<&str> = elements.iter().filter_map(resolved_resource).collect();
     let mut subtypes = HashSet::new();
     for choice in catalog_v3_consumer::presentations(&catalog)? {
         if let Some(guid) = catalog_v3_consumer::nullable_guid(
@@ -103,7 +106,11 @@ fn verify(path: &Path) -> TestResult {
         .count();
     let instabilities: Vec<f64> = elements
         .iter()
-        .filter_map(|element| element["instability"].as_f64())
+        .filter_map(|element| {
+            element
+                .pointer("/instability/value/finite")
+                .and_then(Value::as_f64)
+        })
         .collect();
     let pairs: HashSet<(&str, &str)> = processes
         .iter()
@@ -185,7 +192,13 @@ fn named<'c>(catalog: &'c Value, kind: &str, class: &str) -> Result<&'c Value, B
 fn guids<'c>(catalog: &'c Value, kind: &str) -> Result<HashSet<&'c str>, Box<dyn Error>> {
     Ok(list(catalog, kind)?
         .iter()
-        .filter_map(|entry| entry["guid"].as_str())
+        .filter_map(|entry| {
+            if kind == "mineableElements" {
+                entry.pointer("/guid/value").and_then(Value::as_str)
+            } else {
+                entry["guid"].as_str()
+            }
+        })
         .collect())
 }
 

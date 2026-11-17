@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::cell::RefCell;
+use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-use p4kx_extraction::{Archive, CancelToken, Guid};
+use p4kx_extraction::{Archive, CancelToken, Guid, SourcedValue};
 use rayon::prelude::*;
 
 use crate::catalog_read::original::EntryCapture;
@@ -73,10 +75,12 @@ pub(crate) struct Objects {
 }
 
 impl Objects {
-    pub(crate) fn new(objects: &[StarmapObject<'_>]) -> Self {
+    pub(crate) fn new<'object, 'source: 'object>(
+        objects: impl IntoIterator<Item = &'object StarmapObject<'source>>,
+    ) -> Self {
         Self {
             by_guid: objects
-                .iter()
+                .into_iter()
                 .map(|object| {
                     (
                         object.guid.0,
@@ -133,7 +137,21 @@ pub(crate) fn locate(
     let mut entries: Vec<usize> = opened.iter().map(|container| container.entry).collect();
     entries.sort_unstable();
     entries.dedup();
-    let (read, mut ledger) = read_sources(archive, &entries, cancel, capture)?;
+    let (read, ledger) = read_sources(archive, &entries, cancel, capture)?;
+    Ok(locate_from_sources(
+        archive, opened, presets, objects, cancel, &read, ledger,
+    ))
+}
+
+fn locate_from_sources(
+    archive: &Archive,
+    opened: &[Opened],
+    presets: &HashSet<Guid>,
+    objects: &Objects,
+    cancel: Option<&CancelToken>,
+    read: &HashMap<usize, Soc>,
+    mut ledger: ExportLedger,
+) -> Located {
     let mut unreadable: Vec<String> = read
         .iter()
         .filter_map(|(&entry, soc)| match soc {
@@ -168,12 +186,12 @@ pub(crate) fn locate(
     if !cancel.is_some_and(CancelToken::is_cancelled) {
         ledger.inventory(Kind::HarvestableLocations);
     }
-    Ok(Located {
+    Located {
         ledger,
         without_object: losses(&rows),
         locations: rows.into_iter().map(|(location, _)| location).collect(),
         unreadable,
-    })
+    }
 }
 
 fn read_sources(
@@ -196,6 +214,92 @@ fn read_sources(
         sources.insert(entry, soc);
     }
     Ok((sources, ledger))
+}
+
+/// Selected provider observations memoized by physical outer Entry index.
+pub(crate) struct HarvestSurvey<'providers> {
+    presets: &'providers HashSet<Guid>,
+    reads: RefCell<SurveyReads>,
+}
+
+#[derive(Default)]
+struct SurveyReads {
+    by_entry: HashMap<usize, Soc>,
+    selected: HashMap<usize, SourcedValue<Guid>>,
+    ledger: ExportLedger,
+}
+
+impl<'providers> HarvestSurvey<'providers> {
+    pub(crate) fn new(presets: &'providers HashSet<Guid>) -> Self {
+        Self {
+            presets,
+            reads: RefCell::default(),
+        }
+    }
+
+    pub(crate) fn probe(
+        &self,
+        archive: &Archive,
+        entry: usize,
+        capture: &EntryCapture<'_>,
+        cancel: Option<&CancelToken>,
+    ) -> Result<Option<Guid>, CatalogError> {
+        if cancel.is_some_and(CancelToken::is_cancelled) {
+            return Err(CatalogError::Cancelled);
+        }
+        if self.presets.is_empty() {
+            return Ok(None);
+        }
+        let mut reads = self.reads.borrow_mut();
+        let SurveyReads {
+            by_entry,
+            selected,
+            ledger,
+        } = &mut *reads;
+        if let Entry::Vacant(slot) = by_entry.entry(entry) {
+            let (observed, observations) = crate::harvest_source::read_verified(
+                archive,
+                entry,
+                capture,
+                cancel,
+                self.presets,
+            )?;
+            slot.insert(observed.fact);
+            if let Some(preset) = observed.selected {
+                selected.insert(entry, preset);
+            }
+            ledger.merge(observations);
+        }
+        Ok(selected.get(&entry).and_then(SourcedValue::value).copied())
+    }
+
+    pub(crate) fn finish(
+        self,
+        archive: &Archive,
+        opened: &[Opened],
+        objects: &Objects,
+        cancel: Option<&CancelToken>,
+        capture: &EntryCapture<'_>,
+    ) -> Result<(Located, HashMap<usize, SourcedValue<Guid>>), CatalogError> {
+        for occurrence in opened {
+            let _ = self.probe(archive, occurrence.entry, capture, cancel)?;
+        }
+        let SurveyReads {
+            by_entry,
+            selected,
+            ledger,
+        } = self.reads.into_inner();
+        let located = locate_from_sources(
+            archive,
+            opened,
+            self.presets,
+            objects,
+            cancel,
+            &by_entry,
+            ledger,
+        );
+        Ok((located, selected))
+    }
 }
 
 /// A location and why it has no object, `None` when it has one.

@@ -66,6 +66,11 @@ impl<'source, T> PreparedDefinition<'source, T> {
         &self.definition
     }
 
+    /// Moves the projected definition out of this prepared observation.
+    pub(super) fn into_definition(self) -> T {
+        self.definition
+    }
+
     pub(super) fn order(rows: &mut [Self]) {
         rows.sort_by_cached_key(|row| (CatalogGuid(row.guid).text(), row.index));
     }

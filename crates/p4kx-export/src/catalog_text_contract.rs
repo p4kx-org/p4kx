@@ -23,10 +23,18 @@ pub(crate) use language_sources::{
 pub(crate) struct PublicNameRef(pub(crate) String);
 
 /// A reference into the protected description domain.
-#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(transparent)]
 #[schemars(extend("x-gameText" = true))]
-pub(crate) struct GameTextRef(pub(crate) String);
+pub struct GameTextRef(pub(crate) String);
+
+impl GameTextRef {
+    /// Borrows the canonical protected-text identifier.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
 
 /// One canonical text key and its actually available language projections.
 #[derive(Debug, Serialize, JsonSchema)]

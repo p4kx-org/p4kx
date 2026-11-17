@@ -6,8 +6,9 @@ use std::sync::Arc;
 
 use p4kx_extraction::{Archive, CancelToken, Guid, SourceUse, SourcedValue};
 
-use crate::catalog_read::original::{AuthoredEntryPath, EntryCapture};
+use crate::catalog_read::original::{AuthoredEntryPath, EntryCapture, PhysicalEntryRef};
 use crate::catalog_rows::spool::RowSpoolWriter;
+use crate::harvest_locations::HarvestSurvey;
 use crate::starmap_containers::Limits;
 #[cfg(test)]
 use crate::starmap_containers::instance::ContainerInstance;
@@ -49,6 +50,8 @@ pub(crate) struct SystemRead {
     pub(crate) deepest: usize,
     pub(crate) report: StarmapReport,
     pub(crate) containers: Vec<Opened>,
+    pub(crate) harvest_occurrences: Vec<HarvestOccurrence>,
+    pub(crate) harvest_reached: HashSet<usize>,
     #[cfg(test)]
     pub(crate) instances: Vec<ContainerInstance>,
     #[cfg(test)]
@@ -62,6 +65,18 @@ pub(crate) struct Opened {
     pub(crate) system: Arc<str>,
     pub(crate) entry: usize,
     pub(crate) under: Option<Guid>,
+}
+
+/// A reached container and its detached original route.
+#[derive(Debug)]
+pub(crate) struct HarvestOccurrence {
+    pub(crate) opened: Opened,
+    pub(crate) root_entry: u32,
+    pub(crate) root_reference: PhysicalEntryRef,
+    pub(crate) root_inputs: Arc<[SourceUse]>,
+    pub(crate) parent_route: Option<Arc<PlacementStep>>,
+    pub(crate) declared: Option<AuthoredEntryPath>,
+    pub(crate) route: Option<Arc<PlacementStep>>,
 }
 
 #[derive(Clone)]
@@ -132,6 +147,7 @@ pub(crate) enum PlacementRows<'writer> {
     },
     #[cfg(test)]
     Typed,
+    Harvest(&'writer HarvestSurvey<'writer>),
 }
 
 /// The walk through one star system, over containers that are already parsed.
@@ -144,6 +160,7 @@ pub(crate) struct System<'a> {
     name_cell: SourcedValue<HealthText>,
     root: Arc<[SourceUse]>,
     root_entry: u32,
+    root_reference: PhysicalEntryRef,
     capture: &'a EntryCapture<'a>,
     endpoints: Option<&'a JumpEndpointRecords>,
     read: SystemRead,
@@ -173,13 +190,34 @@ impl System<'_> {
 
     /// Notes that the container at `entry`, `external` containers below the system container,
     /// was opened and hangs below the record `under`.
-    fn opened(&mut self, entry: usize, under: Option<Guid>, external: usize) {
-        self.read.containers.push(Opened {
+    fn opened(&mut self, entry: usize, path: &WalkPath) -> Result<(), CatalogError> {
+        let opened = Opened {
             system: Arc::clone(&self.name),
             entry,
-            under,
-        });
-        self.read.deepest = self.read.deepest.max(external);
+            under: path.under,
+        };
+        if let PlacementRows::Harvest(harvest) = &self.rows {
+            self.read.harvest_reached.insert(entry);
+            if harvest
+                .probe(self.archive, entry, self.capture, self.cancel)?
+                .is_some()
+            {
+                self.read.harvest_occurrences.push(HarvestOccurrence {
+                    opened: opened.clone(),
+                    root_entry: self.root_entry,
+                    root_reference: self.root_reference.clone(),
+                    root_inputs: Arc::clone(&self.root),
+                    parent_route: path.parent_instance.clone(),
+                    declared: path.via.clone(),
+                    route: path.route.clone(),
+                });
+                self.read.containers.push(opened);
+            }
+        } else {
+            self.read.containers.push(opened);
+        }
+        self.read.deepest = self.read.deepest.max(path.external);
+        Ok(())
     }
 
     fn note(

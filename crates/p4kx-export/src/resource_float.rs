@@ -10,7 +10,7 @@ use crate::schema_fields;
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = schema_fields::every_field_required)]
-pub(crate) struct ResourceFloat32 {
+pub struct ResourceFloat32 {
     #[serde(serialize_with = "bits32")]
     #[schemars(
         with = "String",
@@ -22,6 +22,17 @@ pub(crate) struct ResourceFloat32 {
 }
 
 impl ResourceFloat32 {
+    /// Returns the original IEEE 754 bits.
+    #[must_use]
+    pub const fn raw_bits(&self) -> u32 {
+        self.raw_bits
+    }
+
+    /// Returns the finite decimal projection of the source value.
+    #[must_use]
+    pub const fn finite(&self) -> Option<f32> {
+        self.finite
+    }
     pub(crate) fn new(value: f32) -> Self {
         let bits = value.to_bits();
         Self {

@@ -6,7 +6,7 @@ use std::sync::atomic::AtomicUsize;
 use p4kx_extraction::Archive;
 
 use super::children::{child_lists, external};
-use super::{Body, Bounds, CHILD, CHILDREN, parse};
+use super::{Body, Bounds, CHILD, CHILDREN, DescriptorScope, parse};
 use crate::CatalogError;
 use crate::catalog_read::original::{AuthoredEntryPath, EntryCapture, EntryXml};
 use crate::starmap_index::Index;
@@ -21,7 +21,7 @@ pub(crate) fn read_jump_witness_body(
     let bounds = Bounds {
         cancel: None,
         children: AtomicUsize::new(usize::MAX),
-        jump_endpoints: true,
+        scope: DescriptorScope::catalog(true),
     };
     parse(archive, index, entry, &bounds, capture).map(|(body, _)| body)
 }

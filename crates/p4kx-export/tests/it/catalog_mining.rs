@@ -45,7 +45,13 @@ fn class_names<'a>(catalog: &'a Value, kind: &str) -> Vec<&'a str> {
         .as_array()
         .into_iter()
         .flatten()
-        .filter_map(|entry| entry["className"].as_str())
+        .filter_map(|entry| {
+            if kind == "mineableElements" {
+                entry.pointer("/className/value").and_then(Value::as_str)
+            } else {
+                entry["className"].as_str()
+            }
+        })
         .collect()
 }
 
@@ -68,8 +74,18 @@ fn every_element_is_exported_even_when_several_share_a_resource_type() -> TestRe
         .as_array()
         .into_iter()
         .flatten()
-        .filter(|entry| entry["resourceTypeGuid"] == shared.as_str())
-        .map(|entry| (entry["className"].as_str(), entry["instability"].as_f64()))
+        .filter(|entry| {
+            entry
+                .pointer("/resourceType/value/guid/value")
+                .and_then(Value::as_str)
+                == Some(shared.as_str())
+        })
+        .map(|entry| {
+            (
+                entry["className"]["value"].as_str(),
+                entry["instability"]["value"]["finite"].as_f64(),
+            )
+        })
         .collect();
     assert_eq!(
         linked,
@@ -89,7 +105,7 @@ fn every_element_is_exported_even_when_several_share_a_resource_type() -> TestRe
 }
 
 #[test]
-fn a_null_or_dangling_resource_type_gives_a_null_guid_and_keeps_the_element() -> TestResult {
+fn a_null_and_dangling_resource_link_keep_distinct_states() -> TestResult {
     let (_, catalog) = build(None)?;
     for (record, class, instability) in [
         (UNLINKED, "unlinked_ore", 12.0),
@@ -99,40 +115,89 @@ fn a_null_or_dangling_resource_type_gives_a_null_guid_and_keeps_the_element() ->
             .as_array()
             .into_iter()
             .flatten()
-            .find(|entry| entry["guid"] == guid(record).as_str())
+            .find(|entry| entry["guid"]["value"] == guid(record).as_str())
             .ok_or("the element")?;
-        assert_eq!(entry["className"], class);
-        assert_eq!(entry["resourceTypeGuid"], Value::Null, "{class}");
-        assert_eq!(entry["instability"], instability, "{class} keeps its facts");
+        assert_eq!(entry["className"]["value"], class, "direct class name");
+        let reference = &entry["resourceType"];
+        if record == UNLINKED {
+            assert_eq!(reference["state"], "null", "authored null reference");
+            assert!(reference["value"].is_null(), "state carries no value");
+        } else {
+            assert_eq!(reference["state"], "present", "the stored GUID survives");
+            assert_eq!(reference["value"]["status"], "dangling", "missing target");
+            assert!(
+                reference["value"]["guid"]["value"].is_string(),
+                "exact authored GUID"
+            );
+        }
+        assert_eq!(
+            entry["instability"]["value"]["finite"], instability,
+            "{class} keeps its facts"
+        );
     }
     Ok(())
 }
 
 #[test]
-fn a_mineable_element_carries_the_plain_facts_of_its_record() -> TestResult {
+fn a_mineable_element_carries_direct_sourced_facts() -> TestResult {
     let (_, catalog) = build(None)?;
     let entry = catalog["mineableElements"]
         .as_array()
         .into_iter()
         .flatten()
-        .find(|entry| entry["guid"] == guid(BEXALITE).as_str())
-        .ok_or("the element")?;
-    assert_eq!(
-        *entry,
-        json!({
-            "guid": guid(BEXALITE),
-            "className": "bexalite_ore",
-            "recordPath": "libs/foundry/records/mining/mineableelements/bexalite_ore",
-            "resourceTypeGuid": guid(OTHER_RESOURCE),
-            "instability": 0.0,
-            "resistance": -0.5,
-            "optimalWindowMidpoint": 0.5,
-            "optimalWindowMidpointRandomness": 0.25,
-            "optimalWindowThinness": 2.0,
-            "explosionMultiplier": 4.0,
-            "clusterFactor": 0.125,
+        .find(|entry| {
+            entry.pointer("/guid/value").and_then(Value::as_str) == Some(guid(BEXALITE).as_str())
         })
+        .ok_or("the element")?;
+    assert_eq!(entry["className"]["value"], "bexalite_ore", "sourced name");
+    assert_eq!(
+        entry["recordPath"]["value"], "libs/foundry/records/mining/mineableelements/bexalite_ore",
+        "sourced path"
     );
+    assert_eq!(
+        entry["resourceType"]["value"]["guid"]["value"],
+        guid(OTHER_RESOURCE),
+        "sourced link"
+    );
+    for duplicate in ["resourceTypeGuid", "sourceValues"] {
+        assert!(
+            entry.get(duplicate).is_none(),
+            "duplicate wire value {duplicate}"
+        );
+    }
+    let numeric = [
+        ("instability", 0.0_f32),
+        ("resistance", -0.5),
+        ("optimalWindowMidpoint", 0.5),
+        ("optimalWindowMidpointRandomness", 0.25),
+        ("optimalWindowThinness", 2.0),
+        ("explosionMultiplier", 4.0),
+        ("clusterFactor", 0.125),
+    ];
+    for (field, finite) in numeric {
+        let cell = &entry[field];
+        assert_eq!(cell["state"], "present", "{field} source is readable");
+        assert!(
+            cell["containsEncryptedSource"].is_boolean(),
+            "{field} encryption marker"
+        );
+        assert_eq!(cell["sourceSetComplete"], true, "{field} contributor set");
+        assert!(
+            cell["sourceUsesRefs"]
+                .as_array()
+                .is_some_and(|refs| !refs.is_empty()),
+            "{field} source references"
+        );
+        assert_eq!(
+            cell["value"]["finite"], finite,
+            "{field} numeric presentation"
+        );
+        assert_eq!(
+            cell["value"]["rawBits"],
+            format!("{:08x}", finite.to_bits()),
+            "{field} original Single"
+        );
+    }
     Ok(())
 }
 

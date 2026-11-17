@@ -108,11 +108,32 @@ pub(crate) enum Body {
     },
 }
 
+/// The placement details needed by the consumer of the descriptor walk.
+#[derive(Clone, Copy)]
+pub(crate) struct DescriptorScope {
+    companions: bool,
+    jump_endpoints: bool,
+}
+
+impl DescriptorScope {
+    pub(crate) const fn catalog(jump_endpoints: bool) -> Self {
+        Self {
+            companions: true,
+            jump_endpoints,
+        }
+    }
+
+    pub(crate) const HARVEST: Self = Self {
+        companions: false,
+        jump_endpoints: false,
+    };
+}
+
 /// The shared Child count and read controls for the discovered containers.
 struct Bounds<'a> {
     cancel: Option<&'a CancelToken>,
     children: AtomicUsize,
-    jump_endpoints: bool,
+    scope: DescriptorScope,
 }
 
 impl Bounds<'_> {
@@ -229,7 +250,7 @@ fn parsed_root(
     let root = reader.level(xml.root())?;
     let guids = reader.entity_guids;
     let entities = files.scan(&guids, &xml, ledger)?;
-    let (gate, gate_proof) = if bounds.jump_endpoints {
+    let (gate, gate_proof) = if bounds.scope.jump_endpoints {
         let readers = GateFiles {
             archive: files.archive,
             outer: files.outer,
@@ -291,21 +312,28 @@ pub(crate) fn read_all(
     children: usize,
     capture: &EntryCapture<'_>,
 ) -> Result<Read, CatalogError> {
-    read_all_with_jumps(archive, index, roots, cancel, (children, false), capture)
+    read_all_scoped(
+        archive,
+        index,
+        roots,
+        cancel,
+        (children, DescriptorScope::catalog(false)),
+        capture,
+    )
 }
 
-pub(crate) fn read_all_with_jumps(
+pub(crate) fn read_all_scoped(
     archive: &Archive,
     index: &Index<'_>,
     roots: &[usize],
     cancel: Option<&CancelToken>,
-    (children, jump_endpoints): (usize, bool),
+    (children, scope): (usize, DescriptorScope),
     capture: &EntryCapture<'_>,
 ) -> Result<Read, CatalogError> {
     let bounds = Bounds {
         cancel,
         children: AtomicUsize::new(children),
-        jump_endpoints,
+        scope,
     };
     let mut bodies: HashMap<usize, Body> = HashMap::new();
     let mut ledger = ExportLedger::default();

@@ -7,14 +7,12 @@ use crate::catalog_projection::CatalogProjection;
 use crate::catalog_text_contract::GameTextRef;
 use crate::catalog_v3::authored_fields;
 
-use crate::contract::{
-    CompositionPart, MineableComposition, MineableElement, MineableEntity, RefiningProcess,
-};
+use crate::contract::{CompositionPart, MineableComposition, MineableEntity, RefiningProcess};
 use crate::guid_text::CatalogGuid;
 use crate::harvest_link::MINEABLE_PARAMS;
 use crate::picked::Picked;
 use crate::record_fields::{
-    class_name, component, elements, integer, number, reference, single, structs, structure, text,
+    class_name, component, elements, integer, number, reference, structs, structure, text,
 };
 use crate::record_observation::RecordObservation;
 use crate::scan_signature::SignatureSlot;
@@ -98,24 +96,6 @@ fn mineable_composition<'f>(
                 }
             })
             .collect(),
-    }
-}
-
-/// Returns the mineable element the Record tree `tree` describes.
-pub(crate) fn mineable_element<'f>(tree: &RecordTree<'f>) -> MineableElement<'f> {
-    let root = Some(tree.root());
-    MineableElement {
-        guid: CatalogGuid(tree.guid()),
-        class_name: class_name(tree),
-        record_path: tree.record_path(),
-        resource_type_guid: reference(root, "resourceType"),
-        instability: single(root, "elementInstability"),
-        resistance: single(root, "elementResistance"),
-        optimal_window_midpoint: single(root, "elementOptimalWindowMidpoint"),
-        optimal_window_midpoint_randomness: single(root, "elementOptimalWindowMidpointRandomness"),
-        optimal_window_thinness: single(root, "elementOptimalWindowThinness"),
-        explosion_multiplier: single(root, "elementExplosionMultiplier"),
-        cluster_factor: single(root, "elementClusterFactor"),
     }
 }
 

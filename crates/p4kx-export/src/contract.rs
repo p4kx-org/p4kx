@@ -12,6 +12,7 @@ use crate::catalog_projections::CatalogProjections;
 use crate::catalog_text_contract::CatalogTexts;
 use crate::loadout::staging::StagedLoadouts;
 
+pub(crate) use crate::catalog_v3::mineable_element_definition::MineableElement;
 pub(crate) use crate::catalog_v3::resource_group_catalog::ResourceGroup;
 pub(crate) use crate::commodity_contract::Commodity;
 pub(crate) use crate::contract_cargo::CargoManifest;
@@ -24,7 +25,7 @@ pub(crate) use crate::contract_loadout::Loadout;
 pub(crate) use crate::contract_loot::{LootArchetype, LootContainer, LootTable};
 pub(crate) use crate::contract_loot_legacy::{LegacyLootArchetype, LegacyLootTable};
 pub(crate) use crate::contract_mining::{
-    CompositionPart, MineableComposition, MineableElement, MineableEntity, RefiningProcess,
+    CompositionPart, MineableComposition, MineableEntity, RefiningProcess,
 };
 pub(crate) use crate::contract_mining_params::MiningGlobalParams;
 pub(crate) use crate::contract_mission_data::{ContractScenario, MissionLocality, MissionType};
@@ -93,7 +94,7 @@ pub(crate) struct Catalog<'a> {
     pub(crate) loadouts: StagedLoadouts,
 
     /// The mineable elements, ordered by GUID. Several may link to one `ResourceType`.
-    pub(crate) mineable_elements: Vec<MineableElement<'a>>,
+    pub(crate) mineable_elements: Vec<MineableElement>,
     /// The refining processes, ordered by GUID.
     pub(crate) refining_processes: Vec<RefiningProcess<'a>>,
     /// The mineable compositions, the elements a rock or deposit is made of, ordered by GUID.

@@ -94,7 +94,7 @@ impl<'a> System<'a> {
                 self.issue(&format!("{label}: {reason}"));
             }
             Some(Body::Unparsed) => {
-                self.opened(entry, path.under, path.external);
+                self.opened(entry, path)?;
                 self.read.unreadable += 1;
                 self.issue(&format!("{label}: the XML cannot be parsed"));
             }
@@ -105,7 +105,7 @@ impl<'a> System<'a> {
                 ..
             }) => {
                 let before = self.seen;
-                self.opened(entry, path.under, path.external);
+                self.opened(entry, path)?;
                 self.record_instance(path, file)?;
                 if let Some(taken) = fallback {
                     self.issue(&format!(
