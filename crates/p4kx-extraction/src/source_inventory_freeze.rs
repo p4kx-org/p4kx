@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::convert::Infallible;
+use std::sync::Arc;
 
 use thiserror::Error;
 
@@ -89,7 +90,7 @@ impl SourceUses {
         let packed = registry
             .uses
             .packed_values()
-            .map(|(id, row)| (id.clone(), row.clone()));
+            .map(|(id, row)| (Arc::clone(id), row.clone()));
         let packed = collect_rows(packed, &mut check)?;
         drop(registry);
         Ok(SourceInventory::new(sources, uses, packed))

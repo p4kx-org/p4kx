@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::sync::Arc;
+
 use p4kx_testkit::{ArchiveBuilder, TestEntry};
 
 use crate::{
-    Archive, InputScope, SourceEvidenceError, SourceInput, SourceLocation, SourceScope, SourceUse,
-    SourceUseRole, SourceUses, SourceValue,
+    Archive, FieldOrigin, InputScope, SourceEvidenceError, SourceInput, SourceLocation,
+    SourceScope, SourceUse, SourceUseRole, SourceUses, SourceValue,
 };
 
 use super::SourceInventoryFreezeError;
@@ -89,6 +91,7 @@ fn compacted_and_held_uses_keep_wire_order_identity_and_origin_facts() -> TestRe
     let scope = sources.observe(SourceInput::Unknown, InputScope::Payload)?;
     let held = observe_in(&scope, 100)?;
     let cold = observe_in(&scope, 1)?;
+    let cold_description = Arc::downgrade(&cold.description);
     let held_origin = sources.origin(std::slice::from_ref(&held), true);
     let cold_origin = sources.origin(std::slice::from_ref(&cold), false);
     let expected_origin = sources.origin(&[held.clone(), cold.clone()], false);
@@ -103,6 +106,16 @@ fn compacted_and_held_uses_keep_wire_order_identity_and_origin_facts() -> TestRe
         "only the unheld row is packed"
     );
     assert_eq!(sources.registered_use_count()?, 2);
+    assert_eq!(
+        cold_description.strong_count(),
+        0,
+        "the compacted row releases its former description"
+    );
+    assert_eq!(
+        Arc::strong_count(&held.description),
+        2,
+        "the registry and the held observation share one description"
+    );
     let aggregate = sources.origin_with_origins([&held_origin, &cold_origin], true)?;
     assert_eq!(
         aggregate, expected_origin,
@@ -118,24 +131,50 @@ fn compacted_and_held_uses_keep_wire_order_identity_and_origin_facts() -> TestRe
         std::ptr::eq(repeated.reference().as_str(), cold_ref.as_str()),
         "re-registration reuses the canonical reference"
     );
+    assert!(
+        std::ptr::eq(
+            repeated.description().source().as_str(),
+            held.description().source().as_str(),
+        ),
+        "re-registration reuses the original physical source reference"
+    );
     let same_held = observe_in(&scope, 100)?;
     assert!(std::ptr::eq(same_held.description(), held.description()));
     drop(repeated);
     sources.compact_record_uses(|| Ok::<(), SourceEvidenceError>(()))?;
     assert_eq!(sources.packed_use_count()?, 1);
 
+    assert_registry_rejects_foreign_origin(&sources, &cold_origin)?;
+    assert_original_inventory(&sources, &held, &expected_wire)
+}
+
+fn assert_registry_rejects_foreign_origin(
+    sources: &SourceUses,
+    origin: &FieldOrigin,
+) -> TestResult {
     let other = SourceUses::with_compact_coordinates();
     let foreign = use_at(&other, 1)?;
     let foreign_origin = other.origin(&[foreign], true);
     assert_eq!(
         foreign_origin.source_uses_refs(),
-        cold_origin.source_uses_refs()
+        origin.source_uses_refs(),
+        "the two authorities use the same document-local ID"
     );
-    assert!(matches!(
-        sources.origin_with_origins([&foreign_origin], true),
-        Err(SourceEvidenceError::ForeignEvidence)
-    ));
+    assert!(
+        matches!(
+            sources.origin_with_origins([&foreign_origin], true),
+            Err(SourceEvidenceError::ForeignEvidence)
+        ),
+        "a matching ID under a foreign authority is rejected"
+    );
+    Ok(())
+}
 
+fn assert_original_inventory(
+    sources: &SourceUses,
+    held: &SourceUse,
+    expected_wire: &[u8],
+) -> TestResult {
     let snapshot = sources.freeze()?;
     let finished = sources.finish_with(|| Ok::<(), SourceEvidenceError>(()))?;
     assert_eq!(serde_json::to_vec(&snapshot)?, expected_wire);
@@ -146,7 +185,10 @@ fn compacted_and_held_uses_keep_wire_order_identity_and_origin_facts() -> TestRe
             .iter_uses()
             .any(|row| std::ptr::eq(row, held.description()))
     );
-    assert_eq!(finished.iter_uses().len(), finished.uses().len());
+    assert!(
+        finished.iter_uses().eq(finished.uses()),
+        "both compatibility views expose the same complete sorted rows"
+    );
     Ok(())
 }
 

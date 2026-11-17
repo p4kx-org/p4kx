@@ -26,34 +26,58 @@ const _: () = assert!(
 );
 
 const SURVEY_FIELD: &str = "$fields";
-const DECLARATION_FIELDS: &[&str] = &[SURVEY_FIELD];
 
-const VALUE_FIELDS: &[&str] = &[
-    "$value",
-    SURVEY_FIELD,
-    "$fieldName",
-    "$dataType",
-    "$isArray",
-    "$target",
-    "$type",
-    "$error.offset",
-    "$error.byte",
-    "$error.structIndex",
-    "$error.instanceIndex",
-    "$error.first",
-    "$error.count",
-    "$error.len",
-    "$error.guid",
-];
+macro_rules! known_fields {
+    ($type:ident, { $($variant:ident => $text:tt,)+ }) => {
+        #[derive(Debug, Clone, Copy)]
+        #[repr(u8)]
+        enum $type {
+            $($variant,)+
+        }
 
-const HEADER_FIELDS: &[&str] = &[
-    "guid",
-    "recordName",
-    "recordIndex",
-    "sourceType",
-    "fileName",
-    "metadataTag",
-];
+        impl $type {
+            fn of(field: &str) -> Option<Self> {
+                match field {
+                    $($text => Some(Self::$variant),)+
+                    _ => None,
+                }
+            }
+
+            const fn name(self) -> &'static str {
+                match self {
+                    $(Self::$variant => $text,)+
+                }
+            }
+        }
+    };
+}
+
+known_fields!(HeaderField, {
+    Guid => "guid",
+    RecordName => "recordName",
+    RecordIndex => "recordIndex",
+    SourceType => "sourceType",
+    FileName => "fileName",
+    MetadataTag => "metadataTag",
+});
+
+known_fields!(ValueField, {
+    Value => "$value",
+    Fields => SURVEY_FIELD,
+    FieldName => "$fieldName",
+    DataType => "$dataType",
+    IsArray => "$isArray",
+    Target => "$target",
+    Type => "$type",
+    ErrorOffset => "$error.offset",
+    ErrorByte => "$error.byte",
+    ErrorStructIndex => "$error.structIndex",
+    ErrorInstanceIndex => "$error.instanceIndex",
+    ErrorFirst => "$error.first",
+    ErrorCount => "$error.count",
+    ErrorLen => "$error.len",
+    ErrorGuid => "$error.guid",
+});
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Coordinates {
@@ -78,22 +102,25 @@ impl DataForgeSite {
         else {
             return None;
         };
-        let (coordinates, known) = match (namespace.as_str(), indices.as_slice()) {
-            ("dataforgeValue", [record, ordinal]) => {
-                (Coordinates::Value([*record, *ordinal]), VALUE_FIELDS)
-            }
-            ("dataforgeRecordHeader", [record]) => (Coordinates::Header([*record]), HEADER_FIELDS),
-            ("dataforgeRecordDeclarations", [record]) => (
+        let (coordinates, field, record) = match (namespace.as_str(), indices.as_slice()) {
+            ("dataforgeValue", [record, ordinal]) => (
+                Coordinates::Value([*record, *ordinal]),
+                ValueField::of(field)?.name(),
+                *record,
+            ),
+            ("dataforgeRecordHeader", [record]) => (
+                Coordinates::Header([*record]),
+                HeaderField::of(field)?.name(),
+                *record,
+            ),
+            ("dataforgeRecordDeclarations", [record]) if field == SURVEY_FIELD => (
                 Coordinates::RecordDeclarations([*record]),
-                DECLARATION_FIELDS,
+                SURVEY_FIELD,
+                *record,
             ),
             _ => return None,
         };
-        let [record, ..] = indices.as_slice() else {
-            return None;
-        };
-        u32::try_from(*record).ok()?;
-        let field = known.iter().copied().find(|name| *name == field)?;
+        u32::try_from(record).ok()?;
         Some(Self { coordinates, field })
     }
 

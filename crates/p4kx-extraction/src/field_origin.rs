@@ -9,7 +9,9 @@ use serde::{Serialize, Serializer};
 
 use crate::projection_schema;
 use crate::source_inventory::SourceEncryptionState;
-use crate::source_use::{SourceUse, SourceUseDescription, SourceUseRef, SourceUseRole};
+use crate::source_use::{
+    OriginUseId, SourceUse, SourceUseDescription, SourceUseRef, SourceUseRole,
+};
 
 #[path = "field_origin_refs.rs"]
 mod refs;
@@ -206,7 +208,7 @@ impl OriginFacts {
 
 #[derive(Clone, Copy)]
 pub(crate) struct OriginContribution<'a> {
-    pub(crate) id: &'a SourceUseRef,
+    pub(crate) id: OriginUseId<'a>,
     pub(crate) role: SourceUseRole,
     pub(crate) encryption: SourceEncryptionState,
     pub(crate) opaque: bool,
@@ -215,7 +217,7 @@ pub(crate) struct OriginContribution<'a> {
 impl<'a> From<&'a SourceUseDescription> for OriginContribution<'a> {
     fn from(description: &'a SourceUseDescription) -> Self {
         Self {
-            id: description.id(),
+            id: OriginUseId::Description(description.id()),
             role: description.role(),
             encryption: description.effective_encryption(),
             opaque: description.is_opaque(),
@@ -245,7 +247,7 @@ impl OriginAccumulator {
     pub(crate) fn observe(&mut self, contribution: OriginContribution<'_>) {
         if contribution.role.contributes() {
             self.include_completeness(!contribution.opaque);
-            self.references.push(contribution.id.clone());
+            self.references.push(contribution.id.retain());
             self.encryption = self.encryption.combine(contribution.encryption);
         }
     }

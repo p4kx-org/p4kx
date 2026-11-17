@@ -9,7 +9,7 @@ use std::sync::{Arc, OnceLock};
 use serde::{Serialize, Serializer};
 
 use crate::source_packed_use::PackedSourceUse;
-use crate::source_use::{SourceUseDescription, SourceUseRef};
+use crate::source_use::SourceUseDescription;
 
 /// Sorted use rows with lazily expanded borrowed views.
 #[derive(Clone)]
@@ -17,7 +17,7 @@ pub(super) struct FrozenUseRows(Arc<UseRows>);
 
 struct UseRows {
     live: Vec<Arc<SourceUseDescription>>,
-    packed: Vec<(SourceUseRef, PackedSourceUse)>,
+    packed: Vec<(Arc<str>, PackedSourceUse)>,
     expanded: OnceLock<Vec<SourceUseDescription>>,
     contiguous: OnceLock<Vec<SourceUseDescription>>,
 }
@@ -25,7 +25,7 @@ struct UseRows {
 impl FrozenUseRows {
     pub(super) fn new(
         live: Vec<Arc<SourceUseDescription>>,
-        packed: Vec<(SourceUseRef, PackedSourceUse)>,
+        packed: Vec<(Arc<str>, PackedSourceUse)>,
     ) -> Self {
         Self(Arc::new(UseRows {
             live,

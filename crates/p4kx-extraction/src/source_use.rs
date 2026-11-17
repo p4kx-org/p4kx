@@ -52,7 +52,18 @@ impl Serialize for ReferenceText {
 
 impl SourceUseRef {
     pub(crate) fn registered(text: String) -> Self {
-        Self(ReferenceText::Registered(text.into()))
+        Self::from_registered(text.into())
+    }
+
+    pub(crate) const fn from_registered(text: Arc<str>) -> Self {
+        Self(ReferenceText::Registered(text))
+    }
+
+    pub(crate) const fn registered_text(&self) -> Option<&Arc<str>> {
+        match &self.0 {
+            ReferenceText::Registered(text) => Some(text),
+            ReferenceText::Decoded(_) => None,
+        }
     }
 
     pub(crate) const fn decoded(text: Box<str>) -> Self {
@@ -63,6 +74,22 @@ impl SourceUseRef {
     #[must_use]
     pub fn as_str(&self) -> &str {
         self.0.as_str()
+    }
+}
+
+/// A borrowed origin ID from a use description or a registration key.
+#[derive(Clone, Copy)]
+pub(crate) enum OriginUseId<'a> {
+    Description(&'a SourceUseRef),
+    Registered(&'a Arc<str>),
+}
+
+impl OriginUseId<'_> {
+    pub(crate) fn retain(self) -> SourceUseRef {
+        match self {
+            Self::Description(reference) => reference.clone(),
+            Self::Registered(text) => SourceUseRef::from_registered(Arc::clone(text)),
+        }
     }
 }
 

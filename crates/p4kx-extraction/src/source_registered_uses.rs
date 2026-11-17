@@ -7,13 +7,15 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 use crate::field_origin::OriginContribution;
+use crate::source_inventory::PhysicalSourceRef;
 use crate::source_packed_use::PackedSourceUse;
 use crate::source_use::{SourceUseDescription, SourceUseRef};
 
 /// Sorted source-use rows indexed by their own immutable IDs.
 pub(crate) struct RegisteredUses {
     live: BTreeSet<RegisteredUse>,
-    packed: BTreeMap<SourceUseRef, PackedSourceUse>,
+    packed: BTreeMap<Arc<str>, PackedSourceUse>,
+    packed_sources: BTreeSet<Arc<PhysicalSourceRef>>,
     pending_compaction: Option<Vec<SourceUseRef>>,
 }
 
@@ -22,6 +24,7 @@ impl RegisteredUses {
         Self {
             live: BTreeSet::new(),
             packed: BTreeMap::new(),
+            packed_sources: BTreeSet::new(),
             pending_compaction: if compact_coordinates {
                 Some(Vec::new())
             } else {
@@ -46,7 +49,7 @@ impl RegisteredUses {
         if let Some(live) = self.get(id) {
             return Some(OriginContribution::from(live.as_ref()));
         }
-        let (id, packed) = self.packed.get_key_value(id)?;
+        let (id, packed) = self.packed.get_key_value(id.as_str())?;
         Some(packed.contribution(id))
     }
 
@@ -58,7 +61,7 @@ impl RegisteredUses {
         if let Some(registered) = self.get(&id) {
             return Arc::clone(registered);
         }
-        let row = match self.packed.remove_entry(&id) {
+        let row = match self.packed.remove_entry(id.as_str()) {
             Some((original, packed)) => packed.restore(&original),
             None => build(id),
         };
@@ -91,9 +94,12 @@ impl RegisteredUses {
             if Arc::strong_count(&registered.0) != 1 {
                 continue;
             }
-            if let Some(packed) = PackedSourceUse::pack(&registered.0) {
+            if let Some(text) = registered.0.id().registered_text()
+                && let Some(packed) = PackedSourceUse::pack(&registered.0, &mut self.packed_sources)
+            {
+                let text = Arc::clone(text);
                 self.live.remove(id.as_str());
-                self.packed.insert(id, packed);
+                self.packed.insert(text, packed);
             }
         }
         Ok(())
@@ -105,7 +111,7 @@ impl RegisteredUses {
 
     pub(crate) fn packed_values(
         &self,
-    ) -> impl ExactSizeIterator<Item = (&SourceUseRef, &PackedSourceUse)> {
+    ) -> impl ExactSizeIterator<Item = (&Arc<str>, &PackedSourceUse)> {
         self.packed.iter()
     }
 
@@ -113,7 +119,7 @@ impl RegisteredUses {
         self,
     ) -> (
         impl ExactSizeIterator<Item = Arc<SourceUseDescription>>,
-        impl ExactSizeIterator<Item = (SourceUseRef, PackedSourceUse)>,
+        impl ExactSizeIterator<Item = (Arc<str>, PackedSourceUse)>,
     ) {
         (
             self.live.into_iter().map(|registered| registered.0),

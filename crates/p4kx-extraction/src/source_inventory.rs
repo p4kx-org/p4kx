@@ -20,7 +20,7 @@ use crate::projection_schema;
 use crate::source_archive_binding::ArchiveSourceBinding;
 use crate::source_details::SourceDetails;
 use crate::source_packed_use::PackedSourceUse;
-use crate::source_use::{SourceUseDescription, SourceUseRef};
+use crate::source_use::SourceUseDescription;
 use crate::source_value::SourcedValue;
 use crate::{ArchiveByteRange, DecimalU64};
 
@@ -293,7 +293,7 @@ impl SourceInventory {
     pub(crate) fn new(
         sources: Vec<Arc<PhysicalSource>>,
         uses: Vec<Arc<SourceUseDescription>>,
-        packed: Vec<(SourceUseRef, PackedSourceUse)>,
+        packed: Vec<(Arc<str>, PackedSourceUse)>,
     ) -> Self {
         Self {
             sources: FrozenRows::new(sources),

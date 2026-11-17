@@ -4,8 +4,8 @@
 use std::sync::OnceLock;
 
 use super::{
-    Coordinates, DataForgeSite, HEADER_FIELDS, RetainedLocation, SURVEY_FIELD,
-    StoredDataForgeField, StoredDataForgeSite, VALUE_FIELDS,
+    Coordinates, DataForgeSite, HeaderField, RetainedLocation, SURVEY_FIELD, StoredDataForgeField,
+    StoredDataForgeSite, ValueField,
 };
 use crate::source_use::SourceUseRef;
 
@@ -23,22 +23,22 @@ enum PackedCoordinate {
         field_start: usize,
     },
     Header {
+        field: HeaderField,
         record_index: u32,
-        field: &'static &'static str,
     },
     RecordDeclarations {
         record_index: u32,
     },
     Value {
+        field: ValueField,
         record_index: u32,
         ordinal: u64,
-        field: &'static &'static str,
     },
 }
 
 const _: () = assert!(
-    size_of::<PackedDataForgeLocation>() <= 3 * size_of::<u64>(),
-    "packed DataForge sites fit in 24 bytes"
+    size_of::<PackedDataForgeLocation>() <= 2 * size_of::<u64>(),
+    "packed DataForge sites fit in 16 bytes"
 );
 
 impl RetainedLocation {
@@ -75,7 +75,7 @@ impl PackedDataForgeLocation {
                 field,
             } => DataForgeSite {
                 coordinates: Coordinates::Header([u64::from(record_index)]),
-                field,
+                field: field.name(),
             },
             PackedCoordinate::RecordDeclarations { record_index } => DataForgeSite {
                 coordinates: Coordinates::RecordDeclarations([u64::from(record_index)]),
@@ -87,7 +87,7 @@ impl PackedDataForgeLocation {
                 field,
             } => DataForgeSite {
                 coordinates: Coordinates::Value([u64::from(record_index), ordinal]),
-                field,
+                field: field.name(),
             },
         };
         RetainedLocation::DataForge(StoredDataForgeSite::new(site))
@@ -99,7 +99,7 @@ impl PackedCoordinate {
         match site.coordinates {
             Coordinates::Header([record_index]) => Some(Self::Header {
                 record_index: u32::try_from(record_index).ok()?,
-                field: known_field(HEADER_FIELDS, site.field)?,
+                field: HeaderField::of(site.field)?,
             }),
             Coordinates::RecordDeclarations([record_index]) => Some(Self::RecordDeclarations {
                 record_index: u32::try_from(record_index).ok()?,
@@ -107,14 +107,10 @@ impl PackedCoordinate {
             Coordinates::Value([record_index, ordinal]) => Some(Self::Value {
                 record_index: u32::try_from(record_index).ok()?,
                 ordinal,
-                field: known_field(VALUE_FIELDS, site.field)?,
+                field: ValueField::of(site.field)?,
             }),
         }
     }
-}
-
-fn known_field(fields: &'static [&'static str], field: &str) -> Option<&'static &'static str> {
-    fields.iter().find(|name| **name == field)
 }
 
 #[cfg(test)]

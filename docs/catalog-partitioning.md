@@ -258,6 +258,8 @@ After each Record and ContractGenerator window and at selected projection bounda
 source registry packs unheld DataForge uses into compact coordinates. It keeps live handles and their original authority. A later observation
 at the same coordinate reuses the original ID and evidence. The publisher streams the
 sorted live and packed rows together with the same IDs, scope, role and encryption.
+Each packed row uses the registered ID as its key and shares the original physical source
+reference with rows from the same source allocation. The DataForge coordinates remain typed.
 This storage uses RAM and adds no provenance spool.
 
 Record peak working set and peak private bytes separately.
