@@ -11,25 +11,29 @@ use crate::source_use::SourceUseRef;
 
 /// A DataForge coordinate stored beside its original immutable source-use ID.
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct PackedDataForgeLocation {
-    coordinate: PackedCoordinate,
+pub(crate) struct PackedDataForgeLocation<Extra = ()> {
+    coordinate: PackedCoordinate<Extra>,
 }
 
 #[derive(Debug, Clone, Copy)]
 #[repr(u8)]
-enum PackedCoordinate {
+enum PackedCoordinate<Extra> {
     Field {
+        extra: Extra,
         record_index: u32,
         field_start: usize,
     },
     Header {
+        extra: Extra,
         field: HeaderField,
         record_index: u32,
     },
     RecordDeclarations {
+        extra: Extra,
         record_index: u32,
     },
     Value {
+        extra: Extra,
         field: ValueField,
         record_index: u32,
         ordinal: u64,
@@ -43,11 +47,19 @@ const _: () = assert!(
 
 impl RetainedLocation {
     pub(crate) fn pack_dataforge(&self) -> Option<PackedDataForgeLocation> {
+        self.pack_dataforge_with(())
+    }
+
+    pub(crate) fn pack_dataforge_with<Extra: Copy>(
+        &self,
+        extra: Extra,
+    ) -> Option<PackedDataForgeLocation<Extra>> {
         let coordinate = match self {
-            Self::DataForge(stored) => PackedCoordinate::from_site(stored.site)?,
+            Self::DataForge(stored) => PackedCoordinate::from_site(stored.site, extra)?,
             Self::DataForgeField(stored) => PackedCoordinate::Field {
                 record_index: stored.record_index,
                 field_start: stored.field_start,
+                extra,
             },
             Self::Original(_) | Self::Xml(_) | Self::ReferenceSubresource(_) => return None,
         };
@@ -55,7 +67,16 @@ impl RetainedLocation {
     }
 }
 
-impl PackedDataForgeLocation {
+impl<Extra: Copy> PackedDataForgeLocation<Extra> {
+    pub(crate) const fn extra(&self) -> Extra {
+        match self.coordinate {
+            PackedCoordinate::Field { extra, .. }
+            | PackedCoordinate::Header { extra, .. }
+            | PackedCoordinate::RecordDeclarations { extra, .. }
+            | PackedCoordinate::Value { extra, .. } => extra,
+        }
+    }
+
     pub(crate) const fn has_direct_field(&self) -> bool {
         matches!(self.coordinate, PackedCoordinate::Field { .. })
     }
@@ -66,6 +87,7 @@ impl PackedDataForgeLocation {
             PackedCoordinate::Field {
                 record_index,
                 field_start,
+                ..
             } => {
                 return RetainedLocation::DataForgeField(StoredDataForgeField {
                     reference: id.clone(),
@@ -77,11 +99,12 @@ impl PackedDataForgeLocation {
             PackedCoordinate::Header {
                 record_index,
                 field,
+                ..
             } => DataForgeSite {
                 coordinates: Coordinates::Header([u64::from(record_index)]),
                 field: field.name(),
             },
-            PackedCoordinate::RecordDeclarations { record_index } => DataForgeSite {
+            PackedCoordinate::RecordDeclarations { record_index, .. } => DataForgeSite {
                 coordinates: Coordinates::RecordDeclarations([u64::from(record_index)]),
                 field: SURVEY_FIELD,
             },
@@ -89,6 +112,7 @@ impl PackedDataForgeLocation {
                 record_index,
                 ordinal,
                 field,
+                ..
             } => DataForgeSite {
                 coordinates: Coordinates::Value([u64::from(record_index), ordinal]),
                 field: field.name(),
@@ -98,20 +122,23 @@ impl PackedDataForgeLocation {
     }
 }
 
-impl PackedCoordinate {
-    fn from_site(site: DataForgeSite) -> Option<Self> {
+impl<Extra: Copy> PackedCoordinate<Extra> {
+    fn from_site(site: DataForgeSite, extra: Extra) -> Option<Self> {
         match site.coordinates {
             Coordinates::Header([record_index]) => Some(Self::Header {
                 record_index: u32::try_from(record_index).ok()?,
                 field: HeaderField::of(site.field)?,
+                extra,
             }),
             Coordinates::RecordDeclarations([record_index]) => Some(Self::RecordDeclarations {
                 record_index: u32::try_from(record_index).ok()?,
+                extra,
             }),
             Coordinates::Value([record_index, ordinal]) => Some(Self::Value {
                 record_index: u32::try_from(record_index).ok()?,
                 ordinal,
                 field: ValueField::of(site.field)?,
+                extra,
             }),
         }
     }

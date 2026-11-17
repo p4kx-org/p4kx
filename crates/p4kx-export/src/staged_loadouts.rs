@@ -28,37 +28,72 @@ pub(crate) struct StagedLoadouts {
     failure: RefCell<Option<RowSpoolError>>,
 }
 
+pub(super) struct StagedLoadoutWriter<'run> {
+    ships: Vec<PositionedShipLoadout>,
+    items: Option<RowSpoolWriter>,
+    len: usize,
+    scratch: &'run Path,
+    cancel: Option<&'run CancelToken>,
+}
+
+impl<'run> StagedLoadoutWriter<'run> {
+    pub(super) const fn new(scratch: &'run Path, cancel: Option<&'run CancelToken>) -> Self {
+        Self {
+            ships: Vec::new(),
+            items: None,
+            len: 0,
+            scratch,
+            cancel,
+        }
+    }
+
+    pub(super) fn append(&mut self, loadout: Loadout) -> Result<(), RowSpoolError> {
+        checkpoint(self.cancel)?;
+        match loadout.entity_kind {
+            EntityKind::Ship => self.ships.push(PositionedShipLoadout {
+                ordinal: self.len,
+                loadout,
+            }),
+            EntityKind::Item => {
+                let writer = match &mut self.items {
+                    Some(writer) => writer,
+                    None => self.items.insert(RowSpoolWriter::new(self.scratch)?),
+                };
+                writer.append(&loadout, self.cancel)?;
+            }
+        }
+        self.len += 1;
+        Ok(())
+    }
+
+    pub(super) fn finish(self) -> Result<StagedLoadouts, RowSpoolError> {
+        checkpoint(self.cancel)?;
+        let items = self
+            .items
+            .map(|writer| writer.finish(self.cancel))
+            .transpose()?;
+        Ok(StagedLoadouts {
+            ships: self.ships,
+            items,
+            len: self.len,
+            cancel: self.cancel.cloned(),
+            failure: RefCell::default(),
+        })
+    }
+}
+
 impl StagedLoadouts {
+    #[cfg(test)]
     pub(crate) fn stage(
         rows: Vec<Loadout>,
         scratch: &Path,
         cancel: Option<&CancelToken>,
     ) -> Result<Self, RowSpoolError> {
-        checkpoint(cancel)?;
-        let len = rows.len();
-        let mut ships = Vec::new();
-        let mut items: Option<RowSpoolWriter> = None;
-        for (ordinal, loadout) in rows.into_iter().enumerate() {
-            checkpoint(cancel)?;
-            match loadout.entity_kind {
-                EntityKind::Ship => ships.push(PositionedShipLoadout { ordinal, loadout }),
-                EntityKind::Item => {
-                    let writer = match &mut items {
-                        Some(writer) => writer,
-                        None => items.insert(RowSpoolWriter::new(scratch)?),
-                    };
-                    writer.append(&loadout, cancel)?;
-                }
-            }
+        let mut writer = StagedLoadoutWriter::new(scratch, cancel);
+        for row in rows {
+            writer.append(row)?;
         }
-        let items = items.map(|writer| writer.finish(cancel)).transpose()?;
-        Ok(Self {
-            ships,
-            items,
-            len,
-            cancel: cancel.cloned(),
-            failure: RefCell::default(),
-        })
+        writer.finish()
     }
 
     pub(crate) const fn len(&self) -> usize {

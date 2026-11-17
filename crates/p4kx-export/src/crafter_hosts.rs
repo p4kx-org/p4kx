@@ -3,14 +3,15 @@
 
 use std::collections::HashMap;
 
-use crate::contract::{Crafter, Loadout};
-use crate::contract_loadout::{EntityKind, LoadoutPort};
+use crate::contract::Crafter;
+use crate::contract_loadout::LoadoutPort;
 use crate::guid_text::CatalogGuid;
+use crate::loadout::staging::StagedLoadouts;
 
 /// Fills `host_guids` of every crafter in `crafters` with the ships whose Default Loadout mounts
 /// it, at any depth of the port tree. `loadouts` is ordered by entity GUID, so the hosts come out
 /// ordered.
-pub(crate) fn link_hosts(crafters: &mut [Crafter<'_>], loadouts: &[Loadout]) {
+pub(crate) fn link_hosts(crafters: &mut [Crafter<'_>], loadouts: &StagedLoadouts) {
     let index: HashMap<CatalogGuid, usize> = crafters
         .iter()
         .enumerate()
@@ -19,10 +20,8 @@ pub(crate) fn link_hosts(crafters: &mut [Crafter<'_>], loadouts: &[Loadout]) {
     if index.is_empty() {
         return;
     }
-    for loadout in loadouts
-        .iter()
-        .filter(|loadout| loadout.entity_kind == EntityKind::Ship)
-    {
+    for ship in loadouts.ships() {
+        let loadout = &ship.loadout;
         mounted(&loadout.ports, &mut |guid| {
             if let Some(&at) = index.get(&guid)
                 && let Some(crafter) = crafters.get_mut(at)
@@ -47,6 +46,8 @@ fn mounted(ports: &[LoadoutPort], visit: &mut impl FnMut(CatalogGuid)) {
 mod tests {
     use super::*;
     use p4kx_extraction::Guid;
+
+    use crate::contract_loadout::{EntityKind, Loadout};
 
     fn guid(last: u128) -> CatalogGuid {
         CatalogGuid(Guid::from_stored(last.to_le_bytes()))
@@ -89,9 +90,11 @@ mod tests {
     }
 
     #[test]
-    fn a_ship_hosts_a_crafter_mounted_at_any_depth_once() {
+    fn a_ship_hosts_a_crafter_mounted_at_any_depth_once() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let scratch = tempfile::tempdir()?;
         let mut crafters = [crafter(1), crafter(2)];
-        let loadouts = [
+        let loadouts = vec![
             loadout(
                 10,
                 EntityKind::Ship,
@@ -104,8 +107,10 @@ mod tests {
             ),
             loadout(12, EntityKind::Item, vec![port(1, Vec::new())]),
         ];
-        link_hosts(&mut crafters, &loadouts);
+        let staged = StagedLoadouts::stage(loadouts, scratch.path(), None)?;
+        link_hosts(&mut crafters, &staged);
         assert_eq!(crafters[0].host_guids, [guid(10), guid(11)]);
         assert!(crafters[1].host_guids.is_empty(), "a station has no host");
+        Ok(())
     }
 }

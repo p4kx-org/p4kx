@@ -1,3 +1,4 @@
 ### Changed
 
-- Stage Item loadouts in one compressed temporary file to reduce Catalog preparation memory. Ship loadouts keep their ordered placement and configuration links.
+- Resolve loadouts in parallel windows and stage Item rows in one compressed temporary file.
+  Ship loadouts keep their ordered placement and configuration links.

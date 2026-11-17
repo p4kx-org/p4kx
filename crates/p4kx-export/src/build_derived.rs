@@ -16,7 +16,6 @@ use crate::contract_loadout::EntityKind;
 use crate::contract_template_read::ContractTemplates;
 use crate::crafter_hosts::link_hosts;
 use crate::crafting_warning::CraftingWarning;
-use crate::loadout::staging::StagedLoadouts;
 use crate::loadout::{Wanted, loadouts};
 use crate::missions;
 use crate::options::CatalogRun;
@@ -153,7 +152,8 @@ pub(crate) fn add_loadouts<'f>(
     input: &OriginalCatalogInput<'_, 'f>,
     cancel: Option<&CancelToken>,
 ) -> Result<LoadoutSummary, CatalogError> {
-    let wanted: Vec<Wanted> = collected
+    let port_items = std::mem::take(&mut collected.port_items);
+    let wanted = collected
         .ships
         .iter()
         .map(|ship| Wanted {
@@ -161,8 +161,7 @@ pub(crate) fn add_loadouts<'f>(
             guid: ship.guid,
             kind: EntityKind::Ship,
         })
-        .chain(collected.port_items.iter().copied())
-        .collect();
+        .chain(port_items);
     let known: HashSet<Guid> = collected
         .items
         .iter()
@@ -172,7 +171,7 @@ pub(crate) fn add_loadouts<'f>(
     let built = loadouts(
         files,
         entities,
-        &wanted,
+        wanted,
         &known,
         crate::loadout::SelectedSources {
             ledger: &collected.ledger,
@@ -183,7 +182,7 @@ pub(crate) fn add_loadouts<'f>(
     )?;
     collected.ledger.merge(built.ledger);
     link_hosts(&mut collected.crafters, &built.entries);
-    collected.loadouts = StagedLoadouts::stage(built.entries, &std::env::temp_dir(), cancel)?;
+    collected.loadouts = built.entries;
     collected.add_failures(built.failures);
     Ok(built.summary)
 }

@@ -17,16 +17,70 @@ pub(crate) type PackedUseTree = BTreeMap<Arc<str>, PackedSourceUse>;
 #[derive(Clone)]
 pub(crate) struct PackedSourceUse {
     source: Arc<PhysicalSourceRef>,
-    location: PackedDataForgeLocation,
-    scope: InputScope,
-    role: SourceUseRole,
-    encryption: SourceEncryptionState,
+    // The use facts fit beside the coordinate tag before the aligned fields.
+    location: PackedDataForgeLocation<PackedUseFacts>,
 }
 
 const _: () = assert!(
-    size_of::<(Arc<str>, PackedSourceUse)>() <= 6 * size_of::<u64>(),
-    "the packed source-use entry fits in 48 bytes"
+    size_of::<(Arc<str>, PackedSourceUse)>() <= 5 * size_of::<u64>(),
+    "the packed source-use entry fits in 40 bytes"
 );
+
+#[derive(Clone, Copy)]
+struct PackedUseFacts {
+    scope_encryption: ScopeEncryption,
+    role: SourceUseRole,
+}
+
+#[derive(Clone, Copy)]
+#[repr(u8)]
+enum ScopeEncryption {
+    PayloadEncrypted,
+    PayloadUnencrypted,
+    PayloadUnknown,
+    DirectoryEncrypted,
+    DirectoryUnencrypted,
+    DirectoryUnknown,
+    FileEncrypted,
+    FileUnencrypted,
+    FileUnknown,
+}
+
+impl ScopeEncryption {
+    const fn new(scope: InputScope, encryption: SourceEncryptionState) -> Self {
+        use InputScope::{ArchiveDirectoryMetadata, FileMetadata, Payload};
+        use SourceEncryptionState::{Encrypted, Unencrypted, Unknown};
+
+        match (scope, encryption) {
+            (Payload, Encrypted) => Self::PayloadEncrypted,
+            (Payload, Unencrypted) => Self::PayloadUnencrypted,
+            (Payload, Unknown) => Self::PayloadUnknown,
+            (ArchiveDirectoryMetadata, Encrypted) => Self::DirectoryEncrypted,
+            (ArchiveDirectoryMetadata, Unencrypted) => Self::DirectoryUnencrypted,
+            (ArchiveDirectoryMetadata, Unknown) => Self::DirectoryUnknown,
+            (FileMetadata, Encrypted) => Self::FileEncrypted,
+            (FileMetadata, Unencrypted) => Self::FileUnencrypted,
+            (FileMetadata, Unknown) => Self::FileUnknown,
+        }
+    }
+
+    const fn into_parts(self) -> (InputScope, SourceEncryptionState) {
+        use InputScope::{ArchiveDirectoryMetadata, FileMetadata, Payload};
+        use SourceEncryptionState::{Encrypted, Unencrypted, Unknown};
+
+        match self {
+            Self::PayloadEncrypted => (Payload, Encrypted),
+            Self::PayloadUnencrypted => (Payload, Unencrypted),
+            Self::PayloadUnknown => (Payload, Unknown),
+            Self::DirectoryEncrypted => (ArchiveDirectoryMetadata, Encrypted),
+            Self::DirectoryUnencrypted => (ArchiveDirectoryMetadata, Unencrypted),
+            Self::DirectoryUnknown => (ArchiveDirectoryMetadata, Unknown),
+            Self::FileEncrypted => (FileMetadata, Encrypted),
+            Self::FileUnencrypted => (FileMetadata, Unencrypted),
+            Self::FileUnknown => (FileMetadata, Unknown),
+        }
+    }
+}
 
 impl PackedSourceUse {
     pub(crate) const fn has_direct_field(&self) -> bool {
@@ -37,35 +91,37 @@ impl PackedSourceUse {
         row: &SourceUseDescription,
         sources: &mut BTreeSet<Arc<PhysicalSourceRef>>,
     ) -> Option<Self> {
-        let location = row.location.pack_dataforge()?;
-        let source = intern_source(sources, row.source())?;
-        Some(Self {
-            source,
-            location,
-            scope: row.scope(),
+        let facts = PackedUseFacts {
+            scope_encryption: ScopeEncryption::new(row.scope(), row.effective_encryption()),
             role: row.role(),
-            encryption: row.effective_encryption(),
-        })
+        };
+        let location = row.location.pack_dataforge_with(facts)?;
+        let source = intern_source(sources, row.source())?;
+        Some(Self { source, location })
     }
 
     pub(crate) fn restore(&self, text: &Arc<str>) -> SourceUseDescription {
         let id = SourceUseRef::from_registered(Arc::clone(text));
         let location = self.location.retain(&id);
+        let facts = self.location.extra();
+        let (scope, effective_encryption) = facts.scope_encryption.into_parts();
         SourceUseDescription {
             id,
             source: self.source.as_ref().clone(),
-            scope: self.scope,
-            role: self.role,
+            scope,
+            role: facts.role,
             location,
-            effective_encryption: self.encryption,
+            effective_encryption,
         }
     }
 
     pub(crate) const fn contribution<'a>(&self, text: &'a Arc<str>) -> OriginContribution<'a> {
+        let facts = self.location.extra();
+        let (_, encryption) = facts.scope_encryption.into_parts();
         OriginContribution {
             id: OriginUseId::Registered(text),
-            role: self.role,
-            encryption: self.encryption,
+            role: facts.role,
+            encryption,
             opaque: false,
         }
     }
@@ -83,6 +139,10 @@ fn intern_source(
     sources.insert(Arc::clone(&shared));
     Some(shared)
 }
+
+#[cfg(test)]
+#[path = "source_packed_use_wire_tests.rs"]
+mod wire_tests;
 
 #[cfg(test)]
 mod tests {

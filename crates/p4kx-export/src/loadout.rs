@@ -8,9 +8,10 @@ use p4kx_assembly::{ArchiveFiles, Entities, LoadoutResolver};
 use p4kx_extraction::{CancelToken, DataForge, Guid, RecordTree, Value};
 use rayon::prelude::*;
 
+use crate::catalog_rows::spool::{RowSpoolError, checkpoint};
 use crate::catalog_v3::catalog_item_alignment::{AlignmentIndex, ItemAlignmentRows};
 use crate::contract_loadout::{EntityKind, Loadout, LoadoutPort};
-use crate::guid_text::CatalogGuid;
+use crate::guid_text::{self, CatalogGuid};
 use crate::loadout_port::PortReader;
 use crate::record_fields::elements;
 use crate::{CatalogError, CatalogReadFailure, LoadoutSummary};
@@ -23,6 +24,7 @@ pub(crate) mod ledger;
 use crate::Kind;
 use crate::export_ledger::ExportLedger;
 use ledger::Capture;
+use staging::{StagedLoadoutWriter, StagedLoadouts};
 
 #[path = "staged_loadouts.rs"]
 pub(crate) mod staging;
@@ -95,7 +97,7 @@ pub(crate) struct Wanted {
 
 /// The loadouts of a catalog, the Records that could not be resolved and what was counted.
 pub(crate) struct Loadouts<'f> {
-    pub(crate) entries: Vec<Loadout>,
+    pub(crate) entries: StagedLoadouts,
     pub(crate) failures: Vec<CatalogReadFailure<'f>>,
     pub(crate) summary: LoadoutSummary,
     pub(crate) ledger: ExportLedger,
@@ -116,11 +118,11 @@ pub(crate) struct SelectedSources<'rows, 'source> {
 ///
 /// # Errors
 ///
-/// Returns [`CatalogError::Cancelled`] once `cancel` is cancelled.
+/// Returns an error if resolution accounting fails, staging cannot write, or cancellation is requested.
 pub(crate) fn loadouts<'f>(
     files: &ArchiveFiles<'_>,
     entities: &Arc<Entities<'f>>,
-    wanted: &[Wanted],
+    wanted: impl Iterator<Item = Wanted>,
     known: &HashSet<Guid>,
     sources: SelectedSources<'_, 'f>,
     input: &crate::build::original_input::OriginalCatalogInput<'_, 'f>,
@@ -144,36 +146,65 @@ pub(crate) fn loadouts<'f>(
         alignment: &alignment,
         capture: Arc::clone(&capture),
     };
-    let read: Vec<Option<Result<Option<Loadout>, CatalogReadFailure<'f>>>> = wanted
-        .par_iter()
-        .map(|want| {
-            if cancel.is_some_and(CancelToken::is_cancelled) {
-                return None;
-            }
-            Some(pool.read(*want))
-        })
-        .collect();
+    let scratch = std::env::temp_dir();
+    let mut entries = StagedLoadoutWriter::new(&scratch, cancel);
+    let mut summary = LoadoutSummary::default();
+    let mut outside = HashSet::new();
+    let failures = resolve_windows(
+        wanted,
+        rayon::current_num_threads(),
+        cancel,
+        |want| pool.read(want),
+        |entry| {
+            summary.add_entry(&entry, known, &mut outside);
+            entries.append(entry)
+        },
+    );
     drop(pool);
     let mut ledger = capture.finish()?;
     drop(capture);
+    let failures = failures?;
     ledger.inventory(Kind::Loadouts);
-    let mut entries = Vec::with_capacity(read.len());
-    let mut failures = Vec::new();
-    for result in read {
-        match result.ok_or(CatalogError::Cancelled)? {
-            Ok(Some(entry)) => entries.push(entry),
-            Ok(None) => {}
-            Err(failure) => failures.push(failure),
-        }
-    }
-    entries.sort_by_cached_key(|entry| entry.entity_guid.text());
-    let summary = LoadoutSummary::of(&entries, known);
+    summary.outside = outside.len();
     Ok(Loadouts {
-        entries,
+        entries: entries.finish()?,
         failures,
         summary,
         ledger,
     })
+}
+
+fn resolve_windows<'source>(
+    wanted: impl Iterator<Item = Wanted>,
+    width: usize,
+    cancel: Option<&CancelToken>,
+    read: impl Fn(Wanted) -> Result<Option<Loadout>, CatalogReadFailure<'source>> + Sync,
+    mut accept: impl FnMut(Loadout) -> Result<(), RowSpoolError>,
+) -> Result<Vec<CatalogReadFailure<'source>>, CatalogError> {
+    let mut ordered: Vec<_> = wanted.enumerate().collect();
+    guid_text::sort_by_guid(&mut ordered, |(_, want)| want.guid);
+    let mut failures = Vec::new();
+    let mut reads = Vec::with_capacity(width.min(ordered.len()));
+    for window in ordered.chunks(width) {
+        window
+            .par_iter()
+            .map(|(_, want)| checkpoint(cancel).map(|()| read(*want)))
+            .collect_into_vec(&mut reads);
+        #[expect(
+            clippy::iter_with_drain,
+            reason = "reuse the indexed Rayon result buffer across loadout windows"
+        )]
+        for ((position, _), result) in window.iter().zip(reads.drain(..)) {
+            match result? {
+                Ok(Some(entry)) => accept(entry)?,
+                Ok(None) => {}
+                Err(failure) => failures.push((*position, failure)),
+            }
+        }
+    }
+    // Equal-GUID failures are deduplicated in input order by the collector.
+    failures.sort_unstable_by_key(|(position, _)| *position);
+    Ok(failures.into_iter().map(|(_, failure)| failure).collect())
 }
 
 fn read_with<'f: 'worker, 'worker>(
@@ -219,30 +250,20 @@ fn read_with<'f: 'worker, 'worker>(
     }))
 }
 
+#[cfg(test)]
+#[path = "loadout_window_tests.rs"]
+mod window_tests;
+
 impl LoadoutSummary {
-    /// Counts the ports of `entries` and the attached GUIDs outside `known`.
-    fn of(entries: &[Loadout], known: &HashSet<Guid>) -> Self {
-        let mut summary = Self {
-            ships: entries
-                .iter()
-                .filter(|entry| entry.entity_kind == EntityKind::Ship)
-                .count(),
-            items: entries
-                .iter()
-                .filter(|entry| entry.entity_kind == EntityKind::Item)
-                .count(),
-            with_issues: entries
-                .iter()
-                .filter(|entry| !entry.issues.is_empty())
-                .count(),
-            ..Self::default()
-        };
-        let mut outside = HashSet::new();
-        for entry in entries {
-            summary.count(&entry.ports, known, &mut outside);
+    fn add_entry(&mut self, entry: &Loadout, known: &HashSet<Guid>, outside: &mut HashSet<Guid>) {
+        match entry.entity_kind {
+            EntityKind::Ship => self.ships += 1,
+            EntityKind::Item => self.items += 1,
         }
-        summary.outside = outside.len();
-        summary
+        if !entry.issues.is_empty() {
+            self.with_issues += 1;
+        }
+        self.count(&entry.ports, known, outside);
     }
 
     fn count(&mut self, ports: &[LoadoutPort], known: &HashSet<Guid>, outside: &mut HashSet<Guid>) {
