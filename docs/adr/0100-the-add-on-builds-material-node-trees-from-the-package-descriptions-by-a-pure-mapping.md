@@ -1,5 +1,8 @@
 # The add-on builds material node trees from the package descriptions by a pure mapping
 
+Amended by ADR-0400: explicitly selected HardSurface palette finish multiplies sampled
+smoothness before its linear inverse; GLB layer roughness uses the same finish controls.
+
 Decided for issue #160 (M13.4); it reads the descriptions of ADR-0092 in the add-on of ADR-0093.
 
 Amended by ADR-0207: a layer that takes a palette entry or a tint other than white takes its metal

@@ -13,6 +13,7 @@ pub(super) const FINISH_PALETTE_BYTE: u8 = 184;
 pub(super) const PALETTE_BYTES: [u8; 5] = [0, 1, 128, 255, FINISH_PALETTE_BYTE];
 pub(super) const NORMAL_ALPHA: u8 = 196;
 pub(super) const TEXTURE_PATH: &str = "Objects/Test/palette_sample_ddna.dds";
+pub(super) const ROOT_AO_PATH: &str = "Objects/Test/wrapper_ao.dds";
 pub(super) const EXPLICIT_GLOSS_PATH: &str = "Objects/Test/palette_explicit_gloss.dds";
 const ALPHA_FREE_NORMAL: &str = "Objects/Test/palette_rgb_ddna.dds";
 const EXPLICIT_GLOSS_GREEN: u8 = 163;
@@ -22,20 +23,30 @@ pub(super) struct LayerOnlyCase {
     pub(super) path: &'static str,
     pub(super) slot: &'static str,
     layer: &'static str,
+    pub(super) zero_wear_layer: Option<&'static str>,
 }
 
-pub(super) const LAYER_ONLY_CASES: [LayerOnlyCase; 2] = [
+pub(super) const LAYER_ONLY_CASES: [LayerOnlyCase; 3] = [
     LayerOnlyCase {
         name: "LayerOnlyDdna",
         path: TEXTURE_PATH,
         slot: "TexSlot2",
         layer: SAMPLED_LAYER,
+        zero_wear_layer: None,
     },
     LayerOnlyCase {
         name: "LayerOnlyGloss",
         path: EXPLICIT_GLOSS_PATH,
         slot: "TexSlot6",
         layer: GLOSS_LAYER,
+        zero_wear_layer: None,
+    },
+    LayerOnlyCase {
+        name: "LayerZeroWearAo",
+        path: EXPLICIT_GLOSS_PATH,
+        slot: "TexSlot6",
+        layer: GLOSS_LAYER,
+        zero_wear_layer: Some(CONSTANT_LAYER),
     },
 ];
 
@@ -67,6 +78,8 @@ const SAMPLED_LAYER: &str = "Objects/Test/palette_sample.mtl";
 const GLOSS_LAYER: &str = "Objects/Test/palette_gloss_only.mtl";
 const LAYER_ONLY_CLASS: &str = "TEST_LayerOnlyGloss";
 const LAYER_ONLY_LIBRARY: &str = "Objects/Test/layer_only_gloss";
+const ZERO_WEAR_CLASS: &str = "TEST_LayerZeroWearAo";
+const ZERO_WEAR_LIBRARY: &str = "Objects/Test/layer_zero_wear_ao";
 const CONSTANT_LAYER: &str = "Objects/Test/palette_constant.mtl";
 const FIRST_PALETTE_GUID: u128 = 0x9500;
 const FIRST_ENTITY_GUID: u128 = 0x9600;
@@ -119,6 +132,10 @@ pub(super) fn palette_name(byte: u8) -> String {
 pub(super) fn entries() -> Result<Vec<TestEntry>, Box<dyn Error>> {
     let model = TestModel::cube();
     let mut entries = vec![
+        TestEntry::stored(
+            format!("Data/{ROOT_AO_PATH}"),
+            texture(TestTextureFormat::LegacyBgra8, [255, 255, 255, 255])?,
+        ),
         TestEntry::stored(format!("Data/{MODEL}"), model.cgf()),
         TestEntry::stored("Data/Objects/Test/palette_sample.cgfm", model.cgfm()),
         TestEntry::stored(
@@ -153,6 +170,7 @@ pub(super) fn entries() -> Result<Vec<TestEntry>, Box<dyn Error>> {
             format!("Data/{LAYER_ONLY_LIBRARY}.mtl"),
             layer_only_library(),
         ),
+        TestEntry::stored(format!("Data/{ZERO_WEAR_LIBRARY}.mtl"), zero_wear_library()),
     ];
     let database = database(&mut entries);
     entries.push(TestEntry::zstd("Data/Game2.dcb", database).encrypted());
@@ -183,17 +201,7 @@ fn database(entries: &mut Vec<TestEntry>) -> Vec<u8> {
     }
     for (case, id) in EXPLICIT_GLOSS_CASES.iter().zip(ids.by_ref()) {
         let class = format!("TEST_{}", case.name);
-        let library = format!("Objects/Test/{}", case.name);
-        let mut material = TestMtlMaterial::new(case.name)
-            .shader("HardSurface")
-            .texture("TexSlot6", EXPLICIT_GLOSS_PATH);
-        if let Some(normal) = case.normal {
-            material = material.texture("TexSlot2", normal);
-        }
-        entries.push(TestEntry::stored(
-            format!("Data/{library}.mtl"),
-            TestMtl::multi(&[TestMtlMaterial::new("unused"), material]).cryxml(),
-        ));
+        let library = explicit_gloss_library(entries, case);
         children.push(TestLoadoutEntry::class(class.as_str(), class.as_str()));
         database = database.record(
             TestEntity::new(id, &class, format!("entities/scitem/{class}.xml"))
@@ -201,8 +209,16 @@ fn database(entries: &mut Vec<TestEntry>) -> Vec<u8> {
                 .record(),
         );
     }
-    children.push(TestLoadoutEntry::class(LAYER_ONLY_CLASS, LAYER_ONLY_CLASS));
-    database = database.record(layer_only_entity(ids.start).record());
+    for ((class, library), id) in [
+        (LAYER_ONLY_CLASS, LAYER_ONLY_LIBRARY),
+        (ZERO_WEAR_CLASS, ZERO_WEAR_LIBRARY),
+    ]
+    .into_iter()
+    .zip(ids)
+    {
+        children.push(TestLoadoutEntry::class(class, class));
+        database = database.record(layer_only_entity(id, class, library).record());
+    }
     for byte in PALETTE_BYTES {
         database = database.record(tint_palette_record(
             FIRST_PALETTE_GUID + u128::from(byte),
@@ -218,14 +234,25 @@ fn database(entries: &mut Vec<TestEntry>) -> Vec<u8> {
     database.build()
 }
 
-fn layer_only_entity(id: u128) -> TestEntity {
-    TestEntity::new(
-        id,
-        LAYER_ONLY_CLASS,
-        format!("entities/scitem/{LAYER_ONLY_CLASS}.xml"),
-    )
-    .geometry(MODEL, Some(LAYER_ONLY_LIBRARY))
-    .palette(FIRST_PALETTE_GUID + u128::from(FINISH_PALETTE_BYTE), "")
+fn explicit_gloss_library(entries: &mut Vec<TestEntry>, case: &ExplicitGlossCase) -> String {
+    let library = format!("Objects/Test/{}", case.name);
+    let mut material = TestMtlMaterial::new(case.name)
+        .shader("HardSurface")
+        .texture("TexSlot6", EXPLICIT_GLOSS_PATH);
+    if let Some(normal) = case.normal {
+        material = material.texture("TexSlot2", normal);
+    }
+    entries.push(TestEntry::stored(
+        format!("Data/{library}.mtl"),
+        TestMtl::multi(&[TestMtlMaterial::new("unused"), material]).cryxml(),
+    ));
+    library
+}
+
+fn layer_only_entity(id: u128, class: &str, library: &str) -> TestEntity {
+    TestEntity::new(id, class, format!("entities/scitem/{class}.xml"))
+        .geometry(MODEL, Some(library))
+        .palette(FIRST_PALETTE_GUID + u128::from(FINISH_PALETTE_BYTE), "")
 }
 
 fn library(byte: u8, multiplier: Multiplier) -> Vec<u8> {
@@ -251,22 +278,41 @@ fn library(byte: u8, multiplier: Multiplier) -> Vec<u8> {
     TestMtl::multi(&[TestMtlMaterial::new("unused"), make(true), make(false)]).cryxml()
 }
 
+fn layer_only_material(case: &LayerOnlyCase) -> TestMtlMaterial {
+    let material = TestMtlMaterial::new(case.name)
+        .shader("HardSurface")
+        .texture("TexSlot1", ROOT_AO_PATH)
+        .layer_with(&[
+            ("Name", "Paint"),
+            ("PaletteTint", "1"),
+            ("Path", case.layer),
+            ("GlossMult", "0.5"),
+        ]);
+    match case.zero_wear_layer {
+        Some(path) => material
+            .attribute("StringGenMask", "%WEAR_LAYER%VERTCOLORS")
+            .public_param("WearBlendBase", "0")
+            .layer_with(&[("Name", "Wear"), ("PaletteTint", "2"), ("Path", path)]),
+        None => material,
+    }
+}
+
 fn layer_only_library() -> Vec<u8> {
-    let [ddna, gloss] = &LAYER_ONLY_CASES;
-    let material = |case: &LayerOnlyCase| {
-        TestMtlMaterial::new(case.name)
-            .shader("HardSurface")
-            .layer_with(&[
-                ("Name", "Paint"),
-                ("PaletteTint", "1"),
-                ("Path", case.layer),
-                ("GlossMult", "0.5"),
-            ])
-    };
+    let [ddna, gloss, _] = &LAYER_ONLY_CASES;
     TestMtl::multi(&[
         TestMtlMaterial::new("unused"),
-        material(ddna),
-        material(gloss),
+        layer_only_material(ddna),
+        layer_only_material(gloss),
+    ])
+    .cryxml()
+}
+
+fn zero_wear_library() -> Vec<u8> {
+    let [_, _, zero_wear] = &LAYER_ONLY_CASES;
+    TestMtl::multi(&[
+        TestMtlMaterial::new("unused"),
+        layer_only_material(zero_wear),
+        TestMtlMaterial::new("zero_wear_spare"),
     ])
     .cryxml()
 }

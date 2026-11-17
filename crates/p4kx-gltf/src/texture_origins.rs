@@ -65,6 +65,10 @@ pub(crate) enum TexturePaletteUse {
     DiffuseAndSpecular,
     /// The image conversion used specular shading.
     Specular,
+    /// The image conversion used the selected palette finish.
+    Finish,
+    /// The image conversion used specular shading and the selected palette finish.
+    SpecularAndFinish,
     /// The image conversion used stencil decal colours.
     Decal,
     /// The image conversion used tint values of the selected layers.

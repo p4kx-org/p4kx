@@ -7,10 +7,11 @@ use p4kx_model::Material;
 use p4kx_texture::DdsTransfer;
 
 use crate::layer_jobs::{fallback_guards, layer_jobs, layer_normals_last};
-use crate::layer_plan::Layered;
+use crate::layer_plan::{LayerMaps, Layered};
 use crate::material_alpha::uses_alpha;
 use crate::materials::{MaterialPlan, Slot, display_name};
 use crate::shading::shading;
+use crate::surface_finish::SurfaceFinish;
 use crate::texture_assemble::Wish;
 use crate::texture_loader::{TextureLoader, WithFallbacks};
 use crate::texture_make::{Budget, run_guarded};
@@ -48,11 +49,15 @@ pub(crate) enum Key {
         normal: String,
     },
     MetallicRoughness {
+        finish: Option<SurfaceFinish>,
         gloss: Option<String>,
         explicit_gloss: Vec<String>,
         specular: Option<(String, [u8; 3])>,
     },
     LayerBase {
+        blend: String,
+    },
+    LayerRoughness {
         blend: String,
     },
     LayerNormal {
@@ -74,6 +79,14 @@ pub(crate) struct Job {
 }
 
 impl Job {
+    pub(crate) const fn layer_maps(&self) -> LayerMaps {
+        match self.key {
+            Key::LayerNormal { .. } => LayerMaps::Normal,
+            Key::LayerRoughness { .. } => LayerMaps::Smoothness,
+            _ => LayerMaps::Diffuse,
+        }
+    }
+
     /// Returns the file `source` is reported by: its name in the material file, and for a layered
     /// image the image it is the size source of.
     pub(crate) fn file_of(&self, source: &Source) -> String {
@@ -88,6 +101,10 @@ impl Job {
                     source.file
                 )
             }
+            Key::LayerRoughness { .. } => format!(
+                "{} (layered roughness image of {count} layers)",
+                source.file
+            ),
             Key::LayerNormal { .. } => {
                 format!("{} (layered normal image of {count} layers)", source.file)
             }
@@ -111,6 +128,11 @@ impl Job {
                 .and_then(|layered| layered.sizing(true))
                 .or(self.normal.as_ref())
                 .map(|s| (TextureRole::Normal, s)),
+            Key::LayerRoughness { .. } => self
+                .layered
+                .as_ref()
+                .and_then(|layered| layered.size_sources(LayerMaps::Smoothness).next())
+                .map(|source| (TextureRole::Gloss, source)),
             Key::MetallicRoughness { .. } => self
                 .normal
                 .as_ref()
@@ -338,7 +360,8 @@ fn jobs_of(
         .specular
         .as_ref()
         .map(|specular| (specular.identity(), quantise(tints.specular)));
-    let (layer_base, layer_normal, layer_refused) = layer_jobs(material, &found, tints);
+    let (layer_base, layer_normal, layer_finish, layer_refused) =
+        layer_jobs(material, &found, tints);
     refused.extend(refusals(&layer_refused));
     let base = match (&found.diffuse, layer_base) {
         (Some(diffuse), _) => Some(add(base_job(
@@ -365,22 +388,15 @@ fn jobs_of(
     let (normal, fallback) = layer_normal.map_or((plain_normal, None), |layered| {
         (Some(add(layered)), plain_normal)
     });
-    let gloss = found.normal.as_ref().filter(|normal| normal.gloss);
-    let packed =
-        (gloss.is_some() || !explicit_gloss.is_empty() || specular_key.is_some()).then(|| {
-            add(Job {
-                key: Key::MetallicRoughness {
-                    gloss: gloss.map(Source::identity),
-                    explicit_gloss: explicit_gloss.iter().map(Source::identity).collect(),
-                    specular: specular_key,
-                },
-                diffuse: None,
-                normal: gloss.cloned(),
-                specular: found.specular.clone(),
-                explicit_gloss,
-                tints,
-                layered: None,
-            })
-        });
+    let packed = layer_finish.map(&mut *add).or_else(|| {
+        crate::texture_finish_plan::own_packed(
+            material,
+            &found,
+            explicit_gloss,
+            specular_key,
+            tints,
+        )
+        .map(&mut *add)
+    });
     ([base, normal, packed], fallback, refused)
 }

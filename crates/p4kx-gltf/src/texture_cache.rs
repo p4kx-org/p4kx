@@ -7,7 +7,7 @@ use std::sync::Arc;
 use rayon::prelude::*;
 
 use crate::texture_loader::{LoadedTexture, TextureLoadError, TextureLoader};
-use crate::texture_plan::{Job, Key};
+use crate::texture_plan::Job;
 
 /// The most pixels the decoded sources kept for the next group of jobs may hold together.
 pub(crate) const MAX_HELD_PIXELS: u64 = 1 << 27;
@@ -28,7 +28,7 @@ pub(crate) fn paths(job: &Job) -> impl Iterator<Item = &str> {
 }
 
 fn primary_paths(job: &Job) -> impl Iterator<Item = &str> {
-    let normal = matches!(job.key, Key::LayerNormal { .. });
+    let maps = job.layer_maps();
     [&job.diffuse, &job.normal, &job.specular]
         .into_iter()
         .flatten()
@@ -36,7 +36,7 @@ fn primary_paths(job: &Job) -> impl Iterator<Item = &str> {
         .chain(
             job.layered
                 .iter()
-                .flat_map(move |layered| layered.paths(normal)),
+                .flat_map(move |layered| layered.paths(maps)),
         )
 }
 

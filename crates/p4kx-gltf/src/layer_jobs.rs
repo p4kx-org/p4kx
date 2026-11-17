@@ -117,7 +117,12 @@ pub(crate) fn layer_job(
 
 /// The jobs of the base colour and the normal image of a layered material, and the texture files
 /// its layers name that have no safe path.
-pub(crate) type LayerJobs = (Option<Job>, Option<Job>, Vec<(TextureRole, String)>);
+pub(crate) type LayerJobs = (
+    Option<Job>,
+    Option<Job>,
+    Option<Job>,
+    Vec<(TextureRole, String)>,
+);
 
 /// Returns the jobs of the base colour and the normal image that the layers of `material` give
 /// when it has no diffuse map of its own and a layer has a diffuse or a normal map.
@@ -128,7 +133,7 @@ pub(crate) fn layer_jobs(material: &Material, found: &Sources, tints: Tints) -> 
         .then(|| layered_of(material))
         .flatten()
     else {
-        return (None, None, Vec::new());
+        return (None, None, None, Vec::new());
     };
     (
         layered
@@ -137,6 +142,17 @@ pub(crate) fn layer_jobs(material: &Material, found: &Sources, tints: Tints) -> 
         layered
             .has_normal()
             .then(|| layer_job(&layered, true, found.normal.as_ref(), tints)),
+        layered.has_sampled_finish().then(|| Job {
+            key: Key::LayerRoughness {
+                blend: layered.finish_fingerprint(),
+            },
+            diffuse: None,
+            normal: None,
+            specular: None,
+            explicit_gloss: Vec::new(),
+            tints,
+            layered: Some(layered.clone()),
+        }),
         layered.refused,
     )
 }

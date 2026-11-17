@@ -5,6 +5,9 @@ use super::{LayerPlan, Layered, MAX_BAKED_LAYERS};
 
 fn layer(at: usize, share: f32) -> LayerPlan {
     LayerPlan {
+        gloss: Vec::new(),
+        finish: None,
+        roughness: 0.5,
         at,
         share,
         diffuse: None,

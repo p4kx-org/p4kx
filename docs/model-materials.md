@@ -184,11 +184,20 @@ cubemap, array or volume is no surface texture and is listed as unreadable.
 | metallic-roughness texture | green = 1 - smoothness, blue = metalness from the specular map, red full |
 | factors | with a metallic-roughness texture that carries the channel 1, else the plain value of the table above; with a diffuse map the `Diffuse` colour is the base colour factor |
 
-*Roughness.* The smoothness is a linear 0 to 1 value, the same scale as the plain `Shininess`
-(1 - `Shininess` / 255), so the image and the factor agree. StarBreaker maps the texture with
-`V(1-s)`; no evidence in the files favours that, so the linear inverse is used for both. A
-material's own `Shininess` does not multiply the texture (it varies from 0 to 255 over materials
-with a normal map, without a pattern that would say it is a multiplier).
+*Roughness.* Smoothness inputs are linear data. An explicitly selected P4KX HardSurface
+palette finish uses `roughness = clamp(1 - sampledSmoothness × GlossMult × paletteGlossiness / 255,
+0, 1)` (ADR-0400). A layer without a selected entry uses a palette factor of one for sampled
+finish. The layer bake blends the finished roughness by its existing mask/positional shares;
+a layer without readable smoothness keeps its scalar fallback. Selected explicit Gloss uses its red channel; the generic unselected projection
+keeps RGB luminance. The normal-alpha source wins over the first readable explicit Gloss slot. The ordinary Blender importer applies the same per-surface finish calculation.
+A material without a selected palette retains its existing sampled mapping. An ordinary
+material's `Shininess` is not a multiplier of its texture.
+
+This selected authored projection preserves each consumed material, palette and pixel source;
+it does not identify an active runtime shader permutation or infer detail activation from a
+texture. Game lighting, GPU palette packing, detail gloss and engine-specific clamps remain
+separate from the documented export approximation. The new scalar alpha sampler preserves alpha
+when minifying, while existing RGB/normal minification stays unchanged.
 
 *Metalness.* There is no metalness map in the engine. The specular map and `Specular` colour give
 it: a texel is metal in proportion to the linear luminance of its tinted specular colour, from

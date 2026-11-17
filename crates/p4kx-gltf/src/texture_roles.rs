@@ -165,14 +165,25 @@ pub(crate) fn explicit_gloss_sources(
     if !material.layers.is_empty() || !material.shader.eq_ignore_ascii_case("HardSurface") {
         return Vec::new();
     }
-    material
-        .textures
+    layer_gloss_sources(material, &material.textures, refused)
+}
+
+pub(crate) fn layer_gloss_sources(
+    material: &Material,
+    textures: &[TextureSlot],
+    refused: &mut Vec<(TextureRole, String)>,
+) -> Vec<Source> {
+    if !material.shader.eq_ignore_ascii_case("HardSurface") {
+        return Vec::new();
+    }
+    textures
         .iter()
-        .filter(|slot| {
-            !slot.file.trim_start().starts_with('$')
-                && material.texture_role(&slot.map, &slot.file) == MaterialTextureRole::Gloss
-        })
         .filter_map(|slot| {
+            if slot.file.trim_start().starts_with('$')
+                || material.texture_role(&slot.map, &slot.file) != MaterialTextureRole::Gloss
+            {
+                return None;
+            }
             let file = slot.file.clone();
             let Some(path) = canonical(&file) else {
                 refused.push((TextureRole::Gloss, file));
@@ -200,7 +211,7 @@ pub fn diffuse_texture_path(material: &Material) -> Option<String> {
 /// as `$RenderToTexture` and for a path that is empty, absolute, drive-qualified, has control
 /// characters or an empty, `.` or `..` component.
 ///
-/// The extension of a source image (`.tif`, `.tga`, …) becomes `.dds`, the form the Archive holds.
+/// The extension of a source image (`.tif`, `.tga`, Ã¢â‚¬Â¦) becomes `.dds`, the form the Archive holds.
 pub(crate) fn canonical(file: &str) -> Option<String> {
     let unified = file.trim().replace('\\', "/");
     let relative = match unified.get(..DATA_PREFIX.len()) {

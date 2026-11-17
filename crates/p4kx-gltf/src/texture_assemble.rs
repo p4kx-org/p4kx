@@ -72,8 +72,10 @@ fn image_material(
     let mut layers = std::mem::take(&mut outcome.material_layers);
     let uses_palette = match outcome.palette_use {
         TexturePaletteUse::None => false,
-        TexturePaletteUse::Decal => true,
-        TexturePaletteUse::DiffuseAndSpecular | TexturePaletteUse::Specular => {
+        TexturePaletteUse::Decal | TexturePaletteUse::Finish => true,
+        TexturePaletteUse::DiffuseAndSpecular
+        | TexturePaletteUse::Specular
+        | TexturePaletteUse::SpecularAndFinish => {
             layers.extend(
                 shaded_layers(material)
                     .into_iter()
@@ -85,6 +87,7 @@ fn image_material(
                 material.tinted
             } else {
                 layer_palette(material, &layers)
+                    || outcome.palette_use == TexturePaletteUse::SpecularAndFinish
             }
         }
         TexturePaletteUse::Layers => layer_palette(material, &layers),

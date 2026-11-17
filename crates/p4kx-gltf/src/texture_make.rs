@@ -313,6 +313,9 @@ fn make(job: &Job, decoded: &Decoded) -> Outcome {
         Key::MetallicRoughness { .. } => make_packed(job, decoded, &mut outcome, &mut failures),
         Key::LayerBase { .. } => make_base_layers(job, decoded, &mut outcome, &mut failures),
         Key::LayerNormal { .. } => make_normal_layers(job, decoded, &mut outcome, &mut failures),
+        Key::LayerRoughness { .. } => {
+            crate::layer_finish::make(job, decoded, &mut outcome, &mut failures)
+        }
     };
     match made {
         Some(Ok(mut image)) => {

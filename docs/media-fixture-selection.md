@@ -146,11 +146,10 @@ acceptance criteria.
 
 ## Palette gloss and packed normal alpha
 
-The focused material fixture exports a textured GLB and a Blender package from the same
-synthetic Archive. It crosses palette bytes `0`, `1`, `128`, `255` and `184` with authored
-`GlossMult` of `0.5` and `0`. Byte `184` also has a case with the multiplier absent.
-Each case has materials with and without a normal map. The checks cover the palette origin,
-the authored layer multiplier and packed DDNA alpha `196 / 255`.
+The focused fixture exports a textured GLB and a Blender package from the same synthetic
+Archive. It crosses palette endpoints with absent, zero and half `GlossMult`, readable
+DDNA alpha, explicit Gloss, alpha-free normals and textureless fallback. A separate AO
+wrapper has two contributing layer declarations, vertex colours and explicit zero wear.
 
 ```powershell
 $env:P4KX_SYNTHETIC_PALETTE_GLOSS_PACKAGE = Join-Path $verificationRoot 'palette-gloss'
@@ -158,88 +157,54 @@ cargo test --locked -p p4kx-blender --test it -- palette_gloss_fixture_compares_
 & 'C:\Program Files\Blender Foundation\Blender 5.3\blender.exe' --background --factory-startup --disable-autoexec --python-exit-code 23 --python-expr 'import sys; sys.dont_write_bytecode = True' --threads 1 --python blender_addon/tests/blender_material_gloss_package.py -- "$env:P4KX_SYNTHETIC_PALETTE_GLOSS_PACKAGE/scene.json"
 ```
 
-Use a new package directory and the isolated Blender profile above. The GLB test reads the
-packed roughness channel from the embedded image and multiplies it by the exported factor.
-Blender checks the packed alpha pixels and the linked Roughness graph. For palette byte `184`,
-a one-thread 64x64 linear EXR probe samples the imported Roughness inputs through emission.
-The probe keeps a fixed orthographic camera and excludes reflectance and display grading.
-The sampled neutral and authored-half GLB cases expect `59 / 255` after the factor.
-Blender expects `59 / 255` with the
-multiplier absent and `157 / 255` with authored `0.5`, within one 8-bit step. The textureless
-fallback expects `71 / 255` and `163 / 255`, respectively. Cargo and Blender print the measured
-sampled values. The fixture measures the P4KX projection. Installed shader arithmetic, Details
-and in-game appearance have separate criteria.
+Use a new package directory and the isolated Blender profile above. The Rust check reads
+the embedded packed green channel and exported factor. The ordinary Blender importer is
+measured through a one-thread linear EXR emission probe with a fixed orthographic camera;
+reflectance and display grading do not affect that scalar signal.
 
-On Windows AMD64 with Blender 5.3.0 (`02f0899d78e3`), the sampled GLB cases
-measured `0.231372550` with absent, zero and `0.5` multipliers. The Blender
-linear probe measured `0.231372461` with the multiplier absent and
-`0.615686238` with `0.5`. The shared stencil probe also verified all eight
-painted and eight fallback samples.
+For the selected HardSurface finish, both consumers apply
+`R = clamp(1 - S * M * P, 0, 1)`: sampled smoothness `S`, authored layer multiplier `M`
+and selected palette gloss `P`. The fixture supplies expected inputs and tolerances; its
+printed measurements describe the actual candidate. Without a sample, the selected palette
+supplies base smoothness. An absent palette entry uses the documented unpainted fallback.
+See [ADR-0400](adr/0400-selected-hardsurface-palettes-multiply-sampled-smoothness.md).
 
-For an unlayered HardSurface material, the GLB uses the explicit `_gloss` map when the
-normal map supplies no readable smoothness alpha. It chooses the first usable authored
-Gloss slot. Both consumers sample the decoded RGB as data and use the Blender 5.3
-default Linear Rec.709 luminance for the explicit map. The GLB quantizes the inverse
-to its packed green channel and keeps the existing specular map's dimensions and blue
-channel when present. The paired numeric rule applies to the same texel under the
-default Blender colour configuration and neutral own-material multiplier. Blender
-can sample a separate UV transform per map. The GLB combines channels into one texture.
-[Blender default colour configuration](https://github.com/blender/blender/blob/v5.3.0/release/datafiles/colormanagement/config.ocio)
+Readable packed normal alpha takes precedence over an explicit Gloss slot. A selected
+HardSurface finish reads explicit Gloss red; the generic unselected RGB-Gloss path retains
+its luminance convention. Non-grey RGB with independently varying alpha distinguishes all
+three inputs. The AO wrapper checks that zero wear selects only the primary layer even
+with vertex colour present. Original layer positions, palette selection and image origins
+remain part of package verification.
 
-The shared synthetic Archive also supplies an encrypted explicit Gloss texture with RGBA
-`[32, 96, 224, 17]`. The package verifies the original PNG's data encoding and encrypted
-source. Both the gloss-only case and the alpha-free normal case export GLB green `163`,
-or `0.639215686`, and measure Blender roughness `0.640659332`. The alpha-free case keeps
-its Normal input linked. Adding a usable DDNA alpha byte `196` selects it ahead of Gloss.
-That case exports green `59` and measures `0.231372461` in Blender. The measured pairs
-agree within half an 8-bit step. These Windows AMD64 measurements use Blender 5.3.0
-(`02f0899d78e3`) and the package from the ordinary Rust producer.
+The new alpha-minification control uses constant RGB and varying alpha. Temporarily selecting
+RGB minification in that alpha consumer must fail the exact regression; restoring RGBA
+minification must pass. Existing RGB, base-colour and normal sampling keep their own behavior.
 
-The same fixture supplies two layered HardSurface materials with a texture only on the child.
-With palette byte `184` and `GlossMult=0.5`, the GLB uses the scalar `163 / 255` for both
-materials. The child DDNA supplies the GLB normal map. Blender samples the child textures
-for roughness and measures `0.615686178` from DDNA alpha and `0.820329666` from RGB Gloss.
-The package verifies the exact child slots and their image origins. These measurements show
-where the two P4KX paths use different inputs for the same synthetic material.
+On native Windows AMD64, Blender 5.3.0 (`02f0899d78e3`) measured neutral roughness
+`0.44538248`, half-multiplier roughness `0.72269118`, packed-alpha precedence
+`0.23137246` and zero-wear AO wrapper roughness `0.95472515`. The explicit Gloss control
+with independently different RGB and alpha measured `0.64065933` in the unselected
+luminance path. All eight candidate cases passed their declared quantization tolerances.
+These are synthetic scalar-consumer measurements, not a game-appearance comparison.
 
-### Decoded LIVE shader operations
+### Independently bound installed shader operations
 
-A bounded read of the installed LIVE `13165946` Vulkan shader cache verified the
-descriptor sizes and CRCs for HardSurface, LayerBlend_V2, and the shared layer and palette
-libraries. All four descriptors decoded with the `0x00b222be` grammar from StarBreaker
-`041e559215e18e1b13b124cab0e3ecb0f3aa50d4`.
-[Pinned StarBreaker decoder](https://github.com/diogotr7/StarBreaker/blob/041e559215e18e1b13b124cab0e3ecb0f3aa50d4/crates/starbreaker-shadercache/examples/reconstruct.rs#L11-L34)
+The installed LIVE and PTU token vocabularies were independently bound to each engine's
+original keyword initializer and direct token-vector consumer. Eighteen complete selected
+finish/BRDF helpers compare canonically equal. A separate complete texture-gloss helper
+also agrees and reads the scalar `.x` component. These checks verify the selected inner
+members and input identities; they do not establish whole-cache equality or a verified
+checksum of the large outer cache. The opaque header word has no assigned version meaning.
 
-In the HardSurface branch with separate Primary and Wear layers, each layer takes
-gloss-map X as its initial smoothness. The optional detail step multiplies that by
-`1 + processedDetailSample.w × DetailGloss`. The palette step then multiplies by
-the layer gloss and, when the packed palette selector and palette ID are nonzero,
-by the palette gloss unpacked from the palette's half-precision pair. The palette
-stage receives the detail result before saturation.
+The selected palette branch multiplies sampled smoothness by layer and palette controls.
+Detail preprocessing and its generation flag are separate operations. The direct isotropic
+GGX consumer supports P4KX's inverse perceptual roughness coordinate; the source-specific
+upper-gloss clamp is outside this projection.
 
-In the verified `MaterialAttribs_WriteGBuffer` route, `EncodeGBuffer` stores the incoming
-`MaterialAttribs.Smoothness` directly in `GBufferC.x`. The normal encoder for `GBufferA`
-takes the same value as an input. A separate lighting path converts `Pixel.Gloss` before
-shading. With its default upper clamp enabled, the decoded `GlossToRoughness` returns
-`(1 - min(gloss, 251/255))²`.
-
-For the reported surface, the active permutation and detail sample preprocessing still
-require verification. The route from `GBufferC.x` to `Pixel.Gloss` and the corresponding
-glTF or Blender roughness coordinate remain open.
-
-The following synthetic comparison uses base roughness `0.48`, smoothness
-`1 − 0.48²`, neutral layer gloss and the trial final transform `sqrt(1 − S)` with
-saturation at the end. The detail column is the effective product of the processed
-sample and the authored factor. The early-clamp column saturates the detail result
-before the palette multiplication.
-
-| Palette gloss | Effective detail | Reported roughness-space scale | Decoded smoothness order with trial final transform | Early clamp with same transform |
-| ---: | ---: | ---: | ---: | ---: |
-| 0.72 | 0 | 0.253992 | 0.667748 | 0.667748 |
-| 0.72 | 0.1 | 0 | 0.624881 | 0.624881 |
-| 0.72 | 0.5 | 0 | 0.410892 | 0.529150 |
-| 0 | 0 | 0.480000 | 1 | 1 |
-| 1 | 0 | 0 | 0.480000 | 0.480000 |
+Active runtime permutations, DDS-to-GPU view swizzles, DDNA-alpha binding, CPU palette
+packing, exact runtime UVs and rendered game appearance remain separate proof boundaries.
+Texture presence alone does not activate detail. Synthetic consumer parity verifies the
+authored P4KX projection and cannot attest those runtime facts.
 
 ### Packed palette selectors
 
@@ -344,7 +309,7 @@ The supported upstream wheels and standalone release files do not include Linux 
 Ubuntu 24.04 ARM64 Blender package is 4.0.2. The Flathub package currently targets x86_64.
 The Debian check supplies ARM64 Blender 5.2 evidence in that userland. A native Blender 5.3
 consumer on Linux ARM64 and a supported native Blender runtime directly on Ubuntu 24.04 ARM64
-remain outside this CI coverage. [Ubuntu ARM64 package](https://packages.ubuntu.com/noble/arm64/blender) · [Blender 5.3 release files](https://download.blender.org/release/Blender5.3/) · [Flathub architecture manifest](https://github.com/flathub/org.blender.Blender/blob/master/flathub.json)
+remain outside this CI coverage. [Ubuntu ARM64 package](https://packages.ubuntu.com/noble/arm64/blender) · [Blender 5.3 release files](https://download.blender.org/release/Blender5.3/) · Flathub architecture manifest
 
 ## Stencil palette colour and coverage
 

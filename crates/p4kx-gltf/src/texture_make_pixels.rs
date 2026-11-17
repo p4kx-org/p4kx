@@ -3,13 +3,16 @@
 
 use p4kx_texture::DdsTransfer;
 
+use crate::surface_finish::SurfaceFinish;
+use crate::texture_loader::LoadedTexture;
+
 use super::{Made, Outcome, encode, load};
 use crate::texture_cache::Decoded;
 use crate::texture_origins::{TextureComponents, TexturePaletteUse};
 use crate::texture_pixels::{
-    Smoothness, base_colour, metallic_roughness, normal_map, opacity_colour,
+    MetallicRoughness, Smoothness, base_colour, metallic_roughness, normal_map, opacity_colour,
 };
-use crate::texture_plan::{Failure, Job};
+use crate::texture_plan::{Failure, Job, Key};
 use crate::texture_report::TextureRole;
 
 pub(super) fn make_base(
@@ -100,45 +103,89 @@ pub(super) fn make_packed(
     } else {
         None
     };
-    let smoothness = normal
-        .as_ref()
-        .map(|normal| Smoothness::NormalAlpha(&normal.image))
-        .or_else(|| {
-            explicit
-                .as_ref()
-                .map(|gloss| Smoothness::ExplicitRgb(&gloss.image))
-        });
     let specular = load(
         decoded,
         TextureRole::Specular,
         job.specular.as_ref(),
         failures,
     );
-    match metallic_roughness(smoothness, specular.as_deref(), job.tints.specular) {
+    let finish = match job.key {
+        Key::MetallicRoughness { finish, .. } => finish,
+        _ => None,
+    };
+    let inputs = PackedInputs {
+        normal: normal.as_deref(),
+        gloss: explicit.as_deref(),
+        specular: specular.as_deref(),
+    };
+    match metallic_roughness(
+        inputs.smoothness(finish),
+        inputs.specular,
+        job.tints.specular,
+        finish,
+    ) {
         Ok(Some(packed)) => {
-            if specular.is_some() {
-                outcome.palette_use = TexturePaletteUse::Specular;
-            }
-            outcome.texture_sources.extend(
-                normal
-                    .iter()
-                    .map(|texture| texture.contribution(TextureComponents::Alpha)),
-            );
-            outcome.texture_sources.extend(
-                explicit
-                    .iter()
-                    .map(|texture| texture.contribution(TextureComponents::Color)),
-            );
-            outcome.texture_sources.extend(
-                specular
-                    .iter()
-                    .map(|texture| texture.colour_contribution(TextureComponents::Color)),
-            );
-            outcome.roughness = packed.roughness;
-            outcome.metallic = packed.metallic;
+            inputs.observe(outcome, finish, &packed);
             Some(encode(&packed.image, DdsTransfer::Linear))
         }
         Ok(None) => None,
         Err(error) => Some(Err(error.to_string())),
     }
 }
+
+struct PackedInputs<'a> {
+    normal: Option<&'a LoadedTexture>,
+    gloss: Option<&'a LoadedTexture>,
+    specular: Option<&'a LoadedTexture>,
+}
+
+impl PackedInputs<'_> {
+    fn smoothness(&self, finish: Option<SurfaceFinish>) -> Option<Smoothness<'_>> {
+        self.normal
+            .map(|normal| Smoothness::NormalAlpha(&normal.image))
+            .or_else(|| {
+                self.gloss.map(|gloss| match finish {
+                    Some(_) => Smoothness::ExplicitRed(&gloss.image),
+                    None => Smoothness::ExplicitRgb(&gloss.image),
+                })
+            })
+    }
+
+    fn observe(
+        &self,
+        outcome: &mut Outcome,
+        finish: Option<SurfaceFinish>,
+        packed: &MetallicRoughness,
+    ) {
+        outcome.texture_sources.extend(
+            self.normal
+                .iter()
+                .map(|texture| texture.contribution(TextureComponents::Alpha)),
+        );
+        outcome.texture_sources.extend(
+            self.gloss
+                .iter()
+                .map(|texture| texture.contribution(TextureComponents::Color)),
+        );
+        outcome.texture_sources.extend(
+            self.specular
+                .iter()
+                .map(|texture| texture.colour_contribution(TextureComponents::Color)),
+        );
+        outcome.palette_use = match (
+            self.specular.is_some(),
+            finish.is_some() && packed.roughness,
+        ) {
+            (true, true) => TexturePaletteUse::SpecularAndFinish,
+            (true, false) => TexturePaletteUse::Specular,
+            (false, true) => TexturePaletteUse::Finish,
+            (false, false) => TexturePaletteUse::None,
+        };
+        outcome.roughness = packed.roughness;
+        outcome.metallic = packed.metallic;
+    }
+}
+
+#[cfg(test)]
+#[path = "texture_make_pixels/finish_channel_tests.rs"]
+mod finish_channel_tests;

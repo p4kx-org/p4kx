@@ -20,7 +20,7 @@ const fn side(image: &RgbaImage) -> (u32, u32) {
 }
 
 /// Loads the texture of `source`, which counts as not loaded when it has no pixels.
-fn load(
+pub(super) fn load(
     decoded: &Decoded,
     role: TextureRole,
     source: Option<&Source>,

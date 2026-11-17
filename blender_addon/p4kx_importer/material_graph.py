@@ -12,6 +12,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 from .graph_spec import GraphBuilder, GraphSpec, Ref
+from .material_finish import gloss_sample
 from .material_glass import GlassSurface
 from .material_layers import LayerBlending
 from .package import BLENDER_NAME_BYTES
@@ -216,12 +217,12 @@ class _Maker(LayerBlending, GlassSurface):
             b.link(samples, map_key, "Color")
             normal = Ref(map_key, "Normal")
         if smoothness is None and (slot := desc.slot("gloss")):
-            gloss = b.add("ShaderNodeRGBToBW")
-            b.link(Ref(self._image(slot, tiling), "Color"), gloss, "Color")
-            smoothness = Ref(gloss, "Val")
+            smoothness = gloss_sample(b, self._image(slot, tiling), self.desc, self.context.palette)
         if smoothness is None:
             roughness = min(max(1.0 - smooth * gloss_mult, 0.0), 1.0)
             return Surface(colour, roughness, normal, metallic, level)
+        if painted and self.desc.shader.casefold() == "hardsurface":
+            smoothness = b.math("MULTIPLY", smoothness, smooth)
         scaled = smoothness if gloss_mult == 1.0 else b.math("MULTIPLY", smoothness, gloss_mult)
         return Surface(colour, b.math("SUBTRACT", 1.0, scaled, clamp=True), normal, metallic, level)
 

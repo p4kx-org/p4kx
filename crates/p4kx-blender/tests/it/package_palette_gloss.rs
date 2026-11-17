@@ -3,7 +3,7 @@
 
 use std::error::Error;
 use std::fs;
-use std::io::{self, Write as _};
+use std::io;
 use std::path::{Path, PathBuf};
 
 use p4kx_assembly::{ArchiveModels, Assembly, AssemblyOptions, ForgePalettes, LoadoutResolver};
@@ -25,8 +25,8 @@ mod source;
 mod layers;
 
 use source::{
-    EXPLICIT_GLOSS_CASES, EXPLICIT_GLOSS_PATH, FINISH_PALETTE_BYTE, Multiplier, NORMAL_ALPHA,
-    PALETTE_BYTES, ROOT_CLASS, TEXTURE_PATH,
+    EXPLICIT_GLOSS_CASES, EXPLICIT_GLOSS_PATH, Multiplier, NORMAL_ALPHA, PALETTE_BYTES, ROOT_CLASS,
+    TEXTURE_PATH,
 };
 
 #[test]
@@ -117,16 +117,13 @@ fn verify_glb(glb: &CheckedGlb) -> TestResult {
             let image = glb.decode(&packed.texture().source())?;
             expect_unit_roughness_factor(pbr.roughness_factor(), &name);
             let [_, green, _, _] = image.pixel(0, 0).ok_or("decoded packed texel")?;
-            assert_eq!(green, 255 - NORMAL_ALPHA, "{name}: inverse original alpha");
-            if byte == FINISH_PALETTE_BYTE {
-                let effective = f32::from(green) / 255.0 * pbr.roughness_factor();
-                let expected = 59.0 / 255.0;
-                assert!((effective - expected).abs() < 1e-6, "{name}: {effective}");
-                writeln!(
-                    io::stdout().lock(),
-                    "{name}: effective GLB roughness {effective:.9}"
-                )?;
-            }
+            let expected = ((f32::from(NORMAL_ALPHA) / 255.0) * multiplier.value)
+                .mul_add(-(f32::from(byte) / 255.0), 1.0)
+                .clamp(0.0, 1.0);
+            assert!(
+                (f32::from(green) / 255.0 - expected).abs() <= 0.5 / 255.0,
+                "{name}: sampled palette finish"
+            );
         } else {
             assert!(
                 pbr.metallic_roughness_texture().is_none(),

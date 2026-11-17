@@ -3,6 +3,7 @@
 
 use p4kx_model::{LayerSurface, Material, MaterialLayer};
 
+use crate::surface_finish::SurfaceFinish;
 use crate::texture_pixels::metal_share;
 
 const METAL_SPECULAR: f32 = 0.5;
@@ -124,7 +125,8 @@ pub(crate) struct Layer {
     colour: [f32; 3],
     /// How metallic the layer is, 0 to 1.
     pub(crate) metal: f32,
-    roughness: f32,
+    pub(crate) roughness: f32,
+    pub(crate) finish: Option<SurfaceFinish>,
 }
 
 /// A layer whose file was read, with its position and its share of the material.
@@ -139,7 +141,8 @@ fn unit(colour: [f32; 3]) -> [f32; 3] {
     colour.map(|channel| channel.clamp(0.0, 1.0))
 }
 
-fn shade(layer: &MaterialLayer, surface: &LayerSurface) -> Layer {
+fn shade(layer: &MaterialLayer, surface: &LayerSurface, sampled_finish: bool) -> Layer {
+    let finish = sampled_finish.then(|| SurfaceFinish::layer(layer));
     let (tint, specular, smoothness) = layer.palette_entry.map_or_else(
         || {
             (
@@ -167,9 +170,15 @@ fn shade(layer: &MaterialLayer, surface: &LayerSurface) -> Layer {
             towards(diffuse_blue, specular_blue),
         ],
         metal,
-        roughness: smoothness
-            .clamp(0.0, 1.0)
-            .mul_add(-layer.gloss_mult().clamp(0.0, 1.0), 1.0),
+        roughness: finish.map_or_else(
+            || {
+                smoothness
+                    .clamp(0.0, 1.0)
+                    .mul_add(-layer.gloss_mult().clamp(0.0, 1.0), 1.0)
+            },
+            SurfaceFinish::fallback_roughness,
+        ),
+        finish,
     }
 }
 fn mix(into: &mut [f32; 3], from: [f32; 3], share: f32) {
@@ -182,6 +191,8 @@ fn mix(into: &mut [f32; 3], from: [f32; 3], share: f32) {
 /// `None` when the material is shaded by its own colours.
 pub(crate) fn shaded_layers(material: &Material) -> Option<Vec<Shaded>> {
     let layers = &material.layers;
+    let sampled_finish = material.shader.eq_ignore_ascii_case("HardSurface")
+        && layers.iter().any(|layer| layer.palette_entry.is_some());
     let shares =
         material.layer_shares(|at| layers.get(at).is_some_and(|layer| layer.surface.is_some()))?;
     Some(
@@ -193,7 +204,7 @@ pub(crate) fn shaded_layers(material: &Material) -> Option<Vec<Shaded>> {
                 Some(Shaded {
                     at,
                     share,
-                    layer: shade(layer, layer.surface.as_ref()?),
+                    layer: shade(layer, layer.surface.as_ref()?, sampled_finish),
                 })
             })
             .collect(),

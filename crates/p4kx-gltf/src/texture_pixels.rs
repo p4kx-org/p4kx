@@ -6,6 +6,7 @@ use std::sync::LazyLock;
 use p4kx_texture::{DdsTransfer, RgbaImage, TextureError};
 use rayon::prelude::*;
 
+use crate::surface_finish::SurfaceFinish;
 use crate::texture_loader::LoadedTexture;
 
 pub(crate) const RGBA: usize = 4;
@@ -121,7 +122,7 @@ pub(crate) fn texel(image: &RgbaImage, x: usize, y: usize) -> [u8; RGBA] {
 }
 
 /// Returns the texel of `image` at the position of texel (`x`, `y`) of an image of
-/// `width` × `height` texels.
+/// `width` Ãƒâ€” `height` texels.
 pub(crate) fn sampled(
     image: &RgbaImage,
     (x, y): (usize, usize),
@@ -277,12 +278,34 @@ pub(crate) struct MetallicRoughness {
 pub(crate) enum Smoothness<'a> {
     NormalAlpha(&'a RgbaImage),
     ExplicitRgb(&'a RgbaImage),
+    ExplicitRed(&'a RgbaImage),
 }
 
 impl Smoothness<'_> {
+    fn finished_roughness(
+        self,
+        at: (usize, usize),
+        size: (usize, usize),
+        finish: Option<SurfaceFinish>,
+    ) -> u8 {
+        let Some(finish) = finish.filter(|finish| !finish.is_neutral()) else {
+            return self.roughness(at, size);
+        };
+        let smoothness = match self {
+            Self::NormalAlpha(image) => unit(sampled(image, at, size)[3]),
+            Self::ExplicitRed(image) => unit(sampled(image, at, size)[0]),
+            Self::ExplicitRgb(image) => {
+                let [red, green, blue, _] = sampled(image, at, size);
+                luminance([red, green, blue].map(unit))
+            }
+        };
+        encode_share(finish.sampled_roughness(smoothness))
+    }
+
     fn roughness(self, at: (usize, usize), size: (usize, usize)) -> u8 {
         match self {
             Self::NormalAlpha(image) => OPAQUE - sampled(image, at, size)[3],
+            Self::ExplicitRed(image) => OPAQUE - sampled(image, at, size)[0],
             Self::ExplicitRgb(image) => {
                 let [red, green, blue, _] = sampled(image, at, size);
                 OPAQUE - encode_share(luminance([red, green, blue].map(unit)))
@@ -299,17 +322,20 @@ pub(crate) fn metallic_roughness(
     gloss: Option<Smoothness<'_>>,
     specular: Option<&LoadedTexture>,
     tint: [f32; 3],
+    finish: Option<SurfaceFinish>,
 ) -> Result<Option<MetallicRoughness>, TextureError> {
     let size = match (gloss, specular) {
         (Some(Smoothness::NormalAlpha(image)), _)
-        | (Some(Smoothness::ExplicitRgb(image)), None) => image,
+        | (Some(Smoothness::ExplicitRgb(image) | Smoothness::ExplicitRed(image)), None) => image,
         (_, Some(texture)) => &texture.image,
         (None, None) => return Ok(None),
     };
     let dimensions = (size.width() as usize, size.height() as usize);
     let image = fill(size.width(), size.height(), |y, out| {
         for (x, target) in out.as_chunks_mut::<RGBA>().0.iter_mut().enumerate() {
-            let roughness = gloss.map_or(OPAQUE, |gloss| gloss.roughness((x, y), dimensions));
+            let roughness = gloss.map_or(OPAQUE, |gloss| {
+                gloss.finished_roughness((x, y), dimensions, finish)
+            });
             let metallic = specular.map_or(OPAQUE, |specular| {
                 let [red, green, blue, _] = sampled_colour(specular, (x, y), dimensions);
                 encode_share(metal_share(specular_of(
@@ -336,7 +362,7 @@ fn sampled_colour(texture: &LoadedTexture, at: (usize, usize), size: (usize, usi
     texture.straight_texel(texel(image, x, y), y * width + x)
 }
 
-fn encode_share(share: f32) -> u8 {
+pub(crate) fn encode_share(share: f32) -> u8 {
     #[expect(
         clippy::cast_possible_truncation,
         clippy::cast_sign_loss,

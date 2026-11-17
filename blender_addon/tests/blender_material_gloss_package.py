@@ -16,7 +16,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from blender_signal_probe import principled, render_linear_signals  # noqa: E402
-from p4kx_importer.importer import import_package  # noqa: E402
+from p4kx_importer.importer import import_package
+from p4kx_importer.material_finish import GlossChannel  # noqa: E402
 from p4kx_importer.package import load_package  # noqa: E402
 
 
@@ -39,7 +40,7 @@ def verify(location: Path) -> None:
         for label, multiplier in multipliers:
             name = f"Gloss_{byte}_{label}"
             verify_constant(_roughness(f"{name}_Constant"), byte, multiplier)
-            verify_sample(_roughness(f"{name}_Sample"), multiplier)
+            verify_sample(_roughness(f"{name}_Sample"), multiplier, byte / 255.0)
     for name in ("ExplicitGloss", "ExplicitGlossAlphaFree"):
         inputs = principled(bpy.data.materials[name]).inputs
         assert inputs["Normal"].is_linked == (name == "ExplicitGlossAlphaFree"), name
@@ -51,9 +52,16 @@ def verify(location: Path) -> None:
         inputs = principled(bpy.data.materials[name]).inputs
         assert inputs["Normal"].is_linked == has_normal, name
         if has_normal:
-            verify_sample(_roughness(name), 0.5)
+            verify_sample(_roughness(name), 0.5, FINISH_PALETTE_BYTE / 255.0)
         else:
-            verify_explicit_gloss(_roughness(name), 0.5)
+            verify_explicit_gloss(_roughness(name), 0.5, FINISH_PALETTE_BYTE / 255.0, GlossChannel.RED)
+    inputs = principled(bpy.data.materials["LayerZeroWearAo"]).inputs
+    blend = _input(inputs["Roughness"]).from_node
+    assert blend.bl_idname == "ShaderNodeGroup"
+    factor = _input(blend.inputs["Factor"]).from_node
+    assert factor.bl_idname == "ShaderNodeMath" and factor.operation == "MULTIPLY"
+    assert factor.inputs[1].default_value == 0.0 and not factor.inputs[1].is_linked
+    verify_explicit_gloss(blend.inputs["Roughness A"], 0.5, FINISH_PALETTE_BYTE / 255.0, GlossChannel.RED)
     _measure_exact_finish(location)
 
 
@@ -71,7 +79,7 @@ def verify_constant(socket: bpy.types.NodeSocket, byte: int, multiplier: float) 
     assert math.isclose(socket.default_value, 1.0 - (byte / 255.0) * multiplier, abs_tol=1e-6)
 
 
-def _smoothness(socket: bpy.types.NodeSocket, multiplier: float) -> bpy.types.NodeLink:
+def _smoothness(socket: bpy.types.NodeSocket, multiplier: float, palette: float | None = None) -> bpy.types.NodeLink:
     subtract = _input(socket).from_node
     assert subtract.bl_idname == "ShaderNodeMath" and subtract.operation == "SUBTRACT"
     assert subtract.use_clamp
@@ -83,11 +91,17 @@ def _smoothness(socket: bpy.types.NodeSocket, multiplier: float) -> bpy.types.No
         assert not scale.inputs[1].is_linked
         assert scale.inputs[1].default_value == multiplier
         smoothness = _input(scale.inputs[0])
+    if palette is not None:
+        scale = smoothness.from_node
+        assert scale.bl_idname == "ShaderNodeMath" and scale.operation == "MULTIPLY"
+        assert not scale.inputs[1].is_linked
+        assert math.isclose(scale.inputs[1].default_value, palette, abs_tol=1e-6)
+        smoothness = _input(scale.inputs[0])
     return smoothness
 
 
-def verify_sample(socket: bpy.types.NodeSocket, multiplier: float) -> None:
-    alpha = _smoothness(socket, multiplier)
+def verify_sample(socket: bpy.types.NodeSocket, multiplier: float, palette: float | None = None) -> None:
+    alpha = _smoothness(socket, multiplier, palette)
     assert alpha.from_socket.name == "Alpha"
     assert alpha.from_node.bl_idname == "ShaderNodeTexImage"
     image = alpha.from_node.image
@@ -96,10 +110,13 @@ def verify_sample(socket: bpy.types.NodeSocket, multiplier: float) -> None:
     assert image.alpha_mode == "CHANNEL_PACKED"
 
 
-def verify_explicit_gloss(socket: bpy.types.NodeSocket, multiplier: float = 1.0) -> None:
-    luminance = _smoothness(socket, multiplier).from_node
-    assert luminance.bl_idname == "ShaderNodeRGBToBW"
-    colour = _input(luminance.inputs["Color"])
+def verify_explicit_gloss(socket: bpy.types.NodeSocket, multiplier: float = 1.0, palette: float | None = None,
+                          channel: GlossChannel = GlossChannel.LUMINANCE) -> None:
+    scalar = _smoothness(socket, multiplier, palette)
+    expected = "ShaderNodeSeparateColor" if channel is GlossChannel.RED else "ShaderNodeRGBToBW"
+    assert scalar.from_node.bl_idname == expected
+    assert scalar.from_socket.name == ("Red" if channel is GlossChannel.RED else "Val")
+    colour = _input(scalar.from_node.inputs["Color"])
     assert colour.from_socket.name == "Color"
     assert colour.from_node.bl_idname == "ShaderNodeTexImage"
     image = colour.from_node.image
@@ -128,9 +145,9 @@ def _measure_exact_finish(location: Path) -> None:
     width = height = 64
     cases = (
         ("neutral", f"Gloss_{FINISH_PALETTE_BYTE}_Neutral_Sample", 0.75,
-         59 / 255, EXACT_SAMPLE_TOLERANCE),
+         1.0 - NORMAL_ALPHA / 255 * FINISH_PALETTE_BYTE / 255, EXACT_SAMPLE_TOLERANCE),
         ("authored_half", f"Gloss_{FINISH_PALETTE_BYTE}_Half_Sample", 0.5,
-         157 / 255, EXACT_SAMPLE_TOLERANCE),
+         1.0 - NORMAL_ALPHA / 255 * 0.5 * FINISH_PALETTE_BYTE / 255, EXACT_SAMPLE_TOLERANCE),
         ("explicit_gloss", "ExplicitGloss", 0.25,
          EXPLICIT_GLOSS_GREEN / 255, GLOSS_QUANTIZATION_TOLERANCE),
         ("alpha_free_normal", "ExplicitGlossAlphaFree", 0.0,
@@ -138,10 +155,13 @@ def _measure_exact_finish(location: Path) -> None:
         ("packed_ddna_precedence", "ExplicitGlossPackedDdna", -0.25,
          59 / 255, GLOSS_QUANTIZATION_TOLERANCE),
         ("child_ddna", "LayerOnlyDdna", -0.5,
-         1.0 - 0.5 * NORMAL_ALPHA / 255, EXACT_SAMPLE_TOLERANCE),
+         1.0 - 0.5 * NORMAL_ALPHA / 255 * FINISH_PALETTE_BYTE / 255, EXACT_SAMPLE_TOLERANCE),
         ("child_gloss", "LayerOnlyGloss", -0.75,
-         (1.0 + EXPLICIT_GLOSS_GREEN / 255) * 0.5, GLOSS_QUANTIZATION_TOLERANCE),
+         1.0 - 0.5 * EXPLICIT_GLOSS_RGBA[0] / 255 * FINISH_PALETTE_BYTE / 255, GLOSS_QUANTIZATION_TOLERANCE),
     )
+    cases += (("zero_wear_ao", "LayerZeroWearAo", 0.875,
+               1.0 - 0.5 * EXPLICIT_GLOSS_RGBA[0] / 255 * FINISH_PALETTE_BYTE / 255,
+               GLOSS_QUANTIZATION_TOLERANCE),)
     probes = tuple((bpy.data.materials[name], "Roughness", y) for _, name, y, _, _ in cases)
     target = location.parent.with_name(f"{location.parent.name}-roughness.exr")
     pixels = render_linear_signals(probes, target, width, height)

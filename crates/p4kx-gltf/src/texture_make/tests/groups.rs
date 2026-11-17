@@ -75,6 +75,7 @@ fn sources_shared_by_neighbouring_jobs_are_decoded_once_though_the_decode_is_par
 fn packed_gloss_reserves_a_fitting_specular_size_and_keeps_fallback_possible() {
     let job = Job {
         key: Key::MetallicRoughness {
+            finish: None,
             gloss: None,
             explicit_gloss: vec!["coat_gloss.dds".to_owned()],
             specular: Some(("coat_spec.dds".to_owned(), [u8::MAX; 3])),

@@ -1,5 +1,8 @@
 # Layered materials are drawn from the textures of their layers, blended by the blend mask
 
+Amended by ADR-0400: explicitly selected HardSurface palette finish multiplies sampled
+smoothness before its linear inverse; GLB layer roughness uses the same finish controls.
+
 Decided for issue #551, stage 2 of #547. It builds on ADR-0097 (layered materials are the blend of
 their layer files), ADR-0042 (textured materials), ADR-0138 (the texture budget is checked from
 headers and each source is decoded once) and ADR-0140 (`layers_without_diffuse`). Evidence: the
