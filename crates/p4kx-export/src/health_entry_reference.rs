@@ -3,10 +3,22 @@
 
 use p4kx_extraction::{SourceUseRole, SourceValue};
 
-use super::{EntryCapture, EntryMetadata, EntryReceipt, OriginalDatum, PhysicalEntryRef};
-use crate::CatalogError;
+use super::{
+    AuthoredEntryPath, EntryCapture, EntryMetadata, EntryReceipt, OriginalDatum, PathRecipe,
+    PhysicalEntryRef,
+};
+use crate::{CatalogError, ExportAccountingError};
 
 impl EntryReceipt {
+    pub(crate) fn add_authored_selector(
+        &mut self,
+        selector: &AuthoredEntryPath,
+    ) -> Result<(), ExportAccountingError> {
+        self.frame.check_frame(&selector.frame())?;
+        self.recipes.push(PathRecipe::Authored(selector.clone()));
+        Ok(())
+    }
+
     pub(crate) fn physical_reference(
         &self,
         capture: &EntryCapture<'_>,

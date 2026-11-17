@@ -24,6 +24,9 @@ pub(crate) enum Unreadable {
     /// An entity places a container that the Archive lacks.
     #[error("placed by an entity but not in the Archive")]
     MissingFromArchive,
+    /// An authored path has several physical candidate containers.
+    #[error("several physical containers match the authored path")]
+    AmbiguousContainer,
     /// A `.soc` file cannot be read in full.
     #[error("a .soc cannot be read in full")]
     SocFile,

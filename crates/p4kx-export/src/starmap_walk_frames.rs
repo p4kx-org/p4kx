@@ -212,17 +212,27 @@ impl<'a> System<'a> {
         let path = child.external.as_ref()?;
         self.seen[2] += 1;
         let declared = path.as_str();
-        if let Some(entry) = self.index.find(declared) {
-            return Some(Frame::Enter {
-                entry,
+        match self.index.candidates(declared) {
+            [entry] => Some(Frame::Enter {
+                entry: *entry,
                 path: parent.external(path),
-            });
+            }),
+            [] => {
+                self.read.missing += 1;
+                self.issue(&format!(
+                    "{label}: the Archive holds no container {}",
+                    clip(declared)
+                ));
+                None
+            }
+            _ => {
+                self.read.routes_incomplete = true;
+                self.issue(&format!(
+                    "{label}: the Archive holds several containers for {}",
+                    clip(declared)
+                ));
+                None
+            }
         }
-        self.read.missing += 1;
-        self.issue(&format!(
-            "{label}: the Archive holds no container {}",
-            clip(declared)
-        ));
-        None
     }
 }

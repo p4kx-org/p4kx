@@ -43,11 +43,15 @@ impl<'a> Index<'a> {
         }
     }
 
+    #[cfg(test)]
     pub(crate) fn find(&self, path: &str) -> Option<usize> {
-        self.selected_key(path).map(|(_, index)| *index)
+        match self.candidates(path) {
+            [entry] => Some(*entry),
+            _ => None,
+        }
     }
 
-    pub(crate) fn endpoint_candidates(&self, path: &str) -> &[usize] {
+    pub(crate) fn candidates(&self, path: &str) -> &[usize] {
         let Some((key, selected)) = self.selected_key(path) else {
             return &[];
         };

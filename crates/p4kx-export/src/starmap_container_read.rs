@@ -15,10 +15,12 @@ use super::{Limits, PlacementScope, PlacementSpools, Placements};
 use crate::catalog_read::original::EntryCapture;
 use crate::catalog_rows::spool::RowSpoolWriter;
 use crate::catalog_table::DatasetAvailability;
+use crate::entry_source;
+use crate::export_ledger::ExportLedger;
 use crate::starmap_index::Index;
 use crate::starmap_parse::{Body, Read};
 use crate::starmap_walk::{PlacementRows, System, SystemRead};
-use crate::{CatalogError, Kind};
+use crate::{CatalogError, ExportAccountingError, Kind};
 
 #[derive(Clone, Copy)]
 enum PlacementStorage<'directory> {
@@ -85,9 +87,7 @@ impl Placements {
         endpoints: Option<&JumpEndpointRecords>,
         storage: PlacementStorage<'_>,
     ) -> Result<Self, CatalogError> {
-        if cancel.is_some_and(CancelToken::is_cancelled) {
-            return Err(CatalogError::Cancelled);
-        }
+        check_cancelled(cancel)?;
         let started = Instant::now();
         let index = Index::new(archive);
         let systems = index.systems();
@@ -98,8 +98,13 @@ impl Placements {
                 ..Self::default()
             });
         }
+        let system_count = systems.len();
+        let mut root_ledger = ExportLedger::default();
+        let systems = unique_system_roots(archive, &index, capture, systems, &mut root_ledger)?;
         let roots: Vec<usize> = systems.iter().map(|(_, entry)| *entry).collect();
-        let Read { bodies, ledger, .. } = crate::starmap_parse::read_all_with_jumps(
+        let Read {
+            bodies, mut ledger, ..
+        } = crate::starmap_parse::read_all_with_jumps(
             archive,
             &index,
             &roots,
@@ -107,9 +112,7 @@ impl Placements {
             (limits.children, endpoints.is_some()),
             capture,
         )?;
-        if cancel.is_some_and(CancelToken::is_cancelled) {
-            return Err(CatalogError::Cancelled);
-        }
+        check_cancelled(cancel)?;
         let (read, spools) = walk_systems(
             &index,
             &bodies,
@@ -120,26 +123,62 @@ impl Placements {
             storage,
         )?;
         drop(bodies);
-        if cancel.is_some_and(CancelToken::is_cancelled) {
-            return Err(CatalogError::Cancelled);
-        }
-        let endpoint_scope_complete = !ledger
-            .incomplete_inventories
-            .contains(&Kind::StarmapObjects)
-            && read.iter().all(|system| !system.routes_incomplete);
+        check_cancelled(cancel)?;
+        let routes_complete = read.iter().all(|system| !system.routes_incomplete);
+        ledger.merge(root_ledger);
         let mut placements = Self {
             ledger,
             spools,
             ..Self::default()
         };
-        placements.finish(&index, systems.len(), read, scope);
-        placements.endpoint_inventory_complete = endpoint_scope_complete
+        placements.finish(&index, system_count, read, scope, (archive, capture))?;
+        placements.endpoint_inventory_complete = routes_complete
+            && !placements
+                .ledger
+                .incomplete_inventories
+                .contains(&Kind::StarmapObjects)
             && endpoints.is_some_and(|records| records.complete)
             && placements.counts.unreadable == 0
             && placements.counts.missing == 0;
         placements.report.elapsed = started.elapsed();
         Ok(placements)
     }
+}
+
+fn check_cancelled(cancel: Option<&CancelToken>) -> Result<(), CatalogError> {
+    if cancel.is_some_and(CancelToken::is_cancelled) {
+        return Err(CatalogError::Cancelled);
+    }
+    Ok(())
+}
+
+fn unique_system_roots(
+    archive: &Archive,
+    index: &Index<'_>,
+    capture: &EntryCapture<'_>,
+    roots: Vec<(Arc<str>, usize)>,
+    ledger: &mut ExportLedger,
+) -> Result<Vec<(Arc<str>, usize)>, CatalogError> {
+    let mut unique = Vec::with_capacity(roots.len());
+    for (name, index_entry) in roots {
+        let entry = index
+            .entries
+            .get(index_entry)
+            .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+        match index.candidates(entry.path()) {
+            [entry] => unique.push((name, *entry)),
+            [] => return Err(ExportAccountingError::ConflictingSourceDatum.into()),
+            candidates => entry_source::record_ambiguous_outer_entries(
+                archive,
+                capture,
+                ledger,
+                Kind::StarmapObjects,
+                None,
+                candidates,
+            )?,
+        }
+    }
+    Ok(unique)
 }
 
 fn walk_systems(

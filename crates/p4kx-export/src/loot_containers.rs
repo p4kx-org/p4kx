@@ -13,7 +13,7 @@ use crate::guid_text::{CatalogGuid, GuidText};
 use crate::harvest_locations::Objects;
 use crate::loot_soc::EntityTags;
 use crate::loot_unreadable::{Unreadable, UnreadableContainer};
-use crate::loot_walk::{Explored, Placed, Summary, below, explore, path_of};
+use crate::loot_walk::{Explored, Placed, PlacedTarget, Summary, below, explore, path_of};
 use crate::starmap_index::Index;
 use crate::starmap_walk::Opened;
 use crate::{CatalogError, Kind};
@@ -103,7 +103,7 @@ fn rows(
                 placed,
                 key.system,
                 location,
-                placed.entry.and_then(|entry| tags.get(&entry)),
+                placed.target.entry().and_then(|entry| tags.get(&entry)),
             )
         })
         .collect()
@@ -131,10 +131,16 @@ fn unreadable(
     let missing = summaries
         .values()
         .flat_map(|summary| summary.placed.iter())
-        .filter(|placed| placed.entry.is_none())
-        .map(|placed| UnreadableContainer {
-            path: placed.path.clone(),
-            reason: Unreadable::MissingFromArchive,
+        .filter_map(|placed| {
+            let reason = match placed.target {
+                PlacedTarget::Resolved(_) => return None,
+                PlacedTarget::Missing => Unreadable::MissingFromArchive,
+                PlacedTarget::Ambiguous => Unreadable::AmbiguousContainer,
+            };
+            Some(UnreadableContainer {
+                path: placed.path.clone(),
+                reason,
+            })
         });
     let mut found: Vec<UnreadableContainer> = read.chain(counted).chain(missing).collect();
     found.sort_by_cached_key(ToString::to_string);
@@ -194,7 +200,12 @@ fn read_tags(
 ) -> Result<(HashMap<usize, Tags>, ExportLedger), CatalogError> {
     let mut entries: Vec<usize> = summaries
         .values()
-        .flat_map(|summary| summary.placed.iter().filter_map(|placed| placed.entry))
+        .flat_map(|summary| {
+            summary
+                .placed
+                .iter()
+                .filter_map(|placed| placed.target.entry())
+        })
         .collect();
     entries.sort_unstable();
     entries.dedup();
@@ -225,7 +236,7 @@ mod tests {
     use crate::harvest_locations::Objects;
     use crate::loot_soc::EntityTags;
     use crate::loot_unreadable::Unreadable;
-    use crate::loot_walk::{Placed, Summary};
+    use crate::loot_walk::{Placed, PlacedTarget, Summary};
     use crate::starmap_walk::Opened;
 
     const CONFIG: &str = "687af3db-4c0d-4e8d-9261-102274f8b6ed";
@@ -234,13 +245,13 @@ mod tests {
         Placed {
             config: CONFIG.parse::<Guid>().expect("a GUID"),
             path: path.to_owned(),
-            entry: Some(1),
+            target: PlacedTarget::Resolved(1),
         }
     }
 
     fn placement_summaries(first_config: Guid) -> HashMap<usize, Summary> {
         let alternate = Placed {
-            entry: Some(2),
+            target: PlacedTarget::Resolved(2),
             ..placed("a.socpak")
         };
         HashMap::from([

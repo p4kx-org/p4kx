@@ -78,7 +78,7 @@ impl System<'_> {
             });
         };
         let (mut proof, complete) = target.selector_inputs()?;
-        let entries = self.index.endpoint_candidates(target.as_str());
+        let entries = self.index.candidates(target.as_str());
         let references = self.target_references(entries, &mut proof)?;
         let candidates = self.capture.source_uses().value(
             SourceValue::Present(references),

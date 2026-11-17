@@ -78,7 +78,7 @@ fn read_roots(
         let targets = direct_targets(tree, candidates);
         let mut bodies = HashMap::new();
         for path in targets {
-            if let [target] = index.endpoint_candidates(path) {
+            if let [target] = index.candidates(path) {
                 bodies.insert(
                     *target,
                     read_jump_witness_body(archive, &index, *target, capture)?,

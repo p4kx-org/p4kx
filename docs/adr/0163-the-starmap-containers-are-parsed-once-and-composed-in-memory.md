@@ -34,6 +34,10 @@ container on the chain (up to 128 MiB each) was held at once. Only the systems r
   accepts `1` and `true`. Existing exact root Archive matches take priority. For
   other declarations the shared lookup tries the written path, optional `.socpak`
   extension, and root Archive prefixes used by interior assembly.
+- **Require a unique physical Entry at the selected path.** Ordinary Starmap and Loot routes
+  retain the authored selector and every candidate when the winning path is ambiguous.
+  Starmap applies the same check to system roots and to the chosen descriptor inside a container.
+  Candidate identities are retained in the health report without opening their payloads.
 - **Read every direct `ChildObjectContainers` list in document order.** Each `Child` keeps
   its actual owning list. The legacy wrapped-list fallback applies when the element has
   no direct list.

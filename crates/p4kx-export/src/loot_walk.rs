@@ -8,8 +8,8 @@ use std::collections::{HashMap, HashSet};
 use p4kx_extraction::{Archive, CancelToken, Guid};
 use rayon::prelude::*;
 
-use crate::catalog_read::original::EntryCapture;
-use crate::entry_source::EntrySource;
+use crate::catalog_read::original::{AuthoredEntryPath, EntryCapture};
+use crate::entry_source::{self, EntrySource};
 use crate::export_ledger::{ExportLedger, SourceDisposition};
 use crate::loot_entxml::EntityLink;
 use crate::loot_unreadable::Unreadable;
@@ -23,8 +23,24 @@ pub(crate) struct Placed {
     pub(crate) config: Guid,
     /// The path of the placed container: the Archive's when it has it, else as written.
     pub(crate) path: String,
-    /// The Archive entry of the placed container, `None` when the Archive lacks it.
-    pub(crate) entry: Option<usize>,
+    pub(crate) target: PlacedTarget,
+}
+
+/// Resolution of the container selected by an original entity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum PlacedTarget {
+    Resolved(usize),
+    Missing,
+    Ambiguous,
+}
+
+impl PlacedTarget {
+    pub(crate) const fn entry(self) -> Option<usize> {
+        match self {
+            Self::Resolved(entry) => Some(entry),
+            Self::Missing | Self::Ambiguous => None,
+        }
+    }
 }
 
 /// What the entities of one container say: the containers they place and the configs they carry.
@@ -103,18 +119,16 @@ fn summarise(
         if several {
             summary.several.push(path);
         }
-        let found = written.as_deref().and_then(|path| index.find(path));
-        if let Some(path) = written.as_deref().filter(|_| found.is_none()) {
-            let selected = selected.ok_or(ExportAccountingError::UnboundHealthSubject)?;
-            if selected.as_str() != path {
+        let target = if let Some(path) = written.as_deref() {
+            let selector = selected.ok_or(ExportAccountingError::UnboundHealthSubject)?;
+            if selector.as_str() != path {
                 return Err(ExportAccountingError::ConflictingSourceDatum.into());
             }
-            EntrySource::authored_missing(selected).record(
-                &mut ledger,
-                Kind::LootContainers,
-                SourceDisposition::ReadFailed,
-            );
-        }
+            resolve_target(archive, index, capture, &mut ledger, selector)?
+        } else {
+            PlacedTarget::Missing
+        };
+        let found = target.entry();
         if let Some(found) = found {
             summary.nested.push(found);
         }
@@ -126,13 +140,44 @@ fn summarise(
             summary.placed.push(Placed {
                 config,
                 path,
-                entry: found,
+                target,
             });
         }
     }
     summary.nested.sort_unstable();
     summary.nested.dedup();
     Ok((summary, ledger))
+}
+
+fn resolve_target(
+    archive: &Archive,
+    index: &Index<'_>,
+    capture: &EntryCapture<'_>,
+    ledger: &mut ExportLedger,
+    selector: AuthoredEntryPath,
+) -> Result<PlacedTarget, CatalogError> {
+    match index.candidates(selector.as_str()) {
+        [entry] => Ok(PlacedTarget::Resolved(*entry)),
+        [] => {
+            EntrySource::authored_missing(selector).record(
+                ledger,
+                Kind::LootContainers,
+                SourceDisposition::ReadFailed,
+            );
+            Ok(PlacedTarget::Missing)
+        }
+        candidates => {
+            entry_source::record_ambiguous_outer_entries(
+                archive,
+                capture,
+                ledger,
+                Kind::LootContainers,
+                Some(&selector),
+                candidates,
+            )?;
+            Ok(PlacedTarget::Ambiguous)
+        }
+    }
 }
 
 /// Returns every [`Placed`] in `root` and the containers below it, each container once; a cycle

@@ -3,7 +3,9 @@
 
 use crate::health_origin_assertions as check;
 use crate::health_origin_entry_source as entries;
-use crate::health_origin_fixture::TestResult;
+use crate::health_origin_fixture::{self as fixture, Fixture, TestResult};
+use p4kx_export::{CatalogError, ExportDiagnosticCode, build_catalog_from};
+use p4kx_testkit::{TestContainer, TestEntry};
 use serde_json::{Value, json};
 
 #[test]
@@ -60,6 +62,94 @@ fn failed_plain_children_retain_distinct_original_encrypted_container_ancestry()
         check::independent(check::cell(row, "targetGuid", "absent")?)?;
     }
     check::closure(&catalog)
+}
+
+// The target lies outside the independently enumerated shop containers.
+const TARGET: &str = "Data\\FixtureContainers\\ambiguous.socpak";
+
+fn loot_route(copies: usize) -> TestResult<Fixture> {
+    let xml = format!("<Entity objectContainer=\"{TARGET}\"/>");
+    let mut selected = vec![
+        entries::container("alpha", xml.as_bytes(), true),
+        TestEntry::stored(fixture::REGISTRY, b"<LayerBackups/>"),
+    ];
+    for ordinal in 0..copies {
+        let container = TestContainer::new()
+            .entry(TestEntry::stored("contents.txt", ordinal.to_string()))
+            .build();
+        selected.push(TestEntry::stored(TARGET, container));
+    }
+    entries::with_starmap(selected)
+}
+
+#[test]
+fn ambiguous_external_loot_selection_blocks_normal_and_retains_selector_and_candidates()
+-> TestResult {
+    let unique = loot_route(1)?;
+    build_catalog_from(&unique.archive, &unique.entry, &fixture::options())?;
+
+    let duplicate = loot_route(2)?;
+    let result = build_catalog_from(&duplicate.archive, &duplicate.entry, &fixture::options());
+    let Err(CatalogError::IncompleteExport(refusal)) = result else {
+        return Err("normal publication must refuse the duplicate candidate set".into());
+    };
+    assert!(
+        refusal
+            .health()
+            .failed_entries()
+            .iter()
+            .any(|entry| { entry.code() == ExportDiagnosticCode::AmbiguousIdentity }),
+        "the refusal is about ambiguity",
+    );
+
+    let (_, catalog) = duplicate.diagnostic()?;
+    let failed = entries::failure(&catalog, "lootContainers", "enumeration")?;
+    let physical: Vec<_> = duplicate
+        .archive
+        .entries()
+        .iter()
+        .filter(|entry| entry.path() == TARGET)
+        .map(p4kx_extraction::Entry::index)
+        .collect();
+    assert_eq!(failed.len(), 2);
+    assert_eq!(failed.len(), physical.len());
+    for (row, index) in failed.into_iter().zip(physical) {
+        assert_eq!(check::at(row, "/code")?, &json!("ambiguousIdentity"));
+        assert_eq!(check::at(row, "/stage")?, &json!("selection"));
+        check::present(row, "entryIndex", &json!(index), Some(false))?;
+        let path = check::present_text(&catalog, row, "path", &json!(TARGET), Some(true))?;
+        assert!(has_original_loot_selector(&catalog, path)?);
+    }
+    assert_no_candidate_payload_attempts(&catalog)?;
+    check::closure(&catalog)
+}
+
+fn assert_no_candidate_payload_attempts(catalog: &Value) -> TestResult {
+    for used in check::rows(catalog, "/provenance/uses")? {
+        if used.get("role") == Some(&json!("attempted"))
+            && used.get("scope") == Some(&json!("payload"))
+        {
+            let source = check::source(catalog, used)?;
+            assert_ne!(
+                source.pointer("/path/value"),
+                Some(&json!(TARGET)),
+                "enumerating physical candidates does not open their payloads"
+            );
+        }
+    }
+    Ok(())
+}
+
+fn has_original_loot_selector(catalog: &Value, path: &Value) -> TestResult<bool> {
+    Ok(check::uses(catalog, path)?.iter().any(|used| {
+        used.get("scope") == Some(&json!("payload"))
+            && used
+                .pointer("/location/field")
+                .and_then(Value::as_str)
+                .is_some_and(|field| field.contains("objectContainer"))
+            && check::source(catalog, used)
+                .is_ok_and(|source| source.pointer("/path/value") == Some(&json!(entries::INNER)))
+    }))
 }
 
 fn join_conversions(catalog: &Value, cell: &Value, outer: &str) -> TestResult {

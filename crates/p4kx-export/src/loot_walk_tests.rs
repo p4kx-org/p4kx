@@ -31,7 +31,7 @@ fn placed(path: &str, entry: Option<usize>) -> Placed {
     Placed {
         config: guid(),
         path: path.to_owned(),
-        entry,
+        target: entry.map_or(PlacedTarget::Missing, PlacedTarget::Resolved),
     }
 }
 
@@ -143,8 +143,46 @@ fn a_cycle_of_containers_is_read_once_each() {
     assert_eq!(explored.summaries.len(), 2);
     let a = explored.summaries.get(&root.entry).expect("a");
     assert_eq!(a.placed.len(), 1);
-    assert_eq!(a.placed[0].entry, index.find(&written("b")));
+    assert_eq!(a.placed[0].target.entry(), index.find(&written("b")));
     assert_eq!(below(root.entry, &explored.summaries).len(), 2);
+}
+
+#[test]
+fn duplicate_selected_targets_are_reported_without_traversing_either() {
+    let directory = tempfile::tempdir().expect("a directory");
+    let archive = open(
+        directory.path(),
+        vec![
+            socpak("a", &[entity(&written("b"), Some(CONFIG))]),
+            socpak("b", &[entity(&written("first"), None)]),
+            socpak("b", &[entity(&written("second"), None)]),
+        ],
+    );
+    let index = Index::new(&archive);
+    let root = root_of(&archive, "a");
+    let explored = explore(&archive, &index, std::slice::from_ref(&root), None);
+    assert_eq!(
+        explored.summaries.len(),
+        1,
+        "only the unique root is visited"
+    );
+    let compiled = crate::export_health_entries::compile(explored.ledger.entries)
+        .expect("consistent source accounting");
+    let candidates: Vec<_> = compiled
+        .failed
+        .iter()
+        .filter(|entry| {
+            entry.source.kind == Kind::LootContainers
+                && entry.code == crate::ExportDiagnosticCode::AmbiguousIdentity
+                && entry.stage == crate::ExportDiagnosticStage::Selection
+        })
+        .map(|entry| entry.source.entry_index)
+        .collect();
+    assert_eq!(
+        candidates,
+        [Some(1), Some(2)],
+        "both candidates retain physical identity"
+    );
 }
 
 #[test]

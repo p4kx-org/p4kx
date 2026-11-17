@@ -1,18 +1,20 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{CancelToken, Guid};
+use p4kx_extraction::{Archive, CancelToken, Guid};
 use std::collections::hash_map::Entry as MapEntry;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use crate::CatalogError;
+use crate::catalog_read::original::EntryCapture;
 use crate::catalog_rows::spool::RowSpool;
 use crate::catalog_table::{CatalogTable, DatasetAvailability};
+use crate::entry_source;
 use crate::export_ledger::ExportLedger;
 use crate::starmap_index::{Index, unreferenced};
 use crate::starmap_report::{ContainerCounts, Placement, StarmapReport, apart, clip};
 use crate::starmap_walk::{Opened, SystemRead};
+use crate::{CatalogError, ExportAccountingError, Kind};
 
 use jump_endpoint::JumpEndpoint;
 use jump_operating::OperatingResolver;
@@ -194,7 +196,8 @@ impl Placements {
         roots: usize,
         read: Vec<SystemRead>,
         scope: PlacementScope,
-    ) {
+        (archive, capture): (&Archive, &EntryCapture<'_>),
+    ) -> Result<(), CatalogError> {
         self.counts.systems = roots;
         self.instance_availability = Some(if roots == 0 {
             DatasetAvailability::Absent
@@ -212,8 +215,9 @@ impl Placements {
         }
         self.report.unreferenced = unreferenced(index, &opened);
         if matches!(scope, PlacementScope::RecordSelection) {
-            self.add_unreached(index, &opened);
+            self.add_unreached(index, &opened, archive, capture)?;
         }
+        Ok(())
     }
 
     fn merge_systems(
@@ -249,18 +253,39 @@ impl Placements {
 
     /// Adds the containers below the system folder that the walk did not open, each hanging below
     /// no record.
-    fn add_unreached(&mut self, index: &Index<'_>, opened: &HashSet<usize>) {
-        self.opened.extend(
-            index
-                .system_containers()
-                .into_iter()
-                .filter(|(_, entry)| !opened.contains(entry))
-                .map(|(system, entry)| Opened {
+    fn add_unreached(
+        &mut self,
+        index: &Index<'_>,
+        opened: &HashSet<usize>,
+        archive: &Archive,
+        capture: &EntryCapture<'_>,
+    ) -> Result<(), CatalogError> {
+        for (system, index_entry) in index.system_containers() {
+            if opened.contains(&index_entry) {
+                continue;
+            }
+            let entry = index
+                .entries
+                .get(index_entry)
+                .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+            match index.candidates(entry.path()) {
+                [entry] => self.opened.push(Opened {
                     system,
-                    entry,
+                    entry: *entry,
                     under: None,
                 }),
-        );
+                [] => return Err(ExportAccountingError::ConflictingSourceDatum.into()),
+                candidates => entry_source::record_ambiguous_outer_entries(
+                    archive,
+                    capture,
+                    &mut self.ledger,
+                    Kind::StarmapObjects,
+                    None,
+                    candidates,
+                )?,
+            }
+        }
+        Ok(())
     }
 
     /// Retains the first placement and the first pair establishing an ambiguous position.

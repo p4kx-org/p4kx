@@ -80,7 +80,17 @@ fn read_main(
     ledger: &mut ExportLedger,
 ) -> Result<Result<MainXml, String>, CatalogError> {
     let (xml, fallback) = match selected_xml(&container, socpak) {
-        Ok(selected) => selected,
+        Ok(Descriptor::Named(xml)) => (xml, None),
+        Ok(Descriptor::Fallback(xml)) => (xml, Some(xml.path().to_owned())),
+        Ok(Descriptor::Ambiguous(candidates)) => {
+            for candidate in candidates {
+                EntrySource::inner(capture, archive, socpak, &container, candidate)?
+                    .record_ambiguous_candidate(ledger, Kind::StarmapObjects, "mainXml", None)?;
+            }
+            return Ok(Err(
+                "several physical entries qualify as the main XML".to_owned()
+            ));
+        }
         Err(error) => {
             parent.record(
                 ledger,
@@ -107,16 +117,38 @@ fn read_main(
     }
 }
 
+enum Descriptor<'archive> {
+    Named(&'archive Entry),
+    Fallback(&'archive Entry),
+    Ambiguous(Vec<&'archive Entry>),
+}
+
 fn selected_xml<'archive>(
     container: &'archive Archive,
     socpak: &Entry,
-) -> Result<(&'archive Entry, Option<String>), String> {
-    let named = named_descriptors(container, socpak)?.next();
-    let xml = match named {
-        Some(xml) => xml,
-        None => first_xml(container.entries())?,
+) -> Result<Descriptor<'archive>, String> {
+    let mut named = named_descriptors(container, socpak)?;
+    if let Some(first) = named.next() {
+        return Ok(choose_descriptor(first, named, Descriptor::Named));
+    }
+    let first = first_xml(container.entries())?;
+    let wanted = key(first.path());
+    let same_path = container
+        .entries()
+        .iter()
+        .filter(|entry| entry.index() != first.index() && key(entry.path()) == wanted);
+    Ok(choose_descriptor(first, same_path, Descriptor::Fallback))
+}
+
+fn choose_descriptor<'archive>(
+    first: &'archive Entry,
+    mut others: impl Iterator<Item = &'archive Entry>,
+    unique: impl FnOnce(&'archive Entry) -> Descriptor<'archive>,
+) -> Descriptor<'archive> {
+    let Some(second) = others.next() else {
+        return unique(first);
     };
-    Ok((xml, named.is_none().then(|| xml.path().to_owned())))
+    Descriptor::Ambiguous([first, second].into_iter().chain(others).collect())
 }
 
 fn named_descriptors<'archive>(
@@ -137,13 +169,11 @@ fn named_descriptors<'archive>(
 }
 
 #[cfg(test)]
-pub(crate) fn named_descriptor_count(
-    container: &Archive,
-    socpak: &Entry,
-) -> Result<usize, CatalogError> {
-    Ok(named_descriptors(container, socpak)
-        .map_err(|_| crate::ExportAccountingError::ConflictingSourceDatum)?
-        .count())
+pub(crate) fn has_ambiguous_descriptor(ledger: &ExportLedger) -> bool {
+    ledger
+        .entries
+        .iter()
+        .any(|entry| entry.diagnosis.code == Some(crate::ExportDiagnosticCode::AmbiguousIdentity))
 }
 
 fn read_failure(xml: &Entry, error: EntryReadError) -> String {

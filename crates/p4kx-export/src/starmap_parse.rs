@@ -10,7 +10,7 @@ use p4kx_extraction::{Archive, CancelToken, Guid};
 use rayon::prelude::*;
 
 use crate::catalog_read::original::{AuthoredEntryPath, EntryCapture, EntryRead, EntryXml};
-use crate::entry_source::EntrySource;
+use crate::entry_source::{self, EntrySource};
 use crate::export_ledger::{ExportLedger, SourceDisposition};
 use crate::starmap_containers::instance::ContainerFile;
 use crate::starmap_containers::jump_gate::{GateFiles, JumpGate};
@@ -323,7 +323,13 @@ pub(crate) fn read_all_with_jumps(
             .map(|&entry| parse(archive, index, entry, &bounds, capture).map(|read| (entry, read)))
             .collect::<Result<_, _>>()?;
         parsed += read.len();
-        let next = next_sources(read.iter().map(|(_, (body, _))| body), index, &mut ledger);
+        let next = next_sources(
+            read.iter().map(|(_, (body, _))| body),
+            index,
+            archive,
+            capture,
+            &mut ledger,
+        )?;
         for (entry, (body, observed)) in read {
             bodies.insert(entry, body);
             ledger.merge(observed);
@@ -343,8 +349,10 @@ pub(crate) fn read_all_with_jumps(
 fn next_sources<'a>(
     bodies: impl Iterator<Item = &'a Body>,
     index: &Index<'_>,
+    archive: &Archive,
+    capture: &EntryCapture<'_>,
     ledger: &mut ExportLedger,
-) -> HashSet<usize> {
+) -> Result<HashSet<usize>, CatalogError> {
     let mut next = HashSet::new();
     let mut paths = Vec::new();
     for body in bodies {
@@ -352,17 +360,26 @@ fn next_sources<'a>(
             paths.clear();
             externals(root, &mut paths);
             for path in &paths {
-                if let Some(entry) = index.find(path.as_str()) {
-                    next.insert(entry);
-                } else {
-                    EntrySource::authored_missing(AuthoredEntryPath::clone(path))
+                match index.candidates(path.as_str()) {
+                    [entry] => {
+                        next.insert(*entry);
+                    }
+                    [] => EntrySource::authored_missing(AuthoredEntryPath::clone(path))
                         .dependency()
-                        .record(ledger, Kind::StarmapObjects, SourceDisposition::ReadFailed);
+                        .record(ledger, Kind::StarmapObjects, SourceDisposition::ReadFailed),
+                    candidates => entry_source::record_ambiguous_outer_entries(
+                        archive,
+                        capture,
+                        ledger,
+                        Kind::StarmapObjects,
+                        Some(path),
+                        candidates,
+                    )?,
                 }
             }
         }
     }
-    next
+    Ok(next)
 }
 
 #[cfg(test)]

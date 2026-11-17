@@ -9,10 +9,10 @@ use p4kx_extraction::{Archive, Entry};
 use crate::catalog_read::original::{
     AuthoredEntryPath, EntryCapture, EntryDiagnosis, EntryRead, EntryReceipt, LoadoutBodyReceipt,
 };
-use crate::export_diagnostic::ExportSourceRole;
+use crate::export_diagnostic::{ExportDiagnosticCode, ExportSourceRole};
 use crate::export_entry_ledger::{ArchiveEntryObservation, EntryOperation};
 use crate::export_ledger::{ExportLedger, SourceDisposition};
-use crate::{CatalogError, Kind};
+use crate::{CatalogError, ExportAccountingError, Kind};
 
 /// One operation retaining the exact Entry admitted before its original read.
 #[derive(Debug, Clone)]
@@ -98,9 +98,9 @@ impl EntrySource {
         &self.receipt
     }
 
-    pub(crate) fn merge(&mut self, other: &Self) -> Result<(), crate::ExportAccountingError> {
+    pub(crate) fn merge(&mut self, other: &Self) -> Result<(), ExportAccountingError> {
         if self.operation != other.operation || self.role != other.role {
-            return Err(crate::ExportAccountingError::ConflictingSourceDatum);
+            return Err(ExportAccountingError::ConflictingSourceDatum);
         }
         self.receipt.merge(&other.receipt)
     }
@@ -122,6 +122,25 @@ impl EntrySource {
         self.role = ExportSourceRole::SelectionCandidate;
         self.operation = EntryOperation::Enumeration;
         self
+    }
+
+    pub(crate) fn record_ambiguous_candidate(
+        mut self,
+        ledger: &mut ExportLedger,
+        kind: Kind,
+        field: &'static str,
+        selector: Option<&AuthoredEntryPath>,
+    ) -> Result<(), CatalogError> {
+        if let Some(selector) = selector {
+            self.receipt.add_authored_selector(selector)?;
+        }
+        self.selection_candidate().diagnosed(
+            ledger,
+            kind,
+            SourceDisposition::ReadFailed,
+            EntryDiagnosis::field(ExportDiagnosticCode::AmbiguousIdentity, field),
+        );
+        Ok(())
     }
 
     pub(crate) fn record(
@@ -163,6 +182,30 @@ impl EntrySource {
     }
 }
 
+pub(crate) fn record_ambiguous_outer_entries(
+    archive: &Archive,
+    capture: &EntryCapture<'_>,
+    ledger: &mut ExportLedger,
+    kind: Kind,
+    selector: Option<&AuthoredEntryPath>,
+    candidates: &[usize],
+) -> Result<(), CatalogError> {
+    ledger.incomplete_inventory(kind);
+    for &index in candidates {
+        let entry = archive
+            .entries()
+            .get(index)
+            .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+        EntrySource::outer(capture, archive, entry)?.record_ambiguous_candidate(
+            ledger,
+            kind,
+            "containerPath",
+            selector,
+        )?;
+    }
+    Ok(())
+}
+
 /// Copies actual operation receipts to another consuming kind without another source read.
 pub(crate) fn dependencies(source: &ExportLedger, ledger: &mut ExportLedger, kind: Kind) {
     if !source.incomplete_inventories.is_empty() {
@@ -170,7 +213,9 @@ pub(crate) fn dependencies(source: &ExportLedger, ledger: &mut ExportLedger, kin
     }
     for mut entry in source.entries.iter().cloned() {
         entry.kind = kind;
-        entry.role = ExportSourceRole::Dependency;
+        if entry.role != ExportSourceRole::SelectionCandidate {
+            entry.role = ExportSourceRole::Dependency;
+        }
         ledger.entry(entry);
     }
 }

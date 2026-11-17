@@ -87,7 +87,7 @@ pub(super) fn survey(
             state.reachable.unavailable_descriptors += 1;
             continue;
         };
-        match index.endpoint_candidates(entry.path()) {
+        match index.candidates(entry.path()) {
             [at] if *at == root => pending.push(root),
             [_, _, ..] => state.ambiguous_roots += 1,
             _ => state.reachable.unavailable_descriptors += 1,
@@ -104,7 +104,7 @@ pub(super) fn survey(
             .entries
             .get(selected)
             .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
-        for &candidate in index.endpoint_candidates(entry.path()) {
+        for &candidate in index.candidates(entry.path()) {
             pending.push(candidate);
         }
     }
@@ -147,14 +147,13 @@ impl ContainerSurvey {
         };
         let mut ledger = ExportLedger::default();
         let Ok(body) = starmap_read::main_xml(archive, outer, capture, &mut ledger)? else {
-            self.unavailable_descriptors += 1;
+            let ambiguous = starmap_read::has_ambiguous_descriptor(&ledger);
+            self.ambiguous_descriptors += usize::from(ambiguous);
+            self.unavailable_descriptors += usize::from(!ambiguous);
             return Ok(());
         };
         self.non_authoritative_container_directories +=
             usize::from(crate::export_archive_health::inventory(&body.container).is_some());
-        if starmap_read::named_descriptor_count(&body.container, outer)? > 1 {
-            self.ambiguous_descriptors += 1;
-        }
         let Ok(xml) = EntryXml::parse(&body.bytes, capture)? else {
             self.unavailable_descriptors += 1;
             return Ok(());
@@ -240,7 +239,7 @@ impl ContainerSurvey {
         pending: &mut Targets,
     ) {
         self.external_targets += 1;
-        match index.endpoint_candidates(path.as_str()) {
+        match index.candidates(path.as_str()) {
             [at] => pending.push(*at),
             [] => {
                 self.missing_external_targets += 1;
