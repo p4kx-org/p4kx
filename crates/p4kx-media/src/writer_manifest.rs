@@ -44,12 +44,6 @@ impl MediaWriter<'_> {
     ) -> Result<(), MediaError> {
         self.checkpoint()?;
         let result = (|| {
-            if self.artifacts >= self.limits.sources.saturating_add(self.limits.records) {
-                return Err(MediaError::Limit {
-                    budget: "artifacts",
-                    limit: self.limits.sources.saturating_add(self.limits.records),
-                });
-            }
             let mut line = BoundedLine::new(self.limits.record_bytes);
             serde_json::to_writer(&mut line, artifact)?;
             line.write_all(b"\n")
@@ -65,9 +59,7 @@ impl MediaWriter<'_> {
             )?;
             self.manifest
                 .write_all(&line.bytes)
-                .map_err(|source| error::io(&self.root, source))?;
-            self.artifacts += 1;
-            Ok(())
+                .map_err(|source| error::io(&self.root, source))
         })();
         output_operation::checked(result, self.checkpoint())
     }

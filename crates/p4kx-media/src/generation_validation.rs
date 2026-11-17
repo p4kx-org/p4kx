@@ -70,7 +70,6 @@ pub(crate) fn artifacts(
     }
     let path = root.join(&index.artifact_manifest.path);
     let mut reader = BufReader::new(File::open(&path).map_err(|source| error::io(&path, source))?);
-    let mut count = 0_u64;
     loop {
         checkpoint.check()?;
         let mut line = Vec::new();
@@ -82,10 +81,7 @@ pub(crate) fn artifacts(
         if read == 0 {
             break;
         }
-        count += 1;
-        if read as u64 > limits.record_bytes
-            || count > limits.sources.saturating_add(limits.records)
-        {
+        if read as u64 > limits.record_bytes {
             return Err(MediaError::Destination(
                 "artifact manifest exceeds its declared limits".into(),
             ));

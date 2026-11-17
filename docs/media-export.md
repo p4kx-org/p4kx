@@ -486,7 +486,9 @@ real Archives and can be lowered or raised explicitly:
 | `--max-reference-candidates` | 128 | Candidate identities retained in one inline reference result; metadata bytes also use the record bound |
 
 Byte and count limits must be positive; depth cannot exceed the reader's hard limit. A selected
-container payload and its subsequent container-opening work are charged separately. Container
+container payload and its subsequent container-opening work are charged separately. The artifact
+manifest can hold several rows per Entry or provider record, including repeated converted outputs.
+Its lines and total size use the record-byte and output-byte limits. Container
 decoding also retains the existing 512 MiB chain budget, entry-count and expansion-ratio checks.
 Sizes are checked before Extraction or container allocation. Hashing and copy loops check
 cancellation and ArchiveWatch between bounded chunks, and reports are checked before continuing.

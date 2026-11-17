@@ -15,11 +15,11 @@ fn unknown_length_custom_outputs_have_exact_files_manifest_hashes_and_dedup_coun
     let archive = encoded::archive(folder.path())?;
     let output = folder.path().join("media");
     let providers = encoded::registry(Mode::Repeat, CancelToken::new())?;
+    let mut options = ExportOptions::default();
+    options.limits.sources = 1;
+    options.limits.records = 1;
     let index = support::published(p4kx_media::export_with(
-        &archive,
-        &output,
-        &ExportOptions::default(),
-        &providers,
+        &archive, &output, &options, &providers,
     )?)?;
     let kind = index.kinds.first().ok_or("provider summary")?;
     let converted = kind.counts.converted_outputs;
@@ -45,7 +45,7 @@ fn unknown_length_custom_outputs_have_exact_files_manifest_hashes_and_dedup_coun
     encoded::assert_manifest(&output, &index, &first.path, 2)?;
     let previous = fs::read(output.join("media-index.json"))?;
     assert!(matches!(
-        p4kx_media::export_with(&archive, &output, &ExportOptions::default(), &providers)?,
+        p4kx_media::export_with(&archive, &output, &options, &providers)?,
         ExportOutcome::Skipped { .. }
     ));
     assert_eq!(fs::read(output.join("media-index.json"))?, previous);
@@ -54,7 +54,7 @@ fn unknown_length_custom_outputs_have_exact_files_manifest_hashes_and_dedup_coun
         b"corrupt",
     )?;
     assert!(
-        p4kx_media::export_with(&archive, &output, &ExportOptions::default(), &providers).is_err(),
+        p4kx_media::export_with(&archive, &output, &options, &providers).is_err(),
         "skip validates actual encoded bytes"
     );
     Ok(())

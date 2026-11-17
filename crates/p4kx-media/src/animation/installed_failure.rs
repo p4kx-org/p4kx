@@ -137,7 +137,6 @@ fn known_budget(budget: &'static str) -> Option<&'static str> {
         | "references"
         | "reference_candidates"
         | "hash_bytes"
-        | "artifacts"
         | "index_bytes" => Some(budget),
         _ => None,
     }
