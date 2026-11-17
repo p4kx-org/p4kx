@@ -53,6 +53,10 @@ fn selection_completeness() -> Value {
     Value::Object(kinds)
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "the synthetic JSON specimen covers the full catalog structure"
+)]
 pub(crate) fn minimal_catalog() -> Value {
     let mut catalog = json!({
         "schemaVersion": p4kx_export::SCHEMA_VERSION,
