@@ -21,7 +21,8 @@ Assert-ChainWorkflow ($early -cmatch '(?m)^        timeout-minutes: 1\r?$' -and 
 Assert-ChainWorkflow (-not ($early -match '(?m)^        (if|continue-on-error):')) 'Actual pre-risk evidence failure must refuse installer admission.'
 Assert-ChainWorkflow ($prepare.Contains('Write-P4kxMsiDiagnosticInputs $parameters $feedback') -and
     $prepare.Contains("'msi-invocation.json'") -and $installer.Contains("'msi-invocation.json'") -and
-    $installer.Contains('ConvertFrom-Json -AsHashtable') -and $installer.Contains('check-msi.ps1 @parameters') -and
+    $installer.Contains('invoke-msi-observer.ps1 -Stage Start') -and
+    (Get-Content -Raw -LiteralPath (Join-Path $Repository '.github/scripts/msi-observer-parent.ps1')).Contains("'check-msi.ps1') @parameters") -and
     -not $early.Contains('msi-invocation.json')) 'Prepared MSI input hashes must upload before the same runner-local invocation is used, without publishing its paths.'
 
 $chain=Get-Content -Raw -LiteralPath (Join-Path $Repository '.github/workflows/msi-feedback-chain-probe.yml')

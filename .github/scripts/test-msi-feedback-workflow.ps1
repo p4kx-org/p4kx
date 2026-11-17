@@ -38,6 +38,20 @@ Assert-FeedbackWorkflow ($admissionUpload.Contains('always() && !cancelled()') -
     $admissionUpload -cmatch '(?m)^        timeout-minutes: 1\r?$' -and $admissionUpload -cmatch '(?m)^        continue-on-error: true\r?$') 'Admission upload must be bounded independently from the lifecycle.'
 Assert-FeedbackWorkflow ($installer -cmatch '(?m)^        timeout-minutes: \$\{\{ fromJSON\(steps\.msi-budget\.outputs\.minutes\) \}\}\r?$') 'Installer workflow step lacks an independent deadline-derived runner timeout.'
 Assert-FeedbackWorkflow (-not ($installer -match '(?m)^        (continue-on-error|if):')) 'Installer failure must retain ordinary failure gating.'
+$observerFinish=Get-FeedbackWorkflowStep $verify 'Finish the original native MSI lifecycle'
+Assert-FeedbackWorkflow ($installer.Contains('id: msi-launch') -and $installer.Contains('invoke-msi-observer.ps1 -Stage Start') -and
+    $observerFinish.Contains('invoke-msi-observer.ps1 -Stage Finish') -and $observerFinish.Contains('-WaitMilliseconds 0') -and
+    $observerFinish -cmatch '(?m)^        timeout-minutes: \$\{\{ fromJSON\(steps\.msi-budget\.outputs\.minutes\) \}\}\r?$' -and
+    $observerFinish.Contains("always() && !cancelled() && steps.msi-launch.outcome == 'success'") -and
+    -not $observerFinish.Contains('continue-on-error')) 'Original lifecycle completion lost its source-bound deadline or failure gate.'
+$checkpoints=@([regex]::Matches($verify,'(?ms)^      - name: Preserve original MSI phase checkpoint [1-8]\r?\n.*?(?=^      - |\z)'))
+Assert-FeedbackWorkflow ($checkpoints.Count -eq 8) 'Expected eight bounded pre-terminal file checkpoints.'
+foreach($checkpoint in $checkpoints){
+    Assert-FeedbackWorkflow ($checkpoint.Value.Contains('always() && !cancelled()') -and $checkpoint.Value.Contains("steps.msi-launch.outcome == 'success'") -and
+        $checkpoint.Value.Contains("env.P4KX_MSI_OBSERVER_FINISHED != 'true'") -and $checkpoint.Value.Contains('uses: ./.github/actions/msi-observer-checkpoint') -and
+        $checkpoint.Value -cmatch '(?m)^        timeout-minutes: 3\r?$' -and -not $checkpoint.Value.Contains('continue-on-error')) 'Checkpoint can restart work, mask failure or bypass its bounded original observation.'
+}
+
 $uploads=@([regex]::Matches($verify,'(?ms)^      - uses: actions/upload-artifact@[^\r\n]+\r?\n.*?(?=^      - |\z)') |
     Where-Object {$_.Value.Contains('name: windows-package-logs-')})
 Assert-FeedbackWorkflow ($uploads.Count -eq 1) 'Expected the existing diagnostic upload step.'

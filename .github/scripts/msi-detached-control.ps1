@@ -54,8 +54,9 @@ function Assert-P4kxDetachedBinding($Request, [string]$Directory) {
     }
 }
 
-function Open-P4kxDetachedOwnedProcess($Handle, $Request) {
-    if ($Handle.schema -ne 1 -or $Handle.role -cne 'native-msi-detached-control-handle' -or
+function Open-P4kxDetachedOwnedProcess {
+    param($Handle, $Request, [ValidateSet('native-msi-detached-control-handle','native-msi-observer-handle')][string]$Role='native-msi-detached-control-handle')
+    if ($Handle.schema -ne 1 -or $Handle.role -cne $Role -or
         $Handle.request_sha256 -cne (Get-P4kxDetachedDigest (Join-Path $Request.directory 'request.json'))) {
         throw 'Detached control handle is not bound to its original request.'
     }

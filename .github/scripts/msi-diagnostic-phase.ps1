@@ -84,7 +84,7 @@ function Assert-P4kxMsiPhaseEvent {
 }
 
 function Read-P4kxMsiPhaseJournal {
-    param([string]$Path)
+    param([string]$Path, [Collections.Generic.List[hashtable]]$ObservedEvents=$null)
     if (-not (Test-Path -LiteralPath $Path)) { return @{present=$false; complete=$false; events=0; active=@(); terminal=$null} }
     $text = Read-P4kxMsiDiagnosticUtf8 $Path 1MB 'MSI phase journal exceeds its byte bound.'
     $lines = $text.Split([char]10)
@@ -96,6 +96,7 @@ function Read-P4kxMsiPhaseJournal {
         Assert-P4kxMsiPhaseEvent $phaseEvent
         $count++
         if ($phaseEvent.sequence -ne $count) { throw 'MSI phase sequence is discontinuous.' }
+        if ($null -ne $ObservedEvents) { $ObservedEvents.Add($phaseEvent) }
         if ($phaseEvent.status -ceq 'begin') {
             if ($active.ContainsKey([string]$phaseEvent.id) -or ($phaseEvent.parent -ne 0 -and -not $active.ContainsKey([string]$phaseEvent.parent))) { throw 'MSI phase parent or identity differs.' }
             $active[[string]$phaseEvent.id] = $phaseEvent.phase

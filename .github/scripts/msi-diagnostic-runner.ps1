@@ -29,12 +29,18 @@ function Write-P4kxMsiDiagnosticInputs {
         ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $Directory 'diagnostic-inputs.json') -Encoding utf8NoBOM
 }
 
-function Write-P4kxMsiDiagnosticSources {
-    param([System.Collections.IDictionary]$Parameters, [string]$ScriptDirectory, [string]$Directory)
+function Get-P4kxMsiDiagnosticSources {
+    param([string]$ScriptDirectory)
     $sources = @()
     foreach ($name in @('check-msi.ps1','msi-diagnostic-runner.ps1','msi-diagnostic-budget.ps1','msi-diagnostic-phase.ps1','msi-diagnostic-utf8.ps1','portal-process.ps1','package-process.ps1','msi-path-verification.ps1','msi-raw-fixture.ps1','msi-installation.ps1','msi-invocation.ps1','msi-database.ps1','msi-embedded-helper.ps1','check-package-runtime.ps1')) {
         $sources += @{name=$name; sha256=(Get-FileHash -LiteralPath (Join-Path $ScriptDirectory $name) -Algorithm SHA256).Hash.ToLowerInvariant()}
     }
+    return $sources
+}
+
+function Write-P4kxMsiDiagnosticSources {
+    param([System.Collections.IDictionary]$Parameters, [string]$ScriptDirectory, [string]$Directory)
+    $sources = @(Get-P4kxMsiDiagnosticSources $ScriptDirectory)
     @{schema=1; role='native-msi-diagnostic-sources'; revision=$env:GITHUB_SHA; run=$env:GITHUB_RUN_ID; attempt=$env:GITHUB_RUN_ATTEMPT; target=$Parameters['Target']; process_arch=[Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString(); sources=$sources} |
         ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $Directory 'diagnostic-sources.json') -Encoding utf8NoBOM
 }

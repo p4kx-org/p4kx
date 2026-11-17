@@ -111,6 +111,15 @@ unchanged runner tracking fingerprint. Their scope is process observation and ow
 MSI package acceptance still requires the original installation and runtime proofs.
 The control's checkpoint and completion artifacts retain `native_completion_unproven: true`.
 
+The Windows MSI lifecycle runs its original diagnostic parent in a tracked hidden console.
+Eight checkpoints upload bounded copies of its file journal and source metadata before the
+final wait. Checkpoints carry an unproven verdict. Acceptance still requires the original
+successful result, its closed journal, `final-cleanup/end`, matching input/source receipts
+and the existing installed runtime checks. The ten-minute worker cap, thirty-five-minute
+absolute deadline and forty-five-minute job limit remain unchanged. Checkpoint uploads consume
+the original observer allowance; a delayed upload can delay the next parent observation.
+Expiry can stop only the bound parent and cannot prove installer or descendant cleanup.
+
 Before checksums and release notes are assembled, `check-release-matrix.ps1` requires:
 
 - Thirteen non-empty native packages, comprising four for Windows, eight for Linux and one DMG for macOS.

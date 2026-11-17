@@ -1,0 +1,28 @@
+name: Preserve the original native MSI phase checkpoint
+description: Observe the bound diagnostic parent and upload bounded original file evidence
+inputs:
+  sequence:
+    description: Unique checkpoint ordinal from one through eight
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Freeze the original file journal and metadata
+      id: observe
+      shell: pwsh
+      env:
+        P4KX_OBSERVER_SEQUENCE: ${{ inputs.sequence }}
+      run: |
+        $sequence = [int]$env:P4KX_OBSERVER_SEQUENCE
+        if ($sequence -lt 1 -or $sequence -gt 8) { throw 'Invalid native MSI checkpoint ordinal.' }
+        $directory = Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/observer'
+        $checkpoint = Join-Path $directory ('checkpoints/{0:d2}' -f $sequence)
+        "checkpoint=$checkpoint" >> $env:GITHUB_OUTPUT
+        .github/scripts/invoke-msi-observer.ps1 -Stage Snapshot -Directory $directory -Sequence $sequence -WaitMilliseconds 75000
+    - name: Upload the frozen original phase checkpoint
+      if: ${{ always() && !cancelled() }}
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+      with:
+        name: windows-msi-observer-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.P4KX_TARGET }}-${{ inputs.sequence }}
+        path: ${{ steps.observe.outputs.checkpoint }}/*
+        if-no-files-found: error

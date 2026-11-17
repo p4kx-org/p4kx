@@ -186,6 +186,9 @@ jobs:
           .github/scripts/test-msi-feedback-chain-workflow.ps1
           .github/scripts/test-msi-phase-journal-encoding.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/msi-phase-journal-encoding')
           .github/scripts/test-msi-feedback-parent.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/msi-feedback-parent')
+          foreach ($case in @('Complete','Timeout','Admission')) {
+            .github/scripts/test-msi-observer.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK ('contracts/msi-observer-'+$case.ToLowerInvariant())) -Case $case -Milliseconds 10000
+          }
           .github/scripts/test-msi-diagnostics.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/msi-diagnostics')
           .github/scripts/test-msi-diagnostic-failures.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/msi-diagnostic-failures')
           .github/scripts/test-msi-raw-fixture.ps1
@@ -270,13 +273,65 @@ jobs:
         timeout-minutes: 1
         run: .github/scripts/prepare-msi-feedback.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/lifecycle-feedback')
       - name: Installer metadata, upgrade, downgrade, rollback, CPU replacement and preservation
+        id: msi-launch
         timeout-minutes: ${{ fromJSON(steps.msi-budget.outputs.minutes) }}
         run: |
           . .github/scripts/msi-diagnostic-budget.ps1
           Assert-P4kxMsiStepAdmission $env:P4KX_MSI_DIAGNOSTIC_DEADLINE_UTC $env:P4KX_MSI_STEP_MINUTES $env:P4KX_MSI_STEP_COMPUTED_AT_UTC
           $invocation = Join-Path $env:P4KX_PACKAGE_TASK 'msi-invocation.json'
-          $parameters = Get-Content -LiteralPath $invocation -Raw | ConvertFrom-Json -AsHashtable
-          .github/scripts/check-msi.ps1 @parameters
+          .github/scripts/invoke-msi-observer.ps1 -Stage Start -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/observer') -Invocation $invocation
+      - name: Preserve original MSI phase checkpoint 1
+        if: ${{ always() && !cancelled() && steps.msi-launch.outcome == 'success' && env.P4KX_MSI_OBSERVER_FINISHED != 'true' }}
+        timeout-minutes: 3
+        uses: ./.github/actions/msi-observer-checkpoint
+        with:
+          sequence: '1'
+      - name: Preserve original MSI phase checkpoint 2
+        if: ${{ always() && !cancelled() && steps.msi-launch.outcome == 'success' && env.P4KX_MSI_OBSERVER_FINISHED != 'true' }}
+        timeout-minutes: 3
+        uses: ./.github/actions/msi-observer-checkpoint
+        with:
+          sequence: '2'
+      - name: Preserve original MSI phase checkpoint 3
+        if: ${{ always() && !cancelled() && steps.msi-launch.outcome == 'success' && env.P4KX_MSI_OBSERVER_FINISHED != 'true' }}
+        timeout-minutes: 3
+        uses: ./.github/actions/msi-observer-checkpoint
+        with:
+          sequence: '3'
+      - name: Preserve original MSI phase checkpoint 4
+        if: ${{ always() && !cancelled() && steps.msi-launch.outcome == 'success' && env.P4KX_MSI_OBSERVER_FINISHED != 'true' }}
+        timeout-minutes: 3
+        uses: ./.github/actions/msi-observer-checkpoint
+        with:
+          sequence: '4'
+      - name: Preserve original MSI phase checkpoint 5
+        if: ${{ always() && !cancelled() && steps.msi-launch.outcome == 'success' && env.P4KX_MSI_OBSERVER_FINISHED != 'true' }}
+        timeout-minutes: 3
+        uses: ./.github/actions/msi-observer-checkpoint
+        with:
+          sequence: '5'
+      - name: Preserve original MSI phase checkpoint 6
+        if: ${{ always() && !cancelled() && steps.msi-launch.outcome == 'success' && env.P4KX_MSI_OBSERVER_FINISHED != 'true' }}
+        timeout-minutes: 3
+        uses: ./.github/actions/msi-observer-checkpoint
+        with:
+          sequence: '6'
+      - name: Preserve original MSI phase checkpoint 7
+        if: ${{ always() && !cancelled() && steps.msi-launch.outcome == 'success' && env.P4KX_MSI_OBSERVER_FINISHED != 'true' }}
+        timeout-minutes: 3
+        uses: ./.github/actions/msi-observer-checkpoint
+        with:
+          sequence: '7'
+      - name: Preserve original MSI phase checkpoint 8
+        if: ${{ always() && !cancelled() && steps.msi-launch.outcome == 'success' && env.P4KX_MSI_OBSERVER_FINISHED != 'true' }}
+        timeout-minutes: 3
+        uses: ./.github/actions/msi-observer-checkpoint
+        with:
+          sequence: '8'
+      - name: Finish the original native MSI lifecycle
+        if: ${{ always() && !cancelled() && steps.msi-launch.outcome == 'success' }}
+        timeout-minutes: ${{ fromJSON(steps.msi-budget.outputs.minutes) }}
+        run: .github/scripts/invoke-msi-observer.ps1 -Stage Finish -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/observer') -WaitMilliseconds 0
       - name: Record executed release payload evidence
         run: |
           $base = "artifacts/windows-build-$env:P4KX_TARGET"
