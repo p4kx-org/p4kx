@@ -260,7 +260,9 @@ at the same coordinate reuses the original ID and evidence. The publisher stream
 sorted live and packed rows together with the same IDs, scope, role and encryption.
 Each packed row uses the registered ID as its key and shares the original physical source
 reference with rows from the same source allocation. The DataForge coordinates remain typed.
-This storage uses RAM and adds no provenance spool.
+Sealing moves the packed map into the immutable inventory. The normal publisher can count and
+serialize the same sorted rows without copying them into a contiguous array. This storage
+uses RAM and adds no provenance spool.
 
 Record peak working set and peak private bytes separately.
 Sample host commit and paging counters alongside the process write counter to distinguish process
@@ -298,10 +300,12 @@ assessment. The values below are sampled process memory in GiB on a larger host.
 
 LIVE reached a sampled 26.22 GiB working set during health assessment. PTU reached its
 peak working set during provenance. Both sampled private-byte peaks occurred during
-provenance. The packed source-use counts grew by 17,325,165 and 17,974,970 between the
-Record scan and health. The pair logged 0.756 GiB of logical process writes and produced
-no Catalog file or encoder sizes. The later projection compaction checkpoints require
-a new measurement on a producer that includes them.
+provenance. The first PTU provenance sample rose by 4.85 GiB in private bytes. The packed
+array for 72,144,536 rows at 72 bytes each accounts for 4.84 GiB of that reserve.
+The packed source-use counts grew by 17,325,165 and 17,974,970 between the Record scan
+and health. The pair logged 0.756 GiB of logical process writes and produced
+no Catalog file or encoder sizes. The later compaction checkpoints, smaller rows and
+ownership transfer at sealing require a new measurement on a producer that includes them.
 
 The compressed writer prepares a typed Catalog once. It first counts serialized bytes for the
 frame header and then streams serialization into the encoder. A second raw file adds storage

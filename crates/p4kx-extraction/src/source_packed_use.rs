@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 use crate::field_origin::OriginContribution;
@@ -10,6 +10,8 @@ use crate::source_use::storage::PackedDataForgeLocation;
 use crate::source_use::{
     InputScope, OriginUseId, SourceUseDescription, SourceUseRef, SourceUseRole,
 };
+
+pub(crate) type PackedUseTree = BTreeMap<Arc<str>, PackedSourceUse>;
 
 /// An unheld DataForge use stored without the live handle or its location cache.
 #[derive(Clone)]

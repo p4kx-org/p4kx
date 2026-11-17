@@ -7,7 +7,7 @@ use std::sync::Arc;
 use thiserror::Error;
 
 use crate::source_evidence_error::{self, SourceEvidenceError};
-use crate::source_inventory::SourceInventory;
+use crate::source_inventory::{PackedUseRows, SourceInventory};
 
 use super::SourceUses;
 
@@ -93,7 +93,11 @@ impl SourceUses {
             .map(|(id, row)| (Arc::clone(id), row.clone()));
         let packed = collect_rows(packed, &mut check)?;
         drop(registry);
-        Ok(SourceInventory::new(sources, uses, packed))
+        Ok(SourceInventory::new(
+            sources,
+            uses,
+            PackedUseRows::Snapshot(packed),
+        ))
     }
 
     /// Seals the registry and moves its sorted source and use rows into an immutable inventory.
@@ -116,8 +120,14 @@ impl SourceUses {
         let sources = collect_rows(sources.into_values(), &mut check)?;
         let (uses, packed) = uses.into_parts();
         let uses = collect_rows(uses, &mut check)?;
-        let packed = collect_rows(packed, &mut check)?;
-        Ok(SourceInventory::new(sources, uses, packed))
+        for _ in packed.values() {
+            check()?;
+        }
+        Ok(SourceInventory::new(
+            sources,
+            uses,
+            PackedUseRows::Sealed(packed),
+        ))
     }
 }
 

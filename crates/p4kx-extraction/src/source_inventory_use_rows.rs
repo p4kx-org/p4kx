@@ -2,13 +2,15 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::borrow::{Borrow, Cow};
+use std::collections::btree_map;
 use std::fmt::{self, Debug, Formatter};
 use std::iter::Peekable;
+use std::slice;
 use std::sync::{Arc, OnceLock};
 
 use serde::{Serialize, Serializer};
 
-use crate::source_packed_use::PackedSourceUse;
+use crate::source_packed_use::{PackedSourceUse, PackedUseTree};
 use crate::source_use::SourceUseDescription;
 
 /// Sorted use rows with lazily expanded borrowed views.
@@ -17,16 +19,64 @@ pub(super) struct FrozenUseRows(Arc<UseRows>);
 
 struct UseRows {
     live: Vec<Arc<SourceUseDescription>>,
-    packed: Vec<(Arc<str>, PackedSourceUse)>,
+    packed: PackedUseRows,
     expanded: OnceLock<Vec<SourceUseDescription>>,
     contiguous: OnceLock<Vec<SourceUseDescription>>,
 }
 
+pub(crate) enum PackedUseRows {
+    Snapshot(Vec<(Arc<str>, PackedSourceUse)>),
+    Sealed(PackedUseTree),
+}
+
+impl PackedUseRows {
+    fn iter(&self) -> PackedUseIter<'_> {
+        match self {
+            Self::Snapshot(rows) => PackedUseIter::Snapshot(rows.iter()),
+            Self::Sealed(tree) => PackedUseIter::Sealed(tree.iter()),
+        }
+    }
+
+    fn len(&self) -> usize {
+        match self {
+            Self::Snapshot(rows) => rows.len(),
+            Self::Sealed(tree) => tree.len(),
+        }
+    }
+}
+
+enum PackedUseIter<'a> {
+    Snapshot(slice::Iter<'a, (Arc<str>, PackedSourceUse)>),
+    Sealed(btree_map::Iter<'a, Arc<str>, PackedSourceUse>),
+}
+
+impl<'a> Iterator for PackedUseIter<'a> {
+    type Item = (&'a Arc<str>, &'a PackedSourceUse);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Snapshot(rows) => rows.next().map(|(id, row)| (id, row)),
+            Self::Sealed(tree) => tree.next(),
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let length = self.len();
+        (length, Some(length))
+    }
+}
+
+impl ExactSizeIterator for PackedUseIter<'_> {
+    fn len(&self) -> usize {
+        match self {
+            Self::Snapshot(rows) => rows.len(),
+            Self::Sealed(tree) => tree.len(),
+        }
+    }
+}
+
 impl FrozenUseRows {
-    pub(super) fn new(
-        live: Vec<Arc<SourceUseDescription>>,
-        packed: Vec<(Arc<str>, PackedSourceUse)>,
-    ) -> Self {
+    pub(super) fn new(live: Vec<Arc<SourceUseDescription>>, packed: PackedUseRows) -> Self {
         Self(Arc::new(UseRows {
             live,
             packed,

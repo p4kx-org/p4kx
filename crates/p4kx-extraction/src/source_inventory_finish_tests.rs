@@ -180,6 +180,16 @@ fn assert_original_inventory(
     assert_eq!(serde_json::to_vec(&snapshot)?, expected_wire);
     assert_eq!(serde_json::to_vec(&finished)?, expected_wire);
     assert_eq!(snapshot, finished);
+    assert_eq!(
+        snapshot.uses(),
+        finished.uses(),
+        "both backings retain the complete compatibility slice"
+    );
+    assert_eq!(
+        serde_json::to_vec(&finished)?,
+        expected_wire,
+        "traversing the inventory does not consume sealed rows"
+    );
     assert!(
         finished
             .iter_uses()
@@ -294,6 +304,43 @@ fn interruption_before_seal_leaves_registration_available() -> TestResult {
         sources.freeze()?.use_count(),
         2,
         "registration remains open"
+    );
+    Ok(())
+}
+
+#[test]
+fn interruption_among_sealed_packed_rows_leaves_the_registry_sealed() -> TestResult {
+    let sources = SourceUses::with_compact_coordinates();
+    let scope = sources.observe(SourceInput::Unknown, InputScope::Payload)?;
+    observe_in(&scope, 1)?;
+    observe_in(&scope, 2)?;
+    sources.compact_record_uses(|| Ok::<(), SourceEvidenceError>(()))?;
+    assert_eq!(
+        sources.packed_use_count()?,
+        2,
+        "both uses are already packed"
+    );
+
+    let mut checkpoints = 0;
+    let cancelled = sources.finish_with(|| {
+        checkpoints += 1;
+        if checkpoints == 4 {
+            Err(SourceInventoryFreezeError::Interrupted(()))
+        } else {
+            Ok(())
+        }
+    });
+    assert!(
+        matches!(cancelled, Err(SourceInventoryFreezeError::Interrupted(()))),
+        "the second packed row can interrupt the finish"
+    );
+    assert_eq!(
+        checkpoints, 4,
+        "finish checks startup, one physical source, and two packed rows"
+    );
+    assert!(
+        matches!(sources.freeze(), Err(SourceEvidenceError::SealedInventory)),
+        "an interrupted finish does not publish a partial inventory"
     );
     Ok(())
 }

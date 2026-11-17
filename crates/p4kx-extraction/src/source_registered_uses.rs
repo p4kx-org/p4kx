@@ -3,18 +3,18 @@
 
 use std::borrow::Borrow;
 use std::cmp::Ordering;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use crate::field_origin::OriginContribution;
 use crate::source_inventory::PhysicalSourceRef;
-use crate::source_packed_use::PackedSourceUse;
+use crate::source_packed_use::{PackedSourceUse, PackedUseTree};
 use crate::source_use::{SourceUseDescription, SourceUseRef};
 
 /// Sorted source-use rows indexed by their own immutable IDs.
 pub(crate) struct RegisteredUses {
     live: BTreeSet<RegisteredUse>,
-    packed: BTreeMap<Arc<str>, PackedSourceUse>,
+    packed: PackedUseTree,
     packed_sources: BTreeSet<Arc<PhysicalSourceRef>>,
     pending_compaction: Option<Vec<SourceUseRef>>,
 }
@@ -23,7 +23,7 @@ impl RegisteredUses {
     pub(crate) const fn new(compact_coordinates: bool) -> Self {
         Self {
             live: BTreeSet::new(),
-            packed: BTreeMap::new(),
+            packed: PackedUseTree::new(),
             packed_sources: BTreeSet::new(),
             pending_compaction: if compact_coordinates {
                 Some(Vec::new())
@@ -119,11 +119,11 @@ impl RegisteredUses {
         self,
     ) -> (
         impl ExactSizeIterator<Item = Arc<SourceUseDescription>>,
-        impl ExactSizeIterator<Item = (Arc<str>, PackedSourceUse)>,
+        PackedUseTree,
     ) {
         (
             self.live.into_iter().map(|registered| registered.0),
-            self.packed.into_iter(),
+            self.packed,
         )
     }
 }
