@@ -3,6 +3,8 @@
 
 use std::collections::HashSet;
 
+#[path = "face_control_diagnostic.rs"]
+mod diagnostic;
 #[path = "face_rotation_report.rs"]
 mod report;
 
@@ -70,13 +72,19 @@ impl Armour {
         if animation.additive || !animation.bind(&self.skeleton.bones).bound.is_empty() {
             return Err("comparison requires an absolute facial-only clip".to_owned());
         }
-        let (part, _, link) = self.face_part().ok_or("character has no facial rig")?;
+        let (part, selected, link) = self.face_part().ok_or("character has no facial rig")?;
         let rig = load(link, models)?;
         let face = &rig.face;
         let logic = face.logic();
         let tracks = face_tracks(animation, logic, &HashSet::new());
         if tracks.controls.is_empty() || !tracks.skipped.is_empty() {
-            return Err("comparison needs a completely bound facial control sequence".to_owned());
+            return Err(diagnostic::failure(
+                animation,
+                (part, selected),
+                link,
+                logic,
+                &tracks,
+            ));
         }
         let observed = evaluate_frames(logic.controls(), &tracks.controls, frames, |values| {
             let mut angles = Vec::with_capacity(face.joints());

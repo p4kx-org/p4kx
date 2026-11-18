@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+#[path = "face_control_binding_failures.rs"]
+mod binding_failures;
+
 use std::error::Error;
 
 use p4kx_assembly::{ArchiveModels, Expressions, FaceRotationComparison};
