@@ -7,7 +7,7 @@ use p4kx_export::{
     CatalogOptions, CatalogPublicationMode, CatalogSummary, Compression, Kind, Language,
 };
 use p4kx_extraction::{
-    Archive, ArchiveWatch, DataForge, DataForgeEntry, Filter, LocalizationSet, RecordTree,
+    Archive, ArchiveWatch, DataForge, DataForgeEntry, Filter, LocalizationSet, Record, RecordTree,
     StructValue, Value as Original, is_placeholder_key,
 };
 use serde_json::Value;
@@ -92,6 +92,14 @@ fn selected_item<'f>(
     filter: &Filter,
     path: &str,
 ) -> TestResult<RecordTree<'f>> {
+    Ok(selected_record(forge, filter, path)?.tree()?)
+}
+
+fn selected_record<'f>(
+    forge: &'f DataForge<'f>,
+    filter: &Filter,
+    path: &str,
+) -> TestResult<Record<'f>> {
     let mut accepted = forge
         .records()
         .filter(|record| record.record_path().is_ok_and(|path| filter.matches(path)));
@@ -102,7 +110,7 @@ fn selected_item<'f>(
     {
         return Err("the exact Item path must admit one physical Entity Record".into());
     }
-    Ok(record.tree()?)
+    Ok(record)
 }
 
 fn with_item_texts<T>(

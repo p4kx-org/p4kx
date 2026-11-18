@@ -66,11 +66,11 @@ cargo test --release --locked -p p4kx-export --test real_archive -- --ignored --
 ```
 
 For the all-language check, repeat the following command with `P4KX_DATA_P4K` set to
-each installed LIVE and PTU Archive and with a suitable original Item Record in
-that Build. It compares the catalog to the actual language Entry inventory, checks
-the original and displayed forms in both text domains, and resolves each translation's
-origin back to the corresponding language Entry. The result reports counts per
-language.
+each installed LIVE and PTU Archive. The test selects a unique Item Record with
+the required original Locale fields in that Build. Set `P4KX_CATALOG_ITEM_TEXT_RECORD`
+to check a specific Record. The test compares the catalog to the actual language Entry
+inventory, checks source and display forms in both text domains, and resolves each
+translation's origin back to the corresponding Entry. The result reports counts per language.
 
 ```text
 cargo test --release --locked -p p4kx-export --test real_archive -- --ignored --exact --nocapture real_archive_canonical_texts::extras::installed_items::all_languages::installed_item_texts_match_every_available_archive_language

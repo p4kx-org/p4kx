@@ -2,15 +2,18 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::collections::BTreeMap;
+use std::env::{self, VarError};
 
-use p4kx_export::{CatalogSummary, Kind, KindTextSummary, Language, TextOwner};
+use p4kx_export::{CatalogSummary, Kind, KindTextSummary, Language, TextOwner, is_kind_leftover};
 use p4kx_extraction::{
-    Archive, ArchiveWatch, DataForgeEntry, DataForgeOrigin, Filter, LocalizationEntry,
-    LocalizationSet, RecordTree, Value as Original, is_placeholder_key,
+    Archive, ArchiveWatch, DataForge, DataForgeEntry, DataForgeOrigin, Filter, LocalizationEntry,
+    LocalizationSet, RecordTree, StructValue, Value as Original, is_placeholder_key,
 };
 use serde_json::Value;
 
-use super::{TestResult, TextTarget, selected_catalog, selected_item, with_item_texts};
+use super::{
+    TestResult, TextTarget, selected_catalog, selected_item, selected_record, with_item_texts,
+};
 use crate::real_archive_shop_inventory_v3::verify_build;
 use crate::real_archive_text_oracle::Oracle;
 use crate::real_archive_verification::print_line;
@@ -23,11 +26,8 @@ mod origins;
 use origins::{Lookup, TextOrigins};
 
 #[test]
-#[ignore = "real Archive: set P4KX_DATA_P4K and P4KX_CATALOG_ITEM_TEXT_RECORD and pass --ignored"]
+#[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn installed_item_texts_match_every_available_archive_language() -> TestResult<()> {
-    let item_path = std::env::var("P4KX_CATALOG_ITEM_TEXT_RECORD")
-        .map_err(|_| "configure the exact original Item Record path")?;
-    let filter = Filter::parse(&format!("*{item_path}"))?;
     let archive = Archive::open_with_key(
         p4kx_testkit::real_archive_path()?,
         Some(p4kx_testkit::real_archive_key()?),
@@ -35,7 +35,7 @@ fn installed_item_texts_match_every_available_archive_language() -> TestResult<(
     let watch = ArchiveWatch::new(&archive);
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;
-    let original = selected_item(&forge, &filter, &item_path)?;
+    let Selection { filter, original } = select(&forge)?;
     let (summary, catalog) = selected_catalog(&archive, &entry, &filter)?;
     let channel = catalog
         .pointer("/source/channel")
@@ -57,6 +57,91 @@ fn installed_item_texts_match_every_available_archive_language() -> TestResult<(
         .check()
         .map_err(|_| "Archive changed during all-language Item comparison")?;
     Ok(())
+}
+
+struct Selection<'source> {
+    filter: Filter,
+    original: RecordTree<'source>,
+}
+
+fn select<'source>(forge: &'source DataForge<'source>) -> TestResult<Selection<'source>> {
+    match env::var("P4KX_CATALOG_ITEM_TEXT_RECORD") {
+        Ok(path) => {
+            let filter = Filter::parse(&format!("*{path}"))?;
+            let original = selected_item(forge, &filter, &path)?;
+            Ok(Selection { filter, original })
+        }
+        Err(VarError::NotPresent) => original_selection(forge),
+        Err(error) => Err(error.into()),
+    }
+}
+
+fn original_selection<'source>(
+    forge: &'source DataForge<'source>,
+) -> TestResult<Selection<'source>> {
+    let rule = Kind::Items
+        .rule()
+        .ok_or("the Item admission rule is required")?;
+    for record in forge.records() {
+        let (Ok(path), Ok(name), Ok(source_type)) =
+            (record.record_path(), record.name(), record.type_name())
+        else {
+            continue;
+        };
+        if source_type != rule.type_name
+            || !rule.matches_path(path)
+            || is_kind_leftover(Kind::Items, path, name)
+        {
+            continue;
+        }
+        let Ok(original) = record.tree() else {
+            continue;
+        };
+        if !has_original_texts(&original) {
+            continue;
+        }
+        let filter = Filter::parse(&format!("*{path}"))?;
+        if selected_record(forge, &filter, path).is_ok() {
+            return Ok(Selection { filter, original });
+        }
+    }
+    Err("no unique Item Record with the original text fields required by the witness".into())
+}
+
+fn has_original_texts(original: &RecordTree<'_>) -> bool {
+    let Some(Original::Array(components)) = original.field("Components") else {
+        return false;
+    };
+    let Some(attachment) = unique_component(components, "SAttachableComponentParams") else {
+        return false;
+    };
+    let Some(purchasable) = unique_component(components, "SCItemPurchasableParams") else {
+        return false;
+    };
+    let Some(Original::Struct(definition)) = attachment.field("AttachDef") else {
+        return false;
+    };
+    let Some(Original::Struct(locale)) = definition.field("Localization") else {
+        return false;
+    };
+    let has_key = |value: Option<&Original<'_>>| matches!(value, Some(Original::Locale(key)) if !key.is_empty() && !is_placeholder_key(key));
+    has_key(locale.field("Name"))
+        && has_key(locale.field("Description"))
+        && has_key(purchasable.field("displayType"))
+        && purchasable
+            .field("displayName")
+            .is_none_or(|value| matches!(value, Original::Locale(_)))
+}
+
+fn unique_component<'record, 'source>(
+    components: &'record [Original<'source>],
+    source_type: &str,
+) -> Option<&'record StructValue<'source>> {
+    let mut matches = components.iter().filter_map(|value| match value {
+        Original::Struct(component) if component.type_name() == source_type => Some(component),
+        _ => None,
+    });
+    matches.next().filter(|_| matches.next().is_none())
 }
 
 fn original_languages(
@@ -168,13 +253,7 @@ fn item_registrations(original: &RecordTree<'_>) -> TestResult<usize> {
         ("SAttachableComponentParams", 2),
         ("SCItemPurchasableParams", 1),
     ] {
-        let mut matching = components.iter().filter_map(|value| match value {
-            Original::Struct(component) if component.type_name() == required => Some(component),
-            _ => None,
-        });
-        let component = matching
-            .next()
-            .filter(|_| matching.next().is_none())
+        let component = unique_component(components, required)
             .ok_or_else(|| format!("select an Item with exactly one physical {required}"))?;
         registrations += fields;
         if required == "SCItemPurchasableParams"
