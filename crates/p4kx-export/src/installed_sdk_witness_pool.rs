@@ -8,7 +8,6 @@ use p4kx_extraction::{
 use p4kx_testkit::watchdog;
 use serde_json::Value as Json;
 
-use crate::Kind;
 use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_queries::crafting::{
     BlueprintPoolDefinition, BlueprintPoolEntry, BlueprintPoolSnapshot, observe_pool_query,
@@ -22,8 +21,8 @@ use crate::definition_reference::DefinitionStatus;
 use crate::record_fields;
 use crate::record_header_field::RecordHeaderField;
 use crate::resource_number::ResourceNumber;
-use crate::selection;
 
+use super::selection::original_pool_record;
 use super::verify::{self, Graph, Proof};
 use super::{TestResult, binding, open_archive, scope, wire};
 
@@ -39,7 +38,9 @@ fn installed_blueprint_pool_sdk_matches_one_original_record() -> TestResult {
         .parsed(None)
         .map_err(|_| "installed pool DataForge open failed")?;
     binding(&archive, &session, &parsed)?;
-    let original = original_pool(&parsed.forge)?;
+    let original = original_pool_record(&parsed.forge)?
+        .tree()
+        .map_err(|_| "selected original pool body is unreadable")?;
     let index = original.record_index();
     let proof = Proof::read(session.dataforge_origin())?;
     let (checked, reads) = observe_pool_query(
@@ -57,41 +58,6 @@ fn installed_blueprint_pool_sdk_matches_one_original_record() -> TestResult {
         .check()
         .map_err(|_| "installed Archive changed during the Blueprint-pool witness")?;
     Ok(())
-}
-
-fn original_pool<'source>(forge: &'source DataForge<'source>) -> TestResult<RecordTree<'source>> {
-    let kind = Kind::BlueprintPools;
-    let rule = kind.records();
-    let mut uncertain = false;
-    for record in forge.records() {
-        let Ok(source_type) = record.type_name() else {
-            uncertain = true;
-            continue;
-        };
-        if source_type != rule.type_name {
-            continue;
-        }
-        let Ok(path) = record.record_path() else {
-            uncertain = true;
-            continue;
-        };
-        if !rule.selects(path, source_type) {
-            continue;
-        }
-        let Ok(name) = record.name() else {
-            uncertain = true;
-            continue;
-        };
-        if !selection::is_kind_leftover(kind, path, name) {
-            return record
-                .tree()
-                .map_err(|_| "selected original pool body is unreadable".into());
-        }
-    }
-    if uncertain {
-        return Err("unreadable original headers prevent proving whether pool owners exist".into());
-    }
-    Err("installed DataForge has no admissible original Blueprint-pool owner".into())
 }
 
 fn check_snapshot(

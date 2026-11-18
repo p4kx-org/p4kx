@@ -4,7 +4,7 @@
 use std::collections::HashSet;
 use std::slice::Iter;
 
-use p4kx_extraction::{Field, Guid, RecordTree, StructValue, Value};
+use p4kx_extraction::{Field, Guid, RecordTree, Reference, StructValue, Value};
 
 use crate::crafting_types::RewardSource;
 use crate::record_fields::{guid_value, number, text};
@@ -61,19 +61,23 @@ struct VisitedValue<'tree, 'source> {
 }
 
 impl<'source> WalkStep<'_, 'source> {
+    pub(crate) fn pool_reference(&self, tree: &RecordTree<'_>) -> Option<&Reference<'source>> {
+        let Value::Reference(reference) = self.value else {
+            return None;
+        };
+        (matches!(self.edge, Edge::Field)
+            && reference.location().is_none()
+            && reference.guid() != tree.guid())
+        .then_some(reference)
+    }
+
     pub(crate) fn reward(
         &self,
         tree: &RecordTree<'source>,
         pools: &HashSet<Guid>,
     ) -> Option<RewardSource<'source>> {
-        let Value::Reference(reference) = self.value else {
-            return None;
-        };
-        if !matches!(self.edge, Edge::Field)
-            || reference.location().is_some()
-            || reference.guid() == tree.guid()
-            || !pools.contains(&reference.guid())
-        {
+        let guid = self.pool_reference(tree)?.guid();
+        if !pools.contains(&guid) {
             return None;
         }
         Some(RewardSource {
@@ -81,7 +85,7 @@ impl<'source> WalkStep<'_, 'source> {
             record_path: tree.record_path(),
             contract_id: self.scope.id,
             contract_name: self.scope.name,
-            pool: reference.guid(),
+            pool: guid,
             chance: number(Some(self.node), "chance"),
         })
     }

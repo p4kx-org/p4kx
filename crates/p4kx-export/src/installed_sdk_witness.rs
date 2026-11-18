@@ -18,6 +18,8 @@ use crate::catalog_queries::{
 mod pool;
 #[path = "installed_sdk_witness_receipt.rs"]
 mod receipt;
+#[path = "installed_sdk_witness_reward.rs"]
+mod reward;
 #[path = "installed_sdk_witness_scope.rs"]
 mod scope;
 #[path = "installed_sdk_witness_selection.rs"]

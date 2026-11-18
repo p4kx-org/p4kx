@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{DataForge, Record};
+use p4kx_extraction::{DataForge, DataForgeError, Record};
 
 use crate::Kind;
 use crate::catalog_queries::{CatalogRecordSelection, DatasetAvailability};
@@ -164,4 +164,33 @@ impl Census {
             "sourceTypeAbsent"
         }
     }
+}
+
+pub(super) fn original_pool_record<'source>(
+    forge: &'source DataForge<'source>,
+) -> TestResult<Record<'source>> {
+    let mut uncertain = false;
+    for record in forge.records() {
+        match eligible_pool(&record) {
+            Ok(true) => return Ok(record),
+            Ok(false) => {}
+            Err(_) => uncertain = true,
+        }
+    }
+    if uncertain {
+        return Err("unreadable original headers prevent proving whether pool owners exist".into());
+    }
+    Err("installed DataForge has no admissible original Blueprint-pool owner".into())
+}
+
+pub(super) fn eligible_pool(record: &Record<'_>) -> Result<bool, DataForgeError> {
+    let kind = Kind::BlueprintPools;
+    let rule = kind.records();
+    let path = record.record_path();
+    if path.as_ref().is_ok_and(|path| !rule.matches_path(path))
+        || record.type_name()? != rule.type_name
+    {
+        return Ok(false);
+    }
+    Ok(!selection::is_kind_leftover(kind, path?, record.name()?))
 }

@@ -5,6 +5,9 @@
 //! catalog, built from a synthetic Archive with multi-tier blueprints (no blueprint of the
 //! real Archive has more than one tier).
 
+#[path = "catalog_crafting_reward_sdk.rs"]
+mod reward_sdk;
+
 #[path = "catalog_crafting_pool_sdk.rs"]
 mod pool_sdk;
 #[path = "catalog_crafting_pool_tables.rs"]

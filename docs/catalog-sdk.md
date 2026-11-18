@@ -470,3 +470,42 @@ weights in slot order using f32 arithmetic. An overflowing sum still carries its
 The complete Catalog also publishes `declarations.blueprintRewardSources`. This direct query does
 not survey the other Record families that reference the pool. See
 [ADR-0412](adr/0412-blueprint-pools-separate-original-slots-weights-and-reward-sources.md).
+
+## Blueprint reward-source survey
+
+Use `catalog_queries::crafting::with_reward_sources` or `with_reward_sources_from` to read
+`declarations.blueprintRewardSources` directly. Session and parsed-view methods are named
+`with_blueprint_reward_sources`. `BlueprintRewardSelection` distinguishes two costs and scopes:
+
+- `SourceOwners(selection)` reads the selected original enclosing Records and classifies only the
+  pool-GUID dependencies actually observed in their owned bodies. A source can belong to any
+  Record family or path. GUID selection retains all physical source aliases.
+- `TargetPools(selection)` selects physical pool targets and surveys every source Record when
+  at least one target is admitted. An empty target selection skips that survey and reports zero
+  source reads. Pool aliases needed for canonical nominal membership are checked separately.
+
+Both modes share the ordinary reward traversal and original pool reader with the Catalog.
+They keep scalar Record references, foreign root weak pointers, repeated physical occurrences,
+local chance storage and nearest enclosing identity semantics. Raw Reference-array elements, local
+weak pointers and nominal self-links retain the existing exclusions. Pool membership comes from
+materialized admissible pool bodies, while target selection filters the actual physical
+`targetRecordIndex`; the link is never rewritten to another same-GUID alias. A failed physical
+target can still have an observed link if a readable alias establishes nominal membership. Its
+pool coverage remains incomplete.
+
+Rows expose every serialized field through typed getters and stay ordered by original source
+Record index and occurrence ordinal. Filtering does not renumber `sourceOrdinal`. Resolve every
+cell's contributors in the snapshot's own `source_inventory`. The query reads no localization,
+Blueprint, global-configuration, resource or scene dependencies merely to provide these rows;
+the inverse mode can read such a Record as a potential source because its survey is global.
+
+Inspect both `source_coverage` and `pool_coverage`, together with `selection`,
+`source_records_read` and `pool_records_read`, before interpreting an empty result. Unreadable
+possible sources remain gaps even if their type has no readable reward owner. An opaque field
+error remains incomplete on a readable zero-match body. The legacy crafting warning heuristic
+is not the query's completeness policy. Availability describes the original pool family,
+independently of selected row count. No complete Catalog or reverse Reference index is built.
+Only the current source tree and the current demanded pool tree are materialized together.
+The inventory retains the original uses for returned rows and inspected pool admissions.
+Coverage retains failed physical indices. Publish consumer changes only after the outer
+query succeeds.

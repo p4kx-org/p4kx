@@ -89,7 +89,7 @@ impl Report {
     }
 }
 
-fn coverage(value: &CatalogRecordCoverage) -> [usize; 4] {
+pub(super) fn coverage(value: &CatalogRecordCoverage) -> [usize; 4] {
     [
         value.unreadable_headers.len(),
         value.unreadable_bodies.len(),
@@ -120,7 +120,7 @@ pub(super) fn destination() -> TestResult<PathBuf> {
     Ok(path)
 }
 
-pub(super) fn write(path: &Path, archive: &Archive, reports: &[Report]) -> TestResult {
+pub(super) fn build_digest(archive: &Archive) -> TestResult<String> {
     use sha2::Digest as _;
 
     let build = archive.build().ok_or("installed Build identity required")?;
@@ -139,9 +139,13 @@ pub(super) fn write(path: &Path, archive: &Archive, reports: &[Report]) -> TestR
     for byte in digest {
         write!(build_sha256, "{byte:02x}")?;
     }
+    Ok(build_sha256)
+}
+
+pub(super) fn write(path: &Path, archive: &Archive, reports: &[Report]) -> TestResult {
     let receipt = Receipt {
         schema_version: 1,
-        build_sha256,
+        build_sha256: build_digest(archive)?,
         archive_bytes: archive.file_len(),
         decoded_entries: 1,
         parsed_views: 1,
@@ -150,7 +154,11 @@ pub(super) fn write(path: &Path, archive: &Archive, reports: &[Report]) -> TestR
         after_callback_cancel_probe: true,
         queries: reports,
     };
-    let bytes = serde_json::to_vec(&receipt).map_err(|_| "private receipt serialization failed")?;
+    publish(path, &receipt)
+}
+
+pub(super) fn publish(path: &Path, receipt: &impl Serialize) -> TestResult {
+    let bytes = serde_json::to_vec(receipt).map_err(|_| "private receipt serialization failed")?;
     if bytes.len() > MAX_RECEIPT_BYTES {
         return Err("private technical receipt exceeded its fixed size bound".into());
     }

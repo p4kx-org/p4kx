@@ -11,7 +11,6 @@ use rayon::slice::ParallelSlice;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::crafting_sources;
 use crate::crafting_types::{BlueprintPool, RewardSource};
-use crate::export_dependency_read;
 use crate::export_ledger::ExportLedger;
 use crate::record_observation::RecordObservation;
 use crate::{CatalogError, CatalogPhase, CatalogProgress, Kind};
@@ -56,23 +55,31 @@ impl<'f> RewardAccumulator<'f> {
         if cancel.is_some_and(CancelToken::is_cancelled) {
             return Err(CatalogError::Cancelled);
         }
-        let admission = match input {
-            Some(input) => RecordObservation::capture(input, record)?,
-            None => RecordObservation::accounting(record),
-        };
-        let read =
-            export_dependency_read::read(input, trees, &admission, Kind::BlueprintPools, cancel)?;
-        self.ledger.merge(read.ledger);
-        match read.tree {
+        crate::crafting_scan::with_reward_record(trees, record, input, cancel, |admission, read| {
+            self.ledger.merge(read.ledger);
+            self.collect_read(record, wanted, input, cancel, admission, read.tree)
+        })
+    }
+
+    fn collect_read(
+        &mut self,
+        record: &Record<'f>,
+        wanted: &HashSet<Guid>,
+        input: Option<&OriginalCatalogInput<'_, 'f>>,
+        cancel: Option<&CancelToken>,
+        admission: &RecordObservation<'_, 'f>,
+        tree: Result<p4kx_extraction::RecordTree<'f>, p4kx_extraction::DataForgeError>,
+    ) -> Result<(), CatalogError> {
+        match tree {
             Ok(tree) => {
                 if let Some(input) = input {
                     let found = crate::catalog_v3::industry_modules::blueprint_reward_source::read(
-                        &tree, input, &admission, wanted, cancel,
+                        &tree, input, admission, wanted, cancel,
                     )?;
                     crate::source_projection_notes::record(
                         Kind::BlueprintPools,
                         crate::export_diagnostic::ExportSourceRole::Dependency,
-                        &admission,
+                        admission,
                         &tree,
                         found.notes,
                         &mut self.ledger,

@@ -13,7 +13,7 @@ use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_number_capture::NumberCapture;
 use crate::catalog_read::original::{OriginalFlowFields, OriginalValuePart};
 use crate::catalog_v3::authored_fields::Observed;
-use crate::crafting_sources;
+use crate::crafting_sources::{self, WalkStep};
 use crate::record_observation::RecordObservation;
 use crate::template_field_capture::TemplateFieldCapture;
 
@@ -24,13 +24,24 @@ pub(crate) fn read<'source>(
     wanted: &HashSet<Guid>,
     cancel: Option<&CancelToken>,
 ) -> Result<BlueprintRewardRead<'source>, CatalogError> {
+    read_selected(tree, input, admission, wanted, None, cancel)
+}
+
+pub(crate) fn read_selected<'source>(
+    tree: &RecordTree<'source>,
+    input: &OriginalCatalogInput<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    wanted: &HashSet<Guid>,
+    targets: Option<&HashSet<u32>>,
+    cancel: Option<&CancelToken>,
+) -> Result<BlueprintRewardRead<'source>, CatalogError> {
     let mut steps = crafting_sources::walk(tree);
     let first = loop {
         crate::catalog_query_session::checkpoint(cancel)?;
         let Some(step) = steps.next() else {
             return Ok(BlueprintRewardRead::default());
         };
-        if step.reward(tree, wanted).is_some() {
+        if in_target_scope(&step, tree, targets) && step.reward(tree, wanted).is_some() {
             break step;
         }
     };
@@ -43,7 +54,9 @@ pub(crate) fn read<'source>(
     let mut result = BlueprintRewardRead::default();
     for step in std::iter::once(first).chain(steps) {
         fields.check_cancel()?;
-        if let Some(interpreted) = step.reward(tree, wanted) {
+        if in_target_scope(&step, tree, targets)
+            && let Some(interpreted) = step.reward(tree, wanted)
+        {
             let owner = fields.owner_of(step.node)?;
             let observed = owner.map_or(source, |owner| source.at_owner(owner));
             let chance = observed.authored_number("chance", &mut result.notes)?;
@@ -81,4 +94,15 @@ pub(crate) fn read<'source>(
     }
     result.numbers = NumberCapture::deduplicate(numbers.into_inner())?;
     Ok(result)
+}
+
+fn in_target_scope(
+    step: &WalkStep<'_, '_>,
+    tree: &RecordTree<'_>,
+    targets: Option<&HashSet<u32>>,
+) -> bool {
+    targets.is_none_or(|targets| {
+        step.pool_reference(tree)
+            .is_some_and(|reference| targets.contains(&reference.record_index()))
+    })
 }

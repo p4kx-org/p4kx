@@ -23,7 +23,7 @@ mod scope;
 #[path = "blueprint_reward_views.rs"]
 mod views;
 
-pub(crate) use read::read;
+pub(crate) use read::{read, read_selected};
 
 #[cfg(test)]
 #[path = "blueprint_reward_source_tests.rs"]

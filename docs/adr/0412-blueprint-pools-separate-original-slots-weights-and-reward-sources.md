@@ -29,3 +29,18 @@ selected pool owners. This supports clients that need the authored slots while a
 cost of unrelated Record discovery. The complete Catalog's inverse survey retains its own
 coverage and warnings. The released v2 fixture stays immutable, and P4KX 0.5.0 writes only v3.
 The independent interpreted Rust crafting interface retains its existing contract.
+
+## Selective reward-source access
+
+Expose the incoming declaration survey separately from the pool-definition query. Explicit
+source-owner selection restricts source bodies and discovers only demanded pool-GUID dependencies.
+Explicit physical-target selection surveys all source Records; no source type or path heuristic
+can establish a complete inverse result. Both modes use the same one-Record original admission,
+field inspection and canonical reward reader as the complete producer. Tree retention is bounded
+to the current source and demanded pool read, independently of the number of source Records.
+
+Preserve nominal successful-pool membership and actual physical reference identity as different
+facts. Record failures, unreadable possible headers and projection gaps separately for the source
+survey and pool dependencies. Keep zero-match read evidence. The interpreted crafting warning
+continues its own contract; it does not authorize a complete SDK result. No Catalog wire fields
+or released-v2 fixtures change.
