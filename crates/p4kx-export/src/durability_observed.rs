@@ -36,6 +36,8 @@ mod room_offset;
 pub(super) use room_offset::{RoomOffset, RoomTransformUnavailable};
 #[path = "authored_manufacturer.rs"]
 pub(crate) mod authored_manufacturer;
+#[path = "authored_locale_input.rs"]
+pub(crate) mod locale_input;
 #[path = "ship_presentation.rs"]
 pub(crate) mod ship_presentation;
 #[path = "authored_text_fields.rs"]

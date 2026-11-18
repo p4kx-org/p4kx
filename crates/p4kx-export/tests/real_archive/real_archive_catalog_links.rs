@@ -10,6 +10,7 @@ use serde_json::Value;
 use crate::catalog_v3_consumer;
 use crate::real_archive_blueprints::Blueprints;
 use crate::real_archive_broker_entries::check_broker_links;
+use crate::real_archive_canonical_texts::ItemPresentationIndex;
 use crate::real_archive_contract_templates::check_template_links;
 use crate::real_archive_npc_spawns::check_npc_links;
 use crate::real_archive_spawns::check_spawn_links;
@@ -35,12 +36,13 @@ pub(super) fn vehicle_manufacturer(ship: &Value) -> Option<&str> {
 
 fn check_manufacturer_links(catalog: &Value) -> TestResult {
     let manufacturers = real_archive_verification::guids(catalog, Kind::Manufacturers.name())?;
+    let originals = ItemPresentationIndex::new(catalog)?;
     for kind in [Kind::Items, Kind::Ships] {
         for entity in real_archive_verification::list(catalog, kind)? {
             let guid = if kind == Kind::Ships {
                 vehicle_manufacturer(entity)
             } else {
-                entity.get("manufacturerGuid").and_then(Value::as_str)
+                originals.manufacturer(entity)?
             };
             if let Some(guid) = guid {
                 assert!(manufacturers.contains(guid), "{kind} manufacturer {guid}");

@@ -23823,93 +23823,40 @@
       "type": "object"
     },
     "Item": {
-      "description": "An item: an `EntityClassDefinition` Record under `entities/scitem` or `entities/legacyitems`.",
+      "description": "The selected physical Item and its source-backed classification projections.",
       "properties": {
         "className": {
-          "description": "The Record name without its type, e.g. `POWR_ACAS_S01_Lumen`.",
-          "type": "string"
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
-        "grade": {
-          "description": "The grade of `AttachDef.Grade`, `null` without one.",
-          "format": "int64",
-          "type": [
-            "integer",
-            "null"
-          ]
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "guid": {
-          "$ref": "#/$defs/Guid",
-          "description": "The GUID of the Record."
+          "$ref": "#/$defs/SourcedValueOfGuid"
         },
         "itemClass": {
-          "description": "The item class from the `Class:` line of the English description, `null` for another\nvalue or without that line. Today one of `Civilian`, `Competition`, `Industrial`,\n`Military` and `Stealth`; the schema keeps a string, as a new value is additive.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
-        "manufacturerGuid": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Guid"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The GUID of the manufacturer the Reference `AttachDef.Manufacturer` links to, `null` for\na null Reference."
-        },
-        "mass": {
-          "description": "The mass in kilograms of the physics controller, `null` without one.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "playability": {
-          "description": "Who the item is for, `null` when no rule applies. Today one of `player`, `mission` and\n`special`; the schema keeps a string, as a new value is additive.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "recordIndex": {
-          "$ref": "#/$defs/SourcedValueOfuint32",
-          "description": "The physical Record position that identifies this Item's canonical definition."
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "recordPath": {
-          "description": "The record path, without `.xml`.",
-          "type": "string"
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
-        "size": {
-          "description": "The size of `AttachDef.Size`, `null` without one.",
-          "format": "int64",
-          "type": [
-            "integer",
-            "null"
-          ]
+        "selection": {
+          "$ref": "#/$defs/ItemSourceSelection"
         },
-        "subType": {
-          "description": "The item subtype of `AttachDef.SubType`, e.g. `Power`, `null` without one.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "tags": {
-          "description": "The words of `AttachDef.Tags`, in stored order.",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "type": {
-          "description": "The item type of `AttachDef.Type`, e.g. `PowerPlant`, `null` without one.",
-          "type": [
-            "string",
-            "null"
-          ]
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "variantOf": {
           "anyOf": [
@@ -23919,24 +23866,21 @@
             {
               "type": "null"
             }
-          ],
-          "description": "The GUID of the base of the variant group the item belongs to, `null` for a base and for an\nitem that is alone in its group. It is the `guid` of an entry of `items`."
+          ]
         }
       },
       "required": [
         "className",
-        "grade",
+        "fileName",
         "guid",
         "itemClass",
-        "manufacturerGuid",
-        "mass",
+        "metadataTag",
         "playability",
         "recordIndex",
+        "recordName",
         "recordPath",
-        "size",
-        "subType",
-        "tags",
-        "type",
+        "selection",
+        "sourceType",
         "variantOf"
       ],
       "type": "object"
@@ -24031,11 +23975,26 @@
         "grade": {
           "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
+        "itemSubtype": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "itemType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
         "localization": {
           "$ref": "#/$defs/SourcedValueOfItemLocalization"
         },
         "manufacturer": {
           "$ref": "#/$defs/ItemManufacturer"
+        },
+        "requiredTags": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "size": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "tags": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "weaponMotion": {
           "anyOf": [
@@ -24050,8 +24009,13 @@
       },
       "required": [
         "grade",
+        "itemSubtype",
+        "itemType",
         "localization",
         "manufacturer",
+        "requiredTags",
+        "size",
+        "tags",
         "weaponMotion"
       ],
       "type": "object"
@@ -24475,6 +24439,26 @@
         "objectContainer",
         "ownerGuid",
         "ownerRecordIndex"
+      ],
+      "type": "object"
+    },
+    "ItemSourceSelection": {
+      "description": "The first physical presentation components and the source prefixes selecting them.",
+      "properties": {
+        "attachmentComponentOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "physicsComponentOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "purchasableComponentOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        }
+      },
+      "required": [
+        "attachmentComponentOrdinal",
+        "physicsComponentOrdinal",
+        "purchasableComponentOrdinal"
       ],
       "type": "object"
     },

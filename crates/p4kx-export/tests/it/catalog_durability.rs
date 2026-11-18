@@ -223,16 +223,8 @@ fn assert_receipt<'source>(
 }
 
 fn assert_item_identity(catalog: &Value) -> TestResult {
-    let items = proof::rows(catalog, "/items")?;
-    let own = common::guid(HEALTH_ONLY);
-    let specialist = common::guid(SPECIALIST);
-    let lookup = |guid: &str| {
-        items
-            .iter()
-            .find(|row| row.get("guid").and_then(Value::as_str) == Some(guid))
-    };
-    for guid in [own, specialist] {
-        let item = lookup(&guid).ok_or("Item row for original Health owner")?;
+    for guid in [HEALTH_ONLY, SPECIALIST] {
+        let item = super::item(catalog, guid)?;
         assert!(
             item.get("stats").is_none(),
             "health belongs to the physical Durability row"

@@ -12,13 +12,15 @@ use crate::catalog_v3::catalog_item_components::{self, ItemComponentsRead, resol
 use crate::catalog_v3::catalog_weapon_projectile_ammo::{self, LinkedAmmunitionReader};
 use crate::catalog_v3::loot_definition_catalog::{self, LootDefinitionKind};
 use crate::catalog_v3::starmap_object_definition;
+use crate::contract::Item;
 use crate::contract_stats::ItemStats;
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_ledger::ExportLedger;
 use crate::harvest_config::{is_slotpreset_path, multi_config};
+use crate::item_class::ClassLine;
 use crate::loot_kinds::LootPick;
 use crate::mining::mineable_entity;
-use crate::picked::Picked;
+use crate::picked::{Picked, PickedItem};
 use crate::record_fields;
 use crate::record_observation::RecordObservation;
 use crate::scan_health::ScanError;
@@ -76,23 +78,21 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
             ));
         }
         if kind == Kind::Items {
-            let (definition, read, stats) = self.item_components(tree, trees, admission, ledger)?;
-            let (mut item, line) =
-                crate::item::item(tree, definition.record_index().clone(), self.scan.texts);
-            item.variant_key = item_variant::key(tree, stats.as_ref());
+            let (definition, read, (item, line)) =
+                self.item_components(tree, trees, admission, ledger)?;
             let ports = crate::loadout::carries_ports(tree).then_some(crate::loadout::Wanted {
-                guid: item.guid,
+                guid: item.identity.guid,
                 kind: crate::contract_loadout::EntityKind::Item,
                 record_index: tree.record_index(),
             });
             return Ok(Some(
-                Picked::Item {
+                Picked::Item(Box::new(PickedItem {
                     entity: item,
                     line,
                     ports,
                     components: read.rows,
-                    definition: Box::new(definition),
-                }
+                    definition,
+                }))
                 .crafted(tree),
             ));
         }
@@ -168,7 +168,7 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
         (
             ItemDefinition<'f>,
             ItemComponentsRead<'f>,
-            Option<ItemStats<'f>>,
+            (Item<'f>, ClassLine),
         ),
         CatalogError,
     > {
@@ -178,10 +178,13 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
             &self.projection,
             admission,
             cancel,
-            |originals, read| {
+            |definition, originals, read| {
                 let stats = self
                     .item_stats_with_magazines(tree, trees, admission, originals, read, ledger)?;
-                Ok(stats)
+                let (mut item, line) =
+                    crate::item::item(tree, definition, originals, &self.projection)?;
+                item.variant_key = item_variant::key(tree, stats.as_ref());
+                Ok((item, line))
             },
         )
     }

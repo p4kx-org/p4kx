@@ -8,6 +8,8 @@ use crate::catalog_read_failure::CatalogReadFailure;
 use crate::catalog_v3::ammo_definition::PreparedAmmoDefinition;
 use crate::catalog_v3::blueprint_category_list::PreparedBlueprintCategoryList;
 use crate::catalog_v3::cargo_globals::{PreparedCargoLoadingGlobal, PreparedShopCommodityGlobal};
+use crate::catalog_v3::catalog_item_components::ItemComponentRows;
+use crate::catalog_v3::catalog_item_components::item_definition::ItemDefinition;
 use crate::catalog_v3::catalog_item_components::resolution::MagazineDependency;
 use crate::catalog_v3::catalog_resource_network_read::resource_network_global::PreparedResourceNetworkGlobal;
 use crate::catalog_v3::explosion_definition::PreparedExplosionDefinition;
@@ -36,6 +38,14 @@ use crate::paint_port::VehicleFacts;
 use crate::ship_base::ShipRead;
 use crate::{CatalogError, Kind};
 
+pub(crate) struct PickedItem<'f> {
+    pub(crate) entity: Item<'f>,
+    pub(crate) line: ClassLine,
+    pub(crate) ports: Option<crate::loadout::Wanted>,
+    pub(crate) components: ItemComponentRows<'f>,
+    pub(crate) definition: ItemDefinition<'f>,
+}
+
 /// A Record a kind selected: its entity, or a development leftover of the kind.
 ///
 /// The kinds that [`read_crafting`](crate::read_crafting) fills are not picked.
@@ -43,14 +53,7 @@ pub(crate) enum Picked<'f> {
     /// A manufacturer.
     Manufacturer(Box<Manufacturer<'f>>),
     /// An item and the configurations read from its original Record.
-    Item {
-        entity: Item<'f>,
-        line: ClassLine,
-        ports: Option<crate::loadout::Wanted>,
-        components: crate::catalog_v3::catalog_item_components::ItemComponentRows<'f>,
-        definition:
-            Box<crate::catalog_v3::catalog_item_components::item_definition::ItemDefinition<'f>>,
-    },
+    Item(Box<PickedItem<'f>>),
     /// A ship and the vehicle facts its paints are derived from.
     Ship(Ship<'f>, VehicleFacts),
     /// A commodity.
@@ -240,7 +243,7 @@ impl<'f> Picked<'f> {
     pub(crate) fn crafted(self, tree: &RecordTree<'f>) -> Self {
         if !matches!(
             self,
-            Self::Item { .. } | Self::Ship(..) | Self::Commodity(_) | Self::MineableEntity(_)
+            Self::Item(_) | Self::Ship(..) | Self::Commodity(_) | Self::MineableEntity(_)
         ) {
             return self;
         }

@@ -253,7 +253,7 @@ fn every_ship_of_an_assignment_is_a_catalog_ship() -> TestResult {
         .as_array()
         .ok_or("items")?
         .iter()
-        .filter_map(|item| item["guid"].as_str())
+        .filter_map(|item| item.pointer("/guid/value").and_then(Value::as_str))
         .collect();
     for paint in catalog["paints"].as_array().ok_or("paints")? {
         assert!(

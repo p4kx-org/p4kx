@@ -84,7 +84,7 @@ fn item(catalog: &Value, guid: u128) -> TestResult<&Value> {
     let guid = common::guid(guid);
     proof::rows(catalog, "/items")?
         .iter()
-        .find(|row| row.get("guid").and_then(Value::as_str) == Some(guid.as_str()))
+        .find(|row| row.pointer("/guid/value").and_then(Value::as_str) == Some(guid.as_str()))
         .ok_or_else(|| format!("item {guid}").into())
 }
 

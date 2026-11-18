@@ -47,7 +47,9 @@ fn class_names<'a>(catalog: &'a Value, kind: &str) -> Vec<&'a str> {
         .as_array()
         .into_iter()
         .flatten()
-        .filter_map(|entry| entry["className"].as_str())
+        .filter_map(|entry| {
+            crate::catalog_items::entity_field(entry, kind, "className").and_then(Value::as_str)
+        })
         .collect()
 }
 

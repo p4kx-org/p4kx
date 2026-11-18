@@ -23,7 +23,9 @@ fn staging_keeps_typed_health_bytes_in_physical_record_and_component_order() -> 
             let admission = RecordObservation::capture(projection.original(), &record)?;
             let tree = record.tree()?;
             let (_, read, ()) =
-                catalog_item_components::read(&tree, &projection, &admission, None, |_, _| Ok(()))?;
+                catalog_item_components::read(&tree, &projection, &admission, None, |_, _, _| {
+                    Ok(())
+                })?;
             let mut durability = read.rows.durability;
             for row in &durability.health {
                 baseline.push((row.owner.key(), serde_json::value::to_raw_value(row)?));

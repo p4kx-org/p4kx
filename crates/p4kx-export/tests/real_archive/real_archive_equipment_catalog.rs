@@ -13,6 +13,9 @@ use serde_json::Value;
 
 use crate::real_archive_item_durability::rows;
 
+#[path = "equipment_owner_bindings.rs"]
+pub(super) mod owner_bindings;
+
 pub(super) type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 pub(super) const WEAPONS: &str = "/configurations/weaponActions/rows";
@@ -79,8 +82,8 @@ pub(super) fn item<'a>(catalog: &'a Value, class: &str) -> TestResult<&'a Value>
     rows(catalog, "/items")?
         .iter()
         .find(|item| {
-            item["className"]
-                .as_str()
+            item.pointer("/className/value")
+                .and_then(Value::as_str)
                 .is_some_and(|name| name.eq_ignore_ascii_case(class))
         })
         .ok_or_else(|| format!("no item {class}").into())
@@ -91,17 +94,19 @@ pub(super) fn owner_rows<'a>(
     table: &str,
     item: &Value,
 ) -> impl Iterator<Item = &'a Value> {
-    let guid = item.get("guid").and_then(Value::as_str);
+    let validation = owner_bindings::check(catalog, table, item);
+    assert!(
+        validation.is_ok(),
+        "physical Item owner bindings in {table}: {validation:?}"
+    );
+    let guid = item.get("guid");
+    let record = item.get("recordIndex");
     catalog
         .pointer(table)
         .and_then(Value::as_array)
         .into_iter()
         .flatten()
-        .filter(move |row| guid_is(row, guid))
-}
-
-fn guid_is(row: &Value, guid: Option<&str>) -> bool {
-    guid.is_some() && row.pointer("/ownerGuid/value").and_then(Value::as_str) == guid
+        .filter(move |row| row.get("ownerGuid") == guid && row.get("ownerRecordIndex") == record)
 }
 
 pub(super) fn owner<'a>(catalog: &'a Value, table: &str, item: &Value) -> TestResult<&'a Value> {

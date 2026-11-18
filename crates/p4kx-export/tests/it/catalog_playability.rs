@@ -54,8 +54,13 @@ fn catalog_mode(
 fn playability<'c>(catalog: &'c Value, kind: &str, class: &str) -> Result<&'c Value, String> {
     catalog[kind]
         .as_array()
-        .and_then(|list| list.iter().find(|entry| entry["className"] == class))
-        .map(|entry| &entry["playability"])
+        .and_then(|list| {
+            list.iter().find(|entry| {
+                crate::catalog_items::entity_field(entry, kind, "className").and_then(Value::as_str)
+                    == Some(class)
+            })
+        })
+        .and_then(|entry| crate::catalog_items::entity_field(entry, kind, "playability"))
         .ok_or_else(|| format!("{kind} {class} missing"))
 }
 

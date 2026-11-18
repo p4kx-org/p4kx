@@ -47,7 +47,10 @@ fn the_groups_are_the_variant_of_of_every_ship_and_item_of_the_catalog() -> Test
                 Value::Null => None,
                 value => Some(guid(value)?),
             };
-            let own = guid(&entity["guid"])?;
+            let own = guid(
+                crate::catalog_items::entity_field(entity, kind, "guid")
+                    .ok_or("original entity GUID")?,
+            )?;
             assert_eq!(groups.base_of(own), base, "{}", entity["className"]);
             if let Some(base) = base {
                 assert!(groups.variants_of(base).contains(&own), "listed");
@@ -88,7 +91,7 @@ fn shield_variant_groups_use_original_stats_after_the_wire_field_is_removed() ->
     let item = |name: &str| {
         items
             .iter()
-            .find(|item| item["className"] == name)
+            .find(|item| item.pointer("/className/value").and_then(Value::as_str) == Some(name))
             .ok_or_else(|| format!("missing {name}"))
     };
     let base = item("shield_base")?;
@@ -102,7 +105,7 @@ fn shield_variant_groups_use_original_stats_after_the_wire_field_is_removed() ->
     }
     assert!(base["variantOf"].is_null(), "the base retains its identity");
     assert_eq!(
-        twin["variantOf"], base["guid"],
+        twin["variantOf"], base["guid"]["value"],
         "the equal shield is grouped"
     );
     assert!(
@@ -118,7 +121,7 @@ fn shield_variant_groups_use_original_stats_after_the_wire_field_is_removed() ->
         .as_array()
         .ok_or("canonical resource components")?
         .iter()
-        .find(|row| row.pointer("/ownerGuid/value") == resource_item.get("guid"))
+        .find(|row| row.pointer("/ownerGuid/value") == resource_item.pointer("/guid/value"))
         .ok_or("the shield's original resource component")?;
     assert_eq!(
         resource.pointer("/states/value/0/value/deltas/value/0/value/generation/value/resourceAmountPerSecond/value/units/value/finite"),
@@ -130,9 +133,9 @@ fn shield_variant_groups_use_original_stats_after_the_wire_field_is_removed() ->
     let forge = entry.open()?;
     let groups = read_variant_groups(&archive, &forge, &|| false).ok_or("stopped")?;
     assert_eq!(
-        groups.base_of(guid(&twin["guid"])?),
-        Some(guid(&base["guid"])?)
+        groups.base_of(guid(&twin["guid"]["value"])?),
+        Some(guid(&base["guid"]["value"])?)
     );
-    assert_eq!(groups.base_of(guid(&different["guid"])?), None);
+    assert_eq!(groups.base_of(guid(&different["guid"]["value"])?), None);
     Ok(())
 }

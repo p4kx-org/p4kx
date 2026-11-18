@@ -46,7 +46,7 @@ fn resource_only_and_specialist_items_share_the_canonical_wire_contract() -> Tes
     for guid in [fixture::OWNER, fixture::SPECIALIST] {
         let item = proof::rows(&catalog, "/items")?
             .iter()
-            .find(|item| item["guid"] == common::guid(guid))
+            .find(|item| item.pointer("/guid/value") == Some(&json!(common::guid(guid))))
             .ok_or("resource item")?;
         assert!(
             item.get("stats").is_none(),

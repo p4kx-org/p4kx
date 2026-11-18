@@ -12,4 +12,4 @@ mod scope_fixture;
 #[path = "equipment_item_query_values.rs"]
 mod values;
 #[path = "equipment_item_query_walk.rs"]
-mod walk;
+pub(crate) mod walk;

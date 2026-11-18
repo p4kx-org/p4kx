@@ -13,6 +13,9 @@ use p4kx_extraction::{Archive, DataForgeEntry};
 use p4kx_testkit::real_archive_path;
 use serde_json::Value;
 
+use crate::catalog_v3_consumer;
+use crate::real_archive_canonical_texts::ItemPresentationIndex;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 const MIN_ITEMS: usize = 10_000;
@@ -59,45 +62,63 @@ fn builds_items_and_ships_of_a_real_archive() -> TestResult {
         assert!(counts.count >= min, "plausible {kind} count: {counts:?}");
         assert!(counts.complete, "{kind} complete without a Filter");
     }
-    let manufacturers: HashSet<&str> = catalog["definitions"]["manufacturers"]["rows"]
-        .as_array()
-        .ok_or("manufacturer rows")?
-        .iter()
-        .map(|m| m["guid"]["value"].as_str().ok_or("manufacturer GUID"))
-        .collect::<Result<_, _>>()?;
-    for kind in ["items", "ships"] {
-        let entities = list(&catalog, kind)?;
-        let guids: Vec<&str> = entities.iter().filter_map(|e| e["guid"].as_str()).collect();
-        assert!(guids.is_sorted(), "{kind} ordered by GUID");
-        assert!(
-            entities
-                .iter()
-                .filter_map(|e| e["recordPath"].as_str())
-                .all(|path| !path.contains("_test_") && !path.contains("/test_")),
-            "no test leftovers in {kind}"
-        );
-        let linked: Vec<&str> = entities
-            .iter()
-            .filter_map(|entity| {
-                if kind == "ships" {
-                    crate::real_archive_catalog_links::vehicle_manufacturer(entity)
-                } else {
-                    entity["manufacturerGuid"].as_str()
-                }
-            })
-            .collect();
-        let resolved = linked
-            .iter()
-            .filter(|guid| manufacturers.contains(*guid))
-            .count();
-        assert!(
-            ratio(resolved, linked.len()) >= MIN_RESOLVED_MANUFACTURERS,
-            "{kind}: {resolved} of {} manufacturer GUIDs are catalog manufacturers",
-            linked.len()
-        );
-    }
+    check_entity_links(&catalog)?;
     check_items(&catalog, summary)?;
     check_ships(&catalog)
+}
+
+fn check_entity_links(catalog: &Value) -> TestResult {
+    let manufacturers: HashSet<&str> = catalog_v3_consumer::rows(catalog, Kind::Manufacturers)?
+        .iter()
+        .map(|row| catalog_v3_consumer::identity(row, Kind::Manufacturers))
+        .collect::<Result<_, _>>()?;
+    let originals = ItemPresentationIndex::new(catalog)?;
+    for kind in [Kind::Items, Kind::Ships] {
+        check_entity_family(catalog, kind, &manufacturers, &originals)?;
+    }
+    Ok(())
+}
+
+fn check_entity_family(
+    catalog: &Value,
+    kind: Kind,
+    manufacturers: &HashSet<&str>,
+    originals: &ItemPresentationIndex<'_>,
+) -> TestResult {
+    let entities = list(catalog, kind.name())?;
+    let guids: Vec<_> = entities
+        .iter()
+        .map(|entity| catalog_v3_consumer::identity(entity, kind))
+        .collect::<Result<_, _>>()?;
+    assert!(guids.is_sorted(), "{kind} ordered by GUID");
+    let mut linked = Vec::new();
+    for entity in entities {
+        let path = catalog_v3_consumer::field(entity, kind, "recordPath")?
+            .as_str()
+            .ok_or("original entity Record path")?;
+        assert!(
+            !path.contains("_test_") && !path.contains("/test_"),
+            "no test leftovers in {kind}"
+        );
+        let manufacturer = if kind == Kind::Ships {
+            crate::real_archive_catalog_links::vehicle_manufacturer(entity)
+        } else {
+            originals.manufacturer(entity)?
+        };
+        if let Some(guid) = manufacturer {
+            linked.push(guid);
+        }
+    }
+    let resolved = linked
+        .iter()
+        .filter(|guid| manufacturers.contains(*guid))
+        .count();
+    assert!(
+        ratio(resolved, linked.len()) >= MIN_RESOLVED_MANUFACTURERS,
+        "{kind}: {resolved} of {} manufacturer GUIDs are catalog manufacturers",
+        linked.len()
+    );
+    Ok(())
 }
 
 fn list<'c>(catalog: &'c Value, kind: &str) -> Result<&'c Vec<Value>, String> {
@@ -120,10 +141,22 @@ fn ratio(part: usize, whole: usize) -> f64 {
 
 fn check_items(catalog: &Value, summary: &CatalogSummary) -> TestResult {
     let items = list(catalog, "items")?;
-    let classes: HashSet<&str> = items
-        .iter()
-        .filter_map(|item| item["itemClass"].as_str())
-        .collect();
+    let originals = ItemPresentationIndex::new(catalog)?;
+    let mut classes = HashSet::new();
+    let mut typed = 0_usize;
+    let mut massive = 0_usize;
+    for item in items {
+        let class = item.get("itemClass").ok_or("sourced Item class")?;
+        if let Some(class) = catalog_v3_consumer::source_value(class)? {
+            classes.insert(class.as_str().ok_or("derived Item class label")?);
+        }
+        typed += usize::from(
+            originals
+                .item_type(item)?
+                .is_some_and(|label| !label.is_empty()),
+        );
+        massive += usize::from(originals.mass(item)?.is_some());
+    }
     for class in ItemClass::ALL {
         assert!(classes.contains(class.name()), "some item is {class:?}");
     }
@@ -132,13 +165,11 @@ fn check_items(catalog: &Value, summary: &CatalogSummary) -> TestResult {
         counts.classified > 0 && counts.other > 0 && counts.missing > 0,
         "classified, other and missing classes: {counts:?}"
     );
-    let typed = items.iter().filter(|item| item["type"].is_string()).count();
     assert!(
         ratio(typed, items.len()) > 0.9,
         "most items have a type: {typed} of {}",
         items.len()
     );
-    let massive = items.iter().filter(|item| item["mass"].is_number()).count();
     assert!(
         ratio(massive, items.len()) > 0.5,
         "most items have a mass: {massive} of {}",

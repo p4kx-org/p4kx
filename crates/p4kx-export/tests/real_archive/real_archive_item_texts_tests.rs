@@ -306,3 +306,38 @@ fn purchasable(name: &str, display_type: &str) -> TestValue {
             .value("displayType", TestValue::text(display_type)),
     )
 }
+
+#[test]
+fn source_backed_item_headers_match_the_original_definition_in_text_consumers() -> TestResult {
+    let fixture = Fixture::from_database(&database())?;
+    fixture.coverage(&fixture.catalog, Kind::Items)?;
+    for field in ["guid", "recordPath", "recordIndex", "sourceType"] {
+        let mut document = fixture.catalog.clone();
+        let path = format!("/items/0/{field}");
+        let payload = catalog_v3_consumer::present(
+            document
+                .pointer(&path)
+                .ok_or("actual producer source header")?,
+        )?
+        .clone();
+        replace_value(&mut document, &path, payload)?;
+        assert!(
+            fixture.coverage(&document, Kind::Items).is_err(),
+            "an unsourced {field} cannot impersonate the physical definition"
+        );
+    }
+    let mut document = fixture.catalog.clone();
+    replace_value(
+        &mut document,
+        "/items/0/guid/containsEncryptedSource",
+        json!(true),
+    )?;
+    assert!(
+        fixture.coverage(&document, Kind::Items).is_err(),
+        "identical nominal payload does not replace exact original source cells"
+    );
+    Ok(())
+}
+
+#[path = "real_archive_item_source_selection_tests.rs"]
+mod source_selection;

@@ -14,6 +14,7 @@ use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::original::{OriginalFlowFields, OriginalValuePart};
 use crate::catalog_text_contract::{GameTextRef, PublicNameRef};
 use crate::catalog_v3::authored_fields::authored_manufacturer::AuthoredManufacturer;
+use crate::catalog_v3::authored_fields::locale_input::AuthoredLocaleInput;
 use crate::guid_text::{CatalogGuid, GuidText};
 use crate::resource_float::ResourceFloat32;
 use crate::resource_number::ResourceNumber;
@@ -22,6 +23,8 @@ use crate::source_fields::FieldError;
 use crate::template_field_capture::TemplateFieldCapture;
 use crate::{CatalogError, ExportAccountingError};
 
+#[path = "item_localization_read.rs"]
+mod localization_read;
 #[path = "item_definition_staging.rs"]
 mod staging;
 #[path = "item_definition_views.rs"]
@@ -65,7 +68,7 @@ pub enum ItemDefinitionComponentKind<'source> {
     /// The original physics component fields.
     Physics(SourcedValue<ItemPhysics>),
     /// The original purchasable component fields.
-    Purchasable(ItemPurchasable),
+    Purchasable(ItemPurchasable<'source>),
 }
 
 /// Independently authored attachment display and manufacturer values.
@@ -73,9 +76,14 @@ pub enum ItemDefinitionComponentKind<'source> {
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub struct ItemAttachmentPresentation<'source> {
+    item_type: SourcedValue<&'source str>,
+    item_subtype: SourcedValue<&'source str>,
+    size: SourcedValue<ResourceNumber>,
+    tags: SourcedValue<&'source str>,
+    required_tags: SourcedValue<&'source str>,
     grade: SourcedValue<ResourceNumber>,
     manufacturer: AuthoredManufacturer<'source>,
-    localization: SourcedValue<ItemLocalization>,
+    localization: SourcedValue<ItemLocalization<'source>>,
     weapon_motion: Option<WeaponAttachmentMotion<'source>>,
 }
 
@@ -83,10 +91,16 @@ pub struct ItemAttachmentPresentation<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub struct ItemLocalization {
+pub struct ItemLocalization<'source> {
     name: SourcedValue<PublicNameRef>,
     #[schemars(extend("x-gameText" = true))]
     description: SourcedValue<GameTextRef>,
+    #[serde(skip)]
+    #[schemars(skip)]
+    name_input: AuthoredLocaleInput<'source>,
+    #[serde(skip)]
+    #[schemars(skip)]
+    description_input: AuthoredLocaleInput<'source>,
 }
 
 /// Original physical mass from an Item physics declaration.
@@ -101,10 +115,13 @@ pub struct ItemPhysics {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub struct ItemPurchasable {
+pub struct ItemPurchasable<'source> {
     display_name: SourcedValue<PublicNameRef>,
     #[schemars(extend("x-gameText" = true))]
     display_type: SourcedValue<GameTextRef>,
+    #[serde(skip)]
+    #[schemars(skip)]
+    name_input: AuthoredLocaleInput<'source>,
 }
 
 /// Original personal-weapon attachment values used by animation joins.
@@ -125,10 +142,6 @@ pub(crate) struct WeaponAttachment<'source> {
 }
 
 impl<'source> ItemDefinition<'source> {
-    pub(crate) const fn record_index(&self) -> &SourcedValue<u32> {
-        &self.header.record_index
-    }
-
     fn weapon_attachments(&self) -> impl Iterator<Item = WeaponAttachment<'source>> {
         self.components
             .value()
@@ -250,10 +263,15 @@ fn read_component<'source>(
                 source.declared_class("PhysType", notes, ItemPhysics::read)?
             },
         ),
-        PURCHASABLE => ItemDefinitionComponentKind::Purchasable(ItemPurchasable {
-            display_name: source.public_name("displayName", projection, notes)?,
-            display_type: source.protected_locale("displayType", projection, notes)?,
-        }),
+        PURCHASABLE => {
+            let (display_name, name_input) =
+                source.public_name_input("displayName", projection, notes)?;
+            ItemDefinitionComponentKind::Purchasable(ItemPurchasable {
+                display_name,
+                display_type: source.protected_locale("displayType", projection, notes)?,
+                name_input,
+            })
+        }
         _ => return Ok(None),
     };
     Ok(Some(ItemDefinitionComponent {
@@ -269,16 +287,19 @@ impl<'source> ItemAttachmentPresentation<'source> {
         projection: &CatalogProjection<'_, 'source>,
         notes: &mut Vec<FieldError>,
     ) -> Result<Self, CatalogError> {
+        let item_type = label(source, "Type", notes)?;
+        let tags = label(source, "Tags", notes)?;
+        let weapon_motion = WeaponAttachmentMotion::read(&item_type, &tags);
         Ok(Self {
-            weapon_motion: WeaponAttachmentMotion::read(source, notes)?,
+            item_type,
+            item_subtype: label(source, "SubType", notes)?,
+            size: source.authored_number("Size", notes)?,
+            tags,
+            required_tags: label(source, "RequiredTags", notes)?,
+            weapon_motion,
             grade: source.authored_number("Grade", notes)?,
             manufacturer: AuthoredManufacturer::read(source, "Manufacturer", notes)?,
-            localization: source.declared_class("Localization", notes, |source, notes| {
-                Ok(ItemLocalization {
-                    name: source.public_name("Name", projection, notes)?,
-                    description: source.protected_locale("Description", projection, notes)?,
-                })
-            })?,
+            localization: localization_read::read(source, projection, notes)?,
         })
     }
 }
@@ -296,24 +317,27 @@ impl ItemPhysics {
 
 impl<'source> WeaponAttachmentMotion<'source> {
     fn read(
-        source: Observed<'_, '_, '_, 'source>,
-        notes: &mut Vec<FieldError>,
-    ) -> Result<Option<Self>, CatalogError> {
-        let raw = source.structure()?.field("Type");
-        let Some(Value::Enum(name) | Value::String(name)) = raw else {
-            return Ok(None);
-        };
-        if !name.eq_ignore_ascii_case("WeaponPersonal") {
-            return Ok(None);
-        }
-        let item_type = if matches!(raw, Some(Value::Enum(_))) {
-            source.borrowed_declared_enum("Type", notes)?
-        } else {
-            source.borrowed_string("Type", notes)?
-        };
-        Ok(Some(Self {
-            item_type,
-            tags: source.borrowed_string("Tags", notes)?,
-        }))
+        item_type: &SourcedValue<&'source str>,
+        tags: &SourcedValue<&'source str>,
+    ) -> Option<Self> {
+        item_type
+            .value()
+            .is_some_and(|name| name.eq_ignore_ascii_case("WeaponPersonal"))
+            .then(|| Self {
+                item_type: item_type.clone(),
+                tags: tags.clone(),
+            })
+    }
+}
+
+fn label<'source>(
+    source: Observed<'_, '_, '_, 'source>,
+    name: &str,
+    notes: &mut Vec<FieldError>,
+) -> Result<SourcedValue<&'source str>, CatalogError> {
+    if source.storage_type(name)? == Some(DataType::Enum) {
+        source.borrowed_declared_enum(name, notes)
+    } else {
+        source.borrowed_string(name, notes)
     }
 }

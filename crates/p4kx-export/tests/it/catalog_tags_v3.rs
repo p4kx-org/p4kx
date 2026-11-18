@@ -215,11 +215,25 @@ fn selected_entities_keep_root_guids_separate_from_attach_words_and_each_other()
         at(&tags[2], "/value/guid/value")?,
         &json!(fixture::guid(fixture::OTHER))
     );
-    let item = at(&catalog, "/items")?
+    let index = at(item, "/recordIndex/value")?;
+    let projection = at(&catalog, "/items")?
         .as_array()
-        .and_then(|items| items.first())
-        .ok_or("item")?;
-    assert_eq!(at(item, "/tags")?, &json!(["flightReady", "$Small"]));
+        .and_then(|items| {
+            items
+                .iter()
+                .find(|row| row.pointer("/recordIndex/value") == Some(index))
+        })
+        .ok_or("item projection of the same physical owner")?;
+    let attachment = crate::catalog_items::selected_attachment(&catalog, projection)?;
+    assert_eq!(
+        at(attachment, "/tags/value")?,
+        &json!(" flightReady  $Small "),
+        "the selected attachment retains its exact authored words"
+    );
+    assert!(
+        projection.get("tags").is_none(),
+        "the Item projection has no duplicate tags"
+    );
     let commodity = fixture::rows(&catalog, "definitions/commodities")?
         .first()
         .ok_or("commodity")?;

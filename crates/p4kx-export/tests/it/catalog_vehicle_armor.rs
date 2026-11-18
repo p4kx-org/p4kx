@@ -190,7 +190,7 @@ fn check_resistance(row: &Value, encrypted: bool) -> TestResult {
 }
 
 fn check_suit_owners(catalog: &Value, encrypted: bool) -> TestResult {
-    item(catalog, fixture::SUIT)?;
+    super::item(catalog, fixture::SUIT)?;
     let suit_rows = proof::rows(catalog, "/configurations/suitArmor/rows")?;
     let [suit_only, both] = suit_rows else {
         return Err("both original suit armour occurrences".into());
@@ -223,8 +223,8 @@ fn check_suit_owners(catalog: &Value, encrypted: bool) -> TestResult {
         Some(encrypted),
     )?;
     proof::cell(dual, "damageMultiplier", "null")?;
-    item(catalog, fixture::BOTH)?;
-    item(catalog, fixture::KNOWN)?;
+    super::item(catalog, fixture::BOTH)?;
+    super::item(catalog, fixture::KNOWN)?;
     let suit_slot = proof::at(both, "/componentOrdinal/value")?;
     let vehicle_slot = proof::at(dual, "/componentOrdinal/value")?;
     assert_ne!(
@@ -349,12 +349,4 @@ fn configuration(catalog: &Value, guid: u128) -> TestResult<&Value> {
         .iter()
         .find(|row| row.pointer("/ownerGuid/value").and_then(Value::as_str) == Some(owner.as_str()))
         .ok_or_else(|| "original vehicle armour configuration".into())
-}
-
-fn item(catalog: &Value, guid: u128) -> TestResult<&Value> {
-    let owner = common::guid(guid);
-    proof::rows(catalog, "/items")?
-        .iter()
-        .find(|row| row.get("guid").and_then(Value::as_str) == Some(owner.as_str()))
-        .ok_or_else(|| "original item".into())
 }

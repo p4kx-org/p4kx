@@ -83,19 +83,23 @@ fn a_new_value_of_a_closed_value_set_is_additive() -> TestResult {
     let catalog = minimal_catalog();
 
     let mut unknown_class = catalog.clone();
-    unknown_class["items"][0]["itemClass"] = json!("Ballistic");
+    unknown_class["items"][0]["itemClass"]["value"] = json!("Ballistic");
     assert!(validator.is_valid(&unknown_class), "a new value is valid");
 
     let mut class_number = catalog.clone();
-    class_number["items"][0]["itemClass"] = json!(3);
+    class_number["items"][0]["itemClass"]["value"] = json!(3);
     assert!(
         !validator.is_valid(&class_number),
         "the item class stays a string"
     );
 
     let mut no_class = catalog.clone();
-    no_class["items"][0]["itemClass"] = json!(null);
-    assert!(validator.is_valid(&no_class), "the item class may be null");
+    no_class["items"][0]["itemClass"]["state"] = json!("absent");
+    no_class["items"][0]["itemClass"]["value"] = json!(null);
+    assert!(
+        validator.is_valid(&no_class),
+        "the item class may be absent"
+    );
 
     let mut unknown_playability = catalog.clone();
     unknown_playability["ships"][0]["playability"] = json!("event");
@@ -136,10 +140,11 @@ fn a_new_value_of_a_closed_value_set_is_additive() -> TestResult {
     );
 
     let mut no_playability = catalog;
-    no_playability["items"][0]["playability"] = json!(null);
+    no_playability["items"][0]["playability"]["state"] = json!("absent");
+    no_playability["items"][0]["playability"]["value"] = json!(null);
     assert!(
         validator.is_valid(&no_playability),
-        "the playability may be null"
+        "the playability may be absent"
     );
     Ok(())
 }
@@ -203,7 +208,19 @@ fn items_publish_canonical_component_tables_without_a_flat_stat_field() -> TestR
     let item = schema
         .pointer("/$defs/Item")
         .ok_or("catalog Item definition")?;
-    for field in ["stats", "name", "description", "displayType"] {
+    for field in [
+        "stats",
+        "name",
+        "description",
+        "displayType",
+        "type",
+        "subType",
+        "size",
+        "grade",
+        "mass",
+        "manufacturerGuid",
+        "tags",
+    ] {
         assert!(
             item.pointer(&format!("/properties/{field}")).is_none(),
             "the Item projection omits canonical data {field}"

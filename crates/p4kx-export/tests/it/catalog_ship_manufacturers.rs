@@ -27,21 +27,26 @@ fn catalog_of(maker: Maker) -> Result<Value, Box<dyn Error>> {
     Ok(serde_json::from_slice(built.json())?)
 }
 
-fn manufacturer_guids<'c>(catalog: &'c Value, kind: &str) -> Vec<&'c Value> {
-    catalog[kind].as_array().map_or_default(|list| {
-        list.iter()
-            .filter(|entry| entry["className"] != "Counter_Shop")
-            .map(|entry| {
-                if kind == "ships" {
-                    entry
-                        .pointer("/vehicleManufacturer/manufacturer/value/guid/value")
-                        .unwrap_or(&Value::Null)
-                } else {
-                    &entry["manufacturerGuid"]
-                }
-            })
-            .collect()
-    })
+fn manufacturer_guids<'c>(
+    catalog: &'c Value,
+    kind: &str,
+) -> Result<Vec<&'c Value>, Box<dyn Error>> {
+    let mut guids = Vec::new();
+    for entry in catalog[kind].as_array().ok_or("catalog entities")? {
+        if super::entity_field(entry, kind, "className").and_then(Value::as_str)
+            == Some("Counter_Shop")
+        {
+            continue;
+        }
+        let guid = if kind == "ships" {
+            entry.pointer("/vehicleManufacturer/manufacturer/value/guid/value")
+        } else {
+            super::selected_attachment(catalog, entry)?
+                .pointer("/manufacturer/value/value/guid/value")
+        };
+        guids.push(guid.unwrap_or(&Value::Null));
+    }
+    Ok(guids)
 }
 
 #[test]
@@ -51,7 +56,7 @@ fn a_manufacturer_given_by_reference_is_its_guid() -> TestResult {
     let maker = &catalog["definitions"]["manufacturers"]["rows"][0]["guid"]["value"];
     assert_eq!(maker, "10000000-0000-4000-8000-000000000001");
     for kind in ["items", "ships"] {
-        let guids = manufacturer_guids(&catalog, kind);
+        let guids = manufacturer_guids(&catalog, kind)?;
         assert!(!guids.is_empty(), "{kind} present");
         assert!(guids.iter().all(|guid| *guid == maker), "{kind}: {guids:?}");
     }
@@ -105,7 +110,7 @@ fn manufacturer_pointers_keep_authored_storage_without_a_record_guid() -> TestRe
             );
         }
         for kind in ["items", "ships"] {
-            let guids = manufacturer_guids(&catalog, kind);
+            let guids = manufacturer_guids(&catalog, kind)?;
             assert!(!guids.is_empty(), "{kind} present");
             assert!(guids.iter().all(|guid| guid.is_null()), "{kind}: {guids:?}");
         }

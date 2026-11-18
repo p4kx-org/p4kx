@@ -368,7 +368,9 @@ with a GUID, or a physical Record index. Physical indices are local to the suppl
 
 `definitions.items` contains original Item presentation, physics and purchase fields. Its nested
 immutable getters preserve the original component order, numbers, null/unavailable states,
-manufacturer reference or authored value arena and optional personal-weapon motion fields. Use
+manufacturer reference or authored value arena and optional personal-weapon motion fields.
+Attachment getters also expose original type/subtype/size and unsplit tags/required tags for
+foreign authored AttachDef structures; constraint-family admission stays separate. Use
 `CatalogLanguageSelection` for referenced public names and protected descriptions. An empty
 language selection retains keys without reading locale bodies. These definitions are scoped
 canonical facts rather than every value of an arbitrary Entity Record.
@@ -394,8 +396,14 @@ still enumerate their canonical candidate scope and retain the requested rows; t
 a fixed-memory bound. Respect incomplete header/body/field coverage and publish owned cache
 updates only after outer query success. Full-Catalog normal-publication guards are unchanged.
 
-The subsequent sourced Item/Ship/Loadout projection and unfiltered variant-candidate contract is
-specified in [ADR-0410](adr/0410-equipment-sdk-shares-original-family-readers-and-canonical-variant-choices.md).
+The Item producer shares these original facts with its sourced header, first physical component
+selections, English class and key-only playability. Semantic English admission is independent
+of output-language requests; the original-definition query above still needs no English locale
+when its requested language list is empty because it does not compute that classification.
+A full root-Item SDK query, authenticated unfiltered variant choice, Ship and Loadout projection
+coverage remain separate work under
+[ADR-0410](adr/0410-equipment-sdk-shares-original-family-readers-and-canonical-variant-choices.md).
+No legacy root-Item DTO is offered as a complete canonical substitute.
 
 An unclassifiable original component slot or unreadable possible occupancy definition keeps the
 queried source scope incomplete. Readable prefix rows remain available; `coverage.incomplete_fields`

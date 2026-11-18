@@ -29,7 +29,6 @@ use crate::scan_health::{RecordEntityRows, RecordScan, ScanError, SourceTrace};
 use crate::scan_signature::SignatureSlot;
 use crate::ship_pool::ShipPool;
 use crate::starmap::TypeNames;
-use crate::texts::Texts;
 use crate::{CatalogError, CatalogOptions, CatalogPhase, CatalogProgress, Kind};
 
 const PROGRESS_STEP: usize = 1024;
@@ -70,7 +69,6 @@ pub(crate) struct Scan<'o, 'a, 'f> {
     ships: ShipPool<'f>,
     ammo: ammo::AmmoReads<'a, 'o, 'f>,
     options: &'o CatalogOptions<'a>,
-    texts: &'o Texts<'f>,
     projection: &'o CatalogProjection<'o, 'f>,
     domain: ScanDomain<'o>,
     types: TypeNames<'f>,
@@ -125,7 +123,6 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
             ships: ShipPool::new(entities, files),
             ammo: ammo::AmmoReads::new(projection, options.filter, options.cancel),
             options,
-            texts: projection.legacy_texts(),
             projection,
             domain,
             types: TypeNames::default(),

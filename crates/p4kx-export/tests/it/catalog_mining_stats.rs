@@ -28,7 +28,7 @@ fn variant(catalog: &Value, guid: u128) -> TestResult<&Value> {
     let guid = common::guid(guid);
     let item = proof::rows(catalog, "/items")?
         .iter()
-        .find(|item| item.get("guid").and_then(Value::as_str) == Some(guid.as_str()))
+        .find(|item| item.pointer("/guid/value").and_then(Value::as_str) == Some(guid.as_str()))
         .ok_or_else(|| format!("item {guid}"))?;
     proof::at(item, "/variantOf")
 }

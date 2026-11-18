@@ -15,7 +15,7 @@ a component could not be decoded.
 
 | Kind | Original source | Data and joins |
 | --- | --- | --- |
-| `attachment` | `SAttachableComponentParams.AttachDef` | Original `Grade`, `Manufacturer`, and `Localization`. `Name` refers to `texts.publicNames` and `Description` to `texts.gameTexts`. Join `configurations.itemAttachmentConstraints` by `ownerRecordIndex` equal to `recordIndex` and the same `componentOrdinal` for the same AttachDef's `Type`, `SubType`, `Size`, `Tags`, `RequiredTags` and alignment fields. |
+| `attachment` | `SAttachableComponentParams.AttachDef` | Immediately sourced `itemType`, `itemSubtype`, exact numeric `size` and `grade`, unsplit `tags` and `requiredTags`, original `manufacturer`, and `localization`. Name refers to `texts.publicNames` and Description to `texts.gameTexts`. String and Enum labels retain their original value. Valid foreign AttachDef structures retain these source facts without entering the separate SItemDefinition constraint family. Join admitted constraints by physical owner Record and the same component ordinal for restriction and alignment meaning. |
 | `physics` | `SEntityPhysicsControllerParams.PhysType` | Exact stored `Mass` in kilograms as a Single with IEEE bits. Repeated controllers retain separate slots. |
 | `purchasable` | `SCItemPurchasableParams` | Original `displayName` refers to `texts.publicNames` and `displayType` to `texts.gameTexts`. |
 
@@ -27,13 +27,25 @@ See `exportHealth` for the separately measured target materialization.
 
 ## Item presentation
 
-Join `items[].recordIndex.value` to `definitions.items.rows[].recordIndex.value` in the
-same Catalog. The sourced index carries the same physical origin on both sides. GUID and Record
-path can both repeat. Follow the first stored `attachment` entry for
-`value.value.localization.value.name` and `value.value.localization.value.description`.
-Follow the first stored `purchasable` entry for `value.displayType`. A missing or unreadable
-value in the first matching entry stays missing or unreadable. Later entries supply their own
-authored values.
+Join `items[].recordIndex.value` to `definitions.items.rows[].recordIndex.value` within the same
+Build/DataForge source. The root and definition share the original eight-field header cells.
+GUID and Record path can both repeat. Follow `items[].selection.attachmentComponentOrdinal.value`,
+`physicsComponentOrdinal.value` or `purchasableComponentOrdinal.value` to the original component's
+`componentOrdinal.value`. Inspect selection state and completeness before using the target.
+
+Attachment payload paths are `value.value.itemType`, `itemSubtype`, `size`, `grade`, `manufacturer`,
+`tags`, `requiredTags` and `localization`; every named field retains its own immediate source
+carrier or typed original branch. `localization.value.name` and `description` are text references.
+Physics `value.value.mass` preserves exact Single bits. Purchasable `value.displayName` and
+`displayType` remain independent authored references. Tags are the stored label, including
+whitespace, case and repeated words; split whitespace only when a consumer needs tokens.
+
+The root's selected ordinal stays on the first physical component even if its definition or
+Localization is null or unreadable. A valid Class or StrongPointer Localization uses the same
+original reader. A later component retains its own original values and never fills the earlier
+selection. Unknown prefix slots make that choice incomplete. The constraint table continues to
+admit only its own SItemDefinition source family, so a missing constraint row cannot erase
+a valid foreign original Attachment payload.
 
 Read `value.displayName` from each `purchasable` entry for the independently authored purchase
 name of that component. The reference records the source of the authored key. Purchase names

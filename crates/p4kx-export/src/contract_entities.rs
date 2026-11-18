@@ -12,57 +12,9 @@ use crate::catalog_v3::authored_fields::ship_presentation::{
 use crate::contract::every_field_required;
 use crate::contract_insurance::ShipInsurance;
 use crate::guid_text::CatalogGuid;
-use crate::item_variant::ItemKey;
-use crate::{ItemClass, MassBasis, Playability, VehicleKind};
+use crate::{MassBasis, Playability, VehicleKind};
 
-/// An item: an `EntityClassDefinition` Record under `entities/scitem` or `entities/legacyitems`.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct Item<'a> {
-    /// The physical Record position that identifies this Item's canonical definition.
-    pub(crate) record_index: SourcedValue<u32>,
-    /// The GUID of the Record.
-    pub(crate) guid: CatalogGuid,
-    /// The Record name without its type, e.g. `POWR_ACAS_S01_Lumen`.
-    pub(crate) class_name: &'a str,
-    /// The record path, without `.xml`.
-    pub(crate) record_path: &'a str,
-    /// The item type of `AttachDef.Type`, e.g. `PowerPlant`, `null` without one.
-    pub(crate) r#type: Option<&'a str>,
-    /// The item subtype of `AttachDef.SubType`, e.g. `Power`, `null` without one.
-    pub(crate) sub_type: Option<&'a str>,
-    /// The size of `AttachDef.Size`, `null` without one.
-    pub(crate) size: Option<i64>,
-    /// The grade of `AttachDef.Grade`, `null` without one.
-    pub(crate) grade: Option<i64>,
-    /// The mass in kilograms of the physics controller, `null` without one.
-    pub(crate) mass: Option<f32>,
-    /// The GUID of the manufacturer the Reference `AttachDef.Manufacturer` links to, `null` for
-    /// a null Reference.
-    pub(crate) manufacturer_guid: Option<CatalogGuid>,
-    /// The words of `AttachDef.Tags`, in stored order.
-    pub(crate) tags: Vec<&'a str>,
-    /// The item class from the `Class:` line of the English description, `null` for another
-    /// value or without that line. Today one of `Civilian`, `Competition`, `Industrial`,
-    /// `Military` and `Stealth`; the schema keeps a string, as a new value is additive.
-    #[serde(rename = "itemClass")]
-    #[schemars(with = "Option<String>")]
-    pub(crate) class: Option<ItemClass>,
-    /// Who the item is for, `null` when no rule applies. Today one of `player`, `mission` and
-    /// `special`; the schema keeps a string, as a new value is additive.
-    #[schemars(with = "Option<String>")]
-    pub(crate) playability: Option<Playability>,
-    /// The GUID of the base of the variant group the item belongs to, `null` for a base and for an
-    /// item that is alone in its group. It is the `guid` of an entry of `items`.
-    pub(crate) variant_of: Option<CatalogGuid>,
-    #[serde(skip)]
-    #[schemars(skip)]
-    pub(crate) variant_key: Option<ItemKey<'a>>,
-    #[serde(skip)]
-    #[schemars(skip)]
-    pub(crate) required_tags: Vec<&'a str>,
-}
+pub(crate) use crate::item::Item;
 
 /// A paint: an item of the type `Paints` and the ships it fits.
 #[derive(Debug, Serialize, JsonSchema)]

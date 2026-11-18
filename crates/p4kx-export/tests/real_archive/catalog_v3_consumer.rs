@@ -59,10 +59,17 @@ fn rows_of_kind(catalog: &Value, kind: Kind) -> TestResult<&Vec<Value>> {
     if path.starts_with('/') {
         return checked_table(catalog, kind, &path);
     }
-    catalog
+    let rows = catalog
         .get(path.as_ref())
         .and_then(Value::as_array)
-        .ok_or_else(|| format!("required {} rows are missing", kind.name()).into())
+        .ok_or_else(|| format!("required {} rows are missing", kind.name()))?;
+    if kind == Kind::Items {
+        for row in rows {
+            identity(row, kind)?;
+            record_header(row)?;
+        }
+    }
+    Ok(rows)
 }
 
 /// Returns a plain top-level field or the JSON pointer of the canonical table that owns a Kind.
@@ -170,10 +177,32 @@ pub(crate) fn field<'row>(row: &'row Value, kind: Kind, name: &str) -> TestResul
     let value = row
         .get(name)
         .ok_or_else(|| format!("required {kind} field {name}"))?;
-    if kind == Kind::Contracts && name == "guid" {
-        return present(value);
-    }
-    if uses_named_definition_table(kind)
+    let sourced = match kind {
+        Kind::Contracts => name == "guid",
+        Kind::Items => item_source_field(name),
+        _ => all_fields_sourced(kind),
+    };
+    if sourced { present(value) } else { Ok(value) }
+}
+
+fn item_source_field(name: &str) -> bool {
+    matches!(
+        name,
+        "guid"
+            | "recordName"
+            | "className"
+            | "recordPath"
+            | "recordIndex"
+            | "sourceType"
+            | "fileName"
+            | "metadataTag"
+            | "itemClass"
+            | "playability"
+    )
+}
+
+const fn all_fields_sourced(kind: Kind) -> bool {
+    uses_named_definition_table(kind)
         || matches!(
             kind,
             Kind::Blueprints
@@ -222,11 +251,6 @@ pub(crate) fn field<'row>(row: &'row Value, kind: Kind, name: &str) -> TestResul
                 | Kind::CargoLoadingGlobals
                 | Kind::ShopCommodityGlobals
         )
-    {
-        present(value)
-    } else {
-        Ok(value)
-    }
 }
 
 /// Returns a row's original identity, checking canonical UUID spelling where it is a GUID.

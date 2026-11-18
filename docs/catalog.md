@@ -407,33 +407,53 @@ A resource group carries `name` and protected `description`.
 Manufacturers use [their canonical definition contract](catalog-manufacturer-types.md). The authored
 `Code` string and owned `Localization` retain their source states independently of resolved text.
 
-An item takes its fields from the components of its `EntityClassDefinition`.
-[Item definitions](catalog-item-definitions.md#item-presentation) documents the physical
-`recordIndex` join from the Item projection to its sourced name, description and display type.
+An Item projection keeps the shared eight-field, immediately sourced Record header. Read
+`guid.value`, `className.value`, `recordPath.value` and `recordIndex.value`; use each cell's own
+state and origin. [Item definitions](catalog-item-definitions.md#item-presentation) documents the
+physical source joins. A GUID or path can name more than one physical declaration.
 
 | Field | Source |
 |-------|--------|
-| `recordIndex` | Sourced physical Record ordinal used to join the corresponding Item definition |
-| `type`, `subType` | `AttachDef.Type` and `AttachDef.SubType`, e.g. `PowerPlant` and `Power` |
-| `size`, `grade` | `AttachDef.Size` and `AttachDef.Grade`, integers; see "Semantics of `grade`" below |
-| `mass` | `SEntityPhysicsControllerParams.PhysType.Mass`, a number |
-| `manufacturerGuid` | The GUID the Reference `AttachDef.Manufacturer` links to, `null` for a null Reference |
-| `tags` | The words of `AttachDef.Tags`, split at white space |
-| `itemClass` | `Civilian`, `Competition`, `Industrial`, `Military` or `Stealth`, or `null` |
-| `playability` | `player`, `mission` or `special`, or `null`; see "Playability" below |
-| `variantOf` | The `guid` of the base of the item's variant group, `null` for a base and an ungrouped item; see "Variant groups" below |
+| Shared Record header | Original metadata and conversions; the same sourced cells appear on the corresponding `definitions.items` row |
+| `selection.attachmentComponentOrdinal` | Sourced original slot of the first `SAttachableComponentParams` |
+| `selection.physicsComponentOrdinal` | Sourced original slot of the first `SEntityPhysicsControllerParams` |
+| `selection.purchasableComponentOrdinal` | Sourced original slot of the first `SCItemPurchasableParams` |
+| `itemClass` | Sourced classification of the actual English description; known values are `Civilian`, `Competition`, `Industrial`, `Military` and `Stealth` |
+| `playability` | Sourced `player`, `mission` or `special`, or a non-present result; see "Playability" below |
+| `variantOf` | Existing nominal base GUID or null; the separately scoped source-backed variant choice and unfiltered candidate migration remain pending under ADR-0410 |
 
-`itemClass` takes the options of the DataForge enum `EItemClass` (without `UNDEFINED`). No
-DataForge field carries it: it is read from the first line of the English `description` that
-starts with `Class:`, its value trimmed of white space and matched ignoring case. Any other value
-(FPS weapons use the line for the damage type, e.g. `Ballistic`), an item without that line and
-an item without an English description leave it `null`. `p4kx catalog` counts the items with a
-class, with another value, and without the line or an English description. The schema types the
-field as a string; the five options are documented, not enumerated.
+The root does not duplicate `type`, `subType`, `size`, `grade`, `mass`, `manufacturerGuid` or
+`tags`. Join `recordIndex.value` to `definitions.items.rows[].recordIndex.value` and follow the
+corresponding sourced component ordinal. The selected attachment's original `itemType`,
+`itemSubtype`, `size`, `grade`, `manufacturer`, `tags` and `requiredTags` are in its definition
+payload. The selected physics payload contains the original `mass`. Attachment constraints
+retain their separate admissibility and restriction meaning; a foreign authored AttachDef can
+have original fields without a row in `configurations.itemAttachmentConstraints`.
+
+Selection always identifies the first physical family component, including a null, invalid or
+unreadable definition. It never skips forward to a later successful value. An earlier unknown
+component keeps the selection and any dependent result's source set incomplete. Negative
+selection, a present component with null payload and unreadable source remain distinct.
+
+`itemClass.value` uses the options of `EItemClass` other than `UNDEFINED`. No DataForge field
+carries this classification: the rule reads the first English display-text line beginning with
+`Class:`, trims its value and matches ignoring case. Other text, no matching line or a genuinely
+absent English description produces no class. The original Description selector, actual English
+lookup/display conversion and component-selection evidence contribute directly to that result.
+A missing English input must be established by an actual admission and directory proof; an
+unconsulted language is not absence. Requested output languages do not change this semantic
+English dependency. Key-only playability uses the original Locale tokens and Record path,
+without adopting unrelated translation payloads.
+
+`itemClass` and `playability` use the shared sourced-cell envelope. Their present value domains
+remain open strings in the schema. Read state, value, source completeness and encryption
+independently. This bounded Item normalization does not claim completed provenance for
+`variantOf`, Ship/Loadout projections or a complete root-Item SDK query.
 
 #### Semantics of `grade`
 
-`grade` is the integer of `AttachDef.Grade`, exported unchanged; the catalog carries no letter.
+The attachment definition's `grade.value` retains the original numeric storage and value of
+`AttachDef.Grade`; the catalog carries no letter.
 The letter the game shows is not in the DataForge. For ship components it is the `Grade:` line of
 the English `description`, and it follows the integer: **1 = A, 2 = B, 3 = C, 4 = D**, so A is the
 lowest integer. Checked on LIVE 4.10.2 (change 12913470) against that line of every item that has
@@ -2418,7 +2438,8 @@ entry of the ship and keeps the `crafters` entries that fit it:
 - The crafter's `size` must lie between the port's `minSize` and `maxSize`; a `null` bound means
   no bound on that side (a crafter port has size 1 on both).
 
-A crafter that is an item has the same `type`, `subType` and `size` in `items`; a crafter that is
+A crafter that is an Item joins its original type, subtype and size through the Item's sourced
+component selection and definition; a crafter that is
 not an item (the fabricators below `basebuilding`) is only in `crafters`, which is why the three
 fields are part of the entry. A crafter that a ship already mounts is joined the other way round,
 `hostGuids` against `ships[].guid` or `itemGuid` of the port against `crafters[].guid`.

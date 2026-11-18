@@ -17,12 +17,24 @@ pub(crate) const CATALOG_LANGUAGES: [Language; 11] = Language::ALL;
 /// The `global.ini` Entry of every language in [`CATALOG_LANGUAGES`] the Archive holds.
 pub(crate) struct TextSources {
     set: LocalizationSet,
+    consulted: Vec<Language>,
 }
 
 impl TextSources {
     /// Reads the `global.ini` of every catalog language from `archive`.
     pub(crate) fn read(archive: &Archive) -> Result<Self, CatalogError> {
-        Self::read_languages(archive, &CATALOG_LANGUAGES)
+        Self::read_item_languages(archive, &CATALOG_LANGUAGES)
+    }
+
+    pub(crate) fn read_item_languages(
+        archive: &Archive,
+        requested: &[Language],
+    ) -> Result<Self, CatalogError> {
+        let languages: Vec<_> = CATALOG_LANGUAGES
+            .into_iter()
+            .filter(|language| *language == Language::English || requested.contains(language))
+            .collect();
+        Self::read_languages(archive, &languages)
     }
 
     pub(crate) fn read_languages(
@@ -30,7 +42,14 @@ impl TextSources {
         languages: &[Language],
     ) -> Result<Self, CatalogError> {
         let set = LocalizationSet::read(archive, languages).map_err(CatalogError::LoadTexts)?;
-        Ok(Self { set })
+        Ok(Self {
+            set,
+            consulted: languages.to_vec(),
+        })
+    }
+
+    pub(crate) fn consulted(&self, language: Language) -> bool {
+        self.consulted.contains(&language)
     }
 
     pub(crate) fn entry(&self, language: Language) -> Option<&LocalizationEntry> {
@@ -95,10 +114,8 @@ impl<'e> Texts<'e> {
         })
     }
 
-    pub(crate) fn display(&self, language: Language, key: &str) -> Option<Cow<'e, str>> {
-        self.lookup_forms(language, key)
-            .map(|text| text.display)
-            .filter(|value| !value.is_empty())
+    pub(crate) fn consulted(&self, language: Language) -> bool {
+        self.sources.consulted(language)
     }
 
     pub(crate) fn source_entry(&self, language: Language) -> Option<&'e LocalizationEntry> {

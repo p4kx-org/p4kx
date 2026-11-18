@@ -180,12 +180,23 @@ fn tags_are_free_strings_kept_as_stored_and_matched_by_name() -> TestResult {
         .as_array()
         .ok_or("items")?
         .iter()
-        .find(|item| item["guid"] == guid(GUN).as_str())
+        .find(|item| {
+            item.pointer("/guid/value").and_then(Value::as_str) == Some(guid(GUN).as_str())
+        })
         .ok_or("the gun")?;
+    let attachment = crate::catalog_items::selected_attachment(&catalog, item)?;
+    let tags = attachment
+        .pointer("/tags/value")
+        .and_then(Value::as_str)
+        .ok_or("original Tags")?;
     assert_eq!(
-        item["tags"],
-        json!(["Gun", "Unknown", "Dup", "mount"]),
-        "the words of the item's tags, in case as stored"
+        tags.split_whitespace().collect::<Vec<_>>(),
+        ["Gun", "Unknown", "Dup", "mount"],
+        "the original tags preserve all words, case and repeats"
+    );
+    assert!(
+        item.get("tags").is_none(),
+        "the root does not duplicate the original Tags"
     );
     let gun = port(&alpha["ports"], "hardpoint_gun")?;
     assert!(

@@ -36,7 +36,12 @@ fn build() -> Result<(BuiltCatalog, Value), Box<dyn Error>> {
 fn entry<'c>(catalog: &'c Value, kind: &str, class: &str) -> Result<&'c Value, String> {
     catalog[kind]
         .as_array()
-        .and_then(|list| list.iter().find(|entry| entry["className"] == class))
+        .and_then(|list| {
+            list.iter().find(|entry| {
+                crate::catalog_items::entity_field(entry, kind, "className").and_then(Value::as_str)
+                    == Some(class)
+            })
+        })
         .ok_or_else(|| format!("{kind} {class} missing"))
 }
 
@@ -47,8 +52,13 @@ fn base_of(catalog: &Value, kind: &str, class: &str) -> Result<Option<String>, S
     }
     catalog[kind]
         .as_array()
-        .and_then(|list| list.iter().find(|entry| entry["guid"] == *base))
-        .and_then(|entry| entry["className"].as_str())
+        .and_then(|list| {
+            list.iter()
+                .find(|entry| crate::catalog_items::entity_field(entry, kind, "guid") == Some(base))
+        })
+        .and_then(|entry| {
+            crate::catalog_items::entity_field(entry, kind, "className").and_then(Value::as_str)
+        })
         .map(|name| Some(name.to_owned()))
         .ok_or_else(|| format!("variantOf of {class} resolves to no {kind} entry"))
 }

@@ -201,11 +201,15 @@ fn known_weapon_and_quantum_drive() -> TestResult {
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn personal_weapons_take_ammunition_from_their_magazine() -> TestResult {
     let catalog = catalog()?;
-    let personal: Vec<_> = rows(&catalog, "/items")?
-        .iter()
-        .filter(|item| item["type"] == "WeaponPersonal")
-        .filter(|item| owner_rows(&catalog, WEAPONS, item).next().is_some())
-        .collect();
+    let originals = crate::real_archive_canonical_texts::ItemPresentationIndex::new(&catalog)?;
+    let mut personal = Vec::new();
+    for item in rows(&catalog, "/items")? {
+        if originals.item_type(item)? == Some("WeaponPersonal")
+            && owner_rows(&catalog, WEAPONS, item).next().is_some()
+        {
+            personal.push(item);
+        }
+    }
     let magazines = personal
         .iter()
         .filter(|item| {

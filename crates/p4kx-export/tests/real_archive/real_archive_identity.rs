@@ -10,6 +10,9 @@ use serde_json::Value;
 use super::{TestResult, definition_identity, list};
 use crate::catalog_v3_consumer;
 
+#[path = "real_archive_item_identity.rs"]
+mod items;
+
 /// Checks declared family identities and the physical `ResourceType` fallback.
 pub(crate) fn check_unique_guids(catalog: &Value) -> TestResult {
     check_family_aliases(catalog, Kind::BlueprintCategoryLists)?;
@@ -18,6 +21,7 @@ pub(crate) fn check_unique_guids(catalog: &Value) -> TestResult {
     check_family_aliases(catalog, Kind::FactionReputations)?;
     check_family_aliases(catalog, Kind::ReputationScopes)?;
     check_family_aliases(catalog, Kind::ReputationStandings)?;
+    items::check(catalog)?;
     let mut seen: HashMap<&str, (Kind, &Value)> = HashMap::new();
     check_contract_order(catalog)?;
     let kinds = Kind::ALL
@@ -46,12 +50,16 @@ pub(crate) fn check_unique_guids(catalog: &Value) -> TestResult {
         let mut family = HashSet::new();
         for entity in list(catalog, kind)? {
             let guid = catalog_v3_consumer::identity(entity, kind)?;
-            if !family.insert(guid) && kind != Kind::BlueprintCategoryLists {
+            if !family.insert(guid) && !matches!(kind, Kind::BlueprintCategoryLists | Kind::Items) {
                 return Err(format!("{guid} occurs twice inside {kind}").into());
             }
             if let Some((previous_kind, previous)) = seen.get(guid) {
                 let same_list = kind == Kind::BlueprintCategoryLists && *previous_kind == kind;
-                if !same_list && !same_resource_fallback(*previous_kind, previous, kind, entity)? {
+                let same_items = kind == Kind::Items && *previous_kind == kind;
+                if !same_list
+                    && !same_items
+                    && !same_resource_fallback(*previous_kind, previous, kind, entity)?
+                {
                     return Err(format!("{guid} occurs twice, also in {kind}").into());
                 }
             } else {

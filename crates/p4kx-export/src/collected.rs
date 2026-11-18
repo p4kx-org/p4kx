@@ -55,7 +55,7 @@ use crate::mission_property_set::MissionPropertySet;
 use crate::mission_titles::MissionTitles;
 use crate::npc_spawn_model::PublishedNpcPool;
 use crate::paint_port::VehicleFacts;
-use crate::picked::Picked;
+use crate::picked::{Picked, PickedItem};
 use crate::playability::PlayabilitySummary;
 use crate::quality_catalog::QualityRows;
 use crate::shop_inventories::ShopInventoryTable;
@@ -282,17 +282,20 @@ impl<'f> Collected<'f> {
             Picked::Manufacturer(entity) => self.manufacturers.push(*entity),
             Picked::FactionIdentity(entity) => self.faction_identities.push(*entity),
             Picked::Faction(entity) => self.factions.push(*entity),
-            Picked::Item {
-                entity,
-                line,
-                ports,
-                components,
-                definition,
-            } => {
+            Picked::Item(item) => {
+                let PickedItem {
+                    entity,
+                    line,
+                    ports,
+                    components,
+                    definition,
+                } = *item;
                 definitions.append(&definition)?;
                 self.item_classes.count(line);
                 self.port_items.extend(ports);
-                self.playability.items.count(entity.playability);
+                self.playability
+                    .items
+                    .count(entity.playability.value().copied());
                 self.items.push(entity);
                 self.item_components.extend(components);
             }

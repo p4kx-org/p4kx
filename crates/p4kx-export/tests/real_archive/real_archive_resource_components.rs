@@ -252,7 +252,7 @@ pub(super) fn known_generation_amount(
     item: &Value,
     resource: &str,
 ) -> Option<f64> {
-    let guid = item.get("guid")?;
+    let guid = item.pointer("/guid/value")?;
     let component = catalog
         .pointer(TABLE)?
         .as_array()?

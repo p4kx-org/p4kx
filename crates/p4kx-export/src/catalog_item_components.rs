@@ -36,6 +36,8 @@ pub(crate) mod definition_read;
 pub(crate) mod item_definition;
 #[path = "catalog_weapon_magazine_resolution.rs"]
 pub(crate) mod resolution;
+#[path = "item_source_selection.rs"]
+pub(crate) mod selection;
 
 use item_definition::ItemDefinition;
 
@@ -295,6 +297,7 @@ pub(crate) fn read<'source, T>(
     admission: &RecordObservation<'_, 'source>,
     cancel: Option<&CancelToken>,
     project: impl FnOnce(
+        &ItemDefinition<'source>,
         &OriginalFlowFields<'_, '_, 'source>,
         &mut ItemComponentsRead<'source>,
     ) -> Result<T, CatalogError>,
@@ -330,6 +333,6 @@ pub(crate) fn read<'source, T>(
         &mut result.notes,
     )?;
     result.rows.numbers = numbers.into_inner();
-    let projected = project(&originals, &mut result)?;
+    let projected = project(&definition, &originals, &mut result)?;
     Ok((definition, result, projected))
 }

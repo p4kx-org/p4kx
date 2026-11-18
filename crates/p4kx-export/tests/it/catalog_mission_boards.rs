@@ -111,7 +111,7 @@ fn a_board_provider_can_share_its_physical_owner_with_a_selected_item() -> TestR
         "the same entity's board components all survive"
     );
     assert!(
-        at(&boards[0], "/owner/ownerGuid/value")? == at(&items[0], "/guid")?,
+        at(&boards[0], "/owner/ownerGuid/value")? == at(&items[0], "/guid/value")?,
         "the item and board refer to the same original owner"
     );
     Ok(())

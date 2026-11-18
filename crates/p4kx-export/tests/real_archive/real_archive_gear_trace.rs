@@ -226,8 +226,8 @@ fn every_modified_property_is_filled_on_the_item_the_blueprint_produces() -> Tes
         .as_array()
         .ok_or("the items")?
         .iter()
-        .filter_map(|item| Some((item["guid"].as_str()?, item)))
-        .collect();
+        .map(|item| Ok((catalog_v3_consumer::identity(item, Kind::Items)?, item)))
+        .collect::<Result<_, Box<dyn std::error::Error>>>()?;
     let mut uses: BTreeMap<String, usize> = BTreeMap::new();
     let mut misses: BTreeMap<String, Vec<String>> = BTreeMap::new();
     let mut no_source: BTreeMap<String, Vec<String>> = BTreeMap::new();
@@ -279,9 +279,12 @@ fn every_modified_property_is_filled_on_the_item_the_blueprint_produces() -> Tes
                 } else {
                     &mut misses
                 };
-                list.entry(class.clone())
-                    .or_default()
-                    .push(item["className"].as_str().unwrap_or("?").to_owned());
+                list.entry(class.clone()).or_default().push(
+                    item.pointer("/className/value")
+                        .and_then(Value::as_str)
+                        .unwrap_or("?")
+                        .to_owned(),
+                );
             }
         }
     }

@@ -225,11 +225,7 @@ fn check_modifier(
 }
 
 fn check_item_owning_chip(catalog: &Value) -> TestResult {
-    let owner = common::guid(fixture::OWNER);
-    let item = proof::rows(catalog, "/items")?
-        .iter()
-        .find(|row| row.get("guid").and_then(Value::as_str) == Some(owner.as_str()))
-        .ok_or("item owning the original chip")?;
+    let item = super::super::item(catalog, fixture::OWNER)?;
     assert!(
         item.get("stats").is_none(),
         "the chip facts belong to the dedicated configuration rows"

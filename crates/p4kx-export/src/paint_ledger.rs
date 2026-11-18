@@ -21,7 +21,8 @@ pub(crate) fn inputs(
     let paints: BTreeSet<_> = candidates
         .iter()
         .map(|item| {
-            item.record_index
+            item.header
+                .record_index
                 .value()
                 .copied()
                 .ok_or(crate::ExportAccountingError::MissingFieldInspection)

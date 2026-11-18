@@ -9,6 +9,7 @@ use p4kx_extraction::{
 use p4kx_testkit::{ArchiveBuilder, TestEntry};
 
 use super::OriginalCatalogInput;
+use crate::CatalogError;
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::{CatalogProjection, CatalogTextRegistry};
 use crate::texts::TextSources;
@@ -152,4 +153,22 @@ pub(crate) fn with_archive_input(
     let origins = CatalogOrigins::new(archive, &entry, &texts)?;
     let input = OriginalCatalogInput::new(&forge, &origins);
     check(&forge, &input)
+}
+
+pub(crate) fn with_archive_projection(
+    archive: &Archive,
+    sources: &TextSources,
+    inspect: impl for<'source, 'context> FnOnce(
+        &'source DataForge<'source>,
+        &CatalogProjection<'context, 'source>,
+    ) -> Result<(), CatalogError>,
+) -> Result<(), CatalogError> {
+    let entry = DataForgeEntry::read(archive).map_err(CatalogError::Load)?;
+    let forge = entry.open().map_err(CatalogError::DataForge)?;
+    let origins = CatalogOrigins::new(archive, &entry, sources)?;
+    let input = OriginalCatalogInput::new(&forge, &origins);
+    let texts = crate::texts::Texts::parse(sources)?;
+    let registry = CatalogTextRegistry::default();
+    let projection = CatalogProjection::new(&texts, &input, &registry);
+    inspect(&forge, &projection)
 }

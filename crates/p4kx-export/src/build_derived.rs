@@ -165,7 +165,7 @@ pub(crate) fn add_loadouts<'f>(
     let known: HashSet<Guid> = collected
         .items
         .iter()
-        .map(|item| item.guid.0)
+        .map(|item| item.identity.guid.0)
         .chain(collected.ships.iter().map(|ship| ship.guid.0))
         .collect();
     let built = loadouts(

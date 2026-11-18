@@ -11,9 +11,13 @@ use super::{TestResult, list};
 use crate::catalog_v3_consumer;
 
 pub(super) fn check(catalog: &Value, kind: Kind) -> TestResult {
+    check_rows(list(catalog, kind)?, kind)
+}
+
+pub(super) fn check_rows(rows: &[Value], kind: Kind) -> TestResult {
     let mut physical = HashSet::new();
     let mut order = Vec::new();
-    for row in list(catalog, kind)? {
+    for row in rows {
         let index = catalog_v3_consumer::field(row, kind, "recordIndex")?
             .as_u64()
             .ok_or("original physical Record index")?;
@@ -28,6 +32,7 @@ pub(super) fn check(catalog: &Value, kind: Kind) -> TestResult {
                 source_type,
                 "CraftingQualityDistributionRecord" | "CraftingQualityLocationOverrideRecord"
             ),
+            Kind::Items => source_type == "EntityClassDefinition",
             Kind::BlueprintCategories => source_type == "BlueprintCategoryRecord",
             Kind::BlueprintCategoryLists => source_type == "BlueprintCategoryDatabaseRecord",
             Kind::GameplayProperties => source_type == "CraftingGameplayPropertyDef",
@@ -70,8 +75,14 @@ pub(super) fn check_original_ammo(catalog: &Value, forge: &DataForge<'_>) -> Tes
     check_original(catalog, forge, Kind::AmmoDefinitions)
 }
 
+/// Checks each Item projection against its actual original physical Record.
+pub(super) fn check_original_items(catalog: &Value, forge: &DataForge<'_>) -> TestResult {
+    check_original(catalog, forge, Kind::Items)
+}
+
 fn check_original(catalog: &Value, forge: &DataForge<'_>, kind: Kind) -> TestResult {
     let expected_type = match kind {
+        Kind::Items => "EntityClassDefinition",
         Kind::BlueprintCategoryLists => "BlueprintCategoryDatabaseRecord",
         Kind::GameplayProperties => "CraftingGameplayPropertyDef",
         Kind::ExplosionDefinitions => "ExplosionRecord",

@@ -74,18 +74,20 @@ pub(crate) fn minimal_catalog() -> Value {
         "completeness": selection_completeness(),
         "items": [{
             "recordIndex": source_values::present(json!(1)),
-            "guid": "30000000-0000-4000-8000-000000000001",
-            "className": "POWR_ACAS_S01",
-            "recordPath": "libs/foundry/records/entities/scitem/ships/powerplant/powr_acas_s01",
-            "type": "PowerPlant",
-            "subType": "Power",
-            "size": 1,
-            "grade": 3,
-            "mass": 125.5,
-            "manufacturerGuid": "cfc0122d-5275-415a-a656-3dcb3346feb5",
-            "tags": ["flightReady"],
-            "itemClass": "Military",
-            "playability": "player",
+            "guid": source_values::present(json!("30000000-0000-4000-8000-000000000001")),
+            "recordName": source_values::present(json!("EntityClassDefinition.POWR_ACAS_S01")),
+            "className": source_values::present(json!("POWR_ACAS_S01")),
+            "fileName": source_values::present(json!("libs/foundry/records/entities/scitem/ships/powerplant/powr_acas_s01.xml")),
+            "recordPath": source_values::present(json!("libs/foundry/records/entities/scitem/ships/powerplant/powr_acas_s01")),
+            "sourceType": source_values::present(json!("EntityClassDefinition")),
+            "metadataTag": source_values::source(SourceValue::Absent),
+            "selection": {
+                "attachmentComponentOrdinal": source_values::present(json!(0)),
+                "physicsComponentOrdinal": source_values::present(json!(1)),
+                "purchasableComponentOrdinal": source_values::present(json!(2))
+            },
+            "itemClass": source_values::present(json!("Military")),
+            "playability": source_values::present(json!("player")),
             "variantOf": null
         }],
         "ships": [{

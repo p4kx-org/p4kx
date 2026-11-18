@@ -20,6 +20,8 @@ type TestResult = Result<(), Box<dyn Error>>;
 mod completeness;
 #[path = "catalog_item_definitions.rs"]
 mod definitions;
+#[path = "catalog_item_projection_checks.rs"]
+mod item_projection_checks;
 #[path = "catalog_ship_manufacturers.rs"]
 mod ship_manufacturers;
 #[path = "catalog_ship_texts.rs"]
@@ -45,7 +47,7 @@ fn catalog_with(options: &CatalogOptions<'_>) -> Result<(BuiltCatalog, Value), B
 fn class_names<'c>(catalog: &'c Value, kind: &str) -> Vec<&'c str> {
     catalog[kind].as_array().map_or_default(|list| {
         list.iter()
-            .filter_map(|entry| entry["className"].as_str())
+            .filter_map(|entry| entity_field(entry, kind, "className").and_then(Value::as_str))
             .collect()
     })
 }
@@ -53,7 +55,11 @@ fn class_names<'c>(catalog: &'c Value, kind: &str) -> Vec<&'c str> {
 fn entity<'c>(catalog: &'c Value, kind: &str, class: &str) -> Result<&'c Value, String> {
     catalog[kind]
         .as_array()
-        .and_then(|list| list.iter().find(|entry| entry["className"] == class))
+        .and_then(|list| {
+            list.iter().find(|entry| {
+                entity_field(entry, kind, "className").and_then(Value::as_str) == Some(class)
+            })
+        })
         .ok_or_else(|| format!("{kind} {class}"))
 }
 
@@ -85,29 +91,7 @@ fn an_item_carries_its_definition_mass_display_type_and_class() -> TestResult {
     let (_, catalog) = catalog_with(&options())?;
     let projection = entity(&catalog, "items", "POWR_ACAS_S01")?;
     let definition = item_definition(&catalog, projection)?;
-    let mut actual = projection.clone();
-    if let Some(fields) = actual.as_object_mut() {
-        fields.remove("variantOf");
-        fields.remove("recordIndex");
-    }
-    assert_eq!(
-        &actual,
-        &json!({
-            "guid": "30000000-0000-4000-8000-000000000001",
-            "className": "POWR_ACAS_S01",
-            "recordPath": "libs/foundry/records/entities/scitem/ships/powerplant/powr_acas_s01",
-            "type": "PowerPlant",
-            "subType": "Power",
-            "size": 1,
-            "grade": 3,
-            "mass": 125.5,
-            "manufacturerGuid": "10000000-0000-4000-8000-000000000001",
-            "tags": ["flightReady", "$Small"],
-            "itemClass": "Military",
-            "playability": null,
-        }),
-        "the remaining item projection fields"
-    );
+    item_projection_checks::original_values(&catalog, projection, definition)?;
     check_item_texts(&catalog, definition)
 }
 
@@ -189,11 +173,28 @@ fn an_item_without_an_item_definition_keeps_its_identity_and_null_fields() -> Te
         "grade",
         "mass",
         "manufacturerGuid",
-        "itemClass",
+        "tags",
     ] {
-        assert_eq!(counter[field], Value::Null, "{field} is null");
+        assert!(
+            counter.get(field).is_none(),
+            "{field} has one original source-family location"
+        );
     }
-    assert_eq!(counter["tags"], json!([]), "no tags");
+    assert_eq!(
+        counter.pointer("/itemClass/state"),
+        Some(&json!("absent")),
+        "no class without a source definition"
+    );
+    assert_eq!(
+        counter.pointer("/itemClass/value"),
+        Some(&Value::Null),
+        "missing class is explicitly nullable"
+    );
+    assert_eq!(
+        counter.pointer("/selection/attachmentComponentOrdinal/state"),
+        Some(&json!("absent")),
+        "complete original absence is retained"
+    );
     let definition = item_definition(&catalog, counter)?;
     let mut components = definition
         .pointer("/components/value")
@@ -211,7 +212,7 @@ fn an_item_without_an_item_definition_keeps_its_identity_and_null_fields() -> Te
 fn the_item_class_comes_from_the_class_line_of_the_english_description() -> TestResult {
     let (built, catalog) = catalog_with(&options())?;
     let class = |name: &str| -> Result<Value, String> {
-        Ok(entity(&catalog, "items", name)?["itemClass"].clone())
+        Ok(entity(&catalog, "items", name)?["itemClass"]["value"].clone())
     };
     assert_eq!(class("POWR_ACAS_S01")?, "Military", "a valid value");
     assert_eq!(
@@ -321,4 +322,31 @@ fn the_summary_lists_the_kinds_in_catalog_order() -> TestResult {
         .collect();
     assert_eq!(kinds, Kind::ALL, "order");
     Ok(())
+}
+
+pub(crate) fn entity_field<'a>(row: &'a Value, kind: &str, field: &str) -> Option<&'a Value> {
+    match kind {
+        "items" => row.get(field)?.get("value"),
+        "ships" | "crafters" => row.get(field),
+        _ => None,
+    }
+}
+
+pub(crate) fn selected_attachment<'a>(
+    catalog: &'a Value,
+    projection: &Value,
+) -> Result<&'a Value, Box<dyn Error>> {
+    let definition = item_definition(catalog, projection)?;
+    let slot = projection
+        .pointer("/selection/attachmentComponentOrdinal/value")
+        .ok_or("selected attachment slot")?;
+    definition
+        .pointer("/components/value")
+        .and_then(Value::as_array)
+        .and_then(|rows| {
+            rows.iter()
+                .find(|row| row.pointer("/componentOrdinal/value") == Some(slot))
+        })
+        .and_then(|row| row.pointer("/value/value"))
+        .ok_or_else(|| "exact physically selected source attachment".into())
 }

@@ -225,8 +225,8 @@ impl<'stage, 'source> RecordStaging<'stage, 'source> {
         loop {
             match pick {
                 Picked::Crafted(inner, _) => pick = inner.as_mut(),
-                Picked::Item { components, .. } => {
-                    return components.durability.stage_health(&mut self.health);
+                Picked::Item(item) => {
+                    return item.components.durability.stage_health(&mut self.health);
                 }
                 _ => return Ok(()),
             }

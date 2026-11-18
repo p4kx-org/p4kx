@@ -71,3 +71,30 @@ acceptance requires typed external-consumer parity against actual canonical outp
 and numeric closure, selection/failure/cancellation controls and no unintended dependency reads.
 Projection migration, source-backed candidate scope and client memory acceptance remain separate
 required checks.
+
+## Bounded Item source and classification projection
+
+The selected Item root uses the shared original eight-field Header, sourced first physical
+Attachment/Physics/Purchasable ordinals, and independently sourced itemClass and playability.
+Its seven redundant raw source fields are removed in favor of physical joins to Item definitions.
+Item definitions retain original Type/SubType/Size/Tags/RequiredTags even for a foreign valid
+AttachDef; constraint-family admission remains unchanged. The source reader supports the actual
+Class or StrongPointer Localization form. First-family selection never chooses a later successful
+payload after an earlier null/unreadable one.
+
+The source reader captures text references, original Locale tokens and their exact selectors
+together. Internal semantic inputs are not serialized and are not reconstructed from text IDs,
+DTO fields or row/global origins. English ClassLine uses its original Description selector and
+actual English lookup/display conversion. Item semantic language preparation always admits
+English independently of output requests; a source that was not consulted cannot establish
+absence. Key-only playability and compact Paint/key identity facts use the same original read,
+with the established predicates and stats-key representation preserved.
+
+The shared projection rejects a definition from another physical Record, including a same-GUID
+alias, and rejects foreign-inventory header evidence. Producer and subsequent SDK use the same
+admitted source objects rather than clone their original interpretation.
+
+This bounded migration does not introduce a provisional unknown variant carrier or weaken
+normal-publication guards. variantOf remains the existing nominal value until its actual
+unfiltered candidate survey and physical target/status projection are implemented together.
+There is no complete root-Item SDK claim or alternate legacy DTO in this source slice.

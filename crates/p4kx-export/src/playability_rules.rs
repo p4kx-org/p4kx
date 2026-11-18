@@ -176,8 +176,11 @@ fn inclusion_mode<'f>(tree: &RecordTree<'f>) -> Option<&'f str> {
 }
 
 fn under(tree: &RecordTree<'_>, prefix: &str) -> bool {
-    tree.record_path()
-        .get(..prefix.len())
+    under_path(tree.record_path(), prefix)
+}
+
+fn under_path(path: &str, prefix: &str) -> bool {
+    path.get(..prefix.len())
         .is_some_and(|start| start.eq_ignore_ascii_case(prefix))
 }
 
@@ -266,15 +269,36 @@ fn real_key(key: Option<&str>) -> bool {
 /// 3. `special`: `name_key` is no key or a placeholder, so the item has no player-visible name.
 pub(crate) fn item(tree: &RecordTree<'_>, name_key: Option<&str>) -> Option<Playability> {
     let shop = locale_key(component(tree, "SCItemPurchasableParams"), "displayName");
-    if real_key(shop) {
-        Some(Playability::Player)
-    } else if MISSION_PREFIXES.iter().any(|prefix| under(tree, prefix)) {
-        Some(Playability::Mission)
-    } else if !real_key(name_key) {
-        Some(Playability::Special)
+    item_inputs(shop, tree.record_path(), name_key).value
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ItemRule {
+    Purchasable,
+    MissionPath,
+    Name,
+}
+
+pub(crate) struct ItemDecision {
+    pub(crate) value: Option<Playability>,
+    pub(crate) rule: ItemRule,
+}
+
+pub(crate) fn item_inputs(shop: Option<&str>, path: &str, name_key: Option<&str>) -> ItemDecision {
+    let (value, rule) = if real_key(shop) {
+        (Some(Playability::Player), ItemRule::Purchasable)
+    } else if MISSION_PREFIXES
+        .iter()
+        .any(|prefix| under_path(path, prefix))
+    {
+        (Some(Playability::Mission), ItemRule::MissionPath)
     } else {
-        None
-    }
+        (
+            (!real_key(name_key)).then_some(Playability::Special),
+            ItemRule::Name,
+        )
+    };
+    ItemDecision { value, rule }
 }
 
 #[cfg(test)]

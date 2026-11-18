@@ -16,7 +16,7 @@ use crate::canonical_header::wire::Wire;
 use crate::catalog_resources::resource_consumer_walk;
 use crate::commodity_v3_fixture::{self as common, TestResult};
 
-pub(super) fn definition(
+pub(crate) fn definition(
     row: &ItemDefinition<'_>,
     inventory: &SourceInventory,
     canonical: &Value,
@@ -56,6 +56,12 @@ fn visit_component(component: &ItemDefinitionComponent<'_>, wire: Wire<'_>) -> T
 }
 
 fn visit_attachment(row: &ItemAttachmentPresentation<'_>, wire: Wire<'_>) -> TestResult {
+    wire.field("itemType")?.leaf(row.item_type())?;
+    wire.field("itemSubtype")?.leaf(row.item_subtype())?;
+    wire.field("size")?
+        .cell(row.size(), |number, wire| wire.number(number))?;
+    wire.field("tags")?.leaf(row.tags())?;
+    wire.field("requiredTags")?.leaf(row.required_tags())?;
     wire.field("grade")?
         .cell(row.grade(), |number, wire| wire.number(number))?;
     visit_manufacturer(row.manufacturer(), wire.field("manufacturer")?)?;
@@ -85,7 +91,7 @@ fn visit_manufacturer(row: &AuthoredManufacturer<'_>, wire: Wire<'_>) -> TestRes
     }
 }
 
-fn visit_localization(row: &ItemLocalization, wire: Wire<'_>) -> TestResult {
+fn visit_localization(row: &ItemLocalization<'_>, wire: Wire<'_>) -> TestResult {
     wire.field("name")?.leaf(row.name())?;
     wire.field("description")?.leaf(row.description())
 }
@@ -95,7 +101,7 @@ fn visit_physics(row: &ItemPhysics, wire: Wire<'_>) -> TestResult {
         .cell(row.mass(), |number, wire| wire.float32(number))
 }
 
-fn visit_purchasable(row: &ItemPurchasable, wire: Wire<'_>) -> TestResult {
+fn visit_purchasable(row: &ItemPurchasable<'_>, wire: Wire<'_>) -> TestResult {
     wire.field("displayName")?.leaf(row.display_name())?;
     wire.field("displayType")?.leaf(row.display_type())
 }

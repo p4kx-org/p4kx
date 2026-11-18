@@ -8,9 +8,46 @@ use crate::CatalogError;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::original::OriginalValuePart;
 use crate::catalog_text_contract::{GameTextRef, PublicNameRef};
+use crate::catalog_v3::authored_fields::locale_input::AuthoredLocaleInput;
 use crate::source_fields::FieldError;
 
 impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
+    pub(in crate::catalog_v3) fn public_name_input(
+        &self,
+        name: &str,
+        projection: &CatalogProjection<'_, 'source>,
+        notes: &mut Vec<FieldError>,
+    ) -> Result<(SourcedValue<PublicNameRef>, AuthoredLocaleInput<'source>), CatalogError> {
+        self.locale_input(name, notes, |fact| projection.public_name_fact(fact))
+    }
+
+    pub(in crate::catalog_v3) fn protected_locale_input(
+        &self,
+        name: &str,
+        projection: &CatalogProjection<'_, 'source>,
+        notes: &mut Vec<FieldError>,
+    ) -> Result<(SourcedValue<GameTextRef>, AuthoredLocaleInput<'source>), CatalogError> {
+        self.locale_input(name, notes, |fact| projection.protected_locale_fact(fact))
+    }
+
+    fn locale_input<T>(
+        &self,
+        name: &str,
+        notes: &mut Vec<FieldError>,
+        retain: impl FnOnce(&Fact<'scope, 'read, 'source>) -> Result<T, CatalogError>,
+    ) -> Result<(SourcedValue<T>, AuthoredLocaleInput<'source>), CatalogError> {
+        let mut selector = None;
+        let pair = self.locale(name, notes, |fact| {
+            let Value::Locale(token) = fact.value() else {
+                return Err(crate::ExportAccountingError::ConflictingSourceDatum.into());
+            };
+            selector = Some(fact.observe(OriginalValuePart::Value, SourceUseRole::Selector)?);
+            Ok((retain(fact)?, *token))
+        })?;
+        let (value, key) = pair.unzip();
+        Ok((value, AuthoredLocaleInput::new(key, selector)))
+    }
+
     pub(in crate::catalog_v3) fn public_name(
         &self,
         name: &str,

@@ -97,14 +97,12 @@ fn check_counts(built: &BuiltCatalog, catalog: &Value) -> TestResult {
     reason = "the unresolved GUIDs are the result of the verification"
 )]
 fn check_references(built: &BuiltCatalog, catalog: &Value) -> TestResult {
-    let known: HashSet<&str> = ["items", "ships"]
-        .into_iter()
-        .map(|kind| list(catalog, kind))
-        .collect::<Result<Vec<_>, _>>()?
-        .into_iter()
-        .flatten()
-        .filter_map(|entity| entity["guid"].as_str())
-        .collect();
+    let mut known = HashSet::new();
+    for kind in [Kind::Items, Kind::Ships] {
+        for entity in list(catalog, kind.name())? {
+            known.insert(crate::catalog_v3_consumer::identity(entity, kind)?);
+        }
+    }
     let mut owners = HashSet::new();
     let mut outside = HashSet::new();
     let mut classes = HashSet::new();

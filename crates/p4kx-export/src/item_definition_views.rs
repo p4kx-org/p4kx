@@ -11,6 +11,7 @@ use super::{
 use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_text_contract::{GameTextRef, PublicNameRef};
 use crate::catalog_v3::authored_fields::authored_manufacturer::AuthoredManufacturer;
+use crate::catalog_v3::authored_fields::locale_input::AuthoredLocaleInput;
 use crate::resource_float::ResourceFloat32;
 use crate::resource_number::ResourceNumber;
 
@@ -49,6 +50,36 @@ impl<'source> ItemDefinitionComponent<'source> {
 }
 
 impl<'source> ItemAttachmentPresentation<'source> {
+    /// Borrows the original attachment type label without applying constraint-family admission.
+    #[must_use]
+    pub const fn item_type(&self) -> &SourcedValue<&'source str> {
+        &self.item_type
+    }
+
+    /// Borrows the original attachment subtype label.
+    #[must_use]
+    pub const fn item_subtype(&self) -> &SourcedValue<&'source str> {
+        &self.item_subtype
+    }
+
+    /// Borrows the original attachment size without narrowing its numeric storage.
+    #[must_use]
+    pub const fn size(&self) -> &SourcedValue<ResourceNumber> {
+        &self.size
+    }
+
+    /// Borrows the original attachment tags without splitting their stored label.
+    #[must_use]
+    pub const fn tags(&self) -> &SourcedValue<&'source str> {
+        &self.tags
+    }
+
+    /// Borrows the original required tags without splitting their stored label.
+    #[must_use]
+    pub const fn required_tags(&self) -> &SourcedValue<&'source str> {
+        &self.required_tags
+    }
+
     /// Borrows the original grade without narrowing its numeric type.
     #[must_use]
     pub const fn grade(&self) -> &SourcedValue<ResourceNumber> {
@@ -63,7 +94,7 @@ impl<'source> ItemAttachmentPresentation<'source> {
 
     /// Borrows the original localization declaration and its retained state.
     #[must_use]
-    pub const fn localization(&self) -> &SourcedValue<ItemLocalization> {
+    pub const fn localization(&self) -> &SourcedValue<ItemLocalization<'source>> {
         &self.localization
     }
 
@@ -74,7 +105,15 @@ impl<'source> ItemAttachmentPresentation<'source> {
     }
 }
 
-impl ItemLocalization {
+impl<'source> ItemLocalization<'source> {
+    pub(crate) const fn name_input(&self) -> &AuthoredLocaleInput<'source> {
+        &self.name_input
+    }
+
+    pub(crate) const fn description_input(&self) -> &AuthoredLocaleInput<'source> {
+        &self.description_input
+    }
+
     /// Borrows the original public-name reference.
     #[must_use]
     pub const fn name(&self) -> &SourcedValue<PublicNameRef> {
@@ -96,7 +135,11 @@ impl ItemPhysics {
     }
 }
 
-impl ItemPurchasable {
+impl<'source> ItemPurchasable<'source> {
+    pub(crate) const fn display_name_input(&self) -> &AuthoredLocaleInput<'source> {
+        &self.name_input
+    }
+
     /// Borrows the original public display-name reference.
     #[must_use]
     pub const fn display_name(&self) -> &SourcedValue<PublicNameRef> {

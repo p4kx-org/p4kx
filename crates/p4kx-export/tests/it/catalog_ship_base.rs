@@ -211,7 +211,11 @@ fn a_temp_or_display_ship_is_left_out_everywhere_and_an_item_keeps_its_display_w
     let classes = |kind: &str| -> Vec<String> {
         catalog[kind].as_array().map_or_default(|list| {
             list.iter()
-                .filter_map(|entity| entity["className"].as_str().map(str::to_owned))
+                .filter_map(|entity| {
+                    crate::catalog_items::entity_field(entity, kind, "className")
+                        .and_then(Value::as_str)
+                        .map(str::to_owned)
+                })
                 .collect()
         })
     };

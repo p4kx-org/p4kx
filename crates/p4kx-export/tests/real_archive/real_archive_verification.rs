@@ -183,7 +183,8 @@ fn verify_catalog(path: &Path, baselined: bool) -> Result<Value, Box<dyn Error>>
         assert_eq!(guids.len(), entities.len(), "{kind} all have a {own}");
         if matches!(
             kind,
-            Kind::BlueprintCategories
+            Kind::Items
+                | Kind::BlueprintCategories
                 | Kind::BlueprintCategoryLists
                 | Kind::GameplayProperties
                 | Kind::ReputationContexts
@@ -206,13 +207,15 @@ fn verify_catalog(path: &Path, baselined: bool) -> Result<Value, Box<dyn Error>>
         }
     }
     check_unique_guids(&catalog)?;
-    if !list(&catalog, Kind::BlueprintCategoryLists)?.is_empty()
+    if !list(&catalog, Kind::Items)?.is_empty()
+        || !list(&catalog, Kind::BlueprintCategoryLists)?.is_empty()
         || !list(&catalog, Kind::GameplayProperties)?.is_empty()
         || !list(&catalog, Kind::ExplosionDefinitions)?.is_empty()
         || !list(&catalog, Kind::AmmoDefinitions)?.is_empty()
     {
         let entry = DataForgeEntry::read(&archive)?;
         let forge = entry.open()?;
+        definition_identity::check_original_items(&catalog, &forge)?;
         definition_identity::check_original_lists(&catalog, &forge)?;
         definition_identity::check_original_properties(&catalog, &forge)?;
         definition_identity::check_original_explosions(&catalog, &forge)?;

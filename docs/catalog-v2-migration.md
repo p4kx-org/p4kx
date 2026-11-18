@@ -80,3 +80,26 @@ source states or encryption markers from their serialized values.
 A present empty names.value array differs from absent or null. Repeated and nullable authored
 positions are not compacted. The fixed released v2 fixture is a historical input, not another
 writer mode. See the [Mission Location contract](catalog-location-configuration.md#source-identity-flags-cluster-link-and-names).
+
+## Item identity, source selection and classifications
+
+Schema v3 keeps `items` as a selected projection while source facts have one canonical family
+location. This is the only writer form; released-v2 fixtures remain frozen historical inputs.
+Re-export original inputs to obtain physical indices and immediate origins.
+
+| Earlier Item field | Current schema 3 |
+| --- | --- |
+| `guid`, `className`, `recordPath` | Corresponding sourced header cell; read its `value`, state and origin. The complete shared header also carries recordName, recordIndex, sourceType, fileName and metadataTag. |
+| `type`, `subType`, `size`, `grade` | Join Item `recordIndex.value` to `definitions.items.rows[].recordIndex.value`, then follow the sourced `selection.attachmentComponentOrdinal.value`. Read itemType, itemSubtype, size and grade in that component's `value.value`. Numbers retain original kinds and bits. |
+| `manufacturerGuid` | The selected Attachment's original `manufacturer` retains Reference GUID/target state or authored storage. Do not replace an authored pointer or unresolved Reference with an invented GUID. |
+| `tags` | The selected Attachment's sourced raw `tags` preserves whitespace, repeats and case; consumers may split whitespace. Original requiredTags is available independently. |
+| `mass` | Follow `selection.physicsComponentOrdinal.value` to the physics component's exact `value.value.mass`. |
+| Name, description and purchase display type | Follow the selected Attachment Localization or Purchasable source fields to the existing canonical text registries. Source text and display text remain separate. |
+| `itemClass` | Sourced English ClassLine result; the original Description selector and actual English lookup/display evidence contribute even when requested output locales differ. |
+| `playability` | Sourced result from actual key-only rule inputs and Record path; unrelated localized text does not contribute. |
+| `variantOf` | Existing nominal GUID/null is unchanged in this bounded slice. Immediate source-backed physical target/status and unfiltered candidate evidence remain the explicit ADR-0410 variant scope. |
+
+A selected null/unreadable first component is not replaced with a later one. Foreign original
+AttachDef data remains in Item definitions even when the separate constraints family excludes it.
+Respect the source-set completeness on selection and derived cells. These changes do not establish
+complete root-Item/Ship/Loadout provenance or another output compatibility mode.

@@ -21,7 +21,7 @@ pub(crate) const fn is_paint_type(kind: &str) -> bool {
 
 /// Returns whether the selected item is a paint.
 pub(crate) fn is_paint(item: &Item<'_>) -> bool {
-    item.r#type.is_some_and(is_paint_type)
+    item.paint.item_type.is_some_and(is_paint_type)
 }
 
 /// The paints of a catalog and what was counted deriving them.
@@ -78,8 +78,8 @@ pub(crate) fn paints<'f>(
             if cancel.is_some_and(CancelToken::is_cancelled) {
                 return Err(CatalogError::Cancelled);
             }
-            let have = lowered(&item.tags);
-            let required = lowered(&item.required_tags);
+            let have = lowered(&item.paint.tags);
+            let required = lowered(&item.paint.required_tags);
             let mut ship_guids: Vec<CatalogGuid> = groups
                 .iter()
                 .filter(|(group, _)| group.accepts(&have, &required, &index))
@@ -87,7 +87,7 @@ pub(crate) fn paints<'f>(
                 .collect();
             ship_guids.sort_by_cached_key(|guid| guid.text());
             Ok(Paint {
-                item_guid: item.guid,
+                item_guid: item.identity.guid,
                 ship_guids,
             })
         })

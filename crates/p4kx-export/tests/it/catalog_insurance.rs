@@ -148,7 +148,7 @@ fn only_ships_carry_insurance() -> TestResult {
         .as_array()
         .into_iter()
         .flatten()
-        .find(|item| item["guid"] == wanted.as_str())
+        .find(|item| item.pointer("/guid/value").and_then(Value::as_str) == Some(wanted.as_str()))
         .ok_or("the item is missing")?;
     assert!(item.get("insurance").is_none());
     Ok(())

@@ -1,17 +1,32 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{Language, RecordTree, SourcedValue};
+use p4kx_extraction::RecordTree;
 
-use crate::Playability;
-use crate::contract::Item;
-use crate::guid_text::CatalogGuid;
+use crate::catalog_projection::CatalogProjection;
+use crate::catalog_read::original::OriginalFlowFields;
+use crate::catalog_v3::catalog_item_components::item_definition::ItemDefinition;
+use crate::catalog_v3::catalog_item_components::selection::ItemSourceSelection;
 use crate::item_class::ClassLine;
 use crate::playability_rules;
-use crate::record_fields::{
-    class_name, component, integer, locale_key, reference, single, structure, text,
-};
-use crate::texts::Texts;
+use crate::record_fields::{component, locale_key, structure, text};
+use crate::{CatalogError, Playability};
+
+#[path = "item_class_projection.rs"]
+mod classification;
+#[path = "item_projection_inputs.rs"]
+mod inputs;
+#[path = "item_paint_facts.rs"]
+mod paint_facts;
+#[path = "item_playability_projection.rs"]
+mod playability_projection;
+#[path = "item_projection.rs"]
+mod projection;
+
+use inputs::SelectedItem;
+use paint_facts::ItemPaintFacts;
+pub(crate) use projection::Item;
+use projection::ItemIdentity;
 
 /// Returns the playability of the item Record tree `tree`.
 pub(crate) fn playability(tree: &RecordTree<'_>) -> Option<Playability> {
@@ -26,47 +41,41 @@ pub(crate) fn is_paint(tree: &RecordTree<'_>) -> bool {
     text(definition, "Type").is_some_and(crate::paint::is_paint_type)
 }
 
-/// Projects the Item and its classified English description line.
-pub(crate) fn item<'f>(
-    tree: &RecordTree<'f>,
-    record_index: SourcedValue<u32>,
-    texts: &Texts<'f>,
-) -> (Item<'f>, ClassLine) {
-    let definition = structure(component(tree, "SAttachableComponentParams"), "AttachDef");
-    let localization = structure(definition, "Localization");
-    let description = locale_key(localization, "Description")
-        .and_then(|key| texts.display(Language::English, key));
-    let line = ClassLine::read(description.as_deref());
-    let physics = structure(
-        component(tree, "SEntityPhysicsControllerParams"),
-        "PhysType",
-    );
-    let r#type = text(definition, "Type");
-    let item = Item {
-        record_index,
-        guid: CatalogGuid(tree.guid()),
-        class_name: class_name(tree),
-        record_path: tree.record_path(),
-        r#type,
-        sub_type: text(definition, "SubType"),
-        size: integer(definition, "Size"),
-        grade: integer(definition, "Grade"),
-        mass: single(physics, "Mass"),
-        manufacturer_guid: reference(definition, "Manufacturer"),
-        tags: words(text(definition, "Tags")),
-        class: line.class(),
-        playability: playability(tree),
-        variant_of: None,
-        variant_key: None,
-        required_tags: if r#type.is_some_and(crate::paint::is_paint_type) {
-            words(text(definition, "RequiredTags"))
-        } else {
-            Vec::new()
-        },
+/// Projects classifications from the already read physical Item source family.
+pub(crate) fn item<'source>(
+    tree: &RecordTree<'source>,
+    definition: &ItemDefinition<'source>,
+    originals: &OriginalFlowFields<'_, '_, 'source>,
+    projection: &CatalogProjection<'_, 'source>,
+) -> Result<(Item<'source>, ClassLine), CatalogError> {
+    projection::check_source(tree, definition, projection)?;
+    let selection = ItemSourceSelection::read(tree, originals)?;
+    let inputs = SelectedItem::read(definition, &selection)?;
+    let description = inputs.description();
+    let class = match description.input {
+        Some(input) => classification::read(input, projection)?,
+        None => classification::absent(description.state, description.cause, projection)?,
     };
-    (item, line)
+    let class_value = description.add_parents(class.value, &projection.origins().uses)?;
+    let playability = playability_projection::read(&inputs, projection)?;
+    let paint = ItemPaintFacts::read(inputs.attachment());
+    let header = definition.source().clone();
+    let identity = ItemIdentity::read(&header)?;
+    Ok((
+        Item {
+            header,
+            selection,
+            class: class_value,
+            playability,
+            variant_of: None,
+            identity,
+            paint,
+            variant_key: None,
+        },
+        class.line,
+    ))
 }
 
-fn words(value: Option<&str>) -> Vec<&str> {
-    value.map_or_default(|tags| tags.split_whitespace().collect())
-}
+#[cfg(test)]
+#[path = "item_projection_semantic_tests.rs"]
+mod semantic_tests;

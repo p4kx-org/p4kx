@@ -50,13 +50,9 @@ fn the_grade_letter_of_ship_components_follows_the_integer() -> TestResult {
     let texts = TextIndex::new(&catalog)?;
     let mut counts: BTreeMap<&str, (usize, usize)> = BTreeMap::new();
     for item in items {
-        let grade = &item["grade"];
-        assert!(
-            grade.is_null() || grade.as_i64().is_some_and(|value| (1..=7).contains(&value)),
-            "grade is null or 1 to 7: {grade}"
-        );
-        let Some(kind) = item["type"]
-            .as_str()
+        let grade = presentation.grade(item)?;
+        let Some(kind) = presentation
+            .item_type(item)?
             .filter(|kind| LETTER_TYPES.contains(kind))
         else {
             continue;
@@ -79,7 +75,7 @@ fn the_grade_letter_of_ship_components_follows_the_integer() -> TestResult {
         };
         let entry = counts.entry(kind).or_default();
         entry.0 += 1;
-        entry.1 += usize::from(grade.as_i64() == Some(expected));
+        entry.1 += usize::from(grade == Some(expected));
     }
     for kind in LETTER_TYPES {
         let (lettered, agreeing) = counts.get(kind).copied().ok_or("a lettered type")?;

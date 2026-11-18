@@ -110,8 +110,8 @@ fn check_references(built: &BuiltCatalog, catalog: &Value) -> TestResult {
         .collect();
     let items: HashSet<&str> = list(catalog, "items")?
         .iter()
-        .filter_map(|item| item["guid"].as_str())
-        .collect();
+        .map(|item| crate::catalog_v3_consumer::identity(item, Kind::Items))
+        .collect::<Result<_, _>>()?;
     let mut used = HashSet::new();
     for paint in list(catalog, "paints")? {
         let item = paint["itemGuid"].as_str().ok_or("itemGuid")?;

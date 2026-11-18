@@ -65,8 +65,15 @@ pub(crate) fn port<'c>(ports: &'c Value, name: &str) -> Result<&'c Value, Box<dy
 pub(crate) fn known(catalog: &Value) -> Vec<&str> {
     ["items", "ships"]
         .into_iter()
-        .flat_map(|kind| catalog[kind].as_array().into_iter().flatten())
-        .filter_map(|entity| entity["guid"].as_str())
+        .flat_map(|kind| {
+            catalog[kind]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(move |entity| {
+                    crate::catalog_items::entity_field(entity, kind, "guid").and_then(Value::as_str)
+                })
+        })
         .collect()
 }
 

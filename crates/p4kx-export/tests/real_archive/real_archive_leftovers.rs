@@ -75,7 +75,9 @@ fn the_ship_tokens_leave_out_leftover_ships_only() -> TestResult {
     assert!(
         items.iter().any(|item| {
             has_token(
-                item["className"].as_str().unwrap_or_default(),
+                item.pointer("/className/value")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default(),
                 &SHIP_EXCLUDED_TOKENS,
             )
         }),

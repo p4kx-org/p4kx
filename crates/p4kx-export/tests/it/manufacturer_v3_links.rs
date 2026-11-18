@@ -11,10 +11,20 @@ use crate::manufacturer_v3_link_fixture::{self as links, Target};
 #[test]
 fn an_authored_item_reference_joins_the_actual_selected_definition() -> TestResult {
     let (_, catalog) = fixture::normal(&links::database(Target::Kept))?;
-    assert_eq!(fixture::rows(&catalog)?.len(), 1);
+    let rows = fixture::rows(&catalog)?;
+    let [definition] = rows.as_slice() else {
+        return Err("exactly one selected manufacturer definition".into());
+    };
+    let authored = authored_manufacturer(&catalog)?;
     assert_eq!(
-        fixture::at(&catalog, "/items/0/manufacturerGuid")?,
-        &json!(fixture::guid(fixture::MAKER))
+        fixture::at(authored, "/guid/value")?,
+        fixture::at(definition, "/guid/value")?,
+        "the authored identity joins the selected definition"
+    );
+    assert_eq!(
+        fixture::at(authored, "/targetRecordIndex/value")?,
+        fixture::at(definition, "/recordIndex/value")?,
+        "the authored Reference joins the same physical definition"
     );
     assert!(
         references(&catalog)?.is_empty(),
@@ -42,17 +52,12 @@ fn excluded_or_outside_manufacturers_remain_authored_links_without_auto_inclusio
             fixture::rows(&catalog)?.is_empty(),
             "untouched targets do not become definitions"
         );
-        assert_eq!(
-            fixture::at(&catalog, "/items/0/manufacturerGuid")?,
-            &json!(fixture::guid(fixture::MAKER))
-        );
+        let authored = authored_manufacturer(&catalog)?;
+        let index = fixture::at(authored, "/targetRecordIndex/value")?;
         assert!(
             references(&catalog)?.iter().any(|reference| {
                 reference.get("status").and_then(Value::as_str) == Some(expected)
-                    && reference
-                        .pointer("/targetRecordIndex/value")
-                        .and_then(Value::as_u64)
-                        == Some(0)
+                    && reference.pointer("/targetRecordIndex/value") == Some(index)
             }),
             "{target:?} keeps its exact materialization status"
         );
@@ -96,6 +101,33 @@ fn equal_guid_aliases_keep_physical_rows_and_cannot_silently_resolve() -> TestRe
                 == Some("ambiguousIdentity"))
     );
     Ok(())
+}
+
+fn authored_manufacturer(catalog: &Value) -> TestResult<&Value> {
+    let projection = fixture::at(catalog, "/items/0")?;
+    let attachment = crate::catalog_items::selected_attachment(catalog, projection)?;
+    assert_eq!(
+        fixture::at(attachment, "/manufacturer/kind")?,
+        &json!("record"),
+        "the selected attachment contains an original Record Reference"
+    );
+    let link = fixture::at(attachment, "/manufacturer/value/value")?;
+    assert_eq!(
+        fixture::at(link, "/guid/value")?,
+        &json!(fixture::guid(fixture::MAKER)),
+        "the authored manufacturer GUID survives"
+    );
+    assert_eq!(
+        fixture::at(link, "/targetRecordIndex/value")?,
+        &json!(0),
+        "the actual original target survives catalog selection"
+    );
+    assert_eq!(
+        fixture::at(link, "/status")?,
+        &json!("present"),
+        "the DataForge Reference resolves in the source"
+    );
+    Ok(link)
 }
 
 fn references(catalog: &Value) -> TestResult<&Vec<Value>> {

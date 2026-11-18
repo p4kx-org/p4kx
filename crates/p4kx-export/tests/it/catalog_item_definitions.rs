@@ -163,11 +163,12 @@ fn purchase_only_names_preserve_order_empty_keys_and_language_origins() -> TestR
             check_purchase_translations(text)?;
         }
     }
-    assert_eq!(
-        proof::at(&catalog, "/items/0/playability")?,
-        "player",
-        "the first purchase name still decides playability without attachable localization"
-    );
+    proof::present(
+        proof::at(&catalog, "/items/0")?,
+        "playability",
+        &json!("player"),
+        Some(false),
+    )?;
     proof::closure(&catalog)
 }
 
@@ -395,3 +396,6 @@ fn class(name: &str) -> TestType {
 
 #[path = "equipment_source_sdk.rs"]
 mod equipment_sdk;
+
+#[path = "item_source_projection_tests.rs"]
+mod source_projection;

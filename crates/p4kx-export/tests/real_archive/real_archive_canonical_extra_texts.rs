@@ -172,6 +172,9 @@ fn compare_overrides(
     Ok(())
 }
 
+#[path = "real_archive_item_source_fields.rs"]
+mod item_fields;
+
 pub(crate) struct ItemPresentationIndex<'catalog> {
     definitions: HashMap<u64, &'catalog Value>,
 }
@@ -193,12 +196,10 @@ impl<'catalog> ItemPresentationIndex<'catalog> {
             .definitions
             .get(&record_index(item)?)
             .ok_or("Item projection has no exact physical definition")?;
-        if item.get("recordIndex") != row.get("recordIndex")
-            || [("guid", "/guid/value"), ("recordPath", "/recordPath/value")]
-                .into_iter()
-                .any(|(field, path)| item.get(field) != row.pointer(path))
-        {
-            return Err("Item projection and physical definition disagree".into());
+        for field in ["recordIndex", "guid", "recordPath", "sourceType"] {
+            if item.get(field) != row.get(field) {
+                return Err("Item projection and physical definition disagree".into());
+            }
         }
         let carrier = row.get("components").ok_or("Item component carrier")?;
         catalog_v3_consumer::source_value(carrier)?.map_or_else(
@@ -213,14 +214,13 @@ impl<'catalog> ItemPresentationIndex<'catalog> {
     }
 
     pub(crate) fn description(&self, item: &Value) -> TestResult<Option<&'catalog Value>> {
-        let Some(component) = self
-            .components(item)?
-            .iter()
-            .find(|component| component.get("kind").and_then(Value::as_str) == Some("attachment"))
-        else {
+        let Some(attachment) = self.attachment(item)? else {
             return Ok(None);
         };
-        localization(component)?.map_or(Ok(None), |localization| {
+        let carrier = attachment
+            .get("localization")
+            .ok_or("original Item Localization carrier")?;
+        catalog_v3_consumer::source_value(carrier)?.map_or(Ok(None), |localization| {
             Ok(Some(
                 localization
                     .get("description")

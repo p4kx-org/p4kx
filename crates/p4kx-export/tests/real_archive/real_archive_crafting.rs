@@ -148,8 +148,8 @@ fn check_blueprints(catalog: &Value) -> TestResult {
     let blueprints = Blueprints::read(catalog)?;
     let items: HashSet<&str> = list(catalog, "items")?
         .iter()
-        .filter_map(|item| item["guid"].as_str())
-        .collect();
+        .map(|item| catalog_v3_consumer::identity(item, Kind::Items))
+        .collect::<Result<_, _>>()?;
     let produced: Vec<&str> = blueprints
         .rows()
         .iter()
