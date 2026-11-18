@@ -1,17 +1,19 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{DataType, SourcedValue, Value};
+use p4kx_extraction::{SourcedValue, Value};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::{Observed, missing_component};
-use crate::catalog_read::original::ComponentSelection;
+use crate::catalog_read::original::OriginalArraySelection;
 use crate::catalog_v3::authored_fields::authored_manufacturer::{
     AuthoredManufacturer, ManufacturerValue,
 };
+use crate::resource_number::ResourceNumber;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
+
 use crate::{CatalogError, ExportAccountingError};
 
 /// The authored manufacturer on the selected vehicle component.
@@ -36,7 +38,7 @@ pub(crate) struct ShipAttachmentManufacturer<'source> {
 pub(super) fn vehicle<'source>(
     fields: Observed<'_, '_, '_, 'source>,
     selected: Option<&Value<'source>>,
-    selection: &ComponentSelection,
+    selection: &OriginalArraySelection,
     notes: &mut Vec<FieldError>,
 ) -> Result<ShipVehicleManufacturer<'source>, CatalogError> {
     let Some(selected) = selected else {
@@ -55,43 +57,58 @@ pub(super) fn vehicle<'source>(
     })
 }
 
+pub(super) struct AttachmentRead<'source> {
+    pub(super) manufacturer: ShipAttachmentManufacturer<'source>,
+    pub(super) size: SourcedValue<ResourceNumber>,
+}
+
 pub(super) fn attachment<'source>(
     fields: Observed<'_, '_, '_, 'source>,
     selected: Option<&Value<'source>>,
+    selection: &OriginalArraySelection,
     notes: &mut Vec<FieldError>,
-) -> Result<ShipAttachmentManufacturer<'source>, CatalogError> {
-    let selection = fields.originals.component_selection(selected)?;
+) -> Result<AttachmentRead<'source>, CatalogError> {
     let Some(selected) = selected else {
-        return Ok(ShipAttachmentManufacturer {
-            component_ordinal: missing_component(fields.originals, &selection),
-            attach_def_present: missing_component(fields.originals, &selection),
-            manufacturer: missing_component(fields.originals, &selection),
+        return Ok(AttachmentRead {
+            manufacturer: ShipAttachmentManufacturer {
+                component_ordinal: missing_component(fields.originals, selection),
+                attach_def_present: missing_component(fields.originals, selection),
+                manufacturer: missing_component(fields.originals, selection),
+            },
+            size: missing_component(fields.originals, selection),
         });
     };
     let source = fields.at_owner(fields.originals.fact(selected)?);
     let uses = source.originals.sources();
     let placement = uses.origin(&selection.uses, selection.complete);
-    let mut manufacturer = None;
-    let decode = |definition, notes: &mut Vec<FieldError>| {
-        manufacturer =
-            Some(AuthoredManufacturer::read(definition, "Manufacturer", notes)?.into_value());
+    let mut original = None;
+    let attach_def_present = source.declared_owned("AttachDef", notes, |definition, notes| {
+        original = Some((
+            AuthoredManufacturer::read(definition, "Manufacturer", notes)?.into_value(),
+            definition.authored_number("Size", notes)?,
+        ));
         Ok(true)
-    };
-    let attach_def_present = if source.storage_type("AttachDef")? == Some(DataType::StrongPointer) {
-        source.declared_pointer("AttachDef", notes, decode)?
-    } else {
-        source.declared_class("AttachDef", notes, decode)?
-    };
+    })?;
     let attach_def_present = uses.add_value_origins(attach_def_present, &[&placement])?;
-    let manufacturer = match manufacturer {
-        Some(cell) => uses.add_value_origins(cell, &[attach_def_present.origin()])?,
-        None => attach_def_present.clone().try_map(|_| {
-            Err::<_, CatalogError>(ExportAccountingError::ConflictingSourceDatum.into())
-        })?,
+    let (manufacturer, size) = if let Some((manufacturer, size)) = original {
+        (
+            uses.add_value_origins(manufacturer, &[attach_def_present.origin()])?,
+            uses.add_value_origins(size, &[attach_def_present.origin()])?,
+        )
+    } else {
+        let missing = attach_def_present.clone().try_map(|_| {
+            Err::<(ManufacturerValue<'source>, ResourceNumber), CatalogError>(
+                ExportAccountingError::ConflictingSourceDatum.into(),
+            )
+        })?;
+        missing.unzip()
     };
-    Ok(ShipAttachmentManufacturer {
-        component_ordinal: uses.add_value_origins(source.array_ordinal()?, &[&placement])?,
-        attach_def_present,
-        manufacturer,
+    Ok(AttachmentRead {
+        manufacturer: ShipAttachmentManufacturer {
+            component_ordinal: uses.add_value_origins(source.array_ordinal()?, &[&placement])?,
+            attach_def_present,
+            manufacturer,
+        },
+        size,
     })
 }

@@ -69,7 +69,7 @@ pub(crate) use original_datum::OriginalDatum;
 #[path = "original_reward_read.rs"]
 mod original_reward_read;
 pub(crate) use original_flow_fields::{
-    ComponentSelection, OriginalFlowFields, OriginalMissingField,
+    OriginalArraySelection, OriginalFlowFields, OriginalMissingField,
 };
 pub use original_instance_location::OriginalInstanceLocation;
 pub(crate) use original_reference_capture::OriginalReferenceObservation;

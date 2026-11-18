@@ -98,3 +98,22 @@ This bounded migration does not introduce a provisional unknown variant carrier 
 normal-publication guards. variantOf remains the existing nominal value until its actual
 unfiltered candidate survey and physical target/status projection are implemented together.
 There is no complete root-Item SDK claim or alternate legacy DTO in this source slice.
+
+
+## Ship Record fields
+
+The Ship source reader checks that the Record and tree describe the same physical owner and
+indexes the original fields once. Locale and manufacturer projectors use that index. The reader
+uses the same array-prefix selection for `Components` and `StaticEntityClassData`. Earlier
+unreadable candidates keep the corresponding component or insurance selection incomplete.
+
+The Ship row flattens the shared eight-field Record header. The export and its source inventory
+use the physical Record index for joins. `crewSize` and `AttachDef.Size` retain exact numeric
+storage. `vehicleDefinition` retains the original String or Enum value, including empty strings,
+case, separators and whitespace. Insurance retains the first exact declaration, its static
+ordinal and restore flag. Its parameter container carries its own state, and its numbers retain
+their widths, bits and units. Additional original fields remain available.
+
+`playabilityInputs` carries the selected component ordinal, the authored CrewManifest reference
+and its target header state. Interpreted playability, XML totals, cargo and variant results
+depend on the respective readers and their sources.

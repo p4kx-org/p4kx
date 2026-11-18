@@ -11,6 +11,8 @@ use p4kx_extraction::{
 use p4kx_testkit::{real_archive_key, real_archive_path};
 use serde_json::Value;
 
+use crate::catalog_v3_consumer;
+
 use crate::real_archive_item_components as components;
 use crate::real_archive_item_durability as proof;
 
@@ -36,15 +38,23 @@ fn avenger_and_multi_relay_topology_match_the_authored_source() -> TestResult {
     let catalog: Value = serde_json::from_slice(built.json())?;
     crate::real_archive_shop_inventory_v3::verify_build(&archive, &catalog)?;
     let forge = entry.open().map_err(|_| "open original DataForge")?;
-    let avenger = proof::rows(&catalog, "/ships")?
-        .iter()
-        .find(|row| {
-            row["className"]
-                .as_str()
-                .is_some_and(|name| name.eq_ignore_ascii_case("AEGS_Avenger_Titan"))
-        })
-        .ok_or("configured build contains no target Avenger Record")?;
-    let avenger = proof::text(avenger, "/guid")?;
+    let mut avenger = None;
+    for row in proof::rows(&catalog, "/ships")? {
+        let Some(name) = catalog_v3_consumer::source_value(&row["className"])? else {
+            continue;
+        };
+        if name
+            .as_str()
+            .is_some_and(|name| name.eq_ignore_ascii_case("AEGS_Avenger_Titan"))
+        {
+            avenger = Some(row);
+            break;
+        }
+    }
+    let avenger = avenger.ok_or("configured build contains no readable target Avenger Record")?;
+    let avenger = catalog_v3_consumer::present(&avenger["guid"])?
+        .as_str()
+        .ok_or("Avenger GUID")?;
     let multi = multi_relay(&catalog, avenger)?;
     for guid in [avenger, multi] {
         trace(&forge, &catalog, guid, Declaration::Hardpoint)?;

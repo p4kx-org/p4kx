@@ -43338,25 +43338,22 @@
           ]
         },
         "className": {
-          "description": "The Record name without its type, e.g. `AEGS_Avenger_Titan`.",
-          "type": "string"
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "crewSize": {
-          "description": "The crew size, `null` without one.",
-          "format": "int64",
-          "type": [
-            "integer",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber",
+          "description": "The original crew-size field of the selected Vehicle component."
         },
         "description": {
           "$ref": "#/$defs/SourcedValueOfGameTextRef",
           "description": "The description, from `vehicleDescription` of the vehicle parameters.",
           "x-gameText": true
         },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
         "guid": {
-          "$ref": "#/$defs/Guid",
-          "description": "The GUID of the Record."
+          "$ref": "#/$defs/SourcedValueOfGuid"
         },
         "hullHealth": {
           "description": "The hull hit points: the sum of the positive `damageMax` of the structural parts of the\nvehicle implementation, rounded to four decimals. `null` without a vehicle implementation\nor when no part states a `damageMax`.",
@@ -43367,15 +43364,8 @@
           ]
         },
         "insurance": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/ShipInsurance"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The claim and expedite values of the ship's `SEntityInsuranceProperties`; `null` when the\nRecord has none."
+          "$ref": "#/$defs/SourcedValueOfShipInsurance",
+          "description": "The original selected static insurance declaration and parameter states."
         },
         "mass": {
           "description": "The hull mass in kilograms, without the Loadout, the docked vehicles and the landing gear:\nthe sum of the `mass` of the parts of the vehicle implementation after the Modification\nthe ship selects, rounded to four decimals. `null` when neither the parts nor the physics\ncontroller state one, never 0.",
@@ -43392,6 +43382,9 @@
             "null"
           ]
         },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
         "name": {
           "$ref": "#/$defs/SourcedValueOfPublicNameRef",
           "description": "The name, from `vehicleName` of the vehicle parameters."
@@ -43403,21 +43396,29 @@
             "null"
           ]
         },
+        "playabilityInputs": {
+          "$ref": "#/$defs/ShipPlayabilityInputs",
+          "description": "Authored crew-manifest inputs, independently of the derived playability result."
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
         "recordPath": {
-          "description": "The record path, without `.xml`.",
-          "type": "string"
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "role": {
           "$ref": "#/$defs/SourcedValueOfPublicNameRef",
           "description": "The role, from `vehicleRole`, e.g. `@vehicle_class_lightfreight`."
         },
         "size": {
-          "description": "The item size of `AttachDef.Size`, `null` without one.",
-          "format": "int64",
-          "type": [
-            "integer",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber",
+          "description": "The original `Size` of the selected `AttachDef`."
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "variantOf": {
           "anyOf": [
@@ -43431,11 +43432,8 @@
           "description": "The GUID of the base of the variant group the ship belongs to: the ships that share the\nvehicle definition and the vehicle implementation after the Modification. `null` for a base\nand for a ship that is alone in its group. It is the `guid` of an entry of `ships`."
         },
         "vehicleDefinition": {
-          "description": "The path of the vehicle definition XML, `null` without one.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The exact authored vehicle selector, independently of normalized Archive lookup paths."
         },
         "vehicleKind": {
           "description": "Spaceship or ground vehicle, `null` when the record path and the vehicle implementation\ndo not settle it. Today one of `spaceship` and `groundVehicle`; the schema keeps a string,\nas a new value is additive.",
@@ -43457,16 +43455,22 @@
         "className",
         "crewSize",
         "description",
+        "fileName",
         "guid",
         "hullHealth",
         "insurance",
         "mass",
         "massBasis",
+        "metadataTag",
         "name",
         "playability",
+        "playabilityInputs",
+        "recordIndex",
+        "recordName",
         "recordPath",
         "role",
         "size",
+        "sourceType",
         "variantOf",
         "vehicleDefinition",
         "vehicleKind",
@@ -43495,53 +43499,70 @@
       "type": "object"
     },
     "ShipInsurance": {
-      "description": "The insurance data of a ship: the `SEntityInsuranceProperties` of its\n`StaticEntityClassData`, the numbers of its `ShipInsuranceParams`. The Record states no claim\ncost; `expediteFee` is the only fee in aUEC.",
+      "description": "The selected original static insurance declaration and its independent parameter state.",
       "properties": {
-        "baseWaitTimeMinutes": {
-          "description": "`baseWaitTimeMinutes` in minutes; inferred meaning: the claim time. `null` when the Record\nstates none.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "expediteFee": {
-          "description": "`baseExpeditingFee` of the Record in aUEC, the only fee in the Record; `null` when the\nRecord states none.",
-          "format": "int64",
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "mandatoryWaitTimeMinutes": {
-          "description": "`mandatoryWaitTimeMinutes` in minutes; inferred meaning: the shortest claim time. `null`\nwhen the Record states none.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
         },
         "restoreOnClaim": {
-          "description": "`restoreOnClaim`, a boolean; inferred meaning: whether a claim restores the ship with its\nLoadout. `null` when the Record states none.",
-          "type": [
-            "boolean",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfboolean"
         },
-        "shipEntityClassName": {
-          "description": "`shipEntityClassName` of the insurance parameters, e.g. `AEGS_Gladius`; `null` when it is\nempty.",
-          "type": [
-            "string",
-            "null"
-          ]
+        "shipInsuranceParams": {
+          "$ref": "#/$defs/SourcedValueOfShipInsuranceParams"
+        },
+        "staticElementOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
         }
       },
       "required": [
+        "additionalFields",
+        "restoreOnClaim",
+        "shipInsuranceParams",
+        "staticElementOrdinal"
+      ],
+      "type": "object"
+    },
+    "ShipInsuranceParams": {
+      "description": "Exact original insurance parameters, with wait values in minutes and expedite fee in aUEC.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "baseWaitTimeMinutes": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "expediteFee": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "mandatoryWaitTimeMinutes": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "shipEntityClassName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
         "baseWaitTimeMinutes",
         "expediteFee",
         "mandatoryWaitTimeMinutes",
-        "restoreOnClaim",
         "shipEntityClassName"
+      ],
+      "type": "object"
+    },
+    "ShipPlayabilityInputs": {
+      "description": "The selected authored crew-manifest link, independently of resolved crew membership.",
+      "properties": {
+        "crewManifest": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "crewManifestComponentOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        }
+      },
+      "required": [
+        "crewManifest",
+        "crewManifestComponentOrdinal"
       ],
       "type": "object"
     },
@@ -122549,6 +122570,266 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/ShieldStun"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfShipInsurance": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ShipInsurance"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfShipInsuranceParams": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ShipInsuranceParams"
               }
             }
           }

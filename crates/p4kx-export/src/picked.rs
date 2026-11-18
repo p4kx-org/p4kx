@@ -55,11 +55,11 @@ pub(crate) enum Picked<'f> {
     /// An item and the configurations read from its original Record.
     Item(Box<PickedItem<'f>>),
     /// A ship and the vehicle facts its paints are derived from.
-    Ship(Ship<'f>, VehicleFacts),
+    Ship(Box<Ship<'f>>, VehicleFacts),
     /// A commodity.
     Commodity(Box<Commodity<'f>>),
     /// A resource group.
-    ResourceGroup(ResourceGroup<'f>),
+    ResourceGroup(Box<ResourceGroup<'f>>),
     /// A resource definition with its authored source properties.
     ResourceType(Box<ResourceType<'f>>),
     /// A blueprint category.
@@ -262,7 +262,7 @@ impl<'f> Picked<'f> {
         Ok(match read {
             Ok(read) => {
                 let (ship, vehicle) = build(&read)?;
-                Self::Ship(ship, vehicle)
+                Self::Ship(Box::new(ship), vehicle)
             }
             Err(failure) => Self::Failed(failure),
         })

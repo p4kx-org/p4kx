@@ -123,6 +123,19 @@ fn a_ship_that_changed_its_class_name_makes_the_slug_stale() {
 }
 
 #[test]
+fn a_guid_alias_does_not_hide_a_matching_class() {
+    let slugs = with_ok(&mapped("Aurora-ES", 1, "RSI_Aurora_GS_ES", AURORA, false));
+    let mapped = ship("RSI_Aurora_GS_ES", AURORA);
+    let alias = ship("RSI_Aurora_Alias", AURORA);
+    let other = ship("RSI_Ok", OK);
+    for ships in [[mapped, alias, other], [alias, mapped, other]] {
+        let resolved = slugs.resolve(ships, false);
+        assert_eq!(resolved.summary.resolved, 2);
+        assert_eq!(resolved.summary.stale, Vec::<String>::new());
+    }
+}
+
+#[test]
 fn a_retired_slug_is_exported_flagged_without_a_ship() {
     let slugs = StoreSlugs::parse(&data(&mapped("Old", 1, "RSI_Old", GONE, true))).unwrap();
     let resolved = slugs.resolve([ship("RSI_Aurora_GS_ES", AURORA)], false);

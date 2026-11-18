@@ -1,26 +1,21 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::cell::RefCell;
-
-use p4kx_extraction::{CancelToken, RecordTree, SourceUseRole, SourceValue, SourcedValue, Value};
+use p4kx_extraction::{SourceUseRole, SourceValue, SourcedValue, Value};
 
 use super::{Fact, Observed};
 use crate::CatalogError;
 use crate::catalog_projection::CatalogProjection;
-use crate::catalog_read::original::{ComponentSelection, OriginalFlowFields, OriginalValuePart};
+use crate::catalog_read::original::{
+    OriginalArraySelection, OriginalFlowFields, OriginalValuePart,
+};
 use crate::catalog_text_contract::{GameTextRef, PublicNameRef};
-use crate::record_fields;
-use crate::record_observation::RecordObservation;
 use crate::source_fields::FieldError;
-use crate::template_field_capture::TemplateFieldCapture;
 
 #[path = "ship_manufacturers.rs"]
 mod manufacturers;
 
 pub(crate) use self::manufacturers::{ShipAttachmentManufacturer, ShipVehicleManufacturer};
-
-const ATTACHABLE: &str = "SAttachableComponentParams";
 
 pub(crate) struct ShipPresentation<'source> {
     pub(crate) vehicle_manufacturer: ShipVehicleManufacturer<'source>,
@@ -29,6 +24,7 @@ pub(crate) struct ShipPresentation<'source> {
     pub(crate) description: SourcedValue<GameTextRef>,
     pub(crate) role: SourcedValue<PublicNameRef>,
     pub(crate) career: SourcedValue<PublicNameRef>,
+    pub(crate) size: SourcedValue<crate::resource_number::ResourceNumber>,
 }
 
 struct ShipTexts {
@@ -38,46 +34,42 @@ struct ShipTexts {
     career: SourcedValue<PublicNameRef>,
 }
 
-pub(crate) fn read<'source>(
-    tree: &RecordTree<'source>,
+pub(super) fn read<'source>(
+    fields: Observed<'_, '_, '_, 'source>,
     projection: &CatalogProjection<'_, 'source>,
-    admission: &RecordObservation<'_, 'source>,
-    cancel: Option<&CancelToken>,
     vehicle: Option<&Value<'source>>,
+    selection: &OriginalArraySelection,
+    attachment: Option<&Value<'source>>,
+    attachment_selection: &OriginalArraySelection,
 ) -> Result<(ShipPresentation<'source>, Vec<FieldError>), CatalogError> {
-    let input = projection.original();
-    let scope = input.record_scope(admission.record(), tree)?;
-    let originals = OriginalFlowFields::read(&scope, cancel)?;
-    let selection = originals.component_selection(vehicle)?;
-    let capture = TemplateFieldCapture::new(&originals, input, admission)?;
-    let numbers = RefCell::new(Vec::new());
-    let fields = Observed::definition(&originals, input, &capture, &numbers);
+    let originals = fields.originals;
     let mut notes = Vec::new();
     let texts = match vehicle {
         Some(selected) => read_component_texts(
             fields.at_owner(originals.fact(selected)?),
-            &selection,
+            selection,
             projection,
             &mut notes,
         )?,
         None => ShipTexts {
-            name: missing_component(&originals, &selection),
-            description: missing_component(&originals, &selection),
-            role: missing_component(&originals, &selection),
-            career: missing_component(&originals, &selection),
+            name: missing_component(originals, selection),
+            description: missing_component(originals, selection),
+            role: missing_component(originals, selection),
+            career: missing_component(originals, selection),
         },
     };
-    let vehicle_manufacturer = manufacturers::vehicle(fields, vehicle, &selection, &mut notes)?;
-    let attachment = record_fields::component_occurrence(tree, ATTACHABLE).map(|(value, _)| value);
-    let attachment_manufacturer = manufacturers::attachment(fields, attachment, &mut notes)?;
+    let vehicle_manufacturer = manufacturers::vehicle(fields, vehicle, selection, &mut notes)?;
+    let attachment =
+        manufacturers::attachment(fields, attachment, attachment_selection, &mut notes)?;
     Ok((
         ShipPresentation {
             vehicle_manufacturer,
-            attachment_manufacturer,
+            attachment_manufacturer: attachment.manufacturer,
             name: texts.name,
             description: texts.description,
             role: texts.role,
             career: texts.career,
+            size: attachment.size,
         },
         notes,
     ))
@@ -85,7 +77,7 @@ pub(crate) fn read<'source>(
 
 fn missing_component<T>(
     originals: &OriginalFlowFields<'_, '_, '_>,
-    selection: &ComponentSelection,
+    selection: &OriginalArraySelection,
 ) -> SourcedValue<T> {
     let state = if selection.complete {
         SourceValue::Absent
@@ -99,7 +91,7 @@ fn missing_component<T>(
 
 fn read_component_texts<'source>(
     fields: Observed<'_, '_, '_, 'source>,
-    selection: &ComponentSelection,
+    selection: &OriginalArraySelection,
     projection: &CatalogProjection<'_, 'source>,
     notes: &mut Vec<FieldError>,
 ) -> Result<ShipTexts, CatalogError> {
@@ -123,7 +115,7 @@ impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
     fn ship_locale<T>(
         &self,
         name: &str,
-        selection: &ComponentSelection,
+        selection: &OriginalArraySelection,
         notes: &mut Vec<FieldError>,
         retain: impl FnOnce(&Fact<'scope, 'read, 'source>) -> Result<T, CatalogError>,
     ) -> Result<SourcedValue<T>, CatalogError> {

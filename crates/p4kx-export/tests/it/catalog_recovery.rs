@@ -306,7 +306,7 @@ fn original_class_links_retain_null_and_dangling_slots() -> TestResult {
 }
 
 #[test]
-fn a_ship_without_insurance_parameters_has_every_field_null() -> TestResult {
+fn a_ship_without_insurance_parameters_retains_the_absent_parameter_state() -> TestResult {
     let forge = DataForgeBuilder::new()
         .version(8)
         .structure(TestStruct::new("StaticEntityClassData"))
@@ -324,16 +324,11 @@ fn a_ship_without_insurance_parameters_has_every_field_null() -> TestResult {
             ))],
         ));
     let (_, catalog) = build_from(&forge, None)?;
-    assert_eq!(
-        catalog["ships"][0]["insurance"],
-        json!({
-            "restoreOnClaim": null,
-            "shipEntityClassName": null,
-            "baseWaitTimeMinutes": null,
-            "mandatoryWaitTimeMinutes": null,
-            "expediteFee": null
-        })
-    );
+    let insurance = proof::cell(&catalog["ships"][0], "insurance", "present")?;
+    let insurance = &insurance["value"];
+    proof::present(insurance, "staticElementOrdinal", &json!(0), Some(true))?;
+    proof::cell(insurance, "restoreOnClaim", "absent")?;
+    proof::cell(insurance, "shipInsuranceParams", "absent")?;
     Ok(())
 }
 

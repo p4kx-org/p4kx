@@ -107,3 +107,21 @@ A selected null/unreadable first component is not replaced with a later one. For
 AttachDef data remains in Item definitions even when the separate constraints family excludes it.
 Respect the source-set completeness on selection and derived cells. These changes do not establish
 complete root-Item/Ship/Loadout provenance or another output compatibility mode.
+
+
+## Ship DCB/static source fields
+
+Re-export original inputs to obtain canonical `ships` rows in schema v3.
+
+| Earlier Ship field | Current schema 3 |
+| --- | --- |
+| `guid`, `className`, `recordPath` | Corresponding sourced Header cells. recordName, recordIndex, sourceType, fileName and metadataTag complete the shared original Header. Join physical owners by recordIndex.value. |
+| `crewSize`, `size` | Sourced exact ResourceNumber. Read the original numeric type and value or IEEE bits. |
+| `vehicleDefinition` | Sourced original String/Enum, including empty strings and whitespace. The XML reader normalizes the path for lookup. |
+| `insurance` | Sourced first static declaration. Read value.staticElementOrdinal, value.restoreOnClaim and the independent value.shipInsuranceParams state. |
+| Insurance class name, wait times and expedite fee | Sourced fields under `insurance.value.shipInsuranceParams.value`. Empty class names stay present and numbers retain their original widths and bits. `expediteFee` reads `baseExpeditingFee` in aUEC. |
+| Crew-manifest input | `playabilityInputs.crewManifestComponentOrdinal` and `crewManifest` retain physical selection, the original reference and target header state. |
+
+Each typed insurance leaf retains the parent choice uncertainty. A known absent declaration,
+a null parameter pointer, an unreadable earlier static slot and a present zero/false/empty value
+remain distinct.

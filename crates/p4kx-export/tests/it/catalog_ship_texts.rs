@@ -4,6 +4,7 @@
 use p4kx_export::{Language, build_catalog};
 use p4kx_extraction::Archive;
 use p4kx_testkit::{GlobalIniBuilder, TestEntry};
+use serde_json::Value;
 
 use super::{TestResult, catalog_with, options};
 use crate::catalog_fixture;
@@ -59,19 +60,16 @@ fn ship_texts_join_exact_first_component_in_their_own_domains() -> TestResult {
     verify_domain_limits(&catalog)
 }
 
-fn verify_domain_limits(catalog: &serde_json::Value) -> TestResult {
+fn verify_domain_limits(catalog: &Value) -> TestResult {
     let public_names = catalog
         .pointer("/texts/publicNames")
-        .and_then(serde_json::Value::as_array)
+        .and_then(Value::as_array)
         .ok_or("public names")?;
     assert!(
         public_names.iter().all(|name| {
-            name.pointer("/key/value")
-                .and_then(serde_json::Value::as_str)
+            name.pointer("/key/value").and_then(Value::as_str)
                 != Some("@fixture_unused_second_vehicle_name")
-                && name
-                    .pointer("/key/value")
-                    .and_then(serde_json::Value::as_str)
+                && name.pointer("/key/value").and_then(Value::as_str)
                     != Some("@vehicle_DescACAS_Ship")
         }),
         "later components and protected description keys do not enter public names"
@@ -80,7 +78,9 @@ fn verify_domain_limits(catalog: &serde_json::Value) -> TestResult {
         .as_array()
         .ok_or("ships")?
         .iter()
-        .find(|entry| entry["className"] == "ACAS_Rover")
+        .find(|entry| {
+            entry.pointer("/className/value").and_then(Value::as_str) == Some("ACAS_Rover")
+        })
         .ok_or("rover")?;
     let blank = &rover["career"];
     direct(blank)?;
@@ -118,11 +118,11 @@ fn ship_name_has_english_german_and_french_display_forms() -> TestResult {
     )?;
     let archive = Archive::open_with_key(path, Some(p4kx_testkit::test_key()))?;
     let built = build_catalog(&archive, &options())?;
-    let catalog: serde_json::Value = serde_json::from_slice(built.json())?;
+    let catalog: Value = serde_json::from_slice(built.json())?;
     let name = &catalog["ships"][0]["name"]["value"];
     let row = catalog
         .pointer("/texts/publicNames")
-        .and_then(serde_json::Value::as_array)
+        .and_then(Value::as_array)
         .ok_or("public names")?
         .iter()
         .find(|row| row["id"]["value"] == *name)

@@ -3,6 +3,9 @@
 
 //! The ship base data in the `ships` kind of the P4KX catalog, through the public API.
 
+#[path = "catalog_ship_physical_identity.rs"]
+mod physical_identity;
+
 use crate::ship_base_fixture::{
     ALPHA, BETA, BROKEN, CAR, DISPLAY, GROUND, GUN_DISPLAY, HUGE, MIXED, ROLLING, TEMP, UNKNOWN,
     write_archive,
@@ -70,7 +73,7 @@ fn ship(built: &Built, value: u128) -> Result<&Value, Box<dyn Error>> {
     let wanted = guid(value);
     ships(built)?
         .iter()
-        .find(|ship| ship["guid"] == wanted.as_str())
+        .find(|ship| ship.pointer("/guid/value").and_then(Value::as_str) == Some(wanted.as_str()))
         .ok_or_else(|| format!("no ship {wanted}").into())
 }
 
@@ -86,7 +89,11 @@ fn mass_hull_cargo_size_and_kind_come_from_the_ship_base_data() -> TestResult {
         "the docked snub craft's grid is not counted"
     );
     assert_eq!(alpha["cargoGridsWithIssue"], 0);
-    assert_eq!(alpha["size"], 3);
+    assert_eq!(alpha["size"]["state"], "present");
+    assert_eq!(
+        alpha["size"]["value"],
+        serde_json::json!({"type": "int32", "value": 3})
+    );
     assert_eq!(alpha["vehicleKind"], "spaceship");
     let beta = ship(&built, BETA)?;
     assert_eq!(beta["mass"], 1270.0, "the Modification's patch is applied");
@@ -99,9 +106,10 @@ fn every_catalog_ship_equals_its_ship_base_data() -> TestResult {
     let built = build()?;
     assert_eq!(ships(&built)?.len(), built.bases.len());
     for base in &built.bases {
+        let guid = base.guid.to_string();
         let entry = ships(&built)?
             .iter()
-            .find(|ship| ship["guid"] == base.guid.to_string().as_str())
+            .find(|ship| ship.pointer("/guid/value").and_then(Value::as_str) == Some(guid.as_str()))
             .ok_or_else(|| format!("{} is not in the catalog", base.class_name))?;
         let json = |value: Option<f64>| value.map_or(Value::Null, Value::from);
         assert_eq!(entry["mass"], json(base.mass.as_ref().map(|m| m.kg)));
@@ -116,10 +124,17 @@ fn every_catalog_ship_equals_its_ship_base_data() -> TestResult {
         assert_eq!(entry["massBasis"], basis, "{}", base.class_name);
         assert_eq!(entry["cargoScu"], json(base.cargo.scu));
         assert_eq!(entry["cargoGridsWithIssue"], base.cargo.grids_with_issue);
-        assert_eq!(
-            entry["size"],
-            base.size.as_ref().map_or(Value::Null, |s| s.value.into())
-        );
+        let size = &entry["size"];
+        if let Some(expected) = &base.size {
+            assert_eq!(size["state"], "present");
+            assert_eq!(
+                size["value"],
+                serde_json::json!({"type": "int32", "value": expected.value})
+            );
+        } else {
+            assert_eq!(size["state"], "absent");
+            assert!(size["value"].is_null(), "the ship has no authored size");
+        }
         assert_eq!(
             entry["vehicleKind"],
             base.vehicle_kind
@@ -136,7 +151,8 @@ fn a_value_that_cannot_be_determined_is_null_and_never_zero() -> TestResult {
     let built = build()?;
     let broken = ship(&built, BROKEN)?;
     assert!(broken["mass"].is_null() && broken["massBasis"].is_null());
-    assert!(broken["hullHealth"].is_null() && broken["size"].is_null());
+    assert!(broken["hullHealth"].is_null());
+    crate::health_origin_assertions::cell(broken, "size", "absent")?;
     let unknown = ship(&built, UNKNOWN)?;
     assert!(
         unknown["cargoScu"].is_null(),

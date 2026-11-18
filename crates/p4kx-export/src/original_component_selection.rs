@@ -7,8 +7,8 @@ use super::OriginalFlowFields;
 use crate::catalog_read::original::OriginalValuePart;
 use crate::{CatalogError, ExportAccountingError};
 
-/// The original component declarations consulted up to the chosen occurrence.
-pub(crate) struct ComponentSelection {
+/// The original root-array declarations consulted up to the chosen occurrence.
+pub(crate) struct OriginalArraySelection {
     pub(crate) uses: Vec<SourceUse>,
     pub(crate) complete: bool,
 }
@@ -18,12 +18,21 @@ impl OriginalFlowFields<'_, '_, '_> {
     pub(crate) fn component_selection(
         &self,
         selected: Option<&Value<'_>>,
-    ) -> Result<ComponentSelection, CatalogError> {
-        let mut evidence = ComponentSelection {
+    ) -> Result<OriginalArraySelection, CatalogError> {
+        self.root_array_selection("Components", selected)
+    }
+
+    /// Observes an actual root-array prefix through its selected original occurrence.
+    pub(crate) fn root_array_selection(
+        &self,
+        name: &str,
+        selected: Option<&Value<'_>>,
+    ) -> Result<OriginalArraySelection, CatalogError> {
+        let mut evidence = OriginalArraySelection {
             uses: Vec::new(),
             complete: true,
         };
-        let Some((_, root)) = self.field(None, "Components")? else {
+        let Some((_, root)) = self.field(None, name)? else {
             if selected.is_some() {
                 return Err(ExportAccountingError::ConflictingSourceDatum.into());
             }
@@ -38,7 +47,7 @@ impl OriginalFlowFields<'_, '_, '_> {
                 evidence
                     .uses
                     .push(root.observe(OriginalValuePart::Value, SourceUseRole::Selector)?);
-                self.component_prefix(values, selected, &mut evidence)?;
+                self.array_prefix(values, selected, &mut evidence)?;
             }
             _ if selected.is_some() => {
                 return Err(ExportAccountingError::ConflictingSourceDatum.into());
@@ -56,11 +65,11 @@ impl OriginalFlowFields<'_, '_, '_> {
         Ok(evidence)
     }
 
-    fn component_prefix(
+    fn array_prefix(
         &self,
         values: &[Value<'_>],
         selected: Option<&Value<'_>>,
-        evidence: &mut ComponentSelection,
+        evidence: &mut OriginalArraySelection,
     ) -> Result<(), CatalogError> {
         for value in values {
             let fact = self.fact(value)?;

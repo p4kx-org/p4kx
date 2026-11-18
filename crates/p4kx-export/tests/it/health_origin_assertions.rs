@@ -13,6 +13,10 @@ pub(crate) fn at<'a>(value: &'a Value, path: &str) -> TestResult<&'a Value> {
 pub(crate) fn rows<'a>(value: &'a Value, path: &str) -> TestResult<&'a [Value]> {
     Ok(at(value, path)?.as_array().ok_or("actual product rows")?)
 }
+pub(crate) fn single_number(value: f32) -> Result<Value, serde_json::Error> {
+    let finite: Value = serde_json::from_str(&serde_json::to_string(&value)?)?;
+    Ok(json!({"type": "f32", "rawBits": format!("{:08x}", value.to_bits()), "finite": finite}))
+}
 pub(crate) fn cell<'a>(row: &'a Value, field: &str, state: &str) -> TestResult<&'a Value> {
     let value = row
         .get(field)

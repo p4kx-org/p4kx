@@ -5,7 +5,7 @@ use p4kx_extraction::{RecordTree, TreeBuilder};
 
 use super::Scan;
 use crate::catalog_projection::CatalogProjection;
-use crate::catalog_v3::authored_fields::ship_presentation;
+use crate::catalog_v3::authored_fields::ship_source_read;
 use crate::catalog_v3::catalog_harvest_modules::harvest_provider;
 use crate::catalog_v3::catalog_item_components::item_definition::ItemDefinition;
 use crate::catalog_v3::catalog_item_components::{self, ItemComponentsRead, resolution};
@@ -21,10 +21,9 @@ use crate::item_class::ClassLine;
 use crate::loot_kinds::LootPick;
 use crate::mining::mineable_entity;
 use crate::picked::{Picked, PickedItem};
-use crate::record_fields;
 use crate::record_observation::RecordObservation;
 use crate::scan_health::ScanError;
-use crate::ship::{self, VEHICLE_COMPONENT};
+use crate::ship;
 use crate::starmap::starmap_object;
 use crate::{CatalogError, Kind, item_stats, item_variant};
 
@@ -318,34 +317,22 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
             self.scan.options.cancel,
         )?;
         ledger.merge(read.ledger);
-        let mut picked = Picked::of_ship(read.read, |read| {
-            let vehicle = record_fields::component_occurrence(tree, VEHICLE_COMPONENT);
-            let (presentation, notes) = ship_presentation::read(
+        Picked::of_ship(read.read, |read| {
+            let mut source = ship_source_read::read(
                 tree,
                 &self.projection,
                 admission,
                 self.scan.options.cancel,
-                vehicle.map(|(value, _)| value),
             )?;
             crate::source_projection_notes::record(
                 Kind::Ships,
                 ExportSourceRole::Selected,
                 admission,
                 tree,
-                notes,
+                std::mem::take(&mut source.notes),
                 ledger,
             )?;
-            Ok(ship::ship(
-                tree,
-                vehicle.map(|(_, fields)| fields),
-                presentation,
-                &self.scan.evidence,
-                read,
-            ))
-        })?;
-        if let Picked::Ship(_, vehicle) = &mut picked {
-            vehicle.source_record_index = Some(record.index());
-        }
-        Ok(picked)
+            ship::ship(tree, source, &self.scan.evidence, read)
+        })
     }
 }

@@ -148,7 +148,7 @@ pub(super) fn assemble<R>(
         collected
             .ships
             .iter()
-            .map(|ship| (ship.guid.0, ship.class_name)),
+            .map(|ship| (ship.identity.guid.0, ship.identity.class_name)),
         options.filter.is_some(),
     );
     let commodity_tables = crate::commodity::tables(&forge, collected.commodities);

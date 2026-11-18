@@ -193,7 +193,7 @@ impl<'scope, 'read, 'source> OriginalFlowFields<'scope, 'read, 'source> {
 
 #[path = "original_component_selection.rs"]
 mod component_selection;
-pub(crate) use component_selection::ComponentSelection;
+pub(crate) use component_selection::OriginalArraySelection;
 #[path = "original_flow_inventory.rs"]
 mod inventory;
 

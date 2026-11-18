@@ -276,38 +276,48 @@ fn ships_are_entity_class_definitions_under_spaceships_and_groundvehicles_withou
 #[test]
 fn a_ship_carries_crew_and_vehicle_definition() -> TestResult {
     let (_, catalog) = catalog_with(&options())?;
-    let mut ship = catalog["ships"][0].as_object().ok_or("ship")?.clone();
-    for field in [
-        "name",
-        "description",
-        "role",
-        "career",
-        "vehicleManufacturer",
-        "attachmentManufacturer",
-    ] {
-        ship.remove(field);
+    let ship = &catalog["ships"][0];
+    let proof = crate::health_origin_assertions::present;
+    proof(
+        ship,
+        "guid",
+        &json!("90000000-0000-4000-8000-000000000001"),
+        Some(true),
+    )?;
+    proof(ship, "className", &json!("ACAS_Ship"), Some(true))?;
+    proof(
+        ship,
+        "recordPath",
+        &json!("libs/foundry/records/entities/spaceships/acas_ship"),
+        Some(true),
+    )?;
+    proof(
+        ship,
+        "crewSize",
+        &json!({"type": "int32", "value": 2}),
+        Some(true),
+    )?;
+    proof(
+        ship,
+        "vehicleDefinition",
+        &json!("scripts/entities/vehicles/implementations/xml/acas_ship.xml"),
+        Some(true),
+    )?;
+    for field in ["size", "insurance"] {
+        crate::health_origin_assertions::cell(ship, field, "absent")?;
     }
-    assert_eq!(
-        Value::Object(ship),
-        json!({
-            "guid": "90000000-0000-4000-8000-000000000001",
-            "className": "ACAS_Ship",
-            "recordPath": "libs/foundry/records/entities/spaceships/acas_ship",
-            "crewSize": 2,
-            "vehicleDefinition": "scripts/entities/vehicles/implementations/xml/acas_ship.xml",
-            "playability": null,
-            "variantOf": null,
-            "vehicleKind": "spaceship",
-            "size": null,
-            "mass": null,
-            "massBasis": null,
-            "hullHealth": null,
-            "cargoScu": 0.0,
-            "cargoGridsWithIssue": 0,
-            "insurance": null,
-        }),
-        "the ship fields"
-    );
+    for field in [
+        "playability",
+        "variantOf",
+        "mass",
+        "massBasis",
+        "hullHealth",
+    ] {
+        assert!(ship[field].is_null(), "the fixture has no {field}");
+    }
+    assert_eq!(ship["vehicleKind"], "spaceship");
+    assert_eq!(ship["cargoScu"], 0.0);
+    assert_eq!(ship["cargoGridsWithIssue"], 0);
     Ok(())
 }
 
@@ -327,6 +337,21 @@ fn the_summary_lists_the_kinds_in_catalog_order() -> TestResult {
 pub(crate) fn entity_field<'a>(row: &'a Value, kind: &str, field: &str) -> Option<&'a Value> {
     match kind {
         "items" => row.get(field)?.get("value"),
+        "ships"
+            if matches!(
+                field,
+                "guid"
+                    | "recordName"
+                    | "className"
+                    | "recordPath"
+                    | "recordIndex"
+                    | "sourceType"
+                    | "fileName"
+                    | "metadataTag"
+            ) =>
+        {
+            row.get(field)?.get("value")
+        }
         "ships" | "crafters" => row.get(field),
         _ => None,
     }

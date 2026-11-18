@@ -69,7 +69,7 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
             admission,
             self.scan.options.cancel,
         )?;
-        Ok((Picked::ResourceGroup(read.value), read.notes))
+        Ok((Picked::ResourceGroup(Box::new(read.value)), read.notes))
     }
 
     pub(super) fn commodity(

@@ -155,14 +155,14 @@ pub(crate) fn with_archive_input(
     check(&forge, &input)
 }
 
-pub(crate) fn with_archive_projection(
+pub(crate) fn with_archive_projection<E: From<CatalogError>>(
     archive: &Archive,
     sources: &TextSources,
     inspect: impl for<'source, 'context> FnOnce(
         &'source DataForge<'source>,
         &CatalogProjection<'context, 'source>,
-    ) -> Result<(), CatalogError>,
-) -> Result<(), CatalogError> {
+    ) -> Result<(), E>,
+) -> Result<(), E> {
     let entry = DataForgeEntry::read(archive).map_err(CatalogError::Load)?;
     let forge = entry.open().map_err(CatalogError::DataForge)?;
     let origins = CatalogOrigins::new(archive, &entry, sources)?;

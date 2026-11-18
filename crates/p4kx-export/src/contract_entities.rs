@@ -5,13 +5,18 @@ use p4kx_extraction::SourcedValue;
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use crate::canonical_record_header::CanonicalRecordHeader;
+use crate::catalog_number_capture::CapturedNumber;
 use crate::catalog_text_contract::{GameTextRef, PublicNameRef};
 use crate::catalog_v3::authored_fields::ship_presentation::{
     ShipAttachmentManufacturer, ShipVehicleManufacturer,
 };
+use crate::catalog_v3::authored_fields::ship_source_read::ShipPlayabilityInputs;
 use crate::contract::every_field_required;
 use crate::contract_insurance::ShipInsurance;
 use crate::guid_text::CatalogGuid;
+use crate::resource_number::ResourceNumber;
+use crate::ship::ShipIdentity;
 use crate::{MassBasis, Playability, VehicleKind};
 
 pub(crate) use crate::item::Item;
@@ -38,12 +43,14 @@ pub(crate) struct Ship<'a> {
     #[serde(skip)]
     #[schemars(skip)]
     pub(crate) source_record_index: u32,
-    /// The GUID of the Record.
-    pub(crate) guid: CatalogGuid,
-    /// The Record name without its type, e.g. `AEGS_Avenger_Titan`.
-    pub(crate) class_name: &'a str,
-    /// The record path, without `.xml`.
-    pub(crate) record_path: &'a str,
+    #[serde(flatten)]
+    pub(crate) header: CanonicalRecordHeader<'a>,
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub(crate) identity: ShipIdentity<'a>,
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub(crate) source_numbers: Vec<CapturedNumber>,
     /// The name, from `vehicleName` of the vehicle parameters.
     pub(crate) name: SourcedValue<PublicNameRef>,
     /// The description, from `vehicleDescription` of the vehicle parameters.
@@ -53,21 +60,21 @@ pub(crate) struct Ship<'a> {
     pub(crate) role: SourcedValue<PublicNameRef>,
     /// The career, from `vehicleCareer`, e.g. `@vehicle_focus_transporter`.
     pub(crate) career: SourcedValue<PublicNameRef>,
-    /// The crew size, `null` without one.
-    pub(crate) crew_size: Option<i64>,
+    /// The original crew-size field of the selected Vehicle component.
+    pub(crate) crew_size: SourcedValue<ResourceNumber>,
     /// The selected `VehicleComponentParams` occurrence and its manufacturer field.
     pub(crate) vehicle_manufacturer: ShipVehicleManufacturer<'a>,
     /// The selected `AttachDef` on the ship and its independent `Manufacturer` field.
     pub(crate) attachment_manufacturer: ShipAttachmentManufacturer<'a>,
-    /// The path of the vehicle definition XML, `null` without one.
-    pub(crate) vehicle_definition: Option<&'a str>,
+    /// The exact authored vehicle selector, independently of normalized Archive lookup paths.
+    pub(crate) vehicle_definition: SourcedValue<&'a str>,
     /// Spaceship or ground vehicle, `null` when the record path and the vehicle implementation
     /// do not settle it. Today one of `spaceship` and `groundVehicle`; the schema keeps a string,
     /// as a new value is additive.
     #[schemars(with = "Option<String>")]
     pub(crate) vehicle_kind: Option<VehicleKind>,
-    /// The item size of `AttachDef.Size`, `null` without one.
-    pub(crate) size: Option<i64>,
+    /// The original `Size` of the selected `AttachDef`.
+    pub(crate) size: SourcedValue<ResourceNumber>,
     /// The hull mass in kilograms, without the Loadout, the docked vehicles and the landing gear:
     /// the sum of the `mass` of the parts of the vehicle implementation after the Modification
     /// the ship selects, rounded to four decimals. `null` when neither the parts nor the physics
@@ -96,7 +103,8 @@ pub(crate) struct Ship<'a> {
     /// vehicle definition and the vehicle implementation after the Modification. `null` for a base
     /// and for a ship that is alone in its group. It is the `guid` of an entry of `ships`.
     pub(crate) variant_of: Option<CatalogGuid>,
-    /// The claim and expedite values of the ship's `SEntityInsuranceProperties`; `null` when the
-    /// Record has none.
-    pub(crate) insurance: Option<ShipInsurance<'a>>,
+    /// The original selected static insurance declaration and parameter states.
+    pub(crate) insurance: SourcedValue<Box<ShipInsurance<'a>>>,
+    /// Authored crew-manifest inputs, independently of the derived playability result.
+    pub(crate) playability_inputs: ShipPlayabilityInputs<'a>,
 }

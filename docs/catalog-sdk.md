@@ -509,3 +509,17 @@ Only the current source tree and the current demanded pool tree are materialized
 The inventory retains the original uses for returned rows and inspected pool admissions.
 Coverage retains failed physical indices. Publish consumer changes only after the outer
 query succeeds.
+
+
+## Ship source fields in the Catalog
+
+The Catalog Ship root uses an original eight-field Header, exact sourced crewSize and size,
+the unmodified authored vehicleDefinition selector, static insurance declarations/parameters
+and an authored CrewManifest link. The shared DCB interpreter reads these values in a single
+field walk and resolves the crew manifest to its Record header.
+
+Use a Catalog snapshot for the Ship row. The header and `vehicleDefinition` document their
+own inputs. Interpreted fields such as playability, XML totals and variants depend on their
+respective readers. See
+[the Ship contract](catalog.md#ship-dcb-source-fields) and
+[ADR-0410](adr/0410-equipment-sdk-shares-original-family-readers-and-canonical-variant-choices.md).

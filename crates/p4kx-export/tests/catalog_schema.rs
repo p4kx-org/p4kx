@@ -124,19 +124,14 @@ fn a_new_value_of_a_closed_value_set_is_additive() -> TestResult {
     );
 
     let mut unknown_values = catalog.clone();
-    for field in [
-        "vehicleKind",
-        "size",
-        "mass",
-        "massBasis",
-        "hullHealth",
-        "cargoScu",
-    ] {
+    for field in ["vehicleKind", "mass", "massBasis", "hullHealth", "cargoScu"] {
         unknown_values["ships"][0][field] = json!(null);
     }
+    unknown_values["ships"][0]["size"]["state"] = json!("absent");
+    unknown_values["ships"][0]["size"]["value"] = Value::Null;
     assert!(
         validator.is_valid(&unknown_values),
-        "every ship base value may be null"
+        "missing ship values retain their nullable payloads"
     );
 
     let mut no_playability = catalog;

@@ -63,7 +63,7 @@ fn rows_of_kind(catalog: &Value, kind: Kind) -> TestResult<&Vec<Value>> {
         .get(path.as_ref())
         .and_then(Value::as_array)
         .ok_or_else(|| format!("required {} rows are missing", kind.name()))?;
-    if kind == Kind::Items {
+    if matches!(kind, Kind::Items | Kind::Ships) {
         for row in rows {
             identity(row, kind)?;
             record_header(row)?;
@@ -180,6 +180,21 @@ pub(crate) fn field<'row>(row: &'row Value, kind: Kind, name: &str) -> TestResul
     let sourced = match kind {
         Kind::Contracts => name == "guid",
         Kind::Items => item_source_field(name),
+        Kind::Ships => matches!(
+            name,
+            "guid"
+                | "recordName"
+                | "className"
+                | "recordPath"
+                | "recordIndex"
+                | "sourceType"
+                | "fileName"
+                | "metadataTag"
+                | "crewSize"
+                | "size"
+                | "vehicleDefinition"
+                | "insurance"
+        ),
         _ => all_fields_sourced(kind),
     };
     if sourced { present(value) } else { Ok(value) }

@@ -87,21 +87,6 @@ pub(crate) fn references(parent: Option<&StructValue<'_>>, name: &str) -> Vec<Ca
         .collect()
 }
 
-/// Returns the first struct of type `type_name` among the elements of the array the field `name`
-/// of `parent` holds.
-pub(crate) fn element<'t, 'f>(
-    parent: Option<&'t StructValue<'f>>,
-    name: &str,
-    type_name: &str,
-) -> Option<&'t StructValue<'f>> {
-    elements(parent, name)
-        .iter()
-        .find_map(|element| match element {
-            Value::Struct(value) if value.type_name() == type_name => Some(value),
-            _ => None,
-        })
-}
-
 /// Returns the localisation key the field `name` of `parent` holds; an empty key is none.
 pub(crate) fn locale_key<'f>(parent: Option<&StructValue<'f>>, name: &str) -> Option<&'f str> {
     match parent?.field(name)? {

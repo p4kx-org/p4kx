@@ -135,7 +135,7 @@ fn opposite_ship_manufacturers_preserve_both_component_selectors_and_targets() -
             .ok_or("original ship Record")?;
         let row = proof::rows(&catalog, "/ships")?
             .iter()
-            .find(|row| row["guid"] == owner.guid().to_string())
+            .find(|row| row["recordIndex"]["value"] == owner.index())
             .ok_or("projected ship")?;
         assert!(
             row.get("manufacturerGuid").is_none(),

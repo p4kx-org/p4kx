@@ -40,6 +40,8 @@ pub(crate) mod authored_manufacturer;
 pub(crate) mod locale_input;
 #[path = "ship_presentation.rs"]
 pub(crate) mod ship_presentation;
+#[path = "ship_source_read.rs"]
+pub(crate) mod ship_source_read;
 #[path = "authored_text_fields.rs"]
 mod text_fields;
 #[path = "authored_unsigned_fields.rs"]

@@ -178,7 +178,7 @@ fn base_class(catalog: &Value, class: &str) -> Option<String> {
     };
     ships
         .iter()
-        .find(|ship| ship["guid"].as_str() == Some(base))
+        .find(|ship| ship.pointer("/guid/value").and_then(Value::as_str) == Some(base))
         .map(|ship| Kind::class(ship, CatalogKind::Ships).to_ascii_lowercase())
 }
 
@@ -215,7 +215,12 @@ fn print_family(catalog: &Value, needle: &str) {
     let ships = catalog["ships"].as_array().map_or(&[][..], Vec::as_slice);
     let by_guid: HashMap<&str, &str> = ships
         .iter()
-        .filter_map(|ship| Some((ship["guid"].as_str()?, ship["className"].as_str()?)))
+        .filter_map(|ship| {
+            Some((
+                ship.pointer("/guid/value").and_then(Value::as_str)?,
+                ship.pointer("/className/value").and_then(Value::as_str)?,
+            ))
+        })
         .collect();
     for ship in ships {
         let class = Kind::class(ship, CatalogKind::Ships);
@@ -225,7 +230,8 @@ fn print_family(catalog: &Value, needle: &str) {
                 .and_then(|guid| by_guid.get(guid));
             print_line(&format!(
                 "  {class}: definition {}, playability {}, variantOf {}",
-                ship["vehicleDefinition"],
+                ship.pointer("/vehicleDefinition/value")
+                    .unwrap_or(&Value::Null),
                 ship["playability"],
                 base.copied().unwrap_or("-")
             ));

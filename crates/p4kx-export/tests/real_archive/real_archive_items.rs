@@ -14,7 +14,9 @@ use p4kx_testkit::real_archive_path;
 use serde_json::Value;
 
 use crate::catalog_v3_consumer;
-use crate::real_archive_canonical_texts::ItemPresentationIndex;
+use crate::real_archive_canonical_texts::{
+    ItemPresentationIndex, TextDomain, TextIndex, TextReferenceShape,
+};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -182,15 +184,21 @@ fn check_ships(catalog: &Value) -> TestResult {
     let ships = list(catalog, "ships")?;
     let titan = ships
         .iter()
-        .find(|ship| ship["className"] == "AEGS_Avenger_Titan")
+        .find(|ship| {
+            ship.pointer("/className/value").and_then(Value::as_str) == Some("AEGS_Avenger_Titan")
+        })
         .ok_or("the Avenger Titan")?;
     assert!(
-        titan["crewSize"].as_i64().is_some_and(|crew| crew >= 1),
+        titan
+            .pointer("/crewSize/value/value")
+            .and_then(Value::as_i64)
+            .is_some_and(|crew| crew >= 1),
         "crew"
     );
     assert!(
-        titan["vehicleDefinition"]
-            .as_str()
+        titan
+            .pointer("/vehicleDefinition/value")
+            .and_then(Value::as_str)
             .is_some_and(|path| path.to_ascii_lowercase().ends_with(".xml")),
         "vehicle definition"
     );
@@ -198,19 +206,27 @@ fn check_ships(catalog: &Value) -> TestResult {
         crate::real_archive_catalog_links::vehicle_manufacturer(titan).is_some(),
         "authored vehicle manufacturer"
     );
-    for text in ["name", "role", "career"] {
+    let texts = TextIndex::new(catalog)?;
+    for field in ["name", "role", "career"] {
+        let carrier = titan.get(field).ok_or("sourced Ship text reference")?;
+        let text = texts
+            .reference(
+                carrier,
+                TextDomain::PublicName,
+                TextReferenceShape::Required,
+            )?
+            .ok_or("Ship public-name target")?;
         assert!(
-            titan
-                .pointer(&format!("/{text}/key"))
+            text.source()
+                .pointer("/key/value")
                 .and_then(Value::as_str)
                 .is_some_and(|key| key.starts_with('@')),
-            "{text} key"
+            "{field} key"
         );
+        if field == "name" {
+            assert!(text.shown("en")?.is_string(), "English Ship name");
+        }
     }
-    assert!(
-        titan.pointer("/name/en").is_some_and(Value::is_string),
-        "English name"
-    );
     Ok(())
 }
 

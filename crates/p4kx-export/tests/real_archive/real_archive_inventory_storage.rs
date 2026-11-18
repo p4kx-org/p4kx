@@ -12,6 +12,8 @@ use p4kx_extraction::{
 use p4kx_testkit::{real_archive_key, real_archive_path};
 use serde_json::Value;
 
+use crate::catalog_v3_consumer;
+
 use crate::real_archive_item_components::{self as components, cell, owned, single};
 use crate::real_archive_item_durability::{self as proof, Trace};
 
@@ -180,11 +182,21 @@ impl<'read, 'source> Verification<'read, 'source> {
                 wearable = true;
             } else {
                 let guid = tree.guid().to_string();
-                if !ships
-                    .iter()
-                    .any(|ship| ship["guid"] == guid && ship["recordPath"] == tree.record_path())
-                {
+                let mut matches = ships.iter().filter(|ship| {
+                    ship.pointer("/recordIndex/value").and_then(Value::as_u64)
+                        == Some(u64::from(tree.record_index()))
+                });
+                let Some(ship) = matches.next() else {
                     continue;
+                };
+                if matches.next().is_some()
+                    || catalog_v3_consumer::present(&ship["recordIndex"])?.as_u64()
+                        != Some(u64::from(tree.record_index()))
+                    || catalog_v3_consumer::present(&ship["guid"])?.as_str() != Some(guid.as_str())
+                    || catalog_v3_consumer::present(&ship["recordPath"])?.as_str()
+                        != Some(tree.record_path())
+                {
+                    return Err("Ship bounds differ from the physical source owner".into());
                 }
                 self.check_owner(row, &tree, original, component)?;
                 owned(component, row, "maxBoundingBoxSize", compare_vector)?;

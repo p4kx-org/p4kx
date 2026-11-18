@@ -43,7 +43,7 @@ fn ship(catalog: &Value, value: u128) -> Result<&Value, Box<dyn Error>> {
         .as_array()
         .into_iter()
         .flatten()
-        .find(|ship| ship["guid"] == wanted.as_str())
+        .find(|ship| ship.pointer("/guid/value").and_then(Value::as_str) == Some(wanted.as_str()))
         .ok_or_else(|| format!("no ship {wanted}").into())
 }
 
@@ -51,43 +51,68 @@ fn ship(catalog: &Value, value: u128) -> Result<&Value, Box<dyn Error>> {
 fn a_ship_carries_the_claim_and_expedite_values_of_its_record() -> TestResult {
     let catalog = build()?;
     let insured = ship(&catalog, INSURED)?;
+    let insurance = proof::cell(insured, "insurance", "present")?;
+    let insurance = &insurance["value"];
+    proof::present(insurance, "staticElementOrdinal", &json!(0), Some(true))?;
+    proof::present(insurance, "restoreOnClaim", &json!(true), Some(true))?;
+    let params = proof::cell(insurance, "shipInsuranceParams", "present")?;
+    let params = &params["value"];
+    proof::present(
+        params,
+        "shipEntityClassName",
+        &json!("AEGS_Insured"),
+        Some(true),
+    )?;
+    proof::present(
+        params,
+        "baseWaitTimeMinutes",
+        &proof::single_number(5.83)?,
+        Some(true),
+    )?;
+    proof::present(
+        params,
+        "mandatoryWaitTimeMinutes",
+        &proof::single_number(1.94)?,
+        Some(true),
+    )?;
+    proof::present(
+        params,
+        "expediteFee",
+        &json!({"type": "uint32", "value": 2335}),
+        Some(true),
+    )?;
     assert_eq!(
-        insured["insurance"],
-        json!({
-            "restoreOnClaim": true,
-            "shipEntityClassName": "AEGS_Insured",
-            "baseWaitTimeMinutes": 5.83,
-            "mandatoryWaitTimeMinutes": 1.94,
-            "expediteFee": 2335
-        })
-    );
-    assert_eq!(
-        insured["recordPath"], "libs/foundry/records/entities/spaceships/aegs_insured",
+        insured["recordPath"]["value"], "libs/foundry/records/entities/spaceships/aegs_insured",
         "the source path is the ship's record path"
     );
     Ok(())
 }
 
 #[test]
-fn a_ship_without_insurance_properties_has_null() -> TestResult {
+fn a_ship_without_insurance_properties_has_an_absent_state() -> TestResult {
     let catalog = build()?;
-    assert_eq!(ship(&catalog, UNINSURED)?["insurance"], Value::Null);
+    proof::cell(ship(&catalog, UNINSURED)?, "insurance", "absent")?;
     Ok(())
 }
 
 #[test]
 fn empty_values_of_a_ground_vehicle_stay_facts() -> TestResult {
     let catalog = build()?;
-    assert_eq!(
-        ship(&catalog, BARE)?["insurance"],
-        json!({
-            "restoreOnClaim": false,
-            "shipEntityClassName": null,
-            "baseWaitTimeMinutes": 0.0,
-            "mandatoryWaitTimeMinutes": 0.0,
-            "expediteFee": 0
-        })
-    );
+    let insurance = proof::cell(ship(&catalog, BARE)?, "insurance", "present")?;
+    let insurance = &insurance["value"];
+    proof::present(insurance, "restoreOnClaim", &json!(false), Some(true))?;
+    let params = proof::cell(insurance, "shipInsuranceParams", "present")?;
+    let params = &params["value"];
+    proof::present(params, "shipEntityClassName", &json!(""), Some(true))?;
+    for field in ["baseWaitTimeMinutes", "mandatoryWaitTimeMinutes"] {
+        proof::present(params, field, &proof::single_number(0.0)?, Some(true))?;
+    }
+    proof::present(
+        params,
+        "expediteFee",
+        &json!({"type": "uint32", "value": 0}),
+        Some(true),
+    )?;
     Ok(())
 }
 

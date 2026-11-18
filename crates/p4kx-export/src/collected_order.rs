@@ -19,7 +19,8 @@ impl Collected<'_> {
         self.factions
             .sort_by_cached_key(|row| (CatalogGuid(row.physical_guid).text(), row.physical_index));
         sort_by_guid(&mut self.items, |entity| entity.identity.guid);
-        sort_by_guid(&mut self.ships, |entity| entity.guid);
+        self.ships
+            .sort_by_cached_key(|ship| (ship.identity.guid.text(), ship.source_record_index));
         sort_by_guid(&mut self.commodities, |entity| entity.guid);
         self.resource_groups
             .sort_by_cached_key(|row| (row.guid.text(), row.record_index));

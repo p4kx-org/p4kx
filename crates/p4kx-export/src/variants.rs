@@ -73,8 +73,8 @@ impl Collected<'_> {
                 .ships
                 .iter()
                 .map(|ship| Candidate {
-                    guid: ship.guid,
-                    class_name: ship.class_name,
+                    guid: ship.identity.guid,
+                    class_name: ship.identity.class_name,
                     playability: ship.playability,
                     key: ship_keys.get(&ship.source_record_index),
                 })

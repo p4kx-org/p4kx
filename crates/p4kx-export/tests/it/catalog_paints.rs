@@ -247,7 +247,7 @@ fn every_ship_of_an_assignment_is_a_catalog_ship() -> TestResult {
         .as_array()
         .ok_or("ships")?
         .iter()
-        .filter_map(|ship| ship["guid"].as_str())
+        .filter_map(|ship| ship["guid"]["value"].as_str())
         .collect();
     let items: BTreeSet<&str> = catalog["items"]
         .as_array()

@@ -158,7 +158,7 @@ pub(crate) fn add_loadouts<'f>(
         .iter()
         .map(|ship| Wanted {
             record_index: ship.source_record_index,
-            guid: ship.guid,
+            guid: ship.identity.guid,
             kind: EntityKind::Ship,
         })
         .chain(port_items);
@@ -166,7 +166,7 @@ pub(crate) fn add_loadouts<'f>(
         .items
         .iter()
         .map(|item| item.identity.guid.0)
-        .chain(collected.ships.iter().map(|ship| ship.guid.0))
+        .chain(collected.ships.iter().map(|ship| ship.identity.guid.0))
         .collect();
     let built = loadouts(
         files,

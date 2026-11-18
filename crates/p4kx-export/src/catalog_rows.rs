@@ -22,47 +22,7 @@ pub(crate) mod staged;
 /// Captures the actual final row selection independently of successful source projections.
 pub(crate) fn snapshot(collected: &mut Collected<'_>, filter: Option<&Filter>) -> CatalogRows {
     let mut emitted = Vec::new();
-    append(
-        &mut emitted,
-        Kind::Manufacturers,
-        collected
-            .manufacturers
-            .iter()
-            .map(|row| (row.guid.0, row.record_path)),
-    );
-    append(
-        &mut emitted,
-        Kind::Tags,
-        collected
-            .tags
-            .definitions
-            .iter()
-            .map(|row| (row.source.physical.guid, row.source.physical.record_path)),
-    );
-    append(
-        &mut emitted,
-        Kind::Factions,
-        collected
-            .factions
-            .iter()
-            .map(|row| (row.physical_guid, row.physical_path)),
-    );
-    append_resources(&mut emitted, collected);
-    append_explosions_and_ammo(&mut emitted, collected);
-    append(
-        &mut emitted,
-        Kind::Blueprints,
-        collected
-            .blueprints
-            .iter()
-            .map(|row| (row.definition.physical_guid.0, row.definition.physical_path)),
-    );
-    emitted.extend(collected.blueprint_pools.iter().map(|row| CatalogRow {
-        kind: Kind::BlueprintPools,
-        guid: row.physical_guid,
-        record_path: row.physical_path.to_owned(),
-        record_index: Some(row.physical_index),
-    }));
+    append_definition_rows(&mut emitted, collected);
     append_missions(&mut emitted, collected);
     let mut template_numbers = Vec::new();
     let definitions = std::mem::take(&mut collected.contract_templates.proof)
@@ -81,6 +41,56 @@ pub(crate) fn snapshot(collected: &mut Collected<'_>, filter: Option<&Filter>) -
         template_numbers,
         recovery_numbers: Vec::new(),
     }
+}
+
+fn append_definition_rows(emitted: &mut Vec<CatalogRow>, collected: &Collected<'_>) {
+    append(
+        emitted,
+        Kind::Manufacturers,
+        collected
+            .manufacturers
+            .iter()
+            .map(|row| (row.guid.0, row.record_path)),
+    );
+    append(
+        emitted,
+        Kind::Tags,
+        collected
+            .tags
+            .definitions
+            .iter()
+            .map(|row| (row.source.physical.guid, row.source.physical.record_path)),
+    );
+    append(
+        emitted,
+        Kind::Factions,
+        collected
+            .factions
+            .iter()
+            .map(|row| (row.physical_guid, row.physical_path)),
+    );
+    emitted.extend(collected.ships.iter().map(|row| CatalogRow {
+        kind: Kind::Ships,
+        guid: row.identity.guid.0,
+        record_path: row.identity.record_path.to_owned(),
+        record_index: Some(row.source_record_index),
+    }));
+    append_resources(emitted, collected);
+    append_explosions_and_ammo(emitted, collected);
+    append(
+        emitted,
+        Kind::Blueprints,
+        collected
+            .blueprints
+            .iter()
+            .map(|row| (row.definition.physical_guid.0, row.definition.physical_path)),
+    );
+    emitted.extend(collected.blueprint_pools.iter().map(|row| CatalogRow {
+        kind: Kind::BlueprintPools,
+        guid: row.physical_guid,
+        record_path: row.physical_path.to_owned(),
+        record_index: Some(row.physical_index),
+    }));
 }
 
 fn append_explosions_and_ammo(emitted: &mut Vec<CatalogRow>, collected: &Collected<'_>) {

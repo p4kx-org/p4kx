@@ -51,6 +51,20 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
         )
     }
 
+    /// Reads a scalar `Class` or `StrongPointer` through its declared family.
+    pub(in crate::catalog_v3) fn declared_owned<T>(
+        &self,
+        name: &str,
+        notes: &mut Vec<FieldError>,
+        decode: impl FnOnce(Self, &mut Vec<FieldError>) -> Result<T, CatalogError>,
+    ) -> Result<SourcedValue<T>, CatalogError> {
+        if self.storage_type(name)? == Some(DataType::StrongPointer) {
+            self.declared_pointer(name, notes, decode)
+        } else {
+            self.declared_class(name, notes, decode)
+        }
+    }
+
     /// Reads an inline class bound to the expected original declaration.
     pub(in crate::catalog_v3) fn declared_class_to<T>(
         &self,

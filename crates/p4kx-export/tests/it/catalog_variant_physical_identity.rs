@@ -171,7 +171,7 @@ fn ship<'a>(catalog: &'a Value, class: &str) -> TestResult<&'a Value> {
         .ok_or("canonical Ship rows")?;
     let mut matches = rows
         .iter()
-        .filter(|row| row.get("className").and_then(Value::as_str) == Some(class));
+        .filter(|row| row.pointer("/className/value").and_then(Value::as_str) == Some(class));
     let row = matches.next().ok_or("the selected physical class row")?;
     assert!(
         matches.next().is_none(),

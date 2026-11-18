@@ -79,7 +79,8 @@ pub(super) fn projections<'a>(
                 &Path::fields(
                     if matches!(
                         kind,
-                        p4kx_export::Kind::Manufacturers
+                        p4kx_export::Kind::Ships
+                            | p4kx_export::Kind::Manufacturers
                             | p4kx_export::Kind::Commodities
                             | p4kx_export::Kind::ResourceTypes
                             | p4kx_export::Kind::Tags

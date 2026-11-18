@@ -326,14 +326,16 @@ fn compare_ship(
     let mut candidates = catalog
         .ships
         .iter()
-        .filter(|row| text(row, "/recordPath") == Some(path));
+        .filter(|row| index(row, "/recordIndex/value") == Some(u64::from(ship.index())));
     let row = candidates
         .next()
         .ok_or("expected the nominated physical Ship")?;
     let cargo = row.get("cargoScu").ok_or("legacy cargoScu field")?;
     let expected = legacy_total(forge, node);
     if candidates.next().is_some()
-        || text(row, "/guid") != Some(guid.as_str())
+        || present(&row["recordIndex"])?.as_u64() != Some(u64::from(ship.index()))
+        || present(&row["guid"])?.as_str() != Some(guid.as_str())
+        || present(&row["recordPath"])?.as_str() != Some(path)
         || !(cargo.is_null() || cargo.is_number())
         || !same_scu(cargo.as_f64(), expected.scu)
         || index(row, "/cargoGridsWithIssue") != Some(expected.issues)

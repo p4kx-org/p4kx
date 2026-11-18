@@ -3,17 +3,19 @@
 
 use p4kx_extraction::{RecordTree, StructValue, Value};
 
-use crate::catalog_v3::authored_fields::ship_presentation::ShipPresentation;
+use crate::CatalogError;
+use crate::catalog_v3::authored_fields::ship_source_read::ShipSourceRead;
 use crate::contract::Ship;
-use crate::contract_insurance::ShipInsurance;
 use crate::guid_text::CatalogGuid;
 use crate::paint_port::{PaintPort, VehicleFacts};
 use crate::playability_rules::{self, Evidence};
-use crate::record_fields::{
-    boolean, class_name, component, element, elements, integer, number, structure, text,
-};
+use crate::record_fields::{component, elements, structure, text};
 use crate::ship_base::ShipRead;
 use crate::variants::ShipKey;
+
+#[path = "ship_source_identity.rs"]
+mod identity;
+pub(crate) use identity::ShipIdentity;
 
 const PAINTS: &str = "Paints";
 pub(crate) const VEHICLE_COMPONENT: &str = "VehicleComponentParams";
@@ -53,69 +55,52 @@ fn takes_paints(port: &StructValue<'_>) -> bool {
     })
 }
 
-/// Returns the ship the Record tree `tree` describes, its presentation resolved by `presentation` and its
-/// playability decided by `evidence` and its mass, hull, cargo, size and kind taken from `read`,
-/// with the vehicle facts its paints and variant group are derived from.
+/// Projects original Ship fields together with the existing base, playability and paint results.
 pub(crate) fn ship<'f>(
     tree: &RecordTree<'f>,
-    vehicle: Option<&StructValue<'f>>,
-    presentation: ShipPresentation<'f>,
+    source: ShipSourceRead<'_, 'f>,
     evidence: &Evidence,
     read: &ShipRead,
-) -> (Ship<'f>, VehicleFacts) {
+) -> Result<(Ship<'f>, VehicleFacts), CatalogError> {
     let base = &read.base;
+    let identity = ShipIdentity::read(&source.header)?;
+    let playability = playability_rules::ship(tree, source.vehicle, evidence);
+    let presentation = source.presentation;
     let guid = CatalogGuid(tree.guid());
     let ship = Ship {
         source_record_index: tree.record_index(),
-        guid,
-        class_name: class_name(tree),
-        record_path: tree.record_path(),
+        header: source.header,
+        identity,
+        source_numbers: source.numbers,
         name: presentation.name,
         description: presentation.description,
         role: presentation.role,
         career: presentation.career,
-        crew_size: integer(vehicle, "crewSize"),
+        crew_size: source.crew_size,
         vehicle_manufacturer: presentation.vehicle_manufacturer,
         attachment_manufacturer: presentation.attachment_manufacturer,
-        vehicle_definition: text(vehicle, "vehicleDefinition"),
-        playability: playability_rules::ship(tree, vehicle, evidence),
+        vehicle_definition: source.vehicle_definition,
+        playability,
         vehicle_kind: base.vehicle_kind,
-        size: base.size.as_ref().map(|size| size.value),
+        size: presentation.size,
         mass: base.mass.as_ref().map(|mass| mass.kg),
         mass_basis: base.mass.as_ref().map(|mass| mass.basis),
         hull_health: base.hull.as_ref().map(|hull| hull.health),
         cargo_scu: base.cargo.scu,
         cargo_grids_with_issue: base.cargo.grids_with_issue,
         variant_of: None,
-        insurance: insurance(tree),
+        insurance: source.insurance,
+        playability_inputs: source.playability_inputs,
     };
     let facts = VehicleFacts {
-        source_record_index: None,
+        source_record_index: Some(tree.record_index()),
         ship: guid,
         tags: lowered_tags(tree),
         paint_ports: paint_ports(tree),
         implementation: read.paint_ports.clone(),
         variant_key: variant_key(tree, read),
     };
-    (ship, facts)
-}
-
-/// Returns the insurance data of the ship `tree`: its `SEntityInsuranceProperties`, `None` when
-/// the Record has none.
-fn insurance<'f>(tree: &RecordTree<'f>) -> Option<ShipInsurance<'f>> {
-    let properties = element(
-        Some(tree.root()),
-        "StaticEntityClassData",
-        "SEntityInsuranceProperties",
-    )?;
-    let params = structure(Some(properties), "shipInsuranceParams");
-    Some(ShipInsurance {
-        restore_on_claim: boolean(Some(properties), "restoreOnClaim"),
-        ship_entity_class_name: text(params, "shipEntityClassName"),
-        base_wait_time_minutes: number(params, "baseWaitTimeMinutes"),
-        mandatory_wait_time_minutes: number(params, "mandatoryWaitTimeMinutes"),
-        expedite_fee: integer(params, "baseExpeditingFee"),
-    })
+    Ok((ship, facts))
 }
 
 /// Returns what the ship `tree` shares with the ships of its variant group: its vehicle

@@ -29,6 +29,7 @@ mod recovery;
 mod reputation;
 mod resource_groups;
 mod resources;
+mod ships;
 mod slugs;
 mod source_values;
 mod spawns;
@@ -90,42 +91,7 @@ pub(crate) fn minimal_catalog() -> Value {
             "playability": source_values::present(json!("player")),
             "variantOf": null
         }],
-        "ships": [{
-            "guid": "90000000-0000-4000-8000-000000000001",
-            "className": "ACAS_Ship",
-            "recordPath": "libs/foundry/records/entities/spaceships/acas_ship",
-            "name": source_values::source(SourceValue::Absent),
-            "description": source_values::source(SourceValue::Absent),
-            "role": source_values::present(json!("name:27:@vehicle_class_lightfreight")),
-            "career": source_values::source(SourceValue::Absent),
-            "crewSize": 2,
-            "vehicleManufacturer": {
-                "componentOrdinal": source_values::source(SourceValue::Absent),
-                "manufacturer": source_values::source(SourceValue::Absent),
-            },
-            "attachmentManufacturer": {
-                "componentOrdinal": source_values::source(SourceValue::Absent),
-                "attachDefPresent": source_values::source(SourceValue::Absent),
-                "manufacturer": source_values::source(SourceValue::Absent),
-            },
-            "vehicleDefinition": null,
-            "vehicleKind": "spaceship",
-            "size": 3,
-            "mass": 1210.0,
-            "massBasis": "parts",
-            "hullHealth": 600.0,
-            "cargoScu": 18.5,
-            "cargoGridsWithIssue": 0,
-            "playability": "ai",
-            "variantOf": "a0000000-0000-4000-8000-000000000001",
-            "insurance": {
-                "restoreOnClaim": true,
-                "shipEntityClassName": "AEGS_Avenger_Titan",
-                "baseWaitTimeMinutes": 8.5,
-                "mandatoryWaitTimeMinutes": 2.5,
-                "expediteFee": 3200
-            }
-        }],
+        "ships": ships::rows(),
         "definitions": {"items": {"availability": "available", "rows": []}, "contractGenerators": absent_table(), "missionScenarios": absent_table(), "blueprints": blueprints::definitions(), "blueprintPools": blueprints::pools(), "contractTemplates": absent_table(), "missionBrokerEntries": absent_table(), "lootPoolFilters": loot::filters(), "blueprintCategories": blueprint_categories::definitions(), "gameplayProperties": gameplay_properties::definitions(), "qualityDistributions": quality::distributions(), "qualityQuantizations": quality::quantizations(), "resourceTypes": resources::table(), "resourceGroups": resource_groups::definitions(),
             "commodities": commodities::definitions(), "manufacturers": manufacturer(),
             "refiningProcesses": mining::refining(),

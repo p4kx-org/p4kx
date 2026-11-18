@@ -109,7 +109,11 @@ fn catalog() -> Result<&'static Json, Box<dyn Error>> {
 fn ship<'c>(catalog: &'c Json, class_name: &str) -> Result<&'c Json, Box<dyn Error>> {
     catalog["ships"]
         .as_array()
-        .and_then(|ships| ships.iter().find(|ship| ship["className"] == class_name))
+        .and_then(|ships| {
+            ships.iter().find(|ship| {
+                ship.pointer("/className/value").and_then(Json::as_str) == Some(class_name)
+            })
+        })
         .ok_or_else(|| format!("the catalog has no ship {class_name}").into())
 }
 
@@ -190,7 +194,7 @@ fn assert_entry_equals_base(entry: &Json, base: &ShipBase) -> TestResult {
         "{name}"
     );
     assert_eq!(
-        entry["size"].as_i64(),
+        entry.pointer("/size/value/value").and_then(Json::as_i64),
         base.size.as_ref().map(|size| size.value),
         "{name}"
     );
@@ -228,14 +232,14 @@ fn the_catalog_ships_equal_the_ship_base_export_and_the_kind_is_settled() -> Tes
     for base in bases.ships() {
         let entry = ships
             .iter()
-            .find(|ship| ship["guid"] == base.guid.to_string().as_str())
+            .find(|ship| ship["guid"]["value"] == base.guid.to_string().as_str())
             .ok_or_else(|| format!("{} is missing", base.class_name))?;
         assert_entry_equals_base(entry, base)?;
     }
     let ground = ships
         .iter()
         .filter(|ship| {
-            ship["recordPath"]
+            ship["recordPath"]["value"]
                 .as_str()
                 .is_some_and(|path| path.contains("/entities/groundvehicles/"))
         })

@@ -90,6 +90,12 @@ fn definition_number_groups<'rows>(
                 .iter()
                 .map(|row| (Kind::BlueprintPools, row.numbers.as_slice())),
         )
+        .chain(
+            collected
+                .ships
+                .iter()
+                .map(|row| (Kind::Ships, row.source_numbers.as_slice())),
+        )
         .chain(collected.mission_kinds.reputation_number_groups())
         .chain(collected.law.number_groups())
         .chain(collected.location_vocabulary.number_groups())

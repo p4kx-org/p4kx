@@ -213,6 +213,7 @@ const fn uses_physical_row_identity(kind: Kind) -> bool {
                 | Kind::MissionBrokerEntries
                 | Kind::GameplayProperties
                 | Kind::Blueprints
+                | Kind::Ships
                 | Kind::BlueprintPools
                 | Kind::LootPoolFilters
                 | Kind::LootSecondaryChoiceSingleLayers

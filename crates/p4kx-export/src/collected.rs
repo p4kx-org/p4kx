@@ -305,11 +305,11 @@ impl<'f> Collected<'f> {
             }
             Picked::Ship(entity, vehicle) => {
                 self.playability.ships.count(entity.playability);
-                self.ships.push(entity);
+                self.ships.push(*entity);
                 self.vehicles.push(vehicle);
             }
             Picked::Commodity(entity) => self.commodities.push(*entity),
-            Picked::ResourceGroup(entity) => self.resource_groups.push(entity),
+            Picked::ResourceGroup(entity) => self.resource_groups.push(*entity),
             Picked::ResourceType(entity) => self.resource_types.push(*entity),
             Picked::BlueprintCategory(entity) => self.blueprint_categories.push(entity),
             Picked::BlueprintCategoryList(entity) => self.blueprint_category_lists.push(entity),

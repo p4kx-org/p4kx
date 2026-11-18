@@ -73,7 +73,7 @@ pub(super) fn project(
     for root in ship_hosts {
         project.check_cancel()?;
         let record = root.source_record_index;
-        let ship = ShipContext::read(project.origins, root.guid, record)?;
+        let ship = ShipContext::read(project.origins, root.identity.guid, record)?;
         let host = RoomHost {
             record,
             ship: &ship,

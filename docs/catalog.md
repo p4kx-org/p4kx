@@ -558,6 +558,13 @@ separate consumption and generation sides stay visible. The consumer can reprodu
 power or coolant summary by choosing the first applicable generation amount in original state and
 delta order. Match the resource identifier case-insensitively and keep the matching source unit.
 
+### Ship DCB source fields
+
+Each Ship has the shared [eight-field Record header](catalog-record-headers.md). Read
+`recordIndex.value` for physical joins within the original DataForge, including Records with
+equal GUIDs and paths. Header fields and selected source values carry
+their own immediate origin cells.
+
 A ship takes its text fields from the first exact `VehicleComponentParams` in the original
 `Components` array. Each field is a sourced reference. Use its `value` to join the matching
 `id.value` in the indicated text table. The table carries separate `sourceText` and `displayText`
@@ -568,56 +575,56 @@ its key and has absent translation forms.
 |-------|--------|
 | `name`, `role`, `career` | `vehicleName`, `vehicleRole`, `vehicleCareer` → `texts.publicNames` |
 | `description` | `vehicleDescription` → `texts.gameTexts` (`x-gameText`) |
-| `crewSize` | `crewSize`, an integer |
+| `crewSize` | Sourced original `crewSize` as ResourceNumber, independently of CrewManifest membership |
 | `vehicleManufacturer` | The selected `VehicleComponentParams.manufacturer`, with its original component ordinal |
 | `attachmentManufacturer` | The independently authored `AttachDef.Manufacturer`, with the original attachment component ordinal and AttachDef state |
-| `vehicleDefinition` | `vehicleDefinition`, the path of the vehicle XML |
+| `vehicleDefinition` | Sourced original String/Enum selector, including whitespace, case, separators and empty values. The Archive reader interprets it for lookup. |
 | `playability` | `player`, `ai`, `mission` or `special`, or `null`; see "Playability" below |
 | `variantOf` | The `guid` of the base of the ship's variant group, `null` for a base and an ungrouped ship; see "Variant groups" below |
 | `vehicleKind` | `spaceship` or `groundVehicle`, or `null`; see "Ship base data" below |
-| `size` | `Components/SAttachableComponentParams/AttachDef/Size`, an integer, `null` without an `AttachDef` |
+| `size` | Sourced original `Components/SAttachableComponentParams/AttachDef/Size` as ResourceNumber with explicit absent, null and unreadable states |
 | `mass` | The hull mass in kilograms; `null` when unknown, never 0; see "Ship base data" below |
 | `massBasis` | What `mass` is the sum of: `parts` or `physics`; `null` exactly when `mass` is |
 | `hullHealth` | The hull hit points, `null` when unknown; see "Ship base data" below |
 | `cargoScu` | The cargo capacity in SCU: 0 without a cargo grid, `null` when unknown; see "Ship base data" below |
 | `cargoGridsWithIssue` | How many cargo grids have no readable capacity; above 0, `cargoScu` is a lower bound |
-| `insurance` | The claim and expedite values of the ship's `SEntityInsuranceProperties`, `null` when the Record has none; see "Ship insurance" below |
+| `insurance` | Sourced first `SEntityInsuranceProperties` declaration and its independent parameter state |
+| `playabilityInputs` | Selected original `crewManifestComponentOrdinal` and authored `crewManifest` Record link with target header state |
 
 #### Ship insurance
 
-The insurance data is part of the ship Record (ADR-0218, #323): the `SEntityInsuranceProperties`
-struct in the `StaticEntityClassData` of the `EntityClassDefinition`, so the source path of a
-ship's insurance is the ship's `recordPath`. There is no `ShipInsuranceRecord` in the Archive any
-more (LIVE); the field is a fact only, no game text, and it is additive within version 2.
+`insurance` selects the first exact `SEntityInsuranceProperties` in the original
+`StaticEntityClassData` array. Its sourced state distinguishes a known missing declaration
+from an unreadable possible earlier candidate. A present declaration retains the original
+`staticElementOrdinal`, sourced `restoreOnClaim` and sourced `shipInsuranceParams`. A null or
+unreadable parameter pointer belongs to the same selected declaration.
 
-| Field of `insurance` | Source |
-|----------------------|--------|
-| `restoreOnClaim` | `restoreOnClaim`, a boolean (inferred meaning: a claim restores the ship with its Loadout) |
-| `shipEntityClassName` | `shipInsuranceParams.shipEntityClassName`, e.g. `AEGS_Gladius`; `null` when empty |
-| `baseWaitTimeMinutes` | `shipInsuranceParams.baseWaitTimeMinutes`, in minutes (inferred meaning: the claim time) |
-| `mandatoryWaitTimeMinutes` | `shipInsuranceParams.mandatoryWaitTimeMinutes`, in minutes (inferred meaning: the shortest claim time) |
-| `expediteFee` | `shipInsuranceParams.baseExpeditingFee` (renamed), in aUEC as stored |
+| Field under `insurance.value` | Source |
+| --- | --- |
+| `staticElementOrdinal` | Original zero-based StaticEntityClassData array position |
+| `restoreOnClaim` | Original Bool, including a present false |
+| `shipInsuranceParams` | Original Class or StrongPointer container and its independent state |
+| `additionalFields` | Unprojected or rejected original declaration members |
 
-The meanings marked inferred come from the field names; the Archive states none. Every field is
-`null` when the Record states none, including every field of a ship whose
-`SEntityInsuranceProperties` has no `shipInsuranceParams`. The struct has exactly these fields: two
-times, one fee, `restoreOnClaim`, the class name and the `displayParams`. The numbers are those of
-the Record, in their stored units. The `displayParams`
-(name, role, career, crew size, manufacturer) repeat the ship's own fields, are mostly
-placeholders, and are not exported.
+| Field under `insurance.value.shipInsuranceParams.value` | Source |
+| --- | --- |
+| `shipEntityClassName` | Original String/Enum, including a present empty value |
+| `baseWaitTimeMinutes` | Original ResourceNumber in minutes |
+| `mandatoryWaitTimeMinutes` | Original ResourceNumber in minutes |
+| `expediteFee` | Original `baseExpeditingFee` ResourceNumber in aUEC |
+| `additionalFields` | Remaining original parameter members, preserving exact numeric bits |
 
-`expediteFee` is the only fee in aUEC the Archive holds for a ship; the multipliers that relate to
-claims are in the [item recovery configuration tables](#item-recovery-rules), which also state what the data does and
-does not say about a claim fee.
-
-On LIVE all 1,066 catalog ships carry `insurance`, each with a fee;
-AEGS_Gladius has a `baseWaitTimeMinutes` of 5.83, a `mandatoryWaitTimeMinutes` of 1.94 and an
-`expediteFee` of 2,335 (real-Archive test `real_archive_insurance`).
+All independent fields are sourced cells. A present parameter container carries its child
+values. Earlier unknown static candidates remain visible on the selected declaration,
+parameter container and typed leaves. Source-set completeness is independent of the encryption
+marker. The wait and restore meanings are inferred from source names. Related multipliers are
+in the [item recovery configuration tables](#item-recovery-rules).
 
 #### Ship base data
 
-`mass`, `massBasis`, `hullHealth`, `cargoScu`, `cargoGridsWithIssue`, `size` and `vehicleKind` are
-facts only (no game text) and come from the ship base data of `p4kx ships`
+`size` is the exact sourced DCB value described above. The other base projections
+`mass`, `massBasis`, `hullHealth`, `cargoScu`, `cargoGridsWithIssue` and `vehicleKind` retain the
+existing interpreted ship base data of `p4kx ships`
 ([ship-base-data.md](ship-base-data.md), ADR-0061): the catalog build reads each ship once with
 `p4kx_export::ShipReader` in the same pass that reads the other ship fields, so the ship base walk
 runs once, not twice. Every value is `null` when the Archive does not state it, and a reader never
@@ -2454,7 +2461,7 @@ A crafter that is an Item joins its original type, subtype and size through the 
 component selection and definition; a crafter that is
 not an item (the fabricators below `basebuilding`) is only in `crafters`, which is why the three
 fields are part of the entry. A crafter that a ship already mounts is joined the other way round,
-`hostGuids` against `ships[].guid` or `itemGuid` of the port against `crafters[].guid`.
+`hostGuids` against `ships[].guid.value` or `itemGuid` of the port against `crafters[].guid`.
 
 The Records are selected from every entity Record: an item, a ship or a commodity that has the
 component is a crafter as well and stays what it is, and any other `EntityClassDefinition` under
@@ -2815,7 +2822,7 @@ unresolved references. The remaining members are `claimCooldownMultiplier`,
 `escalationTimerMultiplier`, `escalatingClaimCostMultiplier` and
 `escalatingDeliveryTimerMultiplier`. A source that removed the flat minimum multiplier has
 an absent cell. The catalog preserves source rates and multipliers as authored. The fee stated
-directly in ship source data remains `insurance.expediteFee`.
+directly in ship source data remains `insurance.value.shipInsuranceParams.value.expediteFee`.
 
 The policy row retains the seven independent ordered condition arrays `Insurable`,
 `ReplenishOnRearm`, `ReplenishOnClaimAndRepair`, `NeverRepair`, `NeverLTP`, `ForceLTP` and

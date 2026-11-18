@@ -225,7 +225,7 @@ fn every_ship_carries_the_field_and_it_is_a_guid_or_null() -> TestResult {
         assert!(
             value.is_null() || value.is_string(),
             "{}",
-            ship["className"]
+            ship["className"]["value"]
         );
     }
     Ok(())

@@ -106,8 +106,8 @@ fn check_counts(built: &BuiltCatalog, catalog: &Value) -> TestResult {
 fn check_references(built: &BuiltCatalog, catalog: &Value) -> TestResult {
     let ships: HashSet<&str> = list(catalog, "ships")?
         .iter()
-        .filter_map(|ship| ship["guid"].as_str())
-        .collect();
+        .map(|ship| crate::catalog_v3_consumer::identity(ship, Kind::Ships))
+        .collect::<Result<_, _>>()?;
     let items: HashSet<&str> = list(catalog, "items")?
         .iter()
         .map(|item| crate::catalog_v3_consumer::identity(item, Kind::Items))

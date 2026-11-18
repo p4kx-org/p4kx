@@ -9,6 +9,8 @@ use p4kx_assembly::{ArchiveFiles, Attachment, EntityNode, LoadoutResolver, PortN
 use p4kx_extraction::{Archive, DataForge, Filter};
 use serde_json::Value;
 
+use crate::catalog_v3_consumer;
+
 use super::original::{Grid, exact_record, legacy_scu, round};
 use super::{TestResult, WireCatalog, index, same_scu, text};
 
@@ -186,12 +188,15 @@ pub(super) fn compare(
 fn compare_total(rows: &[Value], ship: &Ship) -> TestResult {
     let mut found = rows
         .iter()
-        .filter(|row| text(row, "/recordPath") == Some(ship.path.as_str()));
+        .filter(|row| index(row, "/recordIndex/value") == Some(u64::from(ship.record)));
     let row = found
         .next()
         .ok_or("the nominated physical Ship must be present")?;
     let cargo = row.get("cargoScu").ok_or("legacy cargoScu field")?;
     if found.next().is_some()
+        || catalog_v3_consumer::present(&row["recordIndex"])?.as_u64()
+            != Some(u64::from(ship.record))
+        || catalog_v3_consumer::present(&row["recordPath"])?.as_str() != Some(ship.path.as_str())
         || !(cargo.is_null() || cargo.is_number())
         || !same_scu(cargo.as_f64(), ship.total.scu)
         || index(row, "/cargoGridsWithIssue") != Some(ship.total.issues)
