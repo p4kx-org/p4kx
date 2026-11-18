@@ -61,7 +61,7 @@ pub(crate) fn visit_leaf<T>(cell: &SourcedValue<T>, inventory: &SourceInventory)
     wire::visit_leaf(cell, inventory)
 }
 
-fn visit_header(header: &CanonicalRecordHeader<'_>, wire: Wire<'_>) -> TestResult {
+pub(crate) fn visit_header(header: &CanonicalRecordHeader<'_>, wire: Wire<'_>) -> TestResult {
     wire.field("guid")?.guid(&header.guid())?;
     wire.field("recordName")?.leaf(header.record_name())?;
     wire.field("className")?.leaf(header.class_name())?;
@@ -157,7 +157,7 @@ fn visit_crafting(data: &ResourceCraftingData<'_>, wire: Wire<'_>) -> TestResult
         })
 }
 
-fn visit_quality<'expected, T>(
+pub(crate) fn visit_quality<'expected, T>(
     source: &QualitySource<'_, T>,
     wire: Wire<'expected>,
     visit: impl FnOnce(&T, Wire<'expected>) -> TestResult,
@@ -179,7 +179,7 @@ fn visit_quality<'expected, T>(
         })
 }
 
-fn visit_curve(curve: &QualityCurveSource, wire: Wire<'_>) -> TestResult {
+pub(crate) fn visit_curve(curve: &QualityCurveSource, wire: Wire<'_>) -> TestResult {
     wire.field("min")?
         .cell(curve.min(), |number, wire| wire.number(number))?;
     wire.field("max")?
@@ -190,7 +190,10 @@ fn visit_curve(curve: &QualityCurveSource, wire: Wire<'_>) -> TestResult {
         .cell(curve.stddev(), |number, wire| wire.number(number))
 }
 
-fn visit_overrides(overrides: &QualityOverridesSource<'_>, wire: Wire<'_>) -> TestResult {
+pub(crate) fn visit_overrides(
+    overrides: &QualityOverridesSource<'_>,
+    wire: Wire<'_>,
+) -> TestResult {
     wire.field("locationOverrideList")?
         .cell(overrides.location_override_list(), |entries, wire| {
             wire.array(entries, |source, wire| {
@@ -213,7 +216,10 @@ fn visit_overrides(overrides: &QualityOverridesSource<'_>, wire: Wire<'_>) -> Te
         })
 }
 
-fn visit_quantization(quantization: &QualityQuantizationSource<'_>, wire: Wire<'_>) -> TestResult {
+pub(crate) fn visit_quantization(
+    quantization: &QualityQuantizationSource<'_>,
+    wire: Wire<'_>,
+) -> TestResult {
     wire.field("bands")?
         .cell(quantization.bands(), |bands, wire| {
             wire.array(bands, |band, wire| {

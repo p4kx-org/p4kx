@@ -25,7 +25,7 @@ pub(crate) struct QualityOwner<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct QualityDistributionDefinition<'source> {
+pub struct QualityDistributionDefinition<'source> {
     #[serde(skip)]
     pub(crate) owner: QualityOwner<'source>,
     #[serde(skip)]
@@ -41,7 +41,7 @@ pub(crate) struct QualityDistributionDefinition<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct QualityQuantizationDefinition<'source> {
+pub struct QualityQuantizationDefinition<'source> {
     #[serde(skip)]
     pub(crate) owner: QualityOwner<'source>,
     #[serde(skip)]
@@ -84,4 +84,44 @@ pub(crate) struct QualityQuantizationResources {
     pub(crate) record_index: SourcedValue<u32>,
     pub(crate) eligibility: SourcedValue<QuantizationEligibility>,
     pub(crate) resource_type_guids: SourcedValue<Vec<SourcedValue<CatalogGuid>>>,
+}
+
+impl<'source> QualityDistributionDefinition<'source> {
+    /// Borrows the independently sourced physical Record header.
+    #[must_use]
+    pub const fn source(&self) -> &CanonicalRecordHeader<'source> {
+        &self.source
+    }
+
+    /// Borrows the authored distribution without reading any referenced target body.
+    #[must_use]
+    pub const fn quality_distribution(
+        &self,
+    ) -> &SourcedValue<QualitySource<'source, QualityCurveSource>> {
+        &self.quality_distribution
+    }
+
+    /// Borrows the authored location overrides in their original slot order.
+    #[must_use]
+    pub const fn location_override(
+        &self,
+    ) -> &SourcedValue<QualitySource<'source, QualityOverridesSource<'source>>> {
+        &self.location_override
+    }
+}
+
+impl<'source> QualityQuantizationDefinition<'source> {
+    /// Borrows the independently sourced physical Record header.
+    #[must_use]
+    pub const fn source(&self) -> &CanonicalRecordHeader<'source> {
+        &self.source
+    }
+
+    /// Borrows original quantization values independently of inverse resource membership.
+    #[must_use]
+    pub const fn quality_quantization(
+        &self,
+    ) -> &SourcedValue<QualitySource<'source, QualityQuantizationSource<'source>>> {
+        &self.quality_quantization
+    }
 }

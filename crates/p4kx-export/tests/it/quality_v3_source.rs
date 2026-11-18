@@ -223,3 +223,6 @@ fn quality_v3_retains_all_ordered_bands_when_a_configured_interval_is_reversed()
     );
     Ok(())
 }
+
+#[path = "quality_query_suite.rs"]
+mod queries;

@@ -134,6 +134,30 @@ The mining reader supplies mining-specific placements and coverage. Read
 `placements.unresolvedContainerLinks` from the Catalog snapshot for original unresolved
 external Child occurrences and their Archive lookup states.
 
+## Direct quality definitions
+
+Use `catalog_queries::quality::with_distributions` and `with_quantizations`, their `_from`
+variants, or a parsed session's `with_quality_distributions` and `with_quality_quantizations`.
+The endpoints supply `definitions.qualityDistributions` and `definitions.qualityQuantizations`
+through the same immutable canonical types used by the Catalog. Distribution selection includes
+both distribution Records and location-override Records. All, GUID and RecordIndex selection
+retain the canonical source policy, every eligible physical alias, original nested positions and
+GUID-text/physical-index row order.
+
+Inspect `rows()`, `coverage()` and `source_inventory()` inside the callback. References retain
+their original GUID, physical target header and resolution state without opening target bodies.
+Numeric getters preserve integer widths, canonical Int64 digits, exact IEEE bits, nulls and
+unsupported/unreadable states. Use `raw_bits()` to recover an exact authored Single before
+promotion to binary64; `finite()` is a convenient typed value, while its JSON form follows the
+ordinary shortest Single decimal representation. It is not an independent precision contract.
+
+These unlocalized endpoints open selected owner bodies only. They compute no quantization
+eligibility or inverse ResourceType relation and open no sibling quality, Resource, locale,
+world or placement payload to obtain such a relation. A successful query is not a completeness
+certificate: inspect header, body and field coverage separately before publishing consumer-owned
+cache data after outer success. The independent `projections.qualityQuantizationResources`
+SDK endpoint remains outstanding. [ADR-0406](adr/0406-direct-quality-queries-preserve-canonical-definitions-without-inverse-discovery.md)
+
 ## Authored item ports
 
 Use `with_item_ports` or `with_item_ports_from` to read `configurations.itemPorts`

@@ -45,6 +45,29 @@ remain blocking field failures. A configured end below its start retains all ori
 and a malformed-source diagnosis at that band's `end`. Extra unmapped fields remain explicit
 coverage failures. A source decoder error does not invent recovered numeric bits.
 
+## Direct SDK access
+
+`catalog_queries::quality` supplies these two definition datasets without constructing a Catalog.
+Use `with_distributions` for distribution and location-override owners and `with_quantizations`
+for authored quantization owners. The `_from` forms bind an already decoded DataForge Entry to
+its original Archive. Session and parsed-view methods reuse their existing decoded bytes and
+indexes. Selection supports the entire family, one GUID including all physical aliases, or one
+physical Record index. Rows, nested values and original reference headers are the same canonical
+objects used by the producer; no JSON adapter or second interpretation changes their meaning.
+
+The callback's immutable rows resolve all sourced cells through its own source inventory. Read
+coverage independently for unreadable headers, unreadable bodies and retained rows with field
+projection issues. Missing, null, present empty and unresolved-reference states remain distinct.
+An Archive change, source mismatch or cancellation remains an explicit outer query failure.
+Publish consumer-owned cache data only after outer success and the required coverage checks.
+
+The direct endpoints read selected physical owner bodies and no inverse-related ResourceType
+or sibling quality bodies. They do not read localization, world placements or the whole crafting
+family. The inverse projection is a separate remaining SDK endpoint. Exact IEEE recovery uses
+`ResourceFloat32::raw_bits` or `ResourceFloat64::raw_bits`; a Single's finite JSON convenience
+number uses normal shortest-decimal serialization. The existing quality formula contract and
+Schema v3 wire meanings are unchanged. See [ADR-0406](adr/0406-direct-quality-queries-preserve-canonical-definitions-without-inverse-discovery.md).
+
 ## Inverse relation and eligibility
 
 The resource relation is authored in the opposite direction:

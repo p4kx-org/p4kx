@@ -57,6 +57,9 @@ mod mission_location_templates;
 #[path = "reputation_query.rs"]
 mod reputation;
 
+#[path = "quality_query.rs"]
+pub mod quality;
+
 use p4kx_extraction::{
     Archive, Build, CancelToken, DataForge, DataForgeEntry, Guid, Record, SourceInventory,
     SourcedValue,

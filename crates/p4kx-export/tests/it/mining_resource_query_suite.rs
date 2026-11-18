@@ -10,4 +10,4 @@ mod mining_resource_query_fixture;
 #[path = "mining_resource_query_identity.rs"]
 mod mining_resource_query_identity;
 #[path = "resource_consumer_walk.rs"]
-mod resource_consumer_walk;
+pub(crate) mod resource_consumer_walk;
