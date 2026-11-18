@@ -9,7 +9,7 @@ use super::authored_fields::{AuthoredRestriction, Observed};
 use super::item_alignment_options::AlignmentAxis;
 pub(crate) use super::item_alignment_options::AlignmentOptions;
 pub use super::item_alignment_options::AttachmentAxisOptionStatus;
-use super::item_component_owner::ComponentOwner;
+pub use super::item_component_owner::ComponentOwner;
 pub use super::port_restrictions::{PortItemType, PortRestrictions};
 use crate::catalog_projection::{CatalogProjection, TextOwner};
 use crate::catalog_rows::staged::StagedCatalogTable;
@@ -27,9 +27,8 @@ mod index;
 #[path = "item_port_staging.rs"]
 mod staging;
 
-pub(crate) use index::{
-    AlignmentIndex, AttachmentDefinitionLink, PhysicalPort, PortDefinitionLink,
-};
+pub(crate) use index::{AlignmentIndex, PhysicalPort};
+pub use index::{AttachmentDefinitionLink, PortDefinitionLink};
 pub(crate) use staging::ItemPortStaging;
 
 use self::staging::{PortContainerFacts, StagedItemPorts};

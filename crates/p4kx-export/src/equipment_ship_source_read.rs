@@ -8,7 +8,7 @@ use p4kx_extraction::{
     Archive, CancelToken, DataForge, DataForgeEntry, DataForgeError, Language, SourceUses,
 };
 
-use super::coverage::ShipSourceDependencyCoverage;
+use super::ShipSourceDependencyCoverage;
 use super::{ShipSourceSnapshot, complete};
 use crate::build::catalog_queries::unlocalized_record_query::plan::{Owner, Plan};
 use crate::build::original_input::OriginalCatalogInput;

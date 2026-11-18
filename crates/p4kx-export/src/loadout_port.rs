@@ -10,10 +10,12 @@ use p4kx_assembly::{
 use p4kx_extraction::{SourceUse, is_placeholder_key};
 
 use crate::CatalogError;
-use crate::catalog_v3::catalog_item_alignment::AlignmentIndex;
 use crate::contract_loadout::{LoadoutPort, PortType};
 use crate::guid_text::CatalogGuid;
-use crate::loadout::{alignment::LoadoutAlignment, ledger::Capture};
+use crate::loadout::{
+    alignment::{AlignmentLookup, LoadoutAlignment},
+    ledger::Capture,
+};
 
 const VEHICLE_SOURCE: &str = "vehicle";
 
@@ -31,7 +33,7 @@ impl LoadoutPort {
 /// Turns the tree of an Entity into catalog ports and collects the codes of the issues found.
 pub(crate) struct PortReader<'rows> {
     issues: BTreeSet<&'static str>,
-    alignment: Option<&'rows AlignmentIndex<'rows>>,
+    alignment: Option<&'rows mut dyn AlignmentLookup>,
 }
 
 impl<'rows> PortReader<'rows> {
@@ -43,7 +45,7 @@ impl<'rows> PortReader<'rows> {
         }
     }
 
-    pub(crate) const fn with_alignment(alignment: &'rows AlignmentIndex<'rows>) -> Self {
+    pub(crate) const fn with_alignment(alignment: &'rows mut dyn AlignmentLookup) -> Self {
         Self {
             issues: BTreeSet::new(),
             alignment: Some(alignment),
@@ -96,7 +98,7 @@ impl<'rows> PortReader<'rows> {
             name_proof: capture.port_name_proof(port.name(), port.name_proof())?,
             source,
             visibility,
-            source_constraints: self.alignment.map_or_else(
+            source_constraints: self.alignment.as_deref_mut().map_or_else(
                 || Ok(LoadoutAlignment::default()),
                 |index| LoadoutAlignment::read(port, index, capture),
             )?,

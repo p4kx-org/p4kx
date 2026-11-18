@@ -18,7 +18,7 @@ use crate::{CatalogError, ExportAccountingError};
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ComponentOwner {
+pub struct ComponentOwner {
     owner_guid: SourcedValue<CatalogGuid>,
     owner_record_index: SourcedValue<u32>,
     component_ordinal: SourcedValue<u32>,
@@ -76,15 +76,21 @@ impl ComponentOwner {
             .into_cell(original.sources()))
     }
 
-    pub(super) const fn guid(&self) -> &SourcedValue<CatalogGuid> {
+    /// Borrows the original owner GUID.
+    #[must_use]
+    pub const fn guid(&self) -> &SourcedValue<CatalogGuid> {
         &self.owner_guid
     }
 
-    pub(super) const fn component_ordinal(&self) -> &SourcedValue<u32> {
+    /// Borrows the original Components array position.
+    #[must_use]
+    pub const fn component_ordinal(&self) -> &SourcedValue<u32> {
         &self.component_ordinal
     }
 
-    pub(super) const fn record_index(&self) -> &SourcedValue<u32> {
+    /// Borrows the physical owner Record position.
+    #[must_use]
+    pub const fn record_index(&self) -> &SourcedValue<u32> {
         &self.owner_record_index
     }
 

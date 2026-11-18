@@ -197,3 +197,17 @@ Cancellation and Archive-change checks surround selection, source capture and ca
 Publish consumer-owned state after successful completion of the outer query and acceptance of
 the required coverage. Use the full Catalog for canonical cargo, derived kind and playability,
 and unfiltered variant projections.
+
+## Selective resolved Loadouts
+
+Catalog staging and the SDK use the same ordered Loadout resolver and port projector. The
+Catalog passes its prepared configuration index. The SDK projects port and attachment
+configuration for each reached physical Record and role through the same original readers.
+Each demanded role is read once per query. A negative admission decision and an unavailable
+dependency have distinct outcomes even when the port has no matching projected row.
+
+The SDK identity of a Loadout is its Build-bound physical root Record. Each port occurrence is
+addressed by the sequence of zero-based child positions under that root. This follows the actual
+ordered resolver tree, including repeated names, repeated attached Records and nested empty
+ports. Query results expose independent owner and dependency coverage before callers publish
+their owned cache updates.

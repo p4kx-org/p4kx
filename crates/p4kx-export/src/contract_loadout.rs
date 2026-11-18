@@ -11,7 +11,8 @@ use crate::loadout::alignment::LoadoutAlignment;
 /// Which kind of entry a loadout belongs to; serialised as the strings `ship` and `item`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
-pub(crate) enum EntityKind {
+#[non_exhaustive]
+pub enum EntityKind {
     /// An entry of `ships`.
     Ship,
     /// An entry of `items`.
@@ -22,7 +23,7 @@ pub(crate) enum EntityKind {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct Loadout {
+pub struct Loadout {
     #[serde(skip)]
     pub(crate) root_record_index: u32,
     #[serde(skip)]
@@ -47,7 +48,7 @@ pub(crate) struct Loadout {
 #[derive(Debug, Default, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct LoadoutPort {
+pub struct LoadoutPort {
     #[serde(skip)]
     pub(crate) name_proof: Option<crate::catalog_read::original::AuthoredEntryPath>,
     #[serde(skip)]
@@ -107,10 +108,163 @@ pub(crate) struct LoadoutPort {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct PortType {
+pub struct PortType {
     /// The item type, e.g. `WeaponGun`.
     pub(crate) r#type: String,
     /// The item subtypes the port takes; empty when it takes every subtype or the data gives
     /// none.
     pub(crate) sub_types: Vec<String>,
+}
+
+impl Loadout {
+    /// Returns the physical original Record position.
+    #[must_use]
+    pub const fn record_index(&self) -> u32 {
+        self.root_record_index
+    }
+
+    /// Returns the original owning GUID.
+    #[must_use]
+    pub const fn entity_guid(&self) -> p4kx_extraction::Guid {
+        self.entity_guid.get()
+    }
+
+    /// Returns the kind of catalog owner.
+    #[must_use]
+    pub const fn entity_kind(&self) -> EntityKind {
+        self.entity_kind
+    }
+
+    /// Borrows the sorted resolver issue codes.
+    #[must_use]
+    pub fn issues(&self) -> &[&'static str] {
+        &self.issues
+    }
+
+    /// Borrows the root ports in resolver order.
+    #[must_use]
+    pub fn ports(&self) -> &[LoadoutPort] {
+        &self.ports
+    }
+
+    /// Looks up a port by its zero-based occurrence at each level.
+    #[must_use]
+    pub fn port(&self, occurrences: &[usize]) -> Option<&LoadoutPort> {
+        let (&first, nested) = occurrences.split_first()?;
+        nested
+            .iter()
+            .try_fold(self.ports.get(first)?, |port, &index| port.ports.get(index))
+    }
+}
+
+impl LoadoutPort {
+    /// Borrows the resolved original port name.
+    #[must_use]
+    pub const fn name(&self) -> &str {
+        self.name.as_str()
+    }
+
+    /// Returns the canonical port source code.
+    #[must_use]
+    pub const fn source(&self) -> &'static str {
+        self.source
+    }
+
+    /// Returns the declared minimum item size.
+    #[must_use]
+    pub const fn min_size(&self) -> Option<u32> {
+        self.min_size
+    }
+
+    /// Returns the declared maximum item size.
+    #[must_use]
+    pub const fn max_size(&self) -> Option<u32> {
+        self.max_size
+    }
+
+    /// Borrows the allowed original item types in declaration order.
+    #[must_use]
+    pub fn types(&self) -> &[PortType] {
+        &self.types
+    }
+
+    /// Borrows the original port flags.
+    #[must_use]
+    pub fn flags(&self) -> &[String] {
+        &self.flags
+    }
+
+    /// Borrows the tags supplied by the port.
+    #[must_use]
+    pub fn port_tags(&self) -> &[String] {
+        &self.port_tags
+    }
+
+    /// Borrows the tags required of the attachment.
+    #[must_use]
+    pub fn required_tags(&self) -> &[String] {
+        &self.required_tags
+    }
+
+    /// Borrows the original display name localization key.
+    #[must_use]
+    pub fn display_name_key(&self) -> Option<&str> {
+        self.display_name_key.as_deref()
+    }
+
+    /// Returns the canonical visibility code.
+    #[must_use]
+    pub const fn visibility(&self) -> &'static str {
+        self.visibility
+    }
+
+    /// Returns the attached or authored target GUID when available.
+    #[must_use]
+    pub fn item_guid(&self) -> Option<p4kx_extraction::Guid> {
+        self.item_guid.map(CatalogGuid::get)
+    }
+
+    /// Borrows the attached or authored target class when available.
+    #[must_use]
+    pub fn item_class_name(&self) -> Option<&str> {
+        self.item_class_name.as_deref()
+    }
+
+    /// Reports whether resolution reached a docked vehicle.
+    #[must_use]
+    pub const fn docked_vehicle(&self) -> bool {
+        self.docked_vehicle
+    }
+
+    /// Returns the original resolver's unresolved-attachment code.
+    #[must_use]
+    pub const fn unresolved(&self) -> Option<&'static str> {
+        self.unresolved
+    }
+
+    /// Borrows the original physical port and attachment links.
+    #[must_use]
+    pub const fn source_constraints(&self) -> &LoadoutAlignment {
+        &self.source_constraints
+    }
+
+    /// Borrows nested occurrences in resolver order.
+    #[must_use]
+    pub fn ports(&self) -> &[Self] {
+        &self.ports
+    }
+}
+
+impl PortType {
+    /// Borrows the original accepted item type.
+    #[must_use]
+    pub const fn item_type(&self) -> &str {
+        self.r#type.as_str()
+    }
+
+    /// Borrows the original accepted item subtypes.
+    #[must_use]
+    pub fn sub_types(&self) -> &[String] {
+        &self.sub_types
+    }
 }

@@ -1964,9 +1964,10 @@
       "x-p4kx-vocabularyClass": "control"
     },
     "AttachmentDefinitionLink": {
+      "description": "The link to an original physical attachment definition.",
       "oneOf": [
         {
-          "description": "The shared physical Record and original Components slot of a configuration.",
+          "description": "A link to a projected original declaration.",
           "properties": {
             "componentOrdinal": {
               "$ref": "#/$defs/SourcedValueOfuint32"
@@ -1991,6 +1992,7 @@
           "type": "object"
         },
         {
+          "description": "The exact original declaration has no projected row.",
           "properties": {
             "state": {
               "const": "notProjected",
@@ -2003,6 +2005,7 @@
           "type": "object"
         },
         {
+          "description": "The resolved Entity has no authored attachable component.",
           "properties": {
             "state": {
               "const": "notDeclared",
@@ -26606,6 +26609,7 @@
       "type": "object"
     },
     "LoadoutAlignment": {
+      "description": "The physical source links used by the resolved port.",
       "properties": {
         "attachedItem": {
           "anyOf": [
@@ -34273,9 +34277,10 @@
       "type": "object"
     },
     "PortDefinitionLink": {
+      "description": "The link to an original physical port definition.",
       "oneOf": [
         {
-          "description": "The shared physical Record and original Components slot of a configuration.",
+          "description": "A link to a projected original declaration.",
           "properties": {
             "componentOrdinal": {
               "$ref": "#/$defs/SourcedValueOfuint32"
@@ -34287,7 +34292,8 @@
               "$ref": "#/$defs/SourcedValueOfuint32"
             },
             "portOrdinal": {
-              "$ref": "#/$defs/SourcedValueOfuint32"
+              "$ref": "#/$defs/SourcedValueOfuint32",
+              "description": "The physical original port occurrence."
             },
             "state": {
               "const": "projected",
@@ -34304,6 +34310,7 @@
           "type": "object"
         },
         {
+          "description": "The exact original declaration has no projected row.",
           "properties": {
             "state": {
               "const": "notProjected",

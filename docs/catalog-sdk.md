@@ -603,3 +603,26 @@ Their input sets bind the current physical Record to the original Vehicle XML, t
 Modification, patch and overrides, and the fields consulted for each metric. A Physics fallback
 includes the operand used by ShipReader. Source sets distinguish a failed read from a successful
 read whose original field coordinates are unavailable.
+
+## Resolved Loadouts
+
+Use `equipment::read_loadouts`, `equipment::read_loadouts_from`, or the
+session and parsed-view `read_loadouts` methods. Choose `All`, `Guid`, or `RecordIndex`
+to select the original Ship and Item Records. An admitted Ship can have an empty Loadout.
+Items produce a row when resolution returns at least one port.
+
+A row's `record_index()` identifies its physical Record in the queried DataForge. Use
+`port(&[0, 1])` for the second nested port of the first root port. The zero-based occurrence
+path preserves repeated names and repeated instances of an attached item. It follows resolver
+order for that Build.
+
+The query uses the archive-backed Catalog resolver and returns the selected rows in memory.
+It resolves original port and attachment definitions for the physical Records reached by those
+ports, including dependencies outside the root selection. Stop-at-docked-vehicle rules apply
+to the nested results.
+
+`source_constraints()` exposes typed physical port and attachment links. Resolve their immediate
+origin references against this result's `source_inventory`. `coverage` describes the requested
+owner selection. `dependencies` records the reached resolver operations and each demanded
+alignment role, including failed reads and known exclusions. Check both before replacing a
+consumer cache. [ADR-0410](adr/0410-equipment-sdk-shares-original-family-readers-and-canonical-variant-choices.md)

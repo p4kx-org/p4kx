@@ -260,3 +260,6 @@ fn an_item_with_a_port_and_no_loadout_lists_the_port_empty() -> TestResult {
 
 #[path = "catalog_consumer_refresh.rs"]
 mod consumer_refresh;
+
+#[path = "catalog_loadout_sdk.rs"]
+mod direct_sdk;

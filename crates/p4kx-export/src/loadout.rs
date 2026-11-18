@@ -5,10 +5,10 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use p4kx_assembly::{ArchiveFiles, Entities};
-use p4kx_extraction::{CancelToken, Guid, RecordTree, Value};
+use p4kx_extraction::{CancelToken, Guid};
 
+use crate::catalog_v3::catalog_item_alignment::AlignmentIndex;
 use crate::contract_loadout::{EntityKind, Loadout, LoadoutPort};
-use crate::record_fields::elements;
 use crate::{CatalogError, CatalogReadFailure, LoadoutSummary};
 
 #[path = "loadout_alignment.rs"]
@@ -28,24 +28,9 @@ pub(crate) mod resolution;
 #[path = "staged_loadouts.rs"]
 pub(crate) mod staging;
 
-const DEFAULT_LOADOUT: &str = "SEntityComponentDefaultLoadoutParams";
-const PORT_CONTAINER: &str = "SItemPortContainerComponentParams";
-
-/// Returns whether the Record tree `tree` may have ports: its Record defines item ports or names a
-/// default Loadout. Only such an item is resolved.
-pub(crate) fn carries_ports(tree: &RecordTree<'_>) -> bool {
-    let Some(Value::Array(components)) = tree.field("Components") else {
-        return false;
-    };
-    components.iter().any(|component| match component {
-        Value::Struct(component) => match component.type_name() {
-            DEFAULT_LOADOUT => true,
-            PORT_CONTAINER => !elements(Some(component), "Ports").is_empty(),
-            _ => false,
-        },
-        _ => false,
-    })
-}
+#[path = "loadout_admission.rs"]
+mod admission;
+pub(crate) use admission::{PortAdmission, carries_ports};
 
 /// The loadouts of a catalog, the Records that could not be resolved and what was counted.
 pub(crate) struct Loadouts<'f> {
@@ -74,11 +59,17 @@ pub(crate) fn loadouts<'f>(
     input: &crate::build::original_input::OriginalCatalogInput<'_, 'f>,
     cancel: Option<&CancelToken>,
 ) -> Result<Loadouts<'f>, CatalogError> {
+    crate::catalog_query_session::checkpoint(cancel)?;
     let scratch = std::env::temp_dir();
     let mut entries = StagedLoadoutWriter::new(&scratch, cancel);
     let mut summary = LoadoutSummary::default();
     let mut outside = HashSet::new();
-    let read = resolution::read_rows(files, entities, wanted, sources, input, cancel, |entry| {
+    let mut alignment = AlignmentIndex::new(sources.alignment)?;
+    let evidence = resolution::ResolverEvidence {
+        seed: sources.ledger,
+        alignment: &mut alignment,
+    };
+    let read = resolution::read_rows(files, entities, wanted, evidence, input, cancel, |entry| {
         summary.add_entry(&entry, known, &mut outside);
         entries.append(entry)?;
         Ok(())

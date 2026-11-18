@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_assembly::{Attachment, PortNode};
+use p4kx_assembly::{Attachment, PortDefinitionPosition, PortNode};
 use p4kx_extraction::{SourceUse, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -14,10 +14,45 @@ use crate::catalog_v3::catalog_item_alignment::{
 use crate::guid_text::CatalogGuid;
 use crate::schema_fields::every_field_required;
 
+#[path = "loadout_alignment_direct.rs"]
+pub(crate) mod direct;
+
+/// Resolves the canonical links used by a Loadout port.
+pub(crate) trait AlignmentLookup {
+    fn port(
+        &mut self,
+        position: PortDefinitionPosition,
+    ) -> Result<PortDefinitionLink, CatalogError>;
+
+    fn attachment(
+        &mut self,
+        record: u32,
+        component: Option<usize>,
+    ) -> Result<AttachmentDefinitionLink, CatalogError>;
+}
+
+impl AlignmentLookup for AlignmentIndex<'_> {
+    fn port(
+        &mut self,
+        position: PortDefinitionPosition,
+    ) -> Result<PortDefinitionLink, CatalogError> {
+        AlignmentIndex::port(self, position)
+    }
+
+    fn attachment(
+        &mut self,
+        record: u32,
+        component: Option<usize>,
+    ) -> Result<AttachmentDefinitionLink, CatalogError> {
+        AlignmentIndex::attachment(self, record, component)
+    }
+}
+
 #[derive(Debug, Default, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct LoadoutAlignment {
+/// The physical source links used by the resolved port.
+pub struct LoadoutAlignment {
     port_definition: Option<PortDefinitionLink>,
     attached_item: Option<AttachedItem>,
 }
@@ -37,7 +72,7 @@ struct AttachedItem {
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct AttachmentIdentity {
+pub struct AttachmentIdentity {
     pub(crate) target_guid: SourcedValue<CatalogGuid>,
     pub(crate) target_record_index: SourcedValue<u32>,
 }
@@ -48,7 +83,32 @@ pub(crate) struct AttachmentProof {
     pub(crate) source_set_complete: bool,
 }
 
+impl AttachmentIdentity {
+    /// Borrows the GUID of the actually resolved attached Entity.
+    #[must_use]
+    pub const fn target_guid(&self) -> &SourcedValue<CatalogGuid> {
+        &self.target_guid
+    }
+
+    /// Borrows the exact physical attached Record position.
+    #[must_use]
+    pub const fn target_record_index(&self) -> &SourcedValue<u32> {
+        &self.target_record_index
+    }
+}
+
 impl LoadoutAlignment {
+    /// Borrows the source link for the resolved port definition.
+    #[must_use]
+    pub const fn port_definition(&self) -> Option<&PortDefinitionLink> {
+        self.port_definition.as_ref()
+    }
+
+    /// Borrows the configuration link for the actually attached Entity.
+    #[must_use]
+    pub fn attachment_definition(&self) -> Option<&AttachmentDefinitionLink> {
+        self.attached_item.as_ref().map(|item| &item.definition)
+    }
     pub(crate) fn physical_port(&self) -> Result<Option<PhysicalPort>, CatalogError> {
         self.port_definition
             .as_ref()
@@ -73,7 +133,9 @@ impl LoadoutAlignment {
             .map(|attachment| (&attachment.identity, &attachment.proof))
     }
 
-    pub(crate) fn attachment(&self) -> Option<&AttachmentIdentity> {
+    /// Borrows the sourced identity of the actually attached Entity.
+    #[must_use]
+    pub fn attachment(&self) -> Option<&AttachmentIdentity> {
         self.attached_item
             .as_ref()
             .map(|attachment| &attachment.identity)
@@ -81,7 +143,7 @@ impl LoadoutAlignment {
 
     pub(crate) fn read(
         port: &PortNode,
-        index: &AlignmentIndex<'_>,
+        index: &mut (impl AlignmentLookup + ?Sized),
         capture: &Capture<'_>,
     ) -> Result<Self, CatalogError> {
         let port_definition = port

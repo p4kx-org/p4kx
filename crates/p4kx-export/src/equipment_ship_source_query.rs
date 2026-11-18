@@ -12,12 +12,14 @@ use crate::catalog_queries::{
 
 #[path = "equipment_ship_source_complete.rs"]
 mod complete;
-#[path = "equipment_ship_coverage.rs"]
-mod coverage;
 #[path = "equipment_ship_source_read.rs"]
 mod read;
 
-pub use coverage::{ShipSourceDependencyCoverage, ShipSourceEntryFailure, ShipSourceFailureStage};
+pub use super::dependency_coverage::{
+    EquipmentDependencyCoverage as ShipSourceDependencyCoverage,
+    EquipmentEntryFailure as ShipSourceEntryFailure,
+    EquipmentFailureStage as ShipSourceFailureStage,
+};
 
 /// Selected source-backed Ship fields and their resolver dependency coverage.
 pub type ShipSourceSnapshot<'source> =

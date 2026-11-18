@@ -39,8 +39,19 @@ pub(crate) fn read_item_ports<'source>(
     options: &AlignmentOptions<'_>,
     cancel: Option<&CancelToken>,
 ) -> Result<(Vec<ItemPortContainer<'source>>, Vec<FieldError>), CatalogError> {
+    let read = read_item_ports_scoped(tree, projection, admission, options, cancel)?;
+    Ok((read.value, read.notes))
+}
+
+pub(crate) fn read_item_ports_scoped<'source>(
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    options: &AlignmentOptions<'_>,
+    cancel: Option<&CancelToken>,
+) -> Result<ScopedSourceRead<Vec<ItemPortContainer<'source>>>, CatalogError> {
     let read = read_scope(tree, projection, admission, options, cancel, Scope::Ports)?;
-    Ok((read.value.alignment.into_port_containers(), read.notes))
+    Ok(read.map(|rows| rows.alignment.into_port_containers()))
 }
 
 #[path = "catalog_configuration_scope.rs"]

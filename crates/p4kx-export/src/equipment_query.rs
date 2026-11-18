@@ -1,7 +1,25 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Selective canonical original equipment families without resolved Ship or Loadout work.
+//! Selective queries over original equipment, resolved Ships and Loadouts.
+
+#[path = "equipment_dependency_coverage.rs"]
+mod dependency_coverage;
+#[path = "equipment_loadout_query.rs"]
+mod loadout_query;
+
+pub use crate::catalog_v3::catalog_item_alignment::{
+    AttachmentDefinitionLink, ComponentOwner, PortDefinitionLink,
+};
+pub use crate::loadout::alignment::{AttachmentIdentity, LoadoutAlignment};
+pub use dependency_coverage::{
+    EquipmentDependencyCoverage, EquipmentEntryFailure, EquipmentFailureStage,
+};
+pub use loadout_query::{
+    AlignmentDependency, AlignmentDependencyState, AlignmentRole, Loadout,
+    LoadoutDependencyCoverage, LoadoutOwnerKind, LoadoutPort, LoadoutSnapshot, PortType,
+    read_loadouts, read_loadouts_from,
+};
 
 #[path = "equipment_attachment_query.rs"]
 mod attachments;

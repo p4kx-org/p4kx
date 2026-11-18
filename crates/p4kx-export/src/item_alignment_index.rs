@@ -8,7 +8,7 @@ use p4kx_extraction::SourcedValue;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use super::{ItemAlignmentRows, ItemPort};
+use super::{ItemAlignmentRows, ItemAttachmentComponent, ItemPort, ItemPortContainer};
 use crate::catalog_v3::item_component_owner::ComponentOwner;
 use crate::schema_fields::every_field_required;
 use crate::{CatalogError, ExportAccountingError};
@@ -20,24 +20,36 @@ use crate::{CatalogError, ExportAccountingError};
     rename_all_fields = "camelCase"
 )]
 #[schemars(transform = every_field_required)]
-pub(crate) enum PortDefinitionLink {
+#[non_exhaustive]
+/// The link to an original physical port definition.
+pub enum PortDefinitionLink {
+    /// A link to a projected original declaration.
     Projected {
         #[serde(flatten)]
+        /// The physical original configuration owner.
         owner: ComponentOwner,
+        /// The physical original port occurrence.
         port_ordinal: SourcedValue<u32>,
     },
+    /// The exact original declaration has no projected row.
     NotProjected,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(tag = "state", rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) enum AttachmentDefinitionLink {
+#[non_exhaustive]
+/// The link to an original physical attachment definition.
+pub enum AttachmentDefinitionLink {
+    /// A link to a projected original declaration.
     Projected {
         #[serde(flatten)]
+        /// The physical original configuration owner.
         owner: ComponentOwner,
     },
+    /// The exact original declaration has no projected row.
     NotProjected,
+    /// The resolved Entity has no authored attachable component.
     NotDeclared,
 }
 
@@ -70,6 +82,28 @@ impl PhysicalPort {
 }
 
 impl AttachmentDefinitionLink {
+    /// Resolves an exact physical link in configuration rows ordered by original component.
+    pub(crate) fn from_original(
+        rows: &[ItemAttachmentComponent<'_>],
+        record: u32,
+        component: usize,
+    ) -> Result<Self, CatalogError> {
+        let key = (Some(record), Some(ordinal(component)?));
+        let Ok(row) = rows.binary_search_by_key(&key, |row| row.owner.key()) else {
+            return Ok(Self::NotProjected);
+        };
+        let row = rows
+            .get(row)
+            .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+        Ok(Self::projected(&row.owner))
+    }
+
+    fn projected(owner: &ComponentOwner) -> Self {
+        Self::Projected {
+            owner: owner.clone(),
+        }
+    }
+
     pub(crate) fn physical_key(&self) -> Result<Option<(u32, u32)>, CatalogError> {
         match self {
             Self::Projected { owner } => Ok(Some(physical_key(owner)?)),
@@ -79,6 +113,42 @@ impl AttachmentDefinitionLink {
 }
 
 impl PortDefinitionLink {
+    /// Resolves an exact physical link in configuration rows ordered by original component.
+    pub(crate) fn from_original(
+        rows: &[ItemPortContainer<'_>],
+        position: PortDefinitionPosition,
+    ) -> Result<Self, CatalogError> {
+        let record = position.record_index();
+        let component = ordinal(position.component_ordinal())?;
+        let slot = ordinal(position.port_ordinal())?;
+        let key = (Some(record), Some(component));
+        let Ok(row) = rows.binary_search_by_key(&key, |row| row.owner.key()) else {
+            return Ok(Self::NotProjected);
+        };
+        let row = rows
+            .get(row)
+            .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+        let Some(port) = row
+            .ports()
+            .value()
+            .and_then(|ports| ports.get(position.port_ordinal()))
+            .and_then(SourcedValue::value)
+        else {
+            return Ok(Self::NotProjected);
+        };
+        if port.port_ordinal().value() != Some(&slot) {
+            return Err(ExportAccountingError::ConflictingSourceDatum.into());
+        }
+        Ok(Self::projected(&row.owner, port.port_ordinal()))
+    }
+
+    fn projected(owner: &ComponentOwner, port_ordinal: &SourcedValue<u32>) -> Self {
+        Self::Projected {
+            owner: owner.clone(),
+            port_ordinal: port_ordinal.clone(),
+        }
+    }
+
     pub(crate) fn physical_port(&self) -> Result<Option<PhysicalPort>, CatalogError> {
         match self {
             Self::Projected {
@@ -165,10 +235,7 @@ impl<'rows> AlignmentIndex<'rows> {
             .ports
             .get(&key)
             .map_or(PortDefinitionLink::NotProjected, |found| {
-                PortDefinitionLink::Projected {
-                    owner: found.component.clone(),
-                    port_ordinal: found.port_ordinal.clone(),
-                }
+                PortDefinitionLink::projected(found.component, found.port_ordinal)
             }))
     }
 
@@ -180,12 +247,12 @@ impl<'rows> AlignmentIndex<'rows> {
         let Some(component) = component else {
             return Ok(AttachmentDefinitionLink::NotDeclared);
         };
-        Ok(self.items.get(&(record, ordinal(component)?)).map_or(
-            AttachmentDefinitionLink::NotProjected,
-            |owner| AttachmentDefinitionLink::Projected {
-                owner: (*owner).clone(),
-            },
-        ))
+        Ok(self
+            .items
+            .get(&(record, ordinal(component)?))
+            .map_or(AttachmentDefinitionLink::NotProjected, |owner| {
+                AttachmentDefinitionLink::projected(owner)
+            }))
     }
 }
 

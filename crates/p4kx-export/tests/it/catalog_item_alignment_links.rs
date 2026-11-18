@@ -188,3 +188,6 @@ fn xml_catalog() -> TestResult<Value> {
         build_catalog(&archive, &options)?.json(),
     )?)
 }
+
+#[path = "catalog_loadout_alignment_sdk.rs"]
+mod direct_sdk;

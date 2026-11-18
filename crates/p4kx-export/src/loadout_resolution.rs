@@ -6,10 +6,11 @@ use std::sync::Arc;
 use p4kx_assembly::{ArchiveFiles, Entities, LoadoutResolver};
 use p4kx_extraction::{CancelToken, DataForge};
 
+use super::alignment::AlignmentLookup;
 use super::ledger::Capture;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_rows::spool::checkpoint;
-use crate::catalog_v3::catalog_item_alignment::{AlignmentIndex, ItemAlignmentRows};
+use crate::catalog_v3::catalog_item_alignment::ItemAlignmentRows;
 use crate::contract_loadout::{EntityKind, Loadout};
 use crate::export_ledger::ExportLedger;
 use crate::guid_text::{self, CatalogGuid};
@@ -28,7 +29,7 @@ pub(crate) fn read_rows<'source>(
     files: &ArchiveFiles<'_>,
     entities: &Arc<Entities<'source>>,
     wanted: impl Iterator<Item = Wanted>,
-    sources: SelectedSources<'_, 'source>,
+    sources: ResolverEvidence<'_>,
     input: &OriginalCatalogInput<'_, 'source>,
     cancel: Option<&CancelToken>,
     accept: impl FnMut(Loadout) -> Result<(), CatalogError>,
@@ -36,18 +37,13 @@ pub(crate) fn read_rows<'source>(
     if cancel.is_some_and(CancelToken::is_cancelled) {
         return Err(CatalogError::Cancelled);
     }
-    let capture = Arc::new(Capture::for_input(
-        input,
-        sources.ledger,
-        cancel,
-        Kind::Loadouts,
-    ));
-    let alignment = AlignmentIndex::new(sources.alignment)?;
+    let ResolverEvidence { seed, alignment } = sources;
+    let capture = Arc::new(Capture::for_input(input, seed, cancel, Kind::Loadouts));
     let mut resolver =
         LoadoutResolver::with_observed_entities(Arc::clone(entities), capture.clone())
             .with_files(files)
             .stopping_at_docked_vehicles();
-    let mut reader = PortReader::with_alignment(&alignment);
+    let mut reader = PortReader::with_alignment(alignment);
     let failures = resolve_ordered(
         wanted,
         cancel,
@@ -74,6 +70,12 @@ pub(crate) struct Wanted {
 pub(crate) struct SelectedSources<'rows, 'source> {
     pub(crate) ledger: &'rows ExportLedger,
     pub(crate) alignment: &'rows ItemAlignmentRows<'source>,
+}
+
+/// Shared origin seed and physical configuration reader for a resolved Loadout scan.
+pub(crate) struct ResolverEvidence<'scope> {
+    pub(crate) seed: &'scope ExportLedger,
+    pub(crate) alignment: &'scope mut dyn AlignmentLookup,
 }
 
 pub(super) fn resolve_ordered<'source>(

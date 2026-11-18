@@ -72,7 +72,7 @@ impl Scope {
         input: &OriginalCatalogInput<'_, '_>,
         cancel: Option<&CancelToken>,
     ) -> Result<bool, CatalogError> {
-        if !matches!(self, Self::Attachments | Self::Bounds) {
+        if matches!(self, Self::All) {
             return Ok(false);
         }
         let Some(value) = tree.field("Components") else {
@@ -87,7 +87,9 @@ impl Scope {
             }
             let complete = match value {
                 Value::Error(_) => false,
-                Value::Struct(component) if component.type_name() == ATTACHABLE => {
+                Value::Struct(component)
+                    if !matches!(self, Self::Ports) && component.type_name() == ATTACHABLE =>
+                {
                     self.attachment_complete(component, input)
                 }
                 _ => true,

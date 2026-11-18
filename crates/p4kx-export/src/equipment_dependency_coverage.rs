@@ -10,10 +10,10 @@ use crate::export_entry_ledger::EntryOperation;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
 use crate::{CatalogError, ExportAccountingError};
 
-/// The failed operation observed on a Ship resolver input.
+/// The failed operation observed on an equipment resolver input.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[non_exhaustive]
-pub enum ShipSourceFailureStage {
+pub enum EquipmentFailureStage {
     /// Reading the required input failed.
     SourceRead,
     /// The input was read but its required projection failed.
@@ -22,15 +22,15 @@ pub enum ShipSourceFailureStage {
 
 /// One actual failed Archive-entry operation of this query.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ShipSourceEntryFailure {
+pub struct EquipmentEntryFailure {
     operation: EntryOperation,
     entry_index: Option<usize>,
     container_entry_index: Option<usize>,
     path: String,
-    stage: ShipSourceFailureStage,
+    stage: EquipmentFailureStage,
 }
 
-impl ShipSourceEntryFailure {
+impl EquipmentEntryFailure {
     /// Returns the actual required operation.
     #[must_use]
     pub const fn operation(&self) -> EntryOperation {
@@ -57,22 +57,22 @@ impl ShipSourceEntryFailure {
 
     /// Returns the actually failed operation stage.
     #[must_use]
-    pub const fn stage(&self) -> ShipSourceFailureStage {
+    pub const fn stage(&self) -> EquipmentFailureStage {
         self.stage
     }
 }
 
 /// Actual resolver coverage, separate from the selected output-owner survey.
 #[derive(Debug, Default)]
-pub struct ShipSourceDependencyCoverage {
+pub struct EquipmentDependencyCoverage {
     failed_records: Vec<u32>,
-    failed_entries: Vec<ShipSourceEntryFailure>,
+    failed_entries: Vec<EquipmentEntryFailure>,
     incomplete_records: Vec<u32>,
     incomplete_fields: usize,
     directory_complete: bool,
 }
 
-impl ShipSourceDependencyCoverage {
+impl EquipmentDependencyCoverage {
     /// Borrows distinct physical Records whose required resolver operation failed.
     #[must_use]
     pub fn failed_records(&self) -> &[u32] {
@@ -81,7 +81,7 @@ impl ShipSourceDependencyCoverage {
 
     /// Borrows distinct failed Entry operations in first-observed order.
     #[must_use]
-    pub fn failed_entries(&self) -> &[ShipSourceEntryFailure] {
+    pub fn failed_entries(&self) -> &[EquipmentEntryFailure] {
         &self.failed_entries
     }
 
@@ -150,8 +150,8 @@ impl ShipSourceDependencyCoverage {
         let mut entry_operations = BTreeSet::new();
         for row in &ledger.entries {
             let stage = match row.disposition {
-                SourceDisposition::ReadFailed => ShipSourceFailureStage::SourceRead,
-                SourceDisposition::ProjectionFailed => ShipSourceFailureStage::Projection,
+                SourceDisposition::ReadFailed => EquipmentFailureStage::SourceRead,
+                SourceDisposition::ProjectionFailed => EquipmentFailureStage::Projection,
                 _ => continue,
             };
             if !entry_operations.insert((
@@ -163,7 +163,7 @@ impl ShipSourceDependencyCoverage {
             )) {
                 continue;
             }
-            let failure = ShipSourceEntryFailure {
+            let failure = EquipmentEntryFailure {
                 operation: row.operation,
                 entry_index: row.entry_index,
                 container_entry_index: row.container_entry_index,
