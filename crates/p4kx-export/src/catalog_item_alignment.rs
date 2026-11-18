@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{DataForge, DataType, Guid, SourceUse, SourcedValue, StructValue, Value};
+use p4kx_extraction::{DataForge, Guid, SourceUse, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -11,7 +11,6 @@ pub(crate) use super::item_alignment_options::AlignmentOptions;
 pub use super::item_alignment_options::AttachmentAxisOptionStatus;
 use super::item_component_owner::ComponentOwner;
 pub use super::port_restrictions::{PortItemType, PortRestrictions};
-use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_projection::{CatalogProjection, TextOwner};
 use crate::catalog_rows::staged::StagedCatalogTable;
 use crate::catalog_table::CatalogTable;
@@ -21,6 +20,8 @@ use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 use crate::{CatalogError, ExportAccountingError};
 
+#[path = "item_attachment_views.rs"]
+mod attachment_views;
 #[path = "item_alignment_index.rs"]
 mod index;
 #[path = "item_port_staging.rs"]
@@ -34,9 +35,9 @@ pub(crate) use staging::ItemPortStaging;
 use self::staging::{PortContainerFacts, StagedItemPorts};
 
 pub(crate) const CONTAINER: &str = "SItemPortContainerComponentParams";
-const ATTACHABLE: &str = "SAttachableComponentParams";
-const PORT: &str = "SItemPortDef";
+pub(crate) const ATTACHABLE: &str = "SAttachableComponentParams";
 const DEFINITION: &str = "SItemDefinition";
+const PORT: &str = "SItemPortDef";
 
 pub(super) struct TopologyPortDefinition<'rows> {
     pub(super) name: &'rows str,
@@ -54,6 +55,10 @@ pub(crate) struct ItemAlignmentRows<'source> {
 impl<'source> ItemAlignmentRows<'source> {
     pub(crate) fn into_port_containers(self) -> Vec<ItemPortContainer<'source>> {
         self.ports
+    }
+
+    pub(crate) fn into_attachment_components(self) -> Vec<ItemAttachmentComponent<'source>> {
+        self.attachments
     }
 
     pub(crate) fn extend(&mut self, other: Self) {
@@ -206,19 +211,21 @@ pub struct ItemPort<'source> {
     attach_axes_to_align: AlignmentAxis<'source>,
 }
 
+/// One original attachment component and its physical owner.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct ItemAttachmentComponent<'source> {
+pub struct ItemAttachmentComponent<'source> {
     #[serde(flatten)]
     owner: ComponentOwner,
     definition: SourcedValue<ItemAttachment<'source>>,
 }
 
+/// The original restrictions and alignment fields of an attachment definition.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct ItemAttachment<'source> {
+pub struct ItemAttachment<'source> {
     item_type: SourcedValue<AuthoredRestriction<'source, &'source str>>,
     #[serde(skip)]
     type_use: Option<SourceUse>,
@@ -231,47 +238,9 @@ struct ItemAttachment<'source> {
     attach_check_center_of_mass: SourcedValue<bool>,
 }
 
-#[derive(Clone, Copy)]
-pub(super) enum ItemAlignmentKind {
-    Port,
-    Attachment,
-}
-
-impl ItemAlignmentKind {
-    pub(super) fn of(
-        value: &StructValue<'_>,
-        input: &OriginalCatalogInput<'_, '_>,
-    ) -> Option<Self> {
-        match value.type_name() {
-            CONTAINER => Some(Self::Port),
-            ATTACHABLE if owns_item_definition(value, input) => Some(Self::Attachment),
-            _ => None,
-        }
-    }
-}
-
-fn owns_item_definition(source: &StructValue<'_>, input: &OriginalCatalogInput<'_, '_>) -> bool {
-    let Some(field) = source
-        .fields()
-        .iter()
-        .find(|field| field.name() == "AttachDef")
-    else {
-        return false;
-    };
-    let storage = field.storage();
-    if storage.is_array()
-        || !matches!(
-            storage.data_type(),
-            DataType::Class | DataType::StrongPointer
-        )
-    {
-        return false;
-    }
-    match field.value() {
-        Value::Struct(definition) => definition.type_name() == DEFINITION,
-        _ => input.struct_name(storage.target()) == Some(DEFINITION),
-    }
-}
+#[path = "item_alignment_kind.rs"]
+mod kind;
+pub(super) use kind::{AttachmentTarget, ItemAlignmentKind, attachment_target};
 
 impl<'source> ItemPortContainer<'source> {
     /// Returns the nominal owner GUID with its original header origin.

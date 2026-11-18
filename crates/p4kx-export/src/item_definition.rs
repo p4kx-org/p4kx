@@ -24,6 +24,8 @@ use crate::{CatalogError, ExportAccountingError};
 
 #[path = "item_definition_staging.rs"]
 mod staging;
+#[path = "item_definition_views.rs"]
+mod views;
 
 pub(crate) use self::staging::{ItemDefinitionStaging, StagedItemDefinitions};
 
@@ -35,70 +37,81 @@ const PURCHASABLE: &str = "SCItemPurchasableParams";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ItemDefinition<'source> {
+pub struct ItemDefinition<'source> {
     #[serde(flatten)]
     header: CanonicalRecordHeader<'source>,
     components: SourcedValue<Vec<ItemDefinitionComponent<'source>>>,
 }
 
+/// One original presentation component at its physical Item component position.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct ItemDefinitionComponent<'source> {
+pub struct ItemDefinitionComponent<'source> {
     component_ordinal: SourcedValue<u32>,
     source_type: SourcedValue<&'source str>,
     #[serde(flatten)]
     body: ItemDefinitionComponentKind<'source>,
 }
 
+/// Typed original presentation values selected from an Item component.
 #[derive(Debug, Serialize, JsonSchema)]
+#[non_exhaustive]
 #[serde(tag = "kind", content = "value", rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-enum ItemDefinitionComponentKind<'source> {
+pub enum ItemDefinitionComponentKind<'source> {
+    /// The original attachment classification and presentation fields.
     Attachment(SourcedValue<Box<ItemAttachmentPresentation<'source>>>),
+    /// The original physics component fields.
     Physics(SourcedValue<ItemPhysics>),
+    /// The original purchasable component fields.
     Purchasable(ItemPurchasable),
 }
 
+/// Independently authored attachment display and manufacturer values.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct ItemAttachmentPresentation<'source> {
+pub struct ItemAttachmentPresentation<'source> {
     grade: SourcedValue<ResourceNumber>,
     manufacturer: AuthoredManufacturer<'source>,
     localization: SourcedValue<ItemLocalization>,
     weapon_motion: Option<WeaponAttachmentMotion<'source>>,
 }
 
+/// Separate public-name and protected-description references from an attachment.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct ItemLocalization {
+pub struct ItemLocalization {
     name: SourcedValue<PublicNameRef>,
     #[schemars(extend("x-gameText" = true))]
     description: SourcedValue<GameTextRef>,
 }
 
+/// Original physical mass from an Item physics declaration.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct ItemPhysics {
+pub struct ItemPhysics {
     mass: SourcedValue<ResourceFloat32>,
 }
 
+/// Original public display name and protected display type of a purchasable Item.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct ItemPurchasable {
+pub struct ItemPurchasable {
     display_name: SourcedValue<PublicNameRef>,
     #[schemars(extend("x-gameText" = true))]
     display_type: SourcedValue<GameTextRef>,
 }
 
+/// Original personal-weapon attachment values used by animation joins.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct WeaponAttachmentMotion<'source> {
+pub struct WeaponAttachmentMotion<'source> {
     item_type: SourcedValue<&'source str>,
     tags: SourcedValue<&'source str>,
 }

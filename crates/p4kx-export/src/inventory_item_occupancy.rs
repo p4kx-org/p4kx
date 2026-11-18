@@ -26,7 +26,7 @@ const FIXED_GRID: &str = "inventoryOccupancyFixedGridDimensionsUIV4";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct InventoryItemOccupancy<'source> {
+pub struct InventoryItemOccupancy<'source> {
     #[serde(rename = "inventoryOccupancyVolume")]
     volume: SourcedValue<ResourceCapacity<'source>>,
     #[serde(rename = "inventoryOccupancyDimensions")]
@@ -42,6 +42,42 @@ pub(super) struct InventoryItemOccupancy<'source> {
 }
 
 impl<'source> InventoryItemOccupancy<'source> {
+    /// Borrows the original capacity with its concrete unit.
+    #[must_use]
+    pub const fn volume(&self) -> &SourcedValue<ResourceCapacity<'source>> {
+        &self.volume
+    }
+
+    /// Borrows the authored occupancy dimensions.
+    #[must_use]
+    pub const fn dimensions(&self) -> &SourcedValue<InventoryVector3<'source>> {
+        &self.dimensions
+    }
+
+    /// Borrows the original minimum local bounds.
+    #[must_use]
+    pub const fn local_bounds_min(&self) -> &SourcedValue<InventoryVector3<'source>> {
+        &self.local_bounds_min
+    }
+
+    /// Borrows the original maximum local bounds.
+    #[must_use]
+    pub const fn local_bounds_max(&self) -> &SourcedValue<InventoryVector3<'source>> {
+        &self.local_bounds_max
+    }
+
+    /// Borrows the authored inventory UI dimension override.
+    #[must_use]
+    pub const fn ui_override(&self) -> &SourcedValue<InventoryVector3<'source>> {
+        &self.ui_override
+    }
+
+    /// Borrows the authored fixed inventory UI grid.
+    #[must_use]
+    pub const fn fixed_ui_grid(&self) -> &SourcedValue<InventoryVector2<'source>> {
+        &self.fixed_ui_grid
+    }
+
     pub(super) fn applies(component: &StructValue<'_>) -> bool {
         let Some(Value::Struct(definition)) = component.field(ATTACHMENT) else {
             return false;

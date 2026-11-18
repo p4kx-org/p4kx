@@ -14,11 +14,14 @@ use crate::source_value_catalog::{SourceArenaOutput, SourceRecordReference};
 
 /// A manufacturer field with its original Reference or other declared storage.
 #[derive(Debug, Serialize, JsonSchema)]
+#[non_exhaustive]
 #[serde(tag = "kind", content = "value", rename_all = "camelCase")]
 #[schemars(rename = "ItemManufacturer", transform = every_field_required)]
-pub(crate) enum AuthoredManufacturer<'source> {
+pub enum AuthoredManufacturer<'source> {
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
+    /// The original manufacturer Record reference.
     Record(SourcedValue<Box<SourceRecordReference<'source>>>),
+    /// An authored manufacturer declaration retained in its original value arena.
     Authored(SourcedValue<SourceArenaOutput<'source>>),
 }
 

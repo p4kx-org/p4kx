@@ -44,6 +44,7 @@ mod inventory_interactions;
 
 #[path = "catalog_inventory_containers.rs"]
 mod inventory_containers;
+pub(crate) use inventory_containers::entities as inventory_entities;
 #[path = "catalog_jump_drive.rs"]
 mod jump_drive;
 #[path = "catalog_missile_configuration.rs"]

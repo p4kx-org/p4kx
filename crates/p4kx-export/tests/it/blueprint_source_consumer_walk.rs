@@ -113,7 +113,7 @@ fn visit_payload(
     }
 }
 
-fn visit_record(reference: &SourceRecordReference<'_>, wire: Wire<'_>) -> TestResult {
+pub(crate) fn visit_record(reference: &SourceRecordReference<'_>, wire: Wire<'_>) -> TestResult {
     wire.field("guid")?.guid(&reference.guid())?;
     wire.field("targetRecordIndex")?
         .leaf(reference.target_record_index())?;

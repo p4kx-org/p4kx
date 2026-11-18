@@ -14,12 +14,24 @@ use crate::source_value_catalog::SourceArenaOutput;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct UnitSource<'source> {
+pub struct UnitSource<'source> {
     source_type: SourcedValue<&'source str>,
     additional_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> UnitSource<'source> {
+    /// Borrows the original concrete unit type.
+    #[must_use]
+    pub const fn source_type(&self) -> &SourcedValue<&'source str> {
+        &self.source_type
+    }
+
+    /// Borrows original members outside the typed unit fields.
+    #[must_use]
+    pub const fn additional_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.additional_fields
+    }
+
     #[cfg(test)]
     pub(super) const fn fixture(source_type: SourcedValue<&'source str>) -> Self {
         Self {

@@ -17,7 +17,7 @@ use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 use crate::{CatalogError, ExportAccountingError};
 
-const BOUNDS_SOURCE_TYPES: &[&str] = &[
+pub(crate) const BOUNDS_SOURCE_TYPES: &[&str] = &[
     inventory_item_occupancy::ITEM_DEFINITION,
     room_associations::VEHICLE,
     inventory_owner_bounds::METADATA_COMPONENT,
@@ -93,11 +93,24 @@ impl<'source> InventoryEntityRows<'source> {
                 notes,
             )?);
         }
+        self.vehicle_bounds(owner, source, notes)
+    }
+
+    pub(super) fn vehicle_bounds(
+        &mut self,
+        owner: &ComponentOwner,
+        source: Observed<'_, '_, '_, 'source>,
+        notes: &mut Vec<FieldError>,
+    ) -> Result<(), CatalogError> {
         if source.has_member(inventory_owner_bounds::VEHICLE_FIELD)? {
             self.bounds
                 .push(InventoryOwnerBounds::vehicle(owner.clone(), source, notes)?);
         }
         Ok(())
+    }
+
+    pub(crate) fn into_bounds(self) -> Vec<InventoryOwnerBounds<'source>> {
+        self.bounds
     }
 
     pub(super) fn stage_bounds(

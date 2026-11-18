@@ -146,7 +146,7 @@ pub(crate) mod catalog_ammo_bindings;
 #[path = "catalog_ammo_containers.rs"]
 pub(crate) mod catalog_ammo_containers;
 #[path = "catalog_capacity.rs"]
-mod catalog_capacity;
+pub(crate) mod catalog_capacity;
 #[path = "catalog_declarations.rs"]
 pub(crate) mod catalog_declarations;
 #[path = "catalog_emp.rs"]
@@ -218,7 +218,7 @@ mod catalog_seat_ejection;
 #[path = "catalog_shield_generator.rs"]
 pub(crate) mod catalog_shield_generator;
 #[path = "catalog_unit_source.rs"]
-mod catalog_unit_source;
+pub(crate) mod catalog_unit_source;
 #[path = "procedural_planet_audio.rs"]
 pub(crate) mod procedural_planet_audio;
 #[path = "weapon_procedural_definitions.rs"]
@@ -251,19 +251,19 @@ pub(crate) mod inventory_container_definition;
 #[path = "inventory_container_type.rs"]
 mod inventory_container_type;
 #[path = "inventory_dimensions.rs"]
-mod inventory_dimensions;
+pub(crate) mod inventory_dimensions;
 #[path = "inventory_entity_configurations.rs"]
-mod inventory_entity_configurations;
+pub(crate) mod inventory_entity_configurations;
 #[path = "inventory_grid_cell.rs"]
 mod inventory_grid_cell;
 #[path = "inventory_item_occupancy.rs"]
-mod inventory_item_occupancy;
+pub(crate) mod inventory_item_occupancy;
 #[path = "inventory_item_type_filter.rs"]
 mod inventory_item_type_filter;
 #[path = "inventory_open_container.rs"]
 mod inventory_open_container;
 #[path = "inventory_owner_bounds.rs"]
-mod inventory_owner_bounds;
+pub(crate) mod inventory_owner_bounds;
 #[path = "inventory_owner_storage.rs"]
 mod inventory_owner_storage;
 #[path = "item_alignment_options.rs"]

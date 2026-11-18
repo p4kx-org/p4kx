@@ -37,7 +37,9 @@ use crate::{CatalogError, CatalogOptions, ExportAccountingError};
 
 #[path = "catalog_configuration_record_read.rs"]
 mod record_read;
-pub(crate) use record_read::{read, read_item_ports};
+pub(crate) use record_read::{
+    read, read_attachment_constraints, read_item_bounds, read_item_ports,
+};
 
 #[derive(Default)]
 pub(crate) struct EntityConfigurationRows<'source> {

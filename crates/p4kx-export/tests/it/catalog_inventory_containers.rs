@@ -156,7 +156,7 @@ fn single(row: &Value, field: &str, original: f32, encrypted: bool) -> TestResul
 }
 
 #[path = "catalog_inventory_entities_fixture.rs"]
-mod entities;
+pub(crate) mod entities;
 
 #[path = "catalog_inventory_bounds_staging.rs"]
 mod bounds_staging;

@@ -38,7 +38,7 @@ impl InventoryAxes {
 /// A physical two-coordinate inventory dimension.
 #[derive(Debug, Serialize, JsonSchema)]
 #[schemars(transform = every_field_required)]
-pub(super) struct InventoryVector2<'source> {
+pub struct InventoryVector2<'source> {
     #[serde(flatten)]
     source: UnitSource<'source>,
     #[serde(flatten)]
@@ -46,6 +46,24 @@ pub(super) struct InventoryVector2<'source> {
 }
 
 impl<'source> InventoryVector2<'source> {
+    /// Borrows the original dimension type and unprojected members.
+    #[must_use]
+    pub const fn source(&self) -> &UnitSource<'source> {
+        &self.source
+    }
+
+    /// Borrows the original first coordinate.
+    #[must_use]
+    pub const fn x(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.axes.x
+    }
+
+    /// Borrows the original second coordinate.
+    #[must_use]
+    pub const fn y(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.axes.y
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
@@ -59,7 +77,7 @@ impl<'source> InventoryVector2<'source> {
 /// Physical three-coordinate inventory dimensions or offsets.
 #[derive(Debug, Serialize, JsonSchema)]
 #[schemars(transform = every_field_required)]
-pub(super) struct InventoryVector3<'source> {
+pub struct InventoryVector3<'source> {
     #[serde(flatten)]
     source: UnitSource<'source>,
     #[serde(flatten)]
@@ -68,6 +86,30 @@ pub(super) struct InventoryVector3<'source> {
 }
 
 impl<'source> InventoryVector3<'source> {
+    /// Borrows the original dimension type and unprojected members.
+    #[must_use]
+    pub const fn source(&self) -> &UnitSource<'source> {
+        &self.source
+    }
+
+    /// Borrows the original first coordinate.
+    #[must_use]
+    pub const fn x(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.axes.x
+    }
+
+    /// Borrows the original second coordinate.
+    #[must_use]
+    pub const fn y(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.axes.y
+    }
+
+    /// Borrows the original third coordinate.
+    #[must_use]
+    pub const fn z(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.z
+    }
+
     pub(super) const fn coordinates(&self) -> [&SourcedValue<ResourceFloat32>; 3] {
         [&self.axes.x, &self.axes.y, &self.z]
     }

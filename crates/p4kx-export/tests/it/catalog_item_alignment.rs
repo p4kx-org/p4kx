@@ -314,3 +314,6 @@ fn class(name: &str) -> TestType {
 const fn node(instance: TestInstance) -> TestValue {
     TestValue::Struct(instance)
 }
+
+#[path = "equipment_configuration_sdk.rs"]
+mod equipment_sdk;

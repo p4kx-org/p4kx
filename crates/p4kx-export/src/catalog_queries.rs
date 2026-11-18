@@ -65,6 +65,10 @@ mod reputation;
 #[path = "quality_query.rs"]
 pub mod quality;
 
+/// Canonical original equipment definitions, attachment constraints and bounds.
+#[path = "equipment_query.rs"]
+pub mod equipment;
+
 use p4kx_extraction::{
     Archive, Build, CancelToken, DataForge, DataForgeEntry, Guid, Record, SourceInventory,
     SourcedValue,

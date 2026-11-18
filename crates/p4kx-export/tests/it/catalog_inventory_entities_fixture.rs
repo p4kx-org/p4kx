@@ -20,7 +20,7 @@ const OBJECT_METADATA: &str = "SEntityComponentObjectMetadataParams";
 const INTERACTION: &str = "SSharedInteractionParams";
 const CONTAINER: &str = "InventoryContainer";
 
-pub(super) fn database() -> DataForgeBuilder {
+pub(crate) fn database() -> DataForgeBuilder {
     definitions(fixture::database(), item_definition())
         .record(
             TestEntity::new(
@@ -119,7 +119,7 @@ fn item_definition() -> TestStruct {
         .field("inventoryOccupancyFixedGridDimensionsUIV4", class("Vec2"))
 }
 
-pub(super) fn wrong_dimension_type() -> DataForgeBuilder {
+pub(crate) fn wrong_dimension_type() -> DataForgeBuilder {
     let declaration = TestStruct::new(ITEM)
         .field("Type", TestType::String)
         .field("inventoryOccupancyDimensions", TestType::String)

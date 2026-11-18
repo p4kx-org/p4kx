@@ -30,6 +30,8 @@ use crate::record_observation::RecordObservation;
 use crate::source_fields::FieldError;
 use crate::template_field_capture::TemplateFieldCapture;
 
+#[path = "equipment_item_definition_read.rs"]
+pub(crate) mod definition_read;
 #[path = "item_definition.rs"]
 pub(crate) mod item_definition;
 #[path = "catalog_weapon_magazine_resolution.rs"]

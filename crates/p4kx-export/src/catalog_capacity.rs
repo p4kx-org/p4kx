@@ -16,35 +16,49 @@ use super::cargo_source::{BASE, CargoUnit};
 
 /// A capacity retains the concrete unit and its own stored numeric member.
 #[derive(Debug, Serialize, JsonSchema)]
+#[non_exhaustive]
 #[serde(
     tag = "kind",
     rename_all = "camelCase",
     rename_all_fields = "camelCase"
 )]
 #[schemars(transform = every_field_required)]
-pub(super) enum ResourceCapacity<'source> {
+pub enum ResourceCapacity<'source> {
+    /// The base capacity source without a concrete numeric unit.
     Base {
+        /// The original concrete type and unprojected members.
         #[serde(flatten)]
         source: UnitSource<'source>,
     },
+    /// An original capacity in centi-SCU.
     CentiCargoUnit {
+        /// The original concrete type and unprojected members.
         #[serde(flatten)]
         source: UnitSource<'source>,
+        /// The original centi-SCU amount.
         #[serde(rename = "centiSCU")]
         centi_scu: SourcedValue<i32>,
     },
+    /// An original capacity in micro-SCU.
     MicroCargoUnit {
+        /// The original concrete type and unprojected members.
         #[serde(flatten)]
         source: UnitSource<'source>,
+        /// The original micro-SCU amount.
         #[serde(rename = "microSCU")]
         micro_scu: SourcedValue<i32>,
     },
+    /// An original capacity in standard cargo units.
     StandardCargoUnit {
+        /// The original concrete type and unprojected members.
         #[serde(flatten)]
         source: UnitSource<'source>,
+        /// The original standard-cargo-unit amount.
         standard_cargo_units: SourcedValue<ResourceFloat32>,
     },
+    /// A retained concrete subtype outside the recognized capacity units.
     UnknownUnit {
+        /// The original concrete type and unprojected members.
         #[serde(flatten)]
         source: UnitSource<'source>,
     },
@@ -57,6 +71,18 @@ pub(super) enum CargoAmount<'amount> {
 }
 
 impl<'source> ResourceCapacity<'source> {
+    /// Borrows the concrete capacity type and unprojected original members.
+    #[must_use]
+    pub const fn source(&self) -> &UnitSource<'source> {
+        match self {
+            Self::Base { source }
+            | Self::CentiCargoUnit { source, .. }
+            | Self::MicroCargoUnit { source, .. }
+            | Self::StandardCargoUnit { source, .. }
+            | Self::UnknownUnit { source } => source,
+        }
+    }
+
     pub(super) const fn cargo_amount(&self) -> Option<CargoAmount<'_>> {
         match self {
             Self::StandardCargoUnit {

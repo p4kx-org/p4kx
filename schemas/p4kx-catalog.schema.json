@@ -23240,9 +23240,11 @@
       "description": "A storage occupancy or bound field at its original component slot.",
       "oneOf": [
         {
+          "description": "Occupancy fields on the original attachment definition.",
           "properties": {
             "attachDef": {
-              "$ref": "#/$defs/SourcedValueOfInventoryItemOccupancy"
+              "$ref": "#/$defs/SourcedValueOfInventoryItemOccupancy",
+              "description": "The original attachment definition and its retained state."
             },
             "kind": {
               "const": "itemOccupancy",
@@ -23256,13 +23258,15 @@
           "type": "object"
         },
         {
+          "description": "A vehicle component's original maximum dimensions.",
           "properties": {
             "kind": {
               "const": "vehicleBounds",
               "type": "string"
             },
             "maxBoundingBoxSize": {
-              "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+              "$ref": "#/$defs/SourcedValueOfInventoryVector3",
+              "description": "The original maximum bounding-box vector."
             }
           },
           "required": [
@@ -23272,9 +23276,11 @@
           "type": "object"
         },
         {
+          "description": "The original local-bounds metadata declaration.",
           "properties": {
             "hasLocalBounds": {
-              "$ref": "#/$defs/SourcedValueOfboolean"
+              "$ref": "#/$defs/SourcedValueOfboolean",
+              "description": "Whether the source explicitly declares local bounds."
             },
             "kind": {
               "const": "objectMetadata",
@@ -23881,6 +23887,7 @@
       "type": "object"
     },
     "ItemAttachment": {
+      "description": "The original restrictions and alignment fields of an attachment definition.",
       "properties": {
         "attachAxesToAlign": {
           "$ref": "#/$defs/AlignmentAxis"
@@ -23920,7 +23927,7 @@
       "type": "object"
     },
     "ItemAttachmentComponent": {
-      "description": "The shared physical Record and original Components slot of a configuration.",
+      "description": "One original attachment component and its physical owner.",
       "properties": {
         "componentOrdinal": {
           "$ref": "#/$defs/SourcedValueOfuint32"
@@ -23944,6 +23951,7 @@
       "type": "object"
     },
     "ItemAttachmentPresentation": {
+      "description": "Independently authored attachment display and manufacturer values.",
       "properties": {
         "grade": {
           "$ref": "#/$defs/SourcedValueOfResourceNumber"
@@ -24018,8 +24026,10 @@
       "type": "object"
     },
     "ItemDefinitionComponent": {
+      "description": "One original presentation component at its physical Item component position.",
       "oneOf": [
         {
+          "description": "The original attachment classification and presentation fields.",
           "properties": {
             "kind": {
               "const": "attachment",
@@ -24036,6 +24046,7 @@
           "type": "object"
         },
         {
+          "description": "The original physics component fields.",
           "properties": {
             "kind": {
               "const": "physics",
@@ -24052,6 +24063,7 @@
           "type": "object"
         },
         {
+          "description": "The original purchasable component fields.",
           "properties": {
             "kind": {
               "const": "purchasable",
@@ -24083,6 +24095,7 @@
       "type": "object"
     },
     "ItemLocalization": {
+      "description": "Separate public-name and protected-description references from an attachment.",
       "properties": {
         "description": {
           "$ref": "#/$defs/SourcedValueOfGameTextRef",
@@ -24102,6 +24115,7 @@
       "description": "A manufacturer field with its original Reference or other declared storage.",
       "oneOf": [
         {
+          "description": "The original manufacturer Record reference.",
           "properties": {
             "kind": {
               "const": "record",
@@ -24118,6 +24132,7 @@
           "type": "object"
         },
         {
+          "description": "An authored manufacturer declaration retained in its original value arena.",
           "properties": {
             "kind": {
               "const": "authored",
@@ -24137,6 +24152,7 @@
       "required": []
     },
     "ItemPhysics": {
+      "description": "Original physical mass from an Item physics declaration.",
       "properties": {
         "mass": {
           "$ref": "#/$defs/SourcedValueOfResourceFloat32"
@@ -24200,6 +24216,7 @@
       "type": "object"
     },
     "ItemPurchasable": {
+      "description": "Original public display name and protected display type of a purchasable Item.",
       "properties": {
         "displayName": {
           "$ref": "#/$defs/SourcedValueOfPublicNameRef"
@@ -38662,7 +38679,7 @@
       "description": "A capacity retains the concrete unit and its own stored numeric member.",
       "oneOf": [
         {
-          "description": "Concrete source type and the original members outside its typed fields.",
+          "description": "The base capacity source without a concrete numeric unit.",
           "properties": {
             "additionalFields": {
               "$ref": "#/$defs/SourceArenaOutput"
@@ -38683,13 +38700,14 @@
           "type": "object"
         },
         {
-          "description": "Concrete source type and the original members outside its typed fields.",
+          "description": "An original capacity in centi-SCU.",
           "properties": {
             "additionalFields": {
               "$ref": "#/$defs/SourceArenaOutput"
             },
             "centiSCU": {
-              "$ref": "#/$defs/SourcedValueOfint32"
+              "$ref": "#/$defs/SourcedValueOfint32",
+              "description": "The original centi-SCU amount."
             },
             "kind": {
               "const": "centiCargoUnit",
@@ -38708,7 +38726,7 @@
           "type": "object"
         },
         {
-          "description": "Concrete source type and the original members outside its typed fields.",
+          "description": "An original capacity in micro-SCU.",
           "properties": {
             "additionalFields": {
               "$ref": "#/$defs/SourceArenaOutput"
@@ -38718,7 +38736,8 @@
               "type": "string"
             },
             "microSCU": {
-              "$ref": "#/$defs/SourcedValueOfint32"
+              "$ref": "#/$defs/SourcedValueOfint32",
+              "description": "The original micro-SCU amount."
             },
             "sourceType": {
               "$ref": "#/$defs/SourcedValueOfstring"
@@ -38733,7 +38752,7 @@
           "type": "object"
         },
         {
-          "description": "Concrete source type and the original members outside its typed fields.",
+          "description": "An original capacity in standard cargo units.",
           "properties": {
             "additionalFields": {
               "$ref": "#/$defs/SourceArenaOutput"
@@ -38746,7 +38765,8 @@
               "$ref": "#/$defs/SourcedValueOfstring"
             },
             "standardCargoUnits": {
-              "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+              "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+              "description": "The original standard-cargo-unit amount."
             }
           },
           "required": [
@@ -38758,7 +38778,7 @@
           "type": "object"
         },
         {
-          "description": "Concrete source type and the original members outside its typed fields.",
+          "description": "A retained concrete subtype outside the recognized capacity units.",
           "properties": {
             "additionalFields": {
               "$ref": "#/$defs/SourceArenaOutput"
@@ -134039,6 +134059,7 @@
       "type": "object"
     },
     "WeaponAttachmentMotion": {
+      "description": "Original personal-weapon attachment values used by animation joins.",
       "properties": {
         "itemType": {
           "$ref": "#/$defs/SourcedValueOfstring"

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::SourcedValue;
+use p4kx_extraction::{Guid, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -20,7 +20,7 @@ pub(super) const METADATA_COMPONENT: &str = "SEntityComponentObjectMetadataParam
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct InventoryOwnerBounds<'source> {
+pub struct InventoryOwnerBounds<'source> {
     #[serde(flatten)]
     pub(super) owner: ComponentOwner,
     source_type: SourcedValue<&'source str>,
@@ -28,25 +28,63 @@ pub(super) struct InventoryOwnerBounds<'source> {
     fields: BoundsFields<'source>,
 }
 
+/// The original inventory occupancy, vehicle bound or metadata field family.
 #[derive(Debug, Serialize, JsonSchema)]
+#[non_exhaustive]
 #[serde(
     tag = "kind",
     rename_all = "camelCase",
     rename_all_fields = "camelCase"
 )]
-enum BoundsFields<'source> {
+pub enum BoundsFields<'source> {
+    /// Occupancy fields on the original attachment definition.
     ItemOccupancy {
+        /// The original attachment definition and its retained state.
         attach_def: Box<SourcedValue<InventoryItemOccupancy<'source>>>,
     },
+    /// A vehicle component's original maximum dimensions.
     VehicleBounds {
+        /// The original maximum bounding-box vector.
         max_bounding_box_size: Box<SourcedValue<InventoryVector3<'source>>>,
     },
+    /// The original local-bounds metadata declaration.
     ObjectMetadata {
+        /// Whether the source explicitly declares local bounds.
         has_local_bounds: SourcedValue<bool>,
     },
 }
 
 impl<'source> InventoryOwnerBounds<'source> {
+    /// Returns the nominal owner GUID with its original header origin.
+    #[must_use]
+    pub fn owner_guid(&self) -> SourcedValue<Guid> {
+        self.owner.guid().map_ref(|guid| guid.0)
+    }
+
+    /// Borrows the physical Record index in the queried DataForge.
+    #[must_use]
+    pub const fn owner_record_index(&self) -> &SourcedValue<u32> {
+        self.owner.record_index()
+    }
+
+    /// Borrows the original Components array ordinal.
+    #[must_use]
+    pub const fn component_ordinal(&self) -> &SourcedValue<u32> {
+        self.owner.component_ordinal()
+    }
+
+    /// Borrows the original component source type.
+    #[must_use]
+    pub const fn source_type(&self) -> &SourcedValue<&'source str> {
+        &self.source_type
+    }
+
+    /// Borrows the retained bound family and its original field states.
+    #[must_use]
+    pub const fn fields(&self) -> &BoundsFields<'source> {
+        &self.fields
+    }
+
     pub(super) fn item(
         owner: ComponentOwner,
         source: Observed<'_, '_, '_, 'source>,

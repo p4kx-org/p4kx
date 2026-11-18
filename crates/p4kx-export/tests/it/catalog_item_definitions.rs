@@ -392,3 +392,6 @@ fn structure(name: &str, field: &str, value: TestValue) -> TestValue {
 fn class(name: &str) -> TestType {
     TestType::Class(name.into())
 }
+
+#[path = "equipment_source_sdk.rs"]
+mod equipment_sdk;

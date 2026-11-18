@@ -3,6 +3,9 @@
 
 //! Source-state reads shared by canonical Catalog families.
 
+#[path = "scoped_source_read.rs"]
+pub(crate) mod scoped_source_read;
+
 #[path = "catalog_original.rs"]
 pub(crate) mod original;
 

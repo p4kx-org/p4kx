@@ -3,16 +3,18 @@
 
 use std::cell::RefCell;
 
-use p4kx_extraction::{CancelToken, RecordTree, StructValue, Value};
+use p4kx_extraction::{CancelToken, RecordTree, Value};
 
 use super::{ConfigurationKind, EntityConfigurationRows};
 use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::original::OriginalFlowFields;
+use crate::catalog_read::scoped_source_read::ScopedSourceRead;
 use crate::catalog_v3::authored_fields::Observed;
 use crate::catalog_v3::catalog_facility::{Facility, OwnerComponents};
-use crate::catalog_v3::catalog_item_alignment::{CONTAINER, ItemAlignmentKind, ItemPortContainer};
+use crate::catalog_v3::catalog_item_alignment::{ItemAttachmentComponent, ItemPortContainer};
+use crate::catalog_v3::inventory_owner_bounds::InventoryOwnerBounds;
 use crate::catalog_v3::item_alignment_options::AlignmentOptions;
 use crate::catalog_v3::item_component_owner::ComponentOwner;
 use crate::record_observation::RecordObservation;
@@ -26,7 +28,8 @@ pub(crate) fn read<'source>(
     options: &AlignmentOptions<'_>,
     cancel: Option<&CancelToken>,
 ) -> Result<(EntityConfigurationRows<'source>, Vec<FieldError>), CatalogError> {
-    read_scope(tree, projection, admission, options, cancel, Scope::All)
+    let read = read_scope(tree, projection, admission, options, cancel, Scope::All)?;
+    Ok((read.value, read.notes))
 }
 
 pub(crate) fn read_item_ports<'source>(
@@ -36,31 +39,41 @@ pub(crate) fn read_item_ports<'source>(
     options: &AlignmentOptions<'_>,
     cancel: Option<&CancelToken>,
 ) -> Result<(Vec<ItemPortContainer<'source>>, Vec<FieldError>), CatalogError> {
-    let (rows, notes) = read_scope(tree, projection, admission, options, cancel, Scope::Ports)?;
-    Ok((rows.alignment.into_port_containers(), notes))
+    let read = read_scope(tree, projection, admission, options, cancel, Scope::Ports)?;
+    Ok((read.value.alignment.into_port_containers(), read.notes))
 }
 
-#[derive(Clone, Copy)]
-enum Scope {
-    All,
-    Ports,
+#[path = "catalog_configuration_scope.rs"]
+mod scope;
+use self::scope::{ConfigurationOwner, Scope};
+
+pub(crate) fn read_attachment_constraints<'source>(
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    options: &AlignmentOptions<'_>,
+    cancel: Option<&CancelToken>,
+) -> Result<ScopedSourceRead<Vec<ItemAttachmentComponent<'source>>>, CatalogError> {
+    let read = read_scope(
+        tree,
+        projection,
+        admission,
+        options,
+        cancel,
+        Scope::Attachments,
+    )?;
+    Ok(read.map(|rows| rows.alignment.into_attachment_components()))
 }
 
-impl Scope {
-    fn configuration(
-        self,
-        value: &StructValue<'_>,
-        input: &OriginalCatalogInput<'_, '_>,
-    ) -> Option<ConfigurationKind> {
-        match self {
-            Self::All => ConfigurationKind::of(value, input),
-            Self::Ports if value.type_name() == CONTAINER => Some(ConfigurationKind::Alignment {
-                alignment: ItemAlignmentKind::Port,
-                occupancy: false,
-            }),
-            Self::Ports => None,
-        }
-    }
+pub(crate) fn read_item_bounds<'source>(
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    options: &AlignmentOptions<'_>,
+    cancel: Option<&CancelToken>,
+) -> Result<ScopedSourceRead<Vec<InventoryOwnerBounds<'source>>>, CatalogError> {
+    let read = read_scope(tree, projection, admission, options, cancel, Scope::Bounds)?;
+    Ok(read.map(|rows| rows.inventory.into_bounds()))
 }
 
 fn read_scope<'source>(
@@ -70,28 +83,20 @@ fn read_scope<'source>(
     options: &AlignmentOptions<'_>,
     cancel: Option<&CancelToken>,
     requested: Scope,
-) -> Result<(EntityConfigurationRows<'source>, Vec<FieldError>), CatalogError> {
+) -> Result<ScopedSourceRead<EntityConfigurationRows<'source>>, CatalogError> {
     let input = projection.original();
+    let scope = input.record_scope(admission.record(), tree)?;
+    let selection_complete = requested.selection_complete(tree, input, cancel)?;
     let mut rows = EntityConfigurationRows::default();
     let mut notes = Vec::new();
-    let Some(authored_components @ Value::Array(components)) = tree.field("Components") else {
-        return Ok((rows, notes));
+    let Some((authored_components, components)) = selected_components(tree, input, requested)
+    else {
+        return Ok(ScopedSourceRead::new(rows, notes, selection_complete));
     };
-    let mut components = components
-        .iter()
-        .filter_map(|component| {
-            let Value::Struct(value) = component else {
-                return None;
-            };
-            requested
-                .configuration(value, input)
-                .map(|kind| (component, kind))
-        })
-        .peekable();
+    let mut components = components.peekable();
     if components.peek().is_none() {
-        return Ok((rows, notes));
+        return Ok(ScopedSourceRead::new(rows, notes, selection_complete));
     }
-    let scope = input.record_scope(admission.record(), tree)?;
     let originals = OriginalFlowFields::read(&scope, cancel)?;
     let capture = TemplateFieldCapture::new(&originals, input, admission)?;
     let context = input
@@ -104,24 +109,11 @@ fn read_scope<'source>(
         let component = originals.fact(component)?;
         let owner = ComponentOwner::read(tree, &context, &originals, component)?;
         let source = Observed::new(&originals, input, component, &capture, &numbers);
-        match requested {
-            Scope::All => rows.push_configuration(
-                configuration,
-                owner,
-                source,
-                options,
-                projection,
-                &mut notes,
-            )?,
-            Scope::Ports => rows.alignment.push(
-                ItemAlignmentKind::Port,
-                owner,
-                source,
-                options,
-                projection,
-                &mut notes,
-            )?,
-        }
+        let selected = ConfigurationOwner {
+            configuration,
+            owner,
+        };
+        requested.project(&mut rows, selected, source, options, projection, &mut notes)?;
     }
     retain_cargo_owner(
         &mut rows,
@@ -130,7 +122,7 @@ fn read_scope<'source>(
         authored_components,
     )?;
     rows.numbers = numbers.into_inner();
-    Ok((rows, notes))
+    Ok(ScopedSourceRead::new(rows, notes, selection_complete))
 }
 
 fn retain_cargo_owner(
@@ -144,4 +136,26 @@ fn retain_cargo_owner(
             .push(OwnerComponents::read(index, originals, components)?);
     }
     Ok(())
+}
+
+fn selected_components<'scope, 'source>(
+    tree: &'scope RecordTree<'source>,
+    input: &'scope OriginalCatalogInput<'_, 'source>,
+    requested: Scope,
+) -> Option<(
+    &'scope Value<'source>,
+    impl Iterator<Item = (&'scope Value<'source>, ConfigurationKind)> + 'scope,
+)> {
+    let authored @ Value::Array(components) = tree.field("Components")? else {
+        return None;
+    };
+    let selected = components.iter().filter_map(move |component| {
+        let Value::Struct(value) = component else {
+            return None;
+        };
+        requested
+            .configuration(value, input)
+            .map(|kind| (component, kind))
+    });
+    Some((authored, selected))
 }

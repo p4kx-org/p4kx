@@ -358,3 +358,47 @@ all original group/resource membership slots. `with_resource_group_parents` quer
 first-parent projection separately through the complete canonical group-family survey, without
 Resource/World bodies or locale payloads. Both retain physical GUID aliases, direct source cells,
 result-scoped provenance and explicit coverage. See [Resource group queries](catalog-resource-group-queries.md).
+
+## Original equipment definitions and configurations
+
+Use `catalog_queries::equipment::with_item_definitions`, `with_attachment_constraints` or
+`with_item_bounds` for the corresponding canonical datasets. Each has a decoded-Entry `_from`
+form and the same-named session/parsed-view method. Select the dataset, all physical declarations
+with a GUID, or a physical Record index. Physical indices are local to the supplied DataForge.
+
+`definitions.items` contains original Item presentation, physics and purchase fields. Its nested
+immutable getters preserve the original component order, numbers, null/unavailable states,
+manufacturer reference or authored value arena and optional personal-weapon motion fields. Use
+`CatalogLanguageSelection` for referenced public names and protected descriptions. An empty
+language selection retains keys without reading locale bodies. These definitions are scoped
+canonical facts rather than every value of an arbitrary Entity Record.
+
+`configurations.itemAttachmentConstraints` exposes original type/subtype/size restrictions,
+tags, required tags and alignment-axis declarations at each physical component. Both axis labels
+retain their optional `AttachmentAxisOptionStatus` cells independently. Bounds expose original
+occupancy, vehicle bounding size and object metadata branches, including exact coordinate/unit
+values and retained unknown-unit original fields. The configuration queries accept no language
+argument; their requested/available locale lists and text registries are empty even when the
+session's unused language policy contains languages.
+
+The borrowed `EquipmentSnapshot` supplies rows, family availability, source inventory, coverage,
+Build and the request's text/language metadata. Definitions use GUID/physical order;
+configurations use physical Record/component order. Join typed field contributions only through
+that result's own inventory and follow its physical-source ancestors. Raw numbers and authored
+value arenas keep their own typed states and origins; they are not row-level proof substitutes.
+
+These readers invoke the same original family converters as the producer. They do not build a
+Catalog, resolve loadouts, read vehicle XML, discover world placements or project other equipment
+families. A selected-Record request does not materialize unrelated owner bodies. Dataset requests
+still enumerate their canonical candidate scope and retain the requested rows; they do not imply
+a fixed-memory bound. Respect incomplete header/body/field coverage and publish owned cache
+updates only after outer query success. Full-Catalog normal-publication guards are unchanged.
+
+The subsequent sourced Item/Ship/Loadout projection and unfiltered variant-candidate contract is
+specified in [ADR-0410](adr/0410-equipment-sdk-shares-original-family-readers-and-canonical-variant-choices.md).
+
+An unclassifiable original component slot or unreadable possible occupancy definition keeps the
+queried source scope incomplete. Readable prefix rows remain available; `coverage.incomplete_fields`
+identifies the affected physical Record. An explicit null target and a proven foreign declaration
+remain separate known exclusions. No unrelated configuration projector runs to manufacture that
+coverage result.

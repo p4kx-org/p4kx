@@ -10,6 +10,8 @@ use p4kx_extraction::{
 use crate::catalog_queries::unlocalized_record_query;
 use crate::catalog_queries::{CatalogRecordCoverage, CatalogRecordSelection};
 use crate::catalog_query_session::checkpoint;
+use crate::entity_selection::{self, Selected};
+use crate::scan::{CRAFTER_FIELD, CRAFTER_STRUCT};
 use crate::{CatalogError, Kind};
 
 pub(in crate::build::catalog_queries) struct Owner<'source> {
@@ -30,6 +32,64 @@ impl<'source> Plan<'source> {
         cancel: Option<&CancelToken>,
         observer: Option<Arc<dyn CanonicalReadObserver>>,
     ) -> Result<Self, CatalogError> {
+        Self::read_with(forge, selection, cancel, observer, |record, _, coverage| {
+            Ok(unlocalized_record_query::selected(record, kind, coverage))
+        })
+    }
+
+    pub(in crate::build::catalog_queries) fn read_entities(
+        forge: &'source DataForge<'source>,
+        selection: CatalogRecordSelection,
+        cancel: Option<&CancelToken>,
+        observer: Option<Arc<dyn CanonicalReadObserver>>,
+    ) -> Result<Self, CatalogError> {
+        let crafter = forge.pointer_probe(CRAFTER_FIELD, CRAFTER_STRUCT);
+        Self::read_with(
+            forge,
+            selection,
+            cancel,
+            observer,
+            |record, trees, coverage| {
+                let classified = record.type_name().and_then(|source_type| {
+                    if source_type == p4kx_assembly::ENTITY_TYPE {
+                        entity_selection::select(record, None)
+                    } else {
+                        Ok(None)
+                    }
+                });
+                match classified {
+                    Err(_) => coverage.unreadable_headers.push(record.index()),
+                    Ok(Some(Selected::Leftover(_))) => coverage.skipped_leftovers += 1,
+                    Ok(Some(Selected::Entity(kind))) => {
+                        if kind != Kind::Crafters {
+                            return Ok(true);
+                        }
+                        match crafter
+                            .as_ref()
+                            .map_or(Ok(false), |probe| trees.holds(probe, record))
+                        {
+                            Ok(holds) => return Ok(holds),
+                            Err(_) => coverage.unreadable_headers.push(record.index()),
+                        }
+                    }
+                    Ok(None) => {}
+                }
+                Ok(false)
+            },
+        )
+    }
+
+    fn read_with(
+        forge: &'source DataForge<'source>,
+        selection: CatalogRecordSelection,
+        cancel: Option<&CancelToken>,
+        observer: Option<Arc<dyn CanonicalReadObserver>>,
+        mut selected: impl FnMut(
+            &Record<'source>,
+            &mut TreeBuilder<'source>,
+            &mut CatalogRecordCoverage,
+        ) -> Result<bool, CatalogError>,
+    ) -> Result<Self, CatalogError> {
         let mut result = Self {
             owners: Vec::new(),
             coverage: CatalogRecordCoverage::default(),
@@ -37,7 +97,8 @@ impl<'source> Plan<'source> {
         let mut trees = TreeBuilder::new();
         trees.set_read_observer(observer);
         selection.for_each(forge, cancel, |record| {
-            if !unlocalized_record_query::selected(record, kind, &mut result.coverage) {
+            checkpoint(cancel)?;
+            if !selected(record, &mut trees, &mut result.coverage)? {
                 return Ok(());
             }
             checkpoint(cancel)?;
