@@ -40,6 +40,20 @@ provide no evidence of a new parser defect or schema change.
 [Build comparison](https://github.com/p4kx-org/p4kx/issues/1151#issuecomment-6971711263)
 · [SOCPAK and Territory follow-up](https://github.com/p4kx-org/p4kx/issues/1151#issuecomment-6977222564)
 
+### Selected material shader functions
+
+The installed LIVE `13165946` and PTU `13215521` shader caches agree for all 19 selected
+complete functions, including the scalar gloss helper. The comparison derives a keyword
+mapping independently from each Build's executable and compares canonical token
+sequences. It binds nine selected inner members per Archive using the current physical
+directory, checks all 18 inner CRC32 values and verifies stable source identities.
+
+The comparison reads 41,631,414 bytes across the two Archives after outer directory
+discovery, including both inner ZIP directories. The read budget is derived from their
+measured lengths, the local header bounds and the selected compressed payload allowance.
+Runtime permutation selection, CPU/GPU parameter packing, texture-channel binding and
+game appearance require their own evidence.
+
 ## PTU 13201184 comparison
 
 The installed PTU manifest identifies change `13201184` and internal version
