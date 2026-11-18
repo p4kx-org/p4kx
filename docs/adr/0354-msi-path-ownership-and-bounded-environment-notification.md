@@ -161,3 +161,18 @@ parent, worker or installer descendants. Durable unproven stage files precede sy
 and console progress, so a stalled leaf need not erase its last reached observation stage.
 Snapshot return or timeout does not replace the original result, closed journal, final cleanup
 and installed-runtime acceptance gates.
+
+
+Snapshot console forwarding is observation only. The optional Portal progress observer leaves the
+existing `OnOutput` replay-after-exit contract unchanged. Only Snapshot enables live forwarding.
+Its stdout parser accepts the exact predefined, context-matching unproven worker markers, emits
+fresh stage/status markers, and never republishes raw stdout, stderr or installer values. Wrapper
+caller, start, input-close, capture, cleanup and return markers identify reached observation
+boundaries; they are not installer phases or evidence of native completion. The original parent
+continues under its independent source-bound deadline and completion gate.
+
+Capture retains its 100-second maximum and at most five-second cleanup reserve. These loop and
+wait allowances do not preempt synchronous process Start, input Close, Kill, Dispose, file writes
+or console callbacks. A begin marker without its end identifies the last emitted boundary; it
+cannot prove where a runner, API transport or process stalled. Console observations do not enlarge
+budgets or grant authority to stop the independent original parent or installer descendants.

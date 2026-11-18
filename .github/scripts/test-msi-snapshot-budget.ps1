@@ -62,8 +62,28 @@ try {
         Start-Sleep -Milliseconds 20
     }
     $failed=$false;$timer=[Diagnostics.Stopwatch]::StartNew()
+    $live=@{received=$false;original_alive=$false}
     $env:P4KX_SNAPSHOT_FIXTURE_BLOCK='owned-state'
-    try { Invoke-P4kxMsiObserverSnapshot $observer 1 250 -MaximumMilliseconds 2000 } catch { $failed=$true }
+    try {
+        Invoke-P4kxMsiObserverSnapshot $observer 1 250 -MaximumMilliseconds 2000 6>&1 | ForEach-Object {
+            $text=[string]$_
+            if (-not $text.StartsWith('[P4KX-MSI-SNAPSHOT]',[StringComparison]::Ordinal)) { return }
+            $marker=$text.Substring('[P4KX-MSI-SNAPSHOT]'.Length) | ConvertFrom-Json -AsHashtable
+            if ($marker.stage -ceq 'worker.parentState' -and $marker.status -ceq 'begin') {
+                $leafPath=Join-Path $observer 'controlled-leaf.json'
+                $leafWait=[Diagnostics.Stopwatch]::StartNew()
+                while (-not [IO.File]::Exists($leafPath) -and $leafWait.ElapsedMilliseconds -lt 500) { Start-Sleep -Milliseconds 10 }
+                $liveLeaf=Read-P4kxDetachedReceipt $leafPath
+                $ownedLeaf=[Diagnostics.Process]::GetProcessById($liveLeaf.pid)
+                $original=[Diagnostics.Process]::GetProcessById($handle.pid)
+                try {
+                    Assert-Snapshot (-not $ownedLeaf.HasExited -and -not $original.HasExited) 'Live progress was replayed after the blocked leaf or original parent ended.'
+                    $live.received=$true;$live.original_alive=$true
+                } finally { $ownedLeaf.Dispose();$original.Dispose() }
+            }
+            Write-Host $text
+        }
+    } catch { $failed=$true }
     finally { $env:P4KX_SNAPSHOT_FIXTURE_BLOCK=$saved.block }
     $elapsed=$timer.ElapsedMilliseconds
     $capture=Join-Path $observer 'snapshots/01'
@@ -78,6 +98,7 @@ try {
         -not [IO.File]::Exists((Join-Path $capture 'parentState-end.json')) -and
         -not [IO.File]::Exists((Join-Path $observer 'checkpoints/01/checkpoint.json')) -and
         -not [IO.File]::Exists($env:GITHUB_ENV)) 'Blocked snapshot lost its bounded failure, exact last stage or unproven verdict.'
+    Assert-Snapshot ($live.received -and $live.original_alive) 'The blocked snapshot did not expose its exact stage live before worker return.'
     Assert-Snapshot (-not (Get-P4kxMsiObserverParentState $request $handle).lifetime_ended) 'Snapshot watchdog signaled the independent original parent.'
     Invoke-P4kxMsiObserverSnapshot $observer 2 250 -MaximumMilliseconds 2000
     $positive=Read-P4kxDetachedReceipt (Join-Path $observer 'snapshots/02/caller-result.json')
@@ -94,7 +115,7 @@ try {
     $journal=Read-P4kxMsiPhaseJournal (Join-Path $output 'diagnostics/phase-journal.jsonl')
     Assert-Snapshot ($journal.events -eq 4 -and $journal.active.Count -eq 0 -and $journal.terminal -ceq 'end') 'Original harmless journal did not close after explicit release.'
     @{role='harmless-snapshot-budget-control';blocked_elapsed_ms=$elapsed;only_snapshot_stopped=$true;unblocked_capture_returned=$true;
-        original_closed_after_release=$true;completed_success=$false;native_completion_unproven=$true;mutation_authority=$false} | ConvertTo-Json -Compress
+        original_closed_after_release=$true;live_parent_state_begin_before_worker_return=$live.received;live_original_parent_alive=$live.original_alive;completed_success=$false;native_completion_unproven=$true;mutation_authority=$false} | ConvertTo-Json -Compress
 } finally {
     $env:P4KX_SNAPSHOT_FIXTURE_BLOCK=$saved.block
     if ($null -ne $request -and $null -ne $handle -and -not (Get-P4kxMsiObserverParentState $request $handle).lifetime_ended) {
