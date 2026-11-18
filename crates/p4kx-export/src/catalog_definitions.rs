@@ -124,6 +124,11 @@ pub(crate) struct CatalogDefinitions<'source> {
     pub(crate) mission_broker_entries: StagedCatalogTable,
     #[serde(flatten)]
     pub(crate) loot: LootDefinitionTables<'source>,
+    pub(crate) blueprint_pools: CatalogTable<
+        crate::catalog_v3::industry_modules::blueprint_pool_definition::BlueprintPoolDefinition<
+            'source,
+        >,
+    >,
     pub(crate) blueprint_categories: CatalogTable<BlueprintCategoryDefinition<'source>>,
     pub(crate) gameplay_properties: CatalogTable<GameplayPropertyDefinition<'source>>,
     pub(crate) refining_processes:

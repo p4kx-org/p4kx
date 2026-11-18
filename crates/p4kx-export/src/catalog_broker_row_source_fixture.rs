@@ -92,6 +92,7 @@ fn emitted_row(
         kind: Kind::MissionBrokerEntries,
         guid: emitted.physical_guid.0,
         record_path: emitted.physical_path.to_owned(),
+        record_index: None,
     };
     assert_eq!(
         row.guid,

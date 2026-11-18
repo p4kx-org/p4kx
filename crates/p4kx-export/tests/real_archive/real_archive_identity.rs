@@ -16,6 +16,7 @@ mod items;
 /// Checks declared family identities and the physical `ResourceType` fallback.
 pub(crate) fn check_unique_guids(catalog: &Value) -> TestResult {
     check_family_aliases(catalog, Kind::BlueprintCategoryLists)?;
+    check_family_aliases(catalog, Kind::BlueprintPools)?;
     check_family_aliases(catalog, Kind::GameplayProperties)?;
     check_family_aliases(catalog, Kind::ReputationContexts)?;
     check_family_aliases(catalog, Kind::FactionReputations)?;
@@ -34,6 +35,7 @@ pub(crate) fn check_unique_guids(catalog: &Value) -> TestResult {
         if matches!(
             kind,
             Kind::BlueprintCategories
+                | Kind::BlueprintPools
                 | Kind::GameplayProperties
                 | Kind::ExplosionDefinitions
                 | Kind::AmmoDefinitions
@@ -151,3 +153,7 @@ fn check_family_aliases(catalog: &Value, owner: Kind) -> TestResult {
     }
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "catalog_v3_blueprint_pool_identity_tests.rs"]
+mod pool_identity_tests;

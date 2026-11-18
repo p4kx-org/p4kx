@@ -3,7 +3,9 @@
 
 use std::collections::BTreeSet;
 
-use p4kx_extraction::{InputScope, PhysicalSourceRef, SourceInventory, SourceLocation};
+use p4kx_extraction::{
+    Archive, DataForge, InputScope, PhysicalSourceRef, SourceInventory, SourceLocation,
+};
 use serde_json::Value;
 
 use crate::catalog_read::original::OriginalValuePart;
@@ -18,10 +20,32 @@ pub(super) fn validate(
     inventory: &SourceInventory,
     leaf: &PhysicalSourceRef,
 ) -> TestResult {
+    let owners = &context.census.owners;
+    let limit = if context.family == Family::Parents {
+        owners.len()
+    } else {
+        owners.len().min(1)
+    };
+    validate_record_scope(
+        context.archive,
+        context.forge,
+        inventory,
+        leaf,
+        &owners[..limit],
+    )
+}
+
+pub(super) fn validate_record_scope(
+    archive: &Archive,
+    forge: &DataForge<'_>,
+    inventory: &SourceInventory,
+    leaf: &PhysicalSourceRef,
+    owners: &[u32],
+) -> TestResult {
     for usage in inventory.iter_uses() {
         match usage.location() {
             SourceLocation::DataForge { record_index, .. } => {
-                body(context, *record_index)?;
+                body(owners, *record_index)?;
                 if usage.source() != leaf || usage.scope() != InputScope::Payload {
                     return Err(
                         "SDK body coordinate is not bound to the original DCB payload".into(),
@@ -36,7 +60,7 @@ pub(super) fn validate(
                         "SDK DataForge metadata is not bound to its original payload".into(),
                     );
                 }
-                subresource(context, namespace, indices)?;
+                subresource(forge, owners, namespace, indices)?;
             }
             SourceLocation::Metadata { .. } => {}
             SourceLocation::ArchiveDirectoryPaths {
@@ -51,7 +75,7 @@ pub(super) fn validate(
                     || start_entry_index.get() > end_entry_index.get()
                     || usize::try_from(end_entry_index.get())
                         .ok()
-                        .is_none_or(|end| end > context.archive.entries().len())
+                        .is_none_or(|end| end > archive.entries().len())
                 {
                     return Err("SDK directory survey escaped its original metadata extent".into());
                 }
@@ -62,19 +86,19 @@ pub(super) fn validate(
     Ok(())
 }
 
-fn body(context: &Context<'_>, index: u32) -> TestResult {
-    let allowed = if context.family == Family::Parents {
-        context.census.owners.binary_search(&index).is_ok()
-    } else {
-        context.census.owners.first() == Some(&index)
-    };
-    if !allowed {
+fn body(owners: &[u32], index: u32) -> TestResult {
+    if owners.binary_search(&index).is_err() {
         return Err("SDK body evidence escaped its explicit owner/group-family scope".into());
     }
     Ok(())
 }
 
-fn subresource(context: &Context<'_>, namespace: &str, indices: &[u64]) -> TestResult {
+fn subresource(
+    forge: &DataForge<'_>,
+    owners: &[u32],
+    namespace: &str,
+    indices: &[u64],
+) -> TestResult {
     let first = indices
         .first()
         .copied()
@@ -84,17 +108,15 @@ fn subresource(context: &Context<'_>, namespace: &str, indices: &[u64]) -> TestR
         OriginalValuePart::NAMESPACE
         | "dataforgeRecordDeclarations"
         | "dataforgeTraversal"
-        | "dataforgeRecordBody" => body(context, index),
+        | "dataforgeRecordBody" => body(owners, index),
         RecordHeaderField::NAMESPACE if indices.len() == 1 => {
-            context
-                .forge
+            forge
                 .record(index)
                 .ok_or("original Reference-target header missing")?;
             Ok(())
         }
         "dataforgeStruct" | "dataforgeStructDeclaration" => {
-            context
-                .forge
+            forge
                 .struct_at(index)
                 .ok_or("original Struct declaration missing")?;
             Ok(())
@@ -102,8 +124,7 @@ fn subresource(context: &Context<'_>, namespace: &str, indices: &[u64]) -> TestR
         "dataforgeEnum" => {
             let ordinal =
                 usize::try_from(first).map_err(|_| "Enum declaration index out of range")?;
-            context
-                .forge
+            forge
                 .enums()
                 .nth(ordinal)
                 .ok_or("original Enum declaration missing")?;
@@ -114,7 +135,7 @@ fn subresource(context: &Context<'_>, namespace: &str, indices: &[u64]) -> TestR
 }
 
 pub(super) fn row(context: &Context<'_>, row: &Value) -> TestResult {
-    targets(context, row)?;
+    check_targets(context.forge, row)?;
     let Some(arena) = row.get("fields") else {
         return Ok(());
     };
@@ -170,11 +191,11 @@ fn links(value: &Value, result: &mut Vec<u64>) -> TestResult {
     Ok(())
 }
 
-fn targets(context: &Context<'_>, value: &Value) -> TestResult {
+pub(super) fn check_targets(forge: &DataForge<'_>, value: &Value) -> TestResult {
     match value {
         Value::Array(values) => {
             for value in values {
-                targets(context, value)?;
+                check_targets(forge, value)?;
             }
         }
         Value::Object(fields) => {
@@ -184,8 +205,7 @@ fn targets(context: &Context<'_>, value: &Value) -> TestResult {
             {
                 let index =
                     u32::try_from(index).map_err(|_| "target physical index out of range")?;
-                let record = context
-                    .forge
+                let record = forge
                     .record(index)
                     .ok_or("original target metadata missing")?;
                 if let Some(guid) = value.pointer("/guid/value").and_then(Value::as_str)
@@ -203,7 +223,7 @@ fn targets(context: &Context<'_>, value: &Value) -> TestResult {
                 }
             }
             for value in fields.values() {
-                targets(context, value)?;
+                check_targets(forge, value)?;
             }
         }
         _ => {}

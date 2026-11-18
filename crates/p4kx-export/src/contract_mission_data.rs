@@ -105,6 +105,6 @@ pub(crate) struct ScenarioTier<'a> {
     /// The `globalPointsMultiplier`.
     pub(crate) global_points_multiplier: Option<f32>,
     /// The blueprint pools the tier rewards (`blueprintPool`), the `guid`s of entries of
-    /// `blueprintPools`, in the stored order.
+    /// `definitions.blueprintPools`, in the stored order.
     pub(crate) blueprint_pool_guids: Vec<CatalogGuid>,
 }

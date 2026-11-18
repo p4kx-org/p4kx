@@ -54,7 +54,7 @@ pub(crate) struct Completeness<'a> {
     pub(crate) quality_distributions: KindCompleteness<'a>,
     /// The completeness of `qualityQuantizations`.
     pub(crate) quality_quantizations: KindCompleteness<'a>,
-    /// The completeness of `blueprintPools`.
+    /// The completeness of `definitions.blueprintPools`.
     pub(crate) blueprint_pools: KindCompleteness<'a>,
     /// The completeness of `dismantleProcesses`.
     pub(crate) dismantle_processes: KindCompleteness<'a>,

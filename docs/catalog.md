@@ -242,7 +242,7 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `definitions.gameplayProperties` | Physical gameplay-property definitions with shared eight-field headers, all four authored fields and local flat transformation trees ([contract](catalog-gameplay-properties.md)) |
 | `definitions.qualityDistributions` | Physical distribution and location-override source declarations with exact numbers and immediate per-field origins ([contract](catalog-quality.md)) |
 | `definitions.qualityQuantizations`, `projections.qualityQuantizationResources` | Ordered raw bands, explicit eligibility and the genuine first-eligible nominal-GUID resource inverse ([contract](catalog-quality.md)) |
-| `blueprintPools` | The blueprint pools with the places that reward them, ordered by GUID |
+| `definitions.blueprintPools`, `projections.blueprintPoolWeights`, `declarations.blueprintRewardSources` | Physical Blueprint pools, derived weight sums and original declarations that reference those pools |
 | `dismantleProcesses` | The dismantle processes, ordered by GUID |
 | `paints` | The paints, each the `itemGuid` of an entry of `items` with the ships it fits, ordered by `itemGuid` |
 | `loadouts` | The ports of every ship and of every item that has ports, with the Entity the Default Loadout attaches to each, ordered by `entityGuid` |
@@ -881,12 +881,24 @@ matches the record path and marks selected-kind scope partial independently of s
 | `definitions.gameplayProperties` | `propertyName` and `unitFormat` are sourced public-name references with source/display TextForms; `displayTransformation` preserves original operation occurrences through local links, and `nameOverrides` retains every ordered name/condition declaration. Scale numbers retain exact original width/bits. These definitions remain the targets of modifiers' nominal `propertyGuid` values; no transformation or condition is evaluated ([contract](catalog-gameplay-properties.md)) |
 | `definitions.qualityDistributions` | Shared sourced header, independent `qualityDistribution`/`locationOverride` declarations and ordered nullable override positions; exact numeric storage and inline/recordRef/emptyBase forms |
 | `definitions.qualityQuantizations`, `projections.qualityQuantizationResources` | Complete raw band definitions and a separate genuine inverse, described below |
-| `blueprintPools` | `entries`: per entry `blueprintGuid` and `weight`; `totalWeight`, the sum of the positive weights; `rewardSources`: every struct of any Record with a Reference to the pool (on LIVE the `BlueprintRewards` result of a contract) with `recordGuid`, `recordPath`, `contractId`, `contractName` (both from the nearest enclosing struct that has an `id`) and `chance`, ordered by `recordGuid` and then in stored order. A `blueprintGuid` may refer to a Blueprint outside the selection or missing due to a source-read failure |
+| `definitions.blueprintPools` | Physical `BlueprintPoolRecord` owners with the shared sourced header and ordered `blueprintRewards`. Each slot keeps its concrete type, original `blueprintRecord` Reference and exact `weight`. Local `additionalFields` arenas preserve remaining owner and slot declarations. References can resolve to Blueprint owners outside the current selection. |
+| `projections.blueprintPoolWeights` | `pool` identifies the physical owner by input, original `recordIndex` and nominal `guid`. `totalWeight` is the sourced f32 sum of positive finite decoded weights in slot order. It carries raw bits even when accumulation overflows. |
+| `declarations.blueprintRewardSources` | One row per observed direct scalar Record link to a selected pool. `poolStorage` distinguishes `reference` from a foreign Record root `weakPointer`. Local and self weak pointers are excluded. The sourced header identifies the enclosing Record and `sourceOrdinal` identifies the occurrence within it. `pool` preserves the authored link and `chance` keeps its original numeric storage and source state. |
 | `dismantleProcesses` | `efficiency` (0.5 on LIVE) and `timeSeconds` (15 on LIVE) of the `GenericCraftingProcess_Dismantle` |
 
-A blueprint's chance from a source is `chance` x the entry's `weight` / `totalWeight`; a source
-without a chance or with one outside 0 to 1, a pool without a positive weight and an entry with a
-weight of zero or less give none. The quality distributions carry no link to a blueprint or source:
+`contractId` comes from the nearest enclosing owner with a readable GUID `id`, including the
+Record root. `contractName` takes that owner's `debugName`. When no owner has a readable GUID
+`id`, the nearest readable nonempty `debugName` supplies the name.
+
+Join definitions and their weight projections within the same Build by the DCB input and
+original Record index. Keep the nominal GUID as a consistency check. Same-GUID aliases retain
+separate definitions and weight rows. Reward declarations retain their actual target state; a
+nominal GUID alone cannot establish a physical target. The selected scope and availability
+remain explicit, including empty tables. See [ADR-0412](adr/0412-blueprint-pools-separate-original-slots-weights-and-reward-sources.md).
+
+A consumer can estimate a slot's weight share when both its weight and the total are finite
+and positive. Keep the authored `chance` separately when it is missing or outside 0 to 1. The
+quality distributions carry no link to a blueprint or source:
 the Records do not hold one, so the catalog lists them as they are. Resource-owned inline and
 linked forms preserve their source ownership in
 [`definitions.resourceTypes.rows[].properties`](catalog-resource-types.md#quality-source-wrappers-and-exact-curves).
@@ -1176,7 +1188,7 @@ that the rule on equal `guid` and `subContractGuid` above drops.
 | `offeredAt` | Every place the contract is offered at, uncapped (see "Offered at"): `localityGuids` (entries of `missionLocalities`) and `locations` (starmap objects, each `starmapObjectGuid`, `objectType`, `place`), and `brokerFallback` (`true` when `locations` is the broker entry's location because no place is stated) |
 | `faction` | The `factionReputation` of the handler as stored: `guid`, Record `name` and `displayName` (game text), `null` when the handler names none |
 | `giverFaction` | The faction of the contract and where it was found: `source` (`handler`, `reputationResult` or `reputationPrerequisite`) and `faction` (`guid`, `name`, `displayName`), `null` when none names one (see "Giver faction") |
-| `blueprintRewards` | The blueprint pools the contract hands out, each `poolGuid` (an entry of `blueprintPools`), `source` (`result` or `temporaryModifier`) and `chance` as stored, `null` for a modifier (see "Blueprint rewards") |
+| `blueprintRewards` | The blueprint pools the contract hands out, each `poolGuid` (a nominal GUID in `definitions.blueprintPools`), `source` (`result` or `temporaryModifier`) and `chance` as stored, `null` for a modifier (see "Blueprint rewards") |
 | `reputationGains` | Sourced list of success reputation changes. The faction, scope and amount each have source evidence. `amount` is a signed decimal string. See [Reputation gains](catalog-contract-generators.md#reputation-gains). |
 | `minStandingGuid`, `maxStandingGuid` | The `minStanding` and `maxStanding` of the contract: the standings between which it is offered, rows of `definitions.reputationStandings`; `null` when absent. A sub contract shares the contract's |
 | `standingRequirements` | The reputation prerequisites (see "Standing") |
@@ -1314,8 +1326,8 @@ results, else those of the contract; `source` is `result`. After them come the e
 contract, contract, handler) that states one, `source` `temporaryModifier` and `chance` `null`.
 Each has the `poolGuid` of its `blueprintPool` and, for a result, its `chance` as stored. Which
 sub contract hands out which pool is therefore stated per entry, where
-`blueprintPools[].rewardSources` names only the `id` that a contract and its sub contracts share.
-Three reward sources of `blueprintPools` are in no entry: `BlueprintRewards` results that fire on the
+`declarations.blueprintRewardSources` names only the `id` that a contract and its sub contracts share.
+Three Blueprint reward declarations are in no entry: `BlueprintRewards` results that fire on the
 second outcome, not on success (on LIVE the contracts `TheCollector_Vehicle_L22_Wolf`,
 `TheCollector_Vehicle_DrakeClipper` and `ORS_Cr_Large`). Every other source of an exported contract
 is in its entries; no contract `id` is stated twice with a reward, so the rule that drops an equal
@@ -1343,7 +1355,7 @@ elsewhere in the Archive:
   6 a locality that lists no object of the starmap.
 - Three `BlueprintRewards` results (the contracts `TheCollector_Vehicle_L22_Wolf`,
   `TheCollector_Vehicle_DrakeClipper` and `ORS_Cr_Large`) fire on the second outcome, not on
-  success, so no `blueprintRewards` entry lists them although `blueprintPools[].rewardSources`
+  success, so no `blueprintRewards` entry lists them although `declarations.blueprintRewardSources`
   does (ADR-0273).
 
 **Reward (ADR-0268).** `fixedRewards.value` lists the parent contract's stored `MissionReward`
@@ -1545,7 +1557,7 @@ is the independent link to `factionReputations` from that Record's `factionReput
 The tiers also hold `pointsAsPercent` and the `progressions` (`minMultiplierThreshold`, `completionType` the name of
 the struct, `periodScenarioGuid`), each with `tiers`: `minPoints`, `badgeToAward` (an identifier;
 `null` for a tier without a badge, which the game stores as the text `None`), `globalPointsMultiplier` and
-`blueprintPoolGuids`, entries of `blueprintPools`. The progression texts and the multiplier rewards
+`blueprintPoolGuids`, nominal GUIDs in `definitions.blueprintPools`. The progression texts and the multiplier rewards
 (empty on LIVE) are not exported.
 
 Contract templates are described in "Contract templates", mission broker entries in "Mission broker
@@ -2648,7 +2660,7 @@ and dismantle processes whose record path matches.
 
 The reward sources come from one scan of the Record tree of every Record for a Reference to a pool
 (ADR-0154), so nothing is capped. A Record the scan cannot read is no `failures` entry, because it
-is not known to be selected; it could hide a source, so `rewardSources` may be incomplete exactly
+is not known to be selected; it could hide a source, so `declarations.blueprintRewardSources` may be incomplete exactly
 when `Crafting::warnings` holds `UnreadableRewardRecords` with the count. Only an unreadable Record
 whose struct type is that of a Record with a reward source counts, and when no source is found at
 all every unreadable Record counts. `p4kx catalog` prints the warning and exits with code 1

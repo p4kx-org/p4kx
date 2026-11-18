@@ -4,7 +4,7 @@
 //! The blueprint pools and the crafting tiers.
 
 use p4kx_extraction::SourceValue;
-use serde_json::{Value, json};
+use serde_json::{Map, Value, json};
 
 use super::source_values::{present, source};
 
@@ -12,22 +12,105 @@ const INPUT_REF: &str = "synthetic-game2";
 const BLUEPRINT_GUID: &str = "11000000-0000-4000-8000-000000000001";
 const RESOURCE_GUID: &str = "b1000000-0000-4000-8000-000000000001";
 
+const POOL_GUID: &str = "e4000000-0000-4000-8000-000000000001";
+const POOL_PATH: &str = "libs/foundry/records/crafting/blueprintrewards/bp_rewards_haul";
+const POOL_INDEX: u32 = 2;
+
 pub(super) fn pools() -> Value {
-    json!([{
-        "guid": "e4000000-0000-4000-8000-000000000001",
-        "className": "BP_REWARDS_Haul",
-        "recordPath": "libs/foundry/records/crafting/blueprintrewards/bp_rewards_haul",
-        "totalWeight": 4.0,
-        "entries": [{
-            "blueprintGuid": "11000000-0000-4000-8000-000000000001",
-            "weight": 1.0
-        }],
-        "rewardSources": [{
-            "recordGuid": "e5000000-0000-4000-8000-000000000001",
-            "recordPath": "libs/foundry/records/contracts/contractgenerator/haul",
-            "contractId": null, "contractName": "Haul_Intro", "chance": 0.5
-        }]
-    }])
+    let mut row = record_header(
+        POOL_GUID,
+        POOL_PATH,
+        POOL_INDEX,
+        "BlueprintPoolRecord",
+        "BP_REWARDS_Haul",
+    );
+    row.insert(
+        "blueprintRewards".to_owned(),
+        present(json!([present(json!({
+            "sourceType": present(json!("BlueprintReward")),
+            "blueprintRecord": record_reference(BLUEPRINT_GUID, "libs/foundry/records/crafting/bp_craft_core", 0, "Blueprint"),
+            "weight": present(json!({"type": "f32", "rawBits": "3f800000", "finite": 1.0})),
+            "additionalFields": empty_arena()
+        }))])),
+    );
+    row.insert("additionalFields".to_owned(), empty_arena());
+    table(Value::Object(row))
+}
+
+pub(super) fn pool_weights() -> Value {
+    table(json!({
+        "pool": {"inputRef": INPUT_REF, "guid": present(json!(POOL_GUID)), "recordIndex": present(json!(POOL_INDEX))},
+        "totalWeight": present(json!({"rawBits": "3f800000", "finite": 1.0}))
+    }))
+}
+
+pub(super) fn reward_sources() -> Value {
+    let mut row = record_header(
+        "e5000000-0000-4000-8000-000000000001",
+        "libs/foundry/records/contracts/contractgenerator/haul",
+        3,
+        "ContractGenerator",
+        "Haul",
+    );
+    row.insert("sourceOrdinal".to_owned(), present(json!("0")));
+    row.insert("poolStorage".to_owned(), present(json!("reference")));
+    row.insert(
+        "pool".to_owned(),
+        record_reference(POOL_GUID, POOL_PATH, POOL_INDEX, "BlueprintPoolRecord"),
+    );
+    row.insert("contractId".to_owned(), source(SourceValue::Absent));
+    row.insert("contractName".to_owned(), present(json!("Haul_Intro")));
+    row.insert(
+        "chance".to_owned(),
+        present(json!({"type": "f32", "rawBits": "3f000000", "finite": 0.5})),
+    );
+    table(Value::Object(row))
+}
+
+fn record_header(
+    guid: &str,
+    path: &str,
+    index: u32,
+    field_type: &str,
+    class_name: &str,
+) -> Map<String, Value> {
+    [
+        ("guid", present(json!(guid))),
+        (
+            "recordName",
+            present(json!(format!("{field_type}.{class_name}"))),
+        ),
+        ("className", present(json!(class_name))),
+        ("recordPath", present(json!(path))),
+        ("recordIndex", present(json!(index))),
+        ("sourceType", present(json!(field_type))),
+        ("fileName", present(json!(format!("{path}.xml")))),
+        ("metadataTag", source(SourceValue::Absent)),
+    ]
+    .into_iter()
+    .map(|(key, cell)| (key.to_owned(), cell))
+    .collect()
+}
+
+fn record_reference(guid: &str, path: &str, index: u32, target: &str) -> Value {
+    present(json!({
+        "guid": present(json!(guid)),
+        "recordPath": present(json!(path)),
+        "targetRecordIndex": present(json!(index)),
+        "targetType": present(json!(target)),
+        "status": "present",
+    }))
+}
+
+fn table(row: Value) -> Value {
+    Value::Object(Map::from_iter([
+        ("availability".to_owned(), json!("available")),
+        ("rows".to_owned(), Value::Array(vec![row])),
+    ]))
+}
+
+fn empty_arena() -> Value {
+    json!({"roots": [], "values": []})
 }
 
 pub(super) fn definitions() -> Value {

@@ -36,7 +36,7 @@ use crate::catalog_v3::npc_spawn_definitions::NpcSpawnDefinitions;
 use crate::catalog_v3::procedural_planet_audio::PreparedPlanetAudio;
 use crate::catalog_v3::starmap_definition_kinds::StarmapDefinitions;
 use crate::contract::{
-    BlueprintPool, Commodity, ContractEntry, Crafter, DismantleProcess, HarvestableLocation,
+    Commodity, ContractEntry, Crafter, DismantleProcess, HarvestableLocation,
     HarvestableProviderPreset, Item, LootContainer, MineableComposition, MineableElement,
     MineableEntity, MiningGlobalParams, Paint, RefiningProcess, ResourceGroup, ResourceType, Ship,
     Shop, StarmapObject, SubHarvestableMultiConfig,
@@ -106,7 +106,9 @@ pub(crate) struct Collected<'f> {
     pub(crate) ammo_definitions: Vec<PreparedAmmoDefinition<'f>>,
     pub(crate) gameplay_properties: Vec<GameplayPropertyDefinition<'f>>,
     pub(crate) quality: QualityRows<'f>,
-    pub(crate) blueprint_pools: Vec<BlueprintPool<'f>>,
+    pub(crate) blueprint_pools: Vec<crate::catalog_v3::industry_modules::blueprint_pool_definition::PreparedBlueprintPool<'f>>,
+    pub(crate) blueprint_reward_sources: Vec<crate::catalog_v3::industry_modules::blueprint_reward_source::BlueprintRewardSource<'f>>,
+    pub(crate) blueprint_reward_numbers: Vec<crate::catalog_number_capture::CapturedNumber>,
     pub(crate) dismantle_processes: Vec<DismantleProcess<'f>>,
     pub(crate) crafting_global: Vec<crate::catalog_v3::crafting_global::PreparedCraftingGlobal<'f>>,
     pub(crate) paints: Vec<Paint>,
@@ -216,6 +218,8 @@ impl<'f> Collected<'f> {
             gameplay_properties: crafting.properties,
             quality: crafting.quality,
             blueprint_pools: crafting.pools,
+            blueprint_reward_sources: crafting.reward_declarations,
+            blueprint_reward_numbers: crafting.reward_numbers,
             dismantle_processes: crafting.dismantle,
             crafting_global: crafting.global,
             paints: Vec::new(),

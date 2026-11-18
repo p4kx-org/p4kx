@@ -170,7 +170,7 @@ fn two_reward_placements_are_one_actual_dependency_record() -> TestResult {
         record_path: "synthetic/pool.xml",
         entries: Vec::new(),
     }];
-    let search = super::reward_sources(&records, &pools, None, None, None)?;
+    let search = super::reward_sources(&records, &pools, None, None)?;
     assert_eq!(
         search.sources.len(),
         2,
@@ -219,7 +219,7 @@ fn an_actual_failed_reward_dependency_retains_its_guid_and_path() -> TestResult 
     );
     let forge = DataForge::open(&bytes)?;
     let records: Vec<_> = forge.records().collect();
-    let search = super::reward_sources(&records, &[], None, None, None)?;
+    let search = super::reward_sources(&records, &[], None, None)?;
     let source = search
         .ledger
         .sources
@@ -261,7 +261,7 @@ fn unreadable_field_leaves_are_retained_even_without_reward_rows() -> TestResult
     let bytes = crate::crafting::ledger::fixtures::fields();
     let forge = DataForge::open(&bytes)?;
     let records: Vec<_> = forge.records().collect();
-    let search = super::reward_sources(&records, &[], None, None, None)?;
+    let search = super::reward_sources(&records, &[], None, None)?;
     assert!(
         search.sources.is_empty(),
         "a source-free canonical scan has no invented reward rows"

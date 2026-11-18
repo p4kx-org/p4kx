@@ -206,6 +206,37 @@ impl<'context, 'source> ReadMode<'context, 'source> {
         Ok(Some(GameplayPropertyInput::Selected(Box::new(found.value))))
     }
 
+    pub(super) fn pool(
+        self,
+        selected: Selection,
+        admission: &RecordObservation<'_, 'source>,
+        tree: &RecordTree<'source>,
+        ledger: &mut ExportLedger,
+        cancel: Option<&CancelToken>,
+    ) -> Result<Option<super::projection::Piece<'source>>, CatalogError> {
+        if selected.action != Action::Pool || selected.policy == ReadPolicy::SkipAfter {
+            return Ok(None);
+        }
+        let Some(input) = self.input() else {
+            return Ok(None);
+        };
+        let found = crate::catalog_v3::industry_modules::blueprint_pool_definition::read(
+            tree, input, admission, cancel,
+        )?;
+        crate::source_projection_notes::record(
+            crate::Kind::BlueprintPools,
+            selected.role,
+            admission,
+            tree,
+            found.notes,
+            ledger,
+        )?;
+        Ok(Some(super::projection::Piece::CanonicalPool {
+            prepared: Box::new(found.prepared),
+            interpreted: found.interpreted,
+        }))
+    }
+
     pub(super) fn blueprint_rules(
         self,
         action: Action,

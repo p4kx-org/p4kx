@@ -126,7 +126,7 @@ pub(crate) fn minimal_catalog() -> Value {
                 "expediteFee": 3200
             }
         }],
-        "definitions": {"items": {"availability": "available", "rows": []}, "contractGenerators": absent_table(), "missionScenarios": absent_table(), "blueprints": blueprints::definitions(), "contractTemplates": absent_table(), "missionBrokerEntries": absent_table(), "lootPoolFilters": loot::filters(), "blueprintCategories": blueprint_categories::definitions(), "gameplayProperties": gameplay_properties::definitions(), "qualityDistributions": quality::distributions(), "qualityQuantizations": quality::quantizations(), "resourceTypes": resources::table(), "resourceGroups": resource_groups::definitions(),
+        "definitions": {"items": {"availability": "available", "rows": []}, "contractGenerators": absent_table(), "missionScenarios": absent_table(), "blueprints": blueprints::definitions(), "blueprintPools": blueprints::pools(), "contractTemplates": absent_table(), "missionBrokerEntries": absent_table(), "lootPoolFilters": loot::filters(), "blueprintCategories": blueprint_categories::definitions(), "gameplayProperties": gameplay_properties::definitions(), "qualityDistributions": quality::distributions(), "qualityQuantizations": quality::quantizations(), "resourceTypes": resources::table(), "resourceGroups": resource_groups::definitions(),
             "commodities": commodities::definitions(), "manufacturers": manufacturer(),
             "refiningProcesses": mining::refining(),
             "tags": tags::definitions(),
@@ -238,6 +238,7 @@ pub(crate) fn minimal_catalog() -> Value {
         },
         "declarations": {
             "blueprintCategoryLists": blueprint_category_lists::declarations(),
+            "blueprintRewardSources": blueprints::reward_sources(),
             "tagRoots": tags::roots(),
             "shopInventoryResolution": absent_table(),
             "entityTags": tags::entities(),
@@ -267,10 +268,9 @@ pub(crate) fn minimal_catalog() -> Value {
             "publicNames": public_names(),
             "gameTexts": [reputation::mission_type_text(), spawns::location_name_text()]
         },
-        "projections": {"contracts": contracts::contracts(), "missionTitles": contracts::titles(), "blueprintPresentation": blueprints::presentation(), "qualityQuantizationResources": quality::inverse(), "commodityPresentation": commodities::presentation(), "tagPaths": tags::paths(), "resourceGroupParents": resource_groups::parents(), "weaponMagazineResolutions": absent_table(), "weaponProjectileAmmoSelections": absent_table(), "weaponPlayerAnimationCandidates": absent_table(), "weaponCombatBases": absent_table(), "jumpConnections": absent_table()},
+        "projections": {"contracts": contracts::contracts(), "missionTitles": contracts::titles(), "blueprintPresentation": blueprints::presentation(), "blueprintPoolWeights": blueprints::pool_weights(), "qualityQuantizationResources": quality::inverse(), "commodityPresentation": commodities::presentation(), "tagPaths": tags::paths(), "resourceGroupParents": resource_groups::parents(), "weaponMagazineResolutions": absent_table(), "weaponProjectileAmmoSelections": absent_table(), "weaponPlayerAnimationCandidates": absent_table(), "weaponCombatBases": absent_table(), "jumpConnections": absent_table()},
         "provenance": {"sources": [], "uses": []},
 
-        "blueprintPools": blueprints::pools(),
         "dismantleProcesses": [{
             "guid": "f1000000-0000-4000-8000-000000000001",
             "className": "GlobalGenericDismantle",

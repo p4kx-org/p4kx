@@ -84,6 +84,12 @@ fn definition_number_groups<'rows>(
                 .iter()
                 .map(|row| (Kind::Factions, row.numbers.as_slice())),
         )
+        .chain(
+            collected
+                .blueprint_pools
+                .iter()
+                .map(|row| (Kind::BlueprintPools, row.numbers.as_slice())),
+        )
         .chain(collected.mission_kinds.reputation_number_groups())
         .chain(collected.law.number_groups())
         .chain(collected.location_vocabulary.number_groups())
@@ -100,12 +106,23 @@ fn definition_number_groups<'rows>(
         )
         .chain(collected.starmap_definitions.number_groups())
         .chain(physical_definition_number_groups(collected))
+        .chain(blueprint_number_groups(collected))
         .chain(
             collected
-                .blueprints
-                .iter()
-                .map(|row| (Kind::Blueprints, row.definition.numbers.as_slice())),
+                .loot_kinds
+                .definitions
+                .sources()
+                .map(|(kind, _, _, numbers)| (kind, numbers)),
         )
+}
+
+fn blueprint_number_groups<'rows>(
+    collected: &'rows Collected<'_>,
+) -> impl Iterator<Item = (Kind, &'rows [CapturedNumber])> {
+    collected
+        .blueprints
+        .iter()
+        .map(|row| (Kind::Blueprints, row.definition.numbers.as_slice()))
         .chain(
             collected
                 .gameplay_properties
@@ -125,12 +142,5 @@ fn definition_number_groups<'rows>(
                 .quantizations
                 .iter()
                 .map(|row| (Kind::QualityQuantizations, row.numbers.as_slice())),
-        )
-        .chain(
-            collected
-                .loot_kinds
-                .definitions
-                .sources()
-                .map(|(kind, _, _, numbers)| (kind, numbers)),
         )
 }

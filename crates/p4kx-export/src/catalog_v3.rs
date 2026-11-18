@@ -28,7 +28,7 @@ mod authored_nodes;
 pub(crate) mod catalog_harvest_modules;
 
 #[path = "catalog_industry_modules.rs"]
-mod industry_modules;
+pub(crate) mod industry_modules;
 pub(crate) use industry_modules::{
     crafting_global, mineable_composition_definition, mineable_element_definition,
     mining_process_catalog,

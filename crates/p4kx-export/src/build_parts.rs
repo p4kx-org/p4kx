@@ -85,6 +85,17 @@ pub(super) fn blueprint_tables(
     )
 }
 
+pub(super) fn blueprint_pool_tables<'source>(
+    collected: &mut Collected<'source>,
+    forge: &DataForge<'_>,
+) -> crate::catalog_v3::industry_modules::blueprint_pool_tables::BlueprintPoolTables<'source> {
+    crate::catalog_v3::industry_modules::blueprint_pool_tables::tables(
+        forge,
+        std::mem::take(&mut collected.blueprint_pools),
+        std::mem::take(&mut collected.blueprint_reward_sources),
+    )
+}
+
 pub(super) fn faction_identities<'source>(
     forge: &DataForge<'_>,
     rows: Vec<PreparedFactionIdentity<'source>>,

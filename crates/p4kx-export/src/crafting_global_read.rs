@@ -3,7 +3,7 @@
 
 use std::cell::RefCell;
 
-use p4kx_extraction::{CancelToken, DataType, RecordTree, Value, ValueError};
+use p4kx_extraction::{CancelToken, DataType, RecordTree};
 
 use super::{
     CraftingBlueprintSelection, CraftingGlobalConfiguration, CraftingGlobalRead,
@@ -40,11 +40,7 @@ pub(crate) fn read<'source>(
     let source = CanonicalRecordHeader::read(tree, input.origins())?;
     let configuration = CraftingGlobalConfiguration::project(source, fields, &mut notes)?;
     let rules = BlueprintRules::read_globals_fields(tree, &originals)?;
-    let complete = originals.facts().iter().all(|fact| {
-        !matches!(fact.value(),
-        Value::Error(error) if !matches!(error, ValueError::DanglingReference { .. }
-            | ValueError::UnexpectedReferenceType { .. }))
-    });
+    let complete = crate::source_value_catalog::retained_values_complete(&originals);
     Ok(CraftingGlobalRead {
         prepared: PreparedCraftingGlobal {
             configuration,

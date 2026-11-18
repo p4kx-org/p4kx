@@ -12,6 +12,7 @@ pub(super) const fn uses_owned_number(kind: Kind) -> bool {
         || matches!(
             kind,
             Kind::Blueprints
+                | Kind::BlueprintPools
                 | Kind::Items
                 | Kind::ExplosionDefinitions
                 | Kind::AmmoDefinitions
@@ -113,7 +114,8 @@ pub(super) const fn expected_owned_number(
 const fn uses_authored_raw_number(kind: Kind) -> bool {
     matches!(
         kind,
-        Kind::AmmoDefinitions
+        Kind::BlueprintPools
+            | Kind::AmmoDefinitions
             | Kind::InventoryContainers
             | Kind::MedicalItemTierConfigs
             | Kind::Factions

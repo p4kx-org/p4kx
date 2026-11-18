@@ -14,6 +14,8 @@ use crate::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, ParsedCatalogQueries,
 };
 
+#[path = "installed_sdk_witness_pool.rs"]
+mod pool;
 #[path = "installed_sdk_witness_receipt.rs"]
 mod receipt;
 #[path = "installed_sdk_witness_scope.rs"]

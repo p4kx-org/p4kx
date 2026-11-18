@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use p4kx_extraction::{DataForge, Filter, Guid};
 
@@ -16,10 +16,10 @@ use crate::catalog_read_failure::CatalogReadFailure;
 use crate::catalog_rows::staged::{StagedCatalogRows, StagedCatalogTable};
 use crate::catalog_v3::crafting_global::PreparedCraftingGlobal;
 use crate::catalog_v3::gameplay_property_catalog::GameplayPropertyDefinition;
-use crate::contract::{BlueprintPool, DismantleProcess};
-use crate::contract_rewards::{PoolEntry, RewardSource};
+use crate::catalog_v3::industry_modules::blueprint_pool_definition::PreparedBlueprintPool;
+use crate::contract::DismantleProcess;
 use crate::crafting::{self, Crafting, ReadCrafting};
-use crate::crafting_types as library;
+use crate::crafting_types::BlueprintPool;
 use crate::crafting_warning::CraftingWarning;
 use crate::export_ledger::ExportLedger;
 use crate::guid_text::CatalogGuid;
@@ -33,7 +33,11 @@ pub(crate) struct CraftingKinds<'f> {
     pub(crate) blueprints: Vec<BlueprintRow<'f>>,
     pub(crate) properties: Vec<GameplayPropertyDefinition<'f>>,
     pub(crate) quality: QualityRows<'f>,
-    pub(crate) pools: Vec<BlueprintPool<'f>>,
+    pub(crate) pools: Vec<PreparedBlueprintPool<'f>>,
+    pub(crate) reward_declarations: Vec<
+        crate::catalog_v3::industry_modules::blueprint_reward_source::BlueprintRewardSource<'f>,
+    >,
+    pub(crate) reward_numbers: Vec<crate::catalog_number_capture::CapturedNumber>,
     pub(crate) dismantle: Vec<DismantleProcess<'f>>,
     pub(crate) global: Vec<PreparedCraftingGlobal<'f>>,
     pub(crate) skipped: Vec<(Kind, usize)>,
@@ -77,6 +81,9 @@ pub(crate) fn kinds<'f>(
         blueprints,
         blueprint_rules,
         globals,
+        pools: mut original_pools,
+        mut reward_declarations,
+        mut reward_numbers,
         catalog_failures,
         mut ledger,
         gameplay,
@@ -87,14 +94,12 @@ pub(crate) fn kinds<'f>(
     let properties_skipped = gameplay.skipped;
     let distributions_skipped = quality.skipped_distributions;
     let quantizations_skipped = quality.skipped_quantizations;
-    let sources = sources_by_pool(&crafting.reward_sources);
-    let (pools, pools_skipped) = selected.entities(
-        Kind::BlueprintPools,
-        &crafting.pools,
-        |item| (item.record_path, item.class_name, CatalogGuid(item.guid)),
-        |source| pool(source, &sources),
-        |entity| entity.guid,
-    );
+    let pools_skipped = select_pools(&crafting.pools, &mut original_pools, &mut selected);
+    retain_rewards(
+        &mut reward_declarations,
+        &mut reward_numbers,
+        &original_pools,
+    )?;
     let (dismantle, dismantle_skipped) = dismantle(&crafting, &mut selected);
     let kept: HashSet<Guid> = dismantle.iter().map(|process| process.guid.0).collect();
     let process = crafting
@@ -110,7 +115,9 @@ pub(crate) fn kinds<'f>(
         blueprints,
         properties,
         quality,
-        pools,
+        pools: original_pools,
+        reward_declarations,
+        reward_numbers,
         dismantle,
         global: globals,
         skipped: vec![
@@ -125,6 +132,26 @@ pub(crate) fn kinds<'f>(
         warnings: crafting.warnings,
         ledger,
     })
+}
+
+fn select_pools(
+    pools: &[BlueprintPool<'_>],
+    originals: &mut Vec<PreparedBlueprintPool<'_>>,
+    selection: &mut rows::Selection<'_>,
+) -> usize {
+    let (kept, skipped) = selection.entities(
+        Kind::BlueprintPools,
+        pools,
+        |item| (item.record_path, item.class_name, CatalogGuid(item.guid)),
+        |source| (CatalogGuid(source.guid), source.record_path),
+        |entry| entry.0,
+    );
+    let kept: HashSet<_> = kept
+        .into_iter()
+        .map(|(guid, path)| (guid.0, path))
+        .collect();
+    originals.retain(|row| kept.contains(&(row.physical_guid, row.physical_path)));
+    skipped
 }
 
 fn dismantle<'f>(
@@ -146,46 +173,30 @@ fn dismantle<'f>(
     )
 }
 
-fn sources_by_pool<'a, 'f>(
-    reward_sources: &'a [library::RewardSource<'f>],
-) -> HashMap<Guid, Vec<&'a library::RewardSource<'f>>> {
-    let mut sources: HashMap<Guid, Vec<&library::RewardSource<'f>>> = HashMap::new();
-    for source in reward_sources {
-        sources.entry(source.pool).or_default().push(source);
-    }
-    sources
-}
-
-fn pool<'f>(
-    source: &library::BlueprintPool<'f>,
-    sources: &HashMap<Guid, Vec<&library::RewardSource<'f>>>,
-) -> BlueprintPool<'f> {
-    let mut reward_sources: Vec<RewardSource<'f>> = sources
-        .get(&source.guid)
-        .into_iter()
-        .flatten()
-        .map(|reward| RewardSource {
-            record_guid: CatalogGuid(reward.record),
-            record_path: reward.record_path,
-            contract_id: reward.contract_id.map(CatalogGuid),
-            contract_name: reward.contract_name,
-            chance: reward.chance,
+fn retain_rewards(
+    declarations: &mut Vec<
+        crate::catalog_v3::industry_modules::blueprint_reward_source::BlueprintRewardSource<'_>,
+    >,
+    numbers: &mut Vec<crate::catalog_number_capture::CapturedNumber>,
+    pools: &[PreparedBlueprintPool<'_>],
+) -> Result<(), CatalogError> {
+    let wanted: HashSet<_> = pools.iter().map(|row| row.physical_guid).collect();
+    declarations.retain(|row| {
+        row.pool().value().is_some_and(|pool| {
+            pool.guid()
+                .value()
+                .is_some_and(|guid| wanted.contains(guid))
         })
-        .collect();
-    reward_sources.sort_by_cached_key(|reward| reward.record_guid.text());
-    BlueprintPool {
-        guid: CatalogGuid(source.guid),
-        class_name: source.class_name,
-        record_path: source.record_path,
-        total_weight: source.total_weight(),
-        entries: source
-            .entries
-            .iter()
-            .map(|entry| PoolEntry {
-                blueprint_guid: entry.blueprint.map(CatalogGuid),
-                weight: entry.weight,
-            })
-            .collect(),
-        reward_sources,
+    });
+    let mut positions = HashSet::new();
+    for row in declarations {
+        positions.extend(row.number_position()?);
     }
+    numbers.retain(|number| match number.occurrence {
+        crate::catalog_number_capture::NumberOccurrence::ConfigurationRawValue { ordinal } => {
+            positions.contains(&(number.record_index, ordinal))
+        }
+        _ => false,
+    });
+    Ok(())
 }

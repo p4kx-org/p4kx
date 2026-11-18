@@ -127,6 +127,7 @@ pub(super) fn assemble<R>(
     );
     run.begin(CatalogStage::ProjectBlueprintTables);
     let blueprints = parts::blueprint_tables(&mut collected, &forge, &origins)?;
+    let pool_tables = parts::blueprint_pool_tables(&mut collected, &forge);
     let (catalog_placements, resource_declarations) = collected.catalog_placements(
         archive,
         &forge,
@@ -182,6 +183,7 @@ pub(super) fn assemble<R>(
         items: collected.items,
         ships: collected.ships,
         declarations: crate::catalog_v3::catalog_declarations::CatalogDeclarations {
+            blueprint_reward_sources: pool_tables.rewards,
             blueprint_category_lists: crate::catalog_v3::blueprint_category_list_read::table(
                 &forge,
                 collected.blueprint_category_lists,
@@ -205,6 +207,7 @@ pub(super) fn assemble<R>(
         definitions: CatalogDefinitions {
             items: collected.item_definitions.table,
             blueprints: blueprint_definitions,
+            blueprint_pools: pool_tables.definitions,
             shop_inventories: collected.shop_inventories,
             particle_libraries: collected.particle_libraries,
             planet_tech: collected.planet_tech,
@@ -281,6 +284,7 @@ pub(super) fn assemble<R>(
                 collected.mission_titles,
             ),
             blueprint_presentation: blueprints.presentation,
+            blueprint_pool_weights: pool_tables.weights,
             quality_quantization_resources: quality.resources,
             resource_group_parents: group_tables.parents,
             weapon_magazine_resolutions: components.magazine_resolutions,
@@ -344,7 +348,6 @@ pub(super) fn assemble<R>(
         },
         texts: finished_texts.texts,
         provenance: parts::freeze_provenance(&origins.uses, run)?,
-        blueprint_pools: collected.blueprint_pools,
         dismantle_processes: collected.dismantle_processes,
         paints: collected.paints,
         loadouts: collected.loadouts,

@@ -72,6 +72,7 @@ impl<'stage> MissionDefinitionWriter<'stage> {
                 kind: self.kind,
                 guid: source.guid,
                 record_path: source.path.to_owned(),
+                record_index: None,
             },
             numbers: source.numbers,
         });

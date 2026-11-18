@@ -25,6 +25,7 @@ pub(super) const fn uses_named_definition_table(kind: Kind) -> bool {
             | Kind::ParticleLibraries
             | Kind::EncounterIndices
             | Kind::MissionItems
+            | Kind::BlueprintPools
             | Kind::ProceduralPlanetAudio
             | Kind::ResourceNetworkGlobals
             | Kind::ContractScopes

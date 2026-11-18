@@ -23,6 +23,10 @@ const PARTITIONS_PER_THREAD: usize = 4;
 /// Actual reward-source search results and source-reading observations.
 pub(crate) struct RewardSearch<'f> {
     pub(crate) sources: Vec<RewardSource<'f>>,
+    pub(crate) declarations: Vec<
+        crate::catalog_v3::industry_modules::blueprint_reward_source::BlueprintRewardSource<'f>,
+    >,
+    pub(crate) numbers: Vec<crate::catalog_number_capture::CapturedNumber>,
     pub(crate) unreadable: usize,
     pub(crate) ledger: ExportLedger,
 }
@@ -30,6 +34,10 @@ pub(crate) struct RewardSearch<'f> {
 #[derive(Default)]
 struct RewardAccumulator<'f> {
     sources: Vec<RewardSource<'f>>,
+    declarations: Vec<
+        crate::catalog_v3::industry_modules::blueprint_reward_source::BlueprintRewardSource<'f>,
+    >,
+    numbers: Vec<crate::catalog_number_capture::CapturedNumber>,
     holding: HashSet<&'f str>,
     failures_by_type: HashMap<&'f str, usize>,
     failed: usize,
@@ -42,7 +50,7 @@ impl<'f> RewardAccumulator<'f> {
         trees: &mut TreeBuilder<'f>,
         record: &Record<'f>,
         wanted: &HashSet<Guid>,
-        input: Option<&OriginalCatalogInput<'_, '_>>,
+        input: Option<&OriginalCatalogInput<'_, 'f>>,
         cancel: Option<&CancelToken>,
     ) -> Result<(), CatalogError> {
         if cancel.is_some_and(CancelToken::is_cancelled) {
@@ -54,13 +62,34 @@ impl<'f> RewardAccumulator<'f> {
         };
         let read =
             export_dependency_read::read(input, trees, &admission, Kind::BlueprintPools, cancel)?;
+        self.ledger.merge(read.ledger);
         match read.tree {
-            Ok(tree) => self.collect_placements(tree.type_name(), |sources| {
-                crafting_sources::collect(&tree, wanted, sources);
-            }),
+            Ok(tree) => {
+                if let Some(input) = input {
+                    let found = crate::catalog_v3::industry_modules::blueprint_reward_source::read(
+                        &tree, input, &admission, wanted, cancel,
+                    )?;
+                    crate::source_projection_notes::record(
+                        Kind::BlueprintPools,
+                        crate::export_diagnostic::ExportSourceRole::Dependency,
+                        &admission,
+                        &tree,
+                        found.notes,
+                        &mut self.ledger,
+                    )?;
+                    self.collect_placements(tree.type_name(), |sources| {
+                        sources.extend(found.interpreted);
+                    });
+                    self.declarations.extend(found.rows);
+                    self.numbers.extend(found.numbers);
+                } else {
+                    self.collect_placements(tree.type_name(), |sources| {
+                        crafting_sources::collect(&tree, wanted, sources);
+                    });
+                }
+            }
             Err(_) => self.fail(record.type_name().ok()),
         }
-        self.ledger.merge(read.ledger);
         Ok(())
     }
 
@@ -85,6 +114,8 @@ impl<'f> RewardAccumulator<'f> {
 
     fn append(&mut self, mut next: Self) {
         self.sources.append(&mut next.sources);
+        self.declarations.append(&mut next.declarations);
+        self.numbers.append(&mut next.numbers);
         self.holding.extend(next.holding);
         for (name, count) in next.failures_by_type {
             *self.failures_by_type.entry(name).or_default() += count;
@@ -104,6 +135,8 @@ impl<'f> RewardAccumulator<'f> {
         };
         RewardSearch {
             sources: self.sources,
+            declarations: self.declarations,
+            numbers: self.numbers,
             unreadable,
             ledger: self.ledger,
         }
@@ -127,21 +160,32 @@ fn tick(done: &AtomicUsize, total: usize, progress: Option<&(dyn Fn(CatalogProgr
 pub(crate) fn reward_sources<'f>(
     records: &[Record<'f>],
     pools: &[BlueprintPool<'f>],
-    input: Option<&OriginalCatalogInput<'_, '_>>,
     cancel: Option<&CancelToken>,
     progress: Option<&(dyn Fn(CatalogProgress) + Sync)>,
 ) -> Result<RewardSearch<'f>, CatalogError> {
     let wanted = pools.iter().map(|pool| pool.guid).collect();
     let partitions = rayon::current_num_threads().saturating_mul(PARTITIONS_PER_THREAD);
     let chunk_size = records.len().div_ceil(partitions).max(1);
-    scan_chunks(records, chunk_size, &wanted, input, cancel, progress)
+    scan_chunks(records, chunk_size, &wanted, None, cancel, progress)
+}
+
+pub(crate) fn reward_sources_for<'f>(
+    records: &[Record<'f>],
+    wanted: &HashSet<Guid>,
+    input: &OriginalCatalogInput<'_, 'f>,
+    cancel: Option<&CancelToken>,
+    progress: Option<&(dyn Fn(CatalogProgress) + Sync)>,
+) -> Result<RewardSearch<'f>, CatalogError> {
+    let partitions = rayon::current_num_threads().saturating_mul(PARTITIONS_PER_THREAD);
+    let chunk_size = records.len().div_ceil(partitions).max(1);
+    scan_chunks(records, chunk_size, wanted, Some(input), cancel, progress)
 }
 
 fn scan_chunks<'f>(
     records: &[Record<'f>],
     chunk_size: usize,
     wanted: &HashSet<Guid>,
-    input: Option<&OriginalCatalogInput<'_, '_>>,
+    input: Option<&OriginalCatalogInput<'_, 'f>>,
     cancel: Option<&CancelToken>,
     progress: Option<&(dyn Fn(CatalogProgress) + Sync)>,
 ) -> Result<RewardSearch<'f>, CatalogError> {

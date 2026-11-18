@@ -3482,47 +3482,110 @@
       ],
       "type": "object"
     },
-    "BlueprintPool": {
-      "description": "A blueprint pool: a `BlueprintPoolRecord` under `crafting/blueprintrewards` that a reward\ndraws a blueprint from.\n\nA source gives the blueprint of an entry with the chance of the source times the weight of the\nentry over `totalWeight`.",
+    "BlueprintPoolDefinition": {
+      "description": "One physical original Blueprint pool with every authored reward slot.",
       "properties": {
-        "className": {
-          "description": "The Record name without its type.",
-          "type": "string"
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
         },
-        "entries": {
-          "description": "The entries in stored order.",
-          "items": {
-            "$ref": "#/$defs/PoolEntry"
-          },
-          "type": "array"
+        "blueprintRewards": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfBlueprintPoolEntry"
+        },
+        "className": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "guid": {
-          "$ref": "#/$defs/Guid",
-          "description": "The GUID of the Record."
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "recordPath": {
-          "description": "The record path, without `.xml`.",
-          "type": "string"
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
-        "rewardSources": {
-          "description": "The places that reward a blueprint of the pool, found through their Reference to it.",
-          "items": {
-            "$ref": "#/$defs/RewardSource"
-          },
-          "type": "array"
-        },
-        "totalWeight": {
-          "description": "The sum of the positive weights of the entries.",
-          "format": "float",
-          "type": "number"
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         }
       },
       "required": [
+        "additionalFields",
+        "blueprintRewards",
         "className",
-        "entries",
+        "fileName",
         "guid",
+        "metadataTag",
+        "recordIndex",
+        "recordName",
         "recordPath",
-        "rewardSources",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "BlueprintPoolEntry": {
+      "description": "The original Blueprint reference, weight and additional fields of one owned reward entry.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "blueprintRecord": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "weight": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "blueprintRecord",
+        "sourceType",
+        "weight"
+      ],
+      "type": "object"
+    },
+    "BlueprintPoolRef": {
+      "description": "The original physical definition identity used by a derived pool projection.",
+      "properties": {
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "inputRef": {
+          "$ref": "#/$defs/PhysicalSourceRef"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        }
+      },
+      "required": [
+        "guid",
+        "inputRef",
+        "recordIndex"
+      ],
+      "type": "object"
+    },
+    "BlueprintPoolWeights": {
+      "description": "The positive finite-f32 weight sum of one original pool.",
+      "properties": {
+        "pool": {
+          "$ref": "#/$defs/BlueprintPoolRef"
+        },
+        "totalWeight": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        }
+      },
+      "required": [
+        "pool",
         "totalWeight"
       ],
       "type": "object"
@@ -3673,7 +3736,7 @@
         },
         "poolGuid": {
           "$ref": "#/$defs/Guid",
-          "description": "The `guid` of the entry of `blueprintPools` the reward draws from."
+          "description": "The nominal GUID of the original pool in `definitions.blueprintPools`."
         },
         "source": {
           "$ref": "#/$defs/BlueprintSource",
@@ -3684,6 +3747,70 @@
         "chance",
         "poolGuid",
         "source"
+      ],
+      "type": "object"
+    },
+    "BlueprintRewardSource": {
+      "description": "One original direct pool-reference occurrence and the actual enclosing reward inputs.",
+      "properties": {
+        "chance": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "className": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "contractId": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "contractName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "pool": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "poolStorage": {
+          "$ref": "#/$defs/SourcedValueOfSourceDataType"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfDecimalU64"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "chance",
+        "className",
+        "contractId",
+        "contractName",
+        "fileName",
+        "guid",
+        "metadataTag",
+        "pool",
+        "poolStorage",
+        "recordIndex",
+        "recordName",
+        "recordPath",
+        "sourceOrdinal",
+        "sourceType"
       ],
       "type": "object"
     },
@@ -5286,6 +5413,9 @@
         "blueprintCategoryLists": {
           "$ref": "#/$defs/CatalogTableOfBlueprintCategoryList"
         },
+        "blueprintRewardSources": {
+          "$ref": "#/$defs/CatalogTableOfBlueprintRewardSource"
+        },
         "contractScenarioRequirements": {
           "$ref": "#/$defs/CatalogTableOfContractScenarioRequirements"
         },
@@ -5317,6 +5447,7 @@
       "required": [
         "ammoBindings",
         "blueprintCategoryLists",
+        "blueprintRewardSources",
         "contractScenarioRequirements",
         "entityTags",
         "itemRoomAssociations",
@@ -5349,6 +5480,9 @@
         },
         "blueprintCategories": {
           "$ref": "#/$defs/CatalogTableOfBlueprintCategoryDefinition"
+        },
+        "blueprintPools": {
+          "$ref": "#/$defs/CatalogTableOfBlueprintPoolDefinition"
         },
         "blueprints": {
           "$ref": "#/$defs/CatalogTableOfBlueprintDefinition"
@@ -5589,6 +5723,7 @@
         "autoSpawnSets",
         "autoSpawns",
         "blueprintCategories",
+        "blueprintPools",
         "blueprints",
         "climateAssets",
         "commodities",
@@ -5808,6 +5943,9 @@
     "CatalogProjections": {
       "description": "Explicit choices and derived values, separate from authored definitions.",
       "properties": {
+        "blueprintPoolWeights": {
+          "$ref": "#/$defs/CatalogTableOfBlueprintPoolWeights"
+        },
         "blueprintPresentation": {
           "$ref": "#/$defs/CatalogTableOfBlueprintPresentation"
         },
@@ -5846,6 +5984,7 @@
         }
       },
       "required": [
+        "blueprintPoolWeights",
         "blueprintPresentation",
         "commodityPresentation",
         "contracts",
@@ -6095,6 +6234,44 @@
       ],
       "type": "object"
     },
+    "CatalogTableOfBlueprintPoolDefinition": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/BlueprintPoolDefinition"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfBlueprintPoolWeights": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/BlueprintPoolWeights"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
     "CatalogTableOfBlueprintPresentation": {
       "description": "One named typed dataset with its measured source-family availability.",
       "properties": {
@@ -6104,6 +6281,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/BlueprintPresentation"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfBlueprintRewardSource": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/BlueprintRewardSource"
           },
           "type": "array"
         }
@@ -10380,7 +10576,7 @@
         },
         "blueprintPools": {
           "$ref": "#/$defs/KindCompleteness",
-          "description": "The completeness of `blueprintPools`."
+          "description": "The completeness of `definitions.blueprintPools`."
         },
         "blueprints": {
           "$ref": "#/$defs/KindCompleteness",
@@ -34073,35 +34269,6 @@
       ],
       "type": "object"
     },
-    "PoolEntry": {
-      "description": "One entry of a blueprint pool.",
-      "properties": {
-        "blueprintGuid": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Guid"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The GUID of the blueprint, `null` for a null Reference."
-        },
-        "weight": {
-          "description": "The weight of the entry among the pool's, `null` when the Record holds none.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        }
-      },
-      "required": [
-        "blueprintGuid",
-        "weight"
-      ],
-      "type": "object"
-    },
     "PortDefinitionLink": {
       "oneOf": [
         {
@@ -40913,53 +41080,6 @@
       ],
       "type": "object"
     },
-    "RewardSource": {
-      "description": "A place that rewards a blueprint of a pool with a chance: a `BlueprintRewards` result of a\ncontract.",
-      "properties": {
-        "chance": {
-          "description": "The chance that the reward is given as the Record states it, 0 to 1 on LIVE and not\nclamped, `null` when the Record holds none.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "contractId": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Guid"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The `id` of the nearest enclosing struct that has one, e.g. the contract."
-        },
-        "contractName": {
-          "description": "The `debugName` of that struct.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "recordGuid": {
-          "$ref": "#/$defs/Guid",
-          "description": "The GUID of the Record that holds the reward."
-        },
-        "recordPath": {
-          "description": "The record path of that Record, without `.xml`.",
-          "type": "string"
-        }
-      },
-      "required": [
-        "chance",
-        "contractId",
-        "contractName",
-        "recordGuid",
-        "recordPath"
-      ],
-      "type": "object"
-    },
     "RoomAssociation": {
       "properties": {
         "additionalFields": {
@@ -41561,7 +41681,7 @@
           ]
         },
         "blueprintPoolGuids": {
-          "description": "The blueprint pools the tier rewards (`blueprintPool`), the `guid`s of entries of\n`blueprintPools`, in the stored order.",
+          "description": "The blueprint pools the tier rewards (`blueprintPool`), the `guid`s of entries of\n`definitions.blueprintPools`, in the stored order.",
           "items": {
             "$ref": "#/$defs/Guid"
           },
@@ -51719,6 +51839,139 @@
               "value": {
                 "items": {
                   "$ref": "#/$defs/SourcedValueOfBlackboardProperty"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_of_SourcedValueOfBlueprintPoolEntry": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfBlueprintPoolEntry"
                 },
                 "type": "array"
               }
@@ -71506,6 +71759,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/BlueprintDismantle"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfBlueprintPoolEntry": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/BlueprintPoolEntry"
               }
             }
           }
@@ -134934,13 +135317,6 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "The versioned P4KX game-data catalog.",
   "properties": {
-    "blueprintPools": {
-      "description": "The blueprint pools with the places that reward them, ordered by GUID.",
-      "items": {
-        "$ref": "#/$defs/BlueprintPool"
-      },
-      "type": "array"
-    },
     "cargoManifests": {
       "description": "The cargo manifests, how the game fills the cargo grid of a spawned ship, ordered by GUID.",
       "items": {
@@ -135193,7 +135569,6 @@
     }
   },
   "required": [
-    "blueprintPools",
     "cargoManifests",
     "completeness",
     "configurations",

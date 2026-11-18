@@ -26,12 +26,15 @@ mod field_read;
 mod reference;
 #[path = "source_reference_read.rs"]
 mod reference_read;
+#[path = "source_retained_status.rs"]
+mod retained_status;
 #[path = "source_scalar_read.rs"]
 mod scalar_read;
 #[path = "source_text.rs"]
 mod text;
 #[path = "source_value.rs"]
 mod value;
+pub(crate) use retained_status::retained_values_complete;
 
 pub use crate::catalog_read::original::OriginalInstanceLocation;
 pub use crate::guid_text::CatalogGuid;

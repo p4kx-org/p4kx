@@ -87,6 +87,15 @@ impl TargetIndex {
             let origins = selected
                 .get(&Identity::row(row))
                 .ok_or(ExportAccountingError::MissingCatalogRowSource { kind: row.kind })?;
+            if let Some(physical) = row.record_index {
+                if !origins.contains(&physical) {
+                    return Err(ExportAccountingError::MissingCatalogRowSource { kind: row.kind });
+                }
+                if !self.emitted.insert((row.kind, physical)) {
+                    return Err(ExportAccountingError::ConflictingCatalogRows);
+                }
+                continue;
+            }
             let count = identities.entry((row.kind, row.guid)).or_default();
             *count += 1;
             if origins.len() != 1 || *count != 1 {
@@ -204,6 +213,7 @@ const fn uses_physical_row_identity(kind: Kind) -> bool {
                 | Kind::MissionBrokerEntries
                 | Kind::GameplayProperties
                 | Kind::Blueprints
+                | Kind::BlueprintPools
                 | Kind::LootPoolFilters
                 | Kind::LootSecondaryChoiceSingleLayers
                 | Kind::LootSecondaryChoiceMultiLayers

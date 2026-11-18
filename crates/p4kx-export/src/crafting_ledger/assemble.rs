@@ -20,6 +20,9 @@ fn insert<'f>(
     data: &mut Crafting<'f>,
     blueprints: &mut Vec<crate::blueprint_catalog_read::PreparedBlueprint<'f>>,
     links: &mut HashMap<Guid, Vec<Guid>>,
+    pools: &mut Vec<
+        crate::catalog_v3::industry_modules::blueprint_pool_definition::PreparedBlueprintPool<'f>,
+    >,
     piece: Piece<'f>,
 ) {
     match piece {
@@ -29,6 +32,13 @@ fn insert<'f>(
         Piece::Distribution(value) => data.quality_distributions.push(value),
         Piece::Quantization(value) => data.quality_quantizations.push(value),
         Piece::Pool(value) => data.pools.push(value),
+        Piece::CanonicalPool {
+            prepared,
+            interpreted,
+        } => {
+            pools.push(*prepared);
+            data.pools.push(interpreted);
+        }
         Piece::Dismantle(value) => data.dismantle.push(value),
         Piece::ResourceLinks {
             resource_type,
@@ -79,6 +89,7 @@ pub(super) fn assemble<'f>(
 ) -> Result<ReadCrafting<'f>, CatalogError> {
     let mut data = Crafting::default();
     let mut blueprints = Vec::new();
+    let mut pools = Vec::new();
     let mut blueprint_rules = crate::blueprint_rule_inputs::BlueprintRules::default();
     let mut globals = Vec::new();
     let mut catalog_failures = Vec::new();
@@ -95,7 +106,7 @@ pub(super) fn assemble<'f>(
         if let Some(piece) = tracked.piece {
             match piece {
                 Piece::Failed(failure) if origins.is_some() => catalog_failures.push(failure),
-                piece => insert(&mut data, &mut blueprints, &mut links, piece),
+                piece => insert(&mut data, &mut blueprints, &mut links, &mut pools, piece),
             }
         }
     }
@@ -116,6 +127,9 @@ pub(super) fn assemble<'f>(
         blueprints,
         blueprint_rules,
         globals,
+        pools,
+        reward_declarations: Vec::new(),
+        reward_numbers: Vec::new(),
         catalog_failures,
         ledger,
         gameplay,

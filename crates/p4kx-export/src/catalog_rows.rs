@@ -57,6 +57,12 @@ pub(crate) fn snapshot(collected: &mut Collected<'_>, filter: Option<&Filter>) -
             .iter()
             .map(|row| (row.definition.physical_guid.0, row.definition.physical_path)),
     );
+    emitted.extend(collected.blueprint_pools.iter().map(|row| CatalogRow {
+        kind: Kind::BlueprintPools,
+        guid: row.physical_guid,
+        record_path: row.physical_path.to_owned(),
+        record_index: Some(row.physical_index),
+    }));
     append_missions(&mut emitted, collected);
     let mut template_numbers = Vec::new();
     let definitions = std::mem::take(&mut collected.contract_templates.proof)
@@ -124,6 +130,7 @@ fn append_gameplay_definitions(emitted: &mut Vec<CatalogRow>, collected: &Collec
                 kind,
                 guid,
                 record_path: path.to_owned(),
+                record_index: None,
             }),
     );
     append(
@@ -272,5 +279,6 @@ fn append<'source>(
         kind,
         guid,
         record_path: record_path.to_owned(),
+        record_index: None,
     }));
 }

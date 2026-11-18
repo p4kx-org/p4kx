@@ -39,31 +39,84 @@ pub(crate) fn collect<'source>(
     pools: &HashSet<Guid>,
     out: &mut Vec<RewardSource<'source>>,
 ) {
-    let mut pending = vec![Frame::new(tree.root(), Scope::default())];
-    while let Some(frame) = pending.last_mut() {
-        let Some(value) = frame.next() else {
-            pending.pop();
-            continue;
+    out.extend(walk(tree).filter_map(|step| step.reward(tree, pools)));
+}
+
+pub(crate) struct WalkStep<'tree, 'source> {
+    pub(crate) node: &'tree StructValue<'source>,
+    pub(crate) value: &'tree Value<'source>,
+    scope: Scope<'source>,
+    edge: Edge,
+}
+
+#[derive(Clone, Copy)]
+enum Edge {
+    Field,
+    ArrayElement,
+}
+
+struct VisitedValue<'tree, 'source> {
+    value: &'tree Value<'source>,
+    edge: Edge,
+}
+
+impl<'source> WalkStep<'_, 'source> {
+    pub(crate) fn reward(
+        &self,
+        tree: &RecordTree<'source>,
+        pools: &HashSet<Guid>,
+    ) -> Option<RewardSource<'source>> {
+        let Value::Reference(reference) = self.value else {
+            return None;
         };
-        let node = frame.node;
-        let scope = frame.scope;
-        match value {
-            Value::Reference(reference)
-                if reference.location().is_none()
-                    && reference.guid() != tree.guid()
-                    && pools.contains(&reference.guid()) =>
-            {
-                out.push(RewardSource {
-                    record: tree.guid(),
-                    record_path: tree.record_path(),
-                    contract_id: scope.id,
-                    contract_name: scope.name,
-                    pool: reference.guid(),
-                    chance: number(Some(node), "chance"),
-                });
+        if !matches!(self.edge, Edge::Field)
+            || reference.location().is_some()
+            || reference.guid() == tree.guid()
+            || !pools.contains(&reference.guid())
+        {
+            return None;
+        }
+        Some(RewardSource {
+            record: tree.guid(),
+            record_path: tree.record_path(),
+            contract_id: self.scope.id,
+            contract_name: self.scope.name,
+            pool: reference.guid(),
+            chance: number(Some(self.node), "chance"),
+        })
+    }
+}
+
+pub(crate) struct Walk<'tree, 'source> {
+    pending: Vec<Frame<'tree, 'source>>,
+}
+
+pub(crate) fn walk<'tree, 'source>(tree: &'tree RecordTree<'source>) -> Walk<'tree, 'source> {
+    Walk {
+        pending: vec![Frame::new(tree.root(), Scope::default())],
+    }
+}
+
+impl<'tree, 'source> Iterator for Walk<'tree, 'source> {
+    type Item = WalkStep<'tree, 'source>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            let frame = self.pending.last_mut()?;
+            let Some(visited) = frame.next() else {
+                self.pending.pop();
+                continue;
+            };
+            let step = WalkStep {
+                node: frame.node,
+                value: visited.value,
+                scope: frame.scope,
+                edge: visited.edge,
+            };
+            if let Value::Struct(child) = visited.value {
+                self.pending.push(Frame::new(child, step.scope));
             }
-            Value::Struct(child) => pending.push(Frame::new(child, scope)),
-            _ => {}
+            return Some(step);
         }
     }
 }
@@ -87,26 +140,33 @@ impl<'tree, 'source> Frame<'tree, 'source> {
 }
 
 impl<'tree, 'source> Iterator for Frame<'tree, 'source> {
-    type Item = &'tree Value<'source>;
+    type Item = VisitedValue<'tree, 'source>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            if let Some(child) = self
-                .children
-                .find(|value| matches!(value, Value::Struct(_)))
-            {
-                return Some(child);
-            }
-            let value = self.fields.next()?.value();
-            if let Value::Array(children) = value {
-                self.children = children.iter();
-            } else {
-                return Some(value);
-            }
+        if let Some(value) = self.children.next() {
+            return Some(VisitedValue {
+                value,
+                edge: Edge::ArrayElement,
+            });
         }
+        let value = self.fields.next()?.value();
+        if let Value::Array(children) = value {
+            self.children = children.iter();
+        }
+        Some(VisitedValue {
+            value,
+            edge: Edge::Field,
+        })
     }
 }
 
 #[cfg(test)]
 #[path = "crafting_sources_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "crafting_source_fixture.rs"]
+pub(crate) mod fixture;
+#[cfg(test)]
+#[path = "crafting_source_scope_fixture.rs"]
+pub(crate) mod scope_fixture;

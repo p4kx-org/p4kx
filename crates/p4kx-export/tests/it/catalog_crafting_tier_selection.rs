@@ -58,7 +58,17 @@ fn a_filter_marks_the_crafting_kinds_partial_and_selects_by_record_path() -> Tes
         );
     }
     assert_eq!(blueprint::definitions(&catalog)?.len(), 1);
-    assert_eq!(catalog["blueprintPools"], json!([]), "no pool matches");
+    for path in [
+        "/definitions/blueprintPools/rows",
+        "/projections/blueprintPoolWeights/rows",
+        "/declarations/blueprintRewardSources/rows",
+    ] {
+        assert_eq!(
+            catalog.pointer(path),
+            Some(&json!([])),
+            "no pool matches {path}"
+        );
+    }
     assert_eq!(catalog["dismantleProcesses"], json!([]), "filtered by path");
     assert_eq!(
         catalog["configurations"]["craftingGlobal"]["rows"][0]["dismantleBlacklistResources"]["value"]

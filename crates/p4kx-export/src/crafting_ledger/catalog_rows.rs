@@ -66,6 +66,7 @@ impl<'s> Selection<'s> {
                     kind,
                     guid: guid.0,
                     record_path: path.to_owned(),
+                    record_index: None,
                 },
                 reason,
             });

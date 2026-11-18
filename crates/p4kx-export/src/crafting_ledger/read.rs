@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{CancelToken, DataForge, Filter, Record, RecordTree, TreeBuilder};
+use p4kx_extraction::{CancelToken, DataForge, Filter, Record, TreeBuilder};
 use rayon::prelude::*;
 
 use crate::blueprint_rule_inputs::BlueprintRules;
-use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read_failure::CatalogReadFailure;
 use crate::crafting_scan;
 use crate::crafting_warning::CraftingWarning;
@@ -15,7 +14,7 @@ use crate::record_observation::RecordObservation;
 use crate::{CatalogError, CatalogProgress, Kind};
 
 use super::fault::Fault;
-use super::projection::{self, Piece, ProjectError};
+use super::projection::Piece;
 use super::resource_scope::ResourceLinkScope;
 use super::selection::{self, Action, ReadPolicy, Selection};
 use super::{ReadCrafting, ReadMode};
@@ -54,7 +53,7 @@ fn candidate<'f>(
         global: None,
     })
 }
-fn failure<'f>(
+pub(super) fn failure<'f>(
     selected: Selection,
     admission: &RecordObservation<'_, 'f>,
     fault: Fault<'_>,
@@ -167,115 +166,7 @@ fn selected_record<'f>(
             return Ok(tracked);
         }
     };
-    project_tree(&admission, &tree, selected, mode, cancel, filter)
-}
-
-fn read_blueprint<'source>(
-    tree: &RecordTree<'source>,
-    projection: &CatalogProjection<'_, 'source>,
-    admission: &RecordObservation<'_, 'source>,
-    role: ExportSourceRole,
-    ledger: &mut ExportLedger,
-    cancel: Option<&CancelToken>,
-) -> Result<Piece<'source>, CatalogError> {
-    let found = crate::blueprint_catalog_read::read(
-        tree,
-        &projection.for_kind(Kind::Blueprints),
-        admission,
-        cancel,
-    )?;
-    crate::source_projection_notes::record(
-        Kind::Blueprints,
-        role,
-        admission,
-        tree,
-        found.notes,
-        ledger,
-    )?;
-    Ok(Piece::CanonicalBlueprint(Box::new(found.value)))
-}
-
-fn read_selected_projection<'source>(
-    selected: Selection,
-    admission: &RecordObservation<'_, 'source>,
-    tree: &RecordTree<'source>,
-    ledger: &mut ExportLedger,
-    cancel: Option<&CancelToken>,
-) -> Result<Option<Piece<'source>>, ProjectError> {
-    let projected = projection::project(selected.action, tree, cancel)?;
-    if let Some(kind) = selected.action.kind() {
-        crate::source_projection_notes::record(
-            kind,
-            selected.role,
-            admission,
-            tree,
-            projected.notes,
-            ledger,
-        )
-        .map_err(ProjectError::Catalog)?;
-    }
-    Ok(projected.piece)
-}
-
-fn project_tree<'f>(
-    admission: &RecordObservation<'_, 'f>,
-    tree: &RecordTree<'f>,
-    selected: Selection,
-    mode: ReadMode<'_, 'f>,
-    cancel: Option<&CancelToken>,
-    filter: Option<&Filter>,
-) -> Result<Tracked<'f>, CatalogError> {
-    let mut ledger = crate::export_field_walk::inspect_observed(
-        mode.input(),
-        tree,
-        admission,
-        selected.action.kind(),
-        selected.role,
-        cancel,
-    )?;
-    let input = mode.project(selected, admission, tree, &mut ledger, cancel)?;
-    let gameplay = mode.property(selected, admission, tree, &mut ledger, cancel)?;
-    let piece = if input.is_some() || gameplay.is_some() {
-        None
-    } else if let Some(projection) = mode.projection()
-        && selected.action == Action::Blueprint
-    {
-        Some(read_blueprint(
-            tree,
-            projection,
-            admission,
-            selected.role,
-            &mut ledger,
-            cancel,
-        )?)
-    } else {
-        match read_selected_projection(selected, admission, tree, &mut ledger, cancel) {
-            Ok(piece) => piece,
-            Err(ProjectError::Catalog(error)) => return Err(error),
-            Err(ProjectError::Source(error)) => {
-                return failure(
-                    selected,
-                    admission,
-                    Fault::Projection(&error),
-                    ledger,
-                    filter,
-                );
-            }
-        }
-    };
-    let rules = mode.blueprint_rules(selected.action, admission, tree, &mut ledger, cancel)?;
-    ledger.observe(selected.observation(admission, selected.successful_disposition())?);
-    Ok(Tracked {
-        piece,
-        ledger,
-        gameplay,
-        blueprint_rules: rules.rules,
-        global: rules.global,
-        quality: Step {
-            input,
-            ..Step::default()
-        },
-    })
+    super::project::tree(&admission, &tree, selected, mode, cancel, filter)
 }
 
 fn inventories(ledger: &mut ExportLedger) {
@@ -340,18 +231,23 @@ fn read_scoped<'f>(
         .collect::<Result<Vec<_>, _>>()?;
     let mut result = super::assemble::assemble(tracked, mode.origins(), cancel)?;
     inventories(&mut result.ledger);
-    let search_rewards = !result.data.pools.is_empty();
+    let search_rewards = if mode.input().is_some() {
+        !result.pools.is_empty()
+    } else {
+        !result.data.pools.is_empty()
+    };
     #[cfg(test)]
     let search_rewards = search_rewards && mode.searches_reward_sources();
     if search_rewards {
-        let found = crafting_scan::reward_sources(
-            records,
-            &result.data.pools,
-            mode.input(),
-            cancel,
-            progress,
-        )?;
+        let found = if let Some(input) = mode.input() {
+            let wanted = result.pools.iter().map(|pool| pool.physical_guid).collect();
+            crafting_scan::reward_sources_for(records, &wanted, input, cancel, progress)?
+        } else {
+            crafting_scan::reward_sources(records, &result.data.pools, cancel, progress)?
+        };
         result.data.reward_sources = found.sources;
+        result.reward_declarations = found.declarations;
+        result.reward_numbers = found.numbers;
         result.ledger.merge(found.ledger);
         if found.unreadable > 0 {
             result

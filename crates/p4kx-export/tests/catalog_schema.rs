@@ -171,14 +171,7 @@ fn the_schema_accepts_unknown_fields_and_kinds_but_not_unknown_versions() -> Tes
         json!("CFC0122D-5275-415A-A656-3DCB3346FEB5");
     assert!(!validator.is_valid(&upper_case), "lower-case GUIDs only");
 
-    for kind in [
-        "items",
-        "ships",
-        "blueprintPools",
-        "dismantleProcesses",
-        "paints",
-        "loadouts",
-    ] {
+    for kind in ["items", "ships", "dismantleProcesses", "paints", "loadouts"] {
         let mut unknown = catalog.clone();
         unknown[kind][0]["extra"] = json!(true);
         assert!(validator.is_valid(&unknown), "unknown fields in {kind}");
@@ -197,6 +190,19 @@ fn the_schema_accepts_unknown_fields_and_kinds_but_not_unknown_versions() -> Tes
         validator.is_valid(&unknown_manufacturer),
         "unknown manufacturer fields"
     );
+    for pointer in [
+        "/definitions/blueprintPools/rows/0",
+        "/projections/blueprintPoolWeights/rows/0",
+        "/declarations/blueprintRewardSources/rows/0",
+    ] {
+        let mut unknown = catalog.clone();
+        unknown
+            .pointer_mut(pointer)
+            .and_then(Value::as_object_mut)
+            .ok_or("canonical pool contract fixture row")?
+            .insert("extra".into(), json!(true));
+        assert!(validator.is_valid(&unknown), "unknown fields in {pointer}");
+    }
     additive::assert_unknown_canonical_fields(&validator, &catalog)?;
 
     additive::assert_unknown_nested_fields(&validator, catalog)
@@ -242,7 +248,6 @@ fn every_field_the_schema_lists_is_required() -> TestResult {
         ("ships", "crewSize", "a ship"),
         ("ships", "variantOf", "a ship states its variant base"),
         ("items", "variantOf", "an item states its variant base"),
-        ("blueprintPools", "rewardSources", "a pool"),
     ] {
         let mut catalog = minimal_catalog();
         if let Some(entity) = catalog[kind][0].as_object_mut() {
@@ -252,6 +257,18 @@ fn every_field_the_schema_lists_is_required() -> TestResult {
     }
     for (pointer, field) in [
         ("/definitions/blueprints/rows/0", "source"),
+        ("/definitions/blueprintPools/rows/0", "blueprintRewards"),
+        (
+            "/definitions/blueprintPools/rows/0/blueprintRewards/value/0/value",
+            "blueprintRecord",
+        ),
+        ("/projections/blueprintPoolWeights/rows/0", "totalWeight"),
+        (
+            "/declarations/blueprintRewardSources/rows/0",
+            "sourceOrdinal",
+        ),
+        ("/declarations/blueprintRewardSources/rows/0", "poolStorage"),
+        ("/declarations/blueprintRewardSources/rows/0", "pool"),
         ("/configurations/blueprintTiers/rows/0", "costs"),
         (
             "/configurations/blueprintTiers/rows/0/costs/0/meaning",

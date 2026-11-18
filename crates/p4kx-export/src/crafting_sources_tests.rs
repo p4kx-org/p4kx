@@ -5,17 +5,13 @@ use std::collections::HashSet;
 
 use p4kx_extraction::{DataForge, Guid, Record};
 
-use super::collect;
+use super::{collect, fixture, scope_fixture};
 use crate::crafting_types::RewardSource;
 
 #[path = "crafting_source_controls.rs"]
 mod controls;
-#[path = "crafting_source_fixture.rs"]
-mod fixture;
 #[path = "crafting_source_scope_controls.rs"]
 mod scope_controls;
-#[path = "crafting_source_scope_fixture.rs"]
-mod scope_fixture;
 #[path = "crafting_source_support.rs"]
 mod support;
 

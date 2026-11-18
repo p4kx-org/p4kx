@@ -452,3 +452,21 @@ The Catalog has no merged root `craftingGlobal` compatibility view. The old
 `dismantleBlacklistEntityClasses`. The original `defaultBlueprintSelection.blueprintRecords`
 slots are now available directly. Source states and physical occurrences remain authoritative.
 See [ADR-0411](adr/0411-crafting-globals-retain-physical-original-configuration-rows.md).
+
+## Physical Blueprint pools
+
+Use `catalog_queries::crafting::with_pools` or `with_pools_from` with an Archive or a decoded Entry.
+The session and parsed-view methods are `with_blueprint_pools`. The borrowed snapshot returns
+the original pool rows, weight projections in the same order, the Build, availability, source
+inventory and coverage. The query reads the selected pool family; it needs neither Blueprint
+bodies nor localization.
+
+`All`, `Guid` and `RecordIndex` select physical pool owners. A GUID can select multiple original
+Records, in textual-GUID and then physical-index order. Join each weight using the input and
+physical Record index when combining results from different selections. A slot retains its
+authored Reference and exact numeric storage. The projection sums the positive finite decoded
+weights in slot order using f32 arithmetic. An overflowing sum still carries its f32 bits.
+
+The complete Catalog also publishes `declarations.blueprintRewardSources`. This direct query does
+not survey the other Record families that reference the pool. See
+[ADR-0412](adr/0412-blueprint-pools-separate-original-slots-weights-and-reward-sources.md).

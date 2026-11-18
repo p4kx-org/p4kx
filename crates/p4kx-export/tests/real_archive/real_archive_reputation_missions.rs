@@ -8,7 +8,7 @@ use std::error::Error;
 
 use serde_json::Value;
 
-use super::{TestResult, assert_resolve, catalog, guids, list, print_line, text};
+use super::{TestResult, assert_resolve, catalog, list, print_line, text};
 use crate::real_archive_canonical_texts::{TextDomain, TextIndex, TextReferenceShape};
 use crate::real_archive_verification::guids as canonical_guids;
 
@@ -70,7 +70,7 @@ fn mission_types_localities_and_scenarios_of_a_real_archive_are_linked() -> Test
     let localities = list(&catalog, "missionLocalities")?;
     let scenarios = list(&catalog, "contractScenarios")?;
     let objects = canonical_guids(&catalog, "starmapObjects")?;
-    let pools = guids(&catalog, "blueprintPools")?;
+    let pools = canonical_guids(&catalog, "blueprintPools")?;
     let factions = canonical_guids(&catalog, "factionReputations")?;
     print_line(&format!(
         "{} mission types, {} localities, {} scenarios",

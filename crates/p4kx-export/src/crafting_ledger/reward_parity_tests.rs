@@ -8,7 +8,6 @@ use p4kx_testkit::{TestRecord, TestStruct, TestType, TestValue};
 
 use crate::CatalogError;
 use crate::build::original_input::{OriginalCatalogInput, test_support};
-use crate::crafting_sources;
 use crate::export_dependency_read;
 use crate::export_ledger::SourceDisposition;
 use crate::record_observation::RecordObservation;
@@ -113,6 +112,15 @@ fn check_receipts(
             }),
         "retained chance values preserve their exact float bits",
     );
+    assert_eq!(
+        serde_json::to_value(&measured.declarations)?,
+        serde_json::to_value(&expected.declarations)?,
+        "canonical original declarations"
+    );
+    assert_eq!(
+        measured.numbers, expected.numbers,
+        "original number receipts"
+    );
     assert_eq!(measured.unreadable, expected.unreadable, "warning count");
     assert_eq!(
         measured.ledger.sources, expected.ledger.sources,
@@ -134,11 +142,13 @@ fn check_receipts(
 fn sequential_sources<'f>(
     records: &[Record<'f>],
     wanted: &HashSet<Guid>,
-    input: &OriginalCatalogInput<'_, '_>,
+    input: &OriginalCatalogInput<'_, 'f>,
 ) -> Result<RewardSearch<'f>, CatalogError> {
     let mut trees = TreeBuilder::new();
     let mut ledger = ExportLedger::default();
     let mut sources = Vec::new();
+    let mut declarations = Vec::new();
+    let mut numbers = Vec::new();
     let mut types = HashSet::new();
     let mut failures = Vec::new();
     for record in records {
@@ -153,8 +163,20 @@ fn sequential_sources<'f>(
         ledger.merge(dependency.ledger);
         match dependency.tree {
             Ok(tree) => {
-                let mut placements = Vec::new();
-                crafting_sources::collect(&tree, wanted, &mut placements);
+                let found = crate::catalog_v3::industry_modules::blueprint_reward_source::read(
+                    &tree, input, &admission, wanted, None,
+                )?;
+                crate::source_projection_notes::record(
+                    Kind::BlueprintPools,
+                    crate::export_diagnostic::ExportSourceRole::Dependency,
+                    &admission,
+                    &tree,
+                    found.notes,
+                    &mut ledger,
+                )?;
+                let placements = found.interpreted;
+                declarations.extend(found.rows);
+                numbers.extend(found.numbers);
                 if !placements.is_empty() {
                     types.insert(tree.type_name());
                     sources.extend(placements);
@@ -174,6 +196,8 @@ fn sequential_sources<'f>(
     };
     Ok(RewardSearch {
         sources,
+        declarations,
+        numbers,
         unreadable,
         ledger,
     })

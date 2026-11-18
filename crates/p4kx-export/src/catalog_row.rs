@@ -11,6 +11,7 @@ pub(crate) struct CatalogRow {
     pub(crate) kind: Kind,
     pub(crate) guid: Guid,
     pub(crate) record_path: String,
+    pub(crate) record_index: Option<u32>,
 }
 
 /// The catalog policy that excluded a successfully projected source row.

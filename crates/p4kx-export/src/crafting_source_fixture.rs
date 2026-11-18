@@ -22,7 +22,7 @@ pub(super) const fn pool_b() -> Guid {
     Guid::from_stored([0x33; 16])
 }
 
-pub(super) fn pools() -> HashSet<Guid> {
+pub(crate) fn pools() -> HashSet<Guid> {
     HashSet::from([pool_a(), pool_b(), Guid::from_stored([0x11; 16])])
 }
 
@@ -68,7 +68,7 @@ pub(super) fn targets(builder: DataForgeBuilder) -> DataForgeBuilder {
         ))
 }
 
-pub(super) fn database(depth: u32) -> Vec<u8> {
+pub(crate) fn database(depth: u32) -> Vec<u8> {
     let mut builder = schema();
     for index in 0..depth {
         let terminal = index + 1 == depth;

@@ -3,6 +3,13 @@
 
 pub(super) use super::{authored_fields, prepared_definition};
 
+#[path = "blueprint_pool_definition.rs"]
+pub(crate) mod blueprint_pool_definition;
+#[path = "blueprint_pool_tables.rs"]
+pub(crate) mod blueprint_pool_tables;
+#[path = "blueprint_reward_source.rs"]
+pub(crate) mod blueprint_reward_source;
+
 #[path = "crafting_global.rs"]
 pub(crate) mod crafting_global;
 #[path = "mineable_composition_definition.rs"]
@@ -11,3 +18,7 @@ pub(crate) mod mineable_composition_definition;
 pub(crate) mod mineable_element_definition;
 #[path = "mining_process_catalog.rs"]
 pub(crate) mod mining_process_catalog;
+
+#[cfg(test)]
+#[path = "blueprint_source_test_selectors.rs"]
+mod blueprint_source_test_selectors;

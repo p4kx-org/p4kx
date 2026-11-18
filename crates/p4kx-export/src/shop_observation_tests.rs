@@ -79,6 +79,8 @@ fn empty_collected() -> Collected<'static> {
         properties: Vec::new(),
         quality: crate::quality_catalog::QualityRows::default(),
         pools: Vec::new(),
+        reward_declarations: Vec::new(),
+        reward_numbers: Vec::new(),
         dismantle: Vec::new(),
         skipped: Vec::new(),
         failures: Vec::new(),

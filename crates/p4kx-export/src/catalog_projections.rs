@@ -38,6 +38,9 @@ pub(crate) struct CatalogProjections<'source> {
             p4kx_extraction::SourcedValue<crate::guid_text::CatalogGuid>,
         >,
     >,
+    pub(crate) blueprint_pool_weights: CatalogTable<
+        crate::catalog_v3::industry_modules::blueprint_pool_definition::BlueprintPoolWeights,
+    >,
     pub(crate) quality_quantization_resources: CatalogTable<QualityQuantizationResources>,
     pub(crate) tag_paths: CatalogTable<super::tag_catalog::TagPath>,
     pub(crate) commodity_presentation: CatalogTable<CommodityPresentation>,

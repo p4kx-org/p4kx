@@ -4,4 +4,4 @@
 #[path = "crafting_ledger/reward.rs"]
 mod read;
 
-pub(crate) use read::reward_sources;
+pub(crate) use read::{reward_sources, reward_sources_for};

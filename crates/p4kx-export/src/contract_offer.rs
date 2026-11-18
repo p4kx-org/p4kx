@@ -73,7 +73,7 @@ pub enum BlueprintSource {
 #[schemars(transform = every_field_required)]
 #[non_exhaustive]
 pub struct BlueprintReward {
-    /// The `guid` of the entry of `blueprintPools` the reward draws from.
+    /// The nominal GUID of the original pool in `definitions.blueprintPools`.
     pub pool_guid: CatalogGuid,
     /// The struct that states the reward.
     pub source: BlueprintSource,

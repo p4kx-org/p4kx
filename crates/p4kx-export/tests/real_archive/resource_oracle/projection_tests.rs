@@ -93,7 +93,7 @@ fn unrelated_reward_source_scan_leaves_the_scoped_resource_regions_equal()
     let document: Value = serde_json::from_slice(full.json())?;
     assert_eq!(
         document
-            .pointer("/blueprintPools/0/rewardSources/0/recordPath")
+            .pointer("/declarations/blueprintRewardSources/rows/0/recordPath/value")
             .and_then(Value::as_str),
         Some(REWARD_PATH.trim_end_matches(".xml")),
         "the complete catalog finds the authored reward"

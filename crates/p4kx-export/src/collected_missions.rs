@@ -19,6 +19,7 @@ use super::Collected;
 impl<'f> Collected<'f> {
     pub(crate) fn take_configuration_numbers(&mut self) -> Vec<CapturedNumber> {
         let mut numbers = std::mem::take(&mut self.entity_configurations.numbers);
+        numbers.append(&mut self.blueprint_reward_numbers);
         for global in &mut self.crafting_global {
             numbers.append(&mut global.numbers);
         }

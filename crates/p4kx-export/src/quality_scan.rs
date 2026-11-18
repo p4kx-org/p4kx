@@ -125,6 +125,7 @@ fn exclude(tree: &RecordTree<'_>, kind: Kind, retention: Retention, ledger: &mut
             kind,
             guid: tree.guid(),
             record_path: tree.record_path().to_owned(),
+            record_index: None,
         },
         reason,
     });

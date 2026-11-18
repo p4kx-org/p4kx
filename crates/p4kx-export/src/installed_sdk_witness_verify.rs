@@ -5,8 +5,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use p4kx_extraction::{
     Archive, Build, DataForge, DataForgeOrigin, InputScope, PhysicalSource, PhysicalSourceKind,
-    PhysicalSourceRef, SourceEncryptionState, SourceInput, SourceInventory, SourceUseDescription,
-    SourceUseRole, SourceUses,
+    PhysicalSourceRef, SourceEncryptionState, SourceInput, SourceInventory, SourceLocation,
+    SourceUseDescription, SourceUseRole, SourceUses,
 };
 use serde_json::Value;
 
@@ -59,7 +59,7 @@ impl Proof {
         })
     }
 
-    fn mapped_leaf<'actual>(
+    pub(super) fn mapped_leaf<'actual>(
         &self,
         inventory: &'actual SourceInventory,
     ) -> TestResult<&'actual PhysicalSource> {
@@ -218,13 +218,13 @@ pub(super) fn coverage(value: &CatalogRecordCoverage, skipped: usize) -> TestRes
     Ok(())
 }
 
-struct Graph<'inventory> {
+pub(super) struct Graph<'inventory> {
     sources: BTreeMap<&'inventory str, &'inventory PhysicalSource>,
     uses: BTreeMap<&'inventory str, &'inventory SourceUseDescription>,
 }
 
 impl<'inventory> Graph<'inventory> {
-    fn read(inventory: &'inventory SourceInventory) -> TestResult<Self> {
+    pub(super) fn read(inventory: &'inventory SourceInventory) -> TestResult<Self> {
         let sources: BTreeMap<_, _> = inventory
             .iter_sources()
             .map(|s| (s.id().as_str(), s))
@@ -244,7 +244,7 @@ impl<'inventory> Graph<'inventory> {
         Ok(Self { sources, uses })
     }
 
-    fn physical_closure(&self, archive: &Archive, proof: &Proof) -> TestResult {
+    pub(super) fn physical_closure(&self, archive: &Archive, proof: &Proof) -> TestResult {
         for source in self.sources.values() {
             for (position, ancestor) in source.ancestors().iter().enumerate() {
                 let parent = self
@@ -274,24 +274,34 @@ impl<'inventory> Graph<'inventory> {
         Ok(())
     }
 
-    fn header(&self, row: &Value, name: &str, index: u32, field: RecordHeaderField) -> TestResult {
+    pub(super) fn header(
+        &self,
+        row: &Value,
+        name: &str,
+        index: u32,
+        field: RecordHeaderField,
+    ) -> TestResult {
         let cell = row.get(name).ok_or("physical header cell missing")?;
+        self.coordinate(cell, &field.location(index))
+    }
+
+    pub(super) fn coordinate(&self, cell: &Value, location: &SourceLocation) -> TestResult {
         let refs = cell
             .get("sourceUsesRefs")
             .and_then(Value::as_array)
-            .ok_or("physical header source references missing")?;
+            .ok_or("original cell source references missing")?;
         if !refs.iter().any(|reference| {
             reference
                 .as_str()
                 .and_then(|id| self.uses.get(id))
-                .is_some_and(|usage| usage.location() == &field.location(index))
+                .is_some_and(|usage| usage.location() == location)
         }) {
-            return Err("SDK header cell lost its exact original header coordinate".into());
+            return Err("SDK cell lost its exact original coordinate".into());
         }
         Ok(())
     }
 
-    fn walk(&self, value: &Value) -> TestResult<usize> {
+    pub(super) fn walk(&self, value: &Value) -> TestResult<usize> {
         match value {
             Value::Array(values) => values
                 .iter()

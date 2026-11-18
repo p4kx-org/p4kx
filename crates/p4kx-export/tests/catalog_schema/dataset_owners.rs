@@ -51,6 +51,7 @@ const GROUPS: &[Group] = &[
             "ammoDefinitions",
             "autoSpawnSets",
             "autoSpawns",
+            "blueprintPools",
             "blueprintCategories",
             "blueprints",
             "climateAssets",
@@ -231,6 +232,7 @@ const GROUPS: &[Group] = &[
         shape: Shape::Table,
         members: &[
             "ammoBindings",
+            "blueprintRewardSources",
             "blueprintCategoryLists",
             "contractScenarioRequirements",
             "entityTags",
@@ -271,6 +273,7 @@ const GROUPS: &[Group] = &[
         prefix: "/projections",
         shape: Shape::Table,
         members: &[
+            "blueprintPoolWeights",
             "blueprintPresentation",
             "commodityPresentation",
             "contracts",
@@ -302,7 +305,6 @@ const GROUPS: &[Group] = &[
         prefix: "",
         shape: Shape::Array,
         members: &[
-            "blueprintPools",
             "cargoManifests",
             "contractEntitySpawns",
             "contractLocationQueries",

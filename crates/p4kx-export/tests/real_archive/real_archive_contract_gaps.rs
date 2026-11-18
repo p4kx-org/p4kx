@@ -152,17 +152,17 @@ fn the_giver_faction_follows_the_handler_then_a_positive_result_then_a_prerequis
 fn the_blueprint_rewards_of_an_entry_match_the_reward_sources_of_the_pools() -> TestResult {
     let catalog = catalog()?;
     let contracts = crate::real_archive_contracts::v3::rows(&catalog)?;
-    let pools = catalog["blueprintPools"]
-        .as_array()
-        .ok_or("blueprintPools")?;
+    let rewards =
+        crate::catalog_v3_consumer::table(&catalog, "/declarations/blueprintRewardSources")?;
     let mut sources: HashMap<&str, HashSet<&str>> = HashMap::new();
-    for pool in pools {
-        for source in pool["rewardSources"].as_array().into_iter().flatten() {
-            if let (Some(contract), Some(guid)) =
-                (source["contractId"].as_str(), pool["guid"].as_str())
-            {
-                sources.entry(contract).or_default().insert(guid);
-            }
+    for source in rewards {
+        if let (Some(contract), Some(pool)) = (
+            source.pointer("/contractId/value").and_then(Value::as_str),
+            source
+                .pointer("/pool/value/guid/value")
+                .and_then(Value::as_str),
+        ) {
+            sources.entry(contract).or_default().insert(pool);
         }
     }
     let mut entries = 0_usize;

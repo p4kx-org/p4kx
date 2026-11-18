@@ -95,7 +95,11 @@ pub(super) fn selected(
 ) -> bool {
     let classified = record.type_name().and_then(|source_type| {
         if source_type == kind.records().type_name {
-            entity_selection::select(record, None)
+            if kind == Kind::BlueprintPools {
+                crate::crafting::ledger::pool_record(record)
+            } else {
+                entity_selection::select(record, None)
+            }
         } else {
             Ok(None)
         }

@@ -132,19 +132,29 @@ pub(super) fn choose(
 pub(crate) fn gameplay_property(
     record: &Record<'_>,
 ) -> Result<Option<crate::entity_selection::Selected>, DataForgeError> {
-    use crate::entity_selection::Selected;
+    catalog_action(record, Kind::GameplayProperties, Action::Property)
+}
 
-    if record.type_name()? != PROPERTIES.type_name {
+pub(crate) fn pool_record(
+    record: &Record<'_>,
+) -> Result<Option<crate::entity_selection::Selected>, DataForgeError> {
+    catalog_action(record, Kind::BlueprintPools, Action::Pool)
+}
+
+fn catalog_action(
+    record: &Record<'_>,
+    kind: Kind,
+    action: Action,
+) -> Result<Option<crate::entity_selection::Selected>, DataForgeError> {
+    use crate::entity_selection::Selected;
+    if record.type_name()? != kind.records().type_name {
         return Ok(None);
     }
     Ok(choose(record, None)?.and_then(|selected| {
-        if selected.action != Action::Property {
-            return None;
-        }
-        Some(if selected.policy == ReadPolicy::SkipAfter {
-            Selected::Leftover(Kind::GameplayProperties)
+        (selected.action == action).then_some(if selected.policy == ReadPolicy::SkipAfter {
+            Selected::Leftover(kind)
         } else {
-            Selected::Entity(Kind::GameplayProperties)
+            Selected::Entity(kind)
         })
     }))
 }

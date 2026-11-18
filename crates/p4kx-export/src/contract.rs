@@ -32,7 +32,7 @@ pub(crate) use crate::contract_loot_legacy::{LegacyLootArchetype, LegacyLootTabl
 pub(crate) use crate::contract_mining::MineableEntity;
 pub(crate) use crate::contract_mission_data::{ContractScenario, MissionLocality, MissionType};
 pub(crate) use crate::contract_missions::ContractEntry;
-pub(crate) use crate::contract_rewards::{BlueprintPool, DismantleProcess};
+pub(crate) use crate::contract_rewards::DismantleProcess;
 pub(crate) use crate::contract_shops::Shop;
 pub(crate) use crate::contract_source::{BuildSource, Source};
 pub(crate) use crate::contract_starmap::StarmapObject;
@@ -82,8 +82,6 @@ pub(crate) struct Catalog<'a> {
     pub(crate) provenance: CatalogProvenance,
     /// Public short-name and protected game-text tables.
     pub(crate) texts: CatalogTexts<'a>,
-    /// The blueprint pools with the places that reward them, ordered by GUID.
-    pub(crate) blueprint_pools: Vec<BlueprintPool<'a>>,
     /// The dismantle processes, ordered by GUID.
     pub(crate) dismantle_processes: Vec<DismantleProcess<'a>>,
     /// The paints with the ships they fit, ordered by the GUID of the item.

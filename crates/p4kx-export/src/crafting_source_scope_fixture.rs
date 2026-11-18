@@ -27,7 +27,7 @@ fn node(kind: &str, name: &str, children: &[&str], reward: Option<&str>) -> Test
         .value("reward", reward.map_or(TestValue::Null, TestValue::pointer))
 }
 
-pub(super) fn database() -> Vec<u8> {
+pub(crate) fn database() -> Vec<u8> {
     fixture::targets(rewards(nodes()).record(owner())).build()
 }
 

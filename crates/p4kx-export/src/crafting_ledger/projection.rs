@@ -27,6 +27,14 @@ pub(super) enum Piece<'f> {
         quantizations: Vec<Guid>,
     },
     Pool(BlueprintPool<'f>),
+    CanonicalPool {
+        prepared: Box<
+            crate::catalog_v3::industry_modules::blueprint_pool_definition::PreparedBlueprintPool<
+                'f,
+            >,
+        >,
+        interpreted: BlueprintPool<'f>,
+    },
     Dismantle(DismantleProcess<'f>),
     Globals(GlobalParams),
     Skipped,

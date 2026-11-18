@@ -10,8 +10,8 @@ each tagged or nullable branch. A recursive reference is recorded at the point w
 to an active schema node. This finite inventory works for every root even when definitions are
 shared. A schema keyword outside the supported vocabulary fails the inventory.
 
-Verified migration dispositions below cover Blueprint Categories, Gameplay Properties,
-Manufacturers and Commodities.
+Verified migration dispositions below cover Blueprint Categories, Blueprint Pools, Gameplay
+Properties, Manufacturers and Commodities.
 The rest of the released occurrences still need verified destinations or removal decisions.
 P4KX 0.5.0 writes catalog schema v3. Re-export the original inputs to obtain the physical
 identity and per-value provenance carried by v3.
@@ -20,6 +20,10 @@ identity and per-value provenance carried by v3.
 | --- | --- |
 | `blueprintCategories[].guid`, `className`, `recordPath` | Corresponding sourced field's `value` under `definitions.blueprintCategories.rows[]`. |
 | `blueprintCategories[].name` and its `key`, `en`, `de` | The released writer always used an empty placeholder. The original category Records have no name field. Use the sourced class name when an application needs a category label. |
+| `blueprintPools[].guid`, `className`, `recordPath` | Corresponding sourced value in `definitions.blueprintPools.rows[]`. Resolve nominal GUIDs to physical definitions before identifying an individual pool. |
+| `blueprintPools[].entries[].blueprintGuid`, `weight` | Each `definitions.blueprintPools.rows[].blueprintRewards.value[]` position holds the original `blueprintRecord` Reference and exact `weight`. Retain their original states and positions. |
+| `blueprintPools[].totalWeight` | `projections.blueprintPoolWeights.rows[].totalWeight`. Match the same input and `pool.recordIndex.value` to the definition. |
+| `blueprintPools[].rewardSources[]` | In `declarations.blueprintRewardSources.rows[]`, `guid` and `recordPath` identify the original referencing Record. `sourceOrdinal` distinguishes its occurrences. Use `pool` for the authored target, `poolStorage` for its original storage type, and the sourced `contractId`, `contractName` and `chance` for authored facts. |
 | `gameplayProperties[].guid`, `className`, `recordPath` | Corresponding sourced field's `value` under `definitions.gameplayProperties.rows[]`. |
 | `gameplayProperties[].name` | Join `definitions.gameplayProperties.rows[].propertyName.value` to `texts.publicNames[].id.value`. |
 | `gameplayProperties[].name.key` | `key.value` of that public-name entry. |

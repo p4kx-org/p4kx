@@ -21,6 +21,11 @@ use crate::shop_inventory_resolution::ShopInventoryResolution;
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct CatalogDeclarations<'source> {
+    pub(crate) blueprint_reward_sources: CatalogTable<
+        crate::catalog_v3::industry_modules::blueprint_reward_source::BlueprintRewardSource<
+            'source,
+        >,
+    >,
     pub(crate) blueprint_category_lists: CatalogTable<BlueprintCategoryList<'source>>,
     pub(crate) tag_roots: CatalogTable<TagRoots<'source>>,
     pub(crate) shop_inventory_resolution: CatalogTable<ShopInventoryResolution>,

@@ -5,6 +5,10 @@
 //! catalog, built from a synthetic Archive with multi-tier blueprints (no blueprint of the
 //! real Archive has more than one tier).
 
+#[path = "catalog_crafting_pool_sdk.rs"]
+mod pool_sdk;
+#[path = "catalog_crafting_pool_tables.rs"]
+mod pool_tables;
 #[path = "catalog_crafting_quality.rs"]
 mod quality;
 #[path = "catalog_crafting_quality_positions.rs"]
@@ -193,41 +197,6 @@ fn assert_range(range: &Value, kind: &str, end: &str, at_start: f32, at_end: f32
 fn quality_distributions_keep_their_location_overrides() -> TestResult {
     let (_, catalog) = build()?;
     quality::assert_location_overrides(&catalog)
-}
-
-#[test]
-fn a_pool_lists_its_entries_and_the_places_that_reward_it() -> TestResult {
-    let (_, catalog) = build()?;
-    let pools = catalog["blueprintPools"].as_array().ok_or("pools")?;
-    let pool = pools
-        .iter()
-        .find(|pool| pool["guid"] == text(fixture::POOL).as_str())
-        .ok_or("the pool")?;
-    assert_eq!(pool["totalWeight"], 4.0);
-    assert_eq!(
-        pool["entries"],
-        json!([
-            {"blueprintGuid": text(fixture::TWO_TIERS), "weight": 1.0},
-            {"blueprintGuid": text(fixture::CHOOSE_ONE), "weight": 3.0},
-        ])
-    );
-    assert_eq!(
-        pool["rewardSources"],
-        json!([{
-            "recordGuid": text(fixture::CONTRACTS),
-            "recordPath": "libs/foundry/records/contracts/contractgenerator/haul",
-            "contractId": text(fixture::CONTRACT_ID),
-            "contractName": "Haul_Intro",
-            "chance": 0.5,
-        }]),
-        "the chance of the source; a blueprint's share is weight over totalWeight"
-    );
-    let bad = pools
-        .iter()
-        .find(|pool| pool["guid"] == text(fixture::BAD_POOL).as_str())
-        .ok_or("the pool with a negative weight")?;
-    assert_eq!(bad["totalWeight"], 2.0, "only positive weights count");
-    Ok(())
 }
 
 #[test]

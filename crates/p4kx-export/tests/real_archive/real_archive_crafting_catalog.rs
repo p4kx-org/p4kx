@@ -198,22 +198,29 @@ fn check_pools(catalog: &Value) -> TestResult {
     let pools = list(catalog, "blueprintPools")?;
     let pool = pools
         .iter()
-        .find(|pool| pool["guid"] == COVALEX_POOL)
+        .find(|pool| at(pool, "/guid/value") == COVALEX_POOL)
         .ok_or("the Covalex pool")?;
-    let entries = pool["entries"].as_array().ok_or("entries")?;
+    let entries = pool_entries(pool)?;
     assert!(!entries.is_empty(), "entries");
     assert!(
         entries
             .iter()
-            .any(|entry| entry["blueprintGuid"] == COVALEX_BLUEPRINT),
+            .any(|entry| pool_entry_guid(entry) == Some(COVALEX_BLUEPRINT)),
         "the Covalex blueprint is an entry"
     );
-    let sources = pool["rewardSources"].as_array().ok_or("sources")?;
-    assert!(!sources.is_empty(), "contracts reward the pool");
+    let sources = catalog_v3_consumer::table(catalog, "/declarations/blueprintRewardSources")?;
+    let record_index = at(pool, "/recordIndex/value");
+    assert!(
+        sources.iter().any(|source| {
+            at(source, "/pool/value/targetRecordIndex/value") == record_index
+                && at(source, "/pool/value/guid/value") == COVALEX_POOL
+        }),
+        "contracts reward the physical pool"
+    );
     assert!(
         sources
             .iter()
-            .all(|source| source["recordPath"].is_string()),
+            .all(|source| at(source, "/recordPath/value").is_string()),
         "every source names its Record"
     );
     let blueprints: HashSet<&str> = list(catalog, "blueprints")?
@@ -221,26 +228,43 @@ fn check_pools(catalog: &Value) -> TestResult {
         .filter_map(|blueprint| blueprint.pointer("/guid/value").and_then(Value::as_str))
         .collect();
     let (mut entries_total, mut unresolved) = (0_usize, 0_usize);
-    for entry in pools
-        .iter()
-        .flat_map(|pool| pool["entries"].as_array().into_iter().flatten())
-    {
-        entries_total += 1;
-        unresolved += usize::from(
-            entry["blueprintGuid"]
-                .as_str()
-                .is_some_and(|guid| !blueprints.contains(guid)),
-        );
+    for pool in pools {
+        for entry in pool_entries(pool)? {
+            entries_total += 1;
+            unresolved +=
+                usize::from(pool_entry_guid(entry).is_some_and(|guid| !blueprints.contains(guid)));
+        }
     }
-    let sources_total: usize = pools
-        .iter()
-        .map(|pool| pool["rewardSources"].as_array().map_or(0, Vec::len))
-        .sum();
     print_line(&format!(
-        "pools: {} with {entries_total} entries ({unresolved} to a blueprint outside the catalog) and {sources_total} reward sources",
-        pools.len()
+        "pools: {} with {entries_total} entries ({unresolved} to a blueprint outside the catalog) and {} reward sources",
+        pools.len(),
+        sources.len()
     ));
     Ok(())
+}
+
+fn pool_entries(pool: &Value) -> Result<&[Value], Box<dyn Error>> {
+    let slots = pool
+        .get("blueprintRewards")
+        .ok_or("authored blueprintRewards")?;
+    match catalog_v3_consumer::source_value(slots)? {
+        Some(values) => values
+            .as_array()
+            .map(Vec::as_slice)
+            .ok_or_else(|| "authored reward slots must be an array".into()),
+        None if matches!(
+            slots.get("state").and_then(Value::as_str),
+            Some("absent" | "null")
+        ) =>
+        {
+            Ok(&[])
+        }
+        None => Err("authored reward slots are unavailable".into()),
+    }
+}
+
+fn pool_entry_guid(entry: &Value) -> Option<&str> {
+    at(entry, "/value/blueprintRecord/value/guid/value").as_str()
 }
 
 fn check_dismantle(catalog: &Value, blueprints: &Blueprints<'_>) -> TestResult {
