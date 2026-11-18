@@ -81,7 +81,7 @@ impl WeaponProjectileAmmoSelection {
         self.selection.origin()
     }
 
-    pub(in crate::catalog_v3) const fn selected_ammo_index(&self) -> Option<&SourcedValue<u32>> {
+    pub(crate) const fn selected_ammo_index(&self) -> Option<&SourcedValue<u32>> {
         match self.selected_route() {
             Some(route) => Some(route.ammo_record_index),
             None => None,

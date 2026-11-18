@@ -109,8 +109,9 @@ and `actionSourceType` identify the readable original action node.
 `ammunitionRecordIndex.value` identifies a proved physical selection. Read its body from
 `definitions.ammoDefinitions.rows[].recordIndex.value`. The ammo selection and its reason
 are in `projections.weaponProjectileAmmoSelections` joined by component and action ordinal.
-A filtered Catalog can keep the selected coordinate without its body. See the
-[ammunition selection contract](catalog-ammo-definitions.md#projectile-ammunition-selection).
+A proved route admits its exact readable Ammo definition as a dependency when
+the Catalog filter excludes it. An unreadable body keeps its attempted read
+coverage. See the [ammunition selection contract](catalog-ammo-definitions.md#projectile-ammunition-selection).
 
 Each row specifies `formulaVersion` and `units`. The model is a sourced tagged outcome.
 `nominalBullet` covers direct single and rapid projectile actions with unambiguous selected

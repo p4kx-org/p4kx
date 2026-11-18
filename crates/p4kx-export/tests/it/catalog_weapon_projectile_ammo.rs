@@ -8,6 +8,8 @@ use serde_json::{Value, json};
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
 use crate::health_origin_assertions as proof;
 
+#[path = "catalog_projectile_ammo_admission.rs"]
+pub(super) mod admission;
 #[path = "catalog_countermeasure_emitters.rs"]
 mod countermeasure_emitters;
 #[path = "catalog_weapon_projectile_ammo_fixture.rs"]
@@ -30,14 +32,10 @@ fn projectile_ammo_selects_each_original_role_with_complete_physical_evidence() 
         let filter =
             Filter::new("libs/foundry/records/entities/scitem/ships/fixture_projectile_own_route");
         let catalog = build(Case::Unique, origin, Some(&filter))?;
-        let [required] = proof::rows(&catalog, "/definitions/ammoDefinitions/rows")? else {
-            return Err("one retained original primary dependency".into());
-        };
-        assert_eq!(proof::at(required, "/selection")?, "dependency");
-        assert_eq!(
-            proof::at(required, "/guid/value")?,
-            &json!(common::guid(fixture::PRIMARY))
-        );
+        admission::assert_retained_ammo_dependencies(
+            &catalog,
+            [fixture::PRIMARY, fixture::SECONDARY],
+        )?;
         let [primary, secondary] = proof::rows(&catalog, ROWS)? else {
             return Err("both original projectile actions".into());
         };
@@ -54,7 +52,8 @@ fn projectile_ammo_selects_each_original_role_with_complete_physical_evidence() 
         assert_eq!(proof::at(primary, "/model/value/type")?, "nominalBullet");
         assert_eq!(
             proof::at(secondary, "/model/value/type")?,
-            "ammoDefinitionUnavailable"
+            "nominalBullet",
+            "the exact secondary dependency is available through the proved route"
         );
         let schema = p4kx_export::catalog_schema();
         jsonschema::validator_for(&schema)?

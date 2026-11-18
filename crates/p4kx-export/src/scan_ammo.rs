@@ -115,6 +115,26 @@ impl<'options, 'input, 'source> AmmoReads<'options, 'input, 'source> {
         record: &Record<'source>,
         ledger: &mut ExportLedger,
     ) -> Result<Option<AmmoStats>, CatalogError> {
+        self.with_dependency(record, ledger, |read| match read {
+            AmmoRead::Readable(read) => Some(read.compatibility.clone()),
+            AmmoRead::Unreadable(_) => None,
+        })
+    }
+
+    pub(super) fn retain_projectile_dependency(
+        &self,
+        record: &Record<'source>,
+        ledger: &mut ExportLedger,
+    ) -> Result<(), CatalogError> {
+        self.with_dependency(record, ledger, |_| ())
+    }
+
+    fn with_dependency<T>(
+        &self,
+        record: &Record<'source>,
+        ledger: &mut ExportLedger,
+        inspect: impl FnOnce(&AmmoRead<'source>) -> T,
+    ) -> Result<T, CatalogError> {
         self.with(record, |state, admission| {
             let read = state
                 .read
@@ -124,10 +144,7 @@ impl<'options, 'input, 'source> AmmoReads<'options, 'input, 'source> {
                 retain_dependency(ledger, admission, read)?;
                 state.dependency_observed = true;
             }
-            Ok(match read {
-                AmmoRead::Readable(read) => Some(read.compatibility.clone()),
-                AmmoRead::Unreadable(_) => None,
-            })
+            Ok(inspect(read))
         })
     }
 

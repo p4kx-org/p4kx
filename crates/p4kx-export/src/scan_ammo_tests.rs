@@ -20,6 +20,7 @@ fn ammo_memo_materializes_one_genuine_physical_tree_across_roles() -> TestResult
         let second = forge.record(1).ok_or("second physical definition")?;
         let reads = AmmoReads::new(projection, None, None);
         let mut dependency = ExportLedger::default();
+        reads.retain_projectile_dependency(&first, &mut dependency)?;
         let compatibility = reads
             .dependency(&first, &mut dependency)?
             .ok_or("actual legacy ammunition")?;

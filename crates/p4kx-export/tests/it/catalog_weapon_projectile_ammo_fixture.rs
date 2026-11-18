@@ -43,6 +43,35 @@ pub(super) enum Case {
 }
 
 pub(super) fn build(case: Case) -> DataForgeBuilder {
+    build_with_secondary_name(case, "Secondary")
+}
+
+pub(super) fn cross_owner_ammo(other: bool) -> DataForgeBuilder {
+    let database = build_with_secondary_name(Case::Unique, "debug_secondary");
+    if !other {
+        return database;
+    }
+    database.record(
+        TestRecord::new(
+            0x14a,
+            ENTITY,
+            "EntityClassDefinition.AmmoAdmissionPeer",
+            "libs/foundry/records/entities/scitem/fixture/other_weapon.xml",
+        )
+        .value(
+            "Components",
+            TestValue::Array(vec![
+                TestValue::Struct(weapon_component(Case::IgnoredPrimary)),
+                TestValue::Struct(
+                    TestInstance::new(CONTAINER)
+                        .value("ammoParamsRecord", TestValue::Reference(SECONDARY)),
+                ),
+            ]),
+        ),
+    )
+}
+
+fn build_with_secondary_name(case: Case, secondary_name: &str) -> DataForgeBuilder {
     let builder = common_types(DataForgeBuilder::new().version(8))
         .enumeration(
             "EProjectileType",
@@ -85,7 +114,7 @@ pub(super) fn build(case: Case) -> DataForgeBuilder {
     } else {
         builder
             .record(ammo(PRIMARY, "Primary", 10.0))
-            .record(ammo(SECONDARY, "Secondary", 20.0))
+            .record(ammo(SECONDARY, secondary_name, 20.0))
     };
     builder
         .record(TestRecord::new(

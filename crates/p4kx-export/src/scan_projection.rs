@@ -8,7 +8,9 @@ use crate::catalog_projection::CatalogProjection;
 use crate::catalog_v3::catalog_harvest_modules::harvest_provider;
 use crate::catalog_v3::catalog_item_components::item_definition::ItemDefinition;
 use crate::catalog_v3::catalog_item_components::{self, ItemComponentsRead, resolution};
-use crate::catalog_v3::catalog_weapon_projectile_ammo::{self, LinkedAmmunitionReader};
+use crate::catalog_v3::catalog_weapon_projectile_ammo::{
+    self, LinkedAmmunitionReader, WeaponProjectileAmmoSelection,
+};
 use crate::catalog_v3::loot_definition_catalog::{self, LootDefinitionKind};
 use crate::catalog_v3::starmap_object_definition;
 use crate::contract::Item;
@@ -24,7 +26,7 @@ use crate::record_observation::RecordObservation;
 use crate::scan_health::ScanError;
 use crate::ship;
 use crate::starmap::starmap_object;
-use crate::{CatalogError, Kind, item_stats, item_variant};
+use crate::{CatalogError, ExportAccountingError, Kind, item_stats, item_variant};
 
 pub(super) struct SelectedProjection<'scan, 'options, 'parameters, 'source> {
     pub(super) scan: &'scan Scan<'options, 'parameters, 'source>,
@@ -254,7 +256,31 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
             )?;
         }
         ledger.merge(projectile_ledger);
+        self.retain_projectile_ammo(&read.rows.projectile_ammo_selections, ledger)?;
         Ok(stats)
+    }
+
+    fn retain_projectile_ammo(
+        &self,
+        selections: &[WeaponProjectileAmmoSelection],
+        ledger: &mut ExportLedger,
+    ) -> Result<(), CatalogError> {
+        for index in selections
+            .iter()
+            .filter_map(WeaponProjectileAmmoSelection::selected_ammo_index)
+            .filter_map(|cell| cell.value().copied())
+        {
+            crate::catalog_query_session::checkpoint(self.scan.options.cancel)?;
+            let record = self
+                .scan
+                .forge
+                .record(index)
+                .ok_or(ExportAccountingError::MissingPhysicalReferenceTarget { index })?;
+            self.scan
+                .ammo
+                .retain_projectile_dependency(&record, ledger)?;
+        }
+        Ok(())
     }
 
     fn definition_kind(
@@ -319,7 +345,7 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
         Picked::of_ship(projected.read, |read| {
             let aggregates = projected
                 .aggregates
-                .ok_or(crate::ExportAccountingError::UnobservedFailure)?;
+                .ok_or(ExportAccountingError::UnobservedFailure)?;
             ship::ship(
                 tree,
                 projected.source,

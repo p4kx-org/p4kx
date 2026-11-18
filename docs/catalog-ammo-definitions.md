@@ -347,8 +347,10 @@ accepts single, rapid, and burst actions in the weapon's own `fireActions`.
 `AmmoParams` Reference in the on-item container. A selected result requires
 one physical weapon and one compatible on-item container, a complete
 component survey, an explicit false ignore flag, and no declared external
-or conditional magazine candidate. The target physical Record index survives
-an export filter on the ammunition definitions.
+or conditional magazine candidate. Every proved primary or secondary route
+reads its exact physical Ammo Record. A readable definition outside the
+independent export selection is retained as a dependency. An unreadable
+target keeps its physical index and reports the body failure.
 
 Use the `selection` source uses for the whole decision, including the
 component survey and the selected role. Repeated ownership, unreadable

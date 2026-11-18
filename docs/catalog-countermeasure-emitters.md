@@ -19,9 +19,10 @@ holds the following join coordinates.
 The route combines actual source evidence from the launcher selection, container relationship
 and the countermeasure projectile. Classification follows the readable original
 `CounterMeasureProjectileParams` structure. A null, invalid or future subtype may still be
-visible as its own source state on the canonical Ammo definition. An unproved route, unreadable
-projectile or Ammo definition outside the filter leaves the owned declarations and selections
-available in their canonical tables. Availability reports whether the countermeasure source
+visible as its own source state on the canonical Ammo definition. Each proved route reads
+its exact Ammo body, including dependencies outside the filter. Unproved routes and
+unreadable bodies leave the authored declarations and selection outcomes available.
+Availability reports whether the countermeasure source
 type is declared. An available table may contain zero recognized rows.
 
 Signature values retain their authored Single bits and source units. Chaff timing and radius

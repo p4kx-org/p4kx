@@ -4,6 +4,7 @@
 use p4kx_extraction::Filter;
 use serde_json::{Value, json};
 
+use super::admission::assert_retained_ammo_dependencies;
 use super::fixture::{Case, PRIMARY, SECONDARY, WEAPON};
 use super::{ROWS as SELECTIONS, build};
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
@@ -53,20 +54,28 @@ fn countermeasure_emitters_project_proved_roles_without_copying_ammo() -> TestRe
 fn countermeasure_emitters_require_materialized_definition_and_proved_route() -> TestResult {
     let filter = Filter::parse(WEAPON_PATH)?;
     let filtered = build(Case::Countermeasure, DcbOrigin::Plain, Some(&filter))?;
-    let [primary] = proof::rows(&filtered, EMITTERS)? else {
-        return Err("only the route with a retained Ammo dependency can produce an emitter".into());
+    let [primary, secondary] = proof::rows(&filtered, EMITTERS)? else {
+        return Err(
+            "each proved route with readable countermeasure ammunition supplies an emitter".into(),
+        );
     };
-    let [ammo] = proof::rows(&filtered, AMMO)? else {
-        return Err("one original primary dependency".into());
-    };
-    assert_eq!(proof::at(ammo, "/selection")?, "dependency");
-    let route = proof::at(primary, "/route/value")?;
-    proof::present(route, "ammoRole", &json!("primary"), Some(false))?;
-    assert_eq!(
-        proof::at(route, "/ammoRecordIndex/value")?,
-        proof::at(ammo, "/recordIndex/value")?,
-        "the emitter uses the same physical dependency"
-    );
+    assert_retained_ammo_dependencies(&filtered, [PRIMARY, SECONDARY])?;
+    for (emitter, role, guid) in [
+        (primary, "primary", PRIMARY),
+        (secondary, "secondary", SECONDARY),
+    ] {
+        let route = proof::at(emitter, "/route/value")?;
+        proof::present(route, "ammoRole", &json!(role), Some(false))?;
+        let ammo = proof::rows(&filtered, AMMO)?
+            .iter()
+            .find(|row| row.pointer("/guid/value") == Some(&json!(common::guid(guid))))
+            .ok_or("original dependency Ammo for the emitter")?;
+        assert_eq!(
+            proof::at(route, "/ammoRecordIndex/value")?,
+            proof::at(ammo, "/recordIndex/value")?,
+            "each emitter uses its own physical dependency"
+        );
+    }
     assert_eq!(
         proof::rows(&filtered, SELECTIONS)?.len(),
         3,
