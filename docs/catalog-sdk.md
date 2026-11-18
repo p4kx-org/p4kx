@@ -604,6 +604,18 @@ Modification, patch and overrides, and the fields consulted for each metric. A P
 includes the operand used by ShipReader. Source sets distinguish a failed read from a successful
 read whose original field coordinates are unavailable.
 
+The installed Ship witness compares one original physical Record through the shared producer
+and SDK. Set `P4KX_CATALOG_SHIP_SOURCE_RECORD` to a literal Record path or a unique
+`class:<name>` selector. Set `P4KX_DATA_P4K` for the installed Archive and
+`P4KX_SDK_WITNESS_FILE` for the private technical receipt. The receipt records evidence counts
+and metric states after the Archive identity check.
+
+```powershell
+cargo test --locked -p p4kx-export --lib -- `
+  catalog_query_session::installed_sdk_witness::ship_source::installed_ship_source_matches_scoped_catalog_projection `
+  --ignored --exact
+```
+
 ## Resolved Loadouts
 
 Use `equipment::read_loadouts`, `equipment::read_loadouts_from`, or the

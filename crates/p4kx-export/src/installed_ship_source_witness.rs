@@ -178,16 +178,24 @@ fn source_closure(
 }
 
 fn select<'source>(forge: &'source DataForge<'source>) -> TestResult<Record<'source>> {
-    let path = std::env::var("P4KX_CATALOG_SHIP_SOURCE_RECORD")
-        .map_err(|_| "set a private exact Ship Record path")?;
-    if path.is_empty() || path.contains(['*', '?']) {
-        return Err("the Ship witness needs a literal original Record path".into());
+    let selector = std::env::var("P4KX_CATALOG_SHIP_SOURCE_RECORD")
+        .map_err(|_| "set a private literal Ship Record path or class selector")?;
+    if selector.is_empty() || selector.contains(['*', '?']) {
+        return Err("the Ship witness needs a literal original selector".into());
     }
-    let mut candidates = forge.records_at_path(&path);
-    let record = candidates.next().ok_or("selected physical Ship missing")?;
-    if candidates.next().is_some() {
-        return Err("the nominated path has multiple physical owners; choose a unique case".into());
-    }
+    let record = if let Some(class) = selector.strip_prefix("class:") {
+        if class.is_empty() {
+            return Err("the Ship class selector is empty".into());
+        }
+        unique(forge.records().filter(|record| {
+            record.name().is_ok_and(|name| {
+                crate::record_fields::unqualified_class_name(name, p4kx_assembly::ENTITY_TYPE)
+                    .eq_ignore_ascii_case(class)
+            })
+        }))?
+    } else {
+        unique(forge.records_at_path(&selector))?
+    };
     let kind = Kind::Ships;
     let path = record
         .record_path()
@@ -202,6 +210,16 @@ fn select<'source>(forge: &'source DataForge<'source>) -> TestResult<Record<'sou
         || crate::selection::is_kind_leftover(kind, path, name)
     {
         return Err("nominated Record is outside canonical Ship admission".into());
+    }
+    Ok(record)
+}
+
+fn unique<'source>(
+    mut candidates: impl Iterator<Item = Record<'source>>,
+) -> TestResult<Record<'source>> {
+    let record = candidates.next().ok_or("selected physical Ship missing")?;
+    if candidates.next().is_some() {
+        return Err("the nominated selector has multiple physical owners".into());
     }
     Ok(record)
 }
