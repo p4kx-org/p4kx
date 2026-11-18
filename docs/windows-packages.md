@@ -248,6 +248,21 @@ upgrade, downgrade refusal, wrong-CPU refusal, PATH cases and cleanup with the
 original state restored. The same job ran the portable CLI, MCP and bounded GUI
 with isolated folders. [Native AMD64 execution](https://github.com/p4kx-org/p4kx/actions/runs/43837672769/job/133219150212)
 
+Release run `44226543671` on `b33c4cbc18fa844e93db3c3630073c9ecab8826d` passed
+native Windows AMD64 and ARM64 package execution in the same run. Both original MSI journals
+closed successfully. Each architecture produced six successful installed and portable runtime
+receipts with matching PE architecture, CLI and MCP execution, and software-rendered GUI frames.
+The run also checked repair, rollback, profile preservation and architecture-specific
+package handling. [Native AMD64](https://github.com/p4kx-org/p4kx/actions/runs/44226543671/job/134560610488) ·
+[Native ARM64](https://github.com/p4kx-org/p4kx/actions/runs/44226543671/job/134560610521)
+
+For release acceptance, repeat the native lifecycle checks with the actual release candidate
+and bind both its MSI and portable ZIP to the candidate revision and run attempt. Record any
+remaining AMD64 desktop and WASAPI checks in the release evidence. Use the original tagged
+run's artifacts for the
+[ARM64 desktop intake](supported-platforms.md#validate-the-recorded-arm64-desktop-evidence),
+including the packaged GUI identity. The package run and device intake supply separate evidence.
+
 ### Dynamic parent-chain feedback experiment
 
 The separate `MSI dynamic parent-chain probe` workflow exercises the actual preparation output,
