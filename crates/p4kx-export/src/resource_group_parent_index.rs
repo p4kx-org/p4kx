@@ -18,7 +18,7 @@ struct Occurrence {
 
 /// The existing first-selected non-self parent map with its original construction inputs.
 #[derive(Debug, Default)]
-pub(super) struct Parents {
+pub(crate) struct Parents {
     parents: HashMap<Guid, Occurrence>,
     sources: Vec<ParentSource>,
 }
@@ -30,7 +30,7 @@ pub(crate) struct ParentChoice<'a> {
 }
 
 impl Parents {
-    pub(super) fn add(
+    pub(crate) fn add(
         &mut self,
         source: ParentSource,
         children: Vec<(usize, Guid)>,
@@ -54,11 +54,11 @@ impl Parents {
         Ok(())
     }
 
-    pub(super) fn failed(&mut self, source: ParentSource) {
+    pub(crate) fn failed(&mut self, source: ParentSource) {
         self.sources.push(source);
     }
 
-    pub(super) fn choice(
+    pub(crate) fn choice(
         &self,
         child: &Guid,
         cancel: Option<&CancelToken>,

@@ -6,6 +6,9 @@ use p4kx_extraction::{
     TreeBuilder,
 };
 
+#[path = "catalog_record_plan.rs"]
+pub(super) mod plan;
+
 use super::{CatalogRecordCoverage, CatalogRecordSelection};
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_origins::CatalogOrigins;

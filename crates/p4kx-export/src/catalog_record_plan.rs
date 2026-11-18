@@ -12,18 +12,18 @@ use crate::catalog_queries::{CatalogRecordCoverage, CatalogRecordSelection};
 use crate::catalog_query_session::checkpoint;
 use crate::{CatalogError, Kind};
 
-pub(super) struct Owner<'source> {
-    pub(super) record: Record<'source>,
-    pub(super) tree: RecordTree<'source>,
+pub(in crate::build::catalog_queries) struct Owner<'source> {
+    pub(in crate::build::catalog_queries) record: Record<'source>,
+    pub(in crate::build::catalog_queries) tree: RecordTree<'source>,
 }
 
-pub(super) struct Plan<'source> {
-    pub(super) owners: Vec<Owner<'source>>,
-    pub(super) coverage: CatalogRecordCoverage,
+pub(in crate::build::catalog_queries) struct Plan<'source> {
+    pub(in crate::build::catalog_queries) owners: Vec<Owner<'source>>,
+    pub(in crate::build::catalog_queries) coverage: CatalogRecordCoverage,
 }
 
 impl<'source> Plan<'source> {
-    pub(super) fn read(
+    pub(in crate::build::catalog_queries) fn read(
         forge: &'source DataForge<'source>,
         kind: Kind,
         selection: CatalogRecordSelection,

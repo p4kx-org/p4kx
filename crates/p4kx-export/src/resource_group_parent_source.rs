@@ -38,6 +38,10 @@ pub(crate) struct ParentSource {
 }
 
 impl ParentSource {
+    pub(crate) fn is_complete(&self) -> bool {
+        self.complete && self.slots.iter().all(|slot| slot.complete)
+    }
+
     pub(crate) fn read(
         tree: &RecordTree<'_>,
         origins: &CatalogOrigins,

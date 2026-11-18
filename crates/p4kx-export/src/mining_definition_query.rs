@@ -7,8 +7,7 @@ mod compositions;
 mod dependencies;
 #[path = "mineable_element_query.rs"]
 mod elements;
-#[path = "mining_definition_plan.rs"]
-mod plan;
+use super::unlocalized_record_query::plan;
 #[path = "mining_process_query.rs"]
 pub mod process_api;
 #[path = "mining_definition_read.rs"]

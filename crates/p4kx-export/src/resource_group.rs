@@ -14,7 +14,7 @@ mod parent_index;
 mod parent_source;
 
 pub(crate) use parent_index::ParentChoice;
-use parent_index::Parents;
+pub(crate) use parent_index::Parents;
 pub(crate) use parent_source::ParentSource;
 
 use crate::guid_text::CatalogGuid;

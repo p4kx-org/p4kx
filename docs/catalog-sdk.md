@@ -341,3 +341,12 @@ remains visible on each dependent cell, independently of complete intrinsic Head
 These values share the same original reader, identities, ordering and text domains in direct
 queries and full Catalog production. The old nullable entity_cluster_member_guid() projection is
 replaced by the typed link; no legacy wire mirror is emitted.
+
+
+## Direct resource groups and explicit parent projection
+
+`with_resource_groups` and its `_from`/session forms return selected physical definitions and
+all original group/resource membership slots. `with_resource_group_parents` queries the existing
+first-parent projection separately through the complete canonical group-family survey, without
+Resource/World bodies or locale payloads. Both retain physical GUID aliases, direct source cells,
+result-scoped provenance and explicit coverage. See [Resource group queries](catalog-resource-group-queries.md).

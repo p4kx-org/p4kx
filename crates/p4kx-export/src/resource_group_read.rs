@@ -29,6 +29,38 @@ pub(crate) fn read<'source>(
     admission: &RecordObservation<'_, 'source>,
     cancel: Option<&CancelToken>,
 ) -> Result<ResourceGroupRead<'source>, CatalogError> {
+    let read = read_definition(tree, projection, admission, cancel)?;
+    let guid = CatalogGuid(tree.guid());
+    let parent = crate::catalog_v3::resource_group_catalog::parent(
+        projection.origins(),
+        tree.record_index(),
+        guid,
+        choice,
+    )?;
+    Ok(ResourceGroupRead {
+        value: ResourceGroup {
+            guid,
+            record_path: tree.record_path(),
+            record_index: tree.record_index(),
+            definition: read.value,
+            parent,
+        },
+        notes: read.notes,
+    })
+}
+
+pub(crate) struct ResourceGroupDefinitionRead<'source> {
+    pub(crate) value: ResourceGroupDefinition<'source>,
+    pub(crate) notes: Vec<FieldError>,
+}
+
+/// Reads direct facts without preparing any parent-family dependency.
+pub(crate) fn read_definition<'source>(
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    cancel: Option<&CancelToken>,
+) -> Result<ResourceGroupDefinitionRead<'source>, CatalogError> {
     let input = projection.original();
     let scope = input.record_scope(admission.record(), tree)?;
     let original = OriginalFlowFields::read(&scope, cancel)?;
@@ -40,7 +72,6 @@ pub(crate) fn read<'source>(
     let fields = CatalogFields::observed(tree.root(), "", &context, &capture)?;
     let mut notes = Vec::new();
     let definition = definition(tree, projection, &fields, &mut notes)?;
-    let guid = CatalogGuid(tree.guid());
     if tree.guid() == Guid::default() {
         notes.push(
             FieldError::Malformed {
@@ -55,20 +86,8 @@ pub(crate) fn read<'source>(
             )?),
         );
     }
-    let parent = crate::catalog_v3::resource_group_catalog::parent(
-        projection.origins(),
-        tree.record_index(),
-        guid,
-        choice,
-    )?;
-    Ok(ResourceGroupRead {
-        value: ResourceGroup {
-            guid,
-            record_path: tree.record_path(),
-            record_index: tree.record_index(),
-            definition,
-            parent,
-        },
+    Ok(ResourceGroupDefinitionRead {
+        value: definition,
         notes,
     })
 }

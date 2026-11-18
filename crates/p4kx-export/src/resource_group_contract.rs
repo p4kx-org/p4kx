@@ -25,7 +25,7 @@ pub(crate) struct ResourceGroup<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ResourceGroupDefinition<'source> {
+pub struct ResourceGroupDefinition<'source> {
     #[serde(flatten)]
     pub(crate) source: CanonicalRecordHeader<'source>,
     pub(crate) name: SourcedValue<PublicNameRef>,
@@ -40,7 +40,7 @@ pub(crate) struct ResourceGroupDefinition<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ResourceGroupMembers {
+pub struct ResourceGroupMembers {
     #[serde(skip)]
     #[schemars(skip)]
     pub(crate) physical: ResourceGroupKey,
@@ -54,7 +54,7 @@ pub(crate) struct ResourceGroupMembers {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ResourceGroupParent {
+pub struct ResourceGroupParent {
     pub(crate) guid: SourcedValue<CatalogGuid>,
     pub(crate) record_index: SourcedValue<u32>,
     pub(crate) parent: SourcedValue<Option<CatalogRecordReference>>,
@@ -65,4 +65,82 @@ pub(crate) struct ResourceGroupParent {
 pub(crate) struct ResourceGroupKey {
     pub(crate) guid: CatalogGuid,
     pub(crate) record_index: u32,
+}
+
+impl<'source> ResourceGroupDefinition<'source> {
+    /// Borrows the original physical owner header.
+    #[must_use]
+    pub const fn header(&self) -> &CanonicalRecordHeader<'source> {
+        &self.source
+    }
+
+    /// Borrows the public localized group name identity.
+    #[must_use]
+    pub const fn name(&self) -> &SourcedValue<PublicNameRef> {
+        &self.name
+    }
+
+    /// Borrows the protected localized description identity.
+    #[must_use]
+    pub const fn description(&self) -> &SourcedValue<GameTextRef> {
+        &self.description
+    }
+
+    /// Borrows the original raster thumbnail path.
+    #[must_use]
+    pub const fn default_thumbnail_path(&self) -> &SourcedValue<&'source str> {
+        &self.default_thumbnail_path
+    }
+
+    /// Borrows the original vector thumbnail path.
+    #[must_use]
+    pub const fn default_thumbnail_path_svg(&self) -> &SourcedValue<&'source str> {
+        &self.default_thumbnail_path_svg
+    }
+}
+
+impl ResourceGroupMembers {
+    /// Borrows the original external owner GUID.
+    #[must_use]
+    pub const fn guid(&self) -> &SourcedValue<CatalogGuid> {
+        &self.guid
+    }
+
+    /// Borrows the exact physical owner index.
+    #[must_use]
+    pub const fn record_index(&self) -> &SourcedValue<u32> {
+        &self.record_index
+    }
+
+    /// Borrows original child-group slots in authored order.
+    #[must_use]
+    pub const fn groups(&self) -> &SourcedValue<Vec<SourcedValue<CatalogRecordReference>>> {
+        &self.groups
+    }
+
+    /// Borrows original resource slots in authored order.
+    #[must_use]
+    pub const fn resources(&self) -> &SourcedValue<Vec<SourcedValue<CatalogRecordReference>>> {
+        &self.resources
+    }
+}
+
+impl ResourceGroupParent {
+    /// Borrows the original external child GUID.
+    #[must_use]
+    pub const fn guid(&self) -> &SourcedValue<CatalogGuid> {
+        &self.guid
+    }
+
+    /// Borrows the exact physical child index.
+    #[must_use]
+    pub const fn record_index(&self) -> &SourcedValue<u32> {
+        &self.record_index
+    }
+
+    /// Borrows the canonical first-parent choice and its source knowledge.
+    #[must_use]
+    pub const fn parent(&self) -> &SourcedValue<Option<CatalogRecordReference>> {
+        &self.parent
+    }
 }

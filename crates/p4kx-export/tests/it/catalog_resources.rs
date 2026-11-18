@@ -311,3 +311,6 @@ fn source_only_entity_links_do_not_fabricate_missing_catalog_targets() -> TestRe
 mod queries;
 
 pub(crate) use queries::resource_consumer_walk;
+
+#[path = "resource_group_query_suite.rs"]
+mod resource_group_queries;

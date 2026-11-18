@@ -72,7 +72,7 @@ pub(crate) fn visit_header(header: &CanonicalRecordHeader<'_>, wire: Wire<'_>) -
     wire.field("metadataTag")?.leaf(header.metadata_tag())
 }
 
-fn visit_reference(reference: &CatalogRecordReference, wire: Wire<'_>) -> TestResult {
+pub(crate) fn visit_reference(reference: &CatalogRecordReference, wire: Wire<'_>) -> TestResult {
     wire.field("status")?.raw(reference.status())?;
     wire.field("guid")?.guid(&reference.guid())?;
     wire.field("targetRecordIndex")?

@@ -8,9 +8,8 @@ mod members;
 #[path = "resource_group_parent_read.rs"]
 mod parent;
 
-pub(crate) use contract::{
-    ResourceGroup, ResourceGroupDefinition, ResourceGroupMembers, ResourceGroupParent,
-};
+pub(crate) use contract::ResourceGroup;
+pub use contract::{ResourceGroupDefinition, ResourceGroupMembers, ResourceGroupParent};
 pub(crate) use members::read as members;
 pub(crate) use parent::read as parent;
 

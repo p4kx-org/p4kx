@@ -52,6 +52,8 @@ mod item_ports;
 mod manufacturers;
 #[path = "mining_definition_query.rs"]
 mod mining_definitions;
+#[path = "resource_group_query.rs"]
+mod resource_groups;
 
 /// Canonical mining globals and refining processes without world discovery.
 pub use mining_definitions::process_api as mining;
@@ -382,4 +384,10 @@ pub use blueprints::{
     BlueprintResearch, BlueprintResearchEnvelope, BlueprintResearchPointer, BlueprintSnapshot,
     BlueprintTier, BlueprintUnsupportedRanges, PhysicalBlueprintRef, with_blueprints,
     with_blueprints_from,
+};
+
+pub use resource_groups::{
+    ResourceGroupDefinition, ResourceGroupMembers, ResourceGroupParent,
+    ResourceGroupParentSnapshot, ResourceGroupSnapshot, with_resource_group_parents,
+    with_resource_group_parents_from, with_resource_groups, with_resource_groups_from,
 };
