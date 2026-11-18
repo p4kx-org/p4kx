@@ -20,7 +20,17 @@ pub(crate) enum ItemList {
         dropped: usize,
     },
     Missing,
+    EmptySource(String),
     Unreadable(String),
+}
+
+impl ItemList {
+    pub(crate) fn unreadable_reason(&self) -> Option<&str> {
+        match self {
+            Self::EmptySource(reason) | Self::Unreadable(reason) => Some(reason),
+            Self::Items { .. } | Self::Missing => None,
+        }
+    }
 }
 
 pub(super) fn items(

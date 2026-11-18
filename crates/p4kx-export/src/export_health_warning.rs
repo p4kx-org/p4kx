@@ -14,14 +14,19 @@ use crate::selection::Kind;
 pub(crate) fn diagnostics(warning: &CraftingWarning) -> impl Iterator<Item = ExportDiagnostic> {
     let (kinds, unit, stage) = affected(warning);
     kinds.iter().map(move |kind| {
-        source_warning(
+        let mut diagnostic = source_warning(
             *kind,
             stage,
             warning.kind(),
             warning.count().unwrap_or(1),
             unit,
             Vec::new(),
-        )
+        );
+        if matches!(warning, CraftingWarning::UnreadableShopInventories { .. }) {
+            // The inventory operations account for actual failures individually.
+            diagnostic.severity = ExportDiagnosticSeverity::Information;
+        }
+        diagnostic
     })
 }
 

@@ -117,9 +117,13 @@ impl ReadInventory {
             EntrySource::outer(capture, archive, entry)?.operation(EntryOperation::ShopInventory);
         let identity = source.receipt().physical_file(starmap_index::key)?;
         let uses = source.receipt().source_uses();
-        let result = crate::shop_entry_read::read_all(capture, &source, archive, entry, cancel)?;
+        let result = if entry.uncompressed_size() == 0 {
+            EntryRead::read_verified(source.receipt().clone(), archive, entry, cancel)?
+        } else {
+            crate::shop_entry_read::read_all(capture, &source, archive, entry, cancel)?
+        };
         let read = match result {
-            Ok(read) => document(&read, capture, entry.path(), uses, cancel)?,
+            Ok(read) => document(&read, capture, entry, uses, cancel)?,
             Err(error) => failed(
                 SourceValue::Unreadable,
                 entry.path(),
@@ -175,10 +179,16 @@ impl RecordedItems {
 fn document(
     read: &EntryRead,
     capture: &EntryCapture<'_>,
-    path: &str,
+    entry: &Entry,
     uses: &SourceUses,
     cancel: Option<&CancelToken>,
 ) -> Result<ReadDocument, CatalogError> {
+    let path = entry.path();
+    if entry.uncompressed_size() == 0
+        && let Some(content) = read.empty_payload(capture)?
+    {
+        return Ok(empty_source(path, uses, content));
+    }
     let Ok(root) = EntryJson::parse(read, capture)? else {
         return Ok(ReadDocument {
             item_outcome: Outcome::malformed("Collection.Inventory"),
@@ -220,6 +230,16 @@ fn document(
         item_outcome,
         content: Some(content),
     })
+}
+
+fn empty_source(path: &str, uses: &SourceUses, content: SourceUse) -> ReadDocument {
+    ReadDocument {
+        document: uses.value(SourceValue::Absent, std::slice::from_ref(&content), true),
+        list: ItemList::EmptySource(format!("{path}: the file is empty")),
+        file_outcome: Outcome::projected(),
+        item_outcome: Outcome::projected(),
+        content: Some(content),
+    }
 }
 
 fn failed(

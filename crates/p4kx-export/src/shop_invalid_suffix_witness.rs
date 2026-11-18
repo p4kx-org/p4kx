@@ -42,6 +42,7 @@ enum Outcome {
     UnprovedSelection,
     Parsed,
     ParsedPartial,
+    EmptySource,
     Unreadable,
     Missing,
 }
@@ -264,6 +265,7 @@ impl Verifier<'_, '_, '_> {
             ItemList::Items { dropped: 0, .. } => Outcome::Parsed,
             ItemList::Items { .. } => Outcome::ParsedPartial,
             ItemList::Unreadable(_) => Outcome::Unreadable,
+            ItemList::EmptySource(_) => Outcome::EmptySource,
             ItemList::Missing => Outcome::Missing,
         };
         self.parser.insert(expected.to_owned(), outcome);

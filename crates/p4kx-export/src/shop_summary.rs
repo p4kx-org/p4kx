@@ -62,8 +62,10 @@ pub struct ShopSummary {
     pub inventory_placeholder: usize,
     /// The shops whose named inventory file the Archive lacks.
     pub inventory_missing: usize,
-    /// The shops whose named inventory file cannot be read.
+    /// The shops whose named inventory has no usable document, including zero-byte files.
     pub inventory_unreadable: usize,
+    /// The shops whose named inventory is a fully read zero-byte Entry.
+    pub inventory_empty_source: usize,
     /// The shops none of whose containers has the component in a readable `.soc`, so nothing is
     /// known of their inventory; not the same as a component that names no file.
     pub inventory_unscanned: usize,
@@ -72,8 +74,10 @@ pub struct ShopSummary {
     /// The inventory paths in `.soc` files that no Entity could be tied to; those components stay
     /// unknown.
     pub soc_paths_unattributed: usize,
-    /// The distinct inventory files that cannot be read.
+    /// The distinct named inventories without a usable document, including zero-byte files.
     pub inventories_unreadable: usize,
+    /// The distinct named inventories whose complete reads return zero bytes.
+    pub inventories_empty_source: usize,
     /// The distinct named inventory files the Archive lacks.
     pub inventories_missing: usize,
     /// The distinct inventory files that containers or prefabs name, placeholders included.

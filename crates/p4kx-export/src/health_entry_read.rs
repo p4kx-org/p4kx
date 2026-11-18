@@ -9,7 +9,7 @@ use p4kx_extraction::{Archive, ArchiveError, CancelToken, Entry};
 use super::health_entry_frame::EntryCapture;
 use super::health_entry_receipt::EntryReceipt;
 use crate::{CatalogError, ExportAccountingError};
-use p4kx_extraction::{SourceLocation, SourceUseRole};
+use p4kx_extraction::{SourceLocation, SourceUse, SourceUseRole};
 
 use super::entry_selection_input::{EntrySelectionUse, SelectionSource};
 use super::health_entry_selection::AuthoredEntryPath;
@@ -205,6 +205,21 @@ impl EntryRead {
                 },
             ],
         )
+    }
+
+    /// Returns the payload evidence of a complete read with no decoded bytes.
+    pub(crate) fn empty_payload(
+        &self,
+        capture: &EntryCapture<'_>,
+    ) -> Result<Option<SourceUse>, CatalogError> {
+        self.receipt.check_capture(capture)?;
+        if !self.complete_bytes()?.is_empty() {
+            return Ok(None);
+        }
+        self.receipt
+            .payload_entry()?
+            .payload_read(SourceUseRole::Conversion)
+            .map(Some)
     }
 
     pub(crate) fn bytes(&self) -> &[u8] {

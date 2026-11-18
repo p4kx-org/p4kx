@@ -125,6 +125,10 @@ fn count_inventory(
         }
         (Inventory::One(stem), None) => match lists.get(stem) {
             Some(ItemList::Unreadable(_)) => summary.inventory_unreadable += 1,
+            Some(ItemList::EmptySource(_)) => {
+                summary.inventory_unreadable += 1;
+                summary.inventory_empty_source += 1;
+            }
             _ => summary.inventory_missing += 1,
         },
         (Inventory::Unknown, None) => summary.inventory_unscanned += 1,

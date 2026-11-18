@@ -41,6 +41,7 @@ enum ResolutionStatus {
     Ambiguous,
     Missing,
     Unreadable,
+    EmptySource,
     Unscanned,
     NoDeclaredFile,
 }
@@ -238,6 +239,9 @@ impl<'read, 'input> InventoryResolver<'read, 'input> {
             match self.lists.get(stem) {
                 Some(ItemList::Items { .. }) if !files.is_empty() => ResolutionStatus::Resolved,
                 Some(ItemList::Unreadable(_)) => ResolutionStatus::Unreadable,
+                Some(ItemList::EmptySource(_)) if !files.is_empty() => {
+                    ResolutionStatus::EmptySource
+                }
                 Some(ItemList::Missing) if directory_complete => ResolutionStatus::Missing,
                 _ => ResolutionStatus::Unscanned,
             }
@@ -257,7 +261,10 @@ impl<'read, 'input> InventoryResolver<'read, 'input> {
 
 impl Decision<'_> {
     fn add_content(&self, uses: &mut Vec<SourceUse>) -> Result<(), CatalogError> {
-        if self.status != ResolutionStatus::Resolved {
+        if !matches!(
+            self.status,
+            ResolutionStatus::Resolved | ResolutionStatus::EmptySource
+        ) {
             return Ok(());
         }
         let TargetFiles::Stem([file]) = self.files else {

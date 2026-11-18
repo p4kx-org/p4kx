@@ -2610,10 +2610,14 @@ Valid GUID alternatives and GUID-only `ShopID` chains use the public text domain
 authored string values, including malformed identifier text, use `x-gameText`. Encryption
 markers are independent and come from each actual source use.
 
-An unreadable Entry retains its directory identity and an unreadable document state. Invalid
-JSON, including a zero-byte file, retains its directory identity and an invalid document state.
-An authored empty `Inventory` array is a present, valid list. Archive-entry health reports
-the failed operation, and diagnostic publication retains the failed row. Price, stock and
+An unreadable Entry retains its directory identity and an unreadable document state. Nonzero
+invalid JSON retains its identity and an invalid document state. A complete read of a physical
+zero-byte Entry gives a sourced absent document. The selected shop resolution reports
+`emptySource` with that physical target and its payload evidence. The compatibility shop
+fields `inventory` and `itemGuids` are null. A valid empty `Inventory` array resolves with
+`itemGuids: []`. A missing physical target has no definition row. The zero-byte read is a
+complete observation and still contributes to the legacy `unreadable_shop_inventories`
+warning. Archive-entry health retains other read or projection failures. Price, stock and
 rental values describe offline design settings. Stored values and unit-bearing source fields
 retain their original form.
 
@@ -2654,10 +2658,11 @@ unreadable entity declarations leave the inventory evidence incomplete.
 | `ambiguous` | The observed places disagree, or multiple physical files have the same normalized stem. |
 | `missing` | The actual agreed name has no physical target in the enumerated directory. |
 | `unreadable` | The actual target is present and its item list cannot be read or interpreted. |
+| `emptySource` | The unique physical target was fully read and has zero decoded bytes. |
 | `unscanned` | The available component or directory evidence cannot establish a declaration. |
 | `noDeclaredFile` | An observed readable component declares no inventory file. |
 
-Each candidate, target and status has its own source marker. A resolved status includes the
+Each candidate, target and status has its own source marker. Resolved and empty-source statuses include the
 consumed inventory content. An attempted unreadable payload remains in source health. Directory
 identity and the original authored path retain their independent origins. Source-set completeness
 describes the coverage of the actual contributors. A Record filter omits shop resolutions while

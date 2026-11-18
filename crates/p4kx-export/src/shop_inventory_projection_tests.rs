@@ -28,7 +28,7 @@ fn parse(bytes: &[u8]) -> TestResult<Option<(Arc<[String]>, usize)>> {
     })?;
     Ok(match items {
         ItemList::Items { guids, dropped } => Some((guids, dropped)),
-        ItemList::Missing | ItemList::Unreadable(_) => None,
+        ItemList::Missing | ItemList::EmptySource(_) | ItemList::Unreadable(_) => None,
     })
 }
 

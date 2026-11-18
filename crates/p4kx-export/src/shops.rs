@@ -261,7 +261,11 @@ fn inventory_lists<'a>(
     summary.inventories_in_archive = inventories.count();
     summary.inventories_unreadable = lists
         .values()
-        .filter(|list| matches!(list, ItemList::Unreadable(_)))
+        .filter(|list| list.unreadable_reason().is_some())
+        .count();
+    summary.inventories_empty_source = lists
+        .values()
+        .filter(|list| matches!(list, ItemList::EmptySource(_)))
         .count();
     summary.inventories_missing = lists
         .values()
@@ -271,7 +275,7 @@ fn inventory_lists<'a>(
         .values()
         .map(|list| match list {
             ItemList::Items { dropped, .. } => *dropped,
-            ItemList::Missing | ItemList::Unreadable(_) => 0,
+            ItemList::Missing | ItemList::EmptySource(_) | ItemList::Unreadable(_) => 0,
         })
         .sum();
     Ok(lists)
@@ -293,10 +297,7 @@ fn record_registry(source: EntrySource, disposition: SourceDisposition, ledger: 
 fn unreadable_details(lists: &Lists<'_>) -> Vec<String> {
     let mut details: Vec<String> = lists
         .values()
-        .filter_map(|list| match list {
-            ItemList::Unreadable(reason) => Some(reason.clone()),
-            ItemList::Items { .. } | ItemList::Missing => None,
-        })
+        .filter_map(|list| list.unreadable_reason().map(str::to_owned))
         .collect();
     details.sort_unstable();
     details.dedup();
