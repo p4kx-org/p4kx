@@ -40,6 +40,37 @@ fn nullable_inner(node: &Value) -> Option<&Value> {
     }
 }
 
+pub(super) fn schema_at<'schema>(schema: &'schema Value, path: &str) -> TestResult<&'schema Value> {
+    let mut node = schema;
+    for segment in path.trim_start_matches('/').split('/') {
+        node = resolve(schema, node)?;
+        let child = match segment {
+            "[]" => node.get("items"),
+            "*" => node.get("additionalProperties"),
+            "value" if node.pointer("/properties/value").and_then(Value::as_bool) == Some(true) => {
+                present_value(node)
+            }
+            name => node
+                .get("properties")
+                .and_then(|fields| fields.get(name.replace("~1", "/").replace("~0", "~"))),
+        };
+        node = child.ok_or_else(|| format!("missing schema segment {segment} in {path}"))?;
+    }
+    resolve(schema, node)
+}
+
+pub(super) fn present_value(node: &Value) -> Option<&Value> {
+    node.get("allOf")?
+        .as_array()?
+        .iter()
+        .find(|case| {
+            case.pointer("/if/properties/state/const")
+                .and_then(Value::as_str)
+                == Some("present")
+        })?
+        .pointer("/then/properties/value")
+}
+
 pub(super) fn escape(segment: &str) -> String {
     segment.replace('~', "~0").replace('/', "~1")
 }

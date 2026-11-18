@@ -11,6 +11,8 @@ type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
 #[path = "dataset_owners.rs"]
 mod dataset_owners;
+#[path = "sdk_dataset_coverage.rs"]
+mod sdk_dataset_coverage;
 
 use dataset_owners::{Entry, Owner, Shape};
 

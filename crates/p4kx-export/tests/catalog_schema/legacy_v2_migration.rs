@@ -8,7 +8,7 @@ use p4kx_extraction::Language;
 use serde_json::Value;
 
 use super::legacy_v2_inventory::{Inventory, released_schema};
-use super::schema_navigation::resolve;
+use super::schema_navigation::{present_value, resolve, schema_at};
 
 #[path = "legacy_v2_commodity.rs"]
 mod commodity;
@@ -156,37 +156,6 @@ fn verify_destination(schema: &Value, family: &str, row: &Mapping) -> Result {
         row.old
     );
     Ok(())
-}
-
-fn schema_at<'schema>(schema: &'schema Value, path: &str) -> Result<&'schema Value> {
-    let mut node = schema;
-    for segment in path.trim_start_matches('/').split('/') {
-        node = resolve(schema, node)?;
-        let child = match segment {
-            "[]" => node.get("items"),
-            "*" => node.get("additionalProperties"),
-            "value" if node.pointer("/properties/value").and_then(Value::as_bool) == Some(true) => {
-                present_value(node)
-            }
-            name => node
-                .get("properties")
-                .and_then(|fields| fields.get(name.replace("~1", "/").replace("~0", "~"))),
-        };
-        node = child.ok_or_else(|| format!("missing schema segment {segment} in {path}"))?;
-    }
-    resolve(schema, node)
-}
-
-fn present_value(node: &Value) -> Option<&Value> {
-    node.get("allOf")?
-        .as_array()?
-        .iter()
-        .find(|case| {
-            case.pointer("/if/properties/state/const")
-                .and_then(Value::as_str)
-                == Some("present")
-        })?
-        .pointer("/then/properties/value")
 }
 
 fn family_fields<'inventory>(

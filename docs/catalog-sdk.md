@@ -713,3 +713,17 @@ rejected before a dependency body read.
 
 This query covers authored configuration and the reached inventory definition. Installed ship
 totals and `placements.facilityInstances` use the global Loadout order and a separate projection.
+
+## Verify dataset coverage
+
+The SDK coverage audit checks canonical dataset boundaries against calls to the public typed
+queries. It compares the generated row schemas with the corresponding Catalog schemas. A route
+with partial selection or missing parity evidence remains open in the audit.
+
+```text
+cargo test --locked -p p4kx-export --test catalog_schema dataset_ownership::sdk_dataset_coverage::every_catalog_v3_dataset_has_a_verified_sdk_query -- --ignored --exact
+```
+
+The report names each dataset with an unregistered or partial witness. A dataset may already
+have an SDK query while its coverage witness is pending. The ordinary schema suite checks
+registered witnesses and rejects new unclassified schema boundaries and incompatible changes.
