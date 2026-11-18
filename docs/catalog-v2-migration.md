@@ -55,6 +55,9 @@ Read the original owner GUID and category from `loadouts[].entityGuid.value` and
 identifies its family. Use `sourceRecordIndex.value` to distinguish physical rows
 with equal GUIDs in one Build. Port names are under `ports[].name.value`.
 Each of these values carries its own original source references and encryption marker.
+Read the minimum and maximum accepted sizes from `ports[].minSize.value` and
+`ports[].maxSize.value`. Their separate state and origin distinguish missing, null, unreadable
+and invalid source values.
 
 ## External container links
 

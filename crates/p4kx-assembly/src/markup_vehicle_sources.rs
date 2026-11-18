@@ -38,6 +38,18 @@ pub(super) fn original_sites(
         },
     );
     let port = node.name().eq_ignore_ascii_case("ItemPort");
+    if port && scope.observes_vehicle_port_sizes() {
+        for name in ["minSize", "maxSize"] {
+            retain(
+                &mut origins,
+                node,
+                scope,
+                attributes,
+                name,
+                MissingAttribute::Element,
+            );
+        }
+    }
     retain(
         &mut origins,
         node,

@@ -160,8 +160,12 @@ fn same(tree: &[PortNode], listed: &[Value], at: &str) {
             "{here}: visibility"
         );
         if let Some(definition) = port.definition() {
-            assert_eq!(json["minSize"], json!(definition.min_size()), "{here}: min");
-            assert_eq!(json["maxSize"], json!(definition.max_size()), "{here}: max");
+            for (field, size) in [
+                ("/minSize/value", definition.min_size()),
+                ("/maxSize/value", definition.max_size()),
+            ] {
+                assert_eq!(json.pointer(field), Some(&json!(size)), "{here}: {field}");
+            }
             let types: Vec<&str> = json["types"]
                 .as_array()
                 .into_iter()

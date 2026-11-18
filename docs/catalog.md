@@ -1140,7 +1140,7 @@ GUID in one Build.
 |-------|--------|
 | `name` | A sourced cell containing the port name as the Loadout or port definition spells it; read `name.value`. Port names match ignoring ASCII case. Original DCB/XML coordinates, source uses and encryption state belong to this cell |
 | `source` | Where the attachment comes from: `loadout` (the entity's own Default Loadout), `override` (the Loadout of the entry that attached the entity, which replaces the entity's own per port), `port_default` (the default item of the port definition), `unset` (defined, holds nothing) or `vehicle` (known only from the vehicle implementation, holds nothing). Closed set, string |
-| `minSize`, `maxSize` | `MinSize` and `MaxSize` of the `SItemPortDef`, or `minSize` and `maxSize` of the `ItemPort`; `null` when the data gives none |
+| `minSize`, `maxSize` | Sourced cells with the size in `.value` and its independent state and origin. The selected `SItemPortDef` supplies both cells. Ports without a DataForge definition use the effective XML `ItemPort` attributes. |
 | `types` | `{type, subTypes}` in stored order from `SItemPortDef.Types` or XML `ItemPort/Types/Type`. XML subtype tokens come from the comma-separated `subtypes` attribute |
 | `flags` | The words of `Flags` as stored, without a leading `$` (`invisible`, `uneditable`) |
 | `portTags`, `requiredTags` | The words of `PortTags` and `RequiredPortTags` of the `SItemPortDef`, or of `portTags` and `requiredTags` of the `ItemPort`: split at white space and otherwise as stored, like `tags` of an item (a leading `$` stays). An item fits a port when it carries the required tags (see "Paints" for the tag tree rule) |
@@ -1153,6 +1153,11 @@ GUID in one Build.
 | `ports` | The ports of the attached entity under the Loadout that attached it, or the ports of the nested Loadout of an empty port; empty otherwise |
 
 The name cell retains the original copied name with its own Payload, Selector and Conversion uses. Missing original proof keeps the resolved spelling present and its origin incomplete/unknown. This does not certify the source choice or membership of the whole port tree; the other resolved-port fields remain separate migration boundaries.
+
+The size cells distinguish an absent declaration, an explicit DataForge null, an unreadable
+source, and an invalid value. A missing size in a selected DataForge definition stays absent.
+An XML cell retains the effective attribute or checked absence and the patch selectors that
+supplied it. Its source set stays incomplete until the preceding part selection is accounted for.
 
 The ports of an entity are, in this order: those a Loadout names in Loadout order, the other
 ports the Record defines in definition order, and the `ItemPort` elements of the vehicle

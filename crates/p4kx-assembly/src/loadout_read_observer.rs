@@ -36,6 +36,11 @@ pub trait LoadoutReadObserver: Send + Sync {
         false
     }
 
+    /// Enables original attribute evidence for effective vehicle port sizes.
+    fn observes_vehicle_port_sizes(&self) -> bool {
+        false
+    }
+
     /// Enables exact XML evidence for vehicle mass and hull fields.
     fn observes_vehicle_totals(&self) -> bool {
         false

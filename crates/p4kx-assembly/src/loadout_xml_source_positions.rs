@@ -133,10 +133,17 @@ impl Scope<'_, '_> {
             .is_some_and(Observation::observes_vehicle_totals)
     }
 
+    pub(crate) fn observes_vehicle_port_sizes(&self) -> bool {
+        self.observation
+            .is_some_and(Observation::observes_vehicle_port_sizes)
+    }
+
     fn vehicle_source(&self) -> Option<&LoadoutFileObservation> {
         self.source.filter(|_| {
             self.observation.is_some_and(|observer| {
-                observer.observes_vehicle_visibility() || observer.observes_vehicle_totals()
+                observer.observes_vehicle_visibility()
+                    || observer.observes_vehicle_totals()
+                    || observer.observes_vehicle_port_sizes()
             })
         })
     }

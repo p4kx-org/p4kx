@@ -39,12 +39,12 @@ fn check_default(catalog: &Value, attachment_state: &str) -> TestResult {
         "the authored default still selects the child"
     );
     assert_eq!(
-        proof::at(mount, "/minSize")?,
+        proof::at(mount, "/minSize/value")?,
         &json!(1),
         "the port keeps its original minimum"
     );
     assert_eq!(
-        proof::at(mount, "/maxSize")?,
+        proof::at(mount, "/maxSize/value")?,
         &json!(2),
         "the port keeps its original maximum"
     );
@@ -113,12 +113,12 @@ fn xml_selection_uses_the_first_named_definition_and_preserves_the_actual_xml_co
     let mount = port(proof::at(root, "/ports")?, "mount")?;
     assert_eq!(proof::at(mount, "/source")?, "loadout");
     assert_eq!(
-        proof::at(mount, "/minSize")?,
+        proof::at(mount, "/minSize/value")?,
         &json!(1),
         "the port keeps its original minimum"
     );
     assert_eq!(
-        proof::at(mount, "/maxSize")?,
+        proof::at(mount, "/maxSize/value")?,
         &json!(2),
         "the port keeps its original maximum"
     );

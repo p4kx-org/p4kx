@@ -10,6 +10,7 @@ use p4kx_assembly::{
 use p4kx_extraction::{SourceUse, SourcedValue, is_placeholder_key};
 
 use crate::CatalogError;
+use crate::catalog_read::original::AuthoredEntryPath;
 use crate::contract_loadout::{LoadoutPort, PortType};
 use crate::guid_text::CatalogGuid;
 use crate::loadout::{
@@ -85,11 +86,7 @@ impl<'rows> PortReader<'rows> {
     ) -> Result<LoadoutPort, CatalogError> {
         let name_proof = capture.port_name_proof(port.name(), port.name_proof())?;
         let name = capture.port_name(port.name(), name_proof.as_ref())?;
-        let shape = match (port.definition(), xml) {
-            (Some(definition), _) => read_definition(definition, name),
-            (None, Some(xml)) => read_vehicle(xml, name),
-            (None, None) => LoadoutPort::named(name),
-        };
+        let shape = read_shape(port.definition(), xml, name, name_proof.as_ref(), capture)?;
         let (source, visibility) = match (port.source(), xml) {
             (PortSource::Empty, Some(own)) => (VEHICLE_SOURCE, own.visibility().code()),
             (PortSource::Empty, None) => (VEHICLE_SOURCE, port.visibility().code()),
@@ -136,10 +133,33 @@ impl<'rows> PortReader<'rows> {
     }
 }
 
+fn read_shape(
+    definition: Option<&PortDefinition>,
+    xml: Option<&VehicleItemPort>,
+    name: SourcedValue<String>,
+    proof: Option<&AuthoredEntryPath>,
+    capture: &Capture<'_>,
+) -> Result<LoadoutPort, CatalogError> {
+    Ok(match (definition, xml) {
+        (Some(definition), _) => {
+            let (min_size, max_size) = capture.definition_sizes(definition, proof)?;
+            LoadoutPort {
+                min_size,
+                max_size,
+                ..read_definition(definition, name)
+            }
+        }
+        (None, Some(xml)) => LoadoutPort {
+            min_size: capture.vehicle_size(xml.min_size_source(), proof)?,
+            max_size: capture.vehicle_size(xml.max_size_source(), proof)?,
+            ..read_vehicle(xml, name)
+        },
+        (None, None) => LoadoutPort::named(name),
+    })
+}
+
 fn read_definition(definition: &PortDefinition, name: SourcedValue<String>) -> LoadoutPort {
     LoadoutPort {
-        min_size: definition.min_size(),
-        max_size: definition.max_size(),
         types: definition
             .types()
             .iter()
@@ -158,8 +178,6 @@ fn read_definition(definition: &PortDefinition, name: SourcedValue<String>) -> L
 
 fn read_vehicle(port: &VehicleItemPort, name: SourcedValue<String>) -> LoadoutPort {
     LoadoutPort {
-        min_size: port.min_size(),
-        max_size: port.max_size(),
         types: port
             .item_types()
             .iter()

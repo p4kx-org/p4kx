@@ -136,6 +136,10 @@ impl<'f> Observation<'f> {
         self.observer.observes_vehicle_visibility()
     }
 
+    pub(crate) fn observes_vehicle_port_sizes(&self) -> bool {
+        self.observer.observes_vehicle_port_sizes()
+    }
+
     pub(crate) fn observes_vehicle_totals(&self) -> bool {
         self.observer.observes_vehicle_totals()
     }

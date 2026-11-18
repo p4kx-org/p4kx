@@ -72,7 +72,7 @@ fn vehicle_parts_sharing_a_port_name_all_take_the_first_part_as_the_tree_does() 
     let ports = &loadout(&catalog, ALPHA)?["ports"];
     let gun = port(ports, "hardpoint_gun")?;
     assert_eq!(
-        (&gun["minSize"], &gun["maxSize"]),
+        (&gun["minSize"]["value"], &gun["maxSize"]["value"]),
         (&json!(1), &json!(3)),
         "a part named in another case does not replace the first"
     );
@@ -81,7 +81,12 @@ fn vehicle_parts_sharing_a_port_name_all_take_the_first_part_as_the_tree_does() 
         .into_iter()
         .flatten()
         .filter(|port| port["name"]["value"] == "hardpoint_empty")
-        .map(|port| (port["minSize"].clone(), port["maxSize"].clone()))
+        .map(|port| {
+            (
+                port["minSize"]["value"].clone(),
+                port["maxSize"]["value"].clone(),
+            )
+        })
         .collect();
     assert_eq!(
         sizes,

@@ -3,6 +3,7 @@
 
 use std::collections::HashMap;
 
+use p4kx_extraction::SourceValue;
 use p4kx_foundation::read_text_number;
 
 use super::{PartKind, VehicleAggregateEvidence, VehicleItemPort, VehicleItemType, VehiclePart};
@@ -159,8 +160,13 @@ fn is_set(value: Option<&str>) -> bool {
     })
 }
 
-fn size(value: Option<&str>) -> Option<u32> {
-    value?.trim().parse().ok()
+fn size(value: Option<&str>) -> SourceValue<u32> {
+    value.map_or(SourceValue::Absent, |value| {
+        value
+            .trim()
+            .parse()
+            .map_or(SourceValue::Invalid, SourceValue::Present)
+    })
 }
 
 /// Returns the share of `damageMax` at which the part destroys the vehicle: the `damageRatioMin`

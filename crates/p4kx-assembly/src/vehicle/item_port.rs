@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::SourceValue;
+
 use super::{PortVisibility, ValueOrigin, VehicleAttributeEvidence};
 use crate::markup::AttributeOrigins;
 
@@ -37,8 +39,8 @@ impl VehicleItemType {
 /// The item port of a part of the vehicle implementation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VehicleItemPort {
-    pub(crate) min_size: Option<u32>,
-    pub(crate) max_size: Option<u32>,
+    pub(crate) min_size: SourceValue<u32>,
+    pub(crate) max_size: SourceValue<u32>,
     pub(crate) flags: Option<String>,
     pub(crate) id: Option<String>,
     pub(crate) display_name: Option<String>,
@@ -86,13 +88,37 @@ impl VehicleItemPort {
     /// Returns the smallest item size the port takes, or `None` when the XML gives none.
     #[must_use]
     pub const fn min_size(&self) -> Option<u32> {
-        self.min_size
+        match self.min_size {
+            SourceValue::Present(value) => Some(value),
+            _ => None,
+        }
     }
 
     /// Returns the largest item size the port takes, or `None` when the XML gives none.
     #[must_use]
     pub const fn max_size(&self) -> Option<u32> {
-        self.max_size
+        match self.max_size {
+            SourceValue::Present(value) => Some(value),
+            _ => None,
+        }
+    }
+
+    /// Borrows the minimum size and the effective attribute that supplied or omitted it.
+    #[must_use]
+    pub fn min_size_source(&self) -> (&SourceValue<u32>, Option<&VehicleAttributeEvidence>) {
+        (
+            &self.min_size,
+            self.origins.evidence("minSize").map(std::sync::Arc::as_ref),
+        )
+    }
+
+    /// Borrows the maximum size and the effective attribute that supplied or omitted it.
+    #[must_use]
+    pub fn max_size_source(&self) -> (&SourceValue<u32>, Option<&VehicleAttributeEvidence>) {
+        (
+            &self.max_size,
+            self.origins.evidence("maxSize").map(std::sync::Arc::as_ref),
+        )
     }
 
     /// Returns the item port's own id, which Modifications address, if it has one.

@@ -26770,22 +26770,12 @@
           "description": "The `guid` of the entry in `items` (or, for a docked vehicle, in `ships`) the port holds\nby default; `null` for an empty port. For an attachment that cannot be resolved it is the\nGUID the Loadout names, which may belong to no entry, or `null` when the Loadout names a\nclass name only."
         },
         "maxSize": {
-          "description": "The largest item size the port takes, `null` when the data gives none.",
-          "format": "uint32",
-          "minimum": 0,
-          "type": [
-            "integer",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfuint32",
+          "description": "The largest item size the port takes and its original source."
         },
         "minSize": {
-          "description": "The smallest item size the port takes, `null` when the data gives none.",
-          "format": "uint32",
-          "minimum": 0,
-          "type": [
-            "integer",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfuint32",
+          "description": "The smallest item size the port takes and its original source."
         },
         "name": {
           "$ref": "#/$defs/SourcedValueOfstring",

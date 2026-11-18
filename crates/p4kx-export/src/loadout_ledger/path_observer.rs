@@ -5,7 +5,7 @@ use std::ops::ControlFlow;
 
 use p4kx_assembly::{
     LoadoutClassSelection, LoadoutPathObserver, LoadoutPathOperation, LoadoutReferenceSelection,
-    LoadoutSelection,
+    LoadoutSelection, PortDefinition,
 };
 use p4kx_extraction::{RecordTree, StructValue, Value};
 
@@ -88,6 +88,20 @@ impl<'scope, 'read, 'source> RecordPaths<'_, '_, 'scope, 'read, 'source> {
 }
 
 impl LoadoutPathObserver for RecordPaths<'_, '_, '_, '_, '_> {
+    fn record_port_definition(
+        &self,
+        definition: &PortDefinition,
+        original: &StructValue<'_>,
+    ) -> ControlFlow<()> {
+        match self
+            .capture
+            .record_port_sizes(&self.fields, definition, original)
+        {
+            Ok(()) => ControlFlow::Continue(()),
+            Err(error) => self.capture.fail(error),
+        }
+    }
+
     fn record_reference(
         &self,
         selection: &LoadoutReferenceSelection,

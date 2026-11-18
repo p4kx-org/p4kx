@@ -105,7 +105,7 @@ impl PortDefinition {
 }
 
 /// Original coordinates of one DataForge item port definition.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PortDefinitionPosition {
     pub(crate) record: u32,
     pub(crate) component: usize,

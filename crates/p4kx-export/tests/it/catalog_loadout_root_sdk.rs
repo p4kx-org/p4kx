@@ -46,8 +46,10 @@ fn loadout_root_identity_survives_item_staging_and_matches_the_sdk() -> TestResu
             "the Item spool preserves typed owner values"
         );
         verify_identity(&catalog, encrypted)?;
+        verify_sizes(&catalog, encrypted)?;
         let wire = json!({"loadouts": rows, "provenance": selected.source_inventory});
         verify_identity(&wire, encrypted)?;
+        verify_sizes(&wire, encrypted)?;
     }
     Ok(())
 }
@@ -81,6 +83,34 @@ fn verify_identity(output: &Value, encrypted: bool) -> TestResult {
     verify_row(output, ship, 1, SHIP_GUID, "ship", encrypted)?;
     verify_row(output, item, 0, ITEM_GUID, "item", encrypted)?;
     proof::closure(output)
+}
+
+fn verify_sizes(output: &Value, encrypted: bool) -> TestResult {
+    let port = proof::at(output, "/loadouts/1/ports/0")?;
+    let min = proof::present(port, "minSize", &json!(0), Some(encrypted))?;
+    let max = proof::present(port, "maxSize", &json!(3), Some(encrypted))?;
+    let conversion = |cell| -> TestResult<Value> {
+        let original = proof::uses(output, cell)?;
+        let [datum] = original
+            .into_iter()
+            .filter(|usage| usage.get("role").and_then(Value::as_str) == Some("conversion"))
+            .collect::<Vec<_>>()[..]
+        else {
+            return Err("exactly one original size conversion".into());
+        };
+        assert_eq!(
+            proof::at(datum, "/location/indices/0")?,
+            "0",
+            "size belongs to the physical Item Record",
+        );
+        Ok(proof::at(datum, "/location")?.clone())
+    };
+    assert_ne!(
+        conversion(min)?,
+        conversion(max)?,
+        "min and max retain different original slots",
+    );
+    Ok(())
 }
 
 fn verify_row(
@@ -158,7 +188,7 @@ fn root_database() -> DataForgeBuilder {
                 "FixtureLoadoutItem",
                 "libs/foundry/records/entities/scitem/fixture/root_item.xml",
             )
-            .port(TestPort::new("fixture_port"))
+            .port(TestPort::new("fixture_port").sizes(0, 3))
             .record(),
         )
         .record(

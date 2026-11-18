@@ -77,7 +77,7 @@ fn the_ports_list_the_loadout_ports_then_the_vehicle_only_ports() -> TestResult 
     assert_eq!(
         (
             &empty["source"],
-            &empty["minSize"],
+            &empty["minSize"]["value"],
             &empty["itemGuid"],
             &empty["visibility"]
         ),
@@ -111,8 +111,8 @@ fn a_record_port_keeps_its_definition_and_the_vehicle_file_gives_the_visibility(
     let turret = port(&loadout(&catalog, ALPHA)?["ports"], "hardpoint_turret")?;
     assert_eq!(
         (
-            &turret["minSize"],
-            &turret["maxSize"],
+            &turret["minSize"]["value"],
+            &turret["maxSize"]["value"],
             &turret["types"],
             &turret["flags"],
             &turret["portTags"],
@@ -148,8 +148,8 @@ fn a_port_the_record_lacks_takes_its_definition_from_the_vehicle_file() -> TestR
     let gun = port(&loadout(&catalog, ALPHA)?["ports"], "hardpoint_gun")?;
     assert_eq!(
         (
-            &gun["minSize"],
-            &gun["maxSize"],
+            &gun["minSize"]["value"],
+            &gun["maxSize"]["value"],
             &gun["types"],
             &gun["flags"],
             &gun["portTags"],
@@ -171,6 +171,21 @@ fn a_port_the_record_lacks_takes_its_definition_from_the_vehicle_file() -> TestR
         gun["displayNameKey"],
         Value::Null,
         "the XML placeholder key is omitted"
+    );
+    let size = crate::health_origin_assertions::cell(gun, "minSize", "present")?;
+    let uses = crate::health_origin_assertions::uses(&catalog, size)?;
+    assert!(
+        uses.iter().any(|usage| {
+            usage.pointer("/location/namespace").and_then(Value::as_str) == Some("textXmlAttribute")
+                && usage.pointer("/location/field").and_then(Value::as_str) == Some("minSize")
+                && usage.get("role").and_then(Value::as_str) == Some("conversion")
+        }),
+        "vehicle fallback retains the actual minSize attribute",
+    );
+    assert_eq!(
+        size.get("sourceSetComplete"),
+        Some(&json!(false)),
+        "the attribute does not prove the preceding Part search",
     );
     Ok(())
 }

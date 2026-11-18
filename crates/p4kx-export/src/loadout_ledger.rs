@@ -22,6 +22,8 @@ mod path_capture;
 mod path_observer;
 #[path = "loadout_ledger/path_proofs.rs"]
 mod path_proofs;
+#[path = "loadout_ledger/port_sizes.rs"]
+mod port_sizes;
 #[path = "loadout_ledger/root_index.rs"]
 mod root_index;
 #[path = "loadout_ledger/typed.rs"]
@@ -57,6 +59,7 @@ struct State {
     inspections: BTreeMap<u32, FieldInspection>,
     files: FileProofs,
     paths: path_proofs::PathProofs,
+    port_sizes: port_sizes::RecordPortSizes,
     references: reference_proofs::ReferenceProofs,
     classes: class_proofs::ClassProofs,
     graph: FileGraph,
@@ -73,6 +76,7 @@ impl State {
             inspections: BTreeMap::new(),
             files: FileProofs::default(),
             paths: path_proofs::PathProofs::default(),
+            port_sizes: port_sizes::RecordPortSizes::default(),
             references: reference_proofs::ReferenceProofs::default(),
             classes: class_proofs::ClassProofs::default(),
             graph: FileGraph::default(),

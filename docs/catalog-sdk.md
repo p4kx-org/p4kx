@@ -639,6 +639,12 @@ to the nested results.
 
 `name()` borrows the canonical `SourcedValue<String>` name cell. Read its present value and immediate origin independently; repeated equal spellings can have different physical source uses. The unresolved membership/source-choice boundaries do not acquire a false complete row-wide origin.
 
+`source_min_size()` and `source_max_size()` borrow the canonical size cells that match
+`minSize` and `maxSize` in the Catalog. The value-only getters `min_size()` and `max_size()`
+continue to return `Option<u32>`. Check the sourced state to distinguish absence, null,
+unreadability and invalidity. XML evidence can retain an exact attribute while the complete
+part selection remains unresolved.
+
 `source_constraints()` exposes typed physical port and attachment links. Resolve their immediate
 origin references against this result's `source_inventory`. `coverage` describes the requested
 owner selection. `dependencies` records the reached resolver operations and each demanded

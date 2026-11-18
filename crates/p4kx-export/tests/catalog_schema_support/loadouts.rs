@@ -5,12 +5,14 @@
 
 use serde_json::json;
 
-use super::source_values::present;
+use p4kx_extraction::SourceValue;
+
+use super::source_values::{present, source};
 
 pub(super) fn loadouts() -> serde_json::Value {
     let gun = json!({
         "name": present(json!("hardpoint_gun_left")), "source": "loadout",
-        "minSize": 1, "maxSize": 3,
+        "minSize": present(json!(1)), "maxSize": present(json!(3)),
         "types": [{"type": "WeaponGun", "subTypes": ["Gun"]}],
         "flags": ["uneditable"], "portTags": ["Gun"],
         "requiredTags": ["Mount"],
@@ -27,7 +29,7 @@ pub(super) fn loadouts() -> serde_json::Value {
         "issues": ["vehicle_implementation"],
         "ports": [{
             "name": present(json!("hardpoint_turret")), "source": "vehicle",
-            "minSize": null, "maxSize": null,
+            "minSize": source(SourceValue::Absent), "maxSize": source(SourceValue::Absent),
             "types": [], "flags": [], "portTags": [],
             "requiredTags": [],
             "displayNameKey": null, "visibility": "unspecified",

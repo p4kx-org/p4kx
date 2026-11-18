@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::SourcedValue;
+use std::sync::OnceLock;
+
+use p4kx_extraction::{SourceUses, SourceValue, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -65,10 +67,10 @@ pub struct LoadoutPort {
     /// port is known only from the vehicle implementation and holds nothing). A closed set the
     /// game may extend, so the schema keeps a string.
     pub(crate) source: &'static str,
-    /// The smallest item size the port takes, `null` when the data gives none.
-    pub(crate) min_size: Option<u32>,
-    /// The largest item size the port takes, `null` when the data gives none.
-    pub(crate) max_size: Option<u32>,
+    /// The smallest item size the port takes and its original source.
+    pub(crate) min_size: SourcedValue<u32>,
+    /// The largest item size the port takes and its original source.
+    pub(crate) max_size: SourcedValue<u32>,
     /// The item types the port takes, in stored order; empty when the data names none.
     pub(crate) types: Vec<PortType>,
     /// The flags of the port as stored, split at white space, without a leading `$`, e.g.
@@ -181,13 +183,16 @@ impl Loadout {
 
 impl LoadoutPort {
     pub(crate) fn named(name: SourcedValue<String>) -> Self {
+        static NO_SIZE: OnceLock<SourcedValue<u32>> = OnceLock::new();
+        let size =
+            NO_SIZE.get_or_init(|| SourceUses::default().value(SourceValue::Absent, &[], false));
         Self {
             name,
             name_proof: None,
             attachment_port_inventory_complete: false,
             source: "",
-            min_size: None,
-            max_size: None,
+            min_size: size.clone(),
+            max_size: size.clone(),
             types: Vec::new(),
             flags: Vec::new(),
             port_tags: Vec::new(),
@@ -218,13 +223,25 @@ impl LoadoutPort {
     /// Returns the declared minimum item size.
     #[must_use]
     pub const fn min_size(&self) -> Option<u32> {
-        self.min_size
+        self.min_size.value().copied()
     }
 
     /// Returns the declared maximum item size.
     #[must_use]
     pub const fn max_size(&self) -> Option<u32> {
-        self.max_size
+        self.max_size.value().copied()
+    }
+
+    /// Borrows the minimum item size with its original source and value state.
+    #[must_use]
+    pub const fn source_min_size(&self) -> &SourcedValue<u32> {
+        &self.min_size
+    }
+
+    /// Borrows the maximum item size with its original source and value state.
+    #[must_use]
+    pub const fn source_max_size(&self) -> &SourcedValue<u32> {
+        &self.max_size
     }
 
     /// Borrows the allowed original item types in declaration order.

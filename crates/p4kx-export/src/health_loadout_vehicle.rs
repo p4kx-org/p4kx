@@ -145,46 +145,10 @@ impl VehicleFileSelection {
         site: &VehicleXmlSite,
         role: SourceUseRole,
     ) -> Result<OriginalDatum<()>, CatalogError> {
-        if !self.original.is_same_operation(site.file())
-            || self.original.read_outcome().is_err()
-            || !matches!(self.original.projection_outcome(), Some(Ok(())))
-        {
+        if !self.original.is_same_operation(site.file()) {
             return Err(ExportAccountingError::UnobservedFailure.into());
         }
-        let origin = self
-            .original
-            .source()
-            .entry_origin()
-            .ok_or(ExportAccountingError::UnboundHealthSubject)?;
-        capture.check_origin(origin)?;
-        let sources = capture.source_uses();
-        let mut inputs = Vec::new();
-        let complete = site.location().is_some();
-        inputs.push(
-            sources
-                .observe(
-                    SourceInput::Archive(origin),
-                    InputScope::ArchiveDirectoryMetadata,
-                )?
-                .at(
-                    SourceLocation::Metadata {
-                        field: "path".to_owned(),
-                    },
-                    SourceUseRole::Selector,
-                )?,
-        );
-        let payload = sources.observe(SourceInput::Archive(origin), InputScope::Payload)?;
-        inputs.push(match site.location() {
-            Some(location) => payload.at(location.clone(), role)?,
-            None => {
-                payload.at_opaque(role, p4kx_extraction::SourceCoordinateOmission::Unavailable)?
-            }
-        });
-        Ok(OriginalDatum::observed(
-            SourceValue::Present(()),
-            inputs,
-            complete,
-        ))
+        capture.vehicle_xml_site(site, role)
     }
     pub(crate) fn attempt(
         &self,
@@ -243,6 +207,48 @@ impl VehicleFileSelection {
             SourceValue::Present(()),
             inputs,
             complete,
+        ))
+    }
+}
+
+impl EntryCapture<'_> {
+    pub(crate) fn vehicle_xml_site(
+        &self,
+        site: &VehicleXmlSite,
+        role: SourceUseRole,
+    ) -> Result<OriginalDatum<()>, CatalogError> {
+        let file = site.file();
+        if file.read_outcome().is_err() || !matches!(file.projection_outcome(), Some(Ok(()))) {
+            return Err(ExportAccountingError::UnobservedFailure.into());
+        }
+        let origin = file
+            .source()
+            .entry_origin()
+            .ok_or(ExportAccountingError::UnboundHealthSubject)?;
+        self.check_origin(origin)?;
+        let sources = self.source_uses();
+        let path = sources
+            .observe(
+                SourceInput::Archive(origin),
+                InputScope::ArchiveDirectoryMetadata,
+            )?
+            .at(
+                SourceLocation::Metadata {
+                    field: "path".to_owned(),
+                },
+                SourceUseRole::Selector,
+            )?;
+        let payload = sources.observe(SourceInput::Archive(origin), InputScope::Payload)?;
+        let original = match site.location() {
+            Some(location) => payload.at(location.clone(), role)?,
+            None => {
+                payload.at_opaque(role, p4kx_extraction::SourceCoordinateOmission::Unavailable)?
+            }
+        };
+        Ok(OriginalDatum::observed(
+            SourceValue::Present(()),
+            vec![path, original],
+            site.location().is_some(),
         ))
     }
 }
