@@ -19,7 +19,7 @@ const INPUT_TYPE: &str = "AbstractMissionInitParam";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct MissionModuleInput<'source> {
+pub struct MissionModuleInput<'source> {
     source_type: SourcedValue<&'source str>,
     name: SourcedValue<&'source str>,
     #[serde(flatten)]
@@ -28,6 +28,30 @@ pub(super) struct MissionModuleInput<'source> {
 }
 
 impl<'source> MissionModuleInput<'source> {
+    /// Borrows the original concrete input type.
+    #[must_use]
+    pub const fn source_type(&self) -> &SourcedValue<&'source str> {
+        &self.source_type
+    }
+
+    /// Borrows the original input name.
+    #[must_use]
+    pub const fn name(&self) -> &SourcedValue<&'source str> {
+        &self.name
+    }
+
+    /// Borrows the existing typed input interpretation.
+    #[must_use]
+    pub const fn payload(&self) -> &InputPayload<'source> {
+        &self.payload
+    }
+
+    /// Borrows retained original input fields.
+    #[must_use]
+    pub const fn authored_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.authored_fields
+    }
+
     pub(super) fn read_array(
         fields: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
@@ -54,6 +78,7 @@ impl<'source> MissionModuleInput<'source> {
     }
 }
 
+/// The existing interpretation of one original mission-module input.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(
     tag = "kind",
@@ -61,23 +86,36 @@ impl<'source> MissionModuleInput<'source> {
     rename_all_fields = "camelCase"
 )]
 #[schemars(transform = every_field_required)]
-enum InputPayload<'source> {
+#[non_exhaustive]
+pub enum InputPayload<'source> {
+    /// An original Boolean input.
     Boolean {
+        /// The original value with its existing state and evidence.
         value: SourcedValue<bool>,
     },
+    /// An original signed integer input.
     Integer {
+        /// The original value with its existing state and evidence.
         value: SourcedValue<i32>,
     },
+    /// An original Single input.
     Float {
+        /// The original value with its existing state and evidence.
         value: SourcedValue<ResourceFloat32>,
     },
+    /// An original activity input.
     Activity {
+        /// The original value with its existing state and evidence.
         value: SourcedValue<&'source str>,
     },
+    /// An original Tag-term input.
     Tag {
+        /// The original value with its existing state and evidence.
         value: SourcedValue<MissionInputTags<'source>>,
     },
+    /// The original abstract base input.
     Base,
+    /// An additional concrete input retained in its source arena.
     Authored,
 }
 
@@ -130,10 +168,11 @@ impl<'source> InputPayload<'source> {
 
 type TagLinks<'source> = SourcedValue<Vec<SourcedValue<Box<SourceRecordReference<'source>>>>>;
 
+/// Original positive and negative Tag-reference operands for one input.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct MissionInputTags<'source> {
+pub struct MissionInputTags<'source> {
     #[schemars(with = "SourcedValue<Vec<SourcedValue<CatalogRecordReference>>>")]
     positive_tags: TagLinks<'source>,
     #[schemars(with = "SourcedValue<Vec<SourcedValue<CatalogRecordReference>>>")]
@@ -142,6 +181,28 @@ struct MissionInputTags<'source> {
 }
 
 impl<'source> MissionInputTags<'source> {
+    /// Borrows ordered original positive Tag-reference slots.
+    #[must_use]
+    pub const fn positive_tags(
+        &self,
+    ) -> &SourcedValue<Vec<SourcedValue<Box<SourceRecordReference<'source>>>>> {
+        &self.positive_tags
+    }
+
+    /// Borrows ordered original negative Tag-reference slots.
+    #[must_use]
+    pub const fn negative_tags(
+        &self,
+    ) -> &SourcedValue<Vec<SourcedValue<Box<SourceRecordReference<'source>>>>> {
+        &self.negative_tags
+    }
+
+    /// Borrows additional original fields in source order.
+    #[must_use]
+    pub const fn authored_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.authored_fields
+    }
+
     fn read(
         fields: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

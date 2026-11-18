@@ -27292,6 +27292,7 @@
       "type": "object"
     },
     "LocationMissionLimit": {
+      "description": "One original per-tag mission limit and its retained fields.",
       "properties": {
         "authoredFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -30116,6 +30117,7 @@
       "type": "object"
     },
     "MissionInputTags": {
+      "description": "Original positive and negative Tag-reference operands for one input.",
       "properties": {
         "authoredFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -30491,13 +30493,15 @@
       "description": "One ordered original mission-module input.",
       "oneOf": [
         {
+          "description": "An original Boolean input.",
           "properties": {
             "kind": {
               "const": "boolean",
               "type": "string"
             },
             "value": {
-              "$ref": "#/$defs/SourcedValueOfboolean"
+              "$ref": "#/$defs/SourcedValueOfboolean",
+              "description": "The original value with its existing state and evidence."
             }
           },
           "required": [
@@ -30507,13 +30511,15 @@
           "type": "object"
         },
         {
+          "description": "An original signed integer input.",
           "properties": {
             "kind": {
               "const": "integer",
               "type": "string"
             },
             "value": {
-              "$ref": "#/$defs/SourcedValueOfint32"
+              "$ref": "#/$defs/SourcedValueOfint32",
+              "description": "The original value with its existing state and evidence."
             }
           },
           "required": [
@@ -30523,13 +30529,15 @@
           "type": "object"
         },
         {
+          "description": "An original Single input.",
           "properties": {
             "kind": {
               "const": "float",
               "type": "string"
             },
             "value": {
-              "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+              "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+              "description": "The original value with its existing state and evidence."
             }
           },
           "required": [
@@ -30539,13 +30547,15 @@
           "type": "object"
         },
         {
+          "description": "An original activity input.",
           "properties": {
             "kind": {
               "const": "activity",
               "type": "string"
             },
             "value": {
-              "$ref": "#/$defs/SourcedValueOfstring"
+              "$ref": "#/$defs/SourcedValueOfstring",
+              "description": "The original value with its existing state and evidence."
             }
           },
           "required": [
@@ -30555,13 +30565,15 @@
           "type": "object"
         },
         {
+          "description": "An original Tag-term input.",
           "properties": {
             "kind": {
               "const": "tag",
               "type": "string"
             },
             "value": {
-              "$ref": "#/$defs/SourcedValueOfMissionInputTags"
+              "$ref": "#/$defs/SourcedValueOfMissionInputTags",
+              "description": "The original value with its existing state and evidence."
             }
           },
           "required": [
@@ -30571,6 +30583,7 @@
           "type": "object"
         },
         {
+          "description": "The original abstract base input.",
           "properties": {
             "kind": {
               "const": "base",
@@ -30583,6 +30596,7 @@
           "type": "object"
         },
         {
+          "description": "An additional concrete input retained in its source arena.",
           "properties": {
             "kind": {
               "const": "authored",
@@ -129069,6 +129083,7 @@
       ]
     },
     "SpawnInventory": {
+      "description": "One original spawn inventory-item declaration.",
       "properties": {
         "amountInventoriesToFill": {
           "$ref": "#/$defs/SourcedValueOfint32"
@@ -129235,6 +129250,7 @@
       "type": "object"
     },
     "SpawnTags": {
+      "description": "One original Tag-list declaration and its additional fields.",
       "properties": {
         "authoredFields": {
           "$ref": "#/$defs/SourceArenaOutput"

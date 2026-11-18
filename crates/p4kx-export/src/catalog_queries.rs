@@ -80,6 +80,12 @@ pub use crate::catalog_v3::gameplay_property_catalog::{
     PropertyNameOverrideConditionPayload, PropertyNameOverrideConditionSource,
     PropertyNameOverrideFields, PropertyNameOverrideSource,
 };
+pub use crate::catalog_v3::location_classification::LocationClassification;
+pub use crate::catalog_v3::location_classification::configuration::{
+    LocationAutoSpawnSettings, LocationMissionLimit, LocationMissionModule, LocationSpawnTags,
+    MissionInputTags, MissionLocationConfiguration, MissionModuleInput, MissionModuleInputPayload,
+    ModuleMissionProperty, ModuleMissionPropertyValue, SpawnInventory, SpawnLimits, SpawnTags,
+};
 pub use crate::catalog_v3::reputation_blackboard::{
     BlackboardProperty, BlackboardPropertyBody, BlackboardValue,
 };

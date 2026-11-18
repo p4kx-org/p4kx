@@ -41,6 +41,12 @@ impl MissionLocationTag {
         self.path.sourced()
     }
 
+    /// Borrows the optional original dangling-GUID cell without collapsing its source state.
+    #[must_use]
+    pub const fn dangling_guid_source(&self) -> Option<&SourcedValue<CatalogGuid>> {
+        self.dangling_guid.as_ref()
+    }
+
     /// The authored target GUID for a dangling operand.
     #[must_use]
     pub fn dangling_guid(&self) -> Option<(Guid, &FieldOrigin)> {

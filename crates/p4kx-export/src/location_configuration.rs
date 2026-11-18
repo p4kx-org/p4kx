@@ -23,8 +23,12 @@ mod auto_spawn;
 #[path = "location_mission_module.rs"]
 mod mission_module;
 
-use auto_spawn::LocationAutoSpawnSettings;
-use mission_module::LocationMissionModule;
+pub use super::super::auto_spawn_data::{SpawnInventory, SpawnLimits, SpawnTags};
+pub use auto_spawn::{LocationAutoSpawnSettings, LocationSpawnTags};
+pub use mission_module::{
+    LocationMissionModule, MissionInputTags, MissionModuleInput, MissionModuleInputPayload,
+    ModuleMissionProperty, ModuleMissionPropertyValue,
+};
 
 const SOURCE_TYPE: &str = "MissionLocationData";
 
@@ -32,7 +36,7 @@ const SOURCE_TYPE: &str = "MissionLocationData";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct MissionLocationConfiguration<'source> {
+pub struct MissionLocationConfiguration<'source> {
     mission_modules: SourcedValue<Vec<SourcedValue<LocationMissionModule<'source>>>>,
     auto_spawn_settings: SourcedValue<Vec<SourcedValue<LocationAutoSpawnSettings<'source>>>>,
     mission_limits: SourcedValue<Vec<SourcedValue<LocationMissionLimit<'source>>>>,
@@ -41,6 +45,38 @@ pub(crate) struct MissionLocationConfiguration<'source> {
 }
 
 impl<'source> MissionLocationConfiguration<'source> {
+    /// Borrows ordered original mission-module occurrences.
+    #[must_use]
+    pub const fn mission_modules(
+        &self,
+    ) -> &SourcedValue<Vec<SourcedValue<LocationMissionModule<'source>>>> {
+        &self.mission_modules
+    }
+
+    /// Borrows ordered original NPC spawn settings.
+    #[must_use]
+    pub const fn auto_spawn_settings(
+        &self,
+    ) -> &SourcedValue<Vec<SourcedValue<LocationAutoSpawnSettings<'source>>>> {
+        &self.auto_spawn_settings
+    }
+
+    /// Borrows ordered original per-tag mission limits.
+    #[must_use]
+    pub const fn mission_limits(
+        &self,
+    ) -> &SourcedValue<Vec<SourcedValue<LocationMissionLimit<'source>>>> {
+        &self.mission_limits
+    }
+
+    /// Borrows the original default security-network manifest reference.
+    #[must_use]
+    pub const fn default_security_network_manifest(
+        &self,
+    ) -> &SourcedValue<Box<SourceRecordReference<'source>>> {
+        &self.default_security_network_manifest
+    }
+
     fn read(
         fields: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
@@ -73,10 +109,11 @@ impl<'source> MissionLocationConfiguration<'source> {
     }
 }
 
+/// One original per-tag mission limit and its retained fields.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct LocationMissionLimit<'source> {
+pub struct LocationMissionLimit<'source> {
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
     tag: SourcedValue<Box<SourceRecordReference<'source>>>,
     auto_consume_if_player_at_location: SourcedValue<bool>,
@@ -85,6 +122,30 @@ struct LocationMissionLimit<'source> {
 }
 
 impl<'source> LocationMissionLimit<'source> {
+    /// Borrows the original limit Tag reference.
+    #[must_use]
+    pub const fn tag(&self) -> &SourcedValue<Box<SourceRecordReference<'source>>> {
+        &self.tag
+    }
+
+    /// Borrows the authored player-at-location consumption flag.
+    #[must_use]
+    pub const fn auto_consume_if_player_at_location(&self) -> &SourcedValue<bool> {
+        &self.auto_consume_if_player_at_location
+    }
+
+    /// Borrows the original maximum mission-instance count.
+    #[must_use]
+    pub const fn max_mission_instances(&self) -> &SourcedValue<i32> {
+        &self.max_mission_instances
+    }
+
+    /// Borrows additional original fields in source order.
+    #[must_use]
+    pub const fn authored_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.authored_fields
+    }
+
     fn read(
         fields: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

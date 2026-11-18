@@ -7,7 +7,7 @@ use serde_json::{Value, json};
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult, at, guid};
 
 #[path = "location_vocabulary_fixture.rs"]
-mod fixture;
+pub(crate) mod fixture;
 
 const CLASS_ROWS: &str = "/definitions/locationClasses/rows";
 const CLASS_REGISTRY: &str = "/definitions/locationRegistries/classes/rows/0";

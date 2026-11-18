@@ -13,6 +13,9 @@ mod auto_spawn;
 #[path = "catalog_location_mission_module.rs"]
 mod mission_module;
 
+#[path = "mission_location_typed_sdk_tests.rs"]
+mod typed_sdk;
+
 const TEMPLATE: u128 = 0x1074_0001;
 const MISSING: u128 = 0x1074_00ff;
 

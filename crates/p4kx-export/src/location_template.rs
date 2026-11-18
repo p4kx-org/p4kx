@@ -82,6 +82,18 @@ pub struct LocationName {
 }
 
 impl<'source> MissionLocationTemplate<'source> {
+    /// Borrows the original location dictionary links.
+    #[must_use]
+    pub const fn classification(&self) -> &SourcedValue<LocationClassification<'source>> {
+        &self.classification
+    }
+
+    /// Borrows the original location-owned module, spawn and limit settings.
+    #[must_use]
+    pub const fn configuration(&self) -> &SourcedValue<MissionLocationConfiguration<'source>> {
+        &self.configuration
+    }
+
     /// The original Record GUID.
     #[must_use]
     pub const fn guid(&self) -> Guid {
@@ -110,6 +122,21 @@ impl<'source> MissionLocationTemplate<'source> {
     #[must_use]
     pub const fn disabled(&self) -> Option<bool> {
         self.disabled
+    }
+
+    /// Returns the authored security-network-host flag when present.
+    #[must_use]
+    pub const fn is_security_network_host(&self) -> Option<bool> {
+        self.is_security_network_host
+    }
+
+    /// Returns the authored entity-cluster member GUID when present.
+    #[must_use]
+    pub const fn entity_cluster_member_guid(&self) -> Option<Guid> {
+        match self.entity_cluster_member_guid {
+            Some(guid) => Some(guid.0),
+            None => None,
+        }
     }
 
     /// The general tag operands in source order.

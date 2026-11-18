@@ -90,10 +90,11 @@ impl<'source> AutoSpawnData<'source> {
     }
 }
 
+/// Original group, concurrency and delay limits.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct SpawnLimits {
+pub struct SpawnLimits {
     min_group_size: SourcedValue<i32>,
     max_group_size: SourcedValue<i32>,
     max_concurrent_spawns: SourcedValue<i32>,
@@ -103,6 +104,42 @@ pub(super) struct SpawnLimits {
 }
 
 impl SpawnLimits {
+    /// Borrows the original minimum group size.
+    #[must_use]
+    pub const fn min_group_size(&self) -> &SourcedValue<i32> {
+        &self.min_group_size
+    }
+
+    /// Borrows the original maximum group size.
+    #[must_use]
+    pub const fn max_group_size(&self) -> &SourcedValue<i32> {
+        &self.max_group_size
+    }
+
+    /// Borrows the original concurrent-spawn maximum.
+    #[must_use]
+    pub const fn max_concurrent_spawns(&self) -> &SourcedValue<i32> {
+        &self.max_concurrent_spawns
+    }
+
+    /// Borrows the original total spawn maximum.
+    #[must_use]
+    pub const fn max_spawns(&self) -> &SourcedValue<i32> {
+        &self.max_spawns
+    }
+
+    /// Borrows the original minimum spawn delay.
+    #[must_use]
+    pub const fn min_spawn_delay(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.min_spawn_delay
+    }
+
+    /// Borrows the original maximum spawn delay.
+    #[must_use]
+    pub const fn max_spawn_delay(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.max_spawn_delay
+    }
+
     pub(super) fn read(
         fields: Observed<'_, '_, '_, '_>,
         notes: &mut Vec<FieldError>,
@@ -180,16 +217,31 @@ impl<'source> SpawnAssignment<'source> {
     }
 }
 
+/// One original Tag-list declaration and its additional fields.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct SpawnTags<'source> {
+pub struct SpawnTags<'source> {
     #[schemars(with = "SourcedValue<Vec<SourcedValue<CatalogRecordReference>>>")]
     tags: SourcedValue<Vec<RecordLink<'source>>>,
     authored_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> SpawnTags<'source> {
+    /// Borrows the ordered original Tag-reference slots.
+    #[must_use]
+    pub const fn tags(
+        &self,
+    ) -> &SourcedValue<Vec<SourcedValue<Box<SourceRecordReference<'source>>>>> {
+        &self.tags
+    }
+
+    /// Borrows additional original fields in source order.
+    #[must_use]
+    pub const fn authored_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.authored_fields
+    }
+
     pub(super) fn read_field(
         fields: Observed<'_, '_, '_, 'source>,
         name: &str,
@@ -211,10 +263,11 @@ impl<'source> SpawnTags<'source> {
     }
 }
 
+/// One original spawn inventory-item declaration.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct SpawnInventory<'source> {
+pub struct SpawnInventory<'source> {
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
     entity_class: RecordLink<'source>,
     quantity: SourcedValue<i32>,
@@ -224,6 +277,36 @@ pub(super) struct SpawnInventory<'source> {
 }
 
 impl<'source> SpawnInventory<'source> {
+    /// Borrows the original inventory Entity-class reference.
+    #[must_use]
+    pub const fn entity_class(&self) -> &SourcedValue<Box<SourceRecordReference<'source>>> {
+        &self.entity_class
+    }
+
+    /// Borrows the original item quantity.
+    #[must_use]
+    pub const fn quantity(&self) -> &SourcedValue<i32> {
+        &self.quantity
+    }
+
+    /// Borrows the original number of inventories to fill.
+    #[must_use]
+    pub const fn amount_inventories_to_fill(&self) -> &SourcedValue<i32> {
+        &self.amount_inventories_to_fill
+    }
+
+    /// Borrows the authored mission-item marker flag.
+    #[must_use]
+    pub const fn mark_as_mission_item(&self) -> &SourcedValue<bool> {
+        &self.mark_as_mission_item
+    }
+
+    /// Borrows additional original fields in source order.
+    #[must_use]
+    pub const fn authored_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.authored_fields
+    }
+
     pub(super) fn read(
         fields: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

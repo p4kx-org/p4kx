@@ -27,7 +27,7 @@ type Reference<'source> = SourcedValue<Box<SourceRecordReference<'source>>>;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct LocationClassification<'source> {
+pub struct LocationClassification<'source> {
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
     #[serde(rename = "locationClass")]
     class: Reference<'source>,
@@ -37,6 +37,26 @@ pub(crate) struct LocationClassification<'source> {
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
     #[serde(rename = "locationSize")]
     size: Reference<'source>,
+}
+
+impl<'source> LocationClassification<'source> {
+    /// Borrows the original location-class reference.
+    #[must_use]
+    pub const fn location_class(&self) -> &SourcedValue<Box<SourceRecordReference<'source>>> {
+        &self.class
+    }
+
+    /// Borrows the original location-function reference.
+    #[must_use]
+    pub const fn location_function(&self) -> &SourcedValue<Box<SourceRecordReference<'source>>> {
+        &self.function
+    }
+
+    /// Borrows the original location-size reference.
+    #[must_use]
+    pub const fn location_size(&self) -> &SourcedValue<Box<SourceRecordReference<'source>>> {
+        &self.size
+    }
 }
 
 pub(crate) fn read<'source>(

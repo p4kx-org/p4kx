@@ -19,7 +19,7 @@ type SourceField = (&'static str, SourceValueState);
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct LocationAutoSpawnSettings<'source> {
+pub struct LocationAutoSpawnSettings<'source> {
     name: SourcedValue<&'source str>,
     initial_activity: SourcedValue<&'source str>,
     exclude_ship_crew: SourcedValue<bool>,
@@ -37,6 +37,74 @@ pub(super) struct LocationAutoSpawnSettings<'source> {
 }
 
 impl<'source> LocationAutoSpawnSettings<'source> {
+    /// Borrows the original spawn-settings name.
+    #[must_use]
+    pub const fn name(&self) -> &SourcedValue<&'source str> {
+        &self.name
+    }
+
+    /// Borrows the original initial activity.
+    #[must_use]
+    pub const fn initial_activity(&self) -> &SourcedValue<&'source str> {
+        &self.initial_activity
+    }
+
+    /// Borrows the authored ship-crew exclusion flag.
+    #[must_use]
+    pub const fn exclude_ship_crew(&self) -> &SourcedValue<bool> {
+        &self.exclude_ship_crew
+    }
+
+    /// Borrows the original spawn-gender exclusion label.
+    #[must_use]
+    pub const fn exclude_spawn_gender(&self) -> &SourcedValue<&'source str> {
+        &self.exclude_spawn_gender
+    }
+
+    /// Borrows the original group, concurrency and delay limits.
+    #[must_use]
+    pub const fn limits(&self) -> &SpawnLimits {
+        &self.limits
+    }
+
+    /// Borrows ordered original inventory-item settings.
+    #[must_use]
+    pub const fn inventory_items(
+        &self,
+    ) -> &SourcedValue<Vec<SourcedValue<SpawnInventory<'source>>>> {
+        &self.inventory_items
+    }
+
+    /// Borrows the original spawn, room and area Tag lists.
+    #[must_use]
+    pub const fn tags(&self) -> &LocationSpawnTags<'source> {
+        &self.tags
+    }
+
+    /// Borrows the original faction override reference.
+    #[must_use]
+    pub const fn faction_override(&self) -> &SourcedValue<Box<SourceRecordReference<'source>>> {
+        &self.faction_override
+    }
+
+    /// Borrows the authored mission-allied marker flag.
+    #[must_use]
+    pub const fn mission_allied_marker(&self) -> &SourcedValue<bool> {
+        &self.mission_allied_marker
+    }
+
+    /// Borrows the authored critical-spawn flag.
+    #[must_use]
+    pub const fn is_critical(&self) -> &SourcedValue<bool> {
+        &self.is_critical
+    }
+
+    /// Borrows additional original fields in source order.
+    #[must_use]
+    pub const fn authored_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.authored_fields
+    }
+
     pub(super) fn read(
         fields: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
@@ -89,6 +157,7 @@ impl<'source> LocationAutoSpawnSettings<'source> {
     }
 }
 
+/// The original character, closet, room and area Tag-list declarations.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
@@ -96,7 +165,7 @@ impl<'source> LocationAutoSpawnSettings<'source> {
     clippy::struct_field_names,
     reason = "The field names mirror the distinct DataForge tag-list declarations."
 )]
-struct LocationSpawnTags<'source> {
+pub struct LocationSpawnTags<'source> {
     positive_character_tags: SourcedValue<SpawnTags<'source>>,
     negative_character_tags: SourcedValue<SpawnTags<'source>>,
     closet_positive_tags: SourcedValue<SpawnTags<'source>>,
@@ -111,6 +180,72 @@ struct LocationSpawnTags<'source> {
 }
 
 impl<'source> LocationSpawnTags<'source> {
+    /// Borrows the original positive character Tag list.
+    #[must_use]
+    pub const fn positive_character_tags(&self) -> &SourcedValue<SpawnTags<'source>> {
+        &self.positive_character_tags
+    }
+
+    /// Borrows the original negative character Tag list.
+    #[must_use]
+    pub const fn negative_character_tags(&self) -> &SourcedValue<SpawnTags<'source>> {
+        &self.negative_character_tags
+    }
+
+    /// Borrows the original positive closet Tag list.
+    #[must_use]
+    pub const fn closet_positive_tags(&self) -> &SourcedValue<SpawnTags<'source>> {
+        &self.closet_positive_tags
+    }
+
+    /// Borrows the original negative closet Tag list.
+    #[must_use]
+    pub const fn closet_negative_tags(&self) -> &SourcedValue<SpawnTags<'source>> {
+        &self.closet_negative_tags
+    }
+
+    /// Borrows the original positive room Tag list.
+    #[must_use]
+    pub const fn room_positive_tags(&self) -> &SourcedValue<SpawnTags<'source>> {
+        &self.room_positive_tags
+    }
+
+    /// Borrows the original negative room Tag list.
+    #[must_use]
+    pub const fn room_negative_tags(&self) -> &SourcedValue<SpawnTags<'source>> {
+        &self.room_negative_tags
+    }
+
+    /// Borrows the original positive defend-area Tag list.
+    #[must_use]
+    pub const fn defend_area_positive_tags(&self) -> &SourcedValue<SpawnTags<'source>> {
+        &self.defend_area_positive_tags
+    }
+
+    /// Borrows the original negative defend-area Tag list.
+    #[must_use]
+    pub const fn defend_area_negative_tags(&self) -> &SourcedValue<SpawnTags<'source>> {
+        &self.defend_area_negative_tags
+    }
+
+    /// Borrows the original positive schedule-area Tag list.
+    #[must_use]
+    pub const fn schedule_area_positive_tags(&self) -> &SourcedValue<SpawnTags<'source>> {
+        &self.schedule_area_positive_tags
+    }
+
+    /// Borrows the original negative schedule-area Tag list.
+    #[must_use]
+    pub const fn schedule_area_negative_tags(&self) -> &SourcedValue<SpawnTags<'source>> {
+        &self.schedule_area_negative_tags
+    }
+
+    /// Borrows the original Entity Tag list.
+    #[must_use]
+    pub const fn entity_tags(&self) -> &SourcedValue<SpawnTags<'source>> {
+        &self.entity_tags
+    }
+
     fn read(
         fields: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

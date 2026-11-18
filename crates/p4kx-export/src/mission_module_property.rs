@@ -15,7 +15,7 @@ use crate::source_value_catalog::SourceArenaOutput;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(in crate::catalog_v3) struct ModuleMissionProperty<'source> {
+pub struct ModuleMissionProperty<'source> {
     mission_variable_name: SourcedValue<&'source str>,
     extended_text_token: SourcedValue<&'source str>,
     value: SourcedValue<ModuleMissionPropertyValue<'source>>,
@@ -23,6 +23,30 @@ pub(in crate::catalog_v3) struct ModuleMissionProperty<'source> {
 }
 
 impl<'source> ModuleMissionProperty<'source> {
+    /// Borrows the original mission-variable name.
+    #[must_use]
+    pub const fn mission_variable_name(&self) -> &SourcedValue<&'source str> {
+        &self.mission_variable_name
+    }
+
+    /// Borrows the original extended text token.
+    #[must_use]
+    pub const fn extended_text_token(&self) -> &SourcedValue<&'source str> {
+        &self.extended_text_token
+    }
+
+    /// Borrows the original concrete property value.
+    #[must_use]
+    pub const fn value(&self) -> &SourcedValue<ModuleMissionPropertyValue<'source>> {
+        &self.value
+    }
+
+    /// Borrows additional original fields in source order.
+    #[must_use]
+    pub const fn authored_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.authored_fields
+    }
+
     pub(in crate::catalog_v3) fn read(
         fields: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
@@ -53,12 +77,24 @@ impl<'source> ModuleMissionProperty<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct ModuleMissionPropertyValue<'source> {
+pub struct ModuleMissionPropertyValue<'source> {
     source_type: SourcedValue<&'source str>,
     authored_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> ModuleMissionPropertyValue<'source> {
+    /// Borrows the original concrete property-value type.
+    #[must_use]
+    pub const fn source_type(&self) -> &SourcedValue<&'source str> {
+        &self.source_type
+    }
+
+    /// Borrows all original fields of this concrete value.
+    #[must_use]
+    pub const fn authored_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.authored_fields
+    }
+
     fn read(
         fields: Observed<'_, '_, '_, 'source>,
         _notes: &mut Vec<FieldError>,

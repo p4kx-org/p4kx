@@ -77,7 +77,7 @@ fn record(guid: u128, source_type: &str, path: &str) -> TestRecord {
     )
 }
 
-pub(super) fn template_database(data_type: &str) -> DataForgeBuilder {
+pub(crate) fn template_database(data_type: &str) -> DataForgeBuilder {
     database()
         .structure(
             TestStruct::new("MissionLocationTemplate")

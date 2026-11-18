@@ -71,7 +71,7 @@ fn module_keeps_typed_inputs_and_original_property_slots() -> TestResult {
     crate::commodity_v3_source_inventory::reference_closure(&catalog)
 }
 
-fn database() -> DataForgeBuilder {
+pub(super) fn database() -> DataForgeBuilder {
     input_schema(DataForgeBuilder::new().version(8))
         .structure(TestStruct::new(PROPERTY_VALUE))
         .structure(
@@ -161,6 +161,7 @@ fn module() -> TestValue {
                         ),
                     ),
                     parameter("FixtureFutureModuleInput", TestValue::Int32(4)),
+                    node(TestInstance::new(INPUT).value("name", TestValue::text("FixtureBase"))),
                 ]),
             )
             .value(

@@ -159,6 +159,15 @@ actual ancestry of each path.
 It reads no ContractGenerator, Broker, world placement or mission-query payloads.
 The tags describe authored templates. Their use in a search belongs to the consumer.
 
+Borrow `classification()` and `configuration()` to access the existing dictionary references,
+module inputs, original module properties, spawn settings, inventories and mission limits.
+The immutable views preserve every existing nested field, original slot order, null slots,
+repeated occurrences, target header and lookup state. `MissionModuleInputPayload` distinguishes
+the existing input interpretations; additional source fields remain available through each
+owner's `SourceArenaOutput`. `dangling_guid_source()` exposes the complete optional GUID cell.
+Resolve every sourced cell through this snapshot's source inventory, including unknown encryption
+states. The legacy flags and entity-cluster GUID retain their existing nullable representation.
+
 A selection without an admitted template opens no locale payloads and builds no Tag graph.
 The snapshot carries protected name rows for the requested locales and the source
 inventory for the returned sourced cells. Read the callback's data into consumer-owned
