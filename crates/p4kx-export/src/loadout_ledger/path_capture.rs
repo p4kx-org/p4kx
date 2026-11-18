@@ -6,7 +6,7 @@ use std::ops::ControlFlow;
 use p4kx_assembly::{
     LoadoutPath, LoadoutPathObserver, LoadoutPathOperation, LoadoutSelection, XmlLoadoutPathSite,
 };
-use p4kx_extraction::{Record, RecordTree};
+use p4kx_extraction::{Record, RecordTree, SourceValue, SourcedValue};
 
 use crate::catalog_read::original::{
     AuthoredEntryPath, EntryCapture, EntryPathCapture, LoadoutTargetCapture, OriginalFlowFields,
@@ -17,6 +17,28 @@ use super::Capture;
 use super::path_observer::RecordPaths;
 
 impl Capture<'_> {
+    pub(crate) fn port_name(
+        &self,
+        name: &str,
+        proof: Option<&AuthoredEntryPath>,
+    ) -> Result<SourcedValue<String>, CatalogError> {
+        let Some(proof) = proof else {
+            return Ok(self
+                .name_sources
+                .value(SourceValue::Present(name.to_owned()), &[], false));
+        };
+        if proof.as_str() != name {
+            return Err(ExportAccountingError::ConflictingSourceDatum.into());
+        }
+        let input = self
+            .input
+            .ok_or(ExportAccountingError::UnboundHealthSubject)?;
+        let original = proof.retain_in(&EntryCapture::for_input(input))?;
+        Ok(original
+            .map(|text| text.as_str().to_owned())?
+            .into_cell(&self.name_sources))
+    }
+
     pub(crate) fn port_name_proof(
         &self,
         name: &str,

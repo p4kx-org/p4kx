@@ -39,9 +39,10 @@ fn wanted_uses_the_actual_physical_item_instead_of_its_guid_alias() -> TestResul
     )
     .map_err(|failure| failure.reason().to_owned())?
     .ok_or("loadout missing")?;
+    let port = row.ports.first().ok_or("port missing")?;
     assert_eq!(
-        row.ports.first().ok_or("port missing")?.name,
-        "second",
+        port.name().value().map(String::as_str),
+        Some("second"),
         "the final loadout derives from its exact original Item source"
     );
     let ledger = capture.finish()?;

@@ -136,11 +136,15 @@ fn check_references(built: &BuiltCatalog, catalog: &Value) -> TestResult {
     Ok(())
 }
 
+fn port_name(port: &Value) -> Option<&str> {
+    port.pointer("/name/value").and_then(Value::as_str)
+}
+
 fn same(tree: &[PortNode], listed: &[Value], at: &str) {
     assert!(listed.len() >= tree.len(), "{at}: ports");
     for (port, json) in tree.iter().zip(listed) {
         let here = format!("{at}/{}", port.name());
-        assert_eq!(json["name"], port.name(), "{here}: name");
+        assert_eq!(port_name(json), Some(port.name()), "{here}: name");
         let source = if port.source() == PortSource::Empty {
             VEHICLE_ONLY
         } else {
@@ -234,7 +238,7 @@ fn check_known_ship(archive: &Archive, catalog: &Value) -> TestResult {
         "tree ports with the vehicle-only ones"
     );
     let top = ports(listed);
-    let by_name = |name: &str| top.iter().find(|port| port["name"] == name);
+    let by_name = |name: &str| top.iter().find(|port| port_name(port) == Some(name));
     let power = by_name("hardpoint_power_plant").ok_or("the power plant port")?;
     assert_eq!(
         power["itemGuid"], "4a4a2a9c-040f-4f36-befe-7101b230fa53",

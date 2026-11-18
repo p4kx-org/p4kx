@@ -58,7 +58,7 @@ pub(crate) fn port<'c>(ports: &'c Value, name: &str) -> Result<&'c Value, Box<dy
         .as_array()
         .ok_or("ports")?
         .iter()
-        .find(|port| port["name"] == name)
+        .find(|port| port.pointer("/name/value").and_then(Value::as_str) == Some(name))
         .ok_or("the port")?)
 }
 
@@ -82,6 +82,6 @@ pub(crate) fn names(ports: &Value) -> Vec<&str> {
         .as_array()
         .into_iter()
         .flatten()
-        .filter_map(|port| port["name"].as_str())
+        .filter_map(|port| port.pointer("/name/value").and_then(Value::as_str))
         .collect()
 }

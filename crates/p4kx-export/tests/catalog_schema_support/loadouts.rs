@@ -5,9 +5,11 @@
 
 use serde_json::json;
 
+use super::source_values::present;
+
 pub(super) fn loadouts() -> serde_json::Value {
     let gun = json!({
-        "name": "hardpoint_gun_left", "source": "loadout",
+        "name": present(json!("hardpoint_gun_left")), "source": "loadout",
         "minSize": 1, "maxSize": 3,
         "types": [{"type": "WeaponGun", "subTypes": ["Gun"]}],
         "flags": ["uneditable"], "portTags": ["Gun"],
@@ -21,9 +23,10 @@ pub(super) fn loadouts() -> serde_json::Value {
     json!([{
         "entityGuid": "90000000-0000-4000-8000-000000000001",
         "entityKind": "ship",
+        "sourceRecordIndex": present(json!(0)),
         "issues": ["vehicle_implementation"],
         "ports": [{
-            "name": "hardpoint_turret", "source": "vehicle",
+            "name": present(json!("hardpoint_turret")), "source": "vehicle",
             "minSize": null, "maxSize": null,
             "types": [], "flags": [], "portTags": [],
             "requiredTags": [],

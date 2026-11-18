@@ -350,7 +350,7 @@ fn bindings(catalog: &Value, loadout: usize) -> TestResult<Vec<&Value>> {
 fn named_port_ordinal(ship: &Value, name: &str) -> TestResult<usize> {
     proof::rows(ship, "/ports")?
         .iter()
-        .position(|port| port["name"] == name)
+        .position(|port| port.pointer("/name/value").and_then(Value::as_str) == Some(name))
         .ok_or_else(|| format!("no loadout port {name}").into())
 }
 

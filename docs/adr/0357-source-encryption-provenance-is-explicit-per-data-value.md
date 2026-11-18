@@ -164,6 +164,15 @@ per-field filtering. A shared atom's aggregate marker does not transfer an encry
 membership to a plain occurrence with the same spelling. Public context-bound row collections are
 borrowed; whole-report clones preserve their immutable context.
 
+## Resolved Loadout port names
+
+The resolved port's `name` is the shared typed sourced-value cell, using the actual same-read
+name receipt. Copied spelling and resolver order are unchanged. DCB names retain original
+value/ancestry inputs; XML names retain their exact observed node/attribute and decoder inputs.
+The intrinsic name receipt does not replace the separate contextual membership or winner survey.
+A missing receipt preserves the present resolved spelling with incomplete, unknown origin.
+No filename match, row GUID or enclosing Archive supplies missing proof.
+
 ## Proof required
 
 A synthetic Basetool consumer, another structured tool output and a field-addressed companion each prove immediate plain/encrypted/unknown fields in one row without global/row/provenanceRef recomputation. Synthetic cases cover v1/v2 recognized/missing/short/invalid-length/unknown/conflicting declarations,

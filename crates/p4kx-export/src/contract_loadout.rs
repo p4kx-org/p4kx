@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::SourcedValue;
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -26,6 +27,8 @@ pub enum EntityKind {
 pub struct Loadout {
     #[serde(skip)]
     pub(crate) root_record_index: u32,
+    /// The actual original physical Record position.
+    pub(crate) source_record_index: SourcedValue<u32>,
     #[serde(skip)]
     pub(crate) port_inventory_complete: bool,
     /// The `guid` of the entry in `ships` or `items` the ports belong to; loadouts are ordered by
@@ -45,7 +48,7 @@ pub struct Loadout {
 }
 
 /// One item port and what the Default Loadout attaches to it.
-#[derive(Debug, Default, Serialize, JsonSchema)]
+#[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub struct LoadoutPort {
@@ -54,7 +57,7 @@ pub struct LoadoutPort {
     #[serde(skip)]
     pub(crate) attachment_port_inventory_complete: bool,
     /// The port name, as the Loadout or the port definition spells it.
-    pub(crate) name: String,
+    pub(crate) name: SourcedValue<String>,
     /// Where the attachment comes from: `loadout` (the Entity's own Default Loadout), `override`
     /// (the Loadout of the entry that attached the Entity), `port_default` (the default item of
     /// the port definition), `unset` (the port is defined and holds nothing) or `vehicle` (the
@@ -123,6 +126,12 @@ impl Loadout {
         self.root_record_index
     }
 
+    /// Borrows the physical Record position with its immediate original evidence.
+    #[must_use]
+    pub const fn source_record_index(&self) -> &SourcedValue<u32> {
+        &self.source_record_index
+    }
+
     /// Returns the original owning GUID.
     #[must_use]
     pub const fn entity_guid(&self) -> p4kx_extraction::Guid {
@@ -158,10 +167,33 @@ impl Loadout {
 }
 
 impl LoadoutPort {
-    /// Borrows the resolved original port name.
+    pub(crate) fn named(name: SourcedValue<String>) -> Self {
+        Self {
+            name,
+            name_proof: None,
+            attachment_port_inventory_complete: false,
+            source: "",
+            min_size: None,
+            max_size: None,
+            types: Vec::new(),
+            flags: Vec::new(),
+            port_tags: Vec::new(),
+            required_tags: Vec::new(),
+            display_name_key: None,
+            visibility: "",
+            item_guid: None,
+            item_class_name: None,
+            docked_vehicle: false,
+            unresolved: None,
+            source_constraints: LoadoutAlignment::default(),
+            ports: Vec::new(),
+        }
+    }
+
+    /// Borrows the resolved original port name and its immediate source evidence.
     #[must_use]
-    pub const fn name(&self) -> &str {
-        self.name.as_str()
+    pub const fn name(&self) -> &SourcedValue<String> {
+        &self.name
     }
 
     /// Returns the canonical port source code.
@@ -267,4 +299,11 @@ impl PortType {
     pub fn sub_types(&self) -> &[String] {
         &self.sub_types
     }
+}
+
+#[cfg(test)]
+pub(crate) fn fixture_record_index(index: u32) -> SourcedValue<u32> {
+    use p4kx_extraction::{SourceUses, SourceValue};
+
+    SourceUses::new().value(SourceValue::Present(index), &[], false)
 }

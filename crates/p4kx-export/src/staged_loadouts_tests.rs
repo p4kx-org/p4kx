@@ -4,7 +4,7 @@
 use std::fs;
 use std::io::{self, Write};
 
-use p4kx_extraction::{CancelToken, Guid};
+use p4kx_extraction::{CancelToken, Guid, SourceUses, SourceValue};
 
 use super::StagedLoadouts;
 use crate::CatalogFile;
@@ -15,19 +15,18 @@ use crate::guid_text::CatalogGuid;
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
 fn row(identity: u32, kind: EntityKind) -> Loadout {
+    let sources = SourceUses::default();
+    let name = |value| sources.value(SourceValue::Present(value), &[], false);
     Loadout {
         root_record_index: identity,
+        source_record_index: crate::contract_loadout::fixture_record_index(identity),
         port_inventory_complete: true,
         entity_guid: CatalogGuid(Guid::from_stored(u128::from(identity).to_le_bytes())),
         entity_kind: kind,
         issues: Vec::new(),
         ports: vec![LoadoutPort {
-            name: format!("port-{identity}"),
-            ports: vec![LoadoutPort {
-                name: "nested".into(),
-                ..LoadoutPort::default()
-            }],
-            ..LoadoutPort::default()
+            ports: vec![LoadoutPort::named(name("nested".to_owned()))],
+            ..LoadoutPort::named(name(format!("port-{identity}")))
         }],
     }
 }

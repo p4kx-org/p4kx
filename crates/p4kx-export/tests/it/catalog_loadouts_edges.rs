@@ -80,7 +80,7 @@ fn vehicle_parts_sharing_a_port_name_all_take_the_first_part_as_the_tree_does() 
         .as_array()
         .into_iter()
         .flatten()
-        .filter(|port| port["name"] == "hardpoint_empty")
+        .filter(|port| port["name"]["value"] == "hardpoint_empty")
         .map(|port| (port["minSize"].clone(), port["maxSize"].clone()))
         .collect();
     assert_eq!(

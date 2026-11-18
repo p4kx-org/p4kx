@@ -80,7 +80,7 @@ fn compare_relays(
             .get(ordinal)
             .ok_or("selected relay port in scoped Loadout")?;
         assert!(
-            row["name"].as_str() == Some(port.name())
+            row.pointer("/name/value").and_then(Value::as_str) == Some(port.name())
                 && row["itemGuid"].as_str() == Some(entity.guid().to_string().as_str())
                 && row
                     .pointer("/sourceConstraints/attachedItem/targetRecordIndex/value")

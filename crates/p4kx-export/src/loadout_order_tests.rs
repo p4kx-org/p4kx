@@ -3,7 +3,7 @@
 
 use std::collections::HashSet;
 
-use p4kx_extraction::Guid;
+use p4kx_extraction::{Guid, SourceUses, SourceValue};
 
 use super::Wanted;
 use super::resolution::resolve_ordered;
@@ -27,14 +27,18 @@ fn wanted(index: u32, guid: CatalogGuid, kind: EntityKind) -> Wanted {
 fn resolved(want: Wanted) -> Loadout {
     Loadout {
         root_record_index: want.record_index,
+        source_record_index: crate::contract_loadout::fixture_record_index(want.record_index),
         port_inventory_complete: true,
         entity_guid: want.guid,
         entity_kind: want.kind,
         issues: Vec::new(),
         ports: vec![LoadoutPort {
-            name: want.record_index.to_string(),
             item_guid: Some(guid(99)),
-            ..LoadoutPort::default()
+            ..LoadoutPort::named(SourceUses::default().value(
+                SourceValue::Present(want.record_index.to_string()),
+                &[],
+                false,
+            ))
         }],
     }
 }

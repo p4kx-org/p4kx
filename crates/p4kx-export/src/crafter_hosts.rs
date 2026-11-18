@@ -73,6 +73,7 @@ mod tests {
     fn loadout(host: u128, kind: EntityKind, ports: Vec<LoadoutPort>) -> Loadout {
         Loadout {
             root_record_index: 0,
+            source_record_index: crate::contract_loadout::fixture_record_index(0),
             port_inventory_complete: true,
             entity_guid: guid(host),
             entity_kind: kind,
@@ -85,7 +86,11 @@ mod tests {
         LoadoutPort {
             item_guid: Some(guid(item)),
             ports,
-            ..LoadoutPort::default()
+            ..LoadoutPort::named(p4kx_extraction::SourceUses::default().value(
+                p4kx_extraction::SourceValue::Present(String::new()),
+                &[],
+                false,
+            ))
         }
     }
 

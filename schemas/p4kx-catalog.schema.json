@@ -26598,13 +26598,18 @@
             "$ref": "#/$defs/LoadoutPort"
           },
           "type": "array"
+        },
+        "sourceRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32",
+          "description": "The actual original physical Record position."
         }
       },
       "required": [
         "entityGuid",
         "entityKind",
         "issues",
-        "ports"
+        "ports",
+        "sourceRecordIndex"
       ],
       "type": "object"
     },
@@ -26729,8 +26734,8 @@
           ]
         },
         "name": {
-          "description": "The port name, as the Loadout or the port definition spells it.",
-          "type": "string"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The port name, as the Loadout or the port definition spells it."
         },
         "portTags": {
           "description": "The tags the port offers: the words of the stored value, split at white space and\notherwise unchanged, like `tags` of an item.",

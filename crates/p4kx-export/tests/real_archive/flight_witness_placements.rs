@@ -80,7 +80,7 @@ impl Inventory {
             assert_eq!(ports.len(), output_ports.len(), "resolved port cardinality");
             for (port, output) in ports.iter().zip(output_ports) {
                 assert!(
-                    text(output, "/name")? == port.name(),
+                    text(output, "/name/value")? == port.name(),
                     "authored ordered port"
                 );
                 let Attachment::Entity(child) = port.attachment() else {

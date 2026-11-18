@@ -98,7 +98,11 @@ impl<'scope, 'rows> LocalPorts<'scope, 'rows> {
                 loadout_port_ordinal: Some(ordinal),
                 physical_port: port.source_constraints.physical_port()?,
             };
-            local.add(&port.name, candidate);
+            let name = port
+                .name()
+                .value()
+                .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+            local.add(name, candidate);
         }
         for definition in definitions {
             if !local.by_physical_port.contains_key(&definition.position) {

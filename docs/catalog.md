@@ -1130,11 +1130,15 @@ Loadout (`SEntityComponentDefaultLoadoutParams`) and its tree holds at least one
 racks, weapons with attachment ports. With a `--filter` the ships and items are filtered first,
 so a loadout exists only for the entries the filter selected and the kind is partial.
 
+`sourceRecordIndex` identifies the original physical DataForge Record with its immediate header
+origin. Use it alongside `entityGuid` to distinguish physical Loadout rows with the same nominal
+GUID in one Build.
+
 **Ports.** Each port has:
 
 | Field | Source |
 |-------|--------|
-| `name` | The port name as the Loadout or the port definition spells it; port names match ignoring ASCII case |
+| `name` | A sourced cell containing the port name as the Loadout or port definition spells it; read `name.value`. Port names match ignoring ASCII case. Original DCB/XML coordinates, source uses and encryption state belong to this cell |
 | `source` | Where the attachment comes from: `loadout` (the entity's own Default Loadout), `override` (the Loadout of the entry that attached the entity, which replaces the entity's own per port), `port_default` (the default item of the port definition), `unset` (defined, holds nothing) or `vehicle` (known only from the vehicle implementation, holds nothing). Closed set, string |
 | `minSize`, `maxSize` | `MinSize` and `MaxSize` of the `SItemPortDef`, or `minSize` and `maxSize` of the `ItemPort`; `null` when the data gives none |
 | `types` | `{type, subTypes}` in stored order from `SItemPortDef.Types` or XML `ItemPort/Types/Type`. XML subtype tokens come from the comma-separated `subtypes` attribute |
@@ -1147,6 +1151,8 @@ so a loadout exists only for the entries the filter selected and the kind is par
 | `dockedVehicle` | `true` when the attached entity is a docked vehicle (`AttachDef.Type` starts with `NOITEM_Vehicle`, ignoring case, e.g. a snub craft in a hangar port). It is a reference to a ship and is not expanded: `ports` stays empty (#305) |
 | `unresolved` | The code of the error that kept the attachment from being resolved (`issues` lists the codes), otherwise `null` |
 | `ports` | The ports of the attached entity under the Loadout that attached it, or the ports of the nested Loadout of an empty port; empty otherwise |
+
+The name cell retains the original copied name with its own Payload, Selector and Conversion uses. Missing original proof keeps the resolved spelling present and its origin incomplete/unknown. This does not certify the source choice or membership of the whole port tree; the other resolved-port fields remain separate migration boundaries.
 
 The ports of an entity are, in this order: those a Loadout names in Loadout order, the other
 ports the Record defines in definition order, and the `ItemPort` elements of the vehicle

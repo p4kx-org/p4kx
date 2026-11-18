@@ -264,7 +264,7 @@ fn compare_ports(
         if !path.is_empty() {
             path.push('/');
         }
-        path.push_str(text(port, "/name").ok_or("published Loadout port name")?);
+        path.push_str(text(port, "/name/value").ok_or("published Loadout port name")?);
         if port.get("dockedVehicle").and_then(Value::as_bool) == Some(true) {
             continue;
         }

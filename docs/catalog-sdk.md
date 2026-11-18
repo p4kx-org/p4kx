@@ -623,7 +623,9 @@ session and parsed-view `read_loadouts` methods. Choose `All`, `Guid`, or `Recor
 to select the original Ship and Item Records. An admitted Ship can have an empty Loadout.
 Items produce a row when resolution returns at least one port.
 
-A row's `record_index()` identifies its physical Record in the queried DataForge. Use
+A row's `record_index()` identifies its physical Record in the queried DataForge.
+Its `source_record_index()` gives the same position with its immediate header origin, matching
+`sourceRecordIndex` on the Catalog wire. Use
 `port(&[0, 1])` for the second nested port of the first root port. The zero-based occurrence
 path preserves repeated names and repeated instances of an attached item. It follows resolver
 order for that Build.
@@ -632,6 +634,8 @@ The query uses the archive-backed Catalog resolver and returns the selected rows
 It resolves original port and attachment definitions for the physical Records reached by those
 ports, including dependencies outside the root selection. Stop-at-docked-vehicle rules apply
 to the nested results.
+
+`name()` borrows the canonical `SourcedValue<String>` name cell. Read its present value and immediate origin independently; repeated equal spellings can have different physical source uses. The unresolved membership/source-choice boundaries do not acquire a false complete row-wide origin.
 
 `source_constraints()` exposes typed physical port and attachment links. Resolve their immediate
 origin references against this result's `source_inventory`. `coverage` describes the requested

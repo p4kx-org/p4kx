@@ -33,7 +33,7 @@ fn direct_loadouts_match_the_producer_and_preserve_nested_occurrences() -> TestR
         .ok_or("exact root Ship")?;
     assert!(matches!(alpha.entity_kind(), LoadoutOwnerKind::Ship));
     let nested = alpha.port(&[0, 1]).ok_or("nested physical port")?;
-    assert_eq!(nested.name(), "gun_2");
+    assert_eq!(nested.name().value().map(String::as_str), Some("gun_2"));
     let last = alpha
         .ports()
         .len()
@@ -43,8 +43,8 @@ fn direct_loadouts_match_the_producer_and_preserve_nested_occurrences() -> TestR
         return Err("each original repeated port is accessible".into());
     };
     assert_eq!(
-        first.name(),
-        second.name(),
+        first.name().value(),
+        second.name().value(),
         "two port occurrences share an authored name"
     );
     assert!(
@@ -140,3 +140,9 @@ fn fixture() -> TestResult<(tempfile::TempDir, Archive)> {
     )?;
     Ok((folder, archive))
 }
+
+#[path = "catalog_loadout_root_sdk.rs"]
+mod root_identity;
+
+#[path = "catalog_loadout_name_origins.rs"]
+mod name_origins;

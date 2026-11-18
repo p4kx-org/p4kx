@@ -328,6 +328,8 @@ fn the_loadout_fields_accept_additions_and_new_closed_values_but_stay_required()
         ("ports", Some("unresolved")),
         ("ports", Some("ports")),
         ("ports", Some("requiredTags")),
+        ("ports", Some("name")),
+        ("sourceRecordIndex", None),
     ] {
         let mut missing = catalog.clone();
         let target = match field {

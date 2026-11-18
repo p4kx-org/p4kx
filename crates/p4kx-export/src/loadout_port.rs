@@ -7,7 +7,7 @@ use p4kx_assembly::{
     Attachment, EntityNode, LoadoutError, PortDefinition, PortNode, PortSource, Target,
     VehicleItemPort,
 };
-use p4kx_extraction::{SourceUse, is_placeholder_key};
+use p4kx_extraction::{SourceUse, SourcedValue, is_placeholder_key};
 
 use crate::CatalogError;
 use crate::contract_loadout::{LoadoutPort, PortType};
@@ -83,10 +83,12 @@ impl<'rows> PortReader<'rows> {
         xml: Option<&VehicleItemPort>,
         capture: &Capture<'_>,
     ) -> Result<LoadoutPort, CatalogError> {
+        let name_proof = capture.port_name_proof(port.name(), port.name_proof())?;
+        let name = capture.port_name(port.name(), name_proof.as_ref())?;
         let shape = match (port.definition(), xml) {
-            (Some(definition), _) => read_definition(definition),
-            (None, Some(xml)) => read_vehicle(xml),
-            (None, None) => LoadoutPort::default(),
+            (Some(definition), _) => read_definition(definition, name),
+            (None, Some(xml)) => read_vehicle(xml, name),
+            (None, None) => LoadoutPort::named(name),
         };
         let (source, visibility) = match (port.source(), xml) {
             (PortSource::Empty, Some(own)) => (VEHICLE_SOURCE, own.visibility().code()),
@@ -94,8 +96,7 @@ impl<'rows> PortReader<'rows> {
             (source, _) => (source.code(), port.visibility().code()),
         };
         let mut shape = LoadoutPort {
-            name: port.name().to_owned(),
-            name_proof: capture.port_name_proof(port.name(), port.name_proof())?,
+            name_proof,
             source,
             visibility,
             source_constraints: self.alignment.as_deref_mut().map_or_else(
@@ -135,7 +136,7 @@ impl<'rows> PortReader<'rows> {
     }
 }
 
-fn read_definition(definition: &PortDefinition) -> LoadoutPort {
+fn read_definition(definition: &PortDefinition, name: SourcedValue<String>) -> LoadoutPort {
     LoadoutPort {
         min_size: definition.min_size(),
         max_size: definition.max_size(),
@@ -151,11 +152,11 @@ fn read_definition(definition: &PortDefinition) -> LoadoutPort {
         display_name_key: display_name_key(Some(definition.display_name())),
         port_tags: tag_words(definition.port_tags()),
         required_tags: tag_words(definition.required_tags()),
-        ..LoadoutPort::default()
+        ..LoadoutPort::named(name)
     }
 }
 
-fn read_vehicle(port: &VehicleItemPort) -> LoadoutPort {
+fn read_vehicle(port: &VehicleItemPort, name: SourcedValue<String>) -> LoadoutPort {
     LoadoutPort {
         min_size: port.min_size(),
         max_size: port.max_size(),
@@ -171,7 +172,7 @@ fn read_vehicle(port: &VehicleItemPort) -> LoadoutPort {
         display_name_key: display_name_key(port.display_name()),
         port_tags: tag_words(port.port_tags()),
         required_tags: tag_words(port.required_tags()),
-        ..LoadoutPort::default()
+        ..LoadoutPort::named(name)
     }
 }
 

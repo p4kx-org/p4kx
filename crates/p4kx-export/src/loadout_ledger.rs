@@ -9,6 +9,9 @@ mod file_dependencies;
 mod file_proofs;
 #[path = "loadout_ledger/files.rs"]
 mod files;
+#[cfg(test)]
+#[path = "loadout_ledger/name_tests.rs"]
+mod name_tests;
 #[path = "loadout_ledger/observer.rs"]
 mod observer;
 #[path = "loadout_ledger/operation.rs"]
@@ -19,6 +22,8 @@ mod path_capture;
 mod path_observer;
 #[path = "loadout_ledger/path_proofs.rs"]
 mod path_proofs;
+#[path = "loadout_ledger/root_index.rs"]
+mod root_index;
 #[path = "loadout_ledger/typed.rs"]
 mod typed;
 #[path = "loadout_ledger/vehicle_capture.rs"]
@@ -37,7 +42,7 @@ use std::collections::{BTreeMap, HashSet};
 use std::ops::ControlFlow;
 use std::sync::{Mutex, MutexGuard};
 
-use p4kx_extraction::CancelToken;
+use p4kx_extraction::{CancelToken, SourceUses};
 
 use self::file_proofs::FileProofs;
 use crate::CatalogError;
@@ -104,6 +109,7 @@ impl State {
 /// Retains resolver proofs for cache lifetime and drains each caller's ledger delta.
 pub(crate) struct Capture<'f> {
     input: Option<&'f OriginalCatalogInput<'f, 'f>>,
+    name_sources: SourceUses,
     kind: crate::Kind,
     state: Mutex<State>,
     cancel: Option<CancelToken>,
@@ -112,7 +118,7 @@ pub(crate) struct Capture<'f> {
 impl<'f> Capture<'f> {
     #[cfg(test)]
     pub(crate) fn new(source: &ExportLedger, cancel: Option<&CancelToken>) -> Self {
-        Self::create(source, cancel, crate::Kind::Loadouts)
+        Self::create(source, cancel, crate::Kind::Loadouts, SourceUses::default())
     }
 
     pub(crate) fn for_input(
@@ -121,7 +127,7 @@ impl<'f> Capture<'f> {
         cancel: Option<&CancelToken>,
         kind: crate::Kind,
     ) -> Self {
-        let mut capture = Self::create(source, cancel, kind);
+        let mut capture = Self::create(source, cancel, kind, input.origins().uses.clone());
         capture.input = Some(input);
         capture
     }
@@ -156,9 +162,15 @@ impl<'f> Capture<'f> {
         Ok(())
     }
 
-    fn create(source: &ExportLedger, cancel: Option<&CancelToken>, kind: crate::Kind) -> Self {
+    fn create(
+        source: &ExportLedger,
+        cancel: Option<&CancelToken>,
+        kind: crate::Kind,
+        name_sources: SourceUses,
+    ) -> Self {
         Self {
             input: None,
+            name_sources,
             kind,
             state: Mutex::new(State::new(source)),
             cancel: cancel.cloned(),
