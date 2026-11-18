@@ -35,6 +35,8 @@ pub enum TestCargoGridLayout {
     DuplicateStorage,
     /// A grid whose resolved storage holds the unspecialized inventory type.
     UnsupportedStorage,
+    /// A grid whose inventory Record header references an unreadable instance.
+    UnreadableStorage,
     /// A grid whose resolved closed container stores the chosen unit.
     Closed(TestCapacity),
 }
@@ -137,6 +139,9 @@ fn storage(layout: TestCargoGridLayout) -> TestRecord {
             "inventoryType",
             TestValue::Struct(TestInstance::new(INVENTORY_TYPE)),
         );
+    }
+    if layout == TestCargoGridLayout::UnreadableStorage {
+        return record.with_instance_index(u16::MAX);
     }
     record
 }

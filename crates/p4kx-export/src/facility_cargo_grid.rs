@@ -14,7 +14,7 @@ use crate::catalog_record_reference::CatalogRecordReference;
 use crate::resource_float::ResourceFloat32;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
-use crate::source_value_catalog::SourceArenaOutput;
+use crate::source_value_catalog::{SourceArenaOutput, SourceRecordReference};
 
 pub(super) const COMPONENT: &str = "SCItemCargoGridParams";
 const DAMAGE: &str = "CommodityDamageConfiguration";
@@ -23,7 +23,7 @@ const DAMAGE: &str = "CommodityDamageConfiguration";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct CargoGrid<'source> {
+pub struct CargoGrid<'source> {
     #[serde(serialize_with = "serialize_capacity")]
     #[schemars(with = "CargoGridCapacity")]
     pub(super) capacity: Option<CargoGridCapacity>,
@@ -40,6 +40,66 @@ pub(super) struct CargoGrid<'source> {
 }
 
 impl<'source> CargoGrid<'source> {
+    /// Borrows the resolved capacity and its physical inventory bindings.
+    #[must_use]
+    pub const fn capacity(&self) -> Option<&CargoGridCapacity> {
+        self.capacity.as_ref()
+    }
+
+    /// Borrows the authored grid dimensions.
+    #[must_use]
+    pub const fn dimensions(&self) -> &SourcedValue<InventoryVector3<'source>> {
+        &self.dimensions
+    }
+
+    /// Borrows the authored destruction crate percentage.
+    #[must_use]
+    pub const fn crate_gen_percentage_on_destroy(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.crate_gen_percentage_on_destroy
+    }
+
+    /// Borrows the authored destruction crate limit.
+    #[must_use]
+    pub const fn crate_max_on_destroy(&self) -> &SourcedValue<i32> {
+        &self.crate_max_on_destroy
+    }
+
+    /// Borrows the original visibility flag.
+    #[must_use]
+    pub const fn invisible(&self) -> &SourcedValue<bool> {
+        &self.invisible
+    }
+
+    /// Borrows the original mining-only flag.
+    #[must_use]
+    pub const fn mining_only(&self) -> &SourcedValue<bool> {
+        &self.mining_only
+    }
+
+    /// Borrows the original transform-dependent flag.
+    #[must_use]
+    pub const fn transform_dependant(&self) -> &SourcedValue<bool> {
+        &self.transform_dependant
+    }
+
+    /// Borrows the authored volatile-explosion threshold.
+    #[must_use]
+    pub const fn min_volatile_power_to_explode(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.min_volatile_power_to_explode
+    }
+
+    /// Borrows the original damage configuration Reference.
+    #[must_use]
+    pub const fn damage_configuration(&self) -> &SourcedValue<Box<SourceRecordReference<'source>>> {
+        &self.damage_configuration
+    }
+
+    /// Borrows the other authored component members.
+    #[must_use]
+    pub const fn additional_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.additional_fields
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

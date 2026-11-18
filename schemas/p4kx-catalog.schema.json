@@ -4696,22 +4696,74 @@
       "type": "object"
     },
     "CapacityStatus": {
-      "enum": [
-        "available",
-        "ownerComponentsUnreadable",
-        "ambiguousComponents",
-        "missingStorageComponent",
-        "missingContainerReference",
-        "unresolvedContainerReference",
-        "ambiguousContainerReference",
-        "containerOutsideSelection",
-        "containerUnavailable",
-        "missingCapacity",
-        "unreadableCapacity",
-        "unsupportedCapacity",
-        "invalidCapacity"
+      "description": "Outcome of the original Cargo Grid capacity projection.",
+      "oneOf": [
+        {
+          "const": "available",
+          "description": "Capacity was computed from the original inventory definition.",
+          "type": "string"
+        },
+        {
+          "const": "ownerComponentsUnreadable",
+          "description": "The original Component slots cannot establish the storage selection.",
+          "type": "string"
+        },
+        {
+          "const": "ambiguousComponents",
+          "description": "Several original Grid or Storage slots compete.",
+          "type": "string"
+        },
+        {
+          "const": "missingStorageComponent",
+          "description": "The owner has no item storage component.",
+          "type": "string"
+        },
+        {
+          "const": "missingContainerReference",
+          "description": "The selected storage has no authored container Reference.",
+          "type": "string"
+        },
+        {
+          "const": "unresolvedContainerReference",
+          "description": "The authored Reference cannot select an inventory definition.",
+          "type": "string"
+        },
+        {
+          "const": "ambiguousContainerReference",
+          "description": "The nominal GUID names several physical Records.",
+          "type": "string"
+        },
+        {
+          "const": "containerOutsideSelection",
+          "description": "The target definition is outside the producer's active filter.",
+          "type": "string"
+        },
+        {
+          "const": "containerUnavailable",
+          "description": "The original selected inventory definition is unavailable.",
+          "type": "string"
+        },
+        {
+          "const": "missingCapacity",
+          "description": "The selected definition supplies no capacity operand.",
+          "type": "string"
+        },
+        {
+          "const": "unreadableCapacity",
+          "description": "Original operands could not be read.",
+          "type": "string"
+        },
+        {
+          "const": "unsupportedCapacity",
+          "description": "The authored storage policy or units are unsupported.",
+          "type": "string"
+        },
+        {
+          "const": "invalidCapacity",
+          "description": "Authored operands cannot represent a valid capacity.",
+          "type": "string"
+        }
       ],
-      "type": "string",
       "x-p4kx-vocabularyClass": "control"
     },
     "CargoBoxSizesOfResourceFloat32": {
@@ -4828,6 +4880,7 @@
       "type": "object"
     },
     "CargoGridCapacity": {
+      "description": "Sourced capacity and the exact authored storage identities.",
       "properties": {
         "containerRecordIndex": {
           "anyOf": [
@@ -23231,7 +23284,7 @@
       "description": "Concrete authored storage policy.",
       "oneOf": [
         {
-          "description": "The authored open storage grid and its independent restrictions.",
+          "description": "Original open inventory storage policy.",
           "properties": {
             "additionalFields": {
               "$ref": "#/$defs/SourceArenaOutput"
@@ -23288,13 +23341,14 @@
           "type": "object"
         },
         {
-          "description": "Concrete source type and the original members outside its typed fields.",
+          "description": "Original closed inventory storage policy.",
           "properties": {
             "additionalFields": {
               "$ref": "#/$defs/SourceArenaOutput"
             },
             "capacity": {
-              "$ref": "#/$defs/SourcedValueOfResourceCapacity"
+              "$ref": "#/$defs/SourcedValueOfResourceCapacity",
+              "description": "Stored cargo capacity and unit."
             },
             "kind": {
               "const": "closed",
@@ -23313,7 +23367,7 @@
           "type": "object"
         },
         {
-          "description": "Concrete source type and the original members outside its typed fields.",
+          "description": "Unspecialized inventory source declaration.",
           "properties": {
             "additionalFields": {
               "$ref": "#/$defs/SourceArenaOutput"
@@ -23334,7 +23388,7 @@
           "type": "object"
         },
         {
-          "description": "Concrete source type and the original members outside its typed fields.",
+          "description": "A concrete source type outside the known open and closed policies.",
           "properties": {
             "additionalFields": {
               "$ref": "#/$defs/SourceArenaOutput"

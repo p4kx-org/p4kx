@@ -158,7 +158,7 @@ pub(crate) mod catalog_entity_configurations;
 #[path = "catalog_explosives.rs"]
 pub(crate) mod catalog_explosives;
 #[path = "catalog_facility.rs"]
-mod catalog_facility;
+pub(crate) mod catalog_facility;
 #[path = "catalog_fuel.rs"]
 mod catalog_fuel;
 #[path = "catalog_fuel_configurations.rs"]
@@ -249,7 +249,7 @@ mod interaction_task;
 #[path = "inventory_container_definition.rs"]
 pub(crate) mod inventory_container_definition;
 #[path = "inventory_container_type.rs"]
-mod inventory_container_type;
+pub(crate) mod inventory_container_type;
 #[path = "inventory_dimensions.rs"]
 pub(crate) mod inventory_dimensions;
 #[path = "inventory_entity_configurations.rs"]
@@ -259,13 +259,13 @@ mod inventory_grid_cell;
 #[path = "inventory_item_occupancy.rs"]
 pub(crate) mod inventory_item_occupancy;
 #[path = "inventory_item_type_filter.rs"]
-mod inventory_item_type_filter;
+pub(crate) mod inventory_item_type_filter;
 #[path = "inventory_open_container.rs"]
-mod inventory_open_container;
+pub(crate) mod inventory_open_container;
 #[path = "inventory_owner_bounds.rs"]
 pub(crate) mod inventory_owner_bounds;
 #[path = "inventory_owner_storage.rs"]
-mod inventory_owner_storage;
+pub(crate) mod inventory_owner_storage;
 #[path = "item_alignment_options.rs"]
 mod item_alignment_options;
 #[path = "item_component_owner.rs"]

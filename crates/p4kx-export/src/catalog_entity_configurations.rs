@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{DataForge, SourceUses, StructValue};
+use p4kx_extraction::{CancelToken, DataForge, Filter, SourceUses, StructValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -33,12 +33,13 @@ use crate::catalog_rows::staged::{OrderedComponentRows, StagedCatalogTable};
 use crate::catalog_table::CatalogTable;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
-use crate::{CatalogError, CatalogOptions, ExportAccountingError};
+use crate::{CatalogError, ExportAccountingError};
 
 #[path = "catalog_configuration_record_read.rs"]
 mod record_read;
 pub(crate) use record_read::{
-    read, read_attachment_constraints, read_item_bounds, read_item_ports, read_item_ports_scoped,
+    read, read_attachment_constraints, read_cargo_configurations, read_item_bounds,
+    read_item_ports, read_item_ports_scoped,
 };
 
 #[derive(Default)]
@@ -174,12 +175,36 @@ impl<'source> EntityConfigurationRows<'source> {
         self.inventory.stage_bounds(staging)
     }
 
-    pub(super) fn resolve_cargo_capacities(
+    pub(crate) const fn has_cargo_grids(&self) -> bool {
+        !self.cargo_owners.is_empty()
+    }
+
+    pub(crate) fn cargo_container_index(
+        &self,
+        forge: &DataForge<'_>,
+    ) -> Result<Option<u32>, CatalogError> {
+        let [owner] = self.cargo_owners.as_slice() else {
+            return Err(ExportAccountingError::ConflictingSourceDatum.into());
+        };
+        catalog_facility::cargo_target_for_owner(owner, self.inventory.item_storage(), forge)
+    }
+
+    pub(crate) fn into_cargo_rows(
+        self,
+    ) -> (
+        Vec<Facility<'source>>,
+        Vec<inventory_owner_storage::InventoryOwnerStorage<'source>>,
+    ) {
+        (self.facilities, self.inventory.into_storage())
+    }
+
+    pub(crate) fn resolve_cargo_capacities(
         &mut self,
         forge: &DataForge<'_>,
         containers: &[PreparedInventoryContainer<'source>],
         sources: &SourceUses,
-        options: &CatalogOptions<'_>,
+        filter: Option<&Filter>,
+        cancel: Option<&CancelToken>,
     ) -> Result<(), CatalogError> {
         catalog_facility::project_cargo_capacity(
             &mut self.facilities,
@@ -188,7 +213,7 @@ impl<'source> EntityConfigurationRows<'source> {
             containers,
             forge,
             sources,
-            options,
+            (filter, cancel),
         )
     }
 

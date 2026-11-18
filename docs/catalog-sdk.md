@@ -677,3 +677,17 @@ The result carries Build, original provenance and selected-scope coverage. Check
 `coverage.is_complete()` before treating an empty row list as a confirmed absence. Root availability,
 Entry failures, malformed or blocked routes and caller-selected traversal allowances remain visible
 even if the query could emit some rows.
+
+## Cargo Grid configurations
+
+Use `equipment::with_cargo_grids`, its decoded-Entry form or the equivalent session methods with one
+physical Entity Record index. The snapshot returns the Cargo Grid rows of
+`configurations.facilities`, the co-owned item storage rows and the one original
+`definitions.inventoryContainers` row consulted by the capacity calculation. The capacity uses the
+same original operands, states and provenance as the complete Catalog. Owner and dependency coverage
+are reported separately. Before caching a capacity, check its typed status and source-set
+completeness as well as coverage. The original Reference and capacity status describe candidates
+rejected before a dependency body read.
+
+This query covers authored configuration and the reached inventory definition. Installed ship
+totals and `placements.facilityInstances` use the global Loadout order and a separate projection.

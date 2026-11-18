@@ -13,6 +13,8 @@ use crate::health_origin_assertions as proof;
 
 #[path = "catalog_facility_cargo_grid_filter.rs"]
 mod filter;
+#[path = "catalog_facility_cargo_grid_sdk.rs"]
+mod sdk;
 
 const FACILITIES: &str = "/configurations/facilities/rows";
 const INVENTORY_CONFIGURATIONS: &str = "/configurations/inventoryConfigurations/rows";

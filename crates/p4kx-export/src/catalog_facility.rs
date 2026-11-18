@@ -16,13 +16,19 @@ use crate::source_fields::FieldError;
 
 #[path = "facility_cargo_capacity.rs"]
 mod capacity;
-pub(super) use capacity::{CargoGridCapacity, OwnerComponents, project as project_cargo_capacity};
+pub use capacity::{CapacityStatus, CargoGridCapacity};
+pub(super) use capacity::{
+    OwnerComponents, project as project_cargo_capacity, target_for_owner as cargo_target_for_owner,
+};
+pub use cargo_grid::CargoGrid;
 #[path = "facility_cargo_grid.rs"]
 mod cargo_grid;
 #[path = "facility_logout.rs"]
 mod logout;
 #[path = "facility_outfit_hanger.rs"]
 mod outfit_hanger;
+
+pub(crate) const CARGO_GRID_SOURCE_TYPE: &str = cargo_grid::COMPONENT;
 
 pub(super) const SOURCE_TYPES: &[&str] = &[
     catalog_seat::COMPONENT,
@@ -58,7 +64,7 @@ impl FacilityKind {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct Facility<'source> {
+pub struct Facility<'source> {
     #[serde(flatten)]
     owner: ComponentOwner,
     source_type: SourcedValue<&'source str>,
@@ -71,7 +77,7 @@ pub(super) struct Facility<'source> {
 enum FacilityFields<'source> {
     Seat(Box<Seat<'source>>),
     MedBed(Box<MedBed<'source>>),
-    CargoGrid(Box<cargo_grid::CargoGrid<'source>>),
+    CargoGrid(Box<CargoGrid<'source>>),
     Logout(Box<logout::Logout<'source>>),
     OutfitHanger(Box<outfit_hanger::OutfitHanger<'source>>),
 }
@@ -81,8 +87,19 @@ impl<'source> Facility<'source> {
         matches!(self.fields, FacilityFields::CargoGrid(_))
     }
 
-    pub(super) const fn source_type(&self) -> &SourcedValue<&'source str> {
+    /// Borrows the sourced kind declaration of this facility.
+    #[must_use]
+    pub const fn source_type(&self) -> &SourcedValue<&'source str> {
         &self.source_type
+    }
+
+    /// Borrows the authored Cargo Grid configuration when this facility represents a Grid.
+    #[must_use]
+    pub fn cargo_grid_fields(&self) -> Option<&CargoGrid<'source>> {
+        match &self.fields {
+            FacilityFields::CargoGrid(grid) => Some(grid),
+            _ => None,
+        }
     }
 
     pub(super) fn set_cargo_capacity(
@@ -115,7 +132,7 @@ impl<'source> Facility<'source> {
                 outfit_hanger::OutfitHanger::read(source, notes)?,
             )),
             FacilityKind::CargoGrid => {
-                FacilityFields::CargoGrid(Box::new(cargo_grid::CargoGrid::read(source, notes)?))
+                FacilityFields::CargoGrid(Box::new(CargoGrid::read(source, notes)?))
             }
         };
         Ok(Self {
@@ -125,7 +142,9 @@ impl<'source> Facility<'source> {
         })
     }
 
-    pub(super) const fn owner(&self) -> &ComponentOwner {
+    /// Borrows the original physical owner and component coordinates.
+    #[must_use]
+    pub const fn owner(&self) -> &ComponentOwner {
         &self.owner
     }
 }

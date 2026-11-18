@@ -109,6 +109,7 @@ impl<'query> Query<'query> {
             AlignmentOptions::default()
         };
         let rows = project::<P>(
+            self.forge,
             plan.owners,
             &projection,
             &options,
@@ -156,7 +157,7 @@ impl<'query> Query<'query> {
                 self.cancel,
                 observer,
             )?,
-            Family::Attachments | Family::Bounds => {
+            Family::Attachments | Family::Bounds | Family::CargoGrids => {
                 Plan::read_entities(self.forge, self.selection, self.cancel, observer)?
             }
         };
@@ -181,11 +182,14 @@ fn order(family: Family, owners: &mut [Owner<'_>]) {
                 owner.record.index(),
             )
         }),
-        Family::Attachments | Family::Bounds => owners.sort_by_key(|owner| owner.record.index()),
+        Family::Attachments | Family::Bounds | Family::CargoGrids => {
+            owners.sort_by_key(|owner| owner.record.index());
+        }
     }
 }
 
 fn project<'source, P: Projector>(
+    forge: &'source DataForge<'source>,
     owners: Vec<Owner<'source>>,
     projection: &CatalogProjection<'_, 'source>,
     options: &AlignmentOptions<'_>,
@@ -196,7 +200,7 @@ fn project<'source, P: Projector>(
     for owner in owners {
         checkpoint(cancel)?;
         let admission = RecordObservation::capture(projection.original(), &owner.record)?;
-        let read = P::read(&owner.tree, projection, &admission, options, cancel)?;
+        let read = P::read(forge, &owner.tree, projection, &admission, options, cancel)?;
         if !read.selection_complete
             || read
                 .notes

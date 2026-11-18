@@ -20,21 +20,31 @@ pub(super) const BASE: &str = "InventoryContainerTypeBase";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) enum InventoryContainerType<'source> {
+#[non_exhaustive]
+pub enum InventoryContainerType<'source> {
+    /// Original open inventory storage policy.
     Open {
+        /// Typed open-container parameters.
         #[serde(flatten)]
         source: Box<InventoryOpenContainer<'source>>,
     },
+    /// Original closed inventory storage policy.
     Closed {
+        /// Authored source representation.
         #[serde(flatten)]
         source: UnitSource<'source>,
+        /// Stored cargo capacity and unit.
         capacity: SourcedValue<ResourceCapacity<'source>>,
     },
+    /// Unspecialized inventory source declaration.
     Base {
+        /// Authored source representation.
         #[serde(flatten)]
         source: UnitSource<'source>,
     },
+    /// A concrete source type outside the known open and closed policies.
     UnknownType {
+        /// Authored source representation.
         #[serde(flatten)]
         source: UnitSource<'source>,
     },

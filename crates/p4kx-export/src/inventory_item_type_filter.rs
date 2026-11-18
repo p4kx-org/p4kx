@@ -17,7 +17,7 @@ pub(super) const SOURCE_TYPE: &str = "InventoryContainerItemTypeFilter";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct InventoryItemTypeFilter<'source> {
+pub struct InventoryItemTypeFilter<'source> {
     #[serde(flatten)]
     source: UnitSource<'source>,
     item_type: SourcedValue<&'source str>,
@@ -25,6 +25,24 @@ pub(super) struct InventoryItemTypeFilter<'source> {
 }
 
 impl<'source> InventoryItemTypeFilter<'source> {
+    /// Borrows the original filter declaration.
+    #[must_use]
+    pub const fn source(&self) -> &UnitSource<'source> {
+        &self.source
+    }
+
+    /// Borrows the original item type.
+    #[must_use]
+    pub const fn item_type(&self) -> &SourcedValue<&'source str> {
+        &self.item_type
+    }
+
+    /// Borrows the ordered original subtypes.
+    #[must_use]
+    pub const fn item_sub_types(&self) -> &SourcedValue<Vec<SourcedValue<&'source str>>> {
+        &self.item_sub_types
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

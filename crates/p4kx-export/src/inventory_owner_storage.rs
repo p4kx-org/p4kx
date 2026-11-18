@@ -25,7 +25,7 @@ type InteractionLink<'source> = SourcedValue<Box<SourceWeakReference<'source>>>;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct InventoryOwnerStorage<'source> {
+pub struct InventoryOwnerStorage<'source> {
     #[serde(flatten)]
     pub(super) owner: ComponentOwner,
     source_type: SourcedValue<&'source str>,
@@ -60,14 +60,26 @@ struct ItemStorage<'source> {
 }
 
 impl<'source> InventoryOwnerStorage<'source> {
-    pub(super) const fn item_container_params(&self) -> Option<&ContainerLink<'source>> {
+    /// Borrows the actual physical storage component owner.
+    #[must_use]
+    pub const fn owner(&self) -> &ComponentOwner {
+        &self.owner
+    }
+
+    /// Borrows the original container Reference when this is item storage.
+    #[must_use]
+    pub const fn item_container_params(
+        &self,
+    ) -> Option<&SourcedValue<Box<SourceRecordReference<'source>>>> {
         match &self.fields {
             StorageFields::ItemStorage(storage) => Some(&storage.container_params),
             StorageFields::VehicleStorage { .. } => None,
         }
     }
 
-    pub(super) const fn source_type(&self) -> &SourcedValue<&'source str> {
+    /// Borrows the physical component's authored type.
+    #[must_use]
+    pub const fn source_type(&self) -> &SourcedValue<&'source str> {
         &self.source_type
     }
 

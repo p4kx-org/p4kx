@@ -7,6 +7,7 @@ use super::super::{ConfigurationKind, EntityConfigurationRows};
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_v3::authored_fields::Observed;
+use crate::catalog_v3::catalog_facility::{CARGO_GRID_SOURCE_TYPE, FacilityKind};
 use crate::catalog_v3::catalog_item_alignment::{
     ATTACHABLE, AttachmentTarget, CONTAINER, ItemAlignmentKind, attachment_target,
 };
@@ -21,6 +22,7 @@ pub(super) enum Scope {
     Ports,
     Attachments,
     Bounds,
+    CargoGrids,
 }
 
 pub(super) struct ConfigurationOwner {
@@ -44,6 +46,13 @@ impl Scope {
         self.accepts(kind).then_some(kind)
     }
 
+    pub(super) fn includes_owner(self, components: &[Value<'_>]) -> bool {
+        !matches!(self, Self::CargoGrids)
+            || components.iter().any(|slot| {
+                matches!(slot, Value::Struct(component) if component.type_name() == CARGO_GRID_SOURCE_TYPE)
+            })
+    }
+
     const fn accepts(self, kind: ConfigurationKind) -> bool {
         match self {
             Self::All => true,
@@ -61,6 +70,11 @@ impl Scope {
                     ..
                 } | ConfigurationKind::RoomAssociations
                     | ConfigurationKind::ObjectMetadataBounds
+            ),
+            Self::CargoGrids => matches!(
+                kind,
+                ConfigurationKind::Facility(FacilityKind::CargoGrid)
+                    | ConfigurationKind::InventoryStorage
             ),
             Self::Ports => false,
         }
@@ -88,11 +102,13 @@ impl Scope {
             let complete = match value {
                 Value::Error(_) => false,
                 Value::Struct(component)
-                    if !matches!(self, Self::Ports) && component.type_name() == ATTACHABLE =>
+                    if matches!(self, Self::Attachments | Self::Bounds)
+                        && component.type_name() == ATTACHABLE =>
                 {
                     self.attachment_complete(component, input)
                 }
-                _ => true,
+                Value::Struct(_) | Value::Null => true,
+                _ => !matches!(self, Self::CargoGrids),
             };
             if !complete {
                 return Ok(false);
@@ -133,7 +149,7 @@ impl Scope {
             owner,
         } = selected;
         match self {
-            Self::All => {
+            Self::All | Self::CargoGrids => {
                 rows.push_configuration(configuration, owner, source, options, projection, notes)
             }
             Self::Ports | Self::Attachments => {

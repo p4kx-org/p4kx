@@ -87,6 +87,23 @@ pub(crate) fn read_item_bounds<'source>(
     Ok(read.map(|rows| rows.inventory.into_bounds()))
 }
 
+pub(crate) fn read_cargo_configurations<'source>(
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    options: &AlignmentOptions<'_>,
+    cancel: Option<&CancelToken>,
+) -> Result<ScopedSourceRead<EntityConfigurationRows<'source>>, CatalogError> {
+    read_scope(
+        tree,
+        projection,
+        admission,
+        options,
+        cancel,
+        Scope::CargoGrids,
+    )
+}
+
 fn read_scope<'source>(
     tree: &RecordTree<'source>,
     projection: &CatalogProjection<'_, 'source>,
@@ -160,6 +177,9 @@ fn selected_components<'scope, 'source>(
     let authored @ Value::Array(components) = tree.field("Components")? else {
         return None;
     };
+    if !requested.includes_owner(components) {
+        return None;
+    }
     let selected = components.iter().filter_map(move |component| {
         let Value::Struct(value) = component else {
             return None;

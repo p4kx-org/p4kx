@@ -79,7 +79,8 @@ impl<'source> Collected<'source> {
             forge,
             &self.inventory_containers,
             &origins.uses,
-            options,
+            options.filter,
+            options.cancel,
         )?;
         let cancel = options.cancel;
         run.begin(CatalogStage::ProjectFacilityLoadouts);

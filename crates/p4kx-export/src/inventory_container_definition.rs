@@ -29,7 +29,7 @@ pub(crate) const SOURCE_TYPE: &str = "InventoryContainer";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct InventoryContainerDefinition<'source> {
+pub struct InventoryContainerDefinition<'source> {
     #[serde(flatten)]
     source: CanonicalRecordHeader<'source>,
     excluded_item_sub_types: SourcedValue<Vec<SourcedValue<InventoryItemTypeFilter<'source>>>>,
@@ -47,16 +47,52 @@ pub(crate) struct PreparedInventoryContainer<'source> {
 }
 
 impl<'source> PreparedInventoryContainer<'source> {
+    pub(crate) fn into_definition(self) -> InventoryContainerDefinition<'source> {
+        self.definition
+    }
+
     pub(super) const fn inventory_type(&self) -> &SourcedValue<InventoryContainerType<'source>> {
-        &self.definition.inventory_type
+        self.definition.inventory_type()
     }
 
     pub(super) const fn interior_dimensions(&self) -> &SourcedValue<InventoryVector3<'source>> {
-        &self.definition.interior_dimensions
+        self.definition.interior_dimensions()
     }
 }
 
 impl<'source> InventoryContainerDefinition<'source> {
+    /// Borrows the original physical definition header.
+    #[must_use]
+    pub const fn source(&self) -> &CanonicalRecordHeader<'source> {
+        &self.source
+    }
+
+    /// Borrows the original ordered item-type restrictions.
+    #[must_use]
+    pub const fn excluded_item_sub_types(
+        &self,
+    ) -> &SourcedValue<Vec<SourcedValue<InventoryItemTypeFilter<'source>>>> {
+        &self.excluded_item_sub_types
+    }
+
+    /// Borrows the original interior dimensions.
+    #[must_use]
+    pub const fn interior_dimensions(&self) -> &SourcedValue<InventoryVector3<'source>> {
+        &self.interior_dimensions
+    }
+
+    /// Borrows the original concrete inventory policy.
+    #[must_use]
+    pub const fn inventory_type(&self) -> &SourcedValue<InventoryContainerType<'source>> {
+        &self.inventory_type
+    }
+
+    /// Borrows other authored values on this physical definition.
+    #[must_use]
+    pub const fn additional_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.additional_fields
+    }
+
     fn read(
         header: CanonicalRecordHeader<'source>,
         source: Observed<'_, '_, '_, 'source>,
@@ -134,6 +170,8 @@ pub(crate) fn table<'source>(
     CatalogTable::new(
         forge,
         &[SOURCE_TYPE],
-        rows.into_iter().map(|row| row.definition).collect(),
+        rows.into_iter()
+            .map(PreparedInventoryContainer::into_definition)
+            .collect(),
     )
 }

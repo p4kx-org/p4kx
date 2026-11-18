@@ -4,134 +4,116 @@
 use std::collections::HashMap;
 
 use p4kx_extraction::{
-    CancelToken, DataForge, FieldOrigin, Filter, SourceUse, SourceUseRole, SourceUses, SourceValue,
-    SourceValueState, SourcedValue, Value,
+    CancelToken, DataForge, FieldOrigin, Filter, SourceUses, SourceValue, SourceValueState,
+    SourcedValue,
 };
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use super::{Facility, FacilityKind};
-use crate::catalog_read::original::{OriginalFlowFields, OriginalValuePart};
+use super::Facility;
 use crate::catalog_v3::inventory_container_definition::{self, PreparedInventoryContainer};
-use crate::catalog_v3::inventory_owner_storage::{self, InventoryOwnerStorage};
+use crate::catalog_v3::inventory_owner_storage::InventoryOwnerStorage;
 use crate::schema_fields::every_field_required;
 use crate::source_value_catalog::SourceRecordReference;
-use crate::{CatalogError, CatalogOptions, ExportAccountingError};
+use crate::{CatalogError, ExportAccountingError};
 
 #[path = "facility_cargo_operands.rs"]
 mod operands;
+#[path = "facility_cargo_owner.rs"]
+mod owner;
+
+pub(in crate::catalog_v3) use owner::OwnerComponents;
+use owner::StorageSelection;
 
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(in crate::catalog_v3) struct CargoGridCapacity {
+/// Sourced capacity and the exact authored storage identities.
+pub struct CargoGridCapacity {
     storage_component_ordinal: Option<SourcedValue<u32>>,
     container_record_index: Option<SourcedValue<u32>>,
     status: CapacityStatus,
     scu: SourcedValue<f64>,
 }
 
+/// Outcome of the original Cargo Grid capacity projection.
 #[derive(Debug, Clone, Copy, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
-enum CapacityStatus {
+#[non_exhaustive]
+pub enum CapacityStatus {
+    /// Capacity was computed from the original inventory definition.
     Available,
+    /// The original Component slots cannot establish the storage selection.
     OwnerComponentsUnreadable,
+    /// Several original Grid or Storage slots compete.
     AmbiguousComponents,
+    /// The owner has no item storage component.
     MissingStorageComponent,
+    /// The selected storage has no authored container Reference.
     MissingContainerReference,
+    /// The authored Reference cannot select an inventory definition.
     UnresolvedContainerReference,
+    /// The nominal GUID names several physical Records.
     AmbiguousContainerReference,
+    /// The target definition is outside the producer's active filter.
     ContainerOutsideSelection,
+    /// The original selected inventory definition is unavailable.
     ContainerUnavailable,
+    /// The selected definition supplies no capacity operand.
     MissingCapacity,
+    /// Original operands could not be read.
     UnreadableCapacity,
+    /// The authored storage policy or units are unsupported.
     UnsupportedCapacity,
+    /// Authored operands cannot represent a valid capacity.
     InvalidCapacity,
 }
 
-pub(in crate::catalog_v3) struct OwnerComponents {
-    record: u32,
-    storage: StorageSelection,
-    origin: FieldOrigin,
-}
-
-#[derive(Clone, Copy)]
-enum StorageSelection {
-    Unique(usize),
-    Missing,
-    Ambiguous,
-    Unreadable,
-}
-
-impl OwnerComponents {
-    pub(in crate::catalog_v3) fn read(
-        record: u32,
-        originals: &OriginalFlowFields<'_, '_, '_>,
-        components: &Value<'_>,
-    ) -> Result<Self, CatalogError> {
-        let fact = originals.fact(components)?;
-        originals.span(fact)?;
-        let Value::Array(slots) = fact.value() else {
-            return Err(ExportAccountingError::ConflictingSourceDatum.into());
-        };
-        let mut selectors = vec![fact.observe(OriginalValuePart::Value, SourceUseRole::Selector)?];
-        let storage = Self::select_storage(originals, slots, &mut selectors)?;
-        let origin = originals
-            .sources()
-            .origin(&selectors, !matches!(storage, StorageSelection::Unreadable));
-        Ok(Self {
-            record,
-            storage,
-            origin,
-        })
+impl CargoGridCapacity {
+    /// Returns the exact storage component ordinal established by the original selection.
+    #[must_use]
+    pub const fn storage_component_ordinal(&self) -> Option<&SourcedValue<u32>> {
+        self.storage_component_ordinal.as_ref()
     }
 
-    fn select_storage(
-        originals: &OriginalFlowFields<'_, '_, '_>,
-        slots: &[Value<'_>],
-        selectors: &mut Vec<SourceUse>,
-    ) -> Result<StorageSelection, CatalogError> {
-        let mut grid = false;
-        let mut storage = None;
-        let mut unreadable = false;
-        for (ordinal, slot) in slots.iter().enumerate() {
-            originals.check_cancel()?;
-            let fact = originals.fact(slot)?;
-            match slot {
-                Value::Struct(component) => {
-                    selectors.push(
-                        fact.observe(OriginalValuePart::ConcreteType, SourceUseRole::Selector)?,
-                    );
-                    let source_type = component.type_name();
-                    if source_type == inventory_owner_storage::ITEM_COMPONENT {
-                        if storage.replace(ordinal).is_some() {
-                            return Ok(StorageSelection::Ambiguous);
-                        }
-                    } else if matches!(FacilityKind::of(source_type), Some(FacilityKind::CargoGrid))
-                    {
-                        if grid {
-                            return Ok(StorageSelection::Ambiguous);
-                        }
-                        grid = true;
-                    }
-                }
-                Value::Null => {
-                    selectors
-                        .push(fact.observe(OriginalValuePart::Value, SourceUseRole::Selector)?);
-                }
-                _ => {
-                    selectors
-                        .push(fact.observe(OriginalValuePart::Value, SourceUseRole::Attempted)?);
-                    unreadable = true;
-                }
-            }
-        }
-        if unreadable {
-            return Ok(StorageSelection::Unreadable);
-        }
-        Ok(storage.map_or(StorageSelection::Missing, StorageSelection::Unique))
+    /// Returns the physical inventory Record link established by the original selection.
+    #[must_use]
+    pub const fn container_record_index(&self) -> Option<&SourcedValue<u32>> {
+        self.container_record_index.as_ref()
     }
+
+    /// Returns the recorded capacity outcome.
+    #[must_use]
+    pub const fn status(&self) -> CapacityStatus {
+        self.status
+    }
+
+    /// Returns the sourced numerical capacity in standard cargo units.
+    #[must_use]
+    pub const fn scu(&self) -> &SourcedValue<f64> {
+        &self.scu
+    }
+}
+
+pub(in crate::catalog_v3) fn target_for_owner<'rows, 'source: 'rows>(
+    owner: &OwnerComponents,
+    mut storages: impl Iterator<Item = &'rows InventoryOwnerStorage<'source>>,
+    forge: &DataForge<'_>,
+) -> Result<Option<u32>, CatalogError> {
+    let StorageSelection::Unique(ordinal) = owner.storage else {
+        return Ok(None);
+    };
+    let ordinal = u32::try_from(ordinal).map_err(|_| ExportAccountingError::CounterOverflow)?;
+    let storage = storages
+        .find(|row| row.owner.key() == (Some(owner.record), Some(ordinal)))
+        .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+    let reference = storage
+        .item_container_params()
+        .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+    Ok(reference
+        .value()
+        .and_then(|reference| container_record(forge, reference, None).ok()))
 }
 
 pub(in crate::catalog_v3) fn project<'rows, 'source: 'rows>(
@@ -141,21 +123,21 @@ pub(in crate::catalog_v3) fn project<'rows, 'source: 'rows>(
     definitions: &[PreparedInventoryContainer<'source>],
     forge: &DataForge<'_>,
     sources: &SourceUses,
-    options: &CatalogOptions<'_>,
+    (filter, cancel): (Option<&Filter>, Option<&CancelToken>),
 ) -> Result<(), CatalogError> {
     if components.is_empty() {
         return Ok(());
     }
     let mut owners = HashMap::new();
     for component in components {
-        check_cancel(options.cancel)?;
+        check_cancel(cancel)?;
         if owners.insert(component.record, component).is_some() {
             return Err(ExportAccountingError::ConflictingSourceDatum.into());
         }
     }
     let mut storage = HashMap::new();
     for row in storages {
-        check_cancel(options.cancel)?;
+        check_cancel(cancel)?;
         let (Some(record), Some(ordinal)) = row.owner.key() else {
             return Err(ExportAccountingError::ConflictingSourceDatum.into());
         };
@@ -165,7 +147,7 @@ pub(in crate::catalog_v3) fn project<'rows, 'source: 'rows>(
     }
     let mut containers = HashMap::new();
     for definition in definitions {
-        check_cancel(options.cancel)?;
+        check_cancel(cancel)?;
         if containers
             .insert(definition.physical_index, definition)
             .is_some()
@@ -176,7 +158,7 @@ pub(in crate::catalog_v3) fn project<'rows, 'source: 'rows>(
     let inputs = Inputs {
         forge,
         sources,
-        filter: options.filter,
+        filter,
         storage,
         containers,
     };
@@ -184,7 +166,7 @@ pub(in crate::catalog_v3) fn project<'rows, 'source: 'rows>(
         .iter_mut()
         .filter(|facility| facility.cargo_grid())
     {
-        check_cancel(options.cancel)?;
+        check_cancel(cancel)?;
         let index = grid
             .owner()
             .key()
@@ -213,7 +195,7 @@ struct Binding<'rows> {
     container: Option<&'rows SourcedValue<u32>>,
 }
 
-impl<'source> Inputs<'_, 'source, '_> {
+impl Inputs<'_, '_, '_> {
     fn capacity(
         &self,
         grid: &Facility<'_>,
@@ -283,8 +265,13 @@ impl<'source> Inputs<'_, 'source, '_> {
         reference: &'read SourceRecordReference<'_>,
         mut binding: Binding<'read>,
     ) -> Result<CargoGridCapacity, CatalogError> {
-        match self.target(reference) {
-            Target::Definition(definition) => {
+        let definition = container_record(self.forge, reference, self.filter).and_then(|index| {
+            self.containers
+                .get(&index)
+                .ok_or(CapacityStatus::ContainerUnavailable)
+        });
+        match definition {
+            Ok(definition) => {
                 binding.record(reference, self.filter.is_some());
                 let value = operands::calculate(definition, &mut binding.origins);
                 let status = match value {
@@ -296,57 +283,54 @@ impl<'source> Inputs<'_, 'source, '_> {
                 };
                 binding.finish(self.sources, status, value)
             }
-            Target::MissingDefinition(status) => {
-                binding.record(reference, self.filter.is_some());
-                binding.finish(self.sources, status, SourceValue::Unreadable)
+            Err(status) => {
+                if matches!(
+                    status,
+                    CapacityStatus::ContainerUnavailable
+                        | CapacityStatus::ContainerOutsideSelection
+                ) {
+                    binding.record(reference, self.filter.is_some());
+                }
+                let value = if matches!(status, CapacityStatus::AmbiguousContainerReference) {
+                    SourceValue::Invalid
+                } else {
+                    SourceValue::Unreadable
+                };
+                binding.finish(self.sources, status, value)
             }
-            Target::Unresolved => binding.finish(
-                self.sources,
-                CapacityStatus::UnresolvedContainerReference,
-                SourceValue::Unreadable,
-            ),
-            Target::Ambiguous => binding.finish(
-                self.sources,
-                CapacityStatus::AmbiguousContainerReference,
-                SourceValue::Invalid,
-            ),
         }
-    }
-
-    fn target(&self, reference: &SourceRecordReference<'_>) -> Target<'_, 'source> {
-        let Some(guid) = reference.guid.value() else {
-            return Target::Unresolved;
-        };
-        let mut matches = self.forge.records_by_guid(guid.0);
-        let Some(record) = matches.next() else {
-            return Target::Unresolved;
-        };
-        if matches.next().is_some() {
-            return Target::Ambiguous;
-        }
-        if reference.resolved_index() != Some(record.index())
-            || record.type_name() != Ok(inventory_container_definition::SOURCE_TYPE)
-        {
-            return Target::Unresolved;
-        }
-        let Some(&path) = reference.record_path.value() else {
-            return Target::MissingDefinition(CapacityStatus::ContainerUnavailable);
-        };
-        if self.filter.is_some_and(|filter| !filter.matches(path)) {
-            return Target::MissingDefinition(CapacityStatus::ContainerOutsideSelection);
-        }
-        self.containers.get(&record.index()).copied().map_or(
-            Target::MissingDefinition(CapacityStatus::ContainerUnavailable),
-            Target::Definition,
-        )
     }
 }
 
-enum Target<'rows, 'source> {
-    Definition(&'rows PreparedInventoryContainer<'source>),
-    MissingDefinition(CapacityStatus),
-    Unresolved,
-    Ambiguous,
+fn container_record(
+    forge: &DataForge<'_>,
+    reference: &SourceRecordReference<'_>,
+    filter: Option<&Filter>,
+) -> Result<u32, CapacityStatus> {
+    let guid = reference
+        .guid
+        .value()
+        .ok_or(CapacityStatus::UnresolvedContainerReference)?;
+    let mut matches = forge.records_by_guid(guid.0);
+    let record = matches
+        .next()
+        .ok_or(CapacityStatus::UnresolvedContainerReference)?;
+    if matches.next().is_some() {
+        return Err(CapacityStatus::AmbiguousContainerReference);
+    }
+    if reference.resolved_index() != Some(record.index())
+        || record.type_name() != Ok(inventory_container_definition::SOURCE_TYPE)
+    {
+        return Err(CapacityStatus::UnresolvedContainerReference);
+    }
+    let path = reference
+        .record_path
+        .value()
+        .ok_or(CapacityStatus::ContainerUnavailable)?;
+    if filter.is_some_and(|filter| !filter.matches(path)) {
+        return Err(CapacityStatus::ContainerOutsideSelection);
+    }
+    Ok(record.index())
 }
 
 impl<'rows> Binding<'rows> {

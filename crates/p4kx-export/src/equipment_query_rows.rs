@@ -20,6 +20,7 @@ pub(super) enum Family {
     ItemSources,
     Attachments,
     Bounds,
+    CargoGrids,
 }
 
 impl Family {
@@ -35,6 +36,7 @@ impl Family {
             Self::Definitions | Self::ItemSources => &[p4kx_assembly::ENTITY_TYPE][..],
             Self::Attachments => &[ATTACHABLE][..],
             Self::Bounds => BOUNDS_SOURCE_TYPES,
+            Self::CargoGrids => &[crate::catalog_v3::catalog_facility::CARGO_GRID_SOURCE_TYPE],
         };
         DatasetAvailability::from_source_declarations(forge, |name| types.contains(&name))
     }
@@ -45,6 +47,7 @@ pub(super) trait Projector {
     const FAMILY: Family;
 
     fn read<'source>(
+        forge: &'source DataForge<'source>,
         tree: &RecordTree<'source>,
         projection: &CatalogProjection<'_, 'source>,
         admission: &RecordObservation<'_, 'source>,
@@ -57,12 +60,14 @@ pub(super) struct Definitions;
 pub(super) struct ItemSources;
 pub(super) struct Attachments;
 pub(super) struct Bounds;
+pub(super) struct CargoGrids;
 
 impl Projector for Definitions {
     type Row<'source> = ItemDefinition<'source>;
     const FAMILY: Family = Family::Definitions;
 
     fn read<'source>(
+        _: &'source DataForge<'source>,
         tree: &RecordTree<'source>,
         projection: &CatalogProjection<'_, 'source>,
         admission: &RecordObservation<'_, 'source>,
@@ -79,6 +84,7 @@ impl Projector for ItemSources {
     const FAMILY: Family = Family::ItemSources;
 
     fn read<'source>(
+        _: &'source DataForge<'source>,
         tree: &RecordTree<'source>,
         projection: &CatalogProjection<'_, 'source>,
         admission: &RecordObservation<'_, 'source>,
@@ -106,6 +112,7 @@ impl Projector for Attachments {
     const FAMILY: Family = Family::Attachments;
 
     fn read<'source>(
+        _: &'source DataForge<'source>,
         tree: &RecordTree<'source>,
         projection: &CatalogProjection<'_, 'source>,
         admission: &RecordObservation<'_, 'source>,
@@ -118,11 +125,28 @@ impl Projector for Attachments {
     }
 }
 
+impl Projector for CargoGrids {
+    type Row<'source> = super::cargo_read::CargoGridOwner<'source>;
+    const FAMILY: Family = Family::CargoGrids;
+
+    fn read<'source>(
+        forge: &'source DataForge<'source>,
+        tree: &RecordTree<'source>,
+        projection: &CatalogProjection<'_, 'source>,
+        admission: &RecordObservation<'_, 'source>,
+        options: &AlignmentOptions<'_>,
+        cancel: Option<&CancelToken>,
+    ) -> Result<ScopedSourceRead<Vec<Self::Row<'source>>>, CatalogError> {
+        super::cargo_read::read(forge, tree, projection, admission, options, cancel)
+    }
+}
+
 impl Projector for Bounds {
     type Row<'source> = InventoryOwnerBounds<'source>;
     const FAMILY: Family = Family::Bounds;
 
     fn read<'source>(
+        _: &'source DataForge<'source>,
         tree: &RecordTree<'source>,
         projection: &CatalogProjection<'_, 'source>,
         admission: &RecordObservation<'_, 'source>,

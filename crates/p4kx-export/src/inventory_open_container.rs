@@ -29,7 +29,7 @@ const OVERRIDES: &str = "overrideStorableItemTypes";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct InventoryOpenContainer<'source> {
+pub struct InventoryOpenContainer<'source> {
     #[serde(flatten)]
     source: UnitSource<'source>,
     grid_cell_size: SourcedValue<InventoryGridCellSize<'source>>,
@@ -44,6 +44,44 @@ pub(super) struct InventoryOpenContainer<'source> {
 }
 
 impl<'source> InventoryOpenContainer<'source> {
+    /// Borrows the original source and additional fields.
+    #[must_use]
+    pub const fn source(&self) -> &UnitSource<'source> {
+        &self.source
+    }
+
+    /// Borrows the authored lower item size bound.
+    #[must_use]
+    pub const fn min_permitted_item_size(&self) -> &SourcedValue<InventoryVector3<'source>> {
+        &self.min_permitted_item_size
+    }
+
+    /// Borrows the authored upper item size bound.
+    #[must_use]
+    pub const fn max_permitted_item_size(&self) -> &SourcedValue<InventoryVector3<'source>> {
+        &self.max_permitted_item_size
+    }
+
+    /// Borrows the authored grid offset.
+    #[must_use]
+    pub const fn grid_pos_offset(&self) -> &SourcedValue<InventoryVector3<'source>> {
+        &self.grid_pos_offset
+    }
+
+    /// Borrows the original external storage flag.
+    #[must_use]
+    pub const fn is_external_container(&self) -> &SourcedValue<bool> {
+        &self.is_external_container
+    }
+
+    /// Borrows the original storable item-type overrides.
+    #[must_use]
+    pub const fn override_storable_item_types(
+        &self,
+    ) -> &SourcedValue<Vec<SourcedValue<InventoryItemTypeFilter<'source>>>> {
+        &self.override_storable_item_types
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

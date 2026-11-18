@@ -25,6 +25,10 @@ pub use loadout_query::{
 mod attachments;
 #[path = "equipment_bounds_query.rs"]
 mod bounds;
+#[path = "equipment_cargo_query.rs"]
+mod cargo;
+#[path = "equipment_cargo_read.rs"]
+mod cargo_read;
 #[path = "equipment_item_query.rs"]
 mod definitions;
 #[path = "equipment_item_source_query.rs"]
@@ -56,6 +60,11 @@ pub use crate::catalog_v3::inventory_owner_bounds::{
 pub use crate::item::ItemSource;
 pub use attachments::{with_attachment_constraints, with_attachment_constraints_from};
 pub use bounds::{with_item_bounds, with_item_bounds_from};
+pub use cargo::{
+    CapacityStatus, CargoGrid, CargoGridCapacity, CargoGridOwner, CargoGridSnapshot, Facility,
+    InventoryContainerDefinition, InventoryContainerType, InventoryItemTypeFilter,
+    InventoryOpenContainer, InventoryOwnerStorage, with_cargo_grids, with_cargo_grids_from,
+};
 pub use definitions::{with_item_definitions, with_item_definitions_from};
 #[cfg(test)]
 pub(crate) use item_sources::observe_item_source_query;

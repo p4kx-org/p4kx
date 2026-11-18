@@ -38,6 +38,10 @@ impl<'source> InventoryEntityRows<'source> {
             .filter(|row| row.item_container_params().is_some())
     }
 
+    pub(super) fn into_storage(self) -> Vec<InventoryOwnerStorage<'source>> {
+        self.storage
+    }
+
     pub(super) fn storage_owners(&self) -> impl Iterator<Item = &ComponentOwner> {
         self.storage.iter().map(|row| &row.owner)
     }
