@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 //! The verification of M3 over real Archives: the whole catalog against the checked-in schema,
-//! plausible counts, no development leftovers, resolved texts and the upload limit; runs with
+//! plausible counts, no development leftovers, resolved texts and transport measurements; runs with
 //! `--ignored` when `P4KX_DATA_P4K` names one; the test of the second Channel returns early
 //! while `P4KX_DATA_P4K_B` is unset.
 
@@ -23,8 +23,8 @@ use std::path::Path;
 use std::time::SystemTime;
 
 use p4kx_export::{
-    CatalogOptions, CatalogSummary, Compression, DECOMPRESSED_LIMIT, EXCLUDED_TOKENS, Kind,
-    UPLOAD_LIMIT, catalog_schema, write_catalog,
+    CatalogOptions, CatalogSummary, Compression, EXCLUDED_TOKENS, Kind, catalog_schema,
+    write_catalog,
 };
 use p4kx_extraction::{Archive, DataForgeEntry};
 use p4kx_testkit::{real_archive_b_path, real_archive_path};
@@ -92,17 +92,13 @@ fn built(archive: &Archive) -> Result<(CatalogSummary, Value), Box<dyn Error>> {
         Compression::ZSTD,
         || Ok(Vec::new()),
     )?;
-    assert_eq!(
-        summary.compressed_size(),
-        Some(u64::try_from(frame.len())?),
-        "the compressed size is the frame size"
-    );
+
     let mut json = Vec::new();
     zstd::Decoder::new(frame.as_slice())?.read_to_end(&mut json)?;
-    assert_eq!(
-        summary.size(),
+    crate::real_archive::check_transport(
+        &summary,
         u64::try_from(json.len())?,
-        "the decompressed size"
+        Some(u64::try_from(frame.len())?),
     );
     let catalog = serde_json::from_slice(&json)?;
     Ok((summary, catalog))
@@ -221,24 +217,6 @@ fn verify_catalog(path: &Path, baselined: bool) -> Result<Value, Box<dyn Error>>
         definition_identity::check_original_explosions(&catalog, &forge)?;
         definition_identity::check_original_ammo(&catalog, &forge)?;
     }
-    assert_eq!(
-        summary.size_warning(),
-        None,
-        "the file is below 90 % of the upload limit of {UPLOAD_LIMIT} bytes"
-    );
-    assert_eq!(
-        summary.decompressed_warning(),
-        None,
-        "the catalog is below 90 % of the decompressed limit of {DECOMPRESSED_LIMIT} bytes"
-    );
-    assert!(
-        summary.upload_size() <= UPLOAD_LIMIT,
-        "within the upload limit"
-    );
-    assert!(
-        summary.size() <= DECOMPRESSED_LIMIT,
-        "within the decompressed limit"
-    );
     check_leftovers(&catalog)?;
     check_texts(&archive, &catalog, baselined)?;
     Ok(catalog)
@@ -301,12 +279,7 @@ pub(crate) fn print_line(line: &str) {
 }
 
 fn report(path: &Path, summary: &CatalogSummary) {
-    print_line(&format!(
-        "{}: catalog {} bytes decompressed (limit {DECOMPRESSED_LIMIT}), {} bytes compressed (upload limit {UPLOAD_LIMIT})",
-        path.display(),
-        summary.size(),
-        summary.upload_size()
-    ));
+    print_line(&format!("catalog input: {}", path.display()));
     for kind in summary.kinds() {
         print_line(&format!("{kind:?}"));
     }
@@ -318,14 +291,14 @@ fn report(path: &Path, summary: &CatalogSummary) {
 
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
-fn the_catalog_of_a_real_archive_is_complete_plausible_and_within_the_limit() -> TestResult {
+fn the_catalog_of_a_real_archive_is_complete_and_plausible() -> TestResult {
     let path = real_archive_path()?;
     real_archive_catalog_links::check(&verify_catalog(&path, true)?)
 }
 
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
-fn the_catalog_of_a_second_real_archive_is_complete_plausible_and_within_the_limit() -> TestResult {
+fn the_catalog_of_a_second_real_archive_is_complete_and_plausible() -> TestResult {
     let Some(path) = real_archive_b_path() else {
         return Ok(());
     };

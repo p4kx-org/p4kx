@@ -228,6 +228,10 @@ process quota or reserve on a larger machine measures a different condition.
 
 ## Measuring a complete export
 
+The installed regression checks verify decoded and stored byte counts against the actual writer
+output and report the corresponding size warnings. Catalog schema, references and replay are
+checked at any artifact size. Verify each consumer's import with its own measured limits.
+
 For each Build, record the full Build identity, exporter revision and hash, and archive length
 and modification time before and after the export. Run the normal `p4kx catalog` writer with a
 fixed export time, default text selection, `--progress-phases` and one private `.json.zst` output.

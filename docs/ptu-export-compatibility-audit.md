@@ -389,7 +389,7 @@ Point `P4KX_DATA_P4K` at the PTU Archive for those checks. The two-Archive canar
 `P4KX_DATA_P4K_B`. For the catalog's second-Archive verification, set primary LIVE and secondary PTU:
 
 ~~~powershell
-cargo test --release --locked --offline -p p4kx-export --test real_archive -- the_catalog_of_a_second_real_archive_is_complete_plausible_and_within_the_limit --ignored --nocapture
+cargo test --release --locked --offline -p p4kx-export --test real_archive -- the_catalog_of_a_second_real_archive_is_complete_and_plausible --ignored --nocapture
 ~~~
 
 Apply the configured user-provided Archive key through the existing profile/testkit mechanism;

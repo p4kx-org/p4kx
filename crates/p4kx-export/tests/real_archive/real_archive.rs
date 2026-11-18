@@ -8,7 +8,7 @@ use std::time::SystemTime;
 
 use p4kx_export::{
     CatalogOptions, CatalogSummary, CraftingWarning, DECOMPRESSED_LIMIT, Kind, Language,
-    UPLOAD_LIMIT, build_catalog, catalog_schema,
+    SizeWarning, UPLOAD_LIMIT, build_catalog, catalog_schema,
 };
 use p4kx_extraction::Archive;
 use p4kx_testkit::real_archive_path;
@@ -44,11 +44,7 @@ fn builds_a_valid_catalog_of_a_real_archive() -> TestResult {
         "plausible manufacturer count: {manufacturers:?}"
     );
     assert!(manufacturers.complete, "complete without a Filter");
-    report_size(summary.size());
-    assert!(
-        summary.size() < DECOMPRESSED_LIMIT,
-        "under the decompressed limit"
-    );
+    check_transport(summary, u64::try_from(built.json().len())?, None);
 
     assert!(catalog.get("manufacturers").is_none(), "no legacy array");
     let list = catalog["definitions"]["manufacturers"]["rows"]
@@ -109,12 +105,39 @@ pub(crate) fn is_complete_but_known_defects(summary: &CatalogSummary) -> bool {
     summary.failures().is_empty() && unexpected_warnings(summary).is_empty()
 }
 
-#[expect(
-    clippy::print_stdout,
-    reason = "the size is the measurement the upload limit is sized from"
-)]
-fn report_size(size: u64) {
-    println!("catalog size: {size} bytes, upload limit {UPLOAD_LIMIT} bytes");
+/// Verifies transport measurements and reports the associated size warnings.
+pub(crate) fn check_transport(summary: &CatalogSummary, decoded: u64, compressed: Option<u64>) {
+    let stored = compressed.unwrap_or(decoded);
+    assert_eq!(
+        summary.size(),
+        decoded,
+        "the decoded size matches the observed bytes"
+    );
+    assert_eq!(
+        summary.compressed_size(),
+        compressed,
+        "the compressed size matches the observed frame"
+    );
+    assert_eq!(
+        summary.upload_size(),
+        stored,
+        "the stored size matches the produced artifact"
+    );
+    let upload = SizeWarning::for_size(stored);
+    let decompressed = SizeWarning::for_decompressed_size(decoded);
+    assert_eq!(
+        summary.size_warning(),
+        upload,
+        "the warning uses stored bytes"
+    );
+    assert_eq!(
+        summary.decompressed_warning(),
+        decompressed,
+        "the warning uses decoded bytes"
+    );
+    crate::real_archive_verification::print_line(&format!(
+        "catalog transport: {stored} stored bytes / {UPLOAD_LIMIT} {upload:?}; {decoded} decoded bytes / {DECOMPRESSED_LIMIT} {decompressed:?}"
+    ));
 }
 
 fn check_texts(summary: &CatalogSummary, catalog: &Value, list: &[Value]) -> TestResult {
