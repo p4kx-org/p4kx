@@ -268,3 +268,12 @@ The normalized nodes/configuration references and exact lookup candidates are do
 This additive table has no direct-query SDK adapter yet. A future adapter must reuse the same
 source-owned reader, reached scope, original content/directory surveys and failure handling. The
 existing global first-pair convenience derivation remains a separate limitation.
+
+## Mineable and full resource definitions
+
+Use `with_mineable_elements`, `with_mineable_compositions` and `with_resource_types` for
+All/GUID/physical Record queries without world placements or complete Catalog construction.
+These return the complete canonical source rows and immutable nested views, with text and origin
+resolution. ResourceType group membership demands a separate complete group-family survey.
+Check owner and dependency coverage before publishing a consumer cache. See
+[selective mining and resource queries](catalog-mining-resource-queries.md).

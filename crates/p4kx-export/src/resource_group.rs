@@ -189,6 +189,13 @@ pub(crate) struct Listing {
     complete: bool,
 }
 
+impl Listing {
+    /// Returns whether every original resource-list slot was interpretable.
+    pub(crate) const fn resources_complete(&self) -> bool {
+        self.complete
+    }
+}
+
 pub(crate) fn listing(
     tree: &RecordTree<'_>,
     origins: &CatalogOrigins,

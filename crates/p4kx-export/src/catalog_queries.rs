@@ -47,6 +47,8 @@ mod harvest_provider_presets;
 mod item_ports;
 #[path = "manufacturer_query.rs"]
 mod manufacturers;
+#[path = "mining_definition_query.rs"]
+mod mining_definitions;
 #[path = "mission_location_query.rs"]
 mod mission_location_templates;
 #[path = "reputation_query.rs"]
@@ -339,3 +341,27 @@ fn read_archive(
         coverage: projected.coverage,
     })
 }
+
+pub use mining_definitions::{
+    MineableCompositionSnapshot, MineableElementSnapshot, MiningDefinitionSnapshot,
+    ResourceTypeSnapshot, with_mineable_compositions, with_mineable_compositions_from,
+    with_mineable_elements, with_mineable_elements_from, with_resource_types,
+    with_resource_types_from,
+};
+
+pub use crate::quality_source::{
+    InlineQuality, QualityBandSource, QualityCurveSource, QualityOverrideFields,
+    QualityOverridePayload, QualityOverrideSource, QualityOverridesSource, QualityPayload,
+    QualityQuantizationSource, QualityRecordReference, QualitySource,
+};
+pub use crate::resource_density_source::{
+    ResourceDensity, ResourceDensityPayload, ResourceDensitySource, ResourceDensityUnit,
+    ResourceDensityUnitPayload, ResourceDensityValue, ResourceMolarMass,
+};
+pub use crate::resource_property_contract::{
+    ResourceCargoSlot, ResourceCraftingData, ResourceProperty, ResourcePropertyPayload,
+    ResourceVolatility,
+};
+pub use crate::resource_type_contract::ResourceDefinition;
+
+pub use crate::mining_locations::{CompositionPart, MineableComposition, MineableElement};

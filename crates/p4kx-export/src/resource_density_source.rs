@@ -12,7 +12,7 @@ use crate::schema_fields;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = schema_fields::every_field_required)]
-pub(crate) struct ResourceDensitySource<'source> {
+pub struct ResourceDensitySource<'source> {
     pub(crate) source_type: SourcedValue<&'source str>,
     pub(crate) payload: SourcedValue<ResourceDensityPayload<'source>>,
 }
@@ -20,9 +20,13 @@ pub(crate) struct ResourceDensitySource<'source> {
 /// The closed physical quantity shapes accepted from the source.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "camelCase")]
-pub(crate) enum ResourceDensityPayload<'source> {
+#[non_exhaustive]
+pub enum ResourceDensityPayload<'source> {
+    /// Density using the authored unit.
     Density(ResourceDensity<'source>),
+    /// Molar mass without an inferred unit.
     MolarMass(ResourceMolarMass),
+    /// An authored base source without a quantity.
     EmptyBase,
 }
 
@@ -30,7 +34,7 @@ pub(crate) enum ResourceDensityPayload<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = schema_fields::every_field_required)]
-pub(crate) struct ResourceDensity<'source> {
+pub struct ResourceDensity<'source> {
     pub(crate) density_unit: SourcedValue<ResourceDensityUnit<'source>>,
 }
 
@@ -38,7 +42,7 @@ pub(crate) struct ResourceDensity<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = schema_fields::every_field_required)]
-pub(crate) struct ResourceDensityUnit<'source> {
+pub struct ResourceDensityUnit<'source> {
     pub(crate) source_type: SourcedValue<&'source str>,
     pub(crate) payload: SourcedValue<ResourceDensityUnitPayload>,
 }
@@ -46,9 +50,13 @@ pub(crate) struct ResourceDensityUnit<'source> {
 /// The closed density-unit shapes preserve their declared quantities.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "camelCase")]
-pub(crate) enum ResourceDensityUnitPayload {
+#[non_exhaustive]
+pub enum ResourceDensityUnitPayload {
+    /// The source quantity in grams per cubic centimetre.
     GramsPerCubicCentimeter(ResourceDensityValue),
+    /// The source quantity in kilograms per cubic metre.
     KilogramsPerCubicMeter(ResourceDensityValue),
+    /// An authored base unit without a quantity.
     EmptyBase,
 }
 
@@ -56,7 +64,7 @@ pub(crate) enum ResourceDensityUnitPayload {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = schema_fields::every_field_required)]
-pub(crate) struct ResourceDensityValue {
+pub struct ResourceDensityValue {
     pub(crate) value: SourcedValue<ResourceFloat32>,
 }
 
@@ -64,6 +72,58 @@ pub(crate) struct ResourceDensityValue {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = schema_fields::every_field_required)]
-pub(crate) struct ResourceMolarMass {
+pub struct ResourceMolarMass {
     pub(crate) molar_mass: SourcedValue<ResourceFloat32>,
+}
+
+impl<'source> ResourceDensitySource<'source> {
+    /// Borrows the original concrete density-source type.
+    #[must_use]
+    pub const fn source_type(&self) -> &SourcedValue<&'source str> {
+        &self.source_type
+    }
+
+    /// Borrows the density payload with its original source state.
+    #[must_use]
+    pub const fn payload(&self) -> &SourcedValue<ResourceDensityPayload<'source>> {
+        &self.payload
+    }
+}
+
+impl<'source> ResourceDensity<'source> {
+    /// Borrows the authored unit without converting its quantity.
+    #[must_use]
+    pub const fn density_unit(&self) -> &SourcedValue<ResourceDensityUnit<'source>> {
+        &self.density_unit
+    }
+}
+
+impl<'source> ResourceDensityUnit<'source> {
+    /// Borrows the original concrete density-unit type.
+    #[must_use]
+    pub const fn source_type(&self) -> &SourcedValue<&'source str> {
+        &self.source_type
+    }
+
+    /// Borrows the exact authored unit variant and its quantity.
+    #[must_use]
+    pub const fn payload(&self) -> &SourcedValue<ResourceDensityUnitPayload> {
+        &self.payload
+    }
+}
+
+impl ResourceDensityValue {
+    /// Borrows the source Single with its original IEEE bits.
+    #[must_use]
+    pub const fn value(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.value
+    }
+}
+
+impl ResourceMolarMass {
+    /// Borrows the authored molar mass without assigning a unit.
+    #[must_use]
+    pub const fn molar_mass(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.molar_mass
+    }
 }

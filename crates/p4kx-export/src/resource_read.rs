@@ -49,6 +49,17 @@ pub(crate) fn read<'source>(
     admission: &RecordObservation<'_, 'source>,
     cancel: Option<&CancelToken>,
 ) -> Result<ResourceRead<'source>, CatalogError> {
+    read_with_memberships(tree, projection, admission, cancel, || Ok(memberships))
+}
+
+/// Projects the complete definition and requests reverse memberships only at their canonical field.
+pub(crate) fn read_with_memberships<'source>(
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    cancel: Option<&CancelToken>,
+    memberships: impl FnOnce() -> Result<ResourceMemberships, CatalogError>,
+) -> Result<ResourceRead<'source>, CatalogError> {
     let mut notes = Vec::new();
     let numbers = NumberCapture::default();
     let data = with_fields(
@@ -128,7 +139,7 @@ fn name_and_refinement<'source>(
 fn definition<'source>(
     tree: &RecordTree<'source>,
     projection: &CatalogProjection<'_, 'source>,
-    memberships: ResourceMemberships,
+    memberships: impl FnOnce() -> Result<ResourceMemberships, CatalogError>,
     notes: &mut Vec<FieldError>,
     fields: &CatalogFields<'_, 'source, '_>,
     capture: &dyn FieldCapture<'source>,
@@ -155,7 +166,7 @@ fn definition<'source>(
             tree.record_index(),
             "description",
         )?,
-        group_guids: resource_memberships::values(memberships, origins, tree.record_index())?,
+        group_guids: resource_memberships::values(memberships()?, origins, tree.record_index())?,
         refined_version,
         density,
         default_thumbnail_path: fields.text("defaultThumbnailPath", notes)?,

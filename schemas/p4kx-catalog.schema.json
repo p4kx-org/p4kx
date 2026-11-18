@@ -36292,6 +36292,7 @@
       "oneOf": [
         {
           "$ref": "#/$defs/QualityOverrideFields",
+          "description": "An original location and distribution override.",
           "properties": {
             "type": {
               "const": "entry",
@@ -36304,6 +36305,7 @@
           "type": "object"
         },
         {
+          "description": "An authored base override without additional fields.",
           "properties": {
             "type": {
               "const": "emptyBase",
@@ -36350,6 +36352,7 @@
       "oneOf": [
         {
           "$ref": "#/$defs/InlineQuality",
+          "description": "A payload authored inline in the same original Record.",
           "properties": {
             "type": {
               "const": "inline",
@@ -36363,6 +36366,7 @@
         },
         {
           "$ref": "#/$defs/QualityRecordReference",
+          "description": "An authored reference without reading its target body.",
           "properties": {
             "type": {
               "const": "recordRef",
@@ -36375,6 +36379,7 @@
           "type": "object"
         },
         {
+          "description": "An authored base source without a quality payload.",
           "properties": {
             "type": {
               "const": "emptyBase",
@@ -36393,6 +36398,7 @@
       "oneOf": [
         {
           "$ref": "#/$defs/InlineQuality2",
+          "description": "A payload authored inline in the same original Record.",
           "properties": {
             "type": {
               "const": "inline",
@@ -36406,6 +36412,7 @@
         },
         {
           "$ref": "#/$defs/QualityRecordReference",
+          "description": "An authored reference without reading its target body.",
           "properties": {
             "type": {
               "const": "recordRef",
@@ -36418,6 +36425,7 @@
           "type": "object"
         },
         {
+          "description": "An authored base source without a quality payload.",
           "properties": {
             "type": {
               "const": "emptyBase",
@@ -36436,6 +36444,7 @@
       "oneOf": [
         {
           "$ref": "#/$defs/InlineQuality3",
+          "description": "A payload authored inline in the same original Record.",
           "properties": {
             "type": {
               "const": "inline",
@@ -36449,6 +36458,7 @@
         },
         {
           "$ref": "#/$defs/QualityRecordReference",
+          "description": "An authored reference without reading its target body.",
           "properties": {
             "type": {
               "const": "recordRef",
@@ -36461,6 +36471,7 @@
           "type": "object"
         },
         {
+          "description": "An authored base source without a quality payload.",
           "properties": {
             "type": {
               "const": "emptyBase",
@@ -39469,6 +39480,7 @@
       "oneOf": [
         {
           "$ref": "#/$defs/ResourceDensity",
+          "description": "Density using the authored unit.",
           "properties": {
             "type": {
               "const": "density",
@@ -39482,6 +39494,7 @@
         },
         {
           "$ref": "#/$defs/ResourceMolarMass",
+          "description": "Molar mass without an inferred unit.",
           "properties": {
             "type": {
               "const": "molarMass",
@@ -39494,6 +39507,7 @@
           "type": "object"
         },
         {
+          "description": "An authored base source without a quantity.",
           "properties": {
             "type": {
               "const": "emptyBase",
@@ -39544,6 +39558,7 @@
       "oneOf": [
         {
           "$ref": "#/$defs/ResourceDensityValue",
+          "description": "The source quantity in grams per cubic centimetre.",
           "properties": {
             "type": {
               "const": "gramsPerCubicCentimeter",
@@ -39557,6 +39572,7 @@
         },
         {
           "$ref": "#/$defs/ResourceDensityValue",
+          "description": "The source quantity in kilograms per cubic metre.",
           "properties": {
             "type": {
               "const": "kilogramsPerCubicMeter",
@@ -39569,6 +39585,7 @@
           "type": "object"
         },
         {
+          "description": "An authored base unit without a quantity.",
           "properties": {
             "type": {
               "const": "emptyBase",
@@ -40627,6 +40644,7 @@
       "description": "The closed property payload shapes accepted from resource declarations.",
       "oneOf": [
         {
+          "description": "An authored base property without additional values.",
           "properties": {
             "type": {
               "const": "base",
@@ -40640,6 +40658,7 @@
         },
         {
           "$ref": "#/$defs/ResourceVolatility",
+          "description": "The source volatility and health-decay values.",
           "properties": {
             "type": {
               "const": "volatility",
@@ -40653,6 +40672,7 @@
         },
         {
           "$ref": "#/$defs/ResourceCraftingData",
+          "description": "The independently authored crafting-quality sources.",
           "properties": {
             "type": {
               "const": "craftingData",

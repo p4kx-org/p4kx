@@ -306,3 +306,6 @@ fn source_only_entity_links_do_not_fabricate_missing_catalog_targets() -> TestRe
     );
     Ok(())
 }
+
+#[path = "mining_resource_query_suite.rs"]
+mod queries;
