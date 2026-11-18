@@ -85,13 +85,17 @@ fn reviewed_raw_fields_join_the_actual_canonical_shield_and_direct_fire_action()
 #[test]
 fn draft_item_stats_cannot_supply_missing_canonical_component_rows() -> super::Result<()> {
     let fixture = reference()?;
-    let obsolete = json!({ "items": [
-        {"guid": GUID, "stats": { "shield": { "maxHealth": 20 } }},
-        {"guid": OTHER, "stats": { "weapon": { "fireActions": [
-            {"kind": "SWeaponActionFireRapidParams", "fireRate": 60}
-        ] } }},
-        {"guid": RESOURCE}
-    ] });
+    let mut shield = fixtures::item(GUID, 0, json!(20));
+    shield["stats"] = json!({"shield": {"maxHealth": 20}});
+    let mut weapon = fixtures::item(OTHER, 1, json!(60));
+    weapon["stats"] = json!({"weapon": {"fireActions": [
+        {"kind": "SWeaponActionFireRapidParams", "fireRate": 60}
+    ]}});
+    let obsolete = fixtures::catalog(vec![
+        shield,
+        weapon,
+        fixtures::item(RESOURCE, 2, Value::Null),
+    ]);
     let error = verify(&fixture, &obsolete)
         .err()
         .ok_or("missing configurations must fail")?;
@@ -182,3 +186,6 @@ fn reviewed_13165946_release_remains_bound_to_the_public_version_and_channel() -
     }
     Ok(())
 }
+
+#[path = "published_item_owner_tests.rs"]
+mod item_owners;

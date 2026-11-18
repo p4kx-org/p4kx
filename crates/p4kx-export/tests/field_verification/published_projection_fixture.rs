@@ -25,10 +25,18 @@ const RAPID: &str = "SWeaponActionFireRapidParams";
 const CHARGED: &str = "SWeaponActionFireChargedParams";
 
 pub(super) fn catalog() -> super::super::Result<Value> {
+    build(&database())
+}
+
+pub(super) fn catalog_with_alias() -> super::super::Result<Value> {
+    build(&database().record(item(SHIELD, "audit_shield_alias", "Shield", [shield()])))
+}
+
+fn build(database: &DataForgeBuilder) -> super::super::Result<Value> {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("Data.p4k");
     ArchiveBuilder::new()
-        .entry(TestEntry::stored("Data/Game2.dcb", database().build()))
+        .entry(TestEntry::stored("Data/Game2.dcb", database.build()))
         .write_to(&path)?;
     let archive = Archive::open(path)?;
     let built = p4kx_export::build_catalog(&archive, &CatalogOptions::new(UNIX_EPOCH))?;

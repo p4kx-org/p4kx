@@ -100,11 +100,11 @@ fn selected_guids_from_two_families_are_reconciled_in_their_own_source_sets() ->
     fixture.snapshot.fields.push(field);
     fixture.save()?;
     let catalog = json!({
-        "items": [fixtures::item(GUID, json!(1))],
+        "items": [fixtures::item(GUID, 0, json!(1))],
         "definitions": {"commodities": {"availability": "available", "rows": [{
             "guid": sourced(json!(fixtures::OTHER)), "recordIndex": sourced(json!(2))
         }]}},
-        "commodities": [fixtures::item(fixtures::OTHER, json!(9))]
+        "commodities": [fixtures::item(fixtures::OTHER, 1, json!(9))]
     });
     let report = super::published::verify(
         &fixture.load()?,
@@ -160,7 +160,7 @@ fn canonical_commodity_presentation_uses_its_sourced_identity_and_explicit_field
             "commodityGuid": sourced(json!(GUID)),
             "densityGramsPerCubicCentimetre": sourced(json!(2))
         }]}},
-        "commodities": [fixtures::item(GUID, json!(9))]
+        "commodities": [fixtures::item(GUID, 0, json!(9))]
     });
     let verify = |catalog: &Value| {
         super::published::verify(

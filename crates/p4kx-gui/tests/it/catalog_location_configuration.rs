@@ -53,10 +53,8 @@ fn verify_document(document: &Value) -> TestResult {
     let row = document
         .pointer("/missionLocationTemplates/0")
         .ok_or("published location")?;
-    assert_eq!(
-        row["disabled"], true,
-        "disabled source retains its configuration"
-    );
+    let disabled = row.get("disabled").ok_or("sourced disabled state")?;
+    assert_source_cell(disabled, &json!(true), "/disabled");
     let configuration = row
         .pointer("/configuration/value")
         .ok_or("sourced configuration")?;
@@ -79,21 +77,25 @@ fn verify_document(document: &Value) -> TestResult {
         let cell = configuration
             .pointer(path)
             .ok_or("location configuration field")?;
-        assert_eq!(cell["state"], "present", "authored value at {path}");
-        assert_eq!(cell["value"], expected, "exact source value at {path}");
-        assert_eq!(
-            cell["containsEncryptedSource"], false,
-            "plain DataForge at {path}"
-        );
-        assert_eq!(cell["sourceSetComplete"], true, "complete inputs at {path}");
-        assert!(
-            cell["sourceUsesRefs"]
-                .as_array()
-                .is_some_and(|uses| !uses.is_empty()),
-            "original source-use reference at {path}"
-        );
+        assert_source_cell(cell, &expected, path);
     }
     verify_security_link(configuration, document)
+}
+
+fn assert_source_cell(cell: &Value, expected: &Value, path: &str) {
+    assert_eq!(cell["state"], "present", "authored value at {path}");
+    assert_eq!(&cell["value"], expected, "exact source value at {path}");
+    assert_eq!(
+        cell["containsEncryptedSource"], false,
+        "plain DataForge at {path}"
+    );
+    assert_eq!(cell["sourceSetComplete"], true, "complete inputs at {path}");
+    assert!(
+        cell["sourceUsesRefs"]
+            .as_array()
+            .is_some_and(|uses| !uses.is_empty()),
+        "original source-use reference at {path}"
+    );
 }
 
 fn verify_security_link(configuration: &Value, document: &Value) -> TestResult {

@@ -25,7 +25,7 @@ fn published_bytes_and_exact_channel_version_and_change_are_independent_gates() 
 {
     let fixture = PublishedFixture::new(vec![fixtures::row(GUID, json!(0.1))])?;
     let dataset = fixture.load()?;
-    let catalog = fixtures::catalog(vec![fixtures::item(GUID, json!(f64::from(0.1_f32)))]);
+    let catalog = fixtures::catalog(vec![fixtures::item(GUID, 0, json!(f64::from(0.1_f32)))]);
     let good = published::verify(
         &dataset,
         &catalog,
@@ -70,7 +70,7 @@ fn published_bytes_and_exact_channel_version_and_change_are_independent_gates() 
 #[test]
 fn an_unreviewed_revision_cannot_establish_numerical_build_evidence() -> super::Result<()> {
     let fixture = PublishedFixture::new(vec![fixtures::row(GUID, json!(0.1))])?;
-    let catalog = fixtures::catalog(vec![fixtures::item(GUID, json!(0.1))]);
+    let catalog = fixtures::catalog(vec![fixtures::item(GUID, 0, json!(0.1))]);
     let mut snapshot = fixture.snapshot.clone();
     snapshot.provenance.data_revision = "2".repeat(40);
     std::fs::write(
@@ -105,8 +105,8 @@ fn every_missing_side_and_explicit_selection_exclusion_is_accounted_for() -> sup
     fixture.snapshot.selection = vec![GUID.to_owned(), OTHER.to_owned(), RESOURCE.to_owned()];
     fixture.save()?;
     let catalog = fixtures::catalog(vec![
-        fixtures::item(GUID, json!(1)),
-        fixtures::item(RESOURCE, json!(3)),
+        fixtures::item(GUID, 0, json!(1)),
+        fixtures::item(RESOURCE, 2, json!(3)),
     ]);
     let report = verify(&fixture, &catalog)?;
     let field = report
@@ -166,7 +166,7 @@ fn duplicate_guids_malformed_json_wrong_hash_and_missing_files_never_pass() -> s
     assert!(
         verify(
             &duplicate,
-            &fixtures::catalog(vec![fixtures::item(GUID, json!(1))])
+            &fixtures::catalog(vec![fixtures::item(GUID, 0, json!(1))])
         )
         .is_err(),
         "duplicate GUID rows cannot replace a missing identity"
@@ -203,9 +203,9 @@ fn a_shared_resource_key_retains_every_distinct_commodity_or_mineable_member() -
         catalog: Path::fields(&["resourceType", "value", "guid", "value"]),
     });
     fixture.save()?;
-    let mut first = fixtures::item(GUID, json!(4));
+    let mut first = fixtures::item(GUID, 0, json!(4));
     first["resourceType"] = json!({"value": {"guid": {"value": RESOURCE}}});
-    let mut second = fixtures::item(OTHER, json!(4));
+    let mut second = fixtures::item(OTHER, 1, json!(4));
     second["resourceType"] = json!({"value": {"guid": {"value": RESOURCE}}});
     let report = verify(&fixture, &fixtures::catalog(vec![first, second]))?;
     let summary = report
@@ -238,7 +238,7 @@ fn normalized_derived_and_curated_reference_values_remain_explicit() -> super::R
     fixture.save()?;
     let report = verify(
         &fixture,
-        &fixtures::catalog(vec![fixtures::item(GUID, json!(1))]),
+        &fixtures::catalog(vec![fixtures::item(GUID, 0, json!(1))]),
     )?;
     assert_eq!(
         report
@@ -261,7 +261,7 @@ fn normalized_derived_and_curated_reference_values_remain_explicit() -> super::R
     fixture.save()?;
     let report = verify(
         &fixture,
-        &fixtures::catalog(vec![fixtures::item(GUID, json!(99))]),
+        &fixtures::catalog(vec![fixtures::item(GUID, 0, json!(99))]),
     )?;
     assert_eq!(
         report

@@ -22,7 +22,7 @@ fn survey(
     super::coverage::run(
         &forge,
         &fixtures::probe_inventory(),
-        &projected(),
+        &projected()?,
         BTreeSet::new(),
         BTreeMap::new(),
         Scope::default(),
@@ -30,8 +30,13 @@ fn survey(
     )
 }
 
-fn projected() -> Value {
-    json!({"items": [{"guid": GUID, "stats": {"probe": {"value": 7, "amount": 2, "weights": [0,3], "future": null}}}]})
+fn projected() -> super::Result<Value> {
+    let mut item = fixtures::item(GUID, 0, json!(7));
+    *item
+        .pointer_mut("/stats/probe")
+        .ok_or("projection fixture")? =
+        json!({"value": 7, "amount": 2, "weights": [0,3], "future": null});
+    Ok(fixtures::catalog(vec![item]))
 }
 
 #[test]
@@ -255,7 +260,7 @@ fn unreviewed_declarations_exclusions_and_inventory_errors_are_visible() -> supe
     let counts = super::coverage::run(
         &forge,
         &inventory,
-        &projected(),
+        &projected()?,
         BTreeSet::new(),
         BTreeMap::new(),
         Scope::default(),
@@ -274,7 +279,7 @@ fn unreviewed_declarations_exclusions_and_inventory_errors_are_visible() -> supe
     let counts = super::coverage::run(
         &forge,
         &inventory,
-        &projected(),
+        &projected()?,
         BTreeSet::new(),
         excluded,
         Scope::default(),

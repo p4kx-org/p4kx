@@ -64,6 +64,13 @@ pub(super) fn projections<'a>(
     let kinds = audit_scope::kinds(inventory)?;
     for kind in kinds {
         let group = kind.name();
+        if kind == p4kx_export::Kind::Items {
+            projections.insert(
+                group.to_owned(),
+                super::item_owners::index(catalog, cancelled)?,
+            );
+            continue;
+        }
         let rows = catalog_v3_consumer::rows(catalog, kind)?;
         projections.insert(
             group.to_owned(),
@@ -118,14 +125,7 @@ pub(super) fn component_projections<'a>(
         .pointer(&format!("/configurations/{group}/rows"))
         .and_then(Value::as_array)
         .ok_or_else(|| Error::new(Kind::Input, format!("missing canonical {group} rows")))?;
-    for row in rows {
-        error::check(cancelled)?;
-        if row.pointer("/ownerGuid/state").and_then(Value::as_str) != Some("present") {
-            return Err(
-                Error::new(Kind::Identity, format!("{group} owner GUID is not present")).into(),
-            );
-        }
-    }
+    super::item_owners::check_components(catalog, rows, cancelled)?;
     joins::index(
         rows,
         &Path::fields(&["ownerGuid", "value"]),

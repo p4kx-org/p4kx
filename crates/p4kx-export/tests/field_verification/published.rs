@@ -89,6 +89,9 @@ fn catalog<'a>(
     family: Family,
     cancelled: &impl Fn() -> bool,
 ) -> super::Result<Index<'a>> {
+    if family == Family::Items {
+        return super::item_owners::index(catalog, cancelled);
+    }
     let rows = catalog
         .pointer(family.rows_pointer())
         .and_then(Value::as_array)

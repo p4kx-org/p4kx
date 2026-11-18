@@ -15,6 +15,7 @@ mod coverage_v3_tests;
 mod error;
 mod fixtures;
 mod inventory;
+mod item_owners;
 mod joins;
 mod mission_property_metadata;
 mod mission_property_metadata_fixture;

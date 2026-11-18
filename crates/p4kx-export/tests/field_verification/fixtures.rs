@@ -64,9 +64,30 @@ pub(crate) fn catalog(rows: Vec<Value>) -> Value {
     object([("items", Value::Array(rows))])
 }
 
-pub(crate) fn item(guid: &str, value: Value) -> Value {
+pub(crate) fn item(guid: &str, index: u32, value: Value) -> Value {
+    let cell = |value| {
+        json!({
+            "state": "present", "value": value, "sourceSetComplete": true,
+            "containsEncryptedSource": false, "sourceUsesRefs": []
+        })
+    };
+    let name = format!("FixtureItem{index}");
+    let path = format!("synthetic/items/{index}");
     object([
-        ("guid", json!(guid)),
+        ("guid", cell(json!(guid))),
+        ("recordIndex", cell(json!(index))),
+        (
+            "recordName",
+            cell(json!(format!("EntityClassDefinition.{name}"))),
+        ),
+        ("className", cell(json!(name))),
+        ("recordPath", cell(json!(path))),
+        ("sourceType", cell(json!("EntityClassDefinition"))),
+        (
+            "fileName",
+            cell(json!(format!("synthetic/items/{index}.xml"))),
+        ),
+        ("metadataTag", cell(json!(""))),
         ("stats", nested(&["probe", "value"], value)),
     ])
 }

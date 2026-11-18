@@ -46,7 +46,7 @@ fn path_traversal_malformed_join_identity_and_duplicate_metadata_are_failures() 
         "selected paths cannot escape the offline root"
     );
     let malformed = PublishedFixture::new(vec![fixtures::row("not-a-guid", json!(1))])?;
-    let catalog = fixtures::catalog(vec![fixtures::item(GUID, json!(1))]);
+    let catalog = fixtures::catalog(vec![fixtures::item(GUID, 0, json!(1))]);
     assert!(
         super::published::verify(
             &malformed.load()?,
@@ -82,7 +82,7 @@ fn a_selected_guid_missing_on_both_sides_is_not_an_optional_missing_field() -> s
     fixture.save()?;
     let report = super::published::verify(
         &fixture.load()?,
-        &fixtures::catalog(vec![fixtures::item(GUID, json!(1))]),
+        &fixtures::catalog(vec![fixtures::item(GUID, 0, json!(1))]),
         &fixtures::build(),
         &[fixtures::PUBLICATION],
         &|| false,
@@ -182,7 +182,7 @@ fn a_missing_selected_row_is_not_hidden_by_an_optional_field_absent_on_both_side
     ])?;
     let report = super::published::verify(
         &fixture.load()?,
-        &fixtures::catalog(vec![fixtures::item(OTHER, json!(1))]),
+        &fixtures::catalog(vec![fixtures::item(OTHER, 1, json!(1))]),
         &fixtures::build(),
         &[fixtures::PUBLICATION],
         &|| false,

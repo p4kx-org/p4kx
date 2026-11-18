@@ -63,7 +63,7 @@ impl Family {
 
     pub(crate) const fn identity_fields(self) -> &'static [&'static str] {
         match self {
-            Self::Commodities => &["guid", "value"],
+            Self::Items | Self::Commodities => &["guid", "value"],
             Self::CommodityPresentation => &["commodityGuid", "value"],
             Self::Placements => &["objectGuid", "value"],
             _ => &["guid"],

@@ -13,6 +13,9 @@ use serde_json::{Value, json};
 use super::inventory::{Disposition, FieldKey, Inventory, Mapping};
 use super::path::Path;
 
+#[path = "coverage_v3_routes_fixture.rs"]
+mod routes;
+
 fn catalog() -> super::Result<Value> {
     let database = DataForgeBuilder::new()
         .version(8)
@@ -143,13 +146,9 @@ fn missing_canonical_groups_and_nonpresent_identity_states_fail_the_actual_audit
 #[test]
 fn shield_field_audit_joins_multiple_physical_configurations_by_sourced_owner() -> super::Result<()>
 {
-    let mut catalog = catalog()?;
+    let mut catalog = routes::catalog()?;
     let path = "/configurations/shieldGenerators/rows";
     let owner = "00000000-0000-0000-0000-000000000001";
-    *catalog.pointer_mut(path).ok_or("canonical shield table")? = json!([
-        {"ownerGuid":{"state":"present","value":owner},"componentOrdinal":{"value":1}},
-        {"ownerGuid":{"state":"present","value":owner},"componentOrdinal":{"value":2}}
-    ]);
     let mut inventory = super::baseline::inventory();
     inventory.fields.retain(|mapping| {
         matches!(&mapping.disposition, Disposition::Exported { group, .. }
@@ -183,27 +182,9 @@ fn shield_field_audit_joins_multiple_physical_configurations_by_sourced_owner() 
 
 #[test]
 fn canonical_quantum_modes_join_by_owner_and_actual_source_type() -> super::Result<()> {
-    let mut catalog = catalog()?;
-    let path = "/configurations/quantumDrives/rows";
+    let mut catalog = routes::catalog()?;
+    routes::unmapped_standard(&mut catalog)?;
     let owner = "00000000-0000-0000-0000-000000000001";
-    let profile = |kind, speed| {
-        json!({
-            "state":"present",
-            "value":{"sourceType":{"value":kind},"driveSpeed":{"value":speed}},
-        })
-    };
-    *catalog.pointer_mut(path).ok_or("canonical quantum table")? = json!([
-        {
-            "ownerGuid":{"state":"present","value":owner},
-            "standard":profile("SQuantumDriveParams", 1),
-            "spline":profile("SQuantumDriveParams", 2),
-        },
-        {
-            "ownerGuid":{"state":"present","value":owner},
-            "standard":profile("FixtureUnmappedQuantumMode", 3),
-            "spline":profile("SQuantumDriveParams", 4),
-        },
-    ]);
     let mut inventory = super::baseline::inventory();
     inventory.fields.retain(|mapping| {
         matches!(&mapping.disposition, Disposition::Exported { group, .. }
@@ -227,7 +208,11 @@ fn canonical_quantum_modes_join_by_owner_and_actual_source_type() -> super::Resu
         .ok_or("canonical quantum mode projection")?;
     let speeds: Vec<_> = profiles
         .iter()
-        .filter_map(|profile| profile.pointer("/driveSpeed/value").and_then(Value::as_u64))
+        .filter_map(|profile| {
+            profile
+                .pointer("/driveSpeed/value/value")
+                .and_then(Value::as_u64)
+        })
         .collect();
     assert_eq!(
         speeds,
