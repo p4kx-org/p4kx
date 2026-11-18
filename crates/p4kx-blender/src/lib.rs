@@ -168,3 +168,6 @@ pub use player_source::{
     PlayerDocument, PlayerDocumentRejection, PlayerDocumentSink, PlayerSource, PlayerSourceCapture,
     PlayerSourceError, RejectedPlayerDocument, player_source_schema,
 };
+
+#[cfg(test)]
+mod installed_palette_subset;

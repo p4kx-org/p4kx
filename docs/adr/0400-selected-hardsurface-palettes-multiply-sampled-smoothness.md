@@ -74,6 +74,15 @@ and the ordinary graph. A two-layer AO wrapper with explicit zero wear checks pr
 roughness and the original package layer shares. Installed source checks bind the game
 Build and each selected original member before comparing supported LIVE and PTU sources.
 
+The installed original-subset witness retains the decoded source UV bits in both ordinary
+producers and compares their imported Roughness signals at four original triangle UV centroids.
+Its private selection binds physical geometry, material, palette and texture Entries, including
+split alpha headers. Verification receipts count actual checksum-to-EOF streams separately from
+logical texture requests. Filtering draw ranges invalidates original first-use vertex coordinates;
+this material witness requests no vertex-map sidecar. Its directly supplied scene declares no
+Assembly palette-provenance claim. Native Blender 5.3 parity is a scalar-consumer check and does
+not establish a runtime permutation, palette packing or rendered game appearance.
+
 ## Consequences
 
 Selected painted surfaces can become rougher or smoother as their palette and layer controls

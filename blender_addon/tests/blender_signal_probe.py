@@ -17,7 +17,9 @@ def principled(material: bpy.types.Material) -> bpy.types.Node:
     return nodes[0]
 
 
-def _add_probe(material: bpy.types.Material, signal: str, y: float) -> None:
+def _add_probe(
+    material: bpy.types.Material, signal: str, y: float, uv: tuple[float, float] | None = None
+) -> None:
     # Route the imported socket to emission for measurement without lighting or alpha compositing.
     probe = material.copy()
     tree = probe.node_tree
@@ -37,6 +39,9 @@ def _add_probe(material: bpy.types.Material, signal: str, y: float) -> None:
     plane = bpy.context.object
     plane.scale.y = 0.10
     plane.data.materials.append(probe)
+    if uv is not None:
+        for loop in plane.data.uv_layers.active.data:
+            loop.uv = uv
 
 
 def render_linear_signals(
@@ -44,11 +49,14 @@ def render_linear_signals(
     target: Path,
     width: int,
     height: int,
+    *,
+    uvs: tuple[tuple[float, float], ...] | None = None,
 ) -> tuple[float, ...]:
     for item in bpy.context.scene.objects:
         item.hide_render = True
-    for material, signal, y in probes:
-        _add_probe(material, signal, y)
+    assert uvs is None or len(uvs) == len(probes)
+    for index, (material, signal, y) in enumerate(probes):
+        _add_probe(material, signal, y, None if uvs is None else uvs[index])
     bpy.ops.object.camera_add(location=(0.0, 0.0, 2.0))
     camera = bpy.context.object
     camera.data.type = "ORTHO"

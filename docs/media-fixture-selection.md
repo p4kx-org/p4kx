@@ -187,6 +187,23 @@ with independently different RGB and alpha measured `0.64065933` in the unselect
 luminance path. All eight candidate cases passed their declared quantization tolerances.
 These are synthetic scalar-consumer measurements, not a game-appearance comparison.
 
+The ignored `installed_palette_subset::installed_original_subset_preserves_material_and_uv_inputs`
+library test in `p4kx-blender` exercises one privately selected original subset through both normal
+producers. It requires `P4KX_DATA_P4K`, the Archive key, a private
+`P4KX_INSTALLED_PALETTE_SUBSET_SELECTION` file and a fresh empty absolute
+`P4KX_INSTALLED_PALETTE_SUBSET_OUTPUT` directory under the agent's scratch root. Review the selected
+physical closure and output paths before running that exact ignored test. Include `.dds.a` alpha
+headers alongside the selected texture families. No Catalog, full ship or Assembly walk is needed.
+
+`blender_addon/tests/blender_installed_palette_subset.py` consumes the completed private output
+with the normal package and glTF importers. Both exported meshes retain all original UV float bits;
+the probe compares linear Roughness at four original triangle UV centroids with tolerance `2/255`.
+The selected draw ranges invalidate original first-use vertex traversal, so this test deliberately
+requests no vertex-map sidecar. Its direct scene carries no invented Assembly palette provenance.
+On installed LIVE 13165946, native Blender 5.3.0 (`02f0899d78e3`) agreed at all four probes. The
+shared-helper synthetic Gloss regression also passed with a freshly generated package. These are
+consumer-projection checks; runtime shader activation and game appearance remain separate.
+
 ### Independently bound installed shader operations
 
 The installed LIVE and PTU token vocabularies were independently bound to each engine's
