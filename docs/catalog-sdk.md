@@ -666,6 +666,20 @@ selector for an owner with a named DataForge root port. Set `P4KX_DATA_P4K` and
 cargo test --locked -p p4kx-export --lib -- catalog_query_session::installed_sdk_witness::loadout_source::installed_loadout_sdk_matches_one_original_port_name --ignored --exact
 ```
 
+## Direct ammunition definitions
+
+`catalog_queries::equipment::with_ammo_definitions` reads independently admitted physical
+`definitions.ammoDefinitions` rows using the canonical Ammo reader. Select one original
+Record index, all physical aliases of one GUID, or the whole admitted definition family.
+The callback supplies the same serializable rows, source inventory, requested localization
+and header, body and field coverage. The typed speed and lifetime accessors retain the
+original source bits and per-value origins. The name accessor resolves through the
+snapshot's public names.
+
+This query supplies `selected` Ammo definitions. A Catalog scoped to another owner can
+instead retain Ammo as a `dependency`. Weapon-mode bindings, countermeasure bindings and
+their dependency selection are separate datasets.
+
 ## Starmap container placements
 
 Use `starmap::read_container_placements` to read the canonical `placements.containerInstances` and

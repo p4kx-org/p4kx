@@ -3,7 +3,7 @@
 
 use std::cell::RefCell;
 
-use p4kx_extraction::{CancelToken, DataForge, Guid, RecordTree};
+use p4kx_extraction::{CancelToken, DataForge, Guid, RecordTree, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -15,8 +15,10 @@ use crate::catalog_number_capture::CapturedNumber;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::original::OriginalFlowFields;
 use crate::catalog_table::CatalogTable;
+use crate::catalog_text_contract::PublicNameRef;
 use crate::export_diagnostic::ExportSourceRole;
 use crate::record_observation::RecordObservation;
+use crate::resource_float::ResourceFloat32;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 use crate::template_field_capture::TemplateFieldCapture;
@@ -28,8 +30,11 @@ pub(crate) const SOURCE_TYPE: &str = "AmmoParams";
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
-pub(crate) enum AmmoSelection {
+#[non_exhaustive]
+pub enum AmmoSelection {
+    /// The original Ammo Record was admitted independently.
     Selected,
+    /// The original Ammo Record was reached by another selected owner.
     Dependency,
 }
 
@@ -46,7 +51,7 @@ impl AmmoSelection {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct AmmoDefinition<'source> {
+pub struct AmmoDefinition<'source> {
     selection: AmmoSelection,
     #[serde(flatten)]
     source: CanonicalRecordHeader<'source>,
@@ -54,6 +59,38 @@ pub(crate) struct AmmoDefinition<'source> {
     inputs: AuthoredAmmoInputs<'source>,
     #[serde(flatten)]
     presentation: AmmoPresentation<'source>,
+}
+
+impl<'source> AmmoDefinition<'source> {
+    /// Reports the physical row's reason for admission.
+    #[must_use]
+    pub const fn selection(&self) -> AmmoSelection {
+        self.selection
+    }
+
+    /// Borrows the original physical Record header.
+    #[must_use]
+    pub const fn source(&self) -> &CanonicalRecordHeader<'source> {
+        &self.source
+    }
+
+    /// Borrows the original speed and its source evidence.
+    #[must_use]
+    pub const fn speed(&self) -> &SourcedValue<ResourceFloat32> {
+        self.inputs.speed()
+    }
+
+    /// Borrows the original lifetime and its source evidence.
+    #[must_use]
+    pub const fn lifetime(&self) -> &SourcedValue<ResourceFloat32> {
+        self.inputs.lifetime()
+    }
+
+    /// Borrows the reference to the original localized short name.
+    #[must_use]
+    pub const fn display_name(&self) -> &SourcedValue<PublicNameRef> {
+        self.presentation.display_name()
+    }
 }
 
 pub(crate) struct PreparedAmmoDefinition<'source> {
@@ -66,7 +103,11 @@ pub(crate) struct PreparedAmmoDefinition<'source> {
 
 impl<'source> PreparedAmmoDefinition<'source> {
     pub(crate) const fn selection(&self) -> AmmoSelection {
-        self.definition.selection
+        self.definition.selection()
+    }
+
+    pub(crate) fn into_definition(self) -> AmmoDefinition<'source> {
+        self.definition
     }
 
     pub(super) const fn inputs(&self) -> &AuthoredAmmoInputs<'source> {
@@ -118,6 +159,8 @@ pub(crate) fn table<'source>(
     CatalogTable::new(
         forge,
         &[SOURCE_TYPE],
-        rows.into_iter().map(|row| row.definition).collect(),
+        rows.into_iter()
+            .map(PreparedAmmoDefinition::into_definition)
+            .collect(),
     )
 }

@@ -17,6 +17,8 @@ mod geometry;
 mod radar_declaration;
 #[path = "catalog_ammo_rigid.rs"]
 mod rigid;
+#[path = "catalog_ammo_definitions_sdk.rs"]
+mod sdk;
 
 #[path = "catalog_ammo_filter_dependencies.rs"]
 mod filter_dependencies;

@@ -4,15 +4,16 @@
 use p4kx_extraction::{CancelToken, DataForge, RecordTree};
 
 use super::{InventoryOwnerBounds, ItemAttachmentComponent, ItemDefinition, ItemSource};
-use crate::CatalogError;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::scoped_source_read::ScopedSourceRead;
 use crate::catalog_table::DatasetAvailability;
+use crate::catalog_v3::ammo_definition::{self, AmmoDefinition, AmmoSelection};
 use crate::catalog_v3::catalog_entity_configurations;
 use crate::catalog_v3::catalog_item_alignment::{ATTACHABLE, AlignmentOptions};
 use crate::catalog_v3::catalog_item_components::definition_read;
 use crate::catalog_v3::inventory_entity_configurations::BOUNDS_SOURCE_TYPES;
 use crate::record_observation::RecordObservation;
+use crate::{CatalogError, Kind};
 
 #[derive(Clone, Copy)]
 pub(super) enum Family {
@@ -21,11 +22,23 @@ pub(super) enum Family {
     Attachments,
     Bounds,
     CargoGrids,
+    AmmoDefinitions,
 }
 
 impl Family {
     pub(super) const fn localized(self) -> bool {
-        matches!(self, Self::Definitions)
+        matches!(self, Self::Definitions | Self::AmmoDefinitions)
+    }
+
+    pub(super) const fn kind(self) -> Kind {
+        match self {
+            Self::AmmoDefinitions => Kind::AmmoDefinitions,
+            Self::Definitions
+            | Self::ItemSources
+            | Self::Attachments
+            | Self::Bounds
+            | Self::CargoGrids => Kind::Items,
+        }
     }
 
     pub(super) fn availability(self, forge: &DataForge<'_>, rows: usize) -> DatasetAvailability {
@@ -37,6 +50,7 @@ impl Family {
             Self::Attachments => &[ATTACHABLE][..],
             Self::Bounds => BOUNDS_SOURCE_TYPES,
             Self::CargoGrids => &[crate::catalog_v3::catalog_facility::CARGO_GRID_SOURCE_TYPE],
+            Self::AmmoDefinitions => &[ammo_definition::SOURCE_TYPE],
         };
         DatasetAvailability::from_source_declarations(forge, |name| types.contains(&name))
     }
@@ -61,6 +75,29 @@ pub(super) struct ItemSources;
 pub(super) struct Attachments;
 pub(super) struct Bounds;
 pub(super) struct CargoGrids;
+pub(super) struct AmmoDefinitions;
+
+impl Projector for AmmoDefinitions {
+    type Row<'source> = AmmoDefinition<'source>;
+    const FAMILY: Family = Family::AmmoDefinitions;
+
+    fn read<'source>(
+        _: &'source DataForge<'source>,
+        tree: &RecordTree<'source>,
+        projection: &CatalogProjection<'_, 'source>,
+        admission: &RecordObservation<'_, 'source>,
+        _: &AlignmentOptions<'_>,
+        cancel: Option<&CancelToken>,
+    ) -> Result<ScopedSourceRead<Vec<Self::Row<'source>>>, CatalogError> {
+        let (prepared, notes) =
+            ammo_definition::read(projection, tree, admission, cancel, AmmoSelection::Selected)?;
+        Ok(ScopedSourceRead {
+            value: vec![prepared.into_definition()],
+            notes,
+            selection_complete: true,
+        })
+    }
+}
 
 impl Projector for Definitions {
     type Row<'source> = ItemDefinition<'source>;

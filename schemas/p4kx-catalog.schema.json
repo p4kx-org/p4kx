@@ -1414,11 +1414,18 @@
     },
     "AmmoSelection": {
       "description": "Why a physical ammunition row belongs to this catalog selection.",
-      "enum": [
-        "selected",
-        "dependency"
+      "oneOf": [
+        {
+          "const": "selected",
+          "description": "The original Ammo Record was admitted independently.",
+          "type": "string"
+        },
+        {
+          "const": "dependency",
+          "description": "The original Ammo Record was reached by another selected owner.",
+          "type": "string"
+        }
       ],
-      "type": "string",
       "x-p4kx-vocabularyClass": "control"
     },
     "AnimatedPrimeState": {

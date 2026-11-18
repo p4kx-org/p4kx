@@ -38,6 +38,10 @@ pub(crate) struct AmmoPresentation<'source> {
 }
 
 impl<'source> AmmoPresentation<'source> {
+    pub(super) const fn display_name(&self) -> &SourcedValue<PublicNameRef> {
+        &self.display_name
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, 'source>,
         projection: &CatalogProjection<'_, 'source>,

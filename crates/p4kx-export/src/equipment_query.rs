@@ -21,6 +21,8 @@ pub use loadout_query::{
     read_loadouts, read_loadouts_from,
 };
 
+#[path = "equipment_ammo_query.rs"]
+mod ammo;
 #[path = "equipment_attachment_query.rs"]
 mod attachments;
 #[path = "equipment_bounds_query.rs"]
@@ -58,6 +60,10 @@ pub use crate::catalog_v3::inventory_owner_bounds::{
     BoundsFields as InventoryBoundsFields, InventoryOwnerBounds,
 };
 pub use crate::item::ItemSource;
+pub use ammo::{
+    AmmoDefinition, AmmoDefinitionSnapshot, AmmoSelection, with_ammo_definitions,
+    with_ammo_definitions_from,
+};
 pub use attachments::{with_attachment_constraints, with_attachment_constraints_from};
 pub use bounds::{with_item_bounds, with_item_bounds_from};
 pub use cargo::{

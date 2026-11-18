@@ -9,6 +9,7 @@ use p4kx_extraction::{
 
 use super::rows::{Family, Projector};
 use super::snapshot::EquipmentSnapshot;
+use crate::CatalogError;
 use crate::build::catalog_queries::unlocalized_record_query::plan::{Owner, Plan};
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_origins::CatalogOrigins;
@@ -21,7 +22,6 @@ use crate::catalog_v3::catalog_item_alignment::AlignmentOptions;
 use crate::guid_text::CatalogGuid;
 use crate::record_observation::RecordObservation;
 use crate::texts::{TextSources, Texts};
-use crate::{CatalogError, Kind};
 
 pub(super) fn with_archive<P: Projector, T>(
     archive: &Archive,
@@ -102,7 +102,8 @@ impl<'query> Query<'query> {
         let input = OriginalCatalogInput::new(self.forge, &origins);
         let texts = Texts::parse(&sources)?;
         let registry = CatalogTextRegistry::default();
-        let projection = CatalogProjection::new(&texts, &input, &registry).for_kind(Kind::Items);
+        let projection =
+            CatalogProjection::new(&texts, &input, &registry).for_kind(P::FAMILY.kind());
         let options = if matches!(P::FAMILY, Family::Attachments) {
             AlignmentOptions::read(self.forge, self.cancel)?
         } else {
@@ -150,9 +151,9 @@ impl<'query> Query<'query> {
     ) -> Result<Plan<'query>, CatalogError> {
         checkpoint(self.cancel)?;
         let mut plan = match family {
-            Family::Definitions | Family::ItemSources => Plan::read(
+            Family::Definitions | Family::ItemSources | Family::AmmoDefinitions => Plan::read(
                 self.forge,
-                Kind::Items,
+                family.kind(),
                 self.selection,
                 self.cancel,
                 observer,
@@ -176,12 +177,13 @@ impl<'query> Query<'query> {
 
 fn order(family: Family, owners: &mut [Owner<'_>]) {
     match family {
-        Family::Definitions | Family::ItemSources => owners.sort_by_key(|owner| {
-            (
-                CatalogGuid(owner.record.guid()).text(),
-                owner.record.index(),
-            )
-        }),
+        Family::Definitions | Family::ItemSources | Family::AmmoDefinitions => owners
+            .sort_by_cached_key(|owner| {
+                (
+                    CatalogGuid(owner.record.guid()).text(),
+                    owner.record.index(),
+                )
+            }),
         Family::Attachments | Family::Bounds | Family::CargoGrids => {
             owners.sort_by_key(|owner| owner.record.index());
         }
