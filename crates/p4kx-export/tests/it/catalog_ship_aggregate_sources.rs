@@ -341,3 +341,12 @@ fn parity(archive: &p4kx_extraction::Archive, row: &Value) -> TestResult {
     );
     Ok(())
 }
+
+#[path = "catalog_ship_source_sdk.rs"]
+mod source_sdk;
+
+#[path = "catalog_ship_source_selection_sdk.rs"]
+mod source_selection_sdk;
+
+#[path = "catalog_ship_source_texts_sdk.rs"]
+mod source_texts_sdk;

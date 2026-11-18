@@ -138,6 +138,7 @@ impl<'query> Query<'query> {
             localization_notes: texts.notes().to_vec(),
             source_inventory,
             coverage: plan.coverage,
+            dependency_coverage: (),
         }))
     }
 

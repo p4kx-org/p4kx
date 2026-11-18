@@ -213,3 +213,6 @@ fn body_owner(catalog: &Value, cell: &Value, owner: u32) -> TestResult {
     );
     Ok(())
 }
+
+#[path = "catalog_ship_source_physical_sdk.rs"]
+mod source_sdk;

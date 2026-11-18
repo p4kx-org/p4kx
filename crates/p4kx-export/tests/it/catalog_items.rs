@@ -19,7 +19,7 @@ type TestResult = Result<(), Box<dyn Error>>;
 #[path = "catalog_items_completeness.rs"]
 mod completeness;
 #[path = "catalog_item_definitions.rs"]
-mod definitions;
+pub(crate) mod definitions;
 #[path = "catalog_item_projection_checks.rs"]
 mod item_projection_checks;
 #[path = "catalog_ship_manufacturers.rs"]

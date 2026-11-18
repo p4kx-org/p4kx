@@ -5,7 +5,6 @@ use p4kx_extraction::{RecordTree, TreeBuilder};
 
 use super::Scan;
 use crate::catalog_projection::CatalogProjection;
-use crate::catalog_v3::authored_fields::ship_source_read;
 use crate::catalog_v3::catalog_harvest_modules::harvest_provider;
 use crate::catalog_v3::catalog_item_components::item_definition::ItemDefinition;
 use crate::catalog_v3::catalog_item_components::{self, ItemComponentsRead, resolution};
@@ -308,33 +307,26 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
         tree: &RecordTree<'f>,
         ledger: &mut ExportLedger,
     ) -> Result<Picked<'f>, CatalogError> {
-        let record = admission.record();
-        let mut source =
-            ship_source_read::read(tree, &self.projection, admission, self.scan.options.cancel)?;
-        let read = self.scan.ships.read_catalog(
-            &source.aggregate,
-            record,
+        let projected = ship::source_projection::read(
+            &self.scan.ships,
+            &self.projection,
+            self.scan.original,
+            admission,
             tree,
             ledger,
-            self.scan.original,
             self.scan.options.cancel,
         )?;
-        ledger.merge(read.ledger);
-        let aggregates = read.aggregates;
-        Picked::of_ship(read.read, |read| {
-            let aggregates = aggregates.ok_or(crate::ExportAccountingError::UnobservedFailure)?;
-            if aggregates.physics_used {
-                source.notes.append(&mut source.physics_notes);
-            }
-            crate::source_projection_notes::record(
-                Kind::Ships,
-                ExportSourceRole::Selected,
-                admission,
+        Picked::of_ship(projected.read, |read| {
+            let aggregates = projected
+                .aggregates
+                .ok_or(crate::ExportAccountingError::UnobservedFailure)?;
+            ship::ship(
                 tree,
-                std::mem::take(&mut source.notes),
-                ledger,
-            )?;
-            ship::ship(tree, source, &self.scan.evidence, read, aggregates)
+                projected.source,
+                &self.scan.evidence,
+                read,
+                aggregates,
+            )
         })
     }
 }

@@ -111,7 +111,7 @@ fn visit_motion(row: &WeaponAttachmentMotion<'_>, wire: Wire<'_>) -> TestResult 
     wire.field("tags")?.leaf(row.tags())
 }
 
-pub(super) fn text<R: Serialize>(
+pub(crate) fn text<R: Serialize>(
     row: &CanonicalText<'_, R>,
     inventory: &SourceInventory,
     catalog: &Value,

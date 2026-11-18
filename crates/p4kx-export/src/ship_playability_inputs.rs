@@ -13,8 +13,22 @@ use crate::source_value_catalog::SourceRecordReference;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ShipPlayabilityInputs<'source> {
+pub struct ShipPlayabilityInputs<'source> {
     pub(crate) crew_manifest_component_ordinal: SourcedValue<u32>,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
     pub(crate) crew_manifest: SourcedValue<Box<SourceRecordReference<'source>>>,
+}
+
+impl<'source> ShipPlayabilityInputs<'source> {
+    /// Borrows the original selected crew-component position.
+    #[must_use]
+    pub const fn crew_manifest_component_ordinal(&self) -> &SourcedValue<u32> {
+        &self.crew_manifest_component_ordinal
+    }
+
+    /// Borrows the authored crew-manifest reference and resolution state.
+    #[must_use]
+    pub const fn crew_manifest(&self) -> &SourcedValue<Box<SourceRecordReference<'source>>> {
+        &self.crew_manifest
+    }
 }

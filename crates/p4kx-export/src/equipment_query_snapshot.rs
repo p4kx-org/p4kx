@@ -10,7 +10,7 @@ use crate::catalog_text_contract::{CanonicalText, GameTextRef, PublicNameRef};
 /// Selected canonical original equipment rows with their exact source and text context.
 #[derive(Debug)]
 #[must_use]
-pub struct EquipmentSnapshot<'source, Row> {
+pub struct EquipmentSnapshot<'source, Row, Dependencies = ()> {
     pub(super) build: Option<Build>,
     pub(super) availability: DatasetAvailability,
     pub(super) rows: Vec<Row>,
@@ -21,6 +21,7 @@ pub struct EquipmentSnapshot<'source, Row> {
     pub(super) localization_notes: Vec<LocalizationNote>,
     pub(super) source_inventory: SourceInventory,
     pub(super) coverage: CatalogRecordCoverage,
+    pub(super) dependency_coverage: Dependencies,
 }
 
 /// Selected original Item presentation, physics and purchase definitions.
@@ -36,7 +37,7 @@ pub type AttachmentConstraintSnapshot<'source> =
 /// Selected original storage occupancy, vehicle bounds and object metadata components.
 pub type ItemBoundsSnapshot<'source> = EquipmentSnapshot<'source, InventoryOwnerBounds<'source>>;
 
-impl<'source, Row> EquipmentSnapshot<'source, Row> {
+impl<'source, Row, Dependencies> EquipmentSnapshot<'source, Row, Dependencies> {
     /// Borrows the installed Build when one was identified.
     #[must_use]
     pub const fn build(&self) -> Option<&Build> {

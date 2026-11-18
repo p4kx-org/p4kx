@@ -28865,12 +28865,15 @@
     "ManufacturerValue": {
       "anyOf": [
         {
-          "$ref": "#/$defs/CatalogRecordReference"
+          "$ref": "#/$defs/CatalogRecordReference",
+          "description": "The original stored manufacturer Record reference."
         },
         {
+          "description": "Another authored representation retained without interpretation.",
           "properties": {
             "authored": {
-              "$ref": "#/$defs/SourceArenaOutput"
+              "$ref": "#/$defs/SourceArenaOutput",
+              "description": "The original ordered fields and value occurrences."
             }
           },
           "required": [

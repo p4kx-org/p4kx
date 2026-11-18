@@ -290,3 +290,9 @@ fn a_temp_or_display_ship_is_left_out_everywhere_and_an_item_keeps_its_display_w
     assert!(groups.base_of(item).is_none());
     Ok(())
 }
+
+#[path = "catalog_ship_source_walk.rs"]
+pub(crate) mod source_sdk_walk;
+
+#[path = "catalog_ship_source_arena_coverage.rs"]
+mod source_arena_coverage;

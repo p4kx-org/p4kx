@@ -30,7 +30,7 @@ mod playability_inputs;
 mod selection;
 
 pub(crate) use aggregate::ShipAggregateOperands;
-pub(crate) use playability_inputs::ShipPlayabilityInputs;
+pub use playability_inputs::ShipPlayabilityInputs;
 use selection::SelectedSource;
 
 #[cfg(test)]

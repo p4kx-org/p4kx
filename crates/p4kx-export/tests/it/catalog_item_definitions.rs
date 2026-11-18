@@ -395,7 +395,7 @@ fn class(name: &str) -> TestType {
 }
 
 #[path = "equipment_source_sdk.rs"]
-mod equipment_sdk;
+pub(crate) mod equipment_sdk;
 
 #[path = "item_source_projection_tests.rs"]
 mod source_projection;

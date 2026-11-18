@@ -11,7 +11,7 @@ use p4kx_testkit::{
 };
 use serde_json::Value;
 
-use crate::commodity_v3_fixture::TestResult;
+use crate::commodity_v3_fixture::{DcbOrigin, TestResult};
 
 pub(super) const XML: &str = "Data/Scripts/Entities/Vehicles/Implementations/Xml/AggregateShip.xml";
 pub(super) const PATCH: &str =
@@ -42,10 +42,16 @@ pub(super) enum Case {
 }
 
 pub(super) fn open(case: Case) -> TestResult<(tempfile::TempDir, Archive)> {
+    open_with_origin(case, DcbOrigin::Plain)
+}
+
+pub(super) fn open_with_origin(
+    case: Case,
+    origin: DcbOrigin,
+) -> TestResult<(tempfile::TempDir, Archive)> {
     let folder = tempfile::tempdir()?;
     let path = folder.path().join("Data.p4k");
-    let mut archive =
-        ArchiveBuilder::new().entry(TestEntry::zstd("Data/Game2.dcb", database(case)));
+    let mut archive = ArchiveBuilder::new().entry(dataforge(database(case), origin));
     if let Some(xml) = xml(case)? {
         let mut entry = TestEntry::zstd(XML, xml).encrypted();
         if matches!(case, Case::Unreadable | Case::UnreadableWithPhysics) {
@@ -151,4 +157,13 @@ fn repaired(mass: bool) -> TestResult<Vec<u8>> {
         .get_mut(at)
         .ok_or("actual original string-table byte")? = 0xff;
     Ok(bytes)
+}
+
+fn dataforge(bytes: Vec<u8>, origin: DcbOrigin) -> TestEntry {
+    let entry = TestEntry::zstd("Data/Game2.dcb", bytes);
+    match origin {
+        DcbOrigin::Plain => entry,
+        DcbOrigin::Encrypted => entry.encrypted(),
+        DcbOrigin::Unknown => entry.encrypted().with_encryption_field(7),
+    }
 }

@@ -29,10 +29,14 @@ pub enum AuthoredManufacturer<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(untagged)]
 #[schemars(transform = every_field_required)]
-pub(crate) enum ManufacturerValue<'source> {
+#[non_exhaustive]
+pub enum ManufacturerValue<'source> {
     #[schemars(with = "CatalogRecordReference")]
+    /// The original stored manufacturer Record reference.
     Record(Box<SourceRecordReference<'source>>),
+    /// Another authored representation retained without interpretation.
     Authored {
+        /// The original ordered fields and value occurrences.
         authored: SourceArenaOutput<'source>,
     },
 }

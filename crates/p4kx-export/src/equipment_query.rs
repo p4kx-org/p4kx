@@ -15,6 +15,8 @@ mod item_sources;
 mod read;
 #[path = "equipment_query_rows.rs"]
 mod rows;
+#[path = "equipment_ship_source_query.rs"]
+mod ship_sources;
 #[path = "equipment_query_snapshot.rs"]
 mod snapshot;
 
@@ -43,4 +45,16 @@ pub use item_sources::{with_item_sources, with_item_sources_from};
 pub use snapshot::{
     AttachmentConstraintSnapshot, EquipmentSnapshot, ItemBoundsSnapshot, ItemDefinitionSnapshot,
     ItemSourceSnapshot,
+};
+
+pub use crate::catalog_v3::authored_fields::authored_manufacturer::ManufacturerValue as ShipManufacturerValue;
+pub use crate::catalog_v3::authored_fields::ship_presentation::{
+    ShipAttachmentManufacturer, ShipVehicleManufacturer,
+};
+pub use crate::catalog_v3::authored_fields::ship_source_read::ShipPlayabilityInputs;
+pub use crate::contract_insurance::{ShipInsurance, ShipInsuranceParams};
+pub use crate::ship::ShipSource;
+pub use ship_sources::{
+    ShipSourceDependencyCoverage, ShipSourceEntryFailure, ShipSourceFailureStage,
+    ShipSourceSnapshot, with_ship_sources, with_ship_sources_from,
 };

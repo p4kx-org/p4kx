@@ -171,3 +171,29 @@ basis. The Catalog and standalone ShipBase share the traversal, fallback and rou
 Capture drains its per-resolution staging before publication. Only successful resolution returns
 aggregate cells and a reusable reader. Each cache hit binds the current physical Record to the
 observed file operation.
+
+
+## Selective Ship source snapshot
+
+The selective Ship source query and canonical scan share one source-read, ShipPool/Capture and
+conditional-Physics-diagnostic module. A common immutable ShipSource packet holds the exact
+original Header, presentation, manufacturer, crew, vehicle selector, size, insurance and
+crew-manifest cells, plus the three actually resolved aggregate cells. The canonical producer
+moves those same cells into its existing Ship fields without changing their meaning or shape.
+
+The query exposes free Archive/decoded-Entry, session and parsed-view interfaces. Physical
+selection admits the same canonical owners. GUID selection retains all physical aliases, and
+RecordIndex selects one exact original. Entity class lookup indexes source headers independently
+of selected output owners and opens their actual resolver dependencies. Reader caches and original
+proof bindings belong to the query's input and source inventory.
+
+Borrowed snapshots reuse the Equipment text, locale and provenance context and attach a separate
+typed dependency-coverage result. The caller checks owner and dependency coverage independently.
+Both preserve incomplete coverage when a returned numeric value has incomplete source coordinates.
+Missing requested inputs retain their failed-operation evidence. Each datum carries its own source
+marker, including known encrypted contributors beside unknown inputs.
+
+Cancellation and Archive-change checks surround selection, source capture and callback delivery.
+Publish consumer-owned state after successful completion of the outer query and acceptance of
+the required coverage. Use the full Catalog for canonical cargo, derived kind and playability,
+and unfiltered variant projections.

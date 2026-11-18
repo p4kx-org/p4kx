@@ -16,6 +16,11 @@ use crate::variants::ShipKey;
 #[path = "ship_source_identity.rs"]
 mod identity;
 pub(crate) use identity::ShipIdentity;
+#[path = "ship_source_projection.rs"]
+pub(crate) mod source_projection;
+#[path = "ship_source_row.rs"]
+mod source_row;
+pub use source_row::ShipSource;
 
 const PAINTS: &str = "Paints";
 pub(crate) const VEHICLE_COMPONENT: &str = "VehicleComponentParams";
@@ -58,7 +63,7 @@ fn takes_paints(port: &StructValue<'_>) -> bool {
 /// Projects original Ship fields together with the existing base, playability and paint results.
 pub(crate) fn ship<'f>(
     tree: &RecordTree<'f>,
-    source: ShipSourceRead<'_, 'f>,
+    mut source: ShipSourceRead<'_, 'f>,
     evidence: &Evidence,
     read: &ShipRead,
     aggregates: crate::loadout::ledger::ShipAggregateValues,
@@ -66,27 +71,28 @@ pub(crate) fn ship<'f>(
     let base = &read.base;
     let identity = ShipIdentity::read(&source.header)?;
     let playability = playability_rules::ship(tree, source.vehicle, evidence);
-    let presentation = source.presentation;
+    let source_numbers = std::mem::take(&mut source.numbers);
+    let source = ShipSource::from_read(source, aggregates);
     let guid = CatalogGuid(tree.guid());
     let ship = Ship {
         source_record_index: tree.record_index(),
         header: source.header,
         identity,
-        source_numbers: source.numbers,
-        name: presentation.name,
-        description: presentation.description,
-        role: presentation.role,
-        career: presentation.career,
+        source_numbers,
+        name: source.name,
+        description: source.description,
+        role: source.role,
+        career: source.career,
         crew_size: source.crew_size,
-        vehicle_manufacturer: presentation.vehicle_manufacturer,
-        attachment_manufacturer: presentation.attachment_manufacturer,
+        vehicle_manufacturer: source.vehicle_manufacturer,
+        attachment_manufacturer: source.attachment_manufacturer,
         vehicle_definition: source.vehicle_definition,
         playability,
         vehicle_kind: base.vehicle_kind,
-        size: presentation.size,
-        mass: aggregates.mass,
-        mass_basis: aggregates.mass_basis,
-        hull_health: aggregates.hull_health,
+        size: source.size,
+        mass: source.mass,
+        mass_basis: source.mass_basis,
+        hull_health: source.hull_health,
         cargo_scu: base.cargo.scu,
         cargo_grids_with_issue: base.cargo.grids_with_issue,
         variant_of: None,

@@ -15,7 +15,7 @@ use crate::source_fields::FieldError;
 #[path = "ship_manufacturers.rs"]
 mod manufacturers;
 
-pub(crate) use self::manufacturers::{ShipAttachmentManufacturer, ShipVehicleManufacturer};
+pub use self::manufacturers::{ShipAttachmentManufacturer, ShipVehicleManufacturer};
 
 pub(crate) struct ShipPresentation<'source> {
     pub(crate) vehicle_manufacturer: ShipVehicleManufacturer<'source>,

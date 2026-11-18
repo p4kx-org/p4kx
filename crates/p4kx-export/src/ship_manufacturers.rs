@@ -20,7 +20,7 @@ use crate::{CatalogError, ExportAccountingError};
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ShipVehicleManufacturer<'source> {
+pub struct ShipVehicleManufacturer<'source> {
     component_ordinal: SourcedValue<u32>,
     manufacturer: SourcedValue<ManufacturerValue<'source>>,
 }
@@ -29,7 +29,7 @@ pub(crate) struct ShipVehicleManufacturer<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ShipAttachmentManufacturer<'source> {
+pub struct ShipAttachmentManufacturer<'source> {
     component_ordinal: SourcedValue<u32>,
     attach_def_present: SourcedValue<bool>,
     manufacturer: SourcedValue<ManufacturerValue<'source>>,
@@ -111,4 +111,38 @@ pub(super) fn attachment<'source>(
         },
         size,
     })
+}
+
+impl<'source> ShipVehicleManufacturer<'source> {
+    /// Borrows the original selected vehicle-component position.
+    #[must_use]
+    pub const fn component_ordinal(&self) -> &SourcedValue<u32> {
+        &self.component_ordinal
+    }
+
+    /// Borrows the authored manufacturer value.
+    #[must_use]
+    pub const fn manufacturer(&self) -> &SourcedValue<ManufacturerValue<'source>> {
+        &self.manufacturer
+    }
+}
+
+impl<'source> ShipAttachmentManufacturer<'source> {
+    /// Borrows the original selected attachment-component position.
+    #[must_use]
+    pub const fn component_ordinal(&self) -> &SourcedValue<u32> {
+        &self.component_ordinal
+    }
+
+    /// Borrows the original attachment-definition state.
+    #[must_use]
+    pub const fn attach_def_present(&self) -> &SourcedValue<bool> {
+        &self.attach_def_present
+    }
+
+    /// Borrows the authored attachment manufacturer.
+    #[must_use]
+    pub const fn manufacturer(&self) -> &SourcedValue<ManufacturerValue<'source>> {
+        &self.manufacturer
+    }
 }

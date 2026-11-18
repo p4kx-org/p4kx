@@ -572,10 +572,30 @@ the unmodified authored vehicleDefinition selector, static insurance declaration
 and an authored CrewManifest link. The shared DCB interpreter reads these values in a single
 field walk and resolves the crew manifest to its Record header.
 
-Use a Catalog snapshot for the Ship row. The header and `vehicleDefinition` document their
-own inputs. Interpreted fields such as playability, XML totals and variants depend on their
-respective readers. See
-[the Ship contract](catalog.md#ship-dcb-source-fields) and
+Use `equipment::with_ship_sources`, its `_from` form or the session and parsed-view
+`with_ship_sources` method for the source-backed Ship fields. Choose `All`, `Guid` or
+`RecordIndex`. GUID selection retains every admissible physical alias. Rows keep canonical
+GUID order, then physical Record order for ties. The supplied `ShipSource` has immutable typed
+getters for the complete original Header, name/description/role/career, crew size, both
+manufacturer declarations, original vehicle selector, exact size, insurance and authored
+crew-manifest inputs, plus the canonical sourced mass, mass basis and hull health.
+
+This query shares the Catalog's original reader, Archive-backed ShipPool and per-call
+Capture. It uses the Entity header index to open the dependencies reached by the selected owners'
+Ship, loadout and cargo resolvers. It returns the selected rows in memory. An empty physical
+selection returns an empty source inventory and finishes before locale and Entity index setup.
+Use the result's text resolvers and source inventory to resolve original keys and text identities
+in the requested languages.
+
+Check `coverage()` for owner selection/read/field gaps and `dependency_coverage()` for actual
+failed Record/Entry operations, incomplete source coordinates and directory scope. Known absent,
+unreadable and available-but-incomplete cells remain distinct. Preserve the three-valued
+encryption marker independently of source completeness, and resolve every use against this
+result's own `source_inventory()`. Return consumer-owned values from the callback, and replace
+persistent state only after the outer operation succeeds and the required coverage is accepted.
+
+Use a Catalog snapshot for cargo projections, derived vehicle kind and playability, and variant
+choices. See [the Ship contract](catalog.md#ship-dcb-source-fields) and
 [ADR-0410](adr/0410-equipment-sdk-shares-original-family-readers-and-canonical-variant-choices.md).
 
 The Catalog's `mass`, `massBasis` and `hullHealth` are immediate sourced aggregate cells.
