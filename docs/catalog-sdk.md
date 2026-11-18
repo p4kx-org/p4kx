@@ -166,7 +166,7 @@ refer to different objects within the same Build.
 
 The mining reader supplies mining-specific placements and coverage. Read
 `placements.unresolvedContainerLinks` from the Catalog snapshot for original unresolved
-external Child occurrences and their Archive lookup states.
+external Child occurrences, Archive lookup states and target-body read states.
 
 ## Direct quality definitions
 

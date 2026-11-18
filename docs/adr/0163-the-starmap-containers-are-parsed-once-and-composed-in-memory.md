@@ -95,20 +95,33 @@ Each name cites its own original attribute or the observed absence at that Child
 ## Unresolved declared container occurrences
 
 The separate additive `placements.unresolvedContainerLinks` table retains each reached
-external Child whose normal path lookup has zero or multiple winning physical candidates.
+external Child whose normal path lookup has zero or multiple winning physical candidates, or
+one physical target whose body is unreadable or unparsed.
 A row uses the system root and original Child route for its occurrence identity and the
 enclosing physical container occurrence for its parent. Its immutable declaration retains the
 exact descriptor input, Child node position, raw authored path, independent local pose fields,
 original Starmap Record GUID and every original attribute occurrence with per-value evidence.
 
 Typed target states distinguish an exhausted supported lookup, ambiguous candidates,
-unsupported authored syntax and uncertain root directory membership. Candidate-set cells cite
+unsupported authored syntax and uncertain root directory membership. A unique target keeps
+Directory status `resolved`; `targetReadStatus` separately records the actual cached body outcome
+as `unreadable` or `unparsed`. A nonunique lookup is `notAttempted`. A successfully parsed empty
+target remains an ordinary resolved ContainerInstance. Candidate-set cells cite
 the original consulted root directory path range and the authored selector. One directory
 survey is shared by the source walk. The survey establishes the admitted path domain without
 reading target payloads or using a basename as a source join. Recovered membership keeps
 candidate-set completeness false.
 
-The source walk captures only the sparse unresolved declarations while their XML is borrowed.
+The source walk captures sparse missing/ambiguous declarations while their XML is borrowed.
+For unique targets the same original parse seals private raw attribute packets without
+materializing SourceUses. After the next breadth-first frontier classifies each target, failed
+bodies retain those original packets; successful bodies release them without orphan uses.
+The packet is bound to the actual Entry receipt and cannot be restored from equal DTOs or paths.
+Raw XML and its DOM are still dropped after that one parse; no second Archive read or parse is
+introduced. Temporary raw-attribute retention lasts until target classification and requires
+separate resource measurement. The Harvest descriptor scope captures no packets and runs no
+additional release traversal.
+
 A shared declaration is reused for every reached route. The production row writer uses its own
 staged stream with the same cancellation and cleanup behavior as the existing placement tables.
 Resolved occurrence membership and intrinsic read failures retain their current meanings.

@@ -14,7 +14,7 @@ use crate::catalog_read::original::{AuthoredEntryPath, EntryXml, XmlNodeSource};
 use crate::export_ledger::ExportLedger;
 use crate::starmap_containers::location_declaration::ChildLocation;
 use crate::starmap_containers::proof::ChildOrigins;
-use crate::starmap_containers::unresolved::UnresolvedChild;
+use crate::starmap_containers::unresolved::{DeferredChild, UnresolvedChild};
 use crate::starmap_index::Index;
 use crate::starmap_report::clip;
 use crate::starmap_xml::{Node, Root, attribute, first_below, pose};
@@ -27,6 +27,7 @@ pub(super) struct ChildReader<'a, 'read, 'capture, 'input, 'archive, 'cancel> {
     index: &'a Index<'archive>,
     ledger: &'a mut ExportLedger,
     pub(super) entity_guids: HashSet<Guid>,
+    pub(super) pending_external: bool,
 }
 
 impl<'a, 'read, 'capture, 'input, 'archive, 'cancel>
@@ -46,6 +47,7 @@ impl<'a, 'read, 'capture, 'input, 'archive, 'cancel>
             index,
             ledger,
             entity_guids: HashSet::new(),
+            pending_external: false,
         }
     }
 
@@ -127,15 +129,31 @@ impl<'a, 'read, 'capture, 'input, 'archive, 'cancel>
             })
             .map(|path| UnresolvedChild::capture(xml, child, path, self.bounds.directory.clone()))
             .transpose()?;
+        let deferred_external = self.defer_external(child, external.as_ref())?;
+        self.pending_external |= deferred_external.is_some();
         Ok(Child {
             pose,
             record,
             external,
             unresolved_external,
+            deferred_external,
             origins,
             location: location.map(Arc::new),
             below,
         })
+    }
+    fn defer_external(
+        &self,
+        node: Root<'_>,
+        path: Option<&AuthoredEntryPath>,
+    ) -> Result<Option<Box<DeferredChild>>, CatalogError> {
+        path.filter(|path| {
+            self.bounds.scope.companions && self.index.candidates(path.as_str()).len() == 1
+        })
+        .map(|_| {
+            DeferredChild::capture(self.xml, node, self.bounds.directory.clone()).map(Box::new)
+        })
+        .transpose()
     }
 }
 

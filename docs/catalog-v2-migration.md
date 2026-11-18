@@ -51,10 +51,11 @@ For the Commodity GUID join, resource fallbacks and exact presentation rules, se
 ## External container links
 
 Schema v3 includes `placements.unresolvedContainerLinks` as additive source evidence for a
-reached external Child whose target lookup has zero or multiple winning candidates. Join an
-occurrence's `parentInstanceId.value` to `placements.containerInstances.rows[].instanceId.value`
-within the same Catalog. Resolve source-use IDs in that Catalog. Use `exportHealth` alongside
-selection completeness for decisions about previously imported rows.
+reached external Child whose target lookup has zero or multiple winning candidates or whose
+unique target body is unreadable or unparsed. Join the occurrence's `parentInstanceId.value`
+to `placements.containerInstances.rows[].instanceId.value` within the same Catalog. Resolve
+source-use IDs in that Catalog. Use `exportHealth` alongside selection completeness for decisions
+about previously imported rows.
 
 Schema v3 also adds `declarations.lootEntityContainerDocuments` for original container-link
 attributes in the EntXML documents actually reached by the Loot walk. Document identity is the

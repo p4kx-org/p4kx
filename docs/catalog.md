@@ -1973,22 +1973,27 @@ occurrence. The instance key identifies the system root and original Child route
 keys refer to the enclosing physical container occurrence. Reused tiles keep separate
 local and world transforms, the exact declaring path, label and entity name.
 
-`placements.unresolvedContainerLinks` carries each reached external Child with zero or multiple
-winning physical Entry candidates. `instanceId` is the system root and original Child route.
+`placements.unresolvedContainerLinks` carries each reached external Child with no usable unique
+target body: zero/multiple winning physical Entry candidates, or one target whose body cannot be
+read or parsed. `instanceId` is the system root and original Child route.
 `parentInstanceId` joins to the enclosing `placements.containerInstances` row. The declaration
 retains the exact XML descriptor input and Child node position, authored path, independent local
 position and rotation, optional Starmap Record GUID and all original attribute name/value cells
 in source order. The same physical declaration can appear under several system routes.
 The world cells use the valid composed transform when available.
 
-`targetStatus.value` is `notFound` for an exhausted supported lookup in an intact Archive directory,
+`targetStatus.value` is `resolved` for one physical directory target even when its body is unavailable,
+`notFound` for an exhausted supported lookup in an intact Archive directory,
 `ambiguous` when the winning path names multiple physical entries, `unsupportedSelector` when
 the authored grammar cannot be searched, or `incompleteDirectory` when directory membership is
 uncertain. This sourced cell cites the authored selector and consulted directory survey, retaining
 their encryption marker and completeness. `targetCandidates` identifies the actual winning
 Entries with local input references.
-An empty candidate set with incomplete origin is insufficient to prove absence. Configured
-missing or ambiguous dependencies continue to affect `exportHealth` and normal publication.
+An empty candidate set with incomplete origin is insufficient to prove absence. `targetReadStatus.value` separately records `notAttempted` for a nonunique lookup, `unreadable` for
+a target without a readable descriptor body, or `unparsed` for an intrinsically invalid descriptor.
+It retains the actual directory/target selectors and claims no retained payload from failed reads.
+Configured missing, ambiguous or unreadable dependencies continue to affect `exportHealth` and
+normal publication.
 
 `placements.locationInstances` contains the typed location Children reached by the same walk.
 It uses the system root and physical Child route for each occurrence. `parentLocationId`

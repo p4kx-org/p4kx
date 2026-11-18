@@ -5,7 +5,8 @@ use std::borrow::Cow;
 
 use super::{PlacementRows, System, WalkPath};
 use crate::starmap_containers::instance::ContainerFile;
-use crate::starmap_containers::unresolved::UnresolvedOccurrence;
+use crate::starmap_containers::unresolved::{ContainerTargetReadStatus, UnresolvedOccurrence};
+use crate::starmap_parse::Body;
 use crate::starmap_parse::Child;
 use crate::{CatalogError, ExportAccountingError};
 
@@ -32,6 +33,14 @@ impl System<'_> {
             .route
             .as_deref()
             .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+        let read_status = match self.index.candidates(selector.as_str()) {
+            [target] => match self.bodies.get(target) {
+                Some(Body::Unreadable(_)) => ContainerTargetReadStatus::Unreadable,
+                Some(Body::Unparsed) => ContainerTargetReadStatus::Unparsed,
+                _ => return Err(ExportAccountingError::ConflictingSourceDatum.into()),
+            },
+            _ => ContainerTargetReadStatus::NotAttempted,
+        };
         let occurrence = UnresolvedOccurrence {
             root_entry: self.root_entry,
             root_inputs: &self.root,
@@ -40,6 +49,7 @@ impl System<'_> {
             selector,
             declaration,
             world: placed.map(|path| path.transform),
+            read_status,
         };
         match &mut self.rows {
             PlacementRows::Spool { unresolved, .. } => unresolved

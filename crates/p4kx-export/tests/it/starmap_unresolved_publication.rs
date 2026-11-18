@@ -201,3 +201,6 @@ fn verify_writer_refusal(source: &Fixture, previous: &[u8]) -> TestResult {
     }
     Ok(())
 }
+
+#[path = "starmap_unique_target_publication.rs"]
+mod unique_target;

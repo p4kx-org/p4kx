@@ -23,6 +23,10 @@ mod attribute;
 
 pub(crate) use attribute::XmlAttribute;
 
+#[path = "health_entry_xml_deferred.rs"]
+mod deferred;
+pub(crate) use deferred::DeferredXmlNode;
+
 /// One original XML attribute occurrence.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[schemars(transform = every_field_required)]
@@ -184,32 +188,12 @@ impl<'read, 'capture, 'input> EntryXml<'read, 'capture, 'input> {
         node: impl Node<'node>,
     ) -> Result<Vec<SourcedXmlAttribute>, CatalogError> {
         let source = self.node_source(node)?;
-        let sources = self.capture.source_uses();
-        let complete = !self.is_lossy();
-        node.attributes()
-            .enumerate()
-            .map(|(ordinal, (name, value))| {
-                let ordinal = u64::try_from(ordinal)
-                    .map_err(|_| ExportAccountingError::ConflictingSourceDatum)?;
-                let indices = vec![u64::from(source.index()), ordinal];
-                let field = format!("@{name}");
-                let name_use =
-                    source.observe(indices.clone(), field.clone(), SourceUseRole::Selector)?;
-                let value_use = source.observe(indices, field, SourceUseRole::Payload)?;
-                Ok(SourcedXmlAttribute {
-                    name: sources.value(
-                        SourceValue::Present(name.to_owned()),
-                        &[name_use],
-                        complete,
-                    ),
-                    value: sources.value(
-                        SourceValue::Present(value.to_owned()),
-                        &[value_use],
-                        complete,
-                    ),
-                })
-            })
-            .collect()
+        deferred::sourced_attributes(
+            &source,
+            node.attributes(),
+            self.capture.source_uses(),
+            !self.is_lossy(),
+        )
     }
 
     /// Returns direct text occurrences in their original order.

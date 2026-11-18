@@ -22,6 +22,7 @@ const CONTROL_TYPES: &[&str] = &[
     "CapacityStatus",
     "CatalogPublicationMode",
     "CommoditySelection",
+    "ContainerTargetReadStatus",
     "ContainerTargetStatus",
     "DatasetAvailability",
     "DefinitionStatus",

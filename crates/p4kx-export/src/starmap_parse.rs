@@ -25,6 +25,8 @@ mod children;
 
 #[path = "starmap_external_sources.rs"]
 mod external_sources;
+#[path = "starmap_failed_links.rs"]
+mod failed_links;
 
 #[path = "starmap_hcd.rs"]
 pub(crate) mod hcd;
@@ -52,6 +54,7 @@ pub(crate) struct Child {
     /// The path of the external container the Child names.
     pub(crate) external: Option<AuthoredEntryPath>,
     pub(crate) unresolved_external: Option<Arc<UnresolvedChild>>,
+    pub(crate) deferred_external: Option<Box<crate::starmap_containers::unresolved::DeferredChild>>,
     pub(crate) origins: Option<Arc<ChildOrigins>>,
     pub(crate) location: Option<Arc<ChildLocation>>,
     pub(crate) below: Level,
@@ -105,6 +108,7 @@ pub(crate) enum Body {
     Unparsed,
     Parsed {
         root: Level,
+        pending_external: bool,
         file: Box<ContainerFile>,
         fallback: Option<String>,
         gate: Option<Box<JumpGate>>,
@@ -198,6 +202,7 @@ fn parse_body(
         entities,
         gate,
         gate_proof,
+        pending_external,
     }) = parsed_root(&main.bytes, bounds, &files, index, ledger)?
     else {
         ledger.incomplete_inventory(Kind::StarmapObjects);
@@ -222,6 +227,7 @@ fn parse_body(
     Ok(Body::Parsed {
         root,
         file: Box::new(file),
+        pending_external,
         fallback: main.fallback,
         gate,
         gate_proof,
@@ -230,6 +236,7 @@ fn parse_body(
 
 struct ParsedRoot {
     root: Level,
+    pending_external: bool,
     file: ContainerFile,
     entities: entxml::EntXmlIndex,
     gate: Option<Box<JumpGate>>,
@@ -256,6 +263,7 @@ fn parsed_root(
     );
     let mut reader = children::ChildReader::new(bounds, &xml, &mut hcd, index, ledger);
     let root = reader.level(xml.root())?;
+    let pending_external = reader.pending_external;
     let guids = reader.entity_guids;
     let entities = files.scan(&guids, &xml, ledger)?;
     let (gate, gate_proof) = if bounds.scope.jump_endpoints {
@@ -276,6 +284,7 @@ fn parsed_root(
     Ok(Ok(ParsedRoot {
         root,
         file: ContainerFile::from_xml(&xml, files.capture)?,
+        pending_external,
         entities,
         gate,
         gate_proof,
@@ -331,6 +340,7 @@ pub(crate) fn read_all_scoped(
     let mut bodies: HashMap<usize, Body> = HashMap::new();
     let mut ledger = ExportLedger::default();
     let mut parsed = 0;
+    let mut pending = HashSet::new();
     let mut frontier: Vec<usize> = roots
         .iter()
         .copied()
@@ -352,13 +362,22 @@ pub(crate) fn read_all_scoped(
             &mut ledger,
         )?;
         for (entry, (body, observed)) in read {
+            if scope.companions {
+                failed_links::observe(entry, &body, &mut pending);
+            }
             bodies.insert(entry, body);
             ledger.merge(observed);
+        }
+        if scope.companions {
+            failed_links::finish(&mut bodies, &mut pending, index, capture, cancel)?;
         }
         frontier = next
             .into_iter()
             .filter(|entry| !bodies.contains_key(entry))
             .collect();
+    }
+    if scope.companions {
+        failed_links::completed(&pending, cancel)?;
     }
     Ok(Read {
         ledger,
