@@ -46,7 +46,7 @@ non-empty selections for CLI Archive listing, extraction and conversion; MCP ini
 tool listing and a read-only request; and GUI frames followed by exit. Windows and Linux check a
 software adapter. Linux uses native lavapipe for both the X11 window under Xvfb and the Wayland
 window under isolated Weston. The Wayland check disables X11 for that process and requires the
-viewport to report native 2× scaling. The packaged Linux smoke uses Xvfb. macOS checks native
+viewport to report native 2� scaling. The packaged Linux smoke uses Xvfb. macOS checks native
 Metal. Actual step outcomes populate the native runtime artifact only after successful execution.
 
 GUI and package smoke processes set an absolute `P4KX_FOLDERS_ROOT` to isolate settings, keys,
@@ -119,7 +119,15 @@ and the existing installed runtime checks. The ten-minute worker cap, thirty-fiv
 absolute deadline and forty-five-minute job limit remain unchanged. Checkpoint uploads consume
 the original observer allowance; a delayed upload can delay the next parent observation.
 Expiry can stop only the bound parent and cannot prove installer or descendant cleanup.
-Each checkpoint captures and uploads in separate runner steps within a combined three-minute allowance. Fixed unproven progress markers identify request validation, process observation and file preservation. The original result remains the acceptance authority.
+Each checkpoint captures and uploads in separate runner steps within a combined three-minute
+allowance. Fixed unproven progress files identify request validation, process observation and file
+preservation. Each Snapshot runs all synchronous validation, process reads, waits and file
+preservation in its own captured child. Its caller reserves bounded cleanup within the original
+absolute deadline and caps capture at 100 seconds, leaving the existing two-minute capture and
+one-minute upload steps unchanged. Caller timeout stops only that owned Snapshot child; its
+receipts retain an unproven verdict and cannot attest original-worker or installer cleanup.
+Checkpoint artifacts retain original copies under `checkpoints/NN` and caller progress and logs
+under `snapshots/NN`. The original result remains the acceptance authority.
 
 Before checksums and release notes are assembled, `check-release-matrix.ps1` requires:
 

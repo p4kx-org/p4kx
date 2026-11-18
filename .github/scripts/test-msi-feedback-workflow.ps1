@@ -56,7 +56,7 @@ for($index=0;$index -lt $checkpoints.Count;$index++){
         -not ($checkpoint -match '(?m)^        (continue-on-error|uses):')) 'Direct checkpoint can restart work, mask failure or bypass its bounded original observation.'
     Assert-FeedbackWorkflow ($uploaded.Contains('always() && !cancelled()') -and $uploaded.Contains("steps.msi-checkpoint-$ordinal.outcome != 'skipped'") -and
         $uploaded.Contains('actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9') -and
-        $uploaded -cmatch '(?m)^        timeout-minutes: 1\r?$' -and -not $uploaded.Contains('continue-on-error')) 'Checkpoint upload lost its separate existing transport budget or failure gate.'
+        $uploaded.Contains(('/observer/*/{0:d2}/*' -f $ordinal)) -and $uploaded -cmatch '(?m)^        timeout-minutes: 1\r?$' -and -not $uploaded.Contains('continue-on-error')) 'Checkpoint upload lost its separate existing transport budget or failure gate.'
     Assert-FeedbackWorkflow ($verify.IndexOf($checkpoint,[StringComparison]::Ordinal) -lt $verify.IndexOf($uploaded,[StringComparison]::Ordinal)) 'Checkpoint must be frozen before its independent upload.'
 }
 $entryWorkflow=Get-Content -Raw -LiteralPath (Join-Path $Repository '.github/workflows/release-windows.yml')

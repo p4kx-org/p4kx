@@ -79,6 +79,7 @@ jobs:
           .github/scripts/test-msi-feedback-chain-workflow.ps1
           .github/scripts/test-msi-phase-journal-encoding.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/msi-phase-journal-encoding')
           .github/scripts/test-msi-feedback-parent.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/msi-feedback-parent')
+          .github/scripts/test-msi-snapshot-budget.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/msi-snapshot-budget')
           foreach ($case in @('Complete','Timeout','Admission')) {
             .github/scripts/test-msi-observer.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK ('contracts/msi-observer-'+$case.ToLowerInvariant())) -Case $case -Milliseconds 10000 -SnapshotWaitMilliseconds 250
           }
@@ -184,7 +185,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: windows-msi-observer-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.P4KX_TARGET }}-1
-          path: ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/checkpoints/01/*
+          path: ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/*/01/*
           if-no-files-found: error
       - name: Preserve original MSI phase checkpoint 2
         id: msi-checkpoint-2
@@ -197,7 +198,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: windows-msi-observer-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.P4KX_TARGET }}-2
-          path: ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/checkpoints/02/*
+          path: ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/*/02/*
           if-no-files-found: error
       - name: Preserve original MSI phase checkpoint 3
         id: msi-checkpoint-3
@@ -210,7 +211,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: windows-msi-observer-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.P4KX_TARGET }}-3
-          path: ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/checkpoints/03/*
+          path: ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/*/03/*
           if-no-files-found: error
       - name: Preserve original MSI phase checkpoint 4
         id: msi-checkpoint-4
@@ -223,7 +224,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: windows-msi-observer-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.P4KX_TARGET }}-4
-          path: ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/checkpoints/04/*
+          path: ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/*/04/*
           if-no-files-found: error
       - name: Preserve original MSI phase checkpoint 5
         id: msi-checkpoint-5
@@ -236,7 +237,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: windows-msi-observer-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.P4KX_TARGET }}-5
-          path: ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/checkpoints/05/*
+          path: ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/*/05/*
           if-no-files-found: error
       - name: Preserve original MSI phase checkpoint 6
         id: msi-checkpoint-6
@@ -249,7 +250,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: windows-msi-observer-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.P4KX_TARGET }}-6
-          path: ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/checkpoints/06/*
+          path: ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/*/06/*
           if-no-files-found: error
       - name: Preserve original MSI phase checkpoint 7
         id: msi-checkpoint-7
@@ -262,7 +263,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: windows-msi-observer-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.P4KX_TARGET }}-7
-          path: ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/checkpoints/07/*
+          path: ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/*/07/*
           if-no-files-found: error
       - name: Preserve original MSI phase checkpoint 8
         id: msi-checkpoint-8
@@ -275,7 +276,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: windows-msi-observer-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.P4KX_TARGET }}-8
-          path: ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/checkpoints/08/*
+          path: ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/*/08/*
           if-no-files-found: error
       - name: Finish the original native MSI lifecycle
         if: ${{ always() && !cancelled() && steps.msi-launch.outcome == 'success' }}

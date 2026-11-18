@@ -151,3 +151,13 @@ the original raw PATH cases, repair, post-execute rollback, modern upgrades and 
 A noop or disabled-rollback cancellation retains the previous terminal sequence, journal binding,
 owner and exact raw PATH while leaving a fresh cleanup-only fence. These are new native checks,
 not claims that those checks have already passed.
+
+The observer's Snapshot reader runs in a separately supervised capture-only process. Its complete
+read, validation, process-observation, wait, copy and output path shares one caller allowance.
+Capture is capped at 100 seconds; cleanup reserves at most five seconds from the same original
+absolute deadline. A shortened capture never increases the original worker, observer, runner-step
+or job allowance. The watchdog signals only its own Snapshot process, not the original diagnostic
+parent, worker or installer descendants. Durable unproven stage files precede synchronous leaves
+and console progress, so a stalled leaf need not erase its last reached observation stage.
+Snapshot return or timeout does not replace the original result, closed journal, final cleanup
+and installed-runtime acceptance gates.

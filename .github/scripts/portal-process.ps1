@@ -48,7 +48,7 @@ function Receive-P4kxPortalChannels {
 }
 function Close-P4kxPortalProcess {
     param([Diagnostics.Process]$Process, [bool]$Started, [object[]]$Channels, [string]$Directory, [string]$Name,
-        [Collections.Generic.List[Exception]]$Failures, [hashtable]$Observation = @{})
+        [Collections.Generic.List[Exception]]$Failures, [hashtable]$Observation = @{}, [ValidateRange(1,5000)][int]$CleanupMilliseconds=5000)
     try {
         $Observation['started'] = $Started
         $Observation['signal_contract'] = 'direct-process-only'
@@ -56,7 +56,7 @@ function Close-P4kxPortalProcess {
             $Observation['pid'] = $Process.Id
             if (-not $Process.HasExited) {
                 $Process.Kill($false)
-                if (-not $Process.WaitForExit(5000)) { throw 'Portal child did not terminate after its watchdog.' }
+                if (-not $Process.WaitForExit($CleanupMilliseconds)) { throw 'Portal child did not terminate after its watchdog.' }
             }
             $Observation['exited'] = $Process.HasExited
             if ($Process.HasExited) { $Observation['exit_code'] = $Process.ExitCode }
@@ -82,7 +82,7 @@ function Invoke-P4kxPortalProcess {
     #>
     param([string]$Executable, [string[]]$Arguments, [string]$Directory, [string]$Name,
         [int]$Milliseconds = 5000, [int]$MaximumBytes = 131072, [hashtable]$Environment = @{},
-        [scriptblock]$OnOutput=$null, [hashtable]$Observation=@{})
+        [scriptblock]$OnOutput=$null, [hashtable]$Observation=@{}, [ValidateRange(1,5000)][int]$CleanupMilliseconds=5000)
     if ($Milliseconds -le 0 -or $MaximumBytes -le 0 -or $Name -cnotmatch '^[a-z0-9-]+$') { throw 'Invalid portal measurement bounds or name.' }
     $process = New-P4kxPackageProcess $Executable $Arguments $Directory
     foreach ($entry in $Environment.GetEnumerator()) { $process.StartInfo.Environment[$entry.Key] = [string]$entry.Value }
@@ -104,7 +104,7 @@ function Invoke-P4kxPortalProcess {
     catch { $failures.Add($_.Exception) }
     finally {
         $failuresBeforeClose = $failures.Count
-        Close-P4kxPortalProcess $process $started $channels $Directory $Name $failures -Observation $Observation
+        Close-P4kxPortalProcess $process $started $channels $Directory $Name $failures -Observation $Observation -CleanupMilliseconds $CleanupMilliseconds
     }
     if ($null -ne $OnOutput -and $Observation['exited'] -eq $true -and $channels.Count -eq 2 -and
         $failures.Count -eq $failuresBeforeClose) {
