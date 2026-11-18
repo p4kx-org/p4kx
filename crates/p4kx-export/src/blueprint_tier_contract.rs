@@ -17,7 +17,7 @@ use crate::source_value_catalog::SourceValueRef;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct BlueprintTier {
+pub struct BlueprintTier {
     pub(crate) blueprint: PhysicalBlueprintRef,
     pub(crate) tier_index: SourcedValue<u32>,
     pub(crate) source: SourceValueRef,
@@ -32,7 +32,7 @@ pub(crate) struct BlueprintTier {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct BlueprintCost {
+pub struct BlueprintCost {
     pub(crate) source: SourceValueRef,
     pub(crate) position: SourcedValue<BlueprintCostPosition>,
     pub(crate) context: crate::blueprint_context_contract::BlueprintCostContext,
@@ -47,14 +47,21 @@ pub(crate) struct BlueprintCost {
     rename_all_fields = "camelCase"
 )]
 #[schemars(transform = every_field_required)]
-pub(crate) enum BlueprintCostPosition {
+#[non_exhaustive]
+pub enum BlueprintCostPosition {
+    /// The single mandatory cost edge.
     Mandatory,
+    /// An original optional cost array entry.
     Optional {
+        /// The original zero-based array position.
         #[schemars(range(max = u32::MAX))]
         index: u32,
     },
+    /// An original alternative within a parent selection.
     Option {
+        /// The parent selection occurrence in the same Blueprint arena.
         parent: SourceValueRef,
+        /// The original zero-based array position.
         #[schemars(range(max = u32::MAX))]
         index: u32,
     },
@@ -68,24 +75,114 @@ pub(crate) enum BlueprintCostPosition {
     rename_all_fields = "camelCase"
 )]
 #[schemars(transform = every_field_required)]
-pub(crate) enum BlueprintCostMeaning {
+#[non_exhaustive]
+pub enum BlueprintCostMeaning {
+    /// An authored selection with its available alternatives.
     Select {
+        /// The interpreted number of alternatives to select.
         count: SourcedValue<ResourceInt64>,
+        /// The original debug name occurrence when available.
         debug_name: Option<SourceValueRef>,
         #[schemars(extend("x-gameText" = true))]
+        /// The protected localized selection name identity.
         display_name: SourcedValue<GameTextRef>,
+        /// Original option occurrences in authored order.
         options: Vec<SourceValueRef>,
     },
+    /// An authored resource ingredient.
     Resource {
+        /// The interpreted original resource GUID.
         resource_guid: SourcedValue<CatalogGuid>,
+        /// The interpreted resource quantity in SCU.
         quantity_scu: SourcedValue<f32>,
+        /// The interpreted minimum ingredient quality.
         min_quality: SourcedValue<ResourceInt64>,
     },
+    /// An authored item ingredient.
     Item {
+        /// The interpreted original item GUID.
         item_guid: SourcedValue<CatalogGuid>,
+        /// The interpreted whole item quantity.
         quantity_units: SourcedValue<ResourceInt64>,
+        /// The interpreted minimum ingredient quality.
         min_quality: SourcedValue<ResourceInt64>,
     },
+}
+
+impl BlueprintTier {
+    /// Borrows the physical owner of this tier.
+    #[must_use]
+    pub const fn blueprint(&self) -> &PhysicalBlueprintRef {
+        &self.blueprint
+    }
+
+    /// Borrows the original zero-based tier array position.
+    #[must_use]
+    pub const fn tier_index(&self) -> &SourcedValue<u32> {
+        &self.tier_index
+    }
+
+    /// Returns this tier occurrence within its Blueprint arena.
+    #[must_use]
+    pub const fn source(&self) -> SourceValueRef {
+        self.source
+    }
+
+    /// Borrows the interpreted crafting duration in whole seconds.
+    #[must_use]
+    pub const fn craft_time_seconds(&self) -> &SourcedValue<ResourceInt64> {
+        &self.craft_time_seconds
+    }
+
+    /// Returns the declared mandatory cost occurrence when available.
+    #[must_use]
+    pub const fn mandatory(&self) -> Option<SourceValueRef> {
+        self.mandatory
+    }
+
+    /// Borrows optional cost occurrences in their original order.
+    #[must_use]
+    pub fn optional(&self) -> &[SourceValueRef] {
+        &self.optional
+    }
+
+    /// Borrows interpreted costs in their authored depth-first order.
+    #[must_use]
+    pub fn costs(&self) -> &[BlueprintCost] {
+        &self.costs
+    }
+
+    /// Borrows the original research envelope interpretation.
+    #[must_use]
+    pub const fn research(&self) -> &BlueprintResearch {
+        &self.research
+    }
+}
+
+impl BlueprintCost {
+    /// Returns this cost occurrence within its Blueprint arena.
+    #[must_use]
+    pub const fn source(&self) -> SourceValueRef {
+        self.source
+    }
+
+    /// Borrows the exact authored cost edge and array position.
+    #[must_use]
+    pub const fn position(&self) -> &SourcedValue<BlueprintCostPosition> {
+        &self.position
+    }
+
+    /// Borrows the original context and effective cost rules.
+    #[must_use]
+    pub const fn context(&self) -> &crate::blueprint_context_contract::BlueprintCostContext {
+        &self.context
+    }
+
+    /// Borrows the recognized selection or ingredient interpretation.
+    #[must_use]
+    pub const fn meaning(&self) -> &BlueprintCostMeaning {
+        &self.meaning
+    }
 }
 
 #[cfg(test)]

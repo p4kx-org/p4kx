@@ -11,7 +11,8 @@ use super::health_record_key::RecordSubjectKey;
 use super::health_text_capture::CapturedText;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::record_header_field::RecordHeaderField;
-use crate::{CatalogError, ExportAccountingError};
+use crate::selection::KindRule;
+use crate::{CatalogError, ExportAccountingError, HealthText};
 
 #[derive(Debug, Clone)]
 struct HeaderFrame {
@@ -159,7 +160,7 @@ impl HeaderReadReceipt {
         )
     }
 
-    pub(super) const fn source_type_text(&self) -> Option<&crate::HealthText> {
+    pub(super) const fn source_type_text(&self) -> Option<&HealthText> {
         match &self.source_type {
             SourceValue::Present(value) => Some(value.text()),
             _ => None,
@@ -190,6 +191,44 @@ impl HeaderReadReceipt {
                 SourceUseRole::Selector,
             )?,
         })
+    }
+
+    pub(super) fn unclassified_selection_inputs(
+        &self,
+        rule: KindRule,
+        inventory: &SourceUses,
+    ) -> Result<Option<Vec<SourceUse>>, CatalogError> {
+        self.check_inventory(inventory)?;
+        let path = match &self.path {
+            SourceValue::Present(value) => Some(value.text().as_str()),
+            _ => None,
+        };
+        let source_type = self.source_type_text().map(HealthText::as_str);
+        if path.is_some_and(|path| !rule.matches_path(path))
+            || source_type.is_some_and(|name| name != rule.type_name)
+            || (path.is_some() && source_type.is_some())
+        {
+            return Ok(None);
+        }
+        let (_, mut inputs, _) = self
+            .header(
+                RecordHeaderField::Guid,
+                SourceValue::Present(self.key.guid()),
+                SourceUseRole::Selector,
+            )?
+            .into_parts();
+        inputs.push(self.frame.index.clone());
+        inputs.extend(self.source_type_only(inventory)?.into_parts().1);
+        inputs.extend(
+            self.header(
+                RecordHeaderField::FileName,
+                self.path.clone(),
+                SourceUseRole::Conversion,
+            )?
+            .into_parts()
+            .1,
+        );
+        Ok(Some(inputs))
     }
 
     fn check_inventory(&self, inventory: &SourceUses) -> Result<(), ExportAccountingError> {

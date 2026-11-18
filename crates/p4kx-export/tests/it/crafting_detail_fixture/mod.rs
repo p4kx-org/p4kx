@@ -34,7 +34,7 @@ pub(crate) const GLOBAL: u128 = 0x1200_0000_0000_4000_8000_0000_0000_0002;
 
 pub(super) const CRAFTING: &str = "libs/foundry/records/crafting";
 
-fn resource(guid: u128, scu: f32, context: Vec<TestValue>) -> TestValue {
+pub(crate) fn resource(guid: u128, scu: f32, context: Vec<TestValue>) -> TestValue {
     TestValue::Struct(
         TestInstance::new("CraftingCost_Resource")
             .value("context", TestValue::Array(context))
@@ -50,7 +50,7 @@ fn resource(guid: u128, scu: f32, context: Vec<TestValue>) -> TestValue {
     )
 }
 
-fn item(guid: u128, units: i32) -> TestValue {
+pub(crate) fn item(guid: u128, units: i32) -> TestValue {
     TestValue::Struct(
         TestInstance::new("CraftingCost_Item")
             .value("quantity", TestValue::Int32(units))
@@ -58,7 +58,7 @@ fn item(guid: u128, units: i32) -> TestValue {
     )
 }
 
-fn select(count: i32, debug: &str, options: Vec<TestValue>) -> TestValue {
+pub(crate) fn select(count: i32, debug: &str, options: Vec<TestValue>) -> TestValue {
     TestValue::Struct(
         TestInstance::new("CraftingCost_Select")
             .value("count", TestValue::Int32(count))
@@ -74,21 +74,21 @@ fn select(count: i32, debug: &str, options: Vec<TestValue>) -> TestValue {
     )
 }
 
-fn multiplier(factor: f32) -> TestValue {
+pub(crate) fn multiplier(factor: f32) -> TestValue {
     TestValue::Struct(
         TestInstance::new("CraftingCostContext_QuantityMultiplier")
             .value("multiplier", TestValue::Single(factor)),
     )
 }
 
-fn inclusion(option: &str) -> TestValue {
+pub(crate) fn inclusion(option: &str) -> TestValue {
     TestValue::Struct(
         TestInstance::new("CraftingCostContext_ResultCompositionInclusion")
             .value("option", TestValue::text(option)),
     )
 }
 
-fn modifiers() -> TestValue {
+pub(crate) fn modifiers() -> TestValue {
     let linear = TestInstance::new("CraftingGameplayPropertyModifierValueRange_Linear")
         .value("startQuality", TestValue::Int32(0))
         .value("endQuality", TestValue::Int32(1000))
@@ -119,7 +119,7 @@ fn modifiers() -> TestValue {
     )
 }
 
-pub(super) fn time(minutes: i32, seconds: f32) -> TestValue {
+pub(crate) fn time(minutes: i32, seconds: f32) -> TestValue {
     TestValue::Struct(
         TestInstance::new("TimeValue_Partitioned")
             .value("days", TestValue::Int32(0))

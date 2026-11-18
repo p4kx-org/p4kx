@@ -3,6 +3,9 @@
 
 //! Selective access to canonical catalog data in an opened game Archive.
 
+#[path = "blueprint_query.rs"]
+mod blueprints;
+
 #[path = "blueprint_category_query.rs"]
 mod blueprint_categories;
 #[path = "unlocalized_record_query.rs"]
@@ -365,3 +368,12 @@ pub use crate::resource_property_contract::{
 pub use crate::resource_type_contract::ResourceDefinition;
 
 pub use crate::mining_locations::{CompositionPart, MineableComposition, MineableElement};
+
+pub use blueprints::{
+    BlueprintCost, BlueprintCostContext, BlueprintCostMeaning, BlueprintCostPosition,
+    BlueprintDefinition, BlueprintDependencyCoverage, BlueprintDismantle, BlueprintIngredient,
+    BlueprintModifier, BlueprintModifierRange, BlueprintPresentation, BlueprintRangeKind,
+    BlueprintResearch, BlueprintResearchEnvelope, BlueprintResearchPointer, BlueprintSnapshot,
+    BlueprintTier, BlueprintUnsupportedRanges, PhysicalBlueprintRef, with_blueprints,
+    with_blueprints_from,
+};

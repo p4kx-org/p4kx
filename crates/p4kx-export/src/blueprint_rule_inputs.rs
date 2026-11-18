@@ -3,7 +3,7 @@
 
 use std::collections::BTreeMap;
 
-use p4kx_extraction::{CancelToken, Guid, RecordTree, SourceUse, SourceUseRole, Value};
+use p4kx_extraction::{CancelToken, Guid, Record, RecordTree, SourceUse, SourceUseRole, Value};
 
 use crate::CatalogError;
 use crate::blueprint_field_source::BlueprintField;
@@ -28,6 +28,22 @@ pub(super) struct RuleInputs {
 }
 
 impl BlueprintRules {
+    pub(crate) fn failed_header(record: &Record<'_>) -> Self {
+        let globals = possible_family(record, crate::crafting_records::GLOBALS);
+        Self {
+            defaults: RuleInputs {
+                unavailable: globals,
+                ..RuleInputs::default()
+            },
+            item_exclusions: RuleInputs {
+                unavailable: globals,
+                ..RuleInputs::default()
+            },
+            process_unavailable: possible_family(record, crate::crafting_records::DISMANTLES),
+            ..Self::default()
+        }
+    }
+
     pub(crate) fn merge(&mut self, other: Self) {
         self.defaults.merge(other.defaults);
         self.item_exclusions.merge(other.item_exclusions);
@@ -141,4 +157,13 @@ impl RuleInputs {
             self.members.entry(guid).or_default().extend(values);
         }
     }
+}
+
+fn possible_family(record: &Record<'_>, rule: crate::selection::KindRule) -> bool {
+    record
+        .record_path()
+        .map_or(true, |path| rule.matches_path(path))
+        && record
+            .type_name()
+            .map_or(true, |name| name == rule.type_name)
 }

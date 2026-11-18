@@ -310,3 +310,6 @@ fn the_blueprint_kind_selects_crafting_blueprint_records() {
         "type"
     );
 }
+
+#[path = "blueprint_query_suite.rs"]
+mod queries;

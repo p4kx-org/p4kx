@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 
-use p4kx_extraction::{Guid, Record, SourceUses};
+use p4kx_extraction::{Guid, Record, SourceUse, SourceUses};
 
 use super::OriginalDatum;
 use super::health_header_receipt::{CapturedSubject, HeaderReadReceipt};
@@ -11,6 +11,7 @@ use super::health_record_capture::CapturedRecord;
 use super::health_record_key::RecordSubjectKey;
 use super::health_text_capture::CapturedText;
 use crate::build::original_input::OriginalCatalogInput;
+use crate::selection::KindRule;
 use crate::{CatalogError, ExportAccountingError, HealthText};
 
 #[derive(Debug, Clone)]
@@ -93,6 +94,19 @@ impl RecordSubject {
             Subject::Captured(receipt) => receipt.check_input(input),
             Subject::Absent => Ok(()),
             Subject::Accounting(_) => Err(ExportAccountingError::UnboundHealthSubject),
+        }
+    }
+    /// Retains original inputs when readable headers cannot classify a possible rule source.
+    pub(crate) fn unclassified_selection_inputs(
+        &self,
+        rule: KindRule,
+        inventory: &SourceUses,
+    ) -> Result<Option<Vec<SourceUse>>, CatalogError> {
+        match &self.subject {
+            Subject::Captured(receipt) => receipt.unclassified_selection_inputs(rule, inventory),
+            Subject::Accounting(_) | Subject::Absent => {
+                Err(ExportAccountingError::UnboundHealthSubject.into())
+            }
         }
     }
     pub(super) fn retain_guid(

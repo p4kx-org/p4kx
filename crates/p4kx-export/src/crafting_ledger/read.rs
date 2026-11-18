@@ -49,7 +49,7 @@ fn candidate<'f>(
         ledger,
         quality: Step::default(),
         gameplay: None,
-        blueprint_rules: BlueprintRules::default(),
+        blueprint_rules: BlueprintRules::failed_header(record),
     })
 }
 fn failure<'f>(

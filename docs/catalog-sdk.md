@@ -277,3 +277,11 @@ These return the complete canonical source rows and immutable nested views, with
 resolution. ResourceType group membership demands a separate complete group-family survey.
 Check owner and dependency coverage before publishing a consumer cache. See
 [selective mining and resource queries](catalog-mining-resource-queries.md).
+
+## Physical Blueprint definitions, tiers and presentation
+
+`with_blueprints` and its `_from`/session forms return complete selected physical Blueprint
+source arenas, tier configurations and canonical presentation. All/GUID/RecordIndex selection
+preserves physical duplicates and original quality-slot positions. Rules load only the needed
+global/category/dismantle inputs; source, text and coverage remain available without `read_crafting`
+or a complete Catalog. See [Blueprint queries](catalog-blueprint-queries.md).

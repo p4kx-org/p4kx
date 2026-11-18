@@ -14,7 +14,7 @@ use crate::source_value_catalog::SourceValueRef;
 #[derive(Debug, Default, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct BlueprintCostContext {
+pub struct BlueprintCostContext {
     pub(crate) source: Option<SourceValueRef>,
     pub(crate) quantity_multiplier: Option<SourcedValue<f32>>,
     pub(crate) composition_inclusion: Option<SourceValueRef>,
@@ -25,7 +25,7 @@ pub(crate) struct BlueprintCostContext {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct BlueprintModifier {
+pub struct BlueprintModifier {
     pub(crate) source: SourceValueRef,
     pub(crate) property_guid: SourcedValue<CatalogGuid>,
     pub(crate) ranges: Vec<BlueprintModifierRange>,
@@ -35,7 +35,7 @@ pub(crate) struct BlueprintModifier {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct BlueprintModifierRange {
+pub struct BlueprintModifierRange {
     pub(crate) source: SourceValueRef,
     pub(crate) kind: BlueprintRangeKind,
     pub(crate) start_quality: SourcedValue<ResourceInt64>,
@@ -48,7 +48,94 @@ pub(crate) struct BlueprintModifierRange {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
-pub(crate) enum BlueprintRangeKind {
+#[non_exhaustive]
+pub enum BlueprintRangeKind {
+    /// A multiplicative contribution relative to one.
     Multiplier,
+    /// An additive contribution to the original base value.
     Additive,
+}
+
+impl BlueprintCostContext {
+    /// Returns the original context occurrence when available.
+    #[must_use]
+    pub const fn source(&self) -> Option<SourceValueRef> {
+        self.source
+    }
+
+    /// Borrows the effective quantity multiplier when interpreted.
+    #[must_use]
+    pub const fn quantity_multiplier(&self) -> Option<&SourcedValue<f32>> {
+        self.quantity_multiplier.as_ref()
+    }
+
+    /// Returns the effective original composition option occurrence.
+    #[must_use]
+    pub const fn composition_inclusion(&self) -> Option<SourceValueRef> {
+        self.composition_inclusion
+    }
+
+    /// Borrows original property modifiers in authored order.
+    #[must_use]
+    pub fn modifiers(&self) -> &[BlueprintModifier] {
+        &self.modifiers
+    }
+}
+
+impl BlueprintModifier {
+    /// Returns this modifier occurrence within its Blueprint arena.
+    #[must_use]
+    pub const fn source(&self) -> SourceValueRef {
+        self.source
+    }
+
+    /// Borrows the original gameplay property GUID interpretation.
+    #[must_use]
+    pub const fn property_guid(&self) -> &SourcedValue<CatalogGuid> {
+        &self.property_guid
+    }
+
+    /// Borrows recognized original ranges in authored order.
+    #[must_use]
+    pub fn ranges(&self) -> &[BlueprintModifierRange] {
+        &self.ranges
+    }
+}
+
+impl BlueprintModifierRange {
+    /// Returns this range occurrence within its Blueprint arena.
+    #[must_use]
+    pub const fn source(&self) -> SourceValueRef {
+        self.source
+    }
+
+    /// Borrows the supported modifier operation.
+    #[must_use]
+    pub const fn kind(&self) -> &BlueprintRangeKind {
+        &self.kind
+    }
+
+    /// Borrows the interpreted starting quality bound.
+    #[must_use]
+    pub const fn start_quality(&self) -> &SourcedValue<ResourceInt64> {
+        &self.start_quality
+    }
+
+    /// Borrows the interpreted ending quality bound.
+    #[must_use]
+    pub const fn end_quality(&self) -> &SourcedValue<ResourceInt64> {
+        &self.end_quality
+    }
+
+    /// Borrows the finite binary32 projection at the starting quality.
+    #[must_use]
+    pub const fn at_start(&self) -> &SourcedValue<f32> {
+        &self.at_start
+    }
+
+    /// Borrows the finite binary32 projection at the ending quality.
+    #[must_use]
+    pub const fn at_end(&self) -> &SourcedValue<f32> {
+        &self.at_end
+    }
 }

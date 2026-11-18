@@ -12,7 +12,7 @@ use crate::source_value_catalog::SourceValueRef;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct BlueprintResearch {
+pub struct BlueprintResearch {
     pub(crate) source: Option<SourceValueRef>,
     pub(crate) envelope: SourcedValue<BlueprintResearchEnvelope>,
 }
@@ -21,7 +21,7 @@ pub(crate) struct BlueprintResearch {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct BlueprintResearchEnvelope {
+pub struct BlueprintResearchEnvelope {
     pub(crate) research_costs: BlueprintResearchPointer,
     pub(crate) unlock_requirements: BlueprintResearchPointer,
 }
@@ -30,8 +30,56 @@ pub(crate) struct BlueprintResearchEnvelope {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct BlueprintResearchPointer {
+pub struct BlueprintResearchPointer {
     pub(crate) source: Option<SourceValueRef>,
     pub(crate) declared_base: SourcedValue<String>,
     pub(crate) value: SourcedValue<SourceValueRef>,
+}
+
+impl BlueprintResearch {
+    /// Returns the declared research occurrence when available.
+    #[must_use]
+    pub const fn source(&self) -> Option<SourceValueRef> {
+        self.source
+    }
+
+    /// Borrows the recognized envelope and its original value state.
+    #[must_use]
+    pub const fn envelope(&self) -> &SourcedValue<BlueprintResearchEnvelope> {
+        &self.envelope
+    }
+}
+
+impl BlueprintResearchEnvelope {
+    /// Borrows the original research cost pointer interpretation.
+    #[must_use]
+    pub const fn research_costs(&self) -> &BlueprintResearchPointer {
+        &self.research_costs
+    }
+
+    /// Borrows the original unlock requirement pointer interpretation.
+    #[must_use]
+    pub const fn unlock_requirements(&self) -> &BlueprintResearchPointer {
+        &self.unlock_requirements
+    }
+}
+
+impl BlueprintResearchPointer {
+    /// Returns the original pointer occurrence when available.
+    #[must_use]
+    pub const fn source(&self) -> Option<SourceValueRef> {
+        self.source
+    }
+
+    /// Borrows the original declared pointer target base.
+    #[must_use]
+    pub const fn declared_base(&self) -> &SourcedValue<String> {
+        &self.declared_base
+    }
+
+    /// Borrows the interpreted target occurrence and its support state.
+    #[must_use]
+    pub const fn value(&self) -> &SourcedValue<SourceValueRef> {
+        &self.value
+    }
 }

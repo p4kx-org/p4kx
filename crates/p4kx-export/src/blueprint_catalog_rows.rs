@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::HashSet;
 
-use p4kx_extraction::{DataForge, Guid, SourceUseRole, SourceValue, SourcedValue};
+use p4kx_extraction::{DataForge, Guid, SourceUse, SourceUseRole, SourceValue, SourcedValue};
 
+use crate::CatalogError;
 use crate::blueprint_catalog_read::PreparedBlueprint;
 use crate::blueprint_choice_inputs::BlueprintChoice;
 use crate::blueprint_definition::{BlueprintDefinition, PhysicalBlueprintRef};
@@ -17,7 +18,10 @@ use crate::catalog_table::{CatalogTable, DatasetAvailability};
 use crate::export_ledger::SourceObservation;
 use crate::guid_text::CatalogGuid;
 use crate::record_header_field::RecordHeaderField;
-use crate::{CatalogError, Kind};
+
+#[path = "blueprint_category_knowledge.rs"]
+mod category_knowledge;
+use category_knowledge::CategoryKnowledge;
 
 const SOURCE_TYPES: &[&str] = &["CraftingBlueprintRecord"];
 
@@ -36,6 +40,32 @@ pub(crate) struct BlueprintRowData<Definition> {
     presentation: BlueprintPresentation<BlueprintChoice<CatalogGuid>>,
 }
 
+pub(crate) struct ProcessChoice<'rules> {
+    pub(crate) guid: Option<Guid>,
+    pub(crate) sources: &'rules [SourceUse],
+    pub(crate) unavailable: bool,
+}
+
+impl<Definition> BlueprintRowData<Definition> {
+    pub(crate) fn take_definition(self) -> (Definition, BlueprintRowData<()>) {
+        let Self {
+            definition,
+            resources,
+            tiers,
+            presentation,
+        } = self;
+        (
+            definition,
+            BlueprintRowData {
+                definition: (),
+                resources,
+                tiers,
+                presentation,
+            },
+        )
+    }
+}
+
 pub(crate) struct BlueprintTables {
     pub(crate) tiers: CatalogTable<BlueprintTier>,
     pub(crate) presentation: CatalogTable<BlueprintPresentation<SourcedValue<CatalogGuid>>>,
@@ -46,6 +76,21 @@ pub(crate) fn row<'source>(
     rules: &BlueprintRules,
     process: Option<Guid>,
     origins: &CatalogOrigins,
+) -> Result<BlueprintRowData<BlueprintDefinition<'source>>, CatalogError> {
+    row_with_process(source, rules, origins, || {
+        Ok(ProcessChoice {
+            guid: process,
+            sources: &rules.processes,
+            unavailable: rules.process_unavailable,
+        })
+    })
+}
+
+pub(crate) fn row_with_process<'source, 'rules>(
+    source: PreparedBlueprint<'source>,
+    rules: &BlueprintRules,
+    origins: &CatalogOrigins,
+    process: impl FnOnce() -> Result<ProcessChoice<'rules>, CatalogError>,
 ) -> Result<BlueprintRowData<BlueprintDefinition<'source>>, CatalogError> {
     let guid = source.definition.physical_guid.0;
     let mut default_uses = rules.defaults.sources.clone();
@@ -61,7 +106,7 @@ pub(crate) fn row<'source>(
         &default_uses,
         !rules.defaults.unavailable,
     );
-    let dismantle = dismantle_choice(&source, rules, process, origins);
+    let dismantle = dismantle_choice(&source, rules, process, origins)?;
     let owner = PhysicalBlueprintRef {
         input_ref: source.definition.input_ref.clone(),
         record_index: source.record_index,
@@ -126,48 +171,55 @@ pub(crate) fn availability(forge: &DataForge<'_>, count: usize) -> DatasetAvaila
     }
 }
 
-fn dismantle_choice(
+fn dismantle_choice<'rules>(
     source: &PreparedBlueprint<'_>,
     rules: &BlueprintRules,
-    process: Option<Guid>,
+    process: impl FnOnce() -> Result<ProcessChoice<'rules>, CatalogError>,
     origins: &CatalogOrigins,
-) -> SourcedValue<BlueprintDismantle> {
+) -> Result<SourcedValue<BlueprintDismantle>, CatalogError> {
     let item = &source.produced_item;
     let SourceValue::Present(guid) = item.state else {
-        return origins
+        return Ok(origins
             .uses
-            .value(SourceValue::Absent, &item.used, item.complete);
+            .value(SourceValue::Absent, &item.used, item.complete));
     };
     let mut used = item.used.clone();
     if let Some(exclusion) = rules.item_exclusions.members.get(&guid.0) {
         used.extend(exclusion.iter().cloned());
-        return origins
+        return Ok(origins
             .uses
-            .value(SourceValue::Absent, &used, item.complete);
+            .value(SourceValue::Absent, &used, item.complete));
     }
     used.extend(rules.item_exclusions.sources.iter().cloned());
-    used.extend(rules.processes.iter().cloned());
-    let link = process.map_or(SourceValue::Absent, |process_guid| {
+    let process = process()?;
+    used.extend(process.sources.iter().cloned());
+    let link = process.guid.map_or(SourceValue::Absent, |process_guid| {
         SourceValue::Present(BlueprintDismantle {
             process_guid: CatalogGuid(process_guid),
             tier: source.first_tier,
         })
     });
-    origins.uses.value(
+    Ok(origins.uses.value(
         link,
         &used,
-        item.complete && !rules.item_exclusions.unavailable && !rules.process_unavailable,
-    )
+        item.complete && !rules.item_exclusions.unavailable && !process.unavailable,
+    ))
 }
 
-pub(crate) fn tables(
-    rows: Vec<BlueprintRow<'_>>,
+pub(crate) fn tables<Definition>(
+    rows: Vec<BlueprintRowData<Definition>>,
     missing: &HashSet<Guid>,
     sources: &[SourceObservation],
     forge: &DataForge<'_>,
     origins: &CatalogOrigins,
 ) -> Result<BlueprintTables, CatalogError> {
-    let missing = missing_sources(missing, sources);
+    let wanted = rows
+        .iter()
+        .filter_map(|row| match &row.presentation.category.state {
+            SourceValue::Present(guid) => Some(guid.0),
+            _ => None,
+        });
+    let knowledge = CategoryKnowledge::read(missing, wanted, sources, origins)?;
     let mut tiers = Vec::new();
     let mut presentations = Vec::with_capacity(rows.len());
     for BlueprintRowData {
@@ -186,22 +238,7 @@ pub(crate) fn tables(
             default_available,
             dismantle,
         } = presentation;
-        if let SourceValue::Present(guid) = &category.state
-            && let Some(physical) = missing.get(&guid.0)
-        {
-            for index in physical {
-                let context = origins.record(*index);
-                category.used.push(
-                    context.observe_header(RecordHeaderField::Guid, SourceUseRole::Selector)?,
-                );
-                category.used.push(
-                    context
-                        .observe_header(RecordHeaderField::SourceType, SourceUseRole::Selector)?,
-                );
-            }
-            category.complete &= !physical.is_empty();
-            category.state = SourceValue::Absent;
-        }
+        knowledge.finish(&mut category, origins)?;
         tiers.extend(recipe);
         presentations.push(BlueprintPresentation {
             blueprint,
@@ -218,27 +255,6 @@ pub(crate) fn tables(
         tiers: CatalogTable::new(forge, SOURCE_TYPES, tiers),
         presentation: CatalogTable::new(forge, SOURCE_TYPES, presentations),
     })
-}
-
-fn missing_sources(
-    missing: &HashSet<Guid>,
-    sources: &[SourceObservation],
-) -> BTreeMap<Guid, Vec<u32>> {
-    let mut found: BTreeMap<_, Vec<_>> = missing.iter().map(|guid| (*guid, Vec::new())).collect();
-    for source in sources {
-        if source.kind == Some(Kind::BlueprintCategories)
-            && (source.disposition.failed()
-                || matches!(
-                    source.disposition,
-                    crate::export_ledger::SourceDisposition::SkippedBeforeRead
-                        | crate::export_ledger::SourceDisposition::SkippedAfterRead
-                ))
-            && let Some(physical) = found.get_mut(&source.guid)
-        {
-            physical.push(source.record_index);
-        }
-    }
-    found
 }
 
 #[cfg(test)]

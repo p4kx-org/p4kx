@@ -15,7 +15,7 @@ use crate::source_value_catalog::SourceArenaOutput;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct BlueprintDefinition<'source> {
+pub struct BlueprintDefinition<'source> {
     #[serde(skip)]
     pub(crate) physical_guid: CatalogGuid,
     #[serde(skip)]
@@ -34,7 +34,41 @@ pub(crate) struct BlueprintDefinition<'source> {
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct PhysicalBlueprintRef {
+pub struct PhysicalBlueprintRef {
     pub(crate) input_ref: PhysicalSourceRef,
     pub(crate) record_index: u32,
+}
+
+impl<'source> BlueprintDefinition<'source> {
+    /// Borrows the physical input containing this Blueprint.
+    #[must_use]
+    pub const fn input_ref(&self) -> &PhysicalSourceRef {
+        &self.input_ref
+    }
+
+    /// Borrows the independently sourced physical Record header.
+    #[must_use]
+    pub const fn header(&self) -> &CanonicalRecordHeader<'source> {
+        &self.header
+    }
+
+    /// Borrows the complete owner-local original value arena.
+    #[must_use]
+    pub const fn source(&self) -> &SourceArenaOutput<'source> {
+        &self.source
+    }
+}
+
+impl PhysicalBlueprintRef {
+    /// Borrows the physical input containing the target Blueprint.
+    #[must_use]
+    pub const fn input_ref(&self) -> &PhysicalSourceRef {
+        &self.input_ref
+    }
+
+    /// Returns the physical Record position within that input.
+    #[must_use]
+    pub const fn record_index(&self) -> u32 {
+        self.record_index
+    }
 }

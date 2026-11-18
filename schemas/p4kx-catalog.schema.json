@@ -3157,9 +3157,11 @@
       "description": "The selection or ingredient interpretation of a recognized authored cost.",
       "oneOf": [
         {
+          "description": "An authored selection with its available alternatives.",
           "properties": {
             "count": {
-              "$ref": "#/$defs/SourcedValueOfResourceInt64"
+              "$ref": "#/$defs/SourcedValueOfResourceInt64",
+              "description": "The interpreted number of alternatives to select."
             },
             "debugName": {
               "anyOf": [
@@ -3169,13 +3171,16 @@
                 {
                   "type": "null"
                 }
-              ]
+              ],
+              "description": "The original debug name occurrence when available."
             },
             "displayName": {
               "$ref": "#/$defs/SourcedValueOfGameTextRef",
+              "description": "The protected localized selection name identity.",
               "x-gameText": true
             },
             "options": {
+              "description": "Original option occurrences in authored order.",
               "items": {
                 "$ref": "#/$defs/SourceValueRef"
               },
@@ -3196,15 +3201,19 @@
           "type": "object"
         },
         {
+          "description": "An authored resource ingredient.",
           "properties": {
             "minQuality": {
-              "$ref": "#/$defs/SourcedValueOfResourceInt64"
+              "$ref": "#/$defs/SourcedValueOfResourceInt64",
+              "description": "The interpreted minimum ingredient quality."
             },
             "quantityScu": {
-              "$ref": "#/$defs/SourcedValueOffloat"
+              "$ref": "#/$defs/SourcedValueOffloat",
+              "description": "The interpreted resource quantity in SCU."
             },
             "resourceGuid": {
-              "$ref": "#/$defs/SourcedValueOfGuid"
+              "$ref": "#/$defs/SourcedValueOfGuid",
+              "description": "The interpreted original resource GUID."
             },
             "type": {
               "const": "resource",
@@ -3220,15 +3229,19 @@
           "type": "object"
         },
         {
+          "description": "An authored item ingredient.",
           "properties": {
             "itemGuid": {
-              "$ref": "#/$defs/SourcedValueOfGuid"
+              "$ref": "#/$defs/SourcedValueOfGuid",
+              "description": "The interpreted original item GUID."
             },
             "minQuality": {
-              "$ref": "#/$defs/SourcedValueOfResourceInt64"
+              "$ref": "#/$defs/SourcedValueOfResourceInt64",
+              "description": "The interpreted minimum ingredient quality."
             },
             "quantityUnits": {
-              "$ref": "#/$defs/SourcedValueOfResourceInt64"
+              "$ref": "#/$defs/SourcedValueOfResourceInt64",
+              "description": "The interpreted whole item quantity."
             },
             "type": {
               "const": "item",
@@ -3250,6 +3263,7 @@
       "description": "The actual cost edge in the physical recipe tier.",
       "oneOf": [
         {
+          "description": "The single mandatory cost edge.",
           "properties": {
             "type": {
               "const": "mandatory",
@@ -3262,8 +3276,10 @@
           "type": "object"
         },
         {
+          "description": "An original optional cost array entry.",
           "properties": {
             "index": {
+              "description": "The original zero-based array position.",
               "format": "uint32",
               "maximum": 4294967295,
               "minimum": 0,
@@ -3281,15 +3297,18 @@
           "type": "object"
         },
         {
+          "description": "An original alternative within a parent selection.",
           "properties": {
             "index": {
+              "description": "The original zero-based array position.",
               "format": "uint32",
               "maximum": 4294967295,
               "minimum": 0,
               "type": "integer"
             },
             "parent": {
-              "$ref": "#/$defs/SourceValueRef"
+              "$ref": "#/$defs/SourceValueRef",
+              "description": "The parent selection occurrence in the same Blueprint arena."
             },
             "type": {
               "const": "option",
@@ -3553,11 +3572,18 @@
     },
     "BlueprintRangeKind": {
       "description": "The supported gameplay property range interpretation.",
-      "enum": [
-        "multiplier",
-        "additive"
+      "oneOf": [
+        {
+          "const": "multiplier",
+          "description": "A multiplicative contribution relative to one.",
+          "type": "string"
+        },
+        {
+          "const": "additive",
+          "description": "An additive contribution to the original base value.",
+          "type": "string"
+        }
       ],
-      "type": "string",
       "x-p4kx-vocabularyClass": "control"
     },
     "BlueprintResearch": {
