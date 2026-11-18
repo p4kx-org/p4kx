@@ -148,9 +148,7 @@ fn read_definition(definition: &PortDefinition) -> LoadoutPort {
             })
             .collect(),
         flags: words(definition.flags()),
-        display_name_key: Some(definition.display_name())
-            .filter(|key| !key.is_empty() && !is_placeholder_key(key))
-            .map(str::to_owned),
+        display_name_key: display_name_key(Some(definition.display_name())),
         port_tags: tag_words(definition.port_tags()),
         required_tags: tag_words(definition.required_tags()),
         ..LoadoutPort::default()
@@ -162,18 +160,24 @@ fn read_vehicle(port: &VehicleItemPort) -> LoadoutPort {
         min_size: port.min_size(),
         max_size: port.max_size(),
         types: port
-            .types()
+            .item_types()
             .iter()
             .map(|kind| PortType {
-                r#type: kind.clone(),
-                sub_types: Vec::new(),
+                r#type: kind.item_type().to_owned(),
+                sub_types: kind.subtypes().to_vec(),
             })
             .collect(),
         flags: words(port.flags()),
+        display_name_key: display_name_key(port.display_name()),
         port_tags: tag_words(port.port_tags()),
         required_tags: tag_words(port.required_tags()),
         ..LoadoutPort::default()
     }
+}
+
+fn display_name_key(key: Option<&str>) -> Option<String> {
+    key.filter(|key| !key.is_empty() && !is_placeholder_key(key))
+        .map(str::to_owned)
 }
 
 fn tag_words(text: &str) -> Vec<String> {

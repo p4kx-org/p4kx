@@ -87,10 +87,15 @@ fn the_ports_list_the_loadout_ports_then_the_vehicle_only_ports() -> TestResult 
     assert_eq!(
         empty["types"],
         json!([
-            {"type": "Missile", "subTypes": []},
-            {"type": "Bomb", "subTypes": []}
+            {"type": "Missile", "subTypes": ["IR", "EM", "IR"]},
+            {"type": "Bomb", "subTypes": []},
+            {"type": "Missile", "subTypes": ["Dumbfire", "Heat"]}
         ]),
-        "its types"
+        "the XML type and subtype orders retain repeated entries"
+    );
+    assert_eq!(
+        empty["displayNameKey"], "@fixture_vehicle_port",
+        "the XML display key remains as authored"
     );
     Ok(())
 }
@@ -156,6 +161,11 @@ fn a_port_the_record_lacks_takes_its_definition_from_the_vehicle_file() -> TestR
             &json!("invisible")
         ),
         "sizes, types, flags without the leading $, tags as stored and visibility"
+    );
+    assert_eq!(
+        gun["displayNameKey"],
+        Value::Null,
+        "the XML placeholder key is omitted"
     );
     Ok(())
 }

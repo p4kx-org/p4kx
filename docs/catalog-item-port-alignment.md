@@ -58,9 +58,10 @@ and `componentOrdinal.value` to the item-port container, then match its
 original Locale occurrence, and each available language carries its own source
 and display forms with no fallback. Empty or missing keys have an absent
 reference. Placeholder keys keep their canonical row and have no translations.
-Non-Locale storage does not supply a canonical key. The contextual
-`displayNameKey` retains its existing raw behavior, including for definitions
-outside the filter. XML-only ports have no physical slot to join.
+Non-Locale storage does not supply a canonical key. The contextual raw
+`displayNameKey` also carries the Record key for definitions outside the filter.
+XML-only definitions supply their raw `ItemPort@display_name` key directly.
+Each raw key is omitted when empty or when it is a placeholder.
 
 The resolver continues to place attachments using its established helper
 transforms and merge rules. The alignment labels and center-of-mass declaration
