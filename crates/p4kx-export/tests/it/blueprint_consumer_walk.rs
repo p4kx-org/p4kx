@@ -12,8 +12,7 @@ use serde_json::Value;
 
 use crate::canonical_header::wire::Wire;
 
-#[path = "blueprint_source_consumer_walk.rs"]
-mod originals;
+use crate::canonical_header::originals;
 
 pub(crate) type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 

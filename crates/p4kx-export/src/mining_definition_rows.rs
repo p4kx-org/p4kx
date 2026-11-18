@@ -82,3 +82,46 @@ impl Projector for Resources {
         Ok((read.value.data, read.notes))
     }
 }
+
+pub(super) struct Refining;
+pub(super) struct Globals;
+
+impl Projector for Refining {
+    type Row<'source> =
+        crate::catalog_v3::mining_process_catalog::RefiningProcessDefinition<'source>;
+    const KIND: Kind = Kind::RefiningProcesses;
+    const LOCALIZED: bool = true;
+
+    fn read<'source>(
+        tree: &RecordTree<'source>,
+        projection: &CatalogProjection<'_, 'source>,
+        admission: &RecordObservation<'_, 'source>,
+        _dependencies: &mut Dependencies,
+        cancel: Option<&CancelToken>,
+    ) -> Result<(Self::Row<'source>, Vec<FieldError>), CatalogError> {
+        let (prepared, notes) = crate::catalog_v3::mining_process_catalog::read_refining(
+            tree, projection, admission, cancel,
+        )?;
+        Ok((prepared.into_definition(), notes))
+    }
+}
+
+impl Projector for Globals {
+    type Row<'source> =
+        crate::catalog_v3::mining_process_catalog::MiningGlobalConfiguration<'source>;
+    const KIND: Kind = Kind::MiningGlobalParams;
+    const LOCALIZED: bool = false;
+
+    fn read<'source>(
+        tree: &RecordTree<'source>,
+        projection: &CatalogProjection<'_, 'source>,
+        admission: &RecordObservation<'_, 'source>,
+        _dependencies: &mut Dependencies,
+        cancel: Option<&CancelToken>,
+    ) -> Result<(Self::Row<'source>, Vec<FieldError>), CatalogError> {
+        let (prepared, notes) = crate::catalog_v3::mining_process_catalog::read_globals(
+            tree, projection, admission, cancel,
+        )?;
+        Ok((prepared.into_definition(), notes))
+    }
+}

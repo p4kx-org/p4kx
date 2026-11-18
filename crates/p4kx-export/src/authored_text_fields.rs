@@ -1,39 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::cell::RefCell;
-
-use p4kx_extraction::{
-    CancelToken, DataType, RecordTree, SourceUseRole, SourceValue, SourcedValue, Value,
-};
+use p4kx_extraction::{DataType, SourceUseRole, SourceValue, SourcedValue, Value};
 
 use super::{Fact, Observed};
 use crate::CatalogError;
 use crate::catalog_projection::CatalogProjection;
-use crate::catalog_read::original::{OriginalFlowFields, OriginalValuePart};
+use crate::catalog_read::original::OriginalValuePart;
 use crate::catalog_text_contract::{GameTextRef, PublicNameRef};
-use crate::record_observation::RecordObservation;
 use crate::source_fields::FieldError;
-use crate::template_field_capture::TemplateFieldCapture;
-
-/// Reads one protected Locale from an admitted Record root.
-pub(crate) fn read_root_locale<'source>(
-    tree: &RecordTree<'source>,
-    projection: &CatalogProjection<'_, 'source>,
-    admission: &RecordObservation<'_, 'source>,
-    cancel: Option<&CancelToken>,
-    field: &str,
-) -> Result<(SourcedValue<GameTextRef>, Vec<FieldError>), CatalogError> {
-    let input = projection.original();
-    let scope = input.record_scope(admission.record(), tree)?;
-    let originals = OriginalFlowFields::read(&scope, cancel)?;
-    let capture = TemplateFieldCapture::new(&originals, input, admission)?;
-    let numbers = RefCell::new(Vec::new());
-    let fields = Observed::definition(&originals, input, &capture, &numbers);
-    let mut notes = Vec::new();
-    let locale = fields.protected_locale(field, projection, &mut notes)?;
-    Ok((locale, notes))
-}
 
 impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
     pub(in crate::catalog_v3) fn public_name(

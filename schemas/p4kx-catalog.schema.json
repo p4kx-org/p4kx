@@ -5134,6 +5134,9 @@
         "lootGeneration": {
           "$ref": "#/$defs/CatalogTableOfLootGenerationComponent"
         },
+        "miningGlobal": {
+          "$ref": "#/$defs/CatalogTableOfMiningGlobalConfiguration"
+        },
         "miningLasers": {
           "$ref": "#/$defs/CatalogTableOfMiningLaser"
         },
@@ -5237,6 +5240,7 @@
         "jumpTunnelForces",
         "localContractGenerators",
         "lootGeneration",
+        "miningGlobal",
         "miningLasers",
         "missileConfigurations",
         "missionBoards",
@@ -5484,6 +5488,9 @@
         "qualityQuantizations": {
           "$ref": "#/$defs/CatalogTableOfQualityQuantizationDefinition"
         },
+        "refiningProcesses": {
+          "$ref": "#/$defs/CatalogTableOfRefiningProcessDefinition"
+        },
         "reputationContexts": {
           "$ref": "#/$defs/CatalogTableOfContextDefinition"
         },
@@ -5620,6 +5627,7 @@
         "proceduralPlanetAudio",
         "qualityDistributions",
         "qualityQuantizations",
+        "refiningProcesses",
         "reputationContexts",
         "reputationPerks",
         "reputationRewardAmounts",
@@ -7519,6 +7527,25 @@
       ],
       "type": "object"
     },
+    "CatalogTableOfMiningGlobalConfiguration": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/MiningGlobalConfiguration"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
     "CatalogTableOfMiningLaser": {
       "description": "One named typed dataset with its measured source-family availability.",
       "properties": {
@@ -7965,6 +7992,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/RadarOptionsConfiguration"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfRefiningProcessDefinition": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/RefiningProcessDefinition"
           },
           "type": "array"
         }
@@ -15444,32 +15490,6 @@
       ],
       "type": "object"
     },
-    "ExplosionPool": {
-      "description": "The numbers of `mineableExplosionParams` of a [`MiningGlobalParams`] besides the default\nexplosion.",
-      "properties": {
-        "dangerPoolFactor": {
-          "description": "`dangerPoolFactor`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "defaultVolume": {
-          "description": "`defaultVolume`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        }
-      },
-      "required": [
-        "dangerPoolFactor",
-        "defaultVolume"
-      ],
-      "type": "object"
-    },
     "Explosive": {
       "description": "One original explosive device component on its selected Item owner.",
       "properties": {
@@ -20337,68 +20357,6 @@
       ],
       "type": "object"
     },
-    "HitConsistency": {
-      "description": "`hitConsistencyParams` of a [`MiningGlobalParams`].",
-      "properties": {
-        "extractionMagnitude": {
-          "description": "`extractionMagnitude`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "hitHistoryWindow": {
-          "description": "`hitHistoryWindow`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "maxEffectOnInstability": {
-          "description": "`maxEffectOnInstability`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "minDeviation": {
-          "description": "`minDeviation`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "standardDeviationMultiplier": {
-          "description": "`standardDeviationMultiplier`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "timeExponent": {
-          "description": "`timeExponent`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        }
-      },
-      "required": [
-        "extractionMagnitude",
-        "hitHistoryWindow",
-        "maxEffectOnInstability",
-        "minDeviation",
-        "standardDeviationMultiplier",
-        "timeExponent"
-      ],
-      "type": "object"
-    },
     "HitManipulation": {
       "description": "Separate authored controls for AI and player hits.",
       "properties": {
@@ -21839,41 +21797,6 @@
         }
       ],
       "x-p4kx-vocabularyClass": "control"
-    },
-    "InstabilityParams": {
-      "description": "`mineableInstabilityParams` of a [`MiningGlobalParams`].",
-      "properties": {
-        "curveFactor": {
-          "description": "`instabilityCurveFactor`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "wavePeriod": {
-          "description": "`instabilityWavePeriod`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "waveVariance": {
-          "description": "`instabilityWaveVariance`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        }
-      },
-      "required": [
-        "curveFactor",
-        "wavePeriod",
-        "waveVariance"
-      ],
-      "type": "object"
     },
     "InstalledConfiguration": {
       "description": "Original flight configurations on one resolved vehicle Loadout occurrence.",
@@ -29274,6 +29197,22 @@
       ],
       "type": "object"
     },
+    "MiningExplosion": {
+      "description": "Independently sourced numeric fields of `mineableExplosionParams`.",
+      "properties": {
+        "dangerPoolFactor": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "defaultVolume": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        }
+      },
+      "required": [
+        "dangerPoolFactor",
+        "defaultVolume"
+      ],
+      "type": "object"
+    },
     "MiningFilter": {
       "description": "The original mining filter and its authored float modifier.",
       "properties": {
@@ -29294,256 +29233,130 @@
       ],
       "type": "object"
     },
-    "MiningGlobalParams": {
-      "description": "The mining parameters of one kind of miner: a `MiningGlobalParams` Record under `mining`. Each\nnumber is that of the Record, unchanged, and `null` when the Record states none. The effects,\nsounds and the default explosion of the Record are not exported.",
+    "MiningGlobalConfiguration": {
+      "description": "One physical mining configuration with exact values and its complete original field arena.",
       "properties": {
         "absorbableVolumeThreshold": {
-          "description": "`absorbableVolumeThreshold`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
-        "cScuPerVolume": {
-          "description": "`cSCUPerVolume`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+        "cSCUPerVolume": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
         "childRockInactivityLifetime": {
-          "description": "`childRockInactivityLifetime` in seconds.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
         "childRockInvulnerabilityTime": {
-          "description": "`childRockInvulnerabilityTime` in seconds.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
         "childRockLifeTimer": {
-          "description": "`childRockLifeTimer` in seconds.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
         "childRockZeroGDamping": {
-          "description": "`childRockZeroGDamping`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
         "className": {
-          "description": "The Record name without its type, e.g. `miningglobalparamsship`.",
-          "type": "string"
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "compositionMassMultiplier": {
-          "description": "`compositionMassMultiplier`; `null` for a Record without it.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
         "controlledBreakingDecayRate": {
-          "description": "`controlledBreakingDecayRate`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
         "controlledBreakingFillRate": {
-          "description": "`controlledBreakingFillRate`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
         "controlledBreakingFillRateDanger": {
-          "description": "`controlledBreakingFillRateDanger`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
         "dangerBreakingDecayRate": {
-          "description": "`dangerBreakingDecayRate`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
         "dangerBreakingFillRate": {
-          "description": "`dangerBreakingFillRate`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
         "dangerBreakingFillRateExponent": {
-          "description": "`dangerBreakingFillRateExponent`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
         "dangerToGadgetDamage": {
-          "description": "`dangerToGadgetDamage`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
         "decayPerMass": {
-          "description": "`decayPerMass`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
         "defaultMass": {
-          "description": "`defaultMass`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
-        "explosion": {
-          "$ref": "#/$defs/ExplosionPool",
-          "description": "`mineableExplosionParams`, without the default explosion."
+        "fields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "gadgetDestroyThreshold": {
-          "description": "`gadgetDestroyThreshold`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
         "gadgetDetachThreshold": {
-          "description": "`gadgetDetachThreshold`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
         "guid": {
-          "$ref": "#/$defs/Guid",
-          "description": "The GUID of the Record."
+          "$ref": "#/$defs/SourcedValueOfGuid"
         },
-        "hitConsistency": {
-          "$ref": "#/$defs/HitConsistency",
-          "description": "`hitConsistencyParams`."
+        "hitConsistencyParams": {
+          "$ref": "#/$defs/SourcedValueOfMiningHitConsistency"
         },
-        "instability": {
-          "$ref": "#/$defs/InstabilityParams",
-          "description": "`mineableInstabilityParams`."
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "mineableExplosionParams": {
+          "$ref": "#/$defs/SourcedValueOfMiningExplosion"
+        },
+        "mineableInstabilityParams": {
+          "$ref": "#/$defs/SourcedValueOfMiningInstability"
         },
         "modifierPersistenceTime": {
-          "description": "`modifierPersistenceTime` in seconds.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
         "optimalWindowFactor": {
-          "description": "`optimalWindowFactor`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
         "optimalWindowMaxSize": {
-          "description": "`optimalWindowMaxSize`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
         "optimalWindowSize": {
-          "description": "`optimalWindowSize`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
         "optimalWindowThinnessCurveFactor": {
-          "description": "`optimalWindowThinnessCurveFactor`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
         "powerCapacityPerMass": {
-          "description": "`powerCapacityPerMass`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "recordPath": {
-          "description": "The record path, without `.xml`.",
-          "type": "string"
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "resistanceCurveFactor": {
-          "description": "`resistanceCurveFactor`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "terrainFactorStaticThreshold": {
-          "description": "`terrainFactorStaticThreshold`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
-        "wasteResourceTypeGuid": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Guid"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The GUID of the `ResourceType` Record the Reference `wasteResourceType` links to; `null`\nfor a null Reference."
+        "wasteResourceType": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
         }
       },
       "required": [
         "absorbableVolumeThreshold",
-        "cScuPerVolume",
+        "cSCUPerVolume",
         "childRockInactivityLifetime",
         "childRockInvulnerabilityTime",
         "childRockLifeTimer",
@@ -29559,22 +29372,80 @@
         "dangerToGadgetDamage",
         "decayPerMass",
         "defaultMass",
-        "explosion",
+        "fields",
+        "fileName",
         "gadgetDestroyThreshold",
         "gadgetDetachThreshold",
         "guid",
-        "hitConsistency",
-        "instability",
+        "hitConsistencyParams",
+        "metadataTag",
+        "mineableExplosionParams",
+        "mineableInstabilityParams",
         "modifierPersistenceTime",
         "optimalWindowFactor",
         "optimalWindowMaxSize",
         "optimalWindowSize",
         "optimalWindowThinnessCurveFactor",
         "powerCapacityPerMass",
+        "recordIndex",
+        "recordName",
         "recordPath",
         "resistanceCurveFactor",
+        "sourceType",
         "terrainFactorStaticThreshold",
-        "wasteResourceTypeGuid"
+        "wasteResourceType"
+      ],
+      "type": "object"
+    },
+    "MiningHitConsistency": {
+      "description": "Independently sourced numeric fields of `hitConsistencyParams`.",
+      "properties": {
+        "extractionMagnitude": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "hitHistoryWindow": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "maxEffectOnInstability": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "minDeviation": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "standardDeviationMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "timeExponent": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        }
+      },
+      "required": [
+        "extractionMagnitude",
+        "hitHistoryWindow",
+        "maxEffectOnInstability",
+        "minDeviation",
+        "standardDeviationMultiplier",
+        "timeExponent"
+      ],
+      "type": "object"
+    },
+    "MiningInstability": {
+      "description": "Independently sourced numeric fields of `mineableInstabilityParams`.",
+      "properties": {
+        "instabilityCurveFactor": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "instabilityWavePeriod": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "instabilityWaveVariance": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        }
+      },
+      "required": [
+        "instabilityCurveFactor",
+        "instabilityWavePeriod",
+        "instabilityWaveVariance"
       ],
       "type": "object"
     },
@@ -38246,48 +38117,60 @@
       ],
       "type": "object"
     },
-    "RefiningProcess": {
-      "description": "A refining process: a `RefiningProcess` Record under `refiningprocess`, one method of a\nrefinery. The DataForge holds no yields.",
+    "RefiningProcessDefinition": {
+      "description": "One physical refining process with its original labels and complete field arena.",
       "properties": {
         "className": {
-          "description": "The Record name without its type, e.g. `processingtype-fastcareful`.",
-          "type": "string"
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "fields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "guid": {
-          "$ref": "#/$defs/Guid",
-          "description": "The GUID of the Record."
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "processName": {
           "$ref": "#/$defs/SourcedValueOfGameTextRef",
-          "description": "The name of the method, from `processName`. The localisation key and the texts are game\ntexts.",
           "x-gameText": true
         },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
         "recordPath": {
-          "description": "The record path, without `.xml`.",
-          "type": "string"
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "refiningQuality": {
-          "description": "`refiningQuality`, one of `Wasteful`, `Normal` and `Careful` on LIVE; `null` when the Record\nstates none. The schema keeps a string, as a new value is additive.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "refiningSpeed": {
-          "description": "`refiningSpeed`, one of `Slow`, `Normal` and `Fast` on LIVE; `null` when the Record states\nnone. The schema keeps a string, as a new value is additive.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         }
       },
       "required": [
         "className",
+        "fields",
+        "fileName",
         "guid",
+        "metadataTag",
         "processName",
+        "recordIndex",
+        "recordName",
         "recordPath",
         "refiningQuality",
-        "refiningSpeed"
+        "refiningSpeed",
+        "sourceType"
       ],
       "type": "object"
     },
@@ -98095,6 +97978,136 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfMiningExplosion": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/MiningExplosion"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfMiningFilter": {
       "allOf": [
         {
@@ -98189,6 +98202,266 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/MiningFilter"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfMiningHitConsistency": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/MiningHitConsistency"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfMiningInstability": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/MiningInstability"
               }
             }
           }
@@ -134614,13 +134887,6 @@
       },
       "type": "array"
     },
-    "miningGlobalParams": {
-      "description": "The mining parameters of each kind of miner, ordered by GUID.",
-      "items": {
-        "$ref": "#/$defs/MiningGlobalParams"
-      },
-      "type": "array"
-    },
     "missionLocalities": {
       "description": "The mission localities, sets of starmap objects, ordered by GUID.",
       "items": {
@@ -134667,13 +134933,6 @@
     "provenance": {
       "$ref": "#/$defs/SourceInventory",
       "description": "Physical source observations and actual contribution uses."
-    },
-    "refiningProcesses": {
-      "description": "The refining processes, ordered by GUID.",
-      "items": {
-        "$ref": "#/$defs/RefiningProcess"
-      },
-      "type": "array"
     },
     "schemaVersion": {
       "const": 3,
@@ -134747,7 +135006,6 @@
     "mineableCompositions",
     "mineableElements",
     "mineableEntities",
-    "miningGlobalParams",
     "missionLocalities",
     "missionLocationTemplates",
     "missionPropertySets",
@@ -134756,7 +135014,6 @@
     "placements",
     "projections",
     "provenance",
-    "refiningProcesses",
     "schemaVersion",
     "shipStoreSlugs",
     "ships",

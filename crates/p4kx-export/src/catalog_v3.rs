@@ -31,6 +31,8 @@ pub(crate) mod catalog_harvest_modules;
 pub(crate) mod mineable_composition_definition;
 #[path = "mineable_element_definition.rs"]
 pub(crate) mod mineable_element_definition;
+#[path = "mining_process_catalog.rs"]
+pub(crate) mod mining_process_catalog;
 
 #[path = "faction_definition.rs"]
 pub(crate) mod faction_definition;

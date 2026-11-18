@@ -19,7 +19,8 @@ Join the laser's present `globalParams.value.targetRecordIndex.value` to
 `source.recordIndex.value` inside the same build. A filtered catalog includes the
 target of a selected compatible reference. These definitions carry throttle
 change and acceleration settings, plus three original audio RTPC identifiers.
-The separate `miningGlobalParams` dataset describes the physical mining process.
+The separate `configurations.miningGlobal` table describes the physical mining process and
+retains its [complete original source](catalog-mining-refining.md).
 
 ## Attachable modifiers
 

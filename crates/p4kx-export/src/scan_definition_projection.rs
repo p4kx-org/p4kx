@@ -19,6 +19,8 @@ use crate::record_observation::RecordObservation;
 use crate::scan_health::ScanError;
 use crate::source_fields::FieldError;
 
+#[path = "scan_definition_projection/mining_definition.rs"]
+mod mining_definition;
 #[path = "scan_definition_projection/mission_definition.rs"]
 mod mission_definition;
 
@@ -73,14 +75,8 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
             Kind::ResourceTypes => self.resource_type_definition(admission, tree)?,
             Kind::ResourceGroups => self.resource_group(admission, tree)?,
             Kind::MineableElements => self.mineable_element(admission, tree)?,
-            Kind::RefiningProcesses | Kind::MineableCompositions => {
-                crate::mining::named_definition(
-                    kind,
-                    tree,
-                    &self.projection,
-                    admission,
-                    self.scan.options.cancel,
-                )?
+            Kind::RefiningProcesses | Kind::MineableCompositions | Kind::MiningGlobalParams => {
+                self.mining_definition(kind, admission, tree)?
             }
             Kind::MissionModuleDeclarations => self.module_declaration(admission, tree)?,
             Kind::MissionItems => self.mission_item_definition(admission, tree)?,

@@ -13,7 +13,7 @@ use crate::canonical_header::wire::Wire;
 #[path = "blueprint_error_consumer_walk.rs"]
 mod errors;
 
-pub(super) fn visit_arena(arena: &SourceArenaOutput<'_>, wire: Wire<'_>) -> TestResult {
+pub(crate) fn visit_arena(arena: &SourceArenaOutput<'_>, wire: Wire<'_>) -> TestResult {
     let roots = wire.field("roots")?;
     roots.len(arena.roots().len())?;
     for (index, field) in arena.roots().iter().enumerate() {
@@ -27,7 +27,7 @@ pub(super) fn visit_arena(arena: &SourceArenaOutput<'_>, wire: Wire<'_>) -> Test
     Ok(())
 }
 
-pub(super) fn visit_ref(
+pub(crate) fn visit_ref(
     reference: SourceValueRef,
     arena: &SourceArenaOutput<'_>,
     wire: Wire<'_>,

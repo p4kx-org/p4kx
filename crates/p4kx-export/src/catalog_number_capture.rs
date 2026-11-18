@@ -6,9 +6,9 @@ use std::collections::BTreeMap;
 
 use p4kx_extraction::Value;
 
-use crate::CatalogError;
 use crate::catalog_read::original::{OriginalFlowFields, OriginalValueFact, OriginalValueSite};
 use crate::resource_raw_policy::ResourceNumberContract;
+use crate::{CatalogError, ExportAccountingError};
 
 /// Exact scalar storage of one nonfinite source number.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -248,6 +248,42 @@ impl NumberCapture {
                     token,
                 });
         }
+    }
+
+    /// Retains one consistent receipt for each actually emitted original numeric occurrence.
+    pub(crate) fn deduplicate(
+        values: Vec<CapturedNumber>,
+    ) -> Result<Vec<CapturedNumber>, CatalogError> {
+        if values.len() < 2 {
+            return Ok(values);
+        }
+        let mut unique = BTreeMap::new();
+        for value in values {
+            let position = CapturedPosition {
+                record_index: value.record_index,
+                occurrence: value.occurrence,
+                field: value.field,
+            };
+            let scalar = CapturedScalar {
+                source_type: value.source_type,
+                contract: value.contract,
+                token: value.token,
+            };
+            match unique.entry(position) {
+                std::collections::btree_map::Entry::Vacant(entry) => {
+                    entry.insert(scalar);
+                }
+                std::collections::btree_map::Entry::Occupied(entry) => {
+                    if entry.get() != &scalar {
+                        return Err(ExportAccountingError::ConflictingSourceDatum.into());
+                    }
+                }
+            }
+        }
+        Ok(Self {
+            values: RefCell::new(unique),
+        }
+        .finish())
     }
 
     pub(crate) fn finish(self) -> Vec<CapturedNumber> {

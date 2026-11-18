@@ -33,6 +33,7 @@ use crate::template_projection::TemplateProjection;
 pub(crate) struct CatalogConfigurations<'source> {
     pub(crate) client_profile_settings: crate::ClientProfileSettings,
     pub(crate) reputation_triggers: CatalogTable<ReputationTriggerConfiguration<'source>>,
+    pub(crate) mining_global: CatalogTable<crate::catalog_v3::mining_process_catalog::MiningGlobalConfiguration<'source>>,
     pub(crate) blueprint_tiers: CatalogTable<crate::blueprint_tier_contract::BlueprintTier>,
     pub(crate) contract_templates: CatalogTable<TemplateProjection<'source>>,
     #[schemars(with = "CatalogTable<Durability<'source>>")]

@@ -41,17 +41,15 @@ fn guid(value: u128) -> String {
 }
 
 fn class_names<'a>(catalog: &'a Value, kind: &str) -> Vec<&'a str> {
-    catalog[kind]
-        .as_array()
+    let rows = if kind == "refiningProcesses" {
+        catalog.pointer("/definitions/refiningProcesses/rows")
+    } else {
+        catalog.get(kind)
+    };
+    rows.and_then(Value::as_array)
         .into_iter()
         .flatten()
-        .filter_map(|entry| {
-            if kind == "mineableElements" {
-                entry.pointer("/className/value").and_then(Value::as_str)
-            } else {
-                entry["className"].as_str()
-            }
-        })
+        .filter_map(|entry| entry.pointer("/className/value").and_then(Value::as_str))
         .collect()
 }
 
@@ -204,42 +202,39 @@ fn a_mineable_element_carries_direct_sourced_facts() -> TestResult {
 #[test]
 fn a_refining_process_carries_its_name_speed_and_quality() -> TestResult {
     let (built, catalog) = build(None)?;
-    let mut rows = catalog["refiningProcesses"].clone();
-    let Some([slow, fast]) = rows.as_array_mut().map(Vec::as_mut_slice) else {
+    let rows = catalog
+        .pointer("/definitions/refiningProcesses/rows")
+        .and_then(Value::as_array)
+        .ok_or("canonical refining rows")?;
+    let [slow, fast] = rows.as_slice() else {
         return Err("two selected refining processes".into());
     };
-    for (row, key, english) in [
-        (slow, "@refinery_ui_ProcessingType_SlowWasteful", None),
+    for (row, identity, class, speed, quality, key, english) in [
+        (
+            slow,
+            SLOW_WASTEFUL,
+            "processingtype-slowwasteful",
+            "Slow",
+            "Wasteful",
+            "@refinery_ui_ProcessingType_SlowWasteful",
+            None,
+        ),
         (
             fast,
+            FAST_CAREFUL,
+            "processingtype-fastcareful",
+            "Fast",
+            "Careful",
             "@refinery_ui_ProcessingType_FastCareful",
             Some("Fast, Careful"),
         ),
     ] {
         verify_name(&catalog, row, "processName", key, english)?;
-        row.as_object_mut()
-            .ok_or("refining process row")?
-            .remove("processName");
+        verify_refining_fields(row, identity, class, speed, quality);
     }
-    assert_eq!(
-        rows,
-        json!([
-            {
-                "guid": guid(SLOW_WASTEFUL),
-                "className": "processingtype-slowwasteful",
-                "recordPath": "libs/foundry/records/refiningprocess/processingtype-slowwasteful",
-                "refiningSpeed": "Slow",
-                "refiningQuality": "Wasteful",
-            },
-            {
-                "guid": guid(FAST_CAREFUL),
-                "className": "processingtype-fastcareful",
-                "recordPath": "libs/foundry/records/refiningprocess/processingtype-fastcareful",
-                "refiningSpeed": "Fast",
-                "refiningQuality": "Careful",
-            },
-        ]),
-        "ordered by GUID, the leftover left out"
+    assert!(
+        catalog.get("refiningProcesses").is_none(),
+        "no duplicate legacy root view"
     );
     let kind = built.summary().kind(Kind::RefiningProcesses);
     assert_eq!(
@@ -248,6 +243,30 @@ fn a_refining_process_carries_its_name_speed_and_quality() -> TestResult {
         "counts"
     );
     Ok(())
+}
+
+fn verify_refining_fields(row: &Value, identity: u128, class: &str, speed: &str, quality: &str) {
+    assert_eq!(
+        row.pointer("/guid/value"),
+        Some(&json!(guid(identity))),
+        "original GUID"
+    );
+    assert_eq!(
+        row.pointer("/className/value"),
+        Some(&json!(class)),
+        "original class"
+    );
+    assert_eq!(
+        row.pointer("/refiningSpeed/value"),
+        Some(&json!(speed)),
+        "authored speed label"
+    );
+    assert_eq!(
+        row.pointer("/refiningQuality/value"),
+        Some(&json!(quality)),
+        "authored quality label"
+    );
+    assert!(row.get("fields").is_some(), "complete original owner arena");
 }
 
 #[test]
@@ -303,3 +322,6 @@ pub(super) fn verify_name(
     );
     Ok(())
 }
+
+#[path = "mining_process_query_suite.rs"]
+mod processes;

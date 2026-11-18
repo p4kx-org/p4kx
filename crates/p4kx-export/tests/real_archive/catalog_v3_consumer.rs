@@ -72,6 +72,8 @@ pub(crate) fn row_location(kind: Kind) -> Cow<'static, str> {
     }
     let path = match kind {
         Kind::GameplayProperties => "/definitions/gameplayProperties",
+        Kind::RefiningProcesses => "/definitions/refiningProcesses",
+        Kind::MiningGlobalParams => "/configurations/miningGlobal",
         Kind::BlueprintCategoryLists => "/declarations/blueprintCategoryLists",
         Kind::Blueprints => "/definitions/blueprints",
         Kind::ShopInventories => "/definitions/shopInventories",
@@ -131,49 +133,7 @@ fn checked_table<'catalog>(
     let rows = table(catalog, path)?;
     for row in rows {
         identity(row, kind)?;
-        if uses_named_definition_table(kind)
-            || matches!(
-                kind,
-                Kind::Blueprints
-                    | Kind::ContractTemplates
-                    | Kind::MissionBrokerEntries
-                    | Kind::BlueprintCategories
-                    | Kind::BlueprintCategoryLists
-                    | Kind::ExplosionDefinitions
-                    | Kind::AmmoDefinitions
-                    | Kind::InventoryContainers
-                    | Kind::MedicalItemTierConfigs
-                    | Kind::ReputationContexts
-                    | Kind::ReputationScopes
-                    | Kind::ReputationStandings
-                    | Kind::GameplayProperties
-                    | Kind::Factions
-                    | Kind::FactionIdentities
-                    | Kind::FactionReputations
-                    | Kind::ReputationTriggerRecords
-                    | Kind::ReputationRewardAmounts
-                    | Kind::ReputationPerks
-                    | Kind::Infractions
-                    | Kind::InfractionSets
-                    | Kind::Jurisdictions
-                    | Kind::SecurityNetworkManifests
-                    | Kind::MissionModuleDeclarations
-                    | Kind::MissionLocationTemplates
-                    | Kind::LocationClasses
-                    | Kind::LocationFunctions
-                    | Kind::LocationSizes
-                    | Kind::LocationResourceSlots
-                    | Kind::LocationClassRegistries
-                    | Kind::LocationFunctionRegistries
-                    | Kind::LocationSizeRegistries
-                    | Kind::StarmapObjects
-                    | Kind::StarmapTypes
-                    | Kind::StarmapPresets
-                    | Kind::StarmapAmenities
-                    | Kind::CargoLoadingGlobals
-                    | Kind::ShopCommodityGlobals
-            )
-        {
+        if has_record_header(kind) {
             record_header(row)?;
         }
         if kind == Kind::BlueprintCategoryLists {
@@ -239,6 +199,7 @@ pub(crate) fn field<'row>(row: &'row Value, kind: Kind, name: &str) -> TestResul
                 | Kind::Jurisdictions
                 | Kind::SecurityNetworkManifests
                 | Kind::MissionModuleDeclarations
+                | Kind::MissionLocationTemplates
                 | Kind::LocationClasses
                 | Kind::LocationFunctions
                 | Kind::LocationSizes
@@ -254,6 +215,8 @@ pub(crate) fn field<'row>(row: &'row Value, kind: Kind, name: &str) -> TestResul
                 | Kind::ResourceTypes
                 | Kind::ResourceGroups
                 | Kind::Tags
+                | Kind::RefiningProcesses
+                | Kind::MiningGlobalParams
                 | Kind::QualityDistributions
                 | Kind::QualityQuantizations
                 | Kind::CargoLoadingGlobals
@@ -314,4 +277,51 @@ pub(crate) fn presentations(catalog: &Value) -> TestResult<&Vec<Value>> {
         return Err("Commodity definition/presentation identity closure differs".into());
     }
     Ok(rows)
+}
+
+const fn has_record_header(kind: Kind) -> bool {
+    uses_named_definition_table(kind)
+        || matches!(
+            kind,
+            Kind::Blueprints
+                | Kind::ContractTemplates
+                | Kind::MissionBrokerEntries
+                | Kind::BlueprintCategories
+                | Kind::BlueprintCategoryLists
+                | Kind::ExplosionDefinitions
+                | Kind::AmmoDefinitions
+                | Kind::InventoryContainers
+                | Kind::MedicalItemTierConfigs
+                | Kind::ReputationContexts
+                | Kind::ReputationScopes
+                | Kind::ReputationStandings
+                | Kind::GameplayProperties
+                | Kind::RefiningProcesses
+                | Kind::MiningGlobalParams
+                | Kind::Factions
+                | Kind::FactionIdentities
+                | Kind::FactionReputations
+                | Kind::ReputationTriggerRecords
+                | Kind::ReputationRewardAmounts
+                | Kind::ReputationPerks
+                | Kind::Infractions
+                | Kind::InfractionSets
+                | Kind::Jurisdictions
+                | Kind::SecurityNetworkManifests
+                | Kind::MissionModuleDeclarations
+                | Kind::MissionLocationTemplates
+                | Kind::LocationClasses
+                | Kind::LocationFunctions
+                | Kind::LocationSizes
+                | Kind::LocationResourceSlots
+                | Kind::LocationClassRegistries
+                | Kind::LocationFunctionRegistries
+                | Kind::LocationSizeRegistries
+                | Kind::StarmapObjects
+                | Kind::StarmapTypes
+                | Kind::StarmapPresets
+                | Kind::StarmapAmenities
+                | Kind::CargoLoadingGlobals
+                | Kind::ShopCommodityGlobals
+        )
 }

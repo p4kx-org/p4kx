@@ -314,3 +314,9 @@ fn quality_identity_allows_physical_alternatives_but_rejects_repeated_positions_
     );
     Ok(())
 }
+
+#[path = "catalog_v3_mining_consumer_tests.rs"]
+mod mining;
+
+#[path = "catalog_v3_location_consumer_tests.rs"]
+mod locations;

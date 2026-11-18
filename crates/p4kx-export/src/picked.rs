@@ -31,7 +31,6 @@ use crate::crafting_warning::CraftingWarning;
 use crate::item_class::ClassLine;
 use crate::loot_kinds::LootPick;
 use crate::manufacturer::Manufacturer;
-use crate::mining_params::mining_global_params;
 use crate::mission_kinds::MissionPick;
 use crate::paint_port::VehicleFacts;
 use crate::ship_base::ShipRead;
@@ -87,11 +86,11 @@ pub(crate) enum Picked<'f> {
     /// A mineable element.
     Mineable(Box<MineableElement>),
     /// A refining process.
-    Refining(RefiningProcess<'f>),
+    Refining(Box<RefiningProcess<'f>>),
     /// A mineable composition.
     Composition(Box<MineableComposition>),
     /// The mining parameters of a kind of miner.
-    MiningParams(MiningGlobalParams<'f>),
+    MiningParams(Box<MiningGlobalParams<'f>>),
     /// A mineable entity.
     MineableEntity(MineableEntity<'f>),
     /// A harvestable provider preset.
@@ -126,20 +125,18 @@ impl<'f> Picked<'f> {
         reason = "one exhaustive dispatch for the catalog kinds"
     )]
     pub(crate) fn entity(kind: Kind, tree: &RecordTree<'f>) -> Option<Self> {
-        Some(match kind {
-            Kind::Crafters => return crafter(tree).map(Self::Crafter),
-            Kind::MiningGlobalParams => Self::MiningParams(mining_global_params(tree)),
+        match kind {
+            Kind::Crafters => crafter(tree).map(Self::Crafter),
             Kind::MissionLocalities | Kind::ContractScenarios | Kind::CargoManifests => {
-                return MissionPick::entity(kind, tree).map(Self::Mission);
+                MissionPick::entity(kind, tree).map(Self::Mission)
             }
             Kind::LootTables
             | Kind::LootArchetypes
             | Kind::LegacyLootTables
-            | Kind::LegacyLootArchetypes => {
-                return LootPick::entity(kind, tree).map(Self::Loot);
-            }
+            | Kind::LegacyLootArchetypes => LootPick::entity(kind, tree).map(Self::Loot),
             Kind::Items
             | Kind::RefiningProcesses
+            | Kind::MiningGlobalParams
             | Kind::MineableElements
             | Kind::MineableCompositions
             | Kind::LootPoolFilters
@@ -234,8 +231,8 @@ impl<'f> Picked<'f> {
             | Kind::GeologyTextureSets
             | Kind::Soils
             | Kind::SoilTextureSets
-            | Kind::ShadingClasses => return None,
-        })
+            | Kind::ShadingClasses => None,
+        }
     }
 
     /// Returns `self` joined with the crafting station `tree` describes when `self` is an item,

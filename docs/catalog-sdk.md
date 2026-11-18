@@ -158,6 +158,17 @@ certificate: inspect header, body and field coverage separately before publishin
 cache data after outer success. The independent `projections.qualityQuantizationResources`
 SDK endpoint remains outstanding. [ADR-0406](adr/0406-direct-quality-queries-preserve-canonical-definitions-without-inverse-discovery.md)
 
+## Mining globals and refining processes
+
+`catalog_queries::mining` exposes `with_mining_global_params` and `with_refining_processes`,
+with `_from` functions and the corresponding session/parsed methods. They return the canonical
+`configurations.miningGlobal` and `definitions.refiningProcesses` rows with complete immutable
+original arenas, exact numeric storage, text and physical source inventories. All/GUID/RecordIndex
+preserve physical aliases. Only selected owner bodies and demanded requested refining locales are
+read; ResourceType/group/world discovery and a complete Catalog are unnecessary. Examine sourced
+states and owner/dependency coverage and publish caches only after outer success. See the
+[complete contract](catalog-mining-refining.md).
+
 ## Authored item ports
 
 Use `with_item_ports` or `with_item_ports_from` to read `configurations.itemPorts`
@@ -190,7 +201,10 @@ repeated occurrences, target header and lookup state. `MissionModuleInputPayload
 the existing input interpretations; additional source fields remain available through each
 owner's `SourceArenaOutput`. `dangling_guid_source()` exposes the complete optional GUID cell.
 Resolve every sourced cell through this snapshot's source inventory, including unknown encryption
-states. The legacy flags and entity-cluster GUID retain their existing nullable representation.
+states. `source()` supplies the independently sourced physical Record header. `disabled()` and
+`is_security_network_host()` retain original Bool states. `entity_cluster_member()` supplies the
+original sourced Record reference and its target-header state. `names()` preserves the sourced
+array and each original slot. Absent, null and failed interpretations remain distinct.
 
 A selection without an admitted template opens no locale payloads and builds no Tag graph.
 The snapshot carries protected name rows for the requested locales and the source

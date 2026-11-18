@@ -115,6 +115,10 @@ fn append_gameplay_definitions(emitted: &mut Vec<CatalogRow>, collected: &Collec
                 &collected.resource_network_globals,
             ))
             .chain(collected.cargo_globals.sources())
+            .chain(crate::catalog_v3::mining_process_catalog::sources(
+                &collected.refining_processes,
+                &collected.mining_global_params,
+            ))
             .chain(collected.loot_kinds.definitions.sources())
             .map(|(kind, guid, path, _)| CatalogRow {
                 kind,

@@ -59,6 +59,13 @@ for every speed and quality pair. They identify a method by GUID and record path
 holds no method names of the UEX kind, no yield per commodity and method, and no price: the only
 number near it is a `refiningQualityUnitMultiplier` on one Record. Refinery yields stay with UEX.
 
+Current schema 3 emits these physical declarations in `definitions.refiningProcesses.rows`.
+Each row has a sourced Record header and the complete original `fields` arena. `refiningSpeed`
+and `refiningQuality` are sourced open labels. `processName` is a protected text reference:
+join `processName.value` to `texts.gameTexts[].id.value` for the original Locale key and each
+language's sourced text forms. It is not an inline key/en/de object. The
+[mining/refining contract](catalog-mining-refining.md) defines the complete row and SDK shapes.
+
 ## Per-station yield profiles
 
 Third-party databases list refinery yield profiles per station: an ore mapped to a signed integer
@@ -96,3 +103,7 @@ p4kx grep <Data.p4k> Hephaestanite --in entries --limit 50
 - Catalog fields added with this spike: `densityGramsPerCubicCentimetre`, `refinedSubtypeGuid`.
 - Catalog kinds added by #460: `mineableElements` (instability and the other plain numbers per
   element, no pick per commodity, ADR-0065) and `refiningProcesses` (the 9 Records).
+
+These bullets record the historical additions and counts. Current consumers use sourced element
+tuning and the `definitions.refiningProcesses` table; the Kind selector `refiningProcesses`
+remains valid without restoring the old root array or plain-field representation.

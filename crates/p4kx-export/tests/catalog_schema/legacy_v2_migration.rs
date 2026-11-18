@@ -14,6 +14,8 @@ use super::schema_navigation::resolve;
 mod commodity;
 #[path = "legacy_v2_manufacturer.rs"]
 mod manufacturer;
+#[path = "legacy_v2_mining.rs"]
+mod mining;
 #[path = "legacy_v2_text_routes.rs"]
 mod text_routes;
 
@@ -150,7 +152,7 @@ fn verify_destination(schema: &Value, family: &str, row: &Mapping) -> Result {
     assert_eq!(
         destination.get("type").and_then(Value::as_str),
         Some("string"),
-        "{family}{} → {location}",
+        "{family}{} â†’ {location}",
         row.old
     );
     Ok(())

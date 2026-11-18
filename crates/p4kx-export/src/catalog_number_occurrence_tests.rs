@@ -224,3 +224,6 @@ fn named_contracts_retain_their_old_path_and_once_per_slot_behavior() {
         "a named receipt does not impersonate a complete Loot occurrence"
     );
 }
+
+#[path = "catalog_number_mining_occurrence_tests.rs"]
+mod mining;

@@ -51,6 +51,8 @@ pub(super) const fn uses_owned_number(kind: Kind) -> bool {
                 | Kind::StarmapObjects
                 | Kind::StarmapTypes
                 | Kind::StarmapPresets
+                | Kind::RefiningProcesses
+                | Kind::MiningGlobalParams
                 | Kind::StarmapAmenities
         )
 }
@@ -148,6 +150,8 @@ const fn uses_authored_raw_number(kind: Kind) -> bool {
             | Kind::StarmapObjects
             | Kind::StarmapTypes
             | Kind::StarmapPresets
+            | Kind::RefiningProcesses
+            | Kind::MiningGlobalParams
             | Kind::StarmapAmenities
     )
 }

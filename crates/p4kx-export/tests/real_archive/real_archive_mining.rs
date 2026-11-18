@@ -120,8 +120,8 @@ fn verify(path: &Path) -> TestResult {
         .iter()
         .filter_map(|process| {
             Some((
-                process["refiningSpeed"].as_str()?,
-                process["refiningQuality"].as_str()?,
+                process.pointer("/refiningSpeed/value")?.as_str()?,
+                process.pointer("/refiningQuality/value")?.as_str()?,
             ))
         })
         .collect();

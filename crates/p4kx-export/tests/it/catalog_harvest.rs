@@ -57,8 +57,12 @@ fn guid(value: u128) -> String {
 
 fn entry<'a>(catalog: &'a Value, kind: &str, record: u128) -> Result<&'a Value, Box<dyn Error>> {
     let requested = guid(record);
-    catalog[kind]
-        .as_array()
+    let rows = if kind == "miningGlobalParams" {
+        catalog.pointer("/configurations/miningGlobal/rows")
+    } else {
+        catalog.get(kind)
+    };
+    rows.and_then(Value::as_array)
         .into_iter()
         .flatten()
         .find(|entry| {
@@ -147,21 +151,30 @@ fn verify_composition_header(catalog: &Value, source: &Value) -> TestResult {
 fn the_mining_parameters_carry_their_numbers_and_nested_blocks() -> TestResult {
     let (built, catalog) = build(None)?;
     let params = entry(&catalog, "miningGlobalParams", PARAMS)?;
-    assert_eq!(params["className"], "MiningGlobalParamsShip");
-    assert_eq!(params["cScuPerVolume"], 0.7);
-    assert_eq!(params["defaultMass"], 100.0);
-    assert_eq!(params["compositionMassMultiplier"], 1.5);
-    assert_eq!(params["gadgetDestroyThreshold"], Value::Null);
-    assert_eq!(params["hitConsistency"]["timeExponent"], 2.0);
-    assert_eq!(params["hitConsistency"]["minDeviation"], Value::Null);
-    assert_eq!(params["wasteResourceTypeGuid"], guid(RESOURCE).as_str());
+    assert_eq!(params["className"]["value"], "MiningGlobalParamsShip");
+    assert_eq!(params["cSCUPerVolume"]["value"]["finite"], 0.7);
+    assert_eq!(params["defaultMass"]["value"]["finite"], 100.0);
+    assert_eq!(params["compositionMassMultiplier"]["value"]["finite"], 1.5);
+    assert_eq!(params["gadgetDestroyThreshold"]["state"], "absent");
+    assert_eq!(
+        params["hitConsistencyParams"]["value"]["timeExponent"]["value"]["finite"],
+        2.0
+    );
+    assert_eq!(
+        params["hitConsistencyParams"]["value"]["minDeviation"]["state"],
+        "absent"
+    );
+    assert_eq!(
+        params["wasteResourceType"]["value"]["guid"]["value"],
+        guid(RESOURCE).as_str()
+    );
     let kind = built.summary().kind(Kind::MiningGlobalParams);
     assert_eq!(kind.map(|kind| (kind.count, kind.skipped)), Some((1, 1)));
     Ok(())
 }
 
 #[test]
-fn a_record_without_the_mass_multiplier_leaves_it_null() -> TestResult {
+fn a_record_without_the_mass_multiplier_retains_its_absence() -> TestResult {
     let dir = tempfile::tempdir()?;
     let archive = Archive::open_with_key(
         write_archive_without_mass_multiplier(dir.path())?,
@@ -174,8 +187,8 @@ fn a_record_without_the_mass_multiplier_leaves_it_null() -> TestResult {
     let built = build_catalog(&archive, &options)?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let params = entry(&catalog, "miningGlobalParams", PARAMS)?;
-    assert_eq!(params["compositionMassMultiplier"], Value::Null);
-    assert_eq!(params["defaultMass"], 100.0);
+    assert_eq!(params["compositionMassMultiplier"]["state"], "absent");
+    assert_eq!(params["defaultMass"]["value"]["finite"], 100.0);
     Ok(())
 }
 

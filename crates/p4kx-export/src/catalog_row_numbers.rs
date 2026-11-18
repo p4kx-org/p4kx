@@ -63,6 +63,10 @@ fn physical_definition_number_groups<'rows>(
         .chain(
             resource_network_global::sources(&collected.resource_network_globals)
                 .chain(collected.cargo_globals.sources())
+                .chain(crate::catalog_v3::mining_process_catalog::sources(
+                    &collected.refining_processes,
+                    &collected.mining_global_params,
+                ))
                 .map(|(kind, _, _, numbers)| (kind, numbers)),
         )
 }

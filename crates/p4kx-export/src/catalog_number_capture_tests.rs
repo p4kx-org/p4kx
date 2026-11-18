@@ -126,3 +126,6 @@ fn finite_loot_values_do_not_allocate_conditional_receipt_paths() {
         "the complete scalar DTO carries finite data without a conditional receipt"
     );
 }
+
+#[path = "catalog_number_dedup_tests.rs"]
+mod dedup;

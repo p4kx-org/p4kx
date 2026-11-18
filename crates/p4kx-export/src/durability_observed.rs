@@ -40,7 +40,6 @@ pub(crate) mod authored_manufacturer;
 pub(crate) mod ship_presentation;
 #[path = "authored_text_fields.rs"]
 mod text_fields;
-pub(crate) use text_fields::read_root_locale;
 #[path = "authored_unsigned_fields.rs"]
 mod unsigned;
 

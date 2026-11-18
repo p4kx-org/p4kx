@@ -1,37 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::SourcedValue;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::catalog_text_contract::GameTextRef;
 use crate::contract::every_field_required;
 use crate::guid_text::CatalogGuid;
-
-/// A refining process: a `RefiningProcess` Record under `refiningprocess`, one method of a
-/// refinery. The DataForge holds no yields.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct RefiningProcess<'a> {
-    /// The GUID of the Record.
-    pub(crate) guid: CatalogGuid,
-    /// The Record name without its type, e.g. `processingtype-fastcareful`.
-    pub(crate) class_name: &'a str,
-    /// The record path, without `.xml`.
-    pub(crate) record_path: &'a str,
-    /// The name of the method, from `processName`. The localisation key and the texts are game
-    /// texts.
-    #[schemars(extend("x-gameText" = true))]
-    pub(crate) process_name: SourcedValue<GameTextRef>,
-    /// `refiningSpeed`, one of `Slow`, `Normal` and `Fast` on LIVE; `null` when the Record states
-    /// none. The schema keeps a string, as a new value is additive.
-    pub(crate) refining_speed: Option<&'a str>,
-    /// `refiningQuality`, one of `Wasteful`, `Normal` and `Careful` on LIVE; `null` when the Record
-    /// states none. The schema keeps a string, as a new value is additive.
-    pub(crate) refining_quality: Option<&'a str>,
-}
 
 /// A mineable entity: an `EntityClassDefinition` Record under `entities/mineable`, one kind of
 /// rock or deposit. Many entities share a composition; a provider preset reaches an entity through

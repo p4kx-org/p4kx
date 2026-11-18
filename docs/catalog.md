@@ -259,9 +259,9 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `configurations.localContractGenerators` | Ordered authored Handler scope and mission-board availability. [Contract generator sources](catalog-contract-generators.md#local-generator-configuration) |
 | `declarations.contractScenarioRequirements` | Ordered authored scenario references at their original Generator, Handler and Contract slots. [Contract generator sources](catalog-contract-generators.md#authored-scenario-requirements) |
 | `mineableElements` | Mineable elements with their original tuning values and sourced `resourceType` links, ordered by GUID and physical Record index |
-| `refiningProcesses` | The refining processes (speed and quality pairs of a refinery), ordered by GUID |
+| `definitions.refiningProcesses` | Physical refining processes with sourced labels and complete original field arenas, ordered by GUID and physical Record index |
 | `mineableCompositions` | The elements a rock or deposit is made of, with the range and chance of each, ordered by GUID |
-| `miningGlobalParams` | The mining parameters of each kind of miner (ship, ground vehicle, FPS), ordered by GUID |
+| `configurations.miningGlobal` | Physical mining configurations with exact sourced numbers, owned blocks and original references, ordered by GUID and physical Record index |
 | `harvestableProviderPresets` | What a place can spawn: groups of harvestables followed to their composition, and areas, ordered by GUID |
 | `subHarvestableMultiConfigs` | What the slots of an object can hold by tag, ordered by GUID |
 | `harvestableLocations` | The containers whose `.soc` names a provider preset, with the starmap object each hangs below, ordered by preset, container, system and object |
@@ -2080,14 +2080,18 @@ absence, null and unreadable source facts. The table gives the observed finite r
 | `explosionMultiplier` | `elementExplosionMultiplier` | -1000 to 260 |
 | `clusterFactor` | `elementClusterFactor` | 0 to 1 |
 
-A refining process (`refiningProcesses`) is a `RefiningProcess` Record under `refiningprocess`
-(9 on LIVE, one per pair of speed and quality). `refiningSpeed` (`Slow`, `Normal`, `Fast`) and
-`refiningQuality` (`Wasteful`, `Normal`, `Careful`) are closed sets kept as strings, so a new value
-is additive. `processName` is a sourced reference to the localised method label in
-`texts.gameTexts`. On LIVE (2026-10-22) the English `global.ini` holds all nine keys and the German
-one none, leaving German display values absent for those keys. The
-DataForge holds no yield per commodity and method: yields are not in the Archive and stay with
-other sources.
+A refining process in `definitions.refiningProcesses.rows` is a physical `RefiningProcess`
+Record under `refiningprocess` (9 on LIVE, one per pair of speed and quality). Its sourced
+Record header retains physical identity, and `fields` retains the complete owner-local original
+arena. `refiningSpeed` and `refiningQuality` are independently sourced open String/Enum labels;
+`Slow`, `Normal`, `Fast` and `Wasteful`, `Normal`, `Careful` are observed labels, not closed
+exporter-control vocabularies. Their original spelling and empty values remain exact.
+`processName.value` resolves against `texts.gameTexts[].id.value`; the text row retains the
+original Locale key in `key.value` and sourced `sourceText`/`displayText` forms in
+`translations.value`. On LIVE (2026-10-22) the English `global.ini` holds all nine keys and the
+German one none, leaving German display values absent for those keys. That LIVE source has no
+yield per commodity and method; these yields remain external data.
+See the [mining/refining contract](catalog-mining-refining.md) for source states and typed SDK access.
 
 The 46 element Records of LIVE give 43 entries: the development-leftover rule leaves out
 `MinableElement_Ship_template`, `MinableElement_GroundVehicle_template` and
@@ -2113,13 +2117,25 @@ dangling. Target metadata carries its own source evidence alongside the resoluti
 use their source width. Floating-point values retain `rawBits` and a nullable `finite` number,
 and 64-bit integers use decimal strings. The local mining reader shares this sourced shape.
 
-**Parameters (`miningGlobalParams`).** The `MiningGlobalParams` Records under `mining` (7 on LIVE,
-6 entries). Every number of the Record is a field of the same name in camel case (`cScuPerVolume`
-for `cSCUPerVolume`; `compositionMassMultiplier` is `null` on a Record without it, as on LIVE
-4.10); `hitConsistencyParams`, `mineableInstabilityParams` and the numbers `dangerPoolFactor` and
-`defaultVolume` of `mineableExplosionParams` are the objects `hitConsistency`, `instability` and
-`explosion`. Particle effects, audio triggers and the default explosion are not
-exported. `wasteResourceTypeGuid` is the `ResourceType` of the waste.
+**Parameters (`configurations.miningGlobal.rows`).** The `MiningGlobalParams` Records under
+`mining` (7 on LIVE, 6 entries) retain the sourced physical header and complete original `fields`
+arena. All 26 root numbers keep their original names, including `cSCUPerVolume`. Every projected
+number is a `SourcedValue<ResourceNumber>`: integers retain their width, Int64/UInt64 use exact
+decimal strings, and Single/Double retain raw IEEE bits plus a nullable width-correct finite value.
+Absent declarations, explicit nulls and unreadable values remain distinct; no plain-number or
+null shortcut is emitted. The historical LIVE 4.10 example represented
+a missing `compositionMassMultiplier` with a plain null; current rows retain the actual sourced
+state rather than inferring it from that legacy representation.
+
+The independently sourced `hitConsistencyParams`, `mineableInstabilityParams` and
+`mineableExplosionParams` blocks retain all 11 typed child numbers under their original names,
+including `instabilityCurveFactor`, `instabilityWavePeriod` and `instabilityWaveVariance`, and
+`dangerPoolFactor`/`defaultVolume`. Effects, sound and default-explosion declarations remain in
+the original arena without claiming decoded media or engine semantics. `wasteResourceType` is
+the sourced original Record link: `wasteResourceType.value.guid.value` retains the authored GUID,
+with physical target metadata and resolution status alongside it. No ResourceType body is
+required for this link. See [the complete contract](catalog-mining-refining.md) and
+[ADR0408](adr/0408-canonical-mining-and-refining-tables-preserve-original-owner-data.md).
 
 **Entities (`mineableEntities`).** The `EntityClassDefinition` Records under `entities/mineable`
 (269 on LIVE 4.10, 231 entries; the leftover rule skips the 38 `test` and `template` Records,
@@ -2812,6 +2828,10 @@ for resolved and unresolved counts and reports placeholders separately. See [Tex
 for the wire structure, state rules and per-form source evidence.
 
 ## Selection
+
+The mining selectors `refiningProcesses` and `miningGlobalParams` below are Kind names, not v3
+root-array paths. They emit `definitions.refiningProcesses.rows` and
+`configurations.miningGlobal.rows` respectively.
 
 | Kind | Record-path prefix | Type |
 |------|--------------------|------|

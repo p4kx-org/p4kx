@@ -321,9 +321,9 @@ impl<'f> Collected<'f> {
             }
             Picked::StarmapDefinition(entity) => self.starmap_definitions.push(entity),
             Picked::Mineable(entity) => self.mineable_elements.push(*entity),
-            Picked::Refining(entity) => self.refining_processes.push(entity),
+            Picked::Refining(entity) => self.refining_processes.push(*entity),
             Picked::Composition(entity) => self.mineable_compositions.push(*entity),
-            Picked::MiningParams(entity) => self.mining_global_params.push(entity),
+            Picked::MiningParams(entity) => self.mining_global_params.push(*entity),
             Picked::MineableEntity(entity) => self.mineable_entities.push(entity),
             Picked::Provider(entity) => self.harvestable_provider_presets.push(*entity),
             Picked::MultiConfig {

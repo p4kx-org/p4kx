@@ -59,6 +59,7 @@ do not substitute an inventory from another query.
 
 Borrowed ResourceType and text rows stay inside the callback. Return consumer-owned values if they
 must outlive the query. This additive SDK surface preserves Schema v3 wire fields and values.
-Independent harvesting/world/placement, refining, item and blueprint domains remain separate work.
+[Mining globals and refining](catalog-mining-refining.md) have separate selective endpoints.
+Independent harvesting/world/placement and item domains remain separate work.
 
 Decision: [ADR0403](adr/0403-direct-mining-resource-queries-retain-canonical-membership-dependencies.md).

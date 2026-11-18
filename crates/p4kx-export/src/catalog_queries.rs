@@ -52,6 +52,9 @@ mod item_ports;
 mod manufacturers;
 #[path = "mining_definition_query.rs"]
 mod mining_definitions;
+
+/// Canonical mining globals and refining processes without world discovery.
+pub use mining_definitions::process_api as mining;
 #[path = "mission_location_query.rs"]
 mod mission_location_templates;
 #[path = "reputation_query.rs"]

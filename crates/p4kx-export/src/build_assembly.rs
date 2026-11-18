@@ -252,6 +252,10 @@ pub(super) fn assemble<R>(
                 &forge,
                 collected.blueprint_categories,
             ),
+            refining_processes: crate::catalog_v3::mining_process_catalog::refining_table(
+                &forge,
+                collected.refining_processes,
+            ),
             quality_distributions: quality.distributions,
             quality_quantizations: quality.quantizations,
             resource_groups: group_tables.definitions,
@@ -289,6 +293,10 @@ pub(super) fn assemble<R>(
         },
         configurations: crate::catalog_configurations::CatalogConfigurations {
             client_profile_settings,
+            mining_global: crate::catalog_v3::mining_process_catalog::globals_table(
+                &forge,
+                collected.mining_global_params,
+            ),
             blueprint_tiers: blueprints.tiers,
             reputation_triggers: reputation_tables.factions.triggers,
             independent: independent.tables,
@@ -338,9 +346,7 @@ pub(super) fn assemble<R>(
         paints: collected.paints,
         loadouts: collected.loadouts,
         mineable_elements: collected.mineable_elements,
-        refining_processes: collected.refining_processes,
         mineable_compositions: collected.mineable_compositions,
-        mining_global_params: collected.mining_global_params,
         harvestable_provider_presets: collected.harvestable_provider_presets,
         sub_harvestable_multi_configs: collected.sub_harvestable_multi_configs,
         harvestable_locations: collected.harvestable_locations,

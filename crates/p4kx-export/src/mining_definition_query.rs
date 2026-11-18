@@ -9,6 +9,8 @@ mod dependencies;
 mod elements;
 #[path = "mining_definition_plan.rs"]
 mod plan;
+#[path = "mining_process_query.rs"]
+pub mod process_api;
 #[path = "mining_definition_read.rs"]
 mod read;
 #[path = "resource_type_query.rs"]

@@ -290,3 +290,6 @@ pub(crate) mod wire;
 
 #[path = "canonical_json.rs"]
 pub(crate) mod json;
+
+#[path = "blueprint_source_consumer_walk.rs"]
+pub(crate) mod originals;

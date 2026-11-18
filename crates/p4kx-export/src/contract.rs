@@ -15,6 +15,9 @@ use crate::loadout::staging::StagedLoadouts;
 pub(crate) use crate::catalog_v3::catalog_harvest_modules::harvest_provider::HarvestableProviderPreset;
 pub(crate) use crate::catalog_v3::mineable_composition_definition::MineableComposition;
 pub(crate) use crate::catalog_v3::mineable_element_definition::MineableElement;
+pub(crate) use crate::catalog_v3::mining_process_catalog::{
+    PreparedMiningGlobal as MiningGlobalParams, PreparedRefining as RefiningProcess,
+};
 pub(crate) use crate::catalog_v3::resource_group_catalog::ResourceGroup;
 pub(crate) use crate::commodity_contract::Commodity;
 pub(crate) use crate::contract_cargo::CargoManifest;
@@ -26,8 +29,7 @@ pub(crate) use crate::contract_harvest_config::SubHarvestableMultiConfig;
 pub(crate) use crate::contract_loadout::Loadout;
 pub(crate) use crate::contract_loot::{LootArchetype, LootContainer, LootTable};
 pub(crate) use crate::contract_loot_legacy::{LegacyLootArchetype, LegacyLootTable};
-pub(crate) use crate::contract_mining::{MineableEntity, RefiningProcess};
-pub(crate) use crate::contract_mining_params::MiningGlobalParams;
+pub(crate) use crate::contract_mining::MineableEntity;
 pub(crate) use crate::contract_mission_data::{ContractScenario, MissionLocality, MissionType};
 pub(crate) use crate::contract_missions::ContractEntry;
 pub(crate) use crate::contract_rewards::{BlueprintPool, CraftingGlobal, DismantleProcess};
@@ -95,12 +97,8 @@ pub(crate) struct Catalog<'a> {
 
     /// The mineable elements, ordered by GUID. Several may link to one `ResourceType`.
     pub(crate) mineable_elements: Vec<MineableElement>,
-    /// The refining processes, ordered by GUID.
-    pub(crate) refining_processes: Vec<RefiningProcess<'a>>,
     /// The mineable compositions, the elements a rock or deposit is made of, ordered by GUID.
     pub(crate) mineable_compositions: Vec<MineableComposition>,
-    /// The mining parameters of each kind of miner, ordered by GUID.
-    pub(crate) mining_global_params: Vec<MiningGlobalParams<'a>>,
     /// The harvestable provider presets, what a place can spawn, ordered by GUID.
     pub(crate) harvestable_provider_presets: Vec<HarvestableProviderPreset>,
     /// The sub harvestable multi configs, what the slots of an object can hold, ordered by GUID.

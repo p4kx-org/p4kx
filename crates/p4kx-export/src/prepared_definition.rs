@@ -8,7 +8,7 @@ use p4kx_extraction::{CancelToken, DataForge, Guid, RecordTree};
 use super::authored_fields::Observed;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::canonical_record_header::CanonicalRecordHeader;
-use crate::catalog_number_capture::CapturedNumber;
+use crate::catalog_number_capture::{CapturedNumber, NumberCapture};
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::original::OriginalFlowFields;
 use crate::catalog_table::CatalogTable;
@@ -75,7 +75,7 @@ impl<'source, T> PreparedDefinition<'source, T> {
                 guid: tree.guid(),
                 index: tree.record_index(),
                 path: tree.record_path(),
-                numbers: numbers.into_inner(),
+                numbers: NumberCapture::deduplicate(numbers.into_inner())?,
             },
             notes,
         ))
@@ -87,7 +87,7 @@ impl<'source, T> PreparedDefinition<'source, T> {
     }
 
     /// Moves the projected definition out of this prepared observation.
-    pub(super) fn into_definition(self) -> T {
+    pub(crate) fn into_definition(self) -> T {
         self.definition
     }
 

@@ -238,3 +238,6 @@ fn required_group_failures_are_reported_separately_from_owner_reads() -> TestRes
     );
     Ok(())
 }
+
+#[path = "mining_process_query_trace.rs"]
+mod processes;

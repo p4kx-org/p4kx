@@ -224,6 +224,8 @@ const fn uses_physical_row_identity(kind: Kind) -> bool {
                 | Kind::Commodities
                 | Kind::ResourceTypes
                 | Kind::ResourceGroups
+                | Kind::RefiningProcesses
+                | Kind::MiningGlobalParams
                 | Kind::QualityDistributions
                 | Kind::QualityQuantizations
                 | Kind::StarmapObjects

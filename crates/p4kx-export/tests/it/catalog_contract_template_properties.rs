@@ -11,6 +11,7 @@ use std::error::Error;
 use serde_json::{Value, json};
 
 use crate::catalog_contract_templates::{build, canonical};
+use crate::health_origin_assertions as proof;
 use crate::loot_v3_graph as raw;
 use crate::template_canonical_graph::Template;
 use crate::template_fixture_context as context;
@@ -273,13 +274,68 @@ fn an_input_property_names_the_output_and_the_objective_it_takes() -> TestResult
 fn a_nil_tag_is_no_tag_path_in_a_list_or_in_a_single_tag_field() -> TestResult {
     let catalog = build()?;
     let templates = raw::array(&catalog, "missionLocationTemplates")?;
-    assert_eq!(
-        templates.first().and_then(|row| row.get("tags")),
-        Some(&json!(["Missions.Hijacked"])),
-        "the nil tag in the list is left out"
-    );
+    location_tag_list(
+        &catalog,
+        templates.first().ok_or("actual location template")?,
+    )?;
     let graph = canonical(&catalog)?;
     let phase = graph.field(context::objective(&graph, 2)?, "missionPhaseIdentifierTag")?;
     tags::path(&graph, phase, None)?;
+    Ok(())
+}
+
+fn location_tag_list(catalog: &Value, template: &Value) -> TestResult {
+    let list = proof::cell(template, "tags", "present")?;
+    let operands = raw::present(list)?
+        .as_array()
+        .ok_or("original tag operands")?;
+    let [first, nil, repeated, dangling] = operands.as_slice() else {
+        return Err("exactly four original tag operands in source order".into());
+    };
+    complete_tag_origin(catalog, list)?;
+    for operand in [first, repeated] {
+        let path = proof::present(operand, "path", &json!("Missions.Hijacked"), Some(true))?;
+        complete_tag_origin(catalog, path)?;
+    }
+    let nil_path = proof::cell(nil, "path", "null")?;
+    complete_tag_origin(catalog, nil_path)?;
+    assert_eq!(
+        nil.get("danglingGuid"),
+        Some(&Value::Null),
+        "a nil operand has neither a path nor a dangling GUID"
+    );
+    proof::cell(dangling, "path", "absent")?;
+    let dangling_guid = proof::present(
+        dangling,
+        "danglingGuid",
+        &json!(crate::commodity_v3_fixture::guid(
+            crate::spawns_fixture::LOCATION_DANGLING_TAG
+        )),
+        Some(true),
+    )?;
+    complete_tag_origin(catalog, dangling_guid)?;
+    assert_ne!(
+        proof::at(first, "/path/sourceUsesRefs")?,
+        proof::at(repeated, "/path/sourceUsesRefs")?,
+        "repeated paths preserve distinct original operands"
+    );
+    proof::closure(catalog)
+}
+
+fn complete_tag_origin(catalog: &Value, cell: &Value) -> TestResult {
+    assert_eq!(
+        cell.get("containsEncryptedSource"),
+        Some(&json!(true)),
+        "the original DCB operand is encrypted"
+    );
+    assert_eq!(
+        cell.get("sourceSetComplete"),
+        Some(&json!(true)),
+        "the source contributors of this operand are complete"
+    );
+    assert!(
+        !proof::uses(catalog, cell)?.is_empty(),
+        "the operand retains actual source uses from this catalog"
+    );
     Ok(())
 }

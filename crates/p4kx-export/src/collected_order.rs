@@ -30,9 +30,9 @@ impl Collected<'_> {
             .sort_by_cached_key(|row| (row.guid.text(), row.record_index));
         self.starmap_definitions.order();
         crate::contract::MineableElement::order(&mut self.mineable_elements);
-        sort_by_guid(&mut self.refining_processes, |entity| entity.guid);
+        crate::catalog_v3::mining_process_catalog::order_refining(&mut self.refining_processes);
         crate::contract::MineableComposition::order(&mut self.mineable_compositions);
-        sort_by_guid(&mut self.mining_global_params, |entity| entity.guid);
+        crate::catalog_v3::mining_process_catalog::order_globals(&mut self.mining_global_params);
         sort_by_guid(&mut self.mineable_entities, |entity| entity.guid);
         sort_by_guid(&mut self.crafters, |entity| entity.guid);
         crate::contract::HarvestableProviderPreset::order(&mut self.harvestable_provider_presets);

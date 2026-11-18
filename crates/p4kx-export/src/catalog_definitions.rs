@@ -126,6 +126,8 @@ pub(crate) struct CatalogDefinitions<'source> {
     pub(crate) loot: LootDefinitionTables<'source>,
     pub(crate) blueprint_categories: CatalogTable<BlueprintCategoryDefinition<'source>>,
     pub(crate) gameplay_properties: CatalogTable<GameplayPropertyDefinition<'source>>,
+    pub(crate) refining_processes:
+        CatalogTable<crate::catalog_v3::mining_process_catalog::RefiningProcessDefinition<'source>>,
     pub(crate) quality_distributions: CatalogTable<QualityDistributionDefinition<'source>>,
     pub(crate) quality_quantizations: CatalogTable<QualityQuantizationDefinition<'source>>,
     pub(crate) tags: CatalogTable<super::tag_catalog::TagDefinition<'source>>,

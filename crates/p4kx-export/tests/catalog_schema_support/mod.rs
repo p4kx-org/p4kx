@@ -20,6 +20,7 @@ mod harvest;
 mod health;
 mod loadouts;
 mod loot;
+mod mining;
 mod mission_sets;
 mod npc_spawns;
 mod public_fixtures;
@@ -125,6 +126,7 @@ pub(crate) fn minimal_catalog() -> Value {
         }],
         "definitions": {"items": {"availability": "available", "rows": []}, "contractGenerators": absent_table(), "missionScenarios": absent_table(), "blueprints": blueprints::definitions(), "contractTemplates": absent_table(), "missionBrokerEntries": absent_table(), "lootPoolFilters": loot::filters(), "blueprintCategories": blueprint_categories::definitions(), "gameplayProperties": gameplay_properties::definitions(), "qualityDistributions": quality::distributions(), "qualityQuantizations": quality::quantizations(), "resourceTypes": resources::table(), "resourceGroups": resource_groups::definitions(),
             "commodities": commodities::definitions(), "manufacturers": manufacturer(),
+            "refiningProcesses": mining::refining(),
             "tags": tags::definitions(),
             "explosionDefinitions": absent_table(), "damageResistanceMacros": absent_table(), "turretHealthModifiers": absent_table(), "miningLaserGlobals": absent_table(), "consumableTypes": absent_table(), "consumableSubtypes": absent_table(),
             "inventoryContainers": absent_table(),
@@ -175,6 +177,7 @@ pub(crate) fn minimal_catalog() -> Value {
             "reputationStandings": reputation::standings(),
             "shopInventories": {"availability": "absent", "meaning": "offlineDesignTime", "rows": []}},
         "configurations": {
+            "miningGlobal": mining::globals(),
             "blueprintTiers": blueprints::tiers(),
             "itemRecoveryEconomy": recovery::economy(),
             "itemRecoveryOverrides": recovery::overrides(),
@@ -282,16 +285,7 @@ pub(crate) fn minimal_catalog() -> Value {
         }],
         "loadouts": loadouts::loadouts(),
         "mineableElements": [mineable_element()],
-        "refiningProcesses": [{
-            "guid": "a4000000-0000-4000-8000-000000000001",
-            "className": "processingtype-fastcareful",
-            "recordPath": "libs/foundry/records/refiningprocess/processingtype-fastcareful",
-            "processName": source_values::present(json!("text:fixture:refining-process")),
-            "refiningSpeed": "Fast",
-            "refiningQuality": "Careful"
-        }],
         "mineableCompositions": harvest::compositions(),
-        "miningGlobalParams": [harvest::mining_global_params()],
         "harvestableProviderPresets": harvest::presets(),
         "subHarvestableMultiConfigs": harvest::multi_configs(),
         "harvestableLocations": harvest::locations(),
