@@ -84,7 +84,7 @@ pub use crate::catalog_table::DatasetAvailability;
 pub use crate::catalog_text_contract::{CanonicalText, GameTextRef, PublicNameRef, TextForms};
 pub use crate::catalog_v3::authored_fields::AuthoredRestriction;
 pub use crate::catalog_v3::catalog_item_alignment::{
-    ItemPort, ItemPortContainer, PortItemType, PortRestrictions,
+    AttachmentAxisOptionStatus, ItemPort, ItemPortContainer, PortItemType, PortRestrictions,
 };
 pub use crate::catalog_v3::faction_definition::FactionText;
 pub use crate::catalog_v3::gameplay_property_catalog::{

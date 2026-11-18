@@ -182,6 +182,14 @@ scope coverage, public labels in the selected languages, and the field origin
 inventory. The query reads the selected components and requested localization.
 The archive-backed loadout resolver supplies equipped-item and XML-override data.
 
+`ItemPort::alignment_axis()` borrows the original axis label.
+`alignment_axis_option_status()` borrows its optional `SourcedValue<AttachmentAxisOptionStatus>`.
+`Declared` and `Undeclared` describe membership in the original axis enumeration; an undeclared
+label remains unchanged. An unavailable label has no membership cell, so inspect the label's own
+state to distinguish absent and unreadable input. A retained membership cell preserves its own
+value state, encryption marker, completeness and original source uses, including unavailable
+option evidence. This status describes the declaration and does not infer an alignment transform.
+
 ## Mission location templates
 
 Use `with_mission_location_templates`, its `_from` variant or the parsed session method

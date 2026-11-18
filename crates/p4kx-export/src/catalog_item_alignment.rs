@@ -8,6 +8,7 @@ use serde::Serialize;
 use super::authored_fields::{AuthoredRestriction, Observed};
 use super::item_alignment_options::AlignmentAxis;
 pub(crate) use super::item_alignment_options::AlignmentOptions;
+pub use super::item_alignment_options::AttachmentAxisOptionStatus;
 use super::item_component_owner::ComponentOwner;
 pub use super::port_restrictions::{PortItemType, PortRestrictions};
 use crate::build::original_input::OriginalCatalogInput;
@@ -352,6 +353,14 @@ impl<'source> ItemPort<'source> {
     #[must_use]
     pub const fn alignment_axis(&self) -> &SourcedValue<&'source str> {
         &self.attach_axes_to_align.label
+    }
+
+    /// Borrows the enum-membership result when the authored axis label is readable.
+    #[must_use]
+    pub const fn alignment_axis_option_status(
+        &self,
+    ) -> Option<&SourcedValue<AttachmentAxisOptionStatus>> {
+        self.attach_axes_to_align.option_status.as_ref()
     }
 }
 

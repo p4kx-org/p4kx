@@ -1948,11 +1948,19 @@
       "type": "object"
     },
     "AttachmentAxisOptionStatus": {
-      "enum": [
-        "declared",
-        "undeclared"
+      "description": "Membership of an authored alignment axis in its declared enumeration.",
+      "oneOf": [
+        {
+          "const": "declared",
+          "description": "The original enumeration declares the authored label.",
+          "type": "string"
+        },
+        {
+          "const": "undeclared",
+          "description": "The readable enumeration does not declare the authored label.",
+          "type": "string"
+        }
       ],
-      "type": "string",
       "x-p4kx-vocabularyClass": "control"
     },
     "AttachmentDefinitionLink": {

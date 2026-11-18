@@ -19,11 +19,15 @@ pub(super) struct AlignmentAxis<'source> {
     pub(super) option_status: Option<SourcedValue<AttachmentAxisOptionStatus>>,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, JsonSchema)]
+/// Membership of an authored alignment axis in its declared enumeration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+#[non_exhaustive]
 #[serde(rename_all = "camelCase")]
 #[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
-pub(super) enum AttachmentAxisOptionStatus {
+pub enum AttachmentAxisOptionStatus {
+    /// The original enumeration declares the authored label.
     Declared,
+    /// The readable enumeration does not declare the authored label.
     Undeclared,
 }
 
