@@ -8,6 +8,38 @@ of the current checkout. This report contains technical structures and implement
 only. Game values, text dumps, concrete test-build Record identities, build payloads and
 extracted assets are not included. Public technical issue updates were explicitly authorized.
 
+## PTU 13215521 comparison
+
+The installed PTU manifest identifies change `13215521`. The checks use installed LIVE
+`13165946`, the retained PTU `13189690` Archive and saved scoped evidence from PTU
+`13201184`. The retained Archive supplies a common baseline for the two ContractGenerator
+comparisons. The saved evidence supports a lower bound on changes since `13201184`.
+
+| Area | Observed source and export status |
+| --- | --- |
+| DataForge schema | The schema comparison with `13189690` adds one structure, `TransportVehicleAccessInterface`, with zero own properties and zero standalone Records. Existing properties and enums agree. The LIVE comparison has the same declaration delta as the retained comparison with LIVE plus this structure. No new typed Catalog mapping is indicated. |
+| Contracts and reputation | Against `13189690`, the scoped comparison reports one added and 20 changed ContractGenerator Records, with zero removals or unreadable Records. Comparison with the saved delta identifies at least ten changed generators since `13201184`. They use existing result, reputation, prerequisite, scope, template and location fields. The selected resource-gathering generator changes authored outcome flags, reputation reward references and Blueprint pool fields. [ContractGenerator catalog contract](catalog-contract-generators.md) |
+| Nyx I Starmap | The selected Lagrange Child changes position and rotation against `13189690`. Its `pos`, `rot` and container relationship remain in the existing source format. The inspected LIVE descriptor has no corresponding authored Child. [Starmap definitions and placements](catalog-starmap-definitions.md) |
+| Starchitect interiors | A selected Watchtower SOCPAK passes all 12 root-member CRC checks in each PTU. Of its four scene-container occurrences, three nested occurrences expose additional RoomMapping companions in `13215521`. All three are published via `roomCompanions.roomMapping` as complete ordered XML. The sampled light and mission-link declarations agree between the two PTUs. The minimap filename selection shows no directory delta. [Authored SOC scene contract](soc-scene.md) |
+| Flight suit compatibility | The scoped Xanthule Record comparison with `13189690` reports zero changes. The LIVE comparison has two changed Records in the same selection. Their changed fields cover attachment alignment, materials and a ContractTemplate search-reporting flag. The 17 English search excerpts that contain the suit name agree across all three Archives. Actual backpack compatibility and the full description source remain unverified. [Inventory storage](catalog-inventory-storage.md) |
+
+The archive evidence does not establish live board availability, courier generation, actual
+reward payouts or an effective reputation multiplier. Nine Tactical Strike Group filename
+matches have no directory delta against `13189690`. An English Locale search for the
+patch-note contract wording found no match in either PTU. The interaction reset and temporary
+contract disable remain unverified. The sampled Watchtower documents do not establish the
+power-to-light-to-objective link. The selected loose XML and JSON territory filename probes
+found no matching Entry. A client-side territory box/grid reader or replication limit field
+would require an identified original configuration source.
+
+Two scoped installed checks passed on `13215521` using integration commit
+`3343f50c7c34847fde327afecc1e391cc2456ce0`. One covers six SDK queries for mining,
+refining, quality and resource data. The other covers Starchitect placement and source
+associations. Complete Catalog publication remains an acceptance step. The inspected changes
+provide no evidence of a new parser defect or schema change.
+[Build comparison](https://github.com/p4kx-org/p4kx/issues/1151#issuecomment-6971711263)
+· [SOCPAK and Territory follow-up](https://github.com/p4kx-org/p4kx/issues/1151#issuecomment-6977222564)
+
 ## PTU 13201184 comparison
 
 The installed PTU manifest identifies change `13201184` and internal version
