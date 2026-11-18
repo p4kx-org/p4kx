@@ -3,6 +3,8 @@
 
 #[path = "face_control_binding_failures.rs"]
 mod binding_failures;
+#[path = "face_control_neutral_semantics.rs"]
+mod neutral_semantics;
 
 use std::error::Error;
 
