@@ -103,10 +103,7 @@ fn item_port(element: &Element) -> VehicleItemPort {
         max_size: size(element.attribute("maxSize")),
         flags: element.attribute("flags").map(str::to_owned),
         id: element.attribute("id").map(str::to_owned),
-        display_name: element
-            .attribute("display_name")
-            .filter(|name| !name.is_empty())
-            .map(str::to_owned),
+        display_name: element.attribute("display_name").map(str::to_owned),
         port_tags: element.attribute("portTags").map(str::to_owned),
         required_tags: element.attribute("requiredTags").map(str::to_owned),
         types: type_elements(element)

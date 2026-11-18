@@ -23,6 +23,7 @@ struct DefinitionFacts {
     flags: FieldFact<Vec<String>>,
     port_tags: FieldFact<Vec<String>>,
     required_tags: FieldFact<Vec<String>>,
+    display_name_key: FieldFact<String>,
 }
 
 #[derive(Clone)]
@@ -43,6 +44,7 @@ pub(crate) struct PortAttributes {
     pub(crate) flags: SourcedValue<Vec<String>>,
     pub(crate) port_tags: SourcedValue<Vec<String>>,
     pub(crate) required_tags: SourcedValue<Vec<String>>,
+    pub(crate) display_name_key: SourcedValue<String>,
 }
 
 impl Capture<'_> {
@@ -66,6 +68,13 @@ impl Capture<'_> {
             required_tags: record_field(fields, port, "RequiredPortTags", |raw| {
                 text(raw).map(tag_words)
             })?,
+            display_name_key: read_record_field(
+                fields,
+                port,
+                "DisplayName",
+                SourceUseRole::Payload,
+                |raw| text(raw).map(str::to_owned),
+            )?,
         };
         let mut state = self.lock()?;
         if state
@@ -103,6 +112,11 @@ impl Capture<'_> {
                 flags: words(flag_words(definition.flags())),
                 port_tags: words(tag_words(definition.port_tags())),
                 required_tags: words(tag_words(definition.required_tags())),
+                display_name_key: self.name_sources.value(
+                    SourceValue::Present(definition.display_name().to_owned()),
+                    &[],
+                    false,
+                ),
             });
         }
         let facts = {
@@ -128,6 +142,7 @@ impl Capture<'_> {
             flags: self.definition_field(facts.flags, &selectors, complete),
             port_tags: self.definition_field(facts.port_tags, &selectors, complete),
             required_tags: self.definition_field(facts.required_tags, &selectors, complete),
+            display_name_key: self.definition_field(facts.display_name_key, &selectors, complete),
         })
     }
 
@@ -152,6 +167,7 @@ impl Capture<'_> {
         let (flags, flag_site) = port.flags_source();
         let (tags, tag_site) = port.port_tags_source();
         let (required, required_site) = port.required_tags_source();
+        let (display_name, display_name_site) = port.display_name_source();
         let selection = name.map_or_else(
             || Ok(Vec::new()),
             |name| name.selector_inputs().map(|(selection, _)| selection),
@@ -180,6 +196,14 @@ impl Capture<'_> {
                 required_site,
                 &selection,
             )?,
+            display_name_key: self.read_vehicle_field(
+                display_name.map_or(SourceValue::Absent, |name| {
+                    SourceValue::Present(name.to_owned())
+                }),
+                display_name_site,
+                &selection,
+                SourceUseRole::Payload,
+            )?,
         })
     }
 
@@ -189,6 +213,16 @@ impl Capture<'_> {
         evidence: Option<&VehicleAttributeEvidence>,
         selection: &[SourceUse],
     ) -> Result<SourcedValue<T>, CatalogError> {
+        self.read_vehicle_field(value, evidence, selection, SourceUseRole::Conversion)
+    }
+
+    fn read_vehicle_field<T>(
+        &self,
+        value: SourceValue<T>,
+        evidence: Option<&VehicleAttributeEvidence>,
+        selection: &[SourceUse],
+        role: SourceUseRole,
+    ) -> Result<SourcedValue<T>, CatalogError> {
         let (Some(input), Some(evidence)) = (self.input, evidence) else {
             return Ok(self.name_sources.value(value, selection, false));
         };
@@ -196,7 +230,7 @@ impl Capture<'_> {
         let mut inputs = selection.to_vec();
         let role = match value {
             SourceValue::Absent => SourceUseRole::Selector,
-            _ => SourceUseRole::Conversion,
+            _ => role,
         };
         let state = self.lock()?;
         for (site, role) in std::iter::once((evidence.original(), role)).chain(
@@ -278,6 +312,16 @@ fn record_field<'scope, 'read, 'source, T>(
     name: &'static str,
     parse: impl FnOnce(&Value<'_>) -> Option<T>,
 ) -> Result<FieldFact<T>, CatalogError> {
+    read_record_field(fields, port, name, SourceUseRole::Conversion, parse)
+}
+
+fn read_record_field<'scope, 'read, 'source, T>(
+    fields: &OriginalFlowFields<'scope, 'read, 'source>,
+    port: &OriginalValueFact<'scope, 'read, 'source>,
+    name: &'static str,
+    role: SourceUseRole,
+    parse: impl FnOnce(&Value<'_>) -> Option<T>,
+) -> Result<FieldFact<T>, CatalogError> {
     let mut inputs = Vec::new();
     let fact = fields.observe_field_declaration(port, name, &mut |input| {
         inputs.push(input);
@@ -296,12 +340,7 @@ fn record_field<'scope, 'read, 'source, T>(
         value => parse(value).map_or(SourceValue::Invalid, SourceValue::Present),
     };
     let (value, original, complete) = fact
-        .bind(
-            OriginalValuePart::Value,
-            state,
-            SourceUseRole::Conversion,
-            true,
-        )?
+        .bind(OriginalValuePart::Value, state, role, true)?
         .into_parts();
     inputs.extend(original);
     Ok(FieldFact {

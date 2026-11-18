@@ -12,14 +12,20 @@ use crate::LoadoutFileObservation;
 pub struct VehicleXmlSite {
     file: LoadoutFileObservation,
     location: Option<SourceLocation>,
+    checked_absence: bool,
 }
 
 impl VehicleXmlSite {
     pub(crate) const fn new(
         file: LoadoutFileObservation,
         location: Option<SourceLocation>,
+        checked_absence: bool,
     ) -> Self {
-        Self { file, location }
+        Self {
+            file,
+            location,
+            checked_absence,
+        }
     }
 
     /// Returns the file operation whose XML supplied this site.
@@ -39,13 +45,19 @@ impl VehicleXmlSite {
             }),
             _ => None,
         });
-        Self::new(self.file.clone(), location)
+        Self::new(self.file.clone(), location, self.checked_absence)
     }
 
     /// Returns the original attribute or checked-absence coordinate when available.
     #[must_use]
     pub const fn location(&self) -> Option<&SourceLocation> {
         self.location.as_ref()
+    }
+
+    /// Reports whether the site observes an omitted attribute.
+    #[must_use]
+    pub const fn checked_absence(&self) -> bool {
+        self.checked_absence
     }
 }
 

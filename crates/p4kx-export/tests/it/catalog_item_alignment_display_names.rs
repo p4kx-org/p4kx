@@ -27,7 +27,7 @@ fn item_ports_supply_canonical_display_names_at_the_original_locale_occurrence()
     let physical = proof::at(&catalog, &format!("{PORTS}/0/ports/value/0/value"))?;
     let name = proof::cell(physical, "displayName", "present")?;
     check_original(&catalog, name, ordinal)?;
-    check_loadout_join(&catalog)?;
+    check_loadout_join(&catalog, ordinal)?;
     check_translations(&catalog, proof::at(name, "/value")?, ordinal)?;
     check_counts(&built)?;
     proof::closure(&catalog)
@@ -111,13 +111,16 @@ fn original_location(ordinal: usize) -> Value {
     json!({"type":"subresource", "namespace":"dataforgeValue", "indices":["0", ordinal.to_string()], "field":"$value"})
 }
 
-fn check_loadout_join(catalog: &Value) -> TestResult {
+fn check_loadout_join(catalog: &Value, ordinal: usize) -> TestResult {
     let owner = loadout(catalog, OWNER)?;
     let mount = port(proof::at(owner, "/ports")?, "mount")?;
-    assert_eq!(
-        proof::at(mount, "/displayNameKey")?,
-        PORT_KEY,
-        "the raw Loadout key stays available"
+    let key = proof::present(mount, "displayNameKey", &json!(PORT_KEY), Some(true))?;
+    let original = proof::uses(catalog, key)?;
+    assert!(
+        original.iter().any(|used| {
+            used["role"] == "payload" && used["location"] == original_location(ordinal)
+        }),
+        "the Loadout key uses the physical original Locale",
     );
     let link = proof::at(mount, "/sourceConstraints/portDefinition")?;
     assert_eq!(

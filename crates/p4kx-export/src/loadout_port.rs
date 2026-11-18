@@ -7,7 +7,7 @@ use p4kx_assembly::{
     Attachment, EntityNode, LoadoutError, PortDefinition, PortNode, PortSource, Target,
     VehicleItemPort,
 };
-use p4kx_extraction::{SourceUse, SourcedValue, is_placeholder_key};
+use p4kx_extraction::{SourceUse, SourcedValue};
 
 use crate::CatalogError;
 use crate::catalog_read::original::AuthoredEntryPath;
@@ -157,6 +157,7 @@ fn read_shape(
         flags: attributes.flags,
         port_tags: attributes.port_tags,
         required_tags: attributes.required_tags,
+        display_name_key: attributes.display_name_key,
         ..port
     })
 }
@@ -171,7 +172,6 @@ fn read_definition(definition: &PortDefinition, name: SourcedValue<String>) -> L
                 sub_types: kind.sub_types().to_vec(),
             })
             .collect(),
-        display_name_key: display_name_key(Some(definition.display_name())),
         ..LoadoutPort::named(name)
     }
 }
@@ -186,12 +186,6 @@ fn read_vehicle(port: &VehicleItemPort, name: SourcedValue<String>) -> LoadoutPo
                 sub_types: kind.subtypes().to_vec(),
             })
             .collect(),
-        display_name_key: display_name_key(port.display_name()),
         ..LoadoutPort::named(name)
     }
-}
-
-fn display_name_key(key: Option<&str>) -> Option<String> {
-    key.filter(|key| !key.is_empty() && !is_placeholder_key(key))
-        .map(str::to_owned)
 }

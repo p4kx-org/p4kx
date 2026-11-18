@@ -26795,11 +26795,8 @@
       "description": "One item port and what the Default Loadout attaches to it.",
       "properties": {
         "displayNameKey": {
-          "description": "The localisation key of the port's display name; `null` for none or a placeholder key.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The original display name key and its source, including authored empty or placeholder keys."
         },
         "dockedVehicle": {
           "description": "Whether the attached Entity is a docked vehicle, e.g. a snub craft in a hangar port. Its\nports are not listed.",

@@ -29,6 +29,13 @@ fn loadout_root_identity_survives_item_staging_and_matches_the_sdk() -> TestResu
         assert_eq!(ship.record_index(), 1);
         assert_eq!(item.record_index(), 0);
         assert_eq!(selected.coverage.skipped_leftovers, 1);
+        let port = item.port(&[0]).ok_or("the selected Item port")?;
+        assert_eq!(port.display_name_key(), None);
+        assert_eq!(
+            port.source_display_name_key().value().map(String::as_str),
+            Some("@LOC_EMPTY"),
+            "the typed getter retains the authored placeholder",
+        );
         for row in &selected.rows {
             let index = row.source_record_index();
             let guid = row.source_entity_guid();
@@ -87,6 +94,12 @@ fn verify_identity(output: &Value, encrypted: bool) -> TestResult {
 
 fn verify_port_attributes(output: &Value, encrypted: bool) -> TestResult {
     let port = proof::at(output, "/loadouts/1/ports/0")?;
+    proof::present(
+        port,
+        "displayNameKey",
+        &json!("@LOC_EMPTY"),
+        Some(encrypted),
+    )?;
     let mut locations = std::collections::BTreeSet::new();
     for (field, expected) in [
         ("minSize", json!(0)),

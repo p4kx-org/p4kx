@@ -92,7 +92,11 @@ impl Scope<'_, '_> {
     pub(crate) fn vehicle_element_site(&self, node: Node<'_, '_>) -> Option<VehicleXmlSite> {
         let source = self.vehicle_source()?;
         let position = self.original_element_position(node)?;
-        Some(self.vehicle_site_at_location(source, SourceLocation::xml_element(&position, "$node")))
+        Some(self.vehicle_site_at_location(
+            source,
+            SourceLocation::xml_element(&position, "$node"),
+            false,
+        ))
     }
 
     pub(crate) fn vehicle_site(
@@ -104,14 +108,17 @@ impl Scope<'_, '_> {
         let source = self.vehicle_source()?;
         let element = self.original_element_position(node)?;
         let attribute = self.original_attribute(node, |actual| actual.eq_ignore_ascii_case(name));
-        let location = match attribute {
-            Some(attribute) => SourceLocation::xml_attribute(&attribute.position, attribute.name),
+        let (location, checked_absence) = match attribute {
+            Some(attribute) => (
+                SourceLocation::xml_attribute(&attribute.position, attribute.name),
+                false,
+            ),
             None if matches!(missing, MissingAttribute::Element) => {
-                SourceLocation::xml_element(&element, name)
+                (SourceLocation::xml_element(&element, name), true)
             }
             None => return None,
         };
-        Some(self.vehicle_site_at_location(source, location))
+        Some(self.vehicle_site_at_location(source, location, checked_absence))
     }
 
     pub(crate) fn vehicle_site_at(
@@ -125,7 +132,7 @@ impl Scope<'_, '_> {
         let attribute = self
             .original_attribute_where(node, |index, actual| index == ordinal && actual == name)?;
         let location = SourceLocation::xml_attribute(&attribute.position, attribute.name);
-        Some(self.vehicle_site_at_location(source, location))
+        Some(self.vehicle_site_at_location(source, location, false))
     }
 
     pub(crate) fn observes_vehicle_totals(&self) -> bool {
@@ -157,6 +164,7 @@ impl Scope<'_, '_> {
         &self,
         source: &LoadoutFileObservation,
         location: Option<SourceLocation>,
+        checked_absence: bool,
     ) -> VehicleXmlSite {
         let lossless = !matches!(
             self.decoding,
@@ -165,7 +173,11 @@ impl Scope<'_, '_> {
                 ..
             }
         );
-        VehicleXmlSite::new(source.clone(), location.filter(|_| lossless))
+        VehicleXmlSite::new(
+            source.clone(),
+            location.filter(|_| lossless),
+            checked_absence,
+        )
     }
 
     pub(crate) fn attribute_ascii_position(

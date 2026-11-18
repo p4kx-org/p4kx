@@ -99,7 +99,7 @@ fn the_ports_list_the_loadout_ports_then_the_vehicle_only_ports() -> TestResult 
         "the XML type and subtype orders retain repeated entries"
     );
     assert_eq!(
-        empty["displayNameKey"], "@fixture_vehicle_port",
+        empty["displayNameKey"]["value"], "@fixture_vehicle_port",
         "the XML display key remains as authored"
     );
     Ok(())
@@ -117,7 +117,7 @@ fn a_record_port_keeps_its_definition_and_the_vehicle_file_gives_the_visibility(
             &turret["flags"]["value"],
             &turret["portTags"]["value"],
             &turret["requiredTags"]["value"],
-            &turret["displayNameKey"],
+            &turret["displayNameKey"]["value"],
             &turret["visibility"],
             &turret["source"]
         ),
@@ -128,7 +128,7 @@ fn a_record_port_keeps_its_definition_and_the_vehicle_file_gives_the_visibility(
             &json!(["uneditable"]),
             &json!(["Turret"]),
             &json!(["Mount"]),
-            &Value::Null,
+            &json!("@LOC_EMPTY"),
             &json!("invisible"),
             &json!("loadout")
         ),
@@ -168,9 +168,8 @@ fn a_port_the_record_lacks_takes_its_definition_from_the_vehicle_file() -> TestR
         "sizes, types, flags without the leading $, tags as stored and visibility"
     );
     assert_eq!(
-        gun["displayNameKey"],
-        Value::Null,
-        "the XML placeholder key is omitted"
+        gun["displayNameKey"]["value"], "@LOC_EMPTY",
+        "the XML placeholder is retained in the source cell"
     );
     let size = crate::health_origin_assertions::cell(gun, "minSize", "present")?;
     let uses = crate::health_origin_assertions::uses(&catalog, size)?;
@@ -186,6 +185,16 @@ fn a_port_the_record_lacks_takes_its_definition_from_the_vehicle_file() -> TestR
         size.get("sourceSetComplete"),
         Some(&json!(false)),
         "the attribute does not prove the preceding Part search",
+    );
+    let key = crate::health_origin_assertions::cell(gun, "displayNameKey", "present")?;
+    let uses = crate::health_origin_assertions::uses(&catalog, key)?;
+    assert!(
+        uses.iter().any(|usage| {
+            usage["location"]["namespace"] == "textXmlAttribute"
+                && usage["location"]["field"] == "display_name"
+                && usage["role"] == "payload"
+        }),
+        "the XML key binds only to its original display name attribute",
     );
     Ok(())
 }

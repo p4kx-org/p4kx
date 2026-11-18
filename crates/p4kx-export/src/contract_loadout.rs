@@ -3,7 +3,7 @@
 
 use std::sync::OnceLock;
 
-use p4kx_extraction::{SourceUses, SourceValue, SourcedValue};
+use p4kx_extraction::{SourceUses, SourceValue, SourcedValue, is_placeholder_key};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -79,8 +79,8 @@ pub struct LoadoutPort {
     pub(crate) port_tags: SourcedValue<Vec<String>>,
     /// The required tag words in stored order and their shared source.
     pub(crate) required_tags: SourcedValue<Vec<String>>,
-    /// The localisation key of the port's display name; `null` for none or a placeholder key.
-    pub(crate) display_name_key: Option<String>,
+    /// The original display name key and its source, including authored empty or placeholder keys.
+    pub(crate) display_name_key: SourcedValue<String>,
     /// Whether the port shows its item: `visible` or `invisible` as the vehicle implementation's
     /// part of that name says; without such a part `invisible` when the port definition carries
     /// the flag `invisible`, else `unspecified`. A closed set the game may extend, so the schema
@@ -182,10 +182,13 @@ impl LoadoutPort {
     pub(crate) fn named(name: SourcedValue<String>) -> Self {
         static NO_SIZE: OnceLock<SourcedValue<u32>> = OnceLock::new();
         static NO_WORDS: OnceLock<SourcedValue<Vec<String>>> = OnceLock::new();
+        static NO_NAME_KEY: OnceLock<SourcedValue<String>> = OnceLock::new();
         let size =
             NO_SIZE.get_or_init(|| SourceUses::default().value(SourceValue::Absent, &[], false));
         let words =
             NO_WORDS.get_or_init(|| SourceUses::default().value(SourceValue::Absent, &[], false));
+        let name_key = NO_NAME_KEY
+            .get_or_init(|| SourceUses::default().value(SourceValue::Absent, &[], false));
         Self {
             name,
             name_proof: None,
@@ -197,7 +200,7 @@ impl LoadoutPort {
             flags: words.clone(),
             port_tags: words.clone(),
             required_tags: words.clone(),
-            display_name_key: None,
+            display_name_key: name_key.clone(),
             visibility: "",
             item_guid: None,
             item_class_name: None,
@@ -286,10 +289,19 @@ impl LoadoutPort {
         &self.required_tags
     }
 
-    /// Borrows the original display name localization key.
+    /// Borrows a nonempty display name localization key that is not a placeholder.
     #[must_use]
     pub fn display_name_key(&self) -> Option<&str> {
-        self.display_name_key.as_deref()
+        self.display_name_key
+            .value()
+            .map(String::as_str)
+            .filter(|key| !key.is_empty() && !is_placeholder_key(key))
+    }
+
+    /// Borrows the authored display name key with its original evidence and value state.
+    #[must_use]
+    pub const fn source_display_name_key(&self) -> &SourcedValue<String> {
+        &self.display_name_key
     }
 
     /// Returns the canonical visibility code.

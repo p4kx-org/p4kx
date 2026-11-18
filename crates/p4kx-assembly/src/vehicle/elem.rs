@@ -6,7 +6,7 @@ use std::sync::Arc;
 use crate::loadout_xml::{MissingAttribute, Node, Scope};
 use crate::{LoadoutPath, VehicleAggregateEvidence, VehicleAttributeEvidence, VehicleXmlSite};
 
-use super::PORT_SIZE_AND_TAG_ATTRIBUTES;
+use super::PORT_OBSERVED_ATTRIBUTES;
 
 /// A Modification of the base implementation: its selected patch and Elem overrides.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -116,7 +116,7 @@ fn assignment_evidence(
             .into_iter()
             .any(|field| name.eq_ignore_ascii_case(field));
     let port = scope.observes_vehicle_port_attributes()
-        && PORT_SIZE_AND_TAG_ATTRIBUTES
+        && PORT_OBSERVED_ATTRIBUTES
             .into_iter()
             .any(|field| name.eq_ignore_ascii_case(field));
     if !visibility && !totals && !port {

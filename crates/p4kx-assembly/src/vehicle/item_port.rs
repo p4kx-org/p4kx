@@ -6,8 +6,13 @@ use p4kx_extraction::SourceValue;
 use super::{PortVisibility, ValueOrigin, VehicleAttributeEvidence};
 use crate::markup::AttributeOrigins;
 
-pub(crate) const PORT_SIZE_AND_TAG_ATTRIBUTES: [&str; 4] =
-    ["minSize", "maxSize", "portTags", "requiredTags"];
+pub(crate) const PORT_OBSERVED_ATTRIBUTES: [&str; 5] = [
+    "minSize",
+    "maxSize",
+    "portTags",
+    "requiredTags",
+    "display_name",
+];
 
 /// Returns whether `flags`, words separated by white space, contain `flag`, ignoring ASCII case
 /// and a leading `$`.
@@ -107,7 +112,21 @@ impl VehicleItemPort {
     /// when the XML gives none.
     #[must_use]
     pub fn display_name(&self) -> Option<&str> {
-        self.display_name.as_deref()
+        self.display_name.as_deref().filter(|name| !name.is_empty())
+    }
+
+    /// Borrows the original display name, including empty text, and its effective attribute evidence.
+    #[must_use]
+    pub fn display_name_source(&self) -> (Option<&str>, Option<&VehicleAttributeEvidence>) {
+        let evidence = self
+            .origins
+            .evidence("display_name")
+            .map(std::sync::Arc::as_ref);
+        let authored = self
+            .display_name
+            .as_deref()
+            .filter(|_| !evidence.is_some_and(|site| site.original().checked_absence()));
+        (authored, evidence)
     }
 
     /// Returns the smallest item size the port takes, or `None` when the XML gives none.

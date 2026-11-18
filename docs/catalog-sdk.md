@@ -649,6 +649,10 @@ part selection remains unresolved.
 sourced list cells. Words within one list share the original field or attribute. The value-only
 list getters return an empty slice for non-present cells.
 
+`source_display_name_key()` borrows `displayNameKey`, including the original empty or placeholder
+key and its origin. `display_name_key()` returns a key only when it is present, nonempty and not a
+placeholder. Use the original port-definition link for the canonical text lookup.
+
 `source_constraints()` exposes typed physical port and attachment links. Resolve their immediate
 origin references against this result's `source_inventory`. `coverage` describes the requested
 owner selection. `dependencies` records the reached resolver operations and each demanded

@@ -61,6 +61,8 @@ and invalid source values.
 Read normalized flag and tag words from `flags.value`, `portTags.value` and
 `requiredTags.value` on each resolved port. An explicitly empty source has an empty array.
 For non-present states, use an empty list when applying port compatibility rules.
+Read the original port localisation key from `ports[].displayNameKey.value`. The cell retains
+authored empty and placeholder keys, which can be ignored when displaying a port name.
 
 ## External container links
 

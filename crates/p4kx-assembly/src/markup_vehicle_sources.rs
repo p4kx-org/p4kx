@@ -4,7 +4,7 @@
 use std::sync::Arc;
 
 use crate::loadout_xml::{MissingAttribute, Node, Scope};
-use crate::vehicle::PORT_SIZE_AND_TAG_ATTRIBUTES;
+use crate::vehicle::PORT_OBSERVED_ATTRIBUTES;
 use crate::{ValueOrigin, VehicleAttributeEvidence};
 
 use super::AttributeOrigins;
@@ -79,7 +79,7 @@ fn retain_port_attributes(
             .iter()
             .any(|(name, value)| name.eq_ignore_ascii_case("id") && !value.is_empty());
     if port || patch_donor {
-        for name in PORT_SIZE_AND_TAG_ATTRIBUTES {
+        for name in PORT_OBSERVED_ATTRIBUTES {
             retain(origins, node, scope, attributes, name, absence_scope(port));
         }
     }
