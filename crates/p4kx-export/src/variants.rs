@@ -9,7 +9,7 @@ use crate::collected::Collected;
 use crate::digest::Digest;
 use crate::guid_text::CatalogGuid;
 use crate::item_variant::ItemKey;
-use crate::{Playability, VariantCounts, VariantSummary};
+use crate::{ExportAccountingError, Playability, VariantCounts, VariantSummary};
 
 /// What the ships of one variant group share (`docs/catalog.md`): the vehicle
 /// definition path, compared without regard to case and separator, and the digest of the vehicle
@@ -46,20 +46,28 @@ fn normalised(path: &str) -> Box<str> {
 }
 
 impl Collected<'_> {
-    /// Moves the ship variant keys out of the vehicle facts used for paints.
-    pub(crate) fn take_ship_variant_keys(&mut self) -> HashMap<CatalogGuid, ShipKey> {
-        mem::take(&mut self.vehicles)
-            .into_iter()
-            .filter_map(|vehicle| Some((vehicle.ship, vehicle.variant_key?)))
-            .collect()
+    /// Moves physically bound ship variant keys out of the vehicle facts.
+    ///
+    /// # Errors
+    /// Returns an accounting error if a vehicle has no physical Record binding.
+    pub(crate) fn take_ship_variant_keys(
+        &mut self,
+    ) -> Result<HashMap<u32, ShipKey>, ExportAccountingError> {
+        let mut keys = HashMap::new();
+        for vehicle in mem::take(&mut self.vehicles) {
+            let index = vehicle
+                .source_record_index
+                .ok_or(ExportAccountingError::MissingFieldInspection)?;
+            if let Some(key) = vehicle.variant_key {
+                keys.insert(index, key);
+            }
+        }
+        Ok(keys)
     }
 
     /// Sets `variant_of` of the ships and the items that belong to a variant group and returns the
     /// counts.
-    pub(crate) fn group_variants(
-        &mut self,
-        ship_keys: HashMap<CatalogGuid, ShipKey>,
-    ) -> VariantSummary {
+    pub(crate) fn group_variants(&mut self, ship_keys: HashMap<u32, ShipKey>) -> VariantSummary {
         let (bases, counts) = {
             let candidates: Vec<Candidate<'_, &ShipKey>> = self
                 .ships
@@ -68,7 +76,7 @@ impl Collected<'_> {
                     guid: ship.guid,
                     class_name: ship.class_name,
                     playability: ship.playability,
-                    key: ship_keys.get(&ship.guid),
+                    key: ship_keys.get(&ship.source_record_index),
                 })
                 .collect();
             group(&candidates)

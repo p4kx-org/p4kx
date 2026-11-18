@@ -940,6 +940,11 @@ default loadout. A ship without a `vehicleDefinition`, or whose vehicle
 implementation cannot be read in full (a missing file or patch file, a broken document), is
 ungrouped, because equality cannot be shown.
 
+The implementation key is bound to the original physical ship Record within the current
+DataForge input. Separate Records with an equal GUID keep their own selected implementation
+keys. Reordering such aliases does not change a distinct ship's variant link. The base link
+remains a nominal GUID, and an equal-GUID alias never becomes a variant of itself.
+
 **Items** share a group when all of these are equal:
 
 - `type`, `subType`, `size`, `grade` and `manufacturerGuid` of the `AttachDef`;

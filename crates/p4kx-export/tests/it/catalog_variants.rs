@@ -233,3 +233,8 @@ fn the_summary_counts_groups_and_variants() -> TestResult {
     );
     Ok(())
 }
+
+#[path = "catalog_variant_identity_fixture.rs"]
+mod physical_fixture;
+#[path = "catalog_variant_physical_identity.rs"]
+mod physical_identity;
