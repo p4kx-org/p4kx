@@ -35,7 +35,13 @@ fn a_poisoned_observed_pool_cannot_supply_a_ship_reader() -> Result<(), Box<dyn 
             crate::export_evidence_lock::poison(&pool.observed),
             "the fixture poisons the actual observed reader pool"
         );
+        let operands = crate::catalog_v3::authored_fields::ship_source_read::aggregate_for_test(
+            &tree,
+            input,
+            &crate::record_observation::RecordObservation::capture(input, &record)?,
+        )?;
         let result = pool.read_catalog(
+            &operands,
             &record,
             &tree,
             &crate::export_ledger::ExportLedger::default(),

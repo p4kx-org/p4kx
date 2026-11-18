@@ -147,3 +147,27 @@ deduplication keep the original operation identity when several decisions use th
 For every vehicle use, Assembly supplies the current physical Entity and its Vehicle request.
 The Catalog must bind that request, the observed file operation and the metric's contributing
 values to establish a complete source set for a published total.
+
+## Catalog Ship aggregate publication
+
+The Catalog joins the opted-in Assembly witnesses to the current physical Ship caller and
+actual Archive admissions. The same ShipReader calculation produces the values and reports each
+metric's consulted fields in one pass. The original Ship field walk captures the Physics
+operand for potential fallback. Its origin contributes when that fallback is used. The authored
+Vehicle selector, Modification state and component selection retain their original source facts.
+
+Mass, its basis and hull health use immediate sourced carriers. Parts membership and requested
+Modification/patch/Elem decisions are shared selection evidence. Numeric conversions, rejected
+numeric candidates and structural flags belong to their respective metric. The basis consumes
+selection evidence. Failed archive lookups use the consulted directory range. Failed payload
+reads are recorded as attempts. Repaired XML carries its known file ancestry and reports
+unavailable original coordinates.
+
+Both coordinate incompleteness and unreadable requested inputs can accompany a present numeric
+result. Without a numeric result, a failed configured read yields `unreadable` and a known empty
+source yields `absent`. Positive source mass rounded to zero stays present with its actual
+basis. The Catalog and standalone ShipBase share the traversal, fallback and rounding rules.
+
+Capture drains its per-resolution staging before publication. Only successful resolution returns
+aggregate cells and a reusable reader. Each cache hit binds the current physical Record to the
+observed file operation.

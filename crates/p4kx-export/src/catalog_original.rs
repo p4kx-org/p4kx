@@ -155,7 +155,9 @@ pub(crate) use health_loadout_body::LoadoutBodyReceipt;
 #[path = "health_loadout_graph.rs"]
 mod health_loadout_graph;
 
-pub(crate) use health_loadout_graph::{FileGraph, FileSelection};
+pub(crate) use health_loadout_graph::{
+    FileGraph, FileSelection, VehicleCaller, VehicleFileSelection,
+};
 
 #[cfg(test)]
 #[path = "health_number_body_tests.rs"]

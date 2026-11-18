@@ -577,3 +577,9 @@ own inputs. Interpreted fields such as playability, XML totals and variants depe
 respective readers. See
 [the Ship contract](catalog.md#ship-dcb-source-fields) and
 [ADR-0410](adr/0410-equipment-sdk-shares-original-family-readers-and-canonical-variant-choices.md).
+
+The Catalog's `mass`, `massBasis` and `hullHealth` are immediate sourced aggregate cells.
+Their input sets bind the current physical Record to the original Vehicle XML, the selected
+Modification, patch and overrides, and the fields consulted for each metric. A Physics fallback
+includes the operand used by ShipReader. Source sets distinguish a failed read from a successful
+read whose original field coordinates are unavailable.

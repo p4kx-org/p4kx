@@ -30,6 +30,7 @@ struct ObservedReader<'f> {
 pub(crate) struct CatalogRead<'f> {
     pub(crate) read: Result<ShipRead, CatalogReadFailure<'f>>,
     pub(crate) ledger: crate::export_ledger::ExportLedger,
+    pub(crate) aggregates: Option<crate::loadout::ledger::ShipAggregateValues>,
 }
 
 impl<'f> ShipPool<'f> {
@@ -67,6 +68,7 @@ impl<'f> ShipPool<'f> {
     /// Captures actual resolver and cargo dependencies while reusing their physical cache proofs.
     pub(crate) fn read_catalog(
         &self,
+        operands: &crate::catalog_v3::authored_fields::ship_source_read::ShipAggregateOperands,
         record: &Record<'f>,
         tree: &RecordTree<'f>,
         sources: &crate::export_ledger::ExportLedger,
@@ -92,13 +94,37 @@ impl<'f> ShipPool<'f> {
         });
         observed.capture.check_input(input)?;
         observed.capture.seed_proofs(sources)?;
-        let read = observed.reader.read_with_digest(record, tree);
+        observed.capture.begin_vehicle(record, operands)?;
+        let mut physics_used = false;
+        let read = observed.reader.read_with_digest_using(
+            record,
+            tree,
+            |vehicle| observed.capture.vehicle_totals(record.index(), vehicle),
+            || {
+                physics_used = true;
+                operands.physics.value().copied()
+            },
+        );
+        let aggregates = observed.capture.finish_vehicle(
+            self.files.archive(),
+            record,
+            read.as_ref().ok(),
+            physics_used,
+        )?;
         let ledger = observed.capture.finish()?;
         crate::export_evidence_lock::lock(&self.observed)?.push(observed);
-        Ok(CatalogRead { read, ledger })
+        Ok(CatalogRead {
+            read,
+            ledger,
+            aggregates,
+        })
     }
 }
 
 #[cfg(test)]
 #[path = "ship_pool_cache_tests.rs"]
 mod cache_tests;
+
+#[cfg(test)]
+#[path = "ship_aggregate_transaction_tests.rs"]
+mod aggregate_transaction_tests;

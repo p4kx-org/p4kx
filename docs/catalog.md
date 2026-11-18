@@ -583,9 +583,9 @@ its key and has absent translation forms.
 | `variantOf` | The `guid` of the base of the ship's variant group, `null` for a base and an ungrouped ship; see "Variant groups" below |
 | `vehicleKind` | `spaceship` or `groundVehicle`, or `null`; see "Ship base data" below |
 | `size` | Sourced original `Components/SAttachableComponentParams/AttachDef/Size` as ResourceNumber with explicit absent, null and unreadable states |
-| `mass` | The hull mass in kilograms; `null` when unknown, never 0; see "Ship base data" below |
-| `massBasis` | What `mass` is the sum of: `parts` or `physics`; `null` exactly when `mass` is |
-| `hullHealth` | The hull hit points, `null` when unknown; see "Ship base data" below |
+| `mass` | Immediately sourced hull mass in kilograms; use `value` when `state` is present. A positive total rounding to zero stays present. See "Ship base data" below. |
+| `massBasis` | Sourced selection of `parts` or `physics`; present exactly when `mass` is present. |
+| `hullHealth` | Immediately sourced structural hull hit points; see "Ship base data" below. |
 | `cargoScu` | The cargo capacity in SCU: 0 without a cargo grid, `null` when unknown; see "Ship base data" below |
 | `cargoGridsWithIssue` | How many cargo grids have no readable capacity; above 0, `cargoScu` is a lower bound |
 | `insurance` | Sourced first `SEntityInsuranceProperties` declaration and its independent parameter state |
@@ -622,16 +622,32 @@ in the [item recovery configuration tables](#item-recovery-rules).
 
 #### Ship base data
 
-`size` is the exact sourced DCB value described above. The other base projections
-`mass`, `massBasis`, `hullHealth`, `cargoScu`, `cargoGridsWithIssue` and `vehicleKind` retain the
-existing interpreted ship base data of `p4kx ships`
-([ship-base-data.md](ship-base-data.md), ADR-0061): the catalog build reads each ship once with
-`p4kx_export::ShipReader` in the same pass that reads the other ship fields, so the ship base walk
-runs once, not twice. Every value is `null` when the Archive does not state it, and a reader never
-sees 0 for unknown. The exports agree value for value; the catalog leaves out the per-value
-sources (file and field), the thresholds, the Loadout and the cells, which stay in `p4kx ships`.
-The shapes are additive within version 1 (ADR-0054, ADR-0063); `vehicleKind` and `massBasis` are
-closed sets that the schema keeps as strings.
+`size` is the exact sourced DCB value described above. `mass`, `massBasis` and
+`hullHealth` use the five-field immediate source carrier. Read each cell's `state` and `value`.
+Their numeric payloads and rounding use the same `p4kx_export::ShipReader` calculation as
+`p4kx ships` ([ship-base-data.md](ship-base-data.md), ADR-0061). The totals are calculated once;
+the opt-in observer captures the actual Parts, Modification, patch, override and eligibility
+inputs from that same interpretation. The raw `vehicleDefinition` remains separate from the
+normalized Archive lookup path.
+
+Known empty Parts and missing optional attributes yield complete absent totals when the fallback
+also establishes absence. An unreadable Vehicle, patch or override yields `unreadable` for a
+metric whose value could not be computed. Available results stay present with incomplete source
+sets when a requested input is unreadable. An authored numeric field that cannot be interpreted
+yields `invalid` when its metric has no usable value or fallback. Missing original XML
+coordinates affect `sourceSetComplete` independently of the value state. The encryption marker includes every known
+contributing encrypted payload. Failed reads are recorded as attempts.
+
+Each aggregate joins its actual current physical Ship caller with the original selected file,
+Parts membership and the numeric and selector fields that influenced that metric. Parts mass
+includes the consulted Parts values and selectors. Physics fallback includes the rejected Parts
+choice and the original Physics conversion. `massBasis` uses selection evidence. Hull health
+uses its own damage and structural-port eligibility inputs. Each physical Record retains its
+own DCB contributions, including when its XML is reused or its GUID or path is shared.
+
+`cargoScu`, `cargoGridsWithIssue` and `vehicleKind` are interpreted fields.
+The standalone `p4kx ships` output reports detailed sources, thresholds, Loadout and cells.
+`vehicleKind` and the payload of `massBasis` are extensible strings in the schema.
 
 | Field | Rule and source |
 |-------|-----------------|

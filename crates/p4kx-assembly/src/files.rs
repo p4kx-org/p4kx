@@ -91,6 +91,12 @@ impl<'a> ArchiveFiles<'a> {
         }
     }
 
+    /// Borrows the Archive supplying these files.
+    #[must_use]
+    pub const fn archive(&self) -> &'a Archive {
+        self.archive
+    }
+
     fn index(&self) -> &HashMap<String, usize> {
         self.index.get_or_init(|| {
             self.archive

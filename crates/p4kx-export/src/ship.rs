@@ -61,6 +61,7 @@ pub(crate) fn ship<'f>(
     source: ShipSourceRead<'_, 'f>,
     evidence: &Evidence,
     read: &ShipRead,
+    aggregates: crate::loadout::ledger::ShipAggregateValues,
 ) -> Result<(Ship<'f>, VehicleFacts), CatalogError> {
     let base = &read.base;
     let identity = ShipIdentity::read(&source.header)?;
@@ -83,9 +84,9 @@ pub(crate) fn ship<'f>(
         playability,
         vehicle_kind: base.vehicle_kind,
         size: presentation.size,
-        mass: base.mass.as_ref().map(|mass| mass.kg),
-        mass_basis: base.mass.as_ref().map(|mass| mass.basis),
-        hull_health: base.hull.as_ref().map(|hull| hull.health),
+        mass: aggregates.mass,
+        mass_basis: aggregates.mass_basis,
+        hull_health: aggregates.hull_health,
         cargo_scu: base.cargo.scu,
         cargo_grids_with_issue: base.cargo.grids_with_issue,
         variant_of: None,

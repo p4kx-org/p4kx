@@ -126,21 +126,21 @@ fn the_known_ships_carry_their_mass_hull_and_cargo() -> TestResult {
         print_line(&format!(
             "{}: mass {} hull {} cargo {} (grids with issue {}) kind {} size {}",
             anchor.class_name,
-            ship["mass"],
-            ship["hullHealth"],
+            ship["mass"]["value"],
+            ship["hullHealth"]["value"],
             ship["cargoScu"],
             ship["cargoGridsWithIssue"],
             ship["vehicleKind"],
             ship["size"]
         ));
         assert_eq!(
-            ship["mass"].as_f64(),
+            ship["mass"]["value"].as_f64(),
             Some(anchor.mass),
             "{}",
             anchor.class_name
         );
         assert_eq!(
-            ship["hullHealth"].as_f64(),
+            ship["hullHealth"]["value"].as_f64(),
             Some(anchor.hull),
             "{}",
             anchor.class_name
@@ -178,12 +178,18 @@ fn dangling_container_references_leave_the_cargo_unknown() -> TestResult {
 fn assert_entry_equals_base(entry: &Json, base: &ShipBase) -> TestResult {
     let name = base.class_name.as_str();
     assert_eq!(
-        entry["mass"].as_f64(),
+        entry
+            .pointer("/mass/value")
+            .ok_or("the sourced mass has a value field")?
+            .as_f64(),
         base.mass.as_ref().map(|mass| mass.kg),
         "{name}"
     );
     assert_eq!(
-        entry["hullHealth"].as_f64(),
+        entry
+            .pointer("/hullHealth/value")
+            .ok_or("the sourced hull health has a value field")?
+            .as_f64(),
         base.hull.as_ref().map(|hull| hull.health),
         "{name}"
     );
@@ -202,7 +208,13 @@ fn assert_entry_equals_base(entry: &Json, base: &ShipBase) -> TestResult {
         Some(mass) => serde_json::to_value(mass.basis)?,
         None => Json::Null,
     };
-    assert_eq!(entry["massBasis"], mass_basis, "{name}");
+    assert_eq!(
+        entry
+            .pointer("/massBasis/value")
+            .ok_or("the sourced mass basis has a value field")?,
+        &mass_basis,
+        "{name}"
+    );
     assert_eq!(
         entry["vehicleKind"].as_str(),
         base.vehicle_kind.map(p4kx_export::VehicleKind::code),

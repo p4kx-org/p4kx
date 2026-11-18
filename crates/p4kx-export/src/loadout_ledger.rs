@@ -21,6 +21,16 @@ mod path_observer;
 mod path_proofs;
 #[path = "loadout_ledger/typed.rs"]
 mod typed;
+#[path = "loadout_ledger/vehicle_capture.rs"]
+mod vehicle_capture;
+#[path = "loadout_ledger/vehicle_fields.rs"]
+mod vehicle_fields;
+#[path = "loadout_ledger/vehicle_result.rs"]
+mod vehicle_result;
+#[path = "loadout_ledger/vehicle_stage.rs"]
+mod vehicle_stage;
+
+pub(crate) use vehicle_result::ShipAggregateValues;
 
 use std::collections::btree_map::Entry;
 use std::collections::{BTreeMap, HashSet};
@@ -45,6 +55,7 @@ struct State {
     references: reference_proofs::ReferenceProofs,
     classes: class_proofs::ClassProofs,
     graph: FileGraph,
+    vehicles: vehicle_stage::VehicleCapture,
     seen: HashSet<u32>,
     proofs: HashSet<u32>,
     error: Option<CatalogError>,
@@ -60,6 +71,7 @@ impl State {
             references: reference_proofs::ReferenceProofs::default(),
             classes: class_proofs::ClassProofs::default(),
             graph: FileGraph::default(),
+            vehicles: vehicle_stage::VehicleCapture::default(),
             seen: HashSet::new(),
             proofs: HashSet::new(),
             error: None,

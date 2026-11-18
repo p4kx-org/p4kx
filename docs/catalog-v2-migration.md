@@ -125,3 +125,9 @@ Re-export original inputs to obtain canonical `ships` rows in schema v3.
 Each typed insurance leaf retains the parent choice uncertainty. A known absent declaration,
 a null parameter pointer, an unreadable earlier static slot and a present zero/false/empty value
 remain distinct.
+
+Ship `mass`, `massBasis` and `hullHealth` are immediate sourced cells in v3. Read each cell's
+`state` and `value`. Their numbers and basis use the same ShipReader rules as the standalone
+ShipBase export. Each metric includes the physical Record, the relevant XML selection and fields,
+and the original Physics operand when it supplies fallback mass. Coordinate loss affects
+`sourceSetComplete` independently of the value state.

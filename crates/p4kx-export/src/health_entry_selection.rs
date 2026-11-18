@@ -78,6 +78,9 @@ impl AuthoredEntryPath {
     pub(crate) fn selected_by(self, selector: &Self) -> Result<Self, ExportAccountingError> {
         Ok(Self::from_text(self.inner.selected_by(&selector.inner)?))
     }
+    pub(crate) fn record_owner(&self) -> Result<u32, ExportAccountingError> {
+        self.inner.record_owner()
+    }
     pub(crate) fn check_input(
         &self,
         input: &OriginalCatalogInput<'_, '_>,

@@ -149,6 +149,23 @@ impl Capture<'_> {
 }
 
 impl LoadoutReadObserver for Capture<'_> {
+    fn observes_vehicle_totals(&self) -> bool {
+        self.input.is_some() && self.kind == crate::Kind::Ships
+    }
+
+    fn vehicle_used(
+        &self,
+        record_index: u32,
+        implementation: &p4kx_assembly::VehicleImplementation,
+        caller: &p4kx_assembly::LoadoutRequest,
+    ) -> ControlFlow<()> {
+        if self.observes_vehicle_totals() {
+            self.capture_vehicle(record_index, implementation, caller)
+        } else {
+            ControlFlow::Continue(())
+        }
+    }
+
     fn observes_port_names(&self) -> bool {
         self.input.is_some() && self.kind == crate::Kind::Loadouts
     }

@@ -123,6 +123,20 @@ impl<'input> Probe<'input> {
 }
 
 impl LoadoutReadObserver for Probe<'_> {
+    fn observes_vehicle_totals(&self) -> bool {
+        self.capture.observes_vehicle_totals()
+    }
+
+    fn vehicle_used(
+        &self,
+        record_index: u32,
+        implementation: &p4kx_assembly::VehicleImplementation,
+        caller: &p4kx_assembly::LoadoutRequest,
+    ) -> ControlFlow<()> {
+        self.capture
+            .vehicle_used(record_index, implementation, caller)
+    }
+
     fn with_record_paths(
         &self,
         record: &Record<'_>,

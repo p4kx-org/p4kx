@@ -6,6 +6,9 @@
 #[path = "catalog_ship_physical_identity.rs"]
 mod physical_identity;
 
+#[path = "catalog_ship_aggregate_sources.rs"]
+mod aggregate_sources;
+
 use crate::ship_base_fixture::{
     ALPHA, BETA, BROKEN, CAR, DISPLAY, GROUND, GUN_DISPLAY, HUGE, MIXED, ROLLING, TEMP, UNKNOWN,
     write_archive,
@@ -81,9 +84,9 @@ fn ship(built: &Built, value: u128) -> Result<&Value, Box<dyn Error>> {
 fn mass_hull_cargo_size_and_kind_come_from_the_ship_base_data() -> TestResult {
     let built = build()?;
     let alpha = ship(&built, ALPHA)?;
-    assert_eq!(alpha["mass"], 1210.0);
-    assert_eq!(alpha["massBasis"], "parts");
-    assert_eq!(alpha["hullHealth"], 600.0);
+    assert_eq!(alpha["mass"]["value"], 1210.0);
+    assert_eq!(alpha["massBasis"]["value"], "parts");
+    assert_eq!(alpha["hullHealth"]["value"], 600.0);
     assert_eq!(
         alpha["cargoScu"], 18.5,
         "the docked snub craft's grid is not counted"
@@ -96,8 +99,11 @@ fn mass_hull_cargo_size_and_kind_come_from_the_ship_base_data() -> TestResult {
     );
     assert_eq!(alpha["vehicleKind"], "spaceship");
     let beta = ship(&built, BETA)?;
-    assert_eq!(beta["mass"], 1270.0, "the Modification's patch is applied");
-    assert_eq!(beta["hullHealth"], 650.0);
+    assert_eq!(
+        beta["mass"]["value"], 1270.0,
+        "the Modification's patch is applied"
+    );
+    assert_eq!(beta["hullHealth"]["value"], 650.0);
     Ok(())
 }
 
@@ -112,16 +118,19 @@ fn every_catalog_ship_equals_its_ship_base_data() -> TestResult {
             .find(|ship| ship.pointer("/guid/value").and_then(Value::as_str) == Some(guid.as_str()))
             .ok_or_else(|| format!("{} is not in the catalog", base.class_name))?;
         let json = |value: Option<f64>| value.map_or(Value::Null, Value::from);
-        assert_eq!(entry["mass"], json(base.mass.as_ref().map(|m| m.kg)));
         assert_eq!(
-            entry["hullHealth"],
+            entry["mass"]["value"],
+            json(base.mass.as_ref().map(|m| m.kg))
+        );
+        assert_eq!(
+            entry["hullHealth"]["value"],
             json(base.hull.as_ref().map(|h| h.health))
         );
         let basis = match &base.mass {
             Some(mass) => serde_json::to_value(mass.basis)?,
             None => Value::Null,
         };
-        assert_eq!(entry["massBasis"], basis, "{}", base.class_name);
+        assert_eq!(entry["massBasis"]["value"], basis, "{}", base.class_name);
         assert_eq!(entry["cargoScu"], json(base.cargo.scu));
         assert_eq!(entry["cargoGridsWithIssue"], base.cargo.grids_with_issue);
         let size = &entry["size"];
@@ -147,11 +156,11 @@ fn every_catalog_ship_equals_its_ship_base_data() -> TestResult {
 }
 
 #[test]
-fn a_value_that_cannot_be_determined_is_null_and_never_zero() -> TestResult {
+fn unavailable_aggregate_payloads_remain_null() -> TestResult {
     let built = build()?;
     let broken = ship(&built, BROKEN)?;
-    assert!(broken["mass"].is_null() && broken["massBasis"].is_null());
-    assert!(broken["hullHealth"].is_null());
+    assert!(broken["mass"]["value"].is_null() && broken["massBasis"]["value"].is_null());
+    assert!(broken["hullHealth"]["value"].is_null());
     crate::health_origin_assertions::cell(broken, "size", "absent")?;
     let unknown = ship(&built, UNKNOWN)?;
     assert!(
@@ -159,8 +168,8 @@ fn a_value_that_cannot_be_determined_is_null_and_never_zero() -> TestResult {
         "grids without a readable capacity: unknown, not 0"
     );
     assert_eq!(unknown["cargoGridsWithIssue"], 2);
-    assert!(unknown["hullHealth"].is_null());
-    assert!(unknown["mass"].is_number());
+    assert!(unknown["hullHealth"]["value"].is_null());
+    assert!(unknown["mass"]["value"].is_number());
     Ok(())
 }
 
@@ -168,11 +177,17 @@ fn a_value_that_cannot_be_determined_is_null_and_never_zero() -> TestResult {
 fn a_part_value_too_large_to_round_is_unknown_and_never_null_with_a_basis() -> TestResult {
     let built = build()?;
     let huge = ship(&built, HUGE)?;
-    assert_eq!(huge["mass"], 3000.0, "falls through to the physics mass");
-    assert_eq!(huge["massBasis"], "physics");
-    assert!(huge["hullHealth"].is_null());
+    assert_eq!(
+        huge["mass"]["value"], 3000.0,
+        "falls through to the physics mass"
+    );
+    assert_eq!(huge["massBasis"]["value"], "physics");
+    assert!(huge["hullHealth"]["value"].is_null());
     for ship in ships(&built)? {
-        assert_eq!(ship["mass"].is_null(), ship["massBasis"].is_null());
+        assert_eq!(
+            ship["mass"]["value"].is_null(),
+            ship["massBasis"]["value"].is_null()
+        );
     }
     Ok(())
 }
@@ -191,9 +206,9 @@ fn a_ship_without_cargo_grids_has_zero_scu() -> TestResult {
     let built = build()?;
     let ground = ship(&built, GROUND)?;
     assert_eq!(ground["cargoScu"], 0.0);
-    assert_eq!(ground["mass"], 5400.0);
-    assert_eq!(ground["massBasis"], "physics");
-    assert!(ground["hullHealth"].is_null());
+    assert_eq!(ground["mass"]["value"], 5400.0);
+    assert_eq!(ground["massBasis"]["value"], "physics");
+    assert!(ground["hullHealth"]["value"].is_null());
     Ok(())
 }
 

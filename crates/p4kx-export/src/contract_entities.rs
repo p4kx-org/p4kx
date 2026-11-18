@@ -75,19 +75,14 @@ pub(crate) struct Ship<'a> {
     pub(crate) vehicle_kind: Option<VehicleKind>,
     /// The original `Size` of the selected `AttachDef`.
     pub(crate) size: SourcedValue<ResourceNumber>,
-    /// The hull mass in kilograms, without the Loadout, the docked vehicles and the landing gear:
-    /// the sum of the `mass` of the parts of the vehicle implementation after the Modification
-    /// the ship selects, rounded to four decimals. `null` when neither the parts nor the physics
-    /// controller state one, never 0.
-    pub(crate) mass: Option<f64>,
-    /// What `mass` is the sum of. Today one of `parts` and `physics`; the schema keeps a string,
-    /// as a new value is additive. `null` exactly when `mass` is.
-    #[schemars(with = "Option<String>")]
-    pub(crate) mass_basis: Option<MassBasis>,
-    /// The hull hit points: the sum of the positive `damageMax` of the structural parts of the
-    /// vehicle implementation, rounded to four decimals. `null` without a vehicle implementation
-    /// or when no part states a `damageMax`.
-    pub(crate) hull_health: Option<f64>,
+    /// Hull mass in kilograms from the selected Parts or Physics inputs, rounded to four decimals.
+    /// A positive mass that rounds to zero remains present.
+    pub(crate) mass: SourcedValue<f64>,
+    /// The `parts` or `physics` basis selected for a present `mass`.
+    #[schemars(with = "SourcedValue<String>")]
+    pub(crate) mass_basis: SourcedValue<MassBasis>,
+    /// The sum of positive structural part `damageMax` values, rounded to four decimals.
+    pub(crate) hull_health: SourcedValue<f64>,
     /// The cargo capacity in standard cargo units (SCU) of the cargo grids the default Loadout
     /// reaches, rounded to four decimals: 0 for a ship without a cargo grid, `null` when it has
     /// grids and none can be read. With `cargoGridsWithIssue` above 0 the value is a lower bound.

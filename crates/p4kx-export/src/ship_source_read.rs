@@ -18,6 +18,8 @@ use crate::resource_number::ResourceNumber;
 use crate::source_fields::FieldError;
 use crate::template_field_capture::TemplateFieldCapture;
 
+#[path = "ship_aggregate_source.rs"]
+mod aggregate;
 #[path = "ship_source_fields.rs"]
 pub(super) mod fields;
 #[path = "ship_insurance_source.rs"]
@@ -27,6 +29,7 @@ mod playability_inputs;
 #[path = "ship_source_selection.rs"]
 mod selection;
 
+pub(crate) use aggregate::ShipAggregateOperands;
 pub(crate) use playability_inputs::ShipPlayabilityInputs;
 use selection::SelectedSource;
 
@@ -43,6 +46,8 @@ pub(crate) struct ShipSourceRead<'read, 'source> {
     pub(crate) insurance: SourcedValue<Box<ShipInsurance<'source>>>,
     pub(crate) playability_inputs: ShipPlayabilityInputs<'source>,
     pub(crate) notes: Vec<FieldError>,
+    pub(crate) aggregate: ShipAggregateOperands,
+    pub(crate) physics_notes: Vec<FieldError>,
     pub(crate) numbers: Vec<CapturedNumber>,
 }
 
@@ -78,6 +83,7 @@ pub(crate) fn read<'read, 'source>(
         attachment.value,
         &attachment.prefix,
     )?;
+    let (aggregate, physics_notes) = aggregate::read(fields, &vehicle, &mut notes)?;
     let crew_size = fields::selected(fields, &vehicle, |owner| {
         owner.authored_number("crewSize", &mut notes)
     })?;
@@ -98,6 +104,23 @@ pub(crate) fn read<'read, 'source>(
         insurance,
         playability_inputs,
         notes,
+        aggregate,
+        physics_notes,
         numbers: NumberCapture::deduplicate(numbers.into_inner())?,
     })
+}
+
+#[cfg(test)]
+pub(crate) fn aggregate_for_test(
+    tree: &RecordTree<'_>,
+    input: &crate::build::original_input::OriginalCatalogInput<'_, '_>,
+    admission: &RecordObservation<'_, '_>,
+) -> Result<ShipAggregateOperands, CatalogError> {
+    let scope = input.record_scope(admission.record(), tree)?;
+    let originals = OriginalFlowFields::read(&scope, None)?;
+    let capture = TemplateFieldCapture::new(&originals, input, admission)?;
+    let numbers = RefCell::new(Vec::new());
+    let fields = Observed::definition(&originals, input, &capture, &numbers);
+    let vehicle = SelectedSource::read(&originals, "Components", crate::ship::VEHICLE_COMPONENT)?;
+    aggregate::read(fields, &vehicle, &mut Vec::new()).map(|(operands, _)| operands)
 }

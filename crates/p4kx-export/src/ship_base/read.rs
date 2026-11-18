@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+#[path = "aggregate.rs"]
+mod aggregate;
 #[path = "observe.rs"]
 mod observation;
 
@@ -83,12 +85,28 @@ impl<'f> ShipReader<'f> {
         record: &Record<'f>,
         tree: &RecordTree<'f>,
     ) -> Result<ShipRead, CatalogReadFailure<'f>> {
+        self.read_with_digest_using(record, tree, VehicleImplementation::totals, || {
+            let physics = structure(
+                component(tree, "SEntityPhysicsControllerParams"),
+                "PhysType",
+            );
+            number(physics, "Mass")
+        })
+    }
+
+    pub(crate) fn read_with_digest_using(
+        &mut self,
+        record: &Record<'f>,
+        tree: &RecordTree<'f>,
+        mut totals_of: impl FnMut(&VehicleImplementation) -> VehicleTotals,
+        physics_mass: impl FnOnce() -> Option<f32>,
+    ) -> Result<ShipRead, CatalogReadFailure<'f>> {
         let node = self
             .resolver
             .resolve_tree(record, tree)
             .map_err(|error| CatalogReadFailure::of(record, &error))?;
         let vehicle = node.vehicle();
-        let totals = vehicle.map(VehicleImplementation::totals);
+        let totals = vehicle.map(&mut totals_of);
         let mut issues: Vec<String> = node.issues().iter().map(ToString::to_string).collect();
         issues.extend(
             vehicle
@@ -107,8 +125,10 @@ impl<'f> ShipReader<'f> {
             implementation: vehicle.map(implementation),
             vehicle_kind: vehicle_kind(tree.record_path(), vehicle),
             size: size(tree),
-            mass: mass(tree, vehicle, totals.as_ref()),
-            hull: vehicle.zip(totals.as_ref()).and_then(|(v, t)| hull(v, t)),
+            mass: aggregate::mass(tree, vehicle, totals.as_ref(), physics_mass),
+            hull: vehicle
+                .zip(totals.as_ref())
+                .and_then(|(vehicle, totals)| aggregate::hull(vehicle, totals)),
             cargo: self.cargo.read(&entries, &mut self.trees),
             loadout_source: node.loadout_file().map_or_else(
                 || record_source(tree.record_path(), LOADOUT_FIELD),
@@ -186,74 +206,6 @@ fn size(tree: &RecordTree<'_>) -> Option<Sourced<i64>> {
             file: tree.record_path().to_owned(),
             field: SIZE_FIELD.to_owned(),
         },
-    })
-}
-
-fn mass(
-    tree: &RecordTree<'_>,
-    vehicle: Option<&VehicleImplementation>,
-    totals: Option<&VehicleTotals>,
-) -> Option<Mass> {
-    if let (Some(vehicle), Some(totals)) = (vehicle, totals)
-        && totals.mass_parts() > 0
-        && totals.mass() > 0.0
-        && let kg = rounded(totals.mass())
-        && kg.is_finite()
-    {
-        return Some(Mass {
-            kg,
-            basis: MassBasis::Parts,
-            parts: totals.mass_parts(),
-            sources: shares(vehicle, totals.mass_origins(), PARTS_MASS),
-            unreadable: unreadable(totals, &["mass"]),
-            partial: partial(totals, &["mass"]),
-            cleaned: totals.cleaned_mass(),
-        });
-    }
-    let physics = structure(
-        component(tree, "SEntityPhysicsControllerParams"),
-        "PhysType",
-    );
-    let kg = number(physics, "Mass").filter(|kg| *kg > 0.0)?;
-    let kg = rounded(f64::from(kg));
-    if !kg.is_finite() {
-        return None;
-    }
-    Some(Mass {
-        kg,
-        basis: MassBasis::Physics,
-        parts: 0,
-        sources: vec![SourceShare {
-            source: Source {
-                kind: SourceKind::Record,
-                file: tree.record_path().to_owned(),
-                field: PHYSICS_MASS_FIELD.to_owned(),
-            },
-            values: 1,
-        }],
-        unreadable: totals.map_or_else(Vec::new, |totals| unreadable(totals, &["mass"])),
-        partial: Vec::new(),
-        cleaned: 0,
-    })
-}
-
-fn hull(vehicle: &VehicleImplementation, totals: &VehicleTotals) -> Option<Hull> {
-    if totals.health_parts() == 0 {
-        return None;
-    }
-    let health = rounded(totals.health());
-    if !health.is_finite() {
-        return None;
-    }
-    Some(Hull {
-        health,
-        parts: totals.health_parts(),
-        sources: shares(vehicle, totals.health_origins(), PARTS_DAMAGE),
-        destruction: thresholds(totals.destruction()),
-        detach: thresholds(totals.detach()),
-        unreadable: unreadable(totals, &["damageMax", "detachRatio"]),
-        partial: partial(totals, &["damageMax", "detachRatio"]),
-        cleaned: totals.cleaned_damage(),
     })
 }
 

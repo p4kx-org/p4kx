@@ -158,6 +158,7 @@ impl Capture<'_> {
             } else {
                 None
             };
+            state.stage_vehicle_file(self.input, original, caller)?;
             let entry = self.file_observation(
                 original,
                 bytes_operation(original.kind()),
@@ -240,7 +241,7 @@ impl Capture<'_> {
         }
         let result = (|| {
             self.checked_file(original, request)?;
-            let state = self.lock()?;
+            let mut state = self.lock()?;
             if !state.files.contains(original) {
                 return Err(ExportAccountingError::UnobservedFailure.into());
             }
@@ -257,6 +258,7 @@ impl Capture<'_> {
                     state.paths.validate_request(caller)?;
                 }
             }
+            state.stage_vehicle_file(self.input, original, caller)?;
             drop(state);
             Ok::<_, CatalogError>(())
         })();

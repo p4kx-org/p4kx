@@ -148,12 +148,12 @@ fn check_reference_groups(archive: &Archive) -> TestResult {
 fn assert_physical_ship(catalog: &Value, class: &str, mass: f64, health: f64) -> TestResult {
     let row = ship(catalog, class)?;
     assert_eq!(
-        row.get("mass").and_then(Value::as_f64),
+        row.pointer("/mass/value").and_then(Value::as_f64),
         Some(mass),
         "{class} uses its own actual implementation mass"
     );
     assert_eq!(
-        row.get("hullHealth").and_then(Value::as_f64),
+        row.pointer("/hullHealth/value").and_then(Value::as_f64),
         Some(health),
         "{class} uses its own actual implementation health"
     );

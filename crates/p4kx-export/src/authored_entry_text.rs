@@ -215,6 +215,25 @@ impl AuthoredEntryText {
         Ok(())
     }
 
+    pub(super) fn record_owner(&self) -> Result<u32, ExportAccountingError> {
+        let mut owner = None;
+        for input in self.inputs.iter() {
+            let SelectionSource::Record(frame) = &input.source else {
+                return Err(ExportAccountingError::ConflictingSourceDatum);
+            };
+            let index = frame
+                .subject()
+                .key()
+                .ok_or(ExportAccountingError::UnboundHealthSubject)?
+                .index();
+            if owner.is_some_and(|owner| owner != index) {
+                return Err(ExportAccountingError::ConflictingSourceDatum);
+            }
+            owner = Some(index);
+        }
+        owner.ok_or(ExportAccountingError::UnboundHealthSubject)
+    }
+
     pub(super) fn retain(&self) -> Result<OriginalDatum<HealthText>, CatalogError> {
         let mut inputs: Vec<SourceUse> = Vec::new();
         for input in self.inputs.iter() {

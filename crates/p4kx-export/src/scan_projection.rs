@@ -309,7 +309,10 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
         ledger: &mut ExportLedger,
     ) -> Result<Picked<'f>, CatalogError> {
         let record = admission.record();
+        let mut source =
+            ship_source_read::read(tree, &self.projection, admission, self.scan.options.cancel)?;
         let read = self.scan.ships.read_catalog(
+            &source.aggregate,
             record,
             tree,
             ledger,
@@ -317,13 +320,12 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
             self.scan.options.cancel,
         )?;
         ledger.merge(read.ledger);
+        let aggregates = read.aggregates;
         Picked::of_ship(read.read, |read| {
-            let mut source = ship_source_read::read(
-                tree,
-                &self.projection,
-                admission,
-                self.scan.options.cancel,
-            )?;
+            let aggregates = aggregates.ok_or(crate::ExportAccountingError::UnobservedFailure)?;
+            if aggregates.physics_used {
+                source.notes.append(&mut source.physics_notes);
+            }
             crate::source_projection_notes::record(
                 Kind::Ships,
                 ExportSourceRole::Selected,
@@ -332,7 +334,7 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
                 std::mem::take(&mut source.notes),
                 ledger,
             )?;
-            ship::ship(tree, source, &self.scan.evidence, read)
+            ship::ship(tree, source, &self.scan.evidence, read, aggregates)
         })
     }
 }

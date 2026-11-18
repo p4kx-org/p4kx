@@ -110,7 +110,7 @@ fn a_new_value_of_a_closed_value_set_is_additive() -> TestResult {
 
     let mut unknown_kind = catalog.clone();
     unknown_kind["ships"][0]["vehicleKind"] = json!("hoverVehicle");
-    unknown_kind["ships"][0]["massBasis"] = json!("estimate");
+    unknown_kind["ships"][0]["massBasis"]["value"] = json!("estimate");
     assert!(
         validator.is_valid(&unknown_kind),
         "a new vehicle kind and mass basis are valid"
@@ -124,8 +124,12 @@ fn a_new_value_of_a_closed_value_set_is_additive() -> TestResult {
     );
 
     let mut unknown_values = catalog.clone();
-    for field in ["vehicleKind", "mass", "massBasis", "hullHealth", "cargoScu"] {
+    for field in ["vehicleKind", "cargoScu"] {
         unknown_values["ships"][0][field] = json!(null);
+    }
+    for field in ["mass", "massBasis", "hullHealth"] {
+        unknown_values["ships"][0][field]["state"] = json!("absent");
+        unknown_values["ships"][0][field]["value"] = Value::Null;
     }
     unknown_values["ships"][0]["size"]["state"] = json!("absent");
     unknown_values["ships"][0]["size"]["value"] = Value::Null;

@@ -76,16 +76,35 @@ fn check<'input>(
     original(&first, &first_tree)?;
     original(&second, &second_tree)?;
     let first_source = source(&first, &first_tree)?;
+    let first_operands = crate::catalog_v3::authored_fields::ship_source_read::aggregate_for_test(
+        &first_tree,
+        input,
+        &crate::record_observation::RecordObservation::capture(input, &first)?,
+    )?;
+    let second_operands = crate::catalog_v3::authored_fields::ship_source_read::aggregate_for_test(
+        &second_tree,
+        input,
+        &crate::record_observation::RecordObservation::capture(input, &second)?,
+    )?;
     let observed = observed_pool(files, forge, input, &first_source);
-    let first_read = observed
-        .pool
-        .read_catalog(&first, &first_tree, &first_source, input, None)?;
+    let first_read = observed.pool.read_catalog(
+        &first_operands,
+        &first,
+        &first_tree,
+        &first_source,
+        input,
+        None,
+    )?;
     first_result(&first_read, archive, case, &observed)?;
     let second_source = source(&second, &second_tree)?;
-    let second_read =
-        observed
-            .pool
-            .read_catalog(&second, &second_tree, &second_source, input, None);
+    let second_read = observed.pool.read_catalog(
+        &second_operands,
+        &second,
+        &second_tree,
+        &second_source,
+        input,
+        None,
+    );
     observed.probe.second(archive, case)?;
     let second_read = second_read?;
     assert!(

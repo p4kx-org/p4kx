@@ -15,6 +15,10 @@ use crate::{CatalogError, ExportAccountingError};
 
 #[path = "health_loadout_graph_state.rs"]
 mod state;
+#[path = "health_loadout_vehicle.rs"]
+mod vehicle;
+
+pub(crate) use vehicle::{VehicleCaller, VehicleFileSelection};
 
 struct Operation {
     original: LoadoutFileObservation,

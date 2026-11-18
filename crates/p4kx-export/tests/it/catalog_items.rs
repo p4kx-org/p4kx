@@ -306,14 +306,11 @@ fn a_ship_carries_crew_and_vehicle_definition() -> TestResult {
     for field in ["size", "insurance"] {
         crate::health_origin_assertions::cell(ship, field, "absent")?;
     }
-    for field in [
-        "playability",
-        "variantOf",
-        "mass",
-        "massBasis",
-        "hullHealth",
-    ] {
+    for field in ["playability", "variantOf"] {
         assert!(ship[field].is_null(), "the fixture has no {field}");
+    }
+    for field in ["mass", "massBasis", "hullHealth"] {
+        crate::health_origin_assertions::cell(ship, field, "unreadable")?;
     }
     assert_eq!(ship["vehicleKind"], "spaceship");
     assert_eq!(ship["cargoScu"], 0.0);
