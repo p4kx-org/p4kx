@@ -151,7 +151,10 @@ impl<'query> Query<'query> {
     ) -> Result<Plan<'query>, CatalogError> {
         checkpoint(self.cancel)?;
         let mut plan = match family {
-            Family::Definitions | Family::ItemSources | Family::AmmoDefinitions => Plan::read(
+            Family::Definitions
+            | Family::ItemSources
+            | Family::AmmoDefinitions
+            | Family::WeaponSources => Plan::read(
                 self.forge,
                 family.kind(),
                 self.selection,
@@ -184,7 +187,7 @@ fn order(family: Family, owners: &mut [Owner<'_>]) {
                     owner.record.index(),
                 )
             }),
-        Family::Attachments | Family::Bounds | Family::CargoGrids => {
+        Family::Attachments | Family::Bounds | Family::CargoGrids | Family::WeaponSources => {
             owners.sort_by_key(|owner| owner.record.index());
         }
     }

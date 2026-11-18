@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::cell::RefCell;
-
-use p4kx_extraction::{CancelToken, DataForge, RecordTree, Value};
+use p4kx_extraction::{DataForge, Value};
 
 use super::authored_fields::Observed;
 use super::catalog_ammo_bindings::{self, AmmoBinding};
@@ -23,12 +21,13 @@ use super::catalog_weapon_projectile_ammo::{self, WeaponProjectileAmmoSelection}
 use super::item_component_owner::ComponentOwner;
 use crate::CatalogError;
 use crate::catalog_number_capture::CapturedNumber;
-use crate::catalog_projection::CatalogProjection;
-use crate::catalog_read::original::OriginalFlowFields;
 use crate::catalog_table::CatalogTable;
-use crate::record_observation::RecordObservation;
 use crate::source_fields::FieldError;
-use crate::template_field_capture::TemplateFieldCapture;
+
+#[path = "catalog_item_component_read.rs"]
+mod component_read;
+pub use component_read::WeaponSource;
+pub(crate) use component_read::{read, read_weapon_source};
 
 #[path = "equipment_item_definition_read.rs"]
 pub(crate) mod definition_read;
@@ -38,8 +37,6 @@ pub(crate) mod item_definition;
 pub(crate) mod resolution;
 #[path = "item_source_selection.rs"]
 pub(crate) mod selection;
-
-use item_definition::ItemDefinition;
 
 use self::resolution::WeaponMagazineResolution;
 
@@ -288,51 +285,4 @@ impl Component {
             .or_else(|| HackingComponent::of(name).map(Self::Hacking))?;
         Some((value, kind))
     }
-}
-
-/// Reads each recognized physical component occurrence using its own admitted Record tree.
-pub(crate) fn read<'source, T>(
-    tree: &RecordTree<'source>,
-    projection: &CatalogProjection<'_, 'source>,
-    admission: &RecordObservation<'_, 'source>,
-    cancel: Option<&CancelToken>,
-    project: impl FnOnce(
-        &ItemDefinition<'source>,
-        &OriginalFlowFields<'_, '_, 'source>,
-        &mut ItemComponentsRead<'source>,
-    ) -> Result<T, CatalogError>,
-) -> Result<(ItemDefinition<'source>, ItemComponentsRead<'source>, T), CatalogError> {
-    let mut result = ItemComponentsRead::default();
-    let components = match tree.field("Components") {
-        Some(Value::Array(components)) => components.as_ref(),
-        _ => &[],
-    };
-    let components = components.iter().filter_map(Component::of);
-    let input = projection.original();
-    let scope = input.record_scope(admission.record(), tree)?;
-    let originals = OriginalFlowFields::read(&scope, cancel)?;
-    let capture = TemplateFieldCapture::new(&originals, input, admission)?;
-    let context = projection
-        .origins()
-        .record(tree.record_index())
-        .with_cancel(cancel);
-    let numbers = RefCell::new(Vec::new());
-
-    for (value, kind) in components {
-        let component = originals.fact(value)?;
-        let owner = ComponentOwner::read(tree, &context, &originals, component)?;
-        let observed = Observed::new(&originals, input, component, &capture, &numbers);
-        result.push(kind, owner, observed)?;
-    }
-    let definition = ItemDefinition::read(
-        tree,
-        &originals,
-        &capture,
-        projection,
-        &numbers,
-        &mut result.notes,
-    )?;
-    result.rows.numbers = numbers.into_inner();
-    let projected = project(&definition, &originals, &mut result)?;
-    Ok((definition, result, projected))
 }

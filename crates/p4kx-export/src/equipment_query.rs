@@ -43,6 +43,8 @@ mod rows;
 mod ship_sources;
 #[path = "equipment_query_snapshot.rs"]
 mod snapshot;
+#[path = "equipment_weapon_query.rs"]
+mod weapon;
 
 pub use crate::catalog_v3::authored_fields::authored_manufacturer::AuthoredManufacturer;
 pub use crate::catalog_v3::catalog_capacity::ResourceCapacity;
@@ -78,6 +80,12 @@ pub use item_sources::{with_item_sources, with_item_sources_from};
 pub use snapshot::{
     AttachmentConstraintSnapshot, EquipmentSnapshot, ItemBoundsSnapshot, ItemDefinitionSnapshot,
     ItemSourceSnapshot,
+};
+
+pub use weapon::{
+    AmmoBinding, AmmoContainer, ContainerAmmoSlots, ProjectileCombatInputs, SecondaryMagazine,
+    WeaponAction, WeaponActions, WeaponMagazineSlots, WeaponModeKind, WeaponSource,
+    WeaponSourceSnapshot, with_weapon_sources, with_weapon_sources_from,
 };
 
 pub use crate::catalog_v3::authored_fields::authored_manufacturer::ManufacturerValue as ShipManufacturerValue;

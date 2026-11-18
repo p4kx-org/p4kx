@@ -684,6 +684,23 @@ This query supplies `selected` Ammo definitions. A Catalog scoped to another own
 instead retain Ammo as a `dependency`. Weapon-mode bindings, countermeasure bindings and
 their dependency selection are separate datasets.
 
+## Authored weapon actions and ammunition bindings
+
+Use `equipment::with_weapon_sources`, its decoded-Entry form or the corresponding session
+methods with one physical Item Record index. The snapshot contains the authored rows of
+`configurations.weaponActions`, `configurations.ammoContainers` and `declarations.ammoBindings`
+for that Item, with the same value states and source references as the Catalog.
+
+The weapon component exposes its fire and aim slots, local action nodes and their original
+ordinals. `mode_kind()` classifies each action. For single and rapid projectile actions,
+`combat_inputs()` borrows the original rate, projectile count and damage multiplier cells.
+Inspect their states and origins independently. An incomplete component selection remains
+visible in the snapshot coverage even when the readable components produce rows.
+
+Magazine and Ammo References report original header resolution. Resolving a target index
+does not read its body or select a projectile role. Combat bases and cross-Item dependency
+resolution use separate Catalog projections.
+
 ## Starmap container placements
 
 Use `starmap::read_container_placements` to read the canonical `placements.containerInstances` and

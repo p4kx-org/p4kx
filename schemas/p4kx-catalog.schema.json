@@ -585,13 +585,15 @@
       "description": "The original ammunition links authored on a physical Item component.",
       "oneOf": [
         {
+          "description": "Ammunition References on a physical container.",
           "properties": {
             "type": {
               "const": "containerSlots",
               "type": "string"
             },
             "value": {
-              "$ref": "#/$defs/ContainerAmmoSlots"
+              "$ref": "#/$defs/ContainerAmmoSlots",
+              "description": "Original container slots."
             }
           },
           "required": [
@@ -601,13 +603,15 @@
           "type": "object"
         },
         {
+          "description": "Magazine References on a physical weapon.",
           "properties": {
             "type": {
               "const": "weaponMagazineSlots",
               "type": "string"
             },
             "value": {
-              "$ref": "#/$defs/WeaponMagazineSlots"
+              "$ref": "#/$defs/WeaponMagazineSlots",
+              "description": "Original weapon slots and conditions."
             }
           },
           "required": [

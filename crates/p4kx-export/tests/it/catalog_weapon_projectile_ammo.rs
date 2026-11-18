@@ -12,6 +12,8 @@ use crate::health_origin_assertions as proof;
 mod countermeasure_emitters;
 #[path = "catalog_weapon_projectile_ammo_fixture.rs"]
 mod fixture;
+#[path = "catalog_weapon_source_sdk.rs"]
+mod sdk;
 
 use fixture::Case;
 

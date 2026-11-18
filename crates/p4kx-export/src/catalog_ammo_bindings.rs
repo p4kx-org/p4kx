@@ -8,7 +8,8 @@ use serde::Serialize;
 use super::ammo_definition;
 use super::authored_fields::Observed;
 use super::catalog_ammo_containers;
-use super::catalog_weapon_magazine_slots::{self, WeaponMagazineSlots};
+use super::catalog_weapon_magazine_slots;
+pub use super::catalog_weapon_magazine_slots::{SecondaryMagazine, WeaponMagazineSlots};
 use super::catalog_weapon_projectile_ammo::ProjectileAmmoRole;
 use super::item_component_owner::ComponentOwner;
 use crate::CatalogError;
@@ -22,11 +23,16 @@ use crate::source_value_catalog::SourceRecordReference;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) enum AmmoBinding<'source> {
+#[non_exhaustive]
+pub enum AmmoBinding<'source> {
+    /// Ammunition References on a physical container.
     ContainerSlots {
+        /// Original container slots.
         value: Box<ContainerAmmoSlots<'source>>,
     },
+    /// Magazine References on a physical weapon.
     WeaponMagazineSlots {
+        /// Original weapon slots and conditions.
         value: Box<WeaponMagazineSlots<'source>>,
     },
 }
@@ -42,7 +48,9 @@ impl<'source> AmmoBinding<'source> {
         })
     }
 
-    const fn owner(&self) -> &ComponentOwner {
+    /// Borrows the physical source component of this binding.
+    #[must_use]
+    pub const fn owner(&self) -> &ComponentOwner {
         match self {
             Self::ContainerSlots { value } => &value.owner,
             Self::WeaponMagazineSlots { value } => value.owner(),
@@ -54,7 +62,7 @@ impl<'source> AmmoBinding<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ContainerAmmoSlots<'source> {
+pub struct ContainerAmmoSlots<'source> {
     #[serde(flatten)]
     owner: ComponentOwner,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
@@ -84,8 +92,22 @@ impl<'source> ContainerAmmoSlots<'source> {
         })
     }
 
-    pub(super) const fn owner(&self) -> &ComponentOwner {
+    /// Borrows the physical source component for these slots.
+    #[must_use]
+    pub const fn owner(&self) -> &ComponentOwner {
         &self.owner
+    }
+
+    /// Borrows the original primary ammunition Reference and its state.
+    #[must_use]
+    pub const fn primary_ammo(&self) -> &SourcedValue<Box<SourceRecordReference<'source>>> {
+        &self.primary_ammo
+    }
+
+    /// Borrows the original secondary ammunition Reference and its state.
+    #[must_use]
+    pub const fn secondary_ammo(&self) -> &SourcedValue<Box<SourceRecordReference<'source>>> {
+        &self.secondary_ammo
     }
 
     pub(super) const fn slot(

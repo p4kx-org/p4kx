@@ -42,7 +42,7 @@ use tractor::TractorBeamAction;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct WeaponAction<'source> {
+pub struct WeaponAction<'source> {
     source_type: SourcedValue<&'source str>,
     source_value_ordinal: SourcedValue<DecimalU64>,
     #[serde(flatten)]
@@ -104,33 +104,52 @@ impl<'source> WeaponAction<'source> {
     }
 }
 
-#[derive(Clone, Copy)]
-pub(in crate::catalog_v3) enum WeaponModeKind {
+/// The action family used for the weapon combat projection.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum WeaponModeKind {
+    /// A single or rapid-fire shot.
     SimpleShot,
+    /// A burst with separately authored shot count and cooldown.
     Burst,
+    /// A continuous beam.
     Beam,
+    /// An action completed through a charge.
     Charge,
+    /// An action chosen by an authored condition.
     Conditional,
+    /// An action outside the combat families.
     Other,
 }
 
 /// The stored launcher and rate that drive nominal single-discharge metrics.
-pub(in crate::catalog_v3) struct ProjectileCombatInputs<'action> {
-    pub(in crate::catalog_v3) fire_rate: &'action SourcedValue<i32>,
-    pub(in crate::catalog_v3) pellet_count: &'action SourcedValue<i32>,
-    pub(in crate::catalog_v3) damage_multiplier: &'action SourcedValue<ResourceFloat32>,
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct ProjectileCombatInputs<'action> {
+    /// The original rounds-per-minute setting.
+    pub fire_rate: &'action SourcedValue<i32>,
+    /// The original projectile count per discharge.
+    pub pellet_count: &'action SourcedValue<i32>,
+    /// The original launcher damage multiplier.
+    pub damage_multiplier: &'action SourcedValue<ResourceFloat32>,
 }
 
 impl<'source> WeaponAction<'source> {
-    pub(in crate::catalog_v3) const fn source_ordinal(&self) -> &SourcedValue<DecimalU64> {
+    /// Borrows the original local value ordinal within the physical Record.
+    #[must_use]
+    pub const fn source_ordinal(&self) -> &SourcedValue<DecimalU64> {
         &self.source_value_ordinal
     }
 
-    pub(in crate::catalog_v3) const fn source_type(&self) -> &SourcedValue<&'source str> {
+    /// Borrows the original concrete action type.
+    #[must_use]
+    pub const fn source_type(&self) -> &SourcedValue<&'source str> {
         &self.source_type
     }
 
-    pub(in crate::catalog_v3) const fn mode_kind(&self) -> WeaponModeKind {
+    /// Returns the action family used to select combat derivations.
+    #[must_use]
+    pub const fn mode_kind(&self) -> WeaponModeKind {
         match self.kind {
             WeaponActionKind::Single(_) | WeaponActionKind::Rapid(_) => WeaponModeKind::SimpleShot,
             WeaponActionKind::Burst(_) => WeaponModeKind::Burst,
@@ -143,7 +162,9 @@ impl<'source> WeaponAction<'source> {
         }
     }
 
-    pub(in crate::catalog_v3) fn combat_inputs(&self) -> Option<ProjectileCombatInputs<'_>> {
+    /// Borrows the sourced operands when a single or rapid action declares a projectile launcher.
+    #[must_use]
+    pub fn combat_inputs(&self) -> Option<ProjectileCombatInputs<'_>> {
         let shot = match &self.kind {
             WeaponActionKind::Single(shot) => shot.as_ref(),
             WeaponActionKind::Rapid(rapid) => &rapid.shot,

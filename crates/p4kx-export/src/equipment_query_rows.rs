@@ -10,7 +10,7 @@ use crate::catalog_table::DatasetAvailability;
 use crate::catalog_v3::ammo_definition::{self, AmmoDefinition, AmmoSelection};
 use crate::catalog_v3::catalog_entity_configurations;
 use crate::catalog_v3::catalog_item_alignment::{ATTACHABLE, AlignmentOptions};
-use crate::catalog_v3::catalog_item_components::definition_read;
+use crate::catalog_v3::catalog_item_components::{self, WeaponSource, definition_read};
 use crate::catalog_v3::inventory_entity_configurations::BOUNDS_SOURCE_TYPES;
 use crate::record_observation::RecordObservation;
 use crate::{CatalogError, Kind};
@@ -23,6 +23,7 @@ pub(super) enum Family {
     Bounds,
     CargoGrids,
     AmmoDefinitions,
+    WeaponSources,
 }
 
 impl Family {
@@ -37,7 +38,8 @@ impl Family {
             | Self::ItemSources
             | Self::Attachments
             | Self::Bounds
-            | Self::CargoGrids => Kind::Items,
+            | Self::CargoGrids
+            | Self::WeaponSources => Kind::Items,
         }
     }
 
@@ -51,6 +53,10 @@ impl Family {
             Self::Bounds => BOUNDS_SOURCE_TYPES,
             Self::CargoGrids => &[crate::catalog_v3::catalog_facility::CARGO_GRID_SOURCE_TYPE],
             Self::AmmoDefinitions => &[ammo_definition::SOURCE_TYPE],
+            Self::WeaponSources => &[
+                crate::item_stats::WEAPON_COMPONENT,
+                crate::item_stats::AMMO_CONTAINER,
+            ],
         };
         DatasetAvailability::from_source_declarations(forge, |name| types.contains(&name))
     }
@@ -76,6 +82,23 @@ pub(super) struct Attachments;
 pub(super) struct Bounds;
 pub(super) struct CargoGrids;
 pub(super) struct AmmoDefinitions;
+pub(super) struct WeaponSources;
+
+impl Projector for WeaponSources {
+    type Row<'source> = WeaponSource<'source>;
+    const FAMILY: Family = Family::WeaponSources;
+
+    fn read<'source>(
+        _: &'source DataForge<'source>,
+        tree: &RecordTree<'source>,
+        projection: &CatalogProjection<'_, 'source>,
+        admission: &RecordObservation<'_, 'source>,
+        _: &AlignmentOptions<'_>,
+        cancel: Option<&CancelToken>,
+    ) -> Result<ScopedSourceRead<Vec<Self::Row<'source>>>, CatalogError> {
+        catalog_item_components::read_weapon_source(tree, projection, admission, cancel)
+    }
+}
 
 impl Projector for AmmoDefinitions {
     type Row<'source> = AmmoDefinition<'source>;

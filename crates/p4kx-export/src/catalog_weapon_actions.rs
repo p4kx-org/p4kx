@@ -21,10 +21,8 @@ mod operating;
 #[path = "weapon_action_recoil.rs"]
 mod recoil;
 
-pub(super) use action::WeaponAction;
-pub(super) use action::{
-    ProjectileAction, ProjectileCombatInputs, ProjectileSelector, WeaponModeKind,
-};
+pub(super) use action::{ProjectileAction, ProjectileSelector};
+pub use action::{ProjectileCombatInputs, WeaponAction, WeaponModeKind};
 use operating::WeaponOperatingConfiguration;
 
 const ACTION_BASE: &str = "SWeaponActionParams";
@@ -33,7 +31,7 @@ const ACTION_BASE: &str = "SWeaponActionParams";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct WeaponActions<'source> {
+pub struct WeaponActions<'source> {
     #[serde(flatten)]
     owner: ComponentOwner,
     fire_actions: SourcedValue<Vec<SourcedValue<u32>>>,
@@ -43,11 +41,15 @@ pub(crate) struct WeaponActions<'source> {
 }
 
 impl<'source> WeaponActions<'source> {
-    pub(super) const fn owner(&self) -> &ComponentOwner {
+    /// Borrows the original Item and Components slot identity.
+    #[must_use]
+    pub const fn owner(&self) -> &ComponentOwner {
         &self.owner
     }
 
-    pub(super) const fn fire_actions(&self) -> &SourcedValue<Vec<SourcedValue<u32>>> {
+    /// Borrows the original ordered fire slots and their action-node indices.
+    #[must_use]
+    pub const fn fire_actions(&self) -> &SourcedValue<Vec<SourcedValue<u32>>> {
         &self.fire_actions
     }
 
@@ -56,7 +58,21 @@ impl<'source> WeaponActions<'source> {
         self.action_nodes.get(index).map(WeaponAction::selection)
     }
 
-    pub(super) fn mode(&self, node: u32) -> Option<&WeaponAction<'source>> {
+    /// Borrows the original aim slot, indexed into the local action nodes.
+    #[must_use]
+    pub const fn aim_action(&self) -> &SourcedValue<u32> {
+        &self.aim_action
+    }
+
+    /// Borrows the local action nodes in the order addressed by the authored slots.
+    #[must_use]
+    pub fn action_nodes(&self) -> &[WeaponAction<'source>] {
+        &self.action_nodes
+    }
+
+    /// Borrows the action node at an index retained by an authored action slot.
+    #[must_use]
+    pub fn mode(&self, node: u32) -> Option<&WeaponAction<'source>> {
         self.action_nodes.get(usize::try_from(node).ok()?)
     }
 

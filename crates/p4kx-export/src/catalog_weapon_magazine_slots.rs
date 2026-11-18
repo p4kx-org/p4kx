@@ -23,7 +23,7 @@ const CONDITION_BASE: &str = "SWeaponConditionBase";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct WeaponMagazineSlots<'source> {
+pub struct WeaponMagazineSlots<'source> {
     #[serde(flatten)]
     owner: ComponentOwner,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
@@ -56,8 +56,30 @@ impl<'source> WeaponMagazineSlots<'source> {
         })
     }
 
-    pub(super) const fn owner(&self) -> &ComponentOwner {
+    /// Borrows the original weapon component that owns these slots.
+    #[must_use]
+    pub const fn owner(&self) -> &ComponentOwner {
         &self.owner
+    }
+
+    /// Borrows the authored primary magazine Reference.
+    #[must_use]
+    pub const fn primary_magazine(&self) -> &SourcedValue<Box<SourceRecordReference<'source>>> {
+        &self.ammo_container_record
+    }
+
+    /// Borrows the authored secondary magazine slots in stored order.
+    #[must_use]
+    pub const fn secondary_magazines(
+        &self,
+    ) -> &SourcedValue<Vec<SourcedValue<SecondaryMagazine<'source>>>> {
+        &self.secondary_ammo_containers
+    }
+
+    /// Borrows the original primary-magazine ignore flag.
+    #[must_use]
+    pub const fn ignore_primary_magazine(&self) -> &SourcedValue<bool> {
+        &self.should_ignore_primary_ammo_container
     }
 
     pub(super) const fn route_inputs(&self) -> MagazineRouteInputs<'_, 'source> {
@@ -118,13 +140,25 @@ impl<'rows, 'source> MagazineRouteInputs<'rows, 'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct SecondaryMagazine<'source> {
+pub struct SecondaryMagazine<'source> {
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
     ammo_container_record: SourcedValue<Box<SourceRecordReference<'source>>>,
     condition: SourcedValue<SourceArenaOutput<'source>>,
 }
 
 impl<'source> SecondaryMagazine<'source> {
+    /// Borrows the original secondary magazine Reference.
+    #[must_use]
+    pub const fn magazine(&self) -> &SourcedValue<Box<SourceRecordReference<'source>>> {
+        &self.ammo_container_record
+    }
+
+    /// Borrows the original unevaluated condition and its owned source values.
+    #[must_use]
+    pub const fn condition(&self) -> &SourcedValue<SourceArenaOutput<'source>> {
+        &self.condition
+    }
+
     fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

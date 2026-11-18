@@ -24,7 +24,7 @@ const ATTACHABLE_ENTITY: &str = "SAttachableEntityParams";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct AmmoContainer<'source> {
+pub struct AmmoContainer<'source> {
     #[serde(flatten)]
     owner: ComponentOwner,
     source_type: SourcedValue<&'source str>,
@@ -46,6 +46,18 @@ pub(crate) struct AmmoContainer<'source> {
 }
 
 impl<'source> AmmoContainer<'source> {
+    /// Borrows the original Item and Components slot identity.
+    #[must_use]
+    pub const fn owner(&self) -> &ComponentOwner {
+        &self.owner
+    }
+
+    /// Borrows the original maximum ammunition count and its source.
+    #[must_use]
+    pub const fn max_ammo_count(&self) -> &SourcedValue<i32> {
+        &self.max_ammo_count
+    }
+
     pub(super) fn read(
         owner: ComponentOwner,
         source: Observed<'_, '_, '_, 'source>,
