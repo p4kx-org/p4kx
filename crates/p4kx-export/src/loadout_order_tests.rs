@@ -5,7 +5,8 @@ use std::collections::HashSet;
 
 use p4kx_extraction::Guid;
 
-use super::{Wanted, resolve_ordered};
+use super::Wanted;
+use super::resolution::resolve_ordered;
 use crate::LoadoutSummary;
 use crate::contract_loadout::{EntityKind, Loadout, LoadoutPort};
 use crate::guid_text::CatalogGuid;
@@ -60,7 +61,8 @@ fn a_guid_tie_preserves_wire_order_and_ship_ordinals() -> Result<(), Box<dyn std
         |want| Ok((want.record_index != 4).then(|| resolved(want))),
         |entry| {
             summary.add_entry(&entry, &known, &mut outside);
-            staged.append(entry)
+            staged.append(entry)?;
+            Ok(())
         },
     )?;
     assert!(failures.is_empty(), "the skipped row is not a failed read");

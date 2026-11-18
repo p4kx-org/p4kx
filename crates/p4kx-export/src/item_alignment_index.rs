@@ -8,7 +8,7 @@ use p4kx_extraction::SourcedValue;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use super::ItemAlignmentRows;
+use super::{ItemAlignmentRows, ItemPort};
 use crate::catalog_v3::item_component_owner::ComponentOwner;
 use crate::schema_fields::every_field_required;
 use crate::{CatalogError, ExportAccountingError};
@@ -104,26 +104,18 @@ struct PortOwner<'rows> {
 impl<'rows> AlignmentIndex<'rows> {
     pub(crate) fn new(rows: &'rows ItemAlignmentRows<'_>) -> Result<Self, CatalogError> {
         let mut this = Self::default();
+        for row in &rows.ports {
+            let ordinals = row
+                .ports()
+                .value()
+                .into_iter()
+                .flatten()
+                .filter_map(SourcedValue::value)
+                .map(ItemPort::port_ordinal);
+            this.insert_ports(&row.owner, ordinals)?;
+        }
         for row in rows.port_facts() {
-            let (record, component) = physical_key(&row.owner)?;
-            for port in &row.ports {
-                let ordinal = port
-                    .port_ordinal
-                    .value()
-                    .copied()
-                    .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
-                let source = PortOwner {
-                    component: &row.owner,
-                    port_ordinal: &port.port_ordinal,
-                };
-                if this
-                    .ports
-                    .insert((record, component, ordinal), source)
-                    .is_some()
-                {
-                    return Err(ExportAccountingError::ConflictingSourceDatum.into());
-                }
-            }
+            this.insert_ports(&row.owner, row.ports.iter().map(|port| &port.port_ordinal))?;
         }
         for row in &rows.attachments {
             let key = physical_key(&row.owner)?;
@@ -132,6 +124,32 @@ impl<'rows> AlignmentIndex<'rows> {
             }
         }
         Ok(this)
+    }
+
+    fn insert_ports(
+        &mut self,
+        owner: &'rows ComponentOwner,
+        ordinals: impl Iterator<Item = &'rows SourcedValue<u32>>,
+    ) -> Result<(), CatalogError> {
+        let (record, component) = physical_key(owner)?;
+        for port_ordinal in ordinals {
+            let ordinal = port_ordinal
+                .value()
+                .copied()
+                .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+            let source = PortOwner {
+                component: owner,
+                port_ordinal,
+            };
+            if self
+                .ports
+                .insert((record, component, ordinal), source)
+                .is_some()
+            {
+                return Err(ExportAccountingError::ConflictingSourceDatum.into());
+            }
+        }
+        Ok(())
     }
 
     pub(crate) fn port(

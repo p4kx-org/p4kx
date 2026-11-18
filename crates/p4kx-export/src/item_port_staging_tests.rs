@@ -1,13 +1,21 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_assembly::{LoadoutResolver, PortDefinitionPosition};
 use p4kx_extraction::{DataForge, SourceUses, SourceValue};
-use p4kx_testkit::{DataForgeBuilder, TestStruct};
+use p4kx_testkit::{DataForgeBuilder, TestEntity, TestPort, TestStruct, entity_schema};
 
-use super::super::{AlignmentAxis, AlignmentIndex, ItemAlignmentRows, ItemPort, PortRestrictions};
+use super::super::{
+    AlignmentAxis, AlignmentIndex, AlignmentOptions, ItemAlignmentRows, ItemPort, PortRestrictions,
+};
 use super::{CONTAINER, ComponentOwner, ItemPortContainer, ItemPortStaging};
 use crate::CatalogError;
+use crate::build::original_input::ship_pool_test_input;
+use crate::catalog_projection::{CatalogProjection, CatalogTextRegistry};
 use crate::catalog_table::CatalogTable;
+use crate::catalog_v3::catalog_entity_configurations;
+use crate::record_observation::RecordObservation;
+use crate::texts::{TextSources, Texts};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -96,6 +104,85 @@ fn duplicate_nameless_physical_positions_still_fail_the_alignment_index() -> Tes
     assert!(
         matches!(AlignmentIndex::new(&rows), Err(CatalogError::Accounting(_))),
         "repeat physical slots are rejected even if they have no text name"
+    );
+    Ok(())
+}
+
+#[test]
+fn unspooled_original_ports_have_the_same_alignment_links_as_the_producer() -> TestResult {
+    let bytes = entity_schema(DataForgeBuilder::new())
+        .record(
+            TestEntity::new(1, "FixturePortOwner", "fixture/port_owner.xml")
+                .port(TestPort::new("fixture_slot"))
+                .record(),
+        )
+        .build();
+    ship_pool_test_input::with_input(&bytes, Vec::new(), |archive, _, forge, input| {
+        let record = forge
+            .records()
+            .next()
+            .ok_or("one original fixture Entity")?;
+        let tree = record.tree()?;
+        let admission = RecordObservation::capture(input, &record)?;
+        let sources = TextSources::read_languages(archive, &[])?;
+        let texts = Texts::parse(&sources)?;
+        let registry = CatalogTextRegistry::default();
+        let projection = CatalogProjection::new(&texts, input, &registry);
+        let options = AlignmentOptions::read(forge, None)?;
+        let (ports, notes) = catalog_entity_configurations::read_item_ports(
+            &tree,
+            &projection,
+            &admission,
+            &options,
+            None,
+        )?;
+        assert!(
+            notes.is_empty(),
+            "the original fixture port has no read failures"
+        );
+        let resolved = LoadoutResolver::new(forge).resolve(&record)?;
+        let position = resolved
+            .ports()
+            .first()
+            .and_then(|port| port.definition())
+            .ok_or("resolver must retain the authored port definition")?
+            .position();
+        let rows = ItemAlignmentRows {
+            ports,
+            ..Default::default()
+        };
+        equal_port_link(forge, rows, position)
+    })
+}
+
+fn equal_port_link(
+    forge: &DataForge<'_>,
+    mut rows: ItemAlignmentRows<'_>,
+    position: PortDefinitionPosition,
+) -> TestResult {
+    let memory = AlignmentIndex::new(&rows)?.port(position)?;
+    let physical = memory
+        .physical_port()?
+        .ok_or("unspooled original port coordinates")?;
+    assert_eq!(physical.owner_record_index, position.record_index());
+    assert_eq!(
+        usize::try_from(physical.component_ordinal)?,
+        position.component_ordinal()
+    );
+    assert_eq!(
+        usize::try_from(physical.port_ordinal)?,
+        position.port_ordinal()
+    );
+
+    let directory = tempfile::tempdir()?;
+    let mut staging = ItemPortStaging::new(directory.path(), None);
+    rows.stage_ports(&mut staging)?;
+    rows.install_staged_ports(staging, forge)?;
+    let staged = AlignmentIndex::new(&rows)?.port(position)?;
+    assert_eq!(
+        serde_json::to_vec(&memory)?,
+        serde_json::to_vec(&staged)?,
+        "both storage forms retain exactly the same original link and immediate source references",
     );
     Ok(())
 }
