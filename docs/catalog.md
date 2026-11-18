@@ -1142,8 +1142,8 @@ GUID in one Build.
 | `source` | Where the attachment comes from: `loadout` (the entity's own Default Loadout), `override` (the Loadout of the entry that attached the entity, which replaces the entity's own per port), `port_default` (the default item of the port definition), `unset` (defined, holds nothing) or `vehicle` (known only from the vehicle implementation, holds nothing). Closed set, string |
 | `minSize`, `maxSize` | Sourced cells with the size in `.value` and its independent state and origin. The selected `SItemPortDef` supplies both cells. Ports without a DataForge definition use the effective XML `ItemPort` attributes. |
 | `types` | `{type, subTypes}` in stored order from `SItemPortDef.Types` or XML `ItemPort/Types/Type`. XML subtype tokens come from the comma-separated `subtypes` attribute |
-| `flags` | The words of `Flags` as stored, without a leading `$` (`invisible`, `uneditable`) |
-| `portTags`, `requiredTags` | The words of `PortTags` and `RequiredPortTags` of the `SItemPortDef`, or of `portTags` and `requiredTags` of the `ItemPort`: split at white space and otherwise as stored, like `tags` of an item (a leading `$` stays). An item fits a port when it carries the required tags (see "Paints" for the tag tree rule) |
+| `flags` | Sourced flag words from the selected `SItemPortDef.Flags` or XML `ItemPort@flags`, with leading `$` removed. The words share the original field or attribute evidence. |
+| `portTags`, `requiredTags` | Separate sourced cells from `SItemPortDef.PortTags` and `RequiredPortTags`, or XML `ItemPort@portTags` and `@requiredTags`. Their `.value` preserves order, repeats, case and leading `$`. An item fits a port when it carries the required tags. |
 | `displayNameKey` | Localisation key from `SItemPortDef.DisplayName` or XML `ItemPort@display_name`. Empty and placeholder keys are `null`. Use the [physical port definition](catalog-item-port-alignment.md) for canonical text from DataForge |
 | `visibility` | `visible`, `invisible` or `unspecified`: whether the vehicle implementation's part of that name carries the flag `invisible`; without such a part `invisible` when the port definition carries that flag, else `unspecified`. Closed set, string |
 | `itemGuid` | The `guid` of the entry in `items` (a docked vehicle: in `ships`) that the port holds by default; `null` for an empty port. For an attachment that cannot be resolved the GUID the Loadout names, or `null` when it names a class name only |
@@ -1158,6 +1158,8 @@ The size cells distinguish an absent declaration, an explicit DataForge null, an
 source, and an invalid value. A missing size in a selected DataForge definition stays absent.
 An XML cell retains the effective attribute or checked absence and the patch selectors that
 supplied it. Its source set stays incomplete until the preceding part selection is accounted for.
+The flag and tag cells use the same selection rule. Authored empty text gives a present empty
+list, while an absent, null, unreadable or invalid source has a null `.value`.
 
 The ports of an entity are, in this order: those a Loadout names in Loadout order, the other
 ports the Record defines in definition order, and the `ItemPort` elements of the vehicle

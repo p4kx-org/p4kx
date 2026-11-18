@@ -140,21 +140,24 @@ fn read_shape(
     proof: Option<&AuthoredEntryPath>,
     capture: &Capture<'_>,
 ) -> Result<LoadoutPort, CatalogError> {
-    Ok(match (definition, xml) {
-        (Some(definition), _) => {
-            let (min_size, max_size) = capture.definition_sizes(definition, proof)?;
-            LoadoutPort {
-                min_size,
-                max_size,
-                ..read_definition(definition, name)
-            }
-        }
-        (None, Some(xml)) => LoadoutPort {
-            min_size: capture.vehicle_size(xml.min_size_source(), proof)?,
-            max_size: capture.vehicle_size(xml.max_size_source(), proof)?,
-            ..read_vehicle(xml, name)
-        },
-        (None, None) => LoadoutPort::named(name),
+    let (port, attributes) = match (definition, xml) {
+        (Some(definition), _) => (
+            read_definition(definition, name),
+            capture.definition_attributes(definition, proof)?,
+        ),
+        (None, Some(xml)) => (
+            read_vehicle(xml, name),
+            capture.vehicle_attributes(xml, proof)?,
+        ),
+        (None, None) => return Ok(LoadoutPort::named(name)),
+    };
+    Ok(LoadoutPort {
+        min_size: attributes.min_size,
+        max_size: attributes.max_size,
+        flags: attributes.flags,
+        port_tags: attributes.port_tags,
+        required_tags: attributes.required_tags,
+        ..port
     })
 }
 
@@ -168,10 +171,7 @@ fn read_definition(definition: &PortDefinition, name: SourcedValue<String>) -> L
                 sub_types: kind.sub_types().to_vec(),
             })
             .collect(),
-        flags: words(definition.flags()),
         display_name_key: display_name_key(Some(definition.display_name())),
-        port_tags: tag_words(definition.port_tags()),
-        required_tags: tag_words(definition.required_tags()),
         ..LoadoutPort::named(name)
     }
 }
@@ -186,10 +186,7 @@ fn read_vehicle(port: &VehicleItemPort, name: SourcedValue<String>) -> LoadoutPo
                 sub_types: kind.subtypes().to_vec(),
             })
             .collect(),
-        flags: words(port.flags()),
         display_name_key: display_name_key(port.display_name()),
-        port_tags: tag_words(port.port_tags()),
-        required_tags: tag_words(port.required_tags()),
         ..LoadoutPort::named(name)
     }
 }
@@ -197,16 +194,4 @@ fn read_vehicle(port: &VehicleItemPort, name: SourcedValue<String>) -> LoadoutPo
 fn display_name_key(key: Option<&str>) -> Option<String> {
     key.filter(|key| !key.is_empty() && !is_placeholder_key(key))
         .map(str::to_owned)
-}
-
-fn tag_words(text: &str) -> Vec<String> {
-    text.split_whitespace().map(str::to_owned).collect()
-}
-
-fn words(text: &str) -> Vec<String> {
-    text.split_whitespace()
-        .map(|word| word.trim_start_matches('$'))
-        .filter(|word| !word.is_empty())
-        .map(str::to_owned)
-        .collect()
 }

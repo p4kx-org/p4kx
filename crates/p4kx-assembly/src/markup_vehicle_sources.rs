@@ -4,6 +4,7 @@
 use std::sync::Arc;
 
 use crate::loadout_xml::{MissingAttribute, Node, Scope};
+use crate::vehicle::PORT_SIZE_AND_TAG_ATTRIBUTES;
 use crate::{ValueOrigin, VehicleAttributeEvidence};
 
 use super::AttributeOrigins;
@@ -38,18 +39,7 @@ pub(super) fn original_sites(
         },
     );
     let port = node.name().eq_ignore_ascii_case("ItemPort");
-    if port && scope.observes_vehicle_port_sizes() {
-        for name in ["minSize", "maxSize"] {
-            retain(
-                &mut origins,
-                node,
-                scope,
-                attributes,
-                name,
-                MissingAttribute::Element,
-            );
-        }
-    }
+    retain_port_attributes(&mut origins, node, scope, attributes, port);
     retain(
         &mut origins,
         node,
@@ -72,6 +62,27 @@ pub(super) fn original_sites(
         }
     }
     origins
+}
+
+fn retain_port_attributes(
+    origins: &mut AttributeOrigins,
+    node: Node<'_, '_>,
+    scope: &Scope<'_, '_>,
+    attributes: &[(String, String)],
+    port: bool,
+) {
+    if !scope.observes_vehicle_port_attributes() {
+        return;
+    }
+    let patch_donor = scope.is_vehicle_patch()
+        && attributes
+            .iter()
+            .any(|(name, value)| name.eq_ignore_ascii_case("id") && !value.is_empty());
+    if port || patch_donor {
+        for name in PORT_SIZE_AND_TAG_ATTRIBUTES {
+            retain(origins, node, scope, attributes, name, absence_scope(port));
+        }
+    }
 }
 
 const fn absence_scope(observe: bool) -> MissingAttribute {

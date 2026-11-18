@@ -26799,11 +26799,8 @@
           "type": "boolean"
         },
         "flags": {
-          "description": "The flags of the port as stored, split at white space, without a leading `$`, e.g.\n`invisible`, `uneditable`.",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
+          "$ref": "#/$defs/SourcedValueOfArray_of_string",
+          "description": "The flags split at white space without a leading `$`, and their shared source."
         },
         "itemClassName": {
           "description": "The class name of the attached Entity, or the class name the Loadout names; `null` for an\nempty port or an unresolved Reference.",
@@ -26836,11 +26833,8 @@
           "description": "The port name, as the Loadout or the port definition spells it."
         },
         "portTags": {
-          "description": "The tags the port offers: the words of the stored value, split at white space and\notherwise unchanged, like `tags` of an item.",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
+          "$ref": "#/$defs/SourcedValueOfArray_of_string",
+          "description": "The offered tag words in stored order and their shared source."
         },
         "ports": {
           "description": "The ports of the attached Entity under this Loadout, or the ports of the nested Loadout of\nan empty port; empty for a port without either.",
@@ -26850,11 +26844,8 @@
           "type": "array"
         },
         "requiredTags": {
-          "description": "The tags an item must carry to fit the port: the words of the stored value, split at white\nspace and otherwise unchanged, like `tags` of an item.",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
+          "$ref": "#/$defs/SourcedValueOfArray_of_string",
+          "description": "The required tag words in stored order and their shared source."
         },
         "source": {
           "description": "Where the attachment comes from: `loadout` (the Entity's own Default Loadout), `override`\n(the Loadout of the entry that attached the Entity), `port_default` (the default item of\nthe port definition), `unset` (the port is defined and holds nothing) or `vehicle` (the\nport is known only from the vehicle implementation and holds nothing). A closed set the\ngame may extend, so the schema keeps a string.",
@@ -68587,6 +68578,139 @@
               "value": {
                 "items": {
                   "$ref": "#/$defs/SourcedValueOfuint32"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_of_string": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "type": "string"
                 },
                 "type": "array"
               }

@@ -114,9 +114,9 @@ fn a_record_port_keeps_its_definition_and_the_vehicle_file_gives_the_visibility(
             &turret["minSize"]["value"],
             &turret["maxSize"]["value"],
             &turret["types"],
-            &turret["flags"],
-            &turret["portTags"],
-            &turret["requiredTags"],
+            &turret["flags"]["value"],
+            &turret["portTags"]["value"],
+            &turret["requiredTags"]["value"],
             &turret["displayNameKey"],
             &turret["visibility"],
             &turret["source"]
@@ -151,9 +151,9 @@ fn a_port_the_record_lacks_takes_its_definition_from_the_vehicle_file() -> TestR
             &gun["minSize"]["value"],
             &gun["maxSize"]["value"],
             &gun["types"],
-            &gun["flags"],
-            &gun["portTags"],
-            &gun["requiredTags"],
+            &gun["flags"]["value"],
+            &gun["portTags"]["value"],
+            &gun["requiredTags"]["value"],
             &gun["visibility"]
         ),
         (
@@ -196,15 +196,18 @@ fn tags_are_free_strings_kept_as_stored_and_matched_by_name() -> TestResult {
     let alpha = loadout(&catalog, ALPHA)?;
     let turret = port(&alpha["ports"], "hardpoint_turret")?;
     assert_eq!(
-        (&turret["portTags"], &turret["requiredTags"]),
+        (
+            &turret["portTags"]["value"],
+            &turret["requiredTags"]["value"]
+        ),
         (&json!(["Turret"]), &json!(["Mount"])),
         "the tags of a Record port"
     );
     let rack = port(&loadout(&catalog, RACK)?["ports"], "slot_1")?;
     assert_eq!(
-        (&rack["portTags"], &rack["requiredTags"]),
+        (&rack["portTags"]["value"], &rack["requiredTags"]["value"]),
         (&json!([]), &json!([])),
-        "a port without tags"
+        "explicit empty text gives an empty list"
     );
     let item = catalog["items"]
         .as_array()
@@ -233,6 +236,40 @@ fn tags_are_free_strings_kept_as_stored_and_matched_by_name() -> TestResult {
         gun.get("portTagGuids").is_none() && item.get("tagGuids").is_none(),
         "no tag GUIDs: the tags are matched by name"
     );
+    Ok(())
+}
+
+#[test]
+fn xml_port_lists_keep_their_own_original_attributes_and_known_absence() -> TestResult {
+    use crate::health_origin_assertions as proof;
+
+    let (_, catalog) = build(None)?;
+    let alpha = loadout(&catalog, ALPHA)?;
+    let gun = port(&alpha["ports"], "hardpoint_gun")?;
+    let empty = port(&alpha["ports"], "hardpoint_empty")?;
+    for (row, field, state, namespace, role) in [
+        (gun, "flags", "present", "textXmlAttribute", "conversion"),
+        (gun, "portTags", "present", "textXmlAttribute", "conversion"),
+        (
+            gun,
+            "requiredTags",
+            "present",
+            "textXmlAttribute",
+            "conversion",
+        ),
+        (empty, "portTags", "absent", "textXmlElement", "selector"),
+    ] {
+        let value = proof::cell(row, field, state)?;
+        let uses = proof::uses(&catalog, value)?;
+        assert!(
+            uses.iter().any(|usage| {
+                usage.pointer("/location/namespace").and_then(Value::as_str) == Some(namespace)
+                    && usage.pointer("/location/field").and_then(Value::as_str) == Some(field)
+                    && usage.get("role").and_then(Value::as_str) == Some(role)
+            }),
+            "{field} retains the exact XML location for {state}",
+        );
+    }
     Ok(())
 }
 

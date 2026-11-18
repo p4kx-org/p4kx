@@ -149,7 +149,7 @@ impl Capture<'_> {
 }
 
 impl LoadoutReadObserver for Capture<'_> {
-    fn observes_vehicle_port_sizes(&self) -> bool {
+    fn observes_vehicle_port_attributes(&self) -> bool {
         self.input.is_some() && self.kind == crate::Kind::Loadouts
     }
 

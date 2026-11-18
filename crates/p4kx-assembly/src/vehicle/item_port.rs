@@ -6,6 +6,9 @@ use p4kx_extraction::SourceValue;
 use super::{PortVisibility, ValueOrigin, VehicleAttributeEvidence};
 use crate::markup::AttributeOrigins;
 
+pub(crate) const PORT_SIZE_AND_TAG_ATTRIBUTES: [&str; 4] =
+    ["minSize", "maxSize", "portTags", "requiredTags"];
+
 /// Returns whether `flags`, words separated by white space, contain `flag`, ignoring ASCII case
 /// and a leading `$`.
 pub(crate) fn flags_contain(flags: &str, flag: &str) -> bool {
@@ -44,8 +47,8 @@ pub struct VehicleItemPort {
     pub(crate) flags: Option<String>,
     pub(crate) id: Option<String>,
     pub(crate) display_name: Option<String>,
-    pub(crate) port_tags: String,
-    pub(crate) required_tags: String,
+    pub(crate) port_tags: Option<String>,
+    pub(crate) required_tags: Option<String>,
     pub(crate) types: Vec<String>,
     pub(crate) item_types: Vec<VehicleItemType>,
     pub(crate) light_attachments: Vec<super::VehicleLightAttachment>,
@@ -56,14 +59,36 @@ impl VehicleItemPort {
     /// Returns the tags the port offers, as stored: words separated by white space.
     #[must_use]
     pub fn port_tags(&self) -> &str {
-        &self.port_tags
+        self.port_tags.as_deref().unwrap_or_default()
     }
 
     /// Returns the tags an item must carry to fit the port, as stored: words separated by white
     /// space.
     #[must_use]
     pub fn required_tags(&self) -> &str {
-        &self.required_tags
+        self.required_tags.as_deref().unwrap_or_default()
+    }
+
+    /// Borrows the applied port tags and their original attribute evidence.
+    #[must_use]
+    pub fn port_tags_source(&self) -> (Option<&str>, Option<&VehicleAttributeEvidence>) {
+        (
+            self.port_tags.as_deref(),
+            self.origins
+                .evidence("portTags")
+                .map(std::sync::Arc::as_ref),
+        )
+    }
+
+    /// Borrows the required attachment tags and their original attribute evidence.
+    #[must_use]
+    pub fn required_tags_source(&self) -> (Option<&str>, Option<&VehicleAttributeEvidence>) {
+        (
+            self.required_tags.as_deref(),
+            self.origins
+                .evidence("requiredTags")
+                .map(std::sync::Arc::as_ref),
+        )
     }
 
     /// Returns the item types the port takes, the `type` of each `Types/Type` element.
@@ -159,5 +184,11 @@ impl VehicleItemPort {
     #[must_use]
     pub fn flags_evidence(&self) -> Option<&VehicleAttributeEvidence> {
         self.origins.evidence("flags").map(std::sync::Arc::as_ref)
+    }
+
+    /// Borrows the applied flags and their original attribute evidence.
+    #[must_use]
+    pub fn flags_source(&self) -> (Option<&str>, Option<&VehicleAttributeEvidence>) {
+        (self.flags.as_deref(), self.flags_evidence())
     }
 }

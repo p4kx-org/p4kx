@@ -73,15 +73,12 @@ pub struct LoadoutPort {
     pub(crate) max_size: SourcedValue<u32>,
     /// The item types the port takes, in stored order; empty when the data names none.
     pub(crate) types: Vec<PortType>,
-    /// The flags of the port as stored, split at white space, without a leading `$`, e.g.
-    /// `invisible`, `uneditable`.
-    pub(crate) flags: Vec<String>,
-    /// The tags the port offers: the words of the stored value, split at white space and
-    /// otherwise unchanged, like `tags` of an item.
-    pub(crate) port_tags: Vec<String>,
-    /// The tags an item must carry to fit the port: the words of the stored value, split at white
-    /// space and otherwise unchanged, like `tags` of an item.
-    pub(crate) required_tags: Vec<String>,
+    /// The flags split at white space without a leading `$`, and their shared source.
+    pub(crate) flags: SourcedValue<Vec<String>>,
+    /// The offered tag words in stored order and their shared source.
+    pub(crate) port_tags: SourcedValue<Vec<String>>,
+    /// The required tag words in stored order and their shared source.
+    pub(crate) required_tags: SourcedValue<Vec<String>>,
     /// The localisation key of the port's display name; `null` for none or a placeholder key.
     pub(crate) display_name_key: Option<String>,
     /// Whether the port shows its item: `visible` or `invisible` as the vehicle implementation's
@@ -184,8 +181,11 @@ impl Loadout {
 impl LoadoutPort {
     pub(crate) fn named(name: SourcedValue<String>) -> Self {
         static NO_SIZE: OnceLock<SourcedValue<u32>> = OnceLock::new();
+        static NO_WORDS: OnceLock<SourcedValue<Vec<String>>> = OnceLock::new();
         let size =
             NO_SIZE.get_or_init(|| SourceUses::default().value(SourceValue::Absent, &[], false));
+        let words =
+            NO_WORDS.get_or_init(|| SourceUses::default().value(SourceValue::Absent, &[], false));
         Self {
             name,
             name_proof: None,
@@ -194,9 +194,9 @@ impl LoadoutPort {
             min_size: size.clone(),
             max_size: size.clone(),
             types: Vec::new(),
-            flags: Vec::new(),
-            port_tags: Vec::new(),
-            required_tags: Vec::new(),
+            flags: words.clone(),
+            port_tags: words.clone(),
+            required_tags: words.clone(),
             display_name_key: None,
             visibility: "",
             item_guid: None,
@@ -253,18 +253,36 @@ impl LoadoutPort {
     /// Borrows the original port flags.
     #[must_use]
     pub fn flags(&self) -> &[String] {
-        &self.flags
+        self.flags.value().map_or(&[], Vec::as_slice)
     }
 
     /// Borrows the tags supplied by the port.
     #[must_use]
     pub fn port_tags(&self) -> &[String] {
-        &self.port_tags
+        self.port_tags.value().map_or(&[], Vec::as_slice)
     }
 
     /// Borrows the tags required of the attachment.
     #[must_use]
     pub fn required_tags(&self) -> &[String] {
+        self.required_tags.value().map_or(&[], Vec::as_slice)
+    }
+
+    /// Borrows the flag list and its original attribute or field evidence.
+    #[must_use]
+    pub const fn source_flags(&self) -> &SourcedValue<Vec<String>> {
+        &self.flags
+    }
+
+    /// Borrows the offered tags and their original attribute or field evidence.
+    #[must_use]
+    pub const fn source_port_tags(&self) -> &SourcedValue<Vec<String>> {
+        &self.port_tags
+    }
+
+    /// Borrows the required tags and their original attribute or field evidence.
+    #[must_use]
+    pub const fn source_required_tags(&self) -> &SourcedValue<Vec<String>> {
         &self.required_tags
     }
 

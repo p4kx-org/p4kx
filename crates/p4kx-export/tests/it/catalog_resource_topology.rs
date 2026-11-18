@@ -9,6 +9,8 @@ use crate::health_origin_assertions as proof;
 
 #[path = "catalog_resource_topology_fixture.rs"]
 mod fixture;
+#[path = "catalog_resource_topology_port_attributes.rs"]
+mod port_attributes;
 
 #[test]
 fn resource_topology_preserves_the_original_hardpoint_weak_and_room_occurrences() -> TestResult {

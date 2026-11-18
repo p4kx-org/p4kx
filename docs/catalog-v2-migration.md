@@ -58,6 +58,9 @@ Each of these values carries its own original source references and encryption m
 Read the minimum and maximum accepted sizes from `ports[].minSize.value` and
 `ports[].maxSize.value`. Their separate state and origin distinguish missing, null, unreadable
 and invalid source values.
+Read normalized flag and tag words from `flags.value`, `portTags.value` and
+`requiredTags.value` on each resolved port. An explicitly empty source has an empty array.
+For non-present states, use an empty list when applying port compatibility rules.
 
 ## External container links
 

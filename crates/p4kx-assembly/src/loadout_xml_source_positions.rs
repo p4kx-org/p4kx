@@ -8,7 +8,7 @@ use p4kx_extraction::SourceLocation;
 
 use super::{Node, Owner, Scope};
 use crate::resolver_observation::Observation;
-use crate::{LoadoutFileObservation, LoadoutXmlDecoding, VehicleXmlSite};
+use crate::{LoadoutDocumentKind, LoadoutFileObservation, LoadoutXmlDecoding, VehicleXmlSite};
 
 #[derive(Clone, Copy)]
 pub(crate) enum MissingAttribute {
@@ -133,9 +133,14 @@ impl Scope<'_, '_> {
             .is_some_and(Observation::observes_vehicle_totals)
     }
 
-    pub(crate) fn observes_vehicle_port_sizes(&self) -> bool {
+    pub(crate) fn observes_vehicle_port_attributes(&self) -> bool {
         self.observation
-            .is_some_and(Observation::observes_vehicle_port_sizes)
+            .is_some_and(Observation::observes_vehicle_port_attributes)
+    }
+
+    pub(crate) fn is_vehicle_patch(&self) -> bool {
+        self.source
+            .is_some_and(|source| source.kind() == LoadoutDocumentKind::VehiclePatch)
     }
 
     fn vehicle_source(&self) -> Option<&LoadoutFileObservation> {
@@ -143,7 +148,7 @@ impl Scope<'_, '_> {
             self.observation.is_some_and(|observer| {
                 observer.observes_vehicle_visibility()
                     || observer.observes_vehicle_totals()
-                    || observer.observes_vehicle_port_sizes()
+                    || observer.observes_vehicle_port_attributes()
             })
         })
     }

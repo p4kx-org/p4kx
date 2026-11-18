@@ -6,6 +6,8 @@ use std::sync::Arc;
 use crate::loadout_xml::{MissingAttribute, Node, Scope};
 use crate::{LoadoutPath, VehicleAggregateEvidence, VehicleAttributeEvidence, VehicleXmlSite};
 
+use super::PORT_SIZE_AND_TAG_ATTRIBUTES;
+
 /// A Modification of the base implementation: its selected patch and Elem overrides.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct Modification {
@@ -113,7 +115,11 @@ fn assignment_evidence(
         && ["mass", "damageMax", "skipPart"]
             .into_iter()
             .any(|field| name.eq_ignore_ascii_case(field));
-    if !visibility && !totals {
+    let port = scope.observes_vehicle_port_attributes()
+        && PORT_SIZE_AND_TAG_ATTRIBUTES
+            .into_iter()
+            .any(|field| name.eq_ignore_ascii_case(field));
+    if !visibility && !totals && !port {
         return None;
     }
     let value = scope.vehicle_site(node, "value", MissingAttribute::Element)?;

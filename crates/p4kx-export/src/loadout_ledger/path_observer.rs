@@ -95,7 +95,7 @@ impl LoadoutPathObserver for RecordPaths<'_, '_, '_, '_, '_> {
     ) -> ControlFlow<()> {
         match self
             .capture
-            .record_port_sizes(&self.fields, definition, original)
+            .record_port_attributes(&self.fields, definition, original)
         {
             Ok(()) => ControlFlow::Continue(()),
             Err(error) => self.capture.fail(error),

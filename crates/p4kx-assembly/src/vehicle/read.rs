@@ -107,11 +107,8 @@ fn item_port(element: &Element) -> VehicleItemPort {
             .attribute("display_name")
             .filter(|name| !name.is_empty())
             .map(str::to_owned),
-        port_tags: element.attribute("portTags").unwrap_or_default().to_owned(),
-        required_tags: element
-            .attribute("requiredTags")
-            .unwrap_or_default()
-            .to_owned(),
+        port_tags: element.attribute("portTags").map(str::to_owned),
+        required_tags: element.attribute("requiredTags").map(str::to_owned),
         types: type_elements(element)
             .filter_map(|kind| kind.attribute("type"))
             .map(str::to_owned)

@@ -645,6 +645,10 @@ continue to return `Option<u32>`. Check the sourced state to distinguish absence
 unreadability and invalidity. XML evidence can retain an exact attribute while the complete
 part selection remains unresolved.
 
+`source_flags()`, `source_port_tags()` and `source_required_tags()` borrow the separate
+sourced list cells. Words within one list share the original field or attribute. The value-only
+list getters return an empty slice for non-present cells.
+
 `source_constraints()` exposes typed physical port and attachment links. Resolve their immediate
 origin references against this result's `source_inventory`. `coverage` describes the requested
 owner selection. `dependencies` records the reached resolver operations and each demanded

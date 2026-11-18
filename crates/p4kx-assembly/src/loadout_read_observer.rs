@@ -36,8 +36,8 @@ pub trait LoadoutReadObserver: Send + Sync {
         false
     }
 
-    /// Enables original attribute evidence for effective vehicle port sizes.
-    fn observes_vehicle_port_sizes(&self) -> bool {
+    /// Enables original attribute evidence for effective vehicle port restrictions.
+    fn observes_vehicle_port_attributes(&self) -> bool {
         false
     }
 

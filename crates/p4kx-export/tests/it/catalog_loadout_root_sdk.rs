@@ -46,10 +46,10 @@ fn loadout_root_identity_survives_item_staging_and_matches_the_sdk() -> TestResu
             "the Item spool preserves typed owner values"
         );
         verify_identity(&catalog, encrypted)?;
-        verify_sizes(&catalog, encrypted)?;
+        verify_port_attributes(&catalog, encrypted)?;
         let wire = json!({"loadouts": rows, "provenance": selected.source_inventory});
         verify_identity(&wire, encrypted)?;
-        verify_sizes(&wire, encrypted)?;
+        verify_port_attributes(&wire, encrypted)?;
     }
     Ok(())
 }
@@ -85,31 +85,35 @@ fn verify_identity(output: &Value, encrypted: bool) -> TestResult {
     proof::closure(output)
 }
 
-fn verify_sizes(output: &Value, encrypted: bool) -> TestResult {
+fn verify_port_attributes(output: &Value, encrypted: bool) -> TestResult {
     let port = proof::at(output, "/loadouts/1/ports/0")?;
-    let min = proof::present(port, "minSize", &json!(0), Some(encrypted))?;
-    let max = proof::present(port, "maxSize", &json!(3), Some(encrypted))?;
-    let conversion = |cell| -> TestResult<Value> {
+    let mut locations = std::collections::BTreeSet::new();
+    for (field, expected) in [
+        ("minSize", json!(0)),
+        ("maxSize", json!(3)),
+        ("flags", json!(["visible", "uneditable", "visible"])),
+        ("portTags", json!(["$Offer", "Other", "$Offer"])),
+        ("requiredTags", json!([])),
+    ] {
+        let cell = proof::present(port, field, &expected, Some(encrypted))?;
         let original = proof::uses(output, cell)?;
         let [datum] = original
             .into_iter()
             .filter(|usage| usage.get("role").and_then(Value::as_str) == Some("conversion"))
             .collect::<Vec<_>>()[..]
         else {
-            return Err("exactly one original size conversion".into());
+            return Err(format!("exactly one original {field} conversion").into());
         };
         assert_eq!(
             proof::at(datum, "/location/indices/0")?,
             "0",
-            "size belongs to the physical Item Record",
+            "{field} belongs to the physical Item Record",
         );
-        Ok(proof::at(datum, "/location")?.clone())
-    };
-    assert_ne!(
-        conversion(min)?,
-        conversion(max)?,
-        "min and max retain different original slots",
-    );
+        assert!(
+            locations.insert(proof::at(datum, "/location")?.to_string()),
+            "{field} retains its own original slot",
+        );
+    }
     Ok(())
 }
 
@@ -188,7 +192,12 @@ fn root_database() -> DataForgeBuilder {
                 "FixtureLoadoutItem",
                 "libs/foundry/records/entities/scitem/fixture/root_item.xml",
             )
-            .port(TestPort::new("fixture_port").sizes(0, 3))
+            .port(
+                TestPort::new("fixture_port")
+                    .sizes(0, 3)
+                    .flags("$visible uneditable $visible")
+                    .tags("$Offer Other $Offer", ""),
+            )
             .record(),
         )
         .record(
