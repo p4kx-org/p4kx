@@ -31,7 +31,7 @@ pub(super) fn compare(
         Some(Original::Bool(value)) => Some(*value),
         _ => None,
     };
-    if row.disabled() != disabled {
+    if row.disabled().value().copied() != disabled {
         return Err("SDK disabled value differs from source".into());
     }
     let evidence = Evidence::read(entry, tree, snapshot)?;

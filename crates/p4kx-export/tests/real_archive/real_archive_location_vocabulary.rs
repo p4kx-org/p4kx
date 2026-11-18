@@ -316,8 +316,9 @@ fn verify_classification(
         let rows = consumer::rows(&catalog, Kind::MissionLocationTemplates)?;
         let guid = tree.guid().to_string();
         let mut selected = rows.iter().filter(|row| {
-            row.get("guid").and_then(Value::as_str) == Some(guid.as_str())
-                && row.get("recordPath").and_then(Value::as_str) == Some(tree.record_path())
+            row.pointer("/guid/value").and_then(Value::as_str) == Some(guid.as_str())
+                && row.pointer("/recordPath/value").and_then(Value::as_str)
+                    == Some(tree.record_path())
         });
         let row = selected
             .next()

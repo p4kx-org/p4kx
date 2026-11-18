@@ -26,12 +26,16 @@ fn disabled_location_keeps_all_authored_limits_and_security_reference() -> TestR
     let catalog: Value = serde_json::from_slice(built.json())?;
     let location = at(&catalog, "/missionLocationTemplates/0")?;
     assert_eq!(
-        at(location, "/guid")?,
+        at(location, "/guid/value")?,
         &json!(guid(TEMPLATE)),
         "physical owner"
     );
     let config = at(location, "/configuration/value")?;
-    assert_eq!(at(location, "/disabled")?, true, "authored disabled flag");
+    assert_eq!(
+        at(location, "/disabled/value")?,
+        true,
+        "authored disabled flag"
+    );
     for (index, maximum) in [0, -1].into_iter().enumerate() {
         let row = at(config, &format!("/missionLimits/value/{index}/value"))?;
         assert_eq!(

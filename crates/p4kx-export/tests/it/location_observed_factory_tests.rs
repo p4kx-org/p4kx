@@ -54,12 +54,13 @@ fn check(input: &Fixture) -> TestResult {
     assert_eq!(rows.len(), 1, "one original location row");
     let row = rows.first().ok_or("original location row")?;
     assert_eq!(
-        row.get("guid").and_then(serde_json::Value::as_str),
+        row.pointer("/guid/value")
+            .and_then(serde_json::Value::as_str),
         Some(health_origin_fixture::guid(GUID).as_str()),
         "actual original GUID"
     );
     assert_eq!(
-        row.get("disabled"),
+        row.pointer("/disabled/value"),
         Some(&serde_json::json!(true)),
         "same original flag value"
     );

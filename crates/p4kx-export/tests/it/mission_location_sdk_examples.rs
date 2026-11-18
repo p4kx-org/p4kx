@@ -11,12 +11,12 @@ use super::TestResult;
 pub(super) fn limits(snapshot: &MissionLocationTemplateSnapshot<'_>) -> TestResult {
     let row = snapshot.rows.first().ok_or("template")?;
     assert_eq!(
-        row.is_security_network_host(),
-        Some(false),
+        row.is_security_network_host().value(),
+        Some(&false),
         "original false flag"
     );
     assert!(
-        row.entity_cluster_member_guid().is_none(),
+        row.entity_cluster_member().value().is_none(),
         "no invented member reference"
     );
     let config = row.configuration().value().ok_or("configuration")?;
@@ -269,9 +269,10 @@ pub(super) fn tags(snapshot: &MissionLocationTemplateSnapshot<'_>) -> TestResult
     let row = snapshot
         .rows
         .iter()
-        .find(|row| !row.names().is_empty())
+        .find(|row| row.names().value().is_some_and(|names| !names.is_empty()))
         .ok_or("template with original names")?;
-    assert_eq!(row.names().len(), 3, "name occurrences preserved");
+    let names = row.names().value().ok_or("original name collection")?;
+    assert_eq!(names.len(), 3, "name occurrences preserved");
     let tags = row.tags().value().ok_or("general tags")?;
     let dangling = tags
         .last()
@@ -285,9 +286,9 @@ pub(super) fn tags(snapshot: &MissionLocationTemplateSnapshot<'_>) -> TestResult
         !dangling.origin().source_uses_refs().is_empty(),
         "dangling operand has original evidence"
     );
-    let reference = row
-        .names()
+    let reference = names
         .first()
+        .and_then(SourcedValue::value)
         .ok_or("original first name variant")?
         .display_name
         .value()
@@ -320,9 +321,12 @@ pub(super) fn entity_cluster(snapshot: &MissionLocationTemplateSnapshot<'_>) -> 
         .rows
         .first()
         .ok_or("template with a cluster selector")?;
-    let guid = row
-        .entity_cluster_member_guid()
-        .ok_or("original cluster target GUID")?;
+    let reference = row
+        .entity_cluster_member()
+        .value()
+        .ok_or("original cluster reference")?;
+    let guid = reference.guid();
+    let guid = guid.value().ok_or("original cluster target GUID")?;
     assert_eq!(
         guid.to_string(),
         crate::commodity_v3_fixture::guid(super::fixture::CLUSTER),

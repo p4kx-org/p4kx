@@ -3,16 +3,22 @@
 
 //! One entity of each ship spawn and location kind.
 
+use p4kx_extraction::SourceValue;
 use serde_json::json;
 
 use super::source_values;
 
 pub(super) fn location_templates() -> serde_json::Value {
     json!([{
-        "guid": "e3000000-0000-4000-8000-000000000001",
-        "className": "AEGS_Reclaimer_Space_Stanton2c",
-        "recordPath": "libs/foundry/records/missiondata/pu_locations/templates/aegs_reclaimer_space_stanton2c",
-        "disabled": false,
+        "guid": source_values::present(json!("e3000000-0000-4000-8000-000000000001")),
+        "recordName": source_values::present(json!("MissionLocationTemplate.AEGS_Reclaimer_Space_Stanton2c")),
+        "className": source_values::present(json!("AEGS_Reclaimer_Space_Stanton2c")),
+        "recordPath": source_values::present(json!("libs/foundry/records/missiondata/pu_locations/templates/aegs_reclaimer_space_stanton2c")),
+        "recordIndex": source_values::present(json!(0)),
+        "sourceType": source_values::present(json!("MissionLocationTemplate")),
+        "fileName": source_values::present(json!("libs/foundry/records/missiondata/pu_locations/templates/aegs_reclaimer_space_stanton2c.xml")),
+        "metadataTag": source_values::source(SourceValue::Absent),
+        "disabled": source_values::present(json!(false)),
         "classification": {
             "state": "absent", "value": null, "sourceUsesRefs": [],
             "sourceSetComplete": true, "containsEncryptedSource": false
@@ -21,7 +27,7 @@ pub(super) fn location_templates() -> serde_json::Value {
             "state": "absent", "value": null, "sourceUsesRefs": [],
             "sourceSetComplete": true, "containsEncryptedSource": false
         },
-        "isSecurityNetworkHost": null,
+        "isSecurityNetworkHost": source_values::source(SourceValue::Absent),
         "tags": source_values::present(json!([location_tag("Missions.LocationType.HijackedShip")])),
         "producesTags": source_values::present(json!({
             "positiveTags": source_values::present(json!([])),
@@ -32,11 +38,11 @@ pub(super) fn location_templates() -> serde_json::Value {
             "negativeTags": source_values::present(json!([]))
         })),
         "aiSpawnTags": source_values::present(json!([])),
-        "names": [{
+        "names": source_values::present(json!([source_values::present(json!({
             "tag": location_tag("Missions.Text.Name"),
             "displayName": source_values::present(json!("text:23:@fixture_location_title"))
-        }],
-        "entityClusterMemberGuid": null
+        }))])),
+        "entityClusterMember": source_values::source(SourceValue::Absent)
     }])
 }
 

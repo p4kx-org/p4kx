@@ -10,6 +10,9 @@ use p4kx_extraction::{Archive, CancelToken, DataForgeEntry, Language, SourceValu
 use p4kx_testkit::{ArchiveBuilder, DataForgeBuilder, TestEntry, TestRecord, TestStruct};
 use serde_json::{Value, json};
 
+#[path = "mission_location_source_cells.rs"]
+mod source_cells;
+
 #[path = "catalog_mission_location_sdk_markers.rs"]
 mod markers;
 
@@ -92,7 +95,11 @@ fn verify_selected_row(
         return Err("one location template".into());
     };
     assert_eq!(row.record_index(), physical, "original physical owner");
-    assert_eq!(row.disabled(), Some(false), "original disabled flag");
+    assert_eq!(
+        row.disabled().value(),
+        Some(&false),
+        "original disabled flag"
+    );
     let tags = row.tags().value().ok_or("general tag list")?;
     let [first, null, repeated, dangling] = tags.as_slice() else {
         return Err("all four original tag slots".into());
@@ -222,9 +229,13 @@ fn check_tag_uses(catalog: &Value, first: &Value, repeated: &Value) -> TestResul
 
 fn verify_name_origin(snapshot: &MissionLocationTemplateSnapshot<'_>) -> TestResult {
     let row = snapshot.rows.first().ok_or("location template row")?;
-    let [first, second, placeholder] = row.names() else {
+    let names = row.names().value().ok_or("original name collection")?;
+    let [first, second, placeholder] = names.as_slice() else {
         return Err("three authored name variants".into());
     };
+    let first = first.value().ok_or("first original name slot")?;
+    let second = second.value().ok_or("second original name slot")?;
+    let placeholder = placeholder.value().ok_or("third original name slot")?;
     let id = first
         .display_name
         .value()

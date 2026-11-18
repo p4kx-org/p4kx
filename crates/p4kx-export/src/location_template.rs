@@ -3,32 +3,30 @@
 
 use std::cell::RefCell;
 
-use p4kx_extraction::{
-    CancelToken, DataForge, Filter, Guid, RecordTree, SourcedValue, StructValue,
-};
+use p4kx_extraction::{CancelToken, DataForge, Filter, Guid, RecordTree, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::CatalogError;
-use crate::ExportAccountingError;
-use crate::blueprint::as_struct;
+use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_number_capture::CapturedNumber;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::original::OriginalFlowFields;
+use crate::catalog_record_reference::CatalogRecordReference;
 use crate::catalog_text_contract::GameTextRef;
 use crate::catalog_v3::location_classification::configuration::{
     self, MissionLocationConfiguration,
 };
+use crate::catalog_v3::location_classification::source_fields;
 use crate::catalog_v3::location_classification::{self, LocationClassification};
 use crate::catalog_v3::tag_catalog::CapturedTags;
 use crate::contract::every_field_required;
 use crate::guid_text::CatalogGuid;
-use crate::mission_layers::{items, one};
 use crate::mission_location_tag::{MissionLocationTag, MissionLocationTagTerm, Reader};
-use crate::record_fields::{boolean, class_name, reference};
 use crate::record_observation::RecordObservation;
 use crate::record_read::{KindRead, ReadError, RecordProjection, read_kind_with_notes};
 use crate::selection::Kind;
+use crate::source_value_catalog::SourceRecordReference;
 use crate::template_field_capture::TemplateFieldCapture;
 
 /// A mission location template: a `MissionLocationTemplate` Record under
@@ -39,21 +37,19 @@ use crate::template_field_capture::TemplateFieldCapture;
 pub struct MissionLocationTemplate<'a> {
     #[serde(skip)]
     record_index: u32,
-    /// The GUID of the Record.
+    #[serde(skip)]
     pub(crate) guid: CatalogGuid,
-    /// The Record name without its type, e.g. `AEGS_Reclaimer_Space_Stanton2c`.
-    pub(crate) class_name: &'a str,
-    /// The record path, without `.xml`.
-    pub(crate) record_path: &'a str,
-    /// The `disabled` flag of the location data, `null` when absent.
-    pub(crate) disabled: Option<bool>,
+    #[serde(flatten)]
+    source: CanonicalRecordHeader<'a>,
+    /// The authored disabled flag with its original source state.
+    disabled: SourcedValue<bool>,
     /// The original classification of the location data.
     classification: SourcedValue<LocationClassification<'a>>,
     configuration: SourcedValue<MissionLocationConfiguration<'a>>,
     #[serde(skip)]
     pub(crate) configuration_numbers: Vec<CapturedNumber>,
-    /// The `isSecurityNetworkHost` flag, `null` when absent.
-    pub(crate) is_security_network_host: Option<bool>,
+    /// The authored security-network-host flag with its original source state.
+    is_security_network_host: SourcedValue<bool>,
     /// The `generalTags`: what the queries of `contractLocationQueries` match.
     tags: SourcedValue<Vec<MissionLocationTag>>,
     /// The `producesTags`.
@@ -64,15 +60,17 @@ pub struct MissionLocationTemplate<'a> {
     ai_spawn_tags: SourcedValue<Vec<MissionLocationTag>>,
     /// The `stringVariants`: the texts the location offers a mission, each under the tag that
     /// names its use.
-    pub(crate) names: Vec<LocationName>,
-    /// The `entityClusterMember` Record, `null` when absent.
-    pub(crate) entity_cluster_member_guid: Option<CatalogGuid>,
+    names: SourcedValue<Vec<SourcedValue<LocationName>>>,
+    /// The authored entity-cluster Record link, including unresolved targets.
+    #[schemars(with = "SourcedValue<CatalogRecordReference>")]
+    entity_cluster_member: SourcedValue<Box<SourceRecordReference<'a>>>,
 }
 
 /// A string variant of a location template.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
+#[non_exhaustive]
 pub struct LocationName {
     /// The original tag operand for this variant.
     pub tag: MissionLocationTag,
@@ -106,37 +104,42 @@ impl<'source> MissionLocationTemplate<'source> {
         self.record_index
     }
 
-    /// The original class name.
+    /// The independently sourced original Record header.
     #[must_use]
-    pub const fn class_name(&self) -> &'source str {
-        self.class_name
+    pub const fn source(&self) -> &CanonicalRecordHeader<'source> {
+        &self.source
     }
 
-    /// The original Record path without its extension.
+    /// The original class name and its source evidence.
     #[must_use]
-    pub const fn record_path(&self) -> &'source str {
-        self.record_path
+    pub const fn class_name(&self) -> &SourcedValue<&'source str> {
+        self.source.class_name()
     }
 
-    /// The authored disabled flag when present.
+    /// The original normalized Record path and its source evidence.
     #[must_use]
-    pub const fn disabled(&self) -> Option<bool> {
-        self.disabled
+    pub const fn record_path(&self) -> &SourcedValue<&'source str> {
+        self.source.record_path()
     }
 
-    /// Returns the authored security-network-host flag when present.
+    /// The authored disabled flag and its source state.
     #[must_use]
-    pub const fn is_security_network_host(&self) -> Option<bool> {
-        self.is_security_network_host
+    pub const fn disabled(&self) -> &SourcedValue<bool> {
+        &self.disabled
     }
 
-    /// Returns the authored entity-cluster member GUID when present.
+    /// The authored security-network-host flag and its source state.
     #[must_use]
-    pub const fn entity_cluster_member_guid(&self) -> Option<Guid> {
-        match self.entity_cluster_member_guid {
-            Some(guid) => Some(guid.0),
-            None => None,
-        }
+    pub const fn is_security_network_host(&self) -> &SourcedValue<bool> {
+        &self.is_security_network_host
+    }
+
+    /// The original entity-cluster Reference with its target availability.
+    #[must_use]
+    pub const fn entity_cluster_member(
+        &self,
+    ) -> &SourcedValue<Box<SourceRecordReference<'source>>> {
+        &self.entity_cluster_member
     }
 
     /// The general tag operands in source order.
@@ -165,7 +168,7 @@ impl<'source> MissionLocationTemplate<'source> {
 
     /// The authored name variants in source order.
     #[must_use]
-    pub fn names(&self) -> &[LocationName] {
+    pub const fn names(&self) -> &SourcedValue<Vec<SourcedValue<LocationName>>> {
         &self.names
     }
 }
@@ -209,50 +212,26 @@ pub(crate) fn template<'f>(
     let capture = TemplateFieldCapture::new(&fields, input, admission)?;
     let reader = Reader::new(&fields, tags);
     let tags = reader.location()?;
-    let data = one(Some(tree.root()), "locationData");
     let mut notes = Vec::new();
     let classification = location_classification::read(&fields, input, &capture, &mut notes)?;
     let numbers = RefCell::default();
     let configuration = configuration::read(&fields, input, &capture, &numbers, &mut notes)?;
+    let original = source_fields::read(&fields, input, &capture, &reader, projection, &mut notes)?;
     let value = MissionLocationTemplate {
         record_index: tree.record_index(),
         guid: CatalogGuid(tree.guid()),
-        class_name: class_name(tree),
-        record_path: tree.record_path(),
-        disabled: boolean(data, "disabled"),
+        source: CanonicalRecordHeader::read(tree, projection.origins())?,
+        disabled: original.disabled,
         classification,
         configuration,
         configuration_numbers: numbers.into_inner(),
-        is_security_network_host: boolean(data, "isSecurityNetworkHost"),
+        is_security_network_host: original.is_security_network_host,
         tags: tags.tags,
         produces_tags: tags.produces,
         consumes_tags: tags.consumes,
         ai_spawn_tags: tags.ai_spawn,
-        names: names(&reader, &fields, projection, data)?,
-        entity_cluster_member_guid: reference(data, "entityClusterMember"),
+        names: original.names,
+        entity_cluster_member: original.entity_cluster_member,
     };
     Ok(RecordProjection { value, notes })
-}
-
-fn names<'fields, 'scope, 'read, 'f>(
-    reader: &Reader<'_, 'fields, 'scope, 'read, 'f>,
-    fields: &'fields OriginalFlowFields<'scope, 'read, 'f>,
-    projection: &CatalogProjection<'_, 'f>,
-    data: Option<&StructValue<'f>>,
-) -> Result<Vec<LocationName>, CatalogError> {
-    let variants = one(data, "stringVariants");
-    let failures = reader.variant_failures()?;
-    items(variants, "variants")
-        .iter()
-        .filter_map(as_struct)
-        .map(|variant| {
-            let owner = fields
-                .owner_of(variant)?
-                .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
-            Ok(LocationName {
-                tag: reader.variant(owner, &failures)?,
-                display_name: projection.protected_key_field(fields, Some(owner), "string")?,
-            })
-        })
-        .collect()
 }

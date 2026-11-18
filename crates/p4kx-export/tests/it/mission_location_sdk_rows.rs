@@ -2,7 +2,8 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_export::catalog_queries::{
-    LocationClassification, MissionLocationTag, MissionLocationTagTerm, MissionLocationTemplate,
+    CanonicalRecordHeader, LocationClassification, LocationName, MissionLocationTag,
+    MissionLocationTagTerm, MissionLocationTemplate,
 };
 use serde_json::{Value, json};
 
@@ -10,28 +11,43 @@ use super::{TestResult, proof::View};
 
 impl View<'_> {
     pub(super) fn row(&mut self, row: &MissionLocationTemplate<'_>) -> TestResult<Value> {
-        let names = row
-            .names()
-            .iter()
-            .map(|name| {
-                Ok(json!({
-                    "tag": self.tag(&name.tag)?, "displayName": self.scalar(&name.display_name)?,
-                }))
-            })
-            .collect::<TestResult<Vec<_>>>()?;
-        Ok(json!({
-            "guid": row.guid().to_string(), "className": row.class_name(),
-            "recordPath": row.record_path(), "disabled": row.disabled(),
+        let mut result = self.header(row.source())?;
+        let Value::Object(fields) = json!({
+            "disabled": self.scalar(row.disabled())?,
             "classification": self.cell(row.classification(), Self::classification)?,
             "configuration": self.cell(row.configuration(), Self::configuration)?,
-            "isSecurityNetworkHost": row.is_security_network_host(),
+            "isSecurityNetworkHost": self.scalar(row.is_security_network_host())?,
             "tags": self.tag_list(row.tags())?,
             "producesTags": self.cell(row.produces_tags(), Self::term)?,
             "consumesTags": self.cell(row.consumes_tags(), Self::term)?,
             "aiSpawnTags": self.tag_list(row.ai_spawn_tags())?,
-            "names": names,
-            "entityClusterMemberGuid": row.entity_cluster_member_guid().map(|guid| guid.to_string()),
+            "names": self.sequence(row.names(), Self::name)?,
+            "entityClusterMember": self.cell(row.entity_cluster_member(), |view, value| view.reference(value))?,
+        }) else {
+            return Err("typed location fields object".into());
+        };
+        result
+            .as_object_mut()
+            .ok_or("typed header object")?
+            .extend(fields);
+        Ok(result)
+    }
+
+    fn header(&mut self, source: &CanonicalRecordHeader<'_>) -> TestResult<Value> {
+        Ok(json!({
+            "guid": self.cell(&source.guid(), |_, value| Ok(json!(value.to_string())))?,
+            "recordName": self.scalar(source.record_name())?,
+            "className": self.scalar(source.class_name())?,
+            "recordPath": self.scalar(source.record_path())?,
+            "recordIndex": self.scalar(source.record_index())?,
+            "sourceType": self.scalar(source.source_type())?,
+            "fileName": self.scalar(source.file_name())?,
+            "metadataTag": self.scalar(source.metadata_tag())?,
         }))
+    }
+
+    fn name(&mut self, value: &LocationName) -> TestResult<Value> {
+        Ok(json!({"tag": self.tag(&value.tag)?, "displayName": self.scalar(&value.display_name)?}))
     }
 
     fn classification(&mut self, value: &LocationClassification<'_>) -> TestResult<Value> {

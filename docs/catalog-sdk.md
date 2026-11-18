@@ -285,3 +285,21 @@ source arenas, tier configurations and canonical presentation. All/GUID/RecordIn
 preserves physical duplicates and original quality-slot positions. Rules load only the needed
 global/category/dismantle inputs; source, text and coverage remain available without `read_crafting`
 or a complete Catalog. See [Blueprint queries](catalog-blueprint-queries.md).
+
+
+
+## Mission Location source cells
+
+Mission Location rows expose the same [direct source cells](catalog-location-configuration.md#source-identity-flags-cluster-link-and-names)
+as the complete Catalog. source() returns the canonical eight-field Header. disabled() and
+is_security_network_host() return sourced Bool cells. entity_cluster_member() returns the original
+sourced Record link, retaining its authored GUID even when resolution is dangling or incompatible.
+names() returns a sourced collection whose individual slots retain their original states and
+positions; present members expose the existing Tag operand and protected display-name reference.
+
+Inspect state() and value() independently of origin().contains_encrypted_source(). Resolve
+actual source uses only in the snapshot's SourceInventory. An incomplete first-owner selection
+remains visible on each dependent cell, independently of complete intrinsic Header metadata.
+These values share the same original reader, identities, ordering and text domains in direct
+queries and full Catalog production. The old nullable entity_cluster_member_guid() projection is
+replaced by the typed link; no legacy wire mirror is emitted.

@@ -93,6 +93,28 @@ impl<'context, 'fields, 'scope, 'read, 'source> Reader<'context, 'fields, 'scope
         Self { fields, tags }
     }
 
+    /// Selects the first readable Struct and retains its authored prefix decisions.
+    pub(crate) fn original_owner(
+        &self,
+        members: &[&str],
+    ) -> Result<SourcedValue<&'fields Fact<'scope, 'read, 'source>>, CatalogError> {
+        self.read(None, members, &[], |fact, inputs| {
+            let (owner, complete) = select_owner(self.fields, fact, inputs)?;
+            let state = owner.map_or_else(|| non_present(fact.value()), SourceValue::Present);
+            Ok((state, complete))
+        })
+    }
+
+    /// Selects one original field without losing null or unsupported value shapes.
+    pub(crate) fn original_value(
+        &self,
+        members: &[&str],
+    ) -> Result<SourcedValue<&'fields Fact<'scope, 'read, 'source>>, CatalogError> {
+        self.read(None, members, &[], |fact, _| {
+            Ok((SourceValue::Present(fact), true))
+        })
+    }
+
     pub(crate) fn location(&self) -> Result<LocationTags, CatalogError> {
         Ok(LocationTags {
             tags: self.array(None, &["locationData", "generalTags", "tags"], &[])?,

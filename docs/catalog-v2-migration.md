@@ -59,3 +59,24 @@ nodes and configuration-reference sites are stored once per document; each link 
 selector, sourced lookup status and physical candidate set. This exposes configless and repeated
 original occurrences without inventing Loot placements or changing normal-publication Health.
 See [the original Loot document contract](catalog-loot-source.md#original-container-link-documents-reached-by-the-loot-walk).
+
+
+## Mission Location source cells
+
+The schema-3 missionLocationTemplates dataset remains at the same address and preserves original
+Record selection, GUID sorting and physical ties. Its source-backed header and location facts use
+one typed representation; regenerate older exports from the original input instead of assigning
+source states or encryption markers from their serialized values.
+
+| Previous field | Current schema 3 |
+| --- | --- |
+| guid, className, recordPath | The corresponding immediately sourced Header field; read its state, value and origin. |
+| Record metadata | recordName, recordIndex, sourceType, fileName and metadataTag complete the same shared eight-field Header. |
+| disabled, isSecurityNetworkHost | Sourced Bool values; present false remains false, independently of missing/null/invalid source states. |
+| entityClusterMemberGuid | entityClusterMember carries the original Reference. Read value.guid.value for an available authored GUID and value.status for target resolution. Dangling GUIDs are retained rather than collapsed to null. |
+| names[] | names.value[] contains sourced original slots; inspect each slot's state before reading its value. |
+| names[].tag / names[].displayName | A present names.value[i].value retains tag and displayName. The protected displayName.value joins texts.gameTexts[].id.value. |
+
+A present empty names.value array differs from absent or null. Repeated and nullable authored
+positions are not compacted. The fixed released v2 fixture is a historical input, not another
+writer mode. See the [Mission Location contract](catalog-location-configuration.md#source-identity-flags-cluster-link-and-names).

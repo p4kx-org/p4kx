@@ -4,6 +4,38 @@ The `missionLocationTemplates` row identifies the physical `MissionLocationTempl
 Its sourced `configuration` is read from the declared inline `MissionLocationData`.
 Locations with the authored `disabled` flag retain their configuration.
 
+## Source identity, flags, cluster link and names
+
+Each row flattens the eight [canonical Record header fields](catalog-record-headers.md).
+The original header identity, normalized class/path, physical Record index, stored filename
+and metadata tag each have their own sourced carrier. GUID ordering and physical ties retain
+their existing meaning.
+
+| Original field | Catalog field | Source form |
+| --- | --- | --- |
+| `locationData.disabled` | `disabled` | `SourcedValue<bool>`; present false differs from absent, null and invalid. |
+| `locationData.isSecurityNetworkHost` | `isSecurityNetworkHost` | Independent sourced Bool with the same state distinctions. |
+| `locationData.entityClusterMember` | `entityClusterMember` | Sourced Record reference with separately sourced GUID, target index, path and type plus the closed lookup status. Dangling/incompatible GUIDs remain available. |
+| `locationData.stringVariants.variants` | `names` | Sourced ordered collection of sourced slots. Present empty, absent, null and unreadable members remain distinct. |
+
+The Reader preserves the original first-readable-Struct choice for locationData and
+stringVariants, including scalar singleton normalization. Earlier unreadable candidates remain
+actual selectors and leave the affected per-value contribution sets incomplete. Intrinsic
+header facts retain their independent source scope. A malformed field remains explicit in
+export health; a known false flag or present empty collection is not a missing value.
+
+A present name slot contains the existing Tag operand and protected `displayName` GameTextRef.
+Join its `value` to `texts.gameTexts[].id.value`, then use the requested available language's
+source/display form. The name key, canonical text identity and occurrence counting do not
+change. Null/unreadable slots have no invented name. Repeated slots preserve physical source
+positions even when their text reference is shared. The existing classification and
+configuration projections remain independent of these additional source cells.
+
+The SDK's `source()`, sourced Bool/cluster getters and `names()` expose this same form, with
+the callback's own SourceInventory. There is no second `entityClusterMemberGuid` wire value.
+
+## Location-owned configuration
+
 | Original field | Catalog field | Stored values |
 | --- | --- | --- |
 | `locationData.autoSpawnSettings` | `configuration.value.autoSpawnSettings` | Ordered `AutoSpawnSettings` Class occurrences with their authored tag lists, spawn limits and delays, inventory, faction override and controls. |

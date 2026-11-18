@@ -46,6 +46,9 @@ fn verify_snapshot(
     };
     let row = serde_json::to_value(row)?;
     let selected = failed_selection(snapshot)?;
+    if matches!(ancestor, Ancestor::LocationData) {
+        verify_location_cells(&row, &selected)?;
+    }
     for path in affected_lists(ancestor) {
         verify_list(row.pointer(path).ok_or("selected tag list")?, &selected)?;
     }
@@ -67,7 +70,7 @@ fn verify_snapshot(
         verify_names(&row, &selected)?;
     } else {
         assert_eq!(
-            row.pointer("/names/0/tag/path/sourceSetComplete"),
+            row.pointer("/names/value/0/value/tag/path/sourceSetComplete"),
             Some(&Value::Bool(true)),
             "an unrelated name variant inherits no failed tag-parent attempt"
         );
@@ -167,7 +170,7 @@ const fn affected_lists(ancestor: Ancestor) -> &'static [&'static str] {
 
 fn verify_names(row: &Value, selected: &FailedSelectionProof) -> TestResult {
     let names = row
-        .get("names")
+        .pointer("/names/value")
         .and_then(Value::as_array)
         .ok_or("the selected string variants")?;
     assert_eq!(
@@ -175,16 +178,27 @@ fn verify_names(row: &Value, selected: &FailedSelectionProof) -> TestResult {
         3,
         "all original variant tag slots remain ordered"
     );
+    verify_incomplete(
+        row.get("names").ok_or("original name collection")?,
+        selected,
+    );
     for name in names {
+        verify_incomplete(name, selected);
         verify_incomplete(
-            name.pointer("/tag/path").ok_or("the variant's tag path")?,
+            name.pointer("/value/displayName")
+                .ok_or("original protected name")?,
+            selected,
+        );
+        verify_incomplete(
+            name.pointer("/value/tag/path")
+                .ok_or("the variant's tag path")?,
             selected,
         );
     }
     verify_incomplete(
         names
             .last()
-            .and_then(|name| name.pointer("/tag/danglingGuid"))
+            .and_then(|name| name.pointer("/value/tag/danglingGuid"))
             .ok_or("the dangling variant tag has an original GUID")?,
         selected,
     );
@@ -214,4 +228,32 @@ fn verify_incomplete(cell: &Value, selected: &FailedSelectionProof) {
             .is_some_and(|references| !references.contains(&selected.attempt)),
         "the attempted read stays in the inventory independently of field contributors"
     );
+}
+
+fn verify_location_cells(row: &Value, selected: &FailedSelectionProof) -> TestResult {
+    for path in [
+        "/disabled",
+        "/isSecurityNetworkHost",
+        "/entityClusterMember",
+        "/entityClusterMember/value/guid",
+        "/entityClusterMember/value/targetRecordIndex",
+        "/entityClusterMember/value/recordPath",
+        "/entityClusterMember/value/targetType",
+    ] {
+        verify_incomplete(
+            row.pointer(path).ok_or("selected original location cell")?,
+            selected,
+        );
+    }
+    assert_eq!(
+        row.pointer("/disabled/value"),
+        Some(&Value::Bool(false)),
+        "the first readable owner still supplies false"
+    );
+    assert_eq!(
+        row.pointer("/entityClusterMember/value/status"),
+        Some(&Value::from("present")),
+        "the same original compatible target is retained"
+    );
+    Ok(())
 }

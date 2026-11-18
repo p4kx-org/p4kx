@@ -18,6 +18,9 @@ use crate::source_fields::FieldError;
 use crate::source_value_catalog::SourceRecordReference;
 use crate::template_field_capture::TemplateFieldCapture;
 
+#[path = "location_source_fields.rs"]
+pub(crate) mod source_fields;
+
 #[path = "location_configuration.rs"]
 pub(crate) mod configuration;
 

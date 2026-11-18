@@ -196,8 +196,8 @@ fn compare(
     let rows = consumer::rows(&catalog, KIND)?;
     let guid = tree.guid().to_string();
     let mut owners = rows.iter().filter(|row| {
-        row.get("guid").and_then(Value::as_str) == Some(guid.as_str())
-            && row.get("recordPath").and_then(Value::as_str) == Some(tree.record_path())
+        row.pointer("/guid/value").and_then(Value::as_str) == Some(guid.as_str())
+            && row.pointer("/recordPath/value").and_then(Value::as_str) == Some(tree.record_path())
     });
     let row = owners.next().ok_or("selected original location row")?;
     assert!(
@@ -213,7 +213,7 @@ fn compare(
         _ => None,
     };
     assert!(
-        field(row, "disabled")?.as_bool() == disabled,
+        consumer::source_value(field(row, "disabled")?)?.and_then(Value::as_bool) == disabled,
         "a disabled owner retains its authored state and configuration"
     );
     check_configuration(

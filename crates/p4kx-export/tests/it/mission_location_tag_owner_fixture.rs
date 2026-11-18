@@ -88,7 +88,13 @@ pub(super) fn database(ancestor: Ancestor) -> DataForgeBuilder {
 }
 
 fn structures(ancestor: Ancestor) -> DataForgeBuilder {
-    let mut location = TestStruct::new("MissionLocationData");
+    let mut location = TestStruct::new("MissionLocationData")
+        .field("disabled", TestType::Bool)
+        .field("isSecurityNetworkHost", TestType::Bool)
+        .field(
+            "entityClusterMember",
+            TestType::ReferenceTo("Tag".to_owned()),
+        );
     for (name, kind) in [
         ("generalTags", "TagList"),
         ("producesTags", "TagSearchTerm"),
@@ -137,7 +143,10 @@ fn operands() -> TestValue {
 }
 
 fn location_data(ancestor: Ancestor) -> TestInstance {
-    let mut value = TestInstance::new("MissionLocationData");
+    let mut value = TestInstance::new("MissionLocationData")
+        .value("disabled", TestValue::Bool(false))
+        .value("isSecurityNetworkHost", TestValue::Bool(false))
+        .value("entityClusterMember", TestValue::Reference(TAG_SHIP));
     for name in ["generalTags", "aiSpawnTags"] {
         value = value.value(
             name,

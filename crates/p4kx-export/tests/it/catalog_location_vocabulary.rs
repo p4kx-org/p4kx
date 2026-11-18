@@ -216,7 +216,7 @@ fn mission_location_templates_report_the_rejected_class_declaration() -> TestRes
     assert_eq!(at(row, "/classification/state")?, "unsupported");
     assert_eq!(at(row, "/classification/containsEncryptedSource")?, false);
     assert_eq!(
-        at(row, "/disabled")?,
+        at(row, "/disabled/value")?,
         true,
         "the existing flag still uses its source"
     );

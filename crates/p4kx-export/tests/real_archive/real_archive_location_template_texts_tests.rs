@@ -20,13 +20,28 @@ fn location_template_baseline_counts_each_variant_using_a_shared_text() -> TestR
     let registry = SourceUses::new();
     let reference = registry.value(SourceValue::Present(shared.clone()), &[], true);
     let absent = registry.value(SourceValue::<Value>::Absent, &[], true);
-    fixture.catalog["missionLocationTemplates"] = json!([{
-        "names": [
-            {"displayName": reference},
-            {"displayName": absent},
-            {"displayName": reference}
-        ]
-    }]);
+    let names = registry.value(
+        SourceValue::Present(vec![
+            registry.value(
+                SourceValue::Present(json!({"displayName": reference})),
+                &[],
+                true,
+            ),
+            registry.value(
+                SourceValue::Present(json!({"displayName": absent})),
+                &[],
+                true,
+            ),
+            registry.value(
+                SourceValue::Present(json!({"displayName": reference})),
+                &[],
+                true,
+            ),
+        ]),
+        &[],
+        true,
+    );
+    fixture.catalog["missionLocationTemplates"] = json!([{"names": names}]);
 
     let kind = Kind::MissionLocationTemplates;
     let (english, german) = fixture.coverage(&fixture.catalog, kind)?;

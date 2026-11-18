@@ -3,7 +3,8 @@
 Schema 3 uses one shared header for definitions.tags, declarations.tagRoots,
 declarations.entityTags, definitions.manufacturers, definitions.resourceGroups,
 definitions.commodities, definitions.resourceTypes, definitions.qualityDistributions,
-definitions.qualityQuantizations, definitions.blueprintCategories, and declarations.blueprintCategoryLists.
+definitions.qualityQuantizations, definitions.blueprintCategories, declarations.blueprintCategoryLists,
+and missionLocationTemplates.
 Its eight fields are flattened
 into each
 owning row, with the ordinary required state/value/containsEncryptedSource/sourceUsesRefs/

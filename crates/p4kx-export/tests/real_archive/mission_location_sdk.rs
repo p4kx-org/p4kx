@@ -120,7 +120,7 @@ fn compare(
     };
     if row.record_index() != tree.record_index()
         || row.guid() != tree.guid()
-        || row.record_path() != tree.record_path()
+        || row.record_path().value().copied() != Some(tree.record_path())
     {
         return Err("SDK row identity differs from its original physical owner".into());
     }

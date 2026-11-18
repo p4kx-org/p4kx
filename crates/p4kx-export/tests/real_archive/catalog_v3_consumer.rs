@@ -158,6 +158,7 @@ fn checked_table<'catalog>(
                     | Kind::Jurisdictions
                     | Kind::SecurityNetworkManifests
                     | Kind::MissionModuleDeclarations
+                    | Kind::MissionLocationTemplates
                     | Kind::LocationClasses
                     | Kind::LocationFunctions
                     | Kind::LocationSizes

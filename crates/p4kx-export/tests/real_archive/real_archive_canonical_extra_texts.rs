@@ -18,11 +18,16 @@ pub(super) fn location_templates(
     counters: &mut CoverageCounters<'_>,
 ) -> TestResult<()> {
     for template in catalog_v3_consumer::rows(catalog, Kind::MissionLocationTemplates)? {
-        let names = template
-            .get("names")
-            .and_then(Value::as_array)
-            .ok_or("location names")?;
-        for name in names {
+        let Some(names) = catalog_v3_consumer::source_value(
+            template.get("names").ok_or("location name collection")?,
+        )?
+        else {
+            continue;
+        };
+        for name in names.as_array().ok_or("present location name collection")? {
+            let Some(name) = catalog_v3_consumer::source_value(name)? else {
+                continue;
+            };
             let target = index.reference(
                 name.get("displayName").ok_or("location name reference")?,
                 TextDomain::GameText,

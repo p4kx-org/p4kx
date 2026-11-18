@@ -180,22 +180,22 @@ fn check_location_template_names(catalog: &Value, template: &Value) -> TestResul
     use crate::health_origin_assertions as proof;
     use crate::text_forms_assertions::direct;
 
-    let [first, second, placeholder] = proof::rows(template, "/names")? else {
+    let [first, second, placeholder] = proof::rows(template, "/names/value")? else {
         return Err("expected two named variants and one placeholder".into());
     };
     assert_eq!(
-        proof::at(first, "/tag/path/value")?.as_str(),
+        proof::at(first, "/value/tag/path/value")?.as_str(),
         Some("Missions.Hijacked"),
         "the first variant keeps its original tag",
     );
     assert_eq!(
-        proof::at(second, "/tag/path/value")?.as_str(),
+        proof::at(second, "/value/tag/path/value")?.as_str(),
         Some("ShipModel"),
         "the repeated key keeps its own tag",
     );
-    let first = proof::at(first, "/displayName")?;
-    let second = proof::at(second, "/displayName")?;
-    let placeholder = proof::at(placeholder, "/displayName")?;
+    let first = proof::at(first, "/value/displayName")?;
+    let second = proof::at(second, "/value/displayName")?;
+    let placeholder = proof::at(placeholder, "/value/displayName")?;
     for reference in [first, second, placeholder] {
         direct(reference)?;
         assert_eq!(
@@ -268,7 +268,7 @@ fn location_templates_carry_their_tags_and_leave_out_leftovers() -> TestResult {
     assert!(
         templates
             .iter()
-            .any(|template| template["disabled"] == true),
+            .any(|template| template.pointer("/disabled/value") == Some(&Value::Bool(true))),
         "the disabled flag is kept as stored"
     );
     Ok(())
