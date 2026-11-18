@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::central_directory::{CENTRAL_HEADER_LEN, CENTRAL_HEADER_SIGNATURE};
 use crate::cig_install_metadata::CigInstallMetadata;
 use crate::format_error::FormatError;
 use crate::metadata_range::MetadataRange;
@@ -28,15 +29,102 @@ pub(crate) struct DirectoryLocation {
 }
 
 /// Reads the existing ZIP end/locator route while retaining its original words and extents.
-pub(crate) fn locate_directory(source: &Source) -> Result<DirectoryLocation, FormatError> {
+pub(crate) fn locate_directory(
+    source: &Source,
+    max_entries: Option<u64>,
+) -> Result<DirectoryLocation, FormatError> {
     let tail_len = source.len().min((END_LEN + usize::from(u16::MAX)) as u64);
     let tail_start = source.len() - tail_len;
     let tail = source.read_at(tail_start, usize::try_from(tail_len).unwrap_or(usize::MAX))?;
-    let end_index = find_end_record(&tail).ok_or(FormatError::NotAnArchive)?;
-    let end_offset = tail_start + end_index as u64;
+    let mut frames = crate::end_frame_proof::EndFrameProof::new(source, &tail, tail_start);
+    let mut indices = end_record_indices(&tail).rev();
+    let index = indices.next().ok_or(FormatError::NotAnArchive)?;
+    let end = read_end(&tail, index, tail_start, source.len())?;
+    let mut selected_offset = end.fixed().offset();
+    let mut selected = directory_at(source, &tail, index, tail_start, end);
+    for index in indices {
+        let end = read_end(&tail, index, tail_start, source.len())?;
+        if !end.comment().available().is_some_and(|comment| {
+            comment.offset() <= selected_offset && selected_offset < comment.end()
+        }) {
+            continue;
+        }
+        let Some(owner) = comment_directory(source, &tail, index, tail_start, end, max_entries)?
+        else {
+            continue;
+        };
+        frames.ensure_unowned(first_end(&owner), owner.metadata.end().fixed().offset())?;
+        selected_offset = end.fixed().offset();
+        selected = Ok(owner);
+    }
+    let selected = selected?;
+    if selected.entry_count == 0 && selected.size == 0 {
+        frames.ensure_unowned(
+            first_end(&selected),
+            selected.metadata.end().fixed().offset(),
+        )?;
+    }
+    Ok(selected)
+}
+
+fn first_end(location: &DirectoryLocation) -> u64 {
+    location.metadata.zip64().map_or_else(
+        || location.metadata.end().fixed().offset(),
+        |end| end.fixed().offset(),
+    )
+}
+
+fn read_end(
+    tail: &[u8],
+    index: usize,
+    tail_start: u64,
+    source_len: u64,
+) -> Result<ZipEndMetadata, FormatError> {
+    ZipEndMetadata::read(
+        tail.get(index..).unwrap_or_default(),
+        tail_start + index as u64,
+        source_len,
+    )
+}
+
+fn comment_directory(
+    source: &Source,
+    tail: &[u8],
+    index: usize,
+    tail_start: u64,
+    end: ZipEndMetadata,
+    max_entries: Option<u64>,
+) -> Result<Option<DirectoryLocation>, FormatError> {
+    let location = match directory_at(source, tail, index, tail_start, end) {
+        Ok(value) => value,
+        Err(FormatError::Corrupt { .. } | FormatError::Truncated(_)) => return Ok(None),
+        Err(error) => return Err(error),
+    };
+    let Some(minimum) = location.entry_count.checked_mul(CENTRAL_HEADER_LEN as u64) else {
+        return Ok(None);
+    };
+    if minimum > location.size {
+        return Ok(None);
+    }
+    if location.entry_count == 0 {
+        return Ok((location.size == 0).then_some(location));
+    }
+    crate::entry_count_limit::check_entry_count(location.entry_count, max_entries)?;
+    let mut signature = [0; size_of::<u32>()];
+    source.read_into(location.offset, &mut signature)?;
+    Ok((u32::from_le_bytes(signature) == CENTRAL_HEADER_SIGNATURE).then_some(location))
+}
+
+fn directory_at(
+    source: &Source,
+    tail: &[u8],
+    end_index: usize,
+    tail_start: u64,
+    end: ZipEndMetadata,
+) -> Result<DirectoryLocation, FormatError> {
+    let end_offset = end.fixed().offset();
     let bytes = tail.get(end_index..).unwrap_or_default();
-    let end = ZipEndMetadata::read(bytes, end_offset, source.len())?;
-    let locator = find_zip64_locator(source, &tail, end_index, tail_start, &end)?;
+    let locator = find_zip64_locator(source, tail, end_index, tail_start, &end)?;
     let zip64 = locator
         .map(|value| read_zip64_end(source, value.target()))
         .transpose()?;
@@ -50,6 +138,12 @@ pub(crate) fn locate_directory(source: &Source) -> Result<DirectoryLocation, For
     };
     let record_offset = zip64.map_or(end_offset, |value| value.fixed().offset());
     check_before(offset, size, record_offset)?;
+    if entry_count == 0 && size == 0 && offset != record_offset {
+        return Err(FormatError::corrupt(
+            record_offset,
+            "empty central directory does not meet its end frame",
+        ));
+    }
     let comment = bytes
         .get(END_LEN..)
         .and_then(|bytes| bytes.get(..usize::from(end.comment_len())));
@@ -203,10 +297,9 @@ fn check_before(offset: u64, size: u64, record_offset: u64) -> Result<(), Format
     Ok(())
 }
 
-fn find_end_record(tail: &[u8]) -> Option<usize> {
+fn end_record_indices(tail: &[u8]) -> impl DoubleEndedIterator<Item = usize> + '_ {
     let signature = END_SIGNATURE.to_le_bytes();
-    let last_start = tail.len().checked_sub(END_LEN)?;
-    (0..=last_start)
-        .rev()
-        .find(|&index| tail.get(index..index + signature.len()) == Some(signature.as_slice()))
+    tail.windows(END_LEN)
+        .enumerate()
+        .filter_map(move |(index, bytes)| bytes.starts_with(&signature).then_some(index))
 }

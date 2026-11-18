@@ -12,6 +12,7 @@ mod containers;
 mod decoding;
 mod effective_encoding;
 mod encryption_declaration;
+mod end_record_selection;
 mod entry_metadata;
 mod entry_origin;
 mod hash_block;

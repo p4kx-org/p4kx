@@ -4,9 +4,10 @@
 use std::io;
 
 use crate::archive_metadata::ArchiveMetadata;
-use crate::central_directory::parse_header;
+use crate::central_directory::{CENTRAL_HEADER_LEN, MAX_HEADER_LEN, parse_header};
 use crate::format_error::FormatError;
 use crate::issue::{Directory, IssueLog};
+use crate::local_header_match::{LOCAL_HEADER_LEN, LocalStart};
 use crate::source::Source;
 use crate::{Checksum, Entry, EntryIssue};
 
@@ -23,14 +24,8 @@ const MAX_CANDIDATES: u64 = 1 << 24;
 const WORK_PER_WINDOW_BYTE: u64 = 2;
 const CHUNK_LEN: usize = 4 << 20;
 const CENTRAL_SIGNATURE: [u8; 4] = 0x0201_4B50_u32.to_le_bytes();
-const CENTRAL_HEADER_LEN: usize = 46;
-const MAX_HEADER_LEN: usize = CENTRAL_HEADER_LEN + 3 * u16::MAX as usize;
 const NAME_LEN_AT: usize = 28;
 const LOCAL_OFFSET_AT: usize = 42;
-const LOCAL_SIGNATURE: [u8; 4] = 0x0403_4B50_u32.to_le_bytes();
-const LOCAL_CIG_SIGNATURE: [u8; 4] = 0x1403_4B50_u32.to_le_bytes();
-const LOCAL_HEADER_LEN: usize = 30;
-const LOCAL_NAME_AT: usize = 26;
 
 /// Rebuilds the Entries from the central-directory records found by scanning `source` once from
 /// front to back, from `hint` (the directory offset a valid end record gave) when that lies in the
@@ -158,11 +153,6 @@ enum Outcome {
     Found(Box<Found>),
     Rejected,
     OverBudget,
-}
-
-struct LocalStart {
-    data_start: u64,
-    cig: bool,
 }
 
 fn charge(budget: &mut u64, cost: usize) -> bool {
@@ -302,38 +292,10 @@ fn local_data_start(
     offset: u64,
     name: &[u8],
 ) -> Result<Option<LocalStart>, FormatError> {
-    let mut fixed = [0_u8; LOCAL_HEADER_LEN];
-    if let Err(error) = source.read_into(offset, &mut fixed) {
-        return unless_eof(error);
+    match crate::local_header_match::read(source, offset, name) {
+        Err(FormatError::Io(error)) => unless_eof(error),
+        result => result,
     }
-    let signature = fixed.first_chunk::<4>();
-    let cig = signature == Some(&LOCAL_CIG_SIGNATURE);
-    if !cig && signature != Some(&LOCAL_SIGNATURE) {
-        return Ok(None);
-    }
-    let Some((name_len, extra_len)) = local_lengths(&fixed) else {
-        return Ok(None);
-    };
-    if usize::from(name_len) != name.len() {
-        return Ok(None);
-    }
-    let mut stored = vec![0_u8; name.len()];
-    if let Err(error) = source.read_into(offset + LOCAL_HEADER_LEN as u64, &mut stored) {
-        return unless_eof(error);
-    }
-    Ok((stored == name).then(|| LocalStart {
-        data_start: offset + LOCAL_HEADER_LEN as u64 + u64::from(name_len) + u64::from(extra_len),
-        cig,
-    }))
-}
-
-fn local_lengths(fixed: &[u8; LOCAL_HEADER_LEN]) -> Option<(u16, u16)> {
-    let lengths = fixed.get(LOCAL_NAME_AT..)?.first_chunk::<4>()?;
-    let [name_low, name_high, extra_low, extra_high] = *lengths;
-    Some((
-        u16::from_le_bytes([name_low, name_high]),
-        u16::from_le_bytes([extra_low, extra_high]),
-    ))
 }
 
 fn unless_eof<T>(error: io::Error) -> Result<Option<T>, FormatError> {

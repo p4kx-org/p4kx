@@ -16,8 +16,9 @@ use crate::{
     Checksum, Compression, DosTimestamp, Entry, EntryIssue, EntryMetadata, ZipHeaderMetadata,
 };
 
-const CENTRAL_HEADER_SIGNATURE: u32 = 0x0201_4B50;
+pub(crate) const CENTRAL_HEADER_SIGNATURE: u32 = 0x0201_4B50;
 pub(crate) const CENTRAL_HEADER_LEN: usize = 46;
+pub(crate) const MAX_HEADER_LEN: usize = CENTRAL_HEADER_LEN + 3 * u16::MAX as usize;
 const ZIP64_MARKER_32: u32 = 0xFFFF_FFFF;
 const BLOCK_ZIP64: u16 = 0x0001;
 const BLOCK_CIG_ENCRYPTION: u16 = 0x5002;

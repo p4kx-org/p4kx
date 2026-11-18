@@ -35,6 +35,28 @@ does not erase its established layout.
 | Recognised CIG v1 | Exact 16-byte ZIP64 comment with `CIG\0\x01\0` prefix, sector/free-count words, twelve-byte progress rows and sixteen-byte free rows |
 | P4K v2 | Base/extension directory and name declarations, payload end, free count, trie offset/size, sector size, flags, version, magic and both distinct opaque 32-byte trailer slots |
 
+ZIP end selection treats signatures inside a plausible earlier end record's declared available
+comment prefix as comment bytes. A competing original directory or Entry frame owning the same
+boundary is an explicit corrupt-layout error. Appended generations outside earlier comments and
+opaque bytes following a selected comment keep their existing interpretation. Final empty routes
+and possible comment-owner boundaries are also checked against the existing
+ZIP tail. Only a canonically complete directory record with the exact original local-header name
+and a checked stored extent before that record can establish a conflicting physical Entry frame.
+The shared local-header matcher preserves actual source I/O failures; malformed or unbound raw
+signature candidates do not become Entry authority. Ownership checks share one lazily loaded
+lookback before that tail, bounded by the format's maximum central-record length
+(`46 + 3 * u16::MAX`). The original EOCD search window is unchanged.
+Both the original first end frame and classic END are checked against the same records. A
+ZIP64 start outside the held range uses a separate format-bounded window around that original
+position, retaining at most one such remote window and reusing overlapping held bytes. These
+bounded metadata reads do not scan the gap between windows, the whole Archive or decoded
+payloads. Empty directory positions use the actual first end-frame start, including the
+ZIP64 end record, in owning-source coordinates; executable prefixes are not
+implicitly subtracted from offsets. These rules follow the record and offset structure in
+[PKWARE APPNOTE](https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT), sections 4.3.1,
+4.3.6, 4.3.16 and 4.4.24 through 4.4.26. Bounded frame validation does not establish authenticity
+or a unique interpretation of every intentionally constructed ZIP polyglot.
+
 Unknown ZIP comments remain raw comment bytes and do not imply installation tables. Invalid
 recognised table arithmetic is explicit rather than successful absence. v2 entry records
 expose all 128 signature bytes and all 32 stored digest-slot bytes, including zero slots.

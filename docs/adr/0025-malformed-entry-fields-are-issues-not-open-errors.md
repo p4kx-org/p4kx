@@ -42,6 +42,14 @@ that are not UTF-8 are kept apart from the list, one per such Entry and found by
   for ZIP64 records, the end region already read is searched backwards. A candidate counts only
   when the ZIP64 end record signature stands at the offset it names, before the locator.
 
+- **ZIP end-frame ownership.** A signature inside the selected original comment prefix is comment
+  data when the containing end route has a plausible own directory. Its available prefix remains
+  meaningful even when the complete comment is truncated. Competing directory and Entry frames
+  cannot also own that comment boundary; their proven overlap is a corrupt ambiguous layout.
+  Later generations outside the earlier comment remain eligible. A directory declaring zero
+  Entries and zero bytes starts at its following end frame, including the ZIP64 end-record start.
+  Offsets remain relative to the owning source; no implicit executable-prefix rebasing is done.
+
 ## Considered Options
 
 - Reject the Archive on the first malformed field: simplest, and what the v1 reader did for paths,
