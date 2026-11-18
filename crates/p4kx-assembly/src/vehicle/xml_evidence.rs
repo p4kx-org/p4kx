@@ -28,6 +28,20 @@ impl VehicleXmlSite {
         &self.file
     }
 
+    pub(crate) fn with_field(&self, field: &str) -> Self {
+        let location = self.location.as_ref().and_then(|location| match location {
+            SourceLocation::Subresource {
+                namespace, indices, ..
+            } => Some(SourceLocation::Subresource {
+                namespace: namespace.clone(),
+                indices: indices.clone(),
+                field: field.to_owned(),
+            }),
+            _ => None,
+        });
+        Self::new(self.file.clone(), location)
+    }
+
     /// Returns the original attribute or checked-absence coordinate when available.
     #[must_use]
     pub const fn location(&self) -> Option<&SourceLocation> {
@@ -50,13 +64,24 @@ impl VehicleAttributeEvidence {
         }
     }
 
-    pub(crate) fn with_target(assignment: &Arc<Self>, target: Option<&Arc<Self>>) -> Arc<Self> {
-        let Some(target) = target else {
+    pub(crate) fn with_targets(
+        assignment: &Arc<Self>,
+        targets: &[Option<&Arc<Self>>],
+    ) -> Arc<Self> {
+        let mut targets = targets
+            .iter()
+            .flatten()
+            .copied()
+            .filter(|target| !Arc::ptr_eq(assignment, target))
+            .peekable();
+        if targets.peek().is_none() {
             return Arc::clone(assignment);
-        };
+        }
         let mut selectors = assignment.selectors.clone();
-        selectors.push(target.original.clone());
-        selectors.extend(target.selectors.iter().cloned());
+        for target in targets {
+            selectors.push(target.original.clone());
+            selectors.extend(target.selectors.iter().cloned());
+        }
         Arc::new(Self::new(assignment.original.clone(), selectors))
     }
 

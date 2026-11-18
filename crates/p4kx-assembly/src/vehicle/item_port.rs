@@ -39,7 +39,7 @@ impl VehicleItemType {
 pub struct VehicleItemPort {
     pub(crate) min_size: Option<u32>,
     pub(crate) max_size: Option<u32>,
-    pub(crate) flags: String,
+    pub(crate) flags: Option<String>,
     pub(crate) id: Option<String>,
     pub(crate) display_name: Option<String>,
     pub(crate) port_tags: String,
@@ -104,13 +104,13 @@ impl VehicleItemPort {
     /// Returns the flags as stored, e.g. `invisible $uneditable`.
     #[must_use]
     pub fn flags(&self) -> &str {
-        &self.flags
+        self.flags.as_deref().unwrap_or_default()
     }
 
     /// Returns whether the flags contain `flag`, ignoring ASCII case and a leading `$`.
     #[must_use]
     pub fn has_flag(&self, flag: &str) -> bool {
-        flags_contain(&self.flags, flag)
+        flags_contain(self.flags(), flag)
     }
 
     /// Returns [`PortVisibility::Invisible`] when the port carries the flag `invisible`.

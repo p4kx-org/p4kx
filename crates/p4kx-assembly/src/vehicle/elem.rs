@@ -4,7 +4,7 @@
 use std::sync::Arc;
 
 use crate::loadout_xml::{MissingAttribute, Node, Scope};
-use crate::{LoadoutPath, VehicleAttributeEvidence};
+use crate::{LoadoutPath, VehicleAggregateEvidence, VehicleAttributeEvidence, VehicleXmlSite};
 
 /// A Modification of the base implementation: its selected patch and Elem overrides.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -24,10 +24,14 @@ pub(super) fn find_modification(
     vehicle: Node<'_, '_>,
     scope: &Scope<'_, '_>,
     requested: &str,
+    mut aggregate: Option<&mut VehicleAggregateEvidence>,
 ) -> Result<Option<Modification>, String> {
-    let Some((node, authored_name)) = select_modification(vehicle, requested) else {
+    let Some((node, authored_name)) =
+        select_modification(vehicle, scope, requested, &mut aggregate)
+    else {
         return Ok(None);
     };
+    observe_attribute(&mut aggregate, scope, node, "patchFile");
     let patch = match node.attribute_ascii("patchFile") {
         Some((name, value)) if !value.trim().is_empty() => Some(ModificationPatch {
             path: scope
@@ -39,82 +43,146 @@ pub(super) fn find_modification(
         }),
         _ => None,
     };
-    let mut elems = Vec::new();
-    for node in named_children(node, "Elems").flat_map(|node| named_children(node, "Elem")) {
-        let Some((_, id_ref)) = node
-            .attribute_ascii("idRef")
-            .filter(|(_, id)| !id.is_empty())
-        else {
-            continue;
-        };
-        let Some((_, name)) = node.attribute_ascii("name") else {
-            continue;
-        };
-        let value = node.attribute_ascii("value");
-        let port_name = match value {
-            Some((attribute, _)) if name.eq_ignore_ascii_case("name") => {
-                scope.port_name(node, attribute)?
-            }
-            _ => None,
-        };
-        elems.push(ElemOverride {
-            id_ref: id_ref.to_owned(),
-            name: name.to_owned(),
-            value: value.map_or("", |(_, value)| value).to_owned(),
-            port_name,
-            evidence: assignment_evidence(node, scope, name),
-            light_bone: value
-                .filter(|_| name.eq_ignore_ascii_case("bone"))
-                .and_then(|(attribute, _)| scope.attribute_ascii_position(node, attribute)),
-        });
-    }
+    let modification = scope.vehicle_site(node, authored_name, MissingAttribute::Omit);
+    let elems = read_elems(node, scope, modification.as_ref(), &mut aggregate)?;
     Ok(Some(Modification { patch, elems }))
+}
+
+fn read_elems(
+    node: Node<'_, '_>,
+    scope: &Scope<'_, '_>,
+    modification: Option<&VehicleXmlSite>,
+    aggregate: &mut Option<&mut VehicleAggregateEvidence>,
+) -> Result<Vec<ElemOverride>, String> {
+    let mut elems = Vec::new();
+    observe_element(aggregate, scope, node, "$children");
+    for group in node.children() {
+        observe_element(aggregate, scope, group, "$name");
+        if !group.name().eq_ignore_ascii_case("Elems") {
+            continue;
+        }
+        observe_element(aggregate, scope, group, "$children");
+        for node in group.children() {
+            observe_element(aggregate, scope, node, "$name");
+            if !node.name().eq_ignore_ascii_case("Elem") {
+                continue;
+            }
+            observe_attribute(aggregate, scope, node, "idRef");
+            let Some((_, id_ref)) = node
+                .attribute_ascii("idRef")
+                .filter(|(_, id)| !id.is_empty())
+            else {
+                continue;
+            };
+            observe_attribute(aggregate, scope, node, "name");
+            let Some((_, name)) = node.attribute_ascii("name") else {
+                continue;
+            };
+            let value = node.attribute_ascii("value");
+            let port_name = match value {
+                Some((attribute, _)) if name.eq_ignore_ascii_case("name") => {
+                    scope.port_name(node, attribute)?
+                }
+                _ => None,
+            };
+            elems.push(ElemOverride {
+                id_ref: id_ref.to_owned(),
+                name: name.to_owned(),
+                value: value.map_or("", |(_, value)| value).to_owned(),
+                port_name,
+                evidence: assignment_evidence(node, scope, name, modification),
+                light_bone: value
+                    .filter(|_| name.eq_ignore_ascii_case("bone"))
+                    .and_then(|(attribute, _)| scope.attribute_ascii_position(node, attribute)),
+            });
+        }
+    }
+    Ok(elems)
 }
 
 fn assignment_evidence(
     node: Node<'_, '_>,
     scope: &Scope<'_, '_>,
     name: &str,
+    modification: Option<&VehicleXmlSite>,
 ) -> Option<Arc<VehicleAttributeEvidence>> {
-    if !name.eq_ignore_ascii_case("flags") && !name.eq_ignore_ascii_case("id") {
+    let visibility = ["flags", "id"]
+        .into_iter()
+        .any(|field| name.eq_ignore_ascii_case(field));
+    let totals = scope.observes_vehicle_totals()
+        && ["mass", "damageMax", "skipPart"]
+            .into_iter()
+            .any(|field| name.eq_ignore_ascii_case(field));
+    if !visibility && !totals {
         return None;
     }
     let value = scope.vehicle_site(node, "value", MissingAttribute::Element)?;
     let selectors = ["name", "idRef"]
         .into_iter()
         .filter_map(|name| scope.vehicle_site(node, name, MissingAttribute::Omit))
+        .chain(modification.cloned())
         .collect();
     Some(Arc::new(VehicleAttributeEvidence::new(value, selectors)))
 }
 
 fn select_modification<'document, 'input>(
     vehicle: Node<'document, 'input>,
+    scope: &Scope<'_, '_>,
     requested: &str,
+    aggregate: &mut Option<&mut VehicleAggregateEvidence>,
 ) -> Option<(Node<'document, 'input>, &'document str)> {
     let mut fallback = None;
-    for candidate in named_children(vehicle, "Modifications")
-        .flat_map(|group| named_children(group, "Modification"))
-    {
-        let Some((name, value)) = candidate.attribute_ascii("name") else {
+    observe_element(aggregate, scope, vehicle, "$children");
+    for group in vehicle.children() {
+        observe_element(aggregate, scope, group, "$name");
+        if !group.name().eq_ignore_ascii_case("Modifications") {
             continue;
-        };
-        if value == requested {
-            return Some((candidate, name));
         }
-        if fallback.is_none() && value.eq_ignore_ascii_case(requested) {
-            fallback = Some((candidate, name));
+        observe_element(aggregate, scope, group, "$children");
+        for candidate in group.children() {
+            observe_element(aggregate, scope, candidate, "$name");
+            if !candidate.name().eq_ignore_ascii_case("Modification") {
+                continue;
+            }
+            observe_attribute(aggregate, scope, candidate, "name");
+            let Some((name, value)) = candidate.attribute_ascii("name") else {
+                continue;
+            };
+            if value == requested {
+                return Some((candidate, name));
+            }
+            if fallback.is_none() && value.eq_ignore_ascii_case(requested) {
+                fallback = Some((candidate, name));
+            }
         }
     }
     fallback
 }
 
-fn named_children<'document, 'input>(
-    node: Node<'document, 'input>,
+fn observe_element(
+    aggregate: &mut Option<&mut VehicleAggregateEvidence>,
+    scope: &Scope<'_, '_>,
+    node: Node<'_, '_>,
+    field: &str,
+) {
+    if let Some(aggregate) = aggregate {
+        aggregate.selection(
+            scope
+                .vehicle_element_site(node)
+                .map(|site| site.with_field(field)),
+        );
+    }
+}
+
+fn observe_attribute(
+    aggregate: &mut Option<&mut VehicleAggregateEvidence>,
+    scope: &Scope<'_, '_>,
+    node: Node<'_, '_>,
     name: &str,
-) -> impl Iterator<Item = Node<'document, 'input>> {
-    node.children()
-        .into_iter()
-        .filter(move |child| child.name().eq_ignore_ascii_case(name))
+) {
+    if let Some(aggregate) = aggregate {
+        aggregate.selection(scope.vehicle_site(node, name, MissingAttribute::Element));
+    }
 }
 
 /// One `Elem` of a Modification: the attribute `name` of every element with the `id` `id_ref`

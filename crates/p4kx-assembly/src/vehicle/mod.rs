@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The vehicle implementation of a ship: the XML file its `VehicleComponentParams` name, with the
-//! Modification the Entity selects applied.
+//! Vehicle implementations with the Entity's selected Modification applied.
 
+mod aggregate_evidence;
 mod elem;
 mod file_read;
 mod gear;
@@ -26,6 +26,7 @@ use crate::markup::AttributeOrigins;
 use crate::merge::port_key;
 use crate::{LoadoutError, LoadoutFiles};
 
+pub use aggregate_evidence::{VehicleAggregateEvidence, VehicleAggregateIssue};
 pub use elem::ElemOverride;
 pub(crate) use gear::gears;
 pub(crate) use item_port::flags_contain;
@@ -35,6 +36,7 @@ pub(crate) use locate::{load, load_observed};
 pub use origin::ValueOrigin;
 pub use patch::ModificationReport;
 pub use totals::{OriginTally, PartThreshold, PartialValue, UnreadableValue, VehicleTotals};
+pub use totals::{VehicleTotalFieldPresence, VehicleTotalFieldUse, VehicleTotalMetric};
 pub use xml_evidence::{VehicleAttributeEvidence, VehicleXmlSite};
 
 /// Whether a port shows its item: the vehicle implementation's part of that name decides, else
@@ -303,30 +305,6 @@ impl VehicleImplementation {
             .iter()
             .rev()
             .find(|elem| elem.id_ref == id && elem.name.eq_ignore_ascii_case(attribute))
-    }
-
-    /// Returns the original archive input supplying the effective declaration.
-    #[must_use]
-    pub const fn declaration_origin(
-        &self,
-        origin: ValueOrigin,
-    ) -> Option<&p4kx_extraction::EntryOrigin> {
-        match origin {
-            ValueOrigin::Base | ValueOrigin::Elem => self.declarations.base.as_ref(),
-            ValueOrigin::Patch => self.declarations.patch.as_ref(),
-        }
-    }
-
-    /// Returns the path of the file a value with `origin` was read from: the implementation file
-    /// for [`ValueOrigin::Base`] and [`ValueOrigin::Elem`], whose `Elem` it holds, and the patch
-    /// file for [`ValueOrigin::Patch`]. `None` when the origin is `Patch` and no patch file was
-    /// applied.
-    #[must_use]
-    pub fn source_path(&self, origin: ValueOrigin) -> Option<&str> {
-        match origin {
-            ValueOrigin::Patch => self.patch_path(),
-            ValueOrigin::Base | ValueOrigin::Elem => Some(self.path()),
-        }
     }
 
     /// Returns the `name` of the `Vehicle` element.

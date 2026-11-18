@@ -3,11 +3,12 @@
 
 use std::sync::Arc;
 
-use crate::{ValueOrigin, VehicleAttributeEvidence};
+use crate::{ValueOrigin, VehicleAttributeEvidence, VehicleXmlSite};
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct AttributeOrigins {
     entries: Vec<AttributeOrigin>,
+    element: Option<Arc<VehicleXmlSite>>,
 }
 
 #[derive(Debug, Clone)]
@@ -31,6 +32,14 @@ impl PartialEq for AttributeOrigins {
 impl Eq for AttributeOrigins {}
 
 impl AttributeOrigins {
+    pub(crate) fn set_element(&mut self, site: Option<VehicleXmlSite>) {
+        self.element = site.map(Arc::new);
+    }
+
+    pub(crate) fn element(&self) -> Option<&VehicleXmlSite> {
+        self.element.as_deref()
+    }
+
     fn classification(&self) -> impl Iterator<Item = (&str, ValueOrigin)> {
         self.entries
             .iter()

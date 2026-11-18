@@ -98,6 +98,7 @@ fn one_patch_under_two_context_budgets_does_not_claim_conflicting_intrinsic_resu
             bytes,
             &mut budget,
             resolver.observation.as_deref(),
+            None,
         );
         assert_eq!(
             result.is_ok(),
@@ -121,3 +122,6 @@ fn one_patch_under_two_context_budgets_does_not_claim_conflicting_intrinsic_resu
     drop(seen);
     Ok(())
 }
+
+#[path = "totals_field_tests.rs"]
+mod vehicle_total_fields;

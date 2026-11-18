@@ -7,10 +7,12 @@ use p4kx_cryxml::SourceAttributePosition;
 
 #[path = "markup_origins.rs"]
 mod origins;
+#[path = "markup_vehicle_sources.rs"]
+mod vehicle_sources;
 
 pub(crate) use origins::AttributeOrigins;
 
-use crate::loadout_xml::{MissingAttribute, Node, Scope};
+use crate::loadout_xml::{Node, Scope};
 use crate::{ValueOrigin, VehicleAttributeEvidence};
 
 /// The deepest element nesting that is read.
@@ -325,7 +327,7 @@ fn from_node(
     } else {
         None
     };
-    let origins = original_sites(node, scope, &attributes);
+    let origins = vehicle_sources::original_sites(node, scope, &attributes);
     Ok(Element {
         port_name,
         light_bone,
@@ -334,43 +336,4 @@ fn from_node(
         children,
         origins,
     })
-}
-
-fn original_sites(
-    node: Node<'_, '_>,
-    scope: &Scope<'_, '_>,
-    attributes: &[(String, String)],
-) -> AttributeOrigins {
-    let mut origins = AttributeOrigins::default();
-    for (name, missing) in [
-        ("id", MissingAttribute::Omit),
-        (
-            "flags",
-            if node.name().eq_ignore_ascii_case("ItemPort") {
-                MissingAttribute::Element
-            } else {
-                MissingAttribute::Omit
-            },
-        ),
-    ] {
-        if let Some(site) = scope.vehicle_site(node, name, missing) {
-            origins.assign(
-                name,
-                ValueOrigin::Base,
-                Some(Arc::new(VehicleAttributeEvidence::new(site, Vec::new()))),
-            );
-            for (ordinal, (raw_name, _)) in attributes
-                .iter()
-                .enumerate()
-                .filter(|(_, (raw_name, _))| raw_name.eq_ignore_ascii_case(name))
-                .skip(1)
-            {
-                let proof = scope
-                    .vehicle_site_at(node, ordinal, raw_name)
-                    .map(|site| Arc::new(VehicleAttributeEvidence::new(site, Vec::new())));
-                origins.retain_donor(raw_name, ordinal, proof);
-            }
-        }
-    }
-    origins
 }

@@ -7,6 +7,7 @@ use p4kx_cryxml::{SourceAttributePosition, SourceElementPosition};
 use p4kx_extraction::SourceLocation;
 
 use super::{Node, Owner, Scope};
+use crate::resolver_observation::Observation;
 use crate::{LoadoutFileObservation, LoadoutXmlDecoding, VehicleXmlSite};
 
 #[derive(Clone, Copy)]
@@ -75,6 +76,25 @@ impl Scope<'_, '_> {
         }
     }
 
+    fn original_element_position(&self, node: Node<'_, '_>) -> Option<SourceElementPosition> {
+        let index = self.original_node_index(node)?;
+        Some(match node {
+            Node::Cry(_) => SourceElementPosition::CryXml(index),
+            Node::Text(node) => {
+                let range = node.range();
+                SourceElementPosition::Text(
+                    range.start + self.text_prefix..range.end + self.text_prefix,
+                )
+            }
+        })
+    }
+
+    pub(crate) fn vehicle_element_site(&self, node: Node<'_, '_>) -> Option<VehicleXmlSite> {
+        let source = self.vehicle_source()?;
+        let position = self.original_element_position(node)?;
+        Some(self.vehicle_site_at_location(source, SourceLocation::xml_element(&position, "$node")))
+    }
+
     pub(crate) fn vehicle_site(
         &self,
         node: Node<'_, '_>,
@@ -82,20 +102,11 @@ impl Scope<'_, '_> {
         missing: MissingAttribute,
     ) -> Option<VehicleXmlSite> {
         let source = self.vehicle_source()?;
-        let index = self.original_node_index(node)?;
+        let element = self.original_element_position(node)?;
         let attribute = self.original_attribute(node, |actual| actual.eq_ignore_ascii_case(name));
         let location = match attribute {
             Some(attribute) => SourceLocation::xml_attribute(&attribute.position, attribute.name),
             None if matches!(missing, MissingAttribute::Element) => {
-                let element = match node {
-                    Node::Cry(_) => SourceElementPosition::CryXml(index),
-                    Node::Text(node) => {
-                        let range = node.range();
-                        SourceElementPosition::Text(
-                            range.start + self.text_prefix..range.end + self.text_prefix,
-                        )
-                    }
-                };
                 SourceLocation::xml_element(&element, name)
             }
             None => return None,
@@ -117,10 +128,16 @@ impl Scope<'_, '_> {
         Some(self.vehicle_site_at_location(source, location))
     }
 
+    pub(crate) fn observes_vehicle_totals(&self) -> bool {
+        self.observation
+            .is_some_and(Observation::observes_vehicle_totals)
+    }
+
     fn vehicle_source(&self) -> Option<&LoadoutFileObservation> {
         self.source.filter(|_| {
-            self.observation
-                .is_some_and(crate::resolver_observation::Observation::observes_vehicle_visibility)
+            self.observation.is_some_and(|observer| {
+                observer.observes_vehicle_visibility() || observer.observes_vehicle_totals()
+            })
         })
     }
 

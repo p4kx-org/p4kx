@@ -127,3 +127,23 @@ their widths, bits and units. Additional original fields remain available.
 `playabilityInputs` carries the selected component ordinal, the authored CrewManifest reference
 and its target header state. Interpreted playability, XML totals, cargo and variant results
 depend on the respective readers and their sources.
+
+## Vehicle totals and their XML sources
+
+An observer can request original vehicle evidence from the parser that supplies the totals. It
+retains the element names and child lists used to select Parts, including the decision to skip a
+subtree. The vehicle reader captures the selected Modification, its patch and applied Elem
+overrides. The cache preserves the exact Modification spelling because that spelling can select
+a different declaration in the same file.
+
+The totals reader reports each metric's consulted fields in calculation order. Presence is
+independent of original-coordinate availability. The hull calculation distinguishes an absent
+ItemPort, absent flags and an effective empty flags value. Source coordinates use original text
+ranges or CryXml indices. Repaired binary XML retains the file operation and leaves the original
+coordinate unavailable. Read and application failures have distinct states. File and Elem
+application roll back their staged evidence along with the tree on failure. Shared sites and first-use
+deduplication keep the original operation identity when several decisions use the same field.
+
+For every vehicle use, Assembly supplies the current physical Entity and its Vehicle request.
+The Catalog must bind that request, the observed file operation and the metric's contributing
+values to establish a complete source set for a published total.

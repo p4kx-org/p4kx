@@ -42,6 +42,7 @@ struct Selection<'a> {
     selected: Option<&'a Modification>,
     class_request: &'a LoadoutPath,
     caller: &'a LoadoutRequest,
+    aggregate: Option<super::VehicleAggregateEvidence>,
 }
 
 pub(crate) fn load(
@@ -80,23 +81,18 @@ pub(crate) fn load_observed(
         || Cow::Owned(LoadoutPath::unbound(class_name)),
         Cow::Borrowed,
     );
-    let stem = paths::file_stem(definition);
-    let candidates = definition_candidates(
+    let (path, bytes) = read_definition(
+        files,
         class_name,
         definition,
         class_request.as_ref(),
-        stem,
+        caller,
         observation,
+        trace,
     )?;
-    let shown = if definition.is_empty() {
-        class_request.as_ref()
-    } else {
-        definition
-    };
-    let (path, bytes) = read_definition(files, &candidates, shown, caller, observation, trace)?;
     let physical = bytes.entry_origin();
     let mut budget = Budget::new(bytes.len());
-    let (mut root, selected_element) =
+    let (mut root, selected_element, aggregate) =
         file_read::base(&path, bytes, &mut budget, modification, observation)?;
     let mut issues = Vec::new();
 
@@ -104,25 +100,29 @@ pub(crate) fn load_observed(
     let modified = if selected.is_some() {
         let selection = Selection {
             path: &path,
-            stem,
+            stem: paths::file_stem(definition),
             class_name,
             definition,
             modification,
             selected: selected_element.as_ref(),
             class_request: class_request.as_ref(),
             caller,
+            aggregate,
         };
         modification::apply(
             files,
             &mut root,
-            &selection,
+            selection,
             &mut budget,
             &mut issues,
             observation,
             trace,
         )?
     } else {
-        AppliedModification::default()
+        AppliedModification {
+            aggregate,
+            ..AppliedModification::default()
+        }
     };
     Ok(project(path, selected, &root, modified, issues, physical))
 }
@@ -135,10 +135,12 @@ fn project(
     issues: Vec<LoadoutError>,
     physical: Option<p4kx_extraction::EntryOrigin>,
 ) -> VehicleImplementation {
-    let parts = super::read::parts(root);
+    let mut aggregate = modified.aggregate;
+    let parts = super::read::parts(root, aggregate.as_mut());
     VehicleImplementation {
         structure: super::structure::digest(root),
         declarations: super::origin::DeclarationOrigins {
+            aggregate,
             base: physical,
             patch: modified.patch_origin,
         },
@@ -192,16 +194,29 @@ fn definition_candidates(
 
 fn read_definition(
     files: &dyn LoadoutFiles,
-    candidates: &[LoadoutPath],
-    shown: &LoadoutPath,
+    class_name: &str,
+    definition: &LoadoutPath,
+    class_request: &LoadoutPath,
     caller: &LoadoutRequest,
     observation: Option<&Observation<'_>>,
     trace: &mut FileTrace,
 ) -> Result<(String, Document), LoadoutError> {
+    let candidates = definition_candidates(
+        class_name,
+        definition,
+        class_request,
+        paths::file_stem(definition),
+        observation,
+    )?;
+    let shown = if definition.is_empty() {
+        class_request
+    } else {
+        definition
+    };
     let first = trace.position();
     match file_read::first(
         files,
-        candidates,
+        &candidates,
         caller,
         LoadoutDocumentKind::VehicleImplementation,
         observation,

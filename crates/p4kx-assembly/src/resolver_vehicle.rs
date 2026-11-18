@@ -1,15 +1,22 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use crate::LoadoutTargetGuid;
 use std::collections::hash_map::Entry;
 use std::sync::Arc;
 
 use crate::loadout_file_cache::CachedDocument;
-
 use crate::resolver::VehicleResult;
 use crate::spec::EntitySpec;
-use crate::{LandingGear, LoadoutError, LoadoutRequest, LoadoutResolver, vehicle};
+use crate::{
+    LandingGear, LoadoutError, LoadoutRequest, LoadoutResolver, LoadoutTargetGuid, vehicle,
+};
+
+#[derive(PartialEq, Eq, Hash)]
+pub(crate) struct VehicleCacheKey {
+    definition: String,
+    modification: Arc<str>,
+    class_name: String,
+}
 
 impl LoadoutResolver<'_> {
     /// Returns the vehicle implementation `spec` names with its Modification, read once per
@@ -28,12 +35,11 @@ impl LoadoutResolver<'_> {
         if vehicle_spec.definition.is_empty() {
             return None;
         }
-        let key = format!(
-            "{}\0{}\0{}",
-            vehicle_spec.definition.to_ascii_lowercase(),
-            vehicle_spec.modification.to_ascii_lowercase(),
-            class_name.to_ascii_lowercase()
-        );
+        let key = VehicleCacheKey {
+            definition: vehicle_spec.definition.to_ascii_lowercase(),
+            modification: Arc::clone(vehicle_spec.modification.text()),
+            class_name: class_name.to_ascii_lowercase(),
+        };
         let caller = LoadoutRequest::Vehicle {
             definition: vehicle_spec.definition.clone(),
             modification: vehicle_spec.modification.clone(),

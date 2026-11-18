@@ -5,36 +5,59 @@ use std::collections::HashMap;
 
 use p4kx_foundation::read_text_number;
 
-use super::{PartKind, VehicleItemPort, VehicleItemType, VehiclePart};
+use super::{PartKind, VehicleAggregateEvidence, VehicleItemPort, VehicleItemType, VehiclePart};
 use crate::markup::Element;
 use crate::merge::port_key;
 
 /// Reads the parts below the `Parts` element of a `Vehicle` element; parts marked `skipPart`
 /// are left out with everything below them.
-pub(super) fn parts(vehicle: &Element) -> Vec<VehiclePart> {
-    vehicle
-        .children_named("Parts")
-        .flat_map(part_list)
-        .collect()
+pub(super) fn parts(
+    vehicle: &Element,
+    mut aggregate: Option<&mut VehicleAggregateEvidence>,
+) -> Vec<VehiclePart> {
+    if let Some(evidence) = &mut aggregate {
+        evidence.element(vehicle, "$children");
+    }
+    let mut parts = Vec::new();
+    for child in &vehicle.children {
+        if let Some(evidence) = &mut aggregate {
+            evidence.element(child, "$name");
+        }
+        if child.name.eq_ignore_ascii_case("Parts") {
+            parts.extend(part_list(child, &mut aggregate));
+        }
+    }
+    parts
 }
 
-fn part_list(container: &Element) -> Vec<VehiclePart> {
-    container
-        .children
-        .iter()
-        .flat_map(|child| {
-            if child.name.eq_ignore_ascii_case("Part") {
-                part(child).into_iter().collect()
-            } else if child.name.eq_ignore_ascii_case("Parts") {
-                part_list(child)
-            } else {
-                Vec::new()
-            }
-        })
-        .collect()
+fn part_list(
+    container: &Element,
+    aggregate: &mut Option<&mut VehicleAggregateEvidence>,
+) -> Vec<VehiclePart> {
+    if let Some(evidence) = &mut *aggregate {
+        evidence.element(container, "$children");
+    }
+    let mut parts = Vec::new();
+    for child in &container.children {
+        if let Some(evidence) = &mut *aggregate {
+            evidence.element(child, "$name");
+        }
+        if child.name.eq_ignore_ascii_case("Part") {
+            parts.extend(part(child, aggregate));
+        } else if child.name.eq_ignore_ascii_case("Parts") {
+            parts.extend(part_list(child, aggregate));
+        }
+    }
+    parts
 }
 
-fn part(element: &Element) -> Option<VehiclePart> {
+fn part(
+    element: &Element,
+    aggregate: &mut Option<&mut VehicleAggregateEvidence>,
+) -> Option<VehiclePart> {
+    if let Some(evidence) = &mut *aggregate {
+        evidence.field(element, "skipPart");
+    }
     if is_set(element.attribute("skipPart")) {
         return None;
     }
@@ -57,7 +80,7 @@ fn part(element: &Element) -> Option<VehiclePart> {
         } else {
             Vec::new()
         },
-        children: part_list(element),
+        children: part_list(element, aggregate),
     })
 }
 
@@ -77,7 +100,7 @@ fn item_port(element: &Element) -> VehicleItemPort {
     VehicleItemPort {
         min_size: size(element.attribute("minSize")),
         max_size: size(element.attribute("maxSize")),
-        flags: element.attribute("flags").unwrap_or_default().to_owned(),
+        flags: element.attribute("flags").map(str::to_owned),
         id: element.attribute("id").map(str::to_owned),
         display_name: element
             .attribute("display_name")

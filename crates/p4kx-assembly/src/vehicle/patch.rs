@@ -1,7 +1,15 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, HashSet};
+
+#[path = "patch_overlay.rs"]
+mod overlay;
+#[path = "patch_scope.rs"]
+mod scope;
+
+use crate::VehicleAggregateEvidence;
+use scope::PatchScope;
 
 use super::{ElemOverride, ValueOrigin, VehicleAttributeEvidence};
 use crate::markup::{Budget, Element};
@@ -88,18 +96,23 @@ pub(super) fn apply_patch(
     base: &mut Element,
     patch: &Element,
     budget: &mut Budget,
+    aggregate: Option<&mut VehicleAggregateEvidence>,
 ) -> Result<ModificationReport, String> {
+    let mut scope = PatchScope::new(aggregate);
+    scope.element(patch, "$name");
     let mut report = ModificationReport::default();
     let mut replaced = HashSet::new();
     if patch.name.eq_ignore_ascii_case("Vehicle") {
-        replace_children(base, patch, &mut report, &mut replaced, budget)?;
+        replace_children(base, patch, &mut report, &mut replaced, budget, &mut scope)?;
         return Ok(report);
     }
+    scope.element(patch, "$children");
     for child in &patch.children {
+        scope.element(child, "$name");
         if child.name.eq_ignore_ascii_case("Vehicle") {
-            replace_children(base, child, &mut report, &mut replaced, budget)?;
+            replace_children(base, child, &mut report, &mut replaced, budget, &mut scope)?;
         } else {
-            apply_child(base, child, &mut report, &mut replaced, budget)?;
+            apply_child(base, child, &mut report, &mut replaced, budget, &mut scope)?;
         }
     }
     Ok(report)
@@ -115,20 +128,22 @@ fn apply_child(
     report: &mut ModificationReport,
     replaced: &mut HashSet<String>,
     budget: &mut Budget,
+    scope: &mut PatchScope<'_>,
 ) -> Result<(), String> {
+    scope.field(child, "id");
     let Some(id) = id_of(child) else {
         report.wholesale_children = report.wholesale_children.saturating_add(1);
-        return replace_child(base, child, report, replaced, budget);
+        return replace_child(base, child, report, replaced, budget, scope);
     };
-    if merge_by_id(base, id, child, budget)? > 0 {
+    if merge_by_id(base, id, child, budget, scope)? > 0 {
         report.id_children = report.id_children.saturating_add(1);
         return Ok(());
     }
-    let Some(at) = base
-        .children
-        .iter()
-        .position(|existing| existing.name.eq_ignore_ascii_case(&child.name))
-    else {
+    scope.element(base, "$children");
+    let Some(at) = base.children.iter().position(|existing| {
+        scope.element(existing, "$name");
+        existing.name.eq_ignore_ascii_case(&child.name)
+    }) else {
         report.unmatched_ids.push(id.to_owned());
         return Ok(());
     };
@@ -136,12 +151,12 @@ fn apply_child(
     let mut missed = Vec::new();
     if let Some(target) = base.children.get_mut(at) {
         let mut addressed = Vec::new();
-        top_ids(child, &mut addressed);
+        top_ids(child, &mut addressed, scope);
         for part in addressed {
             let Some(part_id) = id_of(part) else {
                 continue;
             };
-            if merge_by_id(target, part_id, part, budget)? > 0 {
+            if merge_by_id(target, part_id, part, budget, scope)? > 0 {
                 matched = matched.saturating_add(1);
             } else {
                 missed.push(part_id.to_owned());
@@ -154,18 +169,20 @@ fn apply_child(
     } else {
         report.replaced_ids.push(id.to_owned());
         report.wholesale_children = report.wholesale_children.saturating_add(1);
-        replace_child(base, child, report, replaced, budget)?;
+        replace_child(base, child, report, replaced, budget, scope)?;
     }
     Ok(())
 }
 
 /// Collects the descendants of `element` that have an `id`, not looking below one that has.
-fn top_ids<'a>(element: &'a Element, found: &mut Vec<&'a Element>) {
+fn top_ids<'a>(element: &'a Element, found: &mut Vec<&'a Element>, scope: &mut PatchScope<'_>) {
+    scope.element(element, "$children");
     for child in &element.children {
+        scope.field(child, "id");
         if id_of(child).is_some() {
             found.push(child);
         } else {
-            top_ids(child, found);
+            top_ids(child, found, scope);
         }
     }
 }
@@ -176,10 +193,13 @@ fn replace_children(
     report: &mut ModificationReport,
     replaced: &mut HashSet<String>,
     budget: &mut Budget,
+    scope: &mut PatchScope<'_>,
 ) -> Result<(), String> {
+    scope.element(source, "$children");
     for child in &source.children {
+        scope.element(child, "$name");
         report.vehicle_children = report.vehicle_children.saturating_add(1);
-        replace_child(base, child, report, replaced, budget)?;
+        replace_child(base, child, report, replaced, budget, scope)?;
     }
     Ok(())
 }
@@ -193,16 +213,21 @@ fn replace_child(
     report: &mut ModificationReport,
     replaced: &mut HashSet<String>,
     budget: &mut Budget,
+    scope: &mut PatchScope<'_>,
 ) -> Result<(), String> {
+    scope.element(child, "$name");
     if child.name.eq_ignore_ascii_case("Modifications") {
         return Ok(());
     }
     budget.charge_copy(child)?;
-    let same = |existing: &Element| existing.name.eq_ignore_ascii_case(&child.name);
+    scope.element(base, "$children");
     let mut added = child.clone();
     added.mark_all(ValueOrigin::Patch);
     if replaced.insert(child.name.to_ascii_lowercase()) {
-        if let Some(at) = base.children.iter().position(same) {
+        if let Some(at) = base.children.iter().position(|existing| {
+            scope.element(existing, "$name");
+            existing.name.eq_ignore_ascii_case(&child.name)
+        }) {
             if let Some(slot) = base.children.get_mut(at) {
                 *slot = added;
             }
@@ -214,83 +239,14 @@ fn replace_child(
         let after = base
             .children
             .iter()
-            .rposition(same)
+            .rposition(|existing| {
+                scope.element(existing, "$name");
+                existing.name.eq_ignore_ascii_case(&child.name)
+            })
             .map_or(base.children.len(), |last| last + 1);
         base.children.insert(after, added);
     }
     Ok(())
-}
-
-/// Returns the children `new` as the replacement of the children `old`: each is paired with the
-/// first unused old child of the same element name and `name` attribute, and takes over the
-/// attributes of its partner that it does not state itself, such as an `id` a Modification
-/// addresses; old children without a partner are dropped.
-fn overlay_children(
-    old: Vec<Element>,
-    new: &[Element],
-    budget: &mut Budget,
-) -> Result<Vec<Element>, String> {
-    let mut partners: HashMap<(String, String), VecDeque<Element>> = HashMap::new();
-    for element in old {
-        partners
-            .entry(pair_key(&element))
-            .or_default()
-            .push_back(element);
-    }
-    let mut children = Vec::with_capacity(new.len());
-    for source in new {
-        budget.charge_shallow(source)?;
-        let partner = partners
-            .get_mut(&pair_key(source))
-            .and_then(VecDeque::pop_front);
-        let mut element = Element {
-            name: source.name.clone(),
-            port_name: source.port_name.clone(),
-            light_bone: source.light_bone.clone(),
-            attributes: source.attributes.clone(),
-            children: Vec::new(),
-            origins: source.origins.clone(),
-        };
-        for (name, _) in &source.attributes {
-            element.mark(name, ValueOrigin::Patch);
-        }
-        let old_children = match partner {
-            Some(partner) => {
-                for (name, value) in &partner.attributes {
-                    if element.attribute(name).is_none() {
-                        budget.charge_set(element.attributes.len(), name, value)?;
-                        element.set_attribute(
-                            name,
-                            value,
-                            partner.origin_of(name),
-                            partner.origins.evidence(name).cloned(),
-                        );
-                        if name.eq_ignore_ascii_case("name") {
-                            element.port_name.clone_from(&partner.port_name);
-                        }
-                        if name.eq_ignore_ascii_case("bone") {
-                            element.light_bone.clone_from(&partner.light_bone);
-                        }
-                    }
-                }
-                partner.children
-            }
-            None => Vec::new(),
-        };
-        element.children = overlay_children(old_children, &source.children, budget)?;
-        children.push(element);
-    }
-    Ok(children)
-}
-
-fn pair_key(element: &Element) -> (String, String) {
-    (
-        element.name.to_ascii_lowercase(),
-        element
-            .attribute("name")
-            .unwrap_or_default()
-            .to_ascii_lowercase(),
-    )
 }
 
 fn merge_by_id(
@@ -298,18 +254,29 @@ fn merge_by_id(
     id: &str,
     patch: &Element,
     budget: &mut Budget,
+    scope: &mut PatchScope<'_>,
 ) -> Result<usize, String> {
+    scope.element(element, "$children");
     let mut matched = 0_usize;
     for child in &mut element.children {
+        scope.field(child, "id");
         if id_of(child) == Some(id) {
             matched = matched.saturating_add(1);
+            scope.element(patch, "$attributes");
+            let target = child.origins.evidence("id").cloned();
+            let selectors = [patch.origins.evidence("id"), target.as_ref()];
             for (ordinal, (name, value)) in patch.attributes.iter().enumerate() {
                 budget.charge_set(child.attributes.len(), name, value)?;
                 child.set_attribute(
                     name,
                     value,
                     ValueOrigin::Patch,
-                    patch.origins.donor_evidence(name, ordinal).cloned(),
+                    patch
+                        .origins
+                        .donor_evidence(name, ordinal)
+                        .map(|assignment| {
+                            VehicleAttributeEvidence::with_targets(assignment, &selectors)
+                        }),
                 );
                 if name.eq_ignore_ascii_case("name") {
                     child.port_name.clone_from(&patch.port_name);
@@ -318,10 +285,15 @@ fn merge_by_id(
                     child.light_bone.clone_from(&patch.light_bone);
                 }
             }
+            scope.element(child, "$children");
+            scope.element(patch, "$children");
             let old = std::mem::take(&mut child.children);
-            child.children = overlay_children(old, &patch.children, budget)?;
-        } else if !child.name.eq_ignore_ascii_case("Modifications") {
-            matched = matched.saturating_add(merge_by_id(child, id, patch, budget)?);
+            child.children = overlay::children(old, &patch.children, budget, scope)?;
+        } else {
+            scope.element(child, "$name");
+            if !child.name.eq_ignore_ascii_case("Modifications") {
+                matched = matched.saturating_add(merge_by_id(child, id, patch, budget, scope)?);
+            }
         }
     }
     Ok(matched)
@@ -337,6 +309,7 @@ pub(super) fn apply_elems(
     base: &mut Element,
     elems: &[ElemOverride],
     budget: &mut Budget,
+    aggregate: Option<&mut VehicleAggregateEvidence>,
 ) -> Result<Vec<String>, String> {
     if elems.is_empty() {
         return Ok(Vec::new());
@@ -346,7 +319,8 @@ pub(super) fn apply_elems(
         by_id.entry(elem.id_ref.as_str()).or_default().push(elem);
     }
     let mut seen = HashSet::new();
-    set_elems(base, &by_id, &mut seen, budget)?;
+    let mut scope = PatchScope::new(aggregate);
+    set_elems(base, &by_id, &mut seen, budget, &mut scope)?;
     let mut missed: Vec<String> = by_id
         .keys()
         .filter(|id| !seen.contains(**id))
@@ -361,7 +335,9 @@ fn set_elems<'e>(
     by_id: &HashMap<&'e str, Vec<&ElemOverride>>,
     seen: &mut HashSet<&'e str>,
     budget: &mut Budget,
+    scope: &mut PatchScope<'_>,
 ) -> Result<(), String> {
+    scope.field(element, "id");
     if let Some(id) = id_of(element)
         && let Some((key, elems)) = by_id.get_key_value(id)
     {
@@ -370,7 +346,7 @@ fn set_elems<'e>(
         for elem in elems {
             budget.charge_set(element.attributes.len(), &elem.name, &elem.value)?;
             let evidence = elem.evidence.as_ref().map(|assignment| {
-                VehicleAttributeEvidence::with_target(assignment, target.as_ref())
+                VehicleAttributeEvidence::with_targets(assignment, &[target.as_ref()])
             });
             element.set_attribute(&elem.name, &elem.value, ValueOrigin::Elem, evidence);
             if elem.name.eq_ignore_ascii_case("name") {
@@ -381,9 +357,11 @@ fn set_elems<'e>(
             }
         }
     }
+    scope.element(element, "$children");
     for child in &mut element.children {
+        scope.element(child, "$name");
         if !child.name.eq_ignore_ascii_case("Modifications") {
-            set_elems(child, by_id, seen, budget)?;
+            set_elems(child, by_id, seen, budget, scope)?;
         }
     }
     Ok(())

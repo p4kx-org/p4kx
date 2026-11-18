@@ -16,12 +16,14 @@ use crate::{
     LoadoutDocumentKind, LoadoutError, LoadoutFailurePath, LoadoutFiles, LoadoutPath,
     LoadoutPathOperation,
 };
+use crate::{VehicleAggregateEvidence, VehicleAggregateIssue};
 
 const LISTED: usize = 8;
 
 /// The patch and element overrides retained by one selected Modification.
 #[derive(Default)]
 pub(super) struct AppliedModification {
+    pub(super) aggregate: Option<VehicleAggregateEvidence>,
     pub(super) patch_path: Option<String>,
     pub(super) patch_origin: Option<p4kx_extraction::EntryOrigin>,
     pub(super) report: Option<ModificationReport>,
@@ -32,17 +34,26 @@ pub(super) struct AppliedModification {
 pub(super) fn apply(
     files: &dyn LoadoutFiles,
     root: &mut Element,
-    selection: &Selection<'_>,
+    mut selection: Selection<'_>,
     budget: &mut Budget,
     issues: &mut Vec<LoadoutError>,
     observation: Option<&Observation<'_>>,
     trace: &mut FileTrace,
 ) -> Result<AppliedModification, LoadoutError> {
-    let mut modified = AppliedModification::default();
+    let mut modified = AppliedModification {
+        aggregate: selection.aggregate.take(),
+        ..AppliedModification::default()
+    };
     let authored = selection
         .selected
         .and_then(|selected| selected.patch.as_ref());
-    let (candidates, explicit) = patch_candidates(selection, authored, issues, observation)?;
+    let (candidates, explicit) = patch_candidates(
+        &selection,
+        authored,
+        issues,
+        observation,
+        modified.aggregate.as_mut(),
+    )?;
 
     let first = trace.position();
     let read = file_read::first(
@@ -58,29 +69,19 @@ pub(super) fn apply(
         Ok(None) => true,
         Err(_) => false,
     }) {
+        if let Some(aggregate) = &mut modified.aggregate {
+            aggregate.issue(VehicleAggregateIssue::ExplicitPatchMissing);
+        }
         issues.push(super::missing(LoadoutFailurePath::from_attempts(
             wanted,
             trace.attempts(first, 1),
         )));
     }
-    match read {
-        Ok(Some((path, bytes))) => {
-            let physical = bytes.entry_origin();
-            budget.grow(bytes.len());
-            if let Some(done) = apply_patch(root, bytes, &path, budget, issues, observation)? {
-                modified.patch_path = Some(path);
-                modified.patch_origin = physical;
-                modified.report = Some(done);
-            }
-        }
-        Ok(None) => {}
-        Err(LoadoutError::ObservationStopped) => return Err(LoadoutError::ObservationStopped),
-        Err(error) => issues.push(error),
-    }
+    apply_read_patch(root, read, budget, issues, observation, &mut modified)?;
     apply_elements(
         root,
         selection.selected,
-        selection,
+        &selection,
         budget,
         issues,
         observation,
@@ -89,12 +90,51 @@ pub(super) fn apply(
     Ok(modified)
 }
 
+fn apply_read_patch(
+    root: &mut Element,
+    read: Result<Option<(String, Document)>, LoadoutError>,
+    budget: &mut Budget,
+    issues: &mut Vec<LoadoutError>,
+    observation: Option<&Observation<'_>>,
+    modified: &mut AppliedModification,
+) -> Result<(), LoadoutError> {
+    match read {
+        Ok(Some((path, bytes))) => {
+            let physical = bytes.entry_origin();
+            budget.grow(bytes.len());
+            if let Some(done) = apply_patch(
+                root,
+                bytes,
+                &path,
+                budget,
+                issues,
+                observation,
+                modified.aggregate.as_mut(),
+            )? {
+                modified.patch_path = Some(path);
+                modified.patch_origin = physical;
+                modified.report = Some(done);
+            }
+        }
+        Ok(None) => {}
+        Err(LoadoutError::ObservationStopped) => return Err(LoadoutError::ObservationStopped),
+        Err(error) => {
+            if let Some(aggregate) = &mut modified.aggregate {
+                aggregate.issue(VehicleAggregateIssue::PatchReadFailed);
+            }
+            issues.push(error);
+        }
+    }
+    Ok(())
+}
+
 /// Returns the candidates for the patch file, and the one the Modification names itself.
 fn patch_candidates(
     selection: &Selection<'_>,
     authored: Option<&ModificationPatch>,
     issues: &mut Vec<LoadoutError>,
     observation: Option<&Observation<'_>>,
+    aggregate: Option<&mut VehicleAggregateEvidence>,
 ) -> Result<(Vec<LoadoutPath>, Option<LoadoutPath>), LoadoutError> {
     let mut candidates = Vec::new();
     let mut explicit = None;
@@ -109,6 +149,9 @@ fn patch_candidates(
             candidates.push(path.clone());
             explicit = Some(path);
         } else {
+            if let Some(aggregate) = aggregate {
+                aggregate.issue(VehicleAggregateIssue::PatchPathRejected);
+            }
             issues.push(super::issue(
                 &authored.path,
                 format!("the patch file is not below {DIRECTORY}"),
@@ -145,7 +188,12 @@ fn guarded<T>(
     root: &mut Element,
     budget: &mut Budget,
     observation: Option<&Observation<'_>>,
-    run: impl FnOnce(&mut Element, &mut Budget) -> Result<T, String>,
+    mut aggregate: Option<&mut VehicleAggregateEvidence>,
+    run: impl FnOnce(
+        &mut Element,
+        &mut Budget,
+        Option<&mut VehicleAggregateEvidence>,
+    ) -> Result<T, String>,
 ) -> Result<T, String> {
     if let Err(error) = budget.check_copy(root) {
         resolver_observation::notify(observation, LoadoutReadEvent::InventoryIncomplete)
@@ -153,7 +201,14 @@ fn guarded<T>(
         return Err(error);
     }
     let backup = root.clone();
-    let result = run(&mut *root, budget).inspect_err(|_| *root = backup);
+    let checkpoint = aggregate.as_ref().map(|scope| scope.checkpoint());
+    let result = run(&mut *root, budget, aggregate.as_deref_mut());
+    if result.is_err() {
+        *root = backup;
+        if let (Some(aggregate), Some(checkpoint)) = (aggregate, checkpoint) {
+            aggregate.restore(checkpoint);
+        }
+    }
     if result.is_err() && budget.exhausted() {
         resolver_observation::notify(observation, LoadoutReadEvent::InventoryIncomplete)
             .map_err(|error| error.to_string())?;
@@ -200,10 +255,15 @@ fn apply_patch(
     budget: &mut Budget,
     issues: &mut Vec<LoadoutError>,
     observation: Option<&Observation<'_>>,
+    mut aggregate: Option<&mut VehicleAggregateEvidence>,
 ) -> Result<Option<ModificationReport>, LoadoutError> {
-    match guarded(root, budget, observation, |root, budget| {
-        file_read::patch(root, bytes, budget, observation)
-    }) {
+    match guarded(
+        root,
+        budget,
+        observation,
+        aggregate.as_deref_mut(),
+        |root, budget, aggregate| file_read::patch(root, bytes, budget, observation, aggregate),
+    ) {
         Ok(done) => {
             report_issues(path, &done, issues);
             Ok(Some(done))
@@ -212,6 +272,9 @@ fn apply_patch(
             Err(LoadoutError::ObservationStopped)
         }
         Err(reason) => {
+            if let Some(aggregate) = aggregate {
+                aggregate.issue(VehicleAggregateIssue::PatchApplicationFailed);
+            }
             issues.push(super::issue(path, reason));
             Ok(None)
         }
@@ -227,9 +290,13 @@ fn apply_elements(
     modified: &mut AppliedModification,
 ) -> Result<(), LoadoutError> {
     match found {
-        Some(found) => match guarded(root, budget, observation, |root, budget| {
-            patch::apply_elems(root, &found.elems, budget)
-        }) {
+        Some(found) => match guarded(
+            root,
+            budget,
+            observation,
+            modified.aggregate.as_mut(),
+            |root, budget, aggregate| patch::apply_elems(root, &found.elems, budget, aggregate),
+        ) {
             Ok(missed) => {
                 modified.elems = found
                     .elems
@@ -245,13 +312,27 @@ fn apply_elements(
             Err(_) if observation.is_some_and(Observation::stopped) => {
                 return Err(LoadoutError::ObservationStopped);
             }
-            Err(error) => issues.push(super::issue(selection.path, error)),
+            Err(error) => {
+                if let Some(aggregate) = &mut modified.aggregate {
+                    aggregate.issue(VehicleAggregateIssue::ElementOverridesFailed);
+                }
+                issues.push(super::issue(selection.path, error));
+            }
         },
-        None if modified.patch_path.is_none() => issues.push(super::issue(
-            selection.path,
-            format!("it names no Modification {}", selection.modification),
-        )),
+        None if modified.patch_path.is_none() => {
+            if let Some(aggregate) = &mut modified.aggregate {
+                aggregate.issue(VehicleAggregateIssue::ModificationUnavailable);
+            }
+            issues.push(super::issue(
+                selection.path,
+                format!("it names no Modification {}", selection.modification),
+            ));
+        }
         None => {}
     }
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "aggregate_rollback_tests.rs"]
+mod aggregate_rollback_tests;

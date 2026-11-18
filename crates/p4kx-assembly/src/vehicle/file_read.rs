@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use super::VehicleAggregateEvidence;
 use super::elem::{self, Modification};
 use super::locate;
 use super::patch::{self, ModificationReport};
@@ -17,7 +18,17 @@ pub(super) fn base(
     budget: &mut Budget,
     requested: &str,
     observation: Option<&Observation<'_>>,
-) -> Result<(Element, Option<Modification>), LoadoutError> {
+) -> Result<
+    (
+        Element,
+        Option<Modification>,
+        Option<VehicleAggregateEvidence>,
+    ),
+    LoadoutError,
+> {
+    let mut aggregate = observation
+        .is_some_and(Observation::observes_vehicle_totals)
+        .then(VehicleAggregateEvidence::new);
     let result = markup::parse_observed(&document, budget, observation, |root, original, scope| {
         if !root.name.eq_ignore_ascii_case("Vehicle") {
             return Err(format!("its root element is {}, not Vehicle", root.name));
@@ -25,9 +36,12 @@ pub(super) fn base(
         let selected = if requested.is_empty() {
             None
         } else {
-            elem::find_modification(original, scope, requested)?
+            elem::find_modification(original, scope, requested, aggregate.as_mut())?
         };
-        Ok((root, selected))
+        if let Some(aggregate) = &mut aggregate {
+            aggregate.element(&root, "$name");
+        }
+        Ok((root, selected, aggregate))
     });
     crate::loadout_file_events::parsed(
         document,
@@ -43,6 +57,7 @@ pub(super) fn patch(
     source: Document,
     budget: &mut Budget,
     observation: Option<&Observation<'_>>,
+    aggregate: Option<&mut VehicleAggregateEvidence>,
 ) -> Result<ModificationReport, String> {
     let document = match markup::parse_observed(&source, budget, observation, |root, _, _| Ok(root))
     {
@@ -60,7 +75,7 @@ pub(super) fn patch(
     )
     .map_err(|error| error.to_string())?;
     let document = document?;
-    let done = patch::apply_patch(root, &document, budget)?;
+    let done = patch::apply_patch(root, &document, budget, aggregate)?;
     if markup::depth(root) > MAX_ELEMENT_DEPTH {
         return Err(markup::too_deep());
     }

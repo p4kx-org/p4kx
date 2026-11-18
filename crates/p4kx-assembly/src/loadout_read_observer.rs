@@ -36,6 +36,11 @@ pub trait LoadoutReadObserver: Send + Sync {
         false
     }
 
+    /// Enables exact XML evidence for vehicle mass and hull fields.
+    fn observes_vehicle_totals(&self) -> bool {
+        false
+    }
+
     /// Captures this Entity's actual vehicle caller, including uses of an existing cache entry.
     fn vehicle_used(
         &self,
