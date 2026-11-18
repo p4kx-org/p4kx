@@ -14,7 +14,7 @@ use crate::schema_fields::every_field_required;
 /// The first physical presentation components and the source prefixes selecting them.
 #[derive(Debug, Serialize, JsonSchema)]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ItemSourceSelection {
+pub struct ItemSourceSelection {
     #[serde(rename = "attachmentComponentOrdinal")]
     attachment: SourcedValue<u32>,
     #[serde(rename = "physicsComponentOrdinal")]
@@ -35,11 +35,21 @@ impl ItemSourceSelection {
         })
     }
 
-    pub(crate) const fn attachment_component_ordinal(&self) -> &SourcedValue<u32> {
+    /// Borrows the first physical attachment component ordinal.
+    #[must_use]
+    pub const fn attachment_component_ordinal(&self) -> &SourcedValue<u32> {
         &self.attachment
     }
 
-    pub(crate) const fn purchasable_component_ordinal(&self) -> &SourcedValue<u32> {
+    /// Borrows the first physical physics component ordinal.
+    #[must_use]
+    pub const fn physics_component_ordinal(&self) -> &SourcedValue<u32> {
+        &self.physics
+    }
+
+    /// Borrows the first physical purchasable component ordinal.
+    #[must_use]
+    pub const fn purchasable_component_ordinal(&self) -> &SourcedValue<u32> {
         &self.purchasable
     }
 }

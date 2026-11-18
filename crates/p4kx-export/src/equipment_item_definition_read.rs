@@ -19,6 +19,20 @@ pub(crate) fn read<'source>(
     admission: &RecordObservation<'_, 'source>,
     cancel: Option<&CancelToken>,
 ) -> Result<ScopedSourceRead<ItemDefinition<'source>>, CatalogError> {
+    let read = with_definition(tree, projection, admission, cancel, |_, _| Ok(()))?;
+    Ok(read.map(|(definition, ())| definition))
+}
+
+pub(crate) fn with_definition<'source, T>(
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    cancel: Option<&CancelToken>,
+    inspect: impl FnOnce(
+        &ItemDefinition<'source>,
+        &OriginalFlowFields<'_, '_, 'source>,
+    ) -> Result<T, CatalogError>,
+) -> Result<ScopedSourceRead<(ItemDefinition<'source>, T)>, CatalogError> {
     let input = projection.original();
     let scope = input.record_scope(admission.record(), tree)?;
     let originals = OriginalFlowFields::read(&scope, cancel)?;
@@ -31,8 +45,9 @@ pub(crate) fn read<'source>(
         components.state(),
         SourceValueState::Present | SourceValueState::Absent
     ) && components.origin().source_set_complete();
+    let projected = inspect(&row, &originals)?;
     Ok(ScopedSourceRead {
-        value: row,
+        value: (row, projected),
         notes,
         selection_complete,
     })

@@ -3,6 +3,7 @@
 
 use p4kx_extraction::{FieldOrigin, Language, SourceValue, SourceValueState, SourcedValue};
 
+use super::inputs::unavailable_value;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_v3::authored_fields::locale_input::AuthoredLocaleInput;
 use crate::catalog_v3::catalog_text_forms;
@@ -60,15 +61,7 @@ pub(super) fn absent(
     origin: &FieldOrigin,
     projection: &CatalogProjection<'_, '_>,
 ) -> Result<ClassifiedItem, CatalogError> {
-    let state = match state {
-        SourceValueState::Present | SourceValueState::Absent | SourceValueState::Null => {
-            SourceValue::Absent
-        }
-        SourceValueState::Unreadable => SourceValue::Unreadable,
-        SourceValueState::Unsupported => SourceValue::Unsupported,
-        SourceValueState::Invalid => SourceValue::Invalid,
-        _ => return Err(ExportAccountingError::ConflictingSourceDatum.into()),
-    };
+    let state = unavailable_value(state)?.unwrap_or(SourceValue::Absent);
     Ok(ClassifiedItem {
         value: projection
             .origins()

@@ -3,7 +3,7 @@
 
 use p4kx_extraction::{CancelToken, DataForge, RecordTree};
 
-use super::{InventoryOwnerBounds, ItemAttachmentComponent, ItemDefinition};
+use super::{InventoryOwnerBounds, ItemAttachmentComponent, ItemDefinition, ItemSource};
 use crate::CatalogError;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::scoped_source_read::ScopedSourceRead;
@@ -17,6 +17,7 @@ use crate::record_observation::RecordObservation;
 #[derive(Clone, Copy)]
 pub(super) enum Family {
     Definitions,
+    ItemSources,
     Attachments,
     Bounds,
 }
@@ -31,7 +32,7 @@ impl Family {
             return DatasetAvailability::Available;
         }
         let types = match self {
-            Self::Definitions => &[p4kx_assembly::ENTITY_TYPE][..],
+            Self::Definitions | Self::ItemSources => &[p4kx_assembly::ENTITY_TYPE][..],
             Self::Attachments => &[ATTACHABLE][..],
             Self::Bounds => BOUNDS_SOURCE_TYPES,
         };
@@ -53,6 +54,7 @@ pub(super) trait Projector {
 }
 
 pub(super) struct Definitions;
+pub(super) struct ItemSources;
 pub(super) struct Attachments;
 pub(super) struct Bounds;
 
@@ -69,6 +71,33 @@ impl Projector for Definitions {
     ) -> Result<ScopedSourceRead<Vec<Self::Row<'source>>>, CatalogError> {
         let read = definition_read::read(tree, projection, admission, cancel)?;
         Ok(read.map(|row| vec![row]))
+    }
+}
+
+impl Projector for ItemSources {
+    type Row<'source> = ItemSource<'source>;
+    const FAMILY: Family = Family::ItemSources;
+
+    fn read<'source>(
+        tree: &RecordTree<'source>,
+        projection: &CatalogProjection<'_, 'source>,
+        admission: &RecordObservation<'_, 'source>,
+        _: &AlignmentOptions<'_>,
+        cancel: Option<&CancelToken>,
+    ) -> Result<ScopedSourceRead<Vec<Self::Row<'source>>>, CatalogError> {
+        let read = definition_read::with_definition(
+            tree,
+            projection,
+            admission,
+            cancel,
+            |definition, originals| crate::item::source(tree, definition, originals, projection),
+        )?;
+        let (_, source) = read.value;
+        Ok(ScopedSourceRead {
+            selection_complete: source.source_set_complete(),
+            value: vec![source],
+            notes: Vec::new(),
+        })
     }
 }
 

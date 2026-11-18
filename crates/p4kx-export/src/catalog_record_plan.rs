@@ -4,7 +4,7 @@
 use std::sync::Arc;
 
 use p4kx_extraction::{
-    CancelToken, CanonicalReadObserver, DataForge, Record, RecordTree, TreeBuilder,
+    CancelToken, CanonicalReadObserver, DataForge, DataForgeError, Record, RecordTree, TreeBuilder,
 };
 
 use crate::catalog_queries::unlocalized_record_query;
@@ -130,6 +130,7 @@ impl<'source> Plan<'source> {
                     record: *record,
                     tree,
                 }),
+                Err(DataForgeError::ObservationStopped) => return Err(CatalogError::Cancelled),
                 Err(_) => result.coverage.unreadable_bodies.push(record.index()),
             }
             Ok(())

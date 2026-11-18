@@ -9,6 +9,8 @@ mod attachments;
 mod bounds;
 #[path = "equipment_item_query.rs"]
 mod definitions;
+#[path = "equipment_item_source_query.rs"]
+mod item_sources;
 #[path = "equipment_query_read.rs"]
 mod read;
 #[path = "equipment_query_rows.rs"]
@@ -24,15 +26,21 @@ pub use crate::catalog_v3::catalog_item_components::item_definition::{
     ItemDefinitionComponentKind, ItemLocalization, ItemPhysics, ItemPurchasable,
     WeaponAttachmentMotion,
 };
+pub use crate::catalog_v3::catalog_item_components::selection::ItemSourceSelection;
 pub use crate::catalog_v3::catalog_unit_source::UnitSource;
 pub use crate::catalog_v3::inventory_dimensions::{InventoryVector2, InventoryVector3};
 pub use crate::catalog_v3::inventory_item_occupancy::InventoryItemOccupancy;
 pub use crate::catalog_v3::inventory_owner_bounds::{
     BoundsFields as InventoryBoundsFields, InventoryOwnerBounds,
 };
+pub use crate::item::ItemSource;
 pub use attachments::{with_attachment_constraints, with_attachment_constraints_from};
 pub use bounds::{with_item_bounds, with_item_bounds_from};
 pub use definitions::{with_item_definitions, with_item_definitions_from};
+#[cfg(test)]
+pub(crate) use item_sources::observe_item_source_query;
+pub use item_sources::{with_item_sources, with_item_sources_from};
 pub use snapshot::{
     AttachmentConstraintSnapshot, EquipmentSnapshot, ItemBoundsSnapshot, ItemDefinitionSnapshot,
+    ItemSourceSnapshot,
 };

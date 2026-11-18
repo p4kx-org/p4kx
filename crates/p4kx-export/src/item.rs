@@ -27,6 +27,7 @@ use inputs::SelectedItem;
 use paint_facts::ItemPaintFacts;
 pub(crate) use projection::Item;
 use projection::ItemIdentity;
+pub use projection::ItemSource;
 
 /// Returns the playability of the item Record tree `tree`.
 pub(crate) fn playability(tree: &RecordTree<'_>) -> Option<Playability> {
@@ -48,6 +49,44 @@ pub(crate) fn item<'source>(
     originals: &OriginalFlowFields<'_, '_, 'source>,
     projection: &CatalogProjection<'_, 'source>,
 ) -> Result<(Item<'source>, ClassLine), CatalogError> {
+    let read = project_source(tree, definition, originals, projection, |inputs| {
+        ItemPaintFacts::read(inputs.attachment())
+    })?;
+    let identity = ItemIdentity::read(read.source.source())?;
+    Ok((
+        Item {
+            source: read.source,
+            variant_of: None,
+            identity,
+            paint: read.extra,
+            variant_key: None,
+        },
+        read.line,
+    ))
+}
+
+pub(crate) fn source<'source>(
+    tree: &RecordTree<'source>,
+    definition: &ItemDefinition<'source>,
+    originals: &OriginalFlowFields<'_, '_, 'source>,
+    projection: &CatalogProjection<'_, 'source>,
+) -> Result<ItemSource<'source>, CatalogError> {
+    Ok(project_source(tree, definition, originals, projection, |_| ())?.source)
+}
+
+struct ProjectedSource<'source, T> {
+    source: ItemSource<'source>,
+    line: ClassLine,
+    extra: T,
+}
+
+fn project_source<'source, T>(
+    tree: &RecordTree<'source>,
+    definition: &ItemDefinition<'source>,
+    originals: &OriginalFlowFields<'_, '_, 'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    extra: impl FnOnce(&SelectedItem<'_, 'source>) -> T,
+) -> Result<ProjectedSource<'source, T>, CatalogError> {
     projection::check_source(tree, definition, projection)?;
     let selection = ItemSourceSelection::read(tree, originals)?;
     let inputs = SelectedItem::read(definition, &selection)?;
@@ -58,22 +97,18 @@ pub(crate) fn item<'source>(
     };
     let class_value = description.add_parents(class.value, &projection.origins().uses)?;
     let playability = playability_projection::read(&inputs, projection)?;
-    let paint = ItemPaintFacts::read(inputs.attachment());
+    let extra = extra(&inputs);
     let header = definition.source().clone();
-    let identity = ItemIdentity::read(&header)?;
-    Ok((
-        Item {
+    Ok(ProjectedSource {
+        source: ItemSource {
             header,
             selection,
             class: class_value,
             playability,
-            variant_of: None,
-            identity,
-            paint,
-            variant_key: None,
         },
-        class.line,
-    ))
+        line: class.line,
+        extra,
+    })
 }
 
 #[cfg(test)]

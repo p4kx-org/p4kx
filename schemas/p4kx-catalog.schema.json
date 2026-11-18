@@ -24019,7 +24019,7 @@
       "type": "object"
     },
     "Item": {
-      "description": "The selected physical Item and its source-backed classification projections.",
+      "description": "One physical Item with its source fields and variant decision.",
       "properties": {
         "className": {
           "$ref": "#/$defs/SourcedValueOfstring"

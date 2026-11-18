@@ -30,6 +30,11 @@ pub(super) enum Layout {
     NullFirst,
     UnreadableFirst,
     UnknownPrefix,
+    UnknownSuffix,
+    InvalidMass,
+    InvalidShopName,
+    InvalidName,
+    InvalidUnusedName,
     LocalePointer,
     Aliases,
     Player,
@@ -90,15 +95,34 @@ pub(super) fn database(layout: Layout) -> DataForgeBuilder {
             .field("AttachDef", pointer(definition_name)),
         definition(layout),
         TestStruct::new(LOCALIZATION)
-            .field("Name", TestType::Locale)
+            .field(
+                "Name",
+                if matches!(layout, Layout::InvalidName | Layout::InvalidUnusedName) {
+                    TestType::String
+                } else {
+                    TestType::Locale
+                },
+            )
             .field("Description", TestType::Locale),
         TestStruct::new(PHYSICS)
             .parent(COMPONENT)
             .field("PhysType", class(RIGID)),
-        TestStruct::new(RIGID).field("Mass", TestType::Single),
-        TestStruct::new(PURCHASE)
-            .parent(COMPONENT)
-            .field("displayName", TestType::Locale),
+        TestStruct::new(RIGID).field(
+            "Mass",
+            if matches!(layout, Layout::InvalidMass) {
+                TestType::String
+            } else {
+                TestType::Single
+            },
+        ),
+        TestStruct::new(PURCHASE).parent(COMPONENT).field(
+            "displayName",
+            if matches!(layout, Layout::InvalidShopName) {
+                TestType::String
+            } else {
+                TestType::Locale
+            },
+        ),
     ];
     let mut database = definitions
         .into_iter()
@@ -164,17 +188,29 @@ fn owner(name: &str, description: &str, layout: Layout) -> TestRecord {
         node(TestInstance::new(ATTACHMENT).value("AttachDef", definition_value("@second", layout))),
         node(TestInstance::new(PHYSICS).value(
             "PhysType",
-            node(TestInstance::new(RIGID).value("Mass", TestValue::Single(-0.0))),
+            node(TestInstance::new(RIGID).value(
+                "Mass",
+                if matches!(layout, Layout::InvalidMass) {
+                    TestValue::text("not a mass")
+                } else {
+                    TestValue::Single(-0.0)
+                },
+            )),
         )),
         node(TestInstance::new(PURCHASE).value(
             "displayName",
-            if matches!(layout, Layout::Player) {
+            if matches!(layout, Layout::InvalidShopName) {
+                TestValue::text("opaque shop")
+            } else if matches!(layout, Layout::Player | Layout::InvalidUnusedName) {
                 TestValue::text("@shop")
             } else {
                 TestValue::text("")
             },
         )),
     ]);
+    if matches!(layout, Layout::UnknownSuffix) {
+        components.push(bad_pointer(ATTACHMENT_INDEX));
+    }
     let path = if matches!(layout, Layout::Mission) {
         "mission_entities"
     } else {

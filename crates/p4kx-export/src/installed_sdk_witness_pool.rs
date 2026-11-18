@@ -123,7 +123,7 @@ fn check_snapshot(
     Ok(())
 }
 
-fn check_header(
+pub(super) fn check_header(
     original: &RecordTree<'_>,
     source: &CanonicalRecordHeader<'_>,
     row: &Json,
@@ -139,7 +139,7 @@ fn check_header(
         || !record_text_matches(source.record_name(), metadata.name())
         || !record_text_matches(source.metadata_tag(), metadata.metadata_tag())
     {
-        return Err("pool header differs from the original physical Record metadata".into());
+        return Err("SDK header differs from the original physical Record metadata".into());
     }
     for (name, field) in [
         ("guid", RecordHeaderField::Guid),

@@ -94,6 +94,16 @@ The shared projection rejects a definition from another physical Record, includi
 alias, and rejects foreign-inventory header evidence. Producer and subsequent SDK use the same
 admitted source objects rather than clone their original interpretation.
 
+The Item source query uses the same original definition frame, physical selection and sourced
+class and playability readers as the producer. The full Item flattens the same source fields
+beside its variant decision. Source queries return the selected physical owners, including
+same-GUID alternatives. English contributes to classification through its actual lookup.
+The response keeps presentation languages and text dictionaries empty and reports physical
+coverage for the returned fields and their dependencies. Definition coverage describes the
+complete definition. Playability preserves an unusable purchase name's state before evaluating
+lower-priority rules and consumes the attachment name in the name rule. Variant decisions
+require their own unfiltered candidate survey.
+
 This bounded migration does not introduce a provisional unknown variant carrier or weaken
 normal-publication guards. variantOf remains the existing nominal value until its actual
 unfiltered candidate survey and physical target/status projection are implemented together.

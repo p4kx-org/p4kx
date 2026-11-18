@@ -3,7 +3,7 @@
 
 use p4kx_extraction::{Build, Language, LocalizationNote, SourceInventory};
 
-use super::{InventoryOwnerBounds, ItemAttachmentComponent, ItemDefinition};
+use super::{InventoryOwnerBounds, ItemAttachmentComponent, ItemDefinition, ItemSource};
 use crate::catalog_queries::{CatalogRecordCoverage, DatasetAvailability};
 use crate::catalog_text_contract::{CanonicalText, GameTextRef, PublicNameRef};
 
@@ -25,6 +25,9 @@ pub struct EquipmentSnapshot<'source, Row> {
 
 /// Selected original Item presentation, physics and purchase definitions.
 pub type ItemDefinitionSnapshot<'source> = EquipmentSnapshot<'source, ItemDefinition<'source>>;
+
+/// Selected original Item headers, component choices, class and playability.
+pub type ItemSourceSnapshot<'source> = EquipmentSnapshot<'source, ItemSource<'source>>;
 
 /// Selected original physical attachment-constraint components.
 pub type AttachmentConstraintSnapshot<'source> =
@@ -64,7 +67,7 @@ impl<'source, Row> EquipmentSnapshot<'source, Row> {
         &self.game_texts
     }
 
-    /// Borrows the localization policy actually used for this family.
+    /// Borrows the requested presentation languages retained by this family.
     #[must_use]
     pub fn requested_languages(&self) -> &[Language] {
         &self.requested_languages
@@ -76,7 +79,7 @@ impl<'source, Row> EquipmentSnapshot<'source, Row> {
         &self.available_languages
     }
 
-    /// Borrows decoding and parser observations from the requested inputs.
+    /// Borrows decoding and parser observations from the consulted locale inputs.
     #[must_use]
     pub fn localization_notes(&self) -> &[LocalizationNote] {
         &self.localization_notes

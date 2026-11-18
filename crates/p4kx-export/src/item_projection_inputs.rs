@@ -25,6 +25,18 @@ pub(super) struct ItemLocaleRead<'read, 'source> {
     pub(super) parents: [&'read FieldOrigin; 3],
 }
 
+pub(super) fn unavailable_value<T>(
+    state: SourceValueState,
+) -> Result<Option<SourceValue<T>>, CatalogError> {
+    Ok(match state {
+        SourceValueState::Present | SourceValueState::Absent | SourceValueState::Null => None,
+        SourceValueState::Unreadable => Some(SourceValue::Unreadable),
+        SourceValueState::Unsupported => Some(SourceValue::Unsupported),
+        SourceValueState::Invalid => Some(SourceValue::Invalid),
+        _ => return Err(ExportAccountingError::ConflictingSourceDatum.into()),
+    })
+}
+
 impl<'read, 'source> SelectedItem<'read, 'source> {
     pub(super) fn read(
         definition: &'read ItemDefinition<'source>,

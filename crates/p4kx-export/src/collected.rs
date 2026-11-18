@@ -299,7 +299,7 @@ impl<'f> Collected<'f> {
                 self.port_items.extend(ports);
                 self.playability
                     .items
-                    .count(entity.playability.value().copied());
+                    .count(entity.source.playability().value().copied());
                 self.items.push(entity);
                 self.item_components.extend(components);
             }

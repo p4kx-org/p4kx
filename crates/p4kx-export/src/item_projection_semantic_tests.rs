@@ -2,8 +2,14 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::cell::Cell;
+use std::ops::ControlFlow;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
-use p4kx_extraction::{Archive, DataForge, Language, SourceInventory, SourceValueState};
+use p4kx_extraction::{
+    Archive, CanonicalReadObserver, DataForge, DataForgeError, Language, Record, RecordTree,
+    SourceInventory, SourceValueState,
+};
 use p4kx_testkit::{
     ArchiveBuilder, DataForgeBuilder, TestEntry, TestInstance, TestRecord, TestStruct, TestType,
     TestValue,
@@ -12,6 +18,10 @@ use p4kx_testkit::{
 use super::{Item, item};
 use crate::build::original_input::test_support;
 use crate::catalog_projection::CatalogProjection;
+use crate::catalog_queries::equipment;
+use crate::catalog_queries::{
+    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection,
+};
 use crate::catalog_v3::catalog_item_components;
 use crate::item_class::ItemClass;
 use crate::record_observation::RecordObservation;
@@ -40,21 +50,25 @@ fn english_classification_uses_semantic_input_for_empty_german_and_english_outpu
         );
         read_row(&archive, &sources, |row, inventory| {
             assert_eq!(
-                row.class.value(),
+                row.source.item_class().value(),
                 Some(&ItemClass::Military),
                 "requested output language never changes the English rule"
             );
             assert_eq!(
-                row.class.origin().contains_encrypted_source(),
+                row.source.item_class().origin().contains_encrypted_source(),
                 Some(true),
                 "the actual encrypted English contributor is immediate"
             );
             assert!(
-                row.class.origin().source_set_complete(),
+                row.source.item_class().origin().source_set_complete(),
                 "the chosen Description and lookup are complete"
             );
             assert_eq!(
-                row.header.guid.origin().contains_encrypted_source(),
+                row.source
+                    .source()
+                    .guid()
+                    .origin()
+                    .contains_encrypted_source(),
                 Some(false),
                 "the plain owner header keeps its independent origin"
             );
@@ -96,21 +110,25 @@ fn genuinely_absent_english_retains_the_original_directory_negative_proof() -> T
     );
     read_row(&archive, &sources, |row, inventory| {
         assert_eq!(
-            row.class.state(),
+            row.source.item_class().state(),
             SourceValueState::Absent,
             "the German class never substitutes for absent English"
         );
         assert_eq!(
-            row.class.origin().contains_encrypted_source(),
+            row.source.item_class().origin().contains_encrypted_source(),
             Some(false),
             "only the actual plain source and intact directory contribute"
         );
         assert!(
-            row.class.origin().source_set_complete(),
+            row.source.item_class().origin().source_set_complete(),
             "the negative lookup is proved from the original directory"
         );
         assert!(
-            !row.class.origin().source_uses_refs().is_empty(),
+            !row.source
+                .item_class()
+                .origin()
+                .source_uses_refs()
+                .is_empty(),
             "absence is not a sourceless default"
         );
         closure(row, inventory);
@@ -156,7 +174,7 @@ fn with_context(
 }
 
 fn closure(row: &Item<'_>, inventory: &SourceInventory) {
-    for reference in row.class.origin().source_uses_refs() {
+    for reference in row.source.item_class().origin().source_uses_refs() {
         assert!(
             inventory
                 .iter_uses()
@@ -291,5 +309,45 @@ fn an_actual_same_guid_definition_of_another_physical_record_is_rejected() -> Te
         );
         Ok(())
     })?;
+    Ok(())
+}
+
+#[derive(Default)]
+struct StopAfterDecode(AtomicBool);
+
+impl CanonicalReadObserver for StopAfterDecode {
+    fn observe(
+        &self,
+        record: &Record<'_>,
+        outcome: Result<&RecordTree<'_>, &DataForgeError>,
+    ) -> ControlFlow<()> {
+        self.0
+            .store(record.index() == 0 && outcome.is_ok(), Ordering::Relaxed);
+        ControlFlow::Break(())
+    }
+}
+
+#[test]
+fn stopped_original_item_read_never_invokes_callback() -> TestResult {
+    let (_folder, archive) = fixture(true)?;
+    let session =
+        CatalogQuerySession::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?;
+    let parsed = session.parsed(None)?;
+    let observer = Arc::new(StopAfterDecode::default());
+    let seen = Cell::new(false);
+    let result = equipment::observe_item_source_query(
+        &parsed,
+        CatalogRecordSelection::RecordIndex(0),
+        observer.clone(),
+        |_| seen.set(true),
+    );
+    assert!(
+        observer.0.load(Ordering::Relaxed),
+        "the observer reached a successful physical Item decode"
+    );
+    assert!(
+        matches!(result, Err(CatalogError::Cancelled)) && !seen.get(),
+        "a stopped read cannot return a partial success or invoke the callback"
+    );
     Ok(())
 }

@@ -92,7 +92,11 @@ impl<'query> Query<'query> {
         } else {
             requested
         };
-        let sources = TextSources::read_languages(self.archive, selected_languages)?;
+        let sources = if matches!(P::FAMILY, Family::ItemSources) && !plan.owners.is_empty() {
+            TextSources::read_item_languages(self.archive, &[])?
+        } else {
+            TextSources::read_languages(self.archive, selected_languages)?
+        };
         checkpoint(self.cancel)?;
         let origins = CatalogOrigins::new(self.archive, self.entry, &sources)?;
         let input = OriginalCatalogInput::new(self.forge, &origins);
@@ -111,15 +115,20 @@ impl<'query> Query<'query> {
             &mut plan.coverage,
             self.cancel,
         )?;
-        let text_rows = projection.finish_rows()?;
+        let (public_names, game_texts) = (!matches!(P::FAMILY, Family::ItemSources))
+            .then(|| projection.finish_rows())
+            .transpose()?
+            .map_or_else(Default::default, |rows| {
+                (rows.public_names, rows.game_texts)
+            });
         let source_inventory = origins.uses.finish_with(|| checkpoint(self.cancel))?;
         checkpoint(self.cancel)?;
         Ok(inspect(EquipmentSnapshot {
             build: self.archive.build().cloned(),
             availability: P::FAMILY.availability(self.forge, rows.len()),
             rows,
-            public_names: text_rows.public_names,
-            game_texts: text_rows.game_texts,
+            public_names,
+            game_texts,
             requested_languages: requested.to_vec(),
             available_languages: selected_languages
                 .iter()
@@ -139,7 +148,7 @@ impl<'query> Query<'query> {
     ) -> Result<Plan<'query>, CatalogError> {
         checkpoint(self.cancel)?;
         let mut plan = match family {
-            Family::Definitions => Plan::read(
+            Family::Definitions | Family::ItemSources => Plan::read(
                 self.forge,
                 Kind::Items,
                 self.selection,
@@ -165,7 +174,7 @@ impl<'query> Query<'query> {
 
 fn order(family: Family, owners: &mut [Owner<'_>]) {
     match family {
-        Family::Definitions => owners.sort_by_key(|owner| {
+        Family::Definitions | Family::ItemSources => owners.sort_by_key(|owner| {
             (
                 CatalogGuid(owner.record.guid()).text(),
                 owner.record.index(),

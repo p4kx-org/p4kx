@@ -4,9 +4,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use p4kx_extraction::{
-    Archive, Build, DataForge, DataForgeOrigin, InputScope, PhysicalSource, PhysicalSourceKind,
-    PhysicalSourceRef, SourceEncryptionState, SourceInput, SourceInventory, SourceLocation,
-    SourceUseDescription, SourceUseRole, SourceUses,
+    Archive, Build, DataForge, DataForgeOrigin, EntryOrigin, InputScope, PhysicalSource,
+    PhysicalSourceKind, PhysicalSourceRef, SourceEncryptionState, SourceInput, SourceInventory,
+    SourceLocation, SourceUseDescription, SourceUseRole, SourceUses,
 };
 use serde_json::Value;
 
@@ -44,6 +44,13 @@ pub(super) struct Evidence<'query> {
 
 impl Proof {
     pub(super) fn read(origin: &DataForgeOrigin) -> TestResult<Self> {
+        Self::read_with_payload(origin, None)
+    }
+
+    pub(super) fn read_with_payload(
+        origin: &DataForgeOrigin,
+        additional: Option<&EntryOrigin>,
+    ) -> TestResult<Self> {
         let DataForgeOrigin::Archive(origin) = origin else {
             return Err("expected original Archive-bound DataForge evidence".into());
         };
@@ -51,6 +58,10 @@ impl Proof {
         let scope = uses
             .observe(SourceInput::Archive(origin), InputScope::Payload)
             .map_err(|_| "original DataForge evidence capture failed")?;
+        if let Some(entry) = additional {
+            uses.observe(SourceInput::Archive(entry), InputScope::Payload)
+                .map_err(|_| "original locale evidence capture failed")?;
+        }
         Ok(Self {
             leaf: scope.source_ref().clone(),
             inventory: uses

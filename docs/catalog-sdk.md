@@ -400,10 +400,19 @@ The Item producer shares these original facts with its sourced header, first phy
 selections, English class and key-only playability. Semantic English admission is independent
 of output-language requests; the original-definition query above still needs no English locale
 when its requested language list is empty because it does not compute that classification.
-A full root-Item SDK query, authenticated unfiltered variant choice, Ship and Loadout projection
-coverage remain separate work under
+Use `equipment::with_item_sources`, `with_item_sources_from`, or the session and parsed-view
+methods to read the Item header, first physical component ordinals, sourced `itemClass` and
+`playability`. `RecordIndex` selects a physical owner and `Guid` retains each selected alias.
+Join the component ordinals to `definitions.items` using the same DataForge input and Record
+index. Consult English for classification. Look up presentation translations through the
+definition query.
+
+The Item source query reports coverage for its returned fields. An incomplete component
+selection or unreadable input to classification or playability identifies the affected owner in
+`coverage.incomplete_fields`. An unusable higher-priority purchase name preserves its source
+state. The attachment name determines playability when the original decision reaches that rule.
+The definition query reports coverage for the full Item definition. See
 [ADR-0410](adr/0410-equipment-sdk-shares-original-family-readers-and-canonical-variant-choices.md).
-No legacy root-Item DTO is offered as a complete canonical substitute.
 
 An unclassifiable original component slot or unreadable possible occupancy definition keeps the
 queried source scope incomplete. Readable prefix rows remain available; `coverage.incomplete_fields`
@@ -428,6 +437,17 @@ after all checks pass.
 ```powershell
 cargo test --locked -p p4kx-export --lib -- `
     catalog_query_session::installed_sdk_witness::installed_selective_sdk_has_original_owners_and_closed_sources `
+    --ignored --exact --test-threads=1
+```
+
+For a direct Item check, also set `P4KX_CATALOG_ITEM_TEXT_RECORD` to an exact private Record
+path with a readable English description. The Item test compares the 13 source fields with
+the original Record and checks the English lookup, per-value provenance and physical decode
+count. Use a fresh `P4KX_SDK_WITNESS_FILE` on each run.
+
+```powershell
+cargo test --locked -p p4kx-export --lib -- `
+    catalog_query_session::installed_sdk_witness::item::installed_item_source_sdk_matches_one_original_record `
     --ignored --exact --test-threads=1
 ```
 

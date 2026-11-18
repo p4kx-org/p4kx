@@ -91,7 +91,7 @@ impl Collected<'_> {
             .map(|item| Candidate {
                 guid: item.identity.guid,
                 class_name: item.identity.class_name,
-                playability: item.playability.value().copied(),
+                playability: item.source.playability().value().copied(),
                 key: item.variant_key,
             })
             .collect();

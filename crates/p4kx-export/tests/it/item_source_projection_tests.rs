@@ -12,6 +12,10 @@ use crate::health_origin_assertions as proof;
 
 #[path = "item_source_projection_fixture.rs"]
 mod fixture;
+#[path = "item_source_sdk_tests.rs"]
+mod sdk;
+#[path = "item_source_sdk_coverage_tests.rs"]
+mod sdk_coverage;
 use fixture::Layout;
 
 #[test]
