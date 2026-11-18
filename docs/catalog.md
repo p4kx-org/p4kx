@@ -1115,8 +1115,8 @@ The first request owns each original file-read observation. Later requests reuse
 
 | Field | Source |
 |-------|--------|
-| `entityGuid` | The `guid` of the entry in `ships` or `items` the ports belong to |
-| `entityKind` | `ship` or `item`; a closed set the game may extend, so the schema keeps a string |
+| `entityGuid` | Sourced GUID from the original owner Record header. Its value joins to the owning `ships` or `items` entry. |
+| `entityKind` | Sourced owner kind. Its string value is `ship` or `item`. The original inputs are the declared Record type, normalized filename and Record name used by the owner selection. |
 | `issues` | The codes of what kept part of the Loadout from being read, sorted, without duplicates: `dangling_reference`, `invalid_reference`, `unknown_class`, `ambiguous_class`, `not_an_entity`, `unreadable_record`, `cycle`, `too_deep`, `too_many_ports`, `no_loadout_files`, `xml_loadout`, `assortment`, `vehicle_implementation`; empty when all was read. `no_loadout_files` (an XML Loadout is named but no Archive was given to read it from) cannot occur in a catalog, which always has its Archive. A vehicle implementation or a patch file the Archive lacks is a `vehicle_implementation` issue too, a fact of the game data |
 | `ports` | The ports of the entity, see below |
 
@@ -1164,7 +1164,7 @@ Loadout overrides the default Loadout of the turrets and racks it carries per po
 the entry of the turret itself shows the turret's own defaults. The walk is the one of
 `EntityNode::loadout` (#316).
 
-**References.** Every `entityGuid` is a `guid` of `ships` or `items`. An `itemGuid` is one of
+**References.** Every `entityGuid.value` is a GUID of `ships` or `items`. An `itemGuid` is one of
 them too, except for an Entity outside both kinds: a development leftover, or an Entity of another
 folder (`p4kx catalog` counts them as the Entities without an entry in items or ships,
 `CatalogSummary::loadouts().outside`; the key `outside` of `--json`). Such a GUID stays, so the

@@ -49,7 +49,7 @@ impl<'run> StagedLoadoutWriter<'run> {
 
     pub(super) fn append(&mut self, loadout: Loadout) -> Result<(), RowSpoolError> {
         checkpoint(self.cancel)?;
-        match loadout.entity_kind {
+        match loadout.entity_kind() {
             EntityKind::Ship => self.ships.push(PositionedShipLoadout {
                 ordinal: self.len,
                 loadout,

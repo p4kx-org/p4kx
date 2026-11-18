@@ -85,7 +85,7 @@ fn multi_relay<'catalog>(catalog: &'catalog Value, avenger: &str) -> TestResult<
     }
     for (ordinal, count) in relay_counts {
         let loadout = loadouts.get(ordinal).ok_or("published Loadout ordinal")?;
-        let guid = proof::text(loadout, "/entityGuid")?;
+        let guid = proof::text(loadout, "/entityGuid/value")?;
         if guid != avenger && count >= 2 {
             return Ok(guid);
         }

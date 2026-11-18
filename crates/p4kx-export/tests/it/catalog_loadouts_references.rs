@@ -137,7 +137,10 @@ fn every_attached_guid_resolves_except_the_counted_ones() -> TestResult {
     }
     assert_eq!(outside.len(), built.summary().loadouts().outside, "counted");
     for entry in catalog["loadouts"].as_array().ok_or("loadouts")? {
-        let owner = entry["entityGuid"].as_str().ok_or("a GUID")?;
+        let owner = entry
+            .pointer("/entityGuid/value")
+            .and_then(Value::as_str)
+            .ok_or("a GUID")?;
         assert!(known.contains(&owner), "{owner} is an item or a ship");
     }
     Ok(())
@@ -152,7 +155,7 @@ fn a_filter_limits_the_loadouts_to_the_selected_entities_and_marks_the_kind_part
         .as_array()
         .ok_or("loadouts")?
         .iter()
-        .filter_map(|entry| entry["entityKind"].as_str())
+        .filter_map(|entry| entry.pointer("/entityKind/value").and_then(Value::as_str))
         .collect();
     assert_eq!(owners, ["ship", "ship", "ship", "ship"], "only the ships");
     assert_eq!(

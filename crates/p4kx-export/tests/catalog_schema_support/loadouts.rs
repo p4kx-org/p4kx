@@ -21,8 +21,8 @@ pub(super) fn loadouts() -> serde_json::Value {
         "ports": []
     });
     json!([{
-        "entityGuid": "90000000-0000-4000-8000-000000000001",
-        "entityKind": "ship",
+        "entityGuid": present(json!("90000000-0000-4000-8000-000000000001")),
+        "entityKind": present(json!("ship")),
         "sourceRecordIndex": present(json!(0)),
         "issues": ["vehicle_implementation"],
         "ports": [{

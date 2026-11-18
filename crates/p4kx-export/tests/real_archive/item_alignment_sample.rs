@@ -171,7 +171,9 @@ fn check_join(catalog: &Value, origins: &Origins<'_>, sample: &Sample<'_>) -> Te
     let guid = sample.owner.guid().to_string();
     let loadout = rows(catalog, "/loadouts")?
         .iter()
-        .find(|entry| entry.get("entityGuid").and_then(Value::as_str) == Some(guid.as_str()))
+        .find(|entry| {
+            entry.pointer("/entityGuid/value").and_then(Value::as_str) == Some(guid.as_str())
+        })
         .ok_or("source-selected owner Loadout")?;
     let mut matching = rows(loadout, "/ports")?.iter().filter(|port| {
         let Some(link) = port.pointer("/sourceConstraints/portDefinition") else {

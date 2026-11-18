@@ -16,6 +16,8 @@ use crate::catalog_queries::{
 
 #[path = "installed_sdk_witness_item.rs"]
 mod item;
+#[path = "installed_loadout_source_witness.rs"]
+mod loadout_source;
 #[path = "installed_sdk_witness_pool.rs"]
 mod pool;
 #[path = "installed_sdk_witness_receipt.rs"]

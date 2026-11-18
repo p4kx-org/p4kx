@@ -107,7 +107,10 @@ fn check_references(built: &BuiltCatalog, catalog: &Value) -> TestResult {
     let mut outside = HashSet::new();
     let mut classes = HashSet::new();
     for entry in list(catalog, "loadouts")? {
-        let owner = entry["entityGuid"].as_str().ok_or("entityGuid")?;
+        let owner = entry
+            .pointer("/entityGuid/value")
+            .and_then(Value::as_str)
+            .ok_or("entityGuid")?;
         assert!(known.contains(owner), "owner {owner} is an item or a ship");
         assert!(owners.insert(owner), "{owner} has one loadout");
         walk(ports(entry), &mut |port| {
@@ -199,6 +202,29 @@ fn same(tree: &[PortNode], listed: &[Value], at: &str) {
     }
 }
 
+fn check_known_ship_row(catalog: &Value, index: u32) -> Result<&Value, Box<dyn Error>> {
+    let listed = list(catalog, "loadouts")?
+        .iter()
+        .find(|entry| {
+            entry
+                .pointer("/sourceRecordIndex/value")
+                .and_then(Value::as_u64)
+                == Some(u64::from(index))
+        })
+        .ok_or("the Loadout of the selected physical ship")?;
+    assert_eq!(
+        crate::catalog_v3_consumer::identity(listed, Kind::Loadouts)?,
+        ORIG_100I,
+        "the original ship GUID"
+    );
+    assert_eq!(
+        listed.pointer("/entityKind/value").and_then(Value::as_str),
+        Some("ship"),
+        "the original owner is a ship"
+    );
+    Ok(listed)
+}
+
 fn check_known_ship(archive: &Archive, catalog: &Value) -> TestResult {
     let entry = DataForgeEntry::read(archive)?;
     let forge = entry.open()?;
@@ -208,11 +234,7 @@ fn check_known_ship(archive: &Archive, catalog: &Value) -> TestResult {
         .stopping_at_docked_vehicles();
     let record = resolver.entities().find(ORIG_100I)?;
     let tree = resolver.resolve(&record)?;
-    let listed = list(catalog, "loadouts")?
-        .iter()
-        .find(|entry| entry["entityGuid"] == ORIG_100I)
-        .ok_or("the loadout of the 100i")?;
-    assert_eq!(listed["entityKind"], "ship", "a ship");
+    let listed = check_known_ship_row(catalog, record.index())?;
     same(tree.ports(), ports(listed), "100i");
     assert_eq!(
         ports(listed).len(),

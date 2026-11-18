@@ -8,6 +8,7 @@ use serde::Serialize;
 use crate::contract::every_field_required;
 use crate::guid_text::CatalogGuid;
 use crate::loadout::alignment::LoadoutAlignment;
+use crate::loadout_owner_value::LoadoutOwnerValue;
 
 /// Which kind of entry a loadout belongs to; serialised as the strings `ship` and `item`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -31,13 +32,13 @@ pub struct Loadout {
     pub(crate) source_record_index: SourcedValue<u32>,
     #[serde(skip)]
     pub(crate) port_inventory_complete: bool,
-    /// The `guid` of the entry in `ships` or `items` the ports belong to; loadouts are ordered by
-    /// it.
-    pub(crate) entity_guid: CatalogGuid,
+    /// The owning Record GUID used to join the Loadout to `ships` or `items`.
+    #[schemars(with = "SourcedValue<CatalogGuid>")]
+    pub(crate) entity_guid: LoadoutOwnerValue<CatalogGuid>,
     /// Which kind `entityGuid` is an entry of, `ship` or `item`; a closed set the game may
     /// extend, so the schema keeps a string.
-    #[schemars(with = "String")]
-    pub(crate) entity_kind: EntityKind,
+    #[schemars(with = "SourcedValue<String>")]
+    pub(crate) entity_kind: LoadoutOwnerValue<EntityKind>,
     /// The codes of the problems that kept part of the Loadout from being read, e.g.
     /// `xml_loadout`, sorted and without duplicates; empty when everything was read.
     pub(crate) issues: Vec<&'static str>,
@@ -135,13 +136,25 @@ impl Loadout {
     /// Returns the original owning GUID.
     #[must_use]
     pub const fn entity_guid(&self) -> p4kx_extraction::Guid {
-        self.entity_guid.get()
+        self.entity_guid.value.get()
     }
 
     /// Returns the kind of catalog owner.
     #[must_use]
     pub const fn entity_kind(&self) -> EntityKind {
-        self.entity_kind
+        self.entity_kind.value
+    }
+
+    /// Returns the original owning GUID with its immediate header origin.
+    #[must_use]
+    pub fn source_entity_guid(&self) -> SourcedValue<p4kx_extraction::Guid> {
+        self.entity_guid.sourced().map(|guid| guid.get())
+    }
+
+    /// Returns the owner kind with its actual original selection inputs.
+    #[must_use]
+    pub fn source_entity_kind(&self) -> SourcedValue<EntityKind> {
+        self.entity_kind.sourced().map(|kind| *kind)
     }
 
     /// Borrows the sorted resolver issue codes.

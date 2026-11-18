@@ -25,9 +25,9 @@ pub(crate) fn link_hosts(crafters: &mut [Crafter<'_>], loadouts: &StagedLoadouts
         mounted(&loadout.ports, &mut |guid| {
             if let Some(&at) = index.get(&guid)
                 && let Some(crafter) = crafters.get_mut(at)
-                && crafter.host_guids.last() != Some(&loadout.entity_guid)
+                && crafter.host_guids.last() != Some(&loadout.entity_guid.value)
             {
-                crafter.host_guids.push(loadout.entity_guid);
+                crafter.host_guids.push(loadout.entity_guid.value);
             }
         });
     }
@@ -75,8 +75,8 @@ mod tests {
             root_record_index: 0,
             source_record_index: crate::contract_loadout::fixture_record_index(0),
             port_inventory_complete: true,
-            entity_guid: guid(host),
-            entity_kind: kind,
+            entity_guid: crate::loadout_owner_value::LoadoutOwnerValue::fixture(guid(host)),
+            entity_kind: crate::loadout_owner_value::LoadoutOwnerValue::fixture(kind),
             issues: Vec::new(),
             ports,
         }

@@ -34,10 +34,9 @@ pub(super) fn compare(
 ) -> TestResult<Counts> {
     let loadouts = proof::rows(catalog, "/loadouts")?;
     let guid = tree.guid().to_string();
-    let mut matches = loadouts
-        .iter()
-        .enumerate()
-        .filter(|(_, row)| row["entityGuid"] == guid);
+    let mut matches = loadouts.iter().enumerate().filter(|(_, row)| {
+        row.pointer("/entityGuid/value").and_then(Value::as_str) == Some(guid.as_str())
+    });
     let (root, loadout) = matches.next().ok_or("selected original ship loadout")?;
     assert!(
         matches.next().is_none(),

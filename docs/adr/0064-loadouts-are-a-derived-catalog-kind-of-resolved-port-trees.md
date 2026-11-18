@@ -45,7 +45,7 @@ size is handled by `.json.zst`.
   tags, GUIDs, class names and the localisation key of a port's display name (`null` for a
   placeholder key). No description, no geometry, no media (the owner's legal review of 2026-10-20).
 - **Closed sets are strings** (ADR-0054): `entityKind`, `source` and `visibility` document their
-  values in the schema and keep the type string.
+  values in the schema and keep the type string. `entityKind` carries it as the value of a sourced cell.
 
 ## Consequences
 

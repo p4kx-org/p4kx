@@ -49,7 +49,9 @@ pub(crate) fn loadout(catalog: &Value, entity: u128) -> Result<&Value, Box<dyn E
         .as_array()
         .ok_or("loadouts")?
         .iter()
-        .find(|entry| entry["entityGuid"] == wanted.as_str())
+        .find(|entry| {
+            entry.pointer("/entityGuid/value").and_then(Value::as_str) == Some(wanted.as_str())
+        })
         .ok_or("the loadout")?)
 }
 

@@ -197,6 +197,7 @@ mod item_stats;
 mod item_variant;
 mod line_writer;
 mod loadout;
+mod loadout_owner_value;
 mod loadout_port;
 mod localization_table;
 mod location_template;

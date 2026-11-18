@@ -625,7 +625,9 @@ Items produce a row when resolution returns at least one port.
 
 A row's `record_index()` identifies its physical Record in the queried DataForge.
 Its `source_record_index()` gives the same position with its immediate header origin, matching
-`sourceRecordIndex` on the Catalog wire. Use
+`sourceRecordIndex` on the Catalog wire. `entity_guid()` and `entity_kind()` return the original
+owner identity used for joins. `source_entity_guid()` and `source_entity_kind()` give those values with
+their immediate origins, matching the `entityGuid` and `entityKind` cells on the wire. Use
 `port(&[0, 1])` for the second nested port of the first root port. The zero-based occurrence
 path preserves repeated names and repeated instances of an attached item. It follows resolver
 order for that Build.
@@ -642,3 +644,14 @@ origin references against this result's `source_inventory`. `coverage` describes
 owner selection. `dependencies` records the reached resolver operations and each demanded
 alignment role, including failed reads and known exclusions. Check both before replacing a
 consumer cache. [ADR-0410](adr/0410-equipment-sdk-shares-original-family-readers-and-canonical-variant-choices.md)
+
+The installed Loadout witness checks the owning GUID, category and physical Record index
+against the original headers. It independently compares one port name with the original
+DataForge field and checks the payload and declaration inputs. Set
+`P4KX_CATALOG_LOADOUT_SOURCE_RECORD` to a literal Record path or a unique `class:<name>`
+selector for an owner with a named DataForge root port. Set `P4KX_DATA_P4K` and
+`P4KX_SDK_WITNESS_FILE` for the installed Archive and the private technical receipt.
+
+```text
+cargo test --locked -p p4kx-export --lib -- catalog_query_session::installed_sdk_witness::loadout_source::installed_loadout_sdk_matches_one_original_port_name --ignored --exact
+```

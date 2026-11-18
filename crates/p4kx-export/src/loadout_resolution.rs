@@ -133,8 +133,8 @@ pub(super) fn read_with<'f: 'worker, 'worker>(
     if want.kind == EntityKind::Item && ports.is_empty() {
         return Ok(None);
     }
-    let source_record_index = match capture.source_record_index(&record) {
-        Ok(index) => index,
+    let root = match capture.root_values(&record, want.kind) {
+        Ok(root) => root,
         Err(error) => {
             capture.record_error(error);
             return Ok(None);
@@ -142,10 +142,10 @@ pub(super) fn read_with<'f: 'worker, 'worker>(
     };
     Ok(Some(Loadout {
         root_record_index: want.record_index,
-        source_record_index,
+        source_record_index: root.index,
         port_inventory_complete: node.issues().is_empty(),
-        entity_guid: want.guid,
-        entity_kind: want.kind,
+        entity_guid: root.guid,
+        entity_kind: root.kind,
         issues,
         ports,
     }))

@@ -29,8 +29,8 @@ fn resolved(want: Wanted) -> Loadout {
         root_record_index: want.record_index,
         source_record_index: crate::contract_loadout::fixture_record_index(want.record_index),
         port_inventory_complete: true,
-        entity_guid: want.guid,
-        entity_kind: want.kind,
+        entity_guid: crate::loadout_owner_value::LoadoutOwnerValue::fixture(want.guid),
+        entity_kind: crate::loadout_owner_value::LoadoutOwnerValue::fixture(want.kind),
         issues: Vec::new(),
         ports: vec![LoadoutPort {
             item_guid: Some(guid(99)),

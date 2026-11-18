@@ -21,8 +21,10 @@ fn row(identity: u32, kind: EntityKind) -> Loadout {
         root_record_index: identity,
         source_record_index: crate::contract_loadout::fixture_record_index(identity),
         port_inventory_complete: true,
-        entity_guid: CatalogGuid(Guid::from_stored(u128::from(identity).to_le_bytes())),
-        entity_kind: kind,
+        entity_guid: crate::loadout_owner_value::LoadoutOwnerValue::fixture(CatalogGuid(
+            Guid::from_stored(u128::from(identity).to_le_bytes()),
+        )),
+        entity_kind: crate::loadout_owner_value::LoadoutOwnerValue::fixture(kind),
         issues: Vec::new(),
         ports: vec![LoadoutPort {
             ports: vec![LoadoutPort::named(name("nested".to_owned()))],

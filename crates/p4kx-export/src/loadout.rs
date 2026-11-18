@@ -89,7 +89,7 @@ mod order_tests;
 
 impl LoadoutSummary {
     fn add_entry(&mut self, entry: &Loadout, known: &HashSet<Guid>, outside: &mut HashSet<Guid>) {
-        match entry.entity_kind {
+        match entry.entity_kind() {
             EntityKind::Ship => self.ships += 1,
             EntityKind::Item => self.items += 1,
         }

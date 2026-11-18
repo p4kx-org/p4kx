@@ -28,7 +28,7 @@ pub(super) fn check_vehicle<'source>(
     );
     let loadout = rows(catalog, "/loadouts")?
         .iter()
-        .find(|row| row.get("entityGuid").and_then(Value::as_str) == Some(guid.as_str()))
+        .find(|row| row.pointer("/entityGuid/value").and_then(Value::as_str) == Some(guid.as_str()))
         .ok_or("matching selected vehicle Loadout")?;
     let record = forge
         .record(selection.tree.record_index())

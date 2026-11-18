@@ -48,6 +48,14 @@ and the [shared Record header](catalog-record-headers.md).
 For the Commodity GUID join, resource fallbacks and exact presentation rules, see the
 [Commodity contract](catalog-commodity-types.md).
 
+## Loadout identities
+
+Read the original owner GUID and category from `loadouts[].entityGuid.value` and
+`loadouts[].entityKind.value`. The first value joins to the owner and the second
+identifies its family. Use `sourceRecordIndex.value` to distinguish physical rows
+with equal GUIDs in one Build. Port names are under `ports[].name.value`.
+Each of these values carries its own original source references and encryption marker.
+
 ## External container links
 
 Schema v3 includes `placements.unresolvedContainerLinks` as additive source evidence for a

@@ -113,7 +113,9 @@ impl<'source> ShipWitness<'source> {
         let guid = self.guid.to_string();
         let ship = proof::rows(catalog, "/loadouts")?
             .iter()
-            .find(|row| row.get("entityGuid").and_then(Value::as_str) == Some(guid.as_str()))
+            .find(|row| {
+                row.pointer("/entityGuid/value").and_then(Value::as_str) == Some(guid.as_str())
+            })
             .ok_or("exported fuel ship loadout")?;
         assert_eq!(
             proof::text(ship, "/entityKind")?,

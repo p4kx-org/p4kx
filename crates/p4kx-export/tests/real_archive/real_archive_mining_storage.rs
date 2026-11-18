@@ -245,8 +245,8 @@ fn compare_ports(
 ) -> TestResult {
     let ship_guid = ship.guid().to_string();
     let mut loadouts = catalog.loadouts.iter().filter(|row| {
-        text(row, "/entityGuid") == Some(ship_guid.as_str())
-            && text(row, "/entityKind") == Some("ship")
+        text(row, "/entityGuid/value") == Some(ship_guid.as_str())
+            && text(row, "/entityKind/value") == Some("ship")
     });
     let loadout = loadouts
         .next()

@@ -312,7 +312,7 @@ fn the_loadout_fields_accept_additions_and_new_closed_values_but_stay_required()
     );
 
     let mut new_values = catalog.clone();
-    new_values["loadouts"][0]["entityKind"] = json!("vehicle");
+    new_values["loadouts"][0]["entityKind"]["value"] = json!("vehicle");
     new_values["loadouts"][0]["ports"][0]["source"] = json!("modification");
     new_values["loadouts"][0]["ports"][0]["visibility"] = json!("hidden");
     assert!(

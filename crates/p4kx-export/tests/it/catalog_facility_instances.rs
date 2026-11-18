@@ -230,7 +230,7 @@ fn loadout(catalog: &Value, guid: u128) -> TestResult<&Value> {
     let guid = json!(common::guid(guid));
     proof::rows(catalog, "/loadouts")?
         .iter()
-        .find(|row| row.get("entityGuid") == Some(&guid))
+        .find(|row| row.pointer("/entityGuid/value") == Some(&guid))
         .ok_or_else(|| "actual synthetic ship loadout".into())
 }
 

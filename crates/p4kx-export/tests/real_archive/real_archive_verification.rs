@@ -177,6 +177,10 @@ fn verify_catalog(path: &Path, baselined: bool) -> Result<Value, Box<dyn Error>>
             .map(|entry| catalog_v3_consumer::identity(entry, kind))
             .collect::<Result<_, _>>()?;
         assert_eq!(guids.len(), entities.len(), "{kind} all have a {own}");
+        if kind == Kind::Loadouts {
+            check_loadout_order(entities, &guids)?;
+            continue;
+        }
         if matches!(
             kind,
             Kind::Items
@@ -220,6 +224,18 @@ fn verify_catalog(path: &Path, baselined: bool) -> Result<Value, Box<dyn Error>>
     check_leftovers(&catalog)?;
     check_texts(&archive, &catalog, baselined)?;
     Ok(catalog)
+}
+
+fn check_loadout_order(rows: &[Value], guids: &[&str]) -> TestResult {
+    assert!(guids.is_sorted(), "Loadouts are ordered by nominal GUID");
+    let mut indices = HashSet::with_capacity(rows.len());
+    for row in rows {
+        let index = catalog_v3_consumer::field(row, Kind::Loadouts, "sourceRecordIndex")?
+            .as_u64()
+            .ok_or("original physical Loadout Record index")?;
+        assert!(indices.insert(index), "a physical Loadout occurs only once");
+    }
+    Ok(())
 }
 
 fn check_leftovers(catalog: &Value) -> TestResult {

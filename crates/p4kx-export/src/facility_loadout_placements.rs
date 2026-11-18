@@ -204,7 +204,7 @@ impl<'rows, 'origin> Projection<'rows, 'origin> {
         flight: &mut InstalledConfigurations<'_>,
     ) -> Result<(), CatalogError> {
         let root = loadout.root_record_index;
-        let ship = ShipContext::read(self.origins, loadout.entity_guid, root)?;
+        let ship = ShipContext::read(self.origins, loadout.entity_guid.value, root)?;
         let selector = self
             .origins
             .record(root)

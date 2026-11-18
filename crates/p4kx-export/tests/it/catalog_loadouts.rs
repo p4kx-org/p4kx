@@ -24,7 +24,12 @@ fn every_ship_and_every_item_with_ports_has_a_loadout_ordered_by_guid() -> TestR
     let entries = catalog["loadouts"].as_array().ok_or("loadouts")?;
     let owners: Vec<(&str, &str)> = entries
         .iter()
-        .filter_map(|entry| Some((entry["entityGuid"].as_str()?, entry["entityKind"].as_str()?)))
+        .filter_map(|entry| {
+            Some((
+                entry.pointer("/entityGuid/value").and_then(Value::as_str)?,
+                entry.pointer("/entityKind/value").and_then(Value::as_str)?,
+            ))
+        })
         .collect();
     let (alpha, snub, broken, nested) = (guid(ALPHA), guid(SNUB), guid(BROKEN), guid(NESTED));
     let (turret, rack, looped) = (guid(TURRET), guid(RACK), guid(LOOP));

@@ -26589,12 +26589,12 @@
       "description": "The ports of a ship or of an item that has ports, and what the Default Loadout puts into them.",
       "properties": {
         "entityGuid": {
-          "$ref": "#/$defs/Guid",
-          "description": "The `guid` of the entry in `ships` or `items` the ports belong to; loadouts are ordered by\nit."
+          "$ref": "#/$defs/SourcedValueOfGuid",
+          "description": "The owning Record GUID used to join the Loadout to `ships` or `items`."
         },
         "entityKind": {
-          "description": "Which kind `entityGuid` is an entry of, `ship` or `item`; a closed set the game may\nextend, so the schema keeps a string.",
-          "type": "string"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Which kind `entityGuid` is an entry of, `ship` or `item`; a closed set the game may\nextend, so the schema keeps a string."
         },
         "issues": {
           "description": "The codes of the problems that kept part of the Loadout from being read, e.g.\n`xml_loadout`, sorted and without duplicates; empty when everything was read.",

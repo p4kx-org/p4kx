@@ -202,13 +202,7 @@ fn the_summary_counts_the_paints_with_and_without_a_ship() -> TestResult {
         detail.to_ascii_lowercase().contains("acas_broken.xml"),
         "the warning names the file: {details:?}"
     );
-    let missing = guid(SHIP_MISSING);
-    let loadout = catalog["loadouts"]
-        .as_array()
-        .ok_or("loadouts")?
-        .iter()
-        .find(|entry| entry["entityGuid"] == missing.as_str())
-        .ok_or("the loadout of the ship without a vehicle file")?;
+    let loadout = crate::loadouts_support::loadout(&catalog, SHIP_MISSING)?;
     assert!(
         loadout["issues"]
             .as_array()
