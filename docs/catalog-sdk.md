@@ -402,3 +402,23 @@ queried source scope incomplete. Readable prefix rows remain available; `coverag
 identifies the affected physical Record. An explicit null target and a proven foreign declaration
 remain separate known exclusions. No unrelated configuration projector runs to manufacture that
 coverage result.
+
+## Verify selected queries against an installed Archive
+
+The ignored `installed_selective_sdk_has_original_owners_and_closed_sources` test opens one
+session and reuses its parsed DataForge. It selects one physical owner per available family and
+checks mining globals, refining processes, quality distributions and quantizations, ResourceGroup
+definitions and membership, and the separate parent projection. The parent projection surveys the
+canonical group family. The test checks original Record identity, per-value source references,
+dependency coverage, and cancellation before and after a callback.
+
+Set `P4KX_DATA_P4K` to the installed Archive and configure the Archive key through the normal
+test configuration. Set `P4KX_SDK_WITNESS_FILE` to a new absolute JSON path inside the configured
+temporary directory. The test writes only aggregate counts and a Build fingerprint to that file
+after all checks pass.
+
+```powershell
+cargo test --locked -p p4kx-export --lib -- `
+    catalog_query_session::installed_sdk_witness::installed_selective_sdk_has_original_owners_and_closed_sources `
+    --ignored --exact --test-threads=1
+```

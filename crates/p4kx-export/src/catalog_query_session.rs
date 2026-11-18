@@ -212,3 +212,7 @@ fn cancelled(cancel: Option<&CancelToken>) -> bool {
 #[cfg(test)]
 #[path = "catalog_query_session_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "installed_sdk_witness.rs"]
+mod installed_sdk_witness;
