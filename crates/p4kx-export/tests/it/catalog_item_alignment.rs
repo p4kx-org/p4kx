@@ -18,7 +18,7 @@ mod links;
 mod sdk;
 
 const ENUM: &str = "EItemPortAttachRotationLimitAxis";
-const OWNER: u128 = 0x1087;
+pub(super) const OWNER: u128 = 0x1087;
 const CHILD: u128 = 0x1088;
 const PORTS: &str = "/configurations/itemPorts/rows";
 const ITEMS: &str = "/configurations/itemAttachmentConstraints/rows";
@@ -170,6 +170,10 @@ fn check_axis(
     proof::present(axis, "label", &json!(label), Some(encrypted))?;
     proof::present(axis, "optionStatus", &json!(status), Some(encrypted))?;
     Ok(())
+}
+
+pub(super) fn consumer_ports() -> DataForgeBuilder {
+    database(Layout::Absent)
 }
 
 fn database(layout: Layout) -> DataForgeBuilder {

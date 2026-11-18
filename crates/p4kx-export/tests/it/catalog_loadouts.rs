@@ -257,3 +257,6 @@ fn an_item_with_a_port_and_no_loadout_lists_the_port_empty() -> TestResult {
     );
     Ok(())
 }
+
+#[path = "catalog_consumer_refresh.rs"]
+mod consumer_refresh;

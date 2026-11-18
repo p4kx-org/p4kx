@@ -317,7 +317,11 @@ pub(crate) fn ambiguous_database() -> DataForgeBuilder {
 
 /// Returns the DataForge of the fixture.
 pub(crate) fn database() -> DataForgeBuilder {
-    let builder = structures::structures(DataForgeBuilder::new().version(8));
+    with_crafting_detail(DataForgeBuilder::new().version(8))
+}
+
+pub(super) fn with_crafting_detail(builder: DataForgeBuilder) -> DataForgeBuilder {
+    let builder = structures::structures(builder);
     let builder = [IRON, GOLD, PRODUCT_A, PRODUCT_B, BLACKLISTED]
         .into_iter()
         .zip(1_u32..)
