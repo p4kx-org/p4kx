@@ -11770,41 +11770,53 @@
       "description": "A resolved `.socpak` occurrence with its original local and composed world transforms.",
       "properties": {
         "container": {
-          "$ref": "#/$defs/SourcedValueOfPhysicalEntryRef"
+          "$ref": "#/$defs/SourcedValueOfPhysicalEntryRef",
+          "description": "Physical container descriptor that supplies this occurrence."
         },
         "declaredEntityName": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Entity name authored on the Child declaration."
         },
         "declaredLabel": {
           "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Label authored on the Child declaration.",
           "x-gameText": true
         },
         "declaredPath": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Path authored by the parent Child declaration."
         },
         "instanceId": {
-          "$ref": "#/$defs/SourcedValueOfContainerInstanceKey"
+          "$ref": "#/$defs/SourcedValueOfContainerInstanceKey",
+          "description": "Original occurrence key."
         },
         "localPosition": {
-          "$ref": "#/$defs/SourcedValueOfArray_size_3_of_double"
+          "$ref": "#/$defs/SourcedValueOfArray_size_3_of_double",
+          "description": "Position relative to the parent occurrence."
         },
         "localRotation": {
-          "$ref": "#/$defs/SourcedValueOfArray_size_4_of_double"
+          "$ref": "#/$defs/SourcedValueOfArray_size_4_of_double",
+          "description": "Quaternion relative to the parent occurrence."
         },
         "parentInstanceId": {
-          "$ref": "#/$defs/SourcedValueOfContainerInstanceKey"
+          "$ref": "#/$defs/SourcedValueOfContainerInstanceKey",
+          "description": "Parent occurrence key when this container has a parent."
         },
         "sourcePath": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original resolved container descriptor path."
         },
         "system": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Canonical system name."
         },
         "worldPosition": {
-          "$ref": "#/$defs/SourcedValueOfArray_size_3_of_double"
+          "$ref": "#/$defs/SourcedValueOfArray_size_3_of_double",
+          "description": "Composed system position."
         },
         "worldRotation": {
-          "$ref": "#/$defs/SourcedValueOfArray_size_4_of_double"
+          "$ref": "#/$defs/SourcedValueOfArray_size_4_of_double",
+          "description": "Composed system orientation."
         }
       },
       "required": [
@@ -11848,23 +11860,54 @@
     },
     "ContainerTargetReadStatus": {
       "description": "The actual consulted target body's availability after directory selection.",
-      "enum": [
-        "notAttempted",
-        "unreadable",
-        "unparsed"
+      "oneOf": [
+        {
+          "const": "notAttempted",
+          "description": "No unique target body was admitted for reading.",
+          "type": "string"
+        },
+        {
+          "const": "unreadable",
+          "description": "The selected target could not be opened or read.",
+          "type": "string"
+        },
+        {
+          "const": "unparsed",
+          "description": "The selected target was read without a usable descriptor parse.",
+          "type": "string"
+        }
       ],
-      "type": "string",
       "x-p4kx-vocabularyClass": "control"
     },
     "ContainerTargetStatus": {
-      "enum": [
-        "resolved",
-        "notFound",
-        "ambiguous",
-        "unsupportedSelector",
-        "incompleteDirectory"
+      "description": "Directory resolution of the authored container selector.",
+      "oneOf": [
+        {
+          "const": "resolved",
+          "description": "A unique target Entry was found.",
+          "type": "string"
+        },
+        {
+          "const": "notFound",
+          "description": "The complete directory contains no matching target.",
+          "type": "string"
+        },
+        {
+          "const": "ambiguous",
+          "description": "Several physical Entries qualify.",
+          "type": "string"
+        },
+        {
+          "const": "unsupportedSelector",
+          "description": "The authored path does not support a definitive directory selection.",
+          "type": "string"
+        },
+        {
+          "const": "incompleteDirectory",
+          "description": "The original directory cannot establish a definitive match or absence.",
+          "type": "string"
+        }
       ],
-      "type": "string",
       "x-p4kx-vocabularyClass": "control"
     },
     "Contents": {
@@ -130571,10 +130614,12 @@
       "description": "One original XML attribute occurrence.",
       "properties": {
         "name": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original attribute name."
         },
         "value": {
           "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original attribute text.",
           "x-gameText": true
         }
       },
@@ -134389,25 +134434,31 @@
       "description": "Source attributes shared by every placement of a physical Child.",
       "properties": {
         "attributes": {
+          "description": "All original Child attributes in document order.",
           "items": {
             "$ref": "#/$defs/SourcedXmlAttribute"
           },
           "type": "array"
         },
         "childNodeIndex": {
-          "$ref": "#/$defs/SourcedValueOfuint32"
+          "$ref": "#/$defs/SourcedValueOfuint32",
+          "description": "Original document-local Child XML ordinal."
         },
         "declaredPath": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original target path of the Child."
         },
         "descriptor": {
-          "$ref": "#/$defs/SourcedValueOfPhysicalEntryRef"
+          "$ref": "#/$defs/SourcedValueOfPhysicalEntryRef",
+          "description": "Physical descriptor containing the original Child node."
         },
         "localPosition": {
-          "$ref": "#/$defs/SourcedValueOfArray_size_3_of_double"
+          "$ref": "#/$defs/SourcedValueOfArray_size_3_of_double",
+          "description": "Original position relative to the parent occurrence."
         },
         "localRotation": {
-          "$ref": "#/$defs/SourcedValueOfArray_size_4_of_double"
+          "$ref": "#/$defs/SourcedValueOfArray_size_4_of_double",
+          "description": "Original orientation relative to the parent occurrence."
         },
         "starmapRecordGuid": {
           "$ref": "#/$defs/SourcedValueOfGuid"
@@ -134428,31 +134479,40 @@
       "description": "One admitted external Child without a usable uniquely resolved target body.",
       "properties": {
         "declaration": {
-          "$ref": "#/$defs/UnresolvedChild"
+          "$ref": "#/$defs/UnresolvedChild",
+          "description": "Original declaration shared across occurrences of the same physical Child."
         },
         "declaringContainer": {
-          "$ref": "#/$defs/SourcedValueOfPhysicalEntryRef"
+          "$ref": "#/$defs/SourcedValueOfPhysicalEntryRef",
+          "description": "Physical descriptor containing the Child declaration."
         },
         "instanceId": {
-          "$ref": "#/$defs/SourcedValueOfContainerInstanceKey"
+          "$ref": "#/$defs/SourcedValueOfContainerInstanceKey",
+          "description": "Original occurrence key."
         },
         "parentInstanceId": {
-          "$ref": "#/$defs/SourcedValueOfContainerInstanceKey"
+          "$ref": "#/$defs/SourcedValueOfContainerInstanceKey",
+          "description": "Key of the containing resolved occurrence."
         },
         "targetCandidates": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfPhysicalEntryRef"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfPhysicalEntryRef",
+          "description": "Physical target candidates returned by directory resolution."
         },
         "targetReadStatus": {
-          "$ref": "#/$defs/SourcedValueOfContainerTargetReadStatus"
+          "$ref": "#/$defs/SourcedValueOfContainerTargetReadStatus",
+          "description": "Outcome of reading the selected target body."
         },
         "targetStatus": {
-          "$ref": "#/$defs/SourcedValueOfContainerTargetStatus"
+          "$ref": "#/$defs/SourcedValueOfContainerTargetStatus",
+          "description": "Outcome of the original target directory selection."
         },
         "worldPosition": {
-          "$ref": "#/$defs/SourcedValueOfArray_size_3_of_double"
+          "$ref": "#/$defs/SourcedValueOfArray_size_3_of_double",
+          "description": "Composed system position when the placement is usable."
         },
         "worldRotation": {
-          "$ref": "#/$defs/SourcedValueOfArray_size_4_of_double"
+          "$ref": "#/$defs/SourcedValueOfArray_size_4_of_double",
+          "description": "Composed system orientation when the placement is usable."
         }
       },
       "required": [

@@ -171,7 +171,7 @@ impl Placements {
     }
 }
 
-fn finish_route_coverage(read: &[SystemRead], ledger: &mut ExportLedger) -> bool {
+pub(crate) fn finish_route_coverage(read: &[SystemRead], ledger: &mut ExportLedger) -> bool {
     if read.iter().any(|system| system.placement_budget_exhausted) {
         ledger.incomplete_inventory(Kind::StarmapObjects);
     }
@@ -185,7 +185,7 @@ fn check_cancelled(cancel: Option<&CancelToken>) -> Result<(), CatalogError> {
     Ok(())
 }
 
-fn unique_system_roots(
+pub(crate) fn unique_system_roots(
     archive: &Archive,
     index: &Index<'_>,
     capture: &EntryCapture<'_>,

@@ -99,23 +99,36 @@ impl ContainerInstanceKey {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ContainerInstance {
-    instance_id: SourcedValue<ContainerInstanceKey>,
-    parent_instance_id: SourcedValue<ContainerInstanceKey>,
-    container: SourcedValue<PhysicalEntryRef>,
+#[non_exhaustive]
+pub struct ContainerInstance {
+    /// Original occurrence key.
+    pub instance_id: SourcedValue<ContainerInstanceKey>,
+    /// Parent occurrence key when this container has a parent.
+    pub parent_instance_id: SourcedValue<ContainerInstanceKey>,
+    /// Physical container descriptor that supplies this occurrence.
+    pub container: SourcedValue<PhysicalEntryRef>,
+    /// Canonical system name.
     #[schemars(with = "SourcedValue<String>")]
-    system: SourcedValue<HealthText>,
+    pub system: SourcedValue<HealthText>,
+    /// Original resolved container descriptor path.
     #[schemars(with = "SourcedValue<String>")]
-    source_path: SourcedValue<HealthText>,
+    pub source_path: SourcedValue<HealthText>,
+    /// Path authored by the parent Child declaration.
     #[schemars(with = "SourcedValue<String>")]
-    declared_path: SourcedValue<HealthText>,
+    pub declared_path: SourcedValue<HealthText>,
+    /// Label authored on the Child declaration.
     #[schemars(extend("x-gameText" = true))]
-    declared_label: SourcedValue<String>,
-    declared_entity_name: SourcedValue<String>,
-    local_position: SourcedValue<[f64; 3]>,
-    local_rotation: SourcedValue<[f64; 4]>,
-    world_position: SourcedValue<[f64; 3]>,
-    world_rotation: SourcedValue<[f64; 4]>,
+    pub declared_label: SourcedValue<String>,
+    /// Entity name authored on the Child declaration.
+    pub declared_entity_name: SourcedValue<String>,
+    /// Position relative to the parent occurrence.
+    pub local_position: SourcedValue<[f64; 3]>,
+    /// Quaternion relative to the parent occurrence.
+    pub local_rotation: SourcedValue<[f64; 4]>,
+    /// Composed system position.
+    pub world_position: SourcedValue<[f64; 3]>,
+    /// Composed system orientation.
+    pub world_rotation: SourcedValue<[f64; 4]>,
 }
 
 #[cfg(test)]

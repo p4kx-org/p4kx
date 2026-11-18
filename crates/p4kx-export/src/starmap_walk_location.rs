@@ -16,6 +16,9 @@ impl System<'_> {
         path: &WalkPath,
         file: &ContainerFile,
     ) -> Result<(), CatalogError> {
+        if !self.rows.includes_container(path.route.as_deref()) {
+            return Ok(());
+        }
         let instance = ContainerOccurrence {
             system: &self.name_cell,
             root_entry: self.root_entry,
@@ -26,15 +29,18 @@ impl System<'_> {
             local: path.local,
             world: path.transform,
         };
+        let row = instance.project(file, self.capture)?;
         match &mut self.rows {
-            PlacementRows::Spool { containers, .. } => containers
-                .append(&instance.project(file, self.capture)?, self.cancel)
-                .map_err(Into::into),
+            PlacementRows::Spool { containers, .. } => {
+                containers.append(&row, self.cancel).map_err(Into::into)
+            }
             #[cfg(test)]
             PlacementRows::Typed => {
-                self.read
-                    .instances
-                    .push(instance.project(file, self.capture)?);
+                self.read.instances.push(row);
+                Ok(())
+            }
+            PlacementRows::SelectedContainers(rows) => {
+                rows.instances.push(row);
                 Ok(())
             }
             PlacementRows::Harvest(_) => Ok(()),
@@ -77,7 +83,7 @@ impl System<'_> {
                     .locations
                     .push(occurrence.project(location, file, self.capture)?);
             }
-            PlacementRows::Harvest(_) => return Ok(()),
+            PlacementRows::Harvest(_) | PlacementRows::SelectedContainers(_) => return Ok(()),
         }
         path.parent_location = Some(Arc::clone(route));
         Ok(())

@@ -28,6 +28,7 @@ use crate::starmap_walk::HarvestOccurrence;
 
 #[path = "starmap_container_read.rs"]
 mod read;
+pub(crate) use read::{finish_route_coverage, unique_system_roots};
 
 #[path = "starmap_jump_class.rs"]
 pub(crate) mod jump_class;

@@ -197,8 +197,9 @@ pub(crate) use health_entry_read::{EntryRead, EntryReadError};
 pub(crate) use health_entry_receipt::EntryReceipt;
 pub use health_entry_receipt::{PhysicalEntryIdentity, PhysicalEntryRef};
 pub(crate) use health_entry_soc::{EntrySoc, EntrySocEntity, ShopDeclarations, SocSourceFields};
+pub use health_entry_xml::SourcedXmlAttribute;
 pub(crate) use health_entry_xml::{
-    DeferredXmlNode, EntryXml, SourcedXmlAttribute, XmlAttribute, XmlAttributeSource, XmlNodeSource,
+    DeferredXmlNode, EntryXml, XmlAttribute, XmlAttributeSource, XmlNodeSource,
 };
 pub use health_failed_entry::FailedExportEntry;
 

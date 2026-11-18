@@ -10,13 +10,13 @@ use crate::catalog_read::original::{AuthoredEntryPath, EntryCapture, PhysicalEnt
 use crate::catalog_rows::spool::RowSpoolWriter;
 use crate::harvest_locations::HarvestSurvey;
 use crate::starmap_containers::Limits;
-#[cfg(test)]
 use crate::starmap_containers::instance::ContainerInstance;
 use crate::starmap_containers::jump_class::JumpEndpointRecords;
 use crate::starmap_containers::jump_endpoint::JumpEndpoint;
 #[cfg(test)]
 use crate::starmap_containers::location_instance::LocationInstance;
 use crate::starmap_containers::proof::{PlacementProof, PlacementStep};
+use crate::starmap_containers::unresolved::UnresolvedContainerLink;
 use crate::starmap_index::Index;
 use crate::starmap_parse::{Body, Child};
 use crate::starmap_report::{Placement, StarmapReport};
@@ -61,7 +61,7 @@ pub(crate) struct SystemRead {
     #[cfg(test)]
     pub(crate) locations: Vec<LocationInstance>,
     #[cfg(test)]
-    pub(crate) unresolved: Vec<crate::starmap_containers::unresolved::UnresolvedContainerLink>,
+    pub(crate) unresolved: Vec<UnresolvedContainerLink>,
     pub(crate) jump_endpoints: Vec<JumpEndpoint>,
 }
 
@@ -146,6 +146,32 @@ impl WalkPath {
     }
 }
 
+pub(crate) struct SelectedContainerRows {
+    pub(crate) child_node_indices: Option<Vec<u32>>,
+    pub(crate) instances: Vec<ContainerInstance>,
+    pub(crate) unresolved: Vec<UnresolvedContainerLink>,
+}
+
+impl SelectedContainerRows {
+    pub(crate) const fn new(child_node_indices: Option<Vec<u32>>) -> Self {
+        Self {
+            child_node_indices,
+            instances: Vec::new(),
+            unresolved: Vec::new(),
+        }
+    }
+
+    fn matches(&self, route: Option<&PlacementStep>) -> bool {
+        self.child_node_indices.as_ref().is_none_or(|indices| {
+            route
+                .into_iter()
+                .flat_map(PlacementStep::steps)
+                .map(PlacementStep::child_index)
+                .eq(indices.iter().copied().rev())
+        })
+    }
+}
+
 pub(crate) enum PlacementRows<'writer> {
     Spool {
         containers: &'writer mut RowSpoolWriter,
@@ -155,6 +181,19 @@ pub(crate) enum PlacementRows<'writer> {
     #[cfg(test)]
     Typed,
     Harvest(&'writer HarvestSurvey<'writer>),
+    SelectedContainers(&'writer mut SelectedContainerRows),
+}
+
+impl PlacementRows<'_> {
+    fn includes_container(&self, route: Option<&PlacementStep>) -> bool {
+        match self {
+            Self::SelectedContainers(rows) => rows.matches(route),
+            Self::Harvest(_) => false,
+            Self::Spool { .. } => true,
+            #[cfg(test)]
+            Self::Typed => true,
+        }
+    }
 }
 
 /// The walk through one star system, over containers that are already parsed.
@@ -220,7 +259,7 @@ impl System<'_> {
                 });
                 self.read.containers.push(opened);
             }
-        } else {
+        } else if !matches!(&self.rows, PlacementRows::SelectedContainers(_)) {
             self.read.containers.push(opened);
         }
         self.read.deepest = self.read.deepest.max(path.external);
@@ -233,6 +272,9 @@ impl System<'_> {
         path: &WalkPath,
         under: Option<Guid>,
     ) -> Result<(), CatalogError> {
+        if matches!(&self.rows, PlacementRows::SelectedContainers(_)) {
+            return Ok(());
+        }
         let Some(record) = child.record else {
             return Ok(());
         };

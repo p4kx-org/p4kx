@@ -30,10 +30,13 @@ pub(crate) use deferred::DeferredXmlNode;
 /// One original XML attribute occurrence.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[schemars(transform = every_field_required)]
-pub(crate) struct SourcedXmlAttribute {
-    pub(crate) name: SourcedValue<String>,
+#[non_exhaustive]
+pub struct SourcedXmlAttribute {
+    /// Original attribute name.
+    pub name: SourcedValue<String>,
+    /// Original attribute text.
     #[schemars(extend("x-gameText" = true))]
-    pub(crate) value: SourcedValue<String>,
+    pub value: SourcedValue<String>,
 }
 
 /// One actual parse borrowing only bytes from its sealed original Entry read.

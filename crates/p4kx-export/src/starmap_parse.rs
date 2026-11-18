@@ -119,20 +119,29 @@ pub(crate) enum Body {
 /// The placement details needed by the consumer of the descriptor walk.
 #[derive(Clone, Copy)]
 pub(crate) struct DescriptorScope {
-    companions: bool,
+    location_enrichment: bool,
+    unresolved_links: bool,
     jump_endpoints: bool,
 }
 
 impl DescriptorScope {
     pub(crate) const fn catalog(jump_endpoints: bool) -> Self {
         Self {
-            companions: true,
+            location_enrichment: true,
+            unresolved_links: true,
             jump_endpoints,
         }
     }
 
+    pub(crate) const CONTAINER_PLACEMENTS: Self = Self {
+        location_enrichment: false,
+        unresolved_links: true,
+        jump_endpoints: false,
+    };
+
     pub(crate) const HARVEST: Self = Self {
-        companions: false,
+        location_enrichment: false,
+        unresolved_links: false,
         jump_endpoints: false,
     };
 }
@@ -362,13 +371,13 @@ pub(crate) fn read_all_scoped(
             &mut ledger,
         )?;
         for (entry, (body, observed)) in read {
-            if scope.companions {
+            if scope.unresolved_links {
                 failed_links::observe(entry, &body, &mut pending);
             }
             bodies.insert(entry, body);
             ledger.merge(observed);
         }
-        if scope.companions {
+        if scope.unresolved_links {
             failed_links::finish(&mut bodies, &mut pending, index, capture, cancel)?;
         }
         frontier = next
@@ -376,7 +385,7 @@ pub(crate) fn read_all_scoped(
             .filter(|entry| !bodies.contains_key(entry))
             .collect();
     }
-    if scope.companions {
+    if scope.unresolved_links {
         failed_links::completed(&pending, cancel)?;
     }
     Ok(Read {

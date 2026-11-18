@@ -25,14 +25,21 @@ use crate::starmap_transform::Transform;
 use crate::starmap_xml::{self, Root};
 use crate::{CatalogError, ExportAccountingError, HealthText};
 
+/// Directory resolution of the authored container selector.
 #[derive(Clone, Copy, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
-enum ContainerTargetStatus {
+#[non_exhaustive]
+pub enum ContainerTargetStatus {
+    /// A unique target Entry was found.
     Resolved,
+    /// The complete directory contains no matching target.
     NotFound,
+    /// Several physical Entries qualify.
     Ambiguous,
+    /// The authored path does not support a definitive directory selection.
     UnsupportedSelector,
+    /// The original directory cannot establish a definitive match or absence.
     IncompleteDirectory,
 }
 
@@ -40,33 +47,50 @@ enum ContainerTargetStatus {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct UnresolvedContainerLink {
-    instance_id: SourcedValue<ContainerInstanceKey>,
-    parent_instance_id: SourcedValue<ContainerInstanceKey>,
-    declaring_container: SourcedValue<PhysicalEntryRef>,
+#[non_exhaustive]
+pub struct UnresolvedContainerLink {
+    /// Original occurrence key.
+    pub instance_id: SourcedValue<ContainerInstanceKey>,
+    /// Key of the containing resolved occurrence.
+    pub parent_instance_id: SourcedValue<ContainerInstanceKey>,
+    /// Physical descriptor containing the Child declaration.
+    pub declaring_container: SourcedValue<PhysicalEntryRef>,
+    /// Original declaration shared across occurrences of the same physical Child.
     #[serde(serialize_with = "UnresolvedChild::serialize_shared")]
     #[schemars(with = "UnresolvedChild")]
-    declaration: Arc<UnresolvedChild>,
-    world_position: SourcedValue<[f64; 3]>,
-    world_rotation: SourcedValue<[f64; 4]>,
-    target_status: SourcedValue<ContainerTargetStatus>,
-    target_read_status: SourcedValue<ContainerTargetReadStatus>,
-    target_candidates: SourcedValue<Vec<SourcedValue<PhysicalEntryRef>>>,
+    pub declaration: Arc<UnresolvedChild>,
+    /// Composed system position when the placement is usable.
+    pub world_position: SourcedValue<[f64; 3]>,
+    /// Composed system orientation when the placement is usable.
+    pub world_rotation: SourcedValue<[f64; 4]>,
+    /// Outcome of the original target directory selection.
+    pub target_status: SourcedValue<ContainerTargetStatus>,
+    /// Outcome of reading the selected target body.
+    pub target_read_status: SourcedValue<ContainerTargetReadStatus>,
+    /// Physical target candidates returned by directory resolution.
+    pub target_candidates: SourcedValue<Vec<SourcedValue<PhysicalEntryRef>>>,
 }
 
 /// Source attributes shared by every placement of a physical Child.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct UnresolvedChild {
-    descriptor: SourcedValue<PhysicalEntryRef>,
-    child_node_index: SourcedValue<u32>,
+#[non_exhaustive]
+pub struct UnresolvedChild {
+    /// Physical descriptor containing the original Child node.
+    pub descriptor: SourcedValue<PhysicalEntryRef>,
+    /// Original document-local Child XML ordinal.
+    pub child_node_index: SourcedValue<u32>,
+    /// Original target path of the Child.
     #[schemars(with = "SourcedValue<String>")]
-    declared_path: SourcedValue<HealthText>,
+    pub declared_path: SourcedValue<HealthText>,
     starmap_record_guid: SourcedValue<CatalogGuid>,
-    local_position: SourcedValue<[f64; 3]>,
-    local_rotation: SourcedValue<[f64; 4]>,
-    attributes: Vec<SourcedXmlAttribute>,
+    /// Original position relative to the parent occurrence.
+    pub local_position: SourcedValue<[f64; 3]>,
+    /// Original orientation relative to the parent occurrence.
+    pub local_rotation: SourcedValue<[f64; 4]>,
+    /// All original Child attributes in document order.
+    pub attributes: Vec<SourcedXmlAttribute>,
     #[serde(skip)]
     #[schemars(skip)]
     directory: Option<SourceUse>,
@@ -76,9 +100,13 @@ pub(crate) struct UnresolvedChild {
 #[derive(Clone, Copy, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
-pub(crate) enum ContainerTargetReadStatus {
+#[non_exhaustive]
+pub enum ContainerTargetReadStatus {
+    /// No unique target body was admitted for reading.
     NotAttempted,
+    /// The selected target could not be opened or read.
     Unreadable,
+    /// The selected target was read without a usable descriptor parse.
     Unparsed,
 }
 
@@ -110,6 +138,12 @@ impl DeferredChild {
 }
 
 impl UnresolvedChild {
+    /// Returns the Starmap Record GUID authored on the Child.
+    #[must_use]
+    pub fn starmap_record_guid(&self) -> SourcedValue<Guid> {
+        self.starmap_record_guid.map_ref(|guid| guid.get())
+    }
+
     pub(crate) fn capture(
         xml: &EntryXml<'_, '_, '_>,
         node: Root<'_>,

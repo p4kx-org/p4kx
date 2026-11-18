@@ -376,3 +376,5 @@ fn a_position_never_prints_a_negative_zero_and_two_builds_are_identical() -> Tes
 
 #[path = "starmap_container_instance_contract.rs"]
 mod container_instances;
+#[path = "starmap_container_query.rs"]
+mod container_query;

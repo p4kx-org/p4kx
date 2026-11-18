@@ -105,7 +105,7 @@ impl<'a, 'read, 'capture, 'input, 'archive, 'cancel>
             pose,
             node: child,
         } = authored;
-        let mut location = if self.bounds.scope.companions {
+        let mut location = if self.bounds.scope.location_enrichment {
             ChildLocation::read(xml, child, xml.capture())?
         } else {
             None
@@ -125,7 +125,8 @@ impl<'a, 'read, 'capture, 'input, 'archive, 'cancel>
         let unresolved_external = external
             .as_ref()
             .filter(|path| {
-                self.bounds.scope.companions && self.index.candidates(path.as_str()).len() != 1
+                self.bounds.scope.unresolved_links
+                    && self.index.candidates(path.as_str()).len() != 1
             })
             .map(|path| UnresolvedChild::capture(xml, child, path, self.bounds.directory.clone()))
             .transpose()?;
@@ -148,7 +149,7 @@ impl<'a, 'read, 'capture, 'input, 'archive, 'cancel>
         path: Option<&AuthoredEntryPath>,
     ) -> Result<Option<Box<DeferredChild>>, CatalogError> {
         path.filter(|path| {
-            self.bounds.scope.companions && self.index.candidates(path.as_str()).len() == 1
+            self.bounds.scope.unresolved_links && self.index.candidates(path.as_str()).len() == 1
         })
         .map(|_| {
             DeferredChild::capture(self.xml, node, self.bounds.directory.clone()).map(Box::new)

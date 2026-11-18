@@ -33,6 +33,9 @@ impl System<'_> {
             .route
             .as_deref()
             .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+        if !self.rows.includes_container(Some(route)) {
+            return Ok(());
+        }
         let read_status = match self.index.candidates(selector.as_str()) {
             [target] => match self.bodies.get(target) {
                 Some(Body::Unreadable(_)) => ContainerTargetReadStatus::Unreadable,
@@ -51,21 +54,18 @@ impl System<'_> {
             world: placed.map(|path| path.transform),
             read_status,
         };
+        let row = occurrence.project(self.archive, self.index, file, self.capture)?;
         match &mut self.rows {
-            PlacementRows::Spool { unresolved, .. } => unresolved
-                .append(
-                    &occurrence.project(self.archive, self.index, file, self.capture)?,
-                    self.cancel,
-                )
-                .map_err(Into::into),
+            PlacementRows::Spool { unresolved, .. } => {
+                unresolved.append(&row, self.cancel).map_err(Into::into)
+            }
             #[cfg(test)]
             PlacementRows::Typed => {
-                self.read.unresolved.push(occurrence.project(
-                    self.archive,
-                    self.index,
-                    file,
-                    self.capture,
-                )?);
+                self.read.unresolved.push(row);
+                Ok(())
+            }
+            PlacementRows::SelectedContainers(rows) => {
+                rows.unresolved.push(row);
                 Ok(())
             }
             PlacementRows::Harvest(_) => Ok(()),

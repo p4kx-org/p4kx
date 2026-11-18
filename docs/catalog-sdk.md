@@ -164,9 +164,9 @@ Its reference preserves the original target GUID and resolution state. Use
 physical container route. Both relationships carry their own source evidence. They can
 refer to different objects within the same Build.
 
-The mining reader supplies mining-specific placements and coverage. Read
-`placements.unresolvedContainerLinks` from the Catalog snapshot for original unresolved
-external Child occurrences, Archive lookup states and target-body read states.
+The mining reader supplies mining-specific placements and coverage. Use
+[the container placement query](#starmap-container-placements) for original unresolved Child
+occurrences and their Archive lookup and target-body read states.
 
 ## Direct quality definitions
 
@@ -655,3 +655,19 @@ selector for an owner with a named DataForge root port. Set `P4KX_DATA_P4K` and
 ```text
 cargo test --locked -p p4kx-export --lib -- catalog_query_session::installed_sdk_witness::loadout_source::installed_loadout_sdk_matches_one_original_port_name --ignored --exact
 ```
+
+## Starmap container placements
+
+Use `starmap::read_container_placements` to read the canonical `placements.containerInstances` and
+`placements.unresolvedContainerLinks` rows for one original system root. Give a physical root Entry
+index or add the full root-to-leaf Child XML ordinal sequence to select one occurrence. These
+coordinates belong to the queried Archive. An empty Child sequence addresses the root itself.
+
+The query checks the selected root's reachable descriptor and placement graph. An occurrence
+selector limits the rows that are projected. The query reads the Archive directory and the reachable
+container descriptors and uses the canonical container projectors to produce the two tables.
+
+The result carries Build, original provenance and selected-scope coverage. Check
+`coverage.is_complete()` before treating an empty row list as a confirmed absence. Root availability,
+Entry failures, malformed or blocked routes and caller-selected traversal allowances remain visible
+even if the query could emit some rows.

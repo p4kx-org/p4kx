@@ -72,6 +72,9 @@ pub mod crafting;
 #[path = "equipment_query.rs"]
 pub mod equipment;
 
+#[path = "starmap_placement_query.rs"]
+pub mod starmap;
+
 use p4kx_extraction::{
     Archive, Build, CancelToken, DataForge, DataForgeEntry, Guid, Record, SourceInventory,
     SourcedValue,
