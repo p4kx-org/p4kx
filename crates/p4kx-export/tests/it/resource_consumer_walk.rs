@@ -10,8 +10,7 @@ use p4kx_export::catalog_queries::{
 use p4kx_extraction::{SourceInventory, SourcedValue};
 use serde_json::Value;
 
-#[path = "resource_consumer_wire.rs"]
-mod wire;
+use crate::canonical_header::wire;
 
 use wire::{TestResult, Wire};
 

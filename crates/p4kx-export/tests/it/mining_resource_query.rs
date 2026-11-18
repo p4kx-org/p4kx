@@ -12,6 +12,8 @@ use p4kx_extraction::{
 };
 use serde_json::Value;
 
+use crate::canonical_header::json::canonical_value;
+
 use super::mining_resource_query_archive as archive_fixture;
 use super::mining_resource_query_fixture as fixture;
 use super::resource_consumer_walk::{visit_leaf, visit_resource};
@@ -49,7 +51,7 @@ fn direct_mining_and_resource_queries_preserve_canonical_rows_and_all_origin_sta
             None,
             |snapshot| -> TestResult {
                 assert_eq!(
-                    serde_json::to_value(snapshot.rows())?,
+                    canonical_value(snapshot.rows())?,
                     *at(&catalog, "/definitions/resourceTypes/rows")?,
                     "Resource rows match the canonical Catalog"
                 );
@@ -73,7 +75,7 @@ fn verify_elements(
     expected: Option<bool>,
 ) -> TestResult {
     assert_eq!(
-        serde_json::to_value(snapshot.rows())?,
+        canonical_value(snapshot.rows())?,
         *at(catalog, "/mineableElements")?,
         "Element rows match the canonical Catalog"
     );
@@ -131,7 +133,7 @@ fn verify_compositions(
     expected: Option<bool>,
 ) -> TestResult {
     assert_eq!(
-        serde_json::to_value(snapshot.rows())?,
+        canonical_value(snapshot.rows())?,
         *at(catalog, "/mineableCompositions")?,
         "Composition rows match the canonical Catalog"
     );

@@ -6,23 +6,25 @@ use p4kx_extraction::{Guid, SourceInventory, SourceValueState, SourcedValue};
 use serde::Serialize;
 use serde_json::Value;
 
-pub(super) type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
+use crate::canonical_header::json::assert_canonical;
+
+pub(crate) type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
 #[derive(Clone, Copy)]
-pub(super) struct Wire<'a> {
+pub(crate) struct Wire<'a> {
     expected: &'a Value,
     inventory: &'a SourceInventory,
 }
 
 impl<'a> Wire<'a> {
-    pub(super) const fn new(expected: &'a Value, inventory: &'a SourceInventory) -> Self {
+    pub(crate) const fn new(expected: &'a Value, inventory: &'a SourceInventory) -> Self {
         Self {
             expected,
             inventory,
         }
     }
 
-    pub(super) fn field(self, name: &str) -> TestResult<Self> {
+    pub(crate) fn field(self, name: &str) -> TestResult<Self> {
         Ok(Self {
             expected: self
                 .expected
@@ -32,20 +34,31 @@ impl<'a> Wire<'a> {
         })
     }
 
-    pub(super) fn raw<T: Serialize + ?Sized>(self, value: &T) -> TestResult {
+    pub(crate) fn index(self, index: usize) -> TestResult<Self> {
+        Ok(Self {
+            expected: self.expected.get(index).ok_or("wire array position")?,
+            ..self
+        })
+    }
+
+    pub(crate) fn len(self, length: usize) -> TestResult {
         assert_eq!(
-            serde_json::to_value(value)?,
-            *self.expected,
-            "typed getter equals canonical wire"
+            self.expected.as_array().ok_or("wire array")?.len(),
+            length,
+            "typed getter preserves every array position"
         );
         Ok(())
     }
 
-    pub(super) fn tag(self, kind: &str) -> TestResult {
+    pub(crate) fn raw<T: Serialize + ?Sized>(self, value: &T) -> TestResult {
+        assert_canonical(value, self.expected, "typed getter equals canonical wire")
+    }
+
+    pub(crate) fn tag(self, kind: &str) -> TestResult {
         self.field("type")?.raw(kind)
     }
 
-    pub(super) fn cell<T>(
+    pub(crate) fn cell<T>(
         self,
         cell: &SourcedValue<T>,
         visit: impl FnOnce(&T, Self) -> TestResult,
@@ -70,15 +83,15 @@ impl<'a> Wire<'a> {
         Ok(())
     }
 
-    pub(super) fn leaf<T: Serialize>(self, cell: &SourcedValue<T>) -> TestResult {
+    pub(crate) fn leaf<T: Serialize>(self, cell: &SourcedValue<T>) -> TestResult {
         self.cell(cell, |value, payload| payload.raw(value))
     }
 
-    pub(super) fn guid(self, cell: &SourcedValue<Guid>) -> TestResult {
+    pub(crate) fn guid(self, cell: &SourcedValue<Guid>) -> TestResult {
         self.cell(cell, |guid, payload| payload.raw(&guid.to_string()))
     }
 
-    pub(super) fn array<T>(
+    pub(crate) fn array<T>(
         self,
         cells: &[SourcedValue<T>],
         visit: impl Fn(&T, Self) -> TestResult,
@@ -91,19 +104,19 @@ impl<'a> Wire<'a> {
         Ok(())
     }
 
-    pub(super) fn float32(self, number: &ResourceFloat32) -> TestResult {
+    pub(crate) fn float32(self, number: &ResourceFloat32) -> TestResult {
         self.field("rawBits")?
             .raw(&format!("{:08x}", number.raw_bits()))?;
         self.field("finite")?.raw(&number.finite())
     }
 
-    pub(super) fn float64(self, number: &ResourceFloat64) -> TestResult {
+    pub(crate) fn float64(self, number: &ResourceFloat64) -> TestResult {
         self.field("rawBits")?
             .raw(&format!("{:016x}", number.raw_bits()))?;
         self.field("finite")?.raw(&number.finite())
     }
 
-    pub(super) fn number(self, number: &ResourceNumber) -> TestResult {
+    pub(crate) fn number(self, number: &ResourceNumber) -> TestResult {
         match number {
             ResourceNumber::Int8 { value } => self.integer("int8", value),
             ResourceNumber::Int16 { value } => self.integer("int16", value),
@@ -131,7 +144,7 @@ impl<'a> Wire<'a> {
     }
 }
 
-pub(super) fn visit_leaf<T>(cell: &SourcedValue<T>, inventory: &SourceInventory) -> TestResult {
+pub(crate) fn visit_leaf<T>(cell: &SourcedValue<T>, inventory: &SourceInventory) -> TestResult {
     assert_eq!(
         cell.state() == SourceValueState::Present,
         cell.value().is_some(),

@@ -284,3 +284,9 @@ fn canonical_metadata_tag_does_not_expand_the_entity_filter_scope() -> TestResul
     );
     Ok(())
 }
+
+#[path = "catalog_consumer_wire.rs"]
+pub(crate) mod wire;
+
+#[path = "canonical_json.rs"]
+pub(crate) mod json;
