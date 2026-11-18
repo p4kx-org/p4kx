@@ -19,6 +19,9 @@ use super::Collected;
 impl<'f> Collected<'f> {
     pub(crate) fn take_configuration_numbers(&mut self) -> Vec<CapturedNumber> {
         let mut numbers = std::mem::take(&mut self.entity_configurations.numbers);
+        for global in &mut self.crafting_global {
+            numbers.append(&mut global.numbers);
+        }
         for location in &mut self.mission_location_templates {
             numbers.append(&mut location.configuration_numbers);
         }

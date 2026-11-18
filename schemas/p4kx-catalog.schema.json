@@ -5055,6 +5055,9 @@
         "countermeasureEmitters": {
           "$ref": "#/$defs/CatalogTableOfCountermeasureEmitter"
         },
+        "craftingGlobal": {
+          "$ref": "#/$defs/CatalogTableOfCraftingGlobalConfiguration"
+        },
         "degradation": {
           "$ref": "#/$defs/CatalogTableOfDegradation"
         },
@@ -5219,6 +5222,7 @@
         "consumables",
         "contractTemplates",
         "countermeasureEmitters",
+        "craftingGlobal",
         "degradation",
         "distortion",
         "durability",
@@ -6404,6 +6408,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/CountermeasureEmitter"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfCraftingGlobalConfiguration": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/CraftingGlobalConfiguration"
           },
           "type": "array"
         }
@@ -12840,27 +12863,79 @@
       ],
       "type": "object"
     },
-    "CraftingGlobal": {
-      "description": "The `CraftingGlobalParams` Records, merged: what applies to every dismantle.",
+    "CraftingBlueprintSelection": {
+      "description": "An original default-blueprint selection with its concrete type and ordered reference slots.",
       "properties": {
-        "dismantleExcludedItemGuids": {
-          "description": "The entities that cannot be dismantled; their blueprints have no `dismantle`.",
-          "items": {
-            "$ref": "#/$defs/Guid"
-          },
-          "type": "array"
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
         },
-        "dismantleExcludedResourceGuids": {
-          "description": "The `ResourceType` Records dismantling never returns.",
-          "items": {
-            "$ref": "#/$defs/Guid"
-          },
-          "type": "array"
+        "blueprintRecords": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         }
       },
       "required": [
-        "dismantleExcludedItemGuids",
-        "dismantleExcludedResourceGuids"
+        "additionalFields",
+        "blueprintRecords",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "CraftingGlobalConfiguration": {
+      "description": "One physical crafting-global Record with its original default and exclusion declarations.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "className": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "defaultBlueprintSelection": {
+          "$ref": "#/$defs/SourcedValueOfCraftingBlueprintSelection"
+        },
+        "dismantleBlacklistEntityClasses": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+        },
+        "dismantleBlacklistResources": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+        },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "className",
+        "defaultBlueprintSelection",
+        "dismantleBlacklistEntityClasses",
+        "dismantleBlacklistResources",
+        "fileName",
+        "guid",
+        "metadataTag",
+        "recordIndex",
+        "recordName",
+        "recordPath",
+        "sourceType"
       ],
       "type": "object"
     },
@@ -76033,6 +76108,136 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfCraftingBlueprintSelection": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/CraftingBlueprintSelection"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfCrossSection": {
       "allOf": [
         {
@@ -134809,10 +135014,6 @@
       },
       "type": "array"
     },
-    "craftingGlobal": {
-      "$ref": "#/$defs/CraftingGlobal",
-      "description": "The global crafting parameters that apply to every dismantle."
-    },
     "declarations": {
       "$ref": "#/$defs/CatalogDeclarations",
       "description": "Ordered authored declarations from selected physical Records."
@@ -135018,7 +135219,6 @@
     "contractScenarios",
     "contractShipSpawns",
     "crafters",
-    "craftingGlobal",
     "declarations",
     "definitions",
     "dismantleProcesses",

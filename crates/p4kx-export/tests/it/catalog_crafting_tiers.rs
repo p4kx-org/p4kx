@@ -257,13 +257,35 @@ fn a_blueprint_links_to_the_dismantle_process_unless_its_item_is_excluded() -> T
             "timeSeconds": 15,
         }])
     );
-    assert_eq!(
-        catalog["craftingGlobal"],
-        json!({
-            "dismantleExcludedResourceGuids": [text(fixture::GOLD)],
-            "dismantleExcludedItemGuids": [text(fixture::BLACKLISTED)],
-        })
+    assert!(
+        catalog.get("craftingGlobal").is_none(),
+        "no merged compatibility root"
     );
+    let globals = &catalog["configurations"]["craftingGlobal"]["rows"];
+    let [global] = globals
+        .as_array()
+        .ok_or("physical crafting globals")?
+        .as_slice()
+    else {
+        return Err("one original global owner".into());
+    };
+    for (field, guid) in [
+        ("dismantleBlacklistResources", fixture::GOLD),
+        ("dismantleBlacklistEntityClasses", fixture::BLACKLISTED),
+    ] {
+        let [slot] = global[field]["value"]
+            .as_array()
+            .ok_or("original exclusion slots")?
+            .as_slice()
+        else {
+            return Err("one original exclusion slot".into());
+        };
+        assert_eq!(
+            slot["value"]["guid"]["value"],
+            text(guid),
+            "original exclusion target"
+        );
+    }
     Ok(())
 }
 

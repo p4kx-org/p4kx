@@ -59,12 +59,19 @@ impl BlueprintRules {
     ) -> Result<Self, CatalogError> {
         let scope = input.record_scope(admission.record(), tree)?;
         let fields = OriginalFlowFields::read(&scope, cancel)?;
-        let defaults = BlueprintField::read(&fields, tree.root(), "defaultBlueprintSelection")?
+        Self::read_globals_fields(tree, &fields)
+    }
+
+    pub(crate) fn read_globals_fields<'source>(
+        tree: &RecordTree<'source>,
+        fields: &OriginalFlowFields<'_, '_, 'source>,
+    ) -> Result<Self, CatalogError> {
+        let defaults = BlueprintField::read(fields, tree.root(), "defaultBlueprintSelection")?
             .child("blueprintRecords")?;
-        let items = BlueprintField::read(&fields, tree.root(), "dismantleBlacklistEntityClasses")?;
+        let items = BlueprintField::read(fields, tree.root(), "dismantleBlacklistEntityClasses")?;
         Ok(Self {
-            defaults: RuleInputs::read(&fields, &defaults)?,
-            item_exclusions: RuleInputs::read(&fields, &items)?,
+            defaults: RuleInputs::read(fields, &defaults)?,
+            item_exclusions: RuleInputs::read(fields, &items)?,
             ..Self::default()
         })
     }

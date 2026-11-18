@@ -166,6 +166,7 @@ const GROUPS: &[Group] = &[
             "consumables",
             "contractTemplates",
             "countermeasureEmitters",
+            "craftingGlobal",
             "degradation",
             "distortion",
             "durability",
@@ -223,12 +224,6 @@ const GROUPS: &[Group] = &[
         prefix: "/configurations/clientProfileSettings",
         shape: Shape::Array,
         members: &["documents"],
-    },
-    Group {
-        owner: Owner::Configuration,
-        prefix: "",
-        shape: Shape::Object,
-        members: &["craftingGlobal"],
     },
     Group {
         owner: Owner::Declaration,

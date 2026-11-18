@@ -9,6 +9,7 @@ use p4kx_testkit::{ArchiveBuilder, TestEntry, TestRecord, TestStruct};
 use super::super::read::Query;
 use super::{Capture, TestResult, fixture};
 use crate::catalog_queries::CatalogRecordSelection;
+use crate::catalog_queries::crafting;
 
 #[test]
 fn unreadable_global_header_makes_dependent_choices_incomplete() -> TestResult {
@@ -58,6 +59,7 @@ fn observe_header(
         record.type_name().is_err(),
         "The actual type header is unreadable"
     );
+    verify_direct_globals(&archive, &entry, global_failures)?;
     let capture = Arc::new(Capture::default());
     let query = Query {
         archive: &archive,
@@ -82,6 +84,27 @@ fn observe_header(
         expected_reads,
         "Unclassified and unrelated bodies remain unread"
     );
+    Ok(())
+}
+
+fn verify_direct_globals(
+    archive: &Archive,
+    entry: &DataForgeEntry,
+    global_failures: &[u32],
+) -> TestResult {
+    crafting::with_global_params_from(
+        archive,
+        entry,
+        CatalogRecordSelection::All,
+        None,
+        |snapshot| {
+            assert_eq!(
+                snapshot.coverage().unreadable_headers.as_slice(),
+                global_failures,
+                "Direct globals report only headers that can belong to the selected family"
+            );
+        },
+    )?;
     Ok(())
 }
 

@@ -178,6 +178,7 @@ pub(crate) fn minimal_catalog() -> Value {
             "shopInventories": {"availability": "absent", "meaning": "offlineDesignTime", "rows": []}},
         "configurations": {
             "miningGlobal": mining::globals(),
+            "craftingGlobal": blueprints::globals(),
             "blueprintTiers": blueprints::tiers(),
             "itemRecoveryEconomy": recovery::economy(),
             "itemRecoveryOverrides": recovery::overrides(),
@@ -275,10 +276,6 @@ pub(crate) fn minimal_catalog() -> Value {
             "efficiency": 0.5,
             "timeSeconds": 15
         }],
-        "craftingGlobal": {
-            "dismantleExcludedResourceGuids": ["b1000000-0000-4000-8000-000000000001"],
-            "dismantleExcludedItemGuids": []
-        },
         "paints": [{
             "itemGuid": "30000000-0000-4000-8000-000000000001",
             "shipGuids": ["90000000-0000-4000-8000-000000000001"]

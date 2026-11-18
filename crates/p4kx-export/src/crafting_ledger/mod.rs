@@ -23,6 +23,7 @@ pub(crate) struct ReadCrafting<'f> {
     pub(crate) data: Crafting<'f>,
     pub(crate) blueprints: Vec<crate::blueprint_catalog_read::PreparedBlueprint<'f>>,
     pub(crate) blueprint_rules: crate::blueprint_rule_inputs::BlueprintRules,
+    pub(crate) globals: Vec<crate::catalog_v3::crafting_global::PreparedCraftingGlobal<'f>>,
     pub(crate) catalog_failures: Vec<crate::catalog_read_failure::CatalogReadFailure<'f>>,
     pub(crate) ledger: ExportLedger,
     pub(crate) gameplay: GameplayPropertyRows<'f>,

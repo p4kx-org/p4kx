@@ -13,6 +13,21 @@ type LinkPayload<T> = Option<(OriginalValuePart, T)>;
 type LinkList<T> = SourcedValue<Vec<SourcedValue<T>>>;
 
 impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
+    /// Retains every original Reference-array slot without imposing another target declaration.
+    pub(in crate::catalog_v3) fn record_link_array(
+        &self,
+        name: &str,
+        notes: &mut Vec<FieldError>,
+    ) -> Result<SourcedValue<Vec<ReferenceCell<'source>>>, CatalogError> {
+        self.link_array_to(
+            name,
+            (DataType::Reference, None),
+            ["a nullable Reference array", "a nullable Reference"],
+            notes,
+            |fact, sources, selectors| self.decode_record_link(fact, sources, selectors),
+        )
+    }
+
     pub(in crate::catalog_v3) fn record_link_array_to(
         &self,
         name: &str,
@@ -21,7 +36,7 @@ impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
     ) -> Result<SourcedValue<Vec<ReferenceCell<'source>>>, CatalogError> {
         self.link_array_to(
             name,
-            (DataType::Reference, target_type),
+            (DataType::Reference, Some(target_type)),
             ["a nullable Reference array", "a nullable Reference"],
             notes,
             |fact, sources, selectors| self.decode_record_link(fact, sources, selectors),
@@ -37,7 +52,7 @@ impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
     ) -> Result<LinkList<Box<SourceWeakReference<'source>>>, CatalogError> {
         self.link_array_to(
             name,
-            (DataType::WeakPointer, target_type),
+            (DataType::WeakPointer, Some(target_type)),
             ["a nullable WeakPointer array", "a nullable WeakPointer"],
             notes,
             |fact, sources, _| decode_weak_link(fact, sources),
@@ -47,7 +62,7 @@ impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
     fn link_array_to<T>(
         &self,
         name: &str,
-        declaration: (DataType, &str),
+        declaration: (DataType, Option<&str>),
         [array, element]: [&'static str; 2],
         notes: &mut Vec<FieldError>,
         decode: impl Fn(

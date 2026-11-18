@@ -116,3 +116,20 @@ pub(super) fn presentation() -> Value {
         }))
     }]})
 }
+
+pub(super) fn globals() -> Value {
+    json!({"availability": "available", "rows": [{
+        "guid": present(json!("12000000-0000-4000-8000-000000000002")),
+        "recordName": present(json!("CraftingGlobalParams.Synthetic")),
+        "className": present(json!("Synthetic")),
+        "recordPath": present(json!("libs/foundry/records/crafting/globalparams/synthetic")),
+        "recordIndex": present(json!(1)),
+        "sourceType": present(json!("CraftingGlobalParams")),
+        "fileName": present(json!("libs/foundry/records/crafting/globalparams/synthetic.xml")),
+        "metadataTag": source(SourceValue::Absent),
+        "defaultBlueprintSelection": source(SourceValue::Absent),
+        "dismantleBlacklistResources": present(json!([])),
+        "dismantleBlacklistEntityClasses": present(json!([])),
+        "additionalFields": {"roots": [], "values": []}
+    }]})
+}

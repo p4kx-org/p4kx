@@ -293,6 +293,10 @@ pub(super) fn assemble<R>(
         },
         configurations: crate::catalog_configurations::CatalogConfigurations {
             client_profile_settings,
+            crafting_global: crate::catalog_v3::crafting_global::table(
+                &forge,
+                collected.crafting_global,
+            ),
             mining_global: crate::catalog_v3::mining_process_catalog::globals_table(
                 &forge,
                 collected.mining_global_params,
@@ -342,7 +346,6 @@ pub(super) fn assemble<R>(
         provenance: parts::freeze_provenance(&origins.uses, run)?,
         blueprint_pools: collected.blueprint_pools,
         dismantle_processes: collected.dismantle_processes,
-        crafting_global: collected.crafting_global,
         paints: collected.paints,
         loadouts: collected.loadouts,
         mineable_elements: collected.mineable_elements,

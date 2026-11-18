@@ -17,6 +17,12 @@ use crate::record_observation::RecordObservation;
 
 use super::selection::{self, Action, ReadPolicy, Selection};
 
+#[derive(Default)]
+pub(super) struct CraftingRules<'source> {
+    pub(super) rules: crate::blueprint_rule_inputs::BlueprintRules,
+    pub(super) global: Option<crate::catalog_v3::crafting_global::PreparedCraftingGlobal<'source>>,
+}
+
 /// Independent current consumers of the shared crafting selection and canonical read.
 #[derive(Clone, Copy)]
 pub(crate) enum ReadMode<'context, 'source> {
@@ -205,17 +211,30 @@ impl<'context, 'source> ReadMode<'context, 'source> {
         action: Action,
         admission: &RecordObservation<'_, 'source>,
         tree: &RecordTree<'source>,
+        ledger: &mut ExportLedger,
         cancel: Option<&CancelToken>,
-    ) -> Result<crate::blueprint_rule_inputs::BlueprintRules, CatalogError> {
+    ) -> Result<CraftingRules<'source>, CatalogError> {
         use crate::blueprint_rule_inputs::BlueprintRules;
         match (self.input(), action) {
             (Some(input), Action::Globals) => {
-                BlueprintRules::read_globals(tree, admission, input, cancel)
+                let found =
+                    crate::catalog_v3::crafting_global::read(tree, input, admission, cancel)?;
+                crate::source_projection_notes::record_dependency(
+                    admission,
+                    tree,
+                    found.notes,
+                    ledger,
+                )?;
+                Ok(CraftingRules {
+                    rules: found.rules,
+                    global: Some(found.prepared),
+                })
             }
-            (Some(input), Action::Dismantle) => {
-                BlueprintRules::read_dismantle(tree, admission, input, cancel)
-            }
-            _ => Ok(BlueprintRules::default()),
+            (Some(input), Action::Dismantle) => Ok(CraftingRules {
+                rules: BlueprintRules::read_dismantle(tree, admission, input, cancel)?,
+                global: None,
+            }),
+            _ => Ok(CraftingRules::default()),
         }
     }
 

@@ -27,12 +27,12 @@ mod authored_nodes;
 #[path = "catalog_harvest_modules.rs"]
 pub(crate) mod catalog_harvest_modules;
 
-#[path = "mineable_composition_definition.rs"]
-pub(crate) mod mineable_composition_definition;
-#[path = "mineable_element_definition.rs"]
-pub(crate) mod mineable_element_definition;
-#[path = "mining_process_catalog.rs"]
-pub(crate) mod mining_process_catalog;
+#[path = "catalog_industry_modules.rs"]
+mod industry_modules;
+pub(crate) use industry_modules::{
+    crafting_global, mineable_composition_definition, mineable_element_definition,
+    mining_process_catalog,
+};
 
 #[path = "faction_definition.rs"]
 pub(crate) mod faction_definition;

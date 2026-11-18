@@ -422,3 +422,25 @@ cargo test --locked -p p4kx-export --lib -- `
     catalog_query_session::installed_sdk_witness::installed_selective_sdk_has_original_owners_and_closed_sources `
     --ignored --exact --test-threads=1
 ```
+
+## Original crafting-global configuration
+
+`catalog_queries::crafting::with_global_params` and `with_global_params_from` return borrowed
+`CraftingGlobalSnapshot` values from an Archive or a decoded Entry. Session and parsed-view
+methods are named `with_crafting_global_params`. Each uses the same original reader as
+`configurations.craftingGlobal`; no complete Catalog, Blueprint, resource body or localization
+payload is prepared. A session's unrelated language policy is ignored.
+
+`All`, `Guid` and `RecordIndex` select original physical owners. GUID selection retains every
+physical alias. Rows keep canonical textual-GUID/physical-index ordering and expose their complete
+typed header, original default-selection concrete type, default Blueprint slots, resource and item
+exclusion slots, additional fields, source inventory, Build, availability and coverage. Arrays keep
+nulls, repeats and unresolved/foreign target states; they are not deduplicated sets. Consumers can
+union applicable readable GUIDs across owners when implementing the existing interpreted rules.
+
+The Catalog has no merged root `craftingGlobal` compatibility view. The old
+`dismantleExcludedResourceGuids` list corresponds to the applicable readable targets in original
+`dismantleBlacklistResources`; `dismantleExcludedItemGuids` corresponds to
+`dismantleBlacklistEntityClasses`. The original `defaultBlueprintSelection.blueprintRecords`
+slots are now available directly. Source states and physical occurrences remain authoritative.
+See [ADR-0411](adr/0411-crafting-globals-retain-physical-original-configuration-rows.md).

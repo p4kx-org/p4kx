@@ -258,8 +258,8 @@ fn every_field_the_schema_lists_is_required() -> TestResult {
         );
     }
     let mut no_global = minimal_catalog();
-    if let Some(catalog) = no_global.as_object_mut() {
-        catalog.remove("craftingGlobal");
+    if let Some(configurations) = no_global["configurations"].as_object_mut() {
+        configurations.remove("craftingGlobal");
     }
     assert!(!validator.is_valid(&no_global), "the global parameters");
     Ok(())
@@ -320,7 +320,7 @@ fn crafting_fields_allow_additions_but_cost_meanings_are_closed() -> TestResult 
     unknown_field["configurations"]["blueprintTiers"]["rows"][0]["costs"][0]["extra"] = json!(true);
     unknown_field["projections"]["blueprintPresentation"]["rows"][0]["dismantle"]["value"]["extra"] =
         json!(true);
-    unknown_field["craftingGlobal"]["extra"] = json!(true);
+    unknown_field["configurations"]["craftingGlobal"]["rows"][0]["extra"] = json!(true);
     assert!(
         validator.is_valid(&unknown_field),
         "unknown fields are additive"

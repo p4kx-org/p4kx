@@ -36,10 +36,10 @@ use crate::catalog_v3::npc_spawn_definitions::NpcSpawnDefinitions;
 use crate::catalog_v3::procedural_planet_audio::PreparedPlanetAudio;
 use crate::catalog_v3::starmap_definition_kinds::StarmapDefinitions;
 use crate::contract::{
-    BlueprintPool, Commodity, ContractEntry, Crafter, CraftingGlobal, DismantleProcess,
-    HarvestableLocation, HarvestableProviderPreset, Item, LootContainer, MineableComposition,
-    MineableElement, MineableEntity, MiningGlobalParams, Paint, RefiningProcess, ResourceGroup,
-    ResourceType, Ship, Shop, StarmapObject, SubHarvestableMultiConfig,
+    BlueprintPool, Commodity, ContractEntry, Crafter, DismantleProcess, HarvestableLocation,
+    HarvestableProviderPreset, Item, LootContainer, MineableComposition, MineableElement,
+    MineableEntity, MiningGlobalParams, Paint, RefiningProcess, ResourceGroup, ResourceType, Ship,
+    Shop, StarmapObject, SubHarvestableMultiConfig,
 };
 use crate::crafting_warning::CraftingWarning;
 use crate::entity_spawn_model::EntitySpawnPool;
@@ -108,7 +108,7 @@ pub(crate) struct Collected<'f> {
     pub(crate) quality: QualityRows<'f>,
     pub(crate) blueprint_pools: Vec<BlueprintPool<'f>>,
     pub(crate) dismantle_processes: Vec<DismantleProcess<'f>>,
-    pub(crate) crafting_global: CraftingGlobal,
+    pub(crate) crafting_global: Vec<crate::catalog_v3::crafting_global::PreparedCraftingGlobal<'f>>,
     pub(crate) paints: Vec<Paint>,
     pub(crate) loadouts: StagedLoadouts,
     pub(crate) contracts: Vec<ContractEntry<'f>>,

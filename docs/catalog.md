@@ -302,7 +302,7 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `mineableEntities` | The mineable rocks and deposits (`EntityClassDefinition` under `entities/mineable`) with their composition, mining parameters and scan signature, ordered by GUID |
 | `crafters` | The crafting stations (entities with a `CrafterComponentParams`) with the limits and accepted categories of their job queues, their crafting-time modifiers and the attach definition a port is matched against, ordered by GUID |
 | `shipStoreSlugs` | The RSI store slugs that map to a ship of `ships`, with the retired ones flagged, ordered by `slug` (curated data, ADR-0117) |
-| `craftingGlobal` | Not a kind: the global crafting parameters that apply to every dismantle |
+| `configurations.craftingGlobal` | Not a kind: original physical crafting-global configurations |
 | `configurations.itemRecoveryEconomy`, `configurations.itemRecoveryOverrides` and `configurations.itemRecoveryPolicy` | The selected recovery policy's economy parameters and original override declarations. See [Item recovery rules](#item-recovery-rules). |
 
 An unfiltered kind with complete catalog-wide `exportHealth` lists its successfully read sources,
@@ -895,15 +895,18 @@ capture proof, reference health, inverse contributors and publication behavior.
 
 A present `projections.blueprintPresentation.rows[].dismantle` has `processGuid` and `tier`.
 The process applies to the produced item. `tier` is the source occurrence of the first tier and
-is null when the Blueprint has no tier. `craftingGlobal` holds
-`dismantleExcludedResourceGuids` (the `ResourceType` Records a dismantle never returns) and
-`dismantleExcludedItemGuids` (the entities that cannot be dismantled; their blueprints have no
-`dismantle`). The contract:
+is null when the Blueprint has no tier. `configurations.craftingGlobal` is a table of physical
+`CraftingGlobalParams` owners. Each row retains its original `defaultBlueprintSelection`,
+`dismantleBlacklistResources` and `dismantleBlacklistEntityClasses` with immediate per-field
+origins and ordered nullable target slots. Selection concrete types and additional original fields
+remain available; physical aliases and repeated references are not merged. The old merged root
+object is absent. The Blueprint rule interpreter still unions the original owners' readable
+default/exclusion GUIDs. The contract:
 
 - The Build must hold exactly one dismantle process. With several, no blueprint gets a
   `dismantle`, the processes are still listed, and `p4kx catalog` warns and exits with code 1.
 - The item returns the share `efficiency` of the costs of the first tier, except
-  the resources in `dismantleExcludedResourceGuids`.
+  the resources selected by the original `dismantleBlacklistResources` slots.
 - A `select` is not resolved: the Records do not say which options a dismantle returns, so the
   consumer applies the `count` itself. The `quantityMultiplier` is not applied.
 

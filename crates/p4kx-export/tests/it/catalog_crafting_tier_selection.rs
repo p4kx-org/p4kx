@@ -61,8 +61,9 @@ fn a_filter_marks_the_crafting_kinds_partial_and_selects_by_record_path() -> Tes
     assert_eq!(catalog["blueprintPools"], json!([]), "no pool matches");
     assert_eq!(catalog["dismantleProcesses"], json!([]), "filtered by path");
     assert_eq!(
-        catalog["craftingGlobal"]["dismantleExcludedResourceGuids"],
-        json!([text(fixture::GOLD)]),
+        catalog["configurations"]["craftingGlobal"]["rows"][0]["dismantleBlacklistResources"]["value"]
+            [0]["value"]["guid"]["value"],
+        json!(text(fixture::GOLD)),
         "the global parameters are not a kind and stay"
     );
     assert_eq!(

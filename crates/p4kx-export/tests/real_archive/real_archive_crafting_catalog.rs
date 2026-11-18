@@ -267,10 +267,16 @@ fn check_dismantle(catalog: &Value, blueprints: &Blueprints<'_>) -> TestResult {
         magazine.presentation.get("firstTier"),
         "the dismantle return uses the first tier"
     );
-    let excluded = at(catalog, "/craftingGlobal/dismantleExcludedResourceGuids")
+    let globals = at(catalog, "/configurations/craftingGlobal/rows")
         .as_array()
-        .ok_or("excluded resources")?;
-    assert!(!excluded.is_empty(), "excluded resources");
+        .ok_or("original crafting-global owners")?;
+    assert!(
+        globals.iter().any(|global| global
+            .pointer("/dismantleBlacklistResources/value")
+            .and_then(Value::as_array)
+            .is_some_and(|slots| !slots.is_empty())),
+        "original excluded resource declarations"
+    );
     let unlinked = blueprints
         .rows()
         .iter()

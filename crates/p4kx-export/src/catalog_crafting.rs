@@ -14,8 +14,9 @@ use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read_failure::CatalogReadFailure;
 use crate::catalog_rows::staged::{StagedCatalogRows, StagedCatalogTable};
+use crate::catalog_v3::crafting_global::PreparedCraftingGlobal;
 use crate::catalog_v3::gameplay_property_catalog::GameplayPropertyDefinition;
-use crate::contract::{BlueprintPool, CraftingGlobal, DismantleProcess};
+use crate::contract::{BlueprintPool, DismantleProcess};
 use crate::contract_rewards::{PoolEntry, RewardSource};
 use crate::crafting::{self, Crafting, ReadCrafting};
 use crate::crafting_types as library;
@@ -34,7 +35,7 @@ pub(crate) struct CraftingKinds<'f> {
     pub(crate) quality: QualityRows<'f>,
     pub(crate) pools: Vec<BlueprintPool<'f>>,
     pub(crate) dismantle: Vec<DismantleProcess<'f>>,
-    pub(crate) global: CraftingGlobal,
+    pub(crate) global: Vec<PreparedCraftingGlobal<'f>>,
     pub(crate) skipped: Vec<(Kind, usize)>,
     pub(crate) failures: Vec<CatalogReadFailure<'f>>,
     pub(crate) warnings: Vec<CraftingWarning>,
@@ -75,6 +76,7 @@ pub(crate) fn kinds<'f>(
         data: crafting,
         blueprints,
         blueprint_rules,
+        globals,
         catalog_failures,
         mut ledger,
         gameplay,
@@ -110,7 +112,7 @@ pub(crate) fn kinds<'f>(
         quality,
         pools,
         dismantle,
-        global: global(&crafting.global),
+        global: globals,
         skipped: vec![
             (Kind::Blueprints, crafting.skipped_blueprints),
             (Kind::GameplayProperties, properties_skipped),
@@ -142,19 +144,6 @@ fn dismantle<'f>(
         },
         |entity| entity.guid,
     )
-}
-
-fn global(source: &library::GlobalParams) -> CraftingGlobal {
-    let sorted = |guids: &[Guid]| {
-        let mut guids: Vec<CatalogGuid> = guids.iter().copied().map(CatalogGuid).collect();
-        guids.sort_by_key(|guid| guid.text());
-        guids.dedup_by_key(|guid| guid.text());
-        guids
-    };
-    CraftingGlobal {
-        dismantle_excluded_resource_guids: sorted(&source.dismantle_blacklist_resources),
-        dismantle_excluded_item_guids: sorted(&source.dismantle_blacklist_items),
-    }
 }
 
 fn sources_by_pool<'a, 'f>(

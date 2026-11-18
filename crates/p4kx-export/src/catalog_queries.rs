@@ -65,6 +65,9 @@ mod reputation;
 #[path = "quality_query.rs"]
 pub mod quality;
 
+#[path = "crafting_global_query.rs"]
+pub mod crafting;
+
 /// Canonical original equipment definitions, attachment constraints and bounds.
 #[path = "equipment_query.rs"]
 pub mod equipment;

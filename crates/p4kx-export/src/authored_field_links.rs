@@ -97,7 +97,7 @@ impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
         self.read_link(
             name,
             "a nullable Reference",
-            Some((DataType::Reference, target_type)),
+            Some((DataType::Reference, Some(target_type))),
             notes,
             |fact, sources, selectors| self.decode_record_link(fact, sources, selectors),
         )
@@ -113,7 +113,7 @@ impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
         self.read_link(
             name,
             "a nullable WeakPointer",
-            Some((DataType::WeakPointer, target_type)),
+            Some((DataType::WeakPointer, Some(target_type))),
             notes,
             |fact, sources, _| decode_weak_link(fact, sources),
         )
@@ -150,7 +150,7 @@ impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
     fn reject_link_declaration<T>(
         &self,
         fact: &Fact<'scope, 'read, 'source>,
-        expected: (DataType, &str),
+        expected: (DataType, Option<&str>),
         cardinality: ReferenceCardinality,
         notes: &mut Vec<FieldError>,
         selectors: &mut Vec<SourceUse>,
@@ -164,13 +164,16 @@ impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
             && storage.is_array() == (cardinality == ReferenceCardinality::Array)
         {
             selectors.push(fact.observe(OriginalValuePart::Target, SourceUseRole::Selector)?);
+            let Some(expected_target) = expected.1 else {
+                return Ok(None);
+            };
             if storage.target() != u16::MAX {
                 fact.check_input(self.input)?;
                 let (declared_type, declaration) = self
                     .input
                     .declared_struct_name(storage.target(), SourceUseRole::Selector)?;
                 selectors.push(declaration);
-                if declared_type == Ok(expected.1) {
+                if declared_type == Ok(expected_target) {
                     return Ok(None);
                 }
                 declaration_error = declared_type.err();
@@ -239,7 +242,7 @@ impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
         &self,
         name: &str,
         expected: &'static str,
-        declaration: Option<(DataType, &str)>,
+        declaration: Option<(DataType, Option<&str>)>,
         notes: &mut Vec<FieldError>,
         decode: impl FnOnce(
             &Fact<'scope, 'read, 'source>,

@@ -10,7 +10,6 @@ use p4kx_testkit::{ArchiveBuilder, TestContainer, TestEntry};
 use crate::catalog_crafting::CraftingKinds;
 use crate::catalog_read::original::{EntryCapture, FailedEntryObservation};
 use crate::collected::Collected;
-use crate::contract::CraftingGlobal;
 use crate::export_entry_ledger::EntryOperation;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
 use crate::shop_containers::Component;
@@ -85,10 +84,7 @@ fn empty_collected() -> Collected<'static> {
         failures: Vec::new(),
         warnings: Vec::new(),
         ledger: ExportLedger::default(),
-        global: CraftingGlobal {
-            dismantle_excluded_resource_guids: Vec::new(),
-            dismantle_excluded_item_guids: Vec::new(),
-        },
+        global: Vec::new(),
     })
 }
 

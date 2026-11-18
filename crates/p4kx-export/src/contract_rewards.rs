@@ -78,14 +78,3 @@ pub(crate) struct DismantleProcess<'a> {
     /// The dismantle time in whole seconds, `null` when the Record holds none.
     pub(crate) time_seconds: Option<i64>,
 }
-
-/// The `CraftingGlobalParams` Records, merged: what applies to every dismantle.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct CraftingGlobal {
-    /// The `ResourceType` Records dismantling never returns.
-    pub(crate) dismantle_excluded_resource_guids: Vec<CatalogGuid>,
-    /// The entities that cannot be dismantled; their blueprints have no `dismantle`.
-    pub(crate) dismantle_excluded_item_guids: Vec<CatalogGuid>,
-}

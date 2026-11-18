@@ -25,6 +25,7 @@ use crate::quality_catalog::Step;
 pub(super) struct Tracked<'f> {
     pub(super) piece: Option<Piece<'f>>,
     pub(super) blueprint_rules: BlueprintRules,
+    pub(super) global: Option<crate::catalog_v3::crafting_global::PreparedCraftingGlobal<'f>>,
     pub(super) ledger: ExportLedger,
     pub(super) quality: Step<'f>,
     pub(super) gameplay: Option<GameplayPropertyInput<'f>>,
@@ -50,6 +51,7 @@ fn candidate<'f>(
         quality: Step::default(),
         gameplay: None,
         blueprint_rules: BlueprintRules::failed_header(record),
+        global: None,
     })
 }
 fn failure<'f>(
@@ -82,6 +84,7 @@ fn failure<'f>(
         quality: Step::default(),
         gameplay: None,
         blueprint_rules: BlueprintRules::default(),
+        global: None,
     })
 }
 
@@ -105,6 +108,7 @@ fn one<'f>(
             quality: Step::default(),
             gameplay: None,
             blueprint_rules: BlueprintRules::default(),
+            global: None,
         },
         Ok(None) => return Ok(None),
         Err(error) => {
@@ -136,6 +140,7 @@ fn selected_record<'f>(
             quality: Step::default(),
             gameplay: None,
             blueprint_rules: BlueprintRules::default(),
+            global: None,
         });
     }
     let tree = match trees.build(record) {
@@ -258,13 +263,14 @@ fn project_tree<'f>(
             }
         }
     };
-    let blueprint_rules = mode.blueprint_rules(selected.action, admission, tree, cancel)?;
+    let rules = mode.blueprint_rules(selected.action, admission, tree, &mut ledger, cancel)?;
     ledger.observe(selected.observation(admission, selected.successful_disposition())?);
     Ok(Tracked {
         piece,
         ledger,
         gameplay,
-        blueprint_rules,
+        blueprint_rules: rules.rules,
+        global: rules.global,
         quality: Step {
             input,
             ..Step::default()

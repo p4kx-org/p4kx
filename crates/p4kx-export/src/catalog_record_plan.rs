@@ -79,6 +79,29 @@ impl<'source> Plan<'source> {
         )
     }
 
+    pub(in crate::build::catalog_queries) fn read_rule(
+        forge: &'source DataForge<'source>,
+        rule: crate::selection::KindRule,
+        selection: CatalogRecordSelection,
+        cancel: Option<&CancelToken>,
+        observer: Option<Arc<dyn CanonicalReadObserver>>,
+    ) -> Result<Self, CatalogError> {
+        Self::read_with(forge, selection, cancel, observer, |record, _, coverage| {
+            let path = record.record_path();
+            if path.as_ref().is_ok_and(|path| !rule.matches_path(path)) {
+                return Ok(false);
+            }
+            match record.type_name() {
+                Ok(source_type) if source_type != rule.type_name => Ok(false),
+                Ok(_) if path.is_ok() => Ok(true),
+                _ => {
+                    coverage.unreadable_headers.push(record.index());
+                    Ok(false)
+                }
+            }
+        })
+    }
+
     fn read_with(
         forge: &'source DataForge<'source>,
         selection: CatalogRecordSelection,

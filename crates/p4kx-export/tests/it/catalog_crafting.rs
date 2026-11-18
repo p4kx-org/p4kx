@@ -12,6 +12,9 @@ use std::error::Error;
 use p4kx_export::{Filter, Kind};
 use serde_json::{Value, json};
 
+#[path = "crafting_global_sdk.rs"]
+mod crafting_globals;
+
 #[path = "catalog_crafting_commodity_presentation.rs"]
 mod commodity_presentation;
 

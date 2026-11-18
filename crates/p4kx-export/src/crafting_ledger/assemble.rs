@@ -80,6 +80,7 @@ pub(super) fn assemble<'f>(
     let mut data = Crafting::default();
     let mut blueprints = Vec::new();
     let mut blueprint_rules = crate::blueprint_rule_inputs::BlueprintRules::default();
+    let mut globals = Vec::new();
     let mut catalog_failures = Vec::new();
     let mut ledger = ExportLedger::default();
     let mut links = HashMap::new();
@@ -88,6 +89,7 @@ pub(super) fn assemble<'f>(
     for tracked in tracked {
         ledger.merge(tracked.ledger);
         blueprint_rules.merge(tracked.blueprint_rules);
+        globals.extend(tracked.global);
         quality.add(tracked.quality)?;
         gameplay.add(tracked.gameplay);
         if let Some(piece) = tracked.piece {
@@ -113,6 +115,7 @@ pub(super) fn assemble<'f>(
         data,
         blueprints,
         blueprint_rules,
+        globals,
         catalog_failures,
         ledger,
         gameplay,
