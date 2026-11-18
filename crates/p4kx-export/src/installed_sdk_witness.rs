@@ -26,6 +26,8 @@ mod reward;
 mod scope;
 #[path = "installed_sdk_witness_selection.rs"]
 mod selection;
+#[path = "installed_ship_source_witness.rs"]
+mod ship_source;
 #[path = "installed_sdk_witness_verify.rs"]
 mod verify;
 

@@ -47,9 +47,9 @@ impl Proof {
         Self::read_with_payload(origin, None)
     }
 
-    pub(super) fn read_with_payload(
+    pub(super) fn read_with_payload<'entry>(
         origin: &DataForgeOrigin,
-        additional: Option<&EntryOrigin>,
+        additional: impl IntoIterator<Item = &'entry EntryOrigin>,
     ) -> TestResult<Self> {
         let DataForgeOrigin::Archive(origin) = origin else {
             return Err("expected original Archive-bound DataForge evidence".into());
@@ -58,9 +58,9 @@ impl Proof {
         let scope = uses
             .observe(SourceInput::Archive(origin), InputScope::Payload)
             .map_err(|_| "original DataForge evidence capture failed")?;
-        if let Some(entry) = additional {
+        for entry in additional {
             uses.observe(SourceInput::Archive(entry), InputScope::Payload)
-                .map_err(|_| "original locale evidence capture failed")?;
+                .map_err(|_| "original additional payload evidence capture failed")?;
         }
         Ok(Self {
             leaf: scope.source_ref().clone(),
@@ -229,6 +229,12 @@ pub(super) fn coverage(value: &CatalogRecordCoverage, skipped: usize) -> TestRes
     Ok(())
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum ContributionSet {
+    Complete,
+    Retained,
+}
+
 pub(super) struct Graph<'inventory> {
     sources: BTreeMap<&'inventory str, &'inventory PhysicalSource>,
     uses: BTreeMap<&'inventory str, &'inventory SourceUseDescription>,
@@ -313,18 +319,25 @@ impl<'inventory> Graph<'inventory> {
     }
 
     pub(super) fn walk(&self, value: &Value) -> TestResult<usize> {
+        self.walk_cells(value, ContributionSet::Complete)
+    }
+
+    pub(super) fn walk_cells(&self, value: &Value, policy: ContributionSet) -> TestResult<usize> {
         match value {
-            Value::Array(values) => values
-                .iter()
-                .try_fold(0, |count, value| Ok(count + self.walk(value)?)),
+            Value::Array(values) => {
+                values.iter().try_fold(
+                    0,
+                    |count, value| Ok(count + self.walk_cells(value, policy)?),
+                )
+            }
             Value::Object(fields) => {
                 let mut count = 0;
                 if fields.contains_key("sourceUsesRefs") {
-                    self.cell(value)?;
+                    self.cell(value, policy)?;
                     count += 1;
                 }
                 for value in fields.values() {
-                    count += self.walk(value)?;
+                    count += self.walk_cells(value, policy)?;
                 }
                 Ok(count)
             }
@@ -332,8 +345,12 @@ impl<'inventory> Graph<'inventory> {
         }
     }
 
-    fn cell(&self, cell: &Value) -> TestResult {
-        if cell.get("sourceSetComplete").and_then(Value::as_bool) != Some(true) {
+    fn cell(&self, cell: &Value, policy: ContributionSet) -> TestResult {
+        let complete = cell
+            .get("sourceSetComplete")
+            .and_then(Value::as_bool)
+            .ok_or("SDK cell source-set completeness flag missing")?;
+        if !complete && policy == ContributionSet::Complete {
             return Err("SDK cell does not retain a complete original contribution set".into());
         }
         let references = cell
@@ -367,7 +384,7 @@ impl<'inventory> Graph<'inventory> {
         }
         let expected = if encrypted {
             Some(true)
-        } else if unknown {
+        } else if unknown || !complete {
             None
         } else {
             Some(false)
