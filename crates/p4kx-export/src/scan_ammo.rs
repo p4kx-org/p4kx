@@ -12,7 +12,6 @@ use crate::catalog_projection::CatalogProjection;
 use crate::catalog_v3::ammo_definition::{self, AmmoSelection, PreparedAmmoDefinition};
 use crate::catalog_v3::catalog_item_components::resolution::MagazineDependencies;
 use crate::contract_stats::AmmoStats;
-use crate::entity_selection::{self, Selected};
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_evidence_lock;
 use crate::export_field_inspection::FieldInspection;
@@ -244,14 +243,7 @@ impl<'options, 'input, 'source> AmmoReads<'options, 'input, 'source> {
             .field_inspections
             .pop()
             .ok_or(ExportAccountingError::ConflictingFieldInspection)?;
-        let selection = if matches!(
-            entity_selection::select(admission.record(), self.filter),
-            Ok(Some(Selected::Entity(Kind::AmmoDefinitions)))
-        ) {
-            AmmoSelection::Selected
-        } else {
-            AmmoSelection::Dependency
-        };
+        let selection = AmmoSelection::for_reached_record(admission.record(), self.filter);
         let definition = self.prepare_definition(tree, admission, selection)?;
         Ok(ReadableAmmo {
             compatibility,

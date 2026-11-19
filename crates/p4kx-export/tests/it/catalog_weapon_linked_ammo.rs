@@ -10,6 +10,8 @@ use crate::health_origin_assertions as proof;
 
 #[path = "catalog_weapon_linked_ammo_fixture.rs"]
 mod fixture;
+#[path = "catalog_projectile_ammo_sdk.rs"]
+mod sdk;
 
 use fixture::Case;
 

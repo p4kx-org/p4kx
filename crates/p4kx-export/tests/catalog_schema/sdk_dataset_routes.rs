@@ -14,6 +14,9 @@ use p4kx_testkit::{
 
 use super::{AMMUNITION, CONTAINERS, Route, TestResult, UNRESOLVED};
 
+#[path = "sdk_projectile_ammo_route.rs"]
+mod projectile_ammo;
+
 const ROOT: &str = r"Data\ObjectContainers\PU\system\fixture\fixturesystem.socpak";
 const TILE: &str = r"Data\ObjectContainers\PU\fixture\tile.socpak";
 const ROOT_XML: &[u8] = br#"<ObjectContainer version="14"><ChildObjectContainers>
@@ -34,8 +37,14 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
         StarmapTraversalBudget::new(),
         None,
     )?;
+    let independent_ammo = read_ammunition(&archive)?;
+    let [projectile, reached_ammo] = projectile_ammo::read()?;
+    if independent_ammo.schema != reached_ammo.schema {
+        return Err("independently admitted and reached Ammo rows have different schemas".into());
+    }
     Ok(vec![
-        read_ammunition(&archive)?,
+        reached_ammo,
+        projectile,
         Route::queried_rows(
             CONTAINERS,
             &starmap.container_instances,
@@ -64,7 +73,7 @@ fn read_ammunition(archive: &Archive) -> TestResult<Route> {
             Route::queried_rows(
                 AMMUNITION,
                 snapshot.rows(),
-                "independent Record selection available; weapon dependency closure and installed parity open",
+                "independent Record selection available; complete dependency enumeration and installed parity open",
             )
         },
     )?

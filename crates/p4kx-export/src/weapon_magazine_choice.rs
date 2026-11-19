@@ -6,10 +6,10 @@ use p4kx_extraction::{FieldOrigin, SourceValueState};
 use super::linked_reader::{LinkedAmmunitionReader, LinkedMagazine, LinkedMagazineRead};
 use super::route::{self, OwnRoute};
 use super::{ContainerAmmoSlots, OriginalFlowFields, ProjectileAmmoRole, Selection};
+use crate::CatalogError;
 use crate::catalog_v3::catalog_weapon_magazine_slots::{MAGAZINE_TARGET, WeaponMagazineSlots};
 use crate::definition_reference::DefinitionStatus;
 use crate::export_ledger::ExportLedger;
-use crate::{CatalogError, ExportAccountingError};
 
 pub(super) struct LinkedSlots<'source> {
     pub(super) slots: ContainerAmmoSlots<'source>,
@@ -91,7 +91,6 @@ impl<'source> MagazineChoice<'source> {
         if reference.target_type.value().copied() != Some(MAGAZINE_TARGET) {
             return Ok(Self::WrongType);
         }
-        let linked = linked.ok_or(ExportAccountingError::ConflictingSourceDatum)?;
         LinkedMagazine::read(reader, fields, magazine.owner(), linked, reference, ledger)
             .map(Self::Linked)
     }

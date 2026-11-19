@@ -3,7 +3,7 @@
 
 use std::cell::RefCell;
 
-use p4kx_extraction::{CancelToken, DataForge, Guid, RecordTree, SourcedValue};
+use p4kx_extraction::{CancelToken, DataForge, Filter, Guid, Record, RecordTree, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -16,13 +16,15 @@ use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::original::OriginalFlowFields;
 use crate::catalog_table::CatalogTable;
 use crate::catalog_text_contract::PublicNameRef;
+use crate::entity_selection::{self, Selected};
 use crate::export_diagnostic::ExportSourceRole;
+use crate::guid_text::CatalogGuid;
 use crate::record_observation::RecordObservation;
 use crate::resource_float::ResourceFloat32;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 use crate::template_field_capture::TemplateFieldCapture;
-use crate::{CatalogError, ExportAccountingError};
+use crate::{CatalogError, ExportAccountingError, Kind};
 
 pub(crate) const SOURCE_TYPE: &str = "AmmoParams";
 
@@ -39,6 +41,17 @@ pub enum AmmoSelection {
 }
 
 impl AmmoSelection {
+    pub(crate) fn for_reached_record(record: &Record<'_>, filter: Option<&Filter>) -> Self {
+        if matches!(
+            entity_selection::select(record, filter),
+            Ok(Some(Selected::Entity(Kind::AmmoDefinitions)))
+        ) {
+            Self::Selected
+        } else {
+            Self::Dependency
+        }
+    }
+
     pub(crate) const fn role(self) -> ExportSourceRole {
         match self {
             Self::Selected => ExportSourceRole::Selected,
@@ -150,6 +163,10 @@ pub(crate) fn read<'source>(
         },
         notes,
     ))
+}
+
+pub(crate) fn order(rows: &mut [PreparedAmmoDefinition<'_>]) {
+    rows.sort_by_cached_key(|row| (CatalogGuid(row.physical_guid).text(), row.physical_index));
 }
 
 pub(crate) fn table<'source>(

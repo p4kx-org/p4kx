@@ -34963,11 +34963,19 @@
       "type": "object"
     },
     "ProjectileAmmoRole": {
-      "enum": [
-        "primary",
-        "secondary"
+      "description": "The launcher role used to select an original ammunition slot.",
+      "oneOf": [
+        {
+          "const": "primary",
+          "description": "The authored primary ammunition slot.",
+          "type": "string"
+        },
+        {
+          "const": "secondary",
+          "description": "The authored secondary ammunition slot.",
+          "type": "string"
+        }
       ],
-      "type": "string",
       "x-p4kx-vocabularyClass": "control"
     },
     "ProjectileBeamEffect": {
@@ -42611,17 +42619,22 @@
       "type": "object"
     },
     "Selection": {
+      "description": "The outcome of resolving the original ammunition route of a launcher action.",
       "oneOf": [
         {
+          "description": "The launcher selects ammunition from a container on its own Item.",
           "properties": {
             "ammoRecordIndex": {
-              "$ref": "#/$defs/SourcedValueOfuint32"
+              "$ref": "#/$defs/SourcedValueOfuint32",
+              "description": "The admitted physical Ammo Record index."
             },
             "containerComponentOrdinal": {
-              "$ref": "#/$defs/SourcedValueOfuint32"
+              "$ref": "#/$defs/SourcedValueOfuint32",
+              "description": "The original container position in the weapon's Components array."
             },
             "role": {
-              "$ref": "#/$defs/SourcedValueOfProjectileAmmoRole"
+              "$ref": "#/$defs/SourcedValueOfProjectileAmmoRole",
+              "description": "The launcher role that selects the slot."
             },
             "type": {
               "const": "selected",
@@ -42637,18 +42650,23 @@
           "type": "object"
         },
         {
+          "description": "The launcher selects ammunition from a uniquely linked magazine.",
           "properties": {
             "ammoRecordIndex": {
-              "$ref": "#/$defs/SourcedValueOfuint32"
+              "$ref": "#/$defs/SourcedValueOfuint32",
+              "description": "The admitted physical Ammo Record index."
             },
             "containerComponentOrdinal": {
-              "$ref": "#/$defs/SourcedValueOfuint32"
+              "$ref": "#/$defs/SourcedValueOfuint32",
+              "description": "The original container position in the magazine's Components array."
             },
             "magazineRecordIndex": {
-              "$ref": "#/$defs/SourcedValueOfuint32"
+              "$ref": "#/$defs/SourcedValueOfuint32",
+              "description": "The uniquely admitted magazine's physical Record index."
             },
             "role": {
-              "$ref": "#/$defs/SourcedValueOfProjectileAmmoRole"
+              "$ref": "#/$defs/SourcedValueOfProjectileAmmoRole",
+              "description": "The launcher role that selects the slot."
             },
             "type": {
               "const": "selectedLinkedMagazine",
@@ -42665,6 +42683,7 @@
           "type": "object"
         },
         {
+          "description": "The original magazine reference has no target.",
           "properties": {
             "type": {
               "const": "danglingMagazine",
@@ -42677,6 +42696,7 @@
           "type": "object"
         },
         {
+          "description": "The original magazine reference targets a different source type.",
           "properties": {
             "type": {
               "const": "unsupportedMagazineTarget",
@@ -42689,6 +42709,7 @@
           "type": "object"
         },
         {
+          "description": "The magazine reference resolves to the owner Item.",
           "properties": {
             "type": {
               "const": "selfLinkedMagazine",
@@ -42701,6 +42722,7 @@
           "type": "object"
         },
         {
+          "description": "Multiple physical Records match the magazine reference.",
           "properties": {
             "type": {
               "const": "ambiguousMagazineReference",
@@ -42713,6 +42735,7 @@
           "type": "object"
         },
         {
+          "description": "The admitted magazine body could not be read.",
           "properties": {
             "type": {
               "const": "unreadableMagazine",
@@ -42725,6 +42748,7 @@
           "type": "object"
         },
         {
+          "description": "The admitted magazine has no supported container.",
           "properties": {
             "type": {
               "const": "linkedMagazineWithoutContainer",
@@ -42737,6 +42761,7 @@
           "type": "object"
         },
         {
+          "description": "The admitted magazine has competing container components.",
           "properties": {
             "type": {
               "const": "ambiguousLinkedMagazineContainer",
@@ -42749,6 +42774,7 @@
           "type": "object"
         },
         {
+          "description": "The magazine's component inventory could not be determined.",
           "properties": {
             "type": {
               "const": "incompleteLinkedMagazineComponents",
@@ -42761,6 +42787,7 @@
           "type": "object"
         },
         {
+          "description": "The same original action occurrence appears more than once.",
           "properties": {
             "type": {
               "const": "ambiguousAction",
@@ -42773,6 +42800,7 @@
           "type": "object"
         },
         {
+          "description": "The original fire-action inventory could not be determined.",
           "properties": {
             "type": {
               "const": "incompleteActions",
@@ -42785,6 +42813,7 @@
           "type": "object"
         },
         {
+          "description": "The weapon owner has competing weapon or container components.",
           "properties": {
             "type": {
               "const": "ambiguousComponents",
@@ -42797,6 +42826,7 @@
           "type": "object"
         },
         {
+          "description": "The weapon owner's component inventory could not be determined.",
           "properties": {
             "type": {
               "const": "incompleteComponents",
@@ -42809,6 +42839,7 @@
           "type": "object"
         },
         {
+          "description": "The owner's direct container and linked magazine are both absent.",
           "properties": {
             "type": {
               "const": "noAdmittedOwnContainer",
@@ -42821,6 +42852,7 @@
           "type": "object"
         },
         {
+          "description": "The configured magazine route requires other selection inputs.",
           "properties": {
             "type": {
               "const": "otherMagazineRoute",
@@ -42833,6 +42865,7 @@
           "type": "object"
         },
         {
+          "description": "An unusable magazine route field prevents selecting a slot.",
           "properties": {
             "type": {
               "const": "indeterminateMagazineRoute",
@@ -42845,6 +42878,7 @@
           "type": "object"
         },
         {
+          "description": "The launcher type is outside the supported primary and secondary roles.",
           "properties": {
             "type": {
               "const": "unsupportedProjectileType",
@@ -42857,6 +42891,7 @@
           "type": "object"
         },
         {
+          "description": "The original launcher does not name a projectile role.",
           "properties": {
             "type": {
               "const": "missingProjectileType",
@@ -42869,6 +42904,7 @@
           "type": "object"
         },
         {
+          "description": "The original projectile role could not be determined.",
           "properties": {
             "type": {
               "const": "indeterminateProjectileType",
@@ -42881,6 +42917,7 @@
           "type": "object"
         },
         {
+          "description": "The selected slot has no Ammo reference.",
           "properties": {
             "type": {
               "const": "missingAmmo",
@@ -42893,6 +42930,7 @@
           "type": "object"
         },
         {
+          "description": "The selected Ammo reference has no target.",
           "properties": {
             "type": {
               "const": "danglingAmmo",
@@ -42905,6 +42943,7 @@
           "type": "object"
         },
         {
+          "description": "The selected Ammo reference targets a different source type.",
           "properties": {
             "type": {
               "const": "unsupportedAmmoTarget",
@@ -42917,6 +42956,7 @@
           "type": "object"
         },
         {
+          "description": "The Ammo reference or its physical target cannot be determined.",
           "properties": {
             "type": {
               "const": "indeterminateAmmo",

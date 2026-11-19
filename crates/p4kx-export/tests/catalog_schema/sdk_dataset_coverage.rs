@@ -16,6 +16,7 @@ mod routes;
 mod row_schema;
 
 const AMMUNITION: &str = "/definitions/ammoDefinitions";
+const PROJECTILE_AMMUNITION: &str = "/projections/weaponProjectileAmmoSelections";
 const CONTAINERS: &str = "/placements/containerInstances";
 const UNRESOLVED: &str = "/placements/unresolvedContainerLinks";
 const NO_WITNESS: &str = "no query witness recorded by the audit";
@@ -54,7 +55,7 @@ fn sdk_query_witnesses_keep_their_canonical_dataset_contract() -> TestResult {
     let registered = dataset_owners::entries();
     let witnesses = routes::read()?;
     let gaps = audit(&schema, &registered, &witnesses)?;
-    for path in [AMMUNITION, CONTAINERS, UNRESOLVED] {
+    for path in [AMMUNITION, PROJECTILE_AMMUNITION, CONTAINERS, UNRESOLVED] {
         assert_ne!(
             gaps.get(path),
             Some(&NO_WITNESS),

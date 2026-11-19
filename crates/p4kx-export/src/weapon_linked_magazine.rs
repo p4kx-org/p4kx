@@ -72,7 +72,7 @@ impl<'source> LinkedMagazine<'source> {
         reader: &LinkedAmmunitionReader<'_, 'source>,
         fields: &OriginalFlowFields<'_, '_, 'source>,
         weapon: &ComponentOwner,
-        linked: LinkedMagazineRead<'_, 'source>,
+        linked: Option<LinkedMagazineRead<'_, 'source>>,
         reference: &SourceRecordReference<'source>,
         ledger: &mut ExportLedger,
     ) -> Result<Self, CatalogError> {
@@ -84,26 +84,29 @@ impl<'source> LinkedMagazine<'source> {
             .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
         caller.check_input(reader.projection.original())?;
         let observation = caller.reference_observation()?;
-        if !std::ptr::eq(caller.value(), linked.caller)
-            || observation.record_index() != linked.record.index()
-            || reference.resolved_index() != Some(linked.record.index())
+        let record = observation.record()?;
+        if reference.resolved_index() != Some(record.index())
             || observation.is_instance()
-            || !observation
-                .reference()
-                .original_target()
-                .shares_source_with(&linked.record)
-            || linked.record.type_name().map_err(CatalogError::DataForge)? != MAGAZINE_TARGET
+            || record.type_name().map_err(CatalogError::DataForge)? != MAGAZINE_TARGET
+            || linked.is_some_and(|read| {
+                !std::ptr::eq(caller.value(), read.caller)
+                    || read.record.index() != record.index()
+                    || !observation
+                        .reference()
+                        .original_target()
+                        .shares_source_with(&read.record)
+            })
         {
             return Err(SourceEvidenceError::ForeignEvidence.into());
         }
-        if linked.record.index() == fields.record_index() {
+        if record.index() == fields.record_index() {
             return Ok(Self::SelfReference);
         }
-        let mut candidates = reader.forge.records_by_guid(linked.record.guid());
+        let mut candidates = reader.forge.records_by_guid(record.guid());
         let candidate = candidates
             .next()
             .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
-        if candidate.index() != linked.record.index() {
+        if candidate.index() != record.index() {
             return Err(SourceEvidenceError::ForeignEvidence.into());
         }
         if let Some(second) = candidates.next() {
@@ -123,21 +126,26 @@ impl<'source> LinkedMagazine<'source> {
                 evidence.into_origin(fields.sources()),
             ));
         }
-        reader.read_admitted(linked, ledger)
+        if let Some(observed) = linked {
+            reader.read_admitted(record, observed.tree, ledger)
+        } else {
+            fields.check_cancel()?;
+            reader.read_admitted(record, record.tree().as_ref(), ledger)
+        }
     }
 }
 
 impl<'source> LinkedAmmunitionReader<'_, 'source> {
     fn read_admitted(
         &self,
-        linked: LinkedMagazineRead<'_, 'source>,
+        record: Record<'source>,
+        read: Result<&RecordTree<'source>, &DataForgeError>,
         ledger: &mut ExportLedger,
     ) -> Result<LinkedMagazine<'source>, CatalogError> {
-        let record = linked.record;
         let input = self.projection.original();
         let admission = RecordObservation::capture(input, &record)?;
         let context = input.record_context(&record)?.with_cancel(self.cancel);
-        let tree = match linked.tree {
+        let tree = match read {
             Err(DataForgeError::ObservationStopped) => return Err(CatalogError::Cancelled),
             Err(error) => {
                 let mut evidence = SelectionEvidence::default();

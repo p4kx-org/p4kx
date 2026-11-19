@@ -24,6 +24,7 @@ pub(super) enum Family {
     CargoGrids,
     AmmoDefinitions,
     WeaponSources,
+    ProjectileAmmo,
 }
 
 impl Family {
@@ -39,7 +40,8 @@ impl Family {
             | Self::Attachments
             | Self::Bounds
             | Self::CargoGrids
-            | Self::WeaponSources => Kind::Items,
+            | Self::WeaponSources
+            | Self::ProjectileAmmo => Kind::Items,
         }
     }
 
@@ -53,6 +55,7 @@ impl Family {
             Self::Bounds => BOUNDS_SOURCE_TYPES,
             Self::CargoGrids => &[crate::catalog_v3::catalog_facility::CARGO_GRID_SOURCE_TYPE],
             Self::AmmoDefinitions => &[ammo_definition::SOURCE_TYPE],
+            Self::ProjectileAmmo => &[crate::item_stats::WEAPON_COMPONENT],
             Self::WeaponSources => &[
                 crate::item_stats::WEAPON_COMPONENT,
                 crate::item_stats::AMMO_CONTAINER,
@@ -83,6 +86,23 @@ pub(super) struct Bounds;
 pub(super) struct CargoGrids;
 pub(super) struct AmmoDefinitions;
 pub(super) struct WeaponSources;
+pub(super) struct ProjectileAmmo;
+
+impl Projector for ProjectileAmmo {
+    type Row<'source> = super::projectile_ammo_read::ProjectileAmmoOwner<'source>;
+    const FAMILY: Family = Family::ProjectileAmmo;
+
+    fn read<'source>(
+        forge: &'source DataForge<'source>,
+        tree: &RecordTree<'source>,
+        projection: &CatalogProjection<'_, 'source>,
+        admission: &RecordObservation<'_, 'source>,
+        _: &AlignmentOptions<'_>,
+        cancel: Option<&CancelToken>,
+    ) -> Result<ScopedSourceRead<Vec<Self::Row<'source>>>, CatalogError> {
+        super::projectile_ammo_read::read(forge, tree, projection, admission, cancel)
+    }
+}
 
 impl Projector for WeaponSources {
     type Row<'source> = WeaponSource<'source>;

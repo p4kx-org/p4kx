@@ -697,9 +697,24 @@ ordinals. `mode_kind()` classifies each action. For single and rapid projectile 
 Inspect their states and origins independently. An incomplete component selection remains
 visible in the snapshot coverage even when the readable components produce rows.
 
-Magazine and Ammo References report original header resolution. Resolving a target index
-does not read its body or select a projectile role. Combat bases and cross-Item dependency
-resolution use separate Catalog projections.
+Magazine and Ammo References in these authored rows report original header resolution.
+Use the projectile ammunition query for a resolved action route and its reached Ammo.
+
+## Projectile ammunition
+
+Use `equipment::with_projectile_ammo`, its decoded-Entry form or the corresponding session
+methods with one physical Item Record index. The snapshot carries the original outcomes from
+`projections.weaponProjectileAmmoSelections` and the readable `definitions.ammoDefinitions`
+reached by those outcomes. Join the action to its authored weapon component and original
+action occurrence ordinal. Join a selected Ammo cell to the definition's physical Record
+index. Magazine admission checks the original reference's physical header and uniqueness
+before opening the magazine body. The query reads only the requested Item and its admitted
+magazine and Ammo dependencies. It performs no localization lookups.
+
+Read the typed route outcome and its source completeness before treating a missing result
+as absence. A proved route can still name an unreadable Ammo body in dependency coverage.
+`AmmoSelection` reflects the unfiltered Catalog admission policy. The query returns the
+source inputs for each action, while combat-base projections apply separate rules.
 
 ## Starmap container placements
 

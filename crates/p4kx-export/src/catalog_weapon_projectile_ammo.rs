@@ -31,9 +31,10 @@ use linked_reader::LinkedMagazineRead;
 use linked_selection::MagazineChoice;
 use route::OwnRoute;
 
-pub(in crate::catalog_v3) use selection::ProjectileAmmoRole;
 use selection::Selection;
-pub(crate) use selection::WeaponProjectileAmmoSelection;
+pub use selection::{
+    ProjectileAmmoRole, Selection as ProjectileAmmoChoice, WeaponProjectileAmmoSelection,
+};
 
 pub(crate) fn read<'source>(
     fields: &OriginalFlowFields<'_, '_, 'source>,
@@ -288,7 +289,7 @@ fn select_ammo<'origin, 'source>(
     })
 }
 
-pub(super) fn table(
+pub(crate) fn table(
     forge: &DataForge<'_>,
     mut rows: Vec<WeaponProjectileAmmoSelection>,
 ) -> CatalogTable<WeaponProjectileAmmoSelection> {

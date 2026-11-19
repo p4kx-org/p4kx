@@ -35,6 +35,10 @@ mod cargo_read;
 mod definitions;
 #[path = "equipment_item_source_query.rs"]
 mod item_sources;
+#[path = "equipment_projectile_ammo_query.rs"]
+mod projectile_ammo;
+#[path = "equipment_projectile_ammo_read.rs"]
+mod projectile_ammo_read;
 #[path = "equipment_query_read.rs"]
 mod read;
 #[path = "equipment_query_rows.rs"]
@@ -77,6 +81,10 @@ pub use definitions::{with_item_definitions, with_item_definitions_from};
 #[cfg(test)]
 pub(crate) use item_sources::observe_item_source_query;
 pub use item_sources::{with_item_sources, with_item_sources_from};
+pub use projectile_ammo::{
+    ProjectileAmmoChoice, ProjectileAmmoOwner, ProjectileAmmoRole, ProjectileAmmoSnapshot,
+    WeaponProjectileAmmoSelection, with_projectile_ammo, with_projectile_ammo_from,
+};
 pub use snapshot::{
     AttachmentConstraintSnapshot, EquipmentSnapshot, ItemBoundsSnapshot, ItemDefinitionSnapshot,
     ItemSourceSnapshot,

@@ -38,6 +38,14 @@ pub(super) enum Case {
 }
 
 pub(super) fn build(case: Case) -> DataForgeBuilder {
+    with_ammo_names(case, "Primary", "Secondary")
+}
+
+pub(super) fn with_ammo_names(
+    case: Case,
+    primary_name: &str,
+    secondary_name: &str,
+) -> DataForgeBuilder {
     let builder = common_types(DataForgeBuilder::new().version(8))
         .enumeration("EProjectileType", ["Primary", "Secondary"])
         .structure(TestStruct::new(ACTION))
@@ -52,8 +60,8 @@ pub(super) fn build(case: Case) -> DataForgeBuilder {
             TestType::Enum("EProjectileType".to_owned()),
         ))
         .structure(TestStruct::new(AMMO).field("speed", TestType::Single))
-        .record(ammo(PRIMARY, "Primary", 10.0))
-        .record(ammo(SECONDARY, "Secondary", 20.0))
+        .record(ammo(PRIMARY, primary_name, 10.0))
+        .record(ammo(SECONDARY, secondary_name, 20.0))
         .record(weapon(case));
     match case {
         Case::Dangling | Case::SelfLink => builder,

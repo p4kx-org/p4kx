@@ -3,7 +3,7 @@
 
 use std::cell::RefCell;
 
-use p4kx_extraction::{CancelToken, DataType, RecordTree, Value};
+use p4kx_extraction::{CancelToken, DataForge, DataType, RecordTree, Value};
 
 use super::item_definition::ItemDefinition;
 use super::{Component, ItemComponentsRead};
@@ -16,7 +16,11 @@ use crate::catalog_v3::authored_fields::Observed;
 use crate::catalog_v3::catalog_ammo_bindings::AmmoBinding;
 use crate::catalog_v3::catalog_ammo_containers::AmmoContainer;
 use crate::catalog_v3::catalog_weapon_actions::WeaponActions;
+use crate::catalog_v3::catalog_weapon_projectile_ammo::{
+    self, LinkedAmmunitionReader, WeaponProjectileAmmoSelection,
+};
 use crate::catalog_v3::item_component_owner::ComponentOwner;
+use crate::export_ledger::ExportLedger;
 use crate::record_observation::RecordObservation;
 use crate::template_field_capture::TemplateFieldCapture;
 
@@ -91,6 +95,45 @@ pub(crate) fn read_weapon_source<'source>(
                 .collect();
             Ok(ScopedSourceRead::new(
                 value,
+                result.notes,
+                selection_complete,
+            ))
+        },
+    )
+}
+
+pub(crate) fn read_projectile_ammo<'source>(
+    forge: &'source DataForge<'source>,
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    cancel: Option<&CancelToken>,
+    ledger: &mut ExportLedger,
+) -> Result<ScopedSourceRead<Vec<WeaponProjectileAmmoSelection>>, CatalogError> {
+    projection.original().check_forge(forge)?;
+    let selection_complete = weapon_component_selection_complete(tree);
+    with_components(
+        tree,
+        projection,
+        admission,
+        cancel,
+        ComponentScope::Weapon,
+        |result, originals, _, _| {
+            let reader = LinkedAmmunitionReader {
+                projection,
+                forge,
+                cancel,
+            };
+            let rows = catalog_weapon_projectile_ammo::read(
+                originals,
+                &reader,
+                &result.rows.weapon_actions,
+                &result.rows.ammo_bindings,
+                None,
+                ledger,
+            )?;
+            Ok(ScopedSourceRead::new(
+                rows,
                 result.notes,
                 selection_complete,
             ))

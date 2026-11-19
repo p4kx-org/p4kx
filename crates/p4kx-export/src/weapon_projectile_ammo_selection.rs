@@ -12,7 +12,7 @@ use crate::schema_fields::every_field_required;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct WeaponProjectileAmmoSelection {
+pub struct WeaponProjectileAmmoSelection {
     #[serde(flatten)]
     owner: ComponentOwner,
     action_source_value_ordinal: SourcedValue<DecimalU64>,
@@ -67,14 +67,22 @@ impl WeaponProjectileAmmoSelection {
         }
     }
 
-    pub(in crate::catalog_v3) const fn owner(&self) -> &ComponentOwner {
+    /// Borrows the original weapon owner and its physical component position.
+    #[must_use]
+    pub const fn owner(&self) -> &ComponentOwner {
         &self.owner
     }
 
-    pub(in crate::catalog_v3) const fn action_source_value_ordinal(
-        &self,
-    ) -> &SourcedValue<DecimalU64> {
+    /// Borrows the original action occurrence ordinal in the owner Record.
+    #[must_use]
+    pub const fn action_source_value_ordinal(&self) -> &SourcedValue<DecimalU64> {
         &self.action_source_value_ordinal
+    }
+
+    /// Borrows the resolved or rejected route with its original selection evidence.
+    #[must_use]
+    pub const fn selection(&self) -> &SourcedValue<Selection> {
+        &self.selection
     }
 
     pub(in crate::catalog_v3) const fn origin(&self) -> &FieldOrigin {
@@ -89,6 +97,7 @@ impl WeaponProjectileAmmoSelection {
     }
 }
 
+/// The outcome of resolving the original ammunition route of a launcher action.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(
     tag = "type",
@@ -96,47 +105,83 @@ impl WeaponProjectileAmmoSelection {
     rename_all_fields = "camelCase"
 )]
 #[schemars(transform = every_field_required)]
-pub(super) enum Selection {
+#[non_exhaustive]
+pub enum Selection {
+    /// The launcher selects ammunition from a container on its own Item.
     Selected {
+        /// The launcher role that selects the slot.
         role: SourcedValue<ProjectileAmmoRole>,
+        /// The original container position in the weapon's Components array.
         container_component_ordinal: SourcedValue<u32>,
+        /// The admitted physical Ammo Record index.
         ammo_record_index: SourcedValue<u32>,
     },
+    /// The launcher selects ammunition from a uniquely linked magazine.
     SelectedLinkedMagazine {
+        /// The launcher role that selects the slot.
         role: SourcedValue<ProjectileAmmoRole>,
+        /// The uniquely admitted magazine's physical Record index.
         magazine_record_index: SourcedValue<u32>,
+        /// The original container position in the magazine's Components array.
         container_component_ordinal: SourcedValue<u32>,
+        /// The admitted physical Ammo Record index.
         ammo_record_index: SourcedValue<u32>,
     },
+    /// The original magazine reference has no target.
     DanglingMagazine,
+    /// The original magazine reference targets a different source type.
     UnsupportedMagazineTarget,
+    /// The magazine reference resolves to the owner Item.
     SelfLinkedMagazine,
+    /// Multiple physical Records match the magazine reference.
     AmbiguousMagazineReference,
+    /// The admitted magazine body could not be read.
     UnreadableMagazine,
+    /// The admitted magazine has no supported container.
     LinkedMagazineWithoutContainer,
+    /// The admitted magazine has competing container components.
     AmbiguousLinkedMagazineContainer,
+    /// The magazine's component inventory could not be determined.
     IncompleteLinkedMagazineComponents,
+    /// The same original action occurrence appears more than once.
     AmbiguousAction,
+    /// The original fire-action inventory could not be determined.
     IncompleteActions,
+    /// The weapon owner has competing weapon or container components.
     AmbiguousComponents,
+    /// The weapon owner's component inventory could not be determined.
     IncompleteComponents,
+    /// The owner's direct container and linked magazine are both absent.
     NoAdmittedOwnContainer,
+    /// The configured magazine route requires other selection inputs.
     OtherMagazineRoute,
+    /// An unusable magazine route field prevents selecting a slot.
     IndeterminateMagazineRoute,
+    /// The launcher type is outside the supported primary and secondary roles.
     UnsupportedProjectileType,
+    /// The original launcher does not name a projectile role.
     MissingProjectileType,
+    /// The original projectile role could not be determined.
     IndeterminateProjectileType,
+    /// The selected slot has no Ammo reference.
     MissingAmmo,
+    /// The selected Ammo reference has no target.
     DanglingAmmo,
+    /// The selected Ammo reference targets a different source type.
     UnsupportedAmmoTarget,
+    /// The Ammo reference or its physical target cannot be determined.
     IndeterminateAmmo,
 }
 
+/// The launcher role used to select an original ammunition slot.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
-pub(in crate::catalog_v3) enum ProjectileAmmoRole {
+#[non_exhaustive]
+pub enum ProjectileAmmoRole {
+    /// The authored primary ammunition slot.
     Primary,
+    /// The authored secondary ammunition slot.
     Secondary,
 }
 
