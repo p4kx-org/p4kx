@@ -9,8 +9,9 @@ use crate::catalog_read::scoped_source_read::ScopedSourceRead;
 use crate::catalog_table::DatasetAvailability;
 use crate::catalog_v3::ammo_definition::{self, AmmoDefinition, AmmoSelection};
 use crate::catalog_v3::catalog_entity_configurations::{
-    self, RESOURCE_COMPONENT_TYPES, RESOURCE_CONNECTION_TYPES, ResourceComponent,
-    ResourceConnection, VEHICLE_ARMOR_TYPES, VehicleArmor,
+    self, FuelConfigurationKind, FuelIntake, FuelTank, RESOURCE_COMPONENT_TYPES,
+    RESOURCE_CONNECTION_TYPES, ResourceComponent, ResourceConnection, ResourceContainer,
+    VEHICLE_ARMOR_TYPES, VehicleArmor,
 };
 use crate::catalog_v3::catalog_item_alignment::{ATTACHABLE, AlignmentOptions};
 use crate::catalog_v3::catalog_item_components::{self, WeaponSource, definition_read};
@@ -23,6 +24,7 @@ pub(super) enum ConfigurationFamily {
     VehicleArmor,
     ResourceComponents,
     ResourceConnections,
+    Fuel(FuelConfigurationKind),
 }
 
 impl ConfigurationFamily {
@@ -31,6 +33,7 @@ impl ConfigurationFamily {
             Self::VehicleArmor => VEHICLE_ARMOR_TYPES,
             Self::ResourceComponents => RESOURCE_COMPONENT_TYPES,
             Self::ResourceConnections => RESOURCE_CONNECTION_TYPES,
+            Self::Fuel(configuration) => configuration.source_types(),
         }
     }
 }
@@ -111,9 +114,6 @@ pub(super) struct ItemSources;
 pub(super) struct Attachments;
 pub(super) struct Bounds;
 pub(super) struct CargoGrids;
-pub(super) struct VehicleArmorRows;
-pub(super) struct ResourceComponentRows;
-pub(super) struct ResourceConnectionRows;
 pub(super) struct AmmoDefinitions;
 pub(super) struct WeaponSources;
 pub(super) struct ProjectileAmmo;
@@ -305,56 +305,61 @@ impl Projector for Bounds {
     }
 }
 
-impl Projector for VehicleArmorRows {
-    type Row<'source> = VehicleArmor<'source>;
-    const FAMILY: Family = Family::Configuration(ConfigurationFamily::VehicleArmor);
+macro_rules! configuration_projector {
+    ($projector:ident, $row:ident, $family:expr, $read:ident) => {
+        pub(super) struct $projector;
 
-    fn read<'source>(
-        _: &'source DataForge<'source>,
-        tree: &RecordTree<'source>,
-        projection: &CatalogProjection<'_, 'source>,
-        admission: &RecordObservation<'_, 'source>,
-        options: &AlignmentOptions<'_>,
-        cancel: Option<&CancelToken>,
-    ) -> Result<ScopedSourceRead<Vec<Self::Row<'source>>>, CatalogError> {
-        catalog_entity_configurations::read_vehicle_armor(
-            tree, projection, admission, options, cancel,
-        )
-    }
+        impl Projector for $projector {
+            type Row<'source> = $row<'source>;
+            const FAMILY: Family = Family::Configuration($family);
+
+            fn read<'source>(
+                _: &'source DataForge<'source>,
+                tree: &RecordTree<'source>,
+                projection: &CatalogProjection<'_, 'source>,
+                admission: &RecordObservation<'_, 'source>,
+                options: &AlignmentOptions<'_>,
+                cancel: Option<&CancelToken>,
+            ) -> Result<ScopedSourceRead<Vec<Self::Row<'source>>>, CatalogError> {
+                catalog_entity_configurations::$read(tree, projection, admission, options, cancel)
+            }
+        }
+    };
 }
 
-impl Projector for ResourceConnectionRows {
-    type Row<'source> = ResourceConnection<'source>;
-    const FAMILY: Family = Family::Configuration(ConfigurationFamily::ResourceConnections);
-
-    fn read<'source>(
-        _: &'source DataForge<'source>,
-        tree: &RecordTree<'source>,
-        projection: &CatalogProjection<'_, 'source>,
-        admission: &RecordObservation<'_, 'source>,
-        options: &AlignmentOptions<'_>,
-        cancel: Option<&CancelToken>,
-    ) -> Result<ScopedSourceRead<Vec<Self::Row<'source>>>, CatalogError> {
-        catalog_entity_configurations::read_resource_connections(
-            tree, projection, admission, options, cancel,
-        )
-    }
-}
-
-impl Projector for ResourceComponentRows {
-    type Row<'source> = ResourceComponent<'source>;
-    const FAMILY: Family = Family::Configuration(ConfigurationFamily::ResourceComponents);
-
-    fn read<'source>(
-        _: &'source DataForge<'source>,
-        tree: &RecordTree<'source>,
-        projection: &CatalogProjection<'_, 'source>,
-        admission: &RecordObservation<'_, 'source>,
-        options: &AlignmentOptions<'_>,
-        cancel: Option<&CancelToken>,
-    ) -> Result<ScopedSourceRead<Vec<Self::Row<'source>>>, CatalogError> {
-        catalog_entity_configurations::read_resource_components(
-            tree, projection, admission, options, cancel,
-        )
-    }
-}
+configuration_projector!(
+    VehicleArmorRows,
+    VehicleArmor,
+    ConfigurationFamily::VehicleArmor,
+    read_vehicle_armor
+);
+configuration_projector!(
+    ResourceConnectionRows,
+    ResourceConnection,
+    ConfigurationFamily::ResourceConnections,
+    read_resource_connections
+);
+configuration_projector!(
+    ResourceComponentRows,
+    ResourceComponent,
+    ConfigurationFamily::ResourceComponents,
+    read_resource_components
+);
+configuration_projector!(
+    FuelTankRows,
+    FuelTank,
+    ConfigurationFamily::Fuel(FuelConfigurationKind::Tank),
+    read_fuel_tanks
+);
+configuration_projector!(
+    FuelIntakeRows,
+    FuelIntake,
+    ConfigurationFamily::Fuel(FuelConfigurationKind::Intake),
+    read_fuel_intakes
+);
+configuration_projector!(
+    ResourceContainerRows,
+    ResourceContainer,
+    ConfigurationFamily::Fuel(FuelConfigurationKind::Container),
+    read_resource_containers
+);

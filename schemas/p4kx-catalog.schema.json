@@ -11278,18 +11278,23 @@
       "type": "object"
     },
     "CompositionEntry": {
+      "description": "One physical slot in a container default composition.",
       "properties": {
         "additionalFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Original fields outside the typed projection."
         },
         "entry": {
-          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference",
+          "description": "Original resource reference and target disposition."
         },
         "sourceType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original DataForge declaration."
         },
         "weight": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored composition weight."
         }
       },
       "required": [
@@ -18605,15 +18610,19 @@
       "type": "object"
     },
     "FuelAudioRtpc": {
+      "description": "The original audio parameter for a fuel rate or level.",
       "properties": {
         "additionalFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Original fields outside the typed projection."
         },
         "rtpc": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Authored real-time parameter control name."
         },
         "sourceType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original DataForge declaration."
         }
       },
       "required": [
@@ -18624,15 +18633,19 @@
       "type": "object"
     },
     "FuelAudioTrigger": {
+      "description": "The original audio trigger for a fuel flow loop.",
       "properties": {
         "additionalFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Original fields outside the typed projection."
         },
         "audioTrigger": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Authored audio trigger name."
         },
         "sourceType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original DataForge declaration."
         }
       },
       "required": [
@@ -18646,16 +18659,19 @@
       "description": "Authored rate parameters of a physical fuel intake.",
       "properties": {
         "additionalFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Original fields outside the typed projection."
         },
         "componentOrdinal": {
           "$ref": "#/$defs/SourcedValueOfuint32"
         },
         "fuelPushRate": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored intake fuel push rate."
         },
         "minimumRate": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored minimum intake rate."
         },
         "ownerGuid": {
           "$ref": "#/$defs/SourcedValueOfGuid"
@@ -18664,7 +18680,8 @@
           "$ref": "#/$defs/SourcedValueOfuint32"
         },
         "sourceType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original DataForge declaration."
         }
       },
       "required": [
@@ -18682,31 +18699,39 @@
       "description": "Authored flow, interaction and audio parameters of a physical fuel tank.",
       "properties": {
         "additionalFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Original fields outside the typed projection."
         },
         "closedState": {
-          "$ref": "#/$defs/SourcedValueOfHealthLink"
+          "$ref": "#/$defs/SourcedValueOfHealthLink",
+          "description": "Original link to the closed interaction state."
         },
         "componentOrdinal": {
           "$ref": "#/$defs/SourcedValueOfuint32"
         },
         "fuelFillDrainRateAudioRtpc": {
-          "$ref": "#/$defs/SourcedValueOfFuelAudioRtpc"
+          "$ref": "#/$defs/SourcedValueOfFuelAudioRtpc",
+          "description": "Authored audio parameter for the fill or drain rate."
         },
         "fuelFillLevelAudioRtpc": {
-          "$ref": "#/$defs/SourcedValueOfFuelAudioRtpc"
+          "$ref": "#/$defs/SourcedValueOfFuelAudioRtpc",
+          "description": "Authored audio parameter for the fill level."
         },
         "fuelFlowLoopStartAudioTrigger": {
-          "$ref": "#/$defs/SourcedValueOfFuelAudioTrigger"
+          "$ref": "#/$defs/SourcedValueOfFuelAudioTrigger",
+          "description": "Authored audio trigger that starts the flow loop."
         },
         "fuelFlowLoopStopAudioTrigger": {
-          "$ref": "#/$defs/SourcedValueOfFuelAudioTrigger"
+          "$ref": "#/$defs/SourcedValueOfFuelAudioTrigger",
+          "description": "Authored audio trigger that stops the flow loop."
         },
         "hydrogenMaxFlowMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored maximum flow multiplier for hydrogen."
         },
         "openState": {
-          "$ref": "#/$defs/SourcedValueOfHealthLink"
+          "$ref": "#/$defs/SourcedValueOfHealthLink",
+          "description": "Original link to the open interaction state."
         },
         "ownerGuid": {
           "$ref": "#/$defs/SourcedValueOfGuid"
@@ -18715,13 +18740,16 @@
           "$ref": "#/$defs/SourcedValueOfuint32"
         },
         "pumpingState": {
-          "$ref": "#/$defs/SourcedValueOfHealthLink"
+          "$ref": "#/$defs/SourcedValueOfHealthLink",
+          "description": "Original link to the pumping interaction state."
         },
         "quantumMaxFlowMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored maximum flow multiplier for quantum fuel."
         },
         "sourceType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original DataForge declaration."
         }
       },
       "required": [
@@ -40458,43 +40486,55 @@
       "description": "Authored contents and policy of a physical `ResourceContainer` component.",
       "properties": {
         "additionalFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Original fields outside the typed projection."
         },
         "capacity": {
-          "$ref": "#/$defs/SourcedValueOfResourceCapacity"
+          "$ref": "#/$defs/SourcedValueOfResourceCapacity",
+          "description": "Authored capacity in its original unit and numeric representation."
         },
         "componentOrdinal": {
           "$ref": "#/$defs/SourcedValueOfuint32"
         },
         "defaultComposition": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCompositionEntry"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCompositionEntry",
+          "description": "Ordered original default composition slots."
         },
         "defaultCompositionFillFactor": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored default composition fill factor."
         },
         "exclusiveGroups": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference",
+          "description": "Ordered original resource group denylist."
         },
         "exclusiveResources": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference",
+          "description": "Ordered original resource denylist, including null and dangling links."
         },
         "generateRandomQuality": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Whether quality generation is enabled."
         },
         "hideFromUi": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Whether this container is hidden in the UI."
         },
         "immutable": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Whether content changes are disabled."
         },
         "inclusiveGroups": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference",
+          "description": "Ordered original resource group allowlist."
         },
         "inclusiveResources": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference",
+          "description": "Ordered original resource allowlist, including null and dangling links."
         },
         "mutabilityLevel": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original mutability level label."
         },
         "ownerGuid": {
           "$ref": "#/$defs/SourcedValueOfGuid"
@@ -40503,7 +40543,8 @@
           "$ref": "#/$defs/SourcedValueOfuint32"
         },
         "sourceType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original DataForge declaration."
         }
       },
       "required": [

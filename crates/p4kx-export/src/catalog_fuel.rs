@@ -21,20 +21,32 @@ pub(super) const INTAKE: &str = "SCItemFuelIntakeParams";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct FuelTank<'source> {
+#[non_exhaustive]
+pub struct FuelTank<'source> {
     #[serde(flatten)]
     owner: ComponentOwner,
-    source_type: SourcedValue<&'source str>,
-    hydrogen_max_flow_multiplier: SourcedValue<ResourceFloat32>,
-    quantum_max_flow_multiplier: SourcedValue<ResourceFloat32>,
-    open_state: SourcedValue<HealthLink<'source>>,
-    closed_state: SourcedValue<HealthLink<'source>>,
-    pumping_state: SourcedValue<HealthLink<'source>>,
-    fuel_flow_loop_start_audio_trigger: SourcedValue<FuelAudioTrigger<'source>>,
-    fuel_flow_loop_stop_audio_trigger: SourcedValue<FuelAudioTrigger<'source>>,
-    fuel_fill_drain_rate_audio_rtpc: SourcedValue<FuelAudioRtpc<'source>>,
-    fuel_fill_level_audio_rtpc: SourcedValue<FuelAudioRtpc<'source>>,
-    additional_fields: SourceArenaOutput<'source>,
+    /// Original DataForge declaration.
+    pub source_type: SourcedValue<&'source str>,
+    /// Authored maximum flow multiplier for hydrogen.
+    pub hydrogen_max_flow_multiplier: SourcedValue<ResourceFloat32>,
+    /// Authored maximum flow multiplier for quantum fuel.
+    pub quantum_max_flow_multiplier: SourcedValue<ResourceFloat32>,
+    /// Original link to the open interaction state.
+    pub open_state: SourcedValue<HealthLink<'source>>,
+    /// Original link to the closed interaction state.
+    pub closed_state: SourcedValue<HealthLink<'source>>,
+    /// Original link to the pumping interaction state.
+    pub pumping_state: SourcedValue<HealthLink<'source>>,
+    /// Authored audio trigger that starts the flow loop.
+    pub fuel_flow_loop_start_audio_trigger: SourcedValue<FuelAudioTrigger<'source>>,
+    /// Authored audio trigger that stops the flow loop.
+    pub fuel_flow_loop_stop_audio_trigger: SourcedValue<FuelAudioTrigger<'source>>,
+    /// Authored audio parameter for the fill or drain rate.
+    pub fuel_fill_drain_rate_audio_rtpc: SourcedValue<FuelAudioRtpc<'source>>,
+    /// Authored audio parameter for the fill level.
+    pub fuel_fill_level_audio_rtpc: SourcedValue<FuelAudioRtpc<'source>>,
+    /// Original fields outside the typed projection.
+    pub additional_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> FuelTank<'source> {
@@ -104,18 +116,25 @@ impl<'source> FuelTank<'source> {
         })
     }
 
-    pub(super) const fn owner(&self) -> &ComponentOwner {
+    /// Returns the original component owner.
+    #[must_use]
+    pub const fn owner(&self) -> &ComponentOwner {
         &self.owner
     }
 }
 
+/// The original audio trigger for a fuel flow loop.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct FuelAudioTrigger<'source> {
-    source_type: SourcedValue<&'source str>,
-    audio_trigger: SourcedValue<&'source str>,
-    additional_fields: SourceArenaOutput<'source>,
+#[non_exhaustive]
+pub struct FuelAudioTrigger<'source> {
+    /// Original DataForge declaration.
+    pub source_type: SourcedValue<&'source str>,
+    /// Authored audio trigger name.
+    pub audio_trigger: SourcedValue<&'source str>,
+    /// Original fields outside the typed projection.
+    pub additional_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> FuelAudioTrigger<'source> {
@@ -134,13 +153,18 @@ impl<'source> FuelAudioTrigger<'source> {
     }
 }
 
+/// The original audio parameter for a fuel rate or level.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct FuelAudioRtpc<'source> {
-    source_type: SourcedValue<&'source str>,
-    rtpc: SourcedValue<&'source str>,
-    additional_fields: SourceArenaOutput<'source>,
+#[non_exhaustive]
+pub struct FuelAudioRtpc<'source> {
+    /// Original DataForge declaration.
+    pub source_type: SourcedValue<&'source str>,
+    /// Authored real-time parameter control name.
+    pub rtpc: SourcedValue<&'source str>,
+    /// Original fields outside the typed projection.
+    pub additional_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> FuelAudioRtpc<'source> {
@@ -162,13 +186,18 @@ impl<'source> FuelAudioRtpc<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct FuelIntake<'source> {
+#[non_exhaustive]
+pub struct FuelIntake<'source> {
     #[serde(flatten)]
     owner: ComponentOwner,
-    source_type: SourcedValue<&'source str>,
-    fuel_push_rate: SourcedValue<ResourceFloat32>,
-    minimum_rate: SourcedValue<ResourceFloat32>,
-    additional_fields: SourceArenaOutput<'source>,
+    /// Original DataForge declaration.
+    pub source_type: SourcedValue<&'source str>,
+    /// Authored intake fuel push rate.
+    pub fuel_push_rate: SourcedValue<ResourceFloat32>,
+    /// Authored minimum intake rate.
+    pub minimum_rate: SourcedValue<ResourceFloat32>,
+    /// Original fields outside the typed projection.
+    pub additional_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> FuelIntake<'source> {
@@ -192,7 +221,9 @@ impl<'source> FuelIntake<'source> {
         })
     }
 
-    pub(super) const fn owner(&self) -> &ComponentOwner {
+    /// Returns the original component owner.
+    #[must_use]
+    pub const fn owner(&self) -> &ComponentOwner {
         &self.owner
     }
 }

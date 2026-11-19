@@ -18,44 +18,61 @@ use crate::source_value_catalog::{SourceArenaOutput, SourceRecordReference};
 
 pub(super) const RESOURCE_CONTAINER: &str = "ResourceContainer";
 
-type Reference<'source> = SourcedValue<Box<SourceRecordReference<'source>>>;
-type References<'source> = SourcedValue<Vec<Reference<'source>>>;
-
 /// Authored contents and policy of a physical `ResourceContainer` component.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct ResourceContainer<'source> {
+#[non_exhaustive]
+pub struct ResourceContainer<'source> {
     #[serde(flatten)]
     owner: ComponentOwner,
-    source_type: SourcedValue<&'source str>,
-    capacity: SourcedValue<ResourceCapacity<'source>>,
-    immutable: SourcedValue<bool>,
-    mutability_level: SourcedValue<&'source str>,
-    generate_random_quality: SourcedValue<bool>,
+    /// Original DataForge declaration.
+    pub source_type: SourcedValue<&'source str>,
+    /// Authored capacity in its original unit and numeric representation.
+    pub capacity: SourcedValue<ResourceCapacity<'source>>,
+    /// Whether content changes are disabled.
+    pub immutable: SourcedValue<bool>,
+    /// Original mutability level label.
+    pub mutability_level: SourcedValue<&'source str>,
+    /// Whether quality generation is enabled.
+    pub generate_random_quality: SourcedValue<bool>,
     #[schemars(with = "SourcedValue<Vec<SourcedValue<CatalogRecordReference>>>")]
-    inclusive_resources: References<'source>,
+    /// Ordered original resource allowlist, including null and dangling links.
+    pub inclusive_resources: SourcedValue<Vec<SourcedValue<Box<SourceRecordReference<'source>>>>>,
     #[schemars(with = "SourcedValue<Vec<SourcedValue<CatalogRecordReference>>>")]
-    exclusive_resources: References<'source>,
+    /// Ordered original resource denylist, including null and dangling links.
+    pub exclusive_resources: SourcedValue<Vec<SourcedValue<Box<SourceRecordReference<'source>>>>>,
     #[schemars(with = "SourcedValue<Vec<SourcedValue<CatalogRecordReference>>>")]
-    inclusive_groups: References<'source>,
+    /// Ordered original resource group allowlist.
+    pub inclusive_groups: SourcedValue<Vec<SourcedValue<Box<SourceRecordReference<'source>>>>>,
     #[schemars(with = "SourcedValue<Vec<SourcedValue<CatalogRecordReference>>>")]
-    exclusive_groups: References<'source>,
-    default_composition: SourcedValue<Vec<SourcedValue<CompositionEntry<'source>>>>,
-    default_composition_fill_factor: SourcedValue<ResourceFloat32>,
-    hide_from_ui: SourcedValue<bool>,
-    additional_fields: SourceArenaOutput<'source>,
+    /// Ordered original resource group denylist.
+    pub exclusive_groups: SourcedValue<Vec<SourcedValue<Box<SourceRecordReference<'source>>>>>,
+    /// Ordered original default composition slots.
+    pub default_composition: SourcedValue<Vec<SourcedValue<CompositionEntry<'source>>>>,
+    /// Authored default composition fill factor.
+    pub default_composition_fill_factor: SourcedValue<ResourceFloat32>,
+    /// Whether this container is hidden in the UI.
+    pub hide_from_ui: SourcedValue<bool>,
+    /// Original fields outside the typed projection.
+    pub additional_fields: SourceArenaOutput<'source>,
 }
 
+/// One physical slot in a container default composition.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct CompositionEntry<'source> {
-    source_type: SourcedValue<&'source str>,
+#[non_exhaustive]
+pub struct CompositionEntry<'source> {
+    /// Original DataForge declaration.
+    pub source_type: SourcedValue<&'source str>,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
-    entry: Reference<'source>,
-    weight: SourcedValue<ResourceFloat32>,
-    additional_fields: SourceArenaOutput<'source>,
+    /// Original resource reference and target disposition.
+    pub entry: SourcedValue<Box<SourceRecordReference<'source>>>,
+    /// Authored composition weight.
+    pub weight: SourcedValue<ResourceFloat32>,
+    /// Original fields outside the typed projection.
+    pub additional_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> ResourceContainer<'source> {
@@ -124,7 +141,9 @@ impl<'source> ResourceContainer<'source> {
         })
     }
 
-    pub(super) const fn owner(&self) -> &ComponentOwner {
+    /// Returns the original component owner.
+    #[must_use]
+    pub const fn owner(&self) -> &ComponentOwner {
         &self.owner
     }
 }

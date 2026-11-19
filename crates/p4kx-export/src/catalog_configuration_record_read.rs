@@ -7,7 +7,8 @@ use std::ops::Range;
 use p4kx_extraction::{CancelToken, RecordTree, Value};
 
 use super::{
-    ConfigurationKind, EntityConfigurationRows, ResourceComponent, ResourceConnection, VehicleArmor,
+    ConfigurationKind, EntityConfigurationRows, FuelConfigurationKind, FuelIntake, FuelTank,
+    ResourceComponent, ResourceConnection, ResourceContainer, VehicleArmor,
 };
 use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
@@ -162,6 +163,60 @@ pub(crate) fn read_resource_components<'source>(
         Scope::ResourceComponents,
     )?;
     Ok(read.map(|rows| rows.resources))
+}
+
+pub(crate) fn read_resource_containers<'source>(
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    options: &AlignmentOptions<'_>,
+    cancel: Option<&CancelToken>,
+) -> Result<ScopedSourceRead<Vec<ResourceContainer<'source>>>, CatalogError> {
+    let read = read_scope(
+        tree,
+        projection,
+        admission,
+        options,
+        cancel,
+        Scope::Fuel(FuelConfigurationKind::Container),
+    )?;
+    Ok(read.map(|rows| rows.fuel.containers))
+}
+
+pub(crate) fn read_fuel_intakes<'source>(
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    options: &AlignmentOptions<'_>,
+    cancel: Option<&CancelToken>,
+) -> Result<ScopedSourceRead<Vec<FuelIntake<'source>>>, CatalogError> {
+    let read = read_scope(
+        tree,
+        projection,
+        admission,
+        options,
+        cancel,
+        Scope::Fuel(FuelConfigurationKind::Intake),
+    )?;
+    Ok(read.map(|rows| rows.fuel.intakes))
+}
+
+pub(crate) fn read_fuel_tanks<'source>(
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    options: &AlignmentOptions<'_>,
+    cancel: Option<&CancelToken>,
+) -> Result<ScopedSourceRead<Vec<FuelTank<'source>>>, CatalogError> {
+    let read = read_scope(
+        tree,
+        projection,
+        admission,
+        options,
+        cancel,
+        Scope::Fuel(FuelConfigurationKind::Tank),
+    )?;
+    Ok(read.map(|rows| rows.fuel.tanks))
 }
 
 fn read_scope<'source>(

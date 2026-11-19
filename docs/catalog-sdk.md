@@ -609,6 +609,23 @@ ordered states, deltas, control parameters and their physical null slots. Connec
 electrical or thermal field types. Inspect `coverage()` and resolve source-use references through
 the snapshot's source inventory.
 
+## Direct fuel and container configurations
+
+Use these queries in `catalog_queries::equipment::fuel` to read original configurations by
+physical owner GUID or Record index.
+
+| Catalog dataset | SDK query |
+| --- | --- |
+| `configurations.fuelTanks` | `with_fuel_tanks` |
+| `configurations.fuelIntakes` | `with_fuel_intakes` |
+| `configurations.resourceContainers` | `with_resource_containers` |
+
+The decoded-Entry `_from` form, Archive session and parsed view are available for each query.
+Container capacity keeps its original unit and numeric representation. Default composition and
+restriction arrays preserve physical order, null slots, unresolved original links and field
+origins. Tank rows preserve their authored interaction and audio configuration. Inspect
+`coverage()` and resolve source-use references through the snapshot's source inventory.
+
 ## Component definition Records
 
 The functions in the following table are exported by

@@ -37,6 +37,8 @@ mod component_parity;
 mod component_tools;
 #[path = "sdk_flight_configuration_routes.rs"]
 mod flight_configurations;
+#[path = "sdk_fuel_routes.rs"]
+mod fuel;
 #[path = "sdk_projectile_ammo_route.rs"]
 mod projectile_ammo;
 #[path = "sdk_resource_network_routes.rs"]
@@ -105,6 +107,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
     routes.extend(worn_gear::read()?);
     routes.push(vehicle_armor::read()?);
     routes.extend(resource_network::read()?);
+    routes.extend(fuel::read()?);
     routes.extend(component_tools::read()?);
     Ok(routes)
 }

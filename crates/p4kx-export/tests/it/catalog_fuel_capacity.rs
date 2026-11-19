@@ -10,6 +10,8 @@ use crate::loadouts_support::{loadout, port};
 
 #[path = "catalog_fuel_capacity_fixture.rs"]
 mod fixture;
+#[path = "catalog_fuel_sdk.rs"]
+mod sdk;
 use fixture::{
     DOCKED, HYDROGEN, HYDROGEN_TANK, INTAKE, Layout, MISSING, QUANTUM, QUANTUM_TANK, SHIP,
 };

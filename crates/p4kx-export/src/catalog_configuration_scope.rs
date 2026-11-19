@@ -3,7 +3,7 @@
 
 use p4kx_extraction::{CancelToken, RecordTree, StructValue, Value};
 
-use super::super::{ConfigurationKind, EntityConfigurationRows};
+use super::super::{ConfigurationKind, EntityConfigurationRows, FuelConfigurationKind};
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_v3::authored_fields::Observed;
@@ -27,6 +27,7 @@ pub(super) enum Scope {
     VehicleArmor,
     ResourceComponents,
     ResourceConnections,
+    Fuel(FuelConfigurationKind),
 }
 
 pub(super) struct ConfigurationOwner {
@@ -57,7 +58,7 @@ impl Scope {
             })
     }
 
-    const fn accepts(self, kind: ConfigurationKind) -> bool {
+    fn accepts(self, kind: ConfigurationKind) -> bool {
         match self {
             Self::All => true,
             Self::Attachments => matches!(
@@ -83,6 +84,9 @@ impl Scope {
             Self::VehicleArmor => matches!(kind, ConfigurationKind::VehicleArmor),
             Self::ResourceComponents => matches!(kind, ConfigurationKind::Resource),
             Self::ResourceConnections => matches!(kind, ConfigurationKind::Connection(_)),
+            Self::Fuel(requested) => {
+                matches!(kind, ConfigurationKind::Fuel(actual) if actual == requested)
+            }
             Self::Ports => false,
         }
     }
@@ -92,6 +96,11 @@ impl Scope {
             Self::VehicleArmor => Some(ConfigurationInspection::VehicleArmor),
             Self::ResourceComponents => Some(ConfigurationInspection::ResourceComponent),
             Self::ResourceConnections => Some(ConfigurationInspection::ResourceConnection),
+            Self::Fuel(FuelConfigurationKind::Tank) => Some(ConfigurationInspection::FuelTank),
+            Self::Fuel(FuelConfigurationKind::Intake) => Some(ConfigurationInspection::FuelIntake),
+            Self::Fuel(FuelConfigurationKind::Container) => {
+                Some(ConfigurationInspection::ResourceContainer)
+            }
             _ => None,
         }
     }
@@ -169,7 +178,8 @@ impl Scope {
             | Self::CargoGrids
             | Self::VehicleArmor
             | Self::ResourceComponents
-            | Self::ResourceConnections => {
+            | Self::ResourceConnections
+            | Self::Fuel(_) => {
                 rows.push_configuration(configuration, owner, source, options, projection, notes)
             }
             Self::Ports | Self::Attachments => {

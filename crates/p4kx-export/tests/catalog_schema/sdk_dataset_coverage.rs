@@ -32,6 +32,9 @@ const SUIT_ARMOR: &str = "/configurations/suitArmor";
 const VEHICLE_ARMOR: &str = "/configurations/vehicleArmor";
 const RESOURCE_COMPONENTS: &str = "/configurations/resourceComponents";
 const RESOURCE_CONNECTIONS: &str = "/configurations/resourceConnections";
+const FUEL_TANKS: &str = "/configurations/fuelTanks";
+const FUEL_INTAKES: &str = "/configurations/fuelIntakes";
+const RESOURCE_CONTAINERS: &str = "/configurations/resourceContainers";
 const CLOTHING: &str = "/configurations/clothing";
 const ITEM_RADARS: &str = "/configurations/itemRadars";
 const MINING_LASERS: &str = "/configurations/miningLasers";
@@ -102,6 +105,9 @@ fn sdk_query_witnesses_keep_their_canonical_dataset_contract() -> TestResult {
         VEHICLE_ARMOR,
         RESOURCE_COMPONENTS,
         RESOURCE_CONNECTIONS,
+        FUEL_TANKS,
+        FUEL_INTAKES,
+        RESOURCE_CONTAINERS,
         CLOTHING,
         ITEM_RADARS,
         MINING_LASERS,

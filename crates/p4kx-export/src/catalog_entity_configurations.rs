@@ -7,9 +7,8 @@ use serde::Serialize;
 
 use super::authored_fields::Observed;
 use super::catalog_facility::{self, Facility, FacilityKind, OwnerComponents};
-use super::catalog_fuel_configurations::{
-    FuelConfigurationKind, FuelConfigurationRows, FuelConfigurationTables,
-};
+pub(crate) use super::catalog_fuel_configurations::FuelConfigurationKind;
+use super::catalog_fuel_configurations::{FuelConfigurationRows, FuelConfigurationTables};
 use super::catalog_interactions::{self, InteractionConfiguration, InteractionKind};
 use super::catalog_item_alignment::{ItemAlignmentKind, ItemAlignmentRows, ItemAlignmentTables};
 use super::catalog_resource_component;
@@ -38,16 +37,21 @@ use crate::{CatalogError, ExportAccountingError};
 #[path = "catalog_configuration_record_read.rs"]
 mod record_read;
 pub(crate) use record_read::{
-    read, read_attachment_constraints, read_cargo_configurations, read_item_bounds,
-    read_item_ports, read_item_ports_scoped, read_resource_components, read_resource_connections,
+    read, read_attachment_constraints, read_cargo_configurations, read_fuel_intakes,
+    read_fuel_tanks, read_item_bounds, read_item_ports, read_item_ports_scoped,
+    read_resource_components, read_resource_connections, read_resource_containers,
     read_vehicle_armor,
 };
 
 pub use super::authored_damage::{DamageChannels, DamageParameters};
 pub use super::authored_link::HealthLink;
+pub use super::catalog_fuel::{FuelAudioRtpc, FuelAudioTrigger, FuelIntake, FuelTank};
 pub use super::catalog_resource_component::{ResourceComponent, ResourceControls, SelfRepair};
 pub use super::catalog_resource_connection::{
     ConnectionFields as ResourceConnectionFields, ResourceConnection,
+};
+pub use super::catalog_resource_container::{
+    CompositionEntry as ResourceCompositionEntry, ResourceContainer,
 };
 pub use super::catalog_resource_control_parameter::{ParameterSource, ResourceControlParameter};
 pub use super::catalog_resource_delta::{ConsumptionFields, DeltaSource, ResourceDelta};

@@ -16,9 +16,9 @@ use crate::source_fields::FieldError;
 
 #[derive(Default)]
 pub(super) struct FuelConfigurationRows<'source> {
-    tanks: Vec<FuelTank<'source>>,
-    intakes: Vec<FuelIntake<'source>>,
-    containers: Vec<ResourceContainer<'source>>,
+    pub(super) tanks: Vec<FuelTank<'source>>,
+    pub(super) intakes: Vec<FuelIntake<'source>>,
+    pub(super) containers: Vec<ResourceContainer<'source>>,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
@@ -30,14 +30,22 @@ pub(super) struct FuelConfigurationTables<'source> {
     resource_containers: CatalogTable<ResourceContainer<'source>>,
 }
 
-#[derive(Clone, Copy)]
-pub(super) enum FuelConfigurationKind {
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum FuelConfigurationKind {
     Tank,
     Intake,
     Container,
 }
 
 impl FuelConfigurationKind {
+    pub(crate) const fn source_types(self) -> &'static [&'static str] {
+        match self {
+            Self::Tank => &[catalog_fuel::TANK],
+            Self::Intake => &[catalog_fuel::INTAKE],
+            Self::Container => &[catalog_resource_container::RESOURCE_CONTAINER],
+        }
+    }
+
     pub(super) fn of(name: &str) -> Option<Self> {
         match name {
             catalog_fuel::TANK => Some(Self::Tank),
@@ -60,11 +68,19 @@ impl<'source> FuelConfigurationRows<'source> {
         self.intakes.sort_by_key(|row| row.owner().key());
         self.containers.sort_by_key(|row| row.owner().key());
         FuelConfigurationTables {
-            fuel_tanks: CatalogTable::new(forge, &[catalog_fuel::TANK], self.tanks),
-            fuel_intakes: CatalogTable::new(forge, &[catalog_fuel::INTAKE], self.intakes),
+            fuel_tanks: CatalogTable::new(
+                forge,
+                FuelConfigurationKind::Tank.source_types(),
+                self.tanks,
+            ),
+            fuel_intakes: CatalogTable::new(
+                forge,
+                FuelConfigurationKind::Intake.source_types(),
+                self.intakes,
+            ),
             resource_containers: CatalogTable::new(
                 forge,
-                &[catalog_resource_container::RESOURCE_CONTAINER],
+                FuelConfigurationKind::Container.source_types(),
                 self.containers,
             ),
         }

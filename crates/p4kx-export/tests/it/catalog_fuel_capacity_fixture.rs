@@ -44,6 +44,24 @@ pub(super) fn database(layout: Layout) -> DataForgeBuilder {
         .record(resource(QUANTUM, "FixtureQuantum"))
 }
 
+pub(super) fn invalid_intake_database() -> DataForgeBuilder {
+    let builder = p4kx_testkit::entity_schema(DataForgeBuilder::new().version(8));
+    builder
+        .structure(component(TANK_TYPE).field("hydrogenMaxFlowMultiplier", TestType::Single))
+        .structure(component(INTAKE_TYPE).field("fuelPushRate", TestType::Bool))
+        .record(
+            item(INTAKE, "FixtureInvalidFuelIntake", "intake_invalid")
+                .component(node(
+                    TestInstance::new(TANK_TYPE)
+                        .value("hydrogenMaxFlowMultiplier", TestValue::Single(1.0)),
+                ))
+                .component(node(
+                    TestInstance::new(INTAKE_TYPE).value("fuelPushRate", TestValue::Bool(false)),
+                ))
+                .record(),
+        )
+}
+
 fn fuel_schema(builder: DataForgeBuilder) -> DataForgeBuilder {
     builder
         .structure(TestStruct::new(STATE).field("stateName", TestType::String))

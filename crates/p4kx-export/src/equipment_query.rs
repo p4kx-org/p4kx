@@ -22,6 +22,10 @@ mod loadout_query;
 #[path = "equipment_flight_query.rs"]
 pub mod flight;
 
+/// Selective reads of original fuel tanks, intakes and resource containers.
+#[path = "equipment_fuel_query.rs"]
+pub mod fuel;
+
 /// Selective reads of authored mining lasers and attachable modifiers.
 #[path = "equipment_mining_tool_query.rs"]
 pub mod mining_tools;
