@@ -738,6 +738,15 @@ matching physical Records, and `All` selects the definition family in original
 Record order. Inspect scope coverage before treating a missing row as absent.
 The query reads no unrelated Record bodies or localization payloads.
 
+Verify the recoil SDK against an independently selected original action and its
+physical definition. Set `P4KX_DATA_P4K_B` to check a second installed Build in
+the same run. The witness compares the original references, interval bits,
+recoil blocks and nested field origins without generating a Catalog.
+
+```powershell
+cargo test --locked -p p4kx-export --test real_archive real_archive_weapon_recoil_sdk::weapon_recoil_sdk_matches_original_action_and_definition -- --ignored --exact --nocapture --test-threads=1
+```
+
 ## Weapon combat bases
 
 Use `equipment::with_weapon_combat_bases`, its decoded-Entry form or the corresponding
