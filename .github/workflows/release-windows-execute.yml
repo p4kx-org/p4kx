@@ -175,11 +175,24 @@ jobs:
           Assert-P4kxMsiStepAdmission $env:P4KX_MSI_DIAGNOSTIC_DEADLINE_UTC $env:P4KX_MSI_STEP_MINUTES $env:P4KX_MSI_STEP_COMPUTED_AT_UTC
           $invocation = Join-Path $env:P4KX_PACKAGE_TASK 'msi-invocation.json'
           .github/scripts/invoke-msi-observer.ps1 -Stage Start -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/observer') -Invocation $invocation
+      - name: Preserve original MSI observer start
+        if: ${{ always() && !cancelled() && steps.msi-launch.outcome == 'success' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        timeout-minutes: 1
+        continue-on-error: true
+        with:
+          name: windows-msi-start-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.target }}
+          path: |
+            ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/request.json
+            ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/handle.json
+            ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/parent-start.json
+            ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/diagnostic-sources.json
+          if-no-files-found: error
       - name: Preserve original MSI phase checkpoint 1
         id: msi-checkpoint-1
         if: ${{ always() && !cancelled() && steps.msi-launch.outcome == 'success' && env.P4KX_MSI_OBSERVER_FINISHED != 'true' }}
         timeout-minutes: 2
-        run: .github/scripts/invoke-msi-observer.ps1 -Stage Snapshot -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/observer') -Sequence 1 -WaitMilliseconds 75000
+        run: .github/scripts/invoke-msi-observer.ps1 -Stage Snapshot -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/observer') -Sequence 1 -WaitMilliseconds 0
       - name: Upload original MSI phase checkpoint 1
         if: ${{ always() && !cancelled() && steps.msi-launch.outcome == 'success' && steps.msi-checkpoint-1.outcome != 'skipped' }}
         timeout-minutes: 1

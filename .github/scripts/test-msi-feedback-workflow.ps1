@@ -44,15 +44,35 @@ Assert-FeedbackWorkflow ($installer.Contains('id: msi-launch') -and $installer.C
     $observerFinish -cmatch '(?m)^        timeout-minutes: \$\{\{ fromJSON\(steps\.msi-budget\.outputs\.minutes\) \}\}\r?$' -and
     $observerFinish.Contains("always() && !cancelled() && steps.msi-launch.outcome == 'success'") -and
     -not $observerFinish.Contains('continue-on-error')) 'Original lifecycle completion lost its source-bound deadline or failure gate.'
+$observerStart=Get-FeedbackWorkflowStep $verify 'Preserve original MSI observer start'
+$firstCheckpoint=Get-FeedbackWorkflowStep $verify 'Preserve original MSI phase checkpoint 1'
+Assert-FeedbackWorkflow ($observerStart.Contains("always() && !cancelled() && steps.msi-launch.outcome == 'success'") -and
+    $observerStart.Contains('actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9') -and
+    $observerStart.Contains('name: windows-msi-start-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.target }}') -and
+    $observerStart -cmatch '(?m)^        timeout-minutes: 1\r?$' -and
+    $observerStart.Contains('if-no-files-found: error') -and
+    $observerStart -cmatch '(?m)^        continue-on-error: true\r?$' -and
+    -not ($observerStart -match '(?m)^        (run|env):')) 'Original observer start requires a bounded, source-bound upload after successful launch.'
+$startPaths=@([regex]::Matches($observerStart,'(?m)^            ([^\r\n]+)\r?$') | ForEach-Object { $_.Groups[1].Value })
+$expectedStartPaths=@(
+    '${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/request.json',
+    '${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/handle.json',
+    '${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/parent-start.json',
+    '${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/diagnostic-sources.json'
+)
+Assert-FeedbackWorkflow ([string]::Join([char]10,$startPaths) -ceq [string]::Join([char]10,$expectedStartPaths)) 'Original start upload must contain only the four explicit synthetic launch-evidence paths.'
+Assert-FeedbackWorkflow ($verify.IndexOf($installer,[StringComparison]::Ordinal) -lt $verify.IndexOf($observerStart,[StringComparison]::Ordinal) -and
+    $verify.IndexOf($observerStart,[StringComparison]::Ordinal) -lt $verify.IndexOf($firstCheckpoint,[StringComparison]::Ordinal)) 'Original launch receipts must upload before the first snapshot.'
 $checkpoints=@([regex]::Matches($verify,'(?ms)^      - name: Preserve original MSI phase checkpoint [1-8]\r?\n.*?(?=^      - |\z)'))
 Assert-FeedbackWorkflow ($checkpoints.Count -eq 8) 'Expected eight bounded pre-terminal file checkpoints.'
 for($index=0;$index -lt $checkpoints.Count;$index++){
     $checkpoint=$checkpoints[$index].Value
     $ordinal=$index+1
+    $waitMilliseconds=if($ordinal -eq 1){0}else{75000}
     $uploaded=Get-FeedbackWorkflowStep $verify "Upload original MSI phase checkpoint $ordinal"
     Assert-FeedbackWorkflow ($checkpoint.Contains('always() && !cancelled()') -and $checkpoint.Contains("steps.msi-launch.outcome == 'success'") -and
         $checkpoint.Contains("env.P4KX_MSI_OBSERVER_FINISHED != 'true'") -and $checkpoint.Contains('invoke-msi-observer.ps1 -Stage Snapshot') -and
-        $checkpoint.Contains("-Sequence $ordinal -WaitMilliseconds 75000") -and $checkpoint -cmatch '(?m)^        timeout-minutes: 2\r?$' -and
+        $checkpoint.Contains("-Sequence $ordinal -WaitMilliseconds $waitMilliseconds") -and $checkpoint -cmatch '(?m)^        timeout-minutes: 2\r?$' -and
         -not ($checkpoint -match '(?m)^        (continue-on-error|uses):')) 'Direct checkpoint can restart work, mask failure or bypass its bounded original observation.'
     Assert-FeedbackWorkflow ($uploaded.Contains('always() && !cancelled()') -and $uploaded.Contains("steps.msi-checkpoint-$ordinal.outcome != 'skipped'") -and
         $uploaded.Contains('actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9') -and

@@ -112,6 +112,9 @@ MSI package acceptance still requires the original installation and runtime proo
 The control's checkpoint and completion artifacts retain `native_completion_unproven: true`.
 
 The Windows MSI lifecycle runs its original diagnostic parent in a tracked hidden console.
+A separate diagnostic upload captures its original request, launch handle and script inventory
+before the first snapshot. It includes the parent-start receipt when that file is already
+available. Upload errors are recorded as diagnostics.
 Eight checkpoints upload bounded copies of its file journal and source metadata before the
 final wait. Checkpoints carry an unproven verdict. Acceptance still requires the original
 successful result, its closed journal, `final-cleanup/end`, matching input/source receipts
