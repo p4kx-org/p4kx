@@ -14,17 +14,19 @@ use p4kx_export::catalog_queries::starmap::{
     ContainerPlacementSelection, read_container_placements,
 };
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogRecordSelection, with_location_entity_declarations,
+    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection,
+    with_location_entity_declarations,
 };
 use p4kx_extraction::{Archive, Language};
 use p4kx_testkit::{
-    ArchiveBuilder, DataForgeBuilder, TestContainer, TestEntry, TestRecord, TestStruct,
+    ArchiveBuilder, DataForgeBuilder, TestContainer, TestEntity, TestEntry, TestRecord, TestStruct,
+    TestType, TestValue, entity_schema,
 };
 
 use super::{
-    AMMUNITION, CARGO_LOADING_GLOBALS, CONTAINERS, FLARE_LIBRARIES, LANGUAGE_SOURCES,
-    LOCATION_ENTITIES, RADAR_AUDIO, Route, SHOP_COMMODITY_GLOBALS, SHOP_INVENTORIES, TestResult,
-    UNRESOLVED, WEAPON_RECOIL,
+    AMMUNITION, CARGO_LOADING_GLOBALS, CONTAINERS, FLARE_LIBRARIES, ITEM_DEFINITIONS,
+    LANGUAGE_SOURCES, LOCATION_ENTITIES, MANUFACTURERS, RADAR_AUDIO, Route, SHOP_COMMODITY_GLOBALS,
+    SHOP_INVENTORIES, TestResult, UNRESOLVED, WEAPON_RECOIL,
 };
 
 #[path = "sdk_blueprint_physical_routes.rs"]
@@ -115,6 +117,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
     routes.extend(resource_network::read()?);
     routes.extend(fuel::read()?);
     routes.extend(read_cargo_globals(&archive)?);
+    routes.extend(read_entity_definitions(&archive)?);
     routes.push(mineable_entity::read()?);
     routes.push(planet_resource::read()?);
     routes.extend(component_tools::read()?);
@@ -176,6 +179,22 @@ fn read_cargo_globals(archive: &Archive) -> TestResult<[Route; 2]> {
     ])
 }
 
+fn read_entity_definitions(archive: &Archive) -> TestResult<[Route; 2]> {
+    const REMAINING: &str =
+        "typed definitions and synthetic producer parity available; installed producer parity open";
+    let session = CatalogQuerySession::open(archive, CatalogLanguageSelection::AllAvailable, None)?;
+    let parsed = session.parsed(None)?;
+    let selection = CatalogRecordSelection::All;
+    Ok([
+        parsed.with_item_definitions(selection, None, |snapshot| {
+            Route::queried_rows(ITEM_DEFINITIONS, snapshot.rows(), REMAINING)
+        })??,
+        parsed.with_manufacturers(selection, None, |snapshot| {
+            Route::queried_rows(MANUFACTURERS, &snapshot.rows, REMAINING)
+        })??,
+    ])
+}
+
 fn read_language_sources(archive: &Archive) -> TestResult<Route> {
     with_language_sources(
         archive,
@@ -230,8 +249,34 @@ fn read_shop_inventory(archive: &Archive) -> TestResult<Route> {
 }
 
 fn fixture() -> TestResult<(tempfile::TempDir, Archive)> {
-    let database = DataForgeBuilder::new()
-        .version(8)
+    let folder = tempfile::tempdir()?;
+    let path = folder.path().join("sdk_routes.p4k");
+    ArchiveBuilder::new()
+        .entry(TestEntry::stored(
+            "Data\\Game2.dcb",
+            fixture_database().build(),
+        ))
+        .entry(TestEntry::stored(
+            Language::German.global_ini_path(),
+            b"fixture=Fixture\n",
+        ))
+        .entry(packed(ROOT, "fixturesystem.xml", ROOT_XML))
+        .entry(packed(TILE, "tile.xml", b"<ObjectContainer/>"))
+        .entry(TestEntry::stored(OFFLINE_SHOP, br#"{"Inventory":[]}"#))
+        .entry(TestEntry::stored(
+            "Data/Libs/GameAudio/RadarAudioData.xml",
+            b"<RadarAudioData><DefaultZoom min='0'/></RadarAudioData>",
+        ))
+        .entry(TestEntry::stored(
+            FLARE_LIBRARY,
+            b"<LensFlareLibrary><FlareItem Name='fixture'/></LensFlareLibrary>",
+        ))
+        .write_to(&path)?;
+    Ok((folder, Archive::open(path)?))
+}
+
+fn fixture_database() -> DataForgeBuilder {
+    entity_schema(DataForgeBuilder::new().version(8))
         .structure(TestStruct::new("AmmoParams"))
         .record(TestRecord::new(
             1,
@@ -266,28 +311,26 @@ fn fixture() -> TestResult<(tempfile::TempDir, Archive)> {
             "GlobalShopCommodityParams",
             "GlobalShopCommodityParams.Fixture",
             "libs/foundry/records/fixture/shop_commodity.xml",
-        ));
-    let folder = tempfile::tempdir()?;
-    let path = folder.path().join("sdk_routes.p4k");
-    ArchiveBuilder::new()
-        .entry(TestEntry::stored("Data\\Game2.dcb", database.build()))
-        .entry(TestEntry::stored(
-            Language::German.global_ini_path(),
-            b"fixture=Fixture\n",
         ))
-        .entry(packed(ROOT, "fixturesystem.xml", ROOT_XML))
-        .entry(packed(TILE, "tile.xml", b"<ObjectContainer/>"))
-        .entry(TestEntry::stored(OFFLINE_SHOP, br#"{"Inventory":[]}"#))
-        .entry(TestEntry::stored(
-            "Data/Libs/GameAudio/RadarAudioData.xml",
-            b"<RadarAudioData><DefaultZoom min='0'/></RadarAudioData>",
-        ))
-        .entry(TestEntry::stored(
-            FLARE_LIBRARY,
-            b"<LensFlareLibrary><FlareItem Name='fixture'/></LensFlareLibrary>",
-        ))
-        .write_to(&path)?;
-    Ok((folder, Archive::open(path)?))
+        .structure(TestStruct::new("SCItemManufacturer").field("Code", TestType::String))
+        .record(
+            TestRecord::new(
+                6,
+                "SCItemManufacturer",
+                "SCItemManufacturer.FixtureMaker",
+                "libs/foundry/records/scitemmanufacturer/fixture.xml",
+            )
+            .value("Code", TestValue::text("FIX")),
+        )
+        .record(
+            TestEntity::new(
+                7,
+                "FixtureTool",
+                "libs/foundry/records/entities/scitem/fixture/tool.xml",
+            )
+            .attach_type("Misc")
+            .record(),
+        )
 }
 
 fn packed(path: &str, file: &str, xml: &[u8]) -> TestEntry {

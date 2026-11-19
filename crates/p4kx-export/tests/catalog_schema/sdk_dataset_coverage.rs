@@ -16,6 +16,8 @@ mod routes;
 mod row_schema;
 
 const LANGUAGE_SOURCES: &str = "/texts/languageSources";
+const ITEM_DEFINITIONS: &str = "/definitions/items";
+const MANUFACTURERS: &str = "/definitions/manufacturers";
 const SHOP_INVENTORIES: &str = "/definitions/shopInventories";
 const FLARE_LIBRARIES: &str = "/definitions/flareLibraries";
 const RADAR_AUDIO: &str = "/configurations/radarAudio";
@@ -96,6 +98,8 @@ fn sdk_query_witnesses_keep_their_canonical_dataset_contract() -> TestResult {
     let gaps = audit(&schema, &registered, &witnesses)?;
     for path in [
         LANGUAGE_SOURCES,
+        ITEM_DEFINITIONS,
+        MANUFACTURERS,
         LOCATION_ENTITIES,
         BLUEPRINT_POOLS,
         BLUEPRINT_POOL_WEIGHTS,
