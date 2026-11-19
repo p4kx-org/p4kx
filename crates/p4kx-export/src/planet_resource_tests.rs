@@ -10,6 +10,10 @@ use serde_json::{Value, json};
 
 use crate::{CatalogError, CatalogOptions, CatalogPublicationMode, build_catalog};
 
+#[path = "planet_resource_query_tests.rs"]
+mod query;
+#[path = "planet_resource_sdk_witness.rs"]
+mod sdk_witness;
 #[path = "planet_resource_witness.rs"]
 mod witness;
 

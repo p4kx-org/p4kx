@@ -37,6 +37,7 @@ const FUEL_INTAKES: &str = "/configurations/fuelIntakes";
 const RESOURCE_CONTAINERS: &str = "/configurations/resourceContainers";
 const CLOTHING: &str = "/configurations/clothing";
 const ITEM_RADARS: &str = "/configurations/itemRadars";
+const MINEABLE_ENTITIES: &str = "/definitions/mineableEntities";
 const MINING_LASERS: &str = "/configurations/miningLasers";
 const ATTACHABLE_MODIFIERS: &str = "/configurations/attachableModifiers";
 const CONSUMABLE_CONFIGURATIONS: &str = "/configurations/consumables";
@@ -110,6 +111,7 @@ fn sdk_query_witnesses_keep_their_canonical_dataset_contract() -> TestResult {
         RESOURCE_CONTAINERS,
         CLOTHING,
         ITEM_RADARS,
+        MINEABLE_ENTITIES,
         MINING_LASERS,
         ATTACHABLE_MODIFIERS,
         CONSUMABLE_CONFIGURATIONS,

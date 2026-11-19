@@ -121,7 +121,7 @@ impl<'source, Row> MiningDefinitionSnapshot<'source, Row> {
         &self.coverage
     }
 
-    /// Borrows demanded ResourceGroup-family coverage, empty for element/composition reads.
+    /// Borrows the coverage of demanded original dependency Records.
     #[must_use]
     pub const fn dependency_coverage(&self) -> &CatalogRecordCoverage {
         &self.dependency_coverage

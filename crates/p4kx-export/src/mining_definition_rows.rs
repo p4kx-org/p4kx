@@ -5,10 +5,13 @@ use p4kx_extraction::{CancelToken, RecordTree};
 
 use super::dependencies::Dependencies;
 use crate::catalog_projection::CatalogProjection;
-use crate::catalog_v3::{mineable_composition_definition, mineable_element_definition};
+use crate::catalog_v3::{
+    mineable_composition_definition, mineable_element_definition, mineable_entity_definition,
+};
 use crate::mining_locations::{MineableComposition, MineableElement};
 use crate::record_observation::RecordObservation;
 use crate::resource_type_contract::ResourceDefinition;
+use crate::scan_signature::SignatureSlot;
 use crate::source_fields::FieldError;
 use crate::{CatalogError, Kind, resource_read};
 
@@ -28,6 +31,29 @@ pub(super) trait Projector {
 
 pub(super) struct Elements;
 pub(super) struct Compositions;
+pub(super) struct Entities;
+
+impl Projector for Entities {
+    type Row<'source> = mineable_entity_definition::MineableEntity<'source>;
+    const KIND: Kind = Kind::MineableEntities;
+    const LOCALIZED: bool = false;
+
+    fn read<'source>(
+        tree: &RecordTree<'source>,
+        projection: &CatalogProjection<'_, 'source>,
+        admission: &RecordObservation<'_, 'source>,
+        dependencies: &mut Dependencies,
+        cancel: Option<&CancelToken>,
+    ) -> Result<(Self::Row<'source>, Vec<FieldError>), CatalogError> {
+        let unknown = SignatureSlot::unknown();
+        let slot = if mineable_entity_definition::needs_signature_slot(tree) {
+            dependencies.signature_slot(projection.original(), cancel)?
+        } else {
+            &unknown
+        };
+        mineable_entity_definition::read(tree, projection, admission, slot, cancel)
+    }
+}
 pub(super) struct Resources;
 
 impl Projector for Elements {

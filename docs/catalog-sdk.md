@@ -58,6 +58,35 @@ Use `catalog_queries::flares::read_flare_libraries` to read the physical rows fr
 or an exact Archive-relative path. The query reports original parameter origins, directory-only
 texture links, and any required library reads or projections that failed. [Lens flare contract](catalog-flare-libraries.md)
 
+## Original planet resource definitions
+
+Use `catalog_queries::planet_resources::read_planet_resources` for the typed rows under
+`definitions.planetResources`. `EntryIndex` takes a physical directory index in the opened
+Archive. `ArchivePath` retains every occurrence of the same normalized path. `Guid` compares
+the nonzero authored identity against each eligible resource document and retains duplicate
+owners in physical directory order. `All` visits every eligible resource Entry.
+
+The query keeps original GUID spelling, names, the mining flag, tint palette selectors and
+both kinds of palette targets. Exact path and Entry selection leave other resource payloads
+unread. GUID lookup reads candidate resource documents and resolves palette targets for the
+matching rows. Only a selected DataForge palette path requires a DataForge payload. Use
+`read_planet_resources_from` or the session and parsed-view methods to reuse an already
+decoded Entry. Directory-only palette resolution leaves the target payload unread.
+
+`PlanetResourceSnapshot` includes Build identity, physical Entry availability, original source
+uses and unsuccessful read, projection or GUID-candidate counts. A healthy directory and a
+complete selected scan allow the query to prove absence. Palette lookup can still report
+unresolved or ambiguous references on readable rows. Identity and links describe the loose
+definition, with no planet or biome assignment.
+
+For the installed witnesses, set `P4KX_DATA_P4K`, the exact Build change number in
+`P4KX_PLANET_RESOURCE_BUILD` and one original resource Entry path in
+`P4KX_PLANET_RESOURCE_PATH`. Use `installed_planet_resource_sdk_matches_one_physical_definition`
+when the path identifies one Entry. Use `installed_planet_resource_sdk_proves_exact_path_absent`
+when the path is absent. Run either filter with
+`cargo test -p p4kx-export --lib <test-filter> -- --ignored --nocapture`. The tests verify the
+archived source or the complete directory lookup and report only the Build and definition count.
+
 ## Radar audio configuration
 
 Use `catalog_queries::radar_audio::read_radar_audio` to read original rows from
@@ -424,6 +453,22 @@ The normalized nodes/configuration references and exact lookup candidates are do
 This additive table has no direct-query SDK adapter yet. A future adapter must reuse the same
 source-owned reader, reached scope, original content/directory surveys and failure handling. The
 existing global first-pair convenience derivation remains a separate limitation.
+
+## Physical mineable entities
+
+`with_mineable_entities` and `with_mineable_entities_from` accept `CatalogRecordSelection`.
+The session and parsed methods are named `with_mineable_entities`. The returned rows match
+`definitions.mineableEntities`. Selection by GUID keeps all physical aliases and the record
+index identifies one occurrence. The query opens no localization payloads. When a selected
+owner has a signature component, it reads the original global radar selector and reports any
+unreadable dependency Record. An unresolved or ambiguous layout yields no scan value.
+Selection applies the Catalog admission rules, including the development-leftover exclusion.
+Original links retain the physical target even when that target is outside the admitted rows.
+
+Set `P4KX_DATA_P4K` to an installed Build and run
+`cargo test -p p4kx-export --test real_archive installed_mineable_entity_sdk_preserves_original_links_and_both_scan_sources -- --ignored --nocapture`
+to verify original mining links, physical component positions, and both sources of the scan
+signature without building a Catalog.
 
 ## Mineable and full resource definitions
 

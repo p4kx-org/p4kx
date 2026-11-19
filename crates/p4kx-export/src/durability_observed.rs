@@ -3,6 +3,9 @@
 
 use std::cell::RefCell;
 
+#[path = "authored_component_slots.rs"]
+mod component_slots;
+
 use p4kx_extraction::{
     DataType, DecimalU64, SourceUse, SourceUseRole, SourceValue, SourcedValue, StructValue, Value,
 };

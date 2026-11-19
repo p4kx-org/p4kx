@@ -57,10 +57,10 @@ fn guid(value: u128) -> String {
 
 fn entry<'a>(catalog: &'a Value, kind: &str, record: u128) -> Result<&'a Value, Box<dyn Error>> {
     let requested = guid(record);
-    let rows = if kind == "miningGlobalParams" {
-        catalog.pointer("/configurations/miningGlobal/rows")
-    } else {
-        catalog.get(kind)
+    let rows = match kind {
+        "miningGlobalParams" => catalog.pointer("/configurations/miningGlobal/rows"),
+        "mineableEntities" => catalog.pointer("/definitions/mineableEntities/rows"),
+        _ => catalog.get(kind),
     };
     rows.and_then(Value::as_array)
         .into_iter()
@@ -276,19 +276,44 @@ fn a_container_that_names_a_preset_is_a_location_of_the_object_it_hangs_below() 
 fn a_mineable_entity_takes_its_scan_signature_from_the_slot_the_radar_parameters_name() -> TestResult
 {
     let (built, catalog) = build(None)?;
+    let rock = entry(&catalog, "mineableEntities", ENTITY)?;
+    assert_eq!(rock["guid"]["value"], guid(ENTITY).as_str());
+    assert_eq!(rock["className"]["value"], "MineableRock_Iron");
     assert_eq!(
-        *entry(&catalog, "mineableEntities", ENTITY)?,
-        json!({
-            "guid": guid(ENTITY),
-            "className": "MineableRock_Iron",
-            "recordPath": "libs/foundry/records/entities/mineable/mineablerock_iron",
-            "mineableCompositionGuid": guid(COMPOSITION),
-            "miningGlobalParamsGuid": guid(PARAMS),
-            "scanSignature": 4270.0,
-            "signatures": [0.0, 0.0, 4270.0, 0.0],
-            "radarContactTypeGuid": guid(CONTACT_TYPE),
-        }),
-        "the named slot is the third, not the fifth"
+        rock["recordPath"]["value"],
+        "libs/foundry/records/entities/mineable/mineablerock_iron"
+    );
+    assert!(rock["recordIndex"]["value"].is_u64());
+    let mining = &rock["mining"][0];
+    assert_eq!(mining["sourcePosition"]["value"], 0);
+    assert_eq!(
+        mining["composition"]["value"]["guid"]["value"],
+        guid(COMPOSITION).as_str()
+    );
+    assert_eq!(
+        mining["globalParams"]["value"]["guid"]["value"],
+        guid(PARAMS).as_str()
+    );
+    let radar = &rock["radar"][0];
+    assert_eq!(radar["sourcePosition"]["value"], 1);
+    let properties = &radar["properties"]["value"];
+    assert_eq!(
+        properties["contactType"]["value"]["guid"]["value"],
+        guid(CONTACT_TYPE).as_str()
+    );
+    let base = &properties["baseSignatureParams"]["value"];
+    assert_eq!(
+        base["scanSignature"]["value"], 4270.0,
+        "the named signature is the third slot"
+    );
+    assert_eq!(
+        base["signatures"]["value"].as_array().map(Vec::len),
+        Some(4)
+    );
+    assert_eq!(base["signatures"]["value"][2]["value"]["finite"], 4270.0);
+    assert_eq!(
+        base["signatures"]["value"][2]["value"]["rawBits"],
+        format!("{:08x}", 4270.0_f32.to_bits())
     );
     let kind = built.summary().kind(Kind::MineableEntities);
     assert_eq!(kind.map(|kind| kind.count), Some(3));
@@ -299,21 +324,26 @@ fn a_mineable_entity_takes_its_scan_signature_from_the_slot_the_radar_parameters
 fn an_entity_with_only_zero_signatures_has_no_scan_signature_but_keeps_the_array() -> TestResult {
     let (_, catalog) = build(None)?;
     let silent = entry(&catalog, "mineableEntities", ENTITY_SILENT)?;
-    assert_eq!(silent["scanSignature"], Value::Null);
-    assert_eq!(silent["signatures"], json!([0.0, 0.0, 0.0, 0.0]));
-    assert_eq!(silent["radarContactTypeGuid"], guid(CONTACT_TYPE).as_str());
+    let properties = &silent["radar"][0]["properties"]["value"];
+    let base = &properties["baseSignatureParams"]["value"];
+    assert_eq!(base["scanSignature"]["value"], Value::Null);
+    let signatures = base["signatures"]["value"].as_array().ok_or("signatures")?;
+    assert_eq!(signatures.len(), 4);
+    assert!(signatures.iter().all(|slot| slot["value"]["finite"] == 0.0));
+    assert_eq!(
+        properties["contactType"]["value"]["guid"]["value"],
+        guid(CONTACT_TYPE).as_str()
+    );
     Ok(())
 }
 
 #[test]
-fn an_entity_without_signature_or_mining_components_leaves_every_link_null() -> TestResult {
+fn an_entity_without_signature_or_mining_components_keeps_its_identity() -> TestResult {
     let (_, catalog) = build(None)?;
     let bare = entry(&catalog, "mineableEntities", ENTITY_BARE)?;
-    assert_eq!(bare["scanSignature"], Value::Null);
-    assert_eq!(bare["signatures"], json!([]));
-    assert_eq!(bare["radarContactTypeGuid"], Value::Null);
-    assert_eq!(bare["mineableCompositionGuid"], Value::Null);
-    assert_eq!(bare["miningGlobalParamsGuid"], Value::Null);
+    assert_eq!(bare["guid"]["value"], guid(ENTITY_BARE).as_str());
+    assert_eq!(bare["radar"], json!([]));
+    assert_eq!(bare["mining"], json!([]));
     Ok(())
 }
 
@@ -331,7 +361,14 @@ fn a_filter_keeps_only_the_locations_of_the_presets_it_selects() -> TestResult {
     assert_eq!(locations.len(), 1);
     assert_eq!(locations[0]["presetGuid"], guid(PRESET_UNREACHED).as_str());
     assert_eq!(catalog["mineableCompositions"], json!([]), "filtered");
-    assert_eq!(catalog["mineableEntities"], json!([]), "filtered");
+    assert_eq!(
+        catalog["definitions"]["mineableEntities"]["rows"],
+        json!([])
+    );
+    assert!(
+        catalog.get("mineableEntities").is_none(),
+        "one canonical table"
+    );
     assert_eq!(
         catalog["completeness"]["harvestableLocations"]["status"],
         "partial"

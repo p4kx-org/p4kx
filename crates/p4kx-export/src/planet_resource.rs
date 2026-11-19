@@ -5,13 +5,15 @@ use p4kx_extraction::{Archive, CancelToken, DataForge, Filter, SourceValueState,
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use super::planet_palette_reference::PlanetPaletteReference;
+use super::planet_palette_reference;
+pub use super::planet_palette_reference::PlanetPaletteReference;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_read::entry_json_object::{self, EntryJsonObject};
 use crate::catalog_read::loose_archive_path::{LooseArchivePathState, Resolver};
 use crate::catalog_read::loose_definition::{
-    self, DefinitionFamily, DefinitionIssue, LooseDefinition,
+    self, DefinitionFamily, DefinitionIssue, LooseDefinition, Selection,
 };
+use crate::catalog_read::loose_record_link::LooseRecordLink;
 use crate::catalog_read::original::{EntryCapture, PhysicalEntryIdentity};
 use crate::catalog_table::CatalogTable;
 use crate::export_diagnostic::ExportDiagnosticCode;
@@ -22,7 +24,7 @@ use crate::{CatalogError, CatalogOptions, Kind};
 
 const FOLDER: &str = "data/libs/planets/resources/";
 const EXTENSION: &str = "resource";
-const KIND: Kind = Kind::PlanetResources;
+pub(crate) const KIND: Kind = Kind::PlanetResources;
 pub(super) const FAMILY: DefinitionFamily =
     DefinitionFamily::new(KIND, FOLDER, EXTENSION, "PlanetResource", "guid");
 
@@ -32,7 +34,7 @@ pub(crate) type PlanetResourceTable = CatalogTable<PlanetResource>;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct PlanetResource {
+pub struct PlanetResource {
     identity: PhysicalEntryIdentity,
     guid: SourcedValue<CatalogGuid>,
     guid_raw: SourcedValue<String>,
@@ -42,6 +44,56 @@ pub(crate) struct PlanetResource {
     tint_palette_path: SourcedValue<String>,
     tint_palette: PlanetPaletteReference,
     issues: Vec<DefinitionIssue>,
+}
+
+impl PlanetResource {
+    /// Borrows the physical identity of this original Archive Entry.
+    #[must_use]
+    pub const fn identity(&self) -> &PhysicalEntryIdentity {
+        &self.identity
+    }
+
+    /// Borrows the canonical GUID and its authored field evidence.
+    #[must_use]
+    pub const fn guid(&self) -> &SourcedValue<CatalogGuid> {
+        &self.guid
+    }
+
+    /// Borrows the authored GUID spelling.
+    #[must_use]
+    pub const fn guid_raw(&self) -> &SourcedValue<String> {
+        &self.guid_raw
+    }
+
+    /// Borrows the original resource name.
+    #[must_use]
+    pub const fn name(&self) -> &SourcedValue<String> {
+        &self.name
+    }
+
+    /// Borrows the original mining flag.
+    #[must_use]
+    pub const fn minable(&self) -> &SourcedValue<bool> {
+        &self.minable
+    }
+
+    /// Borrows the original tint palette path.
+    #[must_use]
+    pub const fn tint_palette_path(&self) -> &SourcedValue<String> {
+        &self.tint_palette_path
+    }
+
+    /// Borrows the tint palette lookup and its source candidates.
+    #[must_use]
+    pub const fn tint_palette(&self) -> &PlanetPaletteReference {
+        &self.tint_palette
+    }
+
+    /// Lists the represented issues of this physical definition.
+    #[must_use]
+    pub fn issues(&self) -> &[DefinitionIssue] {
+        &self.issues
+    }
 }
 
 impl LooseDefinition for PlanetResource {
@@ -54,15 +106,6 @@ impl LooseDefinition for PlanetResource {
     }
 }
 
-struct Definitions<'input, 'forge, 'source> {
-    forge: &'input DataForge<'source>,
-    original: &'input OriginalCatalogInput<'forge, 'source>,
-    capture: &'input EntryCapture<'input>,
-    filter: Option<&'input Filter>,
-    cancel: Option<&'input CancelToken>,
-    paths: Resolver<'input, 'input, 'input>,
-}
-
 pub(crate) fn read(
     archive: &Archive,
     forge: &DataForge<'_>,
@@ -71,66 +114,82 @@ pub(crate) fn read(
     ledger: &mut ExportLedger,
     options: &CatalogOptions<'_>,
 ) -> Result<PlanetResourceTable, CatalogError> {
-    let mut reader = Definitions {
-        forge,
-        original,
+    read_selected(
+        archive,
         capture,
-        filter: options.filter,
-        cancel: options.cancel,
-        paths: Resolver::new(archive, capture, options.cancel),
-    };
-    loose_definition::read(
+        ledger,
+        options,
+        Selection::All,
+        |path, authored| {
+            resolve_tint_record(
+                path,
+                authored,
+                forge,
+                original,
+                options.filter,
+                options.cancel,
+            )
+        },
+    )
+}
+
+pub(crate) fn read_selected(
+    archive: &Archive,
+    capture: &EntryCapture<'_>,
+    ledger: &mut ExportLedger,
+    options: &CatalogOptions<'_>,
+    selection: Selection<'_>,
+    mut palette_record: impl FnMut(&SourcedValue<String>, &str) -> Result<LooseRecordLink, CatalogError>,
+) -> Result<PlanetResourceTable, CatalogError> {
+    let mut paths = Resolver::new(archive, capture, options.cancel);
+    loose_definition::read_selected(
         archive,
         capture,
         ledger,
         options,
         FAMILY,
-        |identity, object| reader.project(identity, object),
+        selection,
+        |identity, object| {
+            project(identity, object, |path| {
+                PlanetPaletteReference::resolve(path, &mut paths, capture, &mut palette_record)
+            })
+        },
     )
 }
 
-impl Definitions<'_, '_, '_> {
-    fn project(
-        &mut self,
-        identity: PhysicalEntryIdentity,
-        object: &EntryJsonObject<'_, '_>,
-    ) -> Result<PlanetResource, CatalogError> {
-        let guid = object.field("guid", entry_json_object::guid)?;
-        let guid_raw = object.field("guid", entry_json_object::text)?;
-        let name = object.field("name", entry_json_object::text)?;
-        let minable = object.field("bMinable", entry_json_object::boolean)?;
-        let tint_palette_path = object.field("tintPalettePath", entry_json_object::text)?;
-        let tint_palette = self.resolve(&tint_palette_path)?;
-        let issues = field_issues(&guid, &name, &minable, tint_palette.state());
-        Ok(PlanetResource {
-            identity,
-            guid,
-            guid_raw,
-            name,
-            minable,
-            tint_palette_path,
-            tint_palette,
-            issues,
-        })
-    }
+pub(crate) fn resolve_tint_record(
+    path: &SourcedValue<String>,
+    authored: &str,
+    forge: &DataForge<'_>,
+    original: &OriginalCatalogInput<'_, '_>,
+    filter: Option<&Filter>,
+    cancel: Option<&CancelToken>,
+) -> Result<LooseRecordLink, CatalogError> {
+    planet_palette_reference::resolve_record(path, authored, forge, original, filter, cancel)
+}
 
-    fn resolve(
-        &mut self,
-        path: &SourcedValue<String>,
-    ) -> Result<PlanetPaletteReference, CatalogError> {
-        if let Some(link) = PlanetPaletteReference::of_path(
-            path,
-            self.forge,
-            self.original,
-            self.capture,
-            self.filter,
-            self.cancel,
-        )? {
-            return Ok(link);
-        }
-        let resolution = self.paths.resolve(path, |_| true)?;
-        Ok(PlanetPaletteReference::ArchiveEntry { resolution })
-    }
+fn project(
+    identity: PhysicalEntryIdentity,
+    object: &EntryJsonObject<'_, '_>,
+    resolve_palette: impl FnOnce(&SourcedValue<String>) -> Result<PlanetPaletteReference, CatalogError>,
+) -> Result<PlanetResource, CatalogError> {
+    let guid = object.field("guid", entry_json_object::guid)?;
+    let guid_raw = object.field("guid", entry_json_object::text)?;
+    let name = object.field("name", entry_json_object::text)?;
+    let minable = object.field("bMinable", entry_json_object::boolean)?;
+    let tint_palette_path = object.field("tintPalettePath", entry_json_object::text)?;
+    let tint_palette = resolve_palette(&tint_palette_path)?;
+    let issues = field_issues(&guid, &name, &minable, tint_palette.state());
+    Ok(PlanetResource {
+        identity,
+        guid,
+        guid_raw,
+        name,
+        minable,
+        tint_palette_path,
+        tint_palette,
+        issues,
+    })
 }
 
 fn field_issues(

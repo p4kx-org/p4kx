@@ -302,7 +302,7 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `legacyLootTables` | The older loot tables (`LootTable`) with the weighted archetypes of each, ordered by GUID |
 | `legacyLootArchetypes` | The older loot archetypes (`LootArchetype`) with the weighted tags of each, ordered by GUID |
 | `lootContainers` | The containers placed with a multi config, with the starmap object each hangs below, ordered by config, container, system and object |
-| `mineableEntities` | The mineable rocks and deposits (`EntityClassDefinition` under `entities/mineable`) with their composition, mining parameters and scan signature, ordered by GUID |
+| `definitions.mineableEntities` | The physical mineable rocks and deposits with original mining and radar declarations, ordered by GUID and Record index |
 | `crafters` | The crafting stations (entities with a `CrafterComponentParams`) with the limits and accepted categories of their job queues, their crafting-time modifiers and the attach definition a port is matched against, ordered by GUID |
 | `shipStoreSlugs` | The RSI store slugs that map to a ship of `ships`, with the retired ones flagged, ordered by `slug` (curated data, ADR-0117) |
 | `configurations.craftingGlobal` | Not a kind: original physical crafting-global configurations |
@@ -2229,26 +2229,25 @@ with physical target metadata and resolution status alongside it. No ResourceTyp
 required for this link. See [the complete contract](catalog-mining-refining.md) and
 [ADR0408](adr/0408-canonical-mining-and-refining-tables-preserve-original-owner-data.md).
 
-**Entities (`mineableEntities`).** The `EntityClassDefinition` Records under `entities/mineable`
-(269 on LIVE 4.10, 231 entries; the leftover rule skips the 38 `test` and `template` Records,
-`test_miningdestroyable` among them). A provider preset reaches an entity through the
-`entityGuid` of a harvestable. `mineableCompositionGuid` and `miningGlobalParamsGuid` are the
-References of `Components[MineableParams]`, `radarContactTypeGuid` the Reference
-`radarProperties.contactType` of `Components[SSCSignatureSystemParams]` (a `RadarContactTypeEntry`
-Record, no kind). `signatures` is `radarProperties.baseSignatureParams.signatures` as stored, one
-number per signature type (8 on LIVE), empty when the Record has none. `scanSignature` is the
-value the mining scanner shows, from 3000 to 4900 on LIVE. The slot is named by the Archive
-(ADR-0242): the `RadarSystemGlobalParams` Record lists one `signatureTypeParams` entry per slot of
-`signatures`, and the slot whose `displayName` is `@hud_scanning_info_rs_signature` is the scan
-signature (index 4 on LIVE 4.10, after IR, EM, CS and DB). `scanSignature` is `null`
-when the Record states no signatures, every signature is zero (the FPS blockers and the pearls,
-7 of the 231), `signatures` has not as many numbers as the radar parameters have signature
-types, or the Archive names no such slot (no radar parameters, no entry with the key, or the key
-on several entries): an unfiltered build then warns (`unknown_scan_signature_slot`) when any
-entity states signatures. A consumer that wants another slot reads `signatures`, in stored
-order; a number that is not a finite 32-bit float is exported as 0. Entities are selected by
-record path and type alone, so one without the components has `null` links and empty
-`signatures`.
+**Entities (`definitions.mineableEntities`).** The table contains each selected
+`EntityClassDefinition` Record under `entities/mineable`, using the usual leftover rule.
+Rows carry sourced GUIDs and physical Record indices. Equal GUIDs retain independent rows ordered
+by Record index. An entity without matching components still has a definition.
+
+The `mining` and `radar` arrays keep each matching component at its original `sourcePosition`.
+Each mining component retains the original `composition` and `globalParams` Record links.
+Radar components retain the original radar properties, including `contactType` and
+`baseSignatureParams`. The owner-local `authoredFields` values preserve additional authored fields
+without assigning runtime scanner behavior to them.
+
+In each base-signature declaration, `signatures` retains the original ordered slots, each with a
+source state, raw IEEE 754 bits and a finite projection when available. The sourced
+`scanSignature` is derived from the slot whose `displayName` in
+`RadarSystemGlobalParams.signatureSystemParams.signatureTypeParams` is
+`@hud_scanning_info_rs_signature`. The value cites the selected number and the radar slot
+selector. No finite scan value is emitted when the slot is unavailable or ambiguous, signature
+counts differ, or all values are zero. Unfiltered builds retain the established warning for an
+unknown slot when entities contain signatures.
 
 **Provider presets (`harvestableProviderPresets`).** The provider Record identity and all authored
 fields use sourced cells. The groups, elements, geometries, areas, object preset paths and

@@ -7,7 +7,14 @@ mod compositions;
 mod dependencies;
 #[path = "mineable_element_query.rs"]
 mod elements;
+#[path = "mineable_entity_query.rs"]
+mod entities;
 use super::unlocalized_record_query::plan;
+pub use entities::{
+    MineableBaseSignature, MineableEntity, MineableEntitySnapshot, MineableParameters,
+    MineableRadarProperties, MineableSignature, with_mineable_entities,
+    with_mineable_entities_from,
+};
 #[path = "mining_process_query.rs"]
 pub mod process_api;
 #[path = "mining_definition_read.rs"]

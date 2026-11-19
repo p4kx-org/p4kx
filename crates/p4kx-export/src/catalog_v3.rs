@@ -31,7 +31,7 @@ pub(crate) mod catalog_harvest_modules;
 pub(crate) mod industry_modules;
 pub(crate) use industry_modules::{
     crafting_global, mineable_composition_definition, mineable_element_definition,
-    mining_process_catalog,
+    mineable_entity_definition, mining_process_catalog,
 };
 
 #[path = "faction_definition.rs"]

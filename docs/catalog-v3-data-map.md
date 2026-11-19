@@ -137,7 +137,7 @@ Source inventory is current contract.rs:69-181 and generated schema's top requir
 | lootPoolFilters | D.lootPoolFilters | complete ordered original fields/values in an owner-local flat graph; exact declarations, every slot/error parameter, per-datum origins |
 | legacyLootTables | D.legacyLootTables | actual distinct source generation, not compatibility duplicate of LootV3 |
 | legacyLootArchetypes | D.legacyLootArchetypes | source generation/secondary/spawn-with relationships |
-| mineableEntities | D.mineableEntities | scan signature and entity identity |
+| mineableEntities | D.mineableEntities | physical entity identity, ordered mining and radar declarations, and a sourced derived scan signature |
 | crafters | D.crafters | station limits/modifiers/queues, identity |
 | cargoManifests | D.cargoManifests | stored cargo fill/spawn configuration, not runtime cargo |
 | missionLocationTemplates | D.missionLocationTemplates; C.locationData | completed #816 remains; actual configuration distinct from placed location |

@@ -121,8 +121,6 @@ pub(crate) struct Catalog<'a> {
     pub(crate) legacy_loot_tables: Vec<LegacyLootTable<'a>>,
     /// The older loot archetypes the older tables draw from, ordered by GUID.
     pub(crate) legacy_loot_archetypes: Vec<LegacyLootArchetype<'a>>,
-    /// The mineable entities with the scan signature of each, ordered by GUID.
-    pub(crate) mineable_entities: Vec<MineableEntity<'a>>,
     /// The crafting stations with the limits of their job queues, ordered by GUID.
     pub(crate) crafters: Vec<Crafter<'a>>,
     /// The cargo manifests, how the game fills the cargo grid of a spawned ship, ordered by GUID.

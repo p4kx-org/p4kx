@@ -1,17 +1,21 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{CancelToken, Record, RecordTree, TreeBuilder, Value};
+use p4kx_extraction::{
+    CancelToken, Record, RecordTree, SourceUse, SourceUseRole, SourceUses, SourceValue,
+    SourcedValue, TreeBuilder, Value,
+};
 use rayon::prelude::*;
 
 use crate::build::original_input::OriginalCatalogInput;
+use crate::catalog_read::original::{OriginalFlowFields, OriginalValuePart};
 use crate::crafting_warning::CraftingWarning;
 use crate::export_ledger::ExportLedger;
-use crate::record_fields::{elements, locale_key, structure};
 use crate::record_observation::RecordObservation;
-use crate::{CatalogError, CatalogReadFailure, Kind};
+use crate::resource_float::ResourceFloat32;
+use crate::{CatalogError, CatalogReadFailure, ExportAccountingError, Kind};
 
-const RADAR_GLOBAL_PARAMS: &str = "RadarSystemGlobalParams";
+pub(crate) const RADAR_GLOBAL_PARAMS: &str = "RadarSystemGlobalParams";
 const SCAN_SIGNATURE_KEY: &str = "@hud_scanning_info_rs_signature";
 
 /// Why the slot of the scan signature cannot be determined.
@@ -23,6 +27,8 @@ pub(crate) enum SlotProblem {
     NoEntry,
     /// Several `signatureTypeParams` entries or Records have the scan signature key.
     Ambiguous,
+    /// A malformed declaration prevents proving which slot is the scan signature.
+    Unreadable,
 }
 
 impl SlotProblem {
@@ -31,6 +37,7 @@ impl SlotProblem {
         CraftingWarning::UnknownScanSignatureSlot(match self {
             Self::NoRecord => "the Archive has no RadarSystemGlobalParams Record",
             Self::NoEntry => "no signature type of the radar parameters is the scan signature",
+            Self::Unreadable => "a signature declaration cannot be read",
             Self::Ambiguous => {
                 "several signature types of the radar parameters are the scan signature"
             }
@@ -44,8 +51,11 @@ impl SlotProblem {
 /// of `signatures`; the slot whose `displayName` is `@hud_scanning_info_rs_signature` is the scan
 /// signature. The index only applies to an entity whose `signatures` has as many slots as the
 /// array has entries.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct SignatureSlot(Option<(usize, usize)>);
+#[derive(Debug, Clone)]
+pub(crate) struct SignatureSlot {
+    layout: Option<(usize, usize)>,
+    selector: Option<SourceUse>,
+}
 
 type CatalogSlotRead<'f> = (
     SignatureSlot,
@@ -57,13 +67,19 @@ type CatalogSlotRead<'f> = (
 impl SignatureSlot {
     /// Returns the slot of an Archive that names none.
     pub(crate) const fn unknown() -> Self {
-        Self(None)
+        Self {
+            layout: None,
+            selector: None,
+        }
     }
 
     /// Returns the slot `index` of `types` signature types.
     #[cfg(test)]
     pub(crate) const fn at(index: usize, types: usize) -> Self {
-        Self(Some((index, types)))
+        Self {
+            layout: Some((index, types)),
+            selector: None,
+        }
     }
 
     /// Reads scan-signature dependencies and retains their canonical field inspections.
@@ -108,10 +124,10 @@ impl SignatureSlot {
                     Kind::MineableEntities,
                     cancel,
                 )?;
-                let outcome = read
-                    .tree
-                    .map(|tree| Self::of_tree(&tree))
-                    .map_err(|error| CatalogReadFailure::of(record, &error));
+                let outcome = match read.tree {
+                    Ok(tree) => Ok(Self::read_layout(input, &admission, &tree, cancel)?),
+                    Err(error) => Err(CatalogReadFailure::of(record, &error)),
+                };
                 Ok(Some((outcome, read.ledger)))
             })
             .filter_map(Result::transpose)
@@ -126,10 +142,12 @@ impl SignatureSlot {
                 Err(failure) => failures.push(failure),
             }
         }
+        if !failures.is_empty() {
+            return Ok((Self::unknown(), failures, None, ledger));
+        }
         let outcome = match slots.as_slice() {
-            [] if failures.is_empty() => Err(SlotProblem::NoRecord),
-            [] => return Ok((Self::unknown(), failures, None, ledger)),
-            [only] => *only,
+            [] => Err(SlotProblem::NoRecord),
+            [only] => only.clone(),
             _ => Err(SlotProblem::Ambiguous),
         };
         match outcome {
@@ -139,27 +157,138 @@ impl SignatureSlot {
     }
 
     /// Returns the slot the `RadarSystemGlobalParams` tree `tree` names.
-    pub(crate) fn of_tree(tree: &RecordTree<'_>) -> Result<Self, SlotProblem> {
-        let system = structure(Some(tree.root()), "signatureSystemParams");
-        let types = elements(system, "signatureTypeParams");
-        let mut matching = types.iter().enumerate().filter(|(_, entry)| {
-            matches!(
-                entry,
-                Value::Struct(entry)
-                    if locale_key(Some(entry), "displayName") == Some(SCAN_SIGNATURE_KEY)
-            )
-        });
-        match (matching.next(), matching.next()) {
-            (Some((index, _)), None) => Ok(Self(Some((index, types.len())))),
-            (Some(_), Some(_)) => Err(SlotProblem::Ambiguous),
-            (None, _) => Err(SlotProblem::NoEntry),
+    fn of_tree(tree: &RecordTree<'_>) -> Result<(usize, usize), SlotProblem> {
+        let system = match tree.field("signatureSystemParams") {
+            Some(Value::Struct(system)) => system,
+            None | Some(Value::Null) => return Err(SlotProblem::NoEntry),
+            _ => return Err(SlotProblem::Unreadable),
+        };
+        let types = match system.field("signatureTypeParams") {
+            Some(Value::Array(types)) => types,
+            None | Some(Value::Null) => return Err(SlotProblem::NoEntry),
+            _ => return Err(SlotProblem::Unreadable),
+        };
+        let mut selected = None;
+        let mut unreadable = false;
+        for (index, entry) in types.iter().enumerate() {
+            let display_name = match entry {
+                Value::Struct(entry) => entry.field("displayName"),
+                Value::Null => None,
+                _ => {
+                    unreadable = true;
+                    continue;
+                }
+            };
+            match display_name {
+                Some(Value::Locale(key)) if *key == SCAN_SIGNATURE_KEY => {
+                    if selected.replace(index).is_some() {
+                        return Err(SlotProblem::Ambiguous);
+                    }
+                }
+                None | Some(Value::Null | Value::Locale(_)) => {}
+                _ => unreadable = true,
+            }
         }
+        if unreadable {
+            return Err(SlotProblem::Unreadable);
+        }
+        selected
+            .map(|index| (index, types.len()))
+            .ok_or(SlotProblem::NoEntry)
+    }
+
+    fn read_layout<'source>(
+        input: Option<&OriginalCatalogInput<'_, 'source>>,
+        admission: &RecordObservation<'_, 'source>,
+        tree: &RecordTree<'source>,
+        cancel: Option<&CancelToken>,
+    ) -> Result<Result<Self, SlotProblem>, CatalogError> {
+        let layout = match Self::of_tree(tree) {
+            Ok(layout) => layout,
+            Err(problem) => return Ok(Err(problem)),
+        };
+        let selector = input
+            .map(|input| Self::capture_selector(input, admission, tree, layout.0, cancel))
+            .transpose()?;
+        Ok(Ok(Self {
+            layout: Some(layout),
+            selector,
+        }))
+    }
+
+    fn capture_selector<'source>(
+        input: &OriginalCatalogInput<'_, 'source>,
+        admission: &RecordObservation<'_, 'source>,
+        tree: &RecordTree<'source>,
+        index: usize,
+        cancel: Option<&CancelToken>,
+    ) -> Result<SourceUse, CatalogError> {
+        const MISSING: ExportAccountingError = ExportAccountingError::ConflictingSourceDatum;
+        let scope = input.record_scope(admission.record(), tree)?;
+        let fields = OriginalFlowFields::read(&scope, cancel)?;
+        let (_, system) = fields
+            .field(None, "signatureSystemParams")?
+            .ok_or(MISSING)?;
+        let (_, types) = fields
+            .field(Some(system), "signatureTypeParams")?
+            .ok_or(MISSING)?;
+        let Value::Array(types) = types.value() else {
+            return Err(MISSING.into());
+        };
+        let slot = fields.fact(types.get(index).ok_or(MISSING)?)?;
+        let (_, key) = fields.field(Some(slot), "displayName")?.ok_or(MISSING)?;
+        key.observe(OriginalValuePart::Value, SourceUseRole::Selector)
+    }
+
+    /// Projects the finite scan signature and binds the evidence for its slot selection.
+    pub(crate) fn project(
+        &self,
+        signatures: &SourcedValue<Vec<SourcedValue<ResourceFloat32>>>,
+        sources: &SourceUses,
+    ) -> Result<SourcedValue<f32>, CatalogError> {
+        let Some(selector) = &self.selector else {
+            return Ok(sources.add_value_origins(
+                sources.value(SourceValue::Absent, &[], false),
+                &[signatures.origin()],
+            )?);
+        };
+        let selector_origin = sources.origin(std::slice::from_ref(selector), true);
+        let shape = [signatures.origin(), &selector_origin];
+        let values = signatures.value().and_then(|values| {
+            self.layout
+                .filter(|(_, count)| *count == values.len())
+                .map(|(index, _)| (values, index))
+        });
+        let Some((values, index)) = values else {
+            return Ok(sources.value_with_origins(SourceValue::Absent, &shape)?);
+        };
+        let selected = values
+            .get(index)
+            .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+        let nonzero = values.iter().find(|value| {
+            value
+                .value()
+                .and_then(ResourceFloat32::finite)
+                .is_some_and(|value| value != 0.0)
+        });
+        if let (Some(value), Some(nonzero)) =
+            (selected.value().and_then(ResourceFloat32::finite), nonzero)
+        {
+            return Ok(sources.value_with_origins(
+                SourceValue::Present(value),
+                &[shape[0], shape[1], selected.origin(), nonzero.origin()],
+            )?);
+        }
+        let mut evidence = Vec::from(shape);
+        evidence.extend(values.iter().map(SourcedValue::origin));
+        Ok(sources.value_with_origins(SourceValue::Absent, &evidence)?)
     }
 
     /// Returns the scan signature among `signatures`; `None` when the slot is unknown, when
     /// `signatures` has not one number per signature type, or when every signature is zero.
-    pub(crate) fn value(self, signatures: &[f32]) -> Option<f32> {
-        let (index, types) = self.0?;
+    #[cfg(test)]
+    fn value(&self, signatures: &[f32]) -> Option<f32> {
+        let (index, types) = self.layout?;
         if signatures.len() != types || signatures.iter().all(|signature| *signature == 0.0) {
             return None;
         }

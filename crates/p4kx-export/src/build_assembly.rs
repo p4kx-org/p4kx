@@ -253,6 +253,11 @@ pub(super) fn assemble<R>(
                 &forge,
                 collected.blueprint_categories,
             ),
+            mineable_entities: CatalogTable::new(
+                &forge,
+                &[p4kx_assembly::ENTITY_TYPE],
+                collected.mineable_entities,
+            ),
             refining_processes: crate::catalog_v3::mining_process_catalog::refining_table(
                 &forge,
                 collected.refining_processes,
@@ -364,7 +369,6 @@ pub(super) fn assemble<R>(
         loot_archetypes: collected.loot_kinds.archetypes,
         legacy_loot_tables: collected.loot_kinds.legacy_tables,
         legacy_loot_archetypes: collected.loot_kinds.legacy_archetypes,
-        mineable_entities: collected.mineable_entities,
         crafters: collected.crafters,
         cargo_manifests: collected.mission_kinds.manifests,
         mission_location_templates: collected.mission_location_templates,

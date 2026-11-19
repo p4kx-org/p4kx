@@ -243,6 +243,6 @@ impl RecordEvidence {
     fn observe(&mut self, pick: &mut Picked<'_>) {
         self.commodities.observe(pick);
         self.has_signatures |=
-            matches!(pick, Picked::MineableEntity(entity) if !entity.signatures.is_empty());
+            matches!(pick, Picked::MineableEntity(entity) if entity.has_signatures());
     }
 }

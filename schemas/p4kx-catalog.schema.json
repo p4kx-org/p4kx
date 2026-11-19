@@ -5693,6 +5693,9 @@
         "medicalItemTierConfigs": {
           "$ref": "#/$defs/CatalogTableOfMedicalItemTierConfig"
         },
+        "mineableEntities": {
+          "$ref": "#/$defs/CatalogTableOfMineableEntity"
+        },
         "miningLaserGlobals": {
           "$ref": "#/$defs/CatalogTableOfMiningLaserGlobalDefinition"
         },
@@ -5859,6 +5862,7 @@
         "lootThemes",
         "manufacturers",
         "medicalItemTierConfigs",
+        "mineableEntities",
         "miningLaserGlobals",
         "missionBrokerEntries",
         "missionItems",
@@ -7879,6 +7883,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/MedicalItemTierConfig"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfMineableEntity": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/MineableEntity"
           },
           "type": "array"
         }
@@ -30202,6 +30225,34 @@
       ],
       "type": "object"
     },
+    "MineableBaseSignature": {
+      "description": "Ordered original signature slots and their finite scan value.",
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Authored declarations outside the typed projection."
+        },
+        "scanSignature": {
+          "$ref": "#/$defs/SourcedValueOffloat",
+          "description": "Finite scan value selected by the original global radar declaration."
+        },
+        "signatures": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfResourceFloat32",
+          "description": "Original values in slot order, with each Single's exact bits."
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The original concrete type."
+        }
+      },
+      "required": [
+        "authoredFields",
+        "scanSignature",
+        "signatures",
+        "sourceType"
+      ],
+      "type": "object"
+    },
     "MineableComposition": {
       "description": "A mineable composition and its authored element shares.",
       "properties": {
@@ -30355,79 +30406,152 @@
       "type": "object"
     },
     "MineableEntity": {
-      "description": "A mineable entity: an `EntityClassDefinition` Record under `entities/mineable`, one kind of\nrock or deposit. Many entities share a composition; a provider preset reaches an entity through\nthe `entityGuid` of its harvestables. Entities are selected by record path and type alone, so\none without the components below has `null` and empty fields.",
+      "description": "One physical mineable entity and its authored mining and radar components.",
       "properties": {
         "className": {
-          "description": "The Record name without its type, e.g. `MineableRock_AsteroidLegendary_Quantainium`.",
-          "type": "string"
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "componentSlots": {
+          "$ref": "#/$defs/SourcedValueOfuint32",
+          "description": "The original number of component slots."
+        },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "guid": {
-          "$ref": "#/$defs/Guid",
-          "description": "The GUID of the Record."
+          "$ref": "#/$defs/SourcedValueOfGuid"
         },
-        "mineableCompositionGuid": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Guid"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The GUID of the `MineableComposition` Record `Components[MineableParams]` links to."
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
-        "miningGlobalParamsGuid": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Guid"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The GUID of the `MiningGlobalParams` Record `Components[MineableParams]` links to."
-        },
-        "radarContactTypeGuid": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Guid"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The GUID of the `RadarContactTypeEntry` Record `radarProperties.contactType` links to."
-        },
-        "recordPath": {
-          "description": "The record path, without `.xml`.",
-          "type": "string"
-        },
-        "scanSignature": {
-          "description": "The scan signature the mining scanner shows, from 3000 to 4900 on LIVE: the slot of\n`signatures` that `signatureTypeParams` of the `RadarSystemGlobalParams` Record names\n`@hud_scanning_info_rs_signature`. `null` when the Record states no signatures, all of them\nare zero, `signatures` has not one number per signature type, or the Archive names no\nsuch slot (a catalog warning says so).",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "signatures": {
-          "description": "`radarProperties.baseSignatureParams.signatures` of `Components[SSCSignatureSystemParams]`\nin stored order, one number per signature type; a value that is not a finite 32-bit float\nis exported as 0. Empty when the Record states none.",
+        "mining": {
+          "description": "Mining components in their original relative order.",
           "items": {
-            "format": "float",
-            "type": "number"
+            "$ref": "#/$defs/MineableParameters"
           },
           "type": "array"
+        },
+        "radar": {
+          "description": "Signature components in their original relative order.",
+          "items": {
+            "$ref": "#/$defs/MineableSignature"
+          },
+          "type": "array"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         }
       },
       "required": [
         "className",
+        "componentSlots",
+        "fileName",
         "guid",
-        "mineableCompositionGuid",
-        "miningGlobalParamsGuid",
-        "radarContactTypeGuid",
+        "metadataTag",
+        "mining",
+        "radar",
+        "recordIndex",
+        "recordName",
         "recordPath",
-        "scanSignature",
-        "signatures"
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "MineableParameters": {
+      "description": "One authored `MineableParams` component and its links.",
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Authored declarations outside the typed projection."
+        },
+        "composition": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference",
+          "description": "The authored `MineableComposition` link."
+        },
+        "globalParams": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference",
+          "description": "The authored `MiningGlobalParams` link."
+        },
+        "sourcePosition": {
+          "$ref": "#/$defs/SourcedValueOfuint32",
+          "description": "The ordinal in the Entity's Components array."
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The original concrete type."
+        }
+      },
+      "required": [
+        "authoredFields",
+        "composition",
+        "globalParams",
+        "sourcePosition",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "MineableRadarProperties": {
+      "description": "Original radar contact and base signature declarations.",
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Remaining radar declarations and values."
+        },
+        "baseSignatureParams": {
+          "$ref": "#/$defs/SourcedValueOfMineableBaseSignature",
+          "description": "The authored base signature parameters."
+        },
+        "contactType": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference",
+          "description": "The authored radar contact type link."
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The original concrete type."
+        }
+      },
+      "required": [
+        "authoredFields",
+        "baseSignatureParams",
+        "contactType",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "MineableSignature": {
+      "description": "One authored signature component of a mineable entity.",
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Authored declarations outside the typed projection."
+        },
+        "properties": {
+          "$ref": "#/$defs/SourcedValueOfMineableRadarProperties",
+          "description": "The authored radar properties."
+        },
+        "sourcePosition": {
+          "$ref": "#/$defs/SourcedValueOfuint32",
+          "description": "The ordinal in the Entity's Components array."
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The original concrete type."
+        }
+      },
+      "required": [
+        "authoredFields",
+        "properties",
+        "sourcePosition",
+        "sourceType"
       ],
       "type": "object"
     },
@@ -100866,6 +100990,266 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfMineableBaseSignature": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/MineableBaseSignature"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfMineableRadarProperties": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/MineableRadarProperties"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfMiningExplosion": {
       "allOf": [
         {
@@ -138473,13 +138857,6 @@
       },
       "type": "array"
     },
-    "mineableEntities": {
-      "description": "The mineable entities with the scan signature of each, ordered by GUID.",
-      "items": {
-        "$ref": "#/$defs/MineableEntity"
-      },
-      "type": "array"
-    },
     "missionLocalities": {
       "description": "The mission localities, sets of starmap objects, ordered by GUID.",
       "items": {
@@ -138596,7 +138973,6 @@
     "lootTables",
     "mineableCompositions",
     "mineableElements",
-    "mineableEntities",
     "missionLocalities",
     "missionLocationTemplates",
     "missionPropertySets",

@@ -87,6 +87,9 @@ pub mod localization;
 #[path = "shop_inventory_query.rs"]
 pub mod shops;
 
+#[path = "planet_resource_query.rs"]
+pub mod planet_resources;
+
 #[path = "flare_library_query.rs"]
 pub mod flares;
 #[path = "radar_audio_query.rs"]
@@ -348,9 +351,11 @@ fn read_archive(
 }
 
 pub use mining_definitions::{
-    MineableCompositionSnapshot, MineableElementSnapshot, MiningDefinitionSnapshot,
-    ResourceTypeSnapshot, with_mineable_compositions, with_mineable_compositions_from,
-    with_mineable_elements, with_mineable_elements_from, with_resource_types,
+    MineableBaseSignature, MineableCompositionSnapshot, MineableElementSnapshot, MineableEntity,
+    MineableEntitySnapshot, MineableParameters, MineableRadarProperties, MineableSignature,
+    MiningDefinitionSnapshot, ResourceTypeSnapshot, with_mineable_compositions,
+    with_mineable_compositions_from, with_mineable_elements, with_mineable_elements_from,
+    with_mineable_entities, with_mineable_entities_from, with_resource_types,
     with_resource_types_from,
 };
 

@@ -11,12 +11,14 @@ use crate::catalog_query_session::checkpoint;
 use crate::entity_selection::{self, Selected};
 use crate::record_observation::RecordObservation;
 use crate::resource_group::{self, Groups, ResourceMemberships};
+use crate::scan_signature::{RADAR_GLOBAL_PARAMS, SignatureSlot};
 use crate::{CatalogError, Kind};
 
 /// A `ResourceType`'s reverse membership dependency prepared once on canonical demand.
 #[derive(Default)]
 pub(super) struct Dependencies {
     groups: Option<Groups>,
+    signature_slot: Option<SignatureSlot>,
     observer: Option<Arc<dyn CanonicalReadObserver>>,
     pub(super) coverage: CatalogRecordCoverage,
 }
@@ -27,6 +29,30 @@ impl Dependencies {
             observer,
             ..Self::default()
         }
+    }
+
+    pub(super) fn signature_slot(
+        &mut self,
+        input: &OriginalCatalogInput<'_, '_>,
+        cancel: Option<&CancelToken>,
+    ) -> Result<&SignatureSlot, CatalogError> {
+        if self.signature_slot.is_none() {
+            let mut records = Vec::new();
+            for record in input.forge().records() {
+                checkpoint(cancel)?;
+                if record.type_name().ok() == Some(RADAR_GLOBAL_PARAMS) {
+                    records.push(record);
+                }
+            }
+            let (slot, failures, _, _) = SignatureSlot::read_captured(&records, input, cancel)?;
+            self.coverage
+                .unreadable_bodies
+                .extend(failures.iter().map(|failure| failure.record().index()));
+            return Ok(self.signature_slot.insert(slot));
+        }
+        self.signature_slot
+            .as_ref()
+            .ok_or_else(|| crate::ExportAccountingError::ConflictingSourceDatum.into())
     }
 
     pub(super) fn memberships(

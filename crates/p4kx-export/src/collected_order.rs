@@ -33,7 +33,12 @@ impl Collected<'_> {
         crate::catalog_v3::mining_process_catalog::order_refining(&mut self.refining_processes);
         crate::contract::MineableComposition::order(&mut self.mineable_compositions);
         crate::catalog_v3::mining_process_catalog::order_globals(&mut self.mining_global_params);
-        sort_by_guid(&mut self.mineable_entities, |entity| entity.guid);
+        self.mineable_entities.sort_by_cached_key(|row| {
+            (
+                row.source.guid.value().map(|guid| guid.text()),
+                row.source.record_index.value().copied(),
+            )
+        });
         sort_by_guid(&mut self.crafters, |entity| entity.guid);
         crate::contract::HarvestableProviderPreset::order(&mut self.harvestable_provider_presets);
         sort_by_guid(&mut self.sub_harvestable_multi_configs, |entity| {

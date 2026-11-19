@@ -12,6 +12,7 @@ use crate::catalog_v3::catalog_weapon_projectile_ammo::{
     self, LinkedAmmunitionReader, WeaponProjectileAmmoSelection,
 };
 use crate::catalog_v3::loot_definition_catalog::{self, LootDefinitionKind};
+use crate::catalog_v3::mineable_entity_definition;
 use crate::catalog_v3::starmap_object_definition;
 use crate::contract::Item;
 use crate::contract_stats::ItemStats;
@@ -20,7 +21,6 @@ use crate::export_ledger::ExportLedger;
 use crate::harvest_config::{is_slotpreset_path, multi_config};
 use crate::item_class::ClassLine;
 use crate::loot_kinds::LootPick;
-use crate::mining::mineable_entity;
 use crate::picked::{Picked, PickedItem};
 use crate::record_observation::RecordObservation;
 use crate::scan_health::ScanError;
@@ -62,8 +62,22 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
             return self.provider(admission, tree, ledger).map(Some);
         }
         if kind == Kind::MineableEntities {
-            let entity = Picked::MineableEntity(mineable_entity(tree, self.scan.signature_slot));
-            return Ok(Some(entity.crafted(tree)));
+            let (entity, notes) = mineable_entity_definition::read(
+                tree,
+                &self.projection,
+                admission,
+                &self.scan.signature_slot,
+                self.scan.options.cancel,
+            )?;
+            crate::source_projection_notes::record(
+                kind,
+                ExportSourceRole::Selected,
+                admission,
+                tree,
+                notes,
+                ledger,
+            )?;
+            return Ok(Some(Picked::MineableEntity(entity).crafted(tree)));
         }
         if kind == Kind::StarmapObjects {
             return Ok(Some(self.starmap(trees, admission, tree, ledger)?));

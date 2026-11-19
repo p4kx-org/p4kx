@@ -105,8 +105,8 @@ pub enum CraftingWarning {
     /// Shop containers name shops, but no `.soc` holds a shop component, so no shop has an item
     /// list; the component layout may have changed in this Build.
     NoShopComponents,
-    /// The radar parameters do not name the slot of the scan signature, so `scanSignature` of
-    /// `mineableEntities` is `null` everywhere; the text says why. `signatures` is still exported.
+    /// The radar parameters do not name a scan slot, so the derived value in
+    /// `definitions.mineableEntities` is absent; the original signature slots remain available.
     UnknownScanSignatureSlot(&'static str),
     /// This many stored names in the contract templates and mission broker entries (a state, a
     /// category, a comms timing or reason, a kind of objective property, a comparison, a month, a

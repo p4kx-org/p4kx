@@ -38,6 +38,7 @@ use crate::catalog_v3::starmap_definition_kinds::StarmapDefinitionTables;
 use crate::catalog_v3::weapon_action_recoil_definitions::WeaponActionRecoilDefinition;
 use crate::catalog_v3::weapon_procedural_definitions::WeaponProceduralTables;
 use crate::commodity_contract::CommodityDefinition;
+use crate::contract::MineableEntity;
 use crate::manufacturer::ManufacturerDefinition;
 use crate::mission_generator::GeneratorDefinition;
 use planet_tech_definitions::PlanetTechDefinitions;
@@ -132,6 +133,7 @@ pub(crate) struct CatalogDefinitions<'source> {
     >,
     pub(crate) blueprint_categories: CatalogTable<BlueprintCategoryDefinition<'source>>,
     pub(crate) gameplay_properties: CatalogTable<GameplayPropertyDefinition<'source>>,
+    pub(crate) mineable_entities: CatalogTable<MineableEntity<'source>>,
     pub(crate) refining_processes:
         CatalogTable<crate::catalog_v3::mining_process_catalog::RefiningProcessDefinition<'source>>,
     pub(crate) quality_distributions: CatalogTable<QualityDistributionDefinition<'source>>,

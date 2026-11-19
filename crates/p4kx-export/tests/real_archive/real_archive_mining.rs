@@ -202,13 +202,7 @@ fn named<'c>(catalog: &'c Value, kind: &str, class: &str) -> Result<&'c Value, B
 fn guids<'c>(catalog: &'c Value, kind: &str) -> Result<HashSet<&'c str>, Box<dyn Error>> {
     Ok(list(catalog, kind)?
         .iter()
-        .filter_map(|entry| {
-            if matches!(kind, "mineableElements" | "mineableCompositions") {
-                entry.pointer("/guid/value").and_then(Value::as_str)
-            } else {
-                entry["guid"].as_str()
-            }
-        })
+        .filter_map(|entry| entry.pointer("/guid/value").and_then(Value::as_str))
         .collect())
 }
 
@@ -217,11 +211,20 @@ fn at_path<'c>(catalog: &'c Value, kind: &str, name: &str) -> Result<&'c Value, 
     list(catalog, kind)?
         .iter()
         .find(|entry| {
-            entry["recordPath"]
-                .as_str()
+            entry
+                .pointer("/recordPath/value")
+                .and_then(Value::as_str)
                 .is_some_and(|path| path.to_ascii_lowercase().ends_with(&suffix))
         })
         .ok_or_else(|| format!("{kind} has no {name}").into())
+}
+
+fn radar_properties(entity: &Value) -> impl Iterator<Item = &Value> {
+    entity["radar"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|component| component.pointer("/properties/value"))
 }
 
 fn real_catalog() -> Result<Value, Box<dyn Error>> {
@@ -245,10 +248,24 @@ fn the_scan_signature_of_an_asteroid_and_a_surface_rock_of_a_real_archive_is_the
     ] {
         let rock = at_path(&catalog, "mineableEntities", name)?;
         print_line(&format!("mineable entity sample: {rock}"));
-        assert_eq!(rock["scanSignature"], signature, "{name}");
-        assert_eq!(rock["signatures"].as_array().map(Vec::len), Some(8));
-        assert_eq!(rock["signatures"][4], signature, "{name}: slot 4 on LIVE");
-        assert!(rock["radarContactTypeGuid"].is_string(), "{name}");
+        let properties = radar_properties(rock)
+            .find(|row| {
+                row.pointer("/baseSignatureParams/value/scanSignature/value")
+                    .is_some_and(Value::is_number)
+            })
+            .ok_or("a radar declaration with a scan signature")?;
+        let base = &properties["baseSignatureParams"]["value"];
+        assert_eq!(base["scanSignature"]["value"], signature, "{name}");
+        let signatures = base["signatures"]["value"].as_array().ok_or("signatures")?;
+        assert_eq!(signatures.len(), 8);
+        assert_eq!(
+            signatures[4]["value"]["finite"], signature,
+            "{name}: slot 4 on LIVE"
+        );
+        assert!(
+            properties["contactType"]["value"]["guid"]["value"].is_string(),
+            "{name}"
+        );
     }
     Ok(())
 }
@@ -261,7 +278,11 @@ fn the_mineable_entities_of_a_real_archive_are_plausible_and_linked() -> TestRes
     let entities = list(&catalog, "mineableEntities")?;
     let signatures: Vec<f64> = entities
         .iter()
-        .filter_map(|entity| entity["scanSignature"].as_f64())
+        .flat_map(radar_properties)
+        .filter_map(|row| {
+            row.pointer("/baseSignatureParams/value/scanSignature/value")
+                .and_then(Value::as_f64)
+        })
         .collect();
     print_line(&format!(
         "{} mineable entities, {} with a scan signature",
@@ -284,8 +305,14 @@ fn the_mineable_entities_of_a_real_archive_are_plausible_and_linked() -> TestRes
             .all(|value| (3000.0..=4900.0).contains(value)),
         "rock signatures from 3000 to 4900"
     );
-    for entity in entities {
-        if let Some(composition) = entity["mineableCompositionGuid"].as_str() {
+    for component in entities
+        .iter()
+        .flat_map(|entity| entity["mining"].as_array().into_iter().flatten())
+    {
+        if let Some(composition) = component
+            .pointer("/composition/value/guid/value")
+            .and_then(Value::as_str)
+        {
             assert!(compositions.contains(composition), "{composition}");
         }
     }

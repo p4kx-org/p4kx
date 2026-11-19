@@ -27,11 +27,41 @@ pub(crate) struct LooseRecordLink {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct LooseRecordCandidate {
+#[expect(
+    missing_docs,
+    reason = "the original shared schema has no type description"
+)]
+pub struct LooseRecordCandidate {
     index: SourcedValue<u32>,
     guid: SourcedValue<CatalogGuid>,
     path: SourcedValue<String>,
     source_type: SourcedValue<String>,
+}
+
+impl LooseRecordCandidate {
+    /// Borrows the original physical Record index.
+    #[must_use]
+    pub const fn index(&self) -> &SourcedValue<u32> {
+        &self.index
+    }
+
+    /// Borrows the original Record GUID.
+    #[must_use]
+    pub const fn guid(&self) -> &SourcedValue<CatalogGuid> {
+        &self.guid
+    }
+
+    /// Borrows the original Record path spelling.
+    #[must_use]
+    pub const fn path(&self) -> &SourcedValue<String> {
+        &self.path
+    }
+
+    /// Borrows the original declared Record type.
+    #[must_use]
+    pub const fn source_type(&self) -> &SourcedValue<String> {
+        &self.source_type
+    }
 }
 
 pub(crate) fn by_guid(

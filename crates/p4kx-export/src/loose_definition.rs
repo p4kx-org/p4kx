@@ -2,12 +2,13 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::collections::HashMap;
+use std::slice;
 
-use p4kx_extraction::{Archive, Guid, SourceValueState, SourcedValue};
+use p4kx_extraction::{Archive, Entry, Guid, SourceValueState, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::catalog_read::entry_json_object::EntryJsonObject;
+use crate::catalog_read::entry_json_object::{self, EntryJsonObject};
 use crate::catalog_read::loose_archive_path::LooseArchivePathState;
 use crate::catalog_read::loose_json::{LooseJson, LooseJsonFailure};
 use crate::catalog_read::original::{EntryCapture, PhysicalEntryIdentity};
@@ -65,12 +66,24 @@ impl DefinitionFamily {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct DefinitionIssue {
+pub struct DefinitionIssue {
     pub(crate) field: &'static str,
     pub(crate) code: ExportDiagnosticCode,
 }
 
 impl DefinitionIssue {
+    /// Returns the authored field name.
+    #[must_use]
+    pub const fn field(&self) -> &'static str {
+        self.field
+    }
+
+    /// Returns the represented source issue.
+    #[must_use]
+    pub const fn code(&self) -> ExportDiagnosticCode {
+        self.code
+    }
+
     pub(crate) fn record(&self, ledger: &mut ExportLedger, kind: Kind) {
         ledger.field_diagnostic(DiagnosticObservation {
             kind: Some(kind),
@@ -86,6 +99,35 @@ impl DefinitionIssue {
     }
 }
 
+/// Selects physical Entries and optionally their authored GUID.
+#[derive(Clone, Copy)]
+pub(crate) enum Selection<'path> {
+    All,
+    EntryIndex(u32),
+    Path(&'path str),
+    Guid(Guid),
+}
+
+impl Selection<'_> {
+    pub(crate) fn entries(self, archive: &Archive) -> &[Entry] {
+        match self {
+            Self::EntryIndex(index) => usize::try_from(index)
+                .ok()
+                .and_then(|index| archive.entries().get(index))
+                .map_or(&[][..], slice::from_ref),
+            _ => archive.entries(),
+        }
+    }
+
+    const fn guid(self) -> Option<Guid> {
+        if let Self::Guid(guid) = self {
+            Some(guid)
+        } else {
+            None
+        }
+    }
+}
+
 pub(crate) trait LooseDefinition {
     fn guid(&self) -> &SourcedValue<CatalogGuid>;
     fn issues(&mut self) -> &mut Vec<DefinitionIssue>;
@@ -97,17 +139,47 @@ pub(crate) fn read<T: LooseDefinition>(
     ledger: &mut ExportLedger,
     options: &CatalogOptions<'_>,
     family: DefinitionFamily,
+    project: impl FnMut(PhysicalEntryIdentity, &EntryJsonObject<'_, '_>) -> Result<T, CatalogError>,
+) -> Result<CatalogTable<T>, CatalogError> {
+    read_selected(
+        archive,
+        capture,
+        ledger,
+        options,
+        family,
+        Selection::All,
+        project,
+    )
+}
+
+pub(crate) fn read_selected<T: LooseDefinition>(
+    archive: &Archive,
+    capture: &EntryCapture<'_>,
+    ledger: &mut ExportLedger,
+    options: &CatalogOptions<'_>,
+    family: DefinitionFamily,
+    selection: Selection<'_>,
     mut project: impl FnMut(PhysicalEntryIdentity, &EntryJsonObject<'_, '_>) -> Result<T, CatalogError>,
 ) -> Result<CatalogTable<T>, CatalogError> {
+    let path = match selection {
+        Selection::Path(path) => Some(starmap_index::key(path)),
+        _ => None,
+    };
     let mut available = false;
     let mut rows = Vec::new();
     ledger.inventory(family.kind);
-    for entry in archive
-        .entries()
+    for entry in selection
+        .entries(archive)
         .iter()
         .filter(|entry| family.includes(entry.path()))
     {
         parsed_entry_json::check_cancel(options.cancel)?;
+        if path
+            .as_ref()
+            .is_some_and(|path| *path != starmap_index::key(entry.path()))
+        {
+            continue;
+        }
         available = true;
         if options
             .filter
@@ -118,23 +190,18 @@ pub(crate) fn read<T: LooseDefinition>(
         let source =
             EntrySource::outer(capture, archive, entry)?.operation(EntryOperation::SourceJson);
         let outcome = match LooseJson::read(archive, entry, &source, options.cancel)? {
-            Ok(read) => project_entry(&read, &source, capture, options, &mut project)?,
+            Ok(read) => project_entry(
+                &read,
+                &source,
+                capture,
+                options.cancel,
+                selection.guid(),
+                family.guid_field,
+                &mut project,
+            )?,
             Err(error) => Err(error),
         };
-        match outcome {
-            Ok(row) => {
-                source.record(ledger, family.kind, SourceDisposition::Projected);
-                parsed_entry_json::push(&mut rows, row)?;
-            }
-            Err(error) => {
-                source.diagnosed(
-                    ledger,
-                    family.kind,
-                    error.disposition,
-                    error.diagnosis(family.source_type),
-                );
-            }
-        }
+        retain_outcome(&mut rows, ledger, source, family, selection, outcome)?;
     }
     diagnostics(&mut rows, ledger, family)?;
     let availability = if available {
@@ -147,22 +214,71 @@ pub(crate) fn read<T: LooseDefinition>(
     Ok(CatalogTable { availability, rows })
 }
 
+fn retain_outcome<T>(
+    rows: &mut Vec<T>,
+    ledger: &mut ExportLedger,
+    source: EntrySource,
+    family: DefinitionFamily,
+    selection: Selection<'_>,
+    outcome: Result<Option<T>, LooseJsonFailure>,
+) -> Result<(), CatalogError> {
+    match outcome {
+        Ok(Some(row)) => {
+            source.record(ledger, family.kind, SourceDisposition::Projected);
+            parsed_entry_json::push(rows, row)?;
+        }
+        Ok(None) => source.selection_candidate().record(
+            ledger,
+            family.kind,
+            SourceDisposition::SkippedAfterRead,
+        ),
+        Err(error) => {
+            let source = if selection.guid().is_some() {
+                source.selection_candidate()
+            } else {
+                source
+            };
+            source.diagnosed(
+                ledger,
+                family.kind,
+                error.disposition,
+                error.diagnosis(family.source_type),
+            );
+        }
+    }
+    Ok(())
+}
+
 fn project_entry<T>(
     read: &LooseJson,
     source: &EntrySource,
     capture: &EntryCapture<'_>,
-    options: &CatalogOptions<'_>,
+    cancel: Option<&p4kx_extraction::CancelToken>,
+    wanted: Option<Guid>,
+    guid_field: &str,
     project: &mut impl FnMut(PhysicalEntryIdentity, &EntryJsonObject<'_, '_>) -> Result<T, CatalogError>,
-) -> Result<Result<T, LooseJsonFailure>, CatalogError> {
-    let parsed = match read.parse(capture, options.cancel)? {
+) -> Result<Result<Option<T>, LooseJsonFailure>, CatalogError> {
+    let parsed = match read.parse(capture, cancel)? {
         Ok(parsed) => parsed,
         Err(error) => return Ok(Err(error)),
     };
     let Some(object) = EntryJsonObject::new(&parsed, parsed.root, capture.source_uses())? else {
         return Ok(Err(LooseJsonFailure::malformed()));
     };
+    if let Some(wanted) = wanted {
+        let guid = object.field(guid_field, entry_json_object::guid)?;
+        match guid.state() {
+            SourceValueState::Absent | SourceValueState::Null => return Ok(Ok(None)),
+            SourceValueState::Present => {
+                if wanted == Guid::default() || guid.value() != Some(&CatalogGuid(wanted)) {
+                    return Ok(Ok(None));
+                }
+            }
+            _ => return Ok(Err(LooseJsonFailure::malformed())),
+        }
+    }
     let identity = source.receipt().physical_payload_file(starmap_index::key)?;
-    project(identity, &object).map(Ok)
+    project(identity, &object).map(|row| Ok(Some(row)))
 }
 
 pub(crate) fn identity_issue(

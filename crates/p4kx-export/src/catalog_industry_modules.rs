@@ -22,3 +22,6 @@ pub(crate) mod mining_process_catalog;
 #[cfg(test)]
 #[path = "blueprint_source_test_selectors.rs"]
 mod blueprint_source_test_selectors;
+
+#[path = "mineable_entity_definition.rs"]
+pub(crate) mod mineable_entity_definition;

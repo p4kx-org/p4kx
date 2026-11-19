@@ -39,6 +39,10 @@ mod component_tools;
 mod flight_configurations;
 #[path = "sdk_fuel_routes.rs"]
 mod fuel;
+#[path = "sdk_mineable_entity_route.rs"]
+mod mineable_entity;
+#[path = "sdk_planet_resource_route.rs"]
+mod planet_resource;
 #[path = "sdk_projectile_ammo_route.rs"]
 mod projectile_ammo;
 #[path = "sdk_resource_network_routes.rs"]
@@ -108,6 +112,8 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
     routes.push(vehicle_armor::read()?);
     routes.extend(resource_network::read()?);
     routes.extend(fuel::read()?);
+    routes.push(mineable_entity::read()?);
+    routes.push(planet_resource::read()?);
     routes.extend(component_tools::read()?);
     Ok(routes)
 }

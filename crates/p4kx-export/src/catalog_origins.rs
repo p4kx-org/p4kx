@@ -52,30 +52,43 @@ impl CatalogOrigins {
         entry: &DataForgeEntry,
         texts: &TextSources,
     ) -> Result<Self, CatalogError> {
-        Self::from_inputs(archive, entry, Some(texts))
+        Self::from_inputs(
+            archive,
+            entry,
+            Some(texts),
+            SourceUses::with_compact_coordinates(),
+        )
     }
 
     pub(crate) fn for_archive_records(
         archive: &Archive,
         entry: &DataForgeEntry,
     ) -> Result<Self, CatalogError> {
+        Self::for_archive_records_with_uses(archive, entry, SourceUses::with_compact_coordinates())
+    }
+
+    pub(crate) fn for_archive_records_with_uses(
+        archive: &Archive,
+        entry: &DataForgeEntry,
+        uses: SourceUses,
+    ) -> Result<Self, CatalogError> {
         if !entry.origin().matches_archive(archive) {
             return Err(CatalogError::SourceOriginMismatch);
         }
-        Self::from_inputs(archive, entry, None)
+        Self::from_inputs(archive, entry, None, uses)
     }
 
     fn from_inputs(
         archive: &Archive,
         entry: &DataForgeEntry,
         texts: Option<&TextSources>,
+        uses: SourceUses,
     ) -> Result<Self, CatalogError> {
         if matches!(entry.origin(), DataForgeOrigin::Archive(_))
             && !entry.origin().matches_archive(archive)
         {
             return Err(CatalogError::SourceOriginMismatch);
         }
-        let uses = SourceUses::with_compact_coordinates();
         let input = match entry.origin() {
             DataForgeOrigin::Archive(origin) => SourceInput::Archive(origin),
             DataForgeOrigin::File(origin) => SourceInput::File(origin),

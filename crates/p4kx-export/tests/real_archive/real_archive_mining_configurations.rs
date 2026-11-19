@@ -18,6 +18,9 @@ use crate::real_archive_verification::print_line;
 #[path = "mining_tool_sdk_witness.rs"]
 mod sdk;
 
+#[path = "mineable_entity_sdk_witness.rs"]
+mod mineable_sdk;
+
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 #[test]

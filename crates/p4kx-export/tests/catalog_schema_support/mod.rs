@@ -95,6 +95,7 @@ pub(crate) fn minimal_catalog() -> Value {
         "definitions": {"items": {"availability": "available", "rows": []}, "contractGenerators": absent_table(), "missionScenarios": absent_table(), "blueprints": blueprints::definitions(), "blueprintPools": blueprints::pools(), "contractTemplates": absent_table(), "missionBrokerEntries": absent_table(), "lootPoolFilters": loot::filters(), "blueprintCategories": blueprint_categories::definitions(), "gameplayProperties": gameplay_properties::definitions(), "qualityDistributions": quality::distributions(), "qualityQuantizations": quality::quantizations(), "resourceTypes": resources::table(), "resourceGroups": resource_groups::definitions(),
             "commodities": commodities::definitions(), "manufacturers": manufacturer(),
             "refiningProcesses": mining::refining(),
+            "mineableEntities": harvest::mineable_entities(),
             "tags": tags::definitions(),
             "explosionDefinitions": absent_table(), "damageResistanceMacros": absent_table(), "turretHealthModifiers": absent_table(), "miningLaserGlobals": absent_table(), "consumableTypes": absent_table(), "consumableSubtypes": absent_table(),
             "inventoryContainers": absent_table(),
@@ -269,7 +270,6 @@ pub(crate) fn minimal_catalog() -> Value {
         "legacyLootTables": loot::legacy_tables(),
         "legacyLootArchetypes": loot::legacy_archetypes(),
         "lootContainers": loot::containers(),
-        "mineableEntities": harvest::mineable_entities(),
         "crafters": crafters::crafters(),
         "cargoManifests": contracts::manifests(),
         "shipStoreSlugs": slugs::ship_store_slugs()
