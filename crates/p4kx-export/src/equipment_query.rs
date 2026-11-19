@@ -53,6 +53,8 @@ mod weapon;
 mod weapon_combat;
 #[path = "equipment_weapon_combat_read.rs"]
 mod weapon_combat_read;
+#[path = "equipment_weapon_recoil_query.rs"]
+mod weapon_recoil;
 
 pub use crate::catalog_v3::authored_fields::authored_manufacturer::AuthoredManufacturer;
 pub use crate::catalog_v3::catalog_capacity::ResourceCapacity;
@@ -104,6 +106,12 @@ pub use weapon_combat::{
     AlphaUnit, CombatModel, CombatUnits, DamageChannels, DistanceUnit, DpsUnit, FireRateUnit,
     NominalBullet, NominalBulletDamage, WeaponCombatBase, WeaponCombatOwner, WeaponCombatSnapshot,
     with_weapon_combat_bases, with_weapon_combat_bases_from,
+};
+
+pub use crate::catalog_v3::catalog_weapon_actions::WeaponActionRecoil;
+pub use weapon_recoil::{
+    WeaponActionRecoilDefinition, WeaponRecoilSnapshot, with_weapon_recoil_definitions,
+    with_weapon_recoil_definitions_from,
 };
 
 pub use crate::catalog_v3::authored_fields::authored_manufacturer::ManufacturerValue as ShipManufacturerValue;

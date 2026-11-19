@@ -14,7 +14,6 @@ use super::catalog_mission_board::{self, MissionBoard};
 use super::catalog_radar_options::RadarOptionsConfiguration;
 use super::catalog_resource_network_configuration::ResourceNetworkConfiguration;
 use super::catalog_resource_network_read::{self, GameModeRead};
-use super::catalog_weapon_actions::RECOIL_DEFINITION;
 use super::jump_drive_definitions::{self, JumpDriveDefinitions};
 use super::referenced_definition_read::Definitions;
 use super::weapon_action_recoil_definitions::{self, WeaponActionRecoilDefinition};
@@ -328,9 +327,8 @@ impl<'source> PhysicalComponents<'_, '_, 'source> {
         self.numbers.extend(recoil.numbers);
         self.collected.ledger.merge(recoil.ledger);
         self.collected.add_failures(recoil.failures);
-        Ok(CatalogTable::new(
+        Ok(weapon_action_recoil_definitions::table(
             self.forge,
-            &[RECOIL_DEFINITION],
             recoil.rows.into_iter().map(|(_, row)| row).collect(),
         ))
     }

@@ -2,7 +2,9 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_export::StarmapTraversalBudget;
-use p4kx_export::catalog_queries::equipment::with_ammo_definitions;
+use p4kx_export::catalog_queries::equipment::{
+    with_ammo_definitions, with_weapon_recoil_definitions,
+};
 use p4kx_export::catalog_queries::starmap::{
     ContainerPlacementSelection, read_container_placements,
 };
@@ -12,7 +14,7 @@ use p4kx_testkit::{
     ArchiveBuilder, DataForgeBuilder, TestContainer, TestEntry, TestRecord, TestStruct,
 };
 
-use super::{AMMUNITION, CONTAINERS, Route, TestResult, UNRESOLVED};
+use super::{AMMUNITION, CONTAINERS, Route, TestResult, UNRESOLVED, WEAPON_RECOIL};
 
 #[path = "sdk_projectile_ammo_route.rs"]
 mod projectile_ammo;
@@ -46,6 +48,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
         reached_ammo,
         projectile,
         combat,
+        read_weapon_recoil(&archive)?,
         Route::queried_rows(
             CONTAINERS,
             &starmap.container_instances,
@@ -80,6 +83,16 @@ fn read_ammunition(archive: &Archive) -> TestResult<Route> {
     )?
 }
 
+fn read_weapon_recoil(archive: &Archive) -> TestResult<Route> {
+    with_weapon_recoil_definitions(archive, CatalogRecordSelection::All, None, |snapshot| {
+        Route::queried_rows(
+            WEAPON_RECOIL,
+            snapshot.rows(),
+            "physical definition selection available; installed and complete producer parity open",
+        )
+    })?
+}
+
 fn fixture() -> TestResult<(tempfile::TempDir, Archive)> {
     let database = DataForgeBuilder::new()
         .version(8)
@@ -89,6 +102,13 @@ fn fixture() -> TestResult<(tempfile::TempDir, Archive)> {
             "AmmoParams",
             "AmmoParams.FixtureBallistic",
             "libs/foundry/records/ammoparams/fixture_ballistic.xml",
+        ))
+        .structure(TestStruct::new("WeaponProceduralRecoilConfigDef"))
+        .record(TestRecord::new(
+            2,
+            "WeaponProceduralRecoilConfigDef",
+            "WeaponProceduralRecoilConfigDef.Fixture",
+            "libs/foundry/records/fixture/recoil.xml",
         ));
     let folder = tempfile::tempdir()?;
     let path = folder.path().join("sdk_routes.p4k");

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{CancelToken, DataForge, Filter, SourcedValue};
+use p4kx_extraction::{CancelToken, DataForge, Filter, RecordTree, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -13,7 +13,10 @@ use super::referenced_definition_read::{self, Definitions, Selection};
 use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::canonical_record_header::CanonicalRecordHeader;
+use crate::catalog_read::scoped_source_read::ScopedSourceRead;
+use crate::catalog_table::CatalogTable;
 use crate::export_field_inspection::ConfigurationInspection;
+use crate::record_observation::RecordObservation;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 use crate::source_value_catalog::SourceArenaOutput;
@@ -22,7 +25,7 @@ use crate::source_value_catalog::SourceArenaOutput;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct WeaponActionRecoilDefinition<'source> {
+pub struct WeaponActionRecoilDefinition<'source> {
     source: CanonicalRecordHeader<'source>,
     hands: SourcedValue<UnitSource<'source>>,
     aim: SourcedValue<UnitSource<'source>>,
@@ -32,6 +35,42 @@ pub(crate) struct WeaponActionRecoilDefinition<'source> {
 }
 
 impl<'source> WeaponActionRecoilDefinition<'source> {
+    /// Borrows the original physical Record header.
+    #[must_use]
+    pub const fn source(&self) -> &CanonicalRecordHeader<'source> {
+        &self.source
+    }
+
+    /// Borrows the original hands recoil declaration.
+    #[must_use]
+    pub const fn hands(&self) -> &SourcedValue<UnitSource<'source>> {
+        &self.hands
+    }
+
+    /// Borrows the original aim recoil declaration.
+    #[must_use]
+    pub const fn aim(&self) -> &SourcedValue<UnitSource<'source>> {
+        &self.aim
+    }
+
+    /// Borrows the original body recoil declaration.
+    #[must_use]
+    pub const fn body(&self) -> &SourcedValue<UnitSource<'source>> {
+        &self.body
+    }
+
+    /// Borrows the original head recoil declaration.
+    #[must_use]
+    pub const fn head(&self) -> &SourcedValue<UnitSource<'source>> {
+        &self.head
+    }
+
+    /// Borrows the remaining original fields and their source evidence.
+    #[must_use]
+    pub const fn additional_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.additional_fields
+    }
+
     fn read(
         _source_type: &'source str,
         source: CanonicalRecordHeader<'source>,
@@ -77,6 +116,29 @@ impl<'source> WeaponActionRecoilDefinition<'source> {
             additional_fields,
         })
     }
+}
+
+pub(crate) fn read_selected<'source>(
+    tree: &RecordTree<'source>,
+    input: &OriginalCatalogInput<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    cancel: Option<&CancelToken>,
+) -> Result<ScopedSourceRead<WeaponActionRecoilDefinition<'source>>, CatalogError> {
+    referenced_definition_read::read_selected(
+        tree,
+        input,
+        admission,
+        ConfigurationInspection::WeaponActionRecoilDefinition,
+        cancel,
+        WeaponActionRecoilDefinition::read,
+    )
+}
+
+pub(crate) fn table<'source>(
+    forge: &DataForge<'_>,
+    rows: Vec<WeaponActionRecoilDefinition<'source>>,
+) -> CatalogTable<WeaponActionRecoilDefinition<'source>> {
+    CatalogTable::new(forge, &[RECOIL_DEFINITION], rows)
 }
 
 pub(super) fn read<'source>(

@@ -17,3 +17,7 @@ mod catalog_quantum_interdiction;
 mod catalog_scan_signature;
 #[path = "catalog_weapon_operating.rs"]
 mod catalog_weapon_operating;
+#[path = "catalog_weapon_operating_fixture.rs"]
+mod catalog_weapon_operating_fixture;
+#[path = "catalog_weapon_recoil_sdk.rs"]
+mod catalog_weapon_recoil_sdk;

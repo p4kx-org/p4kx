@@ -13,7 +13,8 @@ use crate::build::original_input::OriginalCatalogInput;
 use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_number_capture::CapturedNumber;
 use crate::catalog_read::original::OriginalFlowFields;
-use crate::export_diagnostic::ExportSourceRole;
+use crate::catalog_read::scoped_source_read::ScopedSourceRead;
+use crate::export_diagnostic::{ExportDiagnosticSeverity, ExportSourceRole};
 use crate::export_field_inspection::ConfigurationInspection;
 use crate::export_field_walk;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
@@ -147,6 +148,24 @@ struct RowRead<Row> {
     row: Row,
     numbers: Vec<CapturedNumber>,
     ledger: ExportLedger,
+}
+
+pub(super) fn read_selected<'source, Row>(
+    tree: &RecordTree<'source>,
+    input: &OriginalCatalogInput<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    inspection: ConfigurationInspection,
+    cancel: Option<&CancelToken>,
+    project: Projection<'source, Row>,
+) -> Result<ScopedSourceRead<Row>, CatalogError> {
+    let read = read_row(tree, input, admission, inspection, cancel, project)?;
+    let complete = read.ledger.field_inspections.iter().all(|row| row.complete)
+        && read
+            .ledger
+            .field_diagnostics
+            .iter()
+            .all(|diagnostic| diagnostic.severity == ExportDiagnosticSeverity::Information);
+    Ok(ScopedSourceRead::new(read.row, Vec::new(), complete))
 }
 
 fn read_row<'source, Row>(

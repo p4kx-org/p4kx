@@ -7,8 +7,7 @@ use serde_json::{Value, json};
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
 use crate::health_origin_assertions as proof;
 
-#[path = "catalog_weapon_operating_fixture.rs"]
-mod fixture;
+use super::catalog_weapon_operating_fixture as fixture;
 
 #[test]
 fn weapon_operating_configuration_keeps_authored_states_and_provenance() -> TestResult {

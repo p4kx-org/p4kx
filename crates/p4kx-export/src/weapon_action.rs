@@ -147,6 +147,12 @@ impl<'source> WeaponAction<'source> {
         &self.source_type
     }
 
+    /// Borrows the original recoil links and interval.
+    #[must_use]
+    pub const fn recoil(&self) -> &WeaponActionRecoil<'source> {
+        &self.recoil
+    }
+
     /// Returns the action family used to select combat derivations.
     #[must_use]
     pub const fn mode_kind(&self) -> WeaponModeKind {

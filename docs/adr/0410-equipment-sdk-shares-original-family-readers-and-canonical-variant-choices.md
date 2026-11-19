@@ -211,3 +211,15 @@ addressed by the sequence of zero-based child positions under that root. This fo
 ordered resolver tree, including repeated names, repeated attached Records and nested empty
 ports. Query results expose independent owner and dependency coverage before callers publish
 their owned cache updates.
+
+## Linked weapon recoil definitions
+
+Each weapon action exposes its authored regular and grappling recoil references and interval.
+A resolved reference identifies the physical target Record in the same Build. A GUID can refer
+to multiple physical definitions, so a GUID query returns each matching occurrence in Record order.
+
+The Catalog and SDK use the same definition projector for the original header, hands, aim, body,
+head and additional fields. A physical query opens the requested definition and preserves each
+field's origin. It reports an unreadable selected Record or incomplete field inspection in its
+owner coverage. The caller reads the linked definition explicitly, so reading a weapon action keeps
+its own dependency scope. A definition query needs neither the weapon Record nor localization.

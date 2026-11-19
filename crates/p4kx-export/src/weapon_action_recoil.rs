@@ -12,6 +12,7 @@ use crate::catalog_v3::interaction_source::RecordLink;
 use crate::resource_float::ResourceFloat32;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
+use crate::source_value_catalog::SourceRecordReference;
 
 pub(super) const CONFIG_TYPE: &str = "WeaponProceduralRecoilConfigDef";
 
@@ -19,7 +20,7 @@ pub(super) const CONFIG_TYPE: &str = "WeaponProceduralRecoilConfigDef";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct WeaponActionRecoil<'source> {
+pub struct WeaponActionRecoil<'source> {
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
     recoil: RecordLink<'source>,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
@@ -28,6 +29,24 @@ pub(super) struct WeaponActionRecoil<'source> {
 }
 
 impl<'source> WeaponActionRecoil<'source> {
+    /// Borrows the original recoil definition link, including its target state.
+    #[must_use]
+    pub const fn target(&self) -> &SourcedValue<Box<SourceRecordReference<'source>>> {
+        &self.recoil
+    }
+
+    /// Borrows the original grappling recoil definition link.
+    #[must_use]
+    pub const fn grappling_target(&self) -> &SourcedValue<Box<SourceRecordReference<'source>>> {
+        &self.recoil_grappling
+    }
+
+    /// Borrows the original recoil interval.
+    #[must_use]
+    pub const fn interval(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.recoil_interval
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

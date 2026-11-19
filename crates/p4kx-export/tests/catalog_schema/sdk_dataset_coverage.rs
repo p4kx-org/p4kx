@@ -18,6 +18,7 @@ mod row_schema;
 const AMMUNITION: &str = "/definitions/ammoDefinitions";
 const PROJECTILE_AMMUNITION: &str = "/projections/weaponProjectileAmmoSelections";
 const WEAPON_COMBAT: &str = "/projections/weaponCombatBases";
+const WEAPON_RECOIL: &str = "/definitions/weaponActionRecoilDefinitions";
 const CONTAINERS: &str = "/placements/containerInstances";
 const UNRESOLVED: &str = "/placements/unresolvedContainerLinks";
 const NO_WITNESS: &str = "no query witness recorded by the audit";
@@ -60,6 +61,7 @@ fn sdk_query_witnesses_keep_their_canonical_dataset_contract() -> TestResult {
         AMMUNITION,
         PROJECTILE_AMMUNITION,
         WEAPON_COMBAT,
+        WEAPON_RECOIL,
         CONTAINERS,
         UNRESOLVED,
     ] {

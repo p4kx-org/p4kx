@@ -24,6 +24,7 @@ mod recoil;
 pub(super) use action::{ProjectileAction, ProjectileSelector};
 pub use action::{ProjectileCombatInputs, WeaponAction, WeaponModeKind};
 use operating::WeaponOperatingConfiguration;
+pub use recoil::WeaponActionRecoil;
 
 const ACTION_BASE: &str = "SWeaponActionParams";
 
@@ -127,7 +128,7 @@ fn read_children<'reader, 'scope, 'read, 'source>(
     source.strong_pointer_family_array_to(name, ACTION_BASE, notes, |child, _| pending.push(child))
 }
 
-pub(super) const RECOIL_DEFINITION: &str = recoil::CONFIG_TYPE;
+pub(crate) const RECOIL_DEFINITION: &str = recoil::CONFIG_TYPE;
 
 pub(super) fn table<'source>(
     forge: &DataForge<'_>,

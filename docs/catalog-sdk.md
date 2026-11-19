@@ -724,6 +724,20 @@ check a second Archive in the same run. Each check reads DataForge once and crea
 cargo test --locked -p p4kx-export --test real_archive real_archive_weapon_combat::projectile::projectile_ammunition_sdk_matches_original_sources -- --ignored --exact --nocapture --test-threads=1
 ```
 
+## Weapon recoil definitions
+
+Read the sourced recoil links and interval from `WeaponAction::recoil()` on a
+canonical weapon action. For a resolved regular or grappling link, pass its
+physical target Record index to `equipment::with_weapon_recoil_definitions`, the
+decoded-Entry form, or the same query on an existing session or parsed view.
+
+The snapshot holds the canonical `definitions.weaponActionRecoilDefinitions`
+rows with exact authored hands, aim, body and head values, remaining original
+fields and the source inventory. `CatalogRecordSelection::Guid` retains all
+matching physical Records, and `All` selects the definition family in original
+Record order. Inspect scope coverage before treating a missing row as absent.
+The query reads no unrelated Record bodies or localization payloads.
+
 ## Weapon combat bases
 
 Use `equipment::with_weapon_combat_bases`, its decoded-Entry form or the corresponding
