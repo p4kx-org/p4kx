@@ -169,7 +169,7 @@ impl<'capture, 'view, 'source> SearchView<'capture, 'view, 'source> {
             "entityDeclaration",
             DataType::Reference,
             false,
-            Some("LocationEntityDeclaration"),
+            Some(crate::catalog_v3::location_entity_declaration::SOURCE_TYPE),
         )?;
         Ok(target)
     }

@@ -215,6 +215,8 @@ pub enum Kind {
     LocationSizes,
     /// Physical location resource slot definitions.
     LocationResourceSlots,
+    /// Physical declarations of entities used by mission locations and delivery targets.
+    LocationEntityDeclarations,
     /// Physical mission location class registries.
     LocationClassRegistries,
     /// Physical mission location function registries.
@@ -263,7 +265,7 @@ pub enum Kind {
 
 impl Kind {
     /// Every kind, in the order of the catalog.
-    pub const ALL: [Self; 106] = [
+    pub const ALL: [Self; 107] = [
         Self::Manufacturers,
         Self::Items,
         Self::Ships,
@@ -348,6 +350,7 @@ impl Kind {
         Self::LocationFunctions,
         Self::LocationSizes,
         Self::LocationResourceSlots,
+        Self::LocationEntityDeclarations,
         Self::LocationClassRegistries,
         Self::LocationFunctionRegistries,
         Self::LocationSizeRegistries,

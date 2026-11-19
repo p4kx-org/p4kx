@@ -81,6 +81,8 @@ pub(crate) mod law_kinds;
 mod loadout_position;
 #[path = "location_classification.rs"]
 pub(crate) mod location_classification;
+#[path = "location_entity_declaration.rs"]
+pub(crate) mod location_entity_declaration;
 #[path = "location_vocabulary.rs"]
 pub(crate) mod location_vocabulary;
 #[path = "location_vocabulary_definition.rs"]
@@ -92,7 +94,7 @@ mod npc_spawn_definition;
 #[path = "npc_spawn_definitions.rs"]
 pub(crate) mod npc_spawn_definitions;
 #[path = "prepared_definition.rs"]
-mod prepared_definition;
+pub(crate) mod prepared_definition;
 #[path = "reputation_blackboard.rs"]
 pub(crate) mod reputation_blackboard;
 #[path = "reputation_context_definition.rs"]

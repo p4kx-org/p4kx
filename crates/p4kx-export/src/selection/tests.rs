@@ -82,6 +82,7 @@ fn record_types_disambiguate_kinds_that_share_a_path() {
                 | Kind::LocationFunctions
                 | Kind::LocationSizes
                 | Kind::LocationResourceSlots
+                | Kind::LocationEntityDeclarations
                 | Kind::LocationClassRegistries
                 | Kind::LocationFunctionRegistries
                 | Kind::LocationSizeRegistries

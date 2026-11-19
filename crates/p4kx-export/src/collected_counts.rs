@@ -38,6 +38,7 @@ impl Collected<'_> {
             | Kind::LocationFunctions
             | Kind::LocationSizes
             | Kind::LocationResourceSlots
+            | Kind::LocationEntityDeclarations
             | Kind::LocationClassRegistries
             | Kind::LocationFunctionRegistries
             | Kind::LocationSizeRegistries

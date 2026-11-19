@@ -101,6 +101,7 @@ impl Kind {
             Self::LocationFunctions => "locationFunctions",
             Self::LocationSizes => "locationSizes",
             Self::LocationResourceSlots => "locationResourceSlots",
+            Self::LocationEntityDeclarations => "locationEntityDeclarations",
             Self::LocationClassRegistries => "locationClassRegistries",
             Self::LocationFunctionRegistries => "locationFunctionRegistries",
             Self::LocationSizeRegistries => "locationSizeRegistries",

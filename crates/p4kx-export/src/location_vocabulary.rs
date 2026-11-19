@@ -12,6 +12,7 @@ mod location_resource_slot;
 use contract_scope_global_params::{ContractScopeGlobalParams, SOURCE_TYPE as SCOPE_SOURCE_TYPE};
 use location_resource_slot::LocationResourceSlot;
 
+use super::location_entity_declaration::{self, LocationEntityDeclaration};
 use super::location_vocabulary_definition::{
     LocationClassDefinition, LocationDictionaryEntry, LocationRegistry,
 };
@@ -39,6 +40,7 @@ pub(crate) fn kind_for_type(source_type: &str) -> Option<Kind> {
         FUNCTION => Kind::LocationFunctions,
         SIZE => Kind::LocationSizes,
         RESOURCE_SLOT => Kind::LocationResourceSlots,
+        location_entity_declaration::SOURCE_TYPE => Kind::LocationEntityDeclarations,
         CLASS_REGISTRY => Kind::LocationClassRegistries,
         FUNCTION_REGISTRY => Kind::LocationFunctionRegistries,
         SIZE_REGISTRY => Kind::LocationSizeRegistries,
@@ -53,6 +55,7 @@ pub(crate) const fn source_type(kind: Kind) -> Option<&'static str> {
         Kind::LocationFunctions => FUNCTION,
         Kind::LocationSizes => SIZE,
         Kind::LocationResourceSlots => RESOURCE_SLOT,
+        Kind::LocationEntityDeclarations => location_entity_declaration::SOURCE_TYPE,
         Kind::LocationClassRegistries => CLASS_REGISTRY,
         Kind::LocationFunctionRegistries => FUNCTION_REGISTRY,
         Kind::LocationSizeRegistries => SIZE_REGISTRY,
@@ -66,6 +69,7 @@ pub(crate) enum LocationVocabularyPick<'source> {
     Function(Box<PreparedDefinition<'source, LocationDictionaryEntry<'source>>>),
     Size(Box<PreparedDefinition<'source, LocationDictionaryEntry<'source>>>),
     ResourceSlot(Box<PreparedDefinition<'source, LocationResourceSlot<'source>>>),
+    EntityDeclaration(Box<PreparedDefinition<'source, LocationEntityDeclaration<'source>>>),
     ClassRegistry(Box<PreparedDefinition<'source, LocationRegistry<'source>>>),
     FunctionRegistry(Box<PreparedDefinition<'source, LocationRegistry<'source>>>),
     SizeRegistry(Box<PreparedDefinition<'source, LocationRegistry<'source>>>),
@@ -114,6 +118,10 @@ impl<'source> LocationVocabularyPick<'source> {
                 Self::registry(kind, tree, projection, admission, cancel)
             }
             Kind::ContractScopes => Self::contract_scope(tree, projection, admission, cancel),
+            Kind::LocationEntityDeclarations => {
+                location_entity_declaration::prepare(tree, projection, admission, cancel)
+                    .map(|(row, notes)| (Self::EntityDeclaration(Box::new(row)), notes))
+            }
             Kind::LocationResourceSlots => PreparedDefinition::read(
                 tree,
                 projection,
@@ -179,6 +187,7 @@ pub(crate) struct LocationVocabulary<'source> {
     functions: Vec<PreparedDefinition<'source, LocationDictionaryEntry<'source>>>,
     sizes: Vec<PreparedDefinition<'source, LocationDictionaryEntry<'source>>>,
     resource_slots: Vec<PreparedDefinition<'source, LocationResourceSlot<'source>>>,
+    entity_declarations: Vec<PreparedDefinition<'source, LocationEntityDeclaration<'source>>>,
     class_registries: Vec<PreparedDefinition<'source, LocationRegistry<'source>>>,
     function_registries: Vec<PreparedDefinition<'source, LocationRegistry<'source>>>,
     size_registries: Vec<PreparedDefinition<'source, LocationRegistry<'source>>>,
@@ -197,6 +206,8 @@ pub(crate) struct LocationVocabularyTables<'source> {
     sizes: CatalogTable<LocationDictionaryEntry<'source>>,
     #[serde(rename = "locationResourceSlots")]
     resource_slots: CatalogTable<LocationResourceSlot<'source>>,
+    #[serde(rename = "locationEntityDeclarations")]
+    entity_declarations: CatalogTable<LocationEntityDeclaration<'source>>,
     #[serde(rename = "locationRegistries")]
     registries: LocationRegistries<'source>,
     contract_scopes: CatalogTable<ContractScopeGlobalParams<'source>>,
@@ -218,6 +229,7 @@ impl<'source> LocationVocabulary<'source> {
             LocationVocabularyPick::Function(row) => self.functions.push(*row),
             LocationVocabularyPick::Size(row) => self.sizes.push(*row),
             LocationVocabularyPick::ResourceSlot(row) => self.resource_slots.push(*row),
+            LocationVocabularyPick::EntityDeclaration(row) => self.entity_declarations.push(*row),
             LocationVocabularyPick::ClassRegistry(row) => self.class_registries.push(*row),
             LocationVocabularyPick::FunctionRegistry(row) => self.function_registries.push(*row),
             LocationVocabularyPick::SizeRegistry(row) => self.size_registries.push(*row),
@@ -230,6 +242,7 @@ impl<'source> LocationVocabulary<'source> {
         PreparedDefinition::order(&mut self.functions);
         PreparedDefinition::order(&mut self.sizes);
         PreparedDefinition::order(&mut self.resource_slots);
+        PreparedDefinition::order(&mut self.entity_declarations);
         PreparedDefinition::order(&mut self.class_registries);
         PreparedDefinition::order(&mut self.function_registries);
         PreparedDefinition::order(&mut self.size_registries);
@@ -242,6 +255,7 @@ impl<'source> LocationVocabulary<'source> {
             Kind::LocationFunctions => self.functions.len(),
             Kind::LocationSizes => self.sizes.len(),
             Kind::LocationResourceSlots => self.resource_slots.len(),
+            Kind::LocationEntityDeclarations => self.entity_declarations.len(),
             Kind::LocationClassRegistries => self.class_registries.len(),
             Kind::LocationFunctionRegistries => self.function_registries.len(),
             Kind::LocationSizeRegistries => self.size_registries.len(),
@@ -265,6 +279,10 @@ impl<'source> LocationVocabulary<'source> {
             .chain(PreparedDefinition::sources(
                 Kind::LocationResourceSlots,
                 &self.resource_slots,
+            ))
+            .chain(PreparedDefinition::sources(
+                Kind::LocationEntityDeclarations,
+                &self.entity_declarations,
             ))
             .chain(PreparedDefinition::sources(
                 Kind::LocationClassRegistries,
@@ -294,6 +312,11 @@ impl<'source> LocationVocabulary<'source> {
             functions: PreparedDefinition::table(forge, FUNCTION, self.functions),
             sizes: PreparedDefinition::table(forge, SIZE, self.sizes),
             resource_slots: PreparedDefinition::table(forge, RESOURCE_SLOT, self.resource_slots),
+            entity_declarations: PreparedDefinition::table(
+                forge,
+                location_entity_declaration::SOURCE_TYPE,
+                self.entity_declarations,
+            ),
             contract_scopes: PreparedDefinition::table(forge, CONTRACT_SCOPE, self.contract_scopes),
             registries: LocationRegistries {
                 classes: PreparedDefinition::table(forge, CLASS_REGISTRY, self.class_registries),

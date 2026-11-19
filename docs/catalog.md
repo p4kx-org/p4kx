@@ -254,6 +254,7 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `definitions.contractScopes` | Physical `ContractScopeGlobalParams` Records with seven individually sourced labels and icons. [Contract scope vocabulary](catalog-location-vocabulary.md#global-contract-scopes) |
 | `definitions.missionModuleDeclarations` | Physical `ModuleDeclaration` Records and authored location acquisition, spawned entities and variable bindings. [Mission module declarations](catalog-location-configuration.md#physical-module-declarations) |
 | `definitions.locationResourceSlots` | Physical `LocationResourceSlot` Records with independently sourced counts and Tag links. [Resource slot definitions](catalog-location-configuration.md#resource-slot-definitions) |
+| `definitions.locationEntityDeclarations` | Physical `LocationEntityDeclaration` Records with ordered entity tags, resource-slot links and delivery types. [Location entity declarations](catalog-location-configuration.md#location-entity-declarations) |
 | `definitions.missionScenarios` | Physical `MissionScenario` Records with authored variables, cycles, schedule and flags. [Mission scenario definitions](catalog-contract-generators.md#physical-mission-scenario-definitions) |
 | `configurations.missionBoards` | Authored mission-board components with physical Entity and component identity, declared board type, and ordered faction reputation links. [Mission location vocabulary](catalog-location-vocabulary.md) |
 | `configurations.localContractGenerators` | Ordered authored Handler scope and mission-board availability. [Contract generator sources](catalog-contract-generators.md#local-generator-configuration) |
@@ -2971,6 +2972,7 @@ root-array paths. They emit `definitions.refiningProcesses.rows` and
 | `missionTypes` | `libs/foundry/records/missiontype/` | `MissionType` |
 | `missionLocalities` | `libs/foundry/records/missiondata/pu_missionlocality/` | `MissionLocality` |
 | `contractScopes` | Any Record path | `ContractScopeGlobalParams` |
+| `locationEntityDeclarations` | Any Record path | `LocationEntityDeclaration` |
 | `missionModuleDeclarations` | Any Record path | `ModuleDeclaration` |
 | `locationResourceSlots` | Any Record path | `LocationResourceSlot` |
 | `missionScenarios` | `libs/foundry/records/` | `MissionScenario` |

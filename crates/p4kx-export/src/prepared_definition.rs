@@ -91,7 +91,7 @@ impl<'source, T> PreparedDefinition<'source, T> {
         self.definition
     }
 
-    pub(super) fn order(rows: &mut [Self]) {
+    pub(crate) fn order(rows: &mut [Self]) {
         rows.sort_by_cached_key(|row| (CatalogGuid(row.guid).text(), row.index));
     }
 

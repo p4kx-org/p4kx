@@ -12,6 +12,7 @@ use crate::catalog_read::original::{
     OriginalFlowFields, OriginalValueEdge, OriginalValueFact, OriginalValuePart,
 };
 use crate::guid_text::CatalogGuid;
+use crate::location_hauling_targets::HaulingTargetBinding;
 use crate::schema_fields::every_field_required;
 use crate::source_value_catalog::{SourceArenaOutput, SourceValueRef};
 use crate::{CatalogError, ExportAccountingError};
@@ -40,6 +41,7 @@ pub struct GeneratorDefinition<'source> {
     pub(crate) completion_tag_results: Vec<completion_tag_results::ContractCompletionTagResult>,
     pub(crate) item_reward_results: Vec<item_reward_results::ContractItemRewardResult<'source>>,
     pub(crate) mission_item_properties: Vec<item_properties::GeneratorMissionItemProperty>,
+    pub(crate) hauling_target_bindings: Vec<HaulingTargetBinding>,
 }
 
 impl<'source> GeneratorDefinition<'source> {
@@ -77,6 +79,12 @@ impl<'source> GeneratorDefinition<'source> {
     #[must_use]
     pub fn mission_item_properties(&self) -> &[item_properties::GeneratorMissionItemProperty] {
         &self.mission_item_properties
+    }
+
+    /// The ordered pickup and drop-off bindings of physical hauling declarations.
+    #[must_use]
+    pub fn hauling_target_bindings(&self) -> &[HaulingTargetBinding] {
+        &self.hauling_target_bindings
     }
 }
 
@@ -240,7 +248,7 @@ fn identity<'scope, 'read, 'source>(
         .into_cell(fields.sources()))
 }
 
-const fn value_ref(fact: &OriginalValueFact<'_, '_, '_>) -> SourceValueRef {
+pub(crate) const fn value_ref(fact: &OriginalValueFact<'_, '_, '_>) -> SourceValueRef {
     SourceValueRef {
         value_index: DecimalU64::new(fact.ordinal()),
     }

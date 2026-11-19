@@ -180,6 +180,7 @@ pub(crate) fn emit<'fields, 'scope, 'read, 'source>(
         modifiers,
         owner,
         hauling_orders: crate::template_hauling_read::read(members, kind)?,
+        hauling_target_bindings: crate::location_hauling_targets::read_template(members)?,
         spawn_pools: projections,
         pool_bindings: bindings,
     };

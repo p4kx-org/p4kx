@@ -61,7 +61,7 @@ impl<'source> ModuleLocationEntities<'source> {
         let (data, projected) = if fields.source_type()? == "ModuleLocationEntities_Static" {
             let links = fields.record_link_array_to(
                 "entityDeclarations",
-                "LocationEntityDeclaration",
+                crate::catalog_v3::location_entity_declaration::SOURCE_TYPE,
                 notes,
             )?;
             let projected = Some(("entityDeclarations", links.state()));

@@ -18,6 +18,7 @@ mod row_schema;
 const LANGUAGE_SOURCES: &str = "/texts/languageSources";
 const SHOP_INVENTORIES: &str = "/definitions/shopInventories";
 const AMMUNITION: &str = "/definitions/ammoDefinitions";
+const LOCATION_ENTITIES: &str = "/definitions/locationEntityDeclarations";
 const PROJECTILE_AMMUNITION: &str = "/projections/weaponProjectileAmmoSelections";
 const MAGAZINE_RESOLUTION: &str = "/projections/weaponMagazineResolutions";
 const WEAPON_COMBAT: &str = "/projections/weaponCombatBases";
@@ -46,7 +47,7 @@ impl Route {
     fn queried_rows<Row: JsonSchema + serde::Serialize>(
         dataset: &'static str,
         rows: &[Row],
-        remaining: &'static str,
+        remaining: impl Into<Option<&'static str>>,
     ) -> TestResult<Self> {
         if rows.is_empty() {
             return Err(format!("SDK witness returned no row for {dataset}").into());
@@ -58,7 +59,7 @@ impl Route {
                 .into_generator()
                 .into_root_schema_for::<Vec<Row>>()
                 .to_value(),
-            remaining: Some(remaining),
+            remaining: remaining.into(),
         })
     }
 }
@@ -71,6 +72,7 @@ fn sdk_query_witnesses_keep_their_canonical_dataset_contract() -> TestResult {
     let gaps = audit(&schema, &registered, &witnesses)?;
     for path in [
         LANGUAGE_SOURCES,
+        LOCATION_ENTITIES,
         SHOP_INVENTORIES,
         AMMUNITION,
         PROJECTILE_AMMUNITION,

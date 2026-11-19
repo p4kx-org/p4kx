@@ -20,6 +20,8 @@ mod local_generators;
 
 #[path = "catalog_location_configuration.rs"]
 mod location_configuration;
+#[path = "catalog_location_entities.rs"]
+mod location_entities;
 #[path = "catalog_location_resource_slots.rs"]
 mod location_resource_slots;
 #[path = "catalog_location_vocabulary.rs"]

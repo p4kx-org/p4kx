@@ -4206,6 +4206,12 @@
           },
           "type": "array"
         },
+        "haulingTargetBindings": {
+          "items": {
+            "$ref": "#/$defs/HaulingTargetBinding"
+          },
+          "type": "array"
+        },
         "linkedOutputs": {
           "items": {
             "$ref": "#/$defs/TemplateOutputBinding"
@@ -4314,6 +4320,7 @@
       "required": [
         "broker",
         "haulingOrders",
+        "haulingTargetBindings",
         "linkedOutputs",
         "localizations",
         "modifiers",
@@ -5636,6 +5643,9 @@
         "locationClasses": {
           "$ref": "#/$defs/CatalogTableOfLocationClassDefinition"
         },
+        "locationEntityDeclarations": {
+          "$ref": "#/$defs/CatalogTableOfLocationEntityDeclaration"
+        },
         "locationFunctions": {
           "$ref": "#/$defs/CatalogTableOfLocationDictionaryEntry"
         },
@@ -5822,6 +5832,7 @@
         "items",
         "jurisdictions",
         "locationClasses",
+        "locationEntityDeclarations",
         "locationFunctions",
         "locationRegistries",
         "locationResourceSlots",
@@ -7663,6 +7674,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/LocationDictionaryEntry"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfLocationEntityDeclaration": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/LocationEntityDeclaration"
           },
           "type": "array"
         }
@@ -10814,6 +10844,9 @@
         "locationClasses": {
           "$ref": "#/$defs/KindCompleteness"
         },
+        "locationEntityDeclarations": {
+          "$ref": "#/$defs/KindCompleteness"
+        },
         "locationFunctionRegistries": {
           "$ref": "#/$defs/KindCompleteness"
         },
@@ -11094,6 +11127,7 @@
         "loadouts",
         "locationClassRegistries",
         "locationClasses",
+        "locationEntityDeclarations",
         "locationFunctionRegistries",
         "locationFunctions",
         "locationResourceSlots",
@@ -18583,6 +18617,12 @@
         "guid": {
           "$ref": "#/$defs/SourcedValueOfGuid"
         },
+        "haulingTargetBindings": {
+          "items": {
+            "$ref": "#/$defs/HaulingTargetBinding"
+          },
+          "type": "array"
+        },
         "inputRef": {
           "$ref": "#/$defs/PhysicalSourceRef"
         },
@@ -18622,6 +18662,7 @@
         "completionTagResults",
         "fileName",
         "guid",
+        "haulingTargetBindings",
         "inputRef",
         "itemRewardResults",
         "metadataTag",
@@ -20584,6 +20625,40 @@
           "value": "brokerObjective"
         }
       ]
+    },
+    "HaulingTargetBinding": {
+      "description": "The authored pickup and drop-off fields of one physical hauling order.",
+      "properties": {
+        "dropOffTargetTypes": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceValueRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "order": {
+          "$ref": "#/$defs/SourceValueRef"
+        },
+        "pickUpTargetTypes": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceValueRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "dropOffTargetTypes",
+        "order",
+        "pickUpTargetTypes"
+      ],
+      "type": "object"
     },
     "HcdAttribute": {
       "properties": {
@@ -26026,6 +26101,10 @@
           "value": "locationResourceSlots"
         },
         {
+          "description": "Physical declarations of entities used by mission locations and delivery targets.",
+          "value": "locationEntityDeclarations"
+        },
+        {
           "description": "Physical mission location class registries.",
           "value": "locationClassRegistries"
         },
@@ -27602,6 +27681,146 @@
         "recordIndex",
         "recordName",
         "recordPath",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "LocationEntityDeclaration": {
+      "description": "A physical location entity declaration with its authored tags and delivery type.",
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "className": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "entityTags": {
+          "$ref": "#/$defs/SourcedValueOfLocationEntityTags"
+        },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "resourceSlot": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "type": {
+          "$ref": "#/$defs/SourcedValueOfLocationEntityType"
+        }
+      },
+      "required": [
+        "authoredFields",
+        "className",
+        "entityTags",
+        "fileName",
+        "guid",
+        "metadataTag",
+        "recordIndex",
+        "recordName",
+        "recordPath",
+        "resourceSlot",
+        "sourceType",
+        "type"
+      ],
+      "type": "object"
+    },
+    "LocationEntityTags": {
+      "description": "The original entity tag block and its ordered Reference slots.",
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "tags": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+        }
+      },
+      "required": [
+        "authoredFields",
+        "tags"
+      ],
+      "type": "object"
+    },
+    "LocationEntityType": {
+      "description": "The original location entity type and its kind-specific fields.",
+      "oneOf": [
+        {
+          "description": "The original static-entity declaration.",
+          "properties": {
+            "kind": {
+              "const": "staticEntity",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "The original delivery objective settings.",
+          "properties": {
+            "deliveryObjectiveType": {
+              "$ref": "#/$defs/SourcedValueOfstring",
+              "description": "The option named by the original `DeliveryObjectiveType` field."
+            },
+            "kind": {
+              "const": "deliveryTarget",
+              "type": "string"
+            },
+            "targetDescription": {
+              "$ref": "#/$defs/SourcedValueOfGameTextRef",
+              "description": "The original player-facing description.",
+              "x-gameText": true
+            }
+          },
+          "required": [
+            "kind",
+            "deliveryObjectiveType",
+            "targetDescription"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Another concrete source type whose fields remain in the original arena.",
+          "properties": {
+            "kind": {
+              "const": "original",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        }
+      ],
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
         "sourceType"
       ],
       "type": "object"
@@ -96491,6 +96710,266 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfLocationEntityTags": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/LocationEntityTags"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfLocationEntityType": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/LocationEntityType"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfLocationMissionLimit": {
       "allOf": [
         {
@@ -133449,6 +133928,12 @@
           },
           "type": "array"
         },
+        "haulingTargetBindings": {
+          "items": {
+            "$ref": "#/$defs/HaulingTargetBinding"
+          },
+          "type": "array"
+        },
         "inputs": {
           "$ref": "#/$defs/TemplateInputs"
         },
@@ -133550,6 +134035,7 @@
       },
       "required": [
         "haulingOrders",
+        "haulingTargetBindings",
         "inputs",
         "linkedOutputs",
         "localizations",

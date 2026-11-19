@@ -10,15 +10,17 @@ use p4kx_export::catalog_queries::shops::{ShopInventorySelection, read_shop_inve
 use p4kx_export::catalog_queries::starmap::{
     ContainerPlacementSelection, read_container_placements,
 };
-use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogRecordSelection};
+use p4kx_export::catalog_queries::{
+    CatalogLanguageSelection, CatalogRecordSelection, with_location_entity_declarations,
+};
 use p4kx_extraction::{Archive, Language};
 use p4kx_testkit::{
     ArchiveBuilder, DataForgeBuilder, TestContainer, TestEntry, TestRecord, TestStruct,
 };
 
 use super::{
-    AMMUNITION, CONTAINERS, LANGUAGE_SOURCES, Route, SHOP_INVENTORIES, TestResult, UNRESOLVED,
-    WEAPON_RECOIL,
+    AMMUNITION, CONTAINERS, LANGUAGE_SOURCES, LOCATION_ENTITIES, Route, SHOP_INVENTORIES,
+    TestResult, UNRESOLVED, WEAPON_RECOIL,
 };
 
 #[path = "sdk_projectile_ammo_route.rs"]
@@ -60,6 +62,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
         read_weapon_recoil(&archive)?,
         weapon_animation::read()?,
         read_language_sources(&archive)?,
+        read_location_entities(&archive)?,
         read_shop_inventory(&archive)?,
         Route::queried_rows(
             CONTAINERS,
@@ -92,6 +95,17 @@ fn read_ammunition(archive: &Archive) -> TestResult<Route> {
                 "independent Record selection available; complete dependency enumeration and installed parity open",
             )
         },
+    )?
+}
+
+fn read_location_entities(archive: &Archive) -> TestResult<Route> {
+    with_location_entity_declarations(
+        archive,
+        CatalogRecordSelection::All,
+        None,
+        CatalogLanguageSelection::Selected(&[]),
+        None,
+        |snapshot| Route::queried_rows(LOCATION_ENTITIES, &snapshot.rows, None),
     )?
 }
 
@@ -154,6 +168,13 @@ fn fixture() -> TestResult<(tempfile::TempDir, Archive)> {
             "WeaponProceduralRecoilConfigDef",
             "WeaponProceduralRecoilConfigDef.Fixture",
             "libs/foundry/records/fixture/recoil.xml",
+        ))
+        .structure(TestStruct::new("LocationEntityDeclaration"))
+        .record(TestRecord::new(
+            3,
+            "LocationEntityDeclaration",
+            "LocationEntityDeclaration.Fixture",
+            "libs/foundry/records/fixture/location_entity.xml",
         ));
     let folder = tempfile::tempdir()?;
     let path = folder.path().join("sdk_routes.p4k");

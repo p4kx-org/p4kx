@@ -78,6 +78,7 @@ mod real_archive_law_definitions;
 mod real_archive_leftovers;
 mod real_archive_loadouts;
 mod real_archive_location_configuration;
+mod real_archive_location_entities;
 mod real_archive_location_vocabulary;
 mod real_archive_loot;
 mod real_archive_loot_generation_components;

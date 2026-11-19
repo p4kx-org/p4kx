@@ -80,7 +80,36 @@ The `crewInheritsLocationFaction` Bool is owned by a `SpawnDescription_Ship`. It
 with that concrete ship payload in the module property's `authoredFields` arena. Property
 selectors, module names and weak pointer slots preserve the authored binding semantics.
 
-### Resource slot definitions
+### Location entity declarations
+
+`definitions.locationEntityDeclarations` publishes each selected physical
+`LocationEntityDeclaration` with the canonical Record header. The table reports whether the
+DataForge declares the source family independently of the filter. Duplicate GUIDs retain separate
+rows in physical Record order within each GUID.
+
+| Catalog field | Original source |
+| --- | --- |
+| `entityTags.value.tags` | Ordered `entityTags.tags` References, including repeats, empty arrays, null cells and unresolved GUIDs. |
+| `resourceSlot` | The authored `LocationResourceSlot` Reference with its compatible target header, if available. |
+| `type` | The sourced StrongPointer to the concrete location entity type. A `staticEntity` retains any additional authored fields. A `deliveryTarget` exposes the original `DeliveryObjectiveType` option and protected `targetDescription` GameTextRef. Another concrete type uses `original` and retains its authored members. |
+| `authoredFields` | Original members outside the typed fields. |
+
+Static mission-module entity declarations, AutoSpawns entity-declaration searches, Starmap amenity
+requirements and hauling targets use the same nominal Record type. Join a resolved link by GUID
+and original physical Record index within the same DataForge. A source reference can resolve to
+a Record whose row is outside the current Catalog or SDK selection. A retained link carries the caller
+and applicable target-header evidence. Target payload fields carry their own evidence on the
+definition row.
+
+A physical ContractGenerator definition and each Template or Broker context publish
+`haulingTargetBindings` for their authored hauling occurrences. Each binding points to the physical
+`order` and its independent `pickUpTargetTypes` and `dropOffTargetTypes` array cells through the
+owner-local value inventory. The two target arrays preserve stored direction, order, repeats, and
+missing and unreadable states. This links override occurrences and orders that only specify targets
+while retaining one canonical copy of the original array and its per-slot origins. Use each target
+Reference's physical header to join to the selected location declaration table.
+
+## Resource slot definitions
 
 `definitions.locationResourceSlots` contains selected physical `LocationResourceSlot` Records.
 Follow the sourced GUID and Record index of a mission module's `moduleType.value.requiredResourceSlot`

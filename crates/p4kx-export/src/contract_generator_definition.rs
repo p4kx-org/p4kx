@@ -44,6 +44,11 @@ pub(crate) fn read<'source>(
             completion_tag_results,
             item_reward_results: item_reward_results::read(fields)?,
             mission_item_properties,
+            hauling_target_bindings: crate::location_hauling_targets::read(
+                fields,
+                fields.facts().iter(),
+                |fact| Ok(crate::mission_generator::value_ref(fact)),
+            )?,
         },
         item_error,
         notes,

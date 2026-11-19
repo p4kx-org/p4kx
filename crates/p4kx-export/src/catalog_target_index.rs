@@ -200,6 +200,7 @@ const fn uses_physical_row_identity(kind: Kind) -> bool {
                 | Kind::LocationFunctions
                 | Kind::LocationSizes
                 | Kind::LocationResourceSlots
+                | Kind::LocationEntityDeclarations
                 | Kind::LocationClassRegistries
                 | Kind::LocationFunctionRegistries
                 | Kind::LocationSizeRegistries

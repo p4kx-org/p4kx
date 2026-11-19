@@ -80,6 +80,7 @@ const GROUPS: &[Group] = &[
             "items",
             "jurisdictions",
             "locationClasses",
+            "locationEntityDeclarations",
             "locationFunctions",
             "locationRegistries/classes",
             "locationRegistries/functions",

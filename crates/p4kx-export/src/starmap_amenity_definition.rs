@@ -43,8 +43,11 @@ impl<'source> StarmapAmenityDefinition<'source> {
         let name = fields.borrowed_string("name", notes)?;
         let display_name = fields.public_name("displayName", projection, notes)?;
         let icon = fields.borrowed_string("icon", notes)?;
-        let required_entity =
-            fields.record_link_to("requiredEntity", "LocationEntityDeclaration", notes)?;
+        let required_entity = fields.record_link_to(
+            "requiredEntity",
+            crate::catalog_v3::location_entity_declaration::SOURCE_TYPE,
+            notes,
+        )?;
         let authored_fields = fields.authored_members_except([
             ("name", name.state()),
             ("displayName", display_name.state()),

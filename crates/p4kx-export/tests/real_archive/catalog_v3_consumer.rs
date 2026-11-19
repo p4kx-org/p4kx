@@ -112,6 +112,7 @@ pub(crate) fn row_location(kind: Kind) -> Cow<'static, str> {
         Kind::LocationFunctions => "/definitions/locationFunctions",
         Kind::LocationSizes => "/definitions/locationSizes",
         Kind::LocationResourceSlots => "/definitions/locationResourceSlots",
+        Kind::LocationEntityDeclarations => "/definitions/locationEntityDeclarations",
         Kind::LocationClassRegistries => "/definitions/locationRegistries/classes",
         Kind::LocationFunctionRegistries => "/definitions/locationRegistries/functions",
         Kind::LocationSizeRegistries => "/definitions/locationRegistries/sizes",
@@ -249,6 +250,7 @@ const fn all_fields_sourced(kind: Kind) -> bool {
                 | Kind::LocationFunctions
                 | Kind::LocationSizes
                 | Kind::LocationResourceSlots
+                | Kind::LocationEntityDeclarations
                 | Kind::LocationClassRegistries
                 | Kind::LocationFunctionRegistries
                 | Kind::LocationSizeRegistries
@@ -354,6 +356,7 @@ const fn has_record_header(kind: Kind) -> bool {
                 | Kind::LocationFunctions
                 | Kind::LocationSizes
                 | Kind::LocationResourceSlots
+                | Kind::LocationEntityDeclarations
                 | Kind::LocationClassRegistries
                 | Kind::LocationFunctionRegistries
                 | Kind::LocationSizeRegistries

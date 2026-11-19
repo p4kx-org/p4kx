@@ -117,7 +117,7 @@ impl<'source> Plan<'source> {
         })
     }
 
-    fn read_with(
+    pub(in crate::build::catalog_queries) fn read_with(
         forge: &'source DataForge<'source>,
         selection: CatalogRecordSelection,
         cancel: Option<&CancelToken>,

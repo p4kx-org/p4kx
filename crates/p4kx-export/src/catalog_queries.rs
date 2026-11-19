@@ -61,6 +61,8 @@ mod resource_groups;
 
 /// Canonical mining globals and refining processes without world discovery.
 pub use mining_definitions::process_api as mining;
+#[path = "location_entity_query.rs"]
+mod location_entity_declarations;
 #[path = "mission_location_query.rs"]
 mod mission_location_templates;
 #[path = "reputation_query.rs"]
@@ -117,6 +119,9 @@ pub use crate::catalog_v3::location_classification::configuration::{
     MissionInputTags, MissionLocationConfiguration, MissionModuleInput, MissionModuleInputPayload,
     ModuleMissionProperty, ModuleMissionPropertyValue, SpawnInventory, SpawnLimits, SpawnTags,
 };
+pub use crate::catalog_v3::location_entity_declaration::{
+    LocationEntityDeclaration, LocationEntityKind, LocationEntityTags, LocationEntityType,
+};
 pub use crate::catalog_v3::reputation_blackboard::{
     BlackboardProperty, BlackboardPropertyBody, BlackboardValue,
 };
@@ -132,6 +137,7 @@ pub use crate::catalog_v3::reputation_standing_definition::{
 };
 pub use crate::catalog_v3::tag_catalog::OriginalTagPath;
 pub use crate::definition_reference::DefinitionStatus;
+pub use crate::location_hauling_targets::HaulingTargetBinding;
 pub use crate::location_template::{LocationName, MissionLocationTemplate};
 pub use crate::manufacturer::{
     ManufacturerAudioTrigger, ManufacturerDefinition, ManufacturerDisplayFeatures,
@@ -160,6 +166,10 @@ pub use harvest_provider_presets::{
 };
 
 pub use item_ports::{ItemPortSnapshot, with_item_ports, with_item_ports_from};
+pub use location_entity_declarations::{
+    LocationEntityDeclarationSnapshot, with_location_entity_declarations,
+    with_location_entity_declarations_from,
+};
 pub use manufacturers::{ManufacturerSnapshot, with_manufacturers, with_manufacturers_from};
 pub use mission_location_templates::{
     MissionLocationTemplateSnapshot, with_mission_location_templates,

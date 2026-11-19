@@ -67,6 +67,10 @@ impl Kind {
                 prefixes: &[""],
                 type_name: crate::catalog_v3::location_vocabulary::RESOURCE_SLOT,
             },
+            Self::LocationEntityDeclarations => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::location_entity_declaration::SOURCE_TYPE,
+            },
             Self::LocationClassRegistries => KindRule {
                 prefixes: &[""],
                 type_name: crate::catalog_v3::location_vocabulary::CLASS_REGISTRY,

@@ -59,6 +59,7 @@ pub fn is_kind_leftover(kind: Kind, record_path: &str, name: &str) -> bool {
         | Kind::LocationFunctions
         | Kind::LocationSizes
         | Kind::LocationResourceSlots
+        | Kind::LocationEntityDeclarations
         | Kind::LocationClassRegistries
         | Kind::LocationFunctionRegistries
         | Kind::LocationSizeRegistries

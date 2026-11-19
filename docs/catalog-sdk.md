@@ -32,6 +32,25 @@ with no admitted gameplay-property Record opens no localization payloads and ret
 available list. Compare physical Record indices only within the same DataForge input and resolve
 source uses through each result's own inventory.
 
+## Location entity declarations
+
+Use `with_location_entity_declarations` or `with_location_entity_declarations_from` for the
+canonical `definitions.locationEntityDeclarations` rows. This API supports All, GUID, and physical
+RecordIndex selection, with an optional ordinary Catalog path Filter. The same entry points are
+available on a query session or its parsed view. The query reads the selected physical definitions
+and requested localization payloads for delivery descriptions. An empty selection reads no locale.
+
+The snapshot retains duplicate physical owners, selection coverage, referenced protected texts and
+its own source inventory. `resolve` joins a compatible resolved Reference from the same DataForge
+to a returned physical definition. Consumers distinguish a dangling source Reference from a
+resolved target excluded by the active selection using the Reference's source status. A link does
+not cause the target's payload to be read automatically.
+
+The `hauling_target_bindings()` accessor on a ContractGenerator definition addresses the original
+pickup and drop-off arrays through the same definition's source arena. It is available in both the
+generator query and the logical contract query. Bindings point to individual owning orders at all
+authored levels, including contract and sub-contract overrides.
+
 ## Localization Entry metadata
 
 Use catalog_queries::localization::with_language_sources for the canonical

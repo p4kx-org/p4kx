@@ -13,6 +13,7 @@ fn add_empty_definitions(catalog: &mut Value) {
         "missionItems",
         "contractScopes",
         "locationResourceSlots",
+        "locationEntityDeclarations",
         "particleLibraries",
         "planetResources",
         "creatures",

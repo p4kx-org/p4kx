@@ -41,6 +41,7 @@ pub(super) const fn uses_owned_number(kind: Kind) -> bool {
                 | Kind::LocationFunctions
                 | Kind::LocationSizes
                 | Kind::LocationResourceSlots
+                | Kind::LocationEntityDeclarations
                 | Kind::LocationClassRegistries
                 | Kind::LocationFunctionRegistries
                 | Kind::LocationSizeRegistries
@@ -142,6 +143,7 @@ const fn uses_authored_raw_number(kind: Kind) -> bool {
             | Kind::LocationFunctions
             | Kind::LocationSizes
             | Kind::LocationResourceSlots
+            | Kind::LocationEntityDeclarations
             | Kind::LocationClassRegistries
             | Kind::LocationFunctionRegistries
             | Kind::LocationSizeRegistries

@@ -6,6 +6,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::catalog_v3::tag_catalog::ContextualTagPath;
+use crate::location_hauling_targets::HaulingTargetBinding;
 use crate::schema_fields::every_field_required;
 use crate::source_value_catalog::SourceValueRef;
 use crate::template_context_value::{TemplateLocalization, TemplateVocabularyProjection};
@@ -43,6 +44,7 @@ pub(crate) struct MissionContext<'source> {
     pub(crate) modifiers: Vec<crate::template_modifier_projection::TemplateModifierProjection>,
     pub(crate) owner: Option<TemplateOwnerProjection<'source>>,
     pub(crate) hauling_orders: Vec<TemplateHaulingOrder>,
+    pub(crate) hauling_target_bindings: Vec<HaulingTargetBinding>,
     pub(crate) spawn_pools: Vec<crate::template_spawn_projection::TemplateSpawnProjection>,
     pub(crate) pool_bindings: Vec<crate::template_spawn_projection::TemplatePoolBinding>,
 }
