@@ -6,7 +6,7 @@ use p4kx_media::{ExportOptions, Identity, MediaKind, MediaRecord};
 use p4kx_testkit::{
     ArchiveBuilder, CryXmlByteOrder, CryXmlSignature, TestElement, TestEntry, test_key,
 };
-use serde_json::json;
+use serde_json::{Value, json};
 
 use crate::support;
 use crate::support::audio_provider::{Origins, TestResult};
@@ -39,20 +39,7 @@ fn radar_audio_types_match_xml_and_cryxml_and_keep_physical_occurrences() -> Tes
     let index = support::published(p4kx_media::export(&archive, &output, &options)?)?;
     let rows = support::records(&output, &index, "audio-control.jsonl")?;
     let origins = Origins::read(&output.join(&index.artifact_base))?;
-    let schema = jsonschema::validator_for(&p4kx_media::builtin_record_schema()?)?;
-    for (ordinal, row) in rows.iter().enumerate() {
-        assert!(schema.is_valid(&serde_json::to_value(row)?));
-        if row.subresource.namespace == FIELD {
-            let source = owner(row).ok_or("root RadarAudioData entry")?;
-            origins.field_in(
-                "records",
-                Some("audio-control"),
-                ordinal,
-                "/data/payload/value/state",
-                source == 1,
-            )?;
-        }
-    }
+    assert_schema_and_origins(&rows, &origins)?;
     let typed = |entry, namespace| {
         rows.iter()
             .filter(|row| row.subresource.namespace == namespace && owner(row) == Some(entry))
@@ -78,6 +65,36 @@ fn radar_audio_types_match_xml_and_cryxml_and_keep_physical_occurrences() -> Tes
         .collect::<Vec<_>>()
     );
     assert_eq!(fields.len(), 9);
+    assert_typed_radar_fields(&fields);
+    assert!(rows.iter().any(|row| {
+        row.subresource.namespace == "audio-control-declaration"
+            && row.data.pointer("/payload/value") == Some(&json!("RawExtension"))
+    }));
+    Ok(())
+}
+
+fn assert_schema_and_origins(rows: &[MediaRecord], origins: &Origins) -> TestResult {
+    let schema = jsonschema::validator_for(&p4kx_media::builtin_record_schema()?)?;
+    for (ordinal, row) in rows.iter().enumerate() {
+        assert!(
+            schema.is_valid(&serde_json::to_value(row)?),
+            "radar audio row {ordinal} must satisfy the Media contract"
+        );
+        if row.subresource.namespace == FIELD {
+            let source = owner(row).ok_or("root RadarAudioData entry")?;
+            origins.field_in(
+                "records",
+                Some("audio-control"),
+                ordinal,
+                "/data/payload/value/state",
+                source == 1,
+            )?;
+        }
+    }
+    Ok(())
+}
+
+fn assert_typed_radar_fields(fields: &[&Value]) {
     for (field, value) in [
         ("zoom-min", json!({"state": "empty"})),
         (
@@ -101,11 +118,6 @@ fn radar_audio_types_match_xml_and_cryxml_and_keep_physical_occurrences() -> Tes
             "typed radar field {field}"
         );
     }
-    assert!(rows.iter().any(|row| {
-        row.subresource.namespace == "audio-control-declaration"
-            && row.data.pointer("/payload/value") == Some(&json!("RawExtension"))
-    }));
-    Ok(())
 }
 
 fn radar() -> TestElement {
