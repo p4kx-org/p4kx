@@ -42,6 +42,15 @@ bytes, with 11.81 GiB physical memory and 36.78 GiB system commit headroom
 available. The writer had yet to size or publish JSON.
 [Release producer](https://github.com/p4kx-org/p4kx/actions/runs/43837672769/job/133201840292)
 
+The Windows AMD64 native package at `9ef12b019` completed preparation for installed
+LIVE `13165946` with two Rayon workers. Windows reported a 25.34 GiB process
+working-set peak. The host retained at least 21.07 GiB of sampled available RAM.
+The process reached `export-health` after about 15 minutes and stopped on an
+accounting error in the harvest dependency of a verified missing Starmap target.
+The memory reserve remained available. No Catalog was published, so decoded and
+compressed sizes still require a complete run. The regression is covered by the
+Normal publication test on the integration branch. [Measurement](https://github.com/p4kx-org/p4kx/issues/1151#issuecomment-7009858377)
+
 | Section | LIVE | PTU |
 | --- | ---: | ---: |
 | `placements.containerInstances` | 1.734 GB | 2.046 GB |
@@ -84,9 +93,13 @@ the physical placement. The existing path Filter selects Records and still
 permits substantial world and shared data preparation. Streaming the full
 Catalog removes the in-memory JSON buffer while retaining full preparation.
 
-A selective local mining-location reader can reuse the existing original-source
-readers and resolve the required Starmap dependencies. Compare its results and
-per-value origins with the same Build's complete Catalog. An alternative is a
+The local mining-location SDK uses `read_mining_locations` for the reachable
+Starmap dependencies and the actual mining-resource joins. `with_mineable_entities`
+reads physical scanner definitions and their original scan selectors. The
+standalone `read_planet_resources` query reads terrain resource definitions by
+physical Entry, path or GUID. The selected records carry immediate origin markers.
+Compare the local projection with the same Build's complete Catalog.
+[SDK queries](catalog-sdk.md) An alternative is a
 Build-bound derived cache produced on the producer host and imported locally.
 Measure cold generation or import, changed Build, unchanged cache, failure
 recovery and peak process and system memory. Keep this gate separate from the
