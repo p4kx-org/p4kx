@@ -628,6 +628,17 @@ cargo test --locked -p p4kx-export --test real_archive -- `
     --ignored --exact --test-threads=1
 ```
 
+To verify flight controllers, IFCS and thrusters, use the installed Flight test. It discovers
+one physical owner for each family and compares the original component slots, representative
+raw numeric values and exact source coordinates with the SDK. It checks the Archive Build
+and uses one decoded DataForge Entry. The test prints Build metadata and the aggregate count.
+
+```powershell
+cargo test --locked -p p4kx-export --test real_archive -- `
+    real_archive_flight_configuration::sdk::installed_flight_sdk_preserves_selected_original_components `
+    --ignored --exact --test-threads=1
+```
+
 ## Original crafting-global configuration
 
 `catalog_queries::crafting::with_global_params` and `with_global_params_from` return borrowed

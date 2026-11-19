@@ -15,6 +15,9 @@ mod placements;
 #[path = "flight_witness_selection.rs"]
 mod selection;
 
+#[path = "flight_sdk_source_witness.rs"]
+mod sdk;
+
 use selection::{Selection, SelectorFile};
 
 type Result<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
