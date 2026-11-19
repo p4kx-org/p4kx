@@ -10,6 +10,8 @@ use crate::health_origin_assertions as proof;
 
 #[path = "catalog_consumable_fixture.rs"]
 mod fixture;
+#[path = "catalog_consumable_sdk.rs"]
+mod sdk;
 
 const CONFIGS: &str = "/configurations/consumables/rows";
 const TYPES: &str = "/definitions/consumableTypes/rows";

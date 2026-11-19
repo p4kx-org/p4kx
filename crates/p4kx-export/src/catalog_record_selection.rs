@@ -19,7 +19,7 @@ pub enum CatalogRecordSelection {
 }
 
 impl CatalogRecordSelection {
-    pub(super) fn for_each<'source>(
+    pub(crate) fn for_each<'source>(
         self,
         forge: &'source DataForge<'_>,
         cancel: Option<&CancelToken>,

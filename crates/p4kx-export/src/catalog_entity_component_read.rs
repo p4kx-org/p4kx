@@ -49,8 +49,30 @@ pub(super) type Projection<'source, Row> = fn(
 ) -> Result<Row, CatalogError>;
 
 pub(super) struct ComponentSelection<'a> {
-    pub(super) filter: Option<&'a Filter>,
-    pub(super) dependencies: Option<&'a HashSet<u32>>,
+    filter: Option<&'a Filter>,
+    dependencies: Option<&'a HashSet<u32>>,
+    unclassified_role: Option<ExportSourceRole>,
+}
+
+impl<'a> ComponentSelection<'a> {
+    pub(super) const fn export(
+        filter: Option<&'a Filter>,
+        dependencies: Option<&'a HashSet<u32>>,
+    ) -> Self {
+        Self {
+            filter,
+            dependencies,
+            unclassified_role: None,
+        }
+    }
+
+    pub(super) const fn discovery() -> Self {
+        Self {
+            filter: None,
+            dependencies: None,
+            unclassified_role: Some(ExportSourceRole::SelectionCandidate),
+        }
+    }
 }
 
 /// Reads an independent component family from selected and linked physical Entity owners.
@@ -77,8 +99,16 @@ pub(super) fn read<'source, Row>(
         if cancel.is_some_and(CancelToken::is_cancelled) {
             return Err(CatalogError::Cancelled);
         }
-        if record.type_name().ok() != Some(ENTITY) {
-            continue;
+        match record.type_name() {
+            Ok(ENTITY) => {}
+            Ok(_) => continue,
+            Err(error) => {
+                if let Some(role) = selection.unclassified_role {
+                    let admission = RecordObservation::capture(input, &record)?;
+                    read.failed(&admission, role, kind, &error)?;
+                }
+                continue;
+            }
         }
         match select(&mut trees, &probe, &record, selection) {
             Ok(false) => continue,

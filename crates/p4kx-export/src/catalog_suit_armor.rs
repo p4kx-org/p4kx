@@ -18,7 +18,7 @@ use crate::source_fields::FieldError;
 use crate::source_value_catalog::{SourceArenaOutput, SourceRecordReference};
 
 pub(super) const COMPONENT: &str = "SCItemSuitArmorParams";
-pub(super) const MACRO: &str = "DamageResistanceMacro";
+pub(crate) const MACRO: &str = "DamageResistanceMacro";
 
 /// One original suit armor component with its resistance definition link.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -69,14 +69,32 @@ impl<'source> SuitArmor<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct DamageResistanceMacro<'source> {
+pub struct DamageResistanceMacro<'source> {
     source: CanonicalRecordHeader<'source>,
     damage_resistance: SourcedValue<MacroBody<'source>>,
     additional_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> DamageResistanceMacro<'source> {
-    pub(super) fn read(
+    /// Borrows the original resistance body.
+    #[must_use]
+    pub const fn damage_resistance(&self) -> &SourcedValue<MacroBody<'source>> {
+        &self.damage_resistance
+    }
+
+    /// Borrows remaining original fields.
+    #[must_use]
+    pub const fn additional_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.additional_fields
+    }
+
+    /// Borrows the physical definition header.
+    #[must_use]
+    pub const fn source(&self) -> &CanonicalRecordHeader<'source> {
+        &self.source
+    }
+
+    pub(in crate::catalog_v3) fn read(
         _source_type: &'source str,
         source: CanonicalRecordHeader<'source>,
         fields: Observed<'_, '_, '_, 'source>,
@@ -97,7 +115,8 @@ impl<'source> DamageResistanceMacro<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct MacroBody<'source> {
+/// Original resistance values and remaining fields of one inline macro body.
+pub struct MacroBody<'source> {
     #[serde(flatten)]
     channels: ResistanceSet,
     #[serde(flatten)]
@@ -105,6 +124,18 @@ struct MacroBody<'source> {
 }
 
 impl<'source> MacroBody<'source> {
+    /// Borrows the six original channels and melee flag.
+    #[must_use]
+    pub const fn channels(&self) -> &ResistanceSet {
+        &self.channels
+    }
+
+    /// Borrows the original inline type and remaining fields.
+    #[must_use]
+    pub const fn source(&self) -> &UnitSource<'source> {
+        &self.original
+    }
+
     fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

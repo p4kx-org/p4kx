@@ -52,19 +52,29 @@ pub(super) mod ordered_curve;
 mod turret_health;
 #[path = "worn_gear_tables.rs"]
 mod worn_gear;
-pub(crate) use consumables::ConsumableDefinitions;
 use consumables::{ConsumableConfigurations, ConsumableTables};
+pub(crate) use consumables::{
+    ConsumableDefinitions, SUBTYPE as CONSUMABLE_SUBTYPE, TYPE as CONSUMABLE_TYPE,
+};
+pub use consumables::{ConsumableSubtype, ConsumableType};
 
+pub use super::authored_effect_resource::Rtpc;
+pub use super::catalog_durability::resistance::{DurabilityResistanceEntry, ResistanceSet};
+pub use consumables::{AuthoredList, ConsumableEffect, EffectParameters, GasMass, Override};
 use flight_configuration_tables::FlightConfigurationTables;
 use hackable_configuration::HackableConfiguration;
 use jump_point::JumpPointConfiguration;
 use jump_point_globals::GlobalJumpConfiguration;
+pub(crate) use mining_configurations::GLOBAL as MINING_LASER_GLOBAL;
 use mining_configurations::MiningConfigurationTables;
-pub(crate) use mining_configurations::MiningLaserGlobalDefinition;
-pub(crate) use turret_health::TurretHealthModifier;
+pub use mining_configurations::MiningLaserGlobalDefinition;
+pub use ordered_curve::OrderedCurve;
+pub use turret_health::TurretHealthModifier;
+pub(crate) use turret_health::{HEALTH_MODIFIER, observe_modifier_types};
 use turret_health::{TurretHealth, TurretTables};
-pub(crate) use worn_gear::DamageResistanceMacro;
+pub(crate) use worn_gear::MACRO as DAMAGE_RESISTANCE_MACRO;
 use worn_gear::WornGearTables;
+pub use worn_gear::{DamageResistanceMacro, MacroBody};
 
 /// Independently scoped configurations with their physical owners.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -369,10 +379,7 @@ impl<'source> PhysicalComponents<'_, '_, 'source> {
         } = entity_component::read(
             self.forge,
             self.projection.original(),
-            &ComponentSelection {
-                filter: self.options.filter,
-                dependencies,
-            },
+            &ComponentSelection::export(self.options.filter, dependencies),
             self.options.cancel,
             &component,
             project,

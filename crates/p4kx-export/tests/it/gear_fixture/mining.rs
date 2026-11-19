@@ -229,6 +229,13 @@ pub(super) fn records() -> Vec<TestRecord> {
             "libs/foundry/records/mining/test_laser_globals.xml",
         )
         .value("throttleChangePerAction", TestValue::Single(0.25))
-        .value("blockThrottleChangeWhenNotFiring", TestValue::Bool(true)),
+        .value("blockThrottleChangeWhenNotFiring", TestValue::Bool(true))
+        .value(
+            "throttleRTPC",
+            instance(
+                "AudioRtpc",
+                vec![("rtpc".to_owned(), TestValue::text("FixtureThrottle"))],
+            ),
+        ),
     ]
 }

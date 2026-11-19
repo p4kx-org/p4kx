@@ -17,7 +17,8 @@ use crate::source_fields::FieldError;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct ConsumableEffect<'source> {
+/// One authored consumable effect and its text reference.
+pub struct ConsumableEffect<'source> {
     #[schemars(extend("x-gameText" = true))]
     effect_description: SourcedValue<GameTextRef>,
     #[serde(flatten)]
@@ -27,6 +28,24 @@ pub(super) struct ConsumableEffect<'source> {
 }
 
 impl<'source> ConsumableEffect<'source> {
+    /// Borrows the original protected description reference.
+    #[must_use]
+    pub const fn effect_description(&self) -> &SourcedValue<GameTextRef> {
+        &self.effect_description
+    }
+
+    /// Borrows the original effect variant and field states.
+    #[must_use]
+    pub const fn parameters(&self) -> &EffectParameters<'source> {
+        &self.parameters
+    }
+
+    /// Borrows the original effect type and remaining fields.
+    #[must_use]
+    pub const fn source(&self) -> &UnitSource<'source> {
+        &self.source
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, 'source>,
         projection: &CatalogProjection<'_, 'source>,
@@ -54,27 +73,45 @@ impl<'source> ConsumableEffect<'source> {
     rename_all_fields = "camelCase"
 )]
 #[schemars(transform = every_field_required)]
-enum EffectParameters<'source> {
+/// The original supported effect variant or its authored extension.
+#[non_exhaustive]
+pub enum EffectParameters<'source> {
+    /// An actor status modifier.
     ModifyActorStatus {
+        /// Original status selection.
         stat_type: SourcedValue<&'source str>,
+        /// Authored change in status points.
         stat_point_change: SourcedValue<ResourceFloat32>,
+        /// Authored change in cooldown.
         stat_cooldown_change: SourcedValue<ResourceFloat32>,
     },
+    /// A health change.
     Health {
+        /// Authored health change.
         health_change: SourcedValue<ResourceFloat32>,
     },
+    /// A buff with optional original overrides.
     AddBuffEffect {
+        /// Original buff selection.
         buff_type: SourcedValue<&'source str>,
+        /// Authored duration override.
         buff_duration_override: SourcedValue<Override<'source>>,
+        /// Authored value override.
         buff_value_override: SourcedValue<Override<'source>>,
     },
+    /// A change to an authored resource.
     Resource {
+        /// Original resource selection.
         consumable_resource_type: SourcedValue<&'source str>,
+        /// Authored resource amount.
         amount: SourcedValue<ResourceFloat32>,
     },
+    /// A gas reference and amount.
     Gas {
+        /// Original gas and mass fields.
         gas_mass: SourcedValue<GasMass<'source>>,
     },
+    /// An effect represented by the original type and extra fields.
     Authored,
 }
 
@@ -158,7 +195,8 @@ impl<'source> EffectParameters<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct GasMass<'source> {
+/// An original gas reference and mass.
+pub struct GasMass<'source> {
     #[schemars(with = "SourcedValue<crate::catalog_record_reference::CatalogRecordReference>")]
     gas: SourcedValue<Box<crate::source_value_catalog::SourceRecordReference<'source>>>,
     mass: SourcedValue<ResourceFloat32>,
@@ -167,6 +205,26 @@ struct GasMass<'source> {
 }
 
 impl<'source> GasMass<'source> {
+    /// Borrows the original gas Reference.
+    #[must_use]
+    pub const fn gas(
+        &self,
+    ) -> &SourcedValue<Box<crate::source_value_catalog::SourceRecordReference<'source>>> {
+        &self.gas
+    }
+
+    /// Borrows the original gas mass.
+    #[must_use]
+    pub const fn mass(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.mass
+    }
+
+    /// Borrows the original gas mass type and remaining fields.
+    #[must_use]
+    pub const fn source(&self) -> &UnitSource<'source> {
+        &self.source
+    }
+
     fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
@@ -181,13 +239,26 @@ impl<'source> GasMass<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct Override<'source> {
+/// An original numeric buff override.
+pub struct Override<'source> {
     amount: SourcedValue<ResourceFloat32>,
     #[serde(flatten)]
     source: UnitSource<'source>,
 }
 
 impl<'source> Override<'source> {
+    /// Borrows the original numeric override.
+    #[must_use]
+    pub const fn amount(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.amount
+    }
+
+    /// Borrows the original override type and remaining fields.
+    #[must_use]
+    pub const fn source(&self) -> &UnitSource<'source> {
+        &self.source
+    }
+
     fn duration(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

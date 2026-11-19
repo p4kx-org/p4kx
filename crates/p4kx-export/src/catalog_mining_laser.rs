@@ -17,7 +17,7 @@ use crate::source_fields::FieldError;
 use crate::source_value_catalog::SourceRecordReference;
 
 pub(super) const COMPONENT: &str = "SEntityComponentMiningLaserParams";
-pub(super) const GLOBAL: &str = "MiningLaserGlobalParams";
+pub(crate) const GLOBAL: &str = "MiningLaserGlobalParams";
 
 /// Original throttle, filtering and modifiers on one physical mining laser component.
 #[derive(Debug, Serialize, JsonSchema)]

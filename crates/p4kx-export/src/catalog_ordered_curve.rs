@@ -16,7 +16,7 @@ use crate::source_fields::FieldError;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(in crate::catalog_v3) struct OrderedCurve<'source> {
+pub struct OrderedCurve<'source> {
     #[serde(flatten)]
     source: UnitSource<'source>,
     #[serde(rename = "useLUT")]
@@ -25,6 +25,24 @@ pub(in crate::catalog_v3) struct OrderedCurve<'source> {
 }
 
 impl<'source> OrderedCurve<'source> {
+    /// Borrows the curve type and remaining original fields.
+    #[must_use]
+    pub const fn source(&self) -> &UnitSource<'source> {
+        &self.source
+    }
+
+    /// Borrows the original lookup table setting.
+    #[must_use]
+    pub const fn use_lut(&self) -> &SourcedValue<bool> {
+        &self.use_lut
+    }
+
+    /// Borrows ordered original point slots.
+    #[must_use]
+    pub const fn points(&self) -> &SourcedValue<Vec<SourcedValue<InventoryVector2<'source>>>> {
+        &self.points
+    }
+
     pub(in crate::catalog_v3) fn read(
         fields: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

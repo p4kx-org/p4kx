@@ -179,9 +179,11 @@ fn mining() -> Vec<TestStruct> {
             )
             .field("miningLaserModifiers", class("MiningLaserModifiers"))
             .field("filterParams", class("MiningFilterParams")),
+        TestStruct::new("AudioRtpc").field("rtpc", TestType::String),
         TestStruct::new("MiningLaserGlobalParams")
             .field("throttleChangePerAction", TestType::Single)
-            .field("blockThrottleChangeWhenNotFiring", TestType::Bool),
+            .field("blockThrottleChangeWhenNotFiring", TestType::Bool)
+            .field("throttleRTPC", class("AudioRtpc")),
         TestStruct::new("MiningLaserModifiers")
             .field("isOptimalRateGood", TestType::Bool)
             .field("laserInstability", pointer("FloatModifier"))

@@ -5,6 +5,10 @@
 
 #[path = "equipment_dependency_coverage.rs"]
 mod dependency_coverage;
+
+/// Canonical definitions referenced by consumable, mining and armor components.
+#[path = "equipment_component_definitions.rs"]
+pub mod component_definitions;
 #[path = "equipment_loadout_query.rs"]
 mod loadout_query;
 

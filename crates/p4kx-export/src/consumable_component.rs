@@ -17,9 +17,10 @@ use crate::source_fields::FieldError;
 use crate::source_value_catalog::SourceRecordReference;
 
 pub(super) const COMPONENT: &str = "SCItemConsumableParams";
-pub(super) const SUBTYPE: &str = "ConsumableSubtype";
+pub(crate) const SUBTYPE: &str = "ConsumableSubtype";
 
-pub(super) type AuthoredList<T> = SourcedValue<Vec<SourcedValue<T>>>;
+/// An original list and its individually sourced slots.
+pub type AuthoredList<T> = SourcedValue<Vec<SourcedValue<T>>>;
 
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]

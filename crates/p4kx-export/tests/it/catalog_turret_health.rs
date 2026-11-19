@@ -11,6 +11,9 @@ use serde_json::{Value, json};
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
 use crate::health_origin_assertions as proof;
 
+#[path = "catalog_turret_health_sdk_scope.rs"]
+mod sdk_scope;
+
 const TURRET: &str = "SCItemTurretParams";
 const MODIFIER: &str = "STurretHealthModifierDef";
 const CURVE: &str = "BezierCurve";
@@ -137,18 +140,7 @@ fn turret_health_requires_the_exact_scalar_reference_declaration() -> TestResult
 
 #[test]
 fn turret_health_keeps_a_compatible_derived_reference_target() -> TestResult {
-    let fixture = database(true)
-        .structure(TestStruct::new(DERIVED).parent(MODIFIER))
-        .record(
-            TestEntity::new(DERIVED_OWNER, "FixtureDerivedTurret", DERIVED_OWNER_PATH)
-                .component(turret(TestValue::Reference(DERIVED_TARGET)))
-                .record(),
-        )
-        .record(definition(
-            DERIVED_TARGET,
-            DERIVED,
-            "libs/foundry/records/fixtures/modifier_derived.xml",
-        ));
+    let fixture = derived_database();
     let filter = Filter::parse(DERIVED_OWNER_PATH.trim_end_matches(".xml"))?;
     let catalog = export(&fixture, DcbOrigin::Plain, Some(&filter))?;
     let [component] = proof::rows(&catalog, COMPONENT_ROWS)? else {
@@ -169,6 +161,10 @@ fn turret_health_keeps_a_compatible_derived_reference_target() -> TestResult {
         "the compatible derived Record is the target of the Reference",
     );
     check_definition(definition, false)?;
+    let derived_index = proof::at(definition, "/source/recordIndex/value")?
+        .as_u64()
+        .ok_or("physical derived definition Record")?;
+    sdk_scope::check_derived(&fixture, u32::try_from(derived_index)?)?;
     proof::closure(&catalog)
 }
 
@@ -297,6 +293,21 @@ fn database(matching_declaration: bool) -> DataForgeBuilder {
         .record(definition(DEFINITION, MODIFIER, DEFINITION_PATH))
         .record(definition(DEFINITION, MODIFIER, DUPLICATE_PATH))
         .record(definition(STANDALONE, MODIFIER, STANDALONE_PATH))
+}
+
+fn derived_database() -> DataForgeBuilder {
+    database(true)
+        .structure(TestStruct::new(DERIVED).parent(MODIFIER))
+        .record(
+            TestEntity::new(DERIVED_OWNER, "FixtureDerivedTurret", DERIVED_OWNER_PATH)
+                .component(turret(TestValue::Reference(DERIVED_TARGET)))
+                .record(),
+        )
+        .record(definition(
+            DERIVED_TARGET,
+            DERIVED,
+            "libs/foundry/records/fixtures/modifier_derived.xml",
+        ))
 }
 
 fn turret(reference: TestValue) -> TestValue {

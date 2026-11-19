@@ -55,7 +55,7 @@ impl<'source> DurabilityResistances<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ResistanceSet {
+pub struct ResistanceSet {
     ignore_melee_damage: SourcedValue<bool>,
     physical: SourcedValue<DurabilityResistanceEntry>,
     energy: SourcedValue<DurabilityResistanceEntry>,
@@ -66,6 +66,48 @@ pub(crate) struct ResistanceSet {
 }
 
 impl ResistanceSet {
+    /// Borrows the original melee exclusion flag.
+    #[must_use]
+    pub const fn ignore_melee_damage(&self) -> &SourcedValue<bool> {
+        &self.ignore_melee_damage
+    }
+
+    /// Borrows the physical channel.
+    #[must_use]
+    pub const fn physical(&self) -> &SourcedValue<DurabilityResistanceEntry> {
+        &self.physical
+    }
+
+    /// Borrows the energy channel.
+    #[must_use]
+    pub const fn energy(&self) -> &SourcedValue<DurabilityResistanceEntry> {
+        &self.energy
+    }
+
+    /// Borrows the distortion channel.
+    #[must_use]
+    pub const fn distortion(&self) -> &SourcedValue<DurabilityResistanceEntry> {
+        &self.distortion
+    }
+
+    /// Borrows the thermal channel.
+    #[must_use]
+    pub const fn thermal(&self) -> &SourcedValue<DurabilityResistanceEntry> {
+        &self.thermal
+    }
+
+    /// Borrows the biochemical channel.
+    #[must_use]
+    pub const fn biochemical(&self) -> &SourcedValue<DurabilityResistanceEntry> {
+        &self.biochemical
+    }
+
+    /// Borrows the stun channel.
+    #[must_use]
+    pub const fn stun(&self) -> &SourcedValue<DurabilityResistanceEntry> {
+        &self.stun
+    }
+
     pub(in crate::catalog_v3) fn read(
         source: Observed<'_, '_, '_, '_>,
         notes: &mut Vec<FieldError>,
@@ -130,7 +172,7 @@ impl ResistanceSet {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct DurabilityResistanceEntry {
+pub struct DurabilityResistanceEntry {
     multiplier: SourcedValue<ResourceFloat32>,
     threshold: SourcedValue<ResourceFloat32>,
     damage_cap: SourcedValue<ResourceFloat32>,
@@ -138,6 +180,30 @@ pub(crate) struct DurabilityResistanceEntry {
 }
 
 impl DurabilityResistanceEntry {
+    /// Borrows the authored multiplier.
+    #[must_use]
+    pub const fn multiplier(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.multiplier
+    }
+
+    /// Borrows the authored threshold.
+    #[must_use]
+    pub const fn threshold(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.threshold
+    }
+
+    /// Borrows the authored damage cap.
+    #[must_use]
+    pub const fn damage_cap(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.damage_cap
+    }
+
+    /// Borrows the authored damage-cap limit.
+    #[must_use]
+    pub const fn damage_cap_limit(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.damage_cap_limit
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, '_>,
         notes: &mut Vec<FieldError>,

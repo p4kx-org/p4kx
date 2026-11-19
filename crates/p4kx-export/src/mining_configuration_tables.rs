@@ -26,7 +26,8 @@ mod modifiers;
 mod weapon_modifier;
 
 use attachable::AttachableModifier;
-pub(crate) use global::MiningLaserGlobalDefinition;
+pub use global::MiningLaserGlobalDefinition;
+pub(crate) use laser::GLOBAL;
 use laser::MiningLaser;
 
 const MINING_LASER: ComponentKind = ComponentKind {
@@ -72,7 +73,7 @@ impl<'source> MiningConfigurationTables<'source> {
             components.forge,
             components.projection.original(),
             &Selection {
-                source_types: &[laser::GLOBAL],
+                source_types: &[GLOBAL],
                 linked: &linked,
                 filter: components.options.filter,
                 inspection: ConfigurationInspection::MiningLaserGlobal,
@@ -81,6 +82,6 @@ impl<'source> MiningConfigurationTables<'source> {
             MiningLaserGlobalDefinition::read,
         )?;
         let rows = components.keep_definitions(definitions);
-        Ok(CatalogTable::new(components.forge, &[laser::GLOBAL], rows))
+        Ok(CatalogTable::new(components.forge, &[GLOBAL], rows))
     }
 }

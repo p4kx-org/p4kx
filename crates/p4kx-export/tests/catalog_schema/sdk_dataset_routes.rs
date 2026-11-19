@@ -25,6 +25,8 @@ use super::{
     Route, SHOP_INVENTORIES, TestResult, UNRESOLVED, WEAPON_RECOIL,
 };
 
+#[path = "sdk_component_definition_routes.rs"]
+mod component_definitions;
 #[path = "sdk_projectile_ammo_route.rs"]
 mod projectile_ammo;
 #[path = "sdk_weapon_animation_route.rs"]
@@ -57,7 +59,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
     if independent_ammo.schema != reached_ammo.schema {
         return Err("independently admitted and reached Ammo rows have different schemas".into());
     }
-    Ok(vec![
+    let mut routes = vec![
         reached_ammo,
         projectile,
         combat,
@@ -79,7 +81,9 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
             &starmap.unresolved_container_links,
             "system-root and occurrence query available; root enumeration and installed parity open",
         )?,
-    ])
+    ];
+    routes.extend(component_definitions::read()?);
+    Ok(routes)
 }
 
 pub(super) fn ammunition() -> TestResult<Route> {

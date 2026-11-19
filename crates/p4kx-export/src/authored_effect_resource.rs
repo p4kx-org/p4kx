@@ -55,11 +55,18 @@ impl AudioResource {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct Rtpc {
+/// An authored real-time parameter control identifier.
+pub struct Rtpc {
     rtpc: SourcedValue<String>,
 }
 
 impl Rtpc {
+    /// Borrows the original RTPC identifier.
+    #[must_use]
+    pub const fn rtpc(&self) -> &SourcedValue<String> {
+        &self.rtpc
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, '_>,
         notes: &mut Vec<FieldError>,

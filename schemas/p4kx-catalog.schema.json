@@ -11663,22 +11663,26 @@
       "type": "object"
     },
     "ConsumableEffect": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "One authored consumable effect and its text reference.",
       "oneOf": [
         {
+          "description": "An actor status modifier.",
           "properties": {
             "kind": {
               "const": "modifyActorStatus",
               "type": "string"
             },
             "statCooldownChange": {
-              "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+              "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+              "description": "Authored change in cooldown."
             },
             "statPointChange": {
-              "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+              "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+              "description": "Authored change in status points."
             },
             "statType": {
-              "$ref": "#/$defs/SourcedValueOfstring"
+              "$ref": "#/$defs/SourcedValueOfstring",
+              "description": "Original status selection."
             }
           },
           "required": [
@@ -11690,9 +11694,11 @@
           "type": "object"
         },
         {
+          "description": "A health change.",
           "properties": {
             "healthChange": {
-              "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+              "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+              "description": "Authored health change."
             },
             "kind": {
               "const": "health",
@@ -11706,15 +11712,19 @@
           "type": "object"
         },
         {
+          "description": "A buff with optional original overrides.",
           "properties": {
             "buffDurationOverride": {
-              "$ref": "#/$defs/SourcedValueOfOverride"
+              "$ref": "#/$defs/SourcedValueOfOverride",
+              "description": "Authored duration override."
             },
             "buffType": {
-              "$ref": "#/$defs/SourcedValueOfstring"
+              "$ref": "#/$defs/SourcedValueOfstring",
+              "description": "Original buff selection."
             },
             "buffValueOverride": {
-              "$ref": "#/$defs/SourcedValueOfOverride"
+              "$ref": "#/$defs/SourcedValueOfOverride",
+              "description": "Authored value override."
             },
             "kind": {
               "const": "addBuffEffect",
@@ -11730,12 +11740,15 @@
           "type": "object"
         },
         {
+          "description": "A change to an authored resource.",
           "properties": {
             "amount": {
-              "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+              "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+              "description": "Authored resource amount."
             },
             "consumableResourceType": {
-              "$ref": "#/$defs/SourcedValueOfstring"
+              "$ref": "#/$defs/SourcedValueOfstring",
+              "description": "Original resource selection."
             },
             "kind": {
               "const": "resource",
@@ -11750,9 +11763,11 @@
           "type": "object"
         },
         {
+          "description": "A gas reference and amount.",
           "properties": {
             "gasMass": {
-              "$ref": "#/$defs/SourcedValueOfGasMass"
+              "$ref": "#/$defs/SourcedValueOfGasMass",
+              "description": "Original gas and mass fields."
             },
             "kind": {
               "const": "gas",
@@ -11766,6 +11781,7 @@
           "type": "object"
         },
         {
+          "description": "An effect represented by the original type and extra fields.",
           "properties": {
             "kind": {
               "const": "authored",
@@ -11798,7 +11814,7 @@
       "type": "object"
     },
     "ConsumableSubtype": {
-      "description": "Independently sourced original metadata and stable convenience values of one physical Record.",
+      "description": "One physical consumable subtype and its authored effects.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -11858,7 +11874,7 @@
       "type": "object"
     },
     "ConsumableType": {
-      "description": "Independently sourced original metadata and stable convenience values of one physical Record.",
+      "description": "One physical consumable type and its authored subtype slots.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -18876,7 +18892,7 @@
       "type": "object"
     },
     "GasMass": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "An original gas reference and mass.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -29258,7 +29274,7 @@
       "type": "object"
     },
     "MacroBody": {
-      "description": "The six named resistance entries and the original melee flag.",
+      "description": "Original resistance values and remaining fields of one inline macro body.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -33973,7 +33989,7 @@
       "type": "object"
     },
     "Override": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "An original numeric buff override.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -34626,7 +34642,7 @@
       "type": "object"
     },
     "PlanetAudioRtpc": {
-      "description": "The authored audio RTPC identifier.",
+      "description": "The authored audio RTPC identifier.\nAn authored real-time parameter control identifier.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -42190,7 +42206,7 @@
       "type": "object"
     },
     "Rtpc": {
-      "description": "The authored audio RTPC identifier.",
+      "description": "The authored audio RTPC identifier.\nAn authored real-time parameter control identifier.",
       "properties": {
         "rtpc": {
           "$ref": "#/$defs/SourcedValueOfstring"

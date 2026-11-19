@@ -530,6 +530,40 @@ identifies the affected physical Record. An explicit null target and a proven fo
 remain separate known exclusions. No unrelated configuration projector runs to manufacture that
 coverage result.
 
+## Component definition Records
+
+The functions in the following table are exported by
+`catalog_queries::equipment::component_definitions`. Each also has a decoded-Entry `_from`
+form and a same-named method on both the query session and its parsed view.
+
+| Catalog v3 table under `definitions` | SDK method |
+| --- | --- |
+| `damageResistanceMacros` | `with_damage_resistance_macros` |
+| `miningLaserGlobals` | `with_mining_laser_globals` |
+| `turretHealthModifiers` | `with_turret_health_modifiers` |
+| `consumableTypes` | `with_consumable_types` |
+| `consumableSubtypes` | `with_consumable_subtypes` |
+
+Select `All`, `Guid` or `RecordIndex`. Results follow physical DataForge Record order. A GUID
+selection keeps every admitted physical alias. Use the original Record index in the same
+DataForge to follow a resolved Reference. A physical read returns its own borrowed,
+typed values, original field states and source inventory. A Reference retains its authored
+target and resolution state. The caller queries the target's definition separately.
+
+Check `coverage()` for selected-owner reads and field inspection. `definition_discovery()`
+reports the required dependency survey. Direct Turret selections containing only known
+base-definition Records, or containing no matching Records, need only their selected scope.
+A selection involving a possible derived definition or all definitions surveys the physical
+turret components that can admit additional compatible types. Unclassified owners and failed
+reads remain visible in discovery coverage. A family can be available with no rows for the
+current selection.
+
+Consumable subtypes use the session's selected languages for public names and protected effect
+descriptions. Resolve their typed text references within the snapshot. An empty language
+selection retains keys. A read error in a required requested locale returns a query error.
+The other four definition readers leave the language and text collections empty. Retain the
+current consumer cache until the outer query succeeds and required coverage is complete.
+
 ## Verify selected queries against an installed Archive
 
 The ignored `installed_selective_sdk_has_original_owners_and_closed_sources` test opens one

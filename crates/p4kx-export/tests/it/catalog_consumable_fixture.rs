@@ -24,7 +24,12 @@ const ENUM: &str = "FixtureLabels";
 pub(super) fn database() -> DataForgeBuilder {
     let builder = DataForgeBuilder::new().version(8);
     definitions(components(effects(builder)))
-        .record(subtype(1, "fixture/subtype/mixed.xml", mixed()))
+        .record(subtype(1, "fixture/subtype/mixed.xml", mixed()).value(
+            "tintOverride",
+            TestValue::Struct(
+                TestInstance::new("FixtureTint").value("factor", TestValue::Single(-0.0)),
+            ),
+        ))
         .record(subtype(2, "fixture/subtype/empty.xml", Vec::new()))
         .record(subtype(3, "fixture/subtype/unused.xml", Vec::new()))
         .record(
@@ -52,10 +57,12 @@ pub(super) fn database() -> DataForgeBuilder {
 
 fn definitions(builder: DataForgeBuilder) -> DataForgeBuilder {
     builder
+        .structure(TestStruct::new("FixtureTint").field("factor", TestType::Single))
         .structure(
             TestStruct::new(SUBTYPE)
                 .field("typeName", TestType::String)
                 .field("consumableName", TestType::Locale)
+                .field("tintOverride", pointer("FixtureTint"))
                 .array("effectsPerMicroSCU", pointer(EFFECT))
                 .field("fixtureTypeBackReference", reference(TYPE)),
         )

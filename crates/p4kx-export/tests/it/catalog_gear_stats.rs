@@ -5,3 +5,6 @@
 
 #[path = "catalog_gear_configurations.rs"]
 mod configurations;
+
+#[path = "catalog_gear_definition_sdk.rs"]
+mod definitions;

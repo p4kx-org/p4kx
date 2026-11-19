@@ -156,7 +156,12 @@ pub(super) fn read_selected<'source, Row>(
     admission: &RecordObservation<'_, 'source>,
     inspection: ConfigurationInspection,
     cancel: Option<&CancelToken>,
-    project: Projection<'source, Row>,
+    project: impl Fn(
+        &'source str,
+        CanonicalRecordHeader<'source>,
+        Observed<'_, '_, '_, 'source>,
+        &mut Vec<FieldError>,
+    ) -> Result<Row, CatalogError>,
 ) -> Result<ScopedSourceRead<Row>, CatalogError> {
     let read = read_row(tree, input, admission, inspection, cancel, project)?;
     let complete = read.ledger.field_inspections.iter().all(|row| row.complete)

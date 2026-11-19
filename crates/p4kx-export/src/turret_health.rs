@@ -3,26 +3,29 @@
 
 use std::collections::BTreeSet;
 
-use p4kx_extraction::SourcedValue;
+use p4kx_extraction::{CancelToken, DataForge, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::ordered_curve::OrderedCurve;
 use super::{ComponentKind, PhysicalComponents};
 use crate::CatalogError;
+use crate::build::original_input::OriginalCatalogInput;
 use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_record_reference::CatalogRecordReference;
 use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::authored_fields::Observed;
+use crate::catalog_v3::catalog_entity_component_read::{self, ComponentSelection};
 use crate::catalog_v3::catalog_unit_source::UnitSource;
 use crate::catalog_v3::item_component_owner::ComponentOwner;
 use crate::catalog_v3::referenced_definition_read::{self, Selection};
 use crate::export_field_inspection::ConfigurationInspection;
+use crate::export_ledger::ExportLedger;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 use crate::source_value_catalog::{SourceArenaOutput, SourceRecordReference};
 
-const HEALTH_MODIFIER: &str = "STurretHealthModifierDef";
+pub(crate) const HEALTH_MODIFIER: &str = "STurretHealthModifierDef";
 const TURRET: ComponentKind = ComponentKind {
     source_type: "SCItemTurretParams",
     inspection: ConfigurationInspection::TurretHealth,
@@ -70,14 +73,32 @@ impl<'source> TurretHealth<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct TurretHealthModifier<'source> {
+pub struct TurretHealthModifier<'source> {
     source: CanonicalRecordHeader<'source>,
     damage_movement_modifier: SourcedValue<OrderedCurve<'source>>,
     additional_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> TurretHealthModifier<'source> {
-    fn read(
+    /// Borrows the original damage movement curve.
+    #[must_use]
+    pub const fn damage_movement_modifier(&self) -> &SourcedValue<OrderedCurve<'source>> {
+        &self.damage_movement_modifier
+    }
+
+    /// Borrows remaining original fields.
+    #[must_use]
+    pub const fn additional_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.additional_fields
+    }
+
+    /// Borrows the physical definition header.
+    #[must_use]
+    pub const fn source(&self) -> &CanonicalRecordHeader<'source> {
+        &self.source
+    }
+
+    pub(in crate::catalog_v3) fn read(
         _source_type: &'source str,
         source: CanonicalRecordHeader<'source>,
         fields: Observed<'_, '_, '_, 'source>,
@@ -111,13 +132,7 @@ impl<'source> TurretTables<'source> {
         components: &mut PhysicalComponents<'_, '_, 'source>,
     ) -> Result<Self, CatalogError> {
         let health = components.table(TURRET, TurretHealth::read)?;
-        let (linked, mut source_types): (BTreeSet<_>, BTreeSet<_>) = health
-            .rows
-            .iter()
-            .filter_map(TurretHealth::modifier_target)
-            .unzip();
-        source_types.insert(HEALTH_MODIFIER);
-        let source_types: Vec<_> = source_types.into_iter().collect();
+        let (linked, source_types) = modifier_sources(&health.rows);
         let definitions = referenced_definition_read::read(
             components.forge,
             components.projection.original(),
@@ -137,4 +152,30 @@ impl<'source> TurretTables<'source> {
         );
         Ok(Self { health, modifiers })
     }
+}
+
+fn modifier_sources<'source>(rows: &[TurretHealth<'source>]) -> (BTreeSet<u32>, Vec<&'source str>) {
+    let (linked, mut types): (BTreeSet<_>, BTreeSet<_>) = rows
+        .iter()
+        .filter_map(TurretHealth::modifier_target)
+        .unzip();
+    types.insert(HEALTH_MODIFIER);
+    (linked, types.into_iter().collect())
+}
+
+pub(crate) fn observe_modifier_types<'source>(
+    forge: &'source DataForge<'source>,
+    input: &OriginalCatalogInput<'_, 'source>,
+    cancel: Option<&CancelToken>,
+) -> Result<(Vec<&'source str>, ExportLedger), CatalogError> {
+    let read = catalog_entity_component_read::read(
+        forge,
+        input,
+        &ComponentSelection::discovery(),
+        cancel,
+        &TURRET,
+        TurretHealth::read,
+    )?;
+    let (_, types) = modifier_sources(&read.rows);
+    Ok((types, read.ledger))
 }

@@ -223,3 +223,22 @@ head and additional fields. A physical query opens the requested definition and 
 field's origin. It reports an unreadable selected Record or incomplete field inspection in its
 owner coverage. The caller reads the linked definition explicitly, so reading a weapon action keeps
 its own dependency scope. A definition query needs neither the weapon Record nor localization.
+
+## Shared component definition Records
+
+The selected component-definition queries use the producer's original definition projectors.
+They return canonical physical Records in DataForge order. A GUID is a selection key that can
+name several physical owners. A resolved target Record index identifies one target in the same
+DataForge. Preserve the original list order, numeric bits, text domains and per-value origins.
+
+Turret modifier admission has two sources. The base definition type is declared directly.
+Compatible derived types enter the family through turret definition References authored by
+canonically admitted Entity components. A base-only or empty selection can bypass the
+component survey. Derived candidates and full-family reads use the same type discovery as the
+producer and surface failed and unclassified input owners as incomplete dependency coverage.
+
+Only the consumable subtype definition model has localized fields. Open requested languages
+for selected subtype owners and resolve the public-name and protected-text keys in the result
+inventory. A consumer handles each linked definition as a separate query. It can reuse one
+parsed session across these families, inspect selected-owner and discovery coverage independently,
+and commit its own cache after outer success.

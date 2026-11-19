@@ -21,8 +21,9 @@ mod suit_armor;
 
 use clothing::Clothing;
 use radar::ItemRadar;
-pub(crate) use suit_armor::DamageResistanceMacro;
+pub(crate) use suit_armor::MACRO;
 use suit_armor::SuitArmor;
+pub use suit_armor::{DamageResistanceMacro, MacroBody};
 
 const SUIT_ARMOR: ComponentKind = ComponentKind {
     source_type: suit_armor::COMPONENT,
@@ -72,7 +73,7 @@ impl<'source> WornGearTables<'source> {
             components.forge,
             components.projection.original(),
             &Selection {
-                source_types: &[suit_armor::MACRO],
+                source_types: &[MACRO],
                 linked: &linked,
                 filter: components.options.filter,
                 inspection: ConfigurationInspection::DamageResistanceMacro,
@@ -85,7 +86,7 @@ impl<'source> WornGearTables<'source> {
         components.collected.add_failures(definitions.failures);
         Ok(CatalogTable::new(
             components.forge,
-            &[suit_armor::MACRO],
+            &[MACRO],
             definitions.rows.into_iter().map(|(_, row)| row).collect(),
         ))
     }

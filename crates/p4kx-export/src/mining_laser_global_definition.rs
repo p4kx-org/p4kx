@@ -18,7 +18,7 @@ use crate::source_value_catalog::SourceArenaOutput;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct MiningLaserGlobalDefinition<'source> {
+pub struct MiningLaserGlobalDefinition<'source> {
     source: CanonicalRecordHeader<'source>,
     block_throttle_change_when_not_firing: SourcedValue<bool>,
     throttle_reset_on_stop_fire: SourcedValue<bool>,
@@ -33,7 +33,73 @@ pub(crate) struct MiningLaserGlobalDefinition<'source> {
 }
 
 impl<'source> MiningLaserGlobalDefinition<'source> {
-    pub(super) fn read(
+    /// Borrows the authored inactive throttle restriction.
+    #[must_use]
+    pub const fn block_throttle_change_when_not_firing(&self) -> &SourcedValue<bool> {
+        &self.block_throttle_change_when_not_firing
+    }
+
+    /// Borrows the authored throttle reset setting.
+    #[must_use]
+    pub const fn throttle_reset_on_stop_fire(&self) -> &SourcedValue<bool> {
+        &self.throttle_reset_on_stop_fire
+    }
+
+    /// Borrows the original throttle change per action.
+    #[must_use]
+    pub const fn throttle_change_per_action(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.throttle_change_per_action
+    }
+
+    /// Borrows the original throttle acceleration period.
+    #[must_use]
+    pub const fn throttle_acc_period(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.throttle_acc_period
+    }
+
+    /// Borrows the original throttle acceleration factor.
+    #[must_use]
+    pub const fn throttle_acc_factor(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.throttle_acc_factor
+    }
+
+    /// Borrows the original held throttle acceleration factor.
+    #[must_use]
+    pub const fn throttle_hold_acc_factor(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.throttle_hold_acc_factor
+    }
+
+    /// Borrows the authored throttle control.
+    #[must_use]
+    pub const fn throttle_rtpc(&self) -> &SourcedValue<Rtpc> {
+        &self.throttle_rtpc
+    }
+
+    /// Borrows the authored glow strength control.
+    #[must_use]
+    pub const fn mineable_glow_strength_rtpc(&self) -> &SourcedValue<Rtpc> {
+        &self.mineable_glow_strength_rtpc
+    }
+
+    /// Borrows the authored optimal break zone control.
+    #[must_use]
+    pub const fn mineable_optimal_break_zone_rtpc(&self) -> &SourcedValue<Rtpc> {
+        &self.mineable_optimal_break_zone_rtpc
+    }
+
+    /// Borrows remaining original fields.
+    #[must_use]
+    pub const fn additional_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.additional_fields
+    }
+
+    /// Borrows the physical definition header.
+    #[must_use]
+    pub const fn source(&self) -> &CanonicalRecordHeader<'source> {
+        &self.source
+    }
+
+    pub(in crate::catalog_v3) fn read(
         _source_type: &'source str,
         source: CanonicalRecordHeader<'source>,
         fields: Observed<'_, '_, '_, 'source>,

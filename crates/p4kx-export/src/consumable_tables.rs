@@ -27,10 +27,12 @@ mod component;
 #[path = "consumable_effect.rs"]
 mod effect;
 
-use component::{AuthoredList, Consumable, SUBTYPE};
-use effect::ConsumableEffect;
+pub use component::AuthoredList;
+use component::Consumable;
+pub(crate) use component::SUBTYPE;
+pub use effect::{ConsumableEffect, EffectParameters, GasMass, Override};
 
-const TYPE: &str = "ConsumableType";
+pub(crate) const TYPE: &str = "ConsumableType";
 const CONSUMABLES: ComponentKind = ComponentKind {
     source_type: component::COMPONENT,
     inspection: ConfigurationInspection::ConsumableComponent,
@@ -119,10 +121,11 @@ impl<'source> ConsumableTables<'source> {
     }
 }
 
+/// One physical consumable type and its authored subtype slots.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct ConsumableType<'source> {
+pub struct ConsumableType<'source> {
     #[serde(flatten)]
     source: CanonicalRecordHeader<'source>,
     type_name: SourcedValue<&'source str>,
@@ -132,7 +135,31 @@ struct ConsumableType<'source> {
 }
 
 impl<'source> ConsumableType<'source> {
-    fn read(
+    /// Borrows the authored type name.
+    #[must_use]
+    pub const fn type_name(&self) -> &SourcedValue<&'source str> {
+        &self.type_name
+    }
+
+    /// Borrows ordered authored subtype Reference slots.
+    #[must_use]
+    pub const fn subtypes(&self) -> &AuthoredList<Box<SourceRecordReference<'source>>> {
+        &self.subtypes
+    }
+
+    /// Borrows remaining original fields.
+    #[must_use]
+    pub const fn additional_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.additional_fields
+    }
+
+    /// Borrows the physical definition header.
+    #[must_use]
+    pub const fn source(&self) -> &CanonicalRecordHeader<'source> {
+        &self.source
+    }
+
+    pub(in crate::catalog_v3) fn read(
         _kind: &'source str,
         source: CanonicalRecordHeader<'source>,
         fields: Observed<'_, '_, '_, 'source>,
@@ -161,10 +188,11 @@ impl<'source> ConsumableType<'source> {
     }
 }
 
+/// One physical consumable subtype and its authored effects.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct ConsumableSubtype<'source> {
+pub struct ConsumableSubtype<'source> {
     #[serde(flatten)]
     source: CanonicalRecordHeader<'source>,
     type_name: SourcedValue<&'source str>,
@@ -176,7 +204,43 @@ struct ConsumableSubtype<'source> {
 }
 
 impl<'source> ConsumableSubtype<'source> {
-    fn read(
+    /// Borrows the authored subtype name.
+    #[must_use]
+    pub const fn type_name(&self) -> &SourcedValue<&'source str> {
+        &self.type_name
+    }
+
+    /// Borrows the original public-name reference.
+    #[must_use]
+    pub const fn consumable_name(&self) -> &SourcedValue<PublicNameRef> {
+        &self.consumable_name
+    }
+
+    /// Borrows ordered authored effect slots.
+    #[must_use]
+    pub const fn effects(&self) -> &AuthoredList<ConsumableEffect<'source>> {
+        &self.effects
+    }
+
+    /// Borrows the original pointed tint type and fields.
+    #[must_use]
+    pub const fn tint_override(&self) -> &SourcedValue<UnitSource<'source>> {
+        &self.tint_override
+    }
+
+    /// Borrows remaining original fields.
+    #[must_use]
+    pub const fn additional_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.additional_fields
+    }
+
+    /// Borrows the physical definition header.
+    #[must_use]
+    pub const fn source(&self) -> &CanonicalRecordHeader<'source> {
+        &self.source
+    }
+
+    pub(in crate::catalog_v3) fn read(
         source: CanonicalRecordHeader<'source>,
         fields: Observed<'_, '_, '_, 'source>,
         projection: &CatalogProjection<'_, 'source>,

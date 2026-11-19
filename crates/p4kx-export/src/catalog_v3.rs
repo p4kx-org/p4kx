@@ -236,6 +236,8 @@ pub(crate) mod catalog_weapon_actions;
 mod catalog_weapon_magazine_slots;
 #[path = "catalog_weapon_projectile_ammo.rs"]
 pub(crate) mod catalog_weapon_projectile_ammo;
+#[path = "component_definition_sources.rs"]
+pub(crate) mod component_definition_sources;
 #[path = "interactable_configuration.rs"]
 mod interactable_configuration;
 #[path = "interaction_conditions.rs"]
