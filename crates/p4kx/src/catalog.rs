@@ -17,7 +17,7 @@ use p4kx_extraction::Archive;
 
 use super::catalog_json::summary_json;
 use super::catalog_size::warn_about_size;
-use crate::catalog_input::{InvalidExportTime, MissingCatalogArgs, refuse_gzip};
+use crate::catalog_input::{InvalidExportTime, MissingCatalogArgs, compression};
 use crate::cli::{CatalogArgs, CatalogCommand};
 use crate::exit;
 use crate::extract::cancel_on_interrupt;
@@ -38,7 +38,7 @@ pub(crate) fn run(args: &CatalogArgs, as_json: bool) -> Result<ExitCode> {
     let (Some(archive), Some(out)) = (&args.archive, &args.out) else {
         return Err(MissingCatalogArgs.into());
     };
-    refuse_gzip(out)?;
+    let compression = compression(out, args.zstd_level)?;
     let exported_at = match args.exported_at {
         None => SystemTime::now(),
         Some(seconds) => UNIX_EPOCH
@@ -74,7 +74,7 @@ pub(crate) fn run(args: &CatalogArgs, as_json: bool) -> Result<ExitCode> {
             let _ignored = writeln!(io::stderr().lock(), "catalog phase: {}", stage.as_str());
         }
     };
-    let written = write_file(&archive, &options, out, &phase);
+    let written = write_file(&archive, &options, out, compression, &phase);
     if !args.progress_phases {
         line.finish();
     }
@@ -166,21 +166,20 @@ fn print_result(
     Ok(())
 }
 
-/// Builds the catalog and streams it into a temporary file next to `out`, compressed when the name
-/// ends in `.zst`, then moves it over `out`; a failure or an interrupt leaves `out` as it was.
+/// Streams the catalog into a temporary file next to `out` and publishes it on success.
 fn write_file(
     archive: &Archive,
     options: &CatalogOptions<'_>,
     out: &Path,
+    compression: Compression,
     phase: &dyn Fn(CatalogStage),
 ) -> Result<CatalogSummary> {
     let uncancelled = p4kx_extraction::CancelToken::new();
     let cancel = options.cancel.unwrap_or(&uncancelled);
     let protection = p4kx_extraction::ArchiveWriteProtection::new(archive.path(), cancel.flag())?;
-    let written =
-        write_catalog_file_with_phases(archive, options, Compression::for_path(out), phase, || {
-            CatalogFile::create_protected(out, &protection, cancel)
-        });
+    let written = write_catalog_file_with_phases(archive, options, compression, phase, || {
+        CatalogFile::create_protected(out, &protection, cancel)
+    });
     let (summary, file) = written.map_err(into_anyhow)?;
     file.commit()
         .with_context(|| format!("cannot write {}", out.display()))?;

@@ -137,7 +137,7 @@ selection completeness or publication checks.
 
 ```powershell
 p4kx catalog <archive> --out p4kx-catalog.json [--filter <filter>] [--exported-at <seconds>]
-p4kx catalog <archive> --out p4kx-catalog.json.zst
+p4kx catalog <archive> --out p4kx-catalog.json.zst [--zstd-level <level>]
 p4kx catalog schema
 ```
 
@@ -147,8 +147,11 @@ An output name ending in `.zst` (any case) writes the catalog as one zstd frame;
 `.gz` is refused with exit code 2, because gzip is not written; any other name writes plain JSON,
 which stays the default. The zstd encoder is libzstd (ADR-0149). The JSON is serialised straight into the encoder and
 never held in memory; it is serialised twice, the first time only to count its length. The frame
-uses zstd level 19, long-distance matching, a content checksum, and declares the content size
-(`Frame_Content_Size`). The encoding caps the compression window at 2^27 bytes. Plain
+uses long-distance matching, carries a content checksum and declares its exact decoded size
+(`Frame_Content_Size`). The default compression level is 19. Use `--zstd-level <level>` with a
+`.zst` filename to select a level from 1 to 22. Lower levels can encode faster and produce larger
+files. An explicit level with plain JSON output is invalid. The encoding caps the compression
+window at 2^27 bytes. Plain
 `zstd -d p4kx-catalog.json.zst` decodes the frame. The decoded
 bytes are exactly the plain catalog for the same Archive and export time (tests check this with the
 Rust decoder and read the window and content size from the frame header). The file is written to a

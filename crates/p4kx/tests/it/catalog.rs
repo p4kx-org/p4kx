@@ -6,12 +6,13 @@
 
 use crate::catalog_support;
 
+#[path = "catalog_compression.rs"]
+mod compression;
 #[path = "catalog_phase_reporting.rs"]
 mod phase_reporting;
 
 use std::error::Error;
 use std::fs;
-use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use assert_cmd::Command;
@@ -158,42 +159,6 @@ fn catalog_writes_a_catalog_that_the_schema_accepts() -> TestResult {
 }
 
 #[test]
-fn catalog_to_a_zst_name_writes_a_zstd_frame_with_the_bytes_of_the_plain_catalog() -> TestResult {
-    let dir = tempfile::tempdir()?;
-    let archive = write_archive(dir.path())?;
-    let plain = dir.path().join("plain.json");
-    let packed = dir.path().join("p4kx-catalog.json.zst");
-
-    catalog(&archive, &plain, &[])?;
-    let summary = catalog(&archive, &packed, &["--json"])?;
-
-    let frame = fs::read(&packed)?;
-    assert_eq!(frame.get(..4), Some(&[0x28, 0xb5, 0x2f, 0xfd][..]), "magic");
-    let mut decoded = Vec::new();
-    zstd::Decoder::new(frame.as_slice())?.read_to_end(&mut decoded)?;
-    assert!(decoded == fs::read(&plain)?, "byte-identical JSON");
-    let json: serde_json::Value = serde_json::from_str(&summary)?;
-    assert_eq!(json["size"], decoded.len(), "uncompressed size");
-    assert_eq!(json["compressed_size"], frame.len(), "compressed size");
-    assert_eq!(json["decompressed_limit"], 1_000_000_000, "limit");
-    Ok(())
-}
-
-#[test]
-fn catalog_to_a_json_name_stays_plain_json_without_a_compressed_size() -> TestResult {
-    let dir = tempfile::tempdir()?;
-    let archive = write_archive(dir.path())?;
-    let out = dir.path().join("plain.json");
-
-    let summary = catalog(&archive, &out, &["--json"])?;
-
-    assert_eq!(fs::read(&out)?.first(), Some(&b'{'), "plain JSON");
-    let json: serde_json::Value = serde_json::from_str(&summary)?;
-    assert_eq!(json["compressed_size"], serde_json::Value::Null, "none");
-    Ok(())
-}
-
-#[test]
 fn catalog_source_carries_the_public_patch_the_launcher_log_names() -> TestResult {
     let dir = tempfile::tempdir()?;
     let archive = write_archive(dir.path())?;
@@ -282,28 +247,6 @@ fn catalog_without_an_output_file_is_invalid_input() -> TestResult {
     let archive = write_archive(dir.path())?;
     let output = p4kx(&["catalog"])?.arg(&archive).output()?;
     assert_eq!(output.status.code(), Some(2), "exit code: {output:?}");
-    Ok(())
-}
-
-#[test]
-fn catalog_to_a_gz_name_is_refused_instead_of_writing_plain_json() -> TestResult {
-    let dir = tempfile::tempdir()?;
-    let archive = write_archive(dir.path())?;
-    let out = dir.path().join("p4kx-catalog.json.gz");
-
-    let output = p4kx(&["catalog"])?
-        .arg(&archive)
-        .arg("--out")
-        .arg(&out)
-        .output()?;
-
-    assert_eq!(output.status.code(), Some(2), "invalid input: {output:?}");
-    let stderr = String::from_utf8(output.stderr)?;
-    assert!(
-        stderr.contains("gzip") && stderr.contains(".json.zst"),
-        "names the cause and the alternative: {stderr}"
-    );
-    assert!(!out.exists(), "nothing is written");
     Ok(())
 }
 

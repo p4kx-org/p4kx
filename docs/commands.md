@@ -465,7 +465,7 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   `p4kx media schema` prints the index schema; mutually exclusive `--record`, `--reference` and
   `--source` select the JSONL record, common reference and retained-source schemas.
 - `p4kx catalog <archive> --out <file> [--filter <filter>] [--diagnostic-partial]
-  [--exported-at <seconds>] [--progress-phases]` writes the
+  [--exported-at <seconds>] [--progress-phases] [--zstd-level <level>]` writes the
   P4KX catalog ([docs/catalog.md](catalog.md)):
   schema version (3), Channel and Build, Filter selection scope per kind, read/projection health
   and the kinds of the catalog:
@@ -483,8 +483,9 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   read/projection health. It prints the counts per
   kind, the item classes read and the unresolved texts per language and warns when the catalog
   nears or exceeds the transfer or decoded-size reference thresholds. An `--out` name ending in
-  `.zst` writes the catalog as one zstd frame with content size declared. Plain `zstd -d` decodes
-  it. A read/projection failure or a source warning that makes the export incomplete
+  `.zst` writes the catalog as one zstd frame with content size declared. `--zstd-level <level>`
+  selects a compression level from 1 to 22 for a `.zst` output. The default is 19. Plain `zstd -d`
+  decodes it. A read/projection failure or a source warning that makes the export incomplete
   refuses normal publication with exit code 1, before creating or replacing the destination.
   `--diagnostic-partial` explicitly permits writing the diagnostic result, marks its publication
   mode in the file and CLI status, and still exits with 1 when incomplete. Each invocation must

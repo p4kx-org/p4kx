@@ -14,12 +14,13 @@ pub(crate) struct CatalogArgs {
     /// Path of the Data.p4k Archive.
     #[arg(required = true)]
     pub(crate) archive: Option<PathBuf>,
-    /// The catalog file to write; an existing file is replaced. A name ending in `.zst`, e.g.
-    /// `p4kx-catalog.json.zst`, writes one zstd frame (level 19, content size declared, so a
-    /// plain `zstd -d` decodes it); a name ending in `.gz` is refused, any other name writes plain
-    /// JSON.
+    /// The catalog file to replace. A `.zst` name writes one zstd frame with the content size.
+    /// A `.gz` name is refused. Other names write plain JSON.
     #[arg(long, value_name = "FILE", required = true)]
     pub(crate) out: Option<PathBuf>,
+    /// Sets the compression level from 1 to 22 for a `.zst` output. Defaults to 19.
+    #[arg(long, value_name = "LEVEL", value_parser = clap::value_parser!(i32).range(1..=22))]
+    pub(crate) zstd_level: Option<i32>,
     /// Selects only the Records whose record path matches, with the rules of `p4kx search`; every
     /// kind is then marked partial with this Filter.
     #[arg(long, value_name = "FILTER")]
