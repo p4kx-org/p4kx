@@ -110,8 +110,7 @@ fn a_per_kind_floor_survives_unlimited_source_gaps() {
 }
 
 #[test]
-fn text_oracle_checks_later_kinds_after_invalid_rows_without_printing_values()
--> Result<(), Box<dyn Error>> {
+fn text_oracle_checks_later_kinds_after_invalid_rows_without_printing_values() {
     let catalog = json!({
         "texts": {"publicNames": [], "gameTexts": []},
         "items": {},
@@ -137,7 +136,6 @@ fn text_oracle_checks_later_kinds_after_invalid_rows_without_printing_values()
         !report.contains("private_fixture"),
         "the release report omits keys, exported text and original INI text",
     );
-    Ok(())
 }
 
 fn canonical_catalog() -> Result<Value, Box<dyn Error>> {

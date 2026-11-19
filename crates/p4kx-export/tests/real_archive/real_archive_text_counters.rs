@@ -48,10 +48,10 @@ impl<'oracle> CoverageCounters<'oracle> {
         }
     }
 
-    pub(super) fn finish(self) -> (Coverage, Coverage) {
+    pub(super) const fn finish(self) -> (Coverage, Coverage) {
         (
-            self.english.with_supplemental(self.extra_english),
-            self.german.with_supplemental(self.extra_german),
+            self.english.with_supplemental(&self.extra_english),
+            self.german.with_supplemental(&self.extra_german),
         )
     }
 }

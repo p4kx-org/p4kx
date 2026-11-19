@@ -150,7 +150,7 @@ impl Coverage {
         }
     }
 
-    pub(super) fn with_supplemental(mut self, extra: Self) -> Self {
+    pub(super) const fn with_supplemental(mut self, extra: &Self) -> Self {
         self.supplemental_contradictions = extra.contradictions;
         self
     }
