@@ -11,7 +11,7 @@ use p4kx_extraction::{
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::catalog_origins::CatalogOrigins;
+use crate::catalog_origins::CatalogLocaleOrigins;
 use crate::schema_fields::every_field_required;
 use crate::texts::Texts;
 use crate::{CatalogError, ExportAccountingError};
@@ -50,21 +50,54 @@ enum LanguageFallback {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct CatalogLanguageSource<'source> {
+pub struct CatalogLanguageSource<'source> {
     path: SourcedValue<&'source str>,
     encoding: SourcedValue<SourceIniEncoding>,
     lossy_decoding: SourcedValue<bool>,
     skipped_malformed_lines: SourcedValue<usize>,
 }
 
-#[derive(Debug, Serialize, JsonSchema)]
+impl<'source> CatalogLanguageSource<'source> {
+    /// Borrows the original localization Entry path.
+    #[must_use]
+    pub const fn path(&self) -> &SourcedValue<&'source str> {
+        &self.path
+    }
+
+    /// Borrows the encoding detected on the original Entry.
+    #[must_use]
+    pub const fn encoding(&self) -> &SourcedValue<SourceIniEncoding> {
+        &self.encoding
+    }
+
+    /// Borrows the original Entry's decoding-loss observation.
+    #[must_use]
+    pub const fn lossy_decoding(&self) -> &SourcedValue<bool> {
+        &self.lossy_decoding
+    }
+
+    /// Borrows the number of malformed lines skipped during indexing.
+    #[must_use]
+    pub const fn skipped_malformed_lines(&self) -> &SourcedValue<usize> {
+        &self.skipped_malformed_lines
+    }
+}
+
+/// Encoding observed while decoding a localization Entry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
-enum SourceIniEncoding {
+#[non_exhaustive]
+pub enum SourceIniEncoding {
+    /// UTF-8 without a byte-order mark.
     Utf8,
+    /// UTF-8 with a byte-order mark.
     Utf8Bom,
+    /// Little-endian UTF-16.
     Utf16Le,
+    /// Big-endian UTF-16.
     Utf16Be,
+    /// An encoding outside the supported encoding vocabulary.
     Unknown,
 }
 
@@ -80,28 +113,31 @@ impl From<IniEncoding> for SourceIniEncoding {
     }
 }
 
-pub(crate) type CatalogLanguageSources<'source> =
+/// Canonical localization Entry observations keyed by supported language code.
+pub type CatalogLanguageSources<'source> =
     BTreeMap<&'static str, SourcedValue<CatalogLanguageSource<'source>>>;
 
 pub(crate) fn language_sources<'source>(
     texts: &Texts<'source>,
-    origins: &CatalogOrigins,
+    registry: &SourceUses,
+    origins: &CatalogLocaleOrigins,
+    languages: &[Language],
 ) -> Result<CatalogLanguageSources<'source>, CatalogError> {
     let mut sources = BTreeMap::new();
-    for language in Language::ALL {
-        let entry = match (texts.source_entry(language), origins.locale(language)) {
+    for &language in languages {
+        let entry = match (texts.source_entry(language), origins.get(language)) {
             (Some(entry), Some(input)) => {
                 let skipped = texts
                     .skipped_lines(language)
                     .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
-                present(&origins.uses, input.scope(), entry, skipped)?
+                present(registry, input.scope(), entry, skipped)?
             }
             (None, None) => {
-                let survey = origins.locale_directory();
-                origins.uses.value(
+                let survey = origins.directory();
+                registry.value(
                     SourceValue::Absent,
                     survey.map_or(&[], slice::from_ref),
-                    origins.locale_directory_complete(),
+                    origins.directory_complete(),
                 )
             }
             _ => return Err(ExportAccountingError::ConflictingSourceDatum.into()),

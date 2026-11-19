@@ -5,16 +5,19 @@ use p4kx_export::StarmapTraversalBudget;
 use p4kx_export::catalog_queries::equipment::{
     with_ammo_definitions, with_weapon_recoil_definitions,
 };
+use p4kx_export::catalog_queries::localization::with_language_sources;
 use p4kx_export::catalog_queries::starmap::{
     ContainerPlacementSelection, read_container_placements,
 };
 use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogRecordSelection};
-use p4kx_extraction::Archive;
+use p4kx_extraction::{Archive, Language};
 use p4kx_testkit::{
     ArchiveBuilder, DataForgeBuilder, TestContainer, TestEntry, TestRecord, TestStruct,
 };
 
-use super::{AMMUNITION, CONTAINERS, Route, TestResult, UNRESOLVED, WEAPON_RECOIL};
+use super::{
+    AMMUNITION, CONTAINERS, LANGUAGE_SOURCES, Route, TestResult, UNRESOLVED, WEAPON_RECOIL,
+};
 
 #[path = "sdk_projectile_ammo_route.rs"]
 mod projectile_ammo;
@@ -40,7 +43,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
         None,
     )?;
     let independent_ammo = read_ammunition(&archive)?;
-    let [projectile, reached_ammo, combat] = projectile_ammo::read()?;
+    let [projectile, reached_ammo, combat, magazine] = projectile_ammo::read()?;
     if independent_ammo.schema != reached_ammo.schema {
         return Err("independently admitted and reached Ammo rows have different schemas".into());
     }
@@ -48,7 +51,9 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
         reached_ammo,
         projectile,
         combat,
+        magazine,
         read_weapon_recoil(&archive)?,
+        read_language_sources(&archive)?,
         Route::queried_rows(
             CONTAINERS,
             &starmap.container_instances,
@@ -78,6 +83,29 @@ fn read_ammunition(archive: &Archive) -> TestResult<Route> {
                 AMMUNITION,
                 snapshot.rows(),
                 "independent Record selection available; complete dependency enumeration and installed parity open",
+            )
+        },
+    )?
+}
+
+fn read_language_sources(archive: &Archive) -> TestResult<Route> {
+    with_language_sources(
+        archive,
+        CatalogLanguageSelection::AllAvailable,
+        None,
+        |snapshot| {
+            if snapshot
+                .sources
+                .get("de")
+                .and_then(|source| source.value())
+                .is_none()
+            {
+                return Err("the language metadata query must return a present source".into());
+            }
+            Route::queried_value(
+                LANGUAGE_SOURCES,
+                &snapshot.sources,
+                "selective language Entry metadata available; installed producer parity open",
             )
         },
     )?
@@ -114,6 +142,10 @@ fn fixture() -> TestResult<(tempfile::TempDir, Archive)> {
     let path = folder.path().join("sdk_routes.p4k");
     ArchiveBuilder::new()
         .entry(TestEntry::stored("Data\\Game2.dcb", database.build()))
+        .entry(TestEntry::stored(
+            Language::German.global_ini_path(),
+            b"fixture=Fixture\n",
+        ))
         .entry(packed(ROOT, "fixturesystem.xml", ROOT_XML))
         .entry(packed(TILE, "tile.xml", b"<ObjectContainer/>"))
         .write_to(&path)?;

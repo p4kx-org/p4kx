@@ -51,6 +51,17 @@ impl<'read, 'source> MagazineRead<'read, 'source> {
     pub(crate) const fn into_parts(self) -> (&'read Value<'source>, MagazineRoute<'read, 'source>) {
         (self.weapon, self.route)
     }
+
+    const fn container(self) -> Option<&'read StructValue<'source>> {
+        let value = match self.route {
+            MagazineRoute::Own(value) => Some(value),
+            MagazineRoute::Linked { container, .. } => container,
+        };
+        match value {
+            Some(Value::Struct(fields)) => Some(fields),
+            _ => None,
+        }
+    }
 }
 
 /// The actual on-weapon container or the one attempted target body.
@@ -113,64 +124,73 @@ pub(super) fn weapon<'f, E>(
     ammunition: impl FnOnce(&Record<'f>, &mut TreeBuilder<'f>) -> Result<Option<AmmoStats>, E>,
     observe_magazine: impl FnOnce(MagazineRead<'_, 'f>) -> Result<(), E>,
 ) -> Result<Option<WeaponStats<'f>>, E> {
+    with_primary_magazine(tree, forge, trees, |weapon, magazine, trees| {
+        let fire_actions = fire_actions(weapon);
+        if let Some(magazine) = magazine {
+            observe_magazine(magazine)?;
+        }
+        let (ammo_capacity, ammo) = loaded(
+            magazine.and_then(MagazineRead::container),
+            forge,
+            trees,
+            ammunition,
+        )?;
+        Ok(WeaponStats {
+            fire_actions,
+            ammo_capacity,
+            ammo,
+        })
+    })
+}
+
+/// Observes the first weapon's original on-item or one-hop primary magazine route.
+pub(crate) fn with_primary_magazine<'source, T, E>(
+    tree: &RecordTree<'source>,
+    forge: &'source DataForge<'source>,
+    trees: &mut TreeBuilder<'source>,
+    inspect: impl FnOnce(
+        &StructValue<'source>,
+        Option<MagazineRead<'_, 'source>>,
+        &mut TreeBuilder<'source>,
+    ) -> Result<T, E>,
+) -> Result<Option<T>, E> {
     let Some((occurrence, weapon)) = component_occurrence(tree, WEAPON_COMPONENT) else {
         return Ok(None);
     };
-    let fire_actions = fire_actions(weapon);
-    let (ammo_capacity, ammo) =
-        if let Some((original, container)) = component_occurrence(tree, AMMO_CONTAINER) {
-            observe_magazine(MagazineRead {
+    if let Some((original, _)) = component_occurrence(tree, AMMO_CONTAINER) {
+        return inspect(
+            weapon,
+            Some(MagazineRead {
                 weapon: occurrence,
                 route: MagazineRoute::Own(original),
-            })?;
-            loaded(Some(container), forge, trees, ammunition)?
-        } else {
-            linked_ammo(
-                (occurrence, weapon),
-                forge,
-                trees,
-                ammunition,
-                observe_magazine,
-            )?
-        };
-    Ok(Some(WeaponStats {
-        fire_actions,
-        ammo_capacity,
-        ammo,
-    }))
-}
-
-fn linked_ammo<'f, E>(
-    (occurrence, weapon): (&Value<'f>, &StructValue<'f>),
-    forge: &'f DataForge<'f>,
-    trees: &mut TreeBuilder<'f>,
-    ammunition: impl FnOnce(&Record<'f>, &mut TreeBuilder<'f>) -> Result<Option<AmmoStats>, E>,
-    observe: impl FnOnce(MagazineRead<'_, 'f>) -> Result<(), E>,
-) -> Result<(Option<i64>, Option<AmmoStats>), E> {
-    let Some(caller) = weapon.field(PRIMARY_MAGAZINE_FIELD) else {
-        return Ok((None, None));
-    };
-    let Some(record) = linked_record(record_reference(caller), ENTITY, forge) else {
-        return Ok((None, None));
+            }),
+            trees,
+        )
+        .map(Some);
+    }
+    let linked = weapon.field(PRIMARY_MAGAZINE_FIELD).and_then(|caller| {
+        linked_record(record_reference(caller), ENTITY, forge).map(|record| (caller, record))
+    });
+    let Some((caller, record)) = linked else {
+        return inspect(weapon, None, trees).map(Some);
     };
     let read = trees.build(&record);
     let container = read
         .as_ref()
         .ok()
         .and_then(|tree| component_occurrence(tree, AMMO_CONTAINER));
-    observe(MagazineRead {
-        weapon: occurrence,
-        route: MagazineRoute::Linked {
-            caller,
-            record,
-            tree: read.as_ref(),
-            container: container.map(|(value, _)| value),
-        },
-    })?;
-    loaded(
-        container.map(|(_, fields)| fields),
-        forge,
+    inspect(
+        weapon,
+        Some(MagazineRead {
+            weapon: occurrence,
+            route: MagazineRoute::Linked {
+                caller,
+                record,
+                tree: read.as_ref(),
+                container: container.map(|(value, _)| value),
+            },
+        }),
         trees,
-        ammunition,
     )
+    .map(Some)
 }

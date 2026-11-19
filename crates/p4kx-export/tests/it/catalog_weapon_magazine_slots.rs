@@ -23,6 +23,8 @@ mod numbers;
 mod projectile;
 #[path = "catalog_weapon_magazine_resolution.rs"]
 mod resolution;
+#[path = "catalog_weapon_magazine_sdk.rs"]
+mod sdk;
 #[path = "catalog_weapon_magazine_slots_source.rs"]
 mod source;
 

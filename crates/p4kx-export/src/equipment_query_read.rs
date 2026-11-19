@@ -155,7 +155,8 @@ impl<'query> Query<'query> {
             | Family::ItemSources
             | Family::AmmoDefinitions
             | Family::WeaponSources
-            | Family::ProjectileAmmo => Plan::read(
+            | Family::ProjectileAmmo
+            | Family::MagazineResolutions => Plan::read(
                 self.forge,
                 family.kind(),
                 self.selection,
@@ -192,7 +193,8 @@ fn order(family: Family, owners: &mut [Owner<'_>]) {
         | Family::Bounds
         | Family::CargoGrids
         | Family::WeaponSources
-        | Family::ProjectileAmmo => owners.sort_by_key(|owner| owner.record.index()),
+        | Family::ProjectileAmmo
+        | Family::MagazineResolutions => owners.sort_by_key(|owner| owner.record.index()),
     }
 }
 

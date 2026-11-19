@@ -28,7 +28,12 @@ impl<'source> CatalogProjection<'_, 'source> {
         Ok(FinishedTexts {
             texts: CatalogTexts {
                 language_policy: CatalogLanguagePolicy::AVAILABLE_SUPPORTED,
-                language_sources: language_sources(self.texts, self.origins())?,
+                language_sources: language_sources(
+                    self.texts,
+                    &self.origins().uses,
+                    self.origins().locale_origins(),
+                    &CATALOG_LANGUAGES,
+                )?,
                 public_names: rows.public_names,
                 game_texts: rows.game_texts,
             },

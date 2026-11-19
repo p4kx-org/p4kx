@@ -135,7 +135,12 @@ impl<'e> Texts<'e> {
     /// Drops the lookup indexes and returns the language counts and localization notes.
     pub(crate) fn into_summary(self) -> (Vec<TextSummary>, Vec<LocalizationNote>) {
         let summary = self.summary();
-        (summary, self.notes)
+        (summary, self.into_notes())
+    }
+
+    /// Returns localization notes without preparing the field-count summary.
+    pub(crate) fn into_notes(self) -> Vec<LocalizationNote> {
+        self.notes
     }
 
     /// Returns what resolved per language, in the order of [`CATALOG_LANGUAGES`].

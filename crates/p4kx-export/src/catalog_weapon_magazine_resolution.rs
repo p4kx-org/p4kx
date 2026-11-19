@@ -33,12 +33,13 @@ type Fields<'scope, 'read, 'source> = OriginalFlowFields<'scope, 'read, 'source>
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct WeaponMagazineResolution {
+pub struct WeaponMagazineResolution {
     #[serde(flatten)]
     owner: ComponentOwner,
     outcome: SourcedValue<Outcome>,
 }
 
+/// The observed primary magazine route of a physical weapon component.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(
     tag = "type",
@@ -46,24 +47,51 @@ pub(crate) struct WeaponMagazineResolution {
     rename_all_fields = "camelCase"
 )]
 #[schemars(transform = every_field_required)]
-enum Outcome {
+#[non_exhaustive]
+pub enum Outcome {
+    /// The weapon's own first matching container.
     OwnContainer {
+        /// The selected original Components slot.
         container_ordinal: SourcedValue<u32>,
     },
+    /// The first matching container on the linked magazine.
     LinkedContainer {
+        /// The physical Record selected by the authored reference.
         magazine_record_index: SourcedValue<u32>,
+        /// The selected slot in the magazine's Components array.
         container_ordinal: SourcedValue<u32>,
     },
+    /// The linked magazine was readable and supplied no matching container.
     LinkedWithoutContainer {
+        /// The physical Record selected by the authored reference.
         magazine_record_index: SourcedValue<u32>,
     },
+    /// The linked magazine's components could not establish container absence.
     LinkedContainerUndetermined {
+        /// The physical Record selected by the authored reference.
         magazine_record_index: SourcedValue<u32>,
     },
+    /// The original reference reached a Record whose body could not be read.
     LinkedTargetUnreadable {
+        /// The physical Record selected by the authored reference.
         magazine_record_index: SourcedValue<u32>,
+        /// The reason the linked target was unavailable.
         failure_code: ExportDiagnosticCode,
     },
+}
+
+impl WeaponMagazineResolution {
+    /// Borrows the physical weapon component owner.
+    #[must_use]
+    pub const fn owner(&self) -> &ComponentOwner {
+        &self.owner
+    }
+
+    /// Borrows the original attempt and its field-level source evidence.
+    #[must_use]
+    pub const fn outcome(&self) -> &SourcedValue<Outcome> {
+        &self.outcome
+    }
 }
 
 pub(crate) fn read<'source>(
@@ -73,7 +101,7 @@ pub(crate) fn read<'source>(
     fields: &Fields<'_, '_, 'source>,
     observed: MagazineRead<'_, 'source>,
     cancel: Option<&CancelToken>,
-    dependencies: &MagazineDependencies<'_, 'source>,
+    dependencies: Option<&MagazineDependencies<'_, 'source>>,
 ) -> Result<Option<WeaponMagazineResolution>, CatalogError> {
     fields.check_tree(tree)?;
     let context = input.record_context(record)?;
@@ -153,7 +181,7 @@ fn linked<'source>(
     target: &LinkedTarget<'_, 'source>,
     cancel: Option<&CancelToken>,
     evidence: &mut SelectionEvidence,
-    dependencies: &MagazineDependencies<'_, 'source>,
+    dependencies: Option<&MagazineDependencies<'_, 'source>>,
 ) -> Result<Outcome, CatalogError> {
     caller.check_input(input)?;
     let original = caller.reference_observation()?;
@@ -189,7 +217,9 @@ fn linked<'source>(
             Ok(match target.container {
                 Some(container) => {
                     let fact = fields.fact(container)?;
-                    dependencies.retain(input, &target.record, tree, &fields, fact, cancel)?;
+                    if let Some(dependencies) = dependencies {
+                        dependencies.retain(input, &target.record, tree, &fields, fact, cancel)?;
+                    }
                     Outcome::LinkedContainer {
                         magazine_record_index,
                         container_ordinal: ComponentOwner::ordinal(&fields, fact)?,

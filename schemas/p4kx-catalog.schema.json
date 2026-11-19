@@ -33223,11 +33223,14 @@
       ]
     },
     "Outcome": {
+      "description": "The observed primary magazine route of a physical weapon component.",
       "oneOf": [
         {
+          "description": "The weapon's own first matching container.",
           "properties": {
             "containerOrdinal": {
-              "$ref": "#/$defs/SourcedValueOfuint32"
+              "$ref": "#/$defs/SourcedValueOfuint32",
+              "description": "The selected original Components slot."
             },
             "type": {
               "const": "ownContainer",
@@ -33241,12 +33244,15 @@
           "type": "object"
         },
         {
+          "description": "The first matching container on the linked magazine.",
           "properties": {
             "containerOrdinal": {
-              "$ref": "#/$defs/SourcedValueOfuint32"
+              "$ref": "#/$defs/SourcedValueOfuint32",
+              "description": "The selected slot in the magazine's Components array."
             },
             "magazineRecordIndex": {
-              "$ref": "#/$defs/SourcedValueOfuint32"
+              "$ref": "#/$defs/SourcedValueOfuint32",
+              "description": "The physical Record selected by the authored reference."
             },
             "type": {
               "const": "linkedContainer",
@@ -33261,9 +33267,11 @@
           "type": "object"
         },
         {
+          "description": "The linked magazine was readable and supplied no matching container.",
           "properties": {
             "magazineRecordIndex": {
-              "$ref": "#/$defs/SourcedValueOfuint32"
+              "$ref": "#/$defs/SourcedValueOfuint32",
+              "description": "The physical Record selected by the authored reference."
             },
             "type": {
               "const": "linkedWithoutContainer",
@@ -33277,9 +33285,11 @@
           "type": "object"
         },
         {
+          "description": "The linked magazine's components could not establish container absence.",
           "properties": {
             "magazineRecordIndex": {
-              "$ref": "#/$defs/SourcedValueOfuint32"
+              "$ref": "#/$defs/SourcedValueOfuint32",
+              "description": "The physical Record selected by the authored reference."
             },
             "type": {
               "const": "linkedContainerUndetermined",
@@ -33293,12 +33303,15 @@
           "type": "object"
         },
         {
+          "description": "The original reference reached a Record whose body could not be read.",
           "properties": {
             "failureCode": {
-              "$ref": "#/$defs/ExportDiagnosticCode"
+              "$ref": "#/$defs/ExportDiagnosticCode",
+              "description": "The reason the linked target was unavailable."
             },
             "magazineRecordIndex": {
-              "$ref": "#/$defs/SourcedValueOfuint32"
+              "$ref": "#/$defs/SourcedValueOfuint32",
+              "description": "The physical Record selected by the authored reference."
             },
             "type": {
               "const": "linkedTargetUnreadable",
@@ -45153,14 +45166,34 @@
       "required": []
     },
     "SourceIniEncoding": {
-      "enum": [
-        "utf8",
-        "utf8Bom",
-        "utf16Le",
-        "utf16Be",
-        "unknown"
+      "description": "Encoding observed while decoding a localization Entry.",
+      "oneOf": [
+        {
+          "const": "utf8",
+          "description": "UTF-8 without a byte-order mark.",
+          "type": "string"
+        },
+        {
+          "const": "utf8Bom",
+          "description": "UTF-8 with a byte-order mark.",
+          "type": "string"
+        },
+        {
+          "const": "utf16Le",
+          "description": "Little-endian UTF-16.",
+          "type": "string"
+        },
+        {
+          "const": "utf16Be",
+          "description": "Big-endian UTF-16.",
+          "type": "string"
+        },
+        {
+          "const": "unknown",
+          "description": "An encoding outside the supported encoding vocabulary.",
+          "type": "string"
+        }
       ],
-      "type": "string",
       "x-p4kx-vocabularyClass": "control"
     },
     "SourceInventory": {

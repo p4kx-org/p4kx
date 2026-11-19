@@ -2,13 +2,15 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_export::catalog_queries::equipment::{
-    AmmoSelection, DpsUnit, ProjectileAmmoChoice, ProjectileAmmoSnapshot, with_projectile_ammo,
-    with_weapon_combat_bases,
+    AmmoSelection, DpsUnit, ProjectileAmmoChoice, ProjectileAmmoSnapshot, WeaponMagazineOutcome,
+    with_projectile_ammo, with_weapon_combat_bases, with_weapon_magazine_resolutions,
 };
 use p4kx_extraction::{Archive, DataForge, Filter};
 use p4kx_testkit::{ArchiveBuilder, TestEntry};
 
-use super::super::{AMMUNITION, PROJECTILE_AMMUNITION, Route, TestResult, WEAPON_COMBAT};
+use super::super::{
+    AMMUNITION, MAGAZINE_RESOLUTION, PROJECTILE_AMMUNITION, Route, TestResult, WEAPON_COMBAT,
+};
 
 #[expect(
     dead_code,
@@ -17,7 +19,7 @@ use super::super::{AMMUNITION, PROJECTILE_AMMUNITION, Route, TestResult, WEAPON_
 #[path = "../it/catalog_weapon_linked_ammo_fixture.rs"]
 mod fixture;
 
-pub(super) fn read() -> TestResult<[Route; 3]> {
+pub(super) fn read() -> TestResult<[Route; 4]> {
     let bytes =
         fixture::with_ammo_names(fixture::Case::Unique, "debug_primary", "debug_secondary").build();
     let record_index = {
@@ -40,7 +42,33 @@ pub(super) fn read() -> TestResult<[Route; 3]> {
     let [projectile, ammo] = with_projectile_ammo(&archive, record_index, None, |snapshot| {
         reached(&snapshot, record_index)
     })??;
-    Ok([projectile, ammo, combat(&archive, record_index)?])
+    Ok([
+        projectile,
+        ammo,
+        combat(&archive, record_index)?,
+        magazine(&archive, record_index)?,
+    ])
+}
+
+fn magazine(archive: &Archive, weapon: u32) -> TestResult<Route> {
+    with_weapon_magazine_resolutions(archive, weapon, None, |snapshot| {
+        let [row] = snapshot.rows() else {
+            return Err("one observed legacy route for the physical weapon".into());
+        };
+        if row.owner().record_index().value() != Some(&weapon)
+            || !matches!(
+                row.outcome().value(),
+                Some(WeaponMagazineOutcome::LinkedContainer { .. })
+            )
+        {
+            return Err("one original linked primary magazine route".into());
+        }
+        Route::queried_rows(
+            MAGAZINE_RESOLUTION,
+            snapshot.rows(),
+            "physical Item query available; owner enumeration and installed parity open",
+        )
+    })?
 }
 
 fn combat(archive: &Archive, weapon: u32) -> TestResult<Route> {

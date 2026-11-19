@@ -18,6 +18,7 @@ mod weapon;
 
 pub(crate) use weapon::{
     AMMO_CONTAINER, MagazineRead, MagazineRoute, PRIMARY_MAGAZINE_FIELD, WEAPON_COMPONENT, ammo,
+    with_primary_magazine,
 };
 
 const POWER_PLANT: &str = "PowerPlant";

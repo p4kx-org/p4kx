@@ -20,7 +20,7 @@ pub enum CatalogLanguageSelection<'query> {
 }
 
 impl CatalogLanguageSelection<'_> {
-    fn canonical_languages(self) -> Vec<Language> {
+    pub(crate) fn canonical_languages(self) -> Vec<Language> {
         match self {
             Self::AllAvailable => CATALOG_LANGUAGES.to_vec(),
             Self::Selected(languages) => CATALOG_LANGUAGES

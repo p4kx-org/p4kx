@@ -53,6 +53,8 @@ mod weapon;
 mod weapon_combat;
 #[path = "equipment_weapon_combat_read.rs"]
 mod weapon_combat_read;
+#[path = "equipment_weapon_magazine_query.rs"]
+mod weapon_magazine;
 #[path = "equipment_weapon_recoil_query.rs"]
 mod weapon_recoil;
 
@@ -106,6 +108,11 @@ pub use weapon_combat::{
     AlphaUnit, CombatModel, CombatUnits, DamageChannels, DistanceUnit, DpsUnit, FireRateUnit,
     NominalBullet, NominalBulletDamage, WeaponCombatBase, WeaponCombatOwner, WeaponCombatSnapshot,
     with_weapon_combat_bases, with_weapon_combat_bases_from,
+};
+
+pub use weapon_magazine::{
+    WeaponMagazineOutcome, WeaponMagazineResolution, WeaponMagazineSnapshot,
+    with_weapon_magazine_resolutions, with_weapon_magazine_resolutions_from,
 };
 
 pub use crate::catalog_v3::catalog_weapon_actions::WeaponActionRecoil;

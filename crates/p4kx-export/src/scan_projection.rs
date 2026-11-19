@@ -230,7 +230,7 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
                     originals,
                     observed,
                     cancel,
-                    &self.scan.ammo.magazines,
+                    Some(&self.scan.ammo.magazines),
                 )? {
                     read.rows.magazine_resolutions.push(row);
                 }

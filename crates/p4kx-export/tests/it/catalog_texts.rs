@@ -6,6 +6,9 @@
 #[path = "catalog_text_kind_coverage.rs"]
 mod kind_coverage;
 
+#[path = "catalog_text_source_sdk.rs"]
+mod source_sdk;
+
 #[path = "catalog_text_values.rs"]
 mod values;
 

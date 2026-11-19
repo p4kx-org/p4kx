@@ -27,7 +27,9 @@ use crate::source_fields::FieldError;
 #[path = "catalog_item_component_read.rs"]
 mod component_read;
 pub use component_read::WeaponSource;
-pub(crate) use component_read::{read, read_projectile_ammo, read_weapon_source};
+pub(crate) use component_read::{
+    read, read_magazine_resolution, read_projectile_ammo, read_weapon_source,
+};
 
 #[path = "equipment_item_definition_read.rs"]
 pub(crate) mod definition_read;

@@ -8,8 +8,12 @@ mod blueprints;
 
 #[path = "blueprint_category_query.rs"]
 mod blueprint_categories;
+#[path = "catalog_record_selection.rs"]
+mod record_selection;
 #[path = "unlocalized_record_query.rs"]
 mod unlocalized_record_query;
+
+pub use record_selection::CatalogRecordSelection;
 
 #[path = "contract_query.rs"]
 mod contracts;
@@ -75,13 +79,14 @@ pub mod equipment;
 #[path = "starmap_placement_query.rs"]
 pub mod starmap;
 
+#[path = "catalog_language_query.rs"]
+pub mod localization;
+
 use p4kx_extraction::{
-    Archive, Build, CancelToken, DataForge, DataForgeEntry, Guid, Record, SourceInventory,
-    SourcedValue,
+    Archive, Build, CancelToken, DataForge, DataForgeEntry, SourceInventory, SourcedValue,
 };
 use serde::Serialize;
 
-use crate::catalog_query_session::checkpoint;
 use crate::catalog_v3::blueprint_category_list_read;
 use crate::{CatalogError, Kind};
 
@@ -179,45 +184,6 @@ pub use contract_generators::{
     ContractGeneratorProjectionFailure, ContractGeneratorProjectionNote, ContractGeneratorSnapshot,
     with_contract_generators, with_contract_generators_from,
 };
-
-/// Selects physical Records within the queried dataset and supplied DataForge.
-#[derive(Debug, Clone, Copy)]
-#[non_exhaustive]
-pub enum CatalogRecordSelection {
-    /// All Records admitted to the queried dataset by canonical catalog policy.
-    All,
-    /// All admitted Records with this GUID, including duplicates.
-    Guid(Guid),
-    /// The Record with this physical index in the supplied DataForge.
-    RecordIndex(u32),
-}
-
-impl CatalogRecordSelection {
-    fn for_each<'source>(
-        self,
-        forge: &'source DataForge<'_>,
-        cancel: Option<&CancelToken>,
-        mut read: impl FnMut(&Record<'source>) -> Result<(), CatalogError>,
-    ) -> Result<(), CatalogError> {
-        match self {
-            Self::RecordIndex(index) => {
-                if let Some(record) = forge.record(index) {
-                    read(&record)?;
-                }
-            }
-            Self::All | Self::Guid(_) => {
-                for record in forge.records() {
-                    checkpoint(cancel)?;
-                    if matches!(self, Self::Guid(guid) if record.guid() != guid) {
-                        continue;
-                    }
-                    read(&record)?;
-                }
-            }
-        }
-        Ok(())
-    }
-}
 
 /// A category-list declaration with its original ordered reference slots.
 #[derive(Debug, Serialize)]

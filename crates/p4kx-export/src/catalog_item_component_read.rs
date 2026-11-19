@@ -3,10 +3,10 @@
 
 use std::cell::RefCell;
 
-use p4kx_extraction::{CancelToken, DataForge, DataType, RecordTree, Value};
+use p4kx_extraction::{CancelToken, DataForge, DataType, RecordTree, TreeBuilder, Value};
 
 use super::item_definition::ItemDefinition;
-use super::{Component, ItemComponentsRead};
+use super::{Component, ItemComponentsRead, resolution};
 use crate::CatalogError;
 use crate::catalog_number_capture::CapturedNumber;
 use crate::catalog_projection::CatalogProjection;
@@ -21,6 +21,7 @@ use crate::catalog_v3::catalog_weapon_projectile_ammo::{
 };
 use crate::catalog_v3::item_component_owner::ComponentOwner;
 use crate::export_ledger::ExportLedger;
+use crate::item_stats::{PRIMARY_MAGAZINE_FIELD, with_primary_magazine};
 use crate::record_observation::RecordObservation;
 use crate::template_field_capture::TemplateFieldCapture;
 
@@ -100,6 +101,61 @@ pub(crate) fn read_weapon_source<'source>(
             ))
         },
     )
+}
+
+pub(crate) fn read_magazine_resolution<'source>(
+    forge: &'source DataForge<'source>,
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    cancel: Option<&CancelToken>,
+) -> Result<ScopedSourceRead<Vec<resolution::WeaponMagazineResolution>>, CatalogError> {
+    let input = projection.original();
+    input.check_forge(forge)?;
+    let result = with_primary_magazine(
+        tree,
+        forge,
+        &mut TreeBuilder::new(),
+        |weapon, observed, _| {
+            let Some(observed) = observed else {
+                let failed = matches!(
+                    weapon.field(PRIMARY_MAGAZINE_FIELD),
+                    Some(Value::Error(error)) if error.dangling_guid().is_none()
+                );
+                return Ok::<_, CatalogError>(ScopedSourceRead::new(
+                    Vec::new(),
+                    Vec::new(),
+                    weapon_component_selection_complete(tree) && !failed,
+                ));
+            };
+            let scope = input.record_scope(admission.record(), tree)?;
+            let fields = OriginalFlowFields::read(&scope, cancel)?;
+            let row = resolution::read(
+                input,
+                admission.record(),
+                tree,
+                &fields,
+                observed,
+                cancel,
+                None,
+            )?;
+            let complete = row
+                .as_ref()
+                .is_some_and(|row| row.outcome().origin().source_set_complete());
+            Ok(ScopedSourceRead::new(
+                row.into_iter().collect(),
+                Vec::new(),
+                complete,
+            ))
+        },
+    )?;
+    Ok(result.unwrap_or_else(|| {
+        ScopedSourceRead::new(
+            Vec::new(),
+            Vec::new(),
+            weapon_component_selection_complete(tree),
+        )
+    }))
 }
 
 pub(crate) struct WeaponProjectileSources<'source> {

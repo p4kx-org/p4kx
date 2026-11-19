@@ -15,8 +15,10 @@ mod routes;
 #[path = "sdk_row_schema.rs"]
 mod row_schema;
 
+const LANGUAGE_SOURCES: &str = "/texts/languageSources";
 const AMMUNITION: &str = "/definitions/ammoDefinitions";
 const PROJECTILE_AMMUNITION: &str = "/projections/weaponProjectileAmmoSelections";
+const MAGAZINE_RESOLUTION: &str = "/projections/weaponMagazineResolutions";
 const WEAPON_COMBAT: &str = "/projections/weaponCombatBases";
 const WEAPON_RECOIL: &str = "/definitions/weaponActionRecoilDefinitions";
 const CONTAINERS: &str = "/placements/containerInstances";
@@ -31,6 +33,14 @@ struct Route {
 }
 
 impl Route {
+    fn queried_value<Item: JsonSchema + serde::Serialize>(
+        dataset: &'static str,
+        value: &Item,
+        remaining: &'static str,
+    ) -> TestResult<Self> {
+        Self::queried_rows(dataset, std::slice::from_ref(value), remaining)
+    }
+
     fn queried_rows<Row: JsonSchema + serde::Serialize>(
         dataset: &'static str,
         rows: &[Row],
@@ -58,8 +68,10 @@ fn sdk_query_witnesses_keep_their_canonical_dataset_contract() -> TestResult {
     let witnesses = routes::read()?;
     let gaps = audit(&schema, &registered, &witnesses)?;
     for path in [
+        LANGUAGE_SOURCES,
         AMMUNITION,
         PROJECTILE_AMMUNITION,
+        MAGAZINE_RESOLUTION,
         WEAPON_COMBAT,
         WEAPON_RECOIL,
         CONTAINERS,
@@ -181,7 +193,7 @@ fn audit(
         if !seen.insert(route.dataset) || EXPORT_ATTEMPT_FIELDS.contains(&route.dataset) {
             return Err(format!("invalid SDK route claim for {}", route.dataset).into());
         }
-        let catalog_row = canonical_row(schema, route.dataset, entry.shape)?;
+        let catalog_row = canonical_value(schema, route.dataset, entry.shape)?;
         let query_row = resolve(
             &route.schema,
             route.schema.get("items").ok_or("SDK row list")?,
@@ -200,13 +212,11 @@ fn audit(
     Ok(gaps)
 }
 
-fn canonical_row<'s>(schema: &'s Value, dataset: &str, shape: Shape) -> TestResult<&'s Value> {
+fn canonical_value<'s>(schema: &'s Value, dataset: &str, shape: Shape) -> TestResult<&'s Value> {
     let path = match shape {
         Shape::Table => format!("{dataset}/rows/[]"),
         Shape::Array => format!("{dataset}/[]"),
-        Shape::Object | Shape::Scalar => {
-            return Err(format!("rows do not represent dataset {dataset}").into());
-        }
+        Shape::Object | Shape::Scalar => return schema_at(schema, dataset),
     };
     schema_at(schema, &path)
 }

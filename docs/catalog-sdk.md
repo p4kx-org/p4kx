@@ -32,6 +32,19 @@ with no admitted gameplay-property Record opens no localization payloads and ret
 available list. Compare physical Record indices only within the same DataForge input and resolve
 source uses through each result's own inventory.
 
+## Localization Entry metadata
+
+Use catalog_queries::localization::with_language_sources for the canonical
+texts.languageSources map. It reads and indexes the requested localization Entries directly
+from the Archive and supplies each Entry's path, encoding, lossy-decoding flag, malformed-line
+count and immediate source evidence. AllAvailable returns the same supported-code map as the
+complete Catalog. Selected returns only the requested codes. The map distinguishes a requested
+language absent from the Archive from a language outside the request.
+
+The callback receives the Build, notes and the result's own SourceInventory. The query opens
+no DataForge Entry and creates no Catalog output. A failed requested read returns an error.
+Publish caller-owned state after the outer query returns successfully.
+
 ## Resolve field origins
 
 Use each query's own `SourceInventory`. `SourcedValue::origin` supplies the encryption filter,
@@ -699,6 +712,21 @@ visible in the snapshot coverage even when the readable components produce rows.
 
 Magazine and Ammo References in these authored rows report original header resolution.
 Use the projectile ammunition query for a resolved action route and its reached Ammo.
+
+## Primary weapon magazine resolutions
+
+Use `equipment::with_weapon_magazine_resolutions` with the physical Item index.
+The decoded-Entry, session and parsed forms return the same
+`projections.weaponMagazineResolutions` rows and source evidence.
+
+This query reports the primary route observed by the Catalog, including an
+on-item container, a linked physical magazine and slot, a readable target
+without a container, an undetermined container and an unreadable target.
+An empty row set means the queried Item supplied no observed primary route
+within its reported coverage. Read the authored bindings separately to inspect
+links that were never followed. Source-body reads are scoped to the selected
+Item and any magazine reached by its primary route. Projectile actions, Ammo
+definitions and localization are outside the query scope.
 
 ## Projectile ammunition
 

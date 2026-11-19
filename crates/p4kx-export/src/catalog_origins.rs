@@ -20,9 +20,14 @@ pub(crate) struct CatalogOrigins {
     pub(crate) dataforge: SourceScope,
     health_texts: HealthTextCapture,
     entry_frame: Arc<EntryFrame>,
-    locales: BTreeMap<Language, CatalogLocaleInput>,
-    locale_directory: Option<SourceUse>,
-    locale_directory_complete: bool,
+    locales: CatalogLocaleOrigins,
+}
+
+#[derive(Default)]
+pub(crate) struct CatalogLocaleOrigins {
+    scopes: BTreeMap<Language, CatalogLocaleInput>,
+    directory: Option<SourceUse>,
+    directory_complete: bool,
 }
 
 /// One original locale input and its recorded Entry-decoding contribution.
@@ -82,9 +87,7 @@ impl CatalogOrigins {
             uses,
             entry_frame,
             dataforge,
-            locales: BTreeMap::new(),
-            locale_directory: None,
-            locale_directory_complete: false,
+            locales: CatalogLocaleOrigins::default(),
             health_texts: HealthTextCapture::new(),
         };
         if let Some(texts) = texts {
@@ -98,40 +101,10 @@ impl CatalogOrigins {
         archive: &Archive,
         texts: &TextSources,
     ) -> Result<(), CatalogError> {
-        if !self.locales.is_empty() || self.locale_directory.is_some() {
+        if !self.locales.scopes.is_empty() || self.locales.directory.is_some() {
             return Err(crate::ExportAccountingError::ConflictingSourceDatum.into());
         }
-        let mut locales = BTreeMap::new();
-        for language in Language::ALL {
-            if let Some(entry) = texts.entry(language) {
-                let input = entry
-                    .origin()
-                    .map_or(SourceInput::Unknown, SourceInput::Archive);
-                let text = entry.text();
-                let decoded = text.is_lossy()
-                    || matches!(
-                        text.encoding(),
-                        IniEncoding::Utf8Bom | IniEncoding::Utf16Le | IniEncoding::Utf16Be
-                    );
-                locales.insert(
-                    language,
-                    CatalogLocaleInput {
-                        scope: self.uses.observe(input, InputScope::Payload)?,
-                        decoded,
-                    },
-                );
-            }
-        }
-        let locale_directory = if locales.len() < Language::ALL.len() {
-            self.uses.observe_root_directory_paths(archive)?
-        } else {
-            None
-        };
-        let locale_directory_complete = locale_directory.is_some()
-            && crate::export_archive_health::inventory(archive).is_none();
-        self.locales = locales;
-        self.locale_directory = locale_directory;
-        self.locale_directory_complete = locale_directory_complete;
+        self.locales = CatalogLocaleOrigins::read(archive, texts, &self.uses)?;
         Ok(())
     }
 
@@ -147,15 +120,73 @@ impl CatalogOrigins {
         &self.health_texts
     }
 
+    pub(crate) const fn locale_origins(&self) -> &CatalogLocaleOrigins {
+        &self.locales
+    }
+
     pub(crate) fn locale(&self, language: Language) -> Option<&CatalogLocaleInput> {
-        self.locales.get(&language)
+        self.locales.get(language)
     }
 
     pub(crate) const fn locale_directory(&self) -> Option<&SourceUse> {
-        self.locale_directory.as_ref()
+        self.locales.directory()
     }
 
     pub(crate) const fn locale_directory_complete(&self) -> bool {
-        self.locale_directory_complete
+        self.locales.directory_complete()
+    }
+}
+
+impl CatalogLocaleOrigins {
+    pub(crate) fn read(
+        archive: &Archive,
+        texts: &TextSources,
+        uses: &SourceUses,
+    ) -> Result<Self, CatalogError> {
+        let mut scopes = BTreeMap::new();
+        for language in Language::ALL {
+            if let Some(entry) = texts.entry(language) {
+                let input = entry
+                    .origin()
+                    .map_or(SourceInput::Unknown, SourceInput::Archive);
+                let text = entry.text();
+                let decoded = text.is_lossy()
+                    || matches!(
+                        text.encoding(),
+                        IniEncoding::Utf8Bom | IniEncoding::Utf16Le | IniEncoding::Utf16Be
+                    );
+                scopes.insert(
+                    language,
+                    CatalogLocaleInput {
+                        scope: uses.observe(input, InputScope::Payload)?,
+                        decoded,
+                    },
+                );
+            }
+        }
+        let directory = if scopes.len() < Language::ALL.len() {
+            uses.observe_root_directory_paths(archive)?
+        } else {
+            None
+        };
+        let directory_complete =
+            directory.is_some() && crate::export_archive_health::inventory(archive).is_none();
+        Ok(Self {
+            scopes,
+            directory,
+            directory_complete,
+        })
+    }
+
+    pub(crate) fn get(&self, language: Language) -> Option<&CatalogLocaleInput> {
+        self.scopes.get(&language)
+    }
+
+    pub(crate) const fn directory(&self) -> Option<&SourceUse> {
+        self.directory.as_ref()
+    }
+
+    pub(crate) const fn directory_complete(&self) -> bool {
+        self.directory_complete
     }
 }
