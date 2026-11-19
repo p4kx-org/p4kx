@@ -6,7 +6,7 @@
 
 P4KX opens, browses, searches, compares and extracts the `Data.p4k` Archives of Star Citizen, and
 turns their internal formats into readable or importable data: XML, JSON, PNG, OpenEXR, Ogg, WAV,
-glTF and Blender packages. It comes as a Windows window (`p4kx-gui`), a command line (`p4kx`), a
+glTF and Blender packages. It includes a desktop application (`p4kx-gui`), a command line (`p4kx`), a
 read-only [MCP server](#mcp-server) (`p4kx-mcp`) and a [Blender add-on](#blender-add-on).
 
 The current version is **[0.4.2](https://github.com/p4kx-org/p4kx/releases/tag/v0.4.2)**. P4KX is
@@ -121,28 +121,32 @@ Import > P4KX Package (scene.json)). See [blender_addon/README.md](blender_addon
 
 ## Install
 
-Windows packages target AMD64 (`x86_64-pc-windows-msvc`) and ARM64
-(`aarch64-pc-windows-msvc`). Choose your device's CPU in the
-[GitHub Release](https://github.com/p4kx-org/p4kx/releases):
+### v0.4.2 packages
 
-- `P4KX-<version>-<target>.msi`: installs for the current user, without administrator rights, into
-  `%LOCALAPPDATA%\Programs\P4KX`, adds the Start menu entry and puts the folder on your `PATH`.
-- `P4KX-<version>-<target>-portable.zip`: `p4kx-gui.exe`, `p4kx.exe` and `p4kx-mcp.exe` to run from
-  any folder.
-- `p4kx_importer-<version>.zip`: the Blender add-on (Edit > Preferences > Get Extensions >
+The [v0.4.2 Release](https://github.com/p4kx-org/p4kx/releases/tag/v0.4.2) provides Windows AMD64 packages.
+
+- `P4KX-0.4.2-x86_64.msi` installs for the current user, without administrator rights, into
+  `%LOCALAPPDATA%\Programs\P4KX`. It adds the Start menu entry and puts the folder on your `PATH`.
+- `P4KX-0.4.2-x86_64-portable.zip` contains `p4kx-gui.exe`, `p4kx.exe` and `p4kx-mcp.exe`.
+- `p4kx_importer-0.4.2.zip` is the Blender add-on (Edit > Preferences > Get Extensions >
   Install from Disk).
-- `SHA256SUMS.txt` and `SHA3-512SUMS.txt`: the checksums of the other files, to check a download
-  (see [CONTRIBUTING.md](CONTRIBUTING.md)).
+- `SHA256SUMS.txt` and `SHA3-512SUMS.txt` verify downloads (see [CONTRIBUTING.md](CONTRIBUTING.md)).
 
 Settings live in `%APPDATA%\P4KX`. The window can check GitHub once at start for a newer Release
-if you switch that on in the Help menu. It is off by default. The CLI and MCP also offer explicit
-update checks.
-Both CPUs share one per-user MSI installation; an explicitly chosen same-version package
-replaces it. Settings and the stored Archive key survive uninstall. Older AMD64 releases keep
-their `-x86_64` names. [Windows packages](docs/windows-packages.md) defines supported-system
-evidence, runtime DLLs and installer verification.
+if you switch that on in the Help menu. It is off by default.
 
-Linux v0.5.0 packages cover AMD64 and ARM64 as tar.gz, AppImage, deb and Flatpak, each containing
+### v0.5.0 package names and requirements
+
+Check the [Release listing](https://github.com/p4kx-org/p4kx/releases) for available downloads and select the package for your operating system and CPU.
+
+Windows targets AMD64 (`x86_64-pc-windows-msvc`) and ARM64 (`aarch64-pc-windows-msvc`). Choose the
+matching `P4KX-<version>-<target>.msi` or `P4KX-<version>-<target>-portable.zip`.
+Both CPUs share one per-user MSI installation. An explicitly chosen same-version package replaces
+it, and settings and the stored Archive key survive uninstall. The CLI and MCP also offer explicit
+update checks. [Windows packages](docs/windows-packages.md) defines supported-system evidence,
+runtime DLLs and installer verification.
+
+Linux packages cover AMD64 and ARM64 as tar.gz, AppImage, deb and Flatpak, each containing
 the GUI, CLI and MCP server. Native tar.gz/AppImage/deb require Ubuntu 24.04 / glibc 2.39;
 Flatpak uses Freedesktop Platform 25.08 and additionally requires host Documents-portal API 5
 with authenticated host-path lookup. See [Linux packages](docs/linux-packages.md) for
