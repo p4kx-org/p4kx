@@ -595,6 +595,19 @@ cargo test --locked -p p4kx-export --lib -- `
     --ignored --exact --test-threads=1
 ```
 
+To verify the five component definition families, run the installed definition test. It chooses
+the first suitable physical Record for each family in original order. The query session and
+the independently read Records borrow the same decoded DataForge Entry. The test checks the
+Archive Build, selected coverage, sampled original values and exact source positions. For a
+specific sample, set `P4KX_DEFINITION_SDK_WITNESS` to a private selection file with the exact Build
+identity and physical indices. The default run prints Build metadata and the aggregate count.
+
+```powershell
+cargo test --locked -p p4kx-export --test real_archive -- `
+    real_archive_definition_sdk::installed_component_definition_sdk_preserves_selected_original_values `
+    --ignored --exact --test-threads=1
+```
+
 ## Original crafting-global configuration
 
 `catalog_queries::crafting::with_global_params` and `with_global_params_from` return borrowed

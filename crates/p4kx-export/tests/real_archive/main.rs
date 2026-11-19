@@ -47,6 +47,7 @@ mod real_archive_crafters;
 mod real_archive_crafting;
 mod real_archive_crafting_catalog;
 mod real_archive_crafting_details;
+mod real_archive_definition_sdk;
 mod real_archive_emp;
 mod real_archive_equipment_catalog;
 mod real_archive_explosive_components;
