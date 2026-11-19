@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::collections::{HashMap, HashSet};
+use std::mem;
 use std::sync::Arc;
 
 use p4kx_extraction::{EntryOrigin, ModelArchiveSource};
@@ -13,9 +14,10 @@ use crate::build::{file_key, issue};
 use crate::cdf_model_sources::CdfModelSources;
 use crate::flatten::Draft;
 use crate::geometry_choice::GeometryChoice;
+use crate::provider::DeclaredRig;
 use crate::{
     AssemblyError, AssemblyOptions, Issue, IssueKind, ModelFailure, ModelProvider,
-    ProvidedAttachment, SkeletonProblem,
+    ProvidedAttachment, ProvidedModel, SkeletonProblem,
 };
 
 /// The most distinct model files read at once before the vertex budget is checked again; a wave
@@ -27,6 +29,7 @@ pub(crate) struct Loaded {
     pub(crate) entry: String,
     pub(crate) model: Arc<Model>,
     pub(crate) archive_sources: Arc<[ModelArchiveSource]>,
+    pub(crate) rig_only: bool,
     pub(crate) cdf_model_sources: Option<Arc<CdfModelSources>>,
     pub(crate) gear_pose: Option<Arc<GearPoseSources>>,
     pub(crate) definition_origin: Option<EntryOrigin>,
@@ -36,6 +39,45 @@ pub(crate) struct Loaded {
 }
 
 impl Loaded {
+    fn from_provided(provided: ProvidedModel) -> Self {
+        let mut loaded = Self {
+            entry: provided.entry,
+            model: Arc::new(provided.model),
+            archive_sources: provided.archive_sources,
+            rig_only: provided.declared_rig.is_some(),
+            cdf_model_sources: provided.cdf_model_sources,
+            gear_pose: None,
+            definition_origin: provided.definition_origin,
+            left_out: provided.left_out,
+            attachments: provided.attachments,
+            skeleton: provided.skeleton,
+        };
+        if let Some(rig) = provided.declared_rig {
+            let DeclaredRig {
+                entry,
+                model,
+                sources,
+                selectors,
+                primary,
+            } = *rig;
+            loaded.attachments.insert(
+                0,
+                ProvidedAttachment {
+                    name: primary.name,
+                    bone: primary.bone,
+                    position: primary.position,
+                    rotation: primary.rotation,
+                    entry: mem::replace(&mut loaded.entry, entry),
+                    model: mem::replace(&mut loaded.model, Arc::new(model)),
+                    archive_sources: mem::replace(&mut loaded.archive_sources, sources),
+                    cdf_sources: primary.sources,
+                },
+            );
+            loaded.cdf_model_sources = selectors;
+        }
+        loaded
+    }
+
     /// Returns the vertices the part holds: its model's and those of its bone attachments.
     pub(crate) fn vertices(&self) -> usize {
         self.attachments
@@ -177,17 +219,7 @@ fn read_files(
         let read: Vec<(String, Result<Loaded, ModelFailure>)> = wave
             .par_iter()
             .map(|(key, path)| {
-                let result = provider.model(path, lod).map(|provided| Loaded {
-                    entry: provided.entry,
-                    model: Arc::new(provided.model),
-                    archive_sources: provided.archive_sources,
-                    cdf_model_sources: provided.cdf_model_sources,
-                    gear_pose: None,
-                    definition_origin: provided.definition_origin,
-                    left_out: provided.left_out,
-                    attachments: provided.attachments,
-                    skeleton: provided.skeleton,
-                });
+                let result = provider.model(path, lod).map(Loaded::from_provided);
                 (key.clone(), result)
             })
             .collect();

@@ -511,10 +511,12 @@ below, such a port is reported as `part_hidden` instead of `unresolved`),
 deploys it, or the clip cannot be read or applied to its model; the gear keeps the pose of its
 model; a note, `skipped` is false), `attachments_left_out` (the geometry is
 a character definition, `.cdf`. Its main model comes from its first bound skin. When no skin is
-bound, P4KX uses a declared `Model File` with drawable geometry at the selected LOD. Otherwise it
-uses the first bound attachment, or the declared file when there is no bound attachment. Drawable
-bone attachments have their own nodes below the part. The issue lists other bound attachments and
-unreadable bone attachments once per definition. `skipped` is false),
+bound, P4KX uses a declared `Model File` with drawable geometry at the selected LOD. An expressly
+declared rig without drawable geometry owns the rigid nodes, including the first bound attachment,
+when that attachment is rigid. Otherwise the first bound attachment supplies the main model, or
+the declared file when no attachment is bound. Drawable bone attachments have their own nodes
+below the part. The issue lists other bound attachments and unreadable bone attachments once per
+definition. `skipped` is false),
 `skeleton_missing` and `skeleton_unreadable` (the skeleton file, `Model File`, of a character
 definition is not in the Archive, is larger than 16 MiB or cannot be read as a model. The note
 can accompany a drawable main attachment. Reported once per definition, `skipped` is false),

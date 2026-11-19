@@ -18,6 +18,7 @@ pub(crate) struct ModelDefinition {
     cdf: Option<Arc<CdfModelSources>>,
     gear_pose: Option<Arc<GearPoseSources>>,
     material_from_model: bool,
+    rig_only: bool,
 }
 
 impl ModelDefinition {
@@ -31,6 +32,7 @@ impl ModelDefinition {
                 .filter(|_| Arc::ptr_eq(&loaded.model, rendered))
                 .map(Arc::clone),
             material_from_model: false,
+            rig_only: loaded.rig_only,
         }
     }
 
@@ -41,6 +43,12 @@ impl ModelDefinition {
 }
 
 impl Part {
+    /// Returns whether the part's model is a CDF rig used to place its drawable attachments.
+    #[must_use]
+    pub const fn is_cdf_rig_only(&self) -> bool {
+        self.model_definition.rig_only
+    }
+
     /// Returns the original authored field used to choose this part's model.
     #[must_use]
     pub fn geometry_selector(&self) -> Option<SourceLocation> {

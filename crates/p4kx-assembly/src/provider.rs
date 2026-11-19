@@ -4,14 +4,11 @@
 use std::error::Error;
 use std::sync::Arc;
 
-use p4kx_extraction::model::{
-    LayerBudget, LayerCache, LodSelection, MaterialReading, MaterialStatus, Model, ModelError,
-    PositionBox,
-};
+use p4kx_extraction::model::{LayerBudget, LayerCache, MaterialStatus, Model};
 use p4kx_extraction::{
     AnimationChoice, AnimationSet, Archive, ArchiveDefaultMaterial, ArchiveMaterialRead,
-    ArchiveMaterialReads, ArchiveModelRead, ArchiveTextures, ConversionError, EntryOrigin,
-    ModelArchiveSource, ModelSource, PathIndex, TextureVerdicts, archive_error_in,
+    ArchiveMaterialReads, ArchiveTextures, ConversionError, EntryOrigin, ModelArchiveSource,
+    PathIndex, TextureVerdicts, archive_error_in,
 };
 use thiserror::Error;
 
@@ -25,6 +22,9 @@ use crate::skeleton::SkeletonProblem;
 use crate::{CdfAttachmentSite, DeployedGear, MAX_ASSEMBLY_VERTICES};
 
 mod character;
+mod read_model;
+pub(crate) use character::DeclaredRig;
+
 #[path = "provider_dispatch.rs"]
 mod dispatch;
 
@@ -47,6 +47,7 @@ pub struct ProvidedModel {
     /// the file is fine, the definition names none, or the file is no character definition.
     pub skeleton: Option<SkeletonProblem>,
     pub(crate) archive_sources: Arc<[ModelArchiveSource]>,
+    pub(crate) declared_rig: Option<Box<DeclaredRig>>,
     pub(crate) cdf_model_sources: Option<Arc<CdfModelSources>>,
     pub(crate) definition_origin: Option<EntryOrigin>,
 }
@@ -330,61 +331,6 @@ impl<'a> ArchiveModels<'a> {
     ) -> Result<AnimationSet, ConversionError> {
         self.animations_with_archive_sources(folders, choice, extra)
             .map(p4kx_extraction::ArchiveAnimationRead::into_set)
-    }
-}
-
-impl ArchiveModels<'_> {
-    fn read_model(
-        &self,
-        entry: String,
-        lod: u32,
-        left_out: Vec<String>,
-    ) -> Result<ProvidedModel, ModelFailure> {
-        let read_model = if self.observe_nodes {
-            ModelSource::from_index_observing_model_sources
-        } else {
-            ModelSource::from_index_reading
-        };
-        let read = |selection| {
-            read_model(
-                &self.index,
-                &entry,
-                selection,
-                PositionBox::default(),
-                MaterialReading::Skipped,
-                &self.verdicts,
-            )
-        };
-        let source = match read(LodSelection::AtMost(lod)) {
-            Err(ConversionError::Model {
-                source: ModelError::NoSuchLod { .. },
-                ..
-            }) => read(LodSelection::All),
-            other => other,
-        }
-        .map_err(failure)?;
-        let ArchiveModelRead {
-            mut model,
-            mut sources,
-            ..
-        } = source.into_model_with_archive_sources();
-        keep_nearest_lod(&mut model, lod);
-        if model.lods.is_empty() {
-            return Err(ModelFailure::Unreadable {
-                reason: "the model has no level of detail".to_owned(),
-            });
-        }
-        sources.retain(|source| source.supplies(&model));
-        Ok(ProvidedModel {
-            entry,
-            model,
-            left_out,
-            attachments: Vec::new(),
-            skeleton: None,
-            archive_sources: sources.into(),
-            cdf_model_sources: None,
-            definition_origin: None,
-        })
     }
 }
 

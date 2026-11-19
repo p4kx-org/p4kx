@@ -27,6 +27,8 @@ pub(crate) struct Character {
     pub(crate) left_out: Vec<String>,
     pub(crate) skeleton: Option<String>,
     pub(crate) model_sources: Option<CdfModelSources>,
+    pub(crate) primary_rigid: Option<BoneAttachment>,
+    pub(crate) rig_sources: Option<CdfModelSources>,
 }
 
 /// Reads the character definition in `bytes`.
@@ -37,7 +39,7 @@ pub(crate) struct Character {
 pub(crate) fn read(bytes: &[u8]) -> Result<Character, String> {
     let mut budget = Budget::new(bytes.len());
     let root = markup::parse(bytes, &mut budget)?;
-    Drawing::read(&root)?.project(false, |_| None, |_| None)
+    Drawing::read(&root)?.project(Selection::Bound, |_| None, |_| None)
 }
 
 /// A failed definition parse or read of its declared body.
@@ -47,13 +49,16 @@ pub(crate) enum DrawError<E> {
     Body(E),
 }
 
-/// Projects the CDF and reuses a drawable declared body returned by `read_body`.
-///
-/// Calls `read_body` only when a direct `Model File` can take precedence over a bound attachment.
+pub(crate) enum DeclaredModel<T> {
+    Drawable(T),
+    Rig(T),
+}
+
+/// Projects the CDF and returns the declared model when it supplies the body or rigid rig.
 pub(crate) fn read_drawing<T, E>(
     bytes: &[u8],
     observe: bool,
-    read_body: impl FnOnce(&str) -> Result<Option<T>, E>,
+    read_body: impl FnOnce(&str) -> Result<Option<DeclaredModel<T>>, E>,
 ) -> Result<(Character, Option<T>), DrawError<E>> {
     let mut budget = Budget::new(bytes.len());
     let drawing = markup::parse_with_source(bytes, &mut budget, |root, original, scope| {
@@ -62,10 +67,18 @@ pub(crate) fn read_drawing<T, E>(
             Ok(body) => body,
             Err(error) => return Ok(Err(error)),
         };
+        let (selection, body) = match body {
+            Some(DeclaredModel::Drawable(body)) => (Selection::DeclaredBody, Some(body)),
+            Some(DeclaredModel::Rig(rig)) => drawing.primary_rigid().map_or_else(
+                || (Selection::Bound, None),
+                |primary| (Selection::DeclaredRig(primary), Some(rig)),
+            ),
+            None => (Selection::Bound, None),
+        };
         let character = if observe {
-            project_observed(&drawing, body.is_some(), original, scope)?
+            project_observed(&drawing, selection, original, scope)?
         } else {
-            drawing.project(body.is_some(), |_| None, |_| None)?
+            drawing.project(selection, |_| None, |_| None)?
         };
         Ok(Ok((character, body)))
     })
@@ -75,7 +88,7 @@ pub(crate) fn read_drawing<T, E>(
 
 fn project_observed(
     drawing: &Drawing<'_>,
-    body_drawn: bool,
+    selection: Selection,
     original: Node<'_, '_>,
     scope: &Scope<'_, '_>,
 ) -> Result<Character, String> {
@@ -91,7 +104,7 @@ fn project_observed(
         .copied()
         .find(|child| child.name().eq_ignore_ascii_case("Model"));
     drawing.project(
-        body_drawn,
+        selection,
         |ordinal| Some(cdf_attachment_source::capture(attachment(ordinal)?, scope)),
         |selected| match selected {
             MainSelector::Attachment {
@@ -108,7 +121,7 @@ pub(crate) fn read_skeleton_with_position(
 ) -> Result<(Option<String>, Option<SourceLocation>), String> {
     let mut budget = Budget::new(bytes.len());
     markup::parse_with_source(bytes, &mut budget, |root, original, scope| {
-        let character = Drawing::read(&root)?.project(false, |_| None, |_| None)?;
+        let character = Drawing::read(&root)?.project(Selection::Bound, |_| None, |_| None)?;
         let position = character.skeleton.as_ref().and_then(|_| {
             let node = original
                 .children()
@@ -119,6 +132,12 @@ pub(crate) fn read_skeleton_with_position(
         });
         Ok((character.skeleton, position))
     })
+}
+
+enum Selection {
+    Bound,
+    DeclaredBody,
+    DeclaredRig(BoneAttachment),
 }
 
 enum MainSelector {
@@ -167,17 +186,24 @@ impl<'source> Drawing<'source> {
             .filter(|path| !is_character_definition(path))
     }
 
+    fn primary_rigid(&self) -> Option<BoneAttachment> {
+        let first = self.attachments.first()?;
+        BoneAttachment::read(first.element, first.binding)
+            .filter(|bone| !is_character_definition(&bone.binding))
+    }
+
     fn project(
         &self,
-        body_drawn: bool,
-        capture: impl FnMut(usize) -> Option<Arc<[CdfAttachmentSite]>>,
-        capture_model: impl FnOnce(MainSelector) -> Option<CdfModelSources>,
+        selection: Selection,
+        mut capture: impl FnMut(usize) -> Option<Arc<[CdfAttachmentSite]>>,
+        capture_model: impl Fn(MainSelector) -> Option<CdfModelSources>,
     ) -> Result<Character, String> {
-        let chosen = if body_drawn {
-            None
-        } else {
-            self.first_skin
-                .or_else(|| (!self.attachments.is_empty()).then_some(0))
+        let chosen = match &selection {
+            Selection::Bound => self
+                .first_skin
+                .or_else(|| (!self.attachments.is_empty()).then_some(0)),
+            Selection::DeclaredBody => None,
+            Selection::DeclaredRig(_) => Some(0),
         };
         let (model, material, selected) = match chosen.and_then(|at| self.attachments.get(at)) {
             Some(candidate) => (
@@ -200,6 +226,19 @@ impl<'source> Drawing<'source> {
         if is_character_definition(&model) {
             return Err("it names another character definition".to_owned());
         }
+        let primary_rigid = match selection {
+            Selection::DeclaredRig(mut primary) => {
+                primary.sources = self
+                    .attachments
+                    .first()
+                    .and_then(|first| capture(first.ordinal));
+                Some(primary)
+            }
+            Selection::Bound | Selection::DeclaredBody => None,
+        };
+        let rig_sources = primary_rigid
+            .as_ref()
+            .and_then(|_| capture_model(MainSelector::ModelFile));
         let (bones, left_out) = sort_rest(
             self.attachments
                 .iter()
@@ -215,6 +254,8 @@ impl<'source> Drawing<'source> {
             left_out,
             skeleton: self.model_file.map(slashes),
             model_sources: capture_model(selected),
+            primary_rigid,
+            rig_sources,
         })
     }
 }

@@ -137,11 +137,23 @@ impl ModelCache {
             .fold(bytes_of(&model.model), |sum, attached| {
                 sum.saturating_add(bytes_of(&attached.model))
             });
+        let bytes = bytes.saturating_add(
+            model
+                .declared_rig
+                .as_ref()
+                .map_or(0, |rig| bytes_of(&rig.model)),
+        );
         if bytes > self.limit {
             return;
         }
         let level = model.model.lods.first().map_or(lod, |found| found.level);
-        let lowest = if level <= lod { level } else { 0 };
+        let lowest = if model.declared_rig.is_some() {
+            lod
+        } else if level <= lod {
+            level
+        } else {
+            0
+        };
         let copy = Arc::new(model.clone());
         let mut state = self.state();
         state.clock += 1;

@@ -228,6 +228,113 @@ fn a_cga_with_only_a_rig_keeps_the_first_bound_fallback() -> TestResult {
 }
 
 #[test]
+fn a_rig_only_cga_places_every_rigid_binding_from_the_original_rig() -> TestResult {
+    let rig = TestModel::cube()
+        .helpers_only()
+        .with_compact_skeleton(&TestSkeleton::two_bones());
+    let definition = RIGID_CDF
+        .replace(r#"RelRotation="1,0,0,0""#, r#"RelRotation="0,1,0,0""#)
+        .replace(
+            "</AttachmentList>",
+            r#"<Attachment Type="CA_BONE" AName="Spare"
+            BoneName="root" Binding="Objects\Test\housing.cgf" RelPosition="0,3,0"/>
+            </AttachmentList>"#,
+        );
+    let mut entries = bone_thruster_entries(&definition);
+    entries.push(TestEntry::stored(RIG_MODEL, rig.cgf()));
+    let fixture = fixture(entries)?;
+    let archive = Archive::open(&fixture.path)?;
+    let models = ArchiveModels::new(&archive).with_model_node_sources();
+    let entry = DataForgeEntry::read(&archive)?;
+    let forge = entry.open()?;
+    let mut resolver = LoadoutResolver::new(&forge);
+    let record = resolver.entities().find(THRUSTER)?;
+    let tree = resolver.resolve(&record)?;
+    let assembly = Assembly::build(&tree, &models, &AssemblyOptions::default())?;
+
+    let root = assembly.root().ok_or("the declared rig owner")?;
+    verify_rig_only_bindings(root)?;
+    assert!(assembly.issues().is_empty(), "{:?}", assembly.issues());
+    verify_rig_only_glb(&assembly)
+}
+
+fn verify_rig_only_bindings(root: &Part) -> TestResult {
+    let rig = root.model().ok_or("the original rig")?;
+    assert!(
+        rig.lods.iter().all(|lod| lod.meshes.is_empty()),
+        "the rig has no drawable body"
+    );
+    let [first, second] = root.attachments() else {
+        return Err("both rigid bindings, once each, in original order".into());
+    };
+    assert_eq!(
+        (first.name(), second.name()),
+        ("Housing", "Spare"),
+        "the attachments retain CDF order"
+    );
+    assert!(
+        first.is_bone_found() && second.is_bone_found(),
+        "both bind to the declared rig"
+    );
+    assert_near(first.local().translation(), [0.0, 1.0, 2.0]);
+    assert_near(second.local().translation(), [0.0, 3.0, 0.0]);
+    for (actual, expected) in first.local().rows.iter().zip([
+        [0.0, 0.0, -1.0, 0.0],
+        [1.0, 0.0, 0.0, 1.0],
+        [0.0, -1.0, 0.0, 2.0],
+    ]) {
+        for (actual, expected) in actual.iter().zip(expected) {
+            assert!(
+                (actual - expected).abs() < 1e-5,
+                "the CDF rotation is relative to the bone"
+            );
+        }
+    }
+    let source = root
+        .verified_attachment_bone_placement_source(0)
+        .ok_or("the first bone source")?;
+    assert_eq!(
+        source.origin().entry().path(),
+        RIG_MODEL,
+        "the bone was read from the declared rig"
+    );
+    assert_eq!(
+        source.bone_ordinal(),
+        1,
+        "the placement identifies the authored tip bone"
+    );
+    assert_eq!(
+        first
+            .material_archive_origins()
+            .library()
+            .map(|origin| origin.entry().path()),
+        Some(r"Data\Objects\Test\paint.mtl"),
+        "the first binding retains its CDF material"
+    );
+    Ok(())
+}
+
+fn verify_rig_only_glb(assembly: &Assembly) -> TestResult {
+    let mut output = Vec::new();
+    assembly.write_glb(&GlbOptions::default(), &mut output)?;
+    let glb = check_glb(&output)?;
+    let root = glb
+        .document
+        .nodes()
+        .find(|node| node.name() == Some(THRUSTER))
+        .ok_or("the GLB rig owner")?;
+    assert!(root.mesh().is_none(), "the rig owner has no mesh");
+    for (name, translation) in [("Housing", [0.0, 2.0, -1.0]), ("Spare", [0.0, 0.0, -3.0])] {
+        let mut matches = root.children().filter(|node| node.name() == Some(name));
+        let node = matches.next().ok_or("the rigid GLB child")?;
+        assert!(matches.next().is_none(), "{name} is emitted once");
+        assert!(draws(&node), "{name} draws its bound mesh");
+        assert_near(node.transform().decomposed().0, translation);
+    }
+    Ok(())
+}
+
+#[test]
 fn the_first_bound_skin_wins_over_a_drawable_declared_file() -> TestResult {
     let body = TestModel::cube();
     let definition = RIGID_CDF.replace(

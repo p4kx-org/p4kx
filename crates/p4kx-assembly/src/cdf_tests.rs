@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use super::{is_character_definition, read, read_drawing};
+use super::{DeclaredModel, is_character_definition, read, read_drawing};
 
 const THRUSTER: &str = r#"<CharacterDefinition>
   <Model File="Objects\t\nozzle_CHR.chr" LODRatio="40"/>
@@ -102,7 +102,7 @@ fn a_nested_model_file_does_not_compete_with_a_bound_attachment() -> Result<(), 
             <Attachment Type="CA_BONE" Binding="a.cga"/>
             </AttachmentList></CharacterDefinition>"#;
     let (character, body) = read_drawing(text, false, |_| {
-        Err::<Option<()>, _>("the body reader accepts direct model files only")
+        Err::<Option<DeclaredModel<()>>, _>("the body reader accepts direct model files only")
     })
     .map_err(|error| format!("{error:?}"))?;
     assert_eq!(

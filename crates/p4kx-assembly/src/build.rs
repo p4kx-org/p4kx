@@ -102,7 +102,7 @@ impl Assembly {
         for (index, (draft, model)) in drafts.iter().zip(&chosen).enumerate() {
             let library = materials_of(draft, *model, shared, &mut reported, &mut issues);
             note_character(draft, *model, &mut characters, &mut issues);
-            let attachments = attached(draft, *model, shared, &mut reported, &mut issues);
+            let attachments = attached(draft, *model, &library, shared, &mut reported, &mut issues);
             let (palette, unresolved) = palettes.of_part(index, draft, *model, &library.materials);
             issues.extend(unresolved.into_iter().map(|kind| issue(draft, kind)));
             let rig = under_skin(draft, &parts)
@@ -201,9 +201,9 @@ fn world_of(draft: &Draft<'_>, parts: &[Part], local: &Transform) -> Transform {
         .map_or(*local, |parent| parent.world.then(local))
 }
 
-struct SelectedLibrary {
-    materials: Library,
-    from_model: bool,
+pub(crate) struct SelectedLibrary {
+    pub(crate) materials: Library,
+    pub(crate) from_model: bool,
 }
 
 /// Returns the materials a part draws with, noting a library that has a problem once.
@@ -214,10 +214,11 @@ fn materials_of(
     reported: &mut HashSet<String>,
     issues: &mut Vec<Issue>,
 ) -> SelectedLibrary {
-    let name = model
-        .and_then(|loaded| build_library_name::choose(draft, loaded).map(|name| (loaded, name)));
-    let from_model = matches!(name, Some((_, LibraryName::Model(_))));
-    let key = name.map(|(loaded, name)| library_key_of(name.path(), &loaded.entry));
+    let selected = model.and_then(|loaded| build_library_name::choose(draft, loaded));
+    let from_model = selected
+        .as_ref()
+        .is_some_and(|selected| matches!(selected.name, LibraryName::Model(_)));
+    let key = selected.map(|selected| library_key_of(selected.name.path(), selected.entry));
     let materials = materials_for(draft, key, libraries, reported, issues);
     SelectedLibrary {
         materials,
@@ -346,21 +347,21 @@ fn read_libraries(
         .filter_map(|(draft, loaded)| Some((draft, (*loaded)?)))
         .flat_map(|(draft, loaded)| {
             let part = build_library_name::choose(draft, loaded).map(|selected| {
-                let name = selected.path();
-                (
-                    library_key_of(name, &loaded.entry),
-                    loaded.entry.as_str(),
-                    name,
-                )
+                let name = selected.name.path();
+                (library_key_of(name, selected.entry), selected.entry, name)
             });
-            let attached = loaded.attachments.iter().filter_map(|attached| {
-                let name = attached.model.material_library.as_deref()?;
-                Some((
-                    library_key_of(name, &attached.entry),
-                    attached.entry.as_str(),
-                    name,
-                ))
-            });
+            let attached = loaded
+                .attachments
+                .iter()
+                .skip(usize::from(loaded.rig_only))
+                .filter_map(|attached| {
+                    let name = attached.model.material_library.as_deref()?;
+                    Some((
+                        library_key_of(name, &attached.entry),
+                        attached.entry.as_str(),
+                        name,
+                    ))
+                });
             part.into_iter().chain(attached)
         })
         .filter(|(key, _, _)| seen.insert(key.clone()))

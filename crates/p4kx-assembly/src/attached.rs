@@ -4,7 +4,7 @@
 use std::sync::Arc;
 
 use p4kx_extraction::{
-    ArchiveMaterialRead, EntryOrigin, MaterialArchiveOrigins, ModelArchiveSource,
+    ArchiveMaterialRead, EntryOrigin, MaterialArchiveOrigins, ModelArchiveSource, SourceLocation,
 };
 use p4kx_model::{MaterialStatus, Model, Transform};
 
@@ -27,6 +27,13 @@ pub struct AttachedModel {
     pub(crate) archive_sources: Arc<[ModelArchiveSource]>,
     pub(crate) definition_origin: Option<EntryOrigin>,
     pub(crate) materials: Arc<ArchiveMaterialRead>,
+    pub(crate) material_selection: MaterialSelection,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum MaterialSelection {
+    Attachment,
+    Entity(Option<SourceLocation>),
 }
 
 impl AttachedModel {
@@ -90,6 +97,21 @@ impl AttachedModel {
     #[must_use]
     pub const fn offset_used(&self) -> bool {
         self.offset_used
+    }
+
+    /// Returns the Entity material selector when it overrides this attachment's library.
+    #[must_use]
+    pub const fn material_selector(&self) -> Option<&SourceLocation> {
+        match &self.material_selection {
+            MaterialSelection::Attachment => None,
+            MaterialSelection::Entity(location) => location.as_ref(),
+        }
+    }
+
+    /// Returns whether the attachment's own material declaration is eligible to select its library.
+    #[must_use]
+    pub const fn uses_attachment_material(&self) -> bool {
+        matches!(self.material_selection, MaterialSelection::Attachment)
     }
 
     /// Returns the original observations of the material library used by this attachment.

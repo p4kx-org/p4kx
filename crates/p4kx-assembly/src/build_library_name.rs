@@ -18,16 +18,22 @@ impl<'a> LibraryName<'a> {
     }
 }
 
-pub(crate) fn choose<'a>(draft: &'a Draft<'_>, loaded: &'a Loaded) -> Option<LibraryName<'a>> {
-    draft
+pub(crate) struct Selection<'a> {
+    pub(crate) entry: &'a str,
+    pub(crate) name: LibraryName<'a>,
+}
+
+pub(crate) fn choose<'a>(draft: &'a Draft<'_>, loaded: &'a Loaded) -> Option<Selection<'a>> {
+    let (entry, model) = if loaded.rig_only {
+        let primary = loaded.attachments.first()?;
+        (primary.entry.as_str(), primary.model.as_ref())
+    } else {
+        (loaded.entry.as_str(), loaded.model.as_ref())
+    };
+    let name = draft
         .library
         .or_else(|| draft.geometry.and_then(|geometry| geometry.material()))
         .map(LibraryName::Override)
-        .or_else(|| {
-            loaded
-                .model
-                .material_library
-                .as_deref()
-                .map(LibraryName::Model)
-        })
+        .or_else(|| model.material_library.as_deref().map(LibraryName::Model))?;
+    Some(Selection { entry, name })
 }

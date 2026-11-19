@@ -45,7 +45,10 @@ pub(crate) struct Item<'a> {
 /// the containers, below those their `.soc` files, models, props and lights. A node comes after
 /// its parent.
 pub(crate) fn items(assembly: &Assembly) -> Vec<Item<'_>> {
-    let mut items: Vec<Item<'_>> = assembly.parts().iter().map(part_item).collect();
+    let mut items = Vec::with_capacity(assembly.parts().len());
+    for part in assembly.parts() {
+        items.push(part_item(part, &items));
+    }
     push_attachments(&mut items, assembly);
     let Some(interior) = assembly.interior() else {
         return items;
@@ -157,7 +160,9 @@ fn push_attachments<'a>(items: &mut Vec<Item<'a>>, assembly: &'a Assembly) {
                 material_entry: attached.material_archive_origins().library(),
                 palette: part.and_then(Part::palette),
                 palette_source: part.and_then(Part::palette_source),
-                palette_parent: Some(index),
+                palette_parent: palette_binding_parent(items, index).or_else(|| {
+                    selected_palette_parent(items, part.and_then(Part::palette_source))
+                }),
                 label: attached.name(),
             }),
             light: None,
@@ -166,7 +171,18 @@ fn push_attachments<'a>(items: &mut Vec<Item<'a>>, assembly: &'a Assembly) {
     }
 }
 
-fn part_item(part: &Part) -> Item<'_> {
+fn palette_binding_parent(items: &[Item<'_>], index: usize) -> Option<usize> {
+    let drawn = items.get(index)?.drawn?;
+    drawn.palette?;
+    drawn.palette_source?;
+    Some(index)
+}
+
+fn selected_palette_parent(items: &[Item<'_>], source: Option<&PaletteSource>) -> Option<usize> {
+    palette_binding_parent(items, source?.inherited_from()?)
+}
+
+fn part_item<'a>(part: &'a Part, items: &[Item<'_>]) -> Item<'a> {
     let gear = part.is_landing_gear();
     Item {
         kind: if gear {
@@ -184,18 +200,19 @@ fn part_item(part: &Part) -> Item<'_> {
             classification: None,
         }),
         geometry: part.geometry(),
-        drawn: part.model().map(|model| Drawn {
-            model,
-            model_sources: part.model_archive_sources(),
-            materials: part.materials(),
-            material_entry: part.material_archive_origins().library(),
-            palette: part.palette(),
-            palette_source: part.palette_source(),
-            palette_parent: part
-                .palette_source()
-                .and_then(PaletteSource::inherited_from),
-            label: part.class_name(),
-        }),
+        drawn: part
+            .model()
+            .filter(|_| !part.is_cdf_rig_only())
+            .map(|model| Drawn {
+                model,
+                model_sources: part.model_archive_sources(),
+                materials: part.materials(),
+                material_entry: part.material_archive_origins().library(),
+                palette: part.palette(),
+                palette_source: part.palette_source(),
+                palette_parent: selected_palette_parent(items, part.palette_source()),
+                label: part.class_name(),
+            }),
         light: None,
         light_placement: None,
     }

@@ -7,12 +7,24 @@ use std::sync::Arc;
 use p4kx_extraction::ModelArchiveSource;
 use p4kx_extraction::model::Model;
 
+use super::read_model::ModelAdmission;
 use super::{ArchiveModels, ModelFailure, ProvidedAttachment, ProvidedModel, without_mtl};
 use crate::build_models::vertices;
-use crate::cdf::{self, MAX_CDF_BYTES};
+use crate::cdf::{self, DeclaredModel, MAX_CDF_BYTES};
 use crate::cdf_bone::BoneAttachment;
+use crate::cdf_model_sources::CdfModelSources;
+use crate::placement::PlacementSkeleton;
 
 type AttachmentModels<'bone> = HashMap<String, HashMap<Option<&'bone str>, ReadAttachment>>;
+
+#[derive(Debug, Clone)]
+pub(crate) struct DeclaredRig {
+    pub(crate) entry: String,
+    pub(crate) model: Model,
+    pub(crate) sources: Arc<[ModelArchiveSource]>,
+    pub(crate) selectors: Option<Arc<CdfModelSources>>,
+    pub(crate) primary: BoneAttachment,
+}
 
 #[derive(Clone)]
 struct ReadAttachment {
@@ -29,14 +41,15 @@ impl ArchiveModels<'_> {
             reason: format!("{entry}: {reason}"),
         };
         let observed = self.observe_nodes && definition_origin.is_some();
-        let (mut character, body) = cdf::read_drawing(&bytes, observed, |path| {
-            self.drawable_declared_body(path, lod)
-        })
-        .map_err(|error| match error {
-            cdf::DrawError::Definition(reason) => unreadable(reason),
-            cdf::DrawError::Body(error) => error,
-        })?;
-        let mut provided = if let Some(body) = body {
+        let (mut character, mut body) =
+            cdf::read_drawing(&bytes, observed, |path| self.declared_model(path, lod)).map_err(
+                |error| match error {
+                    cdf::DrawError::Definition(reason) => unreadable(reason),
+                    cdf::DrawError::Body(error) => error,
+                },
+            )?;
+        let drawable = body.take_if(|_| character.primary_rigid.is_none());
+        let mut provided = if let Some(body) = drawable {
             body
         } else {
             let model_entry = self
@@ -46,6 +59,15 @@ impl ArchiveModels<'_> {
         };
         provided.definition_origin = definition_origin;
         provided.cdf_model_sources = character.model_sources.take().map(Arc::new);
+        if let (Some(rig), Some(primary)) = (body, character.primary_rigid) {
+            provided.declared_rig = Some(Box::new(DeclaredRig {
+                entry: rig.entry,
+                model: rig.model,
+                sources: rig.archive_sources,
+                selectors: character.rig_sources.map(Arc::new),
+                primary,
+            }));
+        }
         self.attach_bones(
             &character.bones,
             &mut character.left_out,
@@ -63,15 +85,15 @@ impl ArchiveModels<'_> {
         Ok(provided)
     }
 
-    fn drawable_declared_body(
+    fn declared_model(
         &self,
         path: &str,
         lod: u32,
-    ) -> Result<Option<ProvidedModel>, ModelFailure> {
+    ) -> Result<Option<DeclaredModel<ProvidedModel>>, ModelFailure> {
         let Some(entry) = self.entry_of(path) else {
             return Ok(None);
         };
-        match self.read_model(entry, lod, Vec::new()) {
+        match self.read_model_with(entry, lod, Vec::new(), ModelAdmission::DeclaredCdf) {
             Ok(provided)
                 if provided
                     .model
@@ -79,7 +101,14 @@ impl ArchiveModels<'_> {
                     .iter()
                     .any(|lod| lod.drawable_material_ids().next().is_some()) =>
             {
-                Ok(Some(provided))
+                Ok(Some(DeclaredModel::Drawable(provided)))
+            }
+            Ok(provided)
+                if !PlacementSkeleton::of(&provided.model, provided.model.lods.first())
+                    .bones()
+                    .is_empty() =>
+            {
+                Ok(Some(DeclaredModel::Rig(provided)))
             }
             Err(failure @ ModelFailure::Fatal(_)) => Err(failure),
             // Skeleton validation reports the declared input independently of geometry selection.
@@ -94,9 +123,13 @@ impl ArchiveModels<'_> {
         lod: u32,
         provided: &mut ProvidedModel,
     ) -> Result<(), ModelFailure> {
-        let mut remaining = self
-            .max_attachment_vertices
-            .saturating_sub(vertices(&provided.model));
+        let occupied = vertices(&provided.model).saturating_add(
+            provided
+                .declared_rig
+                .as_ref()
+                .map_or(0, |rig| vertices(&rig.model)),
+        );
+        let mut remaining = self.max_attachment_vertices.saturating_sub(occupied);
         let mut models = HashMap::new();
         for bone in bones {
             if remaining == 0 {

@@ -30,7 +30,11 @@ impl MaterialInputs<'_> {
             cdf_origins::model_material(projection, part, sources)?;
         }
         if let Some((_, attachment)) = self.attachment {
-            cdf_origins::material(projection, attachment, sources)?;
+            if attachment.uses_attachment_material() {
+                cdf_origins::material(projection, attachment, sources)?;
+            } else {
+                projection.authored_selector(attachment.material_selector().cloned(), sources)?;
+            }
         }
         Ok(Some(projection.uses().observe(
             SourceInput::Archive(origin),
