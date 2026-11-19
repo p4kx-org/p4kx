@@ -1187,6 +1187,26 @@ read selected DataForge bodies without localizing values or opening Loadouts. Ch
 and coverage separately. Publish consumer-owned changes after outer query success and after
 checking the required coverage. [Cargo loading contract](catalog-cargo-loading.md).
 
+## Authored shield generators and quantum drives
+
+Use `equipment::ship_systems::with_shield_generators` and `with_quantum_drives` for
+`configurations.shieldGenerators` and `configurations.quantumDrives`. Both support
+the decoded-Entry `_from` form and equivalent session and parsed-view methods.
+Select a physical Item Record index, all physical Item Records with a GUID, or the
+complete authored component family. The rows keep physical owner and original
+component order, including multiple components on the same Item.
+
+The SDK and Catalog use the same authored projection. Shield rows expose health,
+regeneration, reserve ratios, stun and ordered resistance and absorption slots. Drive
+rows expose fuel and range, standard and spline profiles, heat and boost. Each cell
+keeps its original storage and source evidence. Additional fields preserve original
+members outside the typed projections. The queries use selected DataForge bodies
+without opening locales or resolving installed ship loadouts. Check coverage and
+resolve source references against the snapshot's own inventory.
+
+For the consumer convention on quantum acceleration, see the
+[quantum drive contract](catalog-quantum-drives.md).
+
 ## Verify dataset coverage
 
 The SDK coverage audit checks canonical dataset boundaries against calls to the public typed

@@ -55,30 +55,30 @@ impl<'source> Plan<'source> {
         cancel: Option<&CancelToken>,
         observer: Option<Arc<dyn CanonicalReadObserver>>,
     ) -> Result<Self, CatalogError> {
-        checkpoint(cancel)?;
-        let probes: Vec<_> = component_types
-            .iter()
-            .filter_map(|name| forge.strict_pointer_probe(COMPONENTS, name))
-            .collect();
-        let strong_arrays: HashSet<_> = forge
-            .structs()
-            .filter(|structure| {
-                structure
-                    .name()
-                    .is_ok_and(|name| name == p4kx_assembly::ENTITY_TYPE)
-                    && strong_component_array(forge, *structure)
-            })
-            .map(|structure| structure.index())
-            .collect();
-        Self::read_entities_matching(forge, selection, cancel, observer, |record, trees| {
-            // Only a proven negative can exclude a Record before the canonical body read.
-            !record
-                .struct_type()
-                .is_ok_and(|structure| strong_arrays.contains(&structure.index()))
-                || probes
-                    .iter()
-                    .any(|probe| !matches!(trees.holds(probe, record), Ok(false)))
-        })
+        let may_match = component_candidate(forge, component_types, cancel)?;
+        Self::read_entities_matching(forge, selection, cancel, observer, may_match)
+    }
+
+    pub(in crate::build::catalog_queries) fn read_item_components(
+        forge: &'source DataForge<'source>,
+        component_types: &[&str],
+        selection: CatalogRecordSelection,
+        cancel: Option<&CancelToken>,
+        observer: Option<Arc<dyn CanonicalReadObserver>>,
+    ) -> Result<Self, CatalogError> {
+        let mut may_match = component_candidate(forge, component_types, cancel)?;
+        Self::read_with(
+            forge,
+            selection,
+            cancel,
+            observer,
+            |record, trees, coverage| {
+                Ok(
+                    unlocalized_record_query::selected(record, Kind::Items, coverage)
+                        && may_match(record, trees),
+                )
+            },
+        )
     }
 
     fn read_entities_matching(
@@ -200,6 +200,42 @@ impl<'source> Plan<'source> {
 }
 
 const COMPONENTS: &str = "Components";
+
+fn component_candidate<'source>(
+    forge: &'source DataForge<'source>,
+    component_types: &[&str],
+    cancel: Option<&CancelToken>,
+) -> Result<
+    impl FnMut(&Record<'source>, &mut TreeBuilder<'source>) -> bool + use<'source>,
+    CatalogError,
+> {
+    checkpoint(cancel)?;
+    let probes: Vec<_> = component_types
+        .iter()
+        .filter_map(|name| forge.strict_pointer_probe(COMPONENTS, name))
+        .collect();
+    let strong_arrays: HashSet<_> = forge
+        .structs()
+        .filter(|structure| {
+            structure
+                .name()
+                .is_ok_and(|name| name == p4kx_assembly::ENTITY_TYPE)
+                && strong_component_array(forge, *structure)
+        })
+        .map(|structure| structure.index())
+        .collect();
+    Ok(
+        move |record: &Record<'source>, trees: &mut TreeBuilder<'source>| {
+            // Only a proven negative can exclude a Record before the canonical body read.
+            !record
+                .struct_type()
+                .is_ok_and(|structure| strong_arrays.contains(&structure.index()))
+                || probes
+                    .iter()
+                    .any(|probe| !matches!(trees.holds(probe, record), Ok(false)))
+        },
+    )
+}
 
 fn strong_component_array(forge: &DataForge<'_>, mut structure: Struct<'_>) -> bool {
     let mut found = false;

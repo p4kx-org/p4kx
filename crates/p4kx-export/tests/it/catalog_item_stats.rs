@@ -59,6 +59,8 @@ mod resource_connections;
 mod resource_network;
 #[path = "catalog_shield.rs"]
 mod shield;
+#[path = "catalog_ship_system_sdk_coverage.rs"]
+mod ship_system_sdk_coverage;
 #[path = "catalog_vehicle_armor.rs"]
 mod vehicle_armor;
 

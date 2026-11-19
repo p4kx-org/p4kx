@@ -6,7 +6,7 @@ use std::cell::RefCell;
 use p4kx_extraction::{CancelToken, DataForge, DataType, RecordTree, TreeBuilder, Value};
 
 use super::item_definition::ItemDefinition;
-use super::{Component, ItemComponentsRead, resolution};
+use super::{Component, ItemComponentsRead, ItemEquipmentFamily, resolution};
 use crate::CatalogError;
 use crate::catalog_number_capture::CapturedNumber;
 use crate::catalog_projection::CatalogProjection;
@@ -24,6 +24,10 @@ use crate::export_ledger::ExportLedger;
 use crate::item_stats::{PRIMARY_MAGAZINE_FIELD, with_primary_magazine};
 use crate::record_observation::RecordObservation;
 use crate::template_field_capture::TemplateFieldCapture;
+
+#[path = "catalog_item_equipment_read.rs"]
+mod equipment;
+pub(crate) use equipment::{read_quantum_drives, read_shield_generators};
 
 /// Canonical authored weapon and ammunition components of one physical Item.
 #[derive(Debug)]
@@ -77,7 +81,7 @@ pub(crate) fn read_weapon_source<'source>(
     admission: &RecordObservation<'_, 'source>,
     cancel: Option<&CancelToken>,
 ) -> Result<ScopedSourceRead<Vec<WeaponSource<'source>>>, CatalogError> {
-    let selection_complete = weapon_component_selection_complete(tree);
+    let selection_complete = component_selection_complete(tree);
     with_components(
         tree,
         projection,
@@ -125,7 +129,7 @@ pub(crate) fn read_magazine_resolution<'source>(
                 return Ok::<_, CatalogError>(ScopedSourceRead::new(
                     Vec::new(),
                     Vec::new(),
-                    weapon_component_selection_complete(tree) && !failed,
+                    component_selection_complete(tree) && !failed,
                 ));
             };
             let scope = input.record_scope(admission.record(), tree)?;
@@ -150,11 +154,7 @@ pub(crate) fn read_magazine_resolution<'source>(
         },
     )?;
     Ok(result.unwrap_or_else(|| {
-        ScopedSourceRead::new(
-            Vec::new(),
-            Vec::new(),
-            weapon_component_selection_complete(tree),
-        )
+        ScopedSourceRead::new(Vec::new(), Vec::new(), component_selection_complete(tree))
     }))
 }
 
@@ -172,7 +172,7 @@ pub(crate) fn read_projectile_ammo<'source>(
     ledger: &mut ExportLedger,
 ) -> Result<ScopedSourceRead<WeaponProjectileSources<'source>>, CatalogError> {
     projection.original().check_forge(forge)?;
-    let selection_complete = weapon_component_selection_complete(tree);
+    let selection_complete = component_selection_complete(tree);
     with_components(
         tree,
         projection,
@@ -209,6 +209,7 @@ pub(crate) fn read_projectile_ammo<'source>(
 enum ComponentScope {
     All,
     Weapon,
+    Equipment(ItemEquipmentFamily),
 }
 
 impl ComponentScope {
@@ -216,6 +217,7 @@ impl ComponentScope {
         match self {
             Self::All => true,
             Self::Weapon => matches!(kind, Component::Weapon | Component::AmmoContainer),
+            Self::Equipment(family) => family.contains(kind),
         }
     }
 }
@@ -262,7 +264,7 @@ fn components<'read, 'source>(tree: &'read RecordTree<'source>) -> &'read [Value
     }
 }
 
-fn weapon_component_selection_complete(tree: &RecordTree<'_>) -> bool {
+fn component_selection_complete(tree: &RecordTree<'_>) -> bool {
     let mut declarations = tree
         .fields()
         .iter()

@@ -14,7 +14,9 @@ use crate::catalog_v3::catalog_entity_configurations::{
     VEHICLE_ARMOR_TYPES, VehicleArmor,
 };
 use crate::catalog_v3::catalog_item_alignment::{ATTACHABLE, AlignmentOptions};
-use crate::catalog_v3::catalog_item_components::{self, WeaponSource, definition_read};
+use crate::catalog_v3::catalog_item_components::{
+    self, ItemEquipmentFamily, WeaponSource, definition_read,
+};
 use crate::catalog_v3::inventory_entity_configurations::BOUNDS_SOURCE_TYPES;
 use crate::record_observation::RecordObservation;
 use crate::{CatalogError, Kind};
@@ -48,6 +50,7 @@ pub(super) enum Family {
     CargoLoadingGlobals,
     ShopCommodityGlobals,
     Configuration(ConfigurationFamily),
+    ItemEquipment(ItemEquipmentFamily),
     AmmoDefinitions,
     WeaponSources,
     ProjectileAmmo,
@@ -70,6 +73,7 @@ impl Family {
             | Self::Bounds
             | Self::CargoGrids
             | Self::Configuration(_)
+            | Self::ItemEquipment(_)
             | Self::WeaponSources
             | Self::ProjectileAmmo
             | Self::MagazineResolutions => Kind::Items,
@@ -85,6 +89,7 @@ impl Family {
             Self::Attachments => &[ATTACHABLE][..],
             Self::Bounds => BOUNDS_SOURCE_TYPES,
             Self::Configuration(family) => family.source_types(),
+            Self::ItemEquipment(family) => family.source_types(),
             Self::CargoGrids => &[crate::catalog_v3::catalog_facility::CARGO_GRID_SOURCE_TYPE],
             Self::CargoLoadingGlobals | Self::ShopCommodityGlobals => {
                 return DatasetAvailability::from_source_declarations(forge, |name| {

@@ -11,6 +11,8 @@ use crate::health_origin_assertions as proof;
 
 #[path = "catalog_quantum_fixture.rs"]
 mod fixture;
+#[path = "catalog_quantum_sdk.rs"]
+mod sdk;
 
 use fixture::{BOOST_FIELDS, HEAT_FIELDS, Layout, PROFILE_FIELDS};
 

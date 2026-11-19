@@ -6,6 +6,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::authored_fields::Observed;
+use super::catalog_item_components::source_getters;
 use super::item_component_owner::ComponentOwner;
 use crate::CatalogError;
 use crate::catalog_table::CatalogTable;
@@ -20,7 +21,7 @@ pub(super) const SOURCE_TYPE: &str = "SCItemShieldGeneratorParams";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ShieldGenerator<'source> {
+pub struct ShieldGenerator<'source> {
     #[serde(flatten)]
     owner: ComponentOwner,
     source_type: SourcedValue<&'source str>,
@@ -136,7 +137,7 @@ impl ShieldReserve {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct ShieldStun<'source> {
+pub struct ShieldStun<'source> {
     source_type: SourcedValue<&'source str>,
     min_alpha_damage_ratio: SourcedValue<ResourceNumber>,
     max_alpha_damage_ratio: SourcedValue<ResourceNumber>,
@@ -175,7 +176,7 @@ impl<'source> ShieldStun<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct ShieldRange<'source> {
+pub struct ShieldRange<'source> {
     source_type: SourcedValue<&'source str>,
     min: SourcedValue<ResourceNumber>,
     max: SourcedValue<ResourceNumber>,
@@ -206,4 +207,87 @@ pub(crate) fn table<'source>(
 ) -> CatalogTable<ShieldGenerator<'source>> {
     rows.sort_by_key(|row| row.owner.key());
     CatalogTable::new(forge, &[SOURCE_TYPE], rows)
+}
+
+impl<'source> ShieldGenerator<'source> {
+    source_getters! {
+        /// The original physical Item Record and Components slot.
+        owner: ComponentOwner,
+        /// The original concrete source type.
+        source_type: SourcedValue<&'source str>,
+        /// The authored maximum shield health.
+        max_health: SourcedValue<ResourceNumber>,
+        /// The authored maximum regeneration.
+        max_regen: SourcedValue<ResourceNumber>,
+        /// The authored decay ratio.
+        decay_ratio: SourcedValue<ResourceNumber>,
+        /// The authored regeneration delay after the shield is downed.
+        downed_regen_delay: SourcedValue<ResourceNumber>,
+        /// The authored regeneration delay after damage.
+        damaged_regen_delay: SourcedValue<ResourceNumber>,
+        /// The authored resistance to electrical charge damage.
+        electrical_charge_damage_resistance: SourcedValue<ResourceNumber>,
+        /// The authored shield stun parameters.
+        stun_params: SourcedValue<ShieldStun<'source>>,
+        /// The resistance slots in original array order.
+        shield_resistance: SourcedValue<Vec<SourcedValue<ShieldRange<'source>>>>,
+        /// The absorption slots in original array order.
+        shield_absorption: SourcedValue<Vec<SourcedValue<ShieldRange<'source>>>>,
+        /// Original members outside the typed cells.
+        additional_fields: SourceArenaOutput<'source>,
+    }
+
+    /// Borrows the authored initial reserve-pool health ratio.
+    #[must_use]
+    pub const fn reserve_pool_initial_health_ratio(&self) -> &SourcedValue<ResourceNumber> {
+        &self.reserve.initial_health
+    }
+
+    /// Borrows the authored maximum reserve-pool health ratio.
+    #[must_use]
+    pub const fn reserve_pool_max_health_ratio(&self) -> &SourcedValue<ResourceNumber> {
+        &self.reserve.max_health
+    }
+
+    /// Borrows the authored reserve-pool regeneration rate ratio.
+    #[must_use]
+    pub const fn reserve_pool_regen_rate_ratio(&self) -> &SourcedValue<ResourceNumber> {
+        &self.reserve.regen_rate
+    }
+
+    /// Borrows the authored reserve-pool drain rate ratio.
+    #[must_use]
+    pub const fn reserve_pool_drain_rate_ratio(&self) -> &SourcedValue<ResourceNumber> {
+        &self.reserve.drain_rate
+    }
+}
+
+impl<'source> ShieldStun<'source> {
+    source_getters! {
+        /// The original concrete source type.
+        source_type: SourcedValue<&'source str>,
+        /// The authored minimum alpha damage ratio.
+        min_alpha_damage_ratio: SourcedValue<ResourceNumber>,
+        /// The authored maximum alpha damage ratio.
+        max_alpha_damage_ratio: SourcedValue<ResourceNumber>,
+        /// The authored minimum stun time.
+        min_stun_time: SourcedValue<ResourceNumber>,
+        /// The authored maximum stun time.
+        max_stun_time: SourcedValue<ResourceNumber>,
+        /// Original members outside the typed cells.
+        additional_fields: SourceArenaOutput<'source>,
+    }
+}
+
+impl<'source> ShieldRange<'source> {
+    source_getters! {
+        /// The original concrete source type.
+        source_type: SourcedValue<&'source str>,
+        /// The authored minimum of this slot.
+        min: SourcedValue<ResourceNumber>,
+        /// The authored maximum of this slot.
+        max: SourcedValue<ResourceNumber>,
+        /// Original members outside the typed cells.
+        additional_fields: SourceArenaOutput<'source>,
+    }
 }

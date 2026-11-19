@@ -34,6 +34,10 @@ pub mod fuel;
 #[path = "equipment_mining_tool_query.rs"]
 pub mod mining_tools;
 
+/// Selective reads of authored ship shield-generator and quantum-drive configurations.
+#[path = "equipment_ship_system_query.rs"]
+pub mod ship_systems;
+
 #[path = "equipment_record_query.rs"]
 mod record_query;
 /// Direct queries for original resource components and their power and heat connections.

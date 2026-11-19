@@ -34,7 +34,7 @@ mod scalar_read;
 mod text;
 #[path = "source_value.rs"]
 mod value;
-pub(crate) use retained_status::retained_values_complete;
+pub(crate) use retained_status::{retained_facts_complete, retained_values_complete};
 
 pub use crate::catalog_read::original::OriginalInstanceLocation;
 pub use crate::guid_text::CatalogGuid;

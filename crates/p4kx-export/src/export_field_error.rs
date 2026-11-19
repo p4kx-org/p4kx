@@ -20,6 +20,11 @@ pub(crate) fn record(
     collector.note(field, source_type, code, severity, target, body)
 }
 
+/// Whether an owned value failed in a way that blocks canonical projection.
+pub(crate) const fn blocks_projection(error: ValueError) -> bool {
+    matches!(category(error).1, ExportDiagnosticSeverity::Error)
+}
+
 const fn category(
     error: ValueError,
 ) -> (ExportDiagnosticCode, ExportDiagnosticSeverity, Option<Guid>) {

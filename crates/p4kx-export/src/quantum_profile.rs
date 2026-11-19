@@ -6,6 +6,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::authored_fields::Observed;
+use super::catalog_item_components::source_getters;
 use super::quantum_fields::QuantumFields;
 use crate::CatalogError;
 use crate::resource_number::ResourceNumber;
@@ -17,7 +18,7 @@ use crate::source_value_catalog::SourceArenaOutput;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct QuantumProfile<'source> {
+pub struct QuantumProfile<'source> {
     source_type: SourcedValue<&'source str>,
     drive_speed: SourcedValue<ResourceNumber>,
     cooldown_time: SourcedValue<ResourceNumber>,
@@ -86,5 +87,68 @@ impl<'source> QuantumProfile<'source> {
             effect_tags: fields.member("effectTags")?,
             additional_fields: fields.additional_fields()?,
         })
+    }
+}
+
+impl<'source> QuantumProfile<'source> {
+    source_getters! {
+        /// The original concrete source type.
+        source_type: SourcedValue<&'source str>,
+        /// The authored drive speed.
+        drive_speed: SourcedValue<ResourceNumber>,
+        /// The authored cooldown time.
+        cooldown_time: SourcedValue<ResourceNumber>,
+        /// The authored spool-up time.
+        spool_up_time: SourcedValue<ResourceNumber>,
+        /// The authored first-stage acceleration input.
+        stage_one_accel_rate: SourcedValue<ResourceNumber>,
+        /// The authored second-stage acceleration input.
+        stage_two_accel_rate: SourcedValue<ResourceNumber>,
+        /// The authored engage speed.
+        engage_speed: SourcedValue<ResourceNumber>,
+        /// The authored calibration rate.
+        calibration_rate: SourcedValue<ResourceNumber>,
+        /// The authored minimum calibration requirement.
+        min_calibration_requirement: SourcedValue<ResourceNumber>,
+        /// The authored maximum calibration requirement.
+        max_calibration_requirement: SourcedValue<ResourceNumber>,
+        /// The authored calibration process angle limit.
+        calibration_process_angle_limit: SourcedValue<ResourceNumber>,
+        /// The authored calibration warning angle limit.
+        calibration_warning_angle_limit: SourcedValue<ResourceNumber>,
+        /// The authored calibration delay in seconds.
+        calibration_delay_in_seconds: SourcedValue<ResourceNumber>,
+        /// The authored interdiction effect time.
+        interdiction_effect_time: SourcedValue<ResourceNumber>,
+        /// The authored VFX spool-end velocity.
+        vfx_spool_end_velocity: SourcedValue<ResourceNumber>,
+        /// The authored VFX pinch effect time.
+        vfx_pinch_effect_time: SourcedValue<ResourceNumber>,
+        /// The authored VFX pinch maximum velocity.
+        vfx_pinch_max_velocity: SourcedValue<ResourceNumber>,
+        /// The authored VFX entry flash velocity.
+        vfx_entry_flash_velocity: SourcedValue<ResourceNumber>,
+        /// The authored VFX trail-start velocity.
+        vfx_trail_start_velocity: SourcedValue<ResourceNumber>,
+        /// The authored VFX travel-effect start velocity.
+        vfx_travel_effect_start_velocity: SourcedValue<ResourceNumber>,
+        /// The authored VFX travel-effect end velocity.
+        vfx_travel_effect_end_velocity: SourcedValue<ResourceNumber>,
+        /// The authored VFX exit-effect velocity.
+        vfx_exit_effect_velocity: SourcedValue<ResourceNumber>,
+        /// The authored shader-node engage velocity.
+        shader_node_engage_velocity: SourcedValue<ResourceNumber>,
+        /// The authored shader-node shutdown velocity.
+        shader_node_shutdown_velocity: SourcedValue<ResourceNumber>,
+        /// The authored shader-node maximum-strength velocity.
+        shader_node_max_strength_velocity: SourcedValue<ResourceNumber>,
+        /// The original idle-state value and its owned members.
+        idle_state: SourcedValue<SourceArenaOutput<'source>>,
+        /// The original travelling-state value and its owned members.
+        travelling_state: SourcedValue<SourceArenaOutput<'source>>,
+        /// The original effect-tags value and its owned members.
+        effect_tags: SourcedValue<SourceArenaOutput<'source>>,
+        /// Original members outside the typed cells.
+        additional_fields: SourceArenaOutput<'source>,
     }
 }

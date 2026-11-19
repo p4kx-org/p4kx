@@ -6,6 +6,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::authored_fields::Observed;
+use super::catalog_item_components::source_getters;
 use super::quantum_fields::QuantumFields;
 use crate::CatalogError;
 use crate::resource_number::ResourceNumber;
@@ -17,7 +18,7 @@ use crate::source_value_catalog::SourceArenaOutput;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct QuantumBoost<'source> {
+pub struct QuantumBoost<'source> {
     source_type: SourcedValue<&'source str>,
     max_boost_speed: SourcedValue<ResourceNumber>,
     time_to_max_boost_speed: SourcedValue<ResourceNumber>,
@@ -48,5 +49,30 @@ impl<'source> QuantumBoost<'source> {
             ifcs_handover_respool_time: fields.number("ifcsHandoverRespoolTime")?,
             additional_fields: fields.additional_fields()?,
         })
+    }
+}
+
+impl<'source> QuantumBoost<'source> {
+    source_getters! {
+        /// The original concrete source type.
+        source_type: SourcedValue<&'source str>,
+        /// The authored maximum boost speed.
+        max_boost_speed: SourcedValue<ResourceNumber>,
+        /// The authored time to maximum boost speed.
+        time_to_max_boost_speed: SourcedValue<ResourceNumber>,
+        /// The authored boost use time.
+        boost_use_time: SourcedValue<ResourceNumber>,
+        /// The authored boost recharge time.
+        boost_recharge_time: SourcedValue<ResourceNumber>,
+        /// The authored stop time.
+        stop_time: SourcedValue<ResourceNumber>,
+        /// The authored minimum jump distance.
+        min_jump_distance: SourcedValue<ResourceNumber>,
+        /// The authored IFCS handover down time.
+        ifcs_handover_down_time: SourcedValue<ResourceNumber>,
+        /// The authored IFCS handover respool time.
+        ifcs_handover_respool_time: SourcedValue<ResourceNumber>,
+        /// Original members outside the typed cells.
+        additional_fields: SourceArenaOutput<'source>,
     }
 }

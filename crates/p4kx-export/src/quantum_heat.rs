@@ -6,6 +6,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::authored_fields::Observed;
+use super::catalog_item_components::source_getters;
 use super::quantum_fields::QuantumFields;
 use crate::CatalogError;
 use crate::resource_number::ResourceNumber;
@@ -17,7 +18,7 @@ use crate::source_value_catalog::SourceArenaOutput;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct QuantumHeat<'source> {
+pub struct QuantumHeat<'source> {
     source_type: SourcedValue<&'source str>,
     pre_ramp_up_thermal_energy_draw: SourcedValue<ResourceNumber>,
     ramp_up_thermal_energy_draw: SourcedValue<ResourceNumber>,
@@ -42,5 +43,24 @@ impl<'source> QuantumHeat<'source> {
             post_ramp_down_thermal_energy_draw: fields.number("postRampDownThermalEnergyDraw")?,
             additional_fields: fields.additional_fields()?,
         })
+    }
+}
+
+impl<'source> QuantumHeat<'source> {
+    source_getters! {
+        /// The original concrete source type.
+        source_type: SourcedValue<&'source str>,
+        /// The authored thermal energy draw before ramp-up.
+        pre_ramp_up_thermal_energy_draw: SourcedValue<ResourceNumber>,
+        /// The authored ramp-up thermal energy draw.
+        ramp_up_thermal_energy_draw: SourcedValue<ResourceNumber>,
+        /// The authored in-flight thermal energy draw.
+        in_flight_thermal_energy_draw: SourcedValue<ResourceNumber>,
+        /// The authored ramp-down thermal energy draw.
+        ramp_down_thermal_energy_draw: SourcedValue<ResourceNumber>,
+        /// The authored thermal energy draw after ramp-down.
+        post_ramp_down_thermal_energy_draw: SourcedValue<ResourceNumber>,
+        /// Original members outside the typed cells.
+        additional_fields: SourceArenaOutput<'source>,
     }
 }

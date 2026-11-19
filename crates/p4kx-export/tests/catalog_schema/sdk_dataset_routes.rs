@@ -51,6 +51,8 @@ mod planet_resource;
 mod projectile_ammo;
 #[path = "sdk_resource_network_routes.rs"]
 mod resource_network;
+#[path = "sdk_ship_system_routes.rs"]
+mod ship_systems;
 #[path = "sdk_vehicle_armor_route.rs"]
 mod vehicle_armor;
 #[path = "sdk_weapon_animation_route.rs"]
@@ -112,6 +114,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
     routes.extend(blueprint_physical::read()?);
     routes.extend(component_definitions::read()?);
     routes.extend(flight_configurations::read()?);
+    routes.extend(ship_systems::read()?);
     routes.extend(worn_gear::read()?);
     routes.push(vehicle_armor::read()?);
     routes.extend(resource_network::read()?);

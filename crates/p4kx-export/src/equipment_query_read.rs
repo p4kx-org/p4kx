@@ -172,6 +172,13 @@ impl<'query> Query<'query> {
                 self.cancel,
                 observer,
             )?,
+            Family::ItemEquipment(family) => Plan::read_item_components(
+                self.forge,
+                family.source_types(),
+                self.selection,
+                self.cancel,
+                observer,
+            )?,
             Family::Attachments | Family::Bounds | Family::CargoGrids => {
                 Plan::read_entities(self.forge, self.selection, self.cancel, observer)?
             }
@@ -205,6 +212,7 @@ fn order(family: Family, owners: &mut [Owner<'_>]) {
         | Family::Bounds
         | Family::CargoGrids
         | Family::Configuration(_)
+        | Family::ItemEquipment(_)
         | Family::WeaponSources
         | Family::ProjectileAmmo
         | Family::MagazineResolutions => owners.sort_by_key(|owner| owner.record.index()),

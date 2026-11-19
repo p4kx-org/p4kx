@@ -28,11 +28,14 @@ use crate::source_fields::FieldError;
 mod component_read;
 pub use component_read::WeaponSource;
 pub(crate) use component_read::{
-    read, read_magazine_resolution, read_projectile_ammo, read_weapon_source,
+    read, read_magazine_resolution, read_projectile_ammo, read_quantum_drives,
+    read_shield_generators, read_weapon_source,
 };
 
 #[path = "equipment_item_definition_read.rs"]
 pub(crate) mod definition_read;
+#[path = "item_equipment_source_getters.rs"]
+mod getters;
 #[path = "item_definition.rs"]
 pub(crate) mod item_definition;
 #[path = "catalog_weapon_magazine_resolution.rs"]
@@ -41,6 +44,7 @@ pub(crate) mod resolution;
 pub(crate) mod selection;
 
 use self::resolution::WeaponMagazineResolution;
+pub(super) use getters::source_getters;
 
 #[derive(Default)]
 pub(crate) struct ItemComponentRows<'source> {
@@ -259,6 +263,29 @@ enum Component {
     QuantumDrive,
     QuantumInterdictionGenerator,
     ShieldGenerator,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum ItemEquipmentFamily {
+    ShieldGenerators,
+    QuantumDrives,
+}
+
+impl ItemEquipmentFamily {
+    pub(crate) const fn source_types(self) -> &'static [&'static str] {
+        match self {
+            Self::ShieldGenerators => &[catalog_shield_generator::SOURCE_TYPE],
+            Self::QuantumDrives => &[catalog_quantum_drive::SOURCE_TYPE],
+        }
+    }
+
+    const fn contains(self, component: Component) -> bool {
+        matches!(
+            (self, component),
+            (Self::ShieldGenerators, Component::ShieldGenerator)
+                | (Self::QuantumDrives, Component::QuantumDrive)
+        )
+    }
 }
 
 impl Component {

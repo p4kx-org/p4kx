@@ -10,6 +10,9 @@ use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
 use crate::flow_root_positions::{Step, enumerate};
 use crate::health_origin_assertions as proof;
 
+#[path = "catalog_shield_sdk.rs"]
+mod sdk;
+
 const SOURCE_TYPE: &str = "SCItemShieldGeneratorParams";
 const STUN: &str = "FixtureShieldStun";
 const SLOT: &str = "FixtureShieldRange";

@@ -6,11 +6,12 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::authored_fields::Observed;
+use super::catalog_item_components::source_getters;
 use super::item_component_owner::ComponentOwner;
-use super::quantum_boost::QuantumBoost;
+pub use super::quantum_boost::QuantumBoost;
 use super::quantum_fields::QuantumFields;
-use super::quantum_heat::QuantumHeat;
-use super::quantum_profile::QuantumProfile;
+pub use super::quantum_heat::QuantumHeat;
+pub use super::quantum_profile::QuantumProfile;
 use crate::CatalogError;
 use crate::catalog_table::CatalogTable;
 use crate::resource_number::ResourceNumber;
@@ -24,7 +25,7 @@ pub(super) const SOURCE_TYPE: &str = "SCItemQuantumDriveParams";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct QuantumDrive<'source> {
+pub struct QuantumDrive<'source> {
     #[serde(flatten)]
     owner: ComponentOwner,
     source_type: SourcedValue<&'source str>,
@@ -66,4 +67,29 @@ pub(crate) fn table<'source>(
 ) -> CatalogTable<QuantumDrive<'source>> {
     rows.sort_by_key(|row| row.owner.key());
     CatalogTable::new(forge, &[SOURCE_TYPE], rows)
+}
+
+impl<'source> QuantumDrive<'source> {
+    source_getters! {
+        /// The original physical Item Record and Components slot.
+        owner: ComponentOwner,
+        /// The original concrete source type.
+        source_type: SourcedValue<&'source str>,
+        /// The authored quantum fuel requirement.
+        fuel_requirement: SourcedValue<ResourceNumber>,
+        /// The authored jump range.
+        jump_range: SourcedValue<ResourceNumber>,
+        /// The authored disconnect range.
+        disconnect_range: SourcedValue<ResourceNumber>,
+        /// The authored standard flight profile.
+        standard: SourcedValue<QuantumProfile<'source>>,
+        /// The authored spline flight profile.
+        spline: SourcedValue<QuantumProfile<'source>>,
+        /// The authored thermal energy inputs.
+        heat: SourcedValue<QuantumHeat<'source>>,
+        /// The authored boost parameters.
+        boost: SourcedValue<QuantumBoost<'source>>,
+        /// Original members outside the typed cells.
+        additional_fields: SourceArenaOutput<'source>,
+    }
 }
