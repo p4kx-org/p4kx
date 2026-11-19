@@ -60,12 +60,17 @@ additional candidates. Each byte saved per use ID removes 88,689,710 bytes from 
 plus its occurrences in references. Measure those occurrences and the complete dictionary cost
 before choosing an encoding.
 
+A byte census of the completed LIVE file attributed 29,873,701,416 bytes to the
+`sourceUsesRefs` arrays for `displayNameKey`, `flags`, `maxSize`, `minSize`, `portTags` and
+`requiredTags`. Those arrays contain 690,731,520 reference occurrences. They account for 97.39%
+of `loadouts` and 36.14% of the complete decoded file. The census verified the frame and
+reconciled its disjoint counts against all 30,674,479,268 bytes in `loadouts`.
+
 In a synthetic 128-port model, six attributes per port used the same growing selector prefix
 and different local uses. All 768 complete lists were distinct. Sharing the prefixes reduced
 1,451,401 bytes to 134,582 bytes and expanded to the exact original values, immediate markers
-and sorted unique use IDs. The PTU measurement needs the actual byte cost of
-`sourceUsesRefs` per port field. Candidate savings need the real shared-prefix boundaries and
-local-use sizes.
+and sorted unique use IDs. The LIVE census measures the current arrays. Installed-build
+savings depend on the observed prefix boundaries, local-use sizes and replacement encoding.
 
 Keep `containsEncryptedSource` and `sourceSetComplete` directly at each datum. The compact
 representation must explicitly identify its encoding and resolve every local use, exact
