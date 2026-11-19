@@ -43,7 +43,6 @@ use crate::contract::{
 };
 use crate::crafting_warning::CraftingWarning;
 use crate::entity_spawn_model::EntitySpawnPool;
-use crate::export_diagnostic::ExportSourceRole;
 use crate::export_ledger::ExportLedger;
 use crate::guid_text::CatalogGuid;
 use crate::loadout::staging::StagedLoadouts;
@@ -162,27 +161,6 @@ pub(crate) struct Collected<'f> {
 }
 
 impl<'f> Collected<'f> {
-    /// Orders the completed selection and retains category skip and failure identities.
-    pub(crate) fn finish_selection(&mut self) {
-        self.missing_blueprint_categories.extend(
-            self.ledger
-                .sources
-                .iter()
-                .filter(|source| {
-                    source.kind == Some(Kind::BlueprintCategories)
-                        && matches!(
-                            source.role,
-                            ExportSourceRole::Selected | ExportSourceRole::SelectionCandidate
-                        )
-                        && source.disposition.failed()
-                })
-                .map(|source| source.guid),
-        );
-        self.order();
-        self.resource_group_members
-            .sort_by_cached_key(|row| (row.physical.guid.text(), row.physical.record_index));
-    }
-
     #[expect(
         clippy::too_many_lines,
         reason = "one initializer per collected dataset"

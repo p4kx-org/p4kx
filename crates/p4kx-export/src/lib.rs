@@ -56,12 +56,6 @@
 //! the chosen languages as JSON or CSV.
 
 mod action_map;
-mod client_profile_settings;
-pub use client_profile_settings::{
-    ClientProfileSettings, ClientProfileSettingsReport, PhysicalEntryIdentity, ProfileDeclaration,
-    ProfileDocument, ProfileElement, ProfileKind, ProfileState, ProfileText,
-    read_client_profile_settings, read_client_profile_settings_for,
-};
 mod action_map_origin;
 mod action_map_profile;
 mod action_map_source;
@@ -115,6 +109,7 @@ mod catalog_shop_modules;
 mod catalog_target_index;
 mod catalog_template_modules;
 mod catalog_v3;
+mod client_profile_settings;
 mod collected;
 #[cfg(test)]
 mod collected_tests;

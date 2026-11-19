@@ -9,19 +9,22 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use p4kx_extraction::{Archive, CancelToken, Guid, SourceUse};
 use rayon::prelude::*;
 
-use crate::catalog_read::original::{AuthoredEntryPath, EntryCapture, EntryRead, EntryXml};
+use crate::catalog_read::original::{AuthoredEntryPath, EntryCapture};
 use crate::export_ledger::{ExportLedger, SourceDisposition};
 use crate::starmap_containers::instance::ContainerFile;
-use crate::starmap_containers::jump_gate::{GateFiles, JumpGate};
+use crate::starmap_containers::jump_gate::JumpGate;
 use crate::starmap_containers::location_declaration::ChildLocation;
 use crate::starmap_containers::proof::ChildOrigins;
 use crate::starmap_containers::unresolved::UnresolvedChild;
 use crate::starmap_index::Index;
 use crate::starmap_read::main_xml;
-use crate::starmap_xml::{AuthoredPose, XmlError};
+use crate::starmap_xml::AuthoredPose;
 use crate::{CatalogError, Kind};
 #[path = "starmap_children.rs"]
 mod children;
+
+#[path = "starmap_descriptor_root.rs"]
+mod descriptor_root;
 
 #[path = "starmap_external_sources.rs"]
 mod external_sources;
@@ -216,14 +219,14 @@ fn parse_body(
         capture,
         cancel: bounds.cancel,
     };
-    let Ok(ParsedRoot {
+    let Ok(descriptor_root::ParsedRoot {
         mut root,
         file,
         entities,
         gate,
         gate_proof,
         pending_external,
-    }) = parsed_root(&main.bytes, bounds, &files, index, ledger)?
+    }) = descriptor_root::read(&main.bytes, bounds, &files, index, ledger)?
     else {
         ledger.incomplete_inventory(Kind::StarmapObjects);
         main.source.record(
@@ -254,62 +257,6 @@ fn parse_body(
     })
 }
 
-struct ParsedRoot {
-    root: Level,
-    pending_external: bool,
-    file: ContainerFile,
-    entities: entxml::EntXmlIndex,
-    gate: Option<Box<JumpGate>>,
-    gate_proof: Option<crate::catalog_read::original::XmlNodeSource>,
-}
-
-fn parsed_root(
-    read: &EntryRead,
-    bounds: &Bounds<'_>,
-    files: &entxml::EntXmlFiles<'_, '_>,
-    index: &Index<'_>,
-    ledger: &mut ExportLedger,
-) -> Result<Result<ParsedRoot, XmlError>, CatalogError> {
-    let xml = match EntryXml::parse_starmap_main(read, files.capture)? {
-        Ok(xml) => xml,
-        Err(error) => return Ok(Err(error)),
-    };
-    let mut hcd = hcd::HcdReader::new(
-        files.archive,
-        files.outer,
-        files.container,
-        files.capture,
-        files.cancel,
-    );
-    let mut reader = children::ChildReader::new(bounds, &xml, &mut hcd, index, ledger);
-    let root = reader.level(xml.root())?;
-    let pending_external = reader.pending_external;
-    let guids = reader.entity_guids;
-    let entities = files.scan(&guids, &xml, ledger)?;
-    let (gate, gate_proof) = if bounds.scope.jump_endpoints {
-        let readers = GateFiles {
-            archive: files.archive,
-            outer: files.outer,
-            container: files.container,
-            capture: files.capture,
-            cancel: files.cancel,
-        };
-        (
-            Some(Box::new(readers.read(&xml, ledger)?)),
-            Some(xml.node_source(xml.root())?),
-        )
-    } else {
-        (None, None)
-    };
-    Ok(Ok(ParsedRoot {
-        root,
-        file: ContainerFile::from_xml(&xml, files.capture)?,
-        pending_external,
-        entities,
-        gate,
-        gate_proof,
-    }))
-}
 /// The containers read, and how many parses that took.
 pub(crate) struct Read {
     pub(crate) ledger: ExportLedger,

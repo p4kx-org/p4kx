@@ -8,7 +8,9 @@ use p4kx_assembly::{ArchiveFiles, Entities};
 use p4kx_extraction::{Archive, DataForgeEntry};
 
 use crate::archive_key_use::ArchiveKeyUse;
-use crate::build_derived::{add_contracts, add_loadouts, add_paints, add_tags};
+use crate::build_derived::{
+    add_contracts, add_loadouts, add_paints, add_scenario_factions, add_tags,
+};
 use crate::catalog_definitions::CatalogDefinitions;
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::{CatalogProjection, CatalogTextRegistry};
@@ -22,8 +24,7 @@ use crate::catalog_v3::medical::medical_tier_config;
 use crate::catalog_v3::procedural_planet_audio;
 use crate::catalog_v3::weapon_combat_base;
 use crate::contract::{Catalog, Completeness, KindCompleteness, SCHEMA_VERSION};
-use crate::mission_data::link_scenario_factions;
-use crate::options::CatalogStage::{FinalizeProjections, LinkMissionFactions};
+use crate::options::CatalogStage::FinalizeProjections;
 use crate::options::{CatalogRun, CatalogStage};
 use crate::ship_store_slugs::StoreSlugs;
 use crate::shops::add_shops;
@@ -87,13 +88,7 @@ pub(super) fn assemble<R>(
     )?;
     run.begin(CatalogStage::ProjectMissions);
     add_contracts(&forge, &projection, tags, run, &mut collected)?;
-    run.begin_compacted(LinkMissionFactions, &origins.uses, &collected.ledger)?;
-    collected.ledger.merge(link_scenario_factions(
-        &forge,
-        &mut collected.mission_kinds.scenarios,
-        &input,
-        options.cancel,
-    )?);
+    add_scenario_factions(&input, run, &mut collected)?;
     let (client_profile_settings, radar_audio) =
         parts::client_configurations(archive, &entry_capture, &mut collected, run)?;
     run.begin(CatalogStage::ProjectShops);

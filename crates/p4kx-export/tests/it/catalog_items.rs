@@ -303,12 +303,10 @@ fn a_ship_carries_crew_and_vehicle_definition() -> TestResult {
         &json!("scripts/entities/vehicles/implementations/xml/acas_ship.xml"),
         Some(true),
     )?;
-    for field in ["size", "insurance"] {
+    for field in ["size", "insurance", "playability"] {
         crate::health_origin_assertions::cell(ship, field, "absent")?;
     }
-    for field in ["playability", "variantOf"] {
-        assert!(ship[field].is_null(), "the fixture has no {field}");
-    }
+    assert!(ship["variantOf"].is_null(), "the fixture has no variantOf");
     for field in ["mass", "massBasis", "hullHealth"] {
         crate::health_origin_assertions::cell(ship, field, "unreadable")?;
     }

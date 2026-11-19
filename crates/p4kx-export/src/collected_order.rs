@@ -2,9 +2,32 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use super::Collected;
+use crate::Kind;
+use crate::export_diagnostic::ExportSourceRole;
 use crate::guid_text::{CatalogGuid, sort_by_guid};
 
 impl Collected<'_> {
+    /// Orders the completed selection and retains category skip and failure identities.
+    pub(crate) fn finish_selection(&mut self) {
+        self.missing_blueprint_categories.extend(
+            self.ledger
+                .sources
+                .iter()
+                .filter(|source| {
+                    source.kind == Some(Kind::BlueprintCategories)
+                        && matches!(
+                            source.role,
+                            ExportSourceRole::Selected | ExportSourceRole::SelectionCandidate
+                        )
+                        && source.disposition.failed()
+                })
+                .map(|source| source.guid),
+        );
+        self.order();
+        self.resource_group_members
+            .sort_by_cached_key(|row| (row.physical.guid.text(), row.physical.record_index));
+    }
+
     /// Orders the failures and the picked kinds by the text of the GUID.
     pub(super) fn order(&mut self) {
         self.order_failures();

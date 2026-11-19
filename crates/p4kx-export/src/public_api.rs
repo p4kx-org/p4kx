@@ -22,6 +22,11 @@ pub use crate::catalog_file_write::{
 };
 pub use crate::catalog_output::{Compression, ZSTD_LEVEL, ZSTD_WINDOW_LOG};
 pub use crate::catalog_projection::{KindTextSummary, TextOwner};
+pub use crate::client_profile_settings::{
+    ClientProfileSettings, ClientProfileSettingsReport, PhysicalEntryIdentity, ProfileDeclaration,
+    ProfileDocument, ProfileElement, ProfileKind, ProfileState, ProfileText,
+    read_client_profile_settings, read_client_profile_settings_for,
+};
 pub use crate::contract::{SCHEMA_VERSION, catalog_schema};
 pub use crate::crafting::{Crafting, read_crafting};
 pub use crate::crafting_research::{Research, ResearchBlock, ResearchMember, ResearchValue};
