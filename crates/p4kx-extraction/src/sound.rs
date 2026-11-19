@@ -3,6 +3,8 @@
 
 //! Bounded WEM reads and original input evidence.
 
+#[path = "radar_audio.rs"]
+pub mod radar_audio;
 #[path = "wwise_path.rs"]
 pub mod wwise_path;
 

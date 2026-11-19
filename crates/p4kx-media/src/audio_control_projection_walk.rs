@@ -7,6 +7,7 @@ use std::path::Path;
 use p4kx_extraction::cryxml::{
     SourceContent, SourceContents, SourceDeclaration, SourceDocument, SourceElement, SourceSyntax,
 };
+use p4kx_extraction::sound::radar_audio::RadarAudioElement;
 use p4kx_extraction::{DecimalU64, SourceUseRole};
 
 use crate::audio_control_fields::{AtlFamily, AtlScalar};
@@ -39,18 +40,21 @@ struct Frame<'document> {
     children: SourceContents<'document>,
     sibling: u64,
     preload: Option<u64>,
+    radar: Option<RadarAudioElement>,
 }
 
 struct ElementRoute {
     location: wire::AtlLocation,
     index: u64,
     preload: Option<u64>,
+    radar: Option<RadarAudioElement>,
 }
 
 #[derive(Clone, Copy)]
 struct Definition {
     family: Option<AtlFamily>,
     preload: Option<u64>,
+    radar: Option<RadarAudioElement>,
 }
 
 pub(super) fn project(
@@ -64,7 +68,8 @@ pub(super) fn project(
         root_is_atl_config: typed,
         repaired_string_bytes: source.is_lossy(),
     })?;
-    Walk { entry, sink }.tree(source, typed)
+    let radar = RadarAudioElement::root(source.root());
+    Walk { entry, sink }.tree(source, typed, radar)
 }
 
 struct Walk<'sink, S> {
@@ -73,7 +78,12 @@ struct Walk<'sink, S> {
 }
 
 impl<S: Sink> Walk<'_, S> {
-    fn tree(&mut self, source: &SourceDocument<'_>, typed: bool) -> Result<(), Failure> {
+    fn tree(
+        &mut self,
+        source: &SourceDocument<'_>,
+        typed: bool,
+        radar_root: Option<RadarAudioElement>,
+    ) -> Result<(), Failure> {
         let mut stack = Vec::new();
         reserve(&mut stack, self.sink.path())?;
         stack.push(Frame {
@@ -81,6 +91,7 @@ impl<S: Sink> Walk<'_, S> {
             children: source.content(),
             sibling: 0,
             preload: None,
+            radar: None,
         });
         let mut next = 0_u64;
         while let Some(frame) = stack.last_mut() {
@@ -98,10 +109,16 @@ impl<S: Sink> Walk<'_, S> {
             next = advance(next)?;
             match item? {
                 SourceContent::Element(element) => {
+                    let radar = if frame.parent.is_none() {
+                        radar_root
+                    } else {
+                        frame.radar.and_then(|parent| parent.child(element))
+                    };
                     let route = ElementRoute {
                         location,
                         index,
                         preload: frame.preload,
+                        radar,
                     };
                     let child = self.element(element, route, typed)?;
                     reserve(&mut stack, self.sink.path())?;
@@ -123,6 +140,7 @@ impl<S: Sink> Walk<'_, S> {
             location,
             index,
             preload,
+            radar,
         } = route;
         let syntax = element.syntax()?;
         let position = element_position(&element.position())?;
@@ -147,7 +165,11 @@ impl<S: Sink> Walk<'_, S> {
         } else {
             preload
         };
-        let definition = Definition { family, preload };
+        let definition = Definition {
+            family,
+            preload,
+            radar,
+        };
         self.declarations(&syntax, definition, position, index)?;
         if let Some(text) = syntax.binary_text() {
             let position = content_position(text.position())?;
@@ -166,6 +188,7 @@ impl<S: Sink> Walk<'_, S> {
             children: syntax.content()?,
             sibling: 0,
             preload,
+            radar,
         })
     }
 
@@ -182,6 +205,14 @@ impl<S: Sink> Walk<'_, S> {
                 "element",
                 &Subresource::new(wire::DEFINITION, vec![index]),
                 &AtlPayload::Definition(wire::AtlDefinition { family }),
+            )?;
+        }
+        if let Some(radar) = definition.radar {
+            self.payload(
+                position,
+                "element",
+                &Subresource::new(wire::RADAR_DEFINITION, vec![index]),
+                &AtlPayload::RadarDefinition(radar),
             )?;
         }
         for (ordinal, declaration) in syntax.declarations().enumerate() {
@@ -205,6 +236,18 @@ impl<S: Sink> Walk<'_, S> {
             &Subresource::new(wire::DECLARATION, indices.to_vec()),
             &AtlPayload::Declaration(observed.original),
         )?;
+        if let Some(field) = definition
+            .radar
+            .and_then(|radar| radar.attribute(declaration))
+        {
+            self.sink.record(
+                position,
+                "declaration",
+                SourceUseRole::Conversion,
+                &Subresource::new(wire::RADAR_FIELD, indices.to_vec()),
+                &AtlPayload::RadarField(field),
+            )?;
+        }
         if let Some(typed) = observed.typed {
             let short_id = match &typed.record.typed_value {
                 AtlScalar::WwiseEvent { id, .. } => Some(*id),

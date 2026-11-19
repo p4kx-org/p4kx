@@ -5,6 +5,7 @@ use std::ops::Range;
 
 use p4kx_extraction::DecimalU64;
 use p4kx_extraction::cryxml::{Format, Signature, SourceDeclarationKind};
+use p4kx_extraction::sound::radar_audio::{RadarAudioAttribute, RadarAudioElement};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -20,6 +21,8 @@ pub(crate) const CONTENT: &str = "audio-control-content";
 pub(crate) const BINARY_TEXT: &str = "audio-control-binary-text";
 pub(crate) const DEFINITION: &str = "audio-control-definition";
 pub(crate) const FIELD: &str = "audio-control-field";
+pub(crate) const RADAR_DEFINITION: &str = "audio-control-radar-definition";
+pub(crate) const RADAR_FIELD: &str = "audio-control-radar-field";
 pub(crate) const REFERENCE: &str = "audio-control-reference";
 pub(crate) const FAILURE: &str = "audio-control-failure";
 
@@ -38,6 +41,8 @@ pub(crate) enum AtlPayload<'document> {
     BinaryText(AtlBinaryText<'document>),
     Definition(AtlDefinition),
     Field(AtlFieldRecord<'document>),
+    RadarDefinition(RadarAudioElement),
+    RadarField(RadarAudioAttribute<'document>),
     Reference(AtlReference<'document>),
     ReferenceResolution(AtlReferenceResolution),
     ReferenceCandidate(AtlReferenceCandidate),

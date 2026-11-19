@@ -28,6 +28,13 @@ pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
         (wire::BINARY_TEXT, "binary-text", 1, &["complete"][..]),
         (wire::DEFINITION, "definition", 1, &["complete"][..]),
         (wire::FIELD, "field", 2, &["complete"][..]),
+        (
+            wire::RADAR_DEFINITION,
+            "radar-definition",
+            1,
+            &["complete"][..],
+        ),
+        (wire::RADAR_FIELD, "radar-field", 2, &["complete"][..]),
         (wire::REFERENCE, "reference", 2, &["complete"][..]),
         (
             graph::RESOLUTION,

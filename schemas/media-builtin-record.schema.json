@@ -5294,6 +5294,40 @@
           "additionalProperties": false,
           "properties": {
             "payload": {
+              "$ref": "#/$defs/RadarAudioElement"
+            },
+            "record_type": {
+              "const": "radar-definition",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/RadarAudioAttribute"
+            },
+            "record_type": {
+              "const": "radar-field",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
               "$ref": "#/$defs/AtlReference"
             },
             "record_type": {
@@ -20726,6 +20760,206 @@
         "value"
       ],
       "type": "object"
+    },
+    "RadarAudioAttribute": {
+      "additionalProperties": false,
+      "description": "A typed attribute and its original declaration value.",
+      "properties": {
+        "field": {
+          "$ref": "#/$defs/RadarAudioField",
+          "description": "The meaning of the original attribute."
+        },
+        "value": {
+          "$ref": "#/$defs/RadarAudioValue",
+          "description": "The exact token and its typed interpretation."
+        }
+      },
+      "required": [
+        "field",
+        "value"
+      ],
+      "type": "object"
+    },
+    "RadarAudioElement": {
+      "description": "A recognised element in the authored `RadarAudioData` hierarchy.",
+      "oneOf": [
+        {
+          "const": "configuration",
+          "description": "The owning document root.",
+          "type": "string"
+        },
+        {
+          "const": "default-zoom",
+          "description": "A declared zoom range.",
+          "type": "string"
+        },
+        {
+          "const": "category-types",
+          "description": "An ordered group of category declarations.",
+          "type": "string"
+        },
+        {
+          "const": "category-type",
+          "description": "A category with authored identification and display attributes.",
+          "type": "string"
+        },
+        {
+          "const": "sound-events",
+          "description": "An ordered group of sound-event declarations.",
+          "type": "string"
+        },
+        {
+          "const": "sound-event",
+          "description": "A named slot and its authored sound-event value.",
+          "type": "string"
+        }
+      ]
+    },
+    "RadarAudioField": {
+      "description": "The meaning of an unqualified attribute of a recognised `RadarAudioData` element.",
+      "oneOf": [
+        {
+          "const": "zoom-min",
+          "description": "The lower zoom limit.",
+          "type": "string"
+        },
+        {
+          "const": "zoom-max",
+          "description": "The upper zoom limit.",
+          "type": "string"
+        },
+        {
+          "const": "category-name",
+          "description": "The authored category name.",
+          "type": "string"
+        },
+        {
+          "const": "category-value",
+          "description": "The exact integral category value.",
+          "type": "string"
+        },
+        {
+          "const": "display-time",
+          "description": "The authored display time.",
+          "type": "string"
+        },
+        {
+          "const": "display-start-alpha",
+          "description": "The starting display alpha.",
+          "type": "string"
+        },
+        {
+          "const": "sound-event-name",
+          "description": "The named sound-event slot.",
+          "type": "string"
+        },
+        {
+          "const": "sound-event-value",
+          "description": "The sound-event token assigned to the slot.",
+          "type": "string"
+        }
+      ]
+    },
+    "RadarAudioValue": {
+      "description": "The state of an authored `RadarAudioData` attribute.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "A present attribute with no text.",
+          "properties": {
+            "state": {
+              "const": "empty",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "An authored text token.",
+          "properties": {
+            "raw": {
+              "description": "The original decoded value.",
+              "type": "string"
+            },
+            "state": {
+              "const": "text",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "raw"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "An integral decimal token with storage-width-independent precision.",
+          "properties": {
+            "raw": {
+              "description": "The original decoded value, including any sign and leading zeros.",
+              "type": "string"
+            },
+            "state": {
+              "const": "integer",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "raw"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A finite numeric interpretation alongside the unmodified token.",
+          "properties": {
+            "raw": {
+              "description": "The original decoded value.",
+              "type": "string"
+            },
+            "state": {
+              "const": "number",
+              "type": "string"
+            },
+            "value": {
+              "description": "The value parsed as a binary64 number.",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "state",
+            "raw",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A present token that cannot be interpreted as the declared numeric field.",
+          "properties": {
+            "raw": {
+              "description": "The original decoded value that failed interpretation.",
+              "type": "string"
+            },
+            "state": {
+              "const": "invalid",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "raw"
+          ],
+          "type": "object"
+        }
+      ]
     },
     "RandomSequenceItemRecord": {
       "oneOf": [
@@ -45774,6 +46008,128 @@
                 "properties": {
                   "record_type": {
                     "const": "field"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "complete"
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 2,
+                "minItems": 2
+              }
+            }
+          }
+        },
+        "required": [
+          "data",
+          "status"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio-control"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-control-radar-definition"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AtlPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "radar-definition"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "complete"
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 1,
+                "minItems": 1
+              }
+            }
+          }
+        },
+        "required": [
+          "data",
+          "status"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio-control"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-control-radar-field"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AtlPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "radar-field"
                   }
                 },
                 "required": [

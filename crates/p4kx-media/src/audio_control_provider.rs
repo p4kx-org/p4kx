@@ -31,7 +31,7 @@ impl Provider for AudioControlProvider {
             MediaKind::AudioControl,
             "p4kx.audio-control",
             "1.0.0",
-            "Exact selected ATL XML and CryXml bytes, source-ordered authored syntax, typed control families, and observed declarations.",
+            "Exact selected Audio XML and CryXml bytes, source-ordered authored syntax, typed control families, and observed declarations.",
         );
         capability.field_groups = vec![
             FieldGroup::new(
@@ -41,6 +41,10 @@ impl Provider for AudioControlProvider {
             FieldGroup::new(
                 "atl-controls",
                 "Authored ATL control families and established fields with original declarations.",
+            ),
+            FieldGroup::new(
+                "radar-audio",
+                "Authored radar zoom, categories and sound-event declarations.",
             ),
         ];
         capability

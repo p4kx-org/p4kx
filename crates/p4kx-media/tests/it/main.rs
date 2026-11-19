@@ -70,6 +70,7 @@ mod audio_control_graph;
 mod audio_control_graph_origins;
 mod audio_control_path;
 mod audio_control_provider;
+mod audio_control_radar;
 mod audio_foreign_bank_provider;
 mod audio_loose_inventory;
 mod audio_provider_sources;

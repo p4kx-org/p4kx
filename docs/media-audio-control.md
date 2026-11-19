@@ -21,6 +21,8 @@ is an independent slot alongside the child order.
 | `audio-control-binary-text` | Element occurrence of the independent CryXml content slot |
 | `audio-control-definition` | Element occurrence |
 | `audio-control-field` | Element occurrence and original declaration ordinal |
+| `audio-control-radar-definition` | Element occurrence |
+| `audio-control-radar-field` | Element occurrence and original declaration ordinal |
 | `audio-control-reference` | Element occurrence and original declaration ordinal |
 | `audio-control-reference-resolution` | Owning Archive directory and query index |
 | `audio-control-reference-candidate` | Owning Archive directory, query index and candidate ordinal |
@@ -38,6 +40,14 @@ localisation flag, entry language, duration declarations and Wwise filename
 as separate fields. The raw declaration keeps its original literal independently of the typed number. An invalid typed
 literal keeps its original spelling and an explicit typed invalid outcome. The bounds are authored
 metadata and give no runtime timing, unit or playback guarantee.
+
+The independent `RadarAudioData` hierarchy yields ordered radar-definition
+and radar-field rows. The typed view covers the original default zoom limits,
+category names and numeric settings, and each sound-event name and value.
+Values keep their exact spelling. Empty values and invalid numeric declarations
+have explicit states. A missing attribute has no field row. A repeated element
+gets a distinct physical ordinal. Other elements and attributes remain in the
+original syntax stream. A radar sound-event value retains its authored token.
 
 A preload link searches original named requests in the same Archive directory. An RTPC dependee
 searches original RTPC declarations there. A platform group link searches within its exact
