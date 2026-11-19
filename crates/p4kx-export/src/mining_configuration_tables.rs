@@ -8,6 +8,7 @@ use super::{ComponentKind, PhysicalComponents};
 use crate::CatalogError;
 use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::authored_fields::Observed;
+use crate::catalog_v3::component_sources::physical_component;
 use crate::catalog_v3::referenced_definition_read::{self, Selection};
 use crate::export_field_inspection::ConfigurationInspection;
 use crate::schema_fields::every_field_required;
@@ -25,10 +26,15 @@ mod modifiers;
 #[path = "attachable_weapon_modifier.rs"]
 mod weapon_modifier;
 
-use attachable::AttachableModifier;
+pub use attachable::AttachableModifier;
+pub use attachable_effect::{
+    AttachableEffect, FilterEffect, MiningEffect, ModifierLifetime, WeaponEffect,
+};
 pub use global::MiningLaserGlobalDefinition;
 pub(crate) use laser::GLOBAL;
-use laser::MiningLaser;
+pub use laser::MiningLaser;
+pub use modifiers::{FloatModifier, MiningFilter, MiningModifiers};
+pub use weapon_modifier::{SalvageModifier, TractorModifier, WeaponModifier, WeaponModifierStats};
 
 const MINING_LASER: ComponentKind = ComponentKind {
     source_type: laser::COMPONENT,
@@ -38,6 +44,13 @@ const ATTACHABLE_MODIFIER: ComponentKind = ComponentKind {
     source_type: attachable::COMPONENT,
     inspection: ConfigurationInspection::AttachableModifier,
 };
+
+physical_component!(MiningLaserComponents, MiningLaser, MINING_LASER);
+physical_component!(
+    AttachableModifierComponents,
+    AttachableModifier,
+    ATTACHABLE_MODIFIER
+);
 
 /// Global references and physical mining and attachment configurations.
 #[derive(Debug, Serialize, JsonSchema)]

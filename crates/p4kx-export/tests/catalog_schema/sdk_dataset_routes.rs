@@ -33,6 +33,8 @@ mod blueprint_pools;
 mod component_definitions;
 #[path = "sdk_equipment_component_parity.rs"]
 mod component_parity;
+#[path = "sdk_component_tool_routes.rs"]
+mod component_tools;
 #[path = "sdk_flight_configuration_routes.rs"]
 mod flight_configurations;
 #[path = "sdk_projectile_ammo_route.rs"]
@@ -97,6 +99,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
     routes.extend(component_definitions::read()?);
     routes.extend(flight_configurations::read()?);
     routes.extend(worn_gear::read()?);
+    routes.extend(component_tools::read()?);
     Ok(routes)
 }
 

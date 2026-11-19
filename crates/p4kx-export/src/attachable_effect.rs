@@ -17,11 +17,17 @@ use crate::source_fields::FieldError;
 /// The concrete authored effect of one attachable modifier slot.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(tag = "type", content = "value", rename_all = "camelCase")]
-pub(super) enum AttachableEffect<'source> {
+#[non_exhaustive]
+pub enum AttachableEffect<'source> {
+    /// An authored modifier for a mining laser.
     MiningLaser(Box<MiningEffect<'source>>),
+    /// An authored modifier for a mineable rock.
     MineableRock(Box<MiningEffect<'source>>),
+    /// An authored mining filter modifier.
     MiningFilter(Box<FilterEffect<'source>>),
+    /// An authored weapon effect.
     Weapon(Box<WeaponEffect<'source>>),
+    /// A retained concrete effect outside the typed families.
     Authored(UnitSource<'source>),
 }
 
@@ -48,10 +54,11 @@ impl<'source> AttachableEffect<'source> {
     }
 }
 
+/// An authored mining-laser or mineable-rock effect.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct MiningEffect<'source> {
+pub struct MiningEffect<'source> {
     modifier_lifetime: SourcedValue<ModifierLifetime<'source>>,
     mining_laser_modifier: SourcedValue<MiningModifiers<'source>>,
     #[serde(flatten)]
@@ -59,6 +66,24 @@ pub(super) struct MiningEffect<'source> {
 }
 
 impl<'source> MiningEffect<'source> {
+    /// Borrows the authored lifetime parameters.
+    #[must_use]
+    pub const fn modifier_lifetime(&self) -> &SourcedValue<ModifierLifetime<'source>> {
+        &self.modifier_lifetime
+    }
+
+    /// Borrows the authored mining modifier parameters.
+    #[must_use]
+    pub const fn mining_laser_modifier(&self) -> &SourcedValue<MiningModifiers<'source>> {
+        &self.mining_laser_modifier
+    }
+
+    /// Borrows the original type and remaining fields.
+    #[must_use]
+    pub const fn source(&self) -> &UnitSource<'source> {
+        &self.original
+    }
+
     fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
@@ -86,10 +111,11 @@ impl<'source> MiningEffect<'source> {
     }
 }
 
+/// An authored attachable mining filter effect.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct FilterEffect<'source> {
+pub struct FilterEffect<'source> {
     modifier_lifetime: SourcedValue<ModifierLifetime<'source>>,
     filter_params: SourcedValue<MiningFilter<'source>>,
     #[serde(flatten)]
@@ -97,6 +123,24 @@ pub(super) struct FilterEffect<'source> {
 }
 
 impl<'source> FilterEffect<'source> {
+    /// Borrows the authored lifetime parameters.
+    #[must_use]
+    pub const fn modifier_lifetime(&self) -> &SourcedValue<ModifierLifetime<'source>> {
+        &self.modifier_lifetime
+    }
+
+    /// Borrows the authored filter parameters.
+    #[must_use]
+    pub const fn filter_params(&self) -> &SourcedValue<MiningFilter<'source>> {
+        &self.filter_params
+    }
+
+    /// Borrows the original type and remaining fields.
+    #[must_use]
+    pub const fn source(&self) -> &UnitSource<'source> {
+        &self.original
+    }
+
     fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
@@ -124,10 +168,11 @@ impl<'source> FilterEffect<'source> {
     }
 }
 
+/// An authored attachable weapon effect and its fire-action slot.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct WeaponEffect<'source> {
+pub struct WeaponEffect<'source> {
     modifier_lifetime: SourcedValue<ModifierLifetime<'source>>,
     fire_action_index: SourcedValue<i32>,
     weapon_modifier: SourcedValue<WeaponModifier<'source>>,
@@ -136,6 +181,30 @@ pub(super) struct WeaponEffect<'source> {
 }
 
 impl<'source> WeaponEffect<'source> {
+    /// Borrows the authored lifetime parameters.
+    #[must_use]
+    pub const fn modifier_lifetime(&self) -> &SourcedValue<ModifierLifetime<'source>> {
+        &self.modifier_lifetime
+    }
+
+    /// Borrows the authored fire-action index.
+    #[must_use]
+    pub const fn fire_action_index(&self) -> &SourcedValue<i32> {
+        &self.fire_action_index
+    }
+
+    /// Borrows the authored weapon modifier.
+    #[must_use]
+    pub const fn weapon_modifier(&self) -> &SourcedValue<WeaponModifier<'source>> {
+        &self.weapon_modifier
+    }
+
+    /// Borrows the original type and remaining fields.
+    #[must_use]
+    pub const fn source(&self) -> &UnitSource<'source> {
+        &self.original
+    }
+
     fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
@@ -166,16 +235,29 @@ impl<'source> WeaponEffect<'source> {
     }
 }
 
+/// The concrete authored modifier lifetime and its fields.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct ModifierLifetime<'source> {
+pub struct ModifierLifetime<'source> {
     lifetime: SourcedValue<ResourceFloat32>,
     #[serde(flatten)]
     original: UnitSource<'source>,
 }
 
 impl<'source> ModifierLifetime<'source> {
+    /// Borrows the original lifetime value.
+    #[must_use]
+    pub const fn lifetime(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.lifetime
+    }
+
+    /// Borrows the original type and remaining fields.
+    #[must_use]
+    pub const fn source(&self) -> &UnitSource<'source> {
+        &self.original
+    }
+
     fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

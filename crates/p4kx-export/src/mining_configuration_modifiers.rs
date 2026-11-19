@@ -16,13 +16,25 @@ use crate::source_fields::FieldError;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct FloatModifier<'source> {
+pub struct FloatModifier<'source> {
     value: SourcedValue<ResourceFloat32>,
     #[serde(flatten)]
     original: UnitSource<'source>,
 }
 
 impl<'source> FloatModifier<'source> {
+    /// Borrows the original float preserving the stored bits.
+    #[must_use]
+    pub const fn value(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.value
+    }
+
+    /// Borrows the original type and remaining fields.
+    #[must_use]
+    pub const fn source(&self) -> &UnitSource<'source> {
+        &self.original
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
@@ -45,7 +57,7 @@ fn modifier<'source>(
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct MiningModifiers<'source> {
+pub struct MiningModifiers<'source> {
     is_optimal_rate_good: SourcedValue<bool>,
     laser_instability: SourcedValue<FloatModifier<'source>>,
     optimal_charge_window_size_modifier: SourcedValue<FloatModifier<'source>>,
@@ -59,6 +71,66 @@ pub(super) struct MiningModifiers<'source> {
 }
 
 impl<'source> MiningModifiers<'source> {
+    /// Borrows the authored optimal-rate polarity flag.
+    #[must_use]
+    pub const fn is_optimal_rate_good(&self) -> &SourcedValue<bool> {
+        &self.is_optimal_rate_good
+    }
+
+    /// Borrows the authored laser instability modifier.
+    #[must_use]
+    pub const fn laser_instability(&self) -> &SourcedValue<FloatModifier<'source>> {
+        &self.laser_instability
+    }
+
+    /// Borrows the authored optimal charge window size modifier.
+    #[must_use]
+    pub const fn optimal_charge_window_size_modifier(
+        &self,
+    ) -> &SourcedValue<FloatModifier<'source>> {
+        &self.optimal_charge_window_size_modifier
+    }
+
+    /// Borrows the authored resistance modifier.
+    #[must_use]
+    pub const fn resistance_modifier(&self) -> &SourcedValue<FloatModifier<'source>> {
+        &self.resistance_modifier
+    }
+
+    /// Borrows the authored shatter damage modifier.
+    #[must_use]
+    pub const fn shatterdamage_modifier(&self) -> &SourcedValue<FloatModifier<'source>> {
+        &self.shatterdamage_modifier
+    }
+
+    /// Borrows the authored cluster factor modifier.
+    #[must_use]
+    pub const fn cluster_factor_modifier(&self) -> &SourcedValue<FloatModifier<'source>> {
+        &self.cluster_factor_modifier
+    }
+
+    /// Borrows the authored optimal charge window rate modifier.
+    #[must_use]
+    pub const fn optimal_charge_window_rate_modifier(
+        &self,
+    ) -> &SourcedValue<FloatModifier<'source>> {
+        &self.optimal_charge_window_rate_modifier
+    }
+
+    /// Borrows the authored catastrophic charge window rate modifier.
+    #[must_use]
+    pub const fn catastrophic_charge_window_rate_modifier(
+        &self,
+    ) -> &SourcedValue<FloatModifier<'source>> {
+        &self.catastrophic_charge_window_rate_modifier
+    }
+
+    /// Borrows the original type and remaining fields.
+    #[must_use]
+    pub const fn source(&self) -> &UnitSource<'source> {
+        &self.original
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
@@ -114,13 +186,25 @@ impl<'source> MiningModifiers<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct MiningFilter<'source> {
+pub struct MiningFilter<'source> {
     filter_modifier: SourcedValue<FloatModifier<'source>>,
     #[serde(flatten)]
     original: UnitSource<'source>,
 }
 
 impl<'source> MiningFilter<'source> {
+    /// Borrows the authored filter modifier.
+    #[must_use]
+    pub const fn filter_modifier(&self) -> &SourcedValue<FloatModifier<'source>> {
+        &self.filter_modifier
+    }
+
+    /// Borrows the original type and remaining fields.
+    #[must_use]
+    pub const fn source(&self) -> &UnitSource<'source> {
+        &self.original
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

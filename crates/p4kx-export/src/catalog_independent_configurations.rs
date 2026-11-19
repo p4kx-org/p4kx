@@ -31,7 +31,7 @@ use entity_animation_controller::EntityAnimationController;
 use loot_generation_component::LootGenerationComponent;
 
 #[path = "consumable_tables.rs"]
-mod consumables;
+pub(crate) mod consumables;
 #[path = "catalog_entity_animation_controller.rs"]
 mod entity_animation_controller;
 #[path = "flight_configuration_tables.rs"]
@@ -45,7 +45,7 @@ mod jump_point_globals;
 #[path = "loot_generation_component.rs"]
 mod loot_generation_component;
 #[path = "mining_configuration_tables.rs"]
-mod mining_configurations;
+pub(crate) mod mining_configurations;
 #[path = "catalog_ordered_curve.rs"]
 pub(super) mod ordered_curve;
 #[path = "turret_health.rs"]

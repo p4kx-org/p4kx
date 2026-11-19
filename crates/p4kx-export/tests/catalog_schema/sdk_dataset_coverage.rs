@@ -31,6 +31,9 @@ const CRAFTING_GLOBAL: &str = "/configurations/craftingGlobal";
 const SUIT_ARMOR: &str = "/configurations/suitArmor";
 const CLOTHING: &str = "/configurations/clothing";
 const ITEM_RADARS: &str = "/configurations/itemRadars";
+const MINING_LASERS: &str = "/configurations/miningLasers";
+const ATTACHABLE_MODIFIERS: &str = "/configurations/attachableModifiers";
+const CONSUMABLE_CONFIGURATIONS: &str = "/configurations/consumables";
 const PROJECTILE_AMMUNITION: &str = "/projections/weaponProjectileAmmoSelections";
 const MAGAZINE_RESOLUTION: &str = "/projections/weaponMagazineResolutions";
 const WEAPON_COMBAT: &str = "/projections/weaponCombatBases";
@@ -95,6 +98,9 @@ fn sdk_query_witnesses_keep_their_canonical_dataset_contract() -> TestResult {
         SUIT_ARMOR,
         CLOTHING,
         ITEM_RADARS,
+        MINING_LASERS,
+        ATTACHABLE_MODIFIERS,
+        CONSUMABLE_CONFIGURATIONS,
         SHOP_INVENTORIES,
         FLARE_LIBRARIES,
         RADAR_AUDIO,

@@ -23,7 +23,7 @@ pub(crate) const GLOBAL: &str = "MiningLaserGlobalParams";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct MiningLaser<'source> {
+pub struct MiningLaser<'source> {
     #[serde(flatten)]
     owner: ComponentOwner,
     throttle_lerp_speed: SourcedValue<ResourceFloat32>,
@@ -39,6 +39,54 @@ pub(super) struct MiningLaser<'source> {
 }
 
 impl<'source> MiningLaser<'source> {
+    /// Borrows the original physical component owner.
+    #[must_use]
+    pub const fn owner(&self) -> &ComponentOwner {
+        &self.owner
+    }
+
+    /// Borrows the authored throttle interpolation speed.
+    #[must_use]
+    pub const fn throttle_lerp_speed(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.throttle_lerp_speed
+    }
+
+    /// Borrows the authored minimum throttle.
+    #[must_use]
+    pub const fn throttle_minimum(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.throttle_minimum
+    }
+
+    /// Borrows the authored power-throttle flag.
+    #[must_use]
+    pub const fn uses_power_throttle(&self) -> &SourcedValue<bool> {
+        &self.uses_power_throttle
+    }
+
+    /// Borrows the physical mining-laser global reference.
+    #[must_use]
+    pub const fn global_params(&self) -> &SourcedValue<Box<SourceRecordReference<'source>>> {
+        &self.global_params
+    }
+
+    /// Borrows the authored mining modifiers.
+    #[must_use]
+    pub const fn mining_laser_modifiers(&self) -> &SourcedValue<MiningModifiers<'source>> {
+        &self.modifiers
+    }
+
+    /// Borrows the authored filter parameters.
+    #[must_use]
+    pub const fn filter_params(&self) -> &SourcedValue<MiningFilter<'source>> {
+        &self.filter_params
+    }
+
+    /// Borrows the original type and remaining fields.
+    #[must_use]
+    pub const fn source(&self) -> &UnitSource<'source> {
+        &self.original
+    }
+
     pub(super) fn read(
         owner: ComponentOwner,
         source: Observed<'_, '_, '_, 'source>,

@@ -16,13 +16,25 @@ use crate::source_fields::FieldError;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct WeaponModifier<'source> {
+pub struct WeaponModifier<'source> {
     weapon_stats: SourcedValue<WeaponModifierStats<'source>>,
     #[serde(flatten)]
     original: UnitSource<'source>,
 }
 
 impl<'source> WeaponModifier<'source> {
+    /// Borrows the authored weapon statistics changes.
+    #[must_use]
+    pub const fn weapon_stats(&self) -> &SourcedValue<WeaponModifierStats<'source>> {
+        &self.weapon_stats
+    }
+
+    /// Borrows the original type and remaining fields.
+    #[must_use]
+    pub const fn source(&self) -> &UnitSource<'source> {
+        &self.original
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
@@ -41,10 +53,11 @@ impl<'source> WeaponModifier<'source> {
     }
 }
 
+/// Damage, salvage and tractor changes in an authored weapon modifier.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct WeaponModifierStats<'source> {
+pub struct WeaponModifierStats<'source> {
     damage_multiplier: SourcedValue<ResourceFloat32>,
     salvage_modifier: SourcedValue<SalvageModifier<'source>>,
     tractor_modifier: SourcedValue<TractorModifier<'source>>,
@@ -53,6 +66,30 @@ struct WeaponModifierStats<'source> {
 }
 
 impl<'source> WeaponModifierStats<'source> {
+    /// Borrows the authored damage multiplier.
+    #[must_use]
+    pub const fn damage_multiplier(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.damage_multiplier
+    }
+
+    /// Borrows the authored salvage changes.
+    #[must_use]
+    pub const fn salvage_modifier(&self) -> &SourcedValue<SalvageModifier<'source>> {
+        &self.salvage_modifier
+    }
+
+    /// Borrows the authored tractor changes.
+    #[must_use]
+    pub const fn tractor_modifier(&self) -> &SourcedValue<TractorModifier<'source>> {
+        &self.tractor_modifier
+    }
+
+    /// Borrows the original type and remaining fields.
+    #[must_use]
+    pub const fn source(&self) -> &UnitSource<'source> {
+        &self.original
+    }
+
     fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
@@ -87,10 +124,11 @@ impl<'source> WeaponModifierStats<'source> {
     }
 }
 
+/// The original salvage parameters of a weapon modifier.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct SalvageModifier<'source> {
+pub struct SalvageModifier<'source> {
     radius_multiplier: SourcedValue<ResourceFloat32>,
     salvage_speed_multiplier: SourcedValue<ResourceFloat32>,
     extraction_efficiency: SourcedValue<ResourceFloat32>,
@@ -99,6 +137,30 @@ struct SalvageModifier<'source> {
 }
 
 impl<'source> SalvageModifier<'source> {
+    /// Borrows the authored salvage radius multiplier.
+    #[must_use]
+    pub const fn radius_multiplier(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.radius_multiplier
+    }
+
+    /// Borrows the authored salvage speed multiplier.
+    #[must_use]
+    pub const fn salvage_speed_multiplier(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.salvage_speed_multiplier
+    }
+
+    /// Borrows the authored extraction efficiency.
+    #[must_use]
+    pub const fn extraction_efficiency(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.extraction_efficiency
+    }
+
+    /// Borrows the original type and remaining fields.
+    #[must_use]
+    pub const fn source(&self) -> &UnitSource<'source> {
+        &self.original
+    }
+
     fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
@@ -123,10 +185,11 @@ impl<'source> SalvageModifier<'source> {
     }
 }
 
+/// The original tractor parameters of a weapon modifier.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct TractorModifier<'source> {
+pub struct TractorModifier<'source> {
     force_multiplier: SourcedValue<ResourceFloat32>,
     full_strength_dist_multiplier: SourcedValue<ResourceFloat32>,
     max_dist_multiplier: SourcedValue<ResourceFloat32>,
@@ -136,6 +199,36 @@ struct TractorModifier<'source> {
 }
 
 impl<'source> TractorModifier<'source> {
+    /// Borrows the authored tractor force multiplier.
+    #[must_use]
+    pub const fn force_multiplier(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.force_multiplier
+    }
+
+    /// Borrows the authored full-strength distance multiplier.
+    #[must_use]
+    pub const fn full_strength_dist_multiplier(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.full_strength_dist_multiplier
+    }
+
+    /// Borrows the authored maximum distance multiplier.
+    #[must_use]
+    pub const fn max_dist_multiplier(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.max_dist_multiplier
+    }
+
+    /// Borrows the authored maximum volume multiplier.
+    #[must_use]
+    pub const fn max_volume_multiplier(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.max_volume_multiplier
+    }
+
+    /// Borrows the original type and remaining fields.
+    #[must_use]
+    pub const fn source(&self) -> &UnitSource<'source> {
+        &self.original
+    }
+
     fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

@@ -22,10 +22,11 @@ pub(crate) const SUBTYPE: &str = "ConsumableSubtype";
 /// An original list and its individually sourced slots.
 pub type AuthoredList<T> = SourcedValue<Vec<SourcedValue<T>>>;
 
+/// One original consumable component and its authored contents and use settings.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct Consumable<'source> {
+pub struct Consumable<'source> {
     #[serde(flatten)]
     owner: ComponentOwner,
     #[serde(flatten)]
@@ -35,6 +36,96 @@ pub(super) struct Consumable<'source> {
 }
 
 impl<'source> Consumable<'source> {
+    /// Borrows the original physical component owner.
+    #[must_use]
+    pub const fn owner(&self) -> &ComponentOwner {
+        &self.owner
+    }
+
+    /// Borrows the original contents slots in order.
+    #[must_use]
+    pub const fn default_contents(&self) -> &AuthoredList<Contents<'source>> {
+        &self.fields.default_contents
+    }
+
+    /// Borrows the original consumable capacity in its stored unit.
+    #[must_use]
+    pub const fn consumable_volume(&self) -> &SourcedValue<ResourceCapacity<'source>> {
+        &self.fields.consumable_volume
+    }
+
+    /// Borrows the authored container type tag.
+    #[must_use]
+    pub const fn container_type_tag(&self) -> &SourcedValue<&'source str> {
+        &self.fields.container_type_tag
+    }
+
+    /// Borrows the authored lid type tag.
+    #[must_use]
+    pub const fn lid_type_tag(&self) -> &SourcedValue<&'source str> {
+        &self.fields.lid_type_tag
+    }
+
+    /// Borrows the authored utensil type tag.
+    #[must_use]
+    pub const fn utensil_type_tag(&self) -> &SourcedValue<&'source str> {
+        &self.fields.utensil_type_tag
+    }
+
+    /// Borrows the authored container state.
+    #[must_use]
+    pub const fn container_closed(&self) -> &SourcedValue<bool> {
+        &self.fields.container_closed
+    }
+
+    /// Borrows the flag that permits reclosing the container.
+    #[must_use]
+    pub const fn can_be_reclosed(&self) -> &SourcedValue<bool> {
+        &self.fields.can_be_reclosed
+    }
+
+    /// Borrows the authored discard-on-consumption flag.
+    #[must_use]
+    pub const fn discard_when_consumed(&self) -> &SourcedValue<bool> {
+        &self.fields.discard_when_consumed
+    }
+
+    /// Borrows the authored one-shot consumption flag.
+    #[must_use]
+    pub const fn one_shot_consume(&self) -> &SourcedValue<bool> {
+        &self.fields.one_shot_consume
+    }
+
+    /// Borrows the flag that permits prone consumption.
+    #[must_use]
+    pub const fn can_consume_in_prone(&self) -> &SourcedValue<bool> {
+        &self.fields.can_consume_in_prone
+    }
+
+    /// Borrows the flag that permits skipping the animation loop.
+    #[must_use]
+    pub const fn can_skip_consume_anim_loop(&self) -> &SourcedValue<bool> {
+        &self.fields.can_skip_consume_anim_loop
+    }
+
+    /// Borrows the authored prop animation flag.
+    #[must_use]
+    pub const fn is_prop_animated(&self) -> &SourcedValue<bool> {
+        &self.fields.is_prop_animated
+    }
+
+    /// Borrows the authored two-handed consumption flag.
+    #[must_use]
+    pub const fn is_two_handed_consume(&self) -> &SourcedValue<bool> {
+        &self.fields.is_two_handed_consume
+    }
+
+    /// Borrows the original type and remaining fields.
+    #[must_use]
+    pub const fn source(&self) -> &UnitSource<'source> {
+        &self.source
+    }
+
     pub(super) fn read(
         owner: ComponentOwner,
         input: Observed<'_, '_, '_, 'source>,
@@ -132,10 +223,11 @@ impl<'source> ConsumableFields<'source> {
     }
 }
 
+/// An original consumable contents slot, with its subtype link and ratio.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct Contents<'source> {
+pub struct Contents<'source> {
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
     consumable_subtype: SourcedValue<Box<SourceRecordReference<'source>>>,
     ratio: SourcedValue<ResourceFloat32>,
@@ -144,6 +236,24 @@ struct Contents<'source> {
 }
 
 impl<'source> Contents<'source> {
+    /// Borrows the original physical subtype reference.
+    #[must_use]
+    pub const fn consumable_subtype(&self) -> &SourcedValue<Box<SourceRecordReference<'source>>> {
+        &self.consumable_subtype
+    }
+
+    /// Borrows the original ratio preserving the stored bits.
+    #[must_use]
+    pub const fn ratio(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.ratio
+    }
+
+    /// Borrows the original type and remaining fields.
+    #[must_use]
+    pub const fn source(&self) -> &UnitSource<'source> {
+        &self.source
+    }
+
     fn read(
         input: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

@@ -19,7 +19,7 @@ pub(super) const COMPONENT: &str = "EntityComponentAttachableModifierParams";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct AttachableModifier<'source> {
+pub struct AttachableModifier<'source> {
     #[serde(flatten)]
     owner: ComponentOwner,
     activation_method: SourcedValue<&'source str>,
@@ -32,6 +32,48 @@ pub(super) struct AttachableModifier<'source> {
 }
 
 impl<'source> AttachableModifier<'source> {
+    /// Borrows the original physical component owner.
+    #[must_use]
+    pub const fn owner(&self) -> &ComponentOwner {
+        &self.owner
+    }
+
+    /// Borrows the original activation-method enum label.
+    #[must_use]
+    pub const fn activation_method(&self) -> &SourcedValue<&'source str> {
+        &self.activation_method
+    }
+
+    /// Borrows the original charge count.
+    #[must_use]
+    pub const fn charges(&self) -> &SourcedValue<i32> {
+        &self.charges
+    }
+
+    /// Borrows the flag that allows interrupting other modifiers.
+    #[must_use]
+    pub const fn can_interrupt(&self) -> &SourcedValue<bool> {
+        &self.can_interrupt
+    }
+
+    /// Borrows the flag that allows this modifier to be interrupted.
+    #[must_use]
+    pub const fn is_interruptible(&self) -> &SourcedValue<bool> {
+        &self.is_interruptible
+    }
+
+    /// Borrows the authored modifier slots in original order.
+    #[must_use]
+    pub const fn modifiers(&self) -> &SourcedValue<Vec<SourcedValue<AttachableEffect<'source>>>> {
+        &self.modifiers
+    }
+
+    /// Borrows the original type and remaining fields.
+    #[must_use]
+    pub const fn source(&self) -> &UnitSource<'source> {
+        &self.original
+    }
+
     pub(super) fn read(
         owner: ComponentOwner,
         source: Observed<'_, '_, '_, 'source>,

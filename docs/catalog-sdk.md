@@ -567,6 +567,20 @@ reading the macro's body.
 A single owner query projects the requested family for that physical owner. Check `coverage()`
 before accepting the result. These queries do not read locale or model payloads.
 
+## Direct mining equipment and consumable configurations
+
+`catalog_queries::equipment::mining_tools` provides `with_mining_lasers` for
+`configurations.miningLasers` and `with_attachable_modifiers` for
+`configurations.attachableModifiers`. Use `equipment::consumables::with_consumables` for
+`configurations.consumables`. All three have decoded-Entry `_from` forms and matching methods
+on the Archive session and parsed view.
+
+These queries retain physical owner and component indices, original ordered contents and
+effect slots, and per-value source facts. The consumable capacity retains its authored unit.
+Use the physical indices in the mining global and consumable subtype links with the queries
+below. Subtype text selection belongs to the separate definition query. Component queries
+expose read completeness through `coverage()`.
+
 ## Component definition Records
 
 The functions in the following table are exported by

@@ -9,6 +9,7 @@ use serde::Serialize;
 
 use super::super::authored_fields::Observed;
 use super::super::catalog_unit_source::UnitSource;
+use super::super::component_sources::physical_component;
 use super::super::referenced_definition_read::{self, Selection};
 use super::{ComponentKind, PhysicalComponents};
 use crate::CatalogError;
@@ -28,8 +29,8 @@ mod component;
 mod effect;
 
 pub use component::AuthoredList;
-use component::Consumable;
 pub(crate) use component::SUBTYPE;
+pub use component::{Consumable, Contents as ConsumableContents};
 pub use effect::{ConsumableEffect, EffectParameters, GasMass, Override};
 
 pub(crate) const TYPE: &str = "ConsumableType";
@@ -37,6 +38,8 @@ const CONSUMABLES: ComponentKind = ComponentKind {
     source_type: component::COMPONENT,
     inspection: ConfigurationInspection::ConsumableComponent,
 };
+
+physical_component!(ConsumableComponents, Consumable, CONSUMABLES);
 
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]

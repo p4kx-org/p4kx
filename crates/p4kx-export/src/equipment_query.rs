@@ -11,12 +11,20 @@ mod dependency_coverage;
 /// Canonical definitions referenced by consumable, mining and armor components.
 #[path = "equipment_component_definitions.rs"]
 pub mod component_definitions;
+
+/// Selective reads of authored consumable components and contents slots.
+#[path = "equipment_consumable_query.rs"]
+pub mod consumables;
 #[path = "equipment_loadout_query.rs"]
 mod loadout_query;
 
 /// Selective reads of authored flight-controller, IFCS and thruster configurations.
 #[path = "equipment_flight_query.rs"]
 pub mod flight;
+
+/// Selective reads of authored mining lasers and attachable modifiers.
+#[path = "equipment_mining_tool_query.rs"]
+pub mod mining_tools;
 
 /// Selective reads of authored clothing, suit armor and per-item radar components.
 #[path = "equipment_worn_gear_query.rs"]

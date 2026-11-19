@@ -1796,6 +1796,7 @@
       "description": "The concrete authored effect of one attachable modifier slot.",
       "oneOf": [
         {
+          "description": "An authored modifier for a mining laser.",
           "properties": {
             "type": {
               "const": "miningLaser",
@@ -1812,6 +1813,7 @@
           "type": "object"
         },
         {
+          "description": "An authored modifier for a mineable rock.",
           "properties": {
             "type": {
               "const": "mineableRock",
@@ -1828,6 +1830,7 @@
           "type": "object"
         },
         {
+          "description": "An authored mining filter modifier.",
           "properties": {
             "type": {
               "const": "miningFilter",
@@ -1844,6 +1847,7 @@
           "type": "object"
         },
         {
+          "description": "An authored weapon effect.",
           "properties": {
             "type": {
               "const": "weapon",
@@ -1860,6 +1864,7 @@
           "type": "object"
         },
         {
+          "description": "A retained concrete effect outside the typed families.",
           "properties": {
             "type": {
               "const": "authored",
@@ -11588,7 +11593,7 @@
       "type": "object"
     },
     "Consumable": {
-      "description": "The shared physical Record and original Components slot of a configuration.",
+      "description": "One original consumable component and its authored contents and use settings.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -12103,7 +12108,7 @@
       "x-p4kx-vocabularyClass": "control"
     },
     "Contents": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "An original consumable contents slot, with its subtype link and ratio.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -17654,7 +17659,7 @@
       "type": "object"
     },
     "FilterEffect": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "An authored attachable mining filter effect.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -30389,7 +30394,7 @@
       "type": "object"
     },
     "MiningEffect": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "An authored mining-laser or mineable-rock effect.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -32211,7 +32216,7 @@
       "type": "object"
     },
     "ModifierLifetime": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "The concrete authored modifier lifetime and its fields.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -42438,7 +42443,7 @@
       "type": "object"
     },
     "SalvageModifier": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "The original salvage parameters of a weapon modifier.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -136515,7 +136520,7 @@
       "type": "object"
     },
     "TractorModifier": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "The original tractor parameters of a weapon modifier.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -137547,7 +137552,7 @@
       "type": "object"
     },
     "WeaponEffect": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "An authored attachable weapon effect and its fire-action slot.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -137856,7 +137861,7 @@
       "type": "object"
     },
     "WeaponModifierStats": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "Damage, salvage and tractor changes in an authored weapon modifier.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
