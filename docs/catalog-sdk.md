@@ -53,6 +53,21 @@ The witness checks the original physical Entries and their independently read me
 cargo test --locked -p p4kx-export --test real_archive real_archive_language_sources_sdk::language_source_sdk_matches_original_archive_entries -- --ignored --exact --nocapture --test-threads=1
 ~~~
 
+## Offline shop inventory definitions
+
+Use `catalog_queries::shops::read_shop_inventories` to read original offline inventory
+definitions. `EntryIndex` reads one physical Archive directory Entry. `ArchivePath` matches
+every eligible Entry at a normalized Archive path. `All` includes every eligible inventory
+file. Use the physical index from the opened Archive to read an individual file.
+
+The snapshot uses the same rows as `definitions.shopInventories`. It keeps the original JSON
+token order and numeric digits, typed navigation to inventory fields and per-value origins.
+A verified empty file retains an absent document. An invalid or unreadable selected Entry
+retains its own document state and scoped failure count. An indexed lookup cites the selected
+Entry path and position or, for an out-of-range index, the admitted root directory count.
+Path and full inventory searches cite the paths they consulted. The query opens neither the
+shop registry nor DataForge.
+
 ## Resolve field origins
 
 Use each query's own `SourceInventory`. `SourcedValue::origin` supplies the encryption filter,
@@ -767,6 +782,23 @@ check a second Archive in the same run. Each check reads DataForge once and crea
 ```powershell
 cargo test --locked -p p4kx-export --test real_archive real_archive_weapon_combat::projectile::projectile_ammunition_sdk_matches_original_sources -- --ignored --exact --nocapture --test-threads=1
 ```
+
+## Player weapon animation candidates
+
+Use `equipment::with_weapon_animation_candidates` to read the canonical
+`projections.weaponPlayerAnimationCandidates` rows for one physical Item.
+The decoded-Entry, session and parsed forms share the Catalog's AttachDef,
+Player database, scoped tag and option projection. Rows retain both Entry
+identities, original branch and option coordinates, ordered tag matches,
+playback evidence and their own source inventory.
+
+The query reads the selected Item and the Player context and reachable
+Mannequin dependencies required by its personal-weapon attachments. It
+matches the source declarations within that graph. Scoped results include
+the physical owner coverage, Player and graph observations, and failed
+Entry operations. An empty result can be interpreted using those observations.
+The query creates no Catalog or temporary row spool and opens no localization
+payloads.
 
 ## Weapon recoil definitions
 

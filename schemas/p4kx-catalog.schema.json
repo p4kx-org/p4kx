@@ -23255,6 +23255,7 @@
       "required": []
     },
     "InventoryCollection": {
+      "description": "The authored collection wrapper and its inventory selection.",
       "properties": {
         "inventory": {
           "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfInventoryLine"
@@ -23551,6 +23552,7 @@
       "required": []
     },
     "InventoryId": {
+      "description": "The original selection of item identifier alternatives.",
       "properties": {
         "alternatives": {
           "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfDecimalU64"
@@ -23618,6 +23620,7 @@
       "type": "object"
     },
     "InventoryLine": {
+      "description": "The original navigation fields of one authored inventory line.",
       "properties": {
         "buyPrice": {
           "$ref": "#/$defs/SourcedValueOfDecimalU64"
@@ -24910,6 +24913,7 @@
       "required": []
     },
     "JsonMember": {
+      "description": "A named original member and the local address of its value.",
       "properties": {
         "name": {
           "$ref": "#/$defs/SourcedValueOfJsonString"
@@ -24926,10 +24930,13 @@
       "type": "object"
     },
     "JsonString": {
+      "description": "The original string and its text protection category.",
       "oneOf": [
         {
+          "description": "A classified technical string.",
           "properties": {
             "text": {
+              "description": "The decoded text.",
               "type": "string"
             },
             "type": {
@@ -24944,8 +24951,10 @@
           "type": "object"
         },
         {
+          "description": "A protected original string.",
           "properties": {
             "text": {
+              "description": "The decoded text.",
               "type": "string",
               "x-gameText": true
             },
@@ -24961,8 +24970,10 @@
           "type": "object"
         },
         {
+          "description": "An original token that cannot be represented as a decoded string.",
           "properties": {
             "token": {
+              "description": "The protected original token.",
               "type": "string",
               "x-gameText": true
             },
@@ -24980,14 +24991,17 @@
       ]
     },
     "JsonValue": {
+      "description": "One original non-null JSON value in a shop inventory document.",
       "oneOf": [
         {
+          "description": "A Boolean token.",
           "properties": {
             "type": {
               "const": "boolean",
               "type": "string"
             },
             "value": {
+              "description": "The stored value.",
               "type": "boolean"
             }
           },
@@ -24998,9 +25012,10 @@
           "type": "object"
         },
         {
+          "description": "A number token.",
           "properties": {
             "token": {
-              "description": "Exact authored JSON number token with all digits, sign and exponent.",
+              "description": "The exact token, including all digits and its exponent.",
               "not": {
                 "pattern": "[^0-9eE+.-]"
               },
@@ -25019,13 +25034,15 @@
           "type": "object"
         },
         {
+          "description": "A string token.",
           "properties": {
             "type": {
               "const": "string",
               "type": "string"
             },
             "value": {
-              "$ref": "#/$defs/JsonString"
+              "$ref": "#/$defs/JsonString",
+              "description": "The retained original string representation."
             }
           },
           "required": [
@@ -25035,8 +25052,10 @@
           "type": "object"
         },
         {
+          "description": "An ordered array.",
           "properties": {
             "elements": {
+              "description": "Local references to the original elements.",
               "items": {
                 "$ref": "#/$defs/DecimalU64"
               },
@@ -25054,8 +25073,10 @@
           "type": "object"
         },
         {
+          "description": "An object with original member order and multiplicity.",
           "properties": {
             "members": {
+              "description": "Members, including repeated names.",
               "items": {
                 "$ref": "#/$defs/JsonMember"
               },
@@ -34373,10 +34394,14 @@
       "type": "object"
     },
     "Playback": {
-      "enum": [
-        "unverified"
+      "description": "Evidence for selection of the animation during gameplay.",
+      "oneOf": [
+        {
+          "const": "unverified",
+          "description": "The original declarations establish a candidate.",
+          "type": "string"
+        }
       ],
-      "type": "string",
       "x-p4kx-vocabularyClass": "control"
     },
     "PlayerMotion": {
@@ -132599,13 +132624,18 @@
       "type": "object"
     },
     "TagEvidence": {
-      "enum": [
-        "sharedDeclaration"
+      "description": "How the original tags are associated with the option.",
+      "oneOf": [
+        {
+          "const": "sharedDeclaration",
+          "description": "Both authored tokens resolve to the same original declaration.",
+          "type": "string"
+        }
       ],
-      "type": "string",
       "x-p4kx-vocabularyClass": "control"
     },
     "TagMatch": {
+      "description": "One shared original tag declaration and both token positions.",
       "properties": {
         "declaration": {
           "$ref": "#/$defs/SourcedValueOfSourceLocation"
@@ -135892,6 +135922,7 @@
       "type": "object"
     },
     "WeaponPlayerAnimationCandidate": {
+      "description": "One original weapon and Player option relationship with its authored evidence.",
       "properties": {
         "attachmentComponentOrdinal": {
           "$ref": "#/$defs/SourcedValueOfuint32"

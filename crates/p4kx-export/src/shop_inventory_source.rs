@@ -11,56 +11,105 @@ use crate::schema_fields::every_field_required;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ShopInventorySource {
+pub struct ShopInventorySource {
     /// An owner-local index into `values`.
     pub(super) root: DecimalU64,
     pub(super) values: Vec<SourcedValue<JsonValue>>,
 }
 
+impl ShopInventorySource {
+    /// Returns the local address of the original JSON root.
+    #[must_use]
+    pub const fn root(&self) -> DecimalU64 {
+        self.root
+    }
+
+    /// Borrows the original value cells addressed by their local indices.
+    #[must_use]
+    pub fn values(&self) -> &[SourcedValue<JsonValue>] {
+        &self.values
+    }
+}
+
+/// One original non-null JSON value in a shop inventory document.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "camelCase")]
-pub(super) enum JsonValue {
+#[non_exhaustive]
+pub enum JsonValue {
+    /// A Boolean token.
     Boolean {
+        /// The stored value.
         value: bool,
     },
+    /// A number token.
     Number {
+        /// The exact token, including all digits and its exponent.
         #[schemars(schema_with = "number_schema")]
         token: String,
     },
+    /// A string token.
     String {
+        /// The retained original string representation.
         value: JsonString,
     },
+    /// An ordered array.
     Array {
+        /// Local references to the original elements.
         elements: Vec<DecimalU64>,
     },
+    /// An object with original member order and multiplicity.
     Object {
+        /// Members, including repeated names.
         members: Vec<JsonMember>,
     },
 }
 
+/// The original string and its text protection category.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "camelCase")]
-pub(super) enum JsonString {
+#[non_exhaustive]
+pub enum JsonString {
+    /// A classified technical string.
     Public {
+        /// The decoded text.
         text: String,
     },
+    /// A protected original string.
     GameText {
+        /// The decoded text.
         #[schemars(extend("x-gameText" = true))]
         text: String,
     },
+    /// An original token that cannot be represented as a decoded string.
     Raw {
+        /// The protected original token.
         #[schemars(extend("x-gameText" = true))]
         token: String,
     },
 }
 
+/// A named original member and the local address of its value.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct JsonMember {
+pub struct JsonMember {
     pub(super) name: SourcedValue<JsonString>,
     /// An owner-local index into the same source arena.
     pub(super) value: DecimalU64,
+}
+
+impl JsonMember {
+    /// Borrows the original member name.
+    #[must_use]
+    pub const fn name(&self) -> &SourcedValue<JsonString> {
+        &self.name
+    }
+
+    /// Returns the local address of the original value.
+    #[must_use]
+    pub const fn value(&self) -> DecimalU64 {
+        self.value
+    }
 }
 
 fn number_schema(_generator: &mut SchemaGenerator) -> Schema {

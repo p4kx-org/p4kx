@@ -49,6 +49,8 @@ mod ship_sources;
 mod snapshot;
 #[path = "equipment_weapon_query.rs"]
 mod weapon;
+#[path = "equipment_weapon_animation_query.rs"]
+mod weapon_animation;
 #[path = "equipment_weapon_combat_query.rs"]
 mod weapon_combat;
 #[path = "equipment_weapon_combat_read.rs"]
@@ -116,6 +118,11 @@ pub use weapon_magazine::{
 };
 
 pub use crate::catalog_v3::catalog_weapon_actions::WeaponActionRecoil;
+pub use weapon_animation::{
+    WeaponAnimationGraphCoverage, WeaponAnimationPlayback, WeaponAnimationSnapshot,
+    WeaponAnimationTagEvidence, WeaponAnimationTagMatch, WeaponPlayerAnimationCandidate,
+    with_weapon_animation_candidates, with_weapon_animation_candidates_from,
+};
 pub use weapon_recoil::{
     WeaponActionRecoilDefinition, WeaponRecoilSnapshot, with_weapon_recoil_definitions,
     with_weapon_recoil_definitions_from,

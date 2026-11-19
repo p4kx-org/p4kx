@@ -30,9 +30,7 @@ impl<'f> Entities<'f> {
     pub fn new(forge: &'f DataForge<'f>) -> Self {
         let mut classes: HashMap<Box<str>, Vec<Record<'f>>> = HashMap::new();
         for record in forge.records() {
-            if let Some(class) = record.name().ok().and_then(class_name_of)
-                && is_entity(&record)
-            {
+            if let Some(class) = class_name(&record) {
                 match classes.entry(class.to_ascii_lowercase().into_boxed_str()) {
                     Entry::Occupied(mut records) => records.get_mut().push(record),
                     Entry::Vacant(records) => {
@@ -42,6 +40,18 @@ impl<'f> Entities<'f> {
             }
         }
         Self { forge, classes }
+    }
+
+    /// Finds physical Records of one exact class without building the complete class index.
+    #[must_use]
+    pub fn records_of_class(forge: &'f DataForge<'f>, text: &str) -> Vec<Record<'f>> {
+        let name = strip_prefix_ignoring_case(text).unwrap_or(text);
+        forge
+            .records()
+            .filter(|record| {
+                class_name(record).is_some_and(|class| class.eq_ignore_ascii_case(name))
+            })
+            .collect()
     }
 
     /// Returns the DataForge the Entities belong to.
@@ -109,6 +119,11 @@ impl<'f> Entities<'f> {
             .get(name.to_ascii_lowercase().as_str())
             .map_or(&[], Vec::as_slice)
     }
+}
+
+fn class_name<'source>(record: &Record<'source>) -> Option<&'source str> {
+    let name = record.name().ok().and_then(class_name_of)?;
+    is_entity(record).then_some(name)
 }
 
 /// Returns whether the Record is an Entity.

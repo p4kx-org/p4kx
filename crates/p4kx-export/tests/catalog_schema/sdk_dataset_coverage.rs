@@ -16,11 +16,13 @@ mod routes;
 mod row_schema;
 
 const LANGUAGE_SOURCES: &str = "/texts/languageSources";
+const SHOP_INVENTORIES: &str = "/definitions/shopInventories";
 const AMMUNITION: &str = "/definitions/ammoDefinitions";
 const PROJECTILE_AMMUNITION: &str = "/projections/weaponProjectileAmmoSelections";
 const MAGAZINE_RESOLUTION: &str = "/projections/weaponMagazineResolutions";
 const WEAPON_COMBAT: &str = "/projections/weaponCombatBases";
 const WEAPON_RECOIL: &str = "/definitions/weaponActionRecoilDefinitions";
+const WEAPON_ANIMATION: &str = "/projections/weaponPlayerAnimationCandidates";
 const CONTAINERS: &str = "/placements/containerInstances";
 const UNRESOLVED: &str = "/placements/unresolvedContainerLinks";
 const NO_WITNESS: &str = "no query witness recorded by the audit";
@@ -69,11 +71,13 @@ fn sdk_query_witnesses_keep_their_canonical_dataset_contract() -> TestResult {
     let gaps = audit(&schema, &registered, &witnesses)?;
     for path in [
         LANGUAGE_SOURCES,
+        SHOP_INVENTORIES,
         AMMUNITION,
         PROJECTILE_AMMUNITION,
         MAGAZINE_RESOLUTION,
         WEAPON_COMBAT,
         WEAPON_RECOIL,
+        WEAPON_ANIMATION,
         CONTAINERS,
         UNRESOLVED,
     ] {

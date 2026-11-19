@@ -37,10 +37,11 @@ pub(super) struct FragmentMatch {
     options: Vec<SourcedValue<SourceLocation>>,
 }
 
+/// One original weapon and Player option relationship with its authored evidence.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct WeaponPlayerAnimationCandidate {
+pub struct WeaponPlayerAnimationCandidate {
     weapon_record_index: SourcedValue<u32>,
     attachment_component_ordinal: SourcedValue<u32>,
     player_record_index: SourcedValue<u32>,
@@ -54,29 +55,39 @@ pub(crate) struct WeaponPlayerAnimationCandidate {
     playback: SourcedValue<Playback>,
 }
 
+/// One shared original tag declaration and both token positions.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct TagMatch {
+pub struct TagMatch {
     weapon_token: SourcedValue<usize>,
     option_token: SourcedValue<usize>,
     source: PhysicalEntryRef,
     declaration: SourcedValue<SourceLocation>,
 }
 
-#[derive(Debug, Serialize, JsonSchema)]
+/// How the original tags are associated with the option.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
-enum TagEvidence {
+#[non_exhaustive]
+pub enum TagEvidence {
+    /// Both authored tokens resolve to the same original declaration.
     SharedDeclaration,
 }
 
-#[derive(Debug, Serialize, JsonSchema)]
+/// Evidence for selection of the animation during gameplay.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
-enum Playback {
+#[non_exhaustive]
+pub enum Playback {
+    /// The original declarations establish a candidate.
     Unverified,
 }
+
+#[path = "weapon_reload_candidate_views.rs"]
+mod candidate_views;
 
 pub(super) fn fragments(
     edge: &BranchLink,

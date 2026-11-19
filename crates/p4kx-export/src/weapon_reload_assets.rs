@@ -50,6 +50,11 @@ pub(super) enum FileSelector {
 }
 
 impl AssetLink {
+    pub(super) fn is_read(&self) -> bool {
+        matches!(self.state.value(), Some(AssetState::Read))
+            && self.state.origin().source_set_complete()
+    }
+
     pub(super) const fn origin(&self) -> &p4kx_extraction::FieldOrigin {
         self.state.origin()
     }
@@ -233,7 +238,7 @@ fn sub_database_path(path: &str) -> Option<String> {
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(super) struct Controller {
-    source: PhysicalEntryIdentity,
+    pub(super) source: PhysicalEntryIdentity,
     pub(super) tags: Vec<SelectorNode>,
     pub(super) fragments: Vec<SelectorNode>,
 }

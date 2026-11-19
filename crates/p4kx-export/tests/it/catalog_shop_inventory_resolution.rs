@@ -25,6 +25,8 @@ mod empty_source;
 mod jsonn;
 #[path = "shop_inventory_rejected_path.rs"]
 mod rejected_path;
+#[path = "shop_inventory_sdk.rs"]
+mod sdk;
 #[path = "shop_inventory_resolution_sources.rs"]
 mod source_checks;
 

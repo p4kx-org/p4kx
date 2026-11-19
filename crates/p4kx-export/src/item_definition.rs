@@ -142,7 +142,7 @@ pub(crate) struct WeaponAttachment<'source> {
 }
 
 impl<'source> ItemDefinition<'source> {
-    fn weapon_attachments(&self) -> impl Iterator<Item = WeaponAttachment<'source>> {
+    pub(crate) fn weapon_attachments(&self) -> impl Iterator<Item = WeaponAttachment<'source>> {
         self.components
             .value()
             .into_iter()

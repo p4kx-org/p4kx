@@ -36,6 +36,13 @@ pub(super) struct BranchLink {
 }
 
 impl BranchLink {
+    pub(super) fn visit(&self) -> Option<BranchVisit> {
+        self.traversal
+            .value()
+            .copied()
+            .filter(|_| self.traversal.origin().source_set_complete())
+    }
+
     pub(super) const fn is_resolved(&self) -> bool {
         matches!(self.traversal.value(), Some(BranchVisit::Resolved))
     }

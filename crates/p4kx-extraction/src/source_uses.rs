@@ -2,10 +2,10 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::fmt;
-use std::ops::Range;
 use std::sync::{Arc, Mutex};
 
-use p4kx_archive::Archive;
+#[path = "source_directory_observations.rs"]
+mod directory;
 
 #[path = "source_use_batches.rs"]
 mod batches;
@@ -17,14 +17,12 @@ mod union;
 mod freeze;
 pub use self::freeze::SourceInventoryFreezeError;
 
-use crate::DecimalU64;
 use crate::field_origin::{FieldOrigin, SharedFieldOrigin};
 use crate::source_details::{SourceCoordinateOmission, SourceDetails};
 use crate::source_evidence_error::{self, SourceEvidenceError};
-use crate::source_inventory::SourceEncryptionState;
 use crate::source_registry::SourceRegistry;
 use crate::source_scope::{SourceInput, SourceScope};
-use crate::source_use::{InputScope, SourceLocation, SourceUse, SourceUseRole};
+use crate::source_use::{InputScope, SourceLocation, SourceUse};
 use crate::source_value::{SourceValue, SourcedValue};
 
 /// Per-preparation physical source and use inventory shared by parallel field projections.
@@ -59,93 +57,6 @@ impl SourceUses {
         let identity = Arc::new(());
         let registry = Arc::new(Mutex::new(make(Arc::clone(&identity))));
         Self { registry, identity }
-    }
-
-    /// Retains a complete survey of the admitted paths in this root Archive directory.
-    /// Call after consulting every admitted path. A nested Archive returns no root survey.
-    ///
-    /// # Errors
-    /// Returns an error when a mutation interrupted the shared evidence registry.
-    pub fn observe_root_directory_paths(
-        &self,
-        archive: &Archive,
-    ) -> Result<Option<SourceUse>, SourceEvidenceError> {
-        self.observe_root_directory_path_prefix(archive, archive.entries().len())
-    }
-
-    /// Retains the consulted prefix of the original root Archive directory.
-    /// The prefix is in admitted Entry order.
-    ///
-    /// # Errors
-    /// Returns an error when the prefix exceeds the admitted directory or registration fails.
-    pub fn observe_root_directory_path_prefix(
-        &self,
-        archive: &Archive,
-        end: usize,
-    ) -> Result<Option<SourceUse>, SourceEvidenceError> {
-        self.observe_root_directory(archive, |count| {
-            let end = end as u64;
-            if end > count.get() {
-                return Err(SourceEvidenceError::InvalidDirectoryRange);
-            }
-            Ok(SourceLocation::ArchiveDirectoryPaths {
-                start_entry_index: DecimalU64::new(0),
-                end_entry_index: DecimalU64::new(end),
-            })
-        })
-    }
-
-    /// Retains the actual folder tree path range of a root Archive.
-    /// Pass positions from the owning root Archive's `EntryTree`.
-    ///
-    /// # Errors
-    /// Returns an error for a reversed or out-of-bounds range or interrupted evidence registry.
-    pub fn observe_root_directory_tree_paths(
-        &self,
-        archive: &Archive,
-        paths: Range<u32>,
-    ) -> Result<Option<SourceUse>, SourceEvidenceError> {
-        self.observe_root_directory(archive, |count| {
-            let start = u64::from(paths.start);
-            let end = u64::from(paths.end);
-            if start > end || end > count.get() {
-                return Err(SourceEvidenceError::InvalidDirectoryRange);
-            }
-            Ok(SourceLocation::ArchiveDirectoryTreePaths {
-                start_entry_index: DecimalU64::new(start),
-                end_entry_index: DecimalU64::new(end),
-            })
-        })
-    }
-
-    fn observe_root_directory(
-        &self,
-        archive: &Archive,
-        location: impl FnOnce(DecimalU64) -> Result<SourceLocation, SourceEvidenceError>,
-    ) -> Result<Option<SourceUse>, SourceEvidenceError> {
-        let Some(scope) = self.root_directory_scope(archive)? else {
-            return Ok(None);
-        };
-        let count = DecimalU64::new(archive.entries().len() as u64);
-        Ok(Some(scope.at(location(count)?, SourceUseRole::Selector)?))
-    }
-
-    pub(crate) fn root_directory_scope(
-        &self,
-        archive: &Archive,
-    ) -> Result<Option<SourceScope>, SourceEvidenceError> {
-        let Some(count) = archive.root_directory_entry_count() else {
-            return Ok(None);
-        };
-        let source = source_evidence_error::lock(&self.registry)?
-            .root_directory(archive.input_origin(), DecimalU64::new(count as u64));
-        Ok(Some(SourceScope {
-            registry: Arc::clone(&self.registry),
-            source,
-            payload: SourceEncryptionState::Unknown,
-            metadata: SourceEncryptionState::Unencrypted,
-            scope: InputScope::ArchiveDirectoryMetadata,
-        }))
     }
 
     /// Retains the actual input once and returns a shared payload or metadata scope.

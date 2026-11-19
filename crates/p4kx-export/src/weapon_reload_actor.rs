@@ -3,8 +3,9 @@
 
 use std::cell::RefCell;
 
-use p4kx_assembly::Entities;
-use p4kx_extraction::{CancelToken, SourceLocation, SourceUseRole, SourceValue, SourcedValue};
+use p4kx_extraction::{
+    CancelToken, Record, SourceLocation, SourceUseRole, SourceValue, SourcedValue,
+};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -39,7 +40,7 @@ pub(super) struct MotionComponent {
 }
 
 pub(super) fn read<'source>(
-    entities: &Entities<'source>,
+    candidates: &[Record<'source>],
     input: &OriginalCatalogInput<'_, 'source>,
     cancel: Option<&CancelToken>,
 ) -> Result<SourcedValue<Vec<PlayerMotion<'source>>>, CatalogError> {
@@ -49,7 +50,6 @@ pub(super) fn read<'source>(
         },
         SourceUseRole::Selector,
     )?;
-    let candidates = entities.named_class_candidates("Player");
     let sources = &input.origins().uses;
     if candidates.is_empty() {
         return Ok(sources.value(SourceValue::Absent, &[source], true));

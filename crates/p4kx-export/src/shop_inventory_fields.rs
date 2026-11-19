@@ -19,25 +19,28 @@ use crate::{CatalogError, ExportAccountingError};
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ShopInventoryFields {
+pub struct ShopInventoryFields {
     pub(super) shop_id: SourcedValue<DecimalU64>,
     pub(super) inventory: SourcedValue<InventoryLines>,
     pub(super) collection: SourcedValue<InventoryCollection>,
 }
 
+/// The authored collection wrapper and its inventory selection.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct InventoryCollection {
+pub struct InventoryCollection {
     pub(super) inventory: SourcedValue<InventoryLines>,
 }
 
-type InventoryLines = Vec<SourcedValue<InventoryLine>>;
+/// Ordered typed cells for authored inventory array entries.
+pub type InventoryLines = Vec<SourcedValue<InventoryLine>>;
 
+/// The original navigation fields of one authored inventory line.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct InventoryLine {
+pub struct InventoryLine {
     pub(super) node: DecimalU64,
     pub(super) id: SourcedValue<InventoryId>,
     pub(super) buy_price: SourcedValue<DecimalU64>,
@@ -47,12 +50,16 @@ pub(super) struct InventoryLine {
     pub(super) rental_offerings: SourcedValue<DecimalU64>,
 }
 
+/// The original selection of item identifier alternatives.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct InventoryId {
+pub struct InventoryId {
     pub(super) alternatives: SourcedValue<Vec<SourcedValue<DecimalU64>>>,
 }
+
+#[path = "shop_inventory_field_access.rs"]
+mod access;
 
 #[derive(Clone, Copy)]
 enum FieldPosition {

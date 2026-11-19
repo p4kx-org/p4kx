@@ -34,7 +34,7 @@ pub(crate) fn is_placeholder(stem: &str) -> bool {
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct ShopInventoryTable {
-    availability: DatasetAvailability,
+    pub(crate) availability: DatasetAvailability,
     meaning: InventoryMeaning,
     pub(crate) rows: Vec<ShopInventoryDefinition>,
 }
@@ -100,34 +100,14 @@ impl Inventories {
             source::push(&mut files.physical, evidence)?;
             files.selected = Some(items);
         }
-        table.rows.sort_unstable_by(|left, right| {
-            let left = &left.identity;
-            let right = &right.identity;
-            left.normalized_path
-                .value()
-                .cmp(&right.normalized_path.value())
-                .then_with(|| left.entry_index.cmp(&right.entry_index))
-        });
-        let incomplete = crate::export_archive_health::inventory(archive).is_some();
-        if incomplete {
-            ledger.incomplete_inventory(Kind::ShopInventories);
-        }
-        table.availability = if table.rows.is_empty() {
-            if incomplete {
-                DatasetAvailability::Unavailable
-            } else {
-                DatasetAvailability::Absent
-            }
-        } else {
-            DatasetAvailability::Available
-        };
+        let complete_directory = finish_table(archive, &mut table, &mut ledger);
         Ok(PreparedInventories {
             table,
             ledger,
             inventories: Self {
                 count: by_stem.len(),
                 by_stem,
-                complete_directory: !incomplete,
+                complete_directory,
             },
         })
     }
@@ -182,7 +162,67 @@ impl Inventories {
     }
 }
 
+pub(crate) fn read_definitions(
+    archive: &Archive,
+    candidates: &[Entry],
+    path: Option<&str>,
+    capture: &EntryCapture<'_>,
+    cancel: Option<&CancelToken>,
+) -> Result<(ShopInventoryTable, ExportLedger, bool), CatalogError> {
+    let mut table = ShopInventoryTable::default();
+    let mut ledger = ExportLedger::default();
+    ledger.inventory(Kind::ShopInventories);
+    for entry in candidates {
+        source::check_cancel(cancel)?;
+        let Some(normalized) = inventory_path(entry) else {
+            continue;
+        };
+        if path.is_some_and(|path| normalized != path) {
+            continue;
+        }
+        let (definition, _, _) =
+            ReadInventory::read(archive, entry, capture, cancel)?.retain(&mut ledger);
+        source::push(&mut table.rows, definition)?;
+    }
+    let complete = finish_table(archive, &mut table, &mut ledger);
+    Ok((table, ledger, complete))
+}
+
+fn finish_table(
+    archive: &Archive,
+    table: &mut ShopInventoryTable,
+    ledger: &mut ExportLedger,
+) -> bool {
+    table.rows.sort_unstable_by(|left, right| {
+        let left = &left.identity;
+        let right = &right.identity;
+        left.normalized_path
+            .value()
+            .cmp(&right.normalized_path.value())
+            .then_with(|| left.entry_index.cmp(&right.entry_index))
+    });
+    let complete = crate::export_archive_health::inventory(archive).is_none();
+    if !complete {
+        ledger.incomplete_inventory(Kind::ShopInventories);
+    }
+    table.availability = if table.rows.is_empty() {
+        if complete {
+            DatasetAvailability::Absent
+        } else {
+            DatasetAvailability::Unavailable
+        }
+    } else {
+        DatasetAvailability::Available
+    };
+    complete
+}
+
 fn inventory_stem(entry: &Entry) -> Option<String> {
+    let path = inventory_path(entry)?;
+    stem(&path).map(str::to_owned)
+}
+
+fn inventory_path(entry: &Entry) -> Option<String> {
     let raw = entry.path();
     let is_json = raw
         .len()
@@ -193,9 +233,13 @@ fn inventory_stem(entry: &Entry) -> Option<String> {
         return None;
     }
     let path = starmap_index::key(raw);
-    let file = path.strip_prefix(FOLDER)?;
-    let stem = file.strip_suffix(".json")?;
-    (!stem.is_empty() && !stem.contains('\\')).then(|| stem.to_owned())
+    stem(&path)?;
+    Some(path)
+}
+
+fn stem(path: &str) -> Option<&str> {
+    let file = path.strip_prefix(FOLDER)?.strip_suffix(".json")?;
+    (!file.is_empty() && !file.contains('\\')).then_some(file)
 }
 
 fn missing(stem: &InventoryStem, ledger: &mut ExportLedger) -> Result<ItemList, CatalogError> {

@@ -6,6 +6,7 @@ use p4kx_export::catalog_queries::equipment::{
     with_ammo_definitions, with_weapon_recoil_definitions,
 };
 use p4kx_export::catalog_queries::localization::with_language_sources;
+use p4kx_export::catalog_queries::shops::{ShopInventorySelection, read_shop_inventories};
 use p4kx_export::catalog_queries::starmap::{
     ContainerPlacementSelection, read_container_placements,
 };
@@ -16,13 +17,17 @@ use p4kx_testkit::{
 };
 
 use super::{
-    AMMUNITION, CONTAINERS, LANGUAGE_SOURCES, Route, TestResult, UNRESOLVED, WEAPON_RECOIL,
+    AMMUNITION, CONTAINERS, LANGUAGE_SOURCES, Route, SHOP_INVENTORIES, TestResult, UNRESOLVED,
+    WEAPON_RECOIL,
 };
 
 #[path = "sdk_projectile_ammo_route.rs"]
 mod projectile_ammo;
+#[path = "sdk_weapon_animation_route.rs"]
+mod weapon_animation;
 
 const ROOT: &str = r"Data\ObjectContainers\PU\system\fixture\fixturesystem.socpak";
+const OFFLINE_SHOP: &str = r"Data\Scripts\ShopInventories\Inv_Fixture.json";
 const TILE: &str = r"Data\ObjectContainers\PU\fixture\tile.socpak";
 const ROOT_XML: &[u8] = br#"<ObjectContainer version="14"><ChildObjectContainers>
     <Child external="true" name="Data\ObjectContainers\PU\fixture\tile.socpak" pos="0,0,0" rot="1,0,0,0"/>
@@ -53,7 +58,9 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
         combat,
         magazine,
         read_weapon_recoil(&archive)?,
+        weapon_animation::read()?,
         read_language_sources(&archive)?,
+        read_shop_inventory(&archive)?,
         Route::queried_rows(
             CONTAINERS,
             &starmap.container_instances,
@@ -121,6 +128,16 @@ fn read_weapon_recoil(archive: &Archive) -> TestResult<Route> {
     })?
 }
 
+fn read_shop_inventory(archive: &Archive) -> TestResult<Route> {
+    let selection = ShopInventorySelection::ArchivePath(OFFLINE_SHOP);
+    let snapshot = read_shop_inventories(archive, selection, None)?;
+    Route::queried_rows(
+        SHOP_INVENTORIES,
+        &snapshot.rows,
+        "physical Entry and path query available; installed producer parity open",
+    )
+}
+
 fn fixture() -> TestResult<(tempfile::TempDir, Archive)> {
     let database = DataForgeBuilder::new()
         .version(8)
@@ -148,6 +165,7 @@ fn fixture() -> TestResult<(tempfile::TempDir, Archive)> {
         ))
         .entry(packed(ROOT, "fixturesystem.xml", ROOT_XML))
         .entry(packed(TILE, "tile.xml", b"<ObjectContainer/>"))
+        .entry(TestEntry::stored(OFFLINE_SHOP, br#"{"Inventory":[]}"#))
         .write_to(&path)?;
     Ok((folder, Archive::open(path)?))
 }

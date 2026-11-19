@@ -27,19 +27,47 @@ use crate::{CatalogError, Kind};
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ShopInventoryDefinition {
+pub struct ShopInventoryDefinition {
     #[serde(flatten)]
     pub(super) identity: PhysicalEntryIdentity,
     pub(super) document: SourcedValue<ShopInventoryDocument>,
+}
+
+impl ShopInventoryDefinition {
+    /// Borrows the physical source identity of this definition.
+    #[must_use]
+    pub const fn identity(&self) -> &PhysicalEntryIdentity {
+        &self.identity
+    }
+
+    /// Borrows the complete authored document or its captured source state.
+    #[must_use]
+    pub const fn document(&self) -> &SourcedValue<ShopInventoryDocument> {
+        &self.document
+    }
 }
 
 /// Full authored source and direct typed navigation for the two inventory shapes.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ShopInventoryDocument {
+pub struct ShopInventoryDocument {
     source: ShopInventorySource,
     fields: ShopInventoryFields,
+}
+
+impl ShopInventoryDocument {
+    /// Borrows all original values and their source coordinates.
+    #[must_use]
+    pub const fn source(&self) -> &ShopInventorySource {
+        &self.source
+    }
+
+    /// Borrows typed navigation to the authored inventory fields.
+    #[must_use]
+    pub const fn fields(&self) -> &ShopInventoryFields {
+        &self.fields
+    }
 }
 
 pub(super) struct ReadInventory {
