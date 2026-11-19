@@ -11,11 +11,18 @@ use crate::{SourceScope, SourceUse, SourceUseRef, SourceUseRole, SourceUses, Sou
 
 use super::encode;
 
+#[path = "source_use_ref_encoding_physical_xml_tests.rs"]
+mod physical_xml;
+
+use physical_xml::physical_xml_locations;
+
 #[test]
 fn compact_coordinates_distinguish_source_use_keys() {
     let locations = locations_with_distinct_coordinates();
     let mut observed = BTreeSet::new();
-    for source in ["a0.1", "a0.1.2", "a0.12", ":1é", "é:", "🌑"] {
+    for source in [
+        "a0.1", "a0.1.2", "a0.12", "a1.1", "a0x1.1", "a0v1.1", ":1é", "é:", "🌑",
+    ] {
         let source = PhysicalSourceRef::new(source);
         for scope in [
             InputScope::Payload,
@@ -107,6 +114,27 @@ fn locations_with_distinct_coordinates() -> Vec<SourceLocation> {
             locations.push(xml_location(&indices, field));
         }
     }
+    locations.extend(physical_xml_locations());
+    for namespace in [
+        "cryxmlNode",
+        "cryxmlAttribute",
+        "textXmlElement",
+        "textXmlAttribute",
+    ] {
+        for indices in [vec![], vec![1], vec![1, 1], vec![1, 2], vec![1, 2, 3]] {
+            for field in [
+                "$attributes",
+                "$children",
+                "$name",
+                "$node",
+                "name",
+                "skipPart",
+                "Name",
+            ] {
+                locations.push(subresource(namespace, &indices, field));
+            }
+        }
+    }
     locations
 }
 
@@ -173,6 +201,7 @@ fn xml_inventory(reverse: bool) -> Result<Vec<u8>, XmlInventoryError> {
         xml_location(&[u64::MAX], "$absent:@rot"),
         xml_location(&[64, 0], "@Pos"),
     ];
+    locations.extend(physical_xml_locations());
     if reverse {
         locations.reverse();
     }
@@ -227,8 +256,12 @@ fn xml_inventory(reverse: bool) -> Result<Vec<u8>, XmlInventoryError> {
 type XmlInventoryError = Box<dyn std::error::Error + Send + Sync>;
 
 fn xml_location(indices: &[u64], field: &str) -> SourceLocation {
+    subresource("xml", indices, field)
+}
+
+fn subresource(namespace: &str, indices: &[u64], field: &str) -> SourceLocation {
     SourceLocation::Subresource {
-        namespace: "xml".to_owned(),
+        namespace: namespace.to_owned(),
         indices: indices.to_vec(),
         field: field.to_owned(),
     }

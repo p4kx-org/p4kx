@@ -106,7 +106,9 @@ fn append_subresource(key: &mut String, site: &Subresource<'_>) {
         indices,
         field,
     } = site;
-    if *namespace == "xml" && append_xml_location(key, indices, field) {
+    if (*namespace == "xml" && append_xml_location(key, indices, field))
+        || append_physical_xml_location(key, namespace, indices, field)
+    {
         return;
     }
     key.push('s');
@@ -129,6 +131,44 @@ fn append_xml_location(key: &mut String, indices: &[u64], field: &str) -> bool {
     };
     key.push('x');
     key.push(tag);
+    append_coordinates(key, indices);
+    true
+}
+
+fn append_physical_xml_location(
+    key: &mut String,
+    namespace: &str,
+    indices: &[u64],
+    field: &str,
+) -> bool {
+    let namespace_tag = match (namespace, indices) {
+        ("cryxmlNode", [node]) if u32::try_from(*node).is_ok() => 'n',
+        ("cryxmlAttribute", [node, attribute])
+            if u32::try_from(*node).is_ok() && u32::try_from(*attribute).is_ok() =>
+        {
+            'a'
+        }
+        ("textXmlElement", [start, end]) if start < end => 'e',
+        ("textXmlAttribute", [start, end]) if start < end => 't',
+        _ => return false,
+    };
+    let field_tag = match field {
+        "$attributes" => 'a',
+        "$children" => 'c',
+        "$name" => 'n',
+        "$node" => 'o',
+        "name" => 'i',
+        "skipPart" => 's',
+        _ => return false,
+    };
+    key.push('y');
+    key.push(namespace_tag);
+    key.push(field_tag);
+    append_coordinates(key, indices);
+    true
+}
+
+fn append_coordinates(key: &mut String, indices: &[u64]) {
     if let Some((&first, rest)) = indices.split_first() {
         append_coordinate(key, first);
         for &index in rest {
@@ -136,7 +176,6 @@ fn append_xml_location(key: &mut String, indices: &[u64], field: &str) -> bool {
             append_coordinate(key, index);
         }
     }
-    true
 }
 
 fn append_coordinate(key: &mut String, index: u64) {
