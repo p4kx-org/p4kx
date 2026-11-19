@@ -656,6 +656,17 @@ cargo test --locked -p p4kx-export --test real_archive -- `
     --ignored --exact --test-threads=1
 ```
 
+The installed worn-gear test compares one selected original suit, clothing and radar component
+and one referenced damage-resistance macro to the SDK. It checks the physical component slots,
+sampled numbers, reference identity and the original source coordinates. It reuses the decoded
+DataForge Entry and prints the Build and aggregate result.
+
+```powershell
+cargo test --locked -p p4kx-export --test real_archive -- `
+    real_archive_worn_gear::sdk::installed_worn_gear_sdk_matches_original_component_values_and_macro `
+    --ignored --exact --test-threads=1
+```
+
 ## Original crafting-global configuration
 
 `catalog_queries::crafting::with_global_params` and `with_global_params_from` return borrowed

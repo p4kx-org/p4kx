@@ -15,6 +15,9 @@ use serde_json::Value;
 use crate::real_archive_item_durability::{self as proof, Trace};
 use crate::real_archive_verification::print_line;
 
+#[path = "worn_gear_sdk_witness.rs"]
+mod sdk;
+
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 const SUIT: &str = "SCItemSuitArmorParams";
@@ -138,68 +141,124 @@ fn match_component<'row, 'source>(
     Ok((row, raw, component))
 }
 
+type FieldPairs = &'static [(&'static str, &'static str)];
+
+struct GearSection {
+    source: &'static str,
+    key: &'static str,
+    fields: FieldPairs,
+}
+
+const SUIT_SCALARS: FieldPairs = &[("integrityMilestoneToBreak", "integrityMilestoneToBreak")];
+const NO_SCALARS: FieldPairs = &[];
+const CLOTHING_SECTIONS: &[GearSection] = &[
+    GearSection {
+        source: "TemperatureResistance",
+        key: "temperatureResistance",
+        fields: &[
+            ("MinResistance", "minResistance"),
+            ("MaxResistance", "maxResistance"),
+        ],
+    },
+    GearSection {
+        source: "RadiationResistance",
+        key: "radiationResistance",
+        fields: &[
+            ("MaximumRadiationCapacity", "maximumRadiationCapacity"),
+            ("RadiationDissipationRate", "radiationDissipationRate"),
+        ],
+    },
+    GearSection {
+        source: "Flight",
+        key: "flight",
+        fields: &[("gForceResistance", "gForceResistance")],
+    },
+];
+const RADAR_SECTIONS: &[GearSection] = &[
+    GearSection {
+        source: "aimAssist",
+        key: "aimAssist",
+        fields: &[
+            ("distanceMinAssignment", "distanceMinAssignment"),
+            ("distanceMaxAssignment", "distanceMaxAssignment"),
+            ("outsideRangeBufferDistance", "outsideRangeBufferDistance"),
+        ],
+    },
+    GearSection {
+        source: "pingProperties",
+        key: "pingProperties",
+        fields: &[("cooldownTime", "cooldownTime")],
+    },
+];
+const MACRO_SCALARS: FieldPairs = &[("IgnoreMeleeDamage", "ignoreMeleeDamage")];
+const MACRO_CHANNELS: FieldPairs = &[
+    ("PhysicalResistance", "physical"),
+    ("EnergyResistance", "energy"),
+    ("DistortionResistance", "distortion"),
+    ("ThermalResistance", "thermal"),
+    ("BiochemicalResistance", "biochemical"),
+    ("StunResistance", "stun"),
+];
+const MACRO_CHANNEL_FIELDS: FieldPairs = &[
+    ("Multiplier", "multiplier"),
+    ("Threshold", "threshold"),
+    ("DamageCap", "damageCap"),
+    ("DamageCapLimit", "damageCapLimit"),
+];
+
+fn specification(expected: &str) -> Option<(FieldPairs, &'static [GearSection])> {
+    match expected {
+        SUIT => Some((SUIT_SCALARS, &[])),
+        CLOTHING => Some((NO_SCALARS, CLOTHING_SECTIONS)),
+        RADAR => Some((NO_SCALARS, RADAR_SECTIONS)),
+        _ => None,
+    }
+}
+
+fn all_gear_values_present(original: &StructValue<'_>, kind: &str) -> bool {
+    specification(kind).is_some_and(|(scalars, groups)| {
+        field_types_present(original, scalars)
+            && groups
+                .iter()
+                .all(|group| section_present(original, group.source, group.fields))
+    })
+}
+
+fn macro_values_present(tree: &RecordTree<'_>) -> bool {
+    let Some(Original::Struct(original)) = tree.field("damageResistance") else {
+        return false;
+    };
+    field_types_present(original, MACRO_SCALARS)
+        && MACRO_CHANNELS
+            .iter()
+            .all(|&(source, _)| section_present(original, source, MACRO_CHANNEL_FIELDS))
+}
+
+fn section_present(original: &StructValue<'_>, section: &str, names: FieldPairs) -> bool {
+    matches!(original.field(section), Some(Original::Struct(group)) if field_types_present(group, names))
+}
+
+fn field_types_present(original: &StructValue<'_>, names: FieldPairs) -> bool {
+    names.iter().all(|&(name, _)| {
+        matches!(
+            original.field(name),
+            Some(Original::Single(_) | Original::Bool(_))
+        )
+    })
+}
+
 fn compare_values<'source>(
     row: &Value,
     component: &StructValue<'source>,
     trace: &Trace<'_, 'source>,
     expected: &str,
 ) -> TestResult<usize> {
-    match expected {
-        SUIT => fields(
-            row,
-            component,
-            trace,
-            &[("integrityMilestoneToBreak", "integrityMilestoneToBreak")],
-        ),
-        CLOTHING => Ok(nested(
-            row,
-            component,
-            trace,
-            "TemperatureResistance",
-            "temperatureResistance",
-            &[
-                ("MinResistance", "minResistance"),
-                ("MaxResistance", "maxResistance"),
-            ],
-        )? + nested(
-            row,
-            component,
-            trace,
-            "RadiationResistance",
-            "radiationResistance",
-            &[
-                ("MaximumRadiationCapacity", "maximumRadiationCapacity"),
-                ("RadiationDissipationRate", "radiationDissipationRate"),
-            ],
-        )? + nested(
-            row,
-            component,
-            trace,
-            "Flight",
-            "flight",
-            &[("gForceResistance", "gForceResistance")],
-        )?),
-        RADAR => Ok(nested(
-            row,
-            component,
-            trace,
-            "aimAssist",
-            "aimAssist",
-            &[
-                ("distanceMinAssignment", "distanceMinAssignment"),
-                ("distanceMaxAssignment", "distanceMaxAssignment"),
-                ("outsideRangeBufferDistance", "outsideRangeBufferDistance"),
-            ],
-        )? + nested(
-            row,
-            component,
-            trace,
-            "pingProperties",
-            "pingProperties",
-            &[("cooldownTime", "cooldownTime")],
-        )?),
-        _ => Err("supported gear component".into()),
+    let (scalars, groups) = specification(expected).ok_or("supported gear component")?;
+    let mut count = fields(row, component, trace, scalars)?;
+    for group in groups {
+        count += nested(row, component, trace, group.source, group.key, group.fields)?;
     }
+    Ok(count)
 }
 
 fn compare_macro<'trace, 'source>(
@@ -210,28 +269,9 @@ fn compare_macro<'trace, 'source>(
     owner_trace: &Trace<'_, 'source>,
     trace: impl FnOnce(&RecordTree<'source>) -> Trace<'trace, 'source>,
 ) -> TestResult<usize> {
-    let raw @ Original::Reference(reference) = component
-        .field("damageResistance")
-        .ok_or("original suit Reference")?
-    else {
-        return Err("resolved original DamageResistanceMacro Reference".into());
-    };
-    let cell = suit
-        .get("damageResistance")
-        .ok_or("canonical suit Reference")?;
-    owner_trace.check(cell, raw, "selector")?;
-    assert_eq!(
-        proof::text(cell, "/value/status")?,
-        "present",
-        "the authored suit Reference resolves to an admitted macro",
-    );
-    assert_eq!(
-        proof::number(cell, "/value/targetRecordIndex/value")?,
-        u64::from(reference.record_index()),
-        "exact original Reference's target position",
-    );
+    let target = macro_link(suit, component, owner_trace)?;
     let tree = forge
-        .record(reference.record_index())
+        .record(target)
         .ok_or("physical macro definition")?
         .tree()
         .map_err(|_| "read original resistance macro")?;
@@ -247,6 +287,31 @@ fn compare_macro<'trace, 'source>(
     count_macro_values(row, &tree, &trace(&tree))
 }
 
+fn macro_link<'source>(
+    suit: &Value,
+    component: &StructValue<'source>,
+    trace: &Trace<'_, 'source>,
+) -> TestResult<u32> {
+    let raw @ Original::Reference(reference) = component
+        .field("damageResistance")
+        .ok_or("original suit Reference")?
+    else {
+        return Err("resolved original DamageResistanceMacro Reference".into());
+    };
+    let cell = suit
+        .get("damageResistance")
+        .ok_or("canonical suit Reference")?;
+    trace.check(cell, raw, "selector")?;
+    assert!(
+        proof::text(cell, "/value/status")? == "present"
+            && proof::text(cell, "/value/guid/value")? == reference.guid().to_string()
+            && proof::number(cell, "/value/targetRecordIndex/value")?
+                == u64::from(reference.record_index()),
+        "the authored suit Reference resolves to the original physical macro and GUID"
+    );
+    Ok(reference.record_index())
+}
+
 fn count_macro_values<'source>(
     row: &Value,
     tree: &RecordTree<'source>,
@@ -259,33 +324,9 @@ fn count_macro_values<'source>(
     trace.part(cell, original, "$type", "selector")?;
     let contents = cell.get("value").ok_or("decoded macro body")?;
     let original = body(original)?;
-    let mut count = fields(
-        contents,
-        original,
-        trace,
-        &[("IgnoreMeleeDamage", "ignoreMeleeDamage")],
-    )?;
-    for (source_name, key) in [
-        ("PhysicalResistance", "physical"),
-        ("EnergyResistance", "energy"),
-        ("DistortionResistance", "distortion"),
-        ("ThermalResistance", "thermal"),
-        ("BiochemicalResistance", "biochemical"),
-        ("StunResistance", "stun"),
-    ] {
-        count += nested(
-            contents,
-            original,
-            trace,
-            source_name,
-            key,
-            &[
-                ("Multiplier", "multiplier"),
-                ("Threshold", "threshold"),
-                ("DamageCap", "damageCap"),
-                ("DamageCapLimit", "damageCapLimit"),
-            ],
-        )?;
+    let mut count = fields(contents, original, trace, MACRO_SCALARS)?;
+    for &(source, key) in MACRO_CHANNELS {
+        count += nested(contents, original, trace, source, key, MACRO_CHANNEL_FIELDS)?;
     }
     Ok(count)
 }
