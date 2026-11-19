@@ -18,6 +18,9 @@ use crate::real_archive_auto_spawns::{original::Locations, provenance::Origins};
 use crate::real_archive_item_components::{self as components, owned, require_state, single};
 use crate::real_archive_item_durability as proof;
 
+#[path = "vehicle_armor_sdk_witness.rs"]
+mod sdk;
+
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
 const TABLE: &str = "/configurations/vehicleArmor/rows";

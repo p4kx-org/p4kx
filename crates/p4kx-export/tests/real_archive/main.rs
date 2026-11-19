@@ -4,6 +4,7 @@
 //! Tests of `p4kx-export` on a real Archive, built as one test binary; they run with `--ignored`
 //! when `P4KX_DATA_P4K` names one.
 
+mod authored_component_witness;
 mod authored_definition_witness;
 mod catalog_v3_blueprint_category_tests;
 mod catalog_v3_consumer;

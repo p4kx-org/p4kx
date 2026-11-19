@@ -704,6 +704,16 @@ cargo test --locked -p p4kx-export --test real_archive -- `
     --ignored --exact --test-threads=1
 ```
 
+The installed vehicle armor test reads original physical component occurrences and compares
+nested damage, penetration and deflection values and their source coordinates. It reuses one
+decoded DataForge Entry and prints the Build and aggregate counts.
+
+```powershell
+cargo test --locked -p p4kx-export --test real_archive -- `
+    real_archive_vehicle_armor::sdk::installed_vehicle_armor_sdk_matches_the_original_physical_tuning `
+    --ignored --exact --test-threads=1
+```
+
 ## Original crafting-global configuration
 
 `catalog_queries::crafting::with_global_params` and `with_global_params_from` return borrowed
