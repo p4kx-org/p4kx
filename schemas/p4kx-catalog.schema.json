@@ -33538,6 +33538,10 @@
       "x-p4kx-vocabularyClass": "open",
       "x-values": [
         {
+          "description": "The objective has not started.",
+          "value": "notStarted"
+        },
+        {
           "description": "The objective is running.",
           "value": "active"
         },

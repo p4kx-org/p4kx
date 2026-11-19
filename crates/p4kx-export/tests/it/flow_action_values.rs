@@ -58,9 +58,14 @@ pub(crate) fn flow(case: Case) -> TestInstance {
     };
     let all = TestInstance::new("MissionFlowCondition_AllTokensState")
         .value("tokenState", TestValue::text("Active"));
+    let token_state = if matches!(case, Case::NotStarted) {
+        "NotStarted"
+    } else {
+        "Failed"
+    };
     let token = TestInstance::new("MissionFlowCondition_TokenState")
         .value("objectiveToken", TestValue::pointer("actual-after"))
-        .value("tokenState", TestValue::text("Failed"));
+        .value("tokenState", TestValue::text(token_state));
     let change = TestInstance::new("MissionFlowAction_TokenStateChange")
         .value("objectiveToken", TestValue::pointer("actual-before"))
         .value("toState", TestValue::text("Active"));

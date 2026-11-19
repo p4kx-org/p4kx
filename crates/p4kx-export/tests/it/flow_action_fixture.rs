@@ -14,6 +14,7 @@ pub(crate) const EARLY_VARIABLE: &str = "before-original";
 pub(crate) const LATE_VARIABLE: &str = " after-original ";
 pub(crate) const NAN: u32 = 0x7fc0_abcd;
 pub(crate) const DOUBLE: u64 = 0x3fd0_0000_0000_0001;
+const PHASE_STATE: &str = "EMissionPhaseStates";
 const FROM: &[u8] = b"targeT\0";
 const TO: &[u8] = b"target\0";
 
@@ -24,6 +25,7 @@ pub(crate) enum Case {
     Double,
     Nonfinite,
     UnknownAction,
+    NotStarted,
     NilEmpty,
     Absent,
     Null,
@@ -100,6 +102,10 @@ fn schema(case: Case) -> DataForgeBuilder {
 
 fn conditions(builder: DataForgeBuilder) -> DataForgeBuilder {
     builder
+        .enumeration(
+            PHASE_STATE,
+            ["NotStarted", "Active", "Completed", "Failed", "Abandoned"],
+        )
         .structure(TestStruct::new("MissionFlowCondition"))
         .structure(
             TestStruct::new("MissionFlowCondition_AllTokensState")
@@ -113,7 +119,7 @@ fn conditions(builder: DataForgeBuilder) -> DataForgeBuilder {
                     "objectiveToken",
                     TestType::WeakPointer("FlowTarget".to_owned()),
                 )
-                .field("tokenState", TestType::String),
+                .field("tokenState", TestType::Enum(PHASE_STATE.to_owned())),
         )
         .structure(
             TestStruct::new("MissionFlowCondition_PropertyIsSet")

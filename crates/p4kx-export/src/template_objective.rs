@@ -10,6 +10,8 @@ use serde::Serialize;
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = crate::schema_vocabulary::open_string_vocabulary)]
 pub(crate) enum ObjectiveState {
+    /// The objective has not started.
+    NotStarted,
     /// The objective is running.
     Active,
     /// The objective succeeded.
@@ -24,6 +26,7 @@ impl ObjectiveState {
     /// Returns the state the stored enum name `stored` stands for.
     pub(crate) fn parse(stored: &str) -> Option<Self> {
         Some(match stored {
+            "NotStarted" => Self::NotStarted,
             "Active" => Self::Active,
             "Completed" => Self::Completed,
             "Failed" => Self::Failed,

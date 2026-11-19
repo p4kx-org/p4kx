@@ -177,7 +177,7 @@ fn routes(
     );
     assert_eq!(
         condition.field("tokenState"),
-        Some(&Value::String("Failed")),
+        Some(&Value::Enum("Failed")),
         "actual condition state label"
     );
     assert_eq!(

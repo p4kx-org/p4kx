@@ -168,6 +168,35 @@ fn actual_double_probability_has_the_existing_finite_projection_control() -> Tes
     Ok(())
 }
 
+#[test]
+fn declared_not_started_token_state_publishes_with_its_source() -> TestResult {
+    for (origin, encrypted) in [(Input::Plain, false), (Input::Encrypted, true)] {
+        let input = fixture::open(Case::NotStarted, Names::Distinct, origin)?;
+        let catalog = catalog(&input)?;
+        let graph = Template::new(&catalog, fixture::OWNER)?;
+        let node = wire::operation(&graph, 1, "condition")?;
+        assert_eq!(
+            node.pointer("/condition/state"),
+            Some(&json!({"type":"known","state":"notStarted"}))
+        );
+        let state = graph.field(node, "tokenState")?;
+        assert_eq!(
+            raw::payload(state, "enum")?.get("value"),
+            Some(&json!("NotStarted"))
+        );
+        let datum = state.get("value").ok_or("source enum datum")?;
+        assert_eq!(
+            datum.get("containsEncryptedSource"),
+            Some(&json!(encrypted))
+        );
+        assert_eq!(datum.get("sourceSetComplete"), Some(&json!(true)));
+        raw::array(datum, "sourceUsesRefs")?
+            .first()
+            .ok_or("first original enum source use")?;
+    }
+    Ok(())
+}
+
 fn originals() -> TestResult<Vec<Fixture>> {
     let mut inputs = Vec::new();
     for names in [Names::Distinct, Names::Duplicate] {

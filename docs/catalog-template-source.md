@@ -108,6 +108,10 @@ adapter and exact existing ID payloads.
 
 ## Meanings, origin and failures
 
+Mission-flow token conditions, state changes and comms triggers share the known phase states
+`notStarted`, `active`, `completed`, `failed` and `abandoned`. For example, the contextual meaning
+`notStarted` links to the original Enum cell `NotStarted` with its per-value source markers.
+
 Condition/action/randomPhase/trigger meanings occupy the same owner nodes and point to their
 existing raw cells. A successful selected target-field binding keeps exactly the actual target
 field Payload, caller weak-slot Selector and genuine resolution Conversion, independently of the
