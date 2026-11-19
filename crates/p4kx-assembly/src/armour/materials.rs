@@ -96,9 +96,8 @@ pub(super) fn drawn_with(
     library
 }
 
-/// Returns `materials` drawn with the tint palette of the job's geometry, else the default
-/// palette of their library, so that layers with a `PaletteTint` take the palette's entries;
-/// unchanged, and no palette resolved, when no material takes one.
+/// Tints materials from the job's selected palette or the material library's default.
+/// Resolves a palette only when a material takes a palette entry.
 fn painted(
     tints: &mut Palettes<'_>,
     materials: Arc<MaterialStatus>,

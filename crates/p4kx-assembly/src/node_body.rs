@@ -168,6 +168,7 @@ impl LoadoutResolver<'_> {
             .find(|variant| variant.has_tag(body.tag()))
             .map(|variant| {
                 let mut worn = variant.geometry().clone();
+                worn.inherit_palette(child.geometry.as_ref());
                 worn.material = worn.material.or_else(|| {
                     MaterialVariant::resolve(&spec.material_variants, &[body.tag().to_owned()])
                         .map(str::to_owned)

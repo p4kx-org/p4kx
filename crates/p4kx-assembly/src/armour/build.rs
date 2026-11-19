@@ -58,10 +58,9 @@ impl Armour {
             .map(|built| built.with_default_material(models))
     }
 
-    /// Builds the Armour as [`Self::build`] does, with the materials of each piece drawn with the
-    /// tint palette its worn geometry names, else the default palette of its material library,
-    /// which `palettes` reads. A piece keeps its own palette and takes none from elsewhere. A
-    /// palette that cannot be resolved is listed as an [`Issue`] and the piece is drawn without it.
+    /// Builds the Armour as [`Self::build`] does and tints each piece with its worn geometry's
+    /// palette, its main geometry's palette or its material library's default, in that order.
+    /// An unresolved palette is listed as an [`Issue`].
     ///
     /// # Errors
     ///

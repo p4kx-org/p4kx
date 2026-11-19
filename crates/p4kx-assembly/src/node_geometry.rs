@@ -27,9 +27,7 @@ impl LoadoutResolver<'_> {
             if tagged.material.is_none() {
                 tagged.inherit_material(main);
             }
-            if tagged.palette.is_none() {
-                tagged.palette.clone_from(&main.palette);
-            }
+            tagged.inherit_palette(Some(main));
             if tagged.path.eq_ignore_ascii_case(&main.path) {
                 child.geometry = Some(tagged);
                 child.choice = GeometryChoice::Flag;

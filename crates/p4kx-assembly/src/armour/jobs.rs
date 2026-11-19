@@ -215,7 +215,7 @@ fn select_wearable(
         material,
         geometry_selector: geometry.model_field(),
         material_selector,
-        palette: geometry.palette().cloned(),
+        palette: geometry.palette_with_main(wearable.geometry()).cloned(),
     })
 }
 

@@ -19,17 +19,15 @@ drawn with white plates; in the game it is dark gunmetal.
 
 ## Decision
 
-`Armour::build_with_palettes` draws each piece with the palette its worn geometry names, the
-sub-geometry chosen for the body variant, else the default palette of its material library, as an
-Assembly does for its parts. The palette entries are applied to the materials of the piece's
-library first, and the choices of its Character (`Look`) after, so a choice always wins. A piece
-never takes the palette of another piece, of the body or of anything else it is worn with; each
-body variant takes the palette of its own sub-geometry.
+The Outfit and character Entity paths use the palette declared on the selected worn geometry. If
+that geometry declares no palette, they use the palette on the same item's main geometry. The
+palette keeps its original selector and Record, and the worn geometry still supplies the model and
+its selected material. A piece uses no palette from other pieces.
 
-A palette is only resolved for a piece whose library has a material that takes a palette slot, so
-body skins, heads and hair raise no palette issue. A palette that cannot be resolved is listed as a
-`palette` issue, once per message, and the piece is drawn without it. `Armour::build` resolves no
-palette and is unchanged.
+When the material uses a palette slot, the resolver tries the selected item palette and then the
+material library's default. An explicitly declared item palette that fails to resolve produces a
+`palette` issue before the library default is tried. In an Outfit, the Character's `Look` applies
+after the tint palette. `Armour::build_with_palettes` resolves palettes for Outfits.
 
 `armour glb`, `character package`, `chf glb` and the Characters tab use `build_with_palettes`.
 

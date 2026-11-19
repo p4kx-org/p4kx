@@ -222,8 +222,8 @@ pub use entity_npc_zones::{
 };
 pub use entity_package::check_entity_package_sources;
 pub use entity_painted::{
-    PAINTED_FEMALE_PALETTE_GUID, PAINTED_LIBRARY_PALETTE, PAINTED_PALETTE_GUID, PAINTED_SUIT,
-    painted_entries,
+    MAIN_PALETTE_SUIT, PAINTED_FEMALE_PALETTE_GUID, PAINTED_LIBRARY_PALETTE, PAINTED_PALETTE_GUID,
+    PAINTED_SUIT, painted_entries,
 };
 pub use entity_port::TestPort;
 pub use entity_prop_rig::{

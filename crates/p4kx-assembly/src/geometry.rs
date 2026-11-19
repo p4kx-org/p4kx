@@ -139,6 +139,20 @@ impl Geometry {
         self.palette.as_ref()
     }
 
+    /// Returns the geometry's own palette or the one named by the same item's main geometry.
+    pub(crate) fn palette_with_main<'a>(
+        &'a self,
+        main: Option<&'a Self>,
+    ) -> Option<&'a PaletteRef> {
+        self.palette().or_else(|| main.and_then(Self::palette))
+    }
+
+    pub(crate) fn inherit_palette(&mut self, main: Option<&Self>) {
+        if self.palette.is_none() {
+            self.palette = self.palette_with_main(main).cloned();
+        }
+    }
+
     /// Returns whether the model file is a `.cdf`, `.chr` or `.skin` file outside
     /// `Objects/Characters/Human`, the folder of the human body rigs.
     #[must_use]
