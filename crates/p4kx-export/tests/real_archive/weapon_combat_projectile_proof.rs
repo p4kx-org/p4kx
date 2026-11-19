@@ -6,52 +6,28 @@ use p4kx_export::catalog_queries::equipment::{
     WeaponProjectileAmmoSelection, with_projectile_ammo_from,
 };
 use p4kx_export::{Kind, is_kind_leftover};
-use p4kx_extraction::{
-    Archive, DataForgeEntry, DataForgeOrigin, InputScope, SourceEncryption, SourceInput,
-    SourceUses, Value as Original,
-};
-use p4kx_testkit::{real_archive_b_path, real_archive_key, real_archive_path};
+use p4kx_extraction::{Archive, DataForgeEntry, Value as Original};
 use serde_json::Value;
 
 use super::original::{self, OriginalAction, Witness};
-use super::{TestResult, Trace, cell, proof, with_original_witness};
-use crate::real_archive_verification;
+use super::{TestResult, Trace, cell, proof, with_original_traces, with_sdk_samples};
 
-const ROUTES: &str = "/projections/weaponProjectileAmmoSelections/rows";
+pub(super) const ROUTES: &str = "/projections/weaponProjectileAmmoSelections/rows";
 
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn projectile_ammunition_sdk_matches_original_sources() -> TestResult {
-    let paths = std::iter::once(real_archive_path()?).chain(real_archive_b_path());
-    let key = real_archive_key().map_err(|_| "configured Archive key")?;
-    for (index, path) in paths.enumerate() {
-        let archive =
-            Archive::open_with_key(path, Some(key.clone())).map_err(|_| "open input Archive")?;
-        with_original_witness(&archive, verify_sdk)?;
-        real_archive_verification::print_line(&format!(
-            "projectile SDK source witness {}: one original action and reached Ammo",
-            index + 1
-        ));
-    }
-    Ok(())
+    with_sdk_samples(
+        "projectile",
+        "one original action and reached Ammo",
+        verify_sdk,
+    )
 }
 
 fn verify_sdk(archive: &Archive, entry: &DataForgeEntry, witness: &Witness<'_>) -> TestResult {
-    let build = archive.build().ok_or("complete actual Build identity")?;
-    if [
-        build.branch(),
-        build.version(),
-        build.change_number(),
-        build.build_id(),
-    ]
-    .into_iter()
-    .any(|value| value.trim().is_empty())
-    {
-        return Err("the source proof requires a complete Build identity".into());
-    }
     let owner = witness.owner.record_index();
     with_projectile_ammo_from(archive, entry, owner, None, |snapshot| {
-        if snapshot.build() != Some(build) {
+        if snapshot.build() != archive.build() {
             return Err("the SDK must preserve the exact input Build".into());
         }
         inspect(&snapshot, entry, witness)
@@ -68,27 +44,15 @@ fn inspect(
         return Err("one physical weapon in the SDK result".into());
     };
     check_scope(snapshot, owner, witness)?;
-    let DataForgeOrigin::Archive(origin) = entry.origin() else {
-        return Err("the SDK must use the original Archive DataForge Entry".into());
-    };
-    let encrypted = match entry.origin().encryption() {
-        SourceEncryption::Encrypted => Some(true),
-        SourceEncryption::Unencrypted => Some(false),
-        _ => None,
-    };
     let provenance = serde_json::to_value(snapshot.source_inventory())?;
     let uses = proof::indexed(&provenance, "/uses", "id")?;
-    let sources = SourceUses::new();
-    let scope = sources.observe(SourceInput::Archive(origin), InputScope::Payload)?;
-    let weapon_trace = Trace::of(&witness.owner, &uses, &scope, encrypted);
-    let ammo_trace = Trace::of(&witness.ammo, &uses, &scope, encrypted);
     let action = source_action(witness)?;
-    let ordinal = weapon_trace.ordinal(action.action)?;
-    let (route, ammo) = selected_rows(owner, witness, ordinal)?;
-    let route = wire(route)?;
-    let ammo = wire(ammo)?;
-    check_original_route(&route, witness, &action, &weapon_trace)?;
-    check_original_ammo(&ammo, witness, &ammo_trace)
+    with_original_traces(entry, witness, &uses, |traces| {
+        let ordinal = traces.owner.ordinal(action.action)?;
+        let (route, ammo) = selected_rows(owner, witness, ordinal)?;
+        check_original_route(&wire(route)?, witness, &action, &traces.owner)?;
+        check_original_ammo(&wire(ammo)?, witness, &traces.ammo)
+    })
 }
 
 fn check_scope(
@@ -195,13 +159,13 @@ fn check_original_ammo<'source>(
 }
 
 pub(super) fn route_row<'catalog>(
-    catalog: &'catalog Value,
+    rows: &'catalog [Value],
     witness: &Witness<'_>,
     ordinal: &str,
 ) -> TestResult<&'catalog Value> {
     let owner = u64::from(witness.owner.record_index());
     let component = u64::try_from(witness.component)?;
-    let mut routes = proof::rows(catalog, ROUTES)?.iter().filter(|row| {
+    let mut routes = rows.iter().filter(|row| {
         row.pointer("/ownerRecordIndex/value")
             .and_then(Value::as_u64)
             == Some(owner)
@@ -215,7 +179,7 @@ pub(super) fn route_row<'catalog>(
                 == Some(ordinal)
     });
     let (Some(route), None) = (routes.next(), routes.next()) else {
-        return Err("one producer route for the exact original action occurrence".into());
+        return Err("one route for the exact original action occurrence".into());
     };
     Ok(route)
 }

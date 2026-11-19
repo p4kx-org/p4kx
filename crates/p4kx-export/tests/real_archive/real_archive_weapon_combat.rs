@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::collections::HashMap;
 use std::error::Error;
 use std::time::UNIX_EPOCH;
 
 use p4kx_export::{CatalogOptions, CatalogPublicationMode, build_catalog_from};
 use p4kx_extraction::{
-    Archive, ArchiveWatch, DataForgeEntry, DataForgeOrigin, InputScope, RecordTree,
-    SourceEncryption, SourceInput, SourceUses, Value as Original,
+    Archive, ArchiveWatch, DataForgeEntry, DataForgeOrigin, InputScope, SourceEncryption,
+    SourceInput, SourceUses, Value as Original,
 };
-use p4kx_testkit::{real_archive_key, real_archive_pair};
+use p4kx_testkit::{real_archive_b_path, real_archive_key, real_archive_pair, real_archive_path};
 use serde_json::Value;
 
 use crate::real_archive_item_components::{cell, require_state};
@@ -23,6 +24,8 @@ mod dependencies;
 pub(super) mod original;
 #[path = "weapon_combat_projectile_proof.rs"]
 mod projectile;
+#[path = "weapon_combat_sdk_proof.rs"]
+mod sdk;
 
 use original::{OriginalAction, OriginalAmmo, Witness};
 
@@ -63,6 +66,37 @@ fn with_original_witness(
         .map_err(|_| "Archive changed during weapon verification".into())
 }
 
+fn with_sdk_samples(
+    label: &str,
+    evidence: &str,
+    inspect: impl Fn(&Archive, &DataForgeEntry, &Witness<'_>) -> TestResult,
+) -> TestResult {
+    let paths = std::iter::once(real_archive_path()?).chain(real_archive_b_path());
+    let key = real_archive_key().map_err(|_| "configured Archive key")?;
+    for (index, path) in paths.enumerate() {
+        let archive =
+            Archive::open_with_key(path, Some(key.clone())).map_err(|_| "open input Archive")?;
+        let build = archive.build().ok_or("complete actual Build identity")?;
+        if [
+            build.branch(),
+            build.version(),
+            build.change_number(),
+            build.build_id(),
+        ]
+        .into_iter()
+        .any(|value| value.trim().is_empty())
+        {
+            return Err("the source proof requires a complete Build identity".into());
+        }
+        with_original_witness(&archive, &inspect)?;
+        real_archive_verification::print_line(&format!(
+            "{label} SDK source witness {}: {evidence}",
+            index + 1
+        ));
+    }
+    Ok(())
+}
+
 fn compare(archive: &Archive, entry: &DataForgeEntry, witness: &Witness<'_>) -> TestResult {
     let options = CatalogOptions {
         filter: Some(&witness.filter),
@@ -75,9 +109,20 @@ fn compare(archive: &Archive, entry: &DataForgeEntry, witness: &Witness<'_>) -> 
         serde_json::from_slice(built.json()).map_err(|_| "read bounded Catalog JSON")?;
     verify_build(archive, &catalog)?;
     dependencies::check(&catalog, witness)?;
-    let owner = &witness.owner;
-    let ammo = &witness.ammo;
     let uses = proof::indexed(&catalog, "/provenance/uses", "id")?;
+    let rows = modes(&catalog, witness)?;
+    let routes = proof::rows(&catalog, projectile::ROUTES)?;
+    with_original_traces(entry, witness, &uses, |traces| {
+        compare_modes(&rows, routes, witness, traces)
+    })
+}
+
+fn with_original_traces<'source>(
+    entry: &DataForgeEntry,
+    witness: &Witness<'source>,
+    uses: &HashMap<&str, &Value>,
+    inspect: impl FnOnce(&Traces<'_, 'source>) -> TestResult,
+) -> TestResult {
     let DataForgeOrigin::Archive(origin) = entry.origin() else {
         return Err("combat DataForge must have Archive origin".into());
     };
@@ -89,10 +134,10 @@ fn compare(archive: &Archive, entry: &DataForgeEntry, witness: &Witness<'_>) -> 
     let sources = SourceUses::new();
     let scope = sources.observe(SourceInput::Archive(origin), InputScope::Payload)?;
     let traces = Traces {
-        owner: Trace::of(owner, &uses, &scope, encrypted),
-        ammo: Trace::of(ammo, &uses, &scope, encrypted),
+        owner: Trace::of(&witness.owner, uses, &scope, encrypted),
+        ammo: Trace::of(&witness.ammo, uses, &scope, encrypted),
     };
-    compare_modes(&catalog, owner, ammo, witness, &traces)
+    inspect(&traces)
 }
 
 struct Traces<'read, 'source> {
@@ -100,21 +145,19 @@ struct Traces<'read, 'source> {
     ammo: Trace<'read, 'source>,
 }
 
-fn compare_modes<'tree, 'source>(
-    catalog: &Value,
-    owner: &'tree RecordTree<'source>,
-    ammo: &'tree RecordTree<'source>,
+fn compare_modes<'source>(
+    projected: &[&Value],
+    routes: &[Value],
     witness: &Witness<'source>,
     traces: &Traces<'_, 'source>,
 ) -> TestResult {
     let (_, owner_weapon) =
-        original::unique(owner, original::WEAPON).ok_or("original weapon component")?;
+        original::unique(&witness.owner, original::WEAPON).ok_or("original weapon component")?;
     let weapon = original::structure(owner_weapon).ok_or("read original weapon component")?;
     let actions_raw = weapon
         .field("fireActions")
         .ok_or("original fireActions field")?;
     let actions = original::array(actions_raw).ok_or("original fireActions array")?;
-    let projected = modes(catalog, witness)?;
     assert!(
         projected.len() == actions.len(),
         "one row per actual top-level slot"
@@ -140,7 +183,7 @@ fn compare_modes<'tree, 'source>(
             );
         }
         if index == witness.mode {
-            compare_nominal(catalog, row, traces, witness, original, ammo)?;
+            compare_nominal(routes, row, traces, witness, original)?;
         }
     }
     Ok(())
@@ -177,15 +220,15 @@ fn modes<'a>(catalog: &'a Value, witness: &Witness<'_>) -> TestResult<Vec<&'a Va
 }
 
 fn compare_nominal<'source>(
-    catalog: &Value,
+    routes: &[Value],
     row: &Value,
     traces: &Traces<'_, 'source>,
     witness: &Witness<'source>,
     raw: &Original<'source>,
-    ammo: &RecordTree<'source>,
 ) -> TestResult {
     let action = original::action_inputs(raw).ok_or("exact owned action inputs")?;
-    let ammo = original::ammo_inputs(ammo).ok_or("exact selected generic Bullet inputs")?;
+    let ammo =
+        original::ammo_inputs(&witness.ammo).ok_or("exact selected generic Bullet inputs")?;
     assert_eq!(
         proof::text(row, "/model/value/type")?,
         "nominalBullet",
@@ -211,7 +254,7 @@ fn compare_nominal<'source>(
             == u64::from(witness.ammo.record_index()),
         "actual resolved ammo Record position"
     );
-    let route = projectile::route_row(catalog, witness, &ordinal)?;
+    let route = projectile::route_row(routes, witness, &ordinal)?;
     projectile::check_original_route(route, witness, &action, &traces.owner)?;
     let result = row.pointer("/model/value/values").ok_or("mode values")?;
     compare_direct_inputs(result, &action, traces)?;

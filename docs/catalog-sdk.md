@@ -738,6 +738,15 @@ Nominal bullet metrics carry separate source states for fire rate, damage per di
 nominal DPS and nominal flight distance. Crafting adjustments and ship loadout totals use
 the rules in the [combat quality contract](catalog-combat-quality.md).
 
+With `P4KX_DATA_P4K` set, this verification traces the original mode positions and checks a
+nominal bullet mode for independent alpha, DPS and distance values. Set `P4KX_DATA_P4K_B`
+to check a second installed Archive. The test reads DataForge once per Archive and creates
+no Catalog.
+
+```powershell
+cargo test --locked -p p4kx-export --test real_archive real_archive_weapon_combat::sdk::weapon_combat_sdk_matches_original_sources -- --ignored --exact --nocapture --test-threads=1
+```
+
 ## Starmap container placements
 
 Use `starmap::read_container_placements` to read the canonical `placements.containerInstances` and
