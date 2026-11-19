@@ -16,13 +16,18 @@ use crate::source_value_catalog::SourceArenaOutput;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct ResourceSignatureParams<'source> {
-    source_type: SourcedValue<&'source str>,
+#[non_exhaustive]
+pub struct ResourceSignatureParams<'source> {
+    /// Original DataForge declaration.
+    pub source_type: SourcedValue<&'source str>,
     #[serde(rename = "EMSignature")]
-    em_signature: SourcedValue<SignatureEntry<'source>>,
+    /// Electromagnetic signature parameters.
+    pub em_signature: SourcedValue<SignatureEntry<'source>>,
     #[serde(rename = "IRSignature")]
-    ir_signature: SourcedValue<SignatureEntry<'source>>,
-    additional_fields: SourceArenaOutput<'source>,
+    /// Infrared signature parameters.
+    pub ir_signature: SourcedValue<SignatureEntry<'source>>,
+    /// Original fields outside the typed projection.
+    pub additional_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> ResourceSignatureParams<'source> {
@@ -45,15 +50,22 @@ impl<'source> ResourceSignatureParams<'source> {
     }
 }
 
+/// Authored parameters for one signature channel.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct SignatureEntry<'source> {
-    source_type: SourcedValue<&'source str>,
-    nominal_signature: SourcedValue<ResourceFloat32>,
-    decay_rate: SourcedValue<ResourceFloat32>,
-    functionality_curve: SourcedValue<SourceArenaOutput<'source>>,
-    additional_fields: SourceArenaOutput<'source>,
+#[non_exhaustive]
+pub struct SignatureEntry<'source> {
+    /// Original DataForge declaration.
+    pub source_type: SourcedValue<&'source str>,
+    /// Authored nominal signature.
+    pub nominal_signature: SourcedValue<ResourceFloat32>,
+    /// Authored signature decay rate.
+    pub decay_rate: SourcedValue<ResourceFloat32>,
+    /// Original functionality curve declaration and values.
+    pub functionality_curve: SourcedValue<SourceArenaOutput<'source>>,
+    /// Original fields outside the typed projection.
+    pub additional_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> SignatureEntry<'source> {

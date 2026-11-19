@@ -256,3 +256,46 @@ pub(crate) fn closure(catalog: &Value) -> TestResult {
 
 #[path = "catalog_declaration_fixture.rs"]
 pub(crate) mod declaration_fixture;
+
+pub(crate) fn with_origins(mut datum: Value, catalog: &Value) -> TestResult<Value> {
+    resolve_origins(&mut datum, catalog)?;
+    Ok(datum)
+}
+
+fn resolve_origins(datum: &mut Value, catalog: &Value) -> TestResult {
+    match datum {
+        Value::Array(items) => {
+            for item in items {
+                resolve_origins(item, catalog)?;
+            }
+        }
+        Value::Object(_) => {
+            if datum.get("sourceUsesRefs").is_some() {
+                let mut original = Vec::new();
+                for used in uses(catalog, datum)? {
+                    let mut use_object = used.as_object().ok_or("physical use object")?.clone();
+                    use_object.remove("id");
+                    let mut source = source(catalog, used)?
+                        .as_object()
+                        .ok_or("physical source object")?
+                        .clone();
+                    source.remove("id");
+                    use_object.insert("source".into(), Value::Object(source));
+                    original.push(Value::Object(use_object));
+                }
+                original.sort_by_cached_key(ToString::to_string);
+                let fields = datum.as_object_mut().ok_or("sourced object")?;
+                fields.remove("sourceUsesRefs");
+                fields.insert("originalUses".into(), Value::Array(original));
+            }
+            let fields = datum.as_object_mut().ok_or("result object")?;
+            for (key, child) in fields {
+                if key != "originalUses" {
+                    resolve_origins(child, catalog)?;
+                }
+            }
+        }
+        _ => {}
+    }
+    Ok(())
+}

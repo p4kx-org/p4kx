@@ -25,6 +25,8 @@ pub(crate) use scan_fold::ScanInspectionFold;
 pub(crate) enum ConfigurationInspection {
     MissionBoard,
     ResourceNetwork,
+    ResourceComponent,
+    ResourceConnection,
     RadarOptions,
     LootGeneration,
     JumpDriveDefinition,

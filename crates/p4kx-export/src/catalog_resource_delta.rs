@@ -15,9 +15,6 @@ use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 use crate::source_value_catalog::SourceArenaOutput;
 
-type Side<'source> = SourcedValue<ResourceDeltaAmount<'source>>;
-type Composition<'source> = SourcedValue<ResourceComposition<'source>>;
-
 /// A source delta with its original array slot and linked sides.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(
@@ -26,65 +23,102 @@ type Composition<'source> = SourcedValue<ResourceComposition<'source>>;
     rename_all_fields = "camelCase"
 )]
 #[schemars(transform = every_field_required)]
-pub(super) enum ResourceDelta<'source> {
+#[non_exhaustive]
+pub enum ResourceDelta<'source> {
+    /// Consumes the declared resource.
     Consumption {
         #[serde(flatten)]
+        /// Original declaration and position.
         source: DeltaSource<'source>,
         #[serde(flatten)]
+        /// Authored consumption fields.
         fields: ConsumptionFields<'source>,
     },
+    /// Generates the declared resource.
     Generation {
         #[serde(flatten)]
+        /// Original declaration and position.
         source: DeltaSource<'source>,
-        generation: Side<'source>,
-        composition: Composition<'source>,
+        /// Original generation amount and resource.
+        generation: SourcedValue<ResourceDeltaAmount<'source>>,
+        /// Original composition of the generated resource.
+        composition: SourcedValue<ResourceComposition<'source>>,
+        /// Whether overgeneration is disabled.
         no_over_generation: SourcedValue<bool>,
     },
+    /// Consumes one resource and generates another.
     Conversion {
         #[serde(flatten)]
+        /// Original declaration and position.
         source: DeltaSource<'source>,
         #[serde(flatten)]
+        /// Authored consumption fields.
         consumed: ConsumptionFields<'source>,
-        generation: Side<'source>,
-        generated_composition: Composition<'source>,
+        /// Original generation amount and resource.
+        generation: SourcedValue<ResourceDeltaAmount<'source>>,
+        /// Original composition of the generated resource.
+        generated_composition: SourcedValue<ResourceComposition<'source>>,
+        /// Whether overgeneration is disabled.
         no_over_generation: SourcedValue<bool>,
     },
+    /// Declares a storage transfer with consumption and generation sides.
     Storage {
         #[serde(flatten)]
+        /// Original declaration and position.
         source: DeltaSource<'source>,
-        consumption: Side<'source>,
-        generation: Side<'source>,
-        consumption_composition: Composition<'source>,
+        /// Original consumption amount and resource.
+        consumption: SourcedValue<ResourceDeltaAmount<'source>>,
+        /// Original generation amount and resource.
+        generation: SourcedValue<ResourceDeltaAmount<'source>>,
+        /// Original composition of the consumed resource.
+        consumption_composition: SourcedValue<ResourceComposition<'source>>,
+        /// Original discharge flag.
         discharge: SourcedValue<bool>,
     },
+    /// Reflects an authored resource network value.
     NetworkReflection {
         #[serde(flatten)]
+        /// Original declaration and position.
         source: DeltaSource<'source>,
+        /// Authored resource label.
         resource: SourcedValue<&'source str>,
+        /// Whether evaluation is declared binary.
         binary_evaluation: SourcedValue<bool>,
     },
+    /// An original subtype retained as authored fields.
     UnknownDelta {
         #[serde(flatten)]
+        /// Original declaration and position.
         source: DeltaSource<'source>,
     },
 }
 
+/// Identity and original fields of a resource delta.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct DeltaSource<'source> {
-    source_type: SourcedValue<&'source str>,
-    source_position: SourcedValue<u32>,
-    additional_fields: SourceArenaOutput<'source>,
+#[non_exhaustive]
+pub struct DeltaSource<'source> {
+    /// Original DataForge declaration.
+    pub source_type: SourcedValue<&'source str>,
+    /// Zero-based position in the original array.
+    pub source_position: SourcedValue<u32>,
+    /// Original fields outside the typed projection.
+    pub additional_fields: SourceArenaOutput<'source>,
 }
 
+/// Authored consumption side and minimum threshold.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct ConsumptionFields<'source> {
-    minimum_consumption_fraction: SourcedValue<ResourceFloat32>,
-    consumption: Side<'source>,
-    consumption_composition: Composition<'source>,
+#[non_exhaustive]
+pub struct ConsumptionFields<'source> {
+    /// Original minimum consumption fraction.
+    pub minimum_consumption_fraction: SourcedValue<ResourceFloat32>,
+    /// Original consumption amount and resource.
+    pub consumption: SourcedValue<ResourceDeltaAmount<'source>>,
+    /// Original composition of the consumed resource.
+    pub consumption_composition: SourcedValue<ResourceComposition<'source>>,
 }
 
 impl<'source> ResourceDelta<'source> {

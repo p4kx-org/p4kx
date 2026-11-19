@@ -22,32 +22,48 @@ const PARAMETER: &str = "ResourceNetworkAcessParameter";
     rename_all_fields = "camelCase"
 )]
 #[schemars(transform = every_field_required)]
-pub(super) enum ResourceControlParameter<'source> {
+#[non_exhaustive]
+pub enum ResourceControlParameter<'source> {
+    /// A parameter from the resource network.
     NetworkParameter {
         #[serde(flatten)]
+        /// Original declaration and position.
         source: ParameterSource<'source>,
+        /// Authored network parameter label.
         parameter: SourcedValue<&'source str>,
     },
+    /// A resource parameter with an external port declaration.
     ExternalPort {
         #[serde(flatten)]
+        /// Original declaration and position.
         source: ParameterSource<'source>,
+        /// Authored network parameter label.
         parameter: SourcedValue<&'source str>,
+        /// Authored parameter name.
         name: SourcedValue<&'source str>,
+        /// Authored external port name.
         port_name: SourcedValue<&'source str>,
     },
+    /// An original subtype retained as authored fields.
     UnknownParameter {
         #[serde(flatten)]
+        /// Original declaration and position.
         source: ParameterSource<'source>,
     },
 }
 
+/// Identity and original fields of a control parameter.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct ParameterSource<'source> {
-    source_type: SourcedValue<&'source str>,
-    source_position: SourcedValue<u32>,
-    additional_fields: SourceArenaOutput<'source>,
+#[non_exhaustive]
+pub struct ParameterSource<'source> {
+    /// Original DataForge declaration.
+    pub source_type: SourcedValue<&'source str>,
+    /// Zero-based position in the original array.
+    pub source_position: SourcedValue<u32>,
+    /// Original fields outside the typed projection.
+    pub additional_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> ResourceControlParameter<'source> {

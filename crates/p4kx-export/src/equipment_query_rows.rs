@@ -8,12 +8,32 @@ use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::scoped_source_read::ScopedSourceRead;
 use crate::catalog_table::DatasetAvailability;
 use crate::catalog_v3::ammo_definition::{self, AmmoDefinition, AmmoSelection};
-use crate::catalog_v3::catalog_entity_configurations::{self, VEHICLE_ARMOR_TYPES, VehicleArmor};
+use crate::catalog_v3::catalog_entity_configurations::{
+    self, RESOURCE_COMPONENT_TYPES, RESOURCE_CONNECTION_TYPES, ResourceComponent,
+    ResourceConnection, VEHICLE_ARMOR_TYPES, VehicleArmor,
+};
 use crate::catalog_v3::catalog_item_alignment::{ATTACHABLE, AlignmentOptions};
 use crate::catalog_v3::catalog_item_components::{self, WeaponSource, definition_read};
 use crate::catalog_v3::inventory_entity_configurations::BOUNDS_SOURCE_TYPES;
 use crate::record_observation::RecordObservation;
 use crate::{CatalogError, Kind};
+
+#[derive(Clone, Copy)]
+pub(super) enum ConfigurationFamily {
+    VehicleArmor,
+    ResourceComponents,
+    ResourceConnections,
+}
+
+impl ConfigurationFamily {
+    pub(super) const fn source_types(self) -> &'static [&'static str] {
+        match self {
+            Self::VehicleArmor => VEHICLE_ARMOR_TYPES,
+            Self::ResourceComponents => RESOURCE_COMPONENT_TYPES,
+            Self::ResourceConnections => RESOURCE_CONNECTION_TYPES,
+        }
+    }
+}
 
 #[derive(Clone, Copy)]
 pub(super) enum Family {
@@ -22,7 +42,7 @@ pub(super) enum Family {
     Attachments,
     Bounds,
     CargoGrids,
-    VehicleArmor,
+    Configuration(ConfigurationFamily),
     AmmoDefinitions,
     WeaponSources,
     ProjectileAmmo,
@@ -42,7 +62,7 @@ impl Family {
             | Self::Attachments
             | Self::Bounds
             | Self::CargoGrids
-            | Self::VehicleArmor
+            | Self::Configuration(_)
             | Self::WeaponSources
             | Self::ProjectileAmmo
             | Self::MagazineResolutions => Kind::Items,
@@ -57,7 +77,7 @@ impl Family {
             Self::Definitions | Self::ItemSources => &[p4kx_assembly::ENTITY_TYPE][..],
             Self::Attachments => &[ATTACHABLE][..],
             Self::Bounds => BOUNDS_SOURCE_TYPES,
-            Self::VehicleArmor => VEHICLE_ARMOR_TYPES,
+            Self::Configuration(family) => family.source_types(),
             Self::CargoGrids => &[crate::catalog_v3::catalog_facility::CARGO_GRID_SOURCE_TYPE],
             Self::AmmoDefinitions => &[ammo_definition::SOURCE_TYPE],
             Self::ProjectileAmmo | Self::MagazineResolutions => {
@@ -92,6 +112,8 @@ pub(super) struct Attachments;
 pub(super) struct Bounds;
 pub(super) struct CargoGrids;
 pub(super) struct VehicleArmorRows;
+pub(super) struct ResourceComponentRows;
+pub(super) struct ResourceConnectionRows;
 pub(super) struct AmmoDefinitions;
 pub(super) struct WeaponSources;
 pub(super) struct ProjectileAmmo;
@@ -285,7 +307,7 @@ impl Projector for Bounds {
 
 impl Projector for VehicleArmorRows {
     type Row<'source> = VehicleArmor<'source>;
-    const FAMILY: Family = Family::VehicleArmor;
+    const FAMILY: Family = Family::Configuration(ConfigurationFamily::VehicleArmor);
 
     fn read<'source>(
         _: &'source DataForge<'source>,
@@ -296,6 +318,42 @@ impl Projector for VehicleArmorRows {
         cancel: Option<&CancelToken>,
     ) -> Result<ScopedSourceRead<Vec<Self::Row<'source>>>, CatalogError> {
         catalog_entity_configurations::read_vehicle_armor(
+            tree, projection, admission, options, cancel,
+        )
+    }
+}
+
+impl Projector for ResourceConnectionRows {
+    type Row<'source> = ResourceConnection<'source>;
+    const FAMILY: Family = Family::Configuration(ConfigurationFamily::ResourceConnections);
+
+    fn read<'source>(
+        _: &'source DataForge<'source>,
+        tree: &RecordTree<'source>,
+        projection: &CatalogProjection<'_, 'source>,
+        admission: &RecordObservation<'_, 'source>,
+        options: &AlignmentOptions<'_>,
+        cancel: Option<&CancelToken>,
+    ) -> Result<ScopedSourceRead<Vec<Self::Row<'source>>>, CatalogError> {
+        catalog_entity_configurations::read_resource_connections(
+            tree, projection, admission, options, cancel,
+        )
+    }
+}
+
+impl Projector for ResourceComponentRows {
+    type Row<'source> = ResourceComponent<'source>;
+    const FAMILY: Family = Family::Configuration(ConfigurationFamily::ResourceComponents);
+
+    fn read<'source>(
+        _: &'source DataForge<'source>,
+        tree: &RecordTree<'source>,
+        projection: &CatalogProjection<'_, 'source>,
+        admission: &RecordObservation<'_, 'source>,
+        options: &AlignmentOptions<'_>,
+        cancel: Option<&CancelToken>,
+    ) -> Result<ScopedSourceRead<Vec<Self::Row<'source>>>, CatalogError> {
+        catalog_entity_configurations::read_resource_components(
             tree, projection, admission, options, cancel,
         )
     }

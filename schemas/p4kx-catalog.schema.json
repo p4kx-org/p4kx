@@ -11339,18 +11339,23 @@
       "type": "object"
     },
     "CompositionValue": {
+      "description": "One authored resource ratio in a composition.",
       "properties": {
         "additionalFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Original fields outside the typed projection."
         },
         "containerResource": {
-          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference",
+          "description": "Original reference to a container resource definition."
         },
         "ratio": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored resource ratio."
         },
         "sourceType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original DataForge declaration."
         }
       },
       "required": [
@@ -27362,18 +27367,23 @@
       "x-p4kx-vocabularyClass": "control"
     },
     "LinkedInteraction": {
+      "description": "Original interaction-state link and change flag.",
       "properties": {
         "additionalFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Original fields outside the typed projection."
         },
         "changeInteractionState": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Whether a state change is requested."
         },
         "linkedInteractionState": {
-          "$ref": "#/$defs/SourcedValueOfHealthLink"
+          "$ref": "#/$defs/SourcedValueOfHealthLink",
+          "description": "Original reference to the interaction state."
         },
         "sourceType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original DataForge declaration."
         }
       },
       "required": [
@@ -35394,21 +35404,27 @@
       "type": "object"
     },
     "PowerRange": {
+      "description": "An original breakpoint and modifier for a power range.",
       "properties": {
         "additionalFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Original fields outside the typed projection."
         },
         "modifier": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored modifier."
         },
         "registerRange": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Whether the range is registered."
         },
         "sourceType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original DataForge declaration."
         },
         "start": {
-          "$ref": "#/$defs/SourcedValueOfint32"
+          "$ref": "#/$defs/SourcedValueOfint32",
+          "description": "Authored starting breakpoint."
         }
       },
       "required": [
@@ -40270,34 +40286,42 @@
       "description": "Resource-network parameters and ordered states of one physical component.",
       "properties": {
         "additionalFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Original fields outside the typed projection."
         },
         "componentOrdinal": {
           "$ref": "#/$defs/SourcedValueOfuint32"
         },
         "controlBlocks": {
-          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput",
+          "description": "Authored control blocks."
         },
         "controlParameters": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfResourceControlParameter"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfResourceControlParameter",
+          "description": "Original ordered control parameters, including empty slots."
         },
         "defaultPriority": {
-          "$ref": "#/$defs/SourcedValueOfint32"
+          "$ref": "#/$defs/SourcedValueOfint32",
+          "description": "Default resource allocation priority."
         },
         "filterParams": {
-          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput",
+          "description": "Authored resource filter parameters."
         },
         "functionalityModifiers": {
-          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput",
+          "description": "Authored functionality modifiers."
         },
         "isConnectedToRoom": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Whether the component connects to a room."
         },
         "isRelay": {
           "$ref": "#/$defs/SourcedValueOfboolean"
         },
         "isResourceNetworked": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Whether the component uses the resource network."
         },
         "ownerGuid": {
           "$ref": "#/$defs/SourcedValueOfGuid"
@@ -40306,22 +40330,28 @@
           "$ref": "#/$defs/SourcedValueOfuint32"
         },
         "powerPlantOverride": {
-          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput",
+          "description": "Authored power plant override."
         },
         "repairRestoreRatio": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored fraction restored on repair."
         },
         "selfRepair": {
-          "$ref": "#/$defs/SourcedValueOfSelfRepair"
+          "$ref": "#/$defs/SourcedValueOfSelfRepair",
+          "description": "Original configuration for automatic repair."
         },
         "sourceType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original DataForge declaration."
         },
         "states": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfResourceState"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfResourceState",
+          "description": "Original ordered states, including empty slots."
         },
         "wirelessConnection": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Whether connection is declared as wireless."
         }
       },
       "required": [
@@ -40350,13 +40380,16 @@
       "description": "Ordered authored resource ratios attached to a delta side.",
       "properties": {
         "additionalFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Original fields outside the typed projection."
         },
         "sourceType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original DataForge declaration."
         },
         "values": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCompositionValue"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCompositionValue",
+          "description": "Authored ordered composition entries."
         }
       },
       "required": [
@@ -40371,6 +40404,7 @@
       "oneOf": [
         {
           "$ref": "#/$defs/ResourcePowerConnection",
+          "description": "Electrical power supply and performance.",
           "properties": {
             "kind": {
               "const": "power",
@@ -40384,6 +40418,7 @@
         },
         {
           "$ref": "#/$defs/ResourceHeatConnection",
+          "description": "Thermal transfer and cooling.",
           "properties": {
             "kind": {
               "const": "heat",
@@ -40407,7 +40442,8 @@
           "$ref": "#/$defs/SourcedValueOfuint32"
         },
         "sourceType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original DataForge declaration."
         }
       },
       "required": [
@@ -40494,22 +40530,27 @@
       "description": "An authored resource control parameter and its optional external port declaration.",
       "oneOf": [
         {
+          "description": "A parameter from the resource network.",
           "properties": {
             "additionalFields": {
-              "$ref": "#/$defs/SourceArenaOutput"
+              "$ref": "#/$defs/SourceArenaOutput",
+              "description": "Original fields outside the typed projection."
             },
             "kind": {
               "const": "networkParameter",
               "type": "string"
             },
             "parameter": {
-              "$ref": "#/$defs/SourcedValueOfstring"
+              "$ref": "#/$defs/SourcedValueOfstring",
+              "description": "Authored network parameter label."
             },
             "sourcePosition": {
-              "$ref": "#/$defs/SourcedValueOfuint32"
+              "$ref": "#/$defs/SourcedValueOfuint32",
+              "description": "Zero-based position in the original array."
             },
             "sourceType": {
-              "$ref": "#/$defs/SourcedValueOfstring"
+              "$ref": "#/$defs/SourcedValueOfstring",
+              "description": "Original DataForge declaration."
             }
           },
           "required": [
@@ -40522,28 +40563,35 @@
           "type": "object"
         },
         {
+          "description": "A resource parameter with an external port declaration.",
           "properties": {
             "additionalFields": {
-              "$ref": "#/$defs/SourceArenaOutput"
+              "$ref": "#/$defs/SourceArenaOutput",
+              "description": "Original fields outside the typed projection."
             },
             "kind": {
               "const": "externalPort",
               "type": "string"
             },
             "name": {
-              "$ref": "#/$defs/SourcedValueOfstring"
+              "$ref": "#/$defs/SourcedValueOfstring",
+              "description": "Authored parameter name."
             },
             "parameter": {
-              "$ref": "#/$defs/SourcedValueOfstring"
+              "$ref": "#/$defs/SourcedValueOfstring",
+              "description": "Authored network parameter label."
             },
             "portName": {
-              "$ref": "#/$defs/SourcedValueOfstring"
+              "$ref": "#/$defs/SourcedValueOfstring",
+              "description": "Authored external port name."
             },
             "sourcePosition": {
-              "$ref": "#/$defs/SourcedValueOfuint32"
+              "$ref": "#/$defs/SourcedValueOfuint32",
+              "description": "Zero-based position in the original array."
             },
             "sourceType": {
-              "$ref": "#/$defs/SourcedValueOfstring"
+              "$ref": "#/$defs/SourcedValueOfstring",
+              "description": "Original DataForge declaration."
             }
           },
           "required": [
@@ -40558,19 +40606,23 @@
           "type": "object"
         },
         {
+          "description": "An original subtype retained as authored fields.",
           "properties": {
             "additionalFields": {
-              "$ref": "#/$defs/SourceArenaOutput"
+              "$ref": "#/$defs/SourceArenaOutput",
+              "description": "Original fields outside the typed projection."
             },
             "kind": {
               "const": "unknownParameter",
               "type": "string"
             },
             "sourcePosition": {
-              "$ref": "#/$defs/SourcedValueOfuint32"
+              "$ref": "#/$defs/SourcedValueOfuint32",
+              "description": "Zero-based position in the original array."
             },
             "sourceType": {
-              "$ref": "#/$defs/SourcedValueOfstring"
+              "$ref": "#/$defs/SourcedValueOfstring",
+              "description": "Original DataForge declaration."
             }
           },
           "required": [
@@ -40608,28 +40660,35 @@
       "description": "A source delta with its original array slot and linked sides.",
       "oneOf": [
         {
+          "description": "Consumes the declared resource.",
           "properties": {
             "additionalFields": {
-              "$ref": "#/$defs/SourceArenaOutput"
+              "$ref": "#/$defs/SourceArenaOutput",
+              "description": "Original fields outside the typed projection."
             },
             "consumption": {
-              "$ref": "#/$defs/SourcedValueOfResourceDeltaAmount"
+              "$ref": "#/$defs/SourcedValueOfResourceDeltaAmount",
+              "description": "Original consumption amount and resource."
             },
             "consumptionComposition": {
-              "$ref": "#/$defs/SourcedValueOfResourceComposition"
+              "$ref": "#/$defs/SourcedValueOfResourceComposition",
+              "description": "Original composition of the consumed resource."
             },
             "kind": {
               "const": "consumption",
               "type": "string"
             },
             "minimumConsumptionFraction": {
-              "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+              "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+              "description": "Original minimum consumption fraction."
             },
             "sourcePosition": {
-              "$ref": "#/$defs/SourcedValueOfuint32"
+              "$ref": "#/$defs/SourcedValueOfuint32",
+              "description": "Zero-based position in the original array."
             },
             "sourceType": {
-              "$ref": "#/$defs/SourcedValueOfstring"
+              "$ref": "#/$defs/SourcedValueOfstring",
+              "description": "Original DataForge declaration."
             }
           },
           "required": [
@@ -40644,28 +40703,35 @@
           "type": "object"
         },
         {
+          "description": "Generates the declared resource.",
           "properties": {
             "additionalFields": {
-              "$ref": "#/$defs/SourceArenaOutput"
+              "$ref": "#/$defs/SourceArenaOutput",
+              "description": "Original fields outside the typed projection."
             },
             "composition": {
-              "$ref": "#/$defs/SourcedValueOfResourceComposition"
+              "$ref": "#/$defs/SourcedValueOfResourceComposition",
+              "description": "Original composition of the generated resource."
             },
             "generation": {
-              "$ref": "#/$defs/SourcedValueOfResourceDeltaAmount"
+              "$ref": "#/$defs/SourcedValueOfResourceDeltaAmount",
+              "description": "Original generation amount and resource."
             },
             "kind": {
               "const": "generation",
               "type": "string"
             },
             "noOverGeneration": {
-              "$ref": "#/$defs/SourcedValueOfboolean"
+              "$ref": "#/$defs/SourcedValueOfboolean",
+              "description": "Whether overgeneration is disabled."
             },
             "sourcePosition": {
-              "$ref": "#/$defs/SourcedValueOfuint32"
+              "$ref": "#/$defs/SourcedValueOfuint32",
+              "description": "Zero-based position in the original array."
             },
             "sourceType": {
-              "$ref": "#/$defs/SourcedValueOfstring"
+              "$ref": "#/$defs/SourcedValueOfstring",
+              "description": "Original DataForge declaration."
             }
           },
           "required": [
@@ -40680,37 +40746,47 @@
           "type": "object"
         },
         {
+          "description": "Consumes one resource and generates another.",
           "properties": {
             "additionalFields": {
-              "$ref": "#/$defs/SourceArenaOutput"
+              "$ref": "#/$defs/SourceArenaOutput",
+              "description": "Original fields outside the typed projection."
             },
             "consumption": {
-              "$ref": "#/$defs/SourcedValueOfResourceDeltaAmount"
+              "$ref": "#/$defs/SourcedValueOfResourceDeltaAmount",
+              "description": "Original consumption amount and resource."
             },
             "consumptionComposition": {
-              "$ref": "#/$defs/SourcedValueOfResourceComposition"
+              "$ref": "#/$defs/SourcedValueOfResourceComposition",
+              "description": "Original composition of the consumed resource."
             },
             "generatedComposition": {
-              "$ref": "#/$defs/SourcedValueOfResourceComposition"
+              "$ref": "#/$defs/SourcedValueOfResourceComposition",
+              "description": "Original composition of the generated resource."
             },
             "generation": {
-              "$ref": "#/$defs/SourcedValueOfResourceDeltaAmount"
+              "$ref": "#/$defs/SourcedValueOfResourceDeltaAmount",
+              "description": "Original generation amount and resource."
             },
             "kind": {
               "const": "conversion",
               "type": "string"
             },
             "minimumConsumptionFraction": {
-              "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+              "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+              "description": "Original minimum consumption fraction."
             },
             "noOverGeneration": {
-              "$ref": "#/$defs/SourcedValueOfboolean"
+              "$ref": "#/$defs/SourcedValueOfboolean",
+              "description": "Whether overgeneration is disabled."
             },
             "sourcePosition": {
-              "$ref": "#/$defs/SourcedValueOfuint32"
+              "$ref": "#/$defs/SourcedValueOfuint32",
+              "description": "Zero-based position in the original array."
             },
             "sourceType": {
-              "$ref": "#/$defs/SourcedValueOfstring"
+              "$ref": "#/$defs/SourcedValueOfstring",
+              "description": "Original DataForge declaration."
             }
           },
           "required": [
@@ -40728,31 +40804,39 @@
           "type": "object"
         },
         {
+          "description": "Declares a storage transfer with consumption and generation sides.",
           "properties": {
             "additionalFields": {
-              "$ref": "#/$defs/SourceArenaOutput"
+              "$ref": "#/$defs/SourceArenaOutput",
+              "description": "Original fields outside the typed projection."
             },
             "consumption": {
-              "$ref": "#/$defs/SourcedValueOfResourceDeltaAmount"
+              "$ref": "#/$defs/SourcedValueOfResourceDeltaAmount",
+              "description": "Original consumption amount and resource."
             },
             "consumptionComposition": {
-              "$ref": "#/$defs/SourcedValueOfResourceComposition"
+              "$ref": "#/$defs/SourcedValueOfResourceComposition",
+              "description": "Original composition of the consumed resource."
             },
             "discharge": {
-              "$ref": "#/$defs/SourcedValueOfboolean"
+              "$ref": "#/$defs/SourcedValueOfboolean",
+              "description": "Original discharge flag."
             },
             "generation": {
-              "$ref": "#/$defs/SourcedValueOfResourceDeltaAmount"
+              "$ref": "#/$defs/SourcedValueOfResourceDeltaAmount",
+              "description": "Original generation amount and resource."
             },
             "kind": {
               "const": "storage",
               "type": "string"
             },
             "sourcePosition": {
-              "$ref": "#/$defs/SourcedValueOfuint32"
+              "$ref": "#/$defs/SourcedValueOfuint32",
+              "description": "Zero-based position in the original array."
             },
             "sourceType": {
-              "$ref": "#/$defs/SourcedValueOfstring"
+              "$ref": "#/$defs/SourcedValueOfstring",
+              "description": "Original DataForge declaration."
             }
           },
           "required": [
@@ -40768,25 +40852,31 @@
           "type": "object"
         },
         {
+          "description": "Reflects an authored resource network value.",
           "properties": {
             "additionalFields": {
-              "$ref": "#/$defs/SourceArenaOutput"
+              "$ref": "#/$defs/SourceArenaOutput",
+              "description": "Original fields outside the typed projection."
             },
             "binaryEvaluation": {
-              "$ref": "#/$defs/SourcedValueOfboolean"
+              "$ref": "#/$defs/SourcedValueOfboolean",
+              "description": "Whether evaluation is declared binary."
             },
             "kind": {
               "const": "networkReflection",
               "type": "string"
             },
             "resource": {
-              "$ref": "#/$defs/SourcedValueOfstring"
+              "$ref": "#/$defs/SourcedValueOfstring",
+              "description": "Authored resource label."
             },
             "sourcePosition": {
-              "$ref": "#/$defs/SourcedValueOfuint32"
+              "$ref": "#/$defs/SourcedValueOfuint32",
+              "description": "Zero-based position in the original array."
             },
             "sourceType": {
-              "$ref": "#/$defs/SourcedValueOfstring"
+              "$ref": "#/$defs/SourcedValueOfstring",
+              "description": "Original DataForge declaration."
             }
           },
           "required": [
@@ -40800,19 +40890,23 @@
           "type": "object"
         },
         {
+          "description": "An original subtype retained as authored fields.",
           "properties": {
             "additionalFields": {
-              "$ref": "#/$defs/SourceArenaOutput"
+              "$ref": "#/$defs/SourceArenaOutput",
+              "description": "Original fields outside the typed projection."
             },
             "kind": {
               "const": "unknownDelta",
               "type": "string"
             },
             "sourcePosition": {
-              "$ref": "#/$defs/SourcedValueOfuint32"
+              "$ref": "#/$defs/SourcedValueOfuint32",
+              "description": "Zero-based position in the original array."
             },
             "sourceType": {
-              "$ref": "#/$defs/SourcedValueOfstring"
+              "$ref": "#/$defs/SourcedValueOfstring",
+              "description": "Original DataForge declaration."
             }
           },
           "required": [
@@ -40830,16 +40924,20 @@
       "description": "One side of an original resource delta.",
       "properties": {
         "additionalFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Original fields outside the typed projection."
         },
         "resource": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Authored resource label."
         },
         "resourceAmountPerSecond": {
-          "$ref": "#/$defs/SourcedValueOfResourceFlowUnit"
+          "$ref": "#/$defs/SourcedValueOfResourceFlowUnit",
+          "description": "Authored flow rate in its original unit."
         },
         "sourceType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original DataForge declaration."
         }
       },
       "required": [
@@ -41301,64 +41399,84 @@
       "description": "Authored thermal connection parameters of an original component.",
       "properties": {
         "Mass": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored thermal mass parameter."
         },
         "MaxCoolingRate": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored maximum cooling rate."
         },
         "MaxTemperature": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored maximum temperature."
         },
         "MinTemperature": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored minimum temperature."
         },
         "MisfireMaxTemperature": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored upper misfire temperature."
         },
         "MisfireMinTemperature": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored lower misfire temperature."
         },
         "OverclockThresholdMaxHeat": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored upper overclock heat threshold."
         },
         "OverclockThresholdMinHeat": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored lower overclock heat threshold."
         },
         "OverheatTemperature": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored overheat threshold."
         },
         "OverpowerHeat": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored heat under overpower."
         },
         "RecoveryTemperature": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored recovery threshold."
         },
         "SpecificHeatCapacity": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored specific heat capacity."
         },
         "StartCoolingTemperature": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Temperature at which cooling begins."
         },
         "StartIRTemperature": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored starting temperature for infrared signature."
         },
         "SurfaceArea": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored surface area parameter."
         },
         "TemperatureToIR": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored conversion from temperature to infrared signature."
         },
         "ThermalConductivity": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored thermal conductivity."
         },
         "ThermalEnergyBase": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored baseline thermal energy."
         },
         "ThermalEnergyDraw": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored thermal energy draw."
         },
         "additionalFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Original fields outside the typed projection."
         }
       },
       "required": [
@@ -41903,61 +42021,80 @@
       "description": "Authored electrical connection parameters of an original component.",
       "properties": {
         "DecayRateOfEM": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored decay rate of the electromagnetic signature."
         },
         "DisplayedInPoweredItemList": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Whether the component appears in the powered item list."
         },
         "IsOverclockable": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Whether overclocking is enabled."
         },
         "IsThrottleable": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Whether throttling is enabled."
         },
         "MisfireEvents": {
-          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput",
+          "description": "Original misfire events."
         },
         "MisfireGenerationParams": {
-          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput",
+          "description": "Original misfire generation parameters."
         },
         "MisfireItemTypeLocID": {
-          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput",
+          "description": "Original localized item-type identifier."
         },
         "OverclockPerformance": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored performance under overclock."
         },
         "OverclockThresholdMax": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored upper overclock threshold."
         },
         "OverclockThresholdMin": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored lower overclock threshold."
         },
         "OverpowerPerformance": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored performance under overpower."
         },
         "PowerBase": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored baseline power."
         },
         "PowerDraw": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored draw."
         },
         "PowerToEM": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored conversion from power to electromagnetic signature."
         },
         "SafeguardPriority": {
-          "$ref": "#/$defs/SourcedValueOfint32"
+          "$ref": "#/$defs/SourcedValueOfint32",
+          "description": "Authored safeguard priority."
         },
         "TimeToReachDrawRequest": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored delay to reach requested draw."
         },
         "WarningDelayTime": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored delay before a warning."
         },
         "WarningDisplayTime": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored warning display duration."
         },
         "additionalFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Original fields outside the typed projection."
         }
       },
       "required": [
@@ -41987,19 +42124,24 @@
       "description": "The three original power-range slots of a resource state.",
       "properties": {
         "additionalFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Original fields outside the typed projection."
         },
         "high": {
-          "$ref": "#/$defs/SourcedValueOfPowerRange"
+          "$ref": "#/$defs/SourcedValueOfPowerRange",
+          "description": "Authored high power range."
         },
         "low": {
-          "$ref": "#/$defs/SourcedValueOfPowerRange"
+          "$ref": "#/$defs/SourcedValueOfPowerRange",
+          "description": "Authored low power range."
         },
         "medium": {
-          "$ref": "#/$defs/SourcedValueOfPowerRange"
+          "$ref": "#/$defs/SourcedValueOfPowerRange",
+          "description": "Authored medium power range."
         },
         "sourceType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original DataForge declaration."
         }
       },
       "required": [
@@ -42081,16 +42223,20 @@
       "description": "The electromagnetic and infrared signature blocks of an original state.",
       "properties": {
         "EMSignature": {
-          "$ref": "#/$defs/SourcedValueOfSignatureEntry"
+          "$ref": "#/$defs/SourcedValueOfSignatureEntry",
+          "description": "Electromagnetic signature parameters."
         },
         "IRSignature": {
-          "$ref": "#/$defs/SourcedValueOfSignatureEntry"
+          "$ref": "#/$defs/SourcedValueOfSignatureEntry",
+          "description": "Infrared signature parameters."
         },
         "additionalFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Original fields outside the typed projection."
         },
         "sourceType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original DataForge declaration."
         }
       },
       "required": [
@@ -42105,28 +42251,36 @@
       "description": "The authored configuration and ordered deltas of one resource state.",
       "properties": {
         "additionalFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Original fields outside the typed projection."
         },
         "deltas": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfResourceDelta"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfResourceDelta",
+          "description": "Ordered authored resource deltas."
         },
         "linkedInteractionStates": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfLinkedInteraction"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfLinkedInteraction",
+          "description": "Ordered authored interaction links."
         },
         "name": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Authored state name."
         },
         "powerRanges": {
-          "$ref": "#/$defs/SourcedValueOfResourcePowerRanges"
+          "$ref": "#/$defs/SourcedValueOfResourcePowerRanges",
+          "description": "Authored power ranges."
         },
         "signatureParams": {
-          "$ref": "#/$defs/SourcedValueOfResourceSignatureParams"
+          "$ref": "#/$defs/SourcedValueOfResourceSignatureParams",
+          "description": "Authored electromagnetic and infrared signatures."
         },
         "sourcePosition": {
-          "$ref": "#/$defs/SourcedValueOfuint32"
+          "$ref": "#/$defs/SourcedValueOfuint32",
+          "description": "Zero-based position in the original array."
         },
         "sourceType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original DataForge declaration."
         }
       },
       "required": [
@@ -44096,21 +44250,27 @@
       "type": "object"
     },
     "SelfRepair": {
+      "description": "Original automatic repair configuration.",
       "properties": {
         "additionalFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Original fields outside the typed projection."
         },
         "healthRatio": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored self-repair health ratio."
         },
         "maxRepairCount": {
-          "$ref": "#/$defs/SourcedValueOfint32"
+          "$ref": "#/$defs/SourcedValueOfint32",
+          "description": "Maximum self-repair count."
         },
         "sourceType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original DataForge declaration."
         },
         "timeToRepair": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored delay for self-repair."
         }
       },
       "required": [
@@ -45530,21 +45690,27 @@
       "type": "object"
     },
     "SignatureEntry": {
+      "description": "Authored parameters for one signature channel.",
       "properties": {
         "additionalFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Original fields outside the typed projection."
         },
         "decayRate": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored signature decay rate."
         },
         "functionalityCurve": {
-          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput",
+          "description": "Original functionality curve declaration and values."
         },
         "nominalSignature": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored nominal signature."
         },
         "sourceType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original DataForge declaration."
         }
       },
       "required": [

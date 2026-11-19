@@ -20,11 +20,16 @@ pub(super) const RESOURCE_ENUM: &str = "ResourceNetworkResource";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct ResourceDeltaAmount<'source> {
-    source_type: SourcedValue<&'source str>,
-    resource: SourcedValue<&'source str>,
-    resource_amount_per_second: SourcedValue<ResourceFlowUnit<'source>>,
-    additional_fields: SourceArenaOutput<'source>,
+#[non_exhaustive]
+pub struct ResourceDeltaAmount<'source> {
+    /// Original DataForge declaration.
+    pub source_type: SourcedValue<&'source str>,
+    /// Authored resource label.
+    pub resource: SourcedValue<&'source str>,
+    /// Authored flow rate in its original unit.
+    pub resource_amount_per_second: SourcedValue<ResourceFlowUnit<'source>>,
+    /// Original fields outside the typed projection.
+    pub additional_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> ResourceDeltaAmount<'source> {
@@ -55,10 +60,14 @@ impl<'source> ResourceDeltaAmount<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct ResourceComposition<'source> {
-    source_type: SourcedValue<&'source str>,
-    values: SourcedValue<Vec<SourcedValue<CompositionValue<'source>>>>,
-    additional_fields: SourceArenaOutput<'source>,
+#[non_exhaustive]
+pub struct ResourceComposition<'source> {
+    /// Original DataForge declaration.
+    pub source_type: SourcedValue<&'source str>,
+    /// Authored ordered composition entries.
+    pub values: SourcedValue<Vec<SourcedValue<CompositionValue<'source>>>>,
+    /// Original fields outside the typed projection.
+    pub additional_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> ResourceComposition<'source> {
@@ -76,15 +85,21 @@ impl<'source> ResourceComposition<'source> {
     }
 }
 
+/// One authored resource ratio in a composition.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct CompositionValue<'source> {
-    source_type: SourcedValue<&'source str>,
+#[non_exhaustive]
+pub struct CompositionValue<'source> {
+    /// Original DataForge declaration.
+    pub source_type: SourcedValue<&'source str>,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
-    container_resource: SourcedValue<Box<SourceRecordReference<'source>>>,
-    ratio: SourcedValue<ResourceFloat32>,
-    additional_fields: SourceArenaOutput<'source>,
+    /// Original reference to a container resource definition.
+    pub container_resource: SourcedValue<Box<SourceRecordReference<'source>>>,
+    /// Authored resource ratio.
+    pub ratio: SourcedValue<ResourceFloat32>,
+    /// Original fields outside the typed projection.
+    pub additional_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> CompositionValue<'source> {

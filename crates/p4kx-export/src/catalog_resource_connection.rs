@@ -37,18 +37,25 @@ impl ConnectionKind {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct ResourceConnection<'source> {
+#[non_exhaustive]
+pub struct ResourceConnection<'source> {
     #[serde(flatten)]
     owner: ComponentOwner,
-    source_type: SourcedValue<&'source str>,
+    /// Original DataForge declaration.
+    pub source_type: SourcedValue<&'source str>,
     #[serde(flatten)]
-    fields: ConnectionFields<'source>,
+    /// Original fields for the concrete connection kind.
+    pub fields: ConnectionFields<'source>,
 }
 
+/// Fields specific to the original connection kind.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "camelCase")]
-enum ConnectionFields<'source> {
+#[non_exhaustive]
+pub enum ConnectionFields<'source> {
+    /// Electrical power supply and performance.
     Power(ResourcePowerConnection<'source>),
+    /// Thermal transfer and cooling.
     Heat(ResourceHeatConnection<'source>),
 }
 
@@ -74,7 +81,9 @@ impl<'source> ResourceConnection<'source> {
         })
     }
 
-    pub(super) const fn owner(&self) -> &ComponentOwner {
+    /// Returns the original component owner.
+    #[must_use]
+    pub const fn owner(&self) -> &ComponentOwner {
         &self.owner
     }
 }

@@ -16,16 +16,22 @@ use crate::source_value_catalog::SourceArenaOutput;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct ResourcePowerConnection<'source> {
+#[non_exhaustive]
+pub struct ResourcePowerConnection<'source> {
     #[serde(flatten)]
-    supply: PowerSupply,
+    /// Power supply and priority.
+    pub supply: PowerSupply,
     #[serde(flatten)]
-    performance: PowerPerformance,
+    /// Throttling, overclock and performance declarations.
+    pub performance: PowerPerformance,
     #[serde(flatten)]
-    presentation: PowerPresentation,
+    /// Electromagnetic signature and warning declarations.
+    pub presentation: PowerPresentation,
     #[serde(flatten)]
-    misfires: PowerMisfires<'source>,
-    additional_fields: SourceArenaOutput<'source>,
+    /// Authored misfire configuration.
+    pub misfires: PowerMisfires<'source>,
+    /// Original fields outside the typed projection.
+    pub additional_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> ResourcePowerConnection<'source> {
@@ -55,16 +61,24 @@ impl<'source> ResourcePowerConnection<'source> {
     }
 }
 
+/// Original power supply and display declarations.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "PascalCase")]
 #[schemars(transform = every_field_required)]
-struct PowerSupply {
-    power_base: SourcedValue<ResourceFloat32>,
-    power_draw: SourcedValue<ResourceFloat32>,
-    time_to_reach_draw_request: SourcedValue<ResourceFloat32>,
-    safeguard_priority: SourcedValue<i32>,
-    displayed_in_powered_item_list: SourcedValue<bool>,
-    is_throttleable: SourcedValue<bool>,
+#[non_exhaustive]
+pub struct PowerSupply {
+    /// Authored baseline power.
+    pub power_base: SourcedValue<ResourceFloat32>,
+    /// Authored draw.
+    pub power_draw: SourcedValue<ResourceFloat32>,
+    /// Authored delay to reach requested draw.
+    pub time_to_reach_draw_request: SourcedValue<ResourceFloat32>,
+    /// Authored safeguard priority.
+    pub safeguard_priority: SourcedValue<i32>,
+    /// Whether the component appears in the powered item list.
+    pub displayed_in_powered_item_list: SourcedValue<bool>,
+    /// Whether throttling is enabled.
+    pub is_throttleable: SourcedValue<bool>,
 }
 
 impl PowerSupply {
@@ -100,15 +114,22 @@ impl PowerSupply {
     }
 }
 
+/// Original throttle and performance declarations.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "PascalCase")]
 #[schemars(transform = every_field_required)]
-struct PowerPerformance {
-    is_overclockable: SourcedValue<bool>,
-    overclock_threshold_min: SourcedValue<ResourceFloat32>,
-    overclock_threshold_max: SourcedValue<ResourceFloat32>,
-    overpower_performance: SourcedValue<ResourceFloat32>,
-    overclock_performance: SourcedValue<ResourceFloat32>,
+#[non_exhaustive]
+pub struct PowerPerformance {
+    /// Whether overclocking is enabled.
+    pub is_overclockable: SourcedValue<bool>,
+    /// Authored lower overclock threshold.
+    pub overclock_threshold_min: SourcedValue<ResourceFloat32>,
+    /// Authored upper overclock threshold.
+    pub overclock_threshold_max: SourcedValue<ResourceFloat32>,
+    /// Authored performance under overpower.
+    pub overpower_performance: SourcedValue<ResourceFloat32>,
+    /// Authored performance under overclock.
+    pub overclock_performance: SourcedValue<ResourceFloat32>,
 }
 
 impl PowerPerformance {
@@ -142,16 +163,22 @@ impl PowerPerformance {
     }
 }
 
+/// Original electromagnetic and warning declarations.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "PascalCase")]
 #[schemars(transform = every_field_required)]
-struct PowerPresentation {
+#[non_exhaustive]
+pub struct PowerPresentation {
     #[serde(rename = "PowerToEM")]
-    power_to_em: SourcedValue<ResourceFloat32>,
+    /// Authored conversion from power to electromagnetic signature.
+    pub power_to_em: SourcedValue<ResourceFloat32>,
     #[serde(rename = "DecayRateOfEM")]
-    decay_rate_of_em: SourcedValue<ResourceFloat32>,
-    warning_delay_time: SourcedValue<ResourceFloat32>,
-    warning_display_time: SourcedValue<ResourceFloat32>,
+    /// Authored decay rate of the electromagnetic signature.
+    pub decay_rate_of_em: SourcedValue<ResourceFloat32>,
+    /// Authored delay before a warning.
+    pub warning_delay_time: SourcedValue<ResourceFloat32>,
+    /// Authored warning display duration.
+    pub warning_display_time: SourcedValue<ResourceFloat32>,
 }
 
 impl PowerPresentation {
@@ -177,16 +204,21 @@ impl PowerPresentation {
     }
 }
 
+/// Original electrical misfire fields.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "PascalCase")]
 #[schemars(transform = every_field_required)]
-struct PowerMisfires<'source> {
+#[non_exhaustive]
+pub struct PowerMisfires<'source> {
     #[serde(rename = "MisfireItemTypeLocID")]
-    item_type_loc_id: SourcedValue<SourceArenaOutput<'source>>,
+    /// Original localized item-type identifier.
+    pub item_type_loc_id: SourcedValue<SourceArenaOutput<'source>>,
     #[serde(rename = "MisfireGenerationParams")]
-    generation_params: SourcedValue<SourceArenaOutput<'source>>,
+    /// Original misfire generation parameters.
+    pub generation_params: SourcedValue<SourceArenaOutput<'source>>,
     #[serde(rename = "MisfireEvents")]
-    events: SourcedValue<SourceArenaOutput<'source>>,
+    /// Original misfire events.
+    pub events: SourcedValue<SourceArenaOutput<'source>>,
 }
 
 impl<'source> PowerMisfires<'source> {

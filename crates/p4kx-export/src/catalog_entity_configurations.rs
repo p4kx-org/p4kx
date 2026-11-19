@@ -12,8 +12,8 @@ use super::catalog_fuel_configurations::{
 };
 use super::catalog_interactions::{self, InteractionConfiguration, InteractionKind};
 use super::catalog_item_alignment::{ItemAlignmentKind, ItemAlignmentRows, ItemAlignmentTables};
-use super::catalog_resource_component::{self, ResourceComponent};
-use super::catalog_resource_connection::{self, ConnectionKind, ResourceConnection};
+use super::catalog_resource_component;
+use super::catalog_resource_connection::{self, ConnectionKind};
 use super::catalog_vehicle_armor;
 use super::inventory_container_definition::PreparedInventoryContainer;
 use super::inventory_entity_configurations::{InventoryEntityRows, InventoryEntityTables};
@@ -39,11 +39,31 @@ use crate::{CatalogError, ExportAccountingError};
 mod record_read;
 pub(crate) use record_read::{
     read, read_attachment_constraints, read_cargo_configurations, read_item_bounds,
-    read_item_ports, read_item_ports_scoped, read_vehicle_armor,
+    read_item_ports, read_item_ports_scoped, read_resource_components, read_resource_connections,
+    read_vehicle_armor,
 };
 
 pub use super::authored_damage::{DamageChannels, DamageParameters};
 pub use super::authored_link::HealthLink;
+pub use super::catalog_resource_component::{ResourceComponent, ResourceControls, SelfRepair};
+pub use super::catalog_resource_connection::{
+    ConnectionFields as ResourceConnectionFields, ResourceConnection,
+};
+pub use super::catalog_resource_control_parameter::{ParameterSource, ResourceControlParameter};
+pub use super::catalog_resource_delta::{ConsumptionFields, DeltaSource, ResourceDelta};
+pub use super::catalog_resource_delta_amount::{
+    CompositionValue, ResourceComposition, ResourceDeltaAmount,
+};
+pub use super::catalog_resource_flow_unit::ResourceFlowUnit;
+pub use super::catalog_resource_heat_connection::{
+    HeatCooling, HeatPerformance, HeatTransfer, ResourceHeatConnection,
+};
+pub use super::catalog_resource_power_connection::{
+    PowerMisfires, PowerPerformance, PowerPresentation, PowerSupply, ResourcePowerConnection,
+};
+pub use super::catalog_resource_power_ranges::{PowerRange, ResourcePowerRanges};
+pub use super::catalog_resource_signature::{ResourceSignatureParams, SignatureEntry};
+pub use super::catalog_resource_state::{LinkedInteraction, ResourceState};
 pub use super::catalog_vehicle_armor::VehicleArmor;
 pub use super::degradation_curve::{CurvePoint, DegradationCurve};
 pub use super::vehicle_armor_damage::{ArmorDamageInfo, ArmorDamageSource, VehicleArmorDamage};
@@ -52,6 +72,8 @@ pub use super::vehicle_armor_resistance::{
 };
 
 pub(crate) const VEHICLE_ARMOR_TYPES: &[&str] = &[catalog_vehicle_armor::COMPONENT];
+pub(crate) const RESOURCE_COMPONENT_TYPES: &[&str] = &[catalog_resource_component::COMPONENT];
+pub(crate) const RESOURCE_CONNECTION_TYPES: &[&str] = catalog_resource_connection::SOURCE_TYPES;
 
 #[derive(Default)]
 pub(crate) struct EntityConfigurationRows<'source> {

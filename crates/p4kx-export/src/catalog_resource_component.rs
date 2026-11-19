@@ -17,27 +17,36 @@ use crate::source_value_catalog::SourceArenaOutput;
 
 pub(super) const COMPONENT: &str = "ItemResourceComponentParams";
 
-type AuthoredBlock<'source> = SourcedValue<SourceArenaOutput<'source>>;
-
 /// Resource-network parameters and ordered states of one physical component.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct ResourceComponent<'source> {
+#[non_exhaustive]
+pub struct ResourceComponent<'source> {
     #[serde(flatten)]
     owner: ComponentOwner,
-    source_type: SourcedValue<&'source str>,
-    is_resource_networked: SourcedValue<bool>,
+    /// Original DataForge declaration.
+    pub source_type: SourcedValue<&'source str>,
+    /// Whether the component uses the resource network.
+    pub is_resource_networked: SourcedValue<bool>,
     is_relay: SourcedValue<bool>,
-    is_connected_to_room: SourcedValue<bool>,
-    wireless_connection: SourcedValue<bool>,
-    default_priority: SourcedValue<i32>,
-    repair_restore_ratio: SourcedValue<ResourceFloat32>,
-    states: SourcedValue<Vec<SourcedValue<ResourceState<'source>>>>,
-    self_repair: SourcedValue<SelfRepair<'source>>,
+    /// Whether the component connects to a room.
+    pub is_connected_to_room: SourcedValue<bool>,
+    /// Whether connection is declared as wireless.
+    pub wireless_connection: SourcedValue<bool>,
+    /// Default resource allocation priority.
+    pub default_priority: SourcedValue<i32>,
+    /// Authored fraction restored on repair.
+    pub repair_restore_ratio: SourcedValue<ResourceFloat32>,
+    /// Original ordered states, including empty slots.
+    pub states: SourcedValue<Vec<SourcedValue<ResourceState<'source>>>>,
+    /// Original configuration for automatic repair.
+    pub self_repair: SourcedValue<SelfRepair<'source>>,
     #[serde(flatten)]
-    controls: ResourceControls<'source>,
-    additional_fields: SourceArenaOutput<'source>,
+    /// Control declarations applied to the component.
+    pub controls: ResourceControls<'source>,
+    /// Original fields outside the typed projection.
+    pub additional_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> ResourceComponent<'source> {
@@ -85,24 +94,35 @@ impl<'source> ResourceComponent<'source> {
         })
     }
 
-    pub(super) const fn is_relay(&self) -> &SourcedValue<bool> {
+    /// Returns the original relay flag.
+    #[must_use]
+    pub const fn is_relay(&self) -> &SourcedValue<bool> {
         &self.is_relay
     }
 
-    pub(super) const fn owner(&self) -> &ComponentOwner {
+    /// Returns the original component owner.
+    #[must_use]
+    pub const fn owner(&self) -> &ComponentOwner {
         &self.owner
     }
 }
 
+/// Original filters and control declarations.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct ResourceControls<'source> {
-    filter_params: AuthoredBlock<'source>,
-    control_parameters: SourcedValue<Vec<SourcedValue<ResourceControlParameter<'source>>>>,
-    control_blocks: AuthoredBlock<'source>,
-    functionality_modifiers: AuthoredBlock<'source>,
-    power_plant_override: AuthoredBlock<'source>,
+#[non_exhaustive]
+pub struct ResourceControls<'source> {
+    /// Authored resource filter parameters.
+    pub filter_params: SourcedValue<SourceArenaOutput<'source>>,
+    /// Original ordered control parameters, including empty slots.
+    pub control_parameters: SourcedValue<Vec<SourcedValue<ResourceControlParameter<'source>>>>,
+    /// Authored control blocks.
+    pub control_blocks: SourcedValue<SourceArenaOutput<'source>>,
+    /// Authored functionality modifiers.
+    pub functionality_modifiers: SourcedValue<SourceArenaOutput<'source>>,
+    /// Authored power plant override.
+    pub power_plant_override: SourcedValue<SourceArenaOutput<'source>>,
 }
 
 impl<'source> ResourceControls<'source> {
@@ -138,15 +158,22 @@ impl<'source> ResourceControls<'source> {
     }
 }
 
+/// Original automatic repair configuration.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct SelfRepair<'source> {
-    source_type: SourcedValue<&'source str>,
-    max_repair_count: SourcedValue<i32>,
-    time_to_repair: SourcedValue<ResourceFloat32>,
-    health_ratio: SourcedValue<ResourceFloat32>,
-    additional_fields: SourceArenaOutput<'source>,
+#[non_exhaustive]
+pub struct SelfRepair<'source> {
+    /// Original DataForge declaration.
+    pub source_type: SourcedValue<&'source str>,
+    /// Maximum self-repair count.
+    pub max_repair_count: SourcedValue<i32>,
+    /// Authored delay for self-repair.
+    pub time_to_repair: SourcedValue<ResourceFloat32>,
+    /// Authored self-repair health ratio.
+    pub health_ratio: SourcedValue<ResourceFloat32>,
+    /// Original fields outside the typed projection.
+    pub additional_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> SelfRepair<'source> {

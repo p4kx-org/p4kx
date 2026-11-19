@@ -9,6 +9,8 @@ use crate::health_origin_assertions as proof;
 
 #[path = "catalog_resource_connections_fixture.rs"]
 mod fixture;
+#[path = "catalog_resource_network_sdk.rs"]
+mod sdk;
 
 #[test]
 fn power_and_heat_connections_preserve_distinct_authored_fields_and_origin() -> TestResult {

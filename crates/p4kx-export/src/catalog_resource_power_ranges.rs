@@ -16,12 +16,18 @@ use crate::source_value_catalog::SourceArenaOutput;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct ResourcePowerRanges<'source> {
-    source_type: SourcedValue<&'source str>,
-    low: SourcedValue<PowerRange<'source>>,
-    medium: SourcedValue<PowerRange<'source>>,
-    high: SourcedValue<PowerRange<'source>>,
-    additional_fields: SourceArenaOutput<'source>,
+#[non_exhaustive]
+pub struct ResourcePowerRanges<'source> {
+    /// Original DataForge declaration.
+    pub source_type: SourcedValue<&'source str>,
+    /// Authored low power range.
+    pub low: SourcedValue<PowerRange<'source>>,
+    /// Authored medium power range.
+    pub medium: SourcedValue<PowerRange<'source>>,
+    /// Authored high power range.
+    pub high: SourcedValue<PowerRange<'source>>,
+    /// Original fields outside the typed projection.
+    pub additional_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> ResourcePowerRanges<'source> {
@@ -47,15 +53,22 @@ impl<'source> ResourcePowerRanges<'source> {
     }
 }
 
+/// An original breakpoint and modifier for a power range.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct PowerRange<'source> {
-    source_type: SourcedValue<&'source str>,
-    start: SourcedValue<i32>,
-    modifier: SourcedValue<ResourceFloat32>,
-    register_range: SourcedValue<bool>,
-    additional_fields: SourceArenaOutput<'source>,
+#[non_exhaustive]
+pub struct PowerRange<'source> {
+    /// Original DataForge declaration.
+    pub source_type: SourcedValue<&'source str>,
+    /// Authored starting breakpoint.
+    pub start: SourcedValue<i32>,
+    /// Authored modifier.
+    pub modifier: SourcedValue<ResourceFloat32>,
+    /// Whether the range is registered.
+    pub register_range: SourcedValue<bool>,
+    /// Original fields outside the typed projection.
+    pub additional_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> PowerRange<'source> {

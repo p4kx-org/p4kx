@@ -25,6 +25,8 @@ pub(super) enum Scope {
     Bounds,
     CargoGrids,
     VehicleArmor,
+    ResourceComponents,
+    ResourceConnections,
 }
 
 pub(super) struct ConfigurationOwner {
@@ -79,6 +81,8 @@ impl Scope {
                     | ConfigurationKind::InventoryStorage
             ),
             Self::VehicleArmor => matches!(kind, ConfigurationKind::VehicleArmor),
+            Self::ResourceComponents => matches!(kind, ConfigurationKind::Resource),
+            Self::ResourceConnections => matches!(kind, ConfigurationKind::Connection(_)),
             Self::Ports => false,
         }
     }
@@ -86,6 +90,8 @@ impl Scope {
     pub(super) const fn inspection(self) -> Option<ConfigurationInspection> {
         match self {
             Self::VehicleArmor => Some(ConfigurationInspection::VehicleArmor),
+            Self::ResourceComponents => Some(ConfigurationInspection::ResourceComponent),
+            Self::ResourceConnections => Some(ConfigurationInspection::ResourceConnection),
             _ => None,
         }
     }
@@ -159,7 +165,11 @@ impl Scope {
             owner,
         } = selected;
         match self {
-            Self::All | Self::CargoGrids | Self::VehicleArmor => {
+            Self::All
+            | Self::CargoGrids
+            | Self::VehicleArmor
+            | Self::ResourceComponents
+            | Self::ResourceConnections => {
                 rows.push_configuration(configuration, owner, source, options, projection, notes)
             }
             Self::Ports | Self::Attachments => {

@@ -55,8 +55,8 @@ fn check_all(parsed: &ParsedCatalogQueries<'_>, catalog: &Value) -> TestResult {
                 "armor consumes no locale payloads"
             );
             let inventory = json!({"provenance": snapshot.source_inventory()});
-            let actual = with_origins(serde_json::to_value(snapshot.rows())?, &inventory)?;
-            let expected = with_origins(proof::at(catalog, TABLE)?.clone(), catalog)?;
+            let actual = proof::with_origins(serde_json::to_value(snapshot.rows())?, &inventory)?;
+            let expected = proof::with_origins(proof::at(catalog, TABLE)?.clone(), catalog)?;
             assert_eq!(
                 actual, expected,
                 "selected armor rows retain producer values and exact source coordinates"
@@ -128,8 +128,8 @@ fn a_malformed_armor_curve_reports_incomplete_scope_without_losing_the_original(
                 return Err("the diagnostic armor row".into());
             };
             let inventory = json!({"provenance": snapshot.source_inventory()});
-            let actual = with_origins(serde_json::to_value(row)?, &inventory)?;
-            let expected = with_origins(
+            let actual = proof::with_origins(serde_json::to_value(row)?, &inventory)?;
+            let expected = proof::with_origins(
                 proof::at(&catalog, "/configurations/vehicleArmor/rows/0")?.clone(),
                 &catalog,
             )?;
@@ -140,48 +140,5 @@ fn a_malformed_armor_curve_reports_incomplete_scope_without_losing_the_original(
             Ok(())
         },
     )??;
-    Ok(())
-}
-
-fn with_origins(mut datum: Value, catalog: &Value) -> TestResult<Value> {
-    resolve_origins(&mut datum, catalog)?;
-    Ok(datum)
-}
-
-fn resolve_origins(datum: &mut Value, catalog: &Value) -> TestResult {
-    match datum {
-        Value::Array(items) => {
-            for item in items {
-                resolve_origins(item, catalog)?;
-            }
-        }
-        Value::Object(_) => {
-            if datum.get("sourceUsesRefs").is_some() {
-                let mut original = Vec::new();
-                for used in proof::uses(catalog, datum)? {
-                    let mut use_object = used.as_object().ok_or("physical use object")?.clone();
-                    use_object.remove("id");
-                    let mut source = proof::source(catalog, used)?
-                        .as_object()
-                        .ok_or("physical source object")?
-                        .clone();
-                    source.remove("id");
-                    use_object.insert("source".into(), Value::Object(source));
-                    original.push(Value::Object(use_object));
-                }
-                original.sort_by_cached_key(ToString::to_string);
-                let fields = datum.as_object_mut().ok_or("sourced object")?;
-                fields.remove("sourceUsesRefs");
-                fields.insert("originalUses".into(), Value::Array(original));
-            }
-            let fields = datum.as_object_mut().ok_or("result object")?;
-            for (key, child) in fields {
-                if key != "originalUses" {
-                    resolve_origins(child, catalog)?;
-                }
-            }
-        }
-        _ => {}
-    }
     Ok(())
 }

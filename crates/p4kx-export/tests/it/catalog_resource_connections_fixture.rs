@@ -68,6 +68,29 @@ pub(super) fn database() -> DataForgeBuilder {
     )
 }
 
+pub(super) fn invalid_controls_database() -> DataForgeBuilder {
+    let builder = p4kx_testkit::entity_schema(DataForgeBuilder::new().version(8));
+    connections_schema(builder)
+        .structure(
+            TestStruct::new(RESOURCE)
+                .parent("DataForgeComponentParams")
+                .field("controlParameters", TestType::Bool),
+        )
+        .record(
+            TestEntity::new(
+                OWNER,
+                "FixtureInvalidControls",
+                "libs/foundry/records/entities/scitem/ships/resource/fixture_invalid_controls.xml",
+            )
+            .attach_type("Misc")
+            .component(node(
+                TestInstance::new(RESOURCE).value("controlParameters", TestValue::Bool(false)),
+            ))
+            .component(node(power()))
+            .record(),
+        )
+}
+
 fn connections_schema(builder: DataForgeBuilder) -> DataForgeBuilder {
     let power = single_fields(POWER, &POWER_SINGLES)
         .field("SafeguardPriority", TestType::Int32)

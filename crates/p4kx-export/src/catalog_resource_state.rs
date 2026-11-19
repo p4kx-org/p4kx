@@ -19,15 +19,24 @@ use crate::source_value_catalog::SourceArenaOutput;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct ResourceState<'source> {
-    source_type: SourcedValue<&'source str>,
-    source_position: SourcedValue<u32>,
-    name: SourcedValue<&'source str>,
-    deltas: SourcedValue<Vec<SourcedValue<ResourceDelta<'source>>>>,
-    linked_interaction_states: SourcedValue<Vec<SourcedValue<LinkedInteraction<'source>>>>,
-    signature_params: SourcedValue<ResourceSignatureParams<'source>>,
-    power_ranges: SourcedValue<ResourcePowerRanges<'source>>,
-    additional_fields: SourceArenaOutput<'source>,
+#[non_exhaustive]
+pub struct ResourceState<'source> {
+    /// Original DataForge declaration.
+    pub source_type: SourcedValue<&'source str>,
+    /// Zero-based position in the original array.
+    pub source_position: SourcedValue<u32>,
+    /// Authored state name.
+    pub name: SourcedValue<&'source str>,
+    /// Ordered authored resource deltas.
+    pub deltas: SourcedValue<Vec<SourcedValue<ResourceDelta<'source>>>>,
+    /// Ordered authored interaction links.
+    pub linked_interaction_states: SourcedValue<Vec<SourcedValue<LinkedInteraction<'source>>>>,
+    /// Authored electromagnetic and infrared signatures.
+    pub signature_params: SourcedValue<ResourceSignatureParams<'source>>,
+    /// Authored power ranges.
+    pub power_ranges: SourcedValue<ResourcePowerRanges<'source>>,
+    /// Original fields outside the typed projection.
+    pub additional_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> ResourceState<'source> {
@@ -66,15 +75,21 @@ impl<'source> ResourceState<'source> {
     }
 }
 
+/// Original interaction-state link and change flag.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct LinkedInteraction<'source> {
-    source_type: SourcedValue<&'source str>,
+#[non_exhaustive]
+pub struct LinkedInteraction<'source> {
+    /// Original DataForge declaration.
+    pub source_type: SourcedValue<&'source str>,
     #[serde(rename = "linkedInteractionState")]
-    state: SourcedValue<HealthLink<'source>>,
-    change_interaction_state: SourcedValue<bool>,
-    additional_fields: SourceArenaOutput<'source>,
+    /// Original reference to the interaction state.
+    pub state: SourcedValue<HealthLink<'source>>,
+    /// Whether a state change is requested.
+    pub change_interaction_state: SourcedValue<bool>,
+    /// Original fields outside the typed projection.
+    pub additional_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> LinkedInteraction<'source> {

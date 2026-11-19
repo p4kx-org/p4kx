@@ -39,6 +39,8 @@ mod component_tools;
 mod flight_configurations;
 #[path = "sdk_projectile_ammo_route.rs"]
 mod projectile_ammo;
+#[path = "sdk_resource_network_routes.rs"]
+mod resource_network;
 #[path = "sdk_vehicle_armor_route.rs"]
 mod vehicle_armor;
 #[path = "sdk_weapon_animation_route.rs"]
@@ -102,6 +104,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
     routes.extend(flight_configurations::read()?);
     routes.extend(worn_gear::read()?);
     routes.push(vehicle_armor::read()?);
+    routes.extend(resource_network::read()?);
     routes.extend(component_tools::read()?);
     Ok(routes)
 }

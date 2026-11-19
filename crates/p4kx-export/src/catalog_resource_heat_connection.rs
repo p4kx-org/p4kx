@@ -16,14 +16,19 @@ use crate::source_value_catalog::SourceArenaOutput;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct ResourceHeatConnection<'source> {
+#[non_exhaustive]
+pub struct ResourceHeatConnection<'source> {
     #[serde(flatten)]
-    thermal: HeatTransfer,
+    /// Heat transfer declarations.
+    pub thermal: HeatTransfer,
     #[serde(flatten)]
-    performance: HeatPerformance,
+    /// Thermal signature and overclock declarations.
+    pub performance: HeatPerformance,
     #[serde(flatten)]
-    cooling: HeatCooling,
-    additional_fields: SourceArenaOutput<'source>,
+    /// Cooling and temperature thresholds.
+    pub cooling: HeatCooling,
+    /// Original fields outside the typed projection.
+    pub additional_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> ResourceHeatConnection<'source> {
@@ -50,16 +55,24 @@ impl<'source> ResourceHeatConnection<'source> {
     }
 }
 
+/// Original heat transfer declarations.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "PascalCase")]
 #[schemars(transform = every_field_required)]
-struct HeatTransfer {
-    thermal_energy_base: SourcedValue<ResourceFloat32>,
-    thermal_energy_draw: SourcedValue<ResourceFloat32>,
-    thermal_conductivity: SourcedValue<ResourceFloat32>,
-    specific_heat_capacity: SourcedValue<ResourceFloat32>,
-    mass: SourcedValue<ResourceFloat32>,
-    surface_area: SourcedValue<ResourceFloat32>,
+#[non_exhaustive]
+pub struct HeatTransfer {
+    /// Authored baseline thermal energy.
+    pub thermal_energy_base: SourcedValue<ResourceFloat32>,
+    /// Authored thermal energy draw.
+    pub thermal_energy_draw: SourcedValue<ResourceFloat32>,
+    /// Authored thermal conductivity.
+    pub thermal_conductivity: SourcedValue<ResourceFloat32>,
+    /// Authored specific heat capacity.
+    pub specific_heat_capacity: SourcedValue<ResourceFloat32>,
+    /// Authored thermal mass parameter.
+    pub mass: SourcedValue<ResourceFloat32>,
+    /// Authored surface area parameter.
+    pub surface_area: SourcedValue<ResourceFloat32>,
 }
 
 impl HeatTransfer {
@@ -89,17 +102,24 @@ impl HeatTransfer {
     }
 }
 
+/// Original heat signature and overclock declarations.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "PascalCase")]
 #[schemars(transform = every_field_required)]
-struct HeatPerformance {
+#[non_exhaustive]
+pub struct HeatPerformance {
     #[serde(rename = "TemperatureToIR")]
-    temperature_to_ir: SourcedValue<ResourceFloat32>,
+    /// Authored conversion from temperature to infrared signature.
+    pub temperature_to_ir: SourcedValue<ResourceFloat32>,
     #[serde(rename = "StartIRTemperature")]
-    start_ir_temperature: SourcedValue<ResourceFloat32>,
-    overpower_heat: SourcedValue<ResourceFloat32>,
-    overclock_threshold_min_heat: SourcedValue<ResourceFloat32>,
-    overclock_threshold_max_heat: SourcedValue<ResourceFloat32>,
+    /// Authored starting temperature for infrared signature.
+    pub start_ir_temperature: SourcedValue<ResourceFloat32>,
+    /// Authored heat under overpower.
+    pub overpower_heat: SourcedValue<ResourceFloat32>,
+    /// Authored lower overclock heat threshold.
+    pub overclock_threshold_min_heat: SourcedValue<ResourceFloat32>,
+    /// Authored upper overclock heat threshold.
+    pub overclock_threshold_max_heat: SourcedValue<ResourceFloat32>,
 }
 
 impl HeatPerformance {
@@ -133,18 +153,28 @@ impl HeatPerformance {
     }
 }
 
+/// Original cooling and authored temperature thresholds.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "PascalCase")]
 #[schemars(transform = every_field_required)]
-struct HeatCooling {
-    start_cooling_temperature: SourcedValue<ResourceFloat32>,
-    max_cooling_rate: SourcedValue<ResourceFloat32>,
-    max_temperature: SourcedValue<ResourceFloat32>,
-    overheat_temperature: SourcedValue<ResourceFloat32>,
-    recovery_temperature: SourcedValue<ResourceFloat32>,
-    min_temperature: SourcedValue<ResourceFloat32>,
-    misfire_min_temperature: SourcedValue<ResourceFloat32>,
-    misfire_max_temperature: SourcedValue<ResourceFloat32>,
+#[non_exhaustive]
+pub struct HeatCooling {
+    /// Temperature at which cooling begins.
+    pub start_cooling_temperature: SourcedValue<ResourceFloat32>,
+    /// Authored maximum cooling rate.
+    pub max_cooling_rate: SourcedValue<ResourceFloat32>,
+    /// Authored maximum temperature.
+    pub max_temperature: SourcedValue<ResourceFloat32>,
+    /// Authored overheat threshold.
+    pub overheat_temperature: SourcedValue<ResourceFloat32>,
+    /// Authored recovery threshold.
+    pub recovery_temperature: SourcedValue<ResourceFloat32>,
+    /// Authored minimum temperature.
+    pub min_temperature: SourcedValue<ResourceFloat32>,
+    /// Authored lower misfire temperature.
+    pub misfire_min_temperature: SourcedValue<ResourceFloat32>,
+    /// Authored upper misfire temperature.
+    pub misfire_max_temperature: SourcedValue<ResourceFloat32>,
 }
 
 impl HeatCooling {

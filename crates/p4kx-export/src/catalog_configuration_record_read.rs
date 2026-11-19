@@ -6,7 +6,9 @@ use std::ops::Range;
 
 use p4kx_extraction::{CancelToken, RecordTree, Value};
 
-use super::{ConfigurationKind, EntityConfigurationRows, VehicleArmor};
+use super::{
+    ConfigurationKind, EntityConfigurationRows, ResourceComponent, ResourceConnection, VehicleArmor,
+};
 use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_projection::CatalogProjection;
@@ -124,6 +126,42 @@ pub(crate) fn read_vehicle_armor<'source>(
         Scope::VehicleArmor,
     )?;
     Ok(read.map(|rows| rows.vehicle_armor))
+}
+
+pub(crate) fn read_resource_connections<'source>(
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    options: &AlignmentOptions<'_>,
+    cancel: Option<&CancelToken>,
+) -> Result<ScopedSourceRead<Vec<ResourceConnection<'source>>>, CatalogError> {
+    let read = read_scope(
+        tree,
+        projection,
+        admission,
+        options,
+        cancel,
+        Scope::ResourceConnections,
+    )?;
+    Ok(read.map(|rows| rows.connections))
+}
+
+pub(crate) fn read_resource_components<'source>(
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    options: &AlignmentOptions<'_>,
+    cancel: Option<&CancelToken>,
+) -> Result<ScopedSourceRead<Vec<ResourceComponent<'source>>>, CatalogError> {
+    let read = read_scope(
+        tree,
+        projection,
+        admission,
+        options,
+        cancel,
+        Scope::ResourceComponents,
+    )?;
+    Ok(read.map(|rows| rows.resources))
 }
 
 fn read_scope<'source>(

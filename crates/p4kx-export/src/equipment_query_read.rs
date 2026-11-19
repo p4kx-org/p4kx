@@ -18,7 +18,6 @@ use crate::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordCoverage, CatalogRecordSelection,
 };
 use crate::catalog_query_session::checkpoint;
-use crate::catalog_v3::catalog_entity_configurations::VEHICLE_ARMOR_TYPES;
 use crate::catalog_v3::catalog_item_alignment::AlignmentOptions;
 use crate::guid_text::CatalogGuid;
 use crate::record_observation::RecordObservation;
@@ -164,9 +163,9 @@ impl<'query> Query<'query> {
                 self.cancel,
                 observer,
             )?,
-            Family::VehicleArmor => Plan::read_entity_components(
+            Family::Configuration(family) => Plan::read_entity_components(
                 self.forge,
-                VEHICLE_ARMOR_TYPES,
+                family.source_types(),
                 self.selection,
                 self.cancel,
                 observer,
@@ -200,7 +199,7 @@ fn order(family: Family, owners: &mut [Owner<'_>]) {
         Family::Attachments
         | Family::Bounds
         | Family::CargoGrids
-        | Family::VehicleArmor
+        | Family::Configuration(_)
         | Family::WeaponSources
         | Family::ProjectileAmmo
         | Family::MagazineResolutions => owners.sort_by_key(|owner| owner.record.index()),

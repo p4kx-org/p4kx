@@ -593,6 +593,22 @@ fields under `Unknown`.
 Check `coverage()` before accepting the result. The query reads no locale or model payloads.
 Vehicle armor placements in a loadout still join by owner Record and component identity.
 
+## Direct resource components and connections
+
+Use the queries in `catalog_queries::equipment::resource_network` to read these tables by physical
+owner GUID or Record index.
+
+| Catalog dataset | SDK query |
+| --- | --- |
+| `configurations.resourceComponents` | `with_resource_components` |
+| `configurations.resourceConnections` | `with_resource_connections` |
+
+Both queries support the decoded-Entry `_from` form, a session and a parsed session view. They keep
+original component slots, per-value origin and source-use references. Resource components include
+ordered states, deltas, control parameters and their physical null slots. Connections retain their
+electrical or thermal field types. Inspect `coverage()` and resolve source-use references through
+the snapshot's source inventory.
+
 ## Component definition Records
 
 The functions in the following table are exported by
