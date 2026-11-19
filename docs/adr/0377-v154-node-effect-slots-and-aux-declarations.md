@@ -27,4 +27,4 @@ The existing playback traversal consumes the same checked regions.
 The layouts follow [wwiser's initial effect reader](https://github.com/bnnm/wwiser/blob/6d4b5bfb45afc52cda9d68fbbe0cbd97de0e26a3/wwiser/parser/wparser.py#L344),
 [wwiser's node metadata reader](https://github.com/bnnm/wwiser/blob/6d4b5bfb45afc52cda9d68fbbe0cbd97de0e26a3/wwiser/parser/wparser.py#L973),
 [wwiser's Aux reader](https://github.com/bnnm/wwiser/blob/6d4b5bfb45afc52cda9d68fbbe0cbd97de0e26a3/wwiser/parser/wparser.py#L464)
-and [StarBreaker's shared node-base reader](https://github.com/diogotr7/StarBreaker/blob/7d3f01e76307354bbc56a64a70eb5167b1189b64/crates/starbreaker-wwise/src/hirc/node_base.rs#L200).
+and StarBreaker's shared node-base reader (`crates/starbreaker-wwise/src/hirc/node_base.rs:200` at `7d3f01e76307354bbc56a64a70eb5167b1189b64`).

@@ -19,4 +19,4 @@ resolution treats ActorMixer as unsupported.
 
 The layout follows [wwiser's ActorMixer dispatch and node order](https://github.com/bnnm/wwiser/blob/6d4b5bfb45afc52cda9d68fbbe0cbd97de0e26a3/wwiser/parser/wparser.py#L1661),
 [wwiser's child list](https://github.com/bnnm/wwiser/blob/6d4b5bfb45afc52cda9d68fbbe0cbd97de0e26a3/wwiser/parser/wparser.py#L502)
-and [StarBreaker's ActorMixer reader](https://github.com/diogotr7/StarBreaker/blob/7d3f01e76307354bbc56a64a70eb5167b1189b64/crates/starbreaker-wwise/src/hirc/containers.rs#L150).
+and StarBreaker's ActorMixer reader (`crates/starbreaker-wwise/src/hirc/containers.rs:150` at `7d3f01e76307354bbc56a64a70eb5167b1189b64`).

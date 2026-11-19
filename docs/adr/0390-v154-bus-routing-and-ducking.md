@@ -20,7 +20,7 @@ direct metadata count. The alternative that omits the settings and inserts a
 metadata override byte had zero exact matches. The installed scope exercises
 properties, positioning, Aux sends, root devices, ducking, effects, RTPCs and
 states. The scoped metadata lists were empty, so synthetic fixtures exercise
-nonempty metadata. [wwiser v154 bus layout](https://github.com/bnnm/wwiser/blob/24eb88f3b2a99d54c1062d8438a7bd04be88335d/wwiser/parser/wparser.py#L1687-L1998) · [StarBreaker comparison](https://github.com/diogotr7/StarBreaker/blob/7d3f01e76307354bbc56a64a70eb5167b1189b64/crates/starbreaker-wwise/src/hirc/bus.rs#L40-L105)
+nonempty metadata. wwiser v154 bus layout (`wwiser/parser/wparser.py:1687-1998` at `24eb88f3b2a99d54c1062d8438a7bd04be88335d`) · StarBreaker comparison (`crates/starbreaker-wwise/src/hirc/bus.rs:40-105` at `7d3f01e76307354bbc56a64a70eb5167b1189b64`)
 
 Typed source coverage is exposed through the checked original object projection.
 The same grammar classifies eager HIRC coverage and retains the existing

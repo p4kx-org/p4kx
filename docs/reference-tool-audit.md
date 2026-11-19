@@ -29,8 +29,8 @@ Detailed pinned evidence, source seams, licences and capability matrices are in:
 | Reference | Pinned scope |
 | --- | --- |
 | [unp4k/unforge](https://github.com/dolkensp/unp4k/tree/b492ab14d26280c6ec91c4365ff0faf5f3e24a6b) | v4.0.87 source and manual PTU raw/XML production. A private net8 build disabled automatic HTTP exception reporting only; extraction/conversion code was unchanged. |
-| [StarBreaker release](https://github.com/diogotr7/StarBreaker/tree/450fa284d4b1cbed6832675297dfb02579c0abd3) | Official v0.3.2 CLI, release ZIP hash verified, DataForge plus bounded model/DDS exports. |
-| [StarBreaker main](https://github.com/diogotr7/StarBreaker/tree/7d3f01e76307354bbc56a64a70eb5167b1189b64) | Separately inspected current source. Same version string does not imply release parity; the release lacks --all. |
+| StarBreaker release (`450fa284d4b1cbed6832675297dfb02579c0abd3`) | Official v0.3.2 CLI, release ZIP hash verified, DataForge plus bounded model/DDS exports. |
+| StarBreaker main (`7d3f01e76307354bbc56a64a70eb5167b1189b64`) | Separately inspected current source. Same version string does not imply release parity; the release lacks --all. |
 | [Svarog](https://github.com/19h/svarog/tree/2e46eff4f7d475b8826ccfdc01c4a95db764db0d) | Direct Archive/DataCore source; independent synthetic fixtures exercised P4KX, not Svarog runtime. |
 | [scdatatools](https://gitlab.com/cpt_ba/scdatatools/-/tree/972b2ed899278fe1a9e8c44747a2a87e1c21246c) / [StarFab](https://gitlab.com/cpt_ba/starfab/-/tree/d498946d06784cfd22ee273b5dde4069f84af58b) | Historical direct-reader/blueprint source plus publisher scdatatools 1.0.4 release. GitLab retrieval was partly limited; no PTU5 runtime-parity claim. |
 | [Cryengine-Converter](https://github.com/Markemp/Cryengine-Converter/tree/7b951dbb254ab99f560e8ffbf64a771c70ccef74) / [CryBlend](https://github.com/Tzeentchnet/CryBlend/tree/48b9b6c4a4f4c4dded1f2118eb172a5ff7a7eccc) | Extracted-asset/Blender source comparison. No direct P4K reader parity assumed. |

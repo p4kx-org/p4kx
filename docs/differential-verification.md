@@ -158,13 +158,13 @@ The classifiers are pinned to these primary-source contracts:
   with exit code zero. [unp4k entrypoint](https://github.com/dolkensp/unp4k/blob/b492ab14d26280c6ec91c4365ff0faf5f3e24a6b/src/unp4k/Program.cs),
   [unforge entrypoint](https://github.com/dolkensp/unp4k/blob/b492ab14d26280c6ec91c4365ff0faf5f3e24a6b/src/unforge.cli/Program.cs).
 - StarBreaker
-  [release 450fa284](https://github.com/diogotr7/StarBreaker/blob/450fa284d4b1cbed6832675297dfb02579c0abd3/cli/src/dcb.rs)
-  and source revisions [7d3f01e7](https://github.com/diogotr7/StarBreaker/blob/7d3f01e76307354bbc56a64a70eb5167b1189b64/cli/src/dcb.rs)
-  and [305215bca](https://github.com/diogotr7/StarBreaker/blob/305215bca75350013c221bdfbcb2f8180fe09dbe/cli/src/dcb.rs)
+  release 450fa284 (`cli/src/dcb.rs` at `450fa284d4b1cbed6832675297dfb02579c0abd3`)
+  and source revisions `7d3f01e76307354bbc56a64a70eb5167b1189b64` (`cli/src/dcb.rs`)
+  and `305215bca75350013c221bdfbcb2f8180fe09dbe` (`cli/src/dcb.rs`)
   have separate producer identities. The 305215bca DataCore export entry point is byte-identical
   to 7d3f01e7. Individual export/write/directory errors can appear on stderr with a zero exit
   status. The verifier checks those errors, completion markers and exported-file counts. The
-  [archive discovery notice](https://github.com/diogotr7/StarBreaker/blob/450fa284d4b1cbed6832675297dfb02579c0abd3/crates/starbreaker-p4k/src/discover.rs)
+  archive discovery notice (`crates/starbreaker-p4k/src/discover.rs` at `450fa284d4b1cbed6832675297dfb02579c0abd3`)
   can also appear for an explicitly supplied DCB because the CLI separately looks for the
   optional Archive. The captured notice is progress; the verified DCB fingerprint binds the
   actual table input.

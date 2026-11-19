@@ -32,9 +32,9 @@ targets. Authored bank references contribute their own stored IDs.
 
 The [pinned wwiser parser](https://github.com/bnnm/wwiser/blob/24eb88f3b2a99d54c1062d8438a7bd04be88335d/wwiser/parser/wparser.py)
 specifies the common effect prefix, the full effect base before device slots,
-and the shared modulator layout. The [pinned StarBreaker effect parser](https://github.com/diogotr7/StarBreaker/blob/7d3f01e76307354bbc56a64a70eb5167b1189b64/crates/starbreaker-wwise/src/hirc/bus.rs)
-and [modulator parser](https://github.com/diogotr7/StarBreaker/blob/7d3f01e76307354bbc56a64a70eb5167b1189b64/crates/starbreaker-wwise/src/hirc/modulator.rs)
-independently describe those parts. The [StarBreaker device candidate](https://github.com/diogotr7/StarBreaker/blob/7d3f01e76307354bbc56a64a70eb5167b1189b64/crates/starbreaker-wwise/src/hirc/misc.rs)
+and the shared modulator layout. The pinned StarBreaker effect parser (`crates/starbreaker-wwise/src/hirc/bus.rs` at `7d3f01e76307354bbc56a64a70eb5167b1189b64`)
+and modulator parser (`crates/starbreaker-wwise/src/hirc/modulator.rs` at `7d3f01e76307354bbc56a64a70eb5167b1189b64`)
+independently describe those parts. The StarBreaker device candidate (`crates/starbreaker-wwise/src/hirc/misc.rs` at `7d3f01e76307354bbc56a64a70eb5167b1189b64`)
 would read the slot count immediately after the bank mappings. That candidate
 left source bytes after its declared fields in all six sampled devices.
 

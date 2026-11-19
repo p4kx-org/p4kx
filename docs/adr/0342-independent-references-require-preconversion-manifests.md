@@ -62,9 +62,9 @@ checks, and never resolve foreign Record links as host filesystem paths.
 ## Sources and verification
 
 - [unp4k/unforge entrypoints at b492ab14](https://github.com/dolkensp/unp4k/tree/b492ab14d26280c6ec91c4365ff0faf5f3e24a6b/src)
-- [StarBreaker release extraction](https://github.com/diogotr7/StarBreaker/blob/450fa284d4b1cbed6832675297dfb02579c0abd3/cli/src/dcb.rs)
-- [StarBreaker current-source extraction](https://github.com/diogotr7/StarBreaker/blob/7d3f01e76307354bbc56a64a70eb5167b1189b64/cli/src/dcb.rs)
-- [StarBreaker merged extraction](https://github.com/diogotr7/StarBreaker/blob/305215bca75350013c221bdfbcb2f8180fe09dbe/cli/src/dcb.rs)
+- StarBreaker release extraction (`cli/src/dcb.rs` at `450fa284d4b1cbed6832675297dfb02579c0abd3`)
+- StarBreaker current-source extraction (`cli/src/dcb.rs` at `7d3f01e76307354bbc56a64a70eb5167b1189b64`)
+- StarBreaker merged extraction (`cli/src/dcb.rs` at `305215bca75350013c221bdfbcb2f8180fe09dbe`)
 
 Synthetic fixtures exercise real preparation/finalization and every adapter, known log failures,
 unknown reporting capabilities, source/producer mutations, inventory collisions/omissions, empty

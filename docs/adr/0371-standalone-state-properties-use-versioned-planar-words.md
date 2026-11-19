@@ -16,8 +16,8 @@ Support for the standalone v154 layout requires separate evidence, so its origin
 remains available with unsupported layout status. No installed-archive presence or coverage is
 inferred from the synthetic fixtures.
 
-[StarBreaker State dispatch](https://github.com/diogotr7/StarBreaker/blob/7d3f01e76307354bbc56a64a70eb5167b1189b64/crates/starbreaker-wwise/src/hirc/misc.rs),
-[StarBreaker planar bundle](https://github.com/diogotr7/StarBreaker/blob/7d3f01e76307354bbc56a64a70eb5167b1189b64/crates/starbreaker-wwise/src/hirc/props.rs),
+StarBreaker State dispatch (`crates/starbreaker-wwise/src/hirc/misc.rs` at `7d3f01e76307354bbc56a64a70eb5167b1189b64`),
+StarBreaker planar bundle (`crates/starbreaker-wwise/src/hirc/props.rs` at `7d3f01e76307354bbc56a64a70eb5167b1189b64`),
 [wwiser standalone State](https://github.com/bnnm/wwiser/blob/6d4b5bfb45afc52cda9d68fbbe0cbd97de0e26a3/wwiser/parser/wparser.py#L1019),
 [wwiser state groups](https://github.com/bnnm/wwiser/blob/6d4b5bfb45afc52cda9d68fbbe0cbd97de0e26a3/wwiser/parser/wparser.py#L513).
 
@@ -35,5 +35,5 @@ The node parser checks extents without materializing groups. The opt-in cursor h
 active group position and one value bundle. Its source reads are confined to the checked
 State extent, including when opaque or malformed bytes follow the State chunk.
 
-[StarBreaker inline State parser](https://github.com/diogotr7/StarBreaker/blob/7d3f01e76307354bbc56a64a70eb5167b1189b64/crates/starbreaker-wwise/src/hirc/rtpc.rs#L52),
+StarBreaker inline State parser (`crates/starbreaker-wwise/src/hirc/rtpc.rs:52` at `7d3f01e76307354bbc56a64a70eb5167b1189b64`),
 [wwiser v154 group layout](https://github.com/bnnm/wwiser/blob/6d4b5bfb45afc52cda9d68fbbe0cbd97de0e26a3/wwiser/parser/wparser.py#L513).

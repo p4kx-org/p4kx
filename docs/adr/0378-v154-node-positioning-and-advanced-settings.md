@@ -32,4 +32,4 @@ evidence for each value and for each finite conversion.
 
 The verified field order comes from [wwiser's Positioning reader](https://github.com/bnnm/wwiser/blob/6d4b5bfb45afc52cda9d68fbbe0cbd97de0e26a3/wwiser/parser/wparser.py#L782),
 [wwiser's AdvancedSettings reader](https://github.com/bnnm/wwiser/blob/6d4b5bfb45afc52cda9d68fbbe0cbd97de0e26a3/wwiser/parser/wparser.py#L289)
-and [StarBreaker's shared node reader](https://github.com/diogotr7/StarBreaker/blob/7d3f01e76307354bbc56a64a70eb5167b1189b64/crates/starbreaker-wwise/src/hirc/node_base.rs#L70).
+and StarBreaker's shared node reader (`crates/starbreaker-wwise/src/hirc/node_base.rs:70` at `7d3f01e76307354bbc56a64a70eb5167b1189b64`).

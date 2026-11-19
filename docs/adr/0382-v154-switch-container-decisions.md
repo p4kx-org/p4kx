@@ -22,7 +22,7 @@ remain available. The rows preserve original fade units and carry no
 claim about evaluated selection or playback.
 
 The v154 layout is established by [wwiser's Switch reader](https://github.com/bnnm/wwiser/blob/6d4b5bfb45afc52cda9d68fbbe0cbd97de0e26a3/wwiser/parser/wparser.py#L1592)
-and [StarBreaker's container reader](https://github.com/diogotr7/StarBreaker/blob/7d3f01e76307354bbc56a64a70eb5167b1189b64/crates/starbreaker-wwise/src/hirc/containers.rs#L106).
+and StarBreaker's container reader (`crates/starbreaker-wwise/src/hirc/containers.rs:106` at `7d3f01e76307354bbc56a64a70eb5167b1189b64`).
 The known group type codes follow [wwiser's group type table](https://github.com/bnnm/wwiser/blob/6d4b5bfb45afc52cda9d68fbbe0cbd97de0e26a3/wwiser/parser/wdefs.py).
 
 

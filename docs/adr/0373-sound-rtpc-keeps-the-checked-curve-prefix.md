@@ -20,6 +20,6 @@ zero and nonfinite binary32 words keep their original values and half-open bank-
 The typed cursor admits the version-154 Sound node. Other versions retain the existing
 opaque layout coverage.
 
-The layout follows [StarBreaker's initial RTPC reader](https://github.com/diogotr7/StarBreaker/blob/7d3f01e76307354bbc56a64a70eb5167b1189b64/crates/starbreaker-wwise/src/hirc/rtpc.rs#L30),
+The layout follows StarBreaker's initial RTPC reader (`crates/starbreaker-wwise/src/hirc/rtpc.rs:30` at `7d3f01e76307354bbc56a64a70eb5167b1189b64`),
 [wwiser's RTPC curve parser](https://github.com/bnnm/wwiser/blob/6d4b5bfb45afc52cda9d68fbbe0cbd97de0e26a3/wwiser/parser/wparser.py#L606)
 and [wwiser's graph-point layout](https://github.com/bnnm/wwiser/blob/6d4b5bfb45afc52cda9d68fbbe0cbd97de0e26a3/wwiser/parser/wparser.py#L58).

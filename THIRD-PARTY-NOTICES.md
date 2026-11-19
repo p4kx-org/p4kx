@@ -100,7 +100,7 @@ SOFTWARE.
 
 The DNA rig readers in crates/p4kx-character/src/rig*.rs (the neutral morph decode in
 rig_neutral.rs in particular, and the layout of the slots of the `.dna` files) follow the
-starbreaker-dna crate of StarBreaker, https://github.com/diogotr7/StarBreaker, and are rewritten
+starbreaker-dna crate of StarBreaker and are rewritten
 for P4KX's error handling and bounds checks.
 
 StarBreaker, as stated in its LICENSE file:

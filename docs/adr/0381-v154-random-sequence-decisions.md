@@ -25,7 +25,7 @@ representing selection as playback.
 
 The v154 layout and signed weights are established by the version branches in
 [wwiser's Random/Sequence reader](https://github.com/bnnm/wwiser/blob/6d4b5bfb45afc52cda9d68fbbe0cbd97de0e26a3/wwiser/parser/wparser.py#L1501)
-and [StarBreaker's container reader](https://github.com/diogotr7/StarBreaker/blob/7d3f01e76307354bbc56a64a70eb5167b1189b64/crates/starbreaker-wwise/src/hirc/containers.rs#L33).
+and StarBreaker's container reader (`crates/starbreaker-wwise/src/hirc/containers.rs:33` at `7d3f01e76307354bbc56a64a70eb5167b1189b64`).
 
 
 The CLI and MCP ObjectView stream the same checked original Random/Sequence
