@@ -4,6 +4,8 @@
 use p4kx_archive::{Archive, Entry, MetadataRange};
 use thiserror::Error;
 
+#[path = "entry_issue_origins.rs"]
+pub(crate) mod issues;
 #[path = "entry_directory_source.rs"]
 mod source;
 

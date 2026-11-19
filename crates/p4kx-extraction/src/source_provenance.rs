@@ -73,6 +73,7 @@ pub use chunk_table_evidence::{ChunkEvidenceError, ChunkTableEvidence, ChunkTabl
 pub use default_material_receipt::{
     DefaultMaterialContainer, DefaultMaterialReceipt, DefaultMaterialSource, DefaultMaterialState,
 };
+pub(crate) use entry_directory_origins::issues as entry_issue_origins;
 pub use entry_directory_origins::{
     EntryDirectoryFact, EntryDirectoryOrigins, EntryDirectoryOriginsError, directory_path_uses,
 };

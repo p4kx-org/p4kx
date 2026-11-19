@@ -59,8 +59,28 @@ impl ArchiveSummary {
         archive: &Archive,
         address: &str,
     ) -> Result<(Self, ArchiveLayoutOrigins), ArchiveLayoutOriginError> {
+        Self::project(archive, address, 0)
+    }
+
+    /// Projects the root summary and origins for up to `issue_limit` listed issue rows.
+    ///
+    /// # Errors
+    /// Returns an error if source evidence or a field address cannot be represented.
+    pub fn project_with_issue_origins(
+        archive: &Archive,
+        address: &str,
+        issue_limit: usize,
+    ) -> Result<(Self, ArchiveLayoutOrigins), ArchiveLayoutOriginError> {
+        Self::project(archive, address, issue_limit)
+    }
+
+    fn project(
+        archive: &Archive,
+        address: &str,
+        issue_limit: usize,
+    ) -> Result<(Self, ArchiveLayoutOrigins), ArchiveLayoutOriginError> {
         let summary = Self::of(archive);
-        let origins = origins::capture(archive, &summary, address)?;
+        let origins = origins::capture(archive, &summary, address, issue_limit)?;
         Ok((summary, origins))
     }
 }

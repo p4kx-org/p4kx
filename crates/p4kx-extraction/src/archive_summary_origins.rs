@@ -3,7 +3,7 @@
 
 use p4kx_archive::{Archive, ArchiveMetadataStatus, BuildManifestOutcome};
 
-use crate::source_provenance::archive_layout_origins;
+use crate::source_provenance::{archive_layout_origins, entry_issue_origins};
 use crate::{
     ArchiveLayoutOriginError, ArchiveLayoutOrigins, ArchiveSummary, FieldOrigin, FieldOrigins,
     FieldPath, InputScope, SourceInput, SourceLocation, SourceUseRole, SourceUses,
@@ -20,6 +20,7 @@ pub(super) fn capture(
     archive: &Archive,
     summary: &ArchiveSummary,
     address: &str,
+    issue_limit: usize,
 ) -> Result<ArchiveLayoutOrigins, ArchiveLayoutOriginError> {
     let uses = SourceUses::with_compact_use_refs();
     let mut fields = FieldOrigins::new();
@@ -30,6 +31,8 @@ pub(super) fn capture(
     write_directory(archive, summary, &uses, &mut fields, &mut path)?;
     path.push_field("build")?;
     write_build(archive, &uses, &mut fields, &mut path)?;
+    path.pop();
+    entry_issue_origins::write(archive, issue_limit, &uses, &mut fields, &mut path)?;
     Ok(ArchiveLayoutOrigins {
         field_origins: fields,
         provenance: uses.freeze()?,

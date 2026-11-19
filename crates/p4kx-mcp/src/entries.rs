@@ -17,7 +17,11 @@ const MAX_SHOWN_ISSUES: usize = 50;
 
 /// Returns the summary of `archive`, its Build with the public patch `patches` knows.
 pub(crate) fn info(archive: &Archive, patches: &PublicPatches) -> Result<ArchiveInfo, ToolError> {
-    let (summary, origins) = ArchiveSummary::project_with_origins(archive, "/structuredContent")?;
+    let (summary, origins) = ArchiveSummary::project_with_issue_origins(
+        archive,
+        "/structuredContent",
+        MAX_SHOWN_ISSUES,
+    )?;
     Ok(ArchiveInfo {
         archive: archive.path().display().to_string(),
         channel: p4kx_channels::channel_name(archive.path()),
@@ -127,3 +131,7 @@ pub(crate) fn list(place: &Place<'_>, folder: &str, page: Page) -> Result<Folder
 #[cfg(test)]
 #[path = "entries_layout_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "entries_issue_origin_tests.rs"]
+mod issue_origin_tests;

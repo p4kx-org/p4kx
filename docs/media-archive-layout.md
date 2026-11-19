@@ -91,5 +91,13 @@ lineage. The public patch retains its manifest selector, with incomplete contrib
 winning launcher log occurrence is unavailable. Human-readable summaries retain their existing
 lines.
 
+MCP `archive_info` addresses the listed Issue members under
+`/structuredContent/issues/<row>/path` and `/structuredContent/issues/<row>/issue`.
+A physical Issue path uses the original directory path and its lossy decoding when applicable.
+Invalid UTF-8, encryption word and encryption block length messages use the actual cached
+directory data. Entry payload encryption does not taint root directory evidence. Issues without
+their original checker operands carry incomplete origins. The listed sample does not establish
+the provenance of the full `issue_count`.
+
 The reader's [source metadata contract](archive-source-metadata.md) defines record ownership,
 section extents, recovery limits and lazy-access failures.
