@@ -550,6 +550,23 @@ A different Record lies outside a physical lookup even if it has the same GUID. 
 GUID queries inspect the admitted physical owners in order. These readers need no locales
 or loadout resolution.
 
+## Worn gear and item radar
+
+Use `catalog_queries::equipment::worn_gear` for `configurations.suitArmor` with
+`with_suit_armor`, `configurations.clothing` with `with_clothing`, and
+`configurations.itemRadars` with `with_item_radars`. The free functions also accept an already
+decoded Entry through their `_from` forms. The session and parsed view provide the same queries.
+
+The rows keep each original Entity owner and its Components slot, including repeated components
+and physical aliases of a GUID. Inline clothing and radar sections keep authored values,
+presence and provenance. A suit's `damage_resistance()` gives the authored macro reference.
+Pass its resolved physical Record index to `equipment::component_definitions::with_damage_resistance_macros`
+to read that definition in the same session. The suit query resolves the reference identity without
+reading the macro's body.
+
+A single owner query projects the requested family for that physical owner. Check `coverage()`
+before accepting the result. These queries do not read locale or model payloads.
+
 ## Component definition Records
 
 The functions in the following table are exported by

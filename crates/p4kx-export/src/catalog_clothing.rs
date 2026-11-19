@@ -19,7 +19,7 @@ pub(super) const COMPONENT: &str = "SCItemClothingParams";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct Clothing<'source> {
+pub struct Clothing<'source> {
     #[serde(flatten)]
     owner: ComponentOwner,
     temperature_resistance: SourcedValue<TemperatureResistance<'source>>,
@@ -30,6 +30,36 @@ pub(super) struct Clothing<'source> {
 }
 
 impl<'source> Clothing<'source> {
+    /// Borrows the original physical component owner.
+    #[must_use]
+    pub const fn owner(&self) -> &ComponentOwner {
+        &self.owner
+    }
+
+    /// Borrows the original inline temperature resistance.
+    #[must_use]
+    pub const fn temperature_resistance(&self) -> &SourcedValue<TemperatureResistance<'source>> {
+        &self.temperature_resistance
+    }
+
+    /// Borrows the original inline radiation resistance.
+    #[must_use]
+    pub const fn radiation_resistance(&self) -> &SourcedValue<RadiationResistance<'source>> {
+        &self.radiation_resistance
+    }
+
+    /// Borrows the original inline flight resistance.
+    #[must_use]
+    pub const fn flight(&self) -> &SourcedValue<Flight<'source>> {
+        &self.flight
+    }
+
+    /// Borrows original type and remaining fields.
+    #[must_use]
+    pub const fn source(&self) -> &UnitSource<'source> {
+        &self.original
+    }
+
     pub(super) fn read(
         owner: ComponentOwner,
         source: Observed<'_, '_, '_, 'source>,
@@ -74,7 +104,8 @@ impl<'source> Clothing<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct TemperatureResistance<'source> {
+/// Original temperature resistance values and remaining inline fields.
+pub struct TemperatureResistance<'source> {
     min_resistance: SourcedValue<ResourceFloat32>,
     max_resistance: SourcedValue<ResourceFloat32>,
     #[serde(flatten)]
@@ -82,6 +113,24 @@ struct TemperatureResistance<'source> {
 }
 
 impl<'source> TemperatureResistance<'source> {
+    /// Borrows the original minimum temperature resistance.
+    #[must_use]
+    pub const fn min_resistance(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.min_resistance
+    }
+
+    /// Borrows the original maximum temperature resistance.
+    #[must_use]
+    pub const fn max_resistance(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.max_resistance
+    }
+
+    /// Borrows original type and remaining fields.
+    #[must_use]
+    pub const fn source(&self) -> &UnitSource<'source> {
+        &self.original
+    }
+
     fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
@@ -106,7 +155,8 @@ impl<'source> TemperatureResistance<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct RadiationResistance<'source> {
+/// Original radiation resistance values and remaining inline fields.
+pub struct RadiationResistance<'source> {
     maximum_radiation_capacity: SourcedValue<ResourceFloat32>,
     radiation_dissipation_rate: SourcedValue<ResourceFloat32>,
     #[serde(flatten)]
@@ -114,6 +164,24 @@ struct RadiationResistance<'source> {
 }
 
 impl<'source> RadiationResistance<'source> {
+    /// Borrows the original maximum radiation capacity.
+    #[must_use]
+    pub const fn maximum_radiation_capacity(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.maximum_radiation_capacity
+    }
+
+    /// Borrows the original radiation dissipation rate.
+    #[must_use]
+    pub const fn radiation_dissipation_rate(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.radiation_dissipation_rate
+    }
+
+    /// Borrows original type and remaining fields.
+    #[must_use]
+    pub const fn source(&self) -> &UnitSource<'source> {
+        &self.original
+    }
+
     fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
@@ -144,13 +212,26 @@ impl<'source> RadiationResistance<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct Flight<'source> {
+/// Original clothing flight resistance and remaining inline fields.
+pub struct Flight<'source> {
     g_force_resistance: SourcedValue<ResourceFloat32>,
     #[serde(flatten)]
     original: UnitSource<'source>,
 }
 
 impl<'source> Flight<'source> {
+    /// Borrows the original G-force resistance.
+    #[must_use]
+    pub const fn g_force_resistance(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.g_force_resistance
+    }
+
+    /// Borrows original type and remaining fields.
+    #[must_use]
+    pub const fn source(&self) -> &UnitSource<'source> {
+        &self.original
+    }
+
     fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

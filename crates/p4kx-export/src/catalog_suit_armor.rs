@@ -24,7 +24,7 @@ pub(crate) const MACRO: &str = "DamageResistanceMacro";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct SuitArmor<'source> {
+pub struct SuitArmor<'source> {
     #[serde(flatten)]
     owner: ComponentOwner,
     integrity_milestone_to_break: SourcedValue<ResourceFloat32>,
@@ -35,6 +35,30 @@ pub(super) struct SuitArmor<'source> {
 }
 
 impl<'source> SuitArmor<'source> {
+    /// Borrows the original physical component owner.
+    #[must_use]
+    pub const fn owner(&self) -> &ComponentOwner {
+        &self.owner
+    }
+
+    /// Borrows the original integrity milestone for breaking the armor.
+    #[must_use]
+    pub const fn integrity_milestone_to_break(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.integrity_milestone_to_break
+    }
+
+    /// Borrows the original damage resistance macro reference.
+    #[must_use]
+    pub const fn damage_resistance(&self) -> &SourcedValue<Box<SourceRecordReference<'source>>> {
+        &self.damage_resistance
+    }
+
+    /// Borrows original type and remaining fields.
+    #[must_use]
+    pub const fn source(&self) -> &UnitSource<'source> {
+        &self.original
+    }
+
     pub(super) fn read(
         owner: ComponentOwner,
         source: Observed<'_, '_, '_, 'source>,

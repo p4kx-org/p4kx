@@ -8,6 +8,7 @@ use super::{ComponentKind, PhysicalComponents};
 use crate::CatalogError;
 use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::authored_fields::Observed;
+use crate::catalog_v3::component_sources::physical_component;
 use crate::catalog_v3::referenced_definition_read::{self, Selection};
 use crate::export_field_inspection::ConfigurationInspection;
 use crate::schema_fields::every_field_required;
@@ -19,11 +20,14 @@ mod radar;
 #[path = "catalog_suit_armor.rs"]
 mod suit_armor;
 
-use clothing::Clothing;
-use radar::ItemRadar;
+pub use clothing::{
+    Clothing, Flight as ClothingFlight, RadiationResistance, TemperatureResistance,
+};
+pub use radar::{
+    AimAssist as ItemRadarAimAssist, ItemRadar, PingProperties as ItemRadarPingProperties,
+};
 pub(crate) use suit_armor::MACRO;
-use suit_armor::SuitArmor;
-pub use suit_armor::{DamageResistanceMacro, MacroBody};
+pub use suit_armor::{DamageResistanceMacro, MacroBody, SuitArmor};
 
 const SUIT_ARMOR: ComponentKind = ComponentKind {
     source_type: suit_armor::COMPONENT,
@@ -37,6 +41,10 @@ const ITEM_RADAR: ComponentKind = ComponentKind {
     source_type: radar::COMPONENT,
     inspection: ConfigurationInspection::ItemRadar,
 };
+
+physical_component!(SuitArmorComponents, SuitArmor, SUIT_ARMOR);
+physical_component!(ClothingComponents, Clothing, CLOTHING);
+physical_component!(ItemRadarComponents, ItemRadar, ITEM_RADAR);
 
 /// Gear and device records scoped by their physical component owners.
 #[derive(Debug, Serialize, JsonSchema)]

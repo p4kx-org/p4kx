@@ -3,16 +3,15 @@
 
 use std::time::UNIX_EPOCH;
 
-use p4kx_export::catalog_queries::equipment::EquipmentSnapshot;
 use p4kx_export::catalog_queries::equipment::flight::with_thrusters_from;
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, ParsedCatalogQueries,
 };
 use p4kx_export::{CatalogOptions, CatalogPublicationMode, build_catalog_from};
 use p4kx_extraction::{DataForge, DataForgeEntry, TreeBuilder};
-use serde::Serialize;
 use serde_json::Value;
 
+use super::component_parity::parity;
 use super::{Route, TestResult};
 
 #[path = "sdk_flight_configuration_fixture.rs"]
@@ -226,37 +225,4 @@ fn flight_configuration_queries_match_synthetic_producer_rows() -> TestResult<()
     parsed.with_ifcs(ALL, None, |snapshot| parity(IFCS, &snapshot, &catalog))??;
     parsed.with_thrusters(ALL, None, |snapshot| parity(THRUSTERS, &snapshot, &catalog))??;
     Ok(())
-}
-
-fn parity<Row: Serialize>(
-    dataset: &str,
-    snapshot: &EquipmentSnapshot<'_, Row>,
-    catalog: &Value,
-) -> TestResult<()> {
-    let expected = catalog.pointer(dataset).ok_or("canonical Flight dataset")?;
-    assert_eq!(
-        serde_json::to_value(snapshot.availability())?,
-        expected["availability"],
-        "SDK and Catalog agree on source-family availability for {dataset}"
-    );
-    let mut expected = expected["rows"].clone();
-    let mut actual = serde_json::to_value(snapshot.rows())?;
-    omit_document_local_ids(&mut expected);
-    omit_document_local_ids(&mut actual);
-    assert_eq!(
-        actual, expected,
-        "canonical values and origin flags for {dataset}"
-    );
-    Ok(())
-}
-
-fn omit_document_local_ids(value: &mut Value) {
-    match value {
-        Value::Array(values) => values.iter_mut().for_each(omit_document_local_ids),
-        Value::Object(object) => {
-            object.remove("sourceUsesRefs");
-            object.values_mut().for_each(omit_document_local_ids);
-        }
-        _ => {}
-    }
 }

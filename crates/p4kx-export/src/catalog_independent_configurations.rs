@@ -51,7 +51,7 @@ pub(super) mod ordered_curve;
 #[path = "turret_health.rs"]
 mod turret_health;
 #[path = "worn_gear_tables.rs"]
-mod worn_gear;
+pub(crate) mod worn_gear;
 use consumables::{ConsumableConfigurations, ConsumableTables};
 pub(crate) use consumables::{
     ConsumableDefinitions, SUBTYPE as CONSUMABLE_SUBTYPE, TYPE as CONSUMABLE_TYPE,

@@ -525,7 +525,7 @@
       "type": "object"
     },
     "AimAssist": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "Original radar aim assist values and remaining inline fields.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -18001,7 +18001,7 @@
       "type": "object"
     },
     "Flight": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "Original clothing flight resistance and remaining inline fields.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -34838,7 +34838,7 @@
       "type": "object"
     },
     "PingProperties": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "Original radar ping settings and remaining inline fields.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -38943,7 +38943,7 @@
       "type": "object"
     },
     "RadiationResistance": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "Original radiation resistance values and remaining inline fields.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -134949,7 +134949,7 @@
       "type": "object"
     },
     "TemperatureResistance": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "Original temperature resistance values and remaining inline fields.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"

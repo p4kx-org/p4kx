@@ -3,6 +3,8 @@
 
 //! Selective queries over original equipment, resolved Ships and Loadouts.
 
+#[path = "equipment_component_query.rs"]
+mod component_query;
 #[path = "equipment_dependency_coverage.rs"]
 mod dependency_coverage;
 
@@ -15,6 +17,10 @@ mod loadout_query;
 /// Selective reads of authored flight-controller, IFCS and thruster configurations.
 #[path = "equipment_flight_query.rs"]
 pub mod flight;
+
+/// Selective reads of authored clothing, suit armor and per-item radar components.
+#[path = "equipment_worn_gear_query.rs"]
+pub mod worn_gear;
 
 pub use crate::catalog_v3::catalog_item_alignment::{
     AttachmentDefinitionLink, ComponentOwner, PortDefinitionLink,

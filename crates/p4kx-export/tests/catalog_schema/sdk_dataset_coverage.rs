@@ -28,6 +28,9 @@ const BLUEPRINT_DEFINITIONS: &str = "/definitions/blueprints";
 const BLUEPRINT_TIERS: &str = "/configurations/blueprintTiers";
 const BLUEPRINT_PRESENTATION: &str = "/projections/blueprintPresentation";
 const CRAFTING_GLOBAL: &str = "/configurations/craftingGlobal";
+const SUIT_ARMOR: &str = "/configurations/suitArmor";
+const CLOTHING: &str = "/configurations/clothing";
+const ITEM_RADARS: &str = "/configurations/itemRadars";
 const PROJECTILE_AMMUNITION: &str = "/projections/weaponProjectileAmmoSelections";
 const MAGAZINE_RESOLUTION: &str = "/projections/weaponMagazineResolutions";
 const WEAPON_COMBAT: &str = "/projections/weaponCombatBases";
@@ -89,6 +92,9 @@ fn sdk_query_witnesses_keep_their_canonical_dataset_contract() -> TestResult {
         BLUEPRINT_TIERS,
         BLUEPRINT_PRESENTATION,
         CRAFTING_GLOBAL,
+        SUIT_ARMOR,
+        CLOTHING,
+        ITEM_RADARS,
         SHOP_INVENTORIES,
         FLARE_LIBRARIES,
         RADAR_AUDIO,

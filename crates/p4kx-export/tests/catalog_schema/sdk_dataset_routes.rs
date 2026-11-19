@@ -31,12 +31,16 @@ mod blueprint_physical;
 mod blueprint_pools;
 #[path = "sdk_component_definition_routes.rs"]
 mod component_definitions;
+#[path = "sdk_equipment_component_parity.rs"]
+mod component_parity;
 #[path = "sdk_flight_configuration_routes.rs"]
 mod flight_configurations;
 #[path = "sdk_projectile_ammo_route.rs"]
 mod projectile_ammo;
 #[path = "sdk_weapon_animation_route.rs"]
 mod weapon_animation;
+#[path = "sdk_worn_gear_routes.rs"]
+mod worn_gear;
 
 const ROOT: &str = r"Data\ObjectContainers\PU\system\fixture\fixturesystem.socpak";
 const OFFLINE_SHOP: &str = r"Data\Scripts\ShopInventories\Inv_Fixture.json";
@@ -92,6 +96,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
     routes.extend(blueprint_physical::read()?);
     routes.extend(component_definitions::read()?);
     routes.extend(flight_configurations::read()?);
+    routes.extend(worn_gear::read()?);
     Ok(routes)
 }
 
