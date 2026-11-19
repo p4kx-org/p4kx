@@ -1,6 +1,6 @@
 # Catalog domain partitioning
 
-## Complete LIVE measurement
+## Complete LIVE and PTU measurements
 
 The packaged Windows AMD64 producer at `37605ecae` completed a normal, unfiltered export for
 installed LIVE `13165946` with two Rayon workers, all eleven installed languages, and Zstandard
@@ -39,8 +39,14 @@ coordinates. The provenance inventory records 88.69 million source-use relations
 from the physical sources. Texture pixels, 3D mesh buffers and audio samples are exported on
 request through the [normal file and media exporters](catalog.md#media-files).
 
-The first normal PTU `13228337` run reached the publication check and stopped on two unmapped
-mission-phase values. That run produced no complete PTU file. [Size investigation](https://github.com/p4kx-org/p4kx/issues/1151)
+The first normal PTU `13228337` run stopped at the publication check on two unmapped
+mission-phase values. After mapping the original values, the packaged Windows AMD64 producer at
+`1e704c0ae` completed the normal, unfiltered export of the same installed Build. At Zstandard
+level 3, the file is 1,287,882,399 encoded bytes, with 85,600,368,941 decoded bytes pledged in
+the frame. With two Rayon workers, the producer took 21 minutes 14 seconds and reported a
+27.54 GiB Windows working-set peak. Sampled host availability and commit headroom remained at
+or above 29.30 GiB and 74.57 GiB respectively. Windows reported 1,807,985,951 logical process
+write bytes. [Size investigation](https://github.com/p4kx-org/p4kx/issues/1151)
 
 ## Reducing the uncompressed document
 
