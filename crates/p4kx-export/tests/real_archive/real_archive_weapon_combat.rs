@@ -21,6 +21,8 @@ use crate::real_archive_verification;
 mod dependencies;
 #[path = "weapon_combat_original.rs"]
 pub(super) mod original;
+#[path = "weapon_combat_projectile_proof.rs"]
+mod projectile;
 
 use original::{OriginalAction, OriginalAmmo, Witness};
 
@@ -36,22 +38,29 @@ fn weapon_combat_base_matches_original_action_and_ammunition_inputs() -> TestRes
     for (sample, path) in [(1, first), (2, second)] {
         let archive =
             Archive::open_with_key(path, Some(key.clone())).map_err(|_| "open input Archive")?;
-        let watch = ArchiveWatch::new(&archive);
-        let entry = DataForgeEntry::read(&archive).map_err(|_| "read actual DataForge")?;
-        let forge = entry.open().map_err(|_| "open actual DataForge")?;
-        let witness = original::find(&forge).ok_or("bounded combat owner plus Ammo definition")?;
-        watch
-            .check()
-            .map_err(|_| "Archive changed during source selection")?;
-        compare(&archive, &entry, &witness)?;
-        watch
-            .check()
-            .map_err(|_| "Archive changed during combat verification")?;
+        with_original_witness(&archive, compare)?;
         real_archive_verification::print_line(&format!(
             "weapon combat source witness {sample}: one original mode, six independent channels, one flight distance"
         ));
     }
     Ok(())
+}
+
+fn with_original_witness(
+    archive: &Archive,
+    inspect: impl FnOnce(&Archive, &DataForgeEntry, &Witness<'_>) -> TestResult,
+) -> TestResult {
+    let watch = ArchiveWatch::new(archive);
+    let entry = DataForgeEntry::read(archive).map_err(|_| "read actual DataForge")?;
+    let forge = entry.open().map_err(|_| "open actual DataForge")?;
+    let witness = original::find(&forge).ok_or("bounded combat owner plus Ammo definition")?;
+    watch
+        .check()
+        .map_err(|_| "Archive changed during source selection")?;
+    inspect(archive, &entry, &witness)?;
+    watch
+        .check()
+        .map_err(|_| "Archive changed during weapon verification".into())
 }
 
 fn compare(archive: &Archive, entry: &DataForgeEntry, witness: &Witness<'_>) -> TestResult {
@@ -202,7 +211,8 @@ fn compare_nominal<'source>(
             == u64::from(witness.ammo.record_index()),
         "actual resolved ammo Record position"
     );
-    compare_route(catalog, witness, &ordinal, &action, traces)?;
+    let route = projectile::route_row(catalog, witness, &ordinal)?;
+    projectile::check_original_route(route, witness, &action, &traces.owner)?;
     let result = row.pointer("/model/value/values").ok_or("mode values")?;
     compare_direct_inputs(result, &action, traces)?;
     let distance = cell(result, "nominalFlightDistance")?;
@@ -215,68 +225,6 @@ fn compare_nominal<'source>(
     traces.ammo.check(distance, ammo.speed, "payload")?;
     traces.ammo.check(distance, ammo.lifetime, "payload")?;
     compare_channels(result, &action, &ammo, traces)
-}
-
-fn compare_route<'source>(
-    catalog: &Value,
-    witness: &Witness<'source>,
-    ordinal: &str,
-    action: &OriginalAction<'_, 'source>,
-    traces: &Traces<'_, 'source>,
-) -> TestResult {
-    let rows = proof::rows(catalog, "/projections/weaponProjectileAmmoSelections/rows")?;
-    let selected = rows
-        .iter()
-        .filter(|row| {
-            row.pointer("/ownerRecordIndex/value")
-                .and_then(Value::as_u64)
-                == Some(u64::from(witness.owner.record_index()))
-                && row
-                    .pointer("/componentOrdinal/value")
-                    .and_then(Value::as_u64)
-                    == u64::try_from(witness.component).ok()
-                && row
-                    .pointer("/actionSourceValueOrdinal/value")
-                    .and_then(Value::as_str)
-                    == Some(ordinal)
-        })
-        .collect::<Vec<_>>();
-    let [selection] = selected.as_slice() else {
-        return Err("one physical ammo selection".into());
-    };
-    let route = proof::text(selection, "/selection/value/type")?;
-    if let Some(magazine) = witness.magazine {
-        assert_eq!(
-            route, "selectedLinkedMagazine",
-            "original linked magazine route"
-        );
-        assert!(
-            proof::number(selection, "/selection/value/magazineRecordIndex/value")?
-                == u64::from(magazine),
-            "original physical magazine owner"
-        );
-    } else {
-        assert_eq!(route, "selected", "original inline container route");
-    }
-    let role = match action.role {
-        Original::Enum("Primary") => "primary",
-        Original::Enum("Secondary") => "secondary",
-        _ => return Err("original role must be a known selector".into()),
-    };
-    assert_eq!(
-        proof::text(selection, "/selection/value/role/value")?,
-        role,
-        "original projectile role"
-    );
-    assert!(
-        proof::number(selection, "/selection/value/ammoRecordIndex/value")?
-            == u64::from(witness.ammo.record_index()),
-        "physical ammo Record target and not its nominal GUID"
-    );
-    traces
-        .owner
-        .check(cell(selection, "selection")?, action.role, "payload")?;
-    Ok(())
 }
 
 fn compare_direct_inputs<'source>(

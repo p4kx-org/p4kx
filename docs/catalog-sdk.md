@@ -716,6 +716,14 @@ as absence. A proved route can still name an unreadable Ammo body in dependency 
 `AmmoSelection` reflects the unfiltered Catalog admission policy. The query returns the
 source inputs for each action, while combat-base projections apply separate rules.
 
+With `P4KX_DATA_P4K` set to an installed Archive, this verification checks one independently
+selected weapon action, its original route and its reached Ammo. Set `P4KX_DATA_P4K_B` to
+check a second Archive in the same run. Each check reads DataForge once and creates no Catalog.
+
+```powershell
+cargo test --locked -p p4kx-export --test real_archive real_archive_weapon_combat::projectile::projectile_ammunition_sdk_matches_original_sources -- --ignored --exact --nocapture --test-threads=1
+```
+
 ## Starmap container placements
 
 Use `starmap::read_container_placements` to read the canonical `placements.containerInstances` and
