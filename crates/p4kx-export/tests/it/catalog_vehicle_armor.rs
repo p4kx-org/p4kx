@@ -11,6 +11,9 @@ use crate::loadouts_support::{loadout, port};
 #[path = "catalog_vehicle_armor_fixture.rs"]
 mod fixture;
 
+#[path = "catalog_vehicle_armor_sdk.rs"]
+mod sdk;
+
 const TABLE: &str = "/configurations/vehicleArmor/rows";
 
 #[test]

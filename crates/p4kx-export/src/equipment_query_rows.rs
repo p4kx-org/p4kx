@@ -8,7 +8,7 @@ use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::scoped_source_read::ScopedSourceRead;
 use crate::catalog_table::DatasetAvailability;
 use crate::catalog_v3::ammo_definition::{self, AmmoDefinition, AmmoSelection};
-use crate::catalog_v3::catalog_entity_configurations;
+use crate::catalog_v3::catalog_entity_configurations::{self, VEHICLE_ARMOR_TYPES, VehicleArmor};
 use crate::catalog_v3::catalog_item_alignment::{ATTACHABLE, AlignmentOptions};
 use crate::catalog_v3::catalog_item_components::{self, WeaponSource, definition_read};
 use crate::catalog_v3::inventory_entity_configurations::BOUNDS_SOURCE_TYPES;
@@ -22,6 +22,7 @@ pub(super) enum Family {
     Attachments,
     Bounds,
     CargoGrids,
+    VehicleArmor,
     AmmoDefinitions,
     WeaponSources,
     ProjectileAmmo,
@@ -41,6 +42,7 @@ impl Family {
             | Self::Attachments
             | Self::Bounds
             | Self::CargoGrids
+            | Self::VehicleArmor
             | Self::WeaponSources
             | Self::ProjectileAmmo
             | Self::MagazineResolutions => Kind::Items,
@@ -55,6 +57,7 @@ impl Family {
             Self::Definitions | Self::ItemSources => &[p4kx_assembly::ENTITY_TYPE][..],
             Self::Attachments => &[ATTACHABLE][..],
             Self::Bounds => BOUNDS_SOURCE_TYPES,
+            Self::VehicleArmor => VEHICLE_ARMOR_TYPES,
             Self::CargoGrids => &[crate::catalog_v3::catalog_facility::CARGO_GRID_SOURCE_TYPE],
             Self::AmmoDefinitions => &[ammo_definition::SOURCE_TYPE],
             Self::ProjectileAmmo | Self::MagazineResolutions => {
@@ -88,6 +91,7 @@ pub(super) struct ItemSources;
 pub(super) struct Attachments;
 pub(super) struct Bounds;
 pub(super) struct CargoGrids;
+pub(super) struct VehicleArmorRows;
 pub(super) struct AmmoDefinitions;
 pub(super) struct WeaponSources;
 pub(super) struct ProjectileAmmo;
@@ -274,6 +278,24 @@ impl Projector for Bounds {
         cancel: Option<&CancelToken>,
     ) -> Result<ScopedSourceRead<Vec<Self::Row<'source>>>, CatalogError> {
         catalog_entity_configurations::read_item_bounds(
+            tree, projection, admission, options, cancel,
+        )
+    }
+}
+
+impl Projector for VehicleArmorRows {
+    type Row<'source> = VehicleArmor<'source>;
+    const FAMILY: Family = Family::VehicleArmor;
+
+    fn read<'source>(
+        _: &'source DataForge<'source>,
+        tree: &RecordTree<'source>,
+        projection: &CatalogProjection<'_, 'source>,
+        admission: &RecordObservation<'_, 'source>,
+        options: &AlignmentOptions<'_>,
+        cancel: Option<&CancelToken>,
+    ) -> Result<ScopedSourceRead<Vec<Self::Row<'source>>>, CatalogError> {
+        catalog_entity_configurations::read_vehicle_armor(
             tree, projection, admission, options, cancel,
         )
     }

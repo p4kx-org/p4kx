@@ -581,6 +581,18 @@ Use the physical indices in the mining global and consumable subtype links with 
 below. Subtype text selection belongs to the separate definition query. Component queries
 expose read completeness through `coverage()`.
 
+## Vehicle armor
+
+Use `catalog_queries::equipment::vehicle_armor::with_vehicle_armor` for
+`configurations.vehicleArmor`. The decoded-Entry `_from` form, session and parsed view select
+physical owner Records or GUIDs. The query uses canonical Entity admission and keeps the original
+component slot, signal values, concrete damage alternative, penetration and deflection fields, and
+ordered health-curve points. A derived damage type with an unrecognized shape retains its authored
+fields under `Unknown`.
+
+Check `coverage()` before accepting the result. The query reads no locale or model payloads.
+Vehicle armor placements in a loadout still join by owner Record and component identity.
+
 ## Component definition Records
 
 The functions in the following table are exported by

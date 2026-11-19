@@ -5,9 +5,10 @@ use p4kx_extraction::{SourceValueState, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use super::authored_damage::{DamageInfo, DamageParameters};
+use super::authored_damage::{DamageChannels, DamageInfo, DamageParameters};
 use super::authored_fields::Observed;
 use crate::CatalogError;
+use crate::resource_float::ResourceFloat32;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 use crate::source_value_catalog::SourceArenaOutput;
@@ -23,22 +24,32 @@ pub(super) const INFO: &str = "DamageInfo";
     rename_all_fields = "camelCase"
 )]
 #[schemars(transform = every_field_required)]
-pub(super) enum VehicleArmorDamage<'source> {
+#[non_exhaustive]
+pub enum VehicleArmorDamage<'source> {
+    /// The concrete base declaration.
     Base {
+        /// Original type and additional members.
         #[serde(flatten)]
         source: ArmorDamageSource<'source>,
     },
+    /// A concrete vector of damage words.
     Info {
+        /// Original type, damage words and additional members.
         #[serde(flatten)]
         value: Box<ArmorDamageInfo<'source>>,
     },
+    /// A concrete damage total and macro link.
     Parameters {
+        /// Original type and additional members.
         #[serde(flatten)]
         source: ArmorDamageSource<'source>,
+        /// Original total and macro link.
         #[serde(flatten)]
         value: Box<DamageParameters<'source>>,
     },
+    /// An unclassified derived type retained with its original members.
     Unknown {
+        /// Original type and all authored members.
         #[serde(flatten)]
         source: ArmorDamageSource<'source>,
     },
@@ -77,7 +88,7 @@ impl<'source> VehicleArmorDamage<'source> {
 /// The shared six damage words and additional original members of a concrete Class.
 #[derive(Debug, Serialize, JsonSchema)]
 #[schemars(transform = every_field_required)]
-pub(super) struct ArmorDamageInfo<'source> {
+pub struct ArmorDamageInfo<'source> {
     #[serde(flatten)]
     source: ArmorDamageSource<'source>,
     #[serde(flatten)]
@@ -85,6 +96,18 @@ pub(super) struct ArmorDamageInfo<'source> {
 }
 
 impl<'source> ArmorDamageInfo<'source> {
+    /// Borrows the original damage type and other authored fields.
+    #[must_use]
+    pub const fn source(&self) -> &ArmorDamageSource<'source> {
+        &self.source
+    }
+
+    /// Returns the six original damage words.
+    #[must_use]
+    pub const fn channels(&self) -> DamageChannels<&SourcedValue<ResourceFloat32>> {
+        self.values.channels()
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
@@ -95,15 +118,28 @@ impl<'source> ArmorDamageInfo<'source> {
     }
 }
 
+/// The concrete damage type and its remaining original members.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct ArmorDamageSource<'source> {
+pub struct ArmorDamageSource<'source> {
     source_type: SourcedValue<&'source str>,
     additional_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> ArmorDamageSource<'source> {
+    /// Borrows the concrete authored type.
+    #[must_use]
+    pub const fn source_type(&self) -> &SourcedValue<&'source str> {
+        &self.source_type
+    }
+
+    /// Borrows the remaining original members.
+    #[must_use]
+    pub const fn additional_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.additional_fields
+    }
+
     fn read(
         source: Observed<'_, '_, '_, 'source>,
         projected: impl IntoIterator<Item = (&'static str, SourceValueState)>,

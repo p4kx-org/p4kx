@@ -189,12 +189,24 @@ impl<T> DamageChannels<T> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct DamageParameters<'source> {
+pub struct DamageParameters<'source> {
     damage_macro: SourcedValue<HealthLink<'source>>,
     damage_total: SourcedValue<ResourceFloat32>,
 }
 
 impl<'source> DamageParameters<'source> {
+    /// Borrows the original macro link.
+    #[must_use]
+    pub const fn damage_macro(&self) -> &SourcedValue<HealthLink<'source>> {
+        &self.damage_macro
+    }
+
+    /// Borrows the original total.
+    #[must_use]
+    pub const fn damage_total(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.damage_total
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

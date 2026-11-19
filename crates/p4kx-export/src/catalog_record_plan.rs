@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use p4kx_extraction::{
-    CancelToken, CanonicalReadObserver, DataForge, DataForgeError, Record, RecordTree, TreeBuilder,
+    CancelToken, CanonicalReadObserver, DataForge, DataForgeError, DataType, Record, RecordTree,
+    Struct, TreeBuilder,
 };
 
 use crate::catalog_queries::unlocalized_record_query;
@@ -43,6 +45,49 @@ impl<'source> Plan<'source> {
         cancel: Option<&CancelToken>,
         observer: Option<Arc<dyn CanonicalReadObserver>>,
     ) -> Result<Self, CatalogError> {
+        Self::read_entities_matching(forge, selection, cancel, observer, |_, _| true)
+    }
+
+    pub(in crate::build::catalog_queries) fn read_entity_components(
+        forge: &'source DataForge<'source>,
+        component_types: &[&str],
+        selection: CatalogRecordSelection,
+        cancel: Option<&CancelToken>,
+        observer: Option<Arc<dyn CanonicalReadObserver>>,
+    ) -> Result<Self, CatalogError> {
+        checkpoint(cancel)?;
+        let probes: Vec<_> = component_types
+            .iter()
+            .filter_map(|name| forge.strict_pointer_probe(COMPONENTS, name))
+            .collect();
+        let strong_arrays: HashSet<_> = forge
+            .structs()
+            .filter(|structure| {
+                structure
+                    .name()
+                    .is_ok_and(|name| name == p4kx_assembly::ENTITY_TYPE)
+                    && strong_component_array(forge, *structure)
+            })
+            .map(|structure| structure.index())
+            .collect();
+        Self::read_entities_matching(forge, selection, cancel, observer, |record, trees| {
+            // Only a proven negative can exclude a Record before the canonical body read.
+            !record
+                .struct_type()
+                .is_ok_and(|structure| strong_arrays.contains(&structure.index()))
+                || probes
+                    .iter()
+                    .any(|probe| !matches!(trees.holds(probe, record), Ok(false)))
+        })
+    }
+
+    fn read_entities_matching(
+        forge: &'source DataForge<'source>,
+        selection: CatalogRecordSelection,
+        cancel: Option<&CancelToken>,
+        observer: Option<Arc<dyn CanonicalReadObserver>>,
+        mut may_match: impl FnMut(&Record<'source>, &mut TreeBuilder<'source>) -> bool,
+    ) -> Result<Self, CatalogError> {
         let crafter = forge.pointer_probe(CRAFTER_FIELD, CRAFTER_STRUCT);
         Self::read_with(
             forge,
@@ -62,13 +107,13 @@ impl<'source> Plan<'source> {
                     Ok(Some(Selected::Leftover(_))) => coverage.skipped_leftovers += 1,
                     Ok(Some(Selected::Entity(kind))) => {
                         if kind != Kind::Crafters {
-                            return Ok(true);
+                            return Ok(may_match(record, trees));
                         }
                         match crafter
                             .as_ref()
                             .map_or(Ok(false), |probe| trees.holds(probe, record))
                         {
-                            Ok(holds) => return Ok(holds),
+                            Ok(holds) => return Ok(holds && may_match(record, trees)),
                             Err(_) => coverage.unreadable_headers.push(record.index()),
                         }
                     }
@@ -152,4 +197,36 @@ impl<'source> Plan<'source> {
         })?;
         Ok(result)
     }
+}
+
+const COMPONENTS: &str = "Components";
+
+fn strong_component_array(forge: &DataForge<'_>, mut structure: Struct<'_>) -> bool {
+    let mut found = false;
+    for _ in 0..forge.structs().len() {
+        let mut count = 0;
+        for property in structure.properties() {
+            count += 1;
+            let Ok(name) = property.name() else {
+                return false;
+            };
+            if name == COMPONENTS {
+                if found
+                    || !property.is_array()
+                    || !matches!(property.data_type(), Ok(DataType::StrongPointer))
+                {
+                    return false;
+                }
+                found = true;
+            }
+        }
+        if count != structure.property_range().len() {
+            return false;
+        }
+        let Some(parent) = structure.parent() else {
+            return found;
+        };
+        structure = parent;
+    }
+    false
 }

@@ -2,10 +2,11 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::cell::RefCell;
+use std::ops::Range;
 
 use p4kx_extraction::{CancelToken, RecordTree, Value};
 
-use super::{ConfigurationKind, EntityConfigurationRows};
+use super::{ConfigurationKind, EntityConfigurationRows, VehicleArmor};
 use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_projection::CatalogProjection;
@@ -17,6 +18,9 @@ use crate::catalog_v3::catalog_item_alignment::{ItemAttachmentComponent, ItemPor
 use crate::catalog_v3::inventory_owner_bounds::InventoryOwnerBounds;
 use crate::catalog_v3::item_alignment_options::AlignmentOptions;
 use crate::catalog_v3::item_component_owner::ComponentOwner;
+use crate::export_diagnostic::ExportDiagnosticSeverity;
+use crate::export_field_inspection::ConfigurationInspection;
+use crate::export_field_walk;
 use crate::record_observation::RecordObservation;
 use crate::source_fields::FieldError;
 use crate::template_field_capture::TemplateFieldCapture;
@@ -104,6 +108,24 @@ pub(crate) fn read_cargo_configurations<'source>(
     )
 }
 
+pub(crate) fn read_vehicle_armor<'source>(
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    options: &AlignmentOptions<'_>,
+    cancel: Option<&CancelToken>,
+) -> Result<ScopedSourceRead<Vec<VehicleArmor<'source>>>, CatalogError> {
+    let read = read_scope(
+        tree,
+        projection,
+        admission,
+        options,
+        cancel,
+        Scope::VehicleArmor,
+    )?;
+    Ok(read.map(|rows| rows.vehicle_armor))
+}
+
 fn read_scope<'source>(
     tree: &RecordTree<'source>,
     projection: &CatalogProjection<'_, 'source>,
@@ -114,7 +136,7 @@ fn read_scope<'source>(
 ) -> Result<ScopedSourceRead<EntityConfigurationRows<'source>>, CatalogError> {
     let input = projection.original();
     let scope = input.record_scope(admission.record(), tree)?;
-    let selection_complete = requested.selection_complete(tree, input, cancel)?;
+    let mut selection_complete = requested.selection_complete(tree, input, cancel)?;
     let mut rows = EntityConfigurationRows::default();
     let mut notes = Vec::new();
     let Some((authored_components, components)) = selected_components(tree, input, requested)
@@ -132,6 +154,8 @@ fn read_scope<'source>(
         .record(tree.record_index())
         .with_cancel(cancel);
     let numbers = RefCell::new(Vec::new());
+    let inspection = requested.inspection();
+    let mut spans = Vec::new();
     for (component, configuration) in components {
         originals.check_cancel()?;
         let component = originals.fact(component)?;
@@ -142,6 +166,13 @@ fn read_scope<'source>(
             owner,
         };
         requested.project(&mut rows, selected, source, options, projection, &mut notes)?;
+        if inspection.is_some() {
+            spans.push(originals.span(component)?);
+        }
+    }
+    if let Some(inspection) = inspection {
+        selection_complete &=
+            inspected_scope_complete(input, tree, admission, &spans, inspection, cancel)?;
     }
     retain_cargo_owner(
         &mut rows,
@@ -151,6 +182,24 @@ fn read_scope<'source>(
     )?;
     rows.numbers = numbers.into_inner();
     Ok(ScopedSourceRead::new(rows, notes, selection_complete))
+}
+
+fn inspected_scope_complete<'source>(
+    input: &OriginalCatalogInput<'_, 'source>,
+    tree: &RecordTree<'source>,
+    admission: &RecordObservation<'_, 'source>,
+    spans: &[Range<usize>],
+    inspection: ConfigurationInspection,
+    cancel: Option<&CancelToken>,
+) -> Result<bool, CatalogError> {
+    let evidence = export_field_walk::inspect_configuration(
+        input, tree, admission, spans, inspection, cancel,
+    )?;
+    Ok(evidence.field_inspections.iter().all(|row| row.complete)
+        && evidence
+            .field_diagnostics
+            .iter()
+            .all(|row| row.severity == ExportDiagnosticSeverity::Information))
 }
 
 fn retain_cargo_owner(

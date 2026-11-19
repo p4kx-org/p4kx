@@ -21,7 +21,7 @@ pub(super) const DEFLECTION: &str = "ArmorDeflectionParams";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct ArmorPenetrationResistance<'source> {
+pub struct ArmorPenetrationResistance<'source> {
     source_type: SourcedValue<&'source str>,
     base_penetration_reduction: SourcedValue<ResourceFloat32>,
     penetration_absorption_for_type: SourcedValue<ArmorDamageInfo<'source>>,
@@ -29,6 +29,30 @@ pub(super) struct ArmorPenetrationResistance<'source> {
 }
 
 impl<'source> ArmorPenetrationResistance<'source> {
+    /// Borrows the concrete authored type.
+    #[must_use]
+    pub const fn source_type(&self) -> &SourcedValue<&'source str> {
+        &self.source_type
+    }
+
+    /// Borrows the authored penetration reduction.
+    #[must_use]
+    pub const fn base_penetration_reduction(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.base_penetration_reduction
+    }
+
+    /// Borrows the original absorption values.
+    #[must_use]
+    pub const fn penetration_absorption_for_type(&self) -> &SourcedValue<ArmorDamageInfo<'source>> {
+        &self.penetration_absorption_for_type
+    }
+
+    /// Borrows the remaining original members.
+    #[must_use]
+    pub const fn additional_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.additional_fields
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
@@ -63,7 +87,7 @@ impl<'source> ArmorPenetrationResistance<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct ArmorDeflection<'source> {
+pub struct ArmorDeflection<'source> {
     source_type: SourcedValue<&'source str>,
     deflection_value: SourcedValue<ArmorDamageInfo<'source>>,
     health_curve: SourcedValue<ArmorHealthCurve<'source>>,
@@ -71,6 +95,30 @@ pub(super) struct ArmorDeflection<'source> {
 }
 
 impl<'source> ArmorDeflection<'source> {
+    /// Borrows the concrete authored type.
+    #[must_use]
+    pub const fn source_type(&self) -> &SourcedValue<&'source str> {
+        &self.source_type
+    }
+
+    /// Borrows the original deflection values.
+    #[must_use]
+    pub const fn deflection_value(&self) -> &SourcedValue<ArmorDamageInfo<'source>> {
+        &self.deflection_value
+    }
+
+    /// Borrows the authored health curve.
+    #[must_use]
+    pub const fn health_curve(&self) -> &SourcedValue<ArmorHealthCurve<'source>> {
+        &self.health_curve
+    }
+
+    /// Borrows the remaining original members.
+    #[must_use]
+    pub const fn additional_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.additional_fields
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
@@ -100,10 +148,11 @@ impl<'source> ArmorDeflection<'source> {
     }
 }
 
+/// The original curve controls and ordered authored point slots.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct ArmorHealthCurve<'source> {
+pub struct ArmorHealthCurve<'source> {
     source_type: SourcedValue<&'source str>,
     #[serde(flatten)]
     curve: DegradationCurve,
@@ -111,6 +160,24 @@ struct ArmorHealthCurve<'source> {
 }
 
 impl<'source> ArmorHealthCurve<'source> {
+    /// Borrows the concrete authored type.
+    #[must_use]
+    pub const fn source_type(&self) -> &SourcedValue<&'source str> {
+        &self.source_type
+    }
+
+    /// Borrows the original curve controls and point slots.
+    #[must_use]
+    pub const fn curve(&self) -> &DegradationCurve {
+        &self.curve
+    }
+
+    /// Borrows the remaining original members.
+    #[must_use]
+    pub const fn additional_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.additional_fields
+    }
+
     fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

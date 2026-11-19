@@ -21,7 +21,7 @@ pub(super) const COMPONENT: &str = "SCItemVehicleArmorParams";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct VehicleArmor<'source> {
+pub struct VehicleArmor<'source> {
     #[serde(flatten)]
     owner: ComponentOwner,
     source_type: SourcedValue<&'source str>,
@@ -35,6 +35,56 @@ pub(super) struct VehicleArmor<'source> {
 }
 
 impl<'source> VehicleArmor<'source> {
+    /// Borrows the original component type.
+    #[must_use]
+    pub const fn source_type(&self) -> &SourcedValue<&'source str> {
+        &self.source_type
+    }
+
+    /// Borrows the authored infrared value.
+    #[must_use]
+    pub const fn signal_infrared(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.signal_infrared
+    }
+
+    /// Borrows the authored electromagnetic value.
+    #[must_use]
+    pub const fn signal_electromagnetic(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.signal_electromagnetic
+    }
+
+    /// Borrows the authored cross-section value.
+    #[must_use]
+    pub const fn signal_cross_section(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.signal_cross_section
+    }
+
+    /// Borrows the concrete authored damage multiplier.
+    #[must_use]
+    pub const fn damage_multiplier(&self) -> &SourcedValue<VehicleArmorDamage<'source>> {
+        &self.damage_multiplier
+    }
+
+    /// Borrows the authored penetration resistance.
+    #[must_use]
+    pub const fn armor_penetration_resistance(
+        &self,
+    ) -> &SourcedValue<ArmorPenetrationResistance<'source>> {
+        &self.armor_penetration_resistance
+    }
+
+    /// Borrows the authored deflection.
+    #[must_use]
+    pub const fn armor_deflection(&self) -> &SourcedValue<ArmorDeflection<'source>> {
+        &self.armor_deflection
+    }
+
+    /// Borrows other original component members.
+    #[must_use]
+    pub const fn additional_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.additional_fields
+    }
+
     pub(super) fn read(
         owner: ComponentOwner,
         source: Observed<'_, '_, '_, 'source>,
@@ -85,7 +135,9 @@ impl<'source> VehicleArmor<'source> {
         })
     }
 
-    pub(super) const fn owner(&self) -> &ComponentOwner {
+    /// Borrows the physical owner and original component slot.
+    #[must_use]
+    pub const fn owner(&self) -> &ComponentOwner {
         &self.owner
     }
 }

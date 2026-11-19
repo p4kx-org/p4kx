@@ -26,6 +26,10 @@ pub mod flight;
 #[path = "equipment_mining_tool_query.rs"]
 pub mod mining_tools;
 
+/// Selective reads of authored vehicle armor and its original components.
+#[path = "equipment_vehicle_armor_query.rs"]
+pub mod vehicle_armor;
+
 /// Selective reads of authored clothing, suit armor and per-item radar components.
 #[path = "equipment_worn_gear_query.rs"]
 pub mod worn_gear;

@@ -38,6 +38,7 @@ pub(crate) enum ConfigurationInspection {
     Thruster,
     HackableDevice,
     SuitArmor,
+    VehicleArmor,
     Clothing,
     ItemRadar,
     DamageResistanceMacro,

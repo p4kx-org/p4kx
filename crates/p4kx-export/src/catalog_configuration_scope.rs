@@ -13,6 +13,7 @@ use crate::catalog_v3::catalog_item_alignment::{
 };
 use crate::catalog_v3::item_alignment_options::AlignmentOptions;
 use crate::catalog_v3::item_component_owner::ComponentOwner;
+use crate::export_field_inspection::ConfigurationInspection;
 use crate::source_fields::FieldError;
 use crate::{CatalogError, ExportAccountingError};
 
@@ -23,6 +24,7 @@ pub(super) enum Scope {
     Attachments,
     Bounds,
     CargoGrids,
+    VehicleArmor,
 }
 
 pub(super) struct ConfigurationOwner {
@@ -76,7 +78,15 @@ impl Scope {
                 ConfigurationKind::Facility(FacilityKind::CargoGrid)
                     | ConfigurationKind::InventoryStorage
             ),
+            Self::VehicleArmor => matches!(kind, ConfigurationKind::VehicleArmor),
             Self::Ports => false,
+        }
+    }
+
+    pub(super) const fn inspection(self) -> Option<ConfigurationInspection> {
+        match self {
+            Self::VehicleArmor => Some(ConfigurationInspection::VehicleArmor),
+            _ => None,
         }
     }
 
@@ -149,7 +159,7 @@ impl Scope {
             owner,
         } = selected;
         match self {
-            Self::All | Self::CargoGrids => {
+            Self::All | Self::CargoGrids | Self::VehicleArmor => {
                 rows.push_configuration(configuration, owner, source, options, projection, notes)
             }
             Self::Ports | Self::Attachments => {

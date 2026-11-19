@@ -1696,7 +1696,7 @@
       "type": "object"
     },
     "ArmorHealthCurve": {
-      "description": "The original curve controls and authored point slots.",
+      "description": "The original curve controls and ordered authored point slots.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -136887,6 +136887,7 @@
       "description": "The concrete authored vehicle armour multiplier and its original members.",
       "oneOf": [
         {
+          "description": "The concrete base declaration.",
           "properties": {
             "additionalFields": {
               "$ref": "#/$defs/SourceArenaOutput"
@@ -136907,7 +136908,7 @@
           "type": "object"
         },
         {
-          "description": "The shared six damage words and additional original members of a concrete Class.",
+          "description": "A concrete vector of damage words.",
           "properties": {
             "additionalFields": {
               "$ref": "#/$defs/SourceArenaOutput"
@@ -136952,7 +136953,7 @@
           "type": "object"
         },
         {
-          "description": "The original macro link and declared total.",
+          "description": "A concrete damage total and macro link.",
           "properties": {
             "additionalFields": {
               "$ref": "#/$defs/SourceArenaOutput"
@@ -136981,6 +136982,7 @@
           "type": "object"
         },
         {
+          "description": "An unclassified derived type retained with its original members.",
           "properties": {
             "additionalFields": {
               "$ref": "#/$defs/SourceArenaOutput"

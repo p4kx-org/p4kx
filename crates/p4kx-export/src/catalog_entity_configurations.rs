@@ -14,7 +14,7 @@ use super::catalog_interactions::{self, InteractionConfiguration, InteractionKin
 use super::catalog_item_alignment::{ItemAlignmentKind, ItemAlignmentRows, ItemAlignmentTables};
 use super::catalog_resource_component::{self, ResourceComponent};
 use super::catalog_resource_connection::{self, ConnectionKind, ResourceConnection};
-use super::catalog_vehicle_armor::{self, VehicleArmor};
+use super::catalog_vehicle_armor;
 use super::inventory_container_definition::PreparedInventoryContainer;
 use super::inventory_entity_configurations::{InventoryEntityRows, InventoryEntityTables};
 use super::inventory_item_occupancy::InventoryItemOccupancy;
@@ -39,8 +39,19 @@ use crate::{CatalogError, ExportAccountingError};
 mod record_read;
 pub(crate) use record_read::{
     read, read_attachment_constraints, read_cargo_configurations, read_item_bounds,
-    read_item_ports, read_item_ports_scoped,
+    read_item_ports, read_item_ports_scoped, read_vehicle_armor,
 };
+
+pub use super::authored_damage::{DamageChannels, DamageParameters};
+pub use super::authored_link::HealthLink;
+pub use super::catalog_vehicle_armor::VehicleArmor;
+pub use super::degradation_curve::{CurvePoint, DegradationCurve};
+pub use super::vehicle_armor_damage::{ArmorDamageInfo, ArmorDamageSource, VehicleArmorDamage};
+pub use super::vehicle_armor_resistance::{
+    ArmorDeflection, ArmorHealthCurve, ArmorPenetrationResistance,
+};
+
+pub(crate) const VEHICLE_ARMOR_TYPES: &[&str] = &[catalog_vehicle_armor::COMPONENT];
 
 #[derive(Default)]
 pub(crate) struct EntityConfigurationRows<'source> {
@@ -246,11 +257,7 @@ impl<'source> EntityConfigurationRows<'source> {
                 catalog_resource_connection::SOURCE_TYPES,
                 self.connections,
             ),
-            vehicle_armor: CatalogTable::new(
-                forge,
-                &[catalog_vehicle_armor::COMPONENT],
-                self.vehicle_armor,
-            ),
+            vehicle_armor: CatalogTable::new(forge, VEHICLE_ARMOR_TYPES, self.vehicle_armor),
         })
     }
 }
