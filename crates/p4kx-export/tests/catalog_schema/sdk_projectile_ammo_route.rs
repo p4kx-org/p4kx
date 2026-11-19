@@ -2,12 +2,13 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_export::catalog_queries::equipment::{
-    AmmoSelection, ProjectileAmmoChoice, ProjectileAmmoSnapshot, with_projectile_ammo,
+    AmmoSelection, DpsUnit, ProjectileAmmoChoice, ProjectileAmmoSnapshot, with_projectile_ammo,
+    with_weapon_combat_bases,
 };
 use p4kx_extraction::{Archive, DataForge, Filter};
 use p4kx_testkit::{ArchiveBuilder, TestEntry};
 
-use super::super::{AMMUNITION, PROJECTILE_AMMUNITION, Route, TestResult};
+use super::super::{AMMUNITION, PROJECTILE_AMMUNITION, Route, TestResult, WEAPON_COMBAT};
 
 #[expect(
     dead_code,
@@ -16,7 +17,7 @@ use super::super::{AMMUNITION, PROJECTILE_AMMUNITION, Route, TestResult};
 #[path = "../it/catalog_weapon_linked_ammo_fixture.rs"]
 mod fixture;
 
-pub(super) fn read() -> TestResult<[Route; 2]> {
+pub(super) fn read() -> TestResult<[Route; 3]> {
     let bytes =
         fixture::with_ammo_names(fixture::Case::Unique, "debug_primary", "debug_secondary").build();
     let record_index = {
@@ -36,8 +37,34 @@ pub(super) fn read() -> TestResult<[Route; 2]> {
         .entry(TestEntry::stored("Data\\Game2.dcb", bytes))
         .write_to(&path)?;
     let archive = Archive::open(path)?;
-    with_projectile_ammo(&archive, record_index, None, |snapshot| {
+    let [projectile, ammo] = with_projectile_ammo(&archive, record_index, None, |snapshot| {
         reached(&snapshot, record_index)
+    })??;
+    Ok([projectile, ammo, combat(&archive, record_index)?])
+}
+
+fn combat(archive: &Archive, weapon: u32) -> TestResult<Route> {
+    with_weapon_combat_bases(archive, weapon, None, |snapshot| {
+        let [owner] = snapshot.rows() else {
+            return Err("the public combat query must read one physical weapon".into());
+        };
+        if owner.combat_bases.len() != 2
+            || owner.combat_bases.iter().enumerate().any(|(index, row)| {
+                row.owner().record_index().value() != Some(&weapon)
+                    || row.mode_index().value().copied() != u32::try_from(index).ok()
+                    || row.formula_version() != 1
+                    || !matches!(row.units().nominal_dps(), DpsUnit::DamagePointsPerSecond)
+            })
+        {
+            return Err(
+                "the SDK combat rows must retain both original slots and their contract".into(),
+            );
+        }
+        Route::queried_rows(
+            WEAPON_COMBAT,
+            &owner.combat_bases,
+            "physical Item combat query available; owner enumeration and installed parity open",
+        )
     })?
 }
 

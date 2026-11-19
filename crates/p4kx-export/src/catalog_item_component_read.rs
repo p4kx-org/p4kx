@@ -102,6 +102,11 @@ pub(crate) fn read_weapon_source<'source>(
     )
 }
 
+pub(crate) struct WeaponProjectileSources<'source> {
+    pub(crate) actions: Vec<WeaponActions<'source>>,
+    pub(crate) selections: Vec<WeaponProjectileAmmoSelection>,
+}
+
 pub(crate) fn read_projectile_ammo<'source>(
     forge: &'source DataForge<'source>,
     tree: &RecordTree<'source>,
@@ -109,7 +114,7 @@ pub(crate) fn read_projectile_ammo<'source>(
     admission: &RecordObservation<'_, 'source>,
     cancel: Option<&CancelToken>,
     ledger: &mut ExportLedger,
-) -> Result<ScopedSourceRead<Vec<WeaponProjectileAmmoSelection>>, CatalogError> {
+) -> Result<ScopedSourceRead<WeaponProjectileSources<'source>>, CatalogError> {
     projection.original().check_forge(forge)?;
     let selection_complete = weapon_component_selection_complete(tree);
     with_components(
@@ -133,7 +138,10 @@ pub(crate) fn read_projectile_ammo<'source>(
                 ledger,
             )?;
             Ok(ScopedSourceRead::new(
-                rows,
+                WeaponProjectileSources {
+                    actions: result.rows.weapon_actions,
+                    selections: rows,
+                },
                 result.notes,
                 selection_complete,
             ))

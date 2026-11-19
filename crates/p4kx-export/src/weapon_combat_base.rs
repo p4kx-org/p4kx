@@ -3,127 +3,32 @@
 
 use std::collections::BTreeMap;
 
-use p4kx_extraction::{
-    CancelToken, DataForge, DecimalU64, FieldOrigin, SourceUses, SourceValue, SourcedValue,
-};
-use schemars::JsonSchema;
-use serde::Serialize;
-
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::ammo_definition::{self, AmmoDefinition, PreparedAmmoDefinition};
 use crate::catalog_v3::authored_ammo_inputs::AuthoredAmmoInputs;
-use crate::catalog_v3::authored_damage::{DamageChannels, DamageInfo};
+use crate::catalog_v3::authored_damage::DamageInfo;
 use crate::catalog_v3::catalog_item_components::ItemComponentTables;
 use crate::catalog_v3::catalog_weapon_actions::{
     ProjectileCombatInputs, WeaponAction, WeaponActions, WeaponModeKind,
 };
 use crate::catalog_v3::catalog_weapon_projectile_ammo::WeaponProjectileAmmoSelection;
-use crate::catalog_v3::item_component_owner::ComponentOwner;
 use crate::item_stats::WEAPON_COMPONENT;
-use crate::resource_float::ResourceFloat32;
-use crate::schema_fields::every_field_required;
 use crate::{CatalogError, ExportAccountingError};
+use p4kx_extraction::{CancelToken, DataForge, FieldOrigin, SourceUses, SourceValue, SourcedValue};
 
+#[path = "weapon_combat_contract.rs"]
+mod contract;
 #[path = "weapon_combat_math.rs"]
 mod math;
 
+pub use crate::catalog_v3::authored_damage::DamageChannels;
+pub use contract::{
+    AlphaUnit, CombatModel, CombatUnits, DistanceUnit, DpsUnit, FireRateUnit, NominalBullet,
+    NominalBulletDamage, WeaponCombatBase,
+};
+
 const FORMULA_VERSION: u8 = 1;
-
-/// Nominal combat base values keyed to a physical weapon component and fire mode.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct WeaponCombatBase<'source> {
-    #[serde(flatten)]
-    owner: ComponentOwner,
-    #[schemars(range(min = 1, max = 1))]
-    formula_version: u8,
-    units: CombatUnits,
-    mode_index: SourcedValue<u32>,
-    action_source_value_ordinal: Option<SourcedValue<DecimalU64>>,
-    action_source_type: Option<SourcedValue<&'source str>>,
-    ammunition_record_index: Option<SourcedValue<u32>>,
-    model: SourcedValue<CombatModel>,
-}
-
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-struct CombatUnits {
-    fire_rate: FireRateUnit,
-    alpha: AlphaUnit,
-    nominal_dps: DpsUnit,
-    nominal_flight_distance: DistanceUnit,
-}
-
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
-enum FireRateUnit {
-    DischargesPerMinute,
-}
-
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
-enum AlphaUnit {
-    DamagePoints,
-}
-
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
-enum DpsUnit {
-    DamagePointsPerSecond,
-}
-
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
-enum DistanceUnit {
-    Metres,
-}
-
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(
-    tag = "type",
-    rename_all = "camelCase",
-    rename_all_fields = "camelCase"
-)]
-#[schemars(transform = every_field_required)]
-enum CombatModel {
-    NominalBullet { values: Box<NominalBullet> },
-    AmmoSelectionUnavailable,
-    AmmoDefinitionUnavailable,
-    ActionUnavailable,
-    UnsupportedAction,
-    Burst,
-    Beam,
-    Charge,
-    Conditional,
-    ProjectileUnavailable,
-    UnsupportedProjectile,
-}
-
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-struct NominalBullet {
-    fire_rate_rpm: SourcedValue<i32>,
-    projectiles_per_discharge: SourcedValue<i32>,
-    launcher_damage_multiplier: SourcedValue<ResourceFloat32>,
-    nominal_flight_distance: SourcedValue<f64>,
-    damage: SourcedValue<NominalBulletDamage>,
-}
-
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-struct NominalBulletDamage {
-    alpha: DamageChannels<SourcedValue<f64>>,
-    nominal_dps: DamageChannels<SourcedValue<f64>>,
-}
 
 #[path = "countermeasure_emitter.rs"]
 pub(crate) mod countermeasure_emitter;
@@ -144,10 +49,10 @@ impl<'source> CatalogWeaponTables<'source> {
         ammunition: Vec<PreparedAmmoDefinition<'source>>,
         cancel: Option<&CancelToken>,
     ) -> Result<Self, CatalogError> {
-        let combat = table(
-            forge,
+        let combat = rows(
             &input.origins().uses,
-            components,
+            &components.weapon_actions.rows,
+            &components.projectile_ammo_selections.rows,
             &ammunition,
             cancel,
         )?;
@@ -161,21 +66,19 @@ impl<'source> CatalogWeaponTables<'source> {
         Ok(Self {
             emitters,
             ammunition: ammo_definition::table(forge, ammunition),
-            combat,
+            combat: CatalogTable::new(forge, &[WEAPON_COMPONENT], combat),
         })
     }
 }
 
-fn table<'source>(
-    forge: &DataForge<'_>,
+pub(crate) fn rows<'source>(
     sources: &SourceUses,
-    components: &ItemComponentTables<'source>,
+    actions: &[WeaponActions<'source>],
+    selections: &[WeaponProjectileAmmoSelection],
     ammunition: &[PreparedAmmoDefinition<'source>],
     cancel: Option<&CancelToken>,
-) -> Result<CatalogTable<WeaponCombatBase<'source>>, CatalogError> {
-    let selections: BTreeMap<_, _> = components
-        .projectile_ammo_selections
-        .rows
+) -> Result<Vec<WeaponCombatBase<'source>>, CatalogError> {
+    let selections: BTreeMap<_, _> = selections
         .iter()
         .map(|row| {
             (
@@ -199,7 +102,7 @@ fn table<'source>(
         ammunition,
     };
     let mut rows = Vec::new();
-    for weapon in &components.weapon_actions.rows {
+    for weapon in actions {
         let Some(slots) = weapon.fire_actions().value() else {
             continue;
         };
@@ -211,7 +114,7 @@ fn table<'source>(
             rows.push(inputs.mode(weapon, index, slot)?);
         }
     }
-    Ok(CatalogTable::new(forge, &[WEAPON_COMPONENT], rows))
+    Ok(rows)
 }
 
 type ModeKey = ((Option<u32>, Option<u32>), Option<u64>);
@@ -272,12 +175,7 @@ impl<'source> CombatInputs<'_, 'source> {
         Ok(WeaponCombatBase {
             owner: weapon.owner().clone(),
             formula_version: FORMULA_VERSION,
-            units: CombatUnits {
-                fire_rate: FireRateUnit::DischargesPerMinute,
-                alpha: AlphaUnit::DamagePoints,
-                nominal_dps: DpsUnit::DamagePointsPerSecond,
-                nominal_flight_distance: DistanceUnit::Metres,
-            },
+            units: CombatUnits::NOMINAL,
             mode_index: self
                 .sources
                 .value_with_origins(SourceValue::Present(index), &mode_origins[..2])?,

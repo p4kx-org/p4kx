@@ -87,6 +87,23 @@ pub(super) struct CargoGrids;
 pub(super) struct AmmoDefinitions;
 pub(super) struct WeaponSources;
 pub(super) struct ProjectileAmmo;
+pub(super) struct WeaponCombatBases;
+
+impl Projector for WeaponCombatBases {
+    type Row<'source> = super::weapon_combat_read::WeaponCombatOwner<'source>;
+    const FAMILY: Family = Family::ProjectileAmmo;
+
+    fn read<'source>(
+        forge: &'source DataForge<'source>,
+        tree: &RecordTree<'source>,
+        projection: &CatalogProjection<'_, 'source>,
+        admission: &RecordObservation<'_, 'source>,
+        _: &AlignmentOptions<'_>,
+        cancel: Option<&CancelToken>,
+    ) -> Result<ScopedSourceRead<Vec<Self::Row<'source>>>, CatalogError> {
+        super::weapon_combat_read::read(forge, tree, projection, admission, cancel)
+    }
+}
 
 impl Projector for ProjectileAmmo {
     type Row<'source> = super::projectile_ammo_read::ProjectileAmmoOwner<'source>;

@@ -39,6 +39,7 @@ pub(super) enum Case {
     DerivedAmmo,
     InvalidAction,
     MixedModes,
+    BeamOnly,
     RepeatedAction,
 }
 
@@ -269,7 +270,13 @@ fn weapon_component(case: Case) -> TestInstance {
         Case::UnsupportedRole => TestValue::Struct(fire("FixtureFutureRole")),
         _ => TestValue::Struct(fire("Secondary")),
     };
-    let mut actions = vec![TestValue::Struct(primary), second];
+    let mut actions = if case == Case::BeamOnly {
+        vec![TestValue::Struct(TestInstance::new(
+            "SWeaponActionFireBeamParams",
+        ))]
+    } else {
+        vec![TestValue::Struct(primary), second]
+    };
     if case == Case::Countermeasure {
         actions.push(TestValue::Struct(fire("Primary")));
     }

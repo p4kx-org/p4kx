@@ -724,6 +724,20 @@ check a second Archive in the same run. Each check reads DataForge once and crea
 cargo test --locked -p p4kx-export --test real_archive real_archive_weapon_combat::projectile::projectile_ammunition_sdk_matches_original_sources -- --ignored --exact --nocapture --test-threads=1
 ```
 
+## Weapon combat bases
+
+Use `equipment::with_weapon_combat_bases`, its decoded-Entry form or the corresponding
+session methods with one physical Item Record index. The result retains every original
+fire-action slot in Catalog order, with the same units, formula version, damage channels
+and source cells as `projections.weaponCombatBases`. The same read supplies the projectile
+route outcomes, reached Ammo definitions and their dependency coverage.
+
+Beam, burst, charge and conditional modes retain their classifications even if the weapon
+has no projectile route. Missing or unreadable action slots also retain their own outcomes.
+Nominal bullet metrics carry separate source states for fire rate, damage per discharge,
+nominal DPS and nominal flight distance. Crafting adjustments and ship loadout totals use
+the rules in the [combat quality contract](catalog-combat-quality.md).
+
 ## Starmap container placements
 
 Use `starmap::read_container_placements` to read the canonical `placements.containerInstances` and

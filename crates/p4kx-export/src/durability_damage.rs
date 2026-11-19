@@ -113,7 +113,7 @@ impl DamageInfo {
 /// A fixed vector keyed by the original damage channels.
 #[derive(Debug, Serialize, JsonSchema)]
 #[schemars(transform = every_field_required)]
-pub(super) struct DamageChannels<T> {
+pub struct DamageChannels<T> {
     physical: T,
     energy: T,
     distortion: T,
@@ -123,6 +123,42 @@ pub(super) struct DamageChannels<T> {
 }
 
 impl<T> DamageChannels<T> {
+    /// Borrows the physical damage channel.
+    #[must_use]
+    pub const fn physical(&self) -> &T {
+        &self.physical
+    }
+
+    /// Borrows the energy damage channel.
+    #[must_use]
+    pub const fn energy(&self) -> &T {
+        &self.energy
+    }
+
+    /// Borrows the distortion damage channel.
+    #[must_use]
+    pub const fn distortion(&self) -> &T {
+        &self.distortion
+    }
+
+    /// Borrows the thermal damage channel.
+    #[must_use]
+    pub const fn thermal(&self) -> &T {
+        &self.thermal
+    }
+
+    /// Borrows the biochemical damage channel.
+    #[must_use]
+    pub const fn biochemical(&self) -> &T {
+        &self.biochemical
+    }
+
+    /// Borrows the stun damage channel.
+    #[must_use]
+    pub const fn stun(&self) -> &T {
+        &self.stun
+    }
+
     pub(super) const fn as_ref(&self) -> DamageChannels<&T> {
         DamageChannels {
             physical: &self.physical,

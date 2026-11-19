@@ -13,6 +13,7 @@ use crate::catalog_v3::ammo_definition::{
     self, AmmoDefinition, AmmoSelection, PreparedAmmoDefinition,
 };
 use crate::catalog_v3::catalog_item_components;
+use crate::catalog_v3::catalog_weapon_actions::WeaponActions;
 use crate::catalog_v3::catalog_weapon_projectile_ammo::{self, WeaponProjectileAmmoSelection};
 use crate::export_diagnostic::ExportDiagnosticSeverity;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
@@ -31,6 +32,27 @@ pub struct ProjectileAmmoOwner<'source> {
     pub dependency_coverage: CatalogRecordCoverage,
 }
 
+pub(super) struct ProjectileInputs<'source> {
+    pub(super) actions: Vec<WeaponActions<'source>>,
+    pub(super) selections: Vec<WeaponProjectileAmmoSelection>,
+    pub(super) ammunition: Vec<PreparedAmmoDefinition<'source>>,
+    coverage: CatalogRecordCoverage,
+}
+
+impl<'source> ProjectileInputs<'source> {
+    pub(super) fn into_owner(self, forge: &DataForge<'_>) -> ProjectileAmmoOwner<'source> {
+        ProjectileAmmoOwner {
+            selections: catalog_weapon_projectile_ammo::table(forge, self.selections).rows,
+            ammo_definitions: self
+                .ammunition
+                .into_iter()
+                .map(PreparedAmmoDefinition::into_definition)
+                .collect(),
+            dependency_coverage: self.coverage,
+        }
+    }
+}
+
 pub(super) fn read<'source>(
     forge: &'source DataForge<'source>,
     tree: &RecordTree<'source>,
@@ -38,6 +60,22 @@ pub(super) fn read<'source>(
     admission: &RecordObservation<'_, 'source>,
     cancel: Option<&CancelToken>,
 ) -> Result<ScopedSourceRead<Vec<ProjectileAmmoOwner<'source>>>, CatalogError> {
+    let read = read_inputs(forge, tree, projection, admission, cancel)?;
+    Ok(read.map(|inputs| {
+        (!inputs.selections.is_empty())
+            .then(|| inputs.into_owner(forge))
+            .into_iter()
+            .collect()
+    }))
+}
+
+pub(super) fn read_inputs<'source>(
+    forge: &'source DataForge<'source>,
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    cancel: Option<&CancelToken>,
+) -> Result<ScopedSourceRead<ProjectileInputs<'source>>, CatalogError> {
     let mut dependencies = ExportLedger::default();
     let mut routes = catalog_item_components::read_projectile_ammo(
         forge,
@@ -47,25 +85,28 @@ pub(super) fn read<'source>(
         cancel,
         &mut dependencies,
     )?;
-    if routes.value.is_empty() {
-        return Ok(routes.map(|_| Vec::new()));
-    }
     routes.selection_complete &= routes
         .value
+        .selections
         .iter()
         .all(|row| row.selection().origin().source_set_complete());
     let mut coverage = magazine_coverage(dependencies)?;
-    let ammo = reached_ammo(forge, projection, &routes.value, cancel, &mut coverage)?;
+    let ammunition = reached_ammo(
+        forge,
+        projection,
+        &routes.value.selections,
+        cancel,
+        &mut coverage,
+    )?;
     coverage.unreadable_bodies.sort_unstable();
     coverage.unreadable_bodies.dedup();
     coverage.incomplete_fields.sort_unstable();
     coverage.incomplete_fields.dedup();
-    Ok(routes.map(|routes| {
-        vec![ProjectileAmmoOwner {
-            selections: catalog_weapon_projectile_ammo::table(forge, routes).rows,
-            ammo_definitions: ammo,
-            dependency_coverage: coverage,
-        }]
+    Ok(routes.map(|routes| ProjectileInputs {
+        actions: routes.actions,
+        selections: routes.selections,
+        ammunition,
+        coverage,
     }))
 }
 
@@ -105,7 +146,7 @@ fn reached_ammo<'source>(
     routes: &[WeaponProjectileAmmoSelection],
     cancel: Option<&CancelToken>,
     coverage: &mut CatalogRecordCoverage,
-) -> Result<Vec<AmmoDefinition<'source>>, CatalogError> {
+) -> Result<Vec<PreparedAmmoDefinition<'source>>, CatalogError> {
     let indices: BTreeSet<_> = routes
         .iter()
         .filter_map(WeaponProjectileAmmoSelection::selected_ammo_index)
@@ -119,10 +160,7 @@ fn reached_ammo<'source>(
         }
     }
     ammo_definition::order(&mut ammo);
-    Ok(ammo
-        .into_iter()
-        .map(PreparedAmmoDefinition::into_definition)
-        .collect())
+    Ok(ammo)
 }
 
 fn read_ammo<'source>(

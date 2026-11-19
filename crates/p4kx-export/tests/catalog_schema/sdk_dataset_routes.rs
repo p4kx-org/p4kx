@@ -38,13 +38,14 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
         None,
     )?;
     let independent_ammo = read_ammunition(&archive)?;
-    let [projectile, reached_ammo] = projectile_ammo::read()?;
+    let [projectile, reached_ammo, combat] = projectile_ammo::read()?;
     if independent_ammo.schema != reached_ammo.schema {
         return Err("independently admitted and reached Ammo rows have different schemas".into());
     }
     Ok(vec![
         reached_ammo,
         projectile,
+        combat,
         Route::queried_rows(
             CONTAINERS,
             &starmap.container_instances,

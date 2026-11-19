@@ -575,10 +575,14 @@
       "type": "object"
     },
     "AlphaUnit": {
-      "enum": [
-        "damagePoints"
+      "description": "Unit of alpha unit.",
+      "oneOf": [
+        {
+          "const": "damagePoints",
+          "description": "Damage points per discharge.",
+          "type": "string"
+        }
       ],
-      "type": "string",
       "x-p4kx-vocabularyClass": "control"
     },
     "AmmoBinding": {
@@ -10228,15 +10232,18 @@
       "type": "object"
     },
     "CombatModel": {
+      "description": "The outcome of classifying and projecting an authored fire mode.",
       "oneOf": [
         {
+          "description": "The original action and its proved projectile can supply nominal bullet metrics.",
           "properties": {
             "type": {
               "const": "nominalBullet",
               "type": "string"
             },
             "values": {
-              "$ref": "#/$defs/NominalBullet"
+              "$ref": "#/$defs/NominalBullet",
+              "description": "Values and their original sources for this mode."
             }
           },
           "required": [
@@ -10246,6 +10253,7 @@
           "type": "object"
         },
         {
+          "description": "The action has no proved projectile ammunition selection.",
           "properties": {
             "type": {
               "const": "ammoSelectionUnavailable",
@@ -10258,6 +10266,7 @@
           "type": "object"
         },
         {
+          "description": "The proved ammunition target has no readable definition.",
           "properties": {
             "type": {
               "const": "ammoDefinitionUnavailable",
@@ -10270,6 +10279,7 @@
           "type": "object"
         },
         {
+          "description": "The original action slot has no readable action.",
           "properties": {
             "type": {
               "const": "actionUnavailable",
@@ -10282,6 +10292,7 @@
           "type": "object"
         },
         {
+          "description": "The authored action is outside the nominal projectile formula.",
           "properties": {
             "type": {
               "const": "unsupportedAction",
@@ -10294,6 +10305,7 @@
           "type": "object"
         },
         {
+          "description": "The authored action fires in bursts.",
           "properties": {
             "type": {
               "const": "burst",
@@ -10306,6 +10318,7 @@
           "type": "object"
         },
         {
+          "description": "The authored action fires a beam.",
           "properties": {
             "type": {
               "const": "beam",
@@ -10318,6 +10331,7 @@
           "type": "object"
         },
         {
+          "description": "The authored action charges before firing.",
           "properties": {
             "type": {
               "const": "charge",
@@ -10330,6 +10344,7 @@
           "type": "object"
         },
         {
+          "description": "The authored action selects behavior by a condition.",
           "properties": {
             "type": {
               "const": "conditional",
@@ -10342,6 +10357,7 @@
           "type": "object"
         },
         {
+          "description": "The selected ammunition has no readable projectile body.",
           "properties": {
             "type": {
               "const": "projectileUnavailable",
@@ -10354,6 +10370,7 @@
           "type": "object"
         },
         {
+          "description": "The selected projectile is outside the nominal bullet formula.",
           "properties": {
             "type": {
               "const": "unsupportedProjectile",
@@ -10369,6 +10386,7 @@
       "required": []
     },
     "CombatUnits": {
+      "description": "Units of the canonical combat metrics.",
       "properties": {
         "alpha": {
           "$ref": "#/$defs/AlphaUnit"
@@ -14503,10 +14521,14 @@
       "type": "object"
     },
     "DistanceUnit": {
-      "enum": [
-        "metres"
+      "description": "Unit of nominal distance unit.",
+      "oneOf": [
+        {
+          "const": "metres",
+          "description": "Metres of nominal projectile travel.",
+          "type": "string"
+        }
       ],
-      "type": "string",
       "x-p4kx-vocabularyClass": "control"
     },
     "Distortion": {
@@ -14558,10 +14580,14 @@
       "type": "object"
     },
     "DpsUnit": {
-      "enum": [
-        "damagePointsPerSecond"
+      "description": "Unit of nominal DPS unit.",
+      "oneOf": [
+        {
+          "const": "damagePointsPerSecond",
+          "description": "Damage points per second.",
+          "type": "string"
+        }
       ],
-      "type": "string",
       "x-p4kx-vocabularyClass": "control"
     },
     "Durability": {
@@ -17534,10 +17560,14 @@
       "type": "object"
     },
     "FireRateUnit": {
-      "enum": [
-        "dischargesPerMinute"
+      "description": "Unit of fire-rate unit.",
+      "oneOf": [
+        {
+          "const": "dischargesPerMinute",
+          "description": "Discharges per minute.",
+          "type": "string"
+        }
       ],
-      "type": "string",
       "x-p4kx-vocabularyClass": "control"
     },
     "FixedDamage": {
@@ -31962,6 +31992,7 @@
       "type": "object"
     },
     "NominalBullet": {
+      "description": "Authored inputs and computed nominal values one discharge at a time.",
       "properties": {
         "damage": {
           "$ref": "#/$defs/SourcedValueOfNominalBulletDamage"
@@ -31989,6 +32020,7 @@
       "type": "object"
     },
     "NominalBulletDamage": {
+      "description": "Independent damage channels for one discharge and one second.",
       "properties": {
         "alpha": {
           "$ref": "#/$defs/DamageChannels"

@@ -10,6 +10,8 @@ use crate::health_origin_assertions as proof;
 
 #[path = "catalog_projectile_ammo_admission.rs"]
 pub(super) mod admission;
+#[path = "catalog_weapon_combat_sdk.rs"]
+mod combat_sdk;
 #[path = "catalog_countermeasure_emitters.rs"]
 mod countermeasure_emitters;
 #[path = "catalog_weapon_projectile_ammo_fixture.rs"]
