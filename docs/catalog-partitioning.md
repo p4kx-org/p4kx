@@ -32,6 +32,13 @@ alone would leave several tables above the 1,000,000,000-byte decoded reference 
 limit the current decoded volume would need at least 83 parts, before extra bundle overhead.
 Measure each encoded part separately because separate frames change compression.
 
+The size comes from JSON records and their source evidence. A resolved Loadout includes the
+ports and attachments under its specific owning entity, including contextual overrides. Each
+weapon animation candidate retains the weapon, actor, original database and tag-token match
+coordinates. The provenance inventory records 88.69 million source-use relationships separately
+from the physical sources. Texture pixels, 3D mesh buffers and audio samples are exported on
+request through the [normal file and media exporters](catalog.md#media-files).
+
 The first normal PTU `13228337` run reached the publication check and stopped on two unmapped
 mission-phase values. That run produced no complete PTU file. [Size investigation](https://github.com/p4kx-org/p4kx/issues/1151)
 

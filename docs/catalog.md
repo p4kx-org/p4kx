@@ -13,6 +13,19 @@ Callers may independently limit physical declarations and instantiated visits pe
 `StarmapTraversalBudget`; exhaustion remains incomplete and normal publication is refused before
 output creation. The CLI and GUI select no Child-count allowance.
 
+## Media files
+
+The catalog carries media references and metadata, such as Archive paths, physical Entry
+identities, material settings, animation selection and sound-event bindings. The normal file
+and media exporters write texture pixels, 3D model geometry and audio payloads on request,
+including the supported converted formats.
+
+Use the Archive view's file export in the GUI. In the CLI, use `p4kx extract` for original
+Entries, `p4kx texture png` or `p4kx texture merge` for textures, `p4kx model glb` or
+`p4kx entity glb` for geometry, and `p4kx audio wav` or `p4kx audio ogg` for supported audio
+conversions. `p4kx media export` supports targeted inventories and payload
+export through `--kind` and `--filter`. See the [command reference](commands.md) and the [media export contract](media-export.md).
+
 ## Versioning and consumers
 
 See the [released field migration](catalog-v2-migration.md) for the Blueprint Category and Gameplay Property mappings.

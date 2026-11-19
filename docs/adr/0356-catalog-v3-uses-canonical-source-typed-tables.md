@@ -15,6 +15,11 @@ and typed conflict variants. Successful empty, family absent and unavailable are
 Every published dataset has a documented source scope and matching selection/health accounting.
 The Kind vocabulary remains extensible. This is not an EAV document or a generic Record dump.
 
+Catalog media fields describe references, original identities, relationships and metadata.
+Texture, model and audio payloads, including converted representations, belong to the
+[on-demand file and media exporters](../catalog.md#media-files). This applies equally to
+the complete document and any domain-partitioned representation.
+
 Definitions own reusable identity; configurations own declared component/global settings;
 declarations own ordered authored uses; placements own context-qualified instances; projections
 own explicitly named choices/derived views. The same definition in two placements remains two
