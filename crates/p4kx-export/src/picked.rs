@@ -225,6 +225,7 @@ impl<'f> Picked<'f> {
             | Kind::Shops
             | Kind::ShopInventories
             | Kind::ParticleLibraries
+            | Kind::FlareLibraries
             | Kind::ClientProfileSettings
             | Kind::PlanetResources
             | Kind::Creatures

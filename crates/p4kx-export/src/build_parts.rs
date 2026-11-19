@@ -5,6 +5,7 @@ use p4kx_assembly::Entities;
 use p4kx_extraction::{Archive, DataForge, SourceUses};
 
 use crate::blueprint_catalog_rows::{self, BlueprintTables};
+use crate::build_derived::particle_library;
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_output::Written;
 use crate::catalog_projections::weapon_reload::{self, WeaponAnimation};
@@ -13,6 +14,7 @@ use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::faction_identity_definition::{
     self, FactionIdentityDefinition, PreparedFactionIdentity,
 };
+use crate::catalog_v3::flare_library;
 use crate::client_profile_settings::{self, ClientProfileSettings};
 use crate::collected::Collected;
 use crate::options::{CatalogRun, CatalogStage};
@@ -138,6 +140,35 @@ pub(super) fn client_profiles(
     )?;
     collected.client_profile_count = settings.decoded_documents();
     Ok(settings)
+}
+
+pub(super) fn collect_effect_libraries(
+    archive: &Archive,
+    capture: &EntryCapture<'_>,
+    collected: &mut Collected<'_>,
+    run: CatalogRun<'_, '_>,
+    origins: &SourceUses,
+) -> Result<(), crate::CatalogError> {
+    let options = run.options;
+    run.begin_compacted(
+        CatalogStage::ProjectParticleLibraries,
+        origins,
+        &collected.ledger,
+    )?;
+    particle_library::collect(archive, capture, options, collected)?;
+    run.begin_compacted(
+        CatalogStage::ProjectFlareLibraries,
+        origins,
+        &collected.ledger,
+    )?;
+    collected.flare_libraries = flare_library::stage(
+        archive,
+        capture,
+        options,
+        &mut collected.ledger,
+        &std::env::temp_dir(),
+    )?;
+    Ok(())
 }
 
 pub(super) fn capture_rows(

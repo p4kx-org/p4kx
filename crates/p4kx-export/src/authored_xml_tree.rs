@@ -9,24 +9,24 @@ use p4kx_extraction::{CancelToken, SourceLocation, SourceUseRole, SourceValue, S
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use super::check_cancel;
 use crate::catalog_read::original::EntrySourceXml;
+use crate::catalog_read::parsed_entry_json;
 use crate::schema_fields::every_field_required;
 use crate::{CatalogError, ExportAccountingError};
 
 /// An authored XML element with its position, declarations and direct text content.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub struct ProfileElement {
+#[schemars(rename = "ProfileElement", transform = every_field_required)]
+pub struct AuthoredXmlElement {
     parent: SourcedValue<Option<u32>>,
     position: SourcedValue<SourceLocation>,
     name: SourcedValue<String>,
-    declarations: Vec<ProfileDeclaration>,
-    content: Vec<ProfileText>,
+    declarations: Vec<AuthoredXmlDeclaration>,
+    content: Vec<AuthoredXmlText>,
 }
 
-impl ProfileElement {
+impl AuthoredXmlElement {
     /// Borrows the parent element index, with an explicit null for the root.
     #[must_use]
     pub const fn parent(&self) -> &SourcedValue<Option<u32>> {
@@ -47,13 +47,13 @@ impl ProfileElement {
 
     /// Lists attributes and namespace declarations in original order.
     #[must_use]
-    pub fn declarations(&self) -> &[ProfileDeclaration] {
+    pub fn declarations(&self) -> &[AuthoredXmlDeclaration] {
         &self.declarations
     }
 
     /// Lists the element's direct text values in original order.
     #[must_use]
-    pub fn content(&self) -> &[ProfileText] {
+    pub fn content(&self) -> &[AuthoredXmlText] {
         &self.content
     }
 }
@@ -61,14 +61,13 @@ impl ProfileElement {
 /// An original attribute or namespace declaration.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub struct ProfileDeclaration {
+#[schemars(rename = "ProfileDeclaration", transform = every_field_required)]
+pub struct AuthoredXmlDeclaration {
     name: SourcedValue<String>,
-
-    value: ProfileText,
+    value: AuthoredXmlText,
 }
 
-impl ProfileDeclaration {
+impl AuthoredXmlDeclaration {
     /// Borrows the authored qualified declaration name.
     #[must_use]
     pub const fn name(&self) -> &SourcedValue<String> {
@@ -77,7 +76,7 @@ impl ProfileDeclaration {
 
     /// Borrows the protected value and any alternate lexical spelling.
     #[must_use]
-    pub const fn value(&self) -> &ProfileText {
+    pub const fn value(&self) -> &AuthoredXmlText {
         &self.value
     }
 }
@@ -85,16 +84,15 @@ impl ProfileDeclaration {
 /// An authored text value and any distinct original lexical spelling.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub struct ProfileText {
+#[schemars(rename = "ProfileText", transform = every_field_required)]
+pub struct AuthoredXmlText {
     #[schemars(extend("x-gameText" = true))]
     value: SourcedValue<String>,
     #[schemars(extend("x-gameText" = true))]
-    // The alternate lexical spelling is needed only when XML decoding changes it.
     lexeme: Option<SourcedValue<String>>,
 }
 
-impl ProfileText {
+impl AuthoredXmlText {
     /// Borrows the protected decoded value with its own origin.
     #[must_use]
     pub const fn value(&self) -> &SourcedValue<String> {
@@ -108,14 +106,22 @@ impl ProfileText {
     }
 }
 
-pub(super) fn read(
+pub(crate) fn read(
     xml: &EntrySourceXml<'_>,
     cancel: Option<&CancelToken>,
-) -> Result<Vec<ProfileElement>, CatalogError> {
+) -> Result<Vec<AuthoredXmlElement>, CatalogError> {
+    visit(xml, cancel, |_, _| Ok(()))
+}
+
+pub(crate) fn visit(
+    xml: &EntrySourceXml<'_>,
+    cancel: Option<&CancelToken>,
+    mut observe: impl FnMut(SourceElement<'_>, &AuthoredXmlElement) -> Result<(), CatalogError>,
+) -> Result<Vec<AuthoredXmlElement>, CatalogError> {
     let mut pending = vec![(xml.root(), None)];
     let mut elements = Vec::new();
     while let Some((node, parent)) = pending.pop() {
-        check_cancel(cancel)?;
+        parsed_entry_json::check_cancel(cancel)?;
         let index =
             u32::try_from(elements.len()).map_err(|_| ExportAccountingError::CounterOverflow)?;
         let parent = parent
@@ -126,7 +132,9 @@ pub(super) fn read(
                     .ok_or(ExportAccountingError::ConflictingSourceDatum)
             })
             .transpose()?;
-        elements.push(element(xml, node, parent)?);
+        let authored = element(xml, node, parent)?;
+        observe(node, &authored)?;
+        elements.push(authored);
         let first_child = pending.len();
         pending.extend(node.elements().map(|child| (child, Some(index))));
         pending
@@ -140,8 +148,8 @@ pub(super) fn read(
 fn element(
     xml: &EntrySourceXml<'_>,
     node: SourceElement<'_>,
-    parent: Option<(u32, &ProfileElement)>,
-) -> Result<ProfileElement, CatalogError> {
+    parent: Option<(u32, &AuthoredXmlElement)>,
+) -> Result<AuthoredXmlElement, CatalogError> {
     let syntax = node.syntax().map_err(span_error)?;
     let position = xml.position(node)?;
     let parent = match parent {
@@ -162,7 +170,7 @@ fn element(
         .declarations()
         .map(|entry| declaration(xml, &entry.map_err(span_error)?))
         .collect::<Result<Vec<_>, _>>()?;
-    Ok(ProfileElement {
+    Ok(AuthoredXmlElement {
         parent,
         position,
         name,
@@ -174,12 +182,12 @@ fn element(
 fn declaration(
     xml: &EntrySourceXml<'_>,
     declaration: &SourceDeclaration<'_>,
-) -> Result<ProfileDeclaration, CatalogError> {
+) -> Result<AuthoredXmlDeclaration, CatalogError> {
     let name = declaration.qualified_name();
     let location = SourceLocation::xml_attribute(declaration.position(), name)
         .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
     let name = xml.retain(location.clone(), name.to_owned(), SourceUseRole::Selector)?;
-    Ok(ProfileDeclaration {
+    Ok(AuthoredXmlDeclaration {
         name,
         value: original_text(xml, location, declaration.value(), declaration.lexeme())?,
     })
@@ -188,7 +196,7 @@ fn declaration(
 fn content(
     xml: &EntrySourceXml<'_>,
     syntax: &SourceSyntax<'_>,
-) -> Result<Vec<ProfileText>, CatalogError> {
+) -> Result<Vec<AuthoredXmlText>, CatalogError> {
     if let Some(text) = syntax.binary_text() {
         return Ok(vec![node_text(xml, &text)?]);
     }
@@ -203,7 +211,10 @@ fn content(
         .collect()
 }
 
-fn node_text(xml: &EntrySourceXml<'_>, text: &SourceText<'_>) -> Result<ProfileText, CatalogError> {
+fn node_text(
+    xml: &EntrySourceXml<'_>,
+    text: &SourceText<'_>,
+) -> Result<AuthoredXmlText, CatalogError> {
     let (namespace, indices) = match text.position() {
         SourceContentPosition::Text(range) => {
             ("textXmlContent", vec![range.start as u64, range.end as u64])
@@ -224,7 +235,7 @@ fn original_text(
     location: SourceLocation,
     value: &str,
     lexeme: Option<&str>,
-) -> Result<ProfileText, CatalogError> {
+) -> Result<AuthoredXmlText, CatalogError> {
     let lexeme = lexeme.filter(|lexeme| *lexeme != value);
     let retained_lexeme = lexeme
         .map(|lexeme| xml.retain(location.clone(), lexeme.to_owned(), SourceUseRole::Payload))
@@ -234,7 +245,7 @@ fn original_text(
     } else {
         SourceUseRole::Payload
     };
-    Ok(ProfileText {
+    Ok(AuthoredXmlText {
         value: xml.retain(location, value.to_owned(), role)?,
         lexeme: retained_lexeme,
     })

@@ -69,6 +69,8 @@ pub(crate) mod explosion_definition;
 mod facility_instance;
 #[path = "facility_loadout_placements.rs"]
 mod facility_loadout_placements;
+#[path = "flare_library.rs"]
+pub(crate) mod flare_library;
 #[path = "infraction_definition.rs"]
 pub(crate) mod infraction_definition;
 #[path = "infraction_parameters.rs"]
@@ -354,28 +356,13 @@ pub(crate) mod quality_curve_source_read;
 pub(crate) mod quality_source;
 #[path = "quality_source_read.rs"]
 pub(crate) mod quality_source_read;
-#[path = "resource_density_read.rs"]
-pub(crate) mod resource_density_read;
-#[path = "resource_density_source.rs"]
-pub(crate) mod resource_density_source;
-#[path = "resource_group.rs"]
-pub(crate) mod resource_group;
-#[path = "resource_group_catalog.rs"]
-pub(crate) mod resource_group_catalog;
-#[path = "resource_group_read.rs"]
-pub(crate) mod resource_group_read;
-#[path = "resource_memberships.rs"]
-pub(crate) mod resource_memberships;
-#[path = "resource_property_contract.rs"]
-pub(crate) mod resource_property_contract;
-#[path = "resource_property_read.rs"]
-pub(crate) mod resource_property_read;
-#[path = "resource_raw_policy.rs"]
-pub(crate) mod resource_raw_policy;
-#[path = "resource_read.rs"]
-pub(crate) mod resource_read;
-#[path = "resource_type_contract.rs"]
-pub(crate) mod resource_type_contract;
+#[path = "catalog_resource_modules.rs"]
+mod resource_modules;
+pub(crate) use resource_modules::{
+    resource_density_read, resource_density_source, resource_group, resource_group_catalog,
+    resource_group_read, resource_memberships, resource_property_contract, resource_property_read,
+    resource_raw_policy, resource_read, resource_type_contract,
+};
 #[path = "source_value_catalog.rs"]
 pub(crate) mod source_value_catalog;
 

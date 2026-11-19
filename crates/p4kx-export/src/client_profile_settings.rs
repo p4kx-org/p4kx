@@ -5,6 +5,7 @@ use p4kx_extraction::{
     Archive, ArchiveWatch, CancelToken, Entry, Filter, SourceUse, SourceValue, SourcedValue,
 };
 
+use crate::catalog_read::authored_xml_tree as tree;
 use crate::catalog_read::original::{
     EntryCapture, EntryDiagnosis, EntryRead, EntrySourceXml, with_entry_capture,
 };
@@ -16,13 +17,14 @@ use crate::{CatalogError, Kind, starmap_index};
 
 #[path = "client_profile_document.rs"]
 mod document;
-#[path = "client_profile_tree.rs"]
-mod tree;
 
 pub use self::document::{
     ClientProfileSettings, ClientProfileSettingsReport, ProfileDocument, ProfileKind, ProfileState,
 };
-pub use self::tree::{ProfileDeclaration, ProfileElement, ProfileText};
+pub use crate::catalog_read::authored_xml_tree::{
+    AuthoredXmlDeclaration as ProfileDeclaration, AuthoredXmlElement as ProfileElement,
+    AuthoredXmlText as ProfileText,
+};
 pub use crate::catalog_read::original::PhysicalEntryIdentity;
 
 const KIND: Kind = Kind::ClientProfileSettings;

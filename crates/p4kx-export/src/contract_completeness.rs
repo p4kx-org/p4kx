@@ -87,6 +87,7 @@ pub(crate) struct Completeness<'a> {
     /// The complete physical inventory file selection, independent of Record filters.
     pub(crate) shop_inventories: KindCompleteness<'a>,
     pub(crate) particle_libraries: KindCompleteness<'a>,
+    pub(crate) flare_libraries: KindCompleteness<'a>,
     pub(crate) planet_resources: KindCompleteness<'a>,
     pub(crate) creatures: KindCompleteness<'a>,
     pub(crate) climate_assets: KindCompleteness<'a>,
@@ -249,6 +250,7 @@ impl<'a> Completeness<'a> {
             shops: completeness,
             shop_inventories: KindCompleteness::Complete,
             particle_libraries: completeness,
+            flare_libraries: completeness,
             planet_resources: completeness,
             creatures: completeness,
             climate_assets: completeness,

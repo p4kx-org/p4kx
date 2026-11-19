@@ -8,7 +8,7 @@ use p4kx_assembly::{ArchiveFiles, Entities};
 use p4kx_extraction::{Archive, DataForgeEntry};
 
 use crate::archive_key_use::ArchiveKeyUse;
-use crate::build_derived::{add_contracts, add_loadouts, add_paints, add_tags, particle_library};
+use crate::build_derived::{add_contracts, add_loadouts, add_paints, add_tags};
 use crate::catalog_definitions::CatalogDefinitions;
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::{CatalogProjection, CatalogTextRegistry};
@@ -23,9 +23,7 @@ use crate::catalog_v3::procedural_planet_audio;
 use crate::catalog_v3::weapon_combat_base;
 use crate::contract::{Catalog, Completeness, KindCompleteness, SCHEMA_VERSION};
 use crate::mission_data::link_scenario_factions;
-use crate::options::CatalogStage::{
-    FinalizeProjections, LinkMissionFactions, ProjectParticleLibraries,
-};
+use crate::options::CatalogStage::{FinalizeProjections, LinkMissionFactions};
 use crate::options::{CatalogRun, CatalogStage};
 use crate::ship_store_slugs::StoreSlugs;
 use crate::shops::add_shops;
@@ -111,8 +109,7 @@ pub(super) fn assemble<R>(
         &mut collected,
         &jump_owners,
     )?;
-    run.begin_compacted(ProjectParticleLibraries, &origins.uses, &collected.ledger)?;
-    particle_library::collect(archive, &entry_capture, options, &mut collected)?;
+    parts::collect_effect_libraries(archive, &entry_capture, &mut collected, run, &origins.uses)?;
     run.begin(CatalogStage::ProjectWeaponAnimation);
     let weapon_animation =
         parts::capture_weapon_animation(archive, &entities, &input, options, &mut collected)?;
@@ -210,6 +207,7 @@ pub(super) fn assemble<R>(
             blueprint_pools: pool_tables.definitions,
             shop_inventories: collected.shop_inventories,
             particle_libraries: collected.particle_libraries,
+            flare_libraries: collected.flare_libraries,
             planet_tech: collected.planet_tech,
             inventory_containers: inventory_table(&forge, collected.inventory_containers),
             medical_item_tier_configs: medical_tier_config::table(

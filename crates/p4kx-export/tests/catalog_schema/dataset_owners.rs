@@ -102,6 +102,7 @@ const GROUPS: &[Group] = &[
             "npcArchetypes",
             "npcClassPools",
             "particleLibraries",
+            "flareLibraries",
             "planetResources",
             "proceduralPlanetAudio",
             "refiningProcesses",

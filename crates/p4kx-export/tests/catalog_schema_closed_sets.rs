@@ -37,6 +37,7 @@ const CONTROL_TYPES: &[&str] = &[
     "ExportSourceRole",
     "ExportStageStatus",
     "FireRateUnit",
+    "FlareNodeRole",
     "FlightConfigurationKind",
     "FragmentStatus",
     "FuseEvidence",

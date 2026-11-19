@@ -23,6 +23,7 @@ pub(super) const fn uses_named_definition_table(kind: Kind) -> bool {
             | Kind::InventoryContainers
             | Kind::MedicalItemTierConfigs
             | Kind::ParticleLibraries
+            | Kind::FlareLibraries
             | Kind::EncounterIndices
             | Kind::MissionItems
             | Kind::BlueprintPools

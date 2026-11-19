@@ -5,7 +5,7 @@ use p4kx_extraction::{Build, SourceInventory, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use super::tree::ProfileElement;
+use super::ProfileElement;
 use super::{GENERAL, VR};
 use crate::catalog_read::original::PhysicalEntryIdentity;
 use crate::schema_fields::every_field_required;

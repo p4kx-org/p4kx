@@ -144,6 +144,8 @@ pub enum CatalogStage {
     ReadIndependentConfigurations,
     /// Projects authored particle libraries.
     ProjectParticleLibraries,
+    /// Projects authored lens flare libraries.
+    ProjectFlareLibraries,
     /// Projects weapon animation sources.
     ProjectWeaponAnimation,
     /// Captures final row counts and their source accounting.
@@ -196,6 +198,7 @@ impl CatalogStage {
             Self::ResolveJumpOperators => "resolve-jump-operators",
             Self::ReadIndependentConfigurations => "read-independent-configurations",
             Self::ProjectParticleLibraries => "project-particle-libraries",
+            Self::ProjectFlareLibraries => "project-flare-libraries",
             Self::ProjectWeaponAnimation => "project-weapon-animation",
             Self::FinalizeProjections => "finalize-projections",
             Self::ProjectBlueprintTables => "project-blueprint-tables",

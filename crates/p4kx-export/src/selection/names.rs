@@ -75,6 +75,7 @@ impl Kind {
             Self::BlueprintCategoryLists => "blueprintCategoryLists",
             Self::ShopInventories => "shopInventories",
             Self::ParticleLibraries => "particleLibraries",
+            Self::FlareLibraries => "flareLibraries",
             Self::ClientProfileSettings => "clientProfileSettings",
             Self::PlanetResources => "planetResources",
             Self::Creatures => "creatures",

@@ -129,7 +129,7 @@ fn exactly_the_game_text_fields_carry_the_game_text_annotation() {
         marked += usize::from(carries);
     }
     assert_eq!(
-        marked, 108,
+        marked, 110,
         "every protected field in the canonical schema is accounted for"
     );
 }
@@ -178,9 +178,10 @@ fn expected_annotation(owner: &str, name: &str, field: &Value, schema: &Value) -
         | ("RawPlanetAssetMember", "name" | "token")
         | ("IfcsAeroSurface", "name" | "detachParentPartName" | "transformParentPartName")
         | ("ProjectedMissionText", "key" | "translations" | "itemTokens") => true,
+        ("FlareValue", "value") => field["type"] == "string" && field.get("format").is_none(),
         ("SharedInteraction", "displayType")
         | ("ConsumableType" | "ConsumableSubtype", "typeName") => false,
-        ("BlackboardPropertyBody", "value") => {
+        ("BlackboardPropertyBody", "value") | ("LocationEntityType", "targetDescription") => {
             field.get("$ref").and_then(Value::as_str) == Some("#/$defs/SourcedValueOfGameTextRef")
         }
         ("BrokerProjection" | "TemplateProjection", "title") => {

@@ -34,6 +34,7 @@ const CATALOG_PHASES: &[&str] = &[
     "resolve-jump-operators",
     "read-independent-configurations",
     "project-particle-libraries",
+    "project-flare-libraries",
     "project-weapon-animation",
     "finalize-projections",
     "project-blueprint-tables",

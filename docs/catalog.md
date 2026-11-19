@@ -190,6 +190,7 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `definitions.tags`, `declarations.tagRoots`, `declarations.entityTags`, `projections.tagPaths` | Global physical Tag definitions, original root/child/Entity GUID arrays, and separately named first-selected tree paths with exact per-value origin; the taxonomy stays complete under an Entity Filter ([contract](catalog-tags.md)) |
 | `definitions.missionItems` | Physical authored item definitions, ordered tags and localized variants, original weight and Entity reference ([contract](catalog-mission-items.md)) |
 | `definitions.particleLibraries` | Original particle-library XML Entries, ordered elements and attributes, and typed `RainOcclusion` ([contract](catalog-particle-libraries.md)) |
+| `definitions.flareLibraries` | Physical lens flare libraries, ordered effect elements, typed parameters and directory-only texture links with per-value provenance ([contract](catalog-flare-libraries.md)) |
 | `definitions.manufacturers` | Source-family availability and directly sourced Manufacturer rows in GUID order, including typed Localization and canonical text references ([contract](catalog-manufacturer-types.md)) |
 | `items` | The items, ordered by GUID |
 | `ships` | The ships and ground vehicles, ordered by GUID |

@@ -5610,6 +5610,9 @@
         "factions": {
           "$ref": "#/$defs/CatalogTableOfFactionDefinition"
         },
+        "flareLibraries": {
+          "$ref": "#/$defs/CatalogTableOfFlareLibrary"
+        },
         "gameplayProperties": {
           "$ref": "#/$defs/CatalogTableOfGameplayPropertyDefinition"
         },
@@ -5821,6 +5824,7 @@
         "factionIdentities",
         "factionReputations",
         "factions",
+        "flareLibraries",
         "gameplayProperties",
         "geologyAssets",
         "geologySets",
@@ -7009,6 +7013,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/FactionReputationDefinition"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfFlareLibrary": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/FlareLibrary"
           },
           "type": "array"
         }
@@ -10781,6 +10804,9 @@
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `factions`."
         },
+        "flareLibraries": {
+          "$ref": "#/$defs/KindCompleteness"
+        },
         "gameplayProperties": {
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `gameplayProperties`."
@@ -11110,6 +11136,7 @@
         "factionIdentities",
         "factionReputations",
         "factions",
+        "flareLibraries",
         "gameplayProperties",
         "geologyAssets",
         "geologySets",
@@ -17646,6 +17673,263 @@
         "plusBonuses"
       ],
       "type": "object"
+    },
+    "FlareElement": {
+      "description": "One authored element and its supported flare parameters.",
+      "properties": {
+        "authored": {
+          "$ref": "#/$defs/ProfileElement"
+        },
+        "fields": {
+          "items": {
+            "$ref": "#/$defs/FlareField"
+          },
+          "type": "array"
+        },
+        "role": {
+          "$ref": "#/$defs/SourcedValueOfFlareNodeRole"
+        }
+      },
+      "required": [
+        "authored",
+        "fields",
+        "role"
+      ],
+      "type": "object"
+    },
+    "FlareField": {
+      "description": "The interpreted value and optional directory-only target of a supported attribute.",
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "texture": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LooseArchivePath"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "value": {
+          "$ref": "#/$defs/SourcedValueOfFlareValue"
+        }
+      },
+      "required": [
+        "key",
+        "texture",
+        "value"
+      ],
+      "type": "object"
+    },
+    "FlareLibrary": {
+      "description": "One physical flare library and its original effect tree.",
+      "properties": {
+        "elements": {
+          "items": {
+            "$ref": "#/$defs/FlareElement"
+          },
+          "type": "array"
+        },
+        "identity": {
+          "$ref": "#/$defs/PhysicalEntryIdentity"
+        }
+      },
+      "required": [
+        "elements",
+        "identity"
+      ],
+      "type": "object"
+    },
+    "FlareNodeRole": {
+      "description": "The authored context of an element in a lens flare library.",
+      "oneOf": [
+        {
+          "const": "library",
+          "description": "The library root.",
+          "type": "string"
+        },
+        {
+          "const": "item",
+          "description": "A direct library item.",
+          "type": "string"
+        },
+        {
+          "const": "component",
+          "description": "A component or group inside another flare item.",
+          "type": "string"
+        },
+        {
+          "const": "parameters",
+          "description": "The parameter container of an item or component.",
+          "type": "string"
+        },
+        {
+          "const": "parameterGroup",
+          "description": "A parameter group inside a parameter container.",
+          "type": "string"
+        },
+        {
+          "const": "other",
+          "description": "An element outside the recognised grammar.",
+          "type": "string"
+        }
+      ],
+      "x-p4kx-vocabularyClass": "control"
+    },
+    "FlareValue": {
+      "description": "A typed lexical interpretation of a supported flare parameter.",
+      "oneOf": [
+        {
+          "description": "An explicitly empty attribute.",
+          "properties": {
+            "kind": {
+              "const": "empty",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "An authored text parameter.",
+          "properties": {
+            "kind": {
+              "const": "text",
+              "type": "string"
+            },
+            "value": {
+              "type": "string",
+              "x-gameText": true
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A boolean token.",
+          "properties": {
+            "kind": {
+              "const": "boolean",
+              "type": "string"
+            },
+            "value": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A signed integer token.",
+          "properties": {
+            "kind": {
+              "const": "integer",
+              "type": "string"
+            },
+            "value": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A finite scalar token.",
+          "properties": {
+            "kind": {
+              "const": "number",
+              "type": "string"
+            },
+            "value": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Two finite scalar tokens in original order.",
+          "properties": {
+            "kind": {
+              "const": "pair",
+              "type": "string"
+            },
+            "value": {
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Three finite scalar tokens in original order.",
+          "properties": {
+            "kind": {
+              "const": "triple",
+              "type": "string"
+            },
+            "value": {
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A canonical GUID with the original spelling in the authored tree.",
+          "properties": {
+            "kind": {
+              "const": "guid",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/Guid"
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "type": "object"
+        }
+      ]
     },
     "Flashbang": {
       "description": "The two authored flashbang effect settings.",
@@ -26003,6 +26287,10 @@
         {
           "description": "Original particle-library XML files in the Archive.",
           "value": "particleLibraries"
+        },
+        {
+          "description": "Original lens flare library XML files in the Archive.",
+          "value": "flareLibraries"
         },
         {
           "description": "Original loose planet resource definitions in the Archive.",
@@ -81728,6 +82016,266 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/FactionTextOfPublicNameRef"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfFlareNodeRole": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/FlareNodeRole"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfFlareValue": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/FlareValue"
               }
             }
           }

@@ -5,6 +5,7 @@ use p4kx_export::StarmapTraversalBudget;
 use p4kx_export::catalog_queries::equipment::{
     with_ammo_definitions, with_weapon_recoil_definitions,
 };
+use p4kx_export::catalog_queries::flares::{FlareLibrarySelection, read_flare_libraries};
 use p4kx_export::catalog_queries::localization::with_language_sources;
 use p4kx_export::catalog_queries::shops::{ShopInventorySelection, read_shop_inventories};
 use p4kx_export::catalog_queries::starmap::{
@@ -19,8 +20,8 @@ use p4kx_testkit::{
 };
 
 use super::{
-    AMMUNITION, CONTAINERS, LANGUAGE_SOURCES, LOCATION_ENTITIES, Route, SHOP_INVENTORIES,
-    TestResult, UNRESOLVED, WEAPON_RECOIL,
+    AMMUNITION, CONTAINERS, FLARE_LIBRARIES, LANGUAGE_SOURCES, LOCATION_ENTITIES, Route,
+    SHOP_INVENTORIES, TestResult, UNRESOLVED, WEAPON_RECOIL,
 };
 
 #[path = "sdk_projectile_ammo_route.rs"]
@@ -30,6 +31,7 @@ mod weapon_animation;
 
 const ROOT: &str = r"Data\ObjectContainers\PU\system\fixture\fixturesystem.socpak";
 const OFFLINE_SHOP: &str = r"Data\Scripts\ShopInventories\Inv_Fixture.json";
+const FLARE_LIBRARY: &str = r"Data\Libs\Flares\fixture.xml";
 const TILE: &str = r"Data\ObjectContainers\PU\fixture\tile.socpak";
 const ROOT_XML: &[u8] = br#"<ObjectContainer version="14"><ChildObjectContainers>
     <Child external="true" name="Data\ObjectContainers\PU\fixture\tile.socpak" pos="0,0,0" rot="1,0,0,0"/>
@@ -64,6 +66,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
         read_language_sources(&archive)?,
         read_location_entities(&archive)?,
         read_shop_inventory(&archive)?,
+        read_flare_library(&archive)?,
         Route::queried_rows(
             CONTAINERS,
             &starmap.container_instances,
@@ -142,6 +145,16 @@ fn read_weapon_recoil(archive: &Archive) -> TestResult<Route> {
     })?
 }
 
+fn read_flare_library(archive: &Archive) -> TestResult<Route> {
+    let selection = FlareLibrarySelection::ArchivePath(FLARE_LIBRARY);
+    let snapshot = read_flare_libraries(archive, selection, None)?;
+    Route::queried_rows(
+        FLARE_LIBRARIES,
+        &snapshot.rows,
+        "synthetic canonical parity and installed source witness available; installed producer parity open",
+    )
+}
+
 fn read_shop_inventory(archive: &Archive) -> TestResult<Route> {
     let selection = ShopInventorySelection::ArchivePath(OFFLINE_SHOP);
     let snapshot = read_shop_inventories(archive, selection, None)?;
@@ -187,6 +200,10 @@ fn fixture() -> TestResult<(tempfile::TempDir, Archive)> {
         .entry(packed(ROOT, "fixturesystem.xml", ROOT_XML))
         .entry(packed(TILE, "tile.xml", b"<ObjectContainer/>"))
         .entry(TestEntry::stored(OFFLINE_SHOP, br#"{"Inventory":[]}"#))
+        .entry(TestEntry::stored(
+            FLARE_LIBRARY,
+            b"<LensFlareLibrary><FlareItem Name='fixture'/></LensFlareLibrary>",
+        ))
         .write_to(&path)?;
     Ok((folder, Archive::open(path)?))
 }

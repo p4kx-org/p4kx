@@ -87,6 +87,9 @@ pub mod localization;
 #[path = "shop_inventory_query.rs"]
 pub mod shops;
 
+#[path = "flare_library_query.rs"]
+pub mod flares;
+
 use p4kx_extraction::{
     Archive, Build, CancelToken, DataForge, DataForgeEntry, SourceInventory, SourcedValue,
 };

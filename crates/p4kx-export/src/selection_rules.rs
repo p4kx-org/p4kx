@@ -5,6 +5,11 @@ use crate::catalog_v3::cargo_globals;
 use crate::catalog_v3::loot_definition_catalog::LootDefinitionKind;
 use crate::selection::Kind;
 
+#[path = "selection_kind_rule.rs"]
+mod kind_rule;
+pub use kind_rule::KindRule;
+pub(crate) use kind_rule::starts_with_folder;
+
 impl Kind {
     /// Returns the rule of a kind that selects Records; a derived kind has the empty rule, which
     /// matches no path.
@@ -337,6 +342,7 @@ impl Kind {
             | Self::Shops
             | Self::ShopInventories
             | Self::ParticleLibraries
+            | Self::FlareLibraries
             | Self::ClientProfileSettings
             | Self::PlanetResources
             | Self::Creatures
@@ -359,47 +365,4 @@ impl Kind {
             },
         }
     }
-}
-
-/// How the Records of one kind are selected: by record-path prefix and by type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[non_exhaustive]
-pub struct KindRule {
-    /// The starts of the record path of which one must match, ignoring ASCII case and the kind
-    /// of separator.
-    pub prefixes: &'static [&'static str],
-    /// The name of the Records' struct, matched exactly.
-    pub type_name: &'static str,
-}
-
-impl KindRule {
-    /// Returns whether `record_path` starts with one of the prefixes.
-    #[must_use]
-    pub fn matches_path(&self, record_path: &str) -> bool {
-        self.prefixes
-            .iter()
-            .any(|prefix| starts_with_folder(record_path, prefix))
-    }
-
-    /// Returns whether a Record with `record_path` and the struct `type_name` is selected.
-    pub(crate) fn selects(&self, record_path: &str, type_name: &str) -> bool {
-        self.type_name == type_name && self.matches_path(record_path)
-    }
-}
-
-/// Returns whether `record_path` starts with `prefix`, ignoring ASCII case and the kind of
-/// separator.
-pub(crate) fn starts_with_folder(record_path: &str, prefix: &str) -> bool {
-    let fold = |byte: u8| {
-        if byte == b'\\' {
-            b'/'
-        } else {
-            byte.to_ascii_lowercase()
-        }
-    };
-    record_path.len() >= prefix.len()
-        && record_path
-            .bytes()
-            .zip(prefix.bytes())
-            .all(|(have, want)| fold(have) == fold(want))
 }

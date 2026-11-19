@@ -15,6 +15,7 @@ fn add_empty_definitions(catalog: &mut Value) {
         "locationResourceSlots",
         "locationEntityDeclarations",
         "particleLibraries",
+        "flareLibraries",
         "planetResources",
         "creatures",
         "climateAssets",

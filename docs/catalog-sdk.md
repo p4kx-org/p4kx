@@ -51,6 +51,13 @@ pickup and drop-off arrays through the same definition's source arena. It is ava
 generator query and the logical contract query. Bindings point to individual owning orders at all
 authored levels, including contract and sub-contract overrides.
 
+## Lens flare libraries
+
+Use `catalog_queries::flares::read_flare_libraries` to read the physical rows from
+`definitions.flareLibraries` without decoding DataForge. Select all, an Archive Entry index,
+or an exact Archive-relative path. The query reports original parameter origins, directory-only
+texture links, and any required library reads or projections that failed. [Lens flare contract](catalog-flare-libraries.md)
+
 ## Localization Entry metadata
 
 Use catalog_queries::localization::with_language_sources for the canonical

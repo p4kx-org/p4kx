@@ -12,6 +12,9 @@ use serde_json::Value;
 #[path = "catalog_v3_category_lists.rs"]
 mod category_lists;
 
+#[path = "catalog_v3_entry_identity.rs"]
+mod entry_identity;
+
 #[path = "catalog_v3_gameplay_properties.rs"]
 pub(crate) mod gameplay_properties;
 
@@ -85,6 +88,7 @@ pub(crate) fn row_location(kind: Kind) -> Cow<'static, str> {
         Kind::Blueprints => "/definitions/blueprints",
         Kind::ShopInventories => "/definitions/shopInventories",
         Kind::ParticleLibraries => "/definitions/particleLibraries",
+        Kind::FlareLibraries => "/definitions/flareLibraries",
         Kind::ClientProfileSettings => "/configurations/clientProfileSettings/documents",
         Kind::ExplosionDefinitions => "/definitions/explosionDefinitions",
         Kind::AmmoDefinitions => "/definitions/ammoDefinitions",
@@ -139,6 +143,10 @@ fn checked_table<'catalog>(
     path: &str,
 ) -> TestResult<&'catalog Vec<Value>> {
     let rows = table(catalog, path)?;
+    if matches!(kind, Kind::ParticleLibraries | Kind::FlareLibraries) {
+        entry_identity::check(catalog, rows)?;
+        return Ok(rows);
+    }
     for row in rows {
         identity(row, kind)?;
         if has_record_header(kind) {

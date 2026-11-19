@@ -95,6 +95,7 @@ impl Collected<'_> {
             Kind::Shops => self.shops.len(),
             Kind::ShopInventories => self.shop_inventories.rows.len(),
             Kind::ParticleLibraries => self.particle_libraries.len(),
+            Kind::FlareLibraries => self.flare_libraries.len(),
             Kind::ClientProfileSettings => self.client_profile_count,
             Kind::PlanetResources => self.planet_tech.planet_resources.rows.len(),
             Kind::Creatures => self.planet_tech.creatures.rows.len(),

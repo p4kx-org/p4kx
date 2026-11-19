@@ -515,8 +515,8 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   assembly.
   `link-mission-factions` marks scenario faction linking. Within `project-configurations`, the
   phases are `project-shops`, `resolve-jump-operators`, `read-independent-configurations`,
-  `project-particle-libraries` and `project-weapon-animation`. `finalize-projections` marks
-  selected row capture. The remaining phases before `export-health` are
+  `project-particle-libraries`, `project-flare-libraries` and `project-weapon-animation`.
+  `finalize-projections` marks selected row capture. The remaining phases before `export-health` are
   `project-blueprint-tables`, `resolve-cargo-capacities`, `project-facility-loadouts`,
   `project-resource-topology` and `project-starmap-placements`. When facility interior
   projection runs, `project-facility-interiors` follows the facility loadout joins.

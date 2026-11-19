@@ -17,6 +17,9 @@ mod catalog_record_context;
 #[path = "catalog_reference_read.rs"]
 mod catalog_reference_read;
 
+#[path = "authored_xml_tree.rs"]
+pub(crate) mod authored_xml_tree;
+
 #[path = "catalog_json_number.rs"]
 pub(crate) mod catalog_json_number;
 #[path = "entry_json_object.rs"]

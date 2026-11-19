@@ -17,6 +17,7 @@ use crate::catalog_v3::catalog_resource_network_read::resource_network_global::R
 use crate::catalog_v3::explosion_definition::ExplosionDefinition;
 use crate::catalog_v3::faction_definition::FactionDefinition;
 use crate::catalog_v3::faction_identity_definition::FactionIdentityDefinition;
+use crate::catalog_v3::flare_library::FlareLibrary;
 use crate::catalog_v3::gameplay_property_catalog::GameplayPropertyDefinition;
 use crate::catalog_v3::inventory_container_definition::InventoryContainerDefinition;
 use crate::catalog_v3::law_kinds::LawTables;
@@ -139,6 +140,8 @@ pub(crate) struct CatalogDefinitions<'source> {
     pub(crate) shop_inventories: ShopInventoryTable,
     #[schemars(with = "CatalogTable<ParticleLibrary>")]
     pub(crate) particle_libraries: StagedCatalogTable,
+    #[schemars(with = "CatalogTable<FlareLibrary>")]
+    pub(crate) flare_libraries: StagedCatalogTable,
     #[serde(flatten)]
     pub(crate) planet_tech: PlanetTechDefinitions,
     pub(crate) explosion_definitions: CatalogTable<ExplosionDefinition<'source>>,

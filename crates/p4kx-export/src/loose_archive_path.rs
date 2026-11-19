@@ -17,7 +17,12 @@ use crate::selection::starts_with_folder;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
-pub(crate) enum LooseArchivePathState {
+#[expect(
+    missing_docs,
+    reason = "variant docstrings would change the shared schema representation"
+)]
+#[non_exhaustive]
+pub enum LooseArchivePathState {
     Absent,
     Null,
     Empty,
@@ -35,9 +40,23 @@ pub(crate) enum LooseArchivePathState {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct LooseArchivePath {
+pub struct LooseArchivePath {
     pub(crate) state: SourcedValue<LooseArchivePathState>,
     pub(crate) targets: Vec<SourcedValue<PhysicalEntryRef>>,
+}
+
+impl LooseArchivePath {
+    /// Borrows the path resolution outcome and its original evidence.
+    #[must_use]
+    pub const fn state(&self) -> &SourcedValue<LooseArchivePathState> {
+        &self.state
+    }
+
+    /// Lists matching physical directory Entries with their source evidence.
+    #[must_use]
+    pub fn targets(&self) -> &[SourcedValue<PhysicalEntryRef>] {
+        &self.targets
+    }
 }
 
 /// Lazily indexes the Archive directory for repeated sourced path resolutions.

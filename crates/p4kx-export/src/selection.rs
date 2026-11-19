@@ -165,6 +165,8 @@ pub enum Kind {
     ShopInventories,
     /// Original particle-library XML files in the Archive.
     ParticleLibraries,
+    /// Original lens flare library XML files in the Archive.
+    FlareLibraries,
     /// Original loose planet resource definitions in the Archive.
     PlanetResources,
     /// Original loose `PlanetTech` fauna definitions in the Archive.
@@ -265,7 +267,7 @@ pub enum Kind {
 
 impl Kind {
     /// Every kind, in the order of the catalog.
-    pub const ALL: [Self; 107] = [
+    pub const ALL: [Self; 108] = [
         Self::Manufacturers,
         Self::Items,
         Self::Ships,
@@ -325,6 +327,7 @@ impl Kind {
         Self::BlueprintCategoryLists,
         Self::ShopInventories,
         Self::ParticleLibraries,
+        Self::FlareLibraries,
         Self::PlanetResources,
         Self::Creatures,
         Self::ClimateAssets,

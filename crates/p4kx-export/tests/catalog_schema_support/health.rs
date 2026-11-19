@@ -106,6 +106,7 @@ const fn mode(kind: Kind) -> ExportSourceMode {
         | Kind::Shops
         | Kind::ShopInventories
         | Kind::ParticleLibraries
+        | Kind::FlareLibraries
         | Kind::ClientProfileSettings
         | Kind::PlanetResources
         | Kind::Creatures
