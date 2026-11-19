@@ -23,6 +23,9 @@ use crate::catalog_v3::radar_audio_configuration::includes;
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn installed_radar_audio_reconciles_ordered_sound_slots_and_selector_coverage() -> TestResult {
     let archive = Archive::open_with_key(real_archive_path()?, real_archive_key().ok())?;
+    let build = archive.build().ok_or("installed Build identity")?;
+    let expected = std::env::var("P4KX_RADAR_AUDIO_BUILD_CHANGE")?;
+    assert_eq!(build.change_number(), expected, "the selected Build");
     let watch = ArchiveWatch::new(&archive);
     watch.check()?;
     let mut entries = archive
@@ -66,9 +69,17 @@ fn installed_radar_audio_reconciles_ordered_sound_slots_and_selector_coverage() 
     check_tree(row.elements(), original.root(), &snapshot.source_inventory)?;
     check_slots(row.elements(), original.root())?;
     watch.check()?;
+    report(build.change_number());
     Ok(())
 }
 
+#[expect(
+    clippy::print_stdout,
+    reason = "installed witness prints only the verified Build and Entry count"
+)]
+fn report(change: &str) {
+    println!("radar audio source witness: change={change}, entries=1");
+}
 fn check_tree(
     actual: &[RadarAudioNode],
     root: SourceElement<'_>,

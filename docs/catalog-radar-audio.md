@@ -19,10 +19,18 @@ A sound-event element includes a sourced `bindingStatus` of `missingValue`,
 `emptyValue`, `invalidValue`, or `unprovenSelector`. A nonempty slot supplies a
 bare string. The authored hierarchy supplies no target selector or namespace for
 that string. Candidate name comparisons alone cannot establish a runtime binding.
-The status provenance covers the declaration of the slot and its value.
+The status provenance covers the declaration of the slot and its value. A matching
+switch state or Wwise value describes that control's value. A sound binding
+requires an authored link to a compatible event target.
 Querying this dataset reads the selected configuration XML Entries and directory
 metadata without scanning other audio definitions, DataForge, media, or soundbanks.
 
 `catalog_queries::radar_audio::read_radar_audio` accepts all canonical occurrences
 or one physical root Entry index. It returns the canonical rows, observed physical
 scope, source inventory, and failed read and projection counts.
+
+The installed witness compares the decoded source tree, exact sound-slot
+positions, and origin receipts with the physical SDK row. Set `P4KX_DATA_P4K`
+and `P4KX_RADAR_AUDIO_BUILD_CHANGE` to the installed Archive and its Build
+change number. Run
+`cargo test --locked -p p4kx-export --lib installed_radar_audio_reconciles_ordered_sound_slots_and_selector_coverage -- --ignored --nocapture`.

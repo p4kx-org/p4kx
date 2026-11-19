@@ -33,6 +33,7 @@ const SYNTHETIC: &[u8] = br#"<RadarAudioData>
         <SoundEvent name="no-value"/>
         <SoundEvent name="empty" value=""/>
         <SoundEvent name="authored" value="FixtureToken"/>
+        <SoundEvent name="state-token" value="FixtureState"/>
         <Unknown><SoundEvent name="future" value="other"/></Unknown>
     </SoundEvents>
 </RadarAudioData>"#;
@@ -79,7 +80,18 @@ fn fixture() -> TestResult<(tempfile::TempDir, Archive)> {
         .entry(TestEntry::stored(PATH.to_ascii_lowercase(), binary).encrypted())
         .entry(TestEntry::stored(
             "Data/Libs/GameAudio/fixture-atl.xml",
-            br#"<ATLConfig><AudioTriggers><ATLTrigger atl_name="FixtureToken"/></AudioTriggers></ATLConfig>"#,
+            br#"<ATLConfig>
+                <AudioTriggers><ATLTrigger atl_name="FixtureToken"/></AudioTriggers>
+                <AudioSwitches>
+                    <ATLSwitch atl_name="FixtureSwitch">
+                        <ATLSwitchState atl_name="FixtureState">
+                            <WwiseSwitch wwise_name="FixtureSwitch">
+                                <WwiseValue wwise_name="FixtureState"/>
+                            </WwiseSwitch>
+                        </ATLSwitchState>
+                    </ATLSwitch>
+                </AudioSwitches>
+            </ATLConfig>"#,
         ))
         .write_to(&path)?;
     let archive = Archive::open_with_key(path, Some(p4kx_testkit::test_key()))?;
@@ -121,8 +133,9 @@ fn check_text(row: &RadarAudioConfiguration) -> TestResult {
             RadarAudioBindingStatus::MissingValue,
             RadarAudioBindingStatus::EmptyValue,
             RadarAudioBindingStatus::UnprovenSelector,
+            RadarAudioBindingStatus::UnprovenSelector,
         ],
-        "an adjacent matching ATL name does not supply an authored selector"
+        "neither an adjacent trigger nor a switch-state name supplies an authored selector"
     );
     Ok(())
 }
