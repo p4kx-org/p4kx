@@ -48,7 +48,12 @@ function Test-SummaryPersistence([bool]$PortalFails,[string]$Name) {
     $workerFailure=[InvalidOperationException]::new('synthetic actual worker adapter failure')
     $journalFailure=[IO.InvalidDataException]::new('synthetic actual journal adapter failure')
     $writeFailure=[IO.IOException]::new('synthetic actual result persistence failure')
+    $launch=@{count=0;worker_deadline_utc=$null;milliseconds=0}
     function Invoke-P4kxPortalProcess {
+        param($Executable,$Arguments,$Directory,$Name,$Milliseconds,$MaximumBytes,$Environment,$Observation)
+        $launch.count++
+        $launch.worker_deadline_utc=$Environment.P4KX_MSI_WORKER_DEADLINE_UTC
+        $launch.milliseconds=$Milliseconds
         if($PortalFails){throw $workerFailure}
         return @{exit_code=0;stdout='';stderr=''}
     }
@@ -63,6 +68,11 @@ function Test-SummaryPersistence([bool]$PortalFails,[string]$Name) {
     $parameters=@{Target=$target;OutputDirectory=(Join-Path $root $Name)}
     $observed=$null
     try { Invoke-P4kxMsiDiagnosticWorker $stub $parameters } catch { $observed=$_.Exception }
+    $start=Get-Content -Raw -LiteralPath (Join-Path $parameters.OutputDirectory 'diagnostics/diagnostic-start.json') | ConvertFrom-Json -AsHashtable -DateKind String
+    $workerDeadline=ConvertFrom-P4kxMsiBudgetTimestamp $start.worker_deadline_utc
+    $originalDeadline=ConvertFrom-P4kxMsiBudgetTimestamp $start.deadline_utc
+    Assert-FailureControl ($launch.count -eq 1 -and $launch.worker_deadline_utc -ceq $start.worker_deadline_utc -and
+        $workerDeadline -lt $originalDeadline -and $launch.milliseconds -gt 0 -and $launch.milliseconds -le $start.budget_ms) 'The original worker launch lost its separately bound absolute deadline.'
     Assert-FailureControl ($null -ne $observed) 'Controlled actual output failure was accepted.'
     Assert-FailureControl (Contains-DiagnosticException $observed $journalFailure) 'Result persistence replaced the original actual journal failure.'
     Assert-FailureControl (Contains-DiagnosticException $observed $writeFailure) 'Result persistence failure was swallowed.'

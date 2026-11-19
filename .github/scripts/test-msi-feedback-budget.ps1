@@ -21,6 +21,23 @@ foreach($deadline in @('','invalid',$now.ToString('o'),$now.AddMinutes(-1).ToStr
 }
 Assert-FeedbackBudget ((Get-P4kxMsiWorkerBudget ($now.AddMinutes(35).ToString('o')) $now) -eq 600000) 'Worker ten-minute maximum changed.'
 Assert-FeedbackBudget ((Get-P4kxMsiWorkerBudget ($now.AddSeconds(3).ToString('o')) $now) -eq 3000) 'Worker short-deadline precision changed.'
+foreach($case in @(
+    @{seconds=2100;admission=$false;expected=600000},
+    @{seconds=2100;admission=$true;expected=90000},
+    @{seconds=32;admission=$false;expected=32000},
+    @{seconds=32;admission=$true;expected=32000}
+)){
+    $window=New-P4kxMsiWorkerWindow ($now.AddSeconds($case.seconds).ToString('o')) $case.admission $now
+    Assert-FeedbackBudget ($window.budget_ms -eq $case.expected -and $window.deadline_utc -ceq $now.AddMilliseconds($case.expected).ToString('o')) 'Absolute worker deadline differs from its original allowance.'
+}
+$workerDeadline=$now.AddMinutes(10).ToString('o')
+$fixtureBudget=Get-P4kxMsiRawFixtureBudget $workerDeadline ($now.AddMinutes(2))
+Assert-FeedbackBudget ($fixtureBudget.capture_ms -eq 470000 -and $fixtureBudget.cleanup_ms -eq 5000) 'Raw fixture did not receive the worker remainder less its cleanup and evidence reserve.'
+$lastMillisecond=Get-P4kxMsiRawFixtureBudget $workerDeadline ($now.AddMilliseconds(589999))
+Assert-FeedbackBudget ($lastMillisecond.capture_ms -eq 1) 'Last usable raw fixture millisecond was lost.'
+foreach($elapsed in @(590000,600000,600001)){
+    Assert-FeedbackBudgetFailure {Get-P4kxMsiRawFixtureBudget $workerDeadline ($now.AddMilliseconds($elapsed))} 'Raw fixture started without sufficient time under the original worker deadline.'
+}
 $late=$now.AddSeconds(330).ToString('o')
 $prepared=New-P4kxMsiStepBudget $late $now
 Assert-FeedbackBudget ($prepared.minutes -eq 5) 'Late installer received a fresh twelve-minute allowance.'

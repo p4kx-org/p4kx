@@ -50,11 +50,8 @@ function Invoke-P4kxMsiDiagnosticWorker {
     if (-not $IsWindows -or $env:GITHUB_ACTIONS -cne 'true' -or $env:RUNNER_ENVIRONMENT -cne 'github-hosted') { throw 'MSI verification requires a disposable native Windows runner.' }
     if ((Get-Location).Provider.Name -cne 'FileSystem') { throw 'MSI worker requires a filesystem PowerShell location.' }
     $admissionOnly = $Parameters.Keys -contains 'AdmissionOnly' -and [bool]$Parameters['AdmissionOnly']
-    $milliseconds = Get-P4kxMsiWorkerBudget $env:P4KX_MSI_DIAGNOSTIC_DEADLINE_UTC
-    if ($admissionOnly) {
-        $admissionWatchdogMilliseconds = 90000
-        $milliseconds = [Math]::Min($milliseconds, $admissionWatchdogMilliseconds)
-    }
+    $window = New-P4kxMsiWorkerWindow $env:P4KX_MSI_DIAGNOSTIC_DEADLINE_UTC $admissionOnly
+    $workerEnvironment = @{P4KX_MSI_WORKER_DEADLINE_UTC=$window.deadline_utc}
     $output = [IO.Path]::GetFullPath($Parameters['OutputDirectory'])
     $directory = Join-Path $output 'diagnostics'
     New-Item -ItemType Directory -Path $directory -ErrorAction Stop | Out-Null
@@ -65,12 +62,13 @@ function Invoke-P4kxMsiDiagnosticWorker {
     $startRole = if ($admissionOnly) {'native-msi-admission-start'} else {'native-msi-diagnostic-start'}
     @{schema=1;role=$startRole;revision=$env:GITHUB_SHA;run=$env:GITHUB_RUN_ID;attempt=$env:GITHUB_RUN_ATTEMPT;
         target=$Parameters['Target'];process_arch=[Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString();
-        deadline_utc=$env:P4KX_MSI_DIAGNOSTIC_DEADLINE_UTC;budget_ms=$milliseconds;parent_pid=$PID;
+        deadline_utc=$env:P4KX_MSI_DIAGNOSTIC_DEADLINE_UTC;worker_deadline_utc=$window.deadline_utc;budget_ms=$window.budget_ms;parent_pid=$PID;
         worker_script=[IO.Path]::GetFileName($Script);worker_sha256=(Get-FileHash -LiteralPath $Script -Algorithm SHA256).Hash.ToLowerInvariant();
         completed_success=$false;native_completion_unproven=$true;mutation_authority=$false} |
         ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $directory 'diagnostic-start.json') -Encoding utf8NoBOM
     try {
-        $result = Invoke-P4kxPortalProcess (Get-Process -Id $PID).Path $arguments $directory 'lifecycle-worker' -Milliseconds $milliseconds -MaximumBytes 4MB -Observation $observation
+        $milliseconds = Get-P4kxMsiRemainingBudget $window.deadline_utc
+        $result = Invoke-P4kxPortalProcess (Get-Process -Id $PID).Path $arguments $directory 'lifecycle-worker' -Milliseconds $milliseconds -MaximumBytes 4MB -Environment $workerEnvironment -Observation $observation
         if ($result.exit_code -ne 0) { throw "Native MSI worker exited $($result.exit_code); see captured diagnostics." }
     } catch { $failure=$_.Exception }
     try { $journal=Read-P4kxMsiPhaseJournal (Join-Path $directory 'phase-journal.jsonl') } catch { $inspectionFailure=$_.Exception }
@@ -81,7 +79,7 @@ function Invoke-P4kxMsiDiagnosticWorker {
         $resultRole = if ($admissionOnly) {'native-msi-admission-result'} else {'native-msi-diagnostic-result'}
         $lifecycleComplete = $proven -and -not $admissionOnly
         $receipt = @{schema=1; role=$resultRole; revision=$env:GITHUB_SHA; run=$env:GITHUB_RUN_ID; attempt=$env:GITHUB_RUN_ATTEMPT; target=$Parameters['Target'];
-            deadline_utc=$env:P4KX_MSI_DIAGNOSTIC_DEADLINE_UTC; budget_ms=$milliseconds; elapsed_ms=$timer.ElapsedMilliseconds;
+            deadline_utc=$env:P4KX_MSI_DIAGNOSTIC_DEADLINE_UTC; worker_deadline_utc=$window.deadline_utc; budget_ms=$window.budget_ms; elapsed_ms=$timer.ElapsedMilliseconds;
             worker=$observation; completed_success=$lifecycleComplete; native_completion_unproven=(-not $lifecycleComplete);
             worker_result_returned=($null -ne $result); mutation_authority=$false;
             journal=$journal; journal_invalid=($null -ne $inspectionFailure)}

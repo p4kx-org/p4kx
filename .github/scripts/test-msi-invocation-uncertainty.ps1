@@ -9,6 +9,7 @@ param(
 )
 $ErrorActionPreference='Stop'
 $script:checks=0;$script:defects=0
+if($Expectation -ceq 'Green'){ . (Join-Path $SourceDirectory 'msi-diagnostic-budget.ps1') }
 $definitions=@{
     'msi-raw-fixture.ps1'=@('Assert-P4kxMsiMutationReady','New-P4kxRawMsiName','Invoke-P4kxRawMsiFixture','Assert-P4kxRawMsiEnvelope','Get-P4kxRawMsiImage','Test-P4kxRawMsiValueEqual','Set-P4kxRawMsiPath','Restore-P4kxRawMsiImage')
     'msi-path-verification.ps1'=@('ConvertTo-P4kxRawPathFixture','Restore-P4kxMsiVerificationBaseline','Invoke-P4kxMsiRawPathCases','Invoke-P4kxMsiPathHelper','Invoke-P4kxMsiForeignEditProbe')
@@ -37,7 +38,7 @@ function Test-ContainsIdentity($Failure,$Expected){
 function Reset-Test([string]$Role,[string]$Phase,[string]$Mode='unknown'){
     $script:faultRole=$Role;$script:faultPhase=$Phase;$script:mode=$Mode;$script:fired=$false;$script:unknown=$false
     $script:commands=[Collections.Generic.List[object]]::new();$script:after=[Collections.Generic.List[string]]::new()
-    $script:inputs=@{};$script:outputs=@{};$script:seed=$null;$script:waits=0;$script:kills=0;$script:disposed=0;$script:starts=0;$script:jsonWrites=0
+    $script:inputs=@{};$script:outputs=@{};$script:seed=$null;$script:waits=0;$script:kills=0;$script:disposed=0;$script:starts=0;$script:jsonWrites=0;$script:rawBudget=$null
     $script:original=[AggregateException]::new('Synthetic native completion is unproven.',[Exception[]]@([InvalidOperationException]::new('Synthetic teardown failed.')))
     $script:disposeFailure=[IO.IOException]::new('Synthetic disposal failure.')
     $script:binding='v1|4|'+('1'*32)+'|'+('2'*32)+'|'+('3'*64)
@@ -45,7 +46,8 @@ function Reset-Test([string]$Role,[string]$Phase,[string]$Mode='unknown'){
         image=@{path=@{registry_type=2;bytes_hex='41000000'};state=$null;sequence=$null;binding=$null;keys=@{environment=$true;installer=$false;ownership=$false;invocation=$false}};
         core=@{status='valid';phase='committed';owner=$null;reserved_binding=$null;journal_binding=$null}}
     $script:originalImage=Copy-TestValue $script:state
-    $script:fixture=@{interrupted=$false;executable='fixture';sha256=('a'*64);root='C:\runner\raw';counter=0;revision=('1'*40);run='12';attempt='3';arch='x86_64'}
+    $script:fixture=@{interrupted=$false;executable='fixture';sha256=('a'*64);root='C:\runner\raw';counter=0;revision=('1'*40);run='12';attempt='3';arch='x86_64';
+        worker_deadline_utc=[DateTimeOffset]::UtcNow.AddMinutes(2).ToString('o')}
     $script:context=@{metadata=@{product='11111111-1111-1111-1111-111111111111';package='22222222-2222-2222-2222-222222222222'};
         msi='not-executed.msi';folder='C:\P4KX';upgrade='synthetic';shortcut='synthetic';logs='C:\runner';helper='helper';helper_sha256=('a'*64);helper_calls=0}
 }
@@ -76,8 +78,11 @@ function Set-TestInstalled {
     $script:state.core.owner=@{product=('1'*32);package=('2'*32);claim='inserted'};$script:state.core.phase='applied'
 }
 function Invoke-P4kxPortalProcess {
-    param($Executable,$Arguments,$Directory,$Name,$Environment)
+    param($Executable,$Arguments,$Directory,$Name,$Environment,$Milliseconds,$CleanupMilliseconds)
     if($Executable -cnotin @('helper','fixture')){throw 'NATIVE SENTINEL: unexpected executable.'}
+    if($Executable -ceq 'fixture'){
+        $script:rawBudget=@{capture_ms=$Milliseconds;cleanup_ms=$CleanupMilliseconds}
+    }
     $phase=$Arguments[0];Record-TestCommand $Executable $phase
     if(-not $script:fired -and $Executable -ceq $script:faultRole -and $phase -ceq $script:faultPhase){
         $script:fired=$true
@@ -164,6 +169,16 @@ if($Expectation -ceq 'Red'){
 }
 
 if($Expectation -ceq 'Green'){
+    Reset-Test none none
+    Get-P4kxRawMsiImage $script:fixture | Out-Null
+    Assert-Test ($script:rawBudget.capture_ms -gt 5000 -and $script:rawBudget.capture_ms -le 110000 -and $script:rawBudget.cleanup_ms -eq 5000) 'The raw fixture process did not receive the bounded worker remainder.'
+    $script:fixture.worker_deadline_utc=[DateTimeOffset]::UtcNow.AddSeconds(-1).ToString('o')
+    $invocations=$script:commands.Count
+    $counter=$script:fixture.counter
+    $caught=$null
+    try{Invoke-P4kxRawMsiFixture $script:fixture restore | Out-Null}catch{$caught=$_.Exception}
+    Assert-Test ($null -ne $caught -and $script:commands.Count -eq $invocations -and $script:fixture.counter -eq $counter) 'Expired raw fixture invocation advanced or started a process.'
+    Assert-Test (-not $script:fixture.interrupted) 'An expired invocation that did not start fabricated uncertain native completion.'
     foreach($role in @('helper','fixture')){
         $phase=if($role -ceq 'helper'){'apply'}else{'seed-path'}
         Reset-Test $role $phase exit37

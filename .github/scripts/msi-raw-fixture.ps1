@@ -2,6 +2,7 @@ $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'platform-contract.ps1')
 . (Join-Path $PSScriptRoot 'binary-machine.ps1')
 . (Join-Path $PSScriptRoot 'portal-process.ps1')
+. (Join-Path $PSScriptRoot 'msi-diagnostic-budget.ps1')
 
 <#
 .SYNOPSIS
@@ -23,7 +24,7 @@ function New-P4kxRawMsiFixture {
     if(-not $root.StartsWith($temporary+'\',[StringComparison]::OrdinalIgnoreCase) -or (Test-Path -LiteralPath $root)) {throw 'Raw fixture root must be a fresh child of RUNNER_TEMP.'}
     New-Item -ItemType Directory -Path $root | Out-Null
     return @{executable=[IO.Path]::GetFullPath($Executable);sha256=$ExpectedHash;root=$root;counter=0;interrupted=$false;revision=$env:GITHUB_SHA;run=$env:GITHUB_RUN_ID;attempt=$env:GITHUB_RUN_ATTEMPT;
-        arch=$(if($Platform.arch -ceq 'amd64'){'x86_64'}else{'aarch64'});target=$Platform.target}
+        arch=$(if($Platform.arch -ceq 'amd64'){'x86_64'}else{'aarch64'});target=$Platform.target;worker_deadline_utc=$env:P4KX_MSI_WORKER_DEADLINE_UTC}
 }
 
 function New-P4kxRawMsiName {
@@ -44,10 +45,12 @@ function Invoke-P4kxRawMsiFixture {
     param($Context,[string]$Command,[string[]]$Inputs=@())
     if($Command -cne 'capture'){Assert-P4kxMsiMutationReady $Context}
     if((Get-FileHash -LiteralPath $Context.executable -Algorithm SHA256).Hash.ToLowerInvariant() -cne $Context.sha256) {throw 'Registry fixture changed after source validation.'}
+    $budget=Get-P4kxMsiRawFixtureBudget $Context.worker_deadline_utc
     $name=New-P4kxRawMsiName $Context $Command
     $environment=@{P4KX_NATIVE_REGISTRY_FIXTURE="p4kx-native-registry-fixture:$($Context.run):$($Context.attempt)"}
-    try{$result=Invoke-P4kxPortalProcess $Context.executable (@($Command,$Context.root)+$Inputs+@($name)) $Context.root ([IO.Path]::GetFileNameWithoutExtension($name)) -Environment $environment}
-    catch{$Context.interrupted=$true;throw}
+    try {
+        $result=Invoke-P4kxPortalProcess $Context.executable (@($Command,$Context.root)+$Inputs+@($name)) $Context.root ([IO.Path]::GetFileNameWithoutExtension($name)) -Environment $environment -Milliseconds $budget.capture_ms -CleanupMilliseconds $budget.cleanup_ms
+    } catch { $Context.interrupted=$true; throw }
     if($result.exit_code -ne 0) {$failure=[InvalidOperationException]::new('Raw Registry fixture failed.');$failure.Data['result']=$result;throw $failure}
     $path=Join-Path $Context.root $name
     if((Get-Item -LiteralPath $path).Length -gt 40MB) {throw 'Raw Registry observation exceeds its fixture bound.'}
