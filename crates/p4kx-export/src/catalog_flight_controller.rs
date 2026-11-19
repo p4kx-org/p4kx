@@ -18,33 +18,43 @@ use crate::source_value_catalog::SourceRecordReference;
 
 #[path = "flight_controller_limits.rs"]
 mod limits;
-use limits::{CollisionDetection, ShipRecall};
+pub use limits::{CollisionDetection, ShipRecall};
 
 pub(in crate::catalog_v3) const COMPONENT: &str = "SCItemFlightControllerParams";
-
-type Single = SourcedValue<ResourceFloat32>;
-type RecordLink<'source> = SourcedValue<Box<SourceRecordReference<'source>>>;
 
 /// Physical flight-controller settings and input bindings.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(in crate::catalog_v3) struct FlightController<'source> {
+#[non_exhaustive]
+pub struct FlightController<'source> {
     #[serde(flatten)]
     owner: ComponentOwner,
     #[serde(flatten)]
     source: UnitSource<'source>,
     #[serde(flatten)]
-    settings: OperatingSettings<'source>,
+    /// Original settings field.
+    pub settings: OperatingSettings<'source>,
     #[serde(flatten)]
-    interactions: Interactions<'source>,
-    collision_detection: SourcedValue<CollisionDetection<'source>>,
+    /// Original interactions field.
+    pub interactions: Interactions<'source>,
+    /// Original collision detection field.
+    pub collision_detection: SourcedValue<CollisionDetection<'source>>,
     #[serde(rename = "ShipRecall")]
-    ship_recall: SourcedValue<ShipRecall<'source>>,
+    /// Original ship recall field.
+    pub ship_recall: SourcedValue<ShipRecall<'source>>,
 }
 
 impl<'source> FlightController<'source> {
-    pub(in crate::catalog_v3) const fn owner(&self) -> &ComponentOwner {
+    /// Borrows the original component type and remaining fields.
+    #[must_use]
+    pub const fn source(&self) -> &UnitSource<'source> {
+        &self.source
+    }
+
+    /// Borrows the original physical Record and component position.
+    #[must_use]
+    pub const fn owner(&self) -> &ComponentOwner {
         &self.owner
     }
 
@@ -84,21 +94,31 @@ impl<'source> FlightController<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct OperatingSettings<'source> {
-    fuel_warning_display_time: Single,
-    hover_anim_playback_duration: Single,
-    hover_anim_play_in_landing_mode: SourcedValue<bool>,
-    passive_refuel_warning_threshold_percentage: Single,
+/// Original authored operating settings fields and their source evidence.
+#[non_exhaustive]
+pub struct OperatingSettings<'source> {
+    /// Original fuel warning display time field.
+    pub fuel_warning_display_time: SourcedValue<ResourceFloat32>,
+    /// Original hover anim playback duration field.
+    pub hover_anim_playback_duration: SourcedValue<ResourceFloat32>,
+    /// Original hover anim play in landing mode field.
+    pub hover_anim_play_in_landing_mode: SourcedValue<bool>,
+    /// Original passive refuel warning threshold percentage field.
+    pub passive_refuel_warning_threshold_percentage: SourcedValue<ResourceFloat32>,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
-    hud_params_override: RecordLink<'source>,
+    /// Original hud params override field.
+    pub hud_params_override: SourcedValue<Box<SourceRecordReference<'source>>>,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
-    vehicle_hud_params_override: RecordLink<'source>,
+    /// Original vehicle hud params override field.
+    pub vehicle_hud_params_override: SourcedValue<Box<SourceRecordReference<'source>>>,
     #[serde(rename = "PowerOffEffectTag")]
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
-    power_off_effect_tag: RecordLink<'source>,
+    /// Original power off effect tag field.
+    pub power_off_effect_tag: SourcedValue<Box<SourceRecordReference<'source>>>,
     #[serde(rename = "PowerOnEffectTag")]
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
-    power_on_effect_tag: RecordLink<'source>,
+    /// Original power on effect tag field.
+    pub power_on_effect_tag: SourcedValue<Box<SourceRecordReference<'source>>>,
 }
 
 impl<'source> OperatingSettings<'source> {
@@ -151,41 +171,60 @@ impl<'source> OperatingSettings<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct Interactions<'source> {
+/// Original authored interactions fields and their source evidence.
+#[non_exhaustive]
+pub struct Interactions<'source> {
     #[serde(rename = "cycleTransformInteraction")]
-    cycle_transform: SourcedValue<HealthLink<'source>>,
+    /// Original cycle transform field.
+    pub cycle_transform: SourcedValue<HealthLink<'source>>,
     #[serde(rename = "deployTransformInteraction")]
-    deploy_transform: SourcedValue<HealthLink<'source>>,
+    /// Original deploy transform field.
+    pub deploy_transform: SourcedValue<HealthLink<'source>>,
     #[serde(rename = "retractTransformInteraction")]
-    retract_transform: SourcedValue<HealthLink<'source>>,
+    /// Original retract transform field.
+    pub retract_transform: SourcedValue<HealthLink<'source>>,
     #[serde(rename = "disableCoupledModeInteraction")]
-    disable_coupled_mode: SourcedValue<HealthLink<'source>>,
+    /// Original disable coupled mode field.
+    pub disable_coupled_mode: SourcedValue<HealthLink<'source>>,
     #[serde(rename = "enableCoupledModeInteraction")]
-    enable_coupled_mode: SourcedValue<HealthLink<'source>>,
+    /// Original enable coupled mode field.
+    pub enable_coupled_mode: SourcedValue<HealthLink<'source>>,
     #[serde(rename = "disableCruiseControlInteraction")]
-    disable_cruise_control: SourcedValue<HealthLink<'source>>,
+    /// Original disable cruise control field.
+    pub disable_cruise_control: SourcedValue<HealthLink<'source>>,
     #[serde(rename = "enableCruiseControlInteraction")]
-    enable_cruise_control: SourcedValue<HealthLink<'source>>,
+    /// Original enable cruise control field.
+    pub enable_cruise_control: SourcedValue<HealthLink<'source>>,
     #[serde(rename = "disableESPInteraction")]
-    disable_esp: SourcedValue<HealthLink<'source>>,
+    /// Original disable esp field.
+    pub disable_esp: SourcedValue<HealthLink<'source>>,
     #[serde(rename = "enableESPInteraction")]
-    enable_esp: SourcedValue<HealthLink<'source>>,
+    /// Original enable esp field.
+    pub enable_esp: SourcedValue<HealthLink<'source>>,
     #[serde(rename = "disableGSafetyInteraction")]
-    disable_g_safety: SourcedValue<HealthLink<'source>>,
+    /// Original disable g safety field.
+    pub disable_g_safety: SourcedValue<HealthLink<'source>>,
     #[serde(rename = "enableGSafetyInteraction")]
-    enable_g_safety: SourcedValue<HealthLink<'source>>,
+    /// Original enable g safety field.
+    pub enable_g_safety: SourcedValue<HealthLink<'source>>,
     #[serde(rename = "disableProximityAssistInteraction")]
-    disable_proximity_assist: SourcedValue<HealthLink<'source>>,
+    /// Original disable proximity assist field.
+    pub disable_proximity_assist: SourcedValue<HealthLink<'source>>,
     #[serde(rename = "enableProximityAssistInteraction")]
-    enable_proximity_assist: SourcedValue<HealthLink<'source>>,
+    /// Original enable proximity assist field.
+    pub enable_proximity_assist: SourcedValue<HealthLink<'source>>,
     #[serde(rename = "disableVTOLInteraction")]
-    disable_vtol: SourcedValue<HealthLink<'source>>,
+    /// Original disable vtol field.
+    pub disable_vtol: SourcedValue<HealthLink<'source>>,
     #[serde(rename = "enableVTOLInteraction")]
-    enable_vtol: SourcedValue<HealthLink<'source>>,
+    /// Original enable vtol field.
+    pub enable_vtol: SourcedValue<HealthLink<'source>>,
     #[serde(rename = "engineOffInteraction")]
-    engine_off: SourcedValue<HealthLink<'source>>,
+    /// Original engine off field.
+    pub engine_off: SourcedValue<HealthLink<'source>>,
     #[serde(rename = "engineOnInteraction")]
-    engine_on: SourcedValue<HealthLink<'source>>,
+    /// Original engine on field.
+    pub engine_on: SourcedValue<HealthLink<'source>>,
 }
 
 impl<'source> Interactions<'source> {

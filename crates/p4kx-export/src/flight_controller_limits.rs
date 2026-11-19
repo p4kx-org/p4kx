@@ -5,24 +5,30 @@ use p4kx_extraction::SourcedValue;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use super::{RecordLink, Single};
 use crate::CatalogError;
 use crate::catalog_record_reference::CatalogRecordReference;
 use crate::catalog_v3::authored_fields::Observed;
 use crate::catalog_v3::catalog_unit_source::UnitSource;
+use crate::resource_float::ResourceFloat32;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
+use crate::source_value_catalog::SourceRecordReference;
 
 /// Original collision warning time and speed settings.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct CollisionDetection<'source> {
+#[non_exhaustive]
+pub struct CollisionDetection<'source> {
     #[serde(flatten)]
-    source: UnitSource<'source>,
-    collision_danger_close_warn_time: Single,
-    collision_warn_speed: Single,
-    collision_warn_time: Single,
+    /// Original type and remaining authored fields.
+    pub source: UnitSource<'source>,
+    /// Original collision danger close warn time field.
+    pub collision_danger_close_warn_time: SourcedValue<ResourceFloat32>,
+    /// Original collision warn speed field.
+    pub collision_warn_speed: SourcedValue<ResourceFloat32>,
+    /// Original collision warn time field.
+    pub collision_warn_time: SourcedValue<ResourceFloat32>,
 }
 
 impl<'source> CollisionDetection<'source> {
@@ -57,24 +63,33 @@ impl<'source> CollisionDetection<'source> {
 /// Original physical recall parameters and its referenced AI module tag.
 #[derive(Debug, Serialize, JsonSchema)]
 #[schemars(transform = every_field_required)]
-pub(super) struct ShipRecall<'source> {
+#[non_exhaustive]
+pub struct ShipRecall<'source> {
     #[serde(flatten)]
-    source: UnitSource<'source>,
+    /// Original type and remaining authored fields.
+    pub source: UnitSource<'source>,
     #[serde(rename = "AIModuleTag")]
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
-    ai_module_tag: RecordLink<'source>,
+    /// Original ai module tag field.
+    pub ai_module_tag: SourcedValue<Box<SourceRecordReference<'source>>>,
     #[serde(rename = "BrakingDistanceOffset")]
-    braking_distance_offset: Single,
+    /// Original braking distance offset field.
+    pub braking_distance_offset: SourcedValue<ResourceFloat32>,
     #[serde(rename = "DefaultPlatformDetectionRange")]
-    default_platform_detection_range: Single,
+    /// Original default platform detection range field.
+    pub default_platform_detection_range: SourcedValue<ResourceFloat32>,
     #[serde(rename = "ForwardOffset")]
-    forward_offset: Single,
+    /// Original forward offset field.
+    pub forward_offset: SourcedValue<ResourceFloat32>,
     #[serde(rename = "HoverHeightAtDestination")]
-    hover_height_at_destination: Single,
+    /// Original hover height at destination field.
+    pub hover_height_at_destination: SourcedValue<ResourceFloat32>,
     #[serde(rename = "MinimumRecallDistance")]
-    minimum_recall_distance: Single,
+    /// Original minimum recall distance field.
+    pub minimum_recall_distance: SourcedValue<ResourceFloat32>,
     #[serde(rename = "ObstructionDetectionRange")]
-    obstruction_detection_range: Single,
+    /// Original obstruction detection range field.
+    pub obstruction_detection_range: SourcedValue<ResourceFloat32>,
 }
 
 impl<'source> ShipRecall<'source> {

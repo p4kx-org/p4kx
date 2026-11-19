@@ -20,33 +20,50 @@ use crate::source_fields::FieldError;
     rename_all_fields = "camelCase"
 )]
 #[schemars(transform = every_field_required)]
-pub(super) enum ResourceFlowUnit<'source> {
+#[non_exhaustive]
+pub enum ResourceFlowUnit<'source> {
+    /// An original base unit.
     Base {
         #[serde(flatten)]
+        /// Original unit identity and additional fields.
         source: UnitSource<'source>,
     },
+    /// An amount expressed in centi resource units.
     CentiResourceUnit {
         #[serde(flatten)]
+        /// Original unit identity and additional fields.
         source: UnitSource<'source>,
+        /// Original stored amount.
         centi_resource_units: SourcedValue<ResourceNumber>,
     },
+    /// An amount expressed in micro resource units.
     MicroResourceUnit {
         #[serde(flatten)]
+        /// Original unit identity and additional fields.
         source: UnitSource<'source>,
+        /// Original stored amount.
         micro_resource_units: SourcedValue<ResourceNumber>,
     },
+    /// An amount expressed in standard resource units.
     StandardResourceUnit {
         #[serde(flatten)]
+        /// Original unit identity and additional fields.
         source: UnitSource<'source>,
+        /// Original stored amount.
         standard_resource_units: SourcedValue<ResourceNumber>,
     },
+    /// An amount expressed in power segment units.
     PowerSegmentResourceUnit {
         #[serde(flatten)]
+        /// Original unit identity and additional fields.
         source: UnitSource<'source>,
+        /// Original stored amount.
         units: SourcedValue<ResourceNumber>,
     },
+    /// An original unit retained without a known numeric projection.
     UnknownUnit {
         #[serde(flatten)]
+        /// Original unit identity and additional fields.
         source: UnitSource<'source>,
     },
 }

@@ -5,11 +5,11 @@ use p4kx_extraction::SourcedValue;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use super::{Label, Single};
 use crate::CatalogError;
 use crate::catalog_v3::authored_fields::Observed;
 use crate::catalog_v3::authored_link::HealthLink;
 use crate::catalog_v3::catalog_unit_source::UnitSource;
+use crate::resource_float::ResourceFloat32;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 
@@ -17,12 +17,17 @@ use crate::source_fields::FieldError;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct Gimbal<'source> {
+#[non_exhaustive]
+pub struct Gimbal<'source> {
     #[serde(flatten)]
-    source: UnitSource<'source>,
-    is_flex: SourcedValue<bool>,
-    pitch_axis: SourcedValue<GimbalAxis<'source>>,
-    yaw_axis: SourcedValue<GimbalAxis<'source>>,
+    /// Original type and remaining authored fields.
+    pub source: UnitSource<'source>,
+    /// Original is flex field.
+    pub is_flex: SourcedValue<bool>,
+    /// Original pitch axis field.
+    pub pitch_axis: SourcedValue<GimbalAxis<'source>>,
+    /// Original yaw axis field.
+    pub yaw_axis: SourcedValue<GimbalAxis<'source>>,
 }
 
 impl<'source> Gimbal<'source> {
@@ -53,15 +58,24 @@ impl<'source> Gimbal<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct GimbalAxis<'source> {
+/// Original authored gimbal axis fields and their source evidence.
+#[non_exhaustive]
+pub struct GimbalAxis<'source> {
     #[serde(flatten)]
-    source: UnitSource<'source>,
-    accel: Single,
-    angle_max: Single,
-    angle_min: Single,
-    animation: Label<'source>,
-    joint_name: Label<'source>,
-    speed: Single,
+    /// Original type and remaining authored fields.
+    pub source: UnitSource<'source>,
+    /// Original accel field.
+    pub accel: SourcedValue<ResourceFloat32>,
+    /// Original angle max field.
+    pub angle_max: SourcedValue<ResourceFloat32>,
+    /// Original angle min field.
+    pub angle_min: SourcedValue<ResourceFloat32>,
+    /// Original animation field.
+    pub animation: SourcedValue<&'source str>,
+    /// Original joint name field.
+    pub joint_name: SourcedValue<&'source str>,
+    /// Original speed field.
+    pub speed: SourcedValue<ResourceFloat32>,
 }
 
 impl<'source> GimbalAxis<'source> {
@@ -102,11 +116,15 @@ impl<'source> GimbalAxis<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct GimbalOverride<'source> {
+#[non_exhaustive]
+pub struct GimbalOverride<'source> {
     #[serde(flatten)]
-    source: UnitSource<'source>,
-    interaction_state: SourcedValue<HealthLink<'source>>,
-    gimbal_params: SourcedValue<Gimbal<'source>>,
+    /// Original type and remaining authored fields.
+    pub source: UnitSource<'source>,
+    /// Original interaction state field.
+    pub interaction_state: SourcedValue<HealthLink<'source>>,
+    /// Original gimbal params field.
+    pub gimbal_params: SourcedValue<Gimbal<'source>>,
 }
 
 impl<'source> GimbalOverride<'source> {

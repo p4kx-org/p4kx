@@ -23,12 +23,17 @@ use crate::{CatalogError, ExportAccountingError};
     rename_all_fields = "camelCase"
 )]
 #[schemars(transform = every_field_required)]
-pub(crate) enum HealthLink<'source> {
+#[non_exhaustive]
+pub enum HealthLink<'source> {
+    /// An original reference to a Record.
     RecordReference {
         #[schemars(with = "CatalogRecordReference")]
+        /// The original reference state and target evidence.
         value: Box<SourceRecordReference<'source>>,
     },
+    /// An original weak pointer.
     WeakReference {
+        /// The original pointer state and target evidence.
         value: Box<SourceWeakReference<'source>>,
     },
 }

@@ -17,14 +17,22 @@ use crate::source_fields::FieldError;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct IfcsFuelUsage<'source> {
+/// Original authored ifcs fuel usage fields and their source evidence.
+#[non_exhaustive]
+pub struct IfcsFuelUsage<'source> {
     #[serde(flatten)]
-    source: UnitSource<'source>,
-    atmospheric_curve_multiplier: SourcedValue<ResourceFloat32>,
-    atmospheric_modifier: SourcedValue<OrderedCurve<'source>>,
-    fuel_cost_per10_k_newton: SourcedValue<ResourceFlowUnit<'source>>,
-    idle_cost: SourcedValue<ResourceFlowUnit<'source>>,
-    no_fuel_threshold_ratio: SourcedValue<ResourceFloat32>,
+    /// Original type and remaining authored fields.
+    pub source: UnitSource<'source>,
+    /// Original atmospheric curve multiplier field.
+    pub atmospheric_curve_multiplier: SourcedValue<ResourceFloat32>,
+    /// Original atmospheric modifier field.
+    pub atmospheric_modifier: SourcedValue<OrderedCurve<'source>>,
+    /// Original fuel cost per10 k newton field.
+    pub fuel_cost_per10_k_newton: SourcedValue<ResourceFlowUnit<'source>>,
+    /// Original idle cost field.
+    pub idle_cost: SourcedValue<ResourceFlowUnit<'source>>,
+    /// Original no fuel threshold ratio field.
+    pub no_fuel_threshold_ratio: SourcedValue<ResourceFloat32>,
 }
 
 impl<'source> IfcsFuelUsage<'source> {
@@ -75,13 +83,20 @@ impl<'source> IfcsFuelUsage<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct IfcsNoFuel<'source> {
+/// Original authored ifcs no fuel fields and their source evidence.
+#[non_exhaustive]
+pub struct IfcsNoFuel<'source> {
     #[serde(flatten)]
-    source: UnitSource<'source>,
-    angular_acceleration_modifier: SourcedValue<ResourceFloat32>,
-    angular_velocity_modifier: SourcedValue<ResourceFloat32>,
-    linear_acceleration_modifier: SourcedValue<ResourceFloat32>,
-    linear_max_speed: SourcedValue<ResourceFloat32>,
+    /// Original type and remaining authored fields.
+    pub source: UnitSource<'source>,
+    /// Original angular acceleration modifier field.
+    pub angular_acceleration_modifier: SourcedValue<ResourceFloat32>,
+    /// Original angular velocity modifier field.
+    pub angular_velocity_modifier: SourcedValue<ResourceFloat32>,
+    /// Original linear acceleration modifier field.
+    pub linear_acceleration_modifier: SourcedValue<ResourceFloat32>,
+    /// Original linear max speed field.
+    pub linear_max_speed: SourcedValue<ResourceFloat32>,
 }
 
 impl<'source> IfcsNoFuel<'source> {
@@ -121,11 +136,16 @@ impl<'source> IfcsNoFuel<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct IfcsThrusterEfficiency<'source> {
+/// Original authored ifcs thruster efficiency fields and their source evidence.
+#[non_exhaustive]
+pub struct IfcsThrusterEfficiency<'source> {
     #[serde(flatten)]
-    source: UnitSource<'source>,
-    atmospheric_efficiency_curve: SourcedValue<OrderedCurve<'source>>,
-    max_supported_atmospheric_efficiency: SourcedValue<ResourceFloat32>,
+    /// Original type and remaining authored fields.
+    pub source: UnitSource<'source>,
+    /// Original atmospheric efficiency curve field.
+    pub atmospheric_efficiency_curve: SourcedValue<OrderedCurve<'source>>,
+    /// Original max supported atmospheric efficiency field.
+    pub max_supported_atmospheric_efficiency: SourcedValue<ResourceFloat32>,
 }
 
 impl<'source> IfcsThrusterEfficiency<'source> {

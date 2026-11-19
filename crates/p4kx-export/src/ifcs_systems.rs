@@ -20,24 +20,40 @@ use crate::source_value_catalog::{SourceArenaOutput, SourceRecordReference};
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct IfcsSystems<'source> {
-    formation_mode_params: SourcedValue<SourceArenaOutput<'source>>,
-    hud_messages: SourcedValue<SourceArenaOutput<'source>>,
-    thruster_imbalance_message: SourcedValue<SourceArenaOutput<'source>>,
-    thruster_types_for_angular_control: SourcedValue<SourceArenaOutput<'source>>,
+/// Original authored ifcs systems fields and their source evidence.
+#[non_exhaustive]
+pub struct IfcsSystems<'source> {
+    /// Original formation mode params field.
+    pub formation_mode_params: SourcedValue<SourceArenaOutput<'source>>,
+    /// Original hud messages field.
+    pub hud_messages: SourcedValue<SourceArenaOutput<'source>>,
+    /// Original thruster imbalance message field.
+    pub thruster_imbalance_message: SourcedValue<SourceArenaOutput<'source>>,
+    /// Original thruster types for angular control field.
+    pub thruster_types_for_angular_control: SourcedValue<SourceArenaOutput<'source>>,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
-    modifiers: SourcedValue<Box<SourceRecordReference<'source>>>,
+    /// Original modifiers field.
+    pub modifiers: SourcedValue<Box<SourceRecordReference<'source>>>,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
-    modifiers_legacy: SourcedValue<Box<SourceRecordReference<'source>>>,
+    /// Original legacy modifiers legacy field.
+    pub modifiers_legacy: SourcedValue<Box<SourceRecordReference<'source>>>,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
-    intoxication_modifier_ref: SourcedValue<Box<SourceRecordReference<'source>>>,
-    fuel_usage_params: SourcedValue<IfcsFuelUsage<'source>>,
-    thruster_efficiency_params: SourcedValue<IfcsThrusterEfficiency<'source>>,
-    legacy_thruster_efficiency_params: SourcedValue<IfcsThrusterEfficiency<'source>>,
-    no_fuel_params: SourcedValue<IfcsNoFuel<'source>>,
-    no_fuel_params_legacy: SourcedValue<IfcsNoFuel<'source>>,
-    damage_handling: SourcedValue<IfcsDamageHandling<'source>>,
-    part_damage_params: SourcedValue<IfcsPartDamage<'source>>,
+    /// Original intoxication modifier ref field.
+    pub intoxication_modifier_ref: SourcedValue<Box<SourceRecordReference<'source>>>,
+    /// Original fuel usage params field.
+    pub fuel_usage_params: SourcedValue<IfcsFuelUsage<'source>>,
+    /// Original thruster efficiency params field.
+    pub thruster_efficiency_params: SourcedValue<IfcsThrusterEfficiency<'source>>,
+    /// Original legacy thruster efficiency params field.
+    pub legacy_thruster_efficiency_params: SourcedValue<IfcsThrusterEfficiency<'source>>,
+    /// Original no fuel params field.
+    pub no_fuel_params: SourcedValue<IfcsNoFuel<'source>>,
+    /// Original legacy no fuel params legacy field.
+    pub no_fuel_params_legacy: SourcedValue<IfcsNoFuel<'source>>,
+    /// Original damage handling field.
+    pub damage_handling: SourcedValue<IfcsDamageHandling<'source>>,
+    /// Original part damage params field.
+    pub part_damage_params: SourcedValue<IfcsPartDamage<'source>>,
 }
 
 impl<'source> IfcsSystems<'source> {
@@ -127,13 +143,20 @@ impl<'source> IfcsSystems<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct IfcsDamageHandling<'source> {
+/// Original authored ifcs damage handling fields and their source evidence.
+#[non_exhaustive]
+pub struct IfcsDamageHandling<'source> {
     #[serde(flatten)]
-    source: UnitSource<'source>,
-    thrust_threshold_ang_neg: SourcedValue<InventoryVector3<'source>>,
-    thrust_threshold_ang_pos: SourcedValue<InventoryVector3<'source>>,
-    thrust_threshold_lin_neg: SourcedValue<InventoryVector3<'source>>,
-    thrust_threshold_lin_pos: SourcedValue<InventoryVector3<'source>>,
+    /// Original type and remaining authored fields.
+    pub source: UnitSource<'source>,
+    /// Original thrust threshold ang neg field.
+    pub thrust_threshold_ang_neg: SourcedValue<InventoryVector3<'source>>,
+    /// Original thrust threshold ang pos field.
+    pub thrust_threshold_ang_pos: SourcedValue<InventoryVector3<'source>>,
+    /// Original thrust threshold lin neg field.
+    pub thrust_threshold_lin_neg: SourcedValue<InventoryVector3<'source>>,
+    /// Original thrust threshold lin pos field.
+    pub thrust_threshold_lin_pos: SourcedValue<InventoryVector3<'source>>,
 }
 
 impl<'source> IfcsDamageHandling<'source> {
@@ -171,15 +194,24 @@ impl<'source> IfcsDamageHandling<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct IfcsPartDamage<'source> {
+/// Original authored ifcs part damage fields and their source evidence.
+#[non_exhaustive]
+pub struct IfcsPartDamage<'source> {
     #[serde(flatten)]
-    source: UnitSource<'source>,
-    drag_decrease_coefficient: SourcedValue<ResourceFloat32>,
-    drag_influence_mapping: SourcedValue<OrderedCurve<'source>>,
-    lift_decrease_coefficient: SourcedValue<ResourceFloat32>,
-    lift_influence_mapping: SourcedValue<OrderedCurve<'source>>,
-    roll_torque_coefficient: SourcedValue<ResourceFloat32>,
-    yaw_torque_coefficient: SourcedValue<ResourceFloat32>,
+    /// Original type and remaining authored fields.
+    pub source: UnitSource<'source>,
+    /// Original drag decrease coefficient field.
+    pub drag_decrease_coefficient: SourcedValue<ResourceFloat32>,
+    /// Original drag influence mapping field.
+    pub drag_influence_mapping: SourcedValue<OrderedCurve<'source>>,
+    /// Original lift decrease coefficient field.
+    pub lift_decrease_coefficient: SourcedValue<ResourceFloat32>,
+    /// Original lift influence mapping field.
+    pub lift_influence_mapping: SourcedValue<OrderedCurve<'source>>,
+    /// Original roll torque coefficient field.
+    pub roll_torque_coefficient: SourcedValue<ResourceFloat32>,
+    /// Original yaw torque coefficient field.
+    pub yaw_torque_coefficient: SourcedValue<ResourceFloat32>,
 }
 
 impl<'source> IfcsPartDamage<'source> {

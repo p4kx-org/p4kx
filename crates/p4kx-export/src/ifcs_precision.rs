@@ -16,22 +16,39 @@ use crate::source_fields::FieldError;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct IfcsLimits<'source> {
-    scm_speed: SourcedValue<ResourceFloat32>,
-    max_speed: SourcedValue<ResourceFloat32>,
-    boost_speed_forward: SourcedValue<ResourceFloat32>,
-    boost_speed_backward: SourcedValue<ResourceFloat32>,
-    max_angular_velocity: SourcedValue<InventoryVector3<'source>>,
-    negative_angular_scale: SourcedValue<InventoryVector3<'source>>,
-    negative_linear_scale: SourcedValue<InventoryVector3<'source>>,
-    positive_angular_scale: SourcedValue<InventoryVector3<'source>>,
-    positive_linear_scale: SourcedValue<InventoryVector3<'source>>,
-    linear_limiter_type: SourcedValue<&'source str>,
-    pitch_yaw_limiter_type: SourcedValue<&'source str>,
-    angular_accel_decay: SourcedValue<ResourceFloat32>,
-    linear_accel_decay: SourcedValue<ResourceFloat32>,
-    torque_distance_threshold: SourcedValue<ResourceFloat32>,
-    torque_imbalance_multiplier: SourcedValue<ResourceFloat32>,
+/// Original authored ifcs limits fields and their source evidence.
+#[non_exhaustive]
+pub struct IfcsLimits<'source> {
+    /// Original scm speed field.
+    pub scm_speed: SourcedValue<ResourceFloat32>,
+    /// Original max speed field.
+    pub max_speed: SourcedValue<ResourceFloat32>,
+    /// Original boost speed forward field.
+    pub boost_speed_forward: SourcedValue<ResourceFloat32>,
+    /// Original boost speed backward field.
+    pub boost_speed_backward: SourcedValue<ResourceFloat32>,
+    /// Original max angular velocity field.
+    pub max_angular_velocity: SourcedValue<InventoryVector3<'source>>,
+    /// Original negative angular scale field.
+    pub negative_angular_scale: SourcedValue<InventoryVector3<'source>>,
+    /// Original negative linear scale field.
+    pub negative_linear_scale: SourcedValue<InventoryVector3<'source>>,
+    /// Original positive angular scale field.
+    pub positive_angular_scale: SourcedValue<InventoryVector3<'source>>,
+    /// Original positive linear scale field.
+    pub positive_linear_scale: SourcedValue<InventoryVector3<'source>>,
+    /// Original linear limiter type field.
+    pub linear_limiter_type: SourcedValue<&'source str>,
+    /// Original pitch yaw limiter type field.
+    pub pitch_yaw_limiter_type: SourcedValue<&'source str>,
+    /// Original angular accel decay field.
+    pub angular_accel_decay: SourcedValue<ResourceFloat32>,
+    /// Original linear accel decay field.
+    pub linear_accel_decay: SourcedValue<ResourceFloat32>,
+    /// Original torque distance threshold field.
+    pub torque_distance_threshold: SourcedValue<ResourceFloat32>,
+    /// Original torque imbalance multiplier field.
+    pub torque_imbalance_multiplier: SourcedValue<ResourceFloat32>,
 }
 
 impl<'source> IfcsLimits<'source> {
@@ -108,14 +125,23 @@ impl<'source> IfcsLimits<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct IfcsPrecision<'source> {
-    precision_accel_curve: SourcedValue<OrderedCurve<'source>>,
-    precision_landing_multiplier: SourcedValue<ResourceFloat32>,
-    precision_max_distance: SourcedValue<ResourceFloat32>,
-    precision_min_distance: SourcedValue<ResourceFloat32>,
-    max_speed_precision_mode_full_proximity_assist: SourcedValue<ResourceFloat32>,
-    max_speed_precision_mode_zero_proximity_assist: SourcedValue<ResourceFloat32>,
-    refresh_caches_on_landing_mode: SourcedValue<bool>,
+/// Original authored ifcs precision fields and their source evidence.
+#[non_exhaustive]
+pub struct IfcsPrecision<'source> {
+    /// Original precision accel curve field.
+    pub precision_accel_curve: SourcedValue<OrderedCurve<'source>>,
+    /// Original precision landing multiplier field.
+    pub precision_landing_multiplier: SourcedValue<ResourceFloat32>,
+    /// Original precision max distance field.
+    pub precision_max_distance: SourcedValue<ResourceFloat32>,
+    /// Original precision min distance field.
+    pub precision_min_distance: SourcedValue<ResourceFloat32>,
+    /// Original max speed precision mode full proximity assist field.
+    pub max_speed_precision_mode_full_proximity_assist: SourcedValue<ResourceFloat32>,
+    /// Original max speed precision mode zero proximity assist field.
+    pub max_speed_precision_mode_zero_proximity_assist: SourcedValue<ResourceFloat32>,
+    /// Original refresh caches on landing mode field.
+    pub refresh_caches_on_landing_mode: SourcedValue<bool>,
 }
 
 impl<'source> IfcsPrecision<'source> {

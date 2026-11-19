@@ -15,9 +15,12 @@ use crate::source_fields::FieldError;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct DegradationCurve {
-    use_lut: SourcedValue<bool>,
-    points: SourcedValue<Vec<SourcedValue<CurvePoint>>>,
+#[non_exhaustive]
+pub struct DegradationCurve {
+    /// Original use lut field.
+    pub use_lut: SourcedValue<bool>,
+    /// Original points field.
+    pub points: SourcedValue<Vec<SourcedValue<CurvePoint>>>,
 }
 
 impl DegradationCurve {
@@ -43,9 +46,12 @@ impl DegradationCurve {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct CurvePoint {
-    x: SourcedValue<ResourceFloat32>,
-    y: SourcedValue<ResourceFloat32>,
+#[non_exhaustive]
+pub struct CurvePoint {
+    /// Original x field.
+    pub x: SourcedValue<ResourceFloat32>,
+    /// Original y field.
+    pub y: SourcedValue<ResourceFloat32>,
 }
 
 impl CurvePoint {

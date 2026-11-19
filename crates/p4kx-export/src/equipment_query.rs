@@ -12,6 +12,10 @@ pub mod component_definitions;
 #[path = "equipment_loadout_query.rs"]
 mod loadout_query;
 
+/// Selective reads of authored flight-controller, IFCS and thruster configurations.
+#[path = "equipment_flight_query.rs"]
+pub mod flight;
+
 pub use crate::catalog_v3::catalog_item_alignment::{
     AttachmentDefinitionLink, ComponentOwner, PortDefinitionLink,
 };

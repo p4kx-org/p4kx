@@ -530,6 +530,26 @@ identifies the affected physical Record. An explicit null target and a proven fo
 remain separate known exclusions. No unrelated configuration projector runs to manufacture that
 coverage result.
 
+## Direct flight configurations
+
+Use `catalog_queries::equipment::flight` to query `configurations.flightControllers` with
+`with_flight_controllers`, `configurations.ifcs` with `with_ifcs`, and `configurations.thrusters`
+with `with_thrusters`. The free functions have decoded-Entry `_from` forms. The session and
+parsed view provide the same methods for consecutive queries against one Archive.
+
+The query selects original Entity owners by physical Record index, GUID or the complete
+family. For each owner it keeps every admitted component at its original array position.
+Follow the Record index and component ordinal in the same DataForge to link related rows.
+Row getters expose original flight limits, IFCS sections and thruster configuration, including
+source-backed numeric bits, authored fields and typed references. The result owns the source
+inventory for those borrowed fields.
+
+Use `coverage()` to check the selected owner scope before accepting a result. A missing
+component slot, a malformed authored pointer, and an unreadable owner have distinct outcomes.
+A different Record lies outside a physical lookup even if it has the same GUID. Family and
+GUID queries inspect the admitted physical owners in order. These readers need no locales
+or loadout resolution.
+
 ## Component definition Records
 
 The functions in the following table are exported by

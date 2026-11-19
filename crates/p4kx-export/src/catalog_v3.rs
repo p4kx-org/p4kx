@@ -225,6 +225,8 @@ mod catalog_seat_ejection;
 pub(crate) mod catalog_shield_generator;
 #[path = "catalog_unit_source.rs"]
 pub(crate) mod catalog_unit_source;
+#[path = "flight_component_sources.rs"]
+pub(crate) mod flight_component_sources;
 #[path = "procedural_planet_audio.rs"]
 pub(crate) mod procedural_planet_audio;
 #[path = "weapon_procedural_definitions.rs"]

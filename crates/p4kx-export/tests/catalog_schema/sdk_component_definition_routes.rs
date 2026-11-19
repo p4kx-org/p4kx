@@ -18,7 +18,7 @@ use serde::Serialize;
 use super::{Route, TestResult};
 
 const REMAINING: &str =
-    "selective query and typed schema witnessed; installed and full producer parity open";
+    "typed schema and selected LIVE/PTU source samples witnessed; complete producer parity open";
 const TYPES: [&str; 5] = [
     "DamageResistanceMacro",
     "MiningLaserGlobalParams",

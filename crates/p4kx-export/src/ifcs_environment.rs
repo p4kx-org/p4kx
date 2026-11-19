@@ -18,13 +18,21 @@ use crate::source_value_catalog::SourceArenaOutput;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct IfcsEnvironment<'source> {
-    aero_surfaces: SourcedValue<Vec<SourcedValue<IfcsAeroSurface<'source>>>>,
-    atmospheric_flight_params: SourcedValue<IfcsAtmosphericFlight<'source>>,
-    drag_multiplier: SourcedValue<ResourceFloat32>,
-    lift_multiplier: SourcedValue<ResourceFloat32>,
-    scm_max_drag_multiplier: SourcedValue<ResourceFloat32>,
-    turbulence_params: SourcedValue<IfcsTurbulence<'source>>,
+/// Original authored ifcs environment fields and their source evidence.
+#[non_exhaustive]
+pub struct IfcsEnvironment<'source> {
+    /// Original aero surfaces field.
+    pub aero_surfaces: SourcedValue<Vec<SourcedValue<IfcsAeroSurface<'source>>>>,
+    /// Original atmospheric flight params field.
+    pub atmospheric_flight_params: SourcedValue<IfcsAtmosphericFlight<'source>>,
+    /// Original drag multiplier field.
+    pub drag_multiplier: SourcedValue<ResourceFloat32>,
+    /// Original lift multiplier field.
+    pub lift_multiplier: SourcedValue<ResourceFloat32>,
+    /// Original scm max drag multiplier field.
+    pub scm_max_drag_multiplier: SourcedValue<ResourceFloat32>,
+    /// Original turbulence params field.
+    pub turbulence_params: SourcedValue<IfcsTurbulence<'source>>,
 }
 
 impl<'source> IfcsEnvironment<'source> {
@@ -72,12 +80,18 @@ impl<'source> IfcsEnvironment<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct IfcsAtmosphericFlight<'source> {
+/// Original authored ifcs atmospheric flight fields and their source evidence.
+#[non_exhaustive]
+pub struct IfcsAtmosphericFlight<'source> {
     #[serde(flatten)]
-    source: UnitSource<'source>,
-    aerodynamic_fx_params: SourcedValue<SourceArenaOutput<'source>>,
-    aerodynamics_params: SourcedValue<SourceArenaOutput<'source>>,
-    command_control_params: SourcedValue<SourceArenaOutput<'source>>,
+    /// Original type and remaining authored fields.
+    pub source: UnitSource<'source>,
+    /// Original aerodynamic fx params field.
+    pub aerodynamic_fx_params: SourcedValue<SourceArenaOutput<'source>>,
+    /// Original aerodynamics params field.
+    pub aerodynamics_params: SourcedValue<SourceArenaOutput<'source>>,
+    /// Original command control params field.
+    pub command_control_params: SourcedValue<SourceArenaOutput<'source>>,
 }
 
 impl<'source> IfcsAtmosphericFlight<'source> {
@@ -108,23 +122,40 @@ impl<'source> IfcsAtmosphericFlight<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct IfcsTurbulence<'source> {
+/// Original authored ifcs turbulence fields and their source evidence.
+#[non_exhaustive]
+pub struct IfcsTurbulence<'source> {
     #[serde(flatten)]
-    source: UnitSource<'source>,
-    cloud_density_mapping: SourcedValue<OrderedCurve<'source>>,
-    cloud_density_turbulence_amplitude: SourcedValue<ResourceFloat32>,
-    ground_turbulence_altitude_max: SourcedValue<ResourceFloat32>,
-    ground_turbulence_altitude_min: SourcedValue<ResourceFloat32>,
-    ground_turbulence_enabled: SourcedValue<bool>,
-    ground_turbulence_max_ang_acceleration: SourcedValue<ResourceFloat32>,
-    ground_turbulence_noise: SourcedValue<SourceArenaOutput<'source>>,
-    ground_turbulence_speed_max: SourcedValue<ResourceFloat32>,
-    ground_turbulence_speed_min: SourcedValue<ResourceFloat32>,
-    wind_speed_mapping: SourcedValue<OrderedCurve<'source>>,
-    wind_speed_max: SourcedValue<ResourceFloat32>,
-    wind_speed_min: SourcedValue<ResourceFloat32>,
-    wind_speed_turbulence_amplitude: SourcedValue<ResourceFloat32>,
-    wind_speed_turbulence_enabled: SourcedValue<bool>,
+    /// Original type and remaining authored fields.
+    pub source: UnitSource<'source>,
+    /// Original cloud density mapping field.
+    pub cloud_density_mapping: SourcedValue<OrderedCurve<'source>>,
+    /// Original cloud density turbulence amplitude field.
+    pub cloud_density_turbulence_amplitude: SourcedValue<ResourceFloat32>,
+    /// Original ground turbulence altitude max field.
+    pub ground_turbulence_altitude_max: SourcedValue<ResourceFloat32>,
+    /// Original ground turbulence altitude min field.
+    pub ground_turbulence_altitude_min: SourcedValue<ResourceFloat32>,
+    /// Original ground turbulence enabled field.
+    pub ground_turbulence_enabled: SourcedValue<bool>,
+    /// Original ground turbulence max ang acceleration field.
+    pub ground_turbulence_max_ang_acceleration: SourcedValue<ResourceFloat32>,
+    /// Original ground turbulence noise field.
+    pub ground_turbulence_noise: SourcedValue<SourceArenaOutput<'source>>,
+    /// Original ground turbulence speed max field.
+    pub ground_turbulence_speed_max: SourcedValue<ResourceFloat32>,
+    /// Original ground turbulence speed min field.
+    pub ground_turbulence_speed_min: SourcedValue<ResourceFloat32>,
+    /// Original wind speed mapping field.
+    pub wind_speed_mapping: SourcedValue<OrderedCurve<'source>>,
+    /// Original wind speed max field.
+    pub wind_speed_max: SourcedValue<ResourceFloat32>,
+    /// Original wind speed min field.
+    pub wind_speed_min: SourcedValue<ResourceFloat32>,
+    /// Original wind speed turbulence amplitude field.
+    pub wind_speed_turbulence_amplitude: SourcedValue<ResourceFloat32>,
+    /// Original wind speed turbulence enabled field.
+    pub wind_speed_turbulence_enabled: SourcedValue<bool>,
 }
 
 impl<'source> IfcsTurbulence<'source> {

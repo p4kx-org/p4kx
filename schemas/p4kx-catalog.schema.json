@@ -1702,13 +1702,15 @@
           "$ref": "#/$defs/SourceArenaOutput"
         },
         "points": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCurvePoint"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCurvePoint",
+          "description": "Original points field."
         },
         "sourceType": {
           "$ref": "#/$defs/SourcedValueOfstring"
         },
         "useLut": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Original use lut field."
         }
       },
       "required": [
@@ -10286,13 +10288,16 @@
           "$ref": "#/$defs/SourceArenaOutput"
         },
         "collisionDangerCloseWarnTime": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original collision danger close warn time field."
         },
         "collisionWarnSpeed": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original collision warn speed field."
         },
         "collisionWarnTime": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original collision warn time field."
         },
         "sourceType": {
           "$ref": "#/$defs/SourcedValueOfstring"
@@ -13473,10 +13478,12 @@
       "description": "The exact stored coordinates of an authored curve point.",
       "properties": {
         "x": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original x field."
         },
         "y": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original y field."
         }
       },
       "required": [
@@ -14121,10 +14128,12 @@
       "description": "The original curve controls and authored point slots.",
       "properties": {
         "points": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCurvePoint"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCurvePoint",
+          "description": "Original points field."
         },
         "useLut": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Original use lut field."
         }
       },
       "required": [
@@ -18039,82 +18048,106 @@
       "description": "Physical flight-controller settings and input bindings.",
       "properties": {
         "PowerOffEffectTag": {
-          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference",
+          "description": "Original power off effect tag field."
         },
         "PowerOnEffectTag": {
-          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference",
+          "description": "Original power on effect tag field."
         },
         "ShipRecall": {
-          "$ref": "#/$defs/SourcedValueOfShipRecall"
+          "$ref": "#/$defs/SourcedValueOfShipRecall",
+          "description": "Original ship recall field."
         },
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
         },
         "collisionDetection": {
-          "$ref": "#/$defs/SourcedValueOfCollisionDetection"
+          "$ref": "#/$defs/SourcedValueOfCollisionDetection",
+          "description": "Original collision detection field."
         },
         "componentOrdinal": {
           "$ref": "#/$defs/SourcedValueOfuint32"
         },
         "cycleTransformInteraction": {
-          "$ref": "#/$defs/SourcedValueOfHealthLink"
+          "$ref": "#/$defs/SourcedValueOfHealthLink",
+          "description": "Original cycle transform field."
         },
         "deployTransformInteraction": {
-          "$ref": "#/$defs/SourcedValueOfHealthLink"
+          "$ref": "#/$defs/SourcedValueOfHealthLink",
+          "description": "Original deploy transform field."
         },
         "disableCoupledModeInteraction": {
-          "$ref": "#/$defs/SourcedValueOfHealthLink"
+          "$ref": "#/$defs/SourcedValueOfHealthLink",
+          "description": "Original disable coupled mode field."
         },
         "disableCruiseControlInteraction": {
-          "$ref": "#/$defs/SourcedValueOfHealthLink"
+          "$ref": "#/$defs/SourcedValueOfHealthLink",
+          "description": "Original disable cruise control field."
         },
         "disableESPInteraction": {
-          "$ref": "#/$defs/SourcedValueOfHealthLink"
+          "$ref": "#/$defs/SourcedValueOfHealthLink",
+          "description": "Original disable esp field."
         },
         "disableGSafetyInteraction": {
-          "$ref": "#/$defs/SourcedValueOfHealthLink"
+          "$ref": "#/$defs/SourcedValueOfHealthLink",
+          "description": "Original disable g safety field."
         },
         "disableProximityAssistInteraction": {
-          "$ref": "#/$defs/SourcedValueOfHealthLink"
+          "$ref": "#/$defs/SourcedValueOfHealthLink",
+          "description": "Original disable proximity assist field."
         },
         "disableVTOLInteraction": {
-          "$ref": "#/$defs/SourcedValueOfHealthLink"
+          "$ref": "#/$defs/SourcedValueOfHealthLink",
+          "description": "Original disable vtol field."
         },
         "enableCoupledModeInteraction": {
-          "$ref": "#/$defs/SourcedValueOfHealthLink"
+          "$ref": "#/$defs/SourcedValueOfHealthLink",
+          "description": "Original enable coupled mode field."
         },
         "enableCruiseControlInteraction": {
-          "$ref": "#/$defs/SourcedValueOfHealthLink"
+          "$ref": "#/$defs/SourcedValueOfHealthLink",
+          "description": "Original enable cruise control field."
         },
         "enableESPInteraction": {
-          "$ref": "#/$defs/SourcedValueOfHealthLink"
+          "$ref": "#/$defs/SourcedValueOfHealthLink",
+          "description": "Original enable esp field."
         },
         "enableGSafetyInteraction": {
-          "$ref": "#/$defs/SourcedValueOfHealthLink"
+          "$ref": "#/$defs/SourcedValueOfHealthLink",
+          "description": "Original enable g safety field."
         },
         "enableProximityAssistInteraction": {
-          "$ref": "#/$defs/SourcedValueOfHealthLink"
+          "$ref": "#/$defs/SourcedValueOfHealthLink",
+          "description": "Original enable proximity assist field."
         },
         "enableVTOLInteraction": {
-          "$ref": "#/$defs/SourcedValueOfHealthLink"
+          "$ref": "#/$defs/SourcedValueOfHealthLink",
+          "description": "Original enable vtol field."
         },
         "engineOffInteraction": {
-          "$ref": "#/$defs/SourcedValueOfHealthLink"
+          "$ref": "#/$defs/SourcedValueOfHealthLink",
+          "description": "Original engine off field."
         },
         "engineOnInteraction": {
-          "$ref": "#/$defs/SourcedValueOfHealthLink"
+          "$ref": "#/$defs/SourcedValueOfHealthLink",
+          "description": "Original engine on field."
         },
         "fuelWarningDisplayTime": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original fuel warning display time field."
         },
         "hoverAnimPlayInLandingMode": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Original hover anim play in landing mode field."
         },
         "hoverAnimPlaybackDuration": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original hover anim playback duration field."
         },
         "hudParamsOverride": {
-          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference",
+          "description": "Original hud params override field."
         },
         "ownerGuid": {
           "$ref": "#/$defs/SourcedValueOfGuid"
@@ -18123,16 +18156,19 @@
           "$ref": "#/$defs/SourcedValueOfuint32"
         },
         "passiveRefuelWarningThresholdPercentage": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original passive refuel warning threshold percentage field."
         },
         "retractTransformInteraction": {
-          "$ref": "#/$defs/SourcedValueOfHealthLink"
+          "$ref": "#/$defs/SourcedValueOfHealthLink",
+          "description": "Original retract transform field."
         },
         "sourceType": {
           "$ref": "#/$defs/SourcedValueOfstring"
         },
         "vehicleHudParamsOverride": {
-          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference",
+          "description": "Original vehicle hud params override field."
         }
       },
       "required": [
@@ -19942,16 +19978,19 @@
           "$ref": "#/$defs/SourceArenaOutput"
         },
         "isFlex": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Original is flex field."
         },
         "pitchAxis": {
-          "$ref": "#/$defs/SourcedValueOfGimbalAxis"
+          "$ref": "#/$defs/SourcedValueOfGimbalAxis",
+          "description": "Original pitch axis field."
         },
         "sourceType": {
           "$ref": "#/$defs/SourcedValueOfstring"
         },
         "yawAxis": {
-          "$ref": "#/$defs/SourcedValueOfGimbalAxis"
+          "$ref": "#/$defs/SourcedValueOfGimbalAxis",
+          "description": "Original yaw axis field."
         }
       },
       "required": [
@@ -19964,31 +20003,37 @@
       "type": "object"
     },
     "GimbalAxis": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "Original authored gimbal axis fields and their source evidence.",
       "properties": {
         "accel": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original accel field."
         },
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
         },
         "angleMax": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original angle max field."
         },
         "angleMin": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original angle min field."
         },
         "animation": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original animation field."
         },
         "jointName": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original joint name field."
         },
         "sourceType": {
           "$ref": "#/$defs/SourcedValueOfstring"
         },
         "speed": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original speed field."
         }
       },
       "required": [
@@ -20010,10 +20055,12 @@
           "$ref": "#/$defs/SourceArenaOutput"
         },
         "gimbalParams": {
-          "$ref": "#/$defs/SourcedValueOfGimbal"
+          "$ref": "#/$defs/SourcedValueOfGimbal",
+          "description": "Original gimbal params field."
         },
         "interactionState": {
-          "$ref": "#/$defs/SourcedValueOfHealthLink"
+          "$ref": "#/$defs/SourcedValueOfHealthLink",
+          "description": "Original interaction state field."
         },
         "sourceType": {
           "$ref": "#/$defs/SourcedValueOfstring"
@@ -21099,13 +21146,15 @@
       "description": "An authored lifecycle link with its actual Record or weak-pointer shape.",
       "oneOf": [
         {
+          "description": "An original reference to a Record.",
           "properties": {
             "type": {
               "const": "recordReference",
               "type": "string"
             },
             "value": {
-              "$ref": "#/$defs/CatalogRecordReference"
+              "$ref": "#/$defs/CatalogRecordReference",
+              "description": "The original reference state and target evidence."
             }
           },
           "required": [
@@ -21115,13 +21164,15 @@
           "type": "object"
         },
         {
+          "description": "An original weak pointer.",
           "properties": {
             "type": {
               "const": "weakReference",
               "type": "string"
             },
             "value": {
-              "$ref": "#/$defs/SourceWeakReference"
+              "$ref": "#/$defs/SourceWeakReference",
+              "description": "The original pointer state and target evidence."
             }
           },
           "required": [
@@ -21300,13 +21351,16 @@
           "$ref": "#/$defs/SourcedValueOfuint32"
         },
         "dynamics": {
-          "$ref": "#/$defs/IfcsDynamics"
+          "$ref": "#/$defs/IfcsDynamics",
+          "description": "Original dynamics field."
         },
         "environment": {
-          "$ref": "#/$defs/IfcsEnvironment"
+          "$ref": "#/$defs/IfcsEnvironment",
+          "description": "Original environment field."
         },
         "limits": {
-          "$ref": "#/$defs/IfcsLimits"
+          "$ref": "#/$defs/IfcsLimits",
+          "description": "Original limits field."
         },
         "ownerGuid": {
           "$ref": "#/$defs/SourcedValueOfGuid"
@@ -21315,13 +21369,15 @@
           "$ref": "#/$defs/SourcedValueOfuint32"
         },
         "precision": {
-          "$ref": "#/$defs/IfcsPrecision"
+          "$ref": "#/$defs/IfcsPrecision",
+          "description": "Original precision field."
         },
         "sourceType": {
           "$ref": "#/$defs/SourcedValueOfstring"
         },
         "systems": {
-          "$ref": "#/$defs/IfcsSystems"
+          "$ref": "#/$defs/IfcsSystems",
+          "description": "Original systems field."
         }
       },
       "required": [
@@ -21339,34 +21395,42 @@
       "type": "object"
     },
     "IfcsAcceleration": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "Original authored ifcs acceleration fields and their source evidence.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
         },
         "angularAccelerationLimiter": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original angular acceleration limiter field."
         },
         "angularThrustPowerAssignmentModifier": {
-          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput",
+          "description": "Original angular thrust power assignment modifier field."
         },
         "linearAccelerationLimiterDefault": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original linear acceleration limiter default field."
         },
         "linearThrustPowerAssignmentModifier": {
-          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput",
+          "description": "Original linear thrust power assignment modifier field."
         },
         "negativeAngularScale": {
-          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3",
+          "description": "Original negative angular scale field."
         },
         "negativeLinearScale": {
-          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3",
+          "description": "Original negative linear scale field."
         },
         "positiveAngularScale": {
-          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3",
+          "description": "Original positive angular scale field."
         },
         "positiveLinearScale": {
-          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3",
+          "description": "Original positive linear scale field."
         },
         "sourceType": {
           "$ref": "#/$defs/SourcedValueOfstring"
@@ -21387,60 +21451,75 @@
       "type": "object"
     },
     "IfcsAeroSurface": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "Original authored ifcs aero surface fields and their source evidence.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
         },
         "criticalAngle": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original critical angle field."
         },
         "detachParentPartName": {
           "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original detach parent part name field.",
           "x-gameText": true
         },
         "flatPlateMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original flat plate multiplier field."
         },
         "flatPlateSurface": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Original flat plate surface field."
         },
         "fullyStalledAngle": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original fully stalled angle field."
         },
         "liftLevelFlight": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original lift level flight field."
         },
         "minLift": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original min lift field."
         },
         "name": {
           "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original name field.",
           "x-gameText": true
         },
         "negativeAoAMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original negative ao a multiplier field."
         },
         "offset": {
-          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3",
+          "description": "Original offset field."
         },
         "orientation": {
-          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3",
+          "description": "Original orientation field."
         },
         "peakLift": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original peak lift field."
         },
         "size": {
-          "$ref": "#/$defs/SourcedValueOfInventoryVector2"
+          "$ref": "#/$defs/SourcedValueOfInventoryVector2",
+          "description": "Original size field."
         },
         "sourceType": {
           "$ref": "#/$defs/SourcedValueOfstring"
         },
         "torqueMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3",
+          "description": "Original torque multiplier field."
         },
         "transformParentPartName": {
           "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original transform parent part name field.",
           "x-gameText": true
         }
       },
@@ -21472,76 +21551,100 @@
           "$ref": "#/$defs/SourceArenaOutput"
         },
         "afterburnAccelMultiplierNegative": {
-          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3",
+          "description": "Original accel multiplier negative field."
         },
         "afterburnAccelMultiplierPositive": {
-          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3",
+          "description": "Original accel multiplier positive field."
         },
         "afterburnAngAccelMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3",
+          "description": "Original ang accel multiplier field."
         },
         "afterburnAngTimeToFullAccelerationMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3",
+          "description": "Original ang time to full acceleration multiplier field."
         },
         "afterburnAngVelocityMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3",
+          "description": "Original ang velocity multiplier field."
         },
         "afterburnLinSpeedMultiplierNegative": {
-          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3",
+          "description": "Original lin speed multiplier negative field."
         },
         "afterburnLinSpeedMultiplierPositive": {
-          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3",
+          "description": "Original lin speed multiplier positive field."
         },
         "afterburnLinTimeToFullAccelerationMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3",
+          "description": "Original lin time to full acceleration multiplier field."
         },
         "afterburnerAngCapacitorScaling": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Original ang capacitor scaling field."
         },
         "afterburnerAngCapacitorScalingCurve": {
-          "$ref": "#/$defs/SourcedValueOfOrderedCurve"
+          "$ref": "#/$defs/SourcedValueOfOrderedCurve",
+          "description": "Original ang capacitor scaling curve field."
         },
         "afterburnerCapacitorThresholdRatio": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original capacitor threshold ratio field."
         },
         "afterburnerPreDelayTime": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original pre delay time field."
         },
         "afterburnerRampDownTime": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original ramp down time field."
         },
         "afterburnerRampMapping": {
-          "$ref": "#/$defs/SourcedValueOfOrderedCurve"
+          "$ref": "#/$defs/SourcedValueOfOrderedCurve",
+          "description": "Original ramp mapping field."
         },
         "afterburnerRampUpTime": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original ramp up time field."
         },
         "capacitorAfterburnerAngularCost": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original afterburner angular cost field."
         },
         "capacitorAfterburnerIdleCost": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original afterburner idle cost field."
         },
         "capacitorAfterburnerLinearCost": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original afterburner linear cost field."
         },
         "capacitorAssignmentInputOutputRegen": {
-          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference",
+          "description": "Original assignment input output regen field."
         },
         "capacitorAssignmentInputOutputRegenNavMode": {
-          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference",
+          "description": "Original assignment input output regen nav mode field."
         },
         "capacitorAssignmentInputOutputUsage": {
-          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference",
+          "description": "Original assignment input output usage field."
         },
         "capacitorMax": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original max field."
         },
         "capacitorRegenDelayAfterUse": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original regen delay after use field."
         },
         "capacitorRegenPerSec": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original regen per sec field."
         },
         "sourceType": {
           "$ref": "#/$defs/SourcedValueOfstring"
@@ -21578,19 +21681,22 @@
       "type": "object"
     },
     "IfcsAtmosphericFlight": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "Original authored ifcs atmospheric flight fields and their source evidence.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
         },
         "aerodynamicFxParams": {
-          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput",
+          "description": "Original aerodynamic fx params field."
         },
         "aerodynamicsParams": {
-          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput",
+          "description": "Original aerodynamics params field."
         },
         "commandControlParams": {
-          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput",
+          "description": "Original command control params field."
         },
         "sourceType": {
           "$ref": "#/$defs/SourcedValueOfstring"
@@ -21606,22 +21712,25 @@
       "type": "object"
     },
     "IfcsCore": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "Original authored ifcs core fields and their source evidence.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
         },
         "bootWaitTime": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original boot wait time field."
         },
         "sourceType": {
           "$ref": "#/$defs/SourcedValueOfstring"
         },
         "spoolUpTime": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original spool up time field."
         },
         "stunThresholdGs": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original stun threshold gs field."
         }
       },
       "required": [
@@ -21634,7 +21743,7 @@
       "type": "object"
     },
     "IfcsDamageHandling": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "Original authored ifcs damage handling fields and their source evidence.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -21643,16 +21752,20 @@
           "$ref": "#/$defs/SourcedValueOfstring"
         },
         "thrustThresholdAngNeg": {
-          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3",
+          "description": "Original thrust threshold ang neg field."
         },
         "thrustThresholdAngPos": {
-          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3",
+          "description": "Original thrust threshold ang pos field."
         },
         "thrustThresholdLinNeg": {
-          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3",
+          "description": "Original thrust threshold lin neg field."
         },
         "thrustThresholdLinPos": {
-          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3",
+          "description": "Original thrust threshold lin pos field."
         }
       },
       "required": [
@@ -21666,27 +21779,35 @@
       "type": "object"
     },
     "IfcsDynamics": {
+      "description": "Original authored ifcs dynamics fields and their source evidence.",
       "properties": {
         "accelerationData": {
-          "$ref": "#/$defs/SourcedValueOfIfcsAcceleration"
+          "$ref": "#/$defs/SourcedValueOfIfcsAcceleration",
+          "description": "Original acceleration data field."
         },
         "afterburner": {
-          "$ref": "#/$defs/SourcedValueOfIfcsAfterburner"
+          "$ref": "#/$defs/SourcedValueOfIfcsAfterburner",
+          "description": "Original afterburner field."
         },
         "afterburnerNew": {
-          "$ref": "#/$defs/SourcedValueOfIfcsAfterburner"
+          "$ref": "#/$defs/SourcedValueOfIfcsAfterburner",
+          "description": "Original afterburner new field."
         },
         "authoredMotionLimits": {
-          "$ref": "#/$defs/SourcedValueOfIfcsMotionLimits"
+          "$ref": "#/$defs/SourcedValueOfIfcsMotionLimits",
+          "description": "Original authored motion limits field."
         },
         "ifcsCoreParams": {
-          "$ref": "#/$defs/SourcedValueOfIfcsCore"
+          "$ref": "#/$defs/SourcedValueOfIfcsCore",
+          "description": "Original ifcs core params field."
         },
         "jerkProfile": {
-          "$ref": "#/$defs/SourcedValueOfIfcsJerk"
+          "$ref": "#/$defs/SourcedValueOfIfcsJerk",
+          "description": "Original jerk profile field."
         },
         "speedProfile": {
-          "$ref": "#/$defs/SourcedValueOfIfcsSpeedProfile"
+          "$ref": "#/$defs/SourcedValueOfIfcsSpeedProfile",
+          "description": "Original speed profile field."
         }
       },
       "required": [
@@ -21701,24 +21822,31 @@
       "type": "object"
     },
     "IfcsEnvironment": {
+      "description": "Original authored ifcs environment fields and their source evidence.",
       "properties": {
         "aeroSurfaces": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfIfcsAeroSurface"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfIfcsAeroSurface",
+          "description": "Original aero surfaces field."
         },
         "atmosphericFlightParams": {
-          "$ref": "#/$defs/SourcedValueOfIfcsAtmosphericFlight"
+          "$ref": "#/$defs/SourcedValueOfIfcsAtmosphericFlight",
+          "description": "Original atmospheric flight params field."
         },
         "dragMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original drag multiplier field."
         },
         "liftMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original lift multiplier field."
         },
         "scmMaxDragMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original scm max drag multiplier field."
         },
         "turbulenceParams": {
-          "$ref": "#/$defs/SourcedValueOfIfcsTurbulence"
+          "$ref": "#/$defs/SourcedValueOfIfcsTurbulence",
+          "description": "Original turbulence params field."
         }
       },
       "required": [
@@ -21732,25 +21860,30 @@
       "type": "object"
     },
     "IfcsFuelUsage": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "Original authored ifcs fuel usage fields and their source evidence.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
         },
         "atmosphericCurveMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original atmospheric curve multiplier field."
         },
         "atmosphericModifier": {
-          "$ref": "#/$defs/SourcedValueOfOrderedCurve"
+          "$ref": "#/$defs/SourcedValueOfOrderedCurve",
+          "description": "Original atmospheric modifier field."
         },
         "fuelCostPer10KNewton": {
-          "$ref": "#/$defs/SourcedValueOfResourceFlowUnit"
+          "$ref": "#/$defs/SourcedValueOfResourceFlowUnit",
+          "description": "Original fuel cost per10 k newton field."
         },
         "idleCost": {
-          "$ref": "#/$defs/SourcedValueOfResourceFlowUnit"
+          "$ref": "#/$defs/SourcedValueOfResourceFlowUnit",
+          "description": "Original idle cost field."
         },
         "noFuelThresholdRatio": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original no fuel threshold ratio field."
         },
         "sourceType": {
           "$ref": "#/$defs/SourcedValueOfstring"
@@ -21768,22 +21901,26 @@
       "type": "object"
     },
     "IfcsJerk": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "Original authored ifcs jerk fields and their source evidence.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
         },
         "angAccelerationDecay": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original ang acceleration decay field."
         },
         "angJerkTime": {
-          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3",
+          "description": "Original ang jerk time field."
         },
         "linAccelerationDecay": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original lin acceleration decay field."
         },
         "linJerkTime": {
-          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3",
+          "description": "Original lin jerk time field."
         },
         "sourceType": {
           "$ref": "#/$defs/SourcedValueOfstring"
@@ -21800,51 +21937,67 @@
       "type": "object"
     },
     "IfcsLimits": {
+      "description": "Original authored ifcs limits fields and their source evidence.",
       "properties": {
         "angularAccelDecay": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original angular accel decay field."
         },
         "boostSpeedBackward": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original boost speed backward field."
         },
         "boostSpeedForward": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original boost speed forward field."
         },
         "linearAccelDecay": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original linear accel decay field."
         },
         "linearLimiterType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original linear limiter type field."
         },
         "maxAngularVelocity": {
-          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3",
+          "description": "Original max angular velocity field."
         },
         "maxSpeed": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original max speed field."
         },
         "negativeAngularScale": {
-          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3",
+          "description": "Original negative angular scale field."
         },
         "negativeLinearScale": {
-          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3",
+          "description": "Original negative linear scale field."
         },
         "pitchYawLimiterType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original pitch yaw limiter type field."
         },
         "positiveAngularScale": {
-          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3",
+          "description": "Original positive angular scale field."
         },
         "positiveLinearScale": {
-          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3",
+          "description": "Original positive linear scale field."
         },
         "scmSpeed": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original scm speed field."
         },
         "torqueDistanceThreshold": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original torque distance threshold field."
         },
         "torqueImbalanceMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original torque imbalance multiplier field."
         }
       },
       "required": [
@@ -21867,16 +22020,18 @@
       "type": "object"
     },
     "IfcsMotionLimits": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "Original authored ifcs motion limits fields and their source evidence.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
         },
         "linearMaxAcceleration": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original linear max acceleration field."
         },
         "rotationMaxAcceleration": {
-          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3",
+          "description": "Original rotation max acceleration field."
         },
         "sourceType": {
           "$ref": "#/$defs/SourcedValueOfstring"
@@ -21891,22 +22046,26 @@
       "type": "object"
     },
     "IfcsNoFuel": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "Original authored ifcs no fuel fields and their source evidence.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
         },
         "angularAccelerationModifier": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original angular acceleration modifier field."
         },
         "angularVelocityModifier": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original angular velocity modifier field."
         },
         "linearAccelerationModifier": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original linear acceleration modifier field."
         },
         "linearMaxSpeed": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original linear max speed field."
         },
         "sourceType": {
           "$ref": "#/$defs/SourcedValueOfstring"
@@ -21923,31 +22082,37 @@
       "type": "object"
     },
     "IfcsPartDamage": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "Original authored ifcs part damage fields and their source evidence.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
         },
         "dragDecreaseCoefficient": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original drag decrease coefficient field."
         },
         "dragInfluenceMapping": {
-          "$ref": "#/$defs/SourcedValueOfOrderedCurve"
+          "$ref": "#/$defs/SourcedValueOfOrderedCurve",
+          "description": "Original drag influence mapping field."
         },
         "liftDecreaseCoefficient": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original lift decrease coefficient field."
         },
         "liftInfluenceMapping": {
-          "$ref": "#/$defs/SourcedValueOfOrderedCurve"
+          "$ref": "#/$defs/SourcedValueOfOrderedCurve",
+          "description": "Original lift influence mapping field."
         },
         "rollTorqueCoefficient": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original roll torque coefficient field."
         },
         "sourceType": {
           "$ref": "#/$defs/SourcedValueOfstring"
         },
         "yawTorqueCoefficient": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original yaw torque coefficient field."
         }
       },
       "required": [
@@ -21963,27 +22128,35 @@
       "type": "object"
     },
     "IfcsPrecision": {
+      "description": "Original authored ifcs precision fields and their source evidence.",
       "properties": {
         "maxSpeedPrecisionModeFullProximityAssist": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original max speed precision mode full proximity assist field."
         },
         "maxSpeedPrecisionModeZeroProximityAssist": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original max speed precision mode zero proximity assist field."
         },
         "precisionAccelCurve": {
-          "$ref": "#/$defs/SourcedValueOfOrderedCurve"
+          "$ref": "#/$defs/SourcedValueOfOrderedCurve",
+          "description": "Original precision accel curve field."
         },
         "precisionLandingMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original precision landing multiplier field."
         },
         "precisionMaxDistance": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original precision max distance field."
         },
         "precisionMinDistance": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original precision min distance field."
         },
         "refreshCachesOnLandingMode": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Original refresh caches on landing mode field."
         }
       },
       "required": [
@@ -21998,40 +22171,50 @@
       "type": "object"
     },
     "IfcsSpeedProfile": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "Original authored ifcs speed profile fields and their source evidence.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
         },
         "angularVelocity": {
-          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3",
+          "description": "Original angular velocity field."
         },
         "angularVelocityLimiter": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original angular velocity limiter field."
         },
         "coreOffRotationModifier": {
-          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput",
+          "description": "Original core off rotation modifier field."
         },
         "linearAccelerationRotationModifier": {
-          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput",
+          "description": "Original linear acceleration rotation modifier field."
         },
         "linearSpeedRotationModifier": {
-          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput",
+          "description": "Original linear speed rotation modifier field."
         },
         "linearVelocityLimiter": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original linear velocity limiter field."
         },
         "negativeLinearTimeToFullSpeed": {
-          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3",
+          "description": "Original negative linear time to full speed field."
         },
         "positiveLinearTimeToFullSpeed": {
-          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3",
+          "description": "Original positive linear time to full speed field."
         },
         "powerAssignmentRotationModifier": {
-          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput",
+          "description": "Original power assignment rotation modifier field."
         },
         "proximityAssist": {
-          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput",
+          "description": "Original proximity assist field."
         },
         "sourceType": {
           "$ref": "#/$defs/SourcedValueOfstring"
@@ -22054,48 +22237,63 @@
       "type": "object"
     },
     "IfcsSystems": {
+      "description": "Original authored ifcs systems fields and their source evidence.",
       "properties": {
         "damageHandling": {
-          "$ref": "#/$defs/SourcedValueOfIfcsDamageHandling"
+          "$ref": "#/$defs/SourcedValueOfIfcsDamageHandling",
+          "description": "Original damage handling field."
         },
         "formationModeParams": {
-          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput",
+          "description": "Original formation mode params field."
         },
         "fuelUsageParams": {
-          "$ref": "#/$defs/SourcedValueOfIfcsFuelUsage"
+          "$ref": "#/$defs/SourcedValueOfIfcsFuelUsage",
+          "description": "Original fuel usage params field."
         },
         "hudMessages": {
-          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput",
+          "description": "Original hud messages field."
         },
         "intoxicationModifierRef": {
-          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference",
+          "description": "Original intoxication modifier ref field."
         },
         "legacyThrusterEfficiencyParams": {
-          "$ref": "#/$defs/SourcedValueOfIfcsThrusterEfficiency"
+          "$ref": "#/$defs/SourcedValueOfIfcsThrusterEfficiency",
+          "description": "Original legacy thruster efficiency params field."
         },
         "modifiers": {
-          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference",
+          "description": "Original modifiers field."
         },
         "modifiersLegacy": {
-          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference",
+          "description": "Original legacy modifiers legacy field."
         },
         "noFuelParams": {
-          "$ref": "#/$defs/SourcedValueOfIfcsNoFuel"
+          "$ref": "#/$defs/SourcedValueOfIfcsNoFuel",
+          "description": "Original no fuel params field."
         },
         "noFuelParamsLegacy": {
-          "$ref": "#/$defs/SourcedValueOfIfcsNoFuel"
+          "$ref": "#/$defs/SourcedValueOfIfcsNoFuel",
+          "description": "Original legacy no fuel params legacy field."
         },
         "partDamageParams": {
-          "$ref": "#/$defs/SourcedValueOfIfcsPartDamage"
+          "$ref": "#/$defs/SourcedValueOfIfcsPartDamage",
+          "description": "Original part damage params field."
         },
         "thrusterEfficiencyParams": {
-          "$ref": "#/$defs/SourcedValueOfIfcsThrusterEfficiency"
+          "$ref": "#/$defs/SourcedValueOfIfcsThrusterEfficiency",
+          "description": "Original thruster efficiency params field."
         },
         "thrusterImbalanceMessage": {
-          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput",
+          "description": "Original thruster imbalance message field."
         },
         "thrusterTypesForAngularControl": {
-          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput",
+          "description": "Original thruster types for angular control field."
         }
       },
       "required": [
@@ -22117,16 +22315,18 @@
       "type": "object"
     },
     "IfcsThrusterEfficiency": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "Original authored ifcs thruster efficiency fields and their source evidence.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
         },
         "atmosphericEfficiencyCurve": {
-          "$ref": "#/$defs/SourcedValueOfOrderedCurve"
+          "$ref": "#/$defs/SourcedValueOfOrderedCurve",
+          "description": "Original atmospheric efficiency curve field."
         },
         "maxSupportedAtmosphericEfficiency": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original max supported atmospheric efficiency field."
         },
         "sourceType": {
           "$ref": "#/$defs/SourcedValueOfstring"
@@ -22141,55 +22341,69 @@
       "type": "object"
     },
     "IfcsTurbulence": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "Original authored ifcs turbulence fields and their source evidence.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
         },
         "cloudDensityMapping": {
-          "$ref": "#/$defs/SourcedValueOfOrderedCurve"
+          "$ref": "#/$defs/SourcedValueOfOrderedCurve",
+          "description": "Original cloud density mapping field."
         },
         "cloudDensityTurbulenceAmplitude": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original cloud density turbulence amplitude field."
         },
         "groundTurbulenceAltitudeMax": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original ground turbulence altitude max field."
         },
         "groundTurbulenceAltitudeMin": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original ground turbulence altitude min field."
         },
         "groundTurbulenceEnabled": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Original ground turbulence enabled field."
         },
         "groundTurbulenceMaxAngAcceleration": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original ground turbulence max ang acceleration field."
         },
         "groundTurbulenceNoise": {
-          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput",
+          "description": "Original ground turbulence noise field."
         },
         "groundTurbulenceSpeedMax": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original ground turbulence speed max field."
         },
         "groundTurbulenceSpeedMin": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original ground turbulence speed min field."
         },
         "sourceType": {
           "$ref": "#/$defs/SourcedValueOfstring"
         },
         "windSpeedMapping": {
-          "$ref": "#/$defs/SourcedValueOfOrderedCurve"
+          "$ref": "#/$defs/SourcedValueOfOrderedCurve",
+          "description": "Original wind speed mapping field."
         },
         "windSpeedMax": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original wind speed max field."
         },
         "windSpeedMin": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original wind speed min field."
         },
         "windSpeedTurbulenceAmplitude": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original wind speed turbulence amplitude field."
         },
         "windSpeedTurbulenceEnabled": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Original wind speed turbulence enabled field."
         }
       },
       "required": [
@@ -22767,19 +22981,21 @@
       "type": "object"
     },
     "IntegrityCurve": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "Original authored integrity curve fields and their source evidence.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
         },
         "points": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCurvePoint"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCurvePoint",
+          "description": "Original points field."
         },
         "sourceType": {
           "$ref": "#/$defs/SourcedValueOfstring"
         },
         "useLut": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Original use lut field."
         }
       },
       "required": [
@@ -40827,7 +41043,7 @@
       "description": "The original unit of a resource amount per second.",
       "oneOf": [
         {
-          "description": "Concrete source type and the original members outside its typed fields.",
+          "description": "An original base unit.",
           "properties": {
             "additionalFields": {
               "$ref": "#/$defs/SourceArenaOutput"
@@ -40848,13 +41064,14 @@
           "type": "object"
         },
         {
-          "description": "Concrete source type and the original members outside its typed fields.",
+          "description": "An amount expressed in centi resource units.",
           "properties": {
             "additionalFields": {
               "$ref": "#/$defs/SourceArenaOutput"
             },
             "centiResourceUnits": {
-              "$ref": "#/$defs/SourcedValueOfResourceNumber"
+              "$ref": "#/$defs/SourcedValueOfResourceNumber",
+              "description": "Original stored amount."
             },
             "kind": {
               "const": "centiResourceUnit",
@@ -40873,7 +41090,7 @@
           "type": "object"
         },
         {
-          "description": "Concrete source type and the original members outside its typed fields.",
+          "description": "An amount expressed in micro resource units.",
           "properties": {
             "additionalFields": {
               "$ref": "#/$defs/SourceArenaOutput"
@@ -40883,7 +41100,8 @@
               "type": "string"
             },
             "microResourceUnits": {
-              "$ref": "#/$defs/SourcedValueOfResourceNumber"
+              "$ref": "#/$defs/SourcedValueOfResourceNumber",
+              "description": "Original stored amount."
             },
             "sourceType": {
               "$ref": "#/$defs/SourcedValueOfstring"
@@ -40898,7 +41116,7 @@
           "type": "object"
         },
         {
-          "description": "Concrete source type and the original members outside its typed fields.",
+          "description": "An amount expressed in standard resource units.",
           "properties": {
             "additionalFields": {
               "$ref": "#/$defs/SourceArenaOutput"
@@ -40911,7 +41129,8 @@
               "$ref": "#/$defs/SourcedValueOfstring"
             },
             "standardResourceUnits": {
-              "$ref": "#/$defs/SourcedValueOfResourceNumber"
+              "$ref": "#/$defs/SourcedValueOfResourceNumber",
+              "description": "Original stored amount."
             }
           },
           "required": [
@@ -40923,7 +41142,7 @@
           "type": "object"
         },
         {
-          "description": "Concrete source type and the original members outside its typed fields.",
+          "description": "An amount expressed in power segment units.",
           "properties": {
             "additionalFields": {
               "$ref": "#/$defs/SourceArenaOutput"
@@ -40936,7 +41155,8 @@
               "$ref": "#/$defs/SourcedValueOfstring"
             },
             "units": {
-              "$ref": "#/$defs/SourcedValueOfResourceNumber"
+              "$ref": "#/$defs/SourcedValueOfResourceNumber",
+              "description": "Original stored amount."
             }
           },
           "required": [
@@ -40948,7 +41168,7 @@
           "type": "object"
         },
         {
-          "description": "Concrete source type and the original members outside its typed fields.",
+          "description": "An original unit retained without a known numeric projection.",
           "properties": {
             "additionalFields": {
               "$ref": "#/$defs/SourceArenaOutput"
@@ -44593,25 +44813,32 @@
       "description": "Original physical recall parameters and its referenced AI module tag.",
       "properties": {
         "AIModuleTag": {
-          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference",
+          "description": "Original ai module tag field."
         },
         "BrakingDistanceOffset": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original braking distance offset field."
         },
         "DefaultPlatformDetectionRange": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original default platform detection range field."
         },
         "ForwardOffset": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original forward offset field."
         },
         "HoverHeightAtDestination": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original hover height at destination field."
         },
         "MinimumRecallDistance": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original minimum recall distance field."
         },
         "ObstructionDetectionRange": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original obstruction detection range field."
         },
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -45272,16 +45499,18 @@
       "type": "object"
     },
     "SignatureEmitter": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "Original authored signature emitter fields and their source evidence.",
       "properties": {
         "activeSignature": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original active signature field."
         },
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
         },
         "fullDecayTime": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original full decay time field."
         },
         "sourceType": {
           "$ref": "#/$defs/SourcedValueOfstring"
@@ -136081,34 +136310,43 @@
           "$ref": "#/$defs/SourceArenaOutput"
         },
         "automateBackwashSize": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Original automate backwash size field."
         },
         "componentOrdinal": {
           "$ref": "#/$defs/SourcedValueOfuint32"
         },
         "fuelBurnRatePer10KNewton": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original fuel burn rate per 10k newton field."
         },
         "fuelBurnRatePer10KNewtonRN": {
-          "$ref": "#/$defs/SourcedValueOfResourceFlowUnit"
+          "$ref": "#/$defs/SourcedValueOfResourceFlowUnit",
+          "description": "Original fuel burn rate per 10k newton rn field."
         },
         "gimbal": {
-          "$ref": "#/$defs/SourcedValueOfGimbal"
+          "$ref": "#/$defs/SourcedValueOfGimbal",
+          "description": "Original gimbal field."
         },
         "gimbalInteractionStateOverrides": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfGimbalOverride"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfGimbalOverride",
+          "description": "Original gimbal interaction state overrides field."
         },
         "minHealthThrustMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original min health thrust multiplier field."
         },
         "noFuelThresholdRatio": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original no fuel threshold ratio field."
         },
         "nozzleAnimation": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original nozzle animation field."
         },
         "onlyActiveInVTOL": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Original only active in vtol field."
         },
         "ownerGuid": {
           "$ref": "#/$defs/SourcedValueOfGuid"
@@ -136117,46 +136355,59 @@
           "$ref": "#/$defs/SourcedValueOfuint32"
         },
         "shipIntegrityLossModifierCurve": {
-          "$ref": "#/$defs/SourcedValueOfIntegrityCurve"
+          "$ref": "#/$defs/SourcedValueOfIntegrityCurve",
+          "description": "Original ship integrity loss modifier curve field."
         },
         "signatureEmitterParams": {
-          "$ref": "#/$defs/SourcedValueOfSignatureEmitter"
+          "$ref": "#/$defs/SourcedValueOfSignatureEmitter",
+          "description": "Original signature emitter params field."
         },
         "sourceType": {
           "$ref": "#/$defs/SourcedValueOfstring"
         },
         "thrustCapacity": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original thrust capacity field."
         },
         "thrustCapacityNew": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original thrust capacity new field."
         },
         "thrusterAnimDriver": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original thruster anim driver field."
         },
         "thrusterBackwashAfterburnerMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original thruster backwash afterburner multiplier field."
         },
         "thrusterBackwashMaxDensity": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original thruster backwash max density field."
         },
         "thrusterBackwashMaxResistance": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original thruster backwash max resistance field."
         },
         "thrusterBackwashMaxSpeed": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original thruster backwash max speed field."
         },
         "thrusterBackwashSize": {
-          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3",
+          "description": "Original thruster backwash size field."
         },
         "thrusterStrengthSmoothing": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Original thruster strength smoothing field."
         },
         "thrusterType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original thruster type field."
         },
         "toggleThrusterBackwash": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Original enabled field."
         }
       },
       "required": [

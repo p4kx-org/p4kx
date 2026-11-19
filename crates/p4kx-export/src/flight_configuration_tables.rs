@@ -28,15 +28,15 @@ pub(crate) struct FlightConfigurationTables<'source> {
     thrusters: CatalogTable<Thruster<'source>>,
 }
 
-const FLIGHT_CONTROLLERS: ComponentKind = ComponentKind {
+pub(in crate::catalog_v3) const FLIGHT_CONTROLLERS: ComponentKind = ComponentKind {
     source_type: catalog_flight_controller::COMPONENT,
     inspection: ConfigurationInspection::FlightController,
 };
-const IFCS: ComponentKind = ComponentKind {
+pub(in crate::catalog_v3) const IFCS: ComponentKind = ComponentKind {
     source_type: catalog_ifcs::COMPONENT,
     inspection: ConfigurationInspection::Ifcs,
 };
-const THRUSTERS: ComponentKind = ComponentKind {
+pub(in crate::catalog_v3) const THRUSTERS: ComponentKind = ComponentKind {
     source_type: catalog_thruster::COMPONENT,
     inspection: ConfigurationInspection::Thruster,
 };

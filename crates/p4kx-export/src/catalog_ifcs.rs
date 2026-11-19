@@ -33,10 +33,15 @@ mod ifcs_systems;
 #[path = "ifcs_fuel.rs"]
 mod ifcs_fuel;
 
-use ifcs_dynamics::IfcsDynamics;
-use ifcs_environment::IfcsEnvironment;
-use ifcs_precision::{IfcsLimits, IfcsPrecision};
-use ifcs_systems::IfcsSystems;
+pub use ifcs_aero_surface::IfcsAeroSurface;
+pub use ifcs_afterburner::{IfcsAfterburner, IfcsBurnCapacitor, IfcsBurnResponse, IfcsBurnTiming};
+pub use ifcs_dynamics::{
+    IfcsAcceleration, IfcsCore, IfcsDynamics, IfcsJerk, IfcsMotionLimits, IfcsSpeedProfile,
+};
+pub use ifcs_environment::{IfcsAtmosphericFlight, IfcsEnvironment, IfcsTurbulence};
+pub use ifcs_fuel::{IfcsFuelUsage, IfcsNoFuel, IfcsThrusterEfficiency};
+pub use ifcs_precision::{IfcsLimits, IfcsPrecision};
+pub use ifcs_systems::{IfcsDamageHandling, IfcsPartDamage, IfcsSystems};
 
 pub(in crate::catalog_v3) const COMPONENT: &str = "IFCSParams";
 
@@ -44,16 +49,22 @@ pub(in crate::catalog_v3) const COMPONENT: &str = "IFCSParams";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(in crate::catalog_v3) struct Ifcs<'source> {
+#[non_exhaustive]
+pub struct Ifcs<'source> {
     #[serde(flatten)]
     owner: ComponentOwner,
     #[serde(flatten)]
     source: UnitSource<'source>,
-    limits: IfcsLimits<'source>,
-    precision: IfcsPrecision<'source>,
-    dynamics: IfcsDynamics<'source>,
-    environment: IfcsEnvironment<'source>,
-    systems: IfcsSystems<'source>,
+    /// Original limits field.
+    pub limits: IfcsLimits<'source>,
+    /// Original precision field.
+    pub precision: IfcsPrecision<'source>,
+    /// Original dynamics field.
+    pub dynamics: IfcsDynamics<'source>,
+    /// Original environment field.
+    pub environment: IfcsEnvironment<'source>,
+    /// Original systems field.
+    pub systems: IfcsSystems<'source>,
 }
 
 impl<'source> Ifcs<'source> {
@@ -88,7 +99,15 @@ impl<'source> Ifcs<'source> {
         })
     }
 
-    pub(in crate::catalog_v3) const fn owner(&self) -> &ComponentOwner {
+    /// Borrows the original component type and remaining fields.
+    #[must_use]
+    pub const fn source(&self) -> &UnitSource<'source> {
+        &self.source
+    }
+
+    /// Borrows the original physical Record and component position.
+    #[must_use]
+    pub const fn owner(&self) -> &ComponentOwner {
         &self.owner
     }
 }

@@ -18,35 +18,47 @@ use crate::source_fields::FieldError;
 
 #[path = "thruster_gimbal.rs"]
 mod gimbal;
-use gimbal::{Gimbal, GimbalOverride};
+pub use gimbal::{Gimbal, GimbalAxis, GimbalOverride};
 
 pub(in crate::catalog_v3) const COMPONENT: &str = "SCItemThrusterParams";
-
-type Single = SourcedValue<ResourceFloat32>;
-type Label<'source> = SourcedValue<&'source str>;
-type GimbalOverrides<'source> = SourcedValue<Vec<SourcedValue<GimbalOverride<'source>>>>;
 
 /// The authored operating parameters of one physical thruster component.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(in crate::catalog_v3) struct Thruster<'source> {
+#[non_exhaustive]
+pub struct Thruster<'source> {
     #[serde(flatten)]
     owner: ComponentOwner,
     #[serde(flatten)]
     source: UnitSource<'source>,
     #[serde(flatten)]
-    operating: Operating<'source>,
+    /// Original operating field.
+    pub operating: Operating<'source>,
     #[serde(flatten)]
-    backwash: Backwash<'source>,
-    gimbal: SourcedValue<Gimbal<'source>>,
-    gimbal_interaction_state_overrides: GimbalOverrides<'source>,
-    ship_integrity_loss_modifier_curve: SourcedValue<IntegrityCurve<'source>>,
-    signature_emitter_params: SourcedValue<SignatureEmitter<'source>>,
+    /// Original backwash field.
+    pub backwash: Backwash<'source>,
+    /// Original gimbal field.
+    pub gimbal: SourcedValue<Gimbal<'source>>,
+    /// Original gimbal interaction state overrides field.
+    pub gimbal_interaction_state_overrides:
+        SourcedValue<Vec<SourcedValue<GimbalOverride<'source>>>>,
+    /// Original ship integrity loss modifier curve field.
+    pub ship_integrity_loss_modifier_curve: SourcedValue<IntegrityCurve<'source>>,
+    /// Original signature emitter params field.
+    pub signature_emitter_params: SourcedValue<SignatureEmitter<'source>>,
 }
 
 impl<'source> Thruster<'source> {
-    pub(in crate::catalog_v3) const fn owner(&self) -> &ComponentOwner {
+    /// Borrows the original component type and remaining fields.
+    #[must_use]
+    pub const fn source(&self) -> &UnitSource<'source> {
+        &self.source
+    }
+
+    /// Borrows the original physical Record and component position.
+    #[must_use]
+    pub const fn owner(&self) -> &ComponentOwner {
         &self.owner
     }
 
@@ -105,21 +117,34 @@ impl<'source> Thruster<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct Operating<'source> {
-    thrust_capacity: Single,
-    thrust_capacity_new: Single,
-    thruster_type: Label<'source>,
+/// Original authored operating fields and their source evidence.
+#[non_exhaustive]
+pub struct Operating<'source> {
+    /// Original thrust capacity field.
+    pub thrust_capacity: SourcedValue<ResourceFloat32>,
+    /// Original thrust capacity new field.
+    pub thrust_capacity_new: SourcedValue<ResourceFloat32>,
+    /// Original thruster type field.
+    pub thruster_type: SourcedValue<&'source str>,
     #[serde(rename = "onlyActiveInVTOL")]
-    only_active_in_vtol: SourcedValue<bool>,
-    min_health_thrust_multiplier: Single,
-    no_fuel_threshold_ratio: Single,
-    thruster_strength_smoothing: Single,
+    /// Original only active in vtol field.
+    pub only_active_in_vtol: SourcedValue<bool>,
+    /// Original min health thrust multiplier field.
+    pub min_health_thrust_multiplier: SourcedValue<ResourceFloat32>,
+    /// Original no fuel threshold ratio field.
+    pub no_fuel_threshold_ratio: SourcedValue<ResourceFloat32>,
+    /// Original thruster strength smoothing field.
+    pub thruster_strength_smoothing: SourcedValue<ResourceFloat32>,
     #[serde(rename = "fuelBurnRatePer10KNewton")]
-    fuel_burn_rate_per_10k_newton: Single,
+    /// Original fuel burn rate per 10k newton field.
+    pub fuel_burn_rate_per_10k_newton: SourcedValue<ResourceFloat32>,
     #[serde(rename = "fuelBurnRatePer10KNewtonRN")]
-    fuel_burn_rate_per_10k_newton_rn: SourcedValue<ResourceFlowUnit<'source>>,
-    thruster_anim_driver: Label<'source>,
-    nozzle_animation: Label<'source>,
+    /// Original fuel burn rate per 10k newton rn field.
+    pub fuel_burn_rate_per_10k_newton_rn: SourcedValue<ResourceFlowUnit<'source>>,
+    /// Original thruster anim driver field.
+    pub thruster_anim_driver: SourcedValue<&'source str>,
+    /// Original nozzle animation field.
+    pub nozzle_animation: SourcedValue<&'source str>,
 }
 
 impl<'source> Operating<'source> {
@@ -178,15 +203,24 @@ impl<'source> Operating<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct Backwash<'source> {
-    automate_backwash_size: SourcedValue<bool>,
+/// Original authored backwash fields and their source evidence.
+#[non_exhaustive]
+pub struct Backwash<'source> {
+    /// Original automate backwash size field.
+    pub automate_backwash_size: SourcedValue<bool>,
     #[serde(rename = "toggleThrusterBackwash")]
-    enabled: SourcedValue<bool>,
-    thruster_backwash_size: SourcedValue<InventoryVector3<'source>>,
-    thruster_backwash_afterburner_multiplier: Single,
-    thruster_backwash_max_density: Single,
-    thruster_backwash_max_resistance: Single,
-    thruster_backwash_max_speed: Single,
+    /// Original enabled field.
+    pub enabled: SourcedValue<bool>,
+    /// Original thruster backwash size field.
+    pub thruster_backwash_size: SourcedValue<InventoryVector3<'source>>,
+    /// Original thruster backwash afterburner multiplier field.
+    pub thruster_backwash_afterburner_multiplier: SourcedValue<ResourceFloat32>,
+    /// Original thruster backwash max density field.
+    pub thruster_backwash_max_density: SourcedValue<ResourceFloat32>,
+    /// Original thruster backwash max resistance field.
+    pub thruster_backwash_max_resistance: SourcedValue<ResourceFloat32>,
+    /// Original thruster backwash max speed field.
+    pub thruster_backwash_max_speed: SourcedValue<ResourceFloat32>,
 }
 
 impl<'source> Backwash<'source> {
@@ -238,11 +272,15 @@ impl<'source> Backwash<'source> {
 
 #[derive(Debug, Serialize, JsonSchema)]
 #[schemars(transform = every_field_required)]
-struct IntegrityCurve<'source> {
+/// Original authored integrity curve fields and their source evidence.
+#[non_exhaustive]
+pub struct IntegrityCurve<'source> {
     #[serde(flatten)]
-    source: UnitSource<'source>,
+    /// Original type and remaining authored fields.
+    pub source: UnitSource<'source>,
     #[serde(flatten)]
-    curve: DegradationCurve,
+    /// Original curve field.
+    pub curve: DegradationCurve,
 }
 
 impl<'source> IntegrityCurve<'source> {
@@ -259,11 +297,16 @@ impl<'source> IntegrityCurve<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct SignatureEmitter<'source> {
+/// Original authored signature emitter fields and their source evidence.
+#[non_exhaustive]
+pub struct SignatureEmitter<'source> {
     #[serde(flatten)]
-    source: UnitSource<'source>,
-    active_signature: Single,
-    full_decay_time: Single,
+    /// Original type and remaining authored fields.
+    pub source: UnitSource<'source>,
+    /// Original active signature field.
+    pub active_signature: SourcedValue<ResourceFloat32>,
+    /// Original full decay time field.
+    pub full_decay_time: SourcedValue<ResourceFloat32>,
 }
 
 impl<'source> SignatureEmitter<'source> {

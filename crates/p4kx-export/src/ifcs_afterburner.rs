@@ -19,21 +19,30 @@ use crate::source_value_catalog::SourceRecordReference;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct IfcsBurnTiming<'source> {
+/// Original authored ifcs burn timing fields and their source evidence.
+#[non_exhaustive]
+pub struct IfcsBurnTiming<'source> {
     #[serde(rename = "afterburnerAngCapacitorScaling")]
-    ang_capacitor_scaling: SourcedValue<bool>,
+    /// Original ang capacitor scaling field.
+    pub ang_capacitor_scaling: SourcedValue<bool>,
     #[serde(rename = "afterburnerAngCapacitorScalingCurve")]
-    ang_capacitor_scaling_curve: SourcedValue<OrderedCurve<'source>>,
+    /// Original ang capacitor scaling curve field.
+    pub ang_capacitor_scaling_curve: SourcedValue<OrderedCurve<'source>>,
     #[serde(rename = "afterburnerCapacitorThresholdRatio")]
-    capacitor_threshold_ratio: SourcedValue<ResourceFloat32>,
+    /// Original capacitor threshold ratio field.
+    pub capacitor_threshold_ratio: SourcedValue<ResourceFloat32>,
     #[serde(rename = "afterburnerPreDelayTime")]
-    pre_delay_time: SourcedValue<ResourceFloat32>,
+    /// Original pre delay time field.
+    pub pre_delay_time: SourcedValue<ResourceFloat32>,
     #[serde(rename = "afterburnerRampDownTime")]
-    ramp_down_time: SourcedValue<ResourceFloat32>,
+    /// Original ramp down time field.
+    pub ramp_down_time: SourcedValue<ResourceFloat32>,
     #[serde(rename = "afterburnerRampMapping")]
-    ramp_mapping: SourcedValue<OrderedCurve<'source>>,
+    /// Original ramp mapping field.
+    pub ramp_mapping: SourcedValue<OrderedCurve<'source>>,
     #[serde(rename = "afterburnerRampUpTime")]
-    ramp_up_time: SourcedValue<ResourceFloat32>,
+    /// Original ramp up time field.
+    pub ramp_up_time: SourcedValue<ResourceFloat32>,
 }
 
 impl<'source> IfcsBurnTiming<'source> {
@@ -86,23 +95,33 @@ impl<'source> IfcsBurnTiming<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct IfcsBurnResponse<'source> {
+/// Original authored ifcs burn response fields and their source evidence.
+#[non_exhaustive]
+pub struct IfcsBurnResponse<'source> {
     #[serde(rename = "afterburnAccelMultiplierNegative")]
-    accel_multiplier_negative: SourcedValue<InventoryVector3<'source>>,
+    /// Original accel multiplier negative field.
+    pub accel_multiplier_negative: SourcedValue<InventoryVector3<'source>>,
     #[serde(rename = "afterburnAccelMultiplierPositive")]
-    accel_multiplier_positive: SourcedValue<InventoryVector3<'source>>,
+    /// Original accel multiplier positive field.
+    pub accel_multiplier_positive: SourcedValue<InventoryVector3<'source>>,
     #[serde(rename = "afterburnAngAccelMultiplier")]
-    ang_accel_multiplier: SourcedValue<InventoryVector3<'source>>,
+    /// Original ang accel multiplier field.
+    pub ang_accel_multiplier: SourcedValue<InventoryVector3<'source>>,
     #[serde(rename = "afterburnAngTimeToFullAccelerationMultiplier")]
-    ang_time_to_full_acceleration_multiplier: SourcedValue<InventoryVector3<'source>>,
+    /// Original ang time to full acceleration multiplier field.
+    pub ang_time_to_full_acceleration_multiplier: SourcedValue<InventoryVector3<'source>>,
     #[serde(rename = "afterburnAngVelocityMultiplier")]
-    ang_velocity_multiplier: SourcedValue<InventoryVector3<'source>>,
+    /// Original ang velocity multiplier field.
+    pub ang_velocity_multiplier: SourcedValue<InventoryVector3<'source>>,
     #[serde(rename = "afterburnLinSpeedMultiplierNegative")]
-    lin_speed_multiplier_negative: SourcedValue<InventoryVector3<'source>>,
+    /// Original lin speed multiplier negative field.
+    pub lin_speed_multiplier_negative: SourcedValue<InventoryVector3<'source>>,
     #[serde(rename = "afterburnLinSpeedMultiplierPositive")]
-    lin_speed_multiplier_positive: SourcedValue<InventoryVector3<'source>>,
+    /// Original lin speed multiplier positive field.
+    pub lin_speed_multiplier_positive: SourcedValue<InventoryVector3<'source>>,
     #[serde(rename = "afterburnLinTimeToFullAccelerationMultiplier")]
-    lin_time_to_full_acceleration_multiplier: SourcedValue<InventoryVector3<'source>>,
+    /// Original lin time to full acceleration multiplier field.
+    pub lin_time_to_full_acceleration_multiplier: SourcedValue<InventoryVector3<'source>>,
 }
 
 impl<'source> IfcsBurnResponse<'source> {
@@ -195,28 +214,39 @@ impl<'source> IfcsBurnResponse<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct IfcsBurnCapacitor<'source> {
+/// Original authored ifcs burn capacitor fields and their source evidence.
+#[non_exhaustive]
+pub struct IfcsBurnCapacitor<'source> {
     #[serde(rename = "capacitorAfterburnerAngularCost")]
-    afterburner_angular_cost: SourcedValue<ResourceFloat32>,
+    /// Original afterburner angular cost field.
+    pub afterburner_angular_cost: SourcedValue<ResourceFloat32>,
     #[serde(rename = "capacitorAfterburnerIdleCost")]
-    afterburner_idle_cost: SourcedValue<ResourceFloat32>,
+    /// Original afterburner idle cost field.
+    pub afterburner_idle_cost: SourcedValue<ResourceFloat32>,
     #[serde(rename = "capacitorAfterburnerLinearCost")]
-    afterburner_linear_cost: SourcedValue<ResourceFloat32>,
+    /// Original afterburner linear cost field.
+    pub afterburner_linear_cost: SourcedValue<ResourceFloat32>,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
     #[serde(rename = "capacitorAssignmentInputOutputRegen")]
-    assignment_input_output_regen: SourcedValue<Box<SourceRecordReference<'source>>>,
+    /// Original assignment input output regen field.
+    pub assignment_input_output_regen: SourcedValue<Box<SourceRecordReference<'source>>>,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
     #[serde(rename = "capacitorAssignmentInputOutputRegenNavMode")]
-    assignment_input_output_regen_nav_mode: SourcedValue<Box<SourceRecordReference<'source>>>,
+    /// Original assignment input output regen nav mode field.
+    pub assignment_input_output_regen_nav_mode: SourcedValue<Box<SourceRecordReference<'source>>>,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
     #[serde(rename = "capacitorAssignmentInputOutputUsage")]
-    assignment_input_output_usage: SourcedValue<Box<SourceRecordReference<'source>>>,
+    /// Original assignment input output usage field.
+    pub assignment_input_output_usage: SourcedValue<Box<SourceRecordReference<'source>>>,
     #[serde(rename = "capacitorMax")]
-    max: SourcedValue<ResourceFloat32>,
+    /// Original max field.
+    pub max: SourcedValue<ResourceFloat32>,
     #[serde(rename = "capacitorRegenDelayAfterUse")]
-    regen_delay_after_use: SourcedValue<ResourceFloat32>,
+    /// Original regen delay after use field.
+    pub regen_delay_after_use: SourcedValue<ResourceFloat32>,
     #[serde(rename = "capacitorRegenPerSec")]
-    regen_per_sec: SourcedValue<ResourceFloat32>,
+    /// Original regen per sec field.
+    pub regen_per_sec: SourcedValue<ResourceFloat32>,
 }
 
 impl<'source> IfcsBurnCapacitor<'source> {
@@ -280,15 +310,20 @@ impl<'source> IfcsBurnCapacitor<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct IfcsAfterburner<'source> {
+#[non_exhaustive]
+pub struct IfcsAfterburner<'source> {
     #[serde(flatten)]
-    source: UnitSource<'source>,
+    /// Original type and remaining authored fields.
+    pub source: UnitSource<'source>,
     #[serde(flatten)]
-    timing: IfcsBurnTiming<'source>,
+    /// Original timing field.
+    pub timing: IfcsBurnTiming<'source>,
     #[serde(flatten)]
-    response: IfcsBurnResponse<'source>,
+    /// Original response field.
+    pub response: IfcsBurnResponse<'source>,
     #[serde(flatten)]
-    capacitor: IfcsBurnCapacitor<'source>,
+    /// Original capacitor field.
+    pub capacitor: IfcsBurnCapacitor<'source>,
 }
 
 impl<'source> IfcsAfterburner<'source> {

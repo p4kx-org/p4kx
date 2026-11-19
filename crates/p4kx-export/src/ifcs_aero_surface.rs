@@ -16,27 +16,45 @@ use crate::source_fields::FieldError;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct IfcsAeroSurface<'source> {
+/// Original authored ifcs aero surface fields and their source evidence.
+#[non_exhaustive]
+pub struct IfcsAeroSurface<'source> {
     #[serde(flatten)]
-    source: UnitSource<'source>,
-    critical_angle: SourcedValue<ResourceFloat32>,
+    /// Original type and remaining authored fields.
+    pub source: UnitSource<'source>,
+    /// Original critical angle field.
+    pub critical_angle: SourcedValue<ResourceFloat32>,
     #[schemars(extend("x-gameText" = true))]
-    detach_parent_part_name: SourcedValue<&'source str>,
-    flat_plate_multiplier: SourcedValue<ResourceFloat32>,
-    flat_plate_surface: SourcedValue<bool>,
-    fully_stalled_angle: SourcedValue<ResourceFloat32>,
-    lift_level_flight: SourcedValue<ResourceFloat32>,
-    min_lift: SourcedValue<ResourceFloat32>,
+    /// Original detach parent part name field.
+    pub detach_parent_part_name: SourcedValue<&'source str>,
+    /// Original flat plate multiplier field.
+    pub flat_plate_multiplier: SourcedValue<ResourceFloat32>,
+    /// Original flat plate surface field.
+    pub flat_plate_surface: SourcedValue<bool>,
+    /// Original fully stalled angle field.
+    pub fully_stalled_angle: SourcedValue<ResourceFloat32>,
+    /// Original lift level flight field.
+    pub lift_level_flight: SourcedValue<ResourceFloat32>,
+    /// Original min lift field.
+    pub min_lift: SourcedValue<ResourceFloat32>,
     #[schemars(extend("x-gameText" = true))]
-    name: SourcedValue<&'source str>,
-    negative_ao_a_multiplier: SourcedValue<ResourceFloat32>,
-    offset: SourcedValue<InventoryVector3<'source>>,
-    orientation: SourcedValue<InventoryVector3<'source>>,
-    peak_lift: SourcedValue<ResourceFloat32>,
-    size: SourcedValue<InventoryVector2<'source>>,
-    torque_multiplier: SourcedValue<InventoryVector3<'source>>,
+    /// Original name field.
+    pub name: SourcedValue<&'source str>,
+    /// Original negative ao a multiplier field.
+    pub negative_ao_a_multiplier: SourcedValue<ResourceFloat32>,
+    /// Original offset field.
+    pub offset: SourcedValue<InventoryVector3<'source>>,
+    /// Original orientation field.
+    pub orientation: SourcedValue<InventoryVector3<'source>>,
+    /// Original peak lift field.
+    pub peak_lift: SourcedValue<ResourceFloat32>,
+    /// Original size field.
+    pub size: SourcedValue<InventoryVector2<'source>>,
+    /// Original torque multiplier field.
+    pub torque_multiplier: SourcedValue<InventoryVector3<'source>>,
     #[schemars(extend("x-gameText" = true))]
-    transform_parent_part_name: SourcedValue<&'source str>,
+    /// Original transform parent part name field.
+    pub transform_parent_part_name: SourcedValue<&'source str>,
 }
 
 impl<'source> IfcsAeroSurface<'source> {

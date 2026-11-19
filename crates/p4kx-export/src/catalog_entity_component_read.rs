@@ -13,8 +13,10 @@ use super::authored_fields::Observed;
 use super::item_component_owner::ComponentOwner;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_number_capture::CapturedNumber;
+use crate::catalog_queries::{CatalogRecordCoverage, CatalogRecordSelection};
+use crate::catalog_query_session::checkpoint;
 use crate::catalog_read::original::OriginalFlowFields;
-use crate::export_diagnostic::ExportSourceRole;
+use crate::export_diagnostic::{ExportDiagnosticSeverity, ExportSourceRole};
 use crate::export_field_inspection::ConfigurationInspection;
 use crate::export_field_walk;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
@@ -52,6 +54,7 @@ pub(super) struct ComponentSelection<'a> {
     filter: Option<&'a Filter>,
     dependencies: Option<&'a HashSet<u32>>,
     unclassified_role: Option<ExportSourceRole>,
+    physical: CatalogRecordSelection,
 }
 
 impl<'a> ComponentSelection<'a> {
@@ -63,6 +66,7 @@ impl<'a> ComponentSelection<'a> {
             filter,
             dependencies,
             unclassified_role: None,
+            physical: CatalogRecordSelection::All,
         }
     }
 
@@ -71,6 +75,7 @@ impl<'a> ComponentSelection<'a> {
             filter: None,
             dependencies: None,
             unclassified_role: Some(ExportSourceRole::SelectionCandidate),
+            physical: CatalogRecordSelection::All,
         }
     }
 }
@@ -84,6 +89,44 @@ pub(super) fn read<'source, Row>(
     kind: &ComponentKind,
     project: Projection<'source, Row>,
 ) -> Result<ComponentRead<'source, Row>, CatalogError> {
+    read_in(forge, input, selection, cancel, kind, project, None)
+}
+
+pub(super) fn read_selected<'source, Row>(
+    forge: &'source DataForge<'source>,
+    input: &OriginalCatalogInput<'_, 'source>,
+    owners: CatalogRecordSelection,
+    cancel: Option<&CancelToken>,
+    kind: &ComponentKind,
+    project: Projection<'source, Row>,
+) -> Result<(Vec<Row>, CatalogRecordCoverage), CatalogError> {
+    checkpoint(cancel)?;
+    let selection = ComponentSelection {
+        physical: owners,
+        ..ComponentSelection::discovery()
+    };
+    let mut coverage = CatalogRecordCoverage::default();
+    let read = read_in(
+        forge,
+        input,
+        &selection,
+        cancel,
+        kind,
+        project,
+        Some(&mut coverage),
+    )?;
+    Ok((read.rows, coverage))
+}
+
+fn read_in<'source, Row>(
+    forge: &'source DataForge<'source>,
+    input: &OriginalCatalogInput<'_, 'source>,
+    selection: &ComponentSelection<'_>,
+    cancel: Option<&CancelToken>,
+    kind: &ComponentKind,
+    project: Projection<'source, Row>,
+    mut coverage: Option<&mut CatalogRecordCoverage>,
+) -> Result<ComponentRead<'source, Row>, CatalogError> {
     input.check_forge(forge)?;
     let mut read = ComponentRead {
         rows: Vec::new(),
@@ -91,46 +134,113 @@ pub(super) fn read<'source, Row>(
         ledger: ExportLedger::default(),
         failures: Vec::new(),
     };
-    let Some(probe) = forge.pointer_probe(COMPONENTS, kind.source_type) else {
+    let probe = if selection.unclassified_role.is_some() {
+        forge.strict_pointer_probe(COMPONENTS, kind.source_type)
+    } else {
+        forge.pointer_probe(COMPONENTS, kind.source_type)
+    };
+    let Some(probe) = probe else {
         return Ok(read);
     };
     let mut trees = TreeBuilder::new();
-    for record in forge.records() {
-        if cancel.is_some_and(CancelToken::is_cancelled) {
-            return Err(CatalogError::Cancelled);
-        }
-        match record.type_name() {
-            Ok(ENTITY) => {}
-            Ok(_) => continue,
-            Err(error) => {
-                if let Some(role) = selection.unclassified_role {
-                    let admission = RecordObservation::capture(input, &record)?;
-                    read.failed(&admission, role, kind, &error)?;
+    selection.physical.for_each(forge, cancel, |record| {
+        match candidate(&mut trees, &probe, record, selection) {
+            Ok(false) => return Ok(()),
+            Err(failure) => {
+                if let Some(role) = failure.role {
+                    let admission = RecordObservation::capture(input, record)?;
+                    read.failed(&admission, role, kind, &failure.error)?;
                 }
-                continue;
-            }
-        }
-        match select(&mut trees, &probe, &record, selection) {
-            Ok(false) => continue,
-            Err(error) => {
-                let admission = RecordObservation::capture(input, &record)?;
-                read.failed(
-                    &admission,
-                    ExportSourceRole::SelectionCandidate,
-                    kind,
-                    &error,
-                )?;
-                continue;
+                if let Some(coverage) = coverage.as_deref_mut() {
+                    failure.stage.cover(coverage, record.index());
+                }
+                return Ok(());
             }
             Ok(true) => {}
         }
-        let admission = RecordObservation::capture(input, &record)?;
-        match trees.build(&record) {
-            Ok(tree) => read.project(&tree, input, &admission, cancel, kind, project)?,
-            Err(error) => read.failed(&admission, DEPENDENCY, kind, &error)?,
+        let admission = RecordObservation::capture(input, record)?;
+        match trees.build(record) {
+            Ok(tree) => {
+                let inspections = read.ledger.field_inspections.len();
+                let diagnostics = read.ledger.field_diagnostics.len();
+                read.project(&tree, input, &admission, cancel, kind, project)?;
+                if let Some(coverage) = coverage.as_deref_mut()
+                    && !projection_complete(&read.ledger, inspections, diagnostics)
+                {
+                    coverage.incomplete_fields.push(record.index());
+                }
+            }
+            Err(error) => {
+                read.failed(&admission, DEPENDENCY, kind, &error)?;
+                if let Some(coverage) = coverage.as_deref_mut() {
+                    FailureStage::for_failed_tree(record).cover(coverage, record.index());
+                }
+            }
+        }
+        Ok(())
+    })?;
+    Ok(read)
+}
+
+enum FailureStage {
+    Header,
+    Body,
+}
+
+impl FailureStage {
+    fn for_failed_tree(record: &Record<'_>) -> Self {
+        if record.stored_file_name().is_err()
+            || record.stored_name().is_err()
+            || record.stored_tag().is_err()
+        {
+            Self::Header
+        } else {
+            Self::Body
         }
     }
-    Ok(read)
+
+    fn cover(self, coverage: &mut CatalogRecordCoverage, index: u32) {
+        match self {
+            Self::Header => coverage.unreadable_headers.push(index),
+            Self::Body => coverage.unreadable_bodies.push(index),
+        }
+    }
+}
+
+struct CandidateFailure {
+    stage: FailureStage,
+    role: Option<ExportSourceRole>,
+    error: DataForgeError,
+}
+
+fn candidate<'source>(
+    trees: &mut TreeBuilder<'source>,
+    probe: &PointerProbe<'source>,
+    record: &Record<'source>,
+    selection: &ComponentSelection<'_>,
+) -> Result<bool, CandidateFailure> {
+    let source_type = record.type_name().map_err(|error| CandidateFailure {
+        stage: FailureStage::Header,
+        role: selection.unclassified_role,
+        error,
+    })?;
+    if source_type != ENTITY {
+        return Ok(false);
+    }
+    select(trees, probe, record, selection)
+}
+
+fn projection_complete(ledger: &ExportLedger, inspections: usize, diagnostics: usize) -> bool {
+    ledger
+        .field_inspections
+        .iter()
+        .skip(inspections)
+        .all(|row| row.complete)
+        && ledger
+            .field_diagnostics
+            .iter()
+            .skip(diagnostics)
+            .all(|row| row.severity == ExportDiagnosticSeverity::Information)
 }
 
 fn select<'source>(
@@ -138,7 +248,7 @@ fn select<'source>(
     probe: &PointerProbe<'source>,
     record: &Record<'source>,
     selection: &ComponentSelection<'_>,
-) -> Result<bool, DataForgeError> {
+) -> Result<bool, CandidateFailure> {
     let accepted = if selection
         .dependencies
         .is_some_and(|indices| indices.contains(&record.index()))
@@ -149,10 +259,25 @@ fn select<'source>(
             .filter
             .map(|filter| record.record_path().map(|path| filter.matches(path)))
     };
-    if matches!(accepted, Some(Ok(false))) || !trees.holds(probe, record)? {
+    let role = Some(ExportSourceRole::SelectionCandidate);
+    if matches!(accepted, Some(Ok(false)))
+        || !trees
+            .holds(probe, record)
+            .map_err(|error| CandidateFailure {
+                stage: FailureStage::Body,
+                role,
+                error,
+            })?
+    {
         return Ok(false);
     }
-    accepted.unwrap_or(Ok(true))
+    accepted
+        .unwrap_or(Ok(true))
+        .map_err(|error| CandidateFailure {
+            stage: FailureStage::Header,
+            role,
+            error,
+        })
 }
 
 impl<'source, Row> ComponentRead<'source, Row> {

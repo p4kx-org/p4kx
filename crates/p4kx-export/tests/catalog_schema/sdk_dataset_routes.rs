@@ -27,6 +27,8 @@ use super::{
 
 #[path = "sdk_component_definition_routes.rs"]
 mod component_definitions;
+#[path = "sdk_flight_configuration_routes.rs"]
+mod flight_configurations;
 #[path = "sdk_projectile_ammo_route.rs"]
 mod projectile_ammo;
 #[path = "sdk_weapon_animation_route.rs"]
@@ -83,6 +85,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
         )?,
     ];
     routes.extend(component_definitions::read()?);
+    routes.extend(flight_configurations::read()?);
     Ok(routes)
 }
 
