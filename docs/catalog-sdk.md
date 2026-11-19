@@ -757,6 +757,15 @@ cargo test --locked -p p4kx-export --test real_archive -- `
     --ignored --exact --test-threads=1
 ```
 
+The installed fuel test compares original tank multipliers, intake rates, container capacity and
+linked source positions. It uses one decoded DataForge Entry and prints the Build and totals.
+
+```powershell
+cargo test --locked -p p4kx-export --test real_archive -- `
+    fuel_capacity::sdk_witness::installed_fuel_sdk_preserves_original_values_link_slots_and_origins `
+    --ignored --exact --test-threads=1
+```
+
 ## Original crafting-global configuration
 
 `catalog_queries::crafting::with_global_params` and `with_global_params_from` return borrowed

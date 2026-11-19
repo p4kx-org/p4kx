@@ -19,6 +19,8 @@ use crate::real_archive_item_durability as proof;
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
+#[path = "fuel_sdk_witness.rs"]
+mod sdk_witness;
 #[path = "fuel_ship_witness.rs"]
 mod ship_witness;
 #[path = "fuel_source_witness.rs"]

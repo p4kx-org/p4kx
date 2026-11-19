@@ -88,7 +88,7 @@ fn source_members(family: &str) -> &'static [&'static str] {
     }
 }
 
-fn compare_tank(source: &StructValue<'_>, row: &Value) -> TestResult {
+pub(super) fn compare_tank(source: &StructValue<'_>, row: &Value) -> TestResult {
     for name in ["openState", "closedState", "pumpingState"] {
         let value = source.field(name);
         let cell = cell(row, name)?;
@@ -141,7 +141,11 @@ fn compare_tank(source: &StructValue<'_>, row: &Value) -> TestResult {
     Ok(())
 }
 
-fn compare_policy(forge: &DataForge<'_>, source: &StructValue<'_>, row: &Value) -> TestResult {
+pub(super) fn compare_policy(
+    forge: &DataForge<'_>,
+    source: &StructValue<'_>,
+    row: &Value,
+) -> TestResult {
     for name in ["immutable", "generateRandomQuality", "hideFromUI"] {
         let cell = cell(row, wire_name(name))?;
         match source.field(name) {
