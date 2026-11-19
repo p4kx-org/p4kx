@@ -40,6 +40,15 @@ membership cites one original root-directory survey shared by the walk. A recove
 unsupported selector cannot certify a complete candidate set. Actual duplicates remain ambiguous
 even when other directory membership is incomplete.
 
+For an unambiguous, completely observed selected attribute whose literal lookup has no target
+and whose grammar is unsupported by the ordinary lookup, admit a complete `Data/ObjectContainers/`
+virtual key after a validated drive-qualified, parent-relative, or timestamped authoring prefix.
+This repair requires one structural root and one physical candidate in the intact root directory.
+The original literal, exact positional Selector, conversion and directory evidence remain
+available. A required path without an exact candidate remains unsupported. Duplicate physical
+candidates remain ambiguous. The canonical document lookup and traversal consume the same selected
+result. The rule describes P4KX's lookup for packed data.
+
 Immediate values, original collection surveys and lookup results retain their real source-use
 sets, completeness and encryption marker. The successfully parsed original Entry content supplies
 collection/ancestry surveys; exact node/attribute coordinates supply original values. No origin is

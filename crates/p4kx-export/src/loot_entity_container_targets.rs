@@ -12,6 +12,11 @@ use crate::schema_fields::every_field_required;
 use crate::starmap_index::Index;
 use crate::{CatalogError, ExportAccountingError};
 
+#[path = "loot_authoring_path.rs"]
+mod authoring_path;
+
+use authoring_path::{AuthoringPath, RepairKind};
+
 #[derive(Debug, Clone, Copy, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
@@ -29,53 +34,147 @@ enum LootContainerTargetStatus {
 pub(super) struct LootContainerTargets {
     target_status: SourcedValue<LootContainerTargetStatus>,
     target_candidates: SourcedValue<Vec<SourcedValue<PhysicalEntryRef>>>,
+    #[serde(rename = "targetLookupRepair")]
+    lookup_repair: Option<Box<LootContainerLookupRepair>>,
 }
 
-impl LootContainerTargets {
-    pub(super) fn proves_absence_of(&self, selector: &[SourceUse]) -> bool {
-        let origin = self.target_status.origin();
-        matches!(
-            self.target_status.value(),
-            Some(LootContainerTargetStatus::NotFound)
-        ) && origin.source_set_complete()
-            && self.target_candidates.origin().source_set_complete()
-            && self.target_candidates.value().is_some_and(Vec::is_empty)
-            && !selector.is_empty()
-            && selector
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(transform = every_field_required)]
+struct LootContainerLookupRepair {
+    /// The admitted authoring path form.
+    kind: SourcedValue<RepairKind>,
+    /// The complete normalized virtual Archive lookup key.
+    normalized_path: SourcedValue<String>,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) struct SelectedTarget<'index> {
+    pub(crate) candidates: &'index [usize],
+    pub(crate) absence_proved: bool,
+}
+
+pub(super) struct ResolvedTargets<'index> {
+    pub(super) targets: LootContainerTargets,
+    candidates: &'index [usize],
+}
+
+impl<'index> ResolvedTargets<'index> {
+    pub(super) fn selected_target(&self, selector: &[SourceUse]) -> Option<SelectedTarget<'index>> {
+        let origin = self.targets.target_status.origin();
+        if !origin.source_set_complete()
+            || !self
+                .targets
+                .target_candidates
+                .origin()
+                .source_set_complete()
+            || selector.is_empty()
+            || !selector
                 .iter()
                 .all(|used| origin.source_uses_refs().contains(used.reference()))
+        {
+            return None;
+        }
+        Some(SelectedTarget {
+            candidates: self.candidates,
+            absence_proved: self.candidates.is_empty()
+                && matches!(
+                    self.targets.target_status.value(),
+                    Some(LootContainerTargetStatus::NotFound)
+                ),
+        })
     }
 }
 
-pub(super) fn resolve(
+pub(crate) fn literal_candidates<'index>(
+    index: &'index Index<'_>,
+    selector: &str,
+) -> Option<&'index [usize]> {
+    let candidates = index.candidates(selector);
+    (!candidates.is_empty() || ChildContainerPath::new(selector).is_some()).then_some(candidates)
+}
+
+fn authoring_candidates<'index>(
+    index: &'index Index<'_>,
+    selector: &str,
+) -> Option<(AuthoringPath, &'index [usize])> {
+    let alias = AuthoringPath::parse(selector)?;
+    let entries = index.exact_normalized_candidates(&alias.normalized);
+    (!entries.is_empty()).then_some((alias, entries))
+}
+
+pub(super) fn resolve<'index>(
     archive: &Archive,
-    index: &Index<'_>,
+    index: &'index Index<'_>,
     directory: Option<&SourceUse>,
     capture: &EntryCapture<'_>,
     selector: &AuthoredEntryPath,
     document_complete: bool,
-) -> Result<LootContainerTargets, CatalogError> {
+    permit_repair: bool,
+) -> Result<ResolvedTargets<'index>, CatalogError> {
     let directory_complete =
         directory.is_some() && crate::export_archive_health::inventory(archive).is_none();
-    let entries = index.candidates(selector.as_str());
+    let (mut inputs, selector_complete) = selector.selector_inputs()?;
+    inputs.extend(directory.cloned());
+    let complete = selector_complete && document_complete && directory_complete;
+    let literal = literal_candidates(index, selector.as_str());
+    let authoring = if permit_repair && complete && literal.is_none() {
+        authoring_candidates(index, selector.as_str())
+    } else {
+        None
+    };
+    let matched = literal.or_else(|| authoring.as_ref().map(|(_, entries)| *entries));
+    let entries = matched.unwrap_or_default();
     let status = match entries {
         [_, _, ..] => LootContainerTargetStatus::Ambiguous,
         [] | [_] if !directory_complete => LootContainerTargetStatus::IncompleteDirectory,
-        [] if ChildContainerPath::new(selector.as_str()).is_none() => {
-            LootContainerTargetStatus::UnsupportedSelector
-        }
+        [] if matched.is_none() => LootContainerTargetStatus::UnsupportedSelector,
         [] => LootContainerTargetStatus::NotFound,
         [_] => LootContainerTargetStatus::Resolved,
     };
-    let sources = capture.source_uses();
-    let (mut inputs, complete) = selector.selector_inputs()?;
-    inputs.extend(directory.cloned());
+    let conversion_complete = if let Some((alias, _)) = &authoring {
+        observe_repair(capture, selector, alias, &mut inputs)?
+    } else {
+        true
+    };
     let complete = complete
-        && document_complete
-        && directory_complete
+        && conversion_complete
         && !matches!(status, LootContainerTargetStatus::UnsupportedSelector);
-    let shared = sources.shared_origin(&inputs, complete);
-    let candidates = entries
+    let sources = capture.source_uses();
+    let candidates = project_candidates(archive, index, capture, entries, &inputs, complete)?;
+    let repair = if let Some((alias, [_])) = authoring {
+        Some(Box::new(LootContainerLookupRepair {
+            kind: sources.value(SourceValue::Present(alias.kind), &inputs, complete),
+            normalized_path: sources.value(
+                SourceValue::Present(alias.normalized),
+                &inputs,
+                complete,
+            ),
+        }))
+    } else {
+        None
+    };
+    Ok(ResolvedTargets {
+        targets: LootContainerTargets {
+            target_status: sources.value(SourceValue::Present(status), &inputs, complete),
+            target_candidates: sources.value(SourceValue::Present(candidates), &inputs, complete),
+            lookup_repair: repair,
+        },
+        candidates: entries,
+    })
+}
+
+fn project_candidates(
+    archive: &Archive,
+    index: &Index<'_>,
+    capture: &EntryCapture<'_>,
+    entries: &[usize],
+    inputs: &[SourceUse],
+    complete: bool,
+) -> Result<Vec<SourcedValue<PhysicalEntryRef>>, CatalogError> {
+    let sources = capture.source_uses();
+    let shared = sources.shared_origin(inputs, complete);
+    entries
         .iter()
         .map(|&position| {
             let entry = index
@@ -90,9 +189,21 @@ pub(super) fn resolve(
                 .value_with_shared_origin(original.value().clone(), &shared, uses, known)
                 .map_err(CatalogError::from)
         })
-        .collect::<Result<Vec<_>, _>>()?;
-    Ok(LootContainerTargets {
-        target_status: sources.value(SourceValue::Present(status), &inputs, complete),
-        target_candidates: sources.value(SourceValue::Present(candidates), &inputs, complete),
-    })
+        .collect()
+}
+
+fn observe_repair(
+    capture: &EntryCapture<'_>,
+    selector: &AuthoredEntryPath,
+    alias: &AuthoringPath,
+    inputs: &mut Vec<SourceUse>,
+) -> Result<bool, CatalogError> {
+    let converted = selector
+        .clone()
+        .convert(capture, |_| Some(alias.normalized.clone()))?
+        .ok_or(ExportAccountingError::ConflictingSourceDatum)?
+        .retain_in(capture)?;
+    let (uses, known) = converted.contributions();
+    inputs.extend(uses.iter().cloned());
+    Ok(known)
 }

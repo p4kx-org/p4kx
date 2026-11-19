@@ -202,6 +202,24 @@ one actual directory candidate, not read/decode/placement success. The other sta
 ambiguous, unsupportedSelector and incompleteDirectory. Recovered membership and unsupported syntax
 never certify a complete lookup; actual duplicate candidates remain ambiguous.
 
+A selected, fully observed authoring path can supply an exact virtual-root lookup when its literal
+has no Archive target. The accepted prefixes are an absolute Windows drive, one or more leading
+parent-directory components, or a `[H:mm]` or `[H:mm AM|PM]` timestamp followed by a plain
+annotation. The path must contain a single structurally delimited `Data/ObjectContainers/`
+root and an explicit `.socpak` filename. Its complete normalized key must match exactly one
+physical Entry in the intact root directory before the Loot walk follows it.
+
+In that case `targetLookupRepair` contains sourced `kind` and `normalizedPath` cells. The
+`kind.value` is `driveQualified`, `parentRelative` or `timestampedAnnotation`.
+`normalizedPath.value` is the complete virtual key with ASCII case folded and backslash
+separators. The two cells and the target lookup cite the original attribute, the path conversion
+and the consulted directory. Equivalent literals with complete evidence retain proofs for their own
+attribute positions. `declaredPath` retains the original text and `targetCandidates` gives the
+chosen physical Entry.
+For ordinary lookups and unsuccessful repairs `targetLookupRepair` is null. A proposed repair
+with zero exact matches stays `unsupportedSelector`. Multiple physical matches stay `ambiguous`.
+The classification applies to the P4KX Archive lookup for packed data. Game runtime behavior remains unverified.
+
 `configReferences.value` independently preserves each original `multiConfigRef` site once, with
 its node/attribute coordinates and parsed `guid` state. The exact original text is the `value`
 cell of `nodes.value` at the matching `nodeIndex`, then `attributes[attributeOrdinal]`; the raw

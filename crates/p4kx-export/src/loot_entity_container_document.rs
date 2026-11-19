@@ -18,6 +18,7 @@ mod targets;
 
 use nodes::LootEntityLinkNode;
 use targets::LootContainerTargets;
+pub(crate) use targets::{SelectedTarget, literal_candidates};
 
 /// One original `EntXML` document with container-link attributes reached by the Loot walk.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -103,21 +104,21 @@ pub(crate) fn capture(
     }))
 }
 
-pub(crate) struct ProjectedDocument {
+pub(crate) struct ProjectedDocument<'index> {
     pub(crate) document: LootEntityContainerDocument,
-    pub(crate) selected_absence_proved: bool,
+    pub(crate) selected_target: Option<SelectedTarget<'index>>,
 }
 
 impl CapturedDocument {
-    pub(crate) fn project(
+    pub(crate) fn project<'index>(
         self,
         archive: &Archive,
-        index: &Index<'_>,
+        index: &'index Index<'_>,
         directory: Option<&SourceUse>,
         capture: &EntryCapture<'_>,
         cancel: Option<&CancelToken>,
         selected: Option<&AuthoredEntryPath>,
-    ) -> Result<ProjectedDocument, CatalogError> {
+    ) -> Result<ProjectedDocument<'index>, CatalogError> {
         let selected = selected
             .filter(|selected| {
                 self.links.iter().all(|link| {
@@ -126,26 +127,31 @@ impl CapturedDocument {
             })
             .map(AuthoredEntryPath::selector_inputs)
             .transpose()?;
-        let mut selected_absence_proved = false;
+        let selected = selected
+            .as_ref()
+            .filter(|(uses, complete)| *complete && !uses.is_empty())
+            .map(|(uses, _)| uses.as_slice());
+        let mut selected_target = None;
         let mut links = Vec::with_capacity(self.links.len());
         for original in self.links {
             checkpoint(cancel)?;
-            let targets = targets::resolve(
+            let resolved = targets::resolve(
                 archive,
                 index,
                 directory,
                 capture,
                 &original.selector,
                 self.complete,
+                selected.is_some(),
             )?;
-            selected_absence_proved |= selected
-                .as_ref()
-                .is_some_and(|(uses, complete)| *complete && targets.proves_absence_of(uses));
+            if let Some(current) = selected.and_then(|uses| resolved.selected_target(uses)) {
+                selected_target = Some(current);
+            }
             links.push(LootEntityContainerLink {
                 node_index: original.node_index,
                 attribute_ordinal: original.attribute_ordinal,
                 declared_path: original.declared_path,
-                targets,
+                targets: resolved.targets,
             });
         }
         Ok(ProjectedDocument {
@@ -160,7 +166,7 @@ impl CapturedDocument {
                 ),
                 config_references: self.config_references,
             },
-            selected_absence_proved,
+            selected_target,
         })
     }
 }

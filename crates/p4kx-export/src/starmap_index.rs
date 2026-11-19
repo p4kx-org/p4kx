@@ -56,6 +56,18 @@ impl<'a> Index<'a> {
         let Some((key, selected)) = self.selected_key(path) else {
             return &[];
         };
+        self.candidates_for(key, selected)
+    }
+
+    /// Returns every physical Entry at a normalized root key without applying other lookup forms.
+    pub(crate) fn exact_normalized_candidates(&self, normalized: &str) -> &[usize] {
+        let Some(selected) = self.by_path.get(normalized) else {
+            return &[];
+        };
+        self.candidates_for(normalized, selected)
+    }
+
+    fn candidates_for<'index>(&'index self, key: &str, selected: &'index usize) -> &'index [usize] {
         self.duplicates
             .get(key)
             .map_or_else(|| std::slice::from_ref(selected), Vec::as_slice)

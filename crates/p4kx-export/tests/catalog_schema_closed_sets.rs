@@ -51,6 +51,7 @@ const CONTROL_TYPES: &[&str] = &[
     "LocalizationMeaning",
     "LocationConditionKind",
     "LooseArchivePathState",
+    "LootContainerLookupRepairKind",
     "LootContainerTargetStatus",
     "MissionItemGap",
     "NoteInterpretation",

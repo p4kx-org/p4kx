@@ -13,7 +13,9 @@ use crate::catalog_rows::staged::{IndexedCatalogRows, StagedCatalogTable};
 use crate::catalog_table::DatasetAvailability;
 use crate::entry_source::{self, EntrySource};
 use crate::export_ledger::{ExportLedger, SourceDisposition};
-use crate::loot_entxml::documents::LootEntityContainerDocument;
+use crate::loot_entxml::documents::{
+    LootEntityContainerDocument, SelectedTarget, literal_candidates,
+};
 use crate::loot_entxml::{CapturedEntityLink, EntityLink};
 use crate::loot_unreadable::Unreadable;
 use crate::starmap_index::Index;
@@ -148,7 +150,7 @@ fn summarise(
         ..Summary::default()
     };
     for (path, mut link) in read.links {
-        let absence_proved = retain_original(
+        let original = retain_original(
             &mut link,
             archive,
             index,
@@ -172,12 +174,16 @@ fn summarise(
             if selector.as_str() != path {
                 return Err(ExportAccountingError::ConflictingSourceDatum.into());
             }
+            let (candidates, absence_proved) = original.map_or_else(
+                || (literal_candidates(index, path).unwrap_or_default(), false),
+                |selected| (selected.candidates, selected.absence_proved),
+            );
             resolve_target(
                 archive,
-                index,
                 capture,
                 &mut ledger,
                 selector,
+                candidates,
                 absence_proved,
             )?
         } else {
@@ -195,17 +201,17 @@ fn summarise(
     })
 }
 
-fn retain_original(
+fn retain_original<'index>(
     link: &mut CapturedEntityLink,
     archive: &Archive,
-    index: &Index<'_>,
+    index: &'index Index<'_>,
     directory: Option<&SourceUse>,
     capture: &EntryCapture<'_>,
     cancel: Option<&CancelToken>,
     documents: &mut Vec<LootEntityContainerDocument>,
-) -> Result<bool, CatalogError> {
+) -> Result<Option<SelectedTarget<'index>>, CatalogError> {
     let Some(original) = link.take_original() else {
-        return Ok(false);
+        return Ok(None);
     };
     let selected = if link.value().several || link.value().malformed_config {
         None
@@ -214,7 +220,7 @@ fn retain_original(
     };
     let projected = original.project(archive, index, directory, capture, cancel, selected)?;
     documents.push(projected.document);
-    Ok(projected.selected_absence_proved)
+    Ok(projected.selected_target)
 }
 
 impl Summary {
@@ -254,13 +260,13 @@ fn configured_placement(
 
 fn resolve_target(
     archive: &Archive,
-    index: &Index<'_>,
     capture: &EntryCapture<'_>,
     ledger: &mut ExportLedger,
     selector: AuthoredEntryPath,
+    candidates: &[usize],
     absence_proved: bool,
 ) -> Result<PlacedTarget, CatalogError> {
-    match index.candidates(selector.as_str()) {
+    match candidates {
         [entry] => Ok(PlacedTarget::Resolved(*entry)),
         [] if absence_proved => {
             EntrySource::authored_missing(selector).record(

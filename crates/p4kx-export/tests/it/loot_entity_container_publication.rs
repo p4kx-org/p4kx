@@ -41,6 +41,24 @@ fn proved_configless_container_absence_publishes_with_original_evidence_and_warn
 }
 
 #[test]
+fn absent_literal_with_brackets_requires_no_repair() -> TestResult {
+    let source = source(Some("[authoring]/missing.socpak"))?;
+    let published = build_catalog_from(&source.archive, &source.entry, &fixture::options())?;
+    let catalog: Value = serde_json::from_slice(published.json())?;
+    let link = proof::at(
+        &catalog,
+        "/declarations/lootEntityContainerDocuments/rows/0/links/value/0",
+    )?;
+    proof::present(link, "targetStatus", &json!("notFound"), Some(true))?;
+    assert_eq!(
+        link.get("targetLookupRepair"),
+        Some(&Value::Null),
+        "a valid literal bracketed path uses only the ordinary lookup"
+    );
+    verify_warning(&catalog)
+}
+
+#[test]
 fn unsupported_container_selector_refuses_normal_before_output_creation() -> TestResult {
     let complete = source(None)?;
     let previous = build_catalog_from(&complete.archive, &complete.entry, &fixture::options())?;
@@ -115,6 +133,165 @@ fn conflicting_proofs_for_the_same_absent_target_retain_both_authored_origins() 
     proof::closure(&catalog)
 }
 
+const ALIAS_TARGET: &str = "Data/ObjectContainers/PU/synthetic/alias-target.socpak";
+const ALIAS_KEY: &str = "data\\objectcontainers\\pu\\synthetic\\alias-target.socpak";
+
+#[test]
+fn repaired_authoring_paths_publish_with_original_literal_and_reach_the_exact_target() -> TestResult
+{
+    let cases = [
+        (
+            "R:/authoring/Data/ObjectContainers/PU/synthetic/alias-target.socpak",
+            "driveQualified",
+        ),
+        (
+            "../../authoring/Data/ObjectContainers/PU/synthetic/alias-target.socpak",
+            "parentRelative",
+        ),
+        (
+            "[8:15 PM] saved container path Data/ObjectContainers/PU/synthetic/alias-target.socpak",
+            "timestampedAnnotation",
+        ),
+    ];
+    let target = TestContainer::new()
+        .entry(TestEntry::stored(
+            "entdata/nested.entxml",
+            format!(r#"<Entity objectContainer="{ROOT}"/>"#),
+        ))
+        .build();
+    let originals = cases.iter().map(|(selector, _)| {
+        TestEntry::stored(
+            ENTITY_DOCUMENT,
+            format!(r#"<Entity objectContainer="{selector}"/>"#),
+        )
+    });
+    let source =
+        source_documents_and_targets(originals, [TestEntry::stored(ALIAS_TARGET, target)])?;
+    let published = build_catalog_from(&source.archive, &source.entry, &fixture::options())?;
+    assert!(published.summary().export_health().is_complete());
+    let catalog: Value = serde_json::from_slice(published.json())?;
+    let documents = proof::rows(&catalog, "/declarations/lootEntityContainerDocuments/rows")?;
+    assert_eq!(
+        documents.len(),
+        4,
+        "the traversal reads the exactly admitted target once"
+    );
+    for (wanted, kind) in cases {
+        let link = documents
+            .iter()
+            .filter_map(|document| document.pointer("/links/value/0"))
+            .find(|link| link.pointer("/declaredPath/value") == Some(&json!(wanted)))
+            .ok_or("original unreplaced authoring literal")?;
+        verify_repair(&catalog, link, kind)?;
+    }
+    assert!(jsonschema::validator_for(&catalog_schema())?.is_valid(&catalog));
+    proof::closure(&catalog)
+}
+
+fn verify_repair(catalog: &Value, link: &Value, kind: &str) -> TestResult {
+    let status = proof::present(link, "targetStatus", &json!("resolved"), Some(true))?;
+    let repair = proof::at(link, "/targetLookupRepair")?;
+    let label = proof::present(repair, "kind", &json!(kind), Some(true))?;
+    let key = proof::present(repair, "normalizedPath", &json!(ALIAS_KEY), Some(true))?;
+    assert_eq!(
+        label["sourceUsesRefs"], key["sourceUsesRefs"],
+        "the repair kind and virtual key cite the same source evidence"
+    );
+    assert_eq!(
+        status["sourceUsesRefs"], key["sourceUsesRefs"],
+        "resolution and its normalized key cite the same original lookup"
+    );
+    let original_uses = proof::uses(catalog, key)?;
+    assert!(
+        original_uses.iter().any(|used| {
+            used.pointer("/location/field") == Some(&json!("@objectContainer"))
+                && used["role"] == "conversion"
+        }),
+        "the repaired key cites conversion of the original attribute"
+    );
+    assert!(
+        original_uses.iter().any(|used| {
+            used.pointer("/location/type") == Some(&json!("archiveDirectoryPaths"))
+        }),
+        "the repaired key cites the physical archive directory"
+    );
+    let candidate = proof::at(link, "/targetCandidates/value/0")?;
+    verify_physical(catalog, candidate, ALIAS_TARGET)
+}
+
+#[test]
+fn missing_or_malformed_authoring_paths_remain_unsupported_and_block_publication() -> TestResult {
+    for selector in [
+        "R:/authoring/Data/ObjectContainers/PU/synthetic/missing/alias-target.socpak",
+        "R:/Data/ObjectContainers/Data/ObjectContainers/PU/synthetic/alias-target.socpak",
+        "[8:99 PM] saved container path Data/ObjectContainers/PU/synthetic/alias-target.socpak",
+    ] {
+        let source = source_documents_and_targets(
+            [TestEntry::stored(
+                ENTITY_DOCUMENT,
+                format!(r#"<Entity objectContainer="{selector}"/>"#),
+            )],
+            [TestEntry::stored(
+                ALIAS_TARGET,
+                TestContainer::new().build(),
+            )],
+        )?;
+        let (partial, catalog) = source.diagnostic()?;
+        assert!(!partial.summary().export_health().is_complete());
+        let link = proof::at(
+            &catalog,
+            "/declarations/lootEntityContainerDocuments/rows/0/links/value/0",
+        )?;
+        assert_eq!(
+            link.pointer("/targetStatus/value"),
+            Some(&json!("unsupportedSelector"))
+        );
+        assert_eq!(link.get("targetLookupRepair"), Some(&Value::Null));
+        assert!(matches!(
+            build_catalog_from(&source.archive, &source.entry, &fixture::options()),
+            Err(CatalogError::IncompleteExport(_))
+        ));
+    }
+    Ok(())
+}
+
+#[test]
+fn repaired_lookup_with_duplicate_physical_targets_denies_traversal_and_publication() -> TestResult
+{
+    let selector = "R:/authoring/Data/ObjectContainers/PU/synthetic/alias-target.socpak";
+    let target = || TestEntry::stored(ALIAS_TARGET, TestContainer::new().build());
+    let source = source_documents_and_targets(
+        [TestEntry::stored(
+            ENTITY_DOCUMENT,
+            format!(r#"<Entity objectContainer="{selector}"/>"#),
+        )],
+        [target(), target()],
+    )?;
+    let (partial, catalog) = source.diagnostic()?;
+    assert!(!partial.summary().export_health().is_complete());
+    let link = proof::at(
+        &catalog,
+        "/declarations/lootEntityContainerDocuments/rows/0/links/value/0",
+    )?;
+    assert_eq!(
+        link.pointer("/targetStatus/value"),
+        Some(&json!("ambiguous"))
+    );
+    assert_eq!(link.get("targetLookupRepair"), Some(&Value::Null));
+    let [first, second] = proof::rows(link, "/targetCandidates/value")? else {
+        return Err("both physical candidates must be retained".into());
+    };
+    assert_ne!(
+        first.pointer("/value/entryIndex"),
+        second.pointer("/value/entryIndex")
+    );
+    assert!(matches!(
+        build_catalog_from(&source.archive, &source.entry, &fixture::options()),
+        Err(CatalogError::IncompleteExport(_))
+    ));
+    proof::closure(&catalog)
+}
+
 fn source(selector: Option<&str>) -> TestResult<Fixture> {
     let document = selector.map(|selector| {
         let xml = format!(
@@ -126,6 +303,13 @@ fn source(selector: Option<&str>) -> TestResult<Fixture> {
 }
 
 fn source_documents(documents: impl IntoIterator<Item = TestEntry>) -> TestResult<Fixture> {
+    source_documents_and_targets(documents, [])
+}
+
+fn source_documents_and_targets(
+    documents: impl IntoIterator<Item = TestEntry>,
+    targets: impl IntoIterator<Item = TestEntry>,
+) -> TestResult<Fixture> {
     let mut container = TestContainer::new().entry(TestEntry::stored(
         "syntheticsystem.xml",
         r#"<ObjectContainer version="14"/>"#,
@@ -133,10 +317,12 @@ fn source_documents(documents: impl IntoIterator<Item = TestEntry>) -> TestResul
     for document in documents {
         container = container.entry(document);
     }
-    entries::with_starmap(vec![
+    let mut members = vec![
         TestEntry::stored(ROOT, container.build()).encrypted(),
         TestEntry::stored(fixture::REGISTRY, b"<LayerBackups/>"),
-    ])
+    ];
+    members.extend(targets);
+    entries::with_starmap(members)
 }
 
 fn verify_root(catalog: &Value) -> TestResult {
