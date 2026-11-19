@@ -68,11 +68,9 @@ pub(crate) struct Ship<'a> {
     pub(crate) attachment_manufacturer: ShipAttachmentManufacturer<'a>,
     /// The exact authored vehicle selector, independently of normalized Archive lookup paths.
     pub(crate) vehicle_definition: SourcedValue<&'a str>,
-    /// Spaceship or ground vehicle, `null` when the record path and the vehicle implementation
-    /// do not settle it. Today one of `spaceship` and `groundVehicle`; the schema keeps a string,
-    /// as a new value is additive.
-    #[schemars(with = "Option<String>")]
-    pub(crate) vehicle_kind: Option<VehicleKind>,
+    /// The kind derived from the original Record path and effective rolling parts.
+    #[schemars(with = "SourcedValue<String>")]
+    pub(crate) vehicle_kind: SourcedValue<VehicleKind>,
     /// The original `Size` of the selected `AttachDef`.
     pub(crate) size: SourcedValue<ResourceNumber>,
     /// Hull mass in kilograms from the selected Parts or Physics inputs, rounded to four decimals.

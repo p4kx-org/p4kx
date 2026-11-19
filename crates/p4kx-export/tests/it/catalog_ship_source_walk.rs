@@ -33,6 +33,9 @@ pub(super) fn row(
     wire.field("mass")?.leaf(row.mass())?;
     wire.field("massBasis")?.leaf(row.mass_basis())?;
     wire.field("hullHealth")?.leaf(row.hull_health())?;
+    wire.field("vehicleKind")?.leaf(row.vehicle_kind())?;
+    wire.field("vehicleKind")?.leaf(row.vehicle_kind())?;
+    wire.field("vehicleKind")?.leaf(row.vehicle_kind())?;
     wire.field("playability")?.leaf(row.playability())?;
     vehicle_manufacturer(
         row.vehicle_manufacturer(),

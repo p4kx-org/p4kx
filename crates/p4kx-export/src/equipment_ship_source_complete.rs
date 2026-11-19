@@ -33,6 +33,7 @@ pub(super) fn complete(row: &ShipSource<'_>) -> bool {
         && known(row.career())
         && known(row.crew_size())
         && known(row.vehicle_definition())
+        && known(row.vehicle_kind())
         && known(row.size())
         && known(row.mass())
         && known(row.mass_basis())

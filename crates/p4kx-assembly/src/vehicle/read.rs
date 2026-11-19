@@ -27,6 +27,8 @@ pub(super) struct PartTree {
     pub(super) parts: Vec<VehiclePart>,
     pub(super) paths: HashMap<String, IndexedPort>,
     pub(super) selectors: Option<VehicleAggregateEvidence>,
+    pub(super) rolling_parts: bool,
+    pub(super) rolling_selectors: Option<VehicleAggregateEvidence>,
 }
 
 pub(super) fn parts(
@@ -34,9 +36,13 @@ pub(super) fn parts(
     totals: Option<&mut VehicleAggregateEvidence>,
     observe_ports: bool,
 ) -> PartTree {
+    let rolling_selectors = totals.is_some().then(VehicleAggregateEvidence::new);
     let mut reader = PartReader {
         totals,
         selectors: observe_ports.then(VehicleAggregateEvidence::new),
+        rolling_observation: rolling_selectors,
+        rolling_parts: false,
+        found_wheel: false,
         paths: HashMap::new(),
         path: Vec::new(),
     };
@@ -52,22 +58,47 @@ pub(super) fn parts(
         parts,
         paths: reader.paths,
         selectors: reader.selectors,
+        rolling_parts: reader.rolling_parts,
+        rolling_selectors: reader.rolling_observation,
     }
 }
 
 struct PartReader<'scope> {
     totals: Option<&'scope mut VehicleAggregateEvidence>,
     selectors: Option<VehicleAggregateEvidence>,
+    rolling_observation: Option<VehicleAggregateEvidence>,
+    rolling_parts: bool,
+    found_wheel: bool,
     paths: HashMap<String, IndexedPort>,
     path: Vec<usize>,
 }
 
 impl PartReader<'_> {
+    fn rolling_field(&mut self, element: &Element, field: &str) {
+        if let Some(selectors) = self.rolling_observation() {
+            if element.attribute(field).is_some() && element.origins.evidence(field).is_none() {
+                selectors.issue(super::VehicleAggregateIssue::OriginalEvidenceUnavailable);
+            } else {
+                selectors.field(element, field);
+            }
+        }
+    }
+
+    const fn rolling_observation(&mut self) -> Option<&mut VehicleAggregateEvidence> {
+        if self.found_wheel {
+            None
+        } else {
+            self.rolling_observation.as_mut()
+        }
+    }
     fn element(&mut self, element: &Element, field: &str) {
         if let Some(totals) = &mut self.totals {
             totals.element(element, field);
         }
         if let Some(selectors) = &mut self.selectors {
+            selectors.element(element, field);
+        }
+        if let Some(selectors) = self.rolling_observation() {
             selectors.element(element, field);
         }
     }
@@ -93,12 +124,16 @@ impl PartReader<'_> {
         if let Some(selectors) = &mut self.selectors {
             selectors.field(element, "skipPart");
         }
+        self.rolling_field(element, "skipPart");
         if is_set(element.attribute("skipPart")) {
             return None;
         }
         let name = element.attribute("name").unwrap_or_default();
         let class = element.attribute("class").unwrap_or_default();
         let kind = kind_of(class);
+        self.rolling_field(element, "class");
+        self.rolling_parts |= matches!(kind, PartKind::Wheel | PartKind::Tread);
+        self.found_wheel |= kind == PartKind::Wheel;
         let port = self.item_port(element, name);
         let mut children = Vec::new();
         self.append_parts(element, &mut children);

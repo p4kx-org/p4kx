@@ -232,6 +232,7 @@ pub struct VehicleImplementation {
     pub(crate) elems: Vec<ElemOverride>,
     pub(crate) name: String,
     pub(crate) parts: Vec<VehiclePart>,
+    rolling_parts: bool,
     port_paths: HashMap<String, read::IndexedPort>,
     pub(crate) issues: Vec<LoadoutError>,
     pub(crate) structure: [u8; 16],

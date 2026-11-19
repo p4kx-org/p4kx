@@ -58,15 +58,13 @@ pub(super) fn original_sites(
         );
     }
     if totals {
-        for name in ["mass", "damageMax"] {
-            retain(
-                &mut origins,
-                node,
-                scope,
-                attributes,
-                name,
-                absence_scope(is_part),
-            );
+        let part_absence = absence_scope(is_part);
+        for (name, missing) in [
+            ("class", MissingAttribute::Omit),
+            ("mass", part_absence),
+            ("damageMax", part_absence),
+        ] {
+            retain(&mut origins, node, scope, attributes, name, missing);
         }
     }
     origins

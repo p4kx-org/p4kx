@@ -130,7 +130,7 @@ fn the_known_ships_carry_their_mass_hull_and_cargo() -> TestResult {
             ship["hullHealth"]["value"],
             ship["cargoScu"],
             ship["cargoGridsWithIssue"],
-            ship["vehicleKind"],
+            ship["vehicleKind"]["value"],
             ship["size"]
         ));
         assert_eq!(
@@ -151,7 +151,11 @@ fn the_known_ships_carry_their_mass_hull_and_cargo() -> TestResult {
             "{}",
             anchor.class_name
         );
-        assert_eq!(ship["vehicleKind"], "spaceship", "{}", anchor.class_name);
+        assert_eq!(
+            ship["vehicleKind"]["value"], "spaceship",
+            "{}",
+            anchor.class_name
+        );
     }
     Ok(())
 }
@@ -216,7 +220,7 @@ fn assert_entry_equals_base(entry: &Json, base: &ShipBase) -> TestResult {
         "{name}"
     );
     assert_eq!(
-        entry["vehicleKind"].as_str(),
+        entry.pointer("/vehicleKind/value").and_then(Json::as_str),
         base.vehicle_kind.map(p4kx_export::VehicleKind::code),
         "{name}"
     );
@@ -238,7 +242,9 @@ fn the_catalog_ships_equal_the_ship_base_export_and_the_kind_is_settled() -> Tes
     assert_eq!(ships.len(), bases.ships().len());
     let mut kinds: BTreeMap<String, usize> = BTreeMap::new();
     for ship in ships {
-        *kinds.entry(ship["vehicleKind"].to_string()).or_default() += 1;
+        *kinds
+            .entry(ship["vehicleKind"]["value"].to_string())
+            .or_default() += 1;
     }
     print_line(&format!("vehicle kinds {kinds:?}"));
     for base in bases.ships() {
@@ -255,13 +261,15 @@ fn the_catalog_ships_equal_the_ship_base_export_and_the_kind_is_settled() -> Tes
                 .as_str()
                 .is_some_and(|path| path.contains("/entities/groundvehicles/"))
         })
-        .all(|ship| ship["vehicleKind"] == "groundVehicle");
+        .all(|ship| ship["vehicleKind"]["value"] == "groundVehicle");
     assert!(
         ground,
         "every ship under groundvehicles is a ground vehicle"
     );
     assert!(
-        ships.iter().all(|ship| !ship["vehicleKind"].is_null()),
+        ships
+            .iter()
+            .all(|ship| !ship["vehicleKind"]["value"].is_null()),
         "no ship has an undecided kind: no Record under spaceships has a wheel or tread"
     );
     Ok(())

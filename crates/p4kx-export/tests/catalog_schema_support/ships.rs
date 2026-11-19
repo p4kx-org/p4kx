@@ -27,7 +27,7 @@ pub(super) fn rows() -> Value {
             "componentOrdinal": absent(), "attachDefPresent": absent(), "manufacturer": absent()
         },
         "vehicleDefinition": absent(),
-        "vehicleKind": "spaceship",
+        "vehicleKind": present(json!("spaceship")),
         "size": present(json!({"type": "int32", "value": 3})),
         "mass": present(json!(1210.0)),
         "massBasis": present(json!("parts")),

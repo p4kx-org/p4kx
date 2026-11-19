@@ -12,7 +12,7 @@ use crate::catalog_v3::authored_fields::ship_source_read::{ShipPlayabilityInputs
 use crate::contract_insurance::ShipInsurance;
 use crate::loadout::ledger::ShipAggregateValues;
 use crate::resource_number::ResourceNumber;
-use crate::{MassBasis, Playability};
+use crate::{MassBasis, Playability, VehicleKind};
 
 /// Canonical source-backed fields of one physical Ship, including resolved mass and hull.
 #[derive(Debug)]
@@ -26,6 +26,7 @@ pub struct ShipSource<'source> {
     pub(crate) vehicle_manufacturer: ShipVehicleManufacturer<'source>,
     pub(crate) attachment_manufacturer: ShipAttachmentManufacturer<'source>,
     pub(crate) vehicle_definition: SourcedValue<&'source str>,
+    pub(crate) vehicle_kind: SourcedValue<VehicleKind>,
     pub(crate) size: SourcedValue<ResourceNumber>,
     pub(crate) mass: SourcedValue<f64>,
     pub(crate) mass_basis: SourcedValue<MassBasis>,
@@ -52,6 +53,7 @@ impl<'source> ShipSource<'source> {
             vehicle_manufacturer: presentation.vehicle_manufacturer,
             attachment_manufacturer: presentation.attachment_manufacturer,
             vehicle_definition: source.vehicle_definition,
+            vehicle_kind: aggregates.vehicle_kind,
             size: presentation.size,
             mass: aggregates.mass,
             mass_basis: aggregates.mass_basis,
@@ -114,6 +116,12 @@ impl<'source> ShipSource<'source> {
     #[must_use]
     pub const fn vehicle_definition(&self) -> &SourcedValue<&'source str> {
         &self.vehicle_definition
+    }
+
+    /// Borrows the vehicle kind with its original path and rolling-part decision.
+    #[must_use]
+    pub const fn vehicle_kind(&self) -> &SourcedValue<VehicleKind> {
+        &self.vehicle_kind
     }
 
     /// Borrows the original exact attachment size.

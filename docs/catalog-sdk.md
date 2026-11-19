@@ -904,7 +904,7 @@ Use `equipment::with_ship_sources`, its `_from` form or the session and parsed-v
 GUID order, then physical Record order for ties. The supplied `ShipSource` has immutable typed
 getters for the complete original Header, name/description/role/career, crew size, both
 manufacturer declarations, original vehicle selector, exact size, insurance and authored
-crew-manifest inputs, plus canonical sourced mass, mass basis, hull health and playability.
+crew-manifest inputs, plus canonical sourced vehicle kind, mass, mass basis, hull health and playability.
 
 This query shares the Catalog's original reader, Archive-backed ShipPool and per-call
 Capture. It uses the Entity header index to open the dependencies reached by the selected owners'

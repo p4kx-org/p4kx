@@ -45043,11 +45043,8 @@
           "description": "The exact authored vehicle selector, independently of normalized Archive lookup paths."
         },
         "vehicleKind": {
-          "description": "Spaceship or ground vehicle, `null` when the record path and the vehicle implementation\ndo not settle it. Today one of `spaceship` and `groundVehicle`; the schema keeps a string,\nas a new value is additive.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The kind derived from the original Record path and effective rolling parts."
         },
         "vehicleManufacturer": {
           "$ref": "#/$defs/ShipVehicleManufacturer",

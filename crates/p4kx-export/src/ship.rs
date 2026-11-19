@@ -92,7 +92,7 @@ pub(crate) fn ship<'f>(
         attachment_manufacturer: source.attachment_manufacturer,
         vehicle_definition: source.vehicle_definition,
         playability: source.playability,
-        vehicle_kind: base.vehicle_kind,
+        vehicle_kind: source.vehicle_kind,
         size: source.size,
         mass: source.mass,
         mass_basis: source.mass_basis,

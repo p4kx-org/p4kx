@@ -97,7 +97,7 @@ fn mass_hull_cargo_size_and_kind_come_from_the_ship_base_data() -> TestResult {
         alpha["size"]["value"],
         serde_json::json!({"type": "int32", "value": 3})
     );
-    assert_eq!(alpha["vehicleKind"], "spaceship");
+    assert_eq!(alpha["vehicleKind"]["value"], "spaceship");
     let beta = ship(&built, BETA)?;
     assert_eq!(
         beta["mass"]["value"], 1270.0,
@@ -145,7 +145,7 @@ fn every_catalog_ship_equals_its_ship_base_data() -> TestResult {
             assert!(size["value"].is_null(), "the ship has no authored size");
         }
         assert_eq!(
-            entry["vehicleKind"],
+            entry["vehicleKind"]["value"],
             base.vehicle_kind
                 .map_or(Value::Null, |kind| kind.code().into()),
             "{}",
@@ -215,10 +215,13 @@ fn a_ship_without_cargo_grids_has_zero_scu() -> TestResult {
 #[test]
 fn the_kind_uses_the_wheels_of_the_implementation_as_evidence() -> TestResult {
     let built = build()?;
-    assert_eq!(ship(&built, GROUND)?["vehicleKind"], "groundVehicle");
-    assert_eq!(ship(&built, CAR)?["vehicleKind"], "groundVehicle");
+    assert_eq!(
+        ship(&built, GROUND)?["vehicleKind"]["value"],
+        "groundVehicle"
+    );
+    assert_eq!(ship(&built, CAR)?["vehicleKind"]["value"], "groundVehicle");
     assert!(
-        ship(&built, ROLLING)?["vehicleKind"].is_null(),
+        ship(&built, ROLLING)?["vehicleKind"]["value"].is_null(),
         "wheels under the spaceship folder"
     );
     assert_eq!(VehicleKind::Spaceship.code(), "spaceship");

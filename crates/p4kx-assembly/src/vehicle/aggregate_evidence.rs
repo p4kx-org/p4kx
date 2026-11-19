@@ -170,6 +170,43 @@ impl VehicleAggregateEvidence {
 }
 
 impl VehicleImplementation {
+    /// Returns whether the effective Part graph contains a wheel or tread.
+    #[must_use]
+    pub const fn has_rolling_parts(&self) -> bool {
+        self.rolling_parts
+    }
+
+    /// Iterates the document choices and effective Part prefix used by the rolling decision.
+    pub fn rolling_part_selectors(&self) -> impl Iterator<Item = &VehicleXmlSite> {
+        let declarations = &self.declarations;
+        declarations
+            .aggregate
+            .as_ref()
+            .zip(declarations.rolling_documents)
+            .into_iter()
+            .flat_map(|(evidence, end)| evidence.prefix_selectors(end))
+            .chain(
+                declarations
+                    .rolling_parts
+                    .iter()
+                    .flat_map(VehicleAggregateEvidence::selectors),
+            )
+    }
+
+    /// Reports whether all original observations of the rolling decision were retained.
+    #[must_use]
+    pub fn rolling_part_selectors_complete(&self) -> bool {
+        let declarations = &self.declarations;
+        declarations
+            .aggregate
+            .as_ref()
+            .zip(declarations.rolling_documents)
+            .is_some_and(|(evidence, end)| evidence.prefix_complete(end))
+            && declarations
+                .rolling_parts
+                .as_ref()
+                .is_some_and(VehicleAggregateEvidence::has_complete_coordinates)
+    }
     /// Borrows opt-in original aggregate evidence from the actual interpretation.
     /// Publish owned results only after the outer resolution succeeds.
     #[must_use]

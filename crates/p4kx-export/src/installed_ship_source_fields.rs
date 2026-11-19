@@ -13,7 +13,7 @@ use super::{TestResult, wire};
 
 pub(super) struct Wire {
     header: Value,
-    values: [(&'static str, Value); 17],
+    values: [(&'static str, Value); 18],
 }
 
 impl Wire {
@@ -32,6 +32,7 @@ impl Wire {
                     wire(row.attachment_manufacturer())?,
                 ),
                 ("vehicleDefinition", wire(row.vehicle_definition())?),
+                ("vehicleKind", wire(row.vehicle_kind())?),
                 ("size", wire(row.size())?),
                 ("mass", wire(row.mass())?),
                 ("massBasis", wire(row.mass_basis())?),

@@ -587,7 +587,7 @@ its key and has absent translation forms.
 | `vehicleDefinition` | Sourced original String/Enum selector, including whitespace, case, separators and empty values. The Archive reader interprets it for lookup. |
 | `playability` | Sourced `player`, `ai`, `mission` or `special`; see "Playability" below |
 | `variantOf` | The `guid` of the base of the ship's variant group, `null` for a base and an ungrouped ship; see "Variant groups" below |
-| `vehicleKind` | `spaceship` or `groundVehicle`, or `null`; see "Ship base data" below |
+| `vehicleKind` | Sourced `spaceship` or `groundVehicle`, or an absent kind. A readable fallback can carry incomplete source evidence. |
 | `size` | Sourced original `Components/SAttachableComponentParams/AttachDef/Size` as ResourceNumber with explicit absent, null and unreadable states |
 | `mass` | Immediately sourced hull mass in kilograms; use `value` when `state` is present. A positive total rounding to zero stays present. See "Ship base data" below. |
 | `massBasis` | Sourced selection of `parts` or `physics`; present exactly when `mass` is present. |
@@ -653,7 +653,7 @@ own DCB contributions, including when its XML is reused or its GUID or path is s
 
 `cargoScu`, `cargoGridsWithIssue` and `vehicleKind` are interpreted fields.
 The standalone `p4kx ships` output reports detailed sources, thresholds, Loadout and cells.
-`vehicleKind` and the payload of `massBasis` are extensible strings in the schema.
+The payloads of `vehicleKind` and `massBasis` are extensible strings in the schema.
 
 | Field | Rule and source |
 |-------|-----------------|
@@ -661,7 +661,7 @@ The standalone `p4kx ships` output reports detailed sources, thresholds, Loadout
 | `hullHealth` | The sum of the positive `damageMax` of the parts, except parts holding an item port flagged `uneditable` or `invisible`; `null` without a vehicle implementation or when no part states one |
 | `cargoScu` | The sum of the readable capacities of the `CargoGrid` Entities of the default Loadout, including grids flagged `miningOnly` or `invisible`. Docked vehicles and templates are excluded. Open capacity is `x * y * z / 1.953125` from `interiorDimensions`. Closed capacity is normalized to standard cargo units. Zero means the ship has no grid, or the readable grids sum to zero. `null` means the ship has grids and none is readable. See [cargo grid facilities](catalog-ship-facilities.md#cargo-grid-facilities) for capacities and flags per grid. |
 | `cargoGridsWithIssue` | The grids whose capacity cannot be read, e.g. a dangling Reference to the `InventoryContainer`. Above 0, `cargoScu` counts only the readable grids and is a lower bound |
-| `vehicleKind` | `groundVehicle` for a Record under `entities/groundvehicles`, `spaceship` for one under `entities/spaceships` whose vehicle implementation has no wheel (`SubPartWheel`) or tread (`Tread`) part; a missing or unreadable vehicle implementation counts as no wheels, so such a Record under `entities/spaceships` is a `spaceship`. `null` when the evidence disagrees (a wheeled or tracked Record under `entities/spaceships`) or the path names neither folder |
+| `vehicleKind` | `groundVehicle` under `entities/groundvehicles` uses the original Record path. Under `entities/spaceships`, `spaceship` uses the same path and the effective vehicle Parts up to the first wheel (`SubPartWheel`), or the complete Part selection when checking for a tread (`Tread`) after ruling out wheels. The classification is absent for a wheeled or tracked spaceship or any other path. The existing spaceship fallback for unavailable implementations remains present with incomplete evidence. |
 
 LIVE anchors, read by the real-Archive test: Harbinger 230,404 kg, 48,490 hull, 0 SCU; Freelancer
 MAX 341,408 kg, 35,650 hull, 120 SCU; Carrack 3,275,858 kg, 88,000 hull, 456 SCU; Constellation

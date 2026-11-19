@@ -123,7 +123,7 @@ impl<'f> ShipReader<'f> {
             class_name: class_name(tree).to_owned(),
             record_path: tree.record_path().to_owned(),
             implementation: vehicle.map(implementation),
-            vehicle_kind: vehicle_kind(tree.record_path(), vehicle),
+            vehicle_kind: VehicleKindPath::of(tree.record_path()).classify(vehicle),
             size: size(tree),
             mass: aggregate::mass(tree, vehicle, totals.as_ref(), physics_mass),
             hull: vehicle
@@ -172,23 +172,34 @@ fn in_folder(record_path: &str, index: usize) -> bool {
         .is_some_and(|prefix| starts_with_folder(record_path, prefix))
 }
 
-/// Decides the kind from the folder of the record path and the wheels and treads of the vehicle
-/// implementation: a ground vehicle is one in the ground folder, a spaceship one in the spaceship
-/// folder without a wheel or tread; a spaceship folder with wheels or treads is no evidence either
-/// way. The folders are matched like the selection of the `ships` kind matches its prefixes.
-fn vehicle_kind(record_path: &str, vehicle: Option<&VehicleImplementation>) -> Option<VehicleKind> {
-    let rolling = vehicle.is_some_and(|vehicle| {
-        vehicle.wheels().next().is_some() || vehicle.treads().next().is_some()
-    });
-    if in_folder(record_path, GROUND_FOLDER) {
-        Some(VehicleKind::GroundVehicle)
-    } else if in_folder(record_path, SPACESHIP_FOLDER) && !rolling {
-        Some(VehicleKind::Spaceship)
-    } else {
-        None
-    }
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum VehicleKindPath {
+    Ground,
+    Space,
+    Other,
 }
 
+impl VehicleKindPath {
+    pub(crate) fn of(record_path: &str) -> Self {
+        if in_folder(record_path, GROUND_FOLDER) {
+            Self::Ground
+        } else if in_folder(record_path, SPACESHIP_FOLDER) {
+            Self::Space
+        } else {
+            Self::Other
+        }
+    }
+
+    fn classify(self, vehicle: Option<&VehicleImplementation>) -> Option<VehicleKind> {
+        match self {
+            Self::Ground => Some(VehicleKind::GroundVehicle),
+            Self::Space if !vehicle.is_some_and(VehicleImplementation::has_rolling_parts) => {
+                Some(VehicleKind::Spaceship)
+            }
+            Self::Space | Self::Other => None,
+        }
+    }
+}
 fn implementation(vehicle: &VehicleImplementation) -> Implementation {
     Implementation {
         file: vehicle.path().to_owned(),

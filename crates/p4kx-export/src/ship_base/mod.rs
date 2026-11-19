@@ -36,6 +36,7 @@ pub use model::{
     VehicleKind,
 };
 pub use read::ShipReader;
+pub(crate) use read::VehicleKindPath;
 pub use write::ShipBaseError;
 
 /// The version of the ship base data format, raised for a breaking change.

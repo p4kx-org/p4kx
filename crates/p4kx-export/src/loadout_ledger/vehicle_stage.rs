@@ -7,6 +7,7 @@ use crate::catalog_read::original::{
     OriginalDatum, RecordSubject, VehicleCaller, VehicleFileSelection,
 };
 use crate::catalog_v3::authored_fields::ship_source_read::ShipAggregateOperands;
+use crate::ship_base::VehicleKindPath;
 
 /// Per-resolution staging, independent of cache-lifetime file proofs.
 #[derive(Default)]
@@ -17,6 +18,8 @@ pub(super) struct VehicleCapture {
 pub(super) struct PendingVehicle {
     pub(super) subject: RecordSubject,
     pub(super) operands: ShipAggregateOperands,
+    pub(super) kind_path: VehicleKindPath,
+    pub(super) kind_path_origin: FieldOrigin,
     pub(super) files: Vec<VehicleFileSelection>,
     pub(super) selected: Option<SelectedVehicle>,
     pub(super) mass: MetricContributions,
@@ -27,6 +30,7 @@ pub(super) struct PendingVehicle {
 pub(super) struct SelectedVehicle {
     pub(super) caller: VehicleCaller,
     pub(super) membership: Contributions,
+    pub(super) rolling: Option<Contributions>,
     pub(super) unavailable_inputs: bool,
 }
 

@@ -145,6 +145,11 @@ fn project(
     } else {
         None
     };
+    let rolling_documents = if totals_observed {
+        aggregate.as_ref().map(VehicleAggregateEvidence::checkpoint)
+    } else {
+        None
+    };
     let totals = if totals_observed {
         aggregate.as_mut()
     } else {
@@ -158,6 +163,8 @@ fn project(
             totals_observed,
             port_documents,
             port_parts: parts.selectors,
+            rolling_documents,
+            rolling_parts: parts.rolling_selectors,
             base: physical,
             patch: modified.patch_origin,
         },
@@ -169,6 +176,7 @@ fn project(
         name: root.attribute("name").unwrap_or_default().to_owned(),
         port_paths: parts.paths,
         parts: parts.parts,
+        rolling_parts: parts.rolling_parts,
         issues,
     }
 }

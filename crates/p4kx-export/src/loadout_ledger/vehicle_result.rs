@@ -9,11 +9,12 @@ use super::Capture;
 use super::vehicle_capture;
 use super::vehicle_stage::{Contributions, PendingVehicle};
 use crate::catalog_read::original::{EntryCapture, RecordSubjectKey, VehicleFileSelection};
-use crate::ship_base::ShipRead;
-use crate::{CatalogError, ExportAccountingError, MassBasis};
+use crate::ship_base::{ShipRead, VehicleKindPath};
+use crate::{CatalogError, ExportAccountingError, MassBasis, VehicleKind};
 
 /// The actual `ShipReader` aggregates and their immediate source sets.
 pub(crate) struct ShipAggregateValues {
+    pub(crate) vehicle_kind: SourcedValue<VehicleKind>,
     pub(crate) mass: SourcedValue<f64>,
     pub(crate) mass_basis: SourcedValue<MassBasis>,
     pub(crate) hull_health: SourcedValue<f64>,
@@ -75,7 +76,16 @@ fn bind_values(
     physics_used: bool,
 ) -> Result<ShipAggregateValues, CatalogError> {
     let uses = capture.source_uses();
-    let common = common_origin(pending, capture, archive)?;
+    let selected_inputs = vehicle_inputs(pending, capture, archive)?;
+    let membership = pending
+        .selected
+        .as_ref()
+        .map(|selected| selected.membership.origin(uses));
+    let common = uses.origin_with_origins(
+        std::iter::once(&selected_inputs).chain(membership.as_ref()),
+        true,
+    )?;
+    let vehicle_kind = bind_kind(pending, read, uses, &selected_inputs)?;
     let mass_choice = pending.mass.choice.origin(uses);
     let hull_values = pending.hull.value.origin(uses);
     let mass = bind_mass(pending, read, uses, &common, &mass_choice, physics_used)?;
@@ -99,11 +109,39 @@ fn bind_values(
         &[&common, &hull_values],
     )?;
     Ok(ShipAggregateValues {
+        vehicle_kind,
         mass,
         mass_basis,
         hull_health,
         physics_used,
     })
+}
+
+fn bind_kind(
+    pending: &PendingVehicle,
+    read: &ShipRead,
+    uses: &SourceUses,
+    selected_inputs: &FieldOrigin,
+) -> Result<SourcedValue<VehicleKind>, CatalogError> {
+    if VehicleKindPath::of(&read.base.record_path) != pending.kind_path {
+        return Err(ExportAccountingError::ConflictingSourceDatum.into());
+    }
+    let value = read
+        .base
+        .vehicle_kind
+        .map_or(SourceValue::Absent, SourceValue::Present);
+    let path = &pending.kind_path_origin;
+    if pending.kind_path != VehicleKindPath::Space {
+        return Ok(uses.value_with_origins(value, &[path])?);
+    }
+    let rolling = pending
+        .selected
+        .as_ref()
+        .and_then(|selected| selected.rolling.as_ref())
+        .map(|proof| proof.origin(uses));
+    let mut origins = vec![path, selected_inputs];
+    origins.extend(rolling.as_ref());
+    Ok(uses.value_with_origins(value, &origins)?)
 }
 
 fn bind_mass(
@@ -145,7 +183,7 @@ fn bind_mass(
     }
 }
 
-fn common_origin(
+fn vehicle_inputs(
     pending: &PendingVehicle,
     capture: &EntryCapture<'_>,
     archive: &Archive,
@@ -190,11 +228,7 @@ fn common_origin(
         origins.extend([&caller, operands.modification.origin()]);
         complete &= vehicle_capture::known(&operands.modification);
     }
-    let membership;
-    if let Some(selected) = &pending.selected {
-        membership = selected.membership.origin(uses);
-        origins.push(&membership);
-    } else if !known_empty_vehicle(pending) {
+    if pending.selected.is_none() && !known_empty_vehicle(pending) {
         complete = false;
     }
     Ok(uses.origin_with_origins(origins, complete)?)

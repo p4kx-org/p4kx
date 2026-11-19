@@ -350,3 +350,6 @@ mod source_selection_sdk;
 
 #[path = "catalog_ship_source_texts_sdk.rs"]
 mod source_texts_sdk;
+
+#[path = "catalog_ship_vehicle_kind_sources.rs"]
+mod vehicle_kind;

@@ -21,8 +21,8 @@ pub(super) fn check_vehicle<'source>(
     let guid = selection.tree.guid().to_string();
     assert!(
         rows(catalog, "/ships")?.iter().any(|ship| {
-            ship.get("guid").and_then(Value::as_str) == Some(guid.as_str())
-                && ship.get("vehicleKind").and_then(Value::as_str) == Some(category)
+            ship.pointer("/guid/value").and_then(Value::as_str) == Some(guid.as_str())
+                && ship.pointer("/vehicleKind/value").and_then(Value::as_str) == Some(category)
         }),
         "selected source is the expected vehicle category"
     );
