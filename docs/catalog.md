@@ -2100,10 +2100,11 @@ Shared external containers keep each independent use. [ADR-0163](adr/0163-the-st
 `missing_containers` and `unreadable_containers` count references, so a single external target
 named by ten Children contributes ten occurrences. `malformed_children` counts affected Child
 occurrences. A required target with a complete supported
-lookup and no candidate has `targetStatus.value` of `notFound`. Its original Child and lookup
-evidence remain in `placements.unresolvedContainerLinks` in a diagnostic partial Catalog.
-Missing, ambiguous and unreadable required targets block normal publication. The rendered
-`CatalogSummary::starmap_report()` keeps up to 300 container lines and 300 issue lines per star
+lookup and no candidate has `targetStatus.value` of `notFound`. Normal publication retains the
+original Child and lookup evidence in `placements.unresolvedContainerLinks`. Starmap, Loot
+Containers and Harvestable Locations each report a warning when they depend on the verified
+lookup. Unsupported, ambiguous and unreadable required targets block normal publication. The
+rendered `CatalogSummary::starmap_report()` keeps up to 300 container lines and 300 issue lines per star
 system, each up to 300 characters. [Catalog export health](catalog-export-health.md)
 **Rotation order.** `rot` is read as `w,x,y,z`. The raw values of LIVE settle it: the identity occurs as
 `1,0,0,0`, the rotations of the Nyx ring segments are `a,0,0,b` (about the z axis, the axis of the

@@ -7,7 +7,10 @@ use std::fs;
 use p4kx_export::{
     CatalogError, CatalogFile, Compression, build_catalog_from, catalog_schema, write_catalog_from,
 };
-use p4kx_testkit::{TestContainer, TestElement, TestEntry};
+use p4kx_testkit::{
+    DataForgeBuilder, TestContainer, TestElement, TestEntry, TestRecord, TestStruct, TestType,
+    TestValue,
+};
 use serde_json::{Value, json};
 
 use crate::health_origin_assertions as proof;
@@ -16,6 +19,9 @@ use crate::health_origin_fixture::{self as fixture, Fixture, Input, TestResult};
 
 const ROOT: &str = "Data/ObjectContainers/PU/system/synthetic/syntheticsystem.socpak";
 const TARGET: &str = "Data/ObjectContainers/PU/synthetic/absent.socpak";
+const PRESET_GUID: u128 = 0x5713;
+const PRESET_TYPE: &str = "HarvestableProviderPreset";
+const ENTRY_CONSUMERS: [&str; 3] = ["starmapObjects", "harvestableLocations", "lootContainers"];
 
 #[test]
 fn a_proved_missing_child_is_published_with_original_proof_and_warning() -> TestResult {
@@ -58,34 +64,40 @@ fn an_unsupported_child_still_prevents_publication_beside_a_proved_absence() -> 
     proof::present(proved, "targetStatus", &json!("notFound"), Some(true))?;
     assert_eq!(unsupported["targetStatus"]["value"], "unsupportedSelector");
     assert_eq!(unsupported["targetStatus"]["sourceSetComplete"], false);
-    assert_eq!(
-        entries::failure(&catalog, "starmapObjects", "enumeration")?.len(),
-        1
-    );
+    for kind in ENTRY_CONSUMERS {
+        assert_eq!(
+            entries::failure(&catalog, kind, "enumeration")?.len(),
+            1,
+            "{kind} retains the unsupported selector as a failed lookup"
+        );
+    }
     verify_absence_warning(&catalog)?;
     verify_writer_refusal(&source, previous.json())
 }
 
 fn verify_absence_warning(catalog: &Value) -> TestResult {
     let diagnostics = proof::rows(catalog, "/exportHealth/diagnostics")?;
-    let findings: Vec<_> = diagnostics
-        .iter()
-        .filter(|diagnostic| {
-            diagnostic["kind"] == "starmapObjects"
-                && diagnostic["code"] == "verifiedMissingReference"
-        })
-        .collect();
-    let [warning] = findings.as_slice() else {
-        return Err("one verified Starmap absence warning".into());
-    };
-    assert_eq!(
-        warning["severity"], "warning",
-        "verified absence is a warning"
-    );
-    assert_eq!(
-        warning["countUnit"], "entryOperations",
-        "the warning counts directory lookups"
-    );
+    for kind in ENTRY_CONSUMERS {
+        let findings: Vec<_> = diagnostics
+            .iter()
+            .filter(|diagnostic| {
+                diagnostic["kind"] == kind && diagnostic["code"] == "verifiedMissingReference"
+            })
+            .collect();
+        let [warning] = findings.as_slice() else {
+            return Err(format!("one verified absence warning for {kind}").into());
+        };
+        assert_eq!(warning["severity"], "warning", "{kind} verified absence");
+        assert_eq!(
+            warning["sourceRole"], "dependency",
+            "{kind} depends on the original Starmap lookup"
+        );
+        assert_eq!(
+            warning["countUnit"], "entryOperations",
+            "{kind} counts directory lookups"
+        );
+        assert_eq!(warning["count"], 1, "{kind} counts the lookup once");
+    }
     Ok(())
 }
 
@@ -108,10 +120,36 @@ fn source(targets: &[&str]) -> TestResult<Fixture> {
         .entry(TestEntry::stored("syntheticsystem.xml", xml.into_bytes()))
         .build();
     Fixture::open(
-        &fixture::empty_database(),
+        &provider_database(),
         Input::Plain,
         vec![TestEntry::stored(ROOT, container).encrypted()],
     )
+}
+
+fn provider_database() -> Vec<u8> {
+    DataForgeBuilder::new()
+        .version(8)
+        .structure(TestStruct::new("HarvestableElementGroup"))
+        .structure(TestStruct::new("HarvestableAreaPreset"))
+        .structure(
+            TestStruct::new(PRESET_TYPE)
+                .array(
+                    "harvestableGroups",
+                    TestType::Class("HarvestableElementGroup".to_owned()),
+                )
+                .array("areas", TestType::Class("HarvestableAreaPreset".to_owned())),
+        )
+        .record(
+            TestRecord::new(
+                PRESET_GUID,
+                PRESET_TYPE,
+                "HarvestableProviderPreset.Synthetic",
+                "libs/foundry/records/harvestable/providerpresets/synthetic.xml",
+            )
+            .value("harvestableGroups", TestValue::Array(Vec::new()))
+            .value("areas", TestValue::Array(Vec::new())),
+        )
+        .build()
 }
 
 fn verify_original_row(catalog: &Value) -> TestResult {
@@ -161,11 +199,12 @@ fn verify_original_row(catalog: &Value) -> TestResult {
     );
     verify_parent(catalog, row)?;
 
-    let failures = entries::failure(catalog, "starmapObjects", "enumeration")?;
-    assert!(
-        failures.is_empty(),
-        "a verified absence is accounted for by its published row and warning"
-    );
+    for kind in ENTRY_CONSUMERS {
+        assert!(
+            entries::failure(catalog, kind, "enumeration")?.is_empty(),
+            "{kind} accounts for verified absence with the published row and warning"
+        );
+    }
     let attributes = proof::rows(row, "/declaration/attributes")?;
     assert!(
         attributes.iter().any(|attribute| {

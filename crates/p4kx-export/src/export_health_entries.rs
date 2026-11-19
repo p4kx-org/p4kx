@@ -107,12 +107,15 @@ fn check_verified_missing(source: &ArchiveEntryObservation) -> Result<(), Export
     if source.disposition != SourceDisposition::VerifiedMissingReference {
         return Ok(());
     }
+    let allowed_scope = matches!(
+        (source.kind, source.role),
+        (
+            Kind::StarmapObjects | Kind::LootContainers,
+            ExportSourceRole::Dependency | ExportSourceRole::DerivedInput,
+        ) | (Kind::HarvestableLocations, ExportSourceRole::Dependency)
+    );
     if source.operation == EntryOperation::Enumeration
-        && matches!(source.kind, Kind::StarmapObjects | Kind::LootContainers)
-        && matches!(
-            source.role,
-            ExportSourceRole::Dependency | ExportSourceRole::DerivedInput
-        )
+        && allowed_scope
         && source.entry_index.is_none()
         && source.container_entry_index.is_none()
     {
