@@ -27,7 +27,7 @@ fn malformed_inventory_diagnostics_appear_in_both_catalog_outcomes() -> TestResu
         ] {
             let fixture = makers().entry(TestEntry::stored(
                 "Data/Scripts/ShopInventories/Inv_Fixture_Orphan.json",
-                b"",
+                b"{",
             ));
             let (_dir, mut model, out) = opened(&fixture)?;
             model.set_language(language);

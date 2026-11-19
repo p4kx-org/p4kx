@@ -121,7 +121,7 @@ mod tests {
             lines.iter().any(|line| line.contains(
                 "kind=shopInventories stage=Projection severity=Error code=MalformedSource role=Some(DerivedInput) warning=- count=2 unit=EntryOperations"
             )),
-            "the existing health aggregate retains severity and counts both malformed files"
+            "the health aggregate counts malformed files and excludes the verified empty file"
         );
         assert!(
             lines.iter().any(|line| line.ends_with(
@@ -181,6 +181,10 @@ mod tests {
             .entry(TestEntry::stored(
                 "Data/Scripts/ShopInventories/private-malformed.json",
                 "{",
+            ))
+            .entry(TestEntry::stored(
+                "Data/Scripts/ShopInventories/private-invalid.json",
+                "]",
             ))
             .entry(
                 TestEntry::stored(
