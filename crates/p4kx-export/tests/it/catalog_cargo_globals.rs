@@ -16,6 +16,8 @@ use crate::health_origin_assertions as proof;
 
 #[path = "catalog_cargo_globals_fixture.rs"]
 mod fixture;
+#[path = "catalog_cargo_globals_sdk.rs"]
+mod sdk;
 
 const LOADING_ROWS: &str = "/configurations/cargoLoadingGlobals/rows";
 const SHOP_ROWS: &str = "/configurations/shopCommodityGlobals/rows";

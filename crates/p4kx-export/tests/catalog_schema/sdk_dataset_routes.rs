@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_export::StarmapTraversalBudget;
+use p4kx_export::catalog_queries::equipment::cargo_globals;
 use p4kx_export::catalog_queries::equipment::{
     with_ammo_definitions, with_weapon_recoil_definitions,
 };
@@ -21,8 +22,9 @@ use p4kx_testkit::{
 };
 
 use super::{
-    AMMUNITION, CONTAINERS, FLARE_LIBRARIES, LANGUAGE_SOURCES, LOCATION_ENTITIES, RADAR_AUDIO,
-    Route, SHOP_INVENTORIES, TestResult, UNRESOLVED, WEAPON_RECOIL,
+    AMMUNITION, CARGO_LOADING_GLOBALS, CONTAINERS, FLARE_LIBRARIES, LANGUAGE_SOURCES,
+    LOCATION_ENTITIES, RADAR_AUDIO, Route, SHOP_COMMODITY_GLOBALS, SHOP_INVENTORIES, TestResult,
+    UNRESOLVED, WEAPON_RECOIL,
 };
 
 #[path = "sdk_blueprint_physical_routes.rs"]
@@ -112,6 +114,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
     routes.push(vehicle_armor::read()?);
     routes.extend(resource_network::read()?);
     routes.extend(fuel::read()?);
+    routes.extend(read_cargo_globals(&archive)?);
     routes.push(mineable_entity::read()?);
     routes.push(planet_resource::read()?);
     routes.extend(component_tools::read()?);
@@ -157,6 +160,20 @@ fn read_radar_configuration(archive: &Archive) -> TestResult<Route> {
         &snapshot.rows,
         "physical configuration query available; installed producer parity open",
     )
+}
+
+fn read_cargo_globals(archive: &Archive) -> TestResult<[Route; 2]> {
+    const REMAINING: &str =
+        "installed cargo loading and shop commodity producer parity remains open";
+    let selection = CatalogRecordSelection::All;
+    Ok([
+        cargo_globals::with_cargo_loading_globals(archive, selection, None, |snapshot| {
+            Route::queried_rows(CARGO_LOADING_GLOBALS, snapshot.rows(), REMAINING)
+        })??,
+        cargo_globals::with_shop_commodity_globals(archive, selection, None, |snapshot| {
+            Route::queried_rows(SHOP_COMMODITY_GLOBALS, snapshot.rows(), REMAINING)
+        })??,
+    ])
 }
 
 fn read_language_sources(archive: &Archive) -> TestResult<Route> {
@@ -235,6 +252,20 @@ fn fixture() -> TestResult<(tempfile::TempDir, Archive)> {
             "LocationEntityDeclaration",
             "LocationEntityDeclaration.Fixture",
             "libs/foundry/records/fixture/location_entity.xml",
+        ))
+        .structure(TestStruct::new("GlobalCargoLoadingParams"))
+        .record(TestRecord::new(
+            4,
+            "GlobalCargoLoadingParams",
+            "GlobalCargoLoadingParams.Fixture",
+            "libs/foundry/records/fixture/cargo_loading.xml",
+        ))
+        .structure(TestStruct::new("GlobalShopCommodityParams"))
+        .record(TestRecord::new(
+            5,
+            "GlobalShopCommodityParams",
+            "GlobalShopCommodityParams.Fixture",
+            "libs/foundry/records/fixture/shop_commodity.xml",
         ));
     let folder = tempfile::tempdir()?;
     let path = folder.path().join("sdk_routes.p4k");

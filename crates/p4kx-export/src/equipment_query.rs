@@ -8,6 +8,10 @@ mod component_query;
 #[path = "equipment_dependency_coverage.rs"]
 mod dependency_coverage;
 
+/// Selective reads of authored cargo loading times and shop commodity fees.
+#[path = "equipment_cargo_globals_query.rs"]
+pub mod cargo_globals;
+
 /// Canonical definitions referenced by consumable, mining and armor components.
 #[path = "equipment_component_definitions.rs"]
 pub mod component_definitions;

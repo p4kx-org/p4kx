@@ -1171,6 +1171,22 @@ rejected before a dependency body read.
 This query covers authored configuration and the reached inventory definition. Installed ship
 totals and `placements.facilityInstances` use the global Loadout order and a separate projection.
 
+## Cargo loading and shop fees
+
+Use `equipment::cargo_globals::with_cargo_loading_globals` and
+`with_shop_commodity_globals` for
+`configurations.cargoLoadingGlobals` and `configurations.shopCommodityGlobals`.
+Both have a decoded-Entry `_from` form and equivalent session and parsed-view methods.
+Select all rows, a GUID with all its physical occurrences, or a physical Record index.
+The rows use canonical GUID order with physical Record index as the tie-breaker.
+
+Both queries share the Catalog's authored projection. Typed getters return sourced exact Float32
+times, signed Int32 fees, SCU-keyed box cells and the retained original fields outside the typed
+projection. Resolve each cell's source references within the snapshot's own inventory. The queries
+read selected DataForge bodies without localizing values or opening Loadouts. Check availability
+and coverage separately. Publish consumer-owned changes after outer query success and after
+checking the required coverage. [Cargo loading contract](catalog-cargo-loading.md).
+
 ## Verify dataset coverage
 
 The SDK coverage audit checks canonical dataset boundaries against calls to the public typed

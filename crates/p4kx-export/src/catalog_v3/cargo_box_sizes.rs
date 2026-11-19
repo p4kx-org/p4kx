@@ -65,13 +65,31 @@ const BOX_SIZES: [BoxSize; 10] = [
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(rename = "CargoBoxSizesOf{T}", transform = every_field_required)]
-pub(super) struct CargoBoxSizes<'source, T> {
+pub struct CargoBoxSizes<'source, T> {
     source_type: SourcedValue<&'source str>,
     by_scu: BTreeMap<&'static str, SourcedValue<T>>,
     additional_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source, T> CargoBoxSizes<'source, T> {
+    /// Borrows the original Class type.
+    #[must_use]
+    pub const fn source_type(&self) -> &SourcedValue<&'source str> {
+        &self.source_type
+    }
+
+    /// Borrows the sourced cells keyed by exact decimal SCU size.
+    #[must_use]
+    pub const fn by_scu(&self) -> &BTreeMap<&'static str, SourcedValue<T>> {
+        &self.by_scu
+    }
+
+    /// Borrows original members outside the typed cells.
+    #[must_use]
+    pub const fn additional_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.additional_fields
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

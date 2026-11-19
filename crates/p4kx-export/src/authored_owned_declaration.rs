@@ -36,6 +36,10 @@ impl ClassShape {
 }
 
 impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> {
+    pub(in crate::catalog_v3) fn retained_values_complete(&self) -> bool {
+        source_value_catalog::retained_values_complete(self.originals)
+    }
+
     pub(in crate::catalog_v3) fn declared_class<T>(
         &self,
         name: &str,

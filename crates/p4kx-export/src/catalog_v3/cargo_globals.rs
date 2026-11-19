@@ -10,6 +10,7 @@ use super::prepared_definition::PreparedDefinition;
 use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_number_capture::CapturedNumber;
 use crate::catalog_projection::CatalogProjection;
+use crate::catalog_read::scoped_source_read::ScopedSourceRead;
 use crate::catalog_table::CatalogTable;
 use crate::picked::Picked;
 use crate::record_observation::RecordObservation;
@@ -20,10 +21,12 @@ use crate::source_fields::FieldError;
 use crate::source_value_catalog::SourceArenaOutput;
 use crate::{CatalogError, ExportAccountingError, Kind};
 
+#[path = "cargo_global_accessors.rs"]
+mod accessors;
 #[path = "cargo_box_sizes.rs"]
 mod cargo_box_sizes;
 
-use cargo_box_sizes::CargoBoxSizes;
+pub use cargo_box_sizes::CargoBoxSizes;
 
 const LOADING_TYPE: &str = "GlobalCargoLoadingParams";
 const SHOP_TYPE: &str = "GlobalShopCommodityParams";
@@ -51,7 +54,7 @@ const BOX_PRICES: &str = "autoLoadingBoxSizePrices";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct CargoLoadingGlobal<'source> {
+pub struct CargoLoadingGlobal<'source> {
     #[serde(flatten)]
     source: CanonicalRecordHeader<'source>,
     auto_loading_base_loading_time: SourcedValue<ResourceFloat32>,
@@ -104,7 +107,7 @@ impl<'source> CargoLoadingGlobal<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ShopCommodityGlobal<'source> {
+pub struct ShopCommodityGlobal<'source> {
     #[serde(flatten)]
     source: CanonicalRecordHeader<'source>,
     auto_loading_base_price: SourcedValue<i32>,
@@ -183,29 +186,81 @@ pub(crate) fn read<'source>(
     admission: &RecordObservation<'_, 'source>,
     cancel: Option<&CancelToken>,
 ) -> Result<(Picked<'source>, Vec<FieldError>), CatalogError> {
-    match (kind, tree.type_name()) {
-        (Kind::CargoLoadingGlobals, LOADING_TYPE) => {
-            let (row, notes) = PreparedDefinition::read(
-                tree,
-                projection,
-                admission,
-                cancel,
-                |source, fields, _, notes| CargoLoadingGlobal::project(source, fields, notes),
-            )?;
-            Ok((Picked::CargoLoadingGlobal(Box::new(row)), notes))
+    match kind {
+        Kind::CargoLoadingGlobals => {
+            let read = read_loading(tree, projection, admission, cancel)?;
+            Ok((Picked::CargoLoadingGlobal(Box::new(read.value)), read.notes))
         }
-        (Kind::ShopCommodityGlobals, SHOP_TYPE) => {
-            let (row, notes) = PreparedDefinition::read(
-                tree,
-                projection,
-                admission,
-                cancel,
-                |source, fields, _, notes| ShopCommodityGlobal::project(source, fields, notes),
-            )?;
-            Ok((Picked::ShopCommodityGlobal(Box::new(row)), notes))
+        Kind::ShopCommodityGlobals => {
+            let read = read_shop(tree, projection, admission, cancel)?;
+            Ok((
+                Picked::ShopCommodityGlobal(Box::new(read.value)),
+                read.notes,
+            ))
         }
         _ => Err(ExportAccountingError::ConflictingSourceDatum.into()),
     }
+}
+
+pub(crate) fn read_loading<'source>(
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    cancel: Option<&CancelToken>,
+) -> Result<ScopedSourceRead<PreparedCargoLoadingGlobal<'source>>, CatalogError> {
+    read_configuration(
+        tree,
+        projection,
+        admission,
+        cancel,
+        LOADING_TYPE,
+        CargoLoadingGlobal::project,
+    )
+}
+
+pub(crate) fn read_shop<'source>(
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    cancel: Option<&CancelToken>,
+) -> Result<ScopedSourceRead<PreparedShopCommodityGlobal<'source>>, CatalogError> {
+    read_configuration(
+        tree,
+        projection,
+        admission,
+        cancel,
+        SHOP_TYPE,
+        ShopCommodityGlobal::project,
+    )
+}
+
+fn read_configuration<'source, Row>(
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    cancel: Option<&CancelToken>,
+    source_type: &str,
+    project: impl FnOnce(
+        CanonicalRecordHeader<'source>,
+        Observed<'_, '_, '_, 'source>,
+        &mut Vec<FieldError>,
+    ) -> Result<Row, CatalogError>,
+) -> Result<ScopedSourceRead<PreparedDefinition<'source, Row>>, CatalogError> {
+    if tree.type_name() != source_type {
+        return Err(ExportAccountingError::ConflictingSourceDatum.into());
+    }
+    let mut complete = false;
+    let (row, notes) = PreparedDefinition::read(
+        tree,
+        projection,
+        admission,
+        cancel,
+        |source, fields, _, notes| {
+            complete = fields.retained_values_complete();
+            project(source, fields, notes)
+        },
+    )?;
+    Ok(ScopedSourceRead::new(row, notes, complete))
 }
 
 pub(crate) fn kind_for_type(type_name: &str) -> Option<Kind> {
