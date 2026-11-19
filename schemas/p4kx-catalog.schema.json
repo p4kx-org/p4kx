@@ -6087,7 +6087,7 @@
       "oneOf": [
         {
           "const": "normal",
-          "description": "Publishes only a successfully read and projected catalog without source warnings.",
+          "description": "Publishes a catalog whose required operations have no blocking diagnostics.",
           "type": "string"
         },
         {
@@ -16189,6 +16189,10 @@
           "value": "danglingReference"
         },
         {
+          "description": "A complete authored container lookup found no matching target.",
+          "value": "verifiedMissingReference"
+        },
+        {
           "description": "A weak pointer identifies an instance outside its original owner.",
           "value": "outsideOwner"
         },
@@ -16284,7 +16288,7 @@
         },
         {
           "const": "warning",
-          "description": "A source warning that makes the export incomplete.",
+          "description": "A source warning evaluated by the diagnostic's publication policy.",
           "type": "string"
         },
         {
@@ -16545,12 +16549,12 @@
       "oneOf": [
         {
           "const": "complete",
-          "description": "No source read, projection or source warning makes the result incomplete.",
+          "description": "No required operation or diagnostic blocks publication.",
           "type": "string"
         },
         {
           "const": "incomplete",
-          "description": "At least one required operation failed or produced a source warning.",
+          "description": "A required operation or diagnostic blocks publication.",
           "type": "string"
         }
       ],

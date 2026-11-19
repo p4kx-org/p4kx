@@ -12,6 +12,8 @@ use crate::{CatalogError, ExportAccountingError};
 pub(crate) enum SourceDisposition {
     /// A canonical read and typed projection completed, including zero-row projections.
     Projected,
+    /// A complete authored lookup established the absence of its target.
+    VerifiedMissingReference,
     /// A documented policy excluded the Record before a canonical read.
     SkippedBeforeRead,
     /// A documented policy excluded the Record after a successful canonical read.

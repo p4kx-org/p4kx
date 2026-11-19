@@ -213,6 +213,10 @@ fields. Local positions and rotations remain exact raw attributes; no world pose
 
 Availability describes only the reached family: available when a matching document was observed,
 absent after a successful reached-scope inspection with none, or unavailable when failed sources
-prevent establishing absence. Normal Health refusal remains unchanged. The existing Loot
-convenience projection still uses the first document-wide path/config pair and does not establish
+prevent establishing absence. A complete supported lookup with zero candidates produces a
+nonblocking `verifiedMissingReference` warning when it comes from the selected, readable original
+attribute and its retained lookup row. Its `notFound` status, source evidence and empty candidates
+remain in the normal catalog. Unreadable bytes, incomplete evidence and competing selectors still
+block publication when they prevent a required lookup. The Loot convenience projection uses the
+first document-wide path/config pair and does not establish
 per-Entity pairing. The new source carrier exposes that limitation; it does not fix it implicitly.

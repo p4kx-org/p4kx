@@ -182,6 +182,48 @@ impl UnresolvedChild {
         }))
     }
 
+    pub(crate) fn proves_missing_target(
+        &self,
+        archive: &Archive,
+        selector: &AuthoredEntryPath,
+        candidates: &[usize],
+    ) -> bool {
+        matches!(
+            self.target_status(archive, selector, candidates),
+            ContainerTargetStatus::NotFound
+        )
+    }
+
+    fn complete_source(&self, archive: &Archive, selector: &AuthoredEntryPath) -> bool {
+        self.directory.is_some()
+            && crate::export_archive_health::inventory(archive).is_none()
+            && self.child_node_index.origin().source_set_complete()
+            && self.declared_path.origin().source_set_complete()
+            && self
+                .declared_path
+                .value()
+                .is_some_and(|path| path.as_str() == selector.as_str())
+    }
+
+    fn target_status(
+        &self,
+        archive: &Archive,
+        selector: &AuthoredEntryPath,
+        candidates: &[usize],
+    ) -> ContainerTargetStatus {
+        match candidates {
+            [] | [_] if !self.complete_source(archive, selector) => {
+                ContainerTargetStatus::IncompleteDirectory
+            }
+            [] if ChildContainerPath::new(selector.as_str()).is_none() => {
+                ContainerTargetStatus::UnsupportedSelector
+            }
+            [] => ContainerTargetStatus::NotFound,
+            [_] => ContainerTargetStatus::Resolved,
+            _ => ContainerTargetStatus::Ambiguous,
+        }
+    }
+
     fn serialize_shared<S: Serializer>(
         value: &Arc<Self>,
         serializer: S,
@@ -259,19 +301,10 @@ impl UnresolvedOccurrence<'_> {
         index: &Index<'_>,
         capture: &EntryCapture<'_>,
     ) -> Result<Targets, CatalogError> {
-        let directory_complete = self.declaration.directory.is_some()
-            && crate::export_archive_health::inventory(archive).is_none();
-        let path = self.selector.as_str();
-        let entries = index.candidates(path);
-        let status = match entries {
-            [] | [_] if !directory_complete => ContainerTargetStatus::IncompleteDirectory,
-            [] if ChildContainerPath::new(path).is_none() => {
-                ContainerTargetStatus::UnsupportedSelector
-            }
-            [] => ContainerTargetStatus::NotFound,
-            [_] => ContainerTargetStatus::Resolved,
-            _ => ContainerTargetStatus::Ambiguous,
-        };
+        let entries = index.candidates(self.selector.as_str());
+        let status = self
+            .declaration
+            .target_status(archive, self.selector, entries);
         let sources = capture.source_uses();
         let (mut inputs, complete) = self.selector.selector_inputs()?;
         inputs.extend(self.declaration.directory.iter().cloned());
@@ -280,7 +313,7 @@ impl UnresolvedOccurrence<'_> {
         let candidates =
             target_candidates(archive, index, capture, entries, &shared, &mut read_inputs)?;
         let lookup_complete = complete
-            && directory_complete
+            && self.declaration.complete_source(archive, self.selector)
             && !matches!(status, ContainerTargetStatus::UnsupportedSelector);
         Ok(Targets {
             read_status: sources.value(

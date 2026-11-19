@@ -15,6 +15,13 @@ uses `--diagnostic-partial` in the CLI or the separate diagnostic action in the 
 The resulting file records `publicationMode: "diagnosticPartial"` and its actual health. A
 successful write does not turn an incomplete diagnostic result into a healthy snapshot.
 
+A source-bound Starmap Child or Loot entity container selector can establish `notFound` when the
+supported lookup has complete directory evidence and zero candidates. Normal export retains the
+original reference, empty candidate set and contributing source uses. Its
+`verifiedMissingReference` warning counts the verified lookup without failing publication.
+The warning does not certify that the game can load the missing content. Recovered directories,
+unsupported selectors, failed reads and any other unproved lookup keep their blocking outcomes.
+
 | Field | Meaning |
 |---|---|
 | `status` | `complete` or `incomplete`, considering all blocking diagnostics |

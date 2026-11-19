@@ -146,6 +146,26 @@ fn an_overlong_entity_source_cannot_publish_its_valid_prefix() -> TestResult {
 }
 
 #[test]
+fn a_checksum_mismatch_cannot_supply_an_authored_selector() -> TestResult {
+    let xml = r#"<Entity objectContainer="next.socpak"/>"#;
+    let entry = TestEntry::stored("entdata/damaged.entxml", xml).with_crc32(0);
+    let (_folder, archive) = opened(&TestContainer::new().entry(entry))?;
+    let read = crate::catalog_read::original::with_entry_capture(&archive, |capture| {
+        super::read(&archive, 0, None, capture)
+    })?;
+    assert!(
+        read.links.is_empty(),
+        "a corrupt payload supplies no selector"
+    );
+    assert_eq!(read.unreadable, Some(Unreadable::EntityFile));
+    let [_, source] = read.ledger.entries.as_slice() else {
+        return Err("outer container and the failed Entity source".into());
+    };
+    assert_eq!(source.disposition, SourceDisposition::ReadFailed);
+    Ok(())
+}
+
+#[test]
 fn duplicate_paths_preserve_distinct_physical_entry_indices() -> TestResult {
     let container = TestContainer::new()
         .entry(TestEntry::stored("entdata/same.entxml", "<Entity/>"))

@@ -9,7 +9,7 @@ use crate::export_diagnostic::{
     ExportDiagnosticCode, ExportDiagnosticSeverity, ExportDiagnosticStage, ExportDiagnosticUnit,
     ExportSourceRole,
 };
-use crate::export_entry_ledger::ArchiveEntryObservation;
+use crate::export_entry_ledger::{ArchiveEntryObservation, EntryOperation};
 use crate::export_health::ExportSourceCounts;
 use crate::export_ledger::{ExportAccountingError, SourceDisposition};
 use crate::health_diagnostic_observation::DiagnosticObservation as ExportDiagnostic;
@@ -27,6 +27,7 @@ pub(crate) fn compile(
 ) -> Result<Entries, ExportAccountingError> {
     let mut unique = BTreeMap::new();
     for source in observations {
+        check_verified_missing(&source)?;
         let key = (
             source.kind.index(),
             source.entry_index,
@@ -40,12 +41,7 @@ pub(crate) fn compile(
                 entry.insert(source);
             }
             std::collections::btree_map::Entry::Occupied(mut entry) => {
-                if entry.get() != &source {
-                    return Err(ExportAccountingError::ConflictingDisposition {
-                        kind: Some(source.kind),
-                    });
-                }
-                entry.get_mut().merge(&source)?;
+                merge_occurrences(entry.get_mut(), source)?;
             }
         }
     }
@@ -55,7 +51,7 @@ pub(crate) fn compile(
         .filter(|source| source.disposition.failed())
         .map(failure)
         .collect();
-    let diagnostics = failed
+    let mut diagnostics: Vec<_> = failed
         .iter()
         .map(|failure| ExportDiagnostic {
             kind: Some(failure.source.kind),
@@ -69,11 +65,78 @@ pub(crate) fn compile(
             examples: Vec::new(),
         })
         .collect();
+    diagnostics.extend(
+        sources
+            .iter()
+            .filter(|source| source.disposition == SourceDisposition::VerifiedMissingReference)
+            .map(missing_reference_warning),
+    );
     Ok(Entries {
         sources,
         failed,
         diagnostics,
     })
+}
+
+fn merge_occurrences(
+    prior: &mut ArchiveEntryObservation,
+    mut current: ArchiveEntryObservation,
+) -> Result<(), ExportAccountingError> {
+    use SourceDisposition::{ReadFailed, VerifiedMissingReference};
+
+    match (prior.disposition, current.disposition) {
+        (VerifiedMissingReference, ReadFailed) => {
+            prior.disposition = ReadFailed;
+            prior.diagnosis = current.diagnosis.clone();
+        }
+        (ReadFailed, VerifiedMissingReference) => {
+            current.disposition = ReadFailed;
+            current.diagnosis = prior.diagnosis.clone();
+        }
+        _ => {}
+    }
+    if *prior != current {
+        return Err(ExportAccountingError::ConflictingDisposition {
+            kind: Some(current.kind),
+        });
+    }
+    prior.merge(&current)
+}
+
+fn check_verified_missing(source: &ArchiveEntryObservation) -> Result<(), ExportAccountingError> {
+    if source.disposition != SourceDisposition::VerifiedMissingReference {
+        return Ok(());
+    }
+    if source.operation == EntryOperation::Enumeration
+        && matches!(source.kind, Kind::StarmapObjects | Kind::LootContainers)
+        && matches!(
+            source.role,
+            ExportSourceRole::Dependency | ExportSourceRole::DerivedInput
+        )
+        && source.entry_index.is_none()
+        && source.container_entry_index.is_none()
+    {
+        source.original()?;
+        Ok(())
+    } else {
+        Err(ExportAccountingError::ConflictingDisposition {
+            kind: Some(source.kind),
+        })
+    }
+}
+
+const fn missing_reference_warning(source: &ArchiveEntryObservation) -> ExportDiagnostic {
+    ExportDiagnostic {
+        kind: Some(source.kind),
+        stage: ExportDiagnosticStage::DerivedProjection,
+        code: ExportDiagnosticCode::VerifiedMissingReference,
+        severity: ExportDiagnosticSeverity::Warning,
+        source_role: Some(source.role),
+        warning_code: None,
+        count: 1,
+        count_unit: ExportDiagnosticUnit::EntryOperations,
+        examples: Vec::new(),
+    }
 }
 
 fn failure(source: &ArchiveEntryObservation) -> FailedEntryObservation {
@@ -131,6 +194,7 @@ pub(crate) fn counts(
 fn required(left: SourceDisposition, right: SourceDisposition) -> SourceDisposition {
     use SourceDisposition::{
         Projected, ProjectionFailed, ReadFailed, SkippedAfterRead, SkippedBeforeRead,
+        VerifiedMissingReference,
     };
     if left == ReadFailed || right == ReadFailed {
         ReadFailed
@@ -138,6 +202,8 @@ fn required(left: SourceDisposition, right: SourceDisposition) -> SourceDisposit
         ProjectionFailed
     } else if left == Projected || right == Projected {
         Projected
+    } else if left == VerifiedMissingReference || right == VerifiedMissingReference {
+        VerifiedMissingReference
     } else if left == SkippedAfterRead || right == SkippedAfterRead {
         SkippedAfterRead
     } else {

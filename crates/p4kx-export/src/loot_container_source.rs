@@ -78,7 +78,8 @@ fn read_entity(
 ) -> Result<(), CatalogError> {
     let source = EntrySource::inner(capture, archive, socpak, container, inner)?
         .operation(EntryOperation::EntityLinks);
-    let Ok(bytes) = EntryRead::read_all(source.receipt().clone(), container, inner, cancel)? else {
+    let Ok(bytes) = EntryRead::read_verified(source.receipt().clone(), container, inner, cancel)?
+    else {
         source.record(
             &mut read.ledger,
             Kind::LootContainers,

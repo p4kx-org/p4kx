@@ -171,7 +171,10 @@ fn matches_selected_attribute(
     if populated_selectors == 0 {
         return Ok(false);
     }
-    let Some(candidate) = xml.attribute(node, CONTAINER_ATTRIBUTE)? else {
+    let Some((ordinal, _)) = super::container_attribute(node) else {
+        return Ok(false);
+    };
+    let Some(candidate) = xml.attribute_at(node, ordinal)? else {
         return Ok(false);
     };
     let (candidate_uses, complete) = candidate.selector_inputs()?;

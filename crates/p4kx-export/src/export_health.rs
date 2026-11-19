@@ -15,7 +15,7 @@ use crate::selection::Kind;
 #[serde(rename_all = "camelCase")]
 #[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
 pub enum CatalogPublicationMode {
-    /// Publishes only a successfully read and projected catalog without source warnings.
+    /// Publishes a catalog whose required operations have no blocking diagnostics.
     #[default]
     Normal,
     /// Explicitly publishes diagnostic data with its incomplete health attached.
@@ -27,9 +27,9 @@ pub enum CatalogPublicationMode {
 #[serde(rename_all = "camelCase")]
 #[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
 pub enum ExportHealthStatus {
-    /// No source read, projection or source warning makes the result incomplete.
+    /// No required operation or diagnostic blocks publication.
     Complete,
-    /// At least one required operation failed or produced a source warning.
+    /// A required operation or diagnostic blocks publication.
     Incomplete,
 }
 

@@ -35,6 +35,8 @@ pub enum ExportDiagnosticCode {
     EmptyValue,
     /// A configured Reference names no available target.
     DanglingReference,
+    /// A complete authored container lookup found no matching target.
+    VerifiedMissingReference,
     /// A weak pointer identifies an instance outside its original owner.
     OutsideOwner,
     /// A populated concrete value is unsupported.
@@ -70,7 +72,7 @@ pub enum ExportDiagnosticCode {
 pub enum ExportDiagnosticSeverity {
     /// A represented source state that does not make the export incomplete.
     Information,
-    /// A source warning that makes the export incomplete.
+    /// A source warning evaluated by the diagnostic's publication policy.
     Warning,
     /// A failed required operation.
     Error,

@@ -28,6 +28,9 @@ pub(crate) fn sources(
     let mut sources = BTreeMap::<SourceKey, SourceObservation>::new();
     for source in observations {
         source.key()?;
+        if source.disposition == SourceDisposition::VerifiedMissingReference {
+            return Err(ExportAccountingError::ConflictingDisposition { kind: source.kind });
+        }
         let key = (
             source.kind.map(Kind::index),
             source.record_index,
@@ -95,7 +98,9 @@ fn count_selected(counts: &mut ExportSourceCounts, disposition: SourceDispositio
     counts.selected += 1;
     counts.read_successful += usize::from(disposition.read_succeeded());
     match disposition {
-        SourceDisposition::Projected => counts.projected += 1,
+        SourceDisposition::Projected | SourceDisposition::VerifiedMissingReference => {
+            counts.projected += 1;
+        }
         SourceDisposition::SkippedBeforeRead | SourceDisposition::SkippedAfterRead => {
             counts.intentionally_skipped += 1;
         }

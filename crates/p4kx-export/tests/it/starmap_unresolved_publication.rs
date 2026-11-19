@@ -18,44 +18,84 @@ const ROOT: &str = "Data/ObjectContainers/PU/system/synthetic/syntheticsystem.so
 const TARGET: &str = "Data/ObjectContainers/PU/synthetic/absent.socpak";
 
 #[test]
-fn an_unresolved_child_is_retained_diagnostically_and_refuses_normal_before_creation() -> TestResult
-{
-    let complete = source(false)?;
-    let previous = build_catalog_from(&complete.archive, &complete.entry, &fixture::options())?;
-    assert!(
-        previous.summary().export_health().is_complete(),
-        "actual complete counterpart"
-    );
-    let source = source(true)?;
-    let (partial, catalog) = source.diagnostic()?;
-    assert!(
-        !partial.summary().export_health().is_complete(),
-        "configured target still blocks complete export"
-    );
+fn a_proved_missing_child_is_published_with_original_proof_and_warning() -> TestResult {
+    let source = source(&[TARGET])?;
+    let built = build_catalog_from(&source.archive, &source.entry, &fixture::options())?;
+    let catalog: Value = serde_json::from_slice(built.json())?;
+    assert!(built.summary().export_health().is_complete());
+    assert_eq!(catalog["exportHealth"]["publicationMode"], "normal");
     verify_original_row(&catalog)?;
-    let validator = jsonschema::validator_for(&catalog_schema())?;
-    assert!(
-        validator.is_valid(&catalog),
-        "runtime schema accepts the actual diagnostic row"
-    );
+    verify_absence_warning(&catalog)?;
+    assert!(jsonschema::validator_for(&catalog_schema())?.is_valid(&catalog));
     proof::closure(&catalog)?;
-    assert!(
-        matches!(
-            build_catalog_from(&source.archive, &source.entry, &fixture::options()),
-            Err(CatalogError::IncompleteExport(_))
-        ),
-        "public in-memory producer refuses the same source"
+
+    let (summary, bytes) = write_catalog_from(
+        &source.archive,
+        &source.entry,
+        &fixture::options(),
+        Compression::None,
+        || Ok(Vec::new()),
+    )?;
+    assert!(summary.export_health().is_complete());
+    assert_eq!(bytes, built.json());
+    Ok(())
+}
+
+#[test]
+fn an_unsupported_child_still_prevents_publication_beside_a_proved_absence() -> TestResult {
+    const UNSUPPORTED: &str = "C:/authoring/unsearchable.socpak";
+    let complete = source(&[])?;
+    let previous = build_catalog_from(&complete.archive, &complete.entry, &fixture::options())?;
+    assert!(previous.summary().export_health().is_complete());
+
+    let source = source(&[TARGET, UNSUPPORTED])?;
+    let (partial, catalog) = source.diagnostic()?;
+    assert!(!partial.summary().export_health().is_complete());
+    let rows = proof::rows(&catalog, "/placements/unresolvedContainerLinks/rows")?;
+    let [proved, unsupported] = rows else {
+        return Err("both original Children must survive diagnostic publication".into());
+    };
+    proof::present(proved, "targetStatus", &json!("notFound"), Some(true))?;
+    assert_eq!(unsupported["targetStatus"]["value"], "unsupportedSelector");
+    assert_eq!(unsupported["targetStatus"]["sourceSetComplete"], false);
+    assert_eq!(
+        entries::failure(&catalog, "starmapObjects", "enumeration")?.len(),
+        1
     );
+    verify_absence_warning(&catalog)?;
     verify_writer_refusal(&source, previous.json())
 }
 
-fn source(missing: bool) -> TestResult<Fixture> {
+fn verify_absence_warning(catalog: &Value) -> TestResult {
+    let diagnostics = proof::rows(catalog, "/exportHealth/diagnostics")?;
+    let findings: Vec<_> = diagnostics
+        .iter()
+        .filter(|diagnostic| {
+            diagnostic["kind"] == "starmapObjects"
+                && diagnostic["code"] == "verifiedMissingReference"
+        })
+        .collect();
+    let [warning] = findings.as_slice() else {
+        return Err("one verified Starmap absence warning".into());
+    };
+    assert_eq!(
+        warning["severity"], "warning",
+        "verified absence is a warning"
+    );
+    assert_eq!(
+        warning["countUnit"], "entryOperations",
+        "the warning counts directory lookups"
+    );
+    Ok(())
+}
+
+fn source(targets: &[&str]) -> TestResult<Fixture> {
     let mut children = TestElement::new("ChildObjectContainers");
-    if missing {
+    for target in targets {
         children = children.child(
             TestElement::new("Child")
                 .attribute("external", "true")
-                .attribute("name", TARGET)
+                .attribute("name", *target)
                 .attribute("pos", " 1, 2, 3 ")
                 .attribute("rot", "2,0,0,0"),
         );
@@ -122,10 +162,9 @@ fn verify_original_row(catalog: &Value) -> TestResult {
     verify_parent(catalog, row)?;
 
     let failures = entries::failure(catalog, "starmapObjects", "enumeration")?;
-    assert_eq!(
-        failures.len(),
-        1,
-        "actual missing target retains its failure evidence"
+    assert!(
+        failures.is_empty(),
+        "a verified absence is accounted for by its published row and warning"
     );
     let attributes = proof::rows(row, "/declaration/attributes")?;
     assert!(

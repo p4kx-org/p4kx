@@ -33,9 +33,18 @@ fn equal_missing_paths_distinguish_authored_xml_tokens_from_the_fixed_registry_c
         "no target Entry exists"
     );
     let (_, catalog) = source.diagnostic()?;
-    let rows = entries::failure(&catalog, "lootContainers", "enumeration")?;
-    let row = rows.first().ok_or("authored missing target failure")?;
-    let path = check::present_text(&catalog, row, "path", &json!(fixture::REGISTRY), Some(true))?;
+    assert_eq!(
+        entries::failure(&catalog, "lootContainers", "enumeration")?,
+        [] as [&serde_json::Value; 0],
+        "the proved authored lookup is complete even when the separate registry is missing"
+    );
+    let link = check::at(
+        &catalog,
+        "/declarations/lootEntityContainerDocuments/rows/0/links/value/0",
+    )?;
+    check::present(link, "targetStatus", &json!("notFound"), Some(true))?;
+    check::present(link, "targetCandidates", &json!([]), Some(true))?;
+    let path = check::present(link, "declaredPath", &json!(fixture::REGISTRY), Some(true))?;
     let uses = check::uses(&catalog, path)?;
     assert!(
         uses.iter()

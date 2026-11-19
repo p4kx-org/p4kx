@@ -5,7 +5,8 @@ use std::collections::BTreeSet;
 
 use crate::catalog_read::original::FailedEntryObservation;
 use crate::export_diagnostic::{
-    ExportDiagnosticSeverity, ExportDiagnosticStage, ExportDiagnosticUnit, ExportSourceRole,
+    ExportDiagnosticCode, ExportDiagnosticSeverity, ExportDiagnosticStage, ExportDiagnosticUnit,
+    ExportSourceRole,
 };
 use crate::export_health::{CatalogPublicationMode, ExportHealthStatus, ExportStageStatus};
 pub(crate) use crate::export_health_aggregate::aggregate;
@@ -205,7 +206,7 @@ const fn incomplete_inventory(kind: Kind) -> ExportDiagnostic {
     ExportDiagnostic {
         kind: Some(kind),
         stage: ExportDiagnosticStage::Selection,
-        code: crate::ExportDiagnosticCode::IncompleteInventory,
+        code: ExportDiagnosticCode::IncompleteInventory,
         severity: ExportDiagnosticSeverity::Error,
         source_role: None,
         warning_code: None,
@@ -219,7 +220,7 @@ fn incomplete_archive(problem: ArchiveInventoryProblem) -> ExportDiagnostic {
     ExportDiagnostic {
         kind: None,
         stage: ExportDiagnosticStage::Selection,
-        code: crate::ExportDiagnosticCode::IncompleteInventory,
+        code: ExportDiagnosticCode::IncompleteInventory,
         severity: ExportDiagnosticSeverity::Error,
         source_role: None,
         warning_code: Some(problem.warning_code().to_owned()),
@@ -314,7 +315,13 @@ fn stages<'a>(
 }
 
 fn blocks(diagnostic: &ExportDiagnostic) -> bool {
-    diagnostic.severity != ExportDiagnosticSeverity::Information
+    match diagnostic.severity {
+        ExportDiagnosticSeverity::Information => false,
+        ExportDiagnosticSeverity::Warning => {
+            diagnostic.code != ExportDiagnosticCode::VerifiedMissingReference
+        }
+        ExportDiagnosticSeverity::Error => true,
+    }
 }
 
 fn order_failures(records: &mut Vec<FailedExportRecord>) -> Result<(), ExportAccountingError> {

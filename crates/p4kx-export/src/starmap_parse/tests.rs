@@ -236,9 +236,11 @@ fn a_missing_external_container_preserves_the_authored_path() -> TestResult {
     assert_eq!(missing.path.as_str(), NEXT, "the declared path survives");
     assert_eq!(
         missing.disposition,
-        SourceDisposition::ReadFailed,
-        "absence cannot look like successful empty data"
+        SourceDisposition::VerifiedMissingReference,
+        "a complete lookup proves that the declared target is absent"
     );
+    assert!(!missing.disposition.read_succeeded());
+    missing.original()?;
     Ok(())
 }
 

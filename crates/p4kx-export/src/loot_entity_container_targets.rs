@@ -31,6 +31,22 @@ pub(super) struct LootContainerTargets {
     target_candidates: SourcedValue<Vec<SourcedValue<PhysicalEntryRef>>>,
 }
 
+impl LootContainerTargets {
+    pub(super) fn proves_absence_of(&self, selector: &[SourceUse]) -> bool {
+        let origin = self.target_status.origin();
+        matches!(
+            self.target_status.value(),
+            Some(LootContainerTargetStatus::NotFound)
+        ) && origin.source_set_complete()
+            && self.target_candidates.origin().source_set_complete()
+            && self.target_candidates.value().is_some_and(Vec::is_empty)
+            && !selector.is_empty()
+            && selector
+                .iter()
+                .all(|used| origin.source_uses_refs().contains(used.reference()))
+    }
+}
+
 pub(super) fn resolve(
     archive: &Archive,
     index: &Index<'_>,

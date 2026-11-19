@@ -17,7 +17,7 @@ const ROOT: &str = "Data/ObjectContainers/PU/system/canary/canarysystem.socpak";
 const TILE: &str = "Data/ObjectContainers/PU/Starchitect/Tile/instance.socpak";
 const RECORD: u128 = 0x844_0101;
 const LABEL_KEY: &str = "@sample_label";
-const MISSING: &str = "Data/ObjectContainers/PU/Starchitect/Tile/missing.socpak";
+const MISSING: &str = "C:/authoring/Starchitect/Tile/missing.socpak";
 
 #[test]
 fn one_tile_file_keeps_two_physical_instances_and_their_own_transforms() -> TestResult {

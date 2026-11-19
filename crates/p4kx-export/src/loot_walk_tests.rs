@@ -4,7 +4,10 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use p4kx_testkit::{ArchiveBuilder, TestContainer, TestElement, TestEntry, test_key};
+use p4kx_testkit::{
+    ArchiveBuilder, CryXmlByteOrder, CryXmlSignature, TestContainer, TestElement, TestEntry,
+    test_key,
+};
 
 use super::*;
 use crate::export_entry_ledger::EntryOperation;
@@ -186,7 +189,7 @@ fn duplicate_selected_targets_are_reported_without_traversing_either() {
 }
 
 #[test]
-fn a_placed_container_the_archive_lacks_has_no_entry() {
+fn a_proved_missing_loot_target_keeps_the_selected_placement_without_an_entry() {
     let dir = tempfile::tempdir().expect("a directory");
     let archive = open(
         dir.path(),
@@ -196,7 +199,14 @@ fn a_placed_container_the_archive_lacks_has_no_entry() {
     let root = root_of(&archive, "a");
     let explored = explore(&archive, &index, std::slice::from_ref(&root), None);
     let a = explored.summaries.get(&root.entry).expect("a");
-    assert_eq!(a.placed, [placed(&written("ghost"), None)]);
+    assert_eq!(
+        a.placed,
+        [Placed {
+            config: guid(),
+            path: written("ghost"),
+            target: PlacedTarget::VerifiedMissing,
+        }]
+    );
     assert_eq!(a.nested.len(), 0);
     let missing = explored
         .ledger
@@ -211,10 +221,62 @@ fn a_placed_container_the_archive_lacks_has_no_entry() {
     );
     assert_eq!(
         missing.disposition,
-        SourceDisposition::ReadFailed,
-        "a genuinely absent target is still a failed read"
+        SourceDisposition::VerifiedMissingReference,
+        "the retained canonical lookup establishes absence"
     );
     assert!(missing.original().is_ok(), "actual authored link receipt");
+}
+
+#[test]
+fn malformed_config_does_not_certify_missing_loot_target() {
+    let dir = tempfile::tempdir().expect("a directory");
+    let archive = open(
+        dir.path(),
+        vec![socpak("a", &[entity(&written("ghost"), Some("invalid"))])],
+    );
+    assert_missing_is_a_read_failure(&archive);
+}
+
+#[test]
+fn conflicting_cryxml_attributes_do_not_certify_the_selected_missing_loot_target() {
+    let cases = [
+        ("objectContainer", written("other")),
+        ("multiConfigRef", String::from("invalid")),
+        (
+            "multiConfigRef",
+            String::from("11111111-4c0d-4e8d-9261-102274f8b6ed"),
+        ),
+    ];
+    for (attribute, value) in cases {
+        let dir = tempfile::tempdir().expect("a directory");
+        let xml = TestElement::new("Entity")
+            .attribute("objectContainer", written("ghost"))
+            .attribute("multiConfigRef", CONFIG)
+            .attribute(attribute, value)
+            .to_cryxml(CryXmlSignature::CryXmlB, CryXmlByteOrder::Little);
+        let container = TestContainer::new().entry(TestEntry::stored("entdata/source.entxml", xml));
+        let archive = open(
+            dir.path(),
+            vec![TestEntry::stored(
+                "Data/ObjectContainers/PU/loc/a.socpak",
+                container.build(),
+            )],
+        );
+        assert_missing_is_a_read_failure(&archive);
+    }
+}
+
+fn assert_missing_is_a_read_failure(archive: &Archive) {
+    let index = Index::new(archive);
+    let root = root_of(archive, "a");
+    let explored = explore(archive, &index, std::slice::from_ref(&root), None);
+    let missing = explored
+        .ledger
+        .entries
+        .iter()
+        .find(|entry| entry.operation == EntryOperation::Enumeration)
+        .expect("the authored missing Entry");
+    assert_eq!(missing.disposition, SourceDisposition::ReadFailed);
 }
 
 #[test]

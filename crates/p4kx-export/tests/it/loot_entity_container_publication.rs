@@ -17,55 +17,121 @@ use crate::health_origin_fixture::{self as fixture, Fixture, TestResult};
 const ROOT: &str = "Data/ObjectContainers/PU/system/synthetic/syntheticsystem.socpak";
 const TARGET: &str = "Data/ObjectContainers/PU/synthetic/missing.socpak";
 const ENTITY_DOCUMENT: &str = "entdata\\source.entxml";
+const UNSUPPORTED: &str = "C:/authoring/unsupported.socpak";
 
 #[test]
-fn configless_container_links_remain_lossless_but_refuse_normal_before_output_creation()
--> TestResult {
-    let complete = source(false)?;
-    let previous = build_catalog_from(&complete.archive, &complete.entry, &fixture::options())?;
-    assert!(
-        previous.summary().export_health().is_complete(),
-        "complete original counterpart"
-    );
-    let previous_catalog: Value = serde_json::from_slice(previous.json())?;
-    verify_root(&previous_catalog)?;
-    assert!(
-        proof::rows(
-            &previous_catalog,
-            "/declarations/lootEntityContainerDocuments/rows"
-        )?
-        .is_empty(),
-        "the reached complete counterpart has no original link document"
-    );
-    let source = source(true)?;
-    let (partial, catalog) = source.diagnostic()?;
+fn proved_configless_container_absence_publishes_with_original_evidence_and_warning() -> TestResult
+{
+    let source = source(Some(TARGET))?;
+    let path = source.folder.path().join("catalog.json");
+    let (summary, file) = write_catalog_from(
+        &source.archive,
+        &source.entry,
+        &fixture::options(),
+        Compression::None,
+        || CatalogFile::create(&path),
+    )?;
+    file.commit()?;
+    assert!(summary.export_health().is_complete());
+    let catalog: Value = serde_json::from_reader(fs::File::open(path)?)?;
     verify_original(&catalog)?;
-    assert!(
-        !partial.summary().export_health().is_complete(),
-        "retained original is not a completed derived projection"
+    verify_warning(&catalog)?;
+    assert!(jsonschema::validator_for(&catalog_schema())?.is_valid(&catalog));
+    proof::closure(&catalog)
+}
+
+#[test]
+fn unsupported_container_selector_refuses_normal_before_output_creation() -> TestResult {
+    let complete = source(None)?;
+    let previous = build_catalog_from(&complete.archive, &complete.entry, &fixture::options())?;
+    assert!(previous.summary().export_health().is_complete());
+    let source = source(Some(UNSUPPORTED))?;
+    let (partial, catalog) = source.diagnostic()?;
+    assert!(!partial.summary().export_health().is_complete());
+    assert_eq!(
+        catalog.pointer(
+            "/declarations/lootEntityContainerDocuments/rows/0/links/value/0/targetStatus/value"
+        ),
+        Some(&json!("unsupportedSelector"))
     );
-    assert!(
-        jsonschema::validator_for(&catalog_schema())?.is_valid(&catalog),
-        "the actual additive document carrier validates"
+    assert_eq!(
+        catalog.pointer("/declarations/lootEntityContainerDocuments/rows/0/links/value/0/targetStatus/sourceSetComplete"),
+        Some(&json!(false))
     );
-    proof::closure(&catalog)?;
+    verify_refusal(&source, previous.json())
+}
+
+fn verify_warning(catalog: &Value) -> TestResult {
+    let diagnostics = proof::rows(catalog, "/exportHealth/diagnostics")?;
+    assert_eq!(
+        diagnostics
+            .iter()
+            .filter(|item| item["kind"] == "lootContainers"
+                && item["code"] == "verifiedMissingReference"
+                && item["severity"] == "warning"
+                && item["count"] == 1)
+            .count(),
+        1,
+        "the verified absent target emits a nonblocking warning"
+    );
+    assert_eq!(
+        entries::failure(catalog, "lootContainers", "enumeration")?,
+        [] as [&Value; 0],
+        "the proved absence is not a failed enumeration"
+    );
+    Ok(())
+}
+
+#[test]
+fn conflicting_proofs_for_the_same_absent_target_retain_both_authored_origins() -> TestResult {
+    const COMPETING_DOCUMENT: &str = "entdata\\competing.entxml";
+    let clean = format!(r#"<Entity objectContainer="{TARGET}"/>"#);
+    let competing = format!(
+        r#"<Entity><a objectContainer="{TARGET}"/><b objectContainer="{UNSUPPORTED}"/></Entity>"#
+    );
+    let source = source_documents([
+        TestEntry::stored(ENTITY_DOCUMENT, clean),
+        TestEntry::stored(COMPETING_DOCUMENT, competing),
+    ])?;
+    let (partial, catalog) = source.diagnostic()?;
+    assert!(!partial.summary().export_health().is_complete());
+    let failures = entries::failure(&catalog, "lootContainers", "enumeration")?;
+    let [failure] = failures.as_slice() else {
+        return Err("one deduplicated failed enumeration".into());
+    };
+    let path = proof::present_text(&catalog, failure, "path", &json!(TARGET), Some(true))?;
+    let mut owners = Vec::new();
+    for used in proof::uses(&catalog, path)? {
+        if used.pointer("/location/field") == Some(&json!("@objectContainer")) {
+            owners.push(proof::at(proof::source(&catalog, used)?, "/path/value")?);
+        }
+    }
+    assert!(owners.contains(&&json!(ENTITY_DOCUMENT)));
+    assert!(owners.contains(&&json!(COMPETING_DOCUMENT)));
     assert!(matches!(
         build_catalog_from(&source.archive, &source.entry, &fixture::options()),
         Err(CatalogError::IncompleteExport(_))
     ));
-    verify_refusal(&source, previous.json())
+    proof::closure(&catalog)
 }
 
-fn source(missing: bool) -> TestResult<Fixture> {
+fn source(selector: Option<&str>) -> TestResult<Fixture> {
+    let document = selector.map(|selector| {
+        let xml = format!(
+            r#"<Root><Entity CryGUID="00000000-0000-0000-0000-000000000001" pos=" 1, 2, 3 " rot="2,0,0,0"><ObjectContainerComponent objectContainer="{selector}"/></Entity></Root>"#
+        );
+        TestEntry::stored(ENTITY_DOCUMENT, xml)
+    });
+    source_documents(document)
+}
+
+fn source_documents(documents: impl IntoIterator<Item = TestEntry>) -> TestResult<Fixture> {
     let mut container = TestContainer::new().entry(TestEntry::stored(
         "syntheticsystem.xml",
         r#"<ObjectContainer version="14"/>"#,
     ));
-    if missing {
-        let xml = format!(
-            r#"<Root><Entity CryGUID="00000000-0000-0000-0000-000000000001" pos=" 1, 2, 3 " rot="2,0,0,0"><ObjectContainerComponent objectContainer="{TARGET}"/></Entity></Root>"#
-        );
-        container = container.entry(TestEntry::stored(ENTITY_DOCUMENT, xml));
+    for document in documents {
+        container = container.entry(document);
     }
     entries::with_starmap(vec![
         TestEntry::stored(ROOT, container.build()).encrypted(),
@@ -148,6 +214,14 @@ fn verify_link(catalog: &Value, link: &Value) -> TestResult {
     let raw = proof::present(link, "declaredPath", &json!(TARGET), Some(true))?;
     let status = proof::present(link, "targetStatus", &json!("notFound"), Some(true))?;
     let candidates = proof::present(link, "targetCandidates", &json!([]), Some(true))?;
+    assert_eq!(
+        status["sourceSetComplete"], true,
+        "the status cites a complete lookup"
+    );
+    assert_eq!(
+        candidates["sourceSetComplete"], true,
+        "the empty candidate set has complete source evidence"
+    );
     assert_eq!(
         status["sourceUsesRefs"], candidates["sourceUsesRefs"],
         "negative status and candidate set cite the same original lookup"

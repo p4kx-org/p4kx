@@ -13,8 +13,8 @@ use crate::catalog_rows::staged::{IndexedCatalogRows, StagedCatalogTable};
 use crate::catalog_table::DatasetAvailability;
 use crate::entry_source::{self, EntrySource};
 use crate::export_ledger::{ExportLedger, SourceDisposition};
-use crate::loot_entxml::EntityLink;
 use crate::loot_entxml::documents::LootEntityContainerDocument;
+use crate::loot_entxml::{CapturedEntityLink, EntityLink};
 use crate::loot_unreadable::Unreadable;
 use crate::starmap_index::Index;
 use crate::starmap_walk::Opened;
@@ -34,6 +34,7 @@ pub(crate) struct Placed {
 pub(crate) enum PlacedTarget {
     Resolved(usize),
     Missing,
+    VerifiedMissing,
     Ambiguous,
 }
 
@@ -41,7 +42,7 @@ impl PlacedTarget {
     pub(crate) const fn entry(self) -> Option<usize> {
         match self {
             Self::Resolved(entry) => Some(entry),
-            Self::Missing | Self::Ambiguous => None,
+            Self::Missing | Self::VerifiedMissing | Self::Ambiguous => None,
         }
     }
 }
@@ -147,9 +148,15 @@ fn summarise(
         ..Summary::default()
     };
     for (path, mut link) in read.links {
-        if let Some(original) = link.take_original() {
-            documents.push(original.project(archive, index, directory, capture, cancel)?);
-        }
+        let absence_proved = retain_original(
+            &mut link,
+            archive,
+            index,
+            directory,
+            capture,
+            cancel,
+            &mut documents,
+        )?;
         let (link, selected) = link.into_parts();
         let EntityLink {
             container: written,
@@ -165,19 +172,18 @@ fn summarise(
             if selector.as_str() != path {
                 return Err(ExportAccountingError::ConflictingSourceDatum.into());
             }
-            resolve_target(archive, index, capture, &mut ledger, selector)?
+            resolve_target(
+                archive,
+                index,
+                capture,
+                &mut ledger,
+                selector,
+                absence_proved,
+            )?
         } else {
             PlacedTarget::Missing
         };
-        let found = target.entry();
-        if let Some(found) = found {
-            summary.nested.push(found);
-        }
-        if let Some(config) = config {
-            summary
-                .placed
-                .push(configured_placement(archive, config, written, target));
-        }
+        summary.add(archive, config, written, target);
     }
     summary.nested.sort_unstable();
     summary.nested.dedup();
@@ -187,6 +193,46 @@ fn summarise(
         documents,
         scope_unknown,
     })
+}
+
+fn retain_original(
+    link: &mut CapturedEntityLink,
+    archive: &Archive,
+    index: &Index<'_>,
+    directory: Option<&SourceUse>,
+    capture: &EntryCapture<'_>,
+    cancel: Option<&CancelToken>,
+    documents: &mut Vec<LootEntityContainerDocument>,
+) -> Result<bool, CatalogError> {
+    let Some(original) = link.take_original() else {
+        return Ok(false);
+    };
+    let selected = if link.value().several || link.value().malformed_config {
+        None
+    } else {
+        link.selected_container()
+    };
+    let projected = original.project(archive, index, directory, capture, cancel, selected)?;
+    documents.push(projected.document);
+    Ok(projected.selected_absence_proved)
+}
+
+impl Summary {
+    fn add(
+        &mut self,
+        archive: &Archive,
+        config: Option<Guid>,
+        written: Option<String>,
+        target: PlacedTarget,
+    ) {
+        if let Some(found) = target.entry() {
+            self.nested.push(found);
+        }
+        if let Some(config) = config {
+            self.placed
+                .push(configured_placement(archive, config, written, target));
+        }
+    }
 }
 
 fn configured_placement(
@@ -212,9 +258,18 @@ fn resolve_target(
     capture: &EntryCapture<'_>,
     ledger: &mut ExportLedger,
     selector: AuthoredEntryPath,
+    absence_proved: bool,
 ) -> Result<PlacedTarget, CatalogError> {
     match index.candidates(selector.as_str()) {
         [entry] => Ok(PlacedTarget::Resolved(*entry)),
+        [] if absence_proved => {
+            EntrySource::authored_missing(selector).record(
+                ledger,
+                Kind::LootContainers,
+                SourceDisposition::VerifiedMissingReference,
+            );
+            Ok(PlacedTarget::VerifiedMissing)
+        }
         [] => {
             EntrySource::authored_missing(selector).record(
                 ledger,

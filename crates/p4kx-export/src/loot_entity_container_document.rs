@@ -103,6 +103,11 @@ pub(crate) fn capture(
     }))
 }
 
+pub(crate) struct ProjectedDocument {
+    pub(crate) document: LootEntityContainerDocument,
+    pub(crate) selected_absence_proved: bool,
+}
+
 impl CapturedDocument {
     pub(crate) fn project(
         self,
@@ -111,7 +116,17 @@ impl CapturedDocument {
         directory: Option<&SourceUse>,
         capture: &EntryCapture<'_>,
         cancel: Option<&CancelToken>,
-    ) -> Result<LootEntityContainerDocument, CatalogError> {
+        selected: Option<&AuthoredEntryPath>,
+    ) -> Result<ProjectedDocument, CatalogError> {
+        let selected = selected
+            .filter(|selected| {
+                self.links.iter().all(|link| {
+                    link.selector.as_str().is_empty() || link.selector.as_str() == selected.as_str()
+                })
+            })
+            .map(AuthoredEntryPath::selector_inputs)
+            .transpose()?;
+        let mut selected_absence_proved = false;
         let mut links = Vec::with_capacity(self.links.len());
         for original in self.links {
             checkpoint(cancel)?;
@@ -123,6 +138,9 @@ impl CapturedDocument {
                 &original.selector,
                 self.complete,
             )?;
+            selected_absence_proved |= selected
+                .as_ref()
+                .is_some_and(|(uses, complete)| *complete && targets.proves_absence_of(uses));
             links.push(LootEntityContainerLink {
                 node_index: original.node_index,
                 attribute_ordinal: original.attribute_ordinal,
@@ -130,16 +148,19 @@ impl CapturedDocument {
                 targets,
             });
         }
-        Ok(LootEntityContainerDocument {
-            containing_container: self.containing_container,
-            document: self.document,
-            nodes: self.nodes,
-            links: capture.source_uses().value(
-                SourceValue::Present(links),
-                &[self.survey],
-                self.complete,
-            ),
-            config_references: self.config_references,
+        Ok(ProjectedDocument {
+            document: LootEntityContainerDocument {
+                containing_container: self.containing_container,
+                document: self.document,
+                nodes: self.nodes,
+                links: capture.source_uses().value(
+                    SourceValue::Present(links),
+                    &[self.survey],
+                    self.complete,
+                ),
+                config_references: self.config_references,
+            },
+            selected_absence_proved,
         })
     }
 }

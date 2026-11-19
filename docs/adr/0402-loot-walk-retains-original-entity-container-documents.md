@@ -58,10 +58,11 @@ whole-Archive Entity census.
 
 ## Consequences
 
-The existing first-global-pair derivation and all Health severity, inventory and normal-publication
-rules remain unchanged. A represented original missing link does not supply its missing content or
-complete downstream Loot counts. DiagnosticPartial retains the original source; Normal still
-refuses before output creation and preserves the previous complete generation.
+Normal publication retains a `notFound` lookup from a completely observed original selected
+attribute when the directory proves an empty candidate set. The `verifiedMissingReference` warning
+records that outcome. The derived Loot counts for the unavailable container remain absent.
+Required unproved lookups and source read or projection failures still refuse publication before
+output creation and preserve the previous complete generation.
 
 Correcting the existing first-pair derivation or any global owner conflation requires separate
 source-backed ownership proof. This carrier makes those originals inspectable without claiming

@@ -5,7 +5,7 @@ use std::collections::HashSet;
 
 use p4kx_extraction::Archive;
 
-use super::{Body, Level};
+use super::{Body, Child, Level};
 use crate::catalog_read::original::{AuthoredEntryPath, EntryCapture};
 use crate::entry_source::{self, EntrySource};
 use crate::export_ledger::{ExportLedger, SourceDisposition};
@@ -25,14 +25,32 @@ pub(super) fn next_sources<'a>(
         if let Body::Parsed { root, .. } = body {
             paths.clear();
             externals(root, &mut paths);
-            for path in &paths {
-                match index.candidates(path.as_str()) {
+            for child in &paths {
+                let Some(path) = child.external.as_ref() else {
+                    continue;
+                };
+                let candidates = index.candidates(path.as_str());
+                match candidates {
                     [entry] => {
                         next.insert(*entry);
                     }
-                    [] => EntrySource::authored_missing(AuthoredEntryPath::clone(path))
-                        .dependency()
-                        .record(ledger, Kind::StarmapObjects, SourceDisposition::ReadFailed),
+                    [] => {
+                        let disposition =
+                            if child
+                                .unresolved_external
+                                .as_ref()
+                                .is_some_and(|declaration| {
+                                    declaration.proves_missing_target(archive, path, candidates)
+                                })
+                            {
+                                SourceDisposition::VerifiedMissingReference
+                            } else {
+                                SourceDisposition::ReadFailed
+                            };
+                        EntrySource::authored_missing(AuthoredEntryPath::clone(path))
+                            .dependency()
+                            .record(ledger, Kind::StarmapObjects, disposition);
+                    }
                     candidates => entry_source::record_ambiguous_outer_entries(
                         archive,
                         capture,
@@ -48,12 +66,14 @@ pub(super) fn next_sources<'a>(
     Ok(next)
 }
 
-fn externals<'level>(level: &'level Level, out: &mut Vec<&'level AuthoredEntryPath>) {
+fn externals<'level>(level: &'level Level, out: &mut Vec<&'level Child>) {
     let mut parents = Vec::new();
     let mut children = level.children.iter();
     loop {
         if let Some(child) = children.next() {
-            out.extend(child.external.as_ref());
+            if child.external.is_some() {
+                out.push(child);
+            }
             if !child.below.children.is_empty() {
                 parents.push(children);
                 children = child.below.children.iter();

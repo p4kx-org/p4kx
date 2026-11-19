@@ -113,8 +113,7 @@ fn rows(
         .collect()
 }
 
-/// Returns the containers that cannot be read, a placed container the Archive lacks, and the
-/// tags that cannot be counted, ordered by path and reason.
+/// Returns the unreadable sources and unresolved targets, ordered by path and reason.
 fn unreadable(
     archive: &Archive,
     summaries: &HashMap<usize, Summary>,
@@ -137,7 +136,7 @@ fn unreadable(
         .flat_map(|summary| summary.placed.iter())
         .filter_map(|placed| {
             let reason = match placed.target {
-                PlacedTarget::Resolved(_) => return None,
+                PlacedTarget::Resolved(_) | PlacedTarget::VerifiedMissing => return None,
                 PlacedTarget::Missing => Unreadable::MissingFromArchive,
                 PlacedTarget::Ambiguous => Unreadable::AmbiguousContainer,
             };
