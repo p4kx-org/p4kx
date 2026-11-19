@@ -11,6 +11,7 @@ use crate::{DataForge, DataForgeError, DataType, Record, Struct, TreeBuilder, Va
 pub struct PointerProbe<'f> {
     field: &'f str,
     struct_indices: Box<[u32]>,
+    strict: bool,
 }
 
 impl<'f> DataForge<'f> {
@@ -32,6 +33,31 @@ impl<'f> DataForge<'f> {
         Some(PointerProbe {
             field,
             struct_indices: named.iter().map(Struct::index).collect(),
+            strict: false,
+        })
+    }
+
+    /// Returns an exact-name probe that validates each reached strong-pointer slot.
+    ///
+    /// The probe includes unclassifiable declarations and exact types without instances. It
+    /// returns `None` when readable metadata proves there is no possible matching declaration.
+    #[must_use]
+    pub fn strict_pointer_probe(
+        &'f self,
+        field: &'f str,
+        struct_name: &str,
+    ) -> Option<PointerProbe<'f>> {
+        let struct_indices: Box<[u32]> = self
+            .structs()
+            .filter_map(|structure| match structure.name() {
+                Ok(name) if name != struct_name => None,
+                _ => Some(structure.index()),
+            })
+            .collect();
+        (!struct_indices.is_empty()).then_some(PointerProbe {
+            field,
+            struct_indices,
+            strict: true,
         })
     }
 }
@@ -41,13 +67,15 @@ impl<'f> TreeBuilder<'f> {
     /// existing instance of a struct the probe names, which is what the tree of the Record shows
     /// as a struct of that type. Only the pointer array is read, never the tree; the match is
     /// exact, so an instance of a derived struct does not count. A null pointer, a pointer to a
-    /// struct of another name and a pointer to an instance that does not exist do not match.
+    /// struct of another name do not match. A legacy probe ignores missing instances, while a
+    /// strict probe reports unreadable targets and missing exact-family instances.
     ///
     /// # Errors
     ///
     /// Returns the [`DataForgeError`] of the Record's struct layout,
-    /// [`DataForgeError::IndexOutOfRange`] when the array reaches beyond the pool of strong
-    /// pointers.
+    /// [`DataForgeError::IndexOutOfRange`] when the array exceeds the pool. A strict probe
+    /// also returns errors for missing owner storage, unclassifiable targets and missing
+    /// instances of the exact type.
     pub fn holds(
         &mut self,
         probe: &PointerProbe<'f>,
@@ -67,13 +95,26 @@ impl<'f> TreeBuilder<'f> {
         let Some(slot) = found else {
             return Ok(false);
         };
-        let Some(bytes) = forge
-            .instance(def.struct_index, u32::from(def.instance_index))
-            .and_then(|bytes| bytes.get(slot.start..slot.end))
-        else {
-            return Ok(false);
-        };
-        array_holds(forge, probe, record.index as usize, words(bytes))
+        let record_index = record.index as usize;
+        let instance = u32::from(def.instance_index);
+        let bytes = forge
+            .instance(def.struct_index, instance)
+            .ok_or_else(|| out_of_range("Record", record_index, "instance", instance.into()))
+            .and_then(|owner| {
+                owner.get(slot.start..slot.end).ok_or_else(|| {
+                    out_of_range(
+                        "Record",
+                        record_index,
+                        "instance byte",
+                        slot.start.max(owner.len()) as u64,
+                    )
+                })
+            });
+        match bytes {
+            Ok(bytes) => array_holds(forge, probe, record_index, words(bytes)),
+            Err(error) if probe.strict => Err(error),
+            Err(_) => Ok(false),
+        }
     }
 }
 
@@ -90,12 +131,47 @@ fn array_holds(
     if end > pool as u64 {
         return Err(out_of_range("Record", record, "strong pointer pool", end));
     }
-    Ok((first..first.saturating_add(count)).any(|element| {
-        pointer(element_bytes(forge, ValueKind::StrongPointer, element)).is_some_and(
-            |(struct_index, instance)| {
-                probe.struct_indices.contains(&struct_index)
-                    && forge.instance(struct_index, instance).is_some()
-            },
-        )
+    let mut pointers = (first..first.saturating_add(count)).filter_map(|element| {
+        pointer(element_bytes(forge, ValueKind::StrongPointer, element))
+            .map(|target| (element, target))
+    });
+    if probe.strict {
+        return strict_array_holds(forge, probe, pointers);
+    }
+    Ok(pointers.any(|(_, (struct_index, instance))| {
+        probe.struct_indices.contains(&struct_index)
+            && forge.instance(struct_index, instance).is_some()
     }))
+}
+
+fn strict_array_holds(
+    forge: &DataForge<'_>,
+    probe: &PointerProbe<'_>,
+    pointers: impl Iterator<Item = (u32, (u32, u32))>,
+) -> Result<bool, DataForgeError> {
+    let mut matched = false;
+    for (slot, (struct_index, instance)) in pointers {
+        let Some(structure) = forge.struct_at(struct_index) else {
+            return Err(out_of_range(
+                "strong pointer pool",
+                slot as usize,
+                "struct",
+                struct_index.into(),
+            ));
+        };
+        if !probe.struct_indices.contains(&struct_index) {
+            continue;
+        }
+        structure.name()?;
+        if forge.instance(struct_index, instance).is_none() {
+            return Err(out_of_range(
+                "strong pointer pool",
+                slot as usize,
+                "struct instance",
+                instance.into(),
+            ));
+        }
+        matched = true;
+    }
+    Ok(matched)
 }

@@ -8,10 +8,17 @@ use std::error::Error;
 use p4kx_dataforge::{DataForge, DataForgeError, Record, TreeBuilder, Value};
 use p4kx_testkit::{DataForgeBuilder, TestInstance, TestRecord, TestStruct, TestType, TestValue};
 
-type TestResult = Result<(), Box<dyn Error>>;
+#[path = "probe_strict.rs"]
+mod strict;
+
+type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 const COMPONENT: &str = "CrafterComponentParams";
 const CRAFTER_STRUCT: u32 = 1;
+const OTHER: &str = "OtherParams";
+const OTHER_STRUCT: u32 = 2;
+const UNPOPULATED: &str = "UnpopulatedParams";
+const UNPOPULATED_STRUCT: u32 = 5;
 
 /// How the probe is expected to answer for a Record.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -40,6 +47,10 @@ fn entity(index: u128, values: Vec<TestValue>) -> TestRecord {
 }
 
 fn forge_bytes() -> Vec<u8> {
+    forge_builder().build()
+}
+
+fn forge_builder() -> DataForgeBuilder {
     let base = |name: &str| {
         TestStruct::new(name)
             .parent("Base")
@@ -48,16 +59,17 @@ fn forge_bytes() -> Vec<u8> {
     let mut builder = DataForgeBuilder::new()
         .structure(TestStruct::new("Base"))
         .structure(base(COMPONENT))
-        .structure(base("OtherParams"))
+        .structure(base(OTHER))
         .structure(base("CrafterDerivedParams").parent(COMPONENT))
         .structure(
             TestStruct::new("Entity")
                 .array("Components", TestType::StrongPointer("Base".to_owned())),
-        );
+        )
+        .structure(base(UNPOPULATED));
     for record in cases().into_iter().map(|(record, _)| record) {
         builder = builder.record(record);
     }
-    builder.build()
+    builder
 }
 
 fn cases() -> Vec<(TestRecord, Expected)> {
@@ -86,6 +98,23 @@ fn cases() -> Vec<(TestRecord, Expected)> {
         (
             entity(10, Vec::new()).value("Components", raw([u32::MAX, u32::MAX])),
             Expected::Fails,
+        ),
+        (
+            entity(11, vec![instance(COMPONENT), raw([CRAFTER_STRUCT, 77])]),
+            Expected::Holds,
+        ),
+        (
+            entity(12, vec![instance(COMPONENT), raw([OTHER_STRUCT, 77])]),
+            Expected::Holds,
+        ),
+        (entity(13, vec![raw([OTHER_STRUCT, 77])]), Expected::Absent),
+        (
+            entity(14, vec![instance(COMPONENT), raw([99, 0])]),
+            Expected::Holds,
+        ),
+        (
+            entity(15, vec![raw([UNPOPULATED_STRUCT, 0])]),
+            Expected::Absent,
         ),
     ]
 }
