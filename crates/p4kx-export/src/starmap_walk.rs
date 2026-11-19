@@ -47,6 +47,7 @@ pub(crate) struct SystemRead {
     pub(crate) placed: Vec<(Guid, Placement)>,
     pub(crate) unreadable: usize,
     pub(crate) missing: usize,
+    pub(crate) verified_missing: usize,
     pub(crate) malformed: usize,
     pub(crate) routes_incomplete: bool,
     pub(crate) placement_budget_exhausted: bool,

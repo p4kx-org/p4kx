@@ -23,6 +23,7 @@ pub(crate) struct ContainerCounts {
     pub(crate) systems: usize,
     pub(crate) unreadable: usize,
     pub(crate) missing: usize,
+    pub(crate) verified_missing: usize,
     pub(crate) malformed: usize,
     pub(crate) ambiguous: usize,
 }

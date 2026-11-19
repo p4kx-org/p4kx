@@ -5,8 +5,8 @@ use std::path::Path;
 
 use p4kx_extraction::Archive;
 use p4kx_testkit::{
-    ArchiveBuilder, DataForgeBuilder, TestContainer, TestEntry, TestInstance, TestRecord,
-    TestStruct, TestType, TestValue,
+    ArchiveBuilder, DataForgeBuilder, TestContainer, TestElement, TestEntry, TestInstance,
+    TestRecord, TestStruct, TestType, TestValue,
 };
 
 use super::{PLANET, PRESET};
@@ -18,6 +18,13 @@ const COMPOSITION_RECORD: u128 = 0x1000_0000_0000_4000_8000_0000_0000_0006;
 const REGION: &str = "Data/ObjectContainers/PU/system/t/";
 
 pub(super) fn archive(path: &Path) -> Result<Archive, Box<dyn std::error::Error>> {
+    archive_with_external_targets(path, &[])
+}
+
+pub(super) fn archive_with_external_targets(
+    path: &Path,
+    targets: &[&str],
+) -> Result<Archive, Box<dyn std::error::Error>> {
     let tile = format!("{REGION}tile.socpak");
     let root_xml = format!(
         r#"<ObjectContainer><ChildObjectContainers>
@@ -29,12 +36,9 @@ pub(super) fn archive(path: &Path) -> Result<Archive, Box<dyn std::error::Error>
     );
     let root = TestContainer::new().entry(TestEntry::stored("tsystem.xml", root_xml.as_bytes()));
     let marker = format!("\0preset\0{PRESET}\0");
-    let body = |name| {
+    let body = |name, xml: &[u8]| {
         TestContainer::new()
-            .entry(TestEntry::stored(
-                format!("{name}.xml"),
-                b"<ObjectContainer/>",
-            ))
+            .entry(TestEntry::stored(format!("{name}.xml"), xml))
             .entry(TestEntry::stored(format!("{name}.soc"), marker.as_bytes()))
             .build()
     };
@@ -52,13 +56,29 @@ pub(super) fn archive(path: &Path) -> Result<Archive, Box<dyn std::error::Error>
             format!("{REGION}tsystem.socpak"),
             root.build(),
         ))
-        .entry(TestEntry::stored(tile, body("tile")))
+        .entry(TestEntry::stored(
+            tile,
+            body("tile", tile_descriptor(targets).as_bytes()),
+        ))
         .entry(TestEntry::stored(
             format!("{REGION}unreached.socpak"),
-            body("unreached"),
+            body("unreached", b"<ObjectContainer/>"),
         ))
         .write_to(path)?;
     Ok(Archive::open(path)?)
+}
+
+fn tile_descriptor(targets: &[&str]) -> String {
+    let mut children = TestElement::new("ChildObjectContainers");
+    for target in targets {
+        children = children.child(
+            TestElement::new("Child")
+                .attribute("name", *target)
+                .attribute("external", "1")
+                .attribute("pos", "1,0,0"),
+        );
+    }
+    TestElement::new("ObjectContainer").child(children).to_xml()
 }
 
 fn dataforge() -> Vec<u8> {

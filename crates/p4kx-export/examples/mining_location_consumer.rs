@@ -233,6 +233,8 @@ fn phase_report(
             "unreadableResourceTypes": coverage.unreadable_resource_types,
             "unreadableProviderLinks": coverage.unreadable_provider_links,
             "placementInventoryIncomplete": coverage.placement_inventory_incomplete,
+            "completePlacementInventory": coverage.has_complete_placement_inventory(),
+            "verifiedMissingPlacementOccurrences": coverage.verified_missing_placement_occurrences,
             "unavailablePlacementOccurrences": coverage.unavailable_placement_occurrences,
             "unreadableHarvestContainers": coverage.unreadable_harvest_containers,
             "locationsWithUnresolvedParent": coverage.locations_with_unresolved_parent,

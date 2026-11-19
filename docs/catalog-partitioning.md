@@ -94,8 +94,12 @@ permits substantial world and shared data preparation. Streaming the full
 Catalog removes the in-memory JSON buffer while retaining full preparation.
 
 The local mining-location SDK uses `read_mining_locations` for the reachable
-Starmap dependencies and the actual mining-resource joins. `with_mineable_entities`
-reads physical scanner definitions and their original scan selectors. The
+Starmap dependencies and the actual mining-resource joins. Its coverage counts verified
+missing external references by placement occurrence. Those references were authored, and an
+exhaustive directory lookup found no target. Call `has_complete_placement_inventory()` before
+using missing placements to remove entries from a consumer cache. Check harvest and definition
+coverage separately before replacing those results. `with_mineable_entities` reads physical
+scanner definitions and their original scan selectors. The
 standalone `read_planet_resources` query reads terrain resource definitions by
 physical Entry, path or GUID. The selected records carry immediate origin markers.
 Compare the local projection with the same Build's complete Catalog.

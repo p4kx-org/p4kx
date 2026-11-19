@@ -92,6 +92,7 @@ pub(crate) struct Placements {
     by_record: HashMap<Guid, Placement>,
     ambiguous: HashMap<Guid, Arc<[PlacementProof; 2]>>,
     pub(crate) counts: ContainerCounts,
+    pub(crate) placement_routes_incomplete: bool,
     pub(crate) report: StarmapReport,
     spools: PlacementSpools,
     #[cfg(test)]
@@ -246,6 +247,8 @@ impl Placements {
             named += system.named;
             self.counts.unreadable += system.unreadable;
             self.counts.missing += system.missing;
+            self.counts.verified_missing += system.verified_missing;
+            self.placement_routes_incomplete |= system.routes_incomplete;
             self.counts.malformed += system.malformed;
             self.report.containers.extend(system.report.containers);
             self.report.issues.extend(system.report.issues);

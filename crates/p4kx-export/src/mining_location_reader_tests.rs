@@ -86,6 +86,41 @@ fn caller_selected_child_budgets_keep_mining_coverage_incomplete() -> TestResult
 }
 
 #[test]
+fn proved_absence_counts_each_route_without_blocking_complete_mining_placements() -> TestResult {
+    const MISSING: &str = "Data/ObjectContainers/PU/system/t/absent.socpak";
+    const UNSUPPORTED: &str = "C:/authoring/unsearchable.socpak";
+    let dir = tempfile::tempdir()?;
+    for (name, targets, unavailable) in [
+        ("proved", [MISSING].as_slice(), 0),
+        ("mixed", [MISSING, UNSUPPORTED].as_slice(), 2),
+    ] {
+        let archive = fixture::archive_with_external_targets(
+            &dir.path().join(format!("{name}.p4k")),
+            targets,
+        )?;
+        let result = read_mining_locations(
+            &archive,
+            MiningLocationOptions::new(Language::English, None),
+        )?;
+        assert_eq!(
+            result.coverage.verified_missing_placement_occurrences, 2,
+            "{name}: one declared absence on each of the two tile routes"
+        );
+        assert_eq!(
+            result.coverage.unavailable_placement_occurrences, unavailable,
+            "{name}: unverified targets remain unavailable"
+        );
+        assert_eq!(
+            result.coverage.has_complete_placement_inventory(),
+            unavailable == 0,
+            "{name}: cache reconciliation requires complete placement coverage"
+        );
+        check_occurrences(&result)?;
+    }
+    Ok(())
+}
+
+#[test]
 fn rejects_foreign_decoded_input_and_cancellation() -> TestResult {
     let dir = tempfile::tempdir()?;
     let first = archive(&dir.path().join("first.p4k"))?;

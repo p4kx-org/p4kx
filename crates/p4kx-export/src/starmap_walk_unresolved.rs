@@ -18,6 +18,9 @@ impl System<'_> {
         placed: Option<&WalkPath>,
         file: &ContainerFile,
     ) -> Result<(), CatalogError> {
+        if matches!(&self.rows, PlacementRows::Harvest(_)) {
+            return Ok(());
+        }
         let Some(declaration) = &child.unresolved_external else {
             return Ok(());
         };

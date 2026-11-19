@@ -224,13 +224,17 @@ impl<'a> System<'a> {
         let path = child.external.as_ref()?;
         self.seen[2] += 1;
         let declared = path.as_str();
-        match self.index.candidates(declared) {
+        let candidates = self.index.candidates(declared);
+        match candidates {
             [entry] => Some(Frame::Enter {
                 entry: *entry,
                 path: parent.external(path),
             }),
             [] => {
                 self.read.missing += 1;
+                let verified = child.proves_external_absence(self.archive, path, candidates);
+                self.read.verified_missing += usize::from(verified);
+                self.read.routes_incomplete |= !verified;
                 self.issue(&format!(
                     "{label}: the Archive holds no container {}",
                     clip(declared)

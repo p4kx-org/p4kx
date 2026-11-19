@@ -120,14 +120,26 @@ pub struct MiningLocationCoverage {
     pub unreadable_resource_types: usize,
     /// Distinct provider links that could not be resolved.
     pub unreadable_provider_links: usize,
-    /// True when the world placement traversal reported incomplete inventory.
+    /// True when the world placement traversal reported an incomplete inventory or route.
     pub placement_inventory_incomplete: bool,
-    /// Unreadable, missing or malformed container occurrences reported by the world reader.
+    /// Occurrences of authored external targets proved absent from the intact Archive directory.
+    pub verified_missing_placement_occurrences: usize,
+    /// Unreadable, malformed or unverified missing occurrences.
     pub unavailable_placement_occurrences: usize,
     /// Distinct container preset scans that failed.
     pub unreadable_harvest_containers: usize,
     /// Locations for which a malformed or incomplete parent chain prevented a known link.
     pub locations_with_unresolved_parent: usize,
+}
+
+impl MiningLocationCoverage {
+    /// Returns whether the placement reader can rule out further matching occurrences.
+    #[must_use]
+    pub const fn has_complete_placement_inventory(&self) -> bool {
+        !self.archive_inventory_incomplete
+            && !self.placement_inventory_incomplete
+            && self.unavailable_placement_occurrences == 0
+    }
 }
 
 /// A directly linked resource and its original name and refinement fields.

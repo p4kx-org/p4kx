@@ -61,6 +61,17 @@ pub(crate) struct Child {
 }
 
 impl Child {
+    pub(crate) fn proves_external_absence(
+        &self,
+        archive: &Archive,
+        path: &AuthoredEntryPath,
+        candidates: &[usize],
+    ) -> bool {
+        self.unresolved_external
+            .as_ref()
+            .is_some_and(|declaration| declaration.proves_missing_target(archive, path, candidates))
+    }
+
     pub(crate) fn entity_name(&self) -> &str {
         self.origins
             .as_deref()

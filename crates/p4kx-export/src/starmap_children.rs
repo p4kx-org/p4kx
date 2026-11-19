@@ -125,8 +125,9 @@ impl<'a, 'read, 'capture, 'input, 'archive, 'cancel>
         let unresolved_external = external
             .as_ref()
             .filter(|path| {
-                self.bounds.scope.unresolved_links
-                    && self.index.candidates(path.as_str()).len() != 1
+                let candidates = self.index.candidates(path.as_str());
+                candidates.is_empty()
+                    || (self.bounds.scope.unresolved_links && candidates.len() > 1)
             })
             .map(|path| UnresolvedChild::capture(xml, child, path, self.bounds.directory.clone()))
             .transpose()?;

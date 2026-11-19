@@ -36,13 +36,7 @@ pub(super) fn next_sources<'a>(
                     }
                     [] => {
                         let disposition =
-                            if child
-                                .unresolved_external
-                                .as_ref()
-                                .is_some_and(|declaration| {
-                                    declaration.proves_missing_target(archive, path, candidates)
-                                })
-                            {
+                            if child.proves_external_absence(archive, path, candidates) {
                                 SourceDisposition::VerifiedMissingReference
                             } else {
                                 SourceDisposition::ReadFailed

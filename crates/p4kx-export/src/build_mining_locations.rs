@@ -192,9 +192,16 @@ fn read_world<'source>(
     let survey = HarvestSurvey::new(&presets);
     let placements =
         Placements::read_for_harvest(archive, cancel, options.starmap_budget, &capture, &survey)?;
-    coverage.placement_inventory_incomplete = !placements.ledger.incomplete_inventories.is_empty();
+    coverage.placement_inventory_incomplete = placements.placement_routes_incomplete
+        || !placements.ledger.incomplete_inventories.is_empty();
+    coverage.verified_missing_placement_occurrences = placements.counts.verified_missing;
+    let unverified_missing = placements
+        .counts
+        .missing
+        .checked_sub(placements.counts.verified_missing)
+        .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
     coverage.unavailable_placement_occurrences =
-        placements.counts.unreadable + placements.counts.missing + placements.counts.malformed;
+        unverified_missing + placements.counts.unreadable + placements.counts.malformed;
     let objects = rows::place_starmap(input, projection, records, &placements, cancel, coverage)?;
     let locations = harvest_locations(
         archive, cancel, &capture, placements, survey, &objects, coverage,
