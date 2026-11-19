@@ -12,7 +12,7 @@ use super::sections::{SectionReader, SectionReport};
 use super::support::{self, TestResult};
 
 #[path = "real_archive_catalog_replay_bindings.rs"]
-mod bindings;
+pub(crate) mod bindings;
 #[path = "real_archive_catalog_replay_cells.rs"]
 mod cells;
 #[path = "real_archive_catalog_replay_inventory.rs"]

@@ -15,6 +15,9 @@ use serde_json::Value;
 use super::TestResult;
 use crate::catalog_v3_consumer;
 
+#[path = "real_archive_cargo_globals_complete_catalog.rs"]
+mod complete_catalog;
+
 pub(super) fn verify(archive: &Archive, entry: &DataForgeEntry, catalog: &Value) -> TestResult {
     let loading = catalog_v3_consumer::rows(catalog, Kind::CargoLoadingGlobals)?;
     let prices = catalog_v3_consumer::rows(catalog, Kind::ShopCommodityGlobals)?;

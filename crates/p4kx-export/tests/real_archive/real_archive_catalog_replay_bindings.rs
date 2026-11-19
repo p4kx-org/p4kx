@@ -2,19 +2,23 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::collections::BTreeMap;
-use std::fs::File;
+use std::fmt::Write as _;
+use std::fs::{self, File};
 use std::io::{BufReader, Read};
 use std::path::Path;
 
 use p4kx_export::{Kind, SCHEMA_VERSION};
+use p4kx_extraction::{Archive, utc_rfc3339};
 use serde::Deserialize;
+use serde_json::Value;
+use sha2::{Digest as _, Sha256};
 
 use super::TestResult;
 use super::inventory::Inventory;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(super) struct Receipt {
+pub(crate) struct Receipt {
     channel: String,
     archive_before: ArchiveStamp,
     archive_after: ArchiveStamp,
@@ -47,18 +51,18 @@ struct Build {
     id: String,
 }
 
-pub(super) struct Binding {
+pub(crate) struct Binding {
     channel: String,
     archive: ArchiveStamp,
 }
 
 impl Receipt {
-    pub(super) fn read(directory: &Path) -> TestResult<Self> {
+    pub(crate) fn read(directory: &Path) -> TestResult<Self> {
         let input = BufReader::new(File::open(directory.join("receipt.private.json"))?);
         Ok(serde_json::from_reader(input)?)
     }
 
-    pub(super) fn binding(self) -> TestResult<Binding> {
+    pub(crate) fn binding(self) -> TestResult<Binding> {
         let archive = self.archive_before;
         if archive != self.archive_after || archive.build.channel != self.channel {
             return Err("measurement archive stamps or channels disagree".into());
@@ -87,6 +91,15 @@ pub(super) struct IndexedPass {
     export_health: Publication,
     #[serde(rename = "provenance")]
     pub(super) inventory: Inventory,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CatalogMetadata {
+    schema_version: u32,
+    source: CatalogSource,
+    completeness: BTreeMap<String, Selection>,
+    export_health: Publication,
 }
 
 #[derive(Deserialize)]
@@ -121,10 +134,64 @@ impl IndexedPass {
 
 impl Binding {
     pub(super) fn check(&self, pass: &IndexedPass) -> TestResult {
-        if pass.schema_version != SCHEMA_VERSION {
+        self.check_catalog_parts(
+            pass.schema_version,
+            &pass.source,
+            &pass.completeness,
+            &pass.export_health,
+        )
+    }
+
+    pub(crate) fn check_catalog(&self, selected: &Value) -> TestResult {
+        let metadata = CatalogMetadata::deserialize(selected)?;
+        self.check_catalog_parts(
+            metadata.schema_version,
+            &metadata.source,
+            &metadata.completeness,
+            &metadata.export_health,
+        )
+    }
+
+    pub(crate) fn check_archive(&self, archive: &Archive) -> TestResult {
+        let build = archive.build().ok_or("missing installed Build identity")?;
+        let expected = &self.archive.build.build;
+        let modified = utc_rfc3339(
+            archive
+                .file_modified()
+                .ok_or("missing installed Archive modification time")?,
+        );
+        if p4kx_channels::channel_name(archive.path()).as_deref() != Some(self.channel.as_str())
+            || archive.file_len() != self.archive.archive_bytes
+            || modified != stamp_seconds(&self.archive.archive_modified_utc)?
+            || build.branch() != expected.branch
+            || build.version() != expected.version
+            || build.change_number() != expected.change_number
+            || build.build_id() != expected.id
+        {
+            return Err("the installed Archive identity differs from the measurement".into());
+        }
+        let manifest = archive.path().with_file_name("build_manifest.id");
+        let bytes = fs::read(manifest).map_err(|_| "read the installed Build manifest")?;
+        let mut actual = String::with_capacity(64);
+        for byte in Sha256::digest(bytes) {
+            write!(actual, "{byte:02x}")?;
+        }
+        if !actual.eq_ignore_ascii_case(&self.archive.manifest_sha256) {
+            return Err("the installed Build manifest digest differs from the measurement".into());
+        }
+        Ok(())
+    }
+
+    fn check_catalog_parts(
+        &self,
+        schema_version: u32,
+        source: &CatalogSource,
+        completeness: &BTreeMap<String, Selection>,
+        publication: &Publication,
+    ) -> TestResult {
+        if schema_version != SCHEMA_VERSION {
             return Err("replay requires catalog schema v3".into());
         }
-        let source = &pass.source;
         if source.channel.as_deref() != Some(self.channel.as_str())
             || source.build.as_ref() != Some(&self.archive.build.build)
             || source.archive_size != self.archive.archive_bytes
@@ -133,7 +200,6 @@ impl Binding {
         {
             return Err("catalog source identity differs from the measurement".into());
         }
-        let publication = &pass.export_health;
         if publication.mode != "normal"
             || [
                 &publication.status,
@@ -145,13 +211,12 @@ impl Binding {
         {
             return Err("replay requires a complete normal publication".into());
         }
-        if pass
-            .completeness
+        if completeness
             .values()
             .any(|selection| selection.status != "complete")
             || Kind::ALL
                 .iter()
-                .any(|kind| !pass.completeness.contains_key(kind.name()))
+                .any(|kind| !completeness.contains_key(kind.name()))
         {
             return Err("replay requires a complete unfiltered selection".into());
         }

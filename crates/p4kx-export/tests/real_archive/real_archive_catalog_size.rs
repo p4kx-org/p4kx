@@ -14,7 +14,7 @@ use p4kx_extraction::{Archive, DataForgeEntry};
 #[path = "real_archive_catalog_artifact.rs"]
 pub(crate) mod artifact;
 #[path = "real_archive_catalog_replay.rs"]
-mod replay;
+pub(crate) mod replay;
 #[path = "real_archive_catalog_section_pipe.rs"]
 mod sections;
 #[path = "real_archive_catalog_size_support.rs"]

@@ -107,6 +107,19 @@ fn completed_measurement_can_be_read_without_writing_another_catalog() -> TestRe
     );
     write_receipt("complete", CATALOG.len() + 1)?;
     assert!(read().is_err(), "verify the precise decoded count");
+    let claimed = CATALOG.len() / 2;
+    write_receipt("complete", claimed)?;
+    let limited = read_completed(directory.path(), |stream| {
+        let mut bytes = Vec::new();
+        stream.read_to_end(&mut bytes)?;
+        assert_eq!(
+            bytes.len(),
+            claimed + 1,
+            "only one byte beyond the receipt is decoded"
+        );
+        Ok(())
+    });
+    assert!(limited.is_err(), "an understated receipt does not validate");
     write_receipt("stopped-host-headroom", CATALOG.len())?;
     assert!(read().is_err(), "refuse unfinished measurements");
     Ok(())

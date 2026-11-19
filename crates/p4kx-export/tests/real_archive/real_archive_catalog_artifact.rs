@@ -5,6 +5,7 @@ use std::fs::{self, File};
 use std::io::{self, BufReader, Read};
 use std::path::{Path, PathBuf};
 
+use p4kx_export::ZSTD_WINDOW_LOG;
 use serde::Deserialize;
 
 use super::{sections, support};
@@ -70,8 +71,14 @@ pub(crate) fn read_completed<T>(
 ) -> support::TestResult<T> {
     let measurement = Measurement::load(directory)?;
     let frame = open_frame(directory, &measurement.sizes)?;
-    let decoder = zstd::stream::read::Decoder::new(frame)?;
-    let mut input = BufReader::new(CountingReader::new(decoder));
+    let mut decoder = zstd::stream::read::Decoder::new(frame)?;
+    decoder.window_log_max(ZSTD_WINDOW_LOG)?;
+    let limit = measurement
+        .sizes
+        .decoded
+        .checked_add(1)
+        .ok_or("decoded measurement length overflow")?;
+    let mut input = BufReader::new(CountingReader::new(decoder.take(limit)));
     let projection = consume(&mut input)?;
     if input.read(&mut [0])? != 0 || input.into_inner().byte_count() != measurement.sizes.decoded {
         return Err("decoded catalog length differs from the completed measurement".into());
