@@ -16,20 +16,20 @@ or above 25.99 GiB, with at least 69.52 GiB of commit headroom. The sealed row s
 compressed publication. These figures measure the producer run. The local SDK workflow has
 its own 16 GiB system acceptance gate.
 
-| Decoded section | Exact bytes |
-| --- | ---: |
-| `loadouts` | 30,674,479,268 |
-| `provenance` | 22,358,692,968 |
-| `projections.weaponPlayerAnimationCandidates` | 8,587,490,937 |
-| `configurations.interactions` | 5,000,644,330 |
-| `definitions` | 4,875,971,186 |
-| `placements` | 3,226,353,067 |
-| `texts` | 1,663,834,064 |
+| Decoded section | LIVE bytes | PTU bytes |
+| --- | ---: | ---: |
+| `loadouts` | 30,674,479,268 | 30,687,183,746 |
+| `provenance` | 22,358,692,968 | 23,679,210,011 |
+| `projections.weaponPlayerAnimationCandidates` | 8,587,490,937 | 8,877,122,157 |
+| `configurations.interactions` | 5,000,644,330 | 5,316,102,335 |
+| `definitions` | 4,875,971,186 | 5,036,210,389 |
+| `placements` | 3,226,353,067 | 3,508,867,924 |
+| `texts` | 1,663,834,064 | 1,787,491,424 |
 
 Loadouts, provenance and weapon animation candidates together account for 74.54% of the decoded
-document. The target index and source-use inventory need independent parts. Whole-table grouping
+LIVE document. The target index and source-use inventory need independent parts. Whole-table grouping
 alone would leave several tables above the 1,000,000,000-byte decoded reference limit. At that
-limit the current decoded volume would need at least 83 parts, before extra bundle overhead.
+limit LIVE would need at least 83 parts and PTU at least 86, before bundle overhead.
 Measure each encoded part separately because separate frames change compression.
 
 The size comes from JSON records and their source evidence. A resolved Loadout includes the
@@ -46,7 +46,8 @@ level 3, the file is 1,287,882,399 encoded bytes, with 85,600,368,941 decoded by
 the frame. With two Rayon workers, the producer took 21 minutes 14 seconds and reported a
 27.54 GiB Windows working-set peak. Sampled host availability and commit headroom remained at
 or above 29.30 GiB and 74.57 GiB respectively. Windows reported 1,807,985,951 logical process
-write bytes. [Size investigation](https://github.com/p4kx-org/p4kx/issues/1151)
+write bytes. The PTU byte census verified the frame and counted 114,513 physical sources and
+93,861,565 source uses. [Size investigation](https://github.com/p4kx-org/p4kx/issues/1151)
 
 ## Reducing the uncompressed document
 
@@ -71,6 +72,14 @@ A byte census of the completed LIVE file attributed 29,873,701,416 bytes to the
 `requiredTags`. Those arrays contain 690,731,520 reference occurrences. They account for 97.39%
 of `loadouts` and 36.14% of the complete decoded file. The census verified the frame and
 reconciled its disjoint counts against all 30,674,479,268 bytes in `loadouts`.
+
+In PTU `13228337`, the same six arrays occupied 29,871,113,599 bytes across 10,340 trees and
+290,711 ports. The string-compatible encoder at `e29c1ffd5` emits shorter opaque IDs for
+known physical CryXml and text XML coordinates. The PTU census priced 509,833,062 eligible
+ID occurrences in those arrays using their original coordinate shapes and exact replacement
+lengths. The modeled reduction in those six fields is 11,303,107,764 bytes. Applying only
+that reduction yields 74,297,261,177 decoded bytes for the complete PTU Catalog. A paired
+producer run is required for the actual total decoded and compressed sizes.
 
 A deterministic one-to-one remap to nine-character ASCII identifiers would retain the current
 string schema. It bounds the six arrays at 8,292,191,628 bytes including quotes, separators
