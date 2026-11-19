@@ -78,8 +78,14 @@ In PTU `13228337`, the same six arrays occupied 29,871,113,599 bytes across 10,3
 known physical CryXml and text XML coordinates. The PTU census priced 509,833,062 eligible
 ID occurrences in those arrays using their original coordinate shapes and exact replacement
 lengths. The modeled reduction in those six fields is 11,303,107,764 bytes. Applying only
-that reduction yields 74,297,261,177 decoded bytes for the complete PTU Catalog. A paired
-producer run is required for the actual total decoded and compressed sizes.
+that reduction yields 74,297,261,177 decoded bytes for the complete PTU Catalog.
+
+The paired native Windows AMD64 producer at `8a23763e`, from integration head `e29c1ffd5`,
+completed on the same PTU Archive stamp and options. The decoded size fell from 85,600,368,941
+to 74,174,978,158 bytes, a reduction of 11,425,390,783 bytes (13.35%). The Zstandard level 3
+file fell from 1,287,882,399 to 1,282,450,554 bytes, a reduction of 5,431,845 bytes (0.42%).
+The source-use IDs remain document-local strings. Domains and encryption markers still use
+the same schema-v3 fields.
 
 A deterministic one-to-one remap to nine-character ASCII identifiers would retain the current
 string schema. It bounds the six arrays at 8,292,191,628 bytes including quotes, separators
