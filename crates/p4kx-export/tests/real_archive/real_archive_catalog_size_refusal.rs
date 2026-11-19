@@ -111,6 +111,11 @@ mod tests {
         report("LIVE", "123", refusal.health(), |line| {
             lines.push(line.to_string());
         });
+        assert_report(&lines);
+        Ok(())
+    }
+
+    fn assert_report(lines: &[String]) {
         assert!(
             lines
                 .iter()
@@ -137,15 +142,21 @@ mod tests {
         );
         assert!(
             lines.iter().any(|line| line.ends_with(
-                "kind=lootContainers role=DerivedInput operation=Enumeration code=SourceReadFailure stage=SourceRead entry_status=Absent count=1"
+                "kind=lootContainers stage=DerivedProjection severity=Warning code=VerifiedMissingReference role=Some(DerivedInput) warning=- count=1 unit=EntryOperations"
             )),
-            "unavailable authored targets are distinct from unreadable physical Entries"
+            "the proved absent target is reported as a warning"
+        );
+        assert!(
+            lines.iter().all(|line| {
+                !line.starts_with("catalog sizing refusal entry")
+                    || !line.contains("kind=lootContainers")
+            }),
+            "the verified absent target contributes no failed Entry operation"
         );
         assert!(
             lines.iter().all(|line| !line.contains("private-")),
             "authored paths and record identities never reach the measurement log"
         );
-        Ok(())
     }
 
     fn refused_sources() -> TestResult<(tempfile::TempDir, Archive)> {

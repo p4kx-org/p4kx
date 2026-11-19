@@ -14,7 +14,7 @@ use crate::starmap_fixture::guid_text;
 
 use std::error::Error;
 
-use p4kx_export::Kind;
+use p4kx_export::{ExportDiagnosticCode, ExportDiagnosticSeverity, Kind};
 use serde_json::{Value, json};
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -109,12 +109,23 @@ fn warning_details(
 #[test]
 fn a_placed_container_the_archive_lacks_is_warned_about() -> TestResult {
     let (built, catalog) = build()?;
-    let details = warning_details(&built, "unreadable_loot_containers")?;
-    assert_eq!(
-        details,
-        [format!(
-            "{GHOST}: placed by an entity but not in the Archive"
-        )]
+    let health = built.summary().export_health();
+    let warning = health
+        .diagnostics()
+        .iter()
+        .find(|row| {
+            row.kind == Some(Kind::LootContainers)
+                && row.code == ExportDiagnosticCode::VerifiedMissingReference
+        })
+        .ok_or("verified missing container warning")?;
+    assert_eq!(warning.severity, ExportDiagnosticSeverity::Warning);
+    assert_eq!(warning.count, 1);
+    assert!(
+        health
+            .failed_entries()
+            .iter()
+            .all(|entry| entry.kind() != Kind::LootContainers),
+        "the proved absent target contributes no failed Entry operation"
     );
     let ghost = catalog["lootContainers"]
         .as_array()
