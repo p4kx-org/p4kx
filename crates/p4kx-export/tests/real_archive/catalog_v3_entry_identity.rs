@@ -3,11 +3,12 @@
 
 use std::collections::HashMap;
 
+use p4kx_export::Kind;
 use serde_json::Value;
 
 use super::{TestResult, present};
 
-pub(super) fn check(catalog: &Value, rows: &[Value]) -> TestResult<()> {
+pub(super) fn check(catalog: &Value, kind: Kind, rows: &[Value]) -> TestResult<()> {
     if rows.is_empty() {
         return Ok(());
     }
@@ -25,8 +26,18 @@ pub(super) fn check(catalog: &Value, rows: &[Value]) -> TestResult<()> {
         )?;
         let path = entry_path(identity, "sourcePath")?;
         let normalized = entry_path(identity, "normalizedPath")?;
-        if normalized.contains('\\') || !path.replace('\\', "/").eq_ignore_ascii_case(normalized) {
-            return Err("normalized Entry path differs from the physical source path".into());
+        let expected = if kind == Kind::ParticleLibraries {
+            path.trim_start_matches(['/', '\\'])
+                .replace('/', "\\")
+                .to_ascii_lowercase()
+        } else {
+            path.replace('\\', "/")
+        };
+        if normalized != expected {
+            return Err(format!(
+                "{kind}: normalized Entry path differs from the physical source path"
+            )
+            .into());
         }
         if identities.insert(id, (index, path)).is_some() {
             return Err("duplicate physical Entry identity".into());

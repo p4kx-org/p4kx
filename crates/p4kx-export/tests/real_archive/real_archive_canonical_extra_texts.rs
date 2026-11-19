@@ -13,11 +13,11 @@ use crate::catalog_v3_consumer;
 mod installed_items;
 
 pub(super) fn location_templates(
-    catalog: &Value,
+    rows: &[Value],
     index: &TextIndex<'_>,
     counters: &mut CoverageCounters<'_>,
 ) -> TestResult<()> {
-    for template in catalog_v3_consumer::rows(catalog, Kind::MissionLocationTemplates)? {
+    for template in rows {
         let Some(names) = catalog_v3_consumer::source_value(
             template.get("names").ok_or("location name collection")?,
         )?
@@ -40,11 +40,11 @@ pub(super) fn location_templates(
 }
 
 pub(super) fn npc_names(
-    catalog: &Value,
+    rows: &[Value],
     index: &TextIndex<'_>,
     counters: &mut CoverageCounters<'_>,
 ) -> TestResult<()> {
-    for pool in catalog_v3_consumer::rows(catalog, Kind::ContractNpcSpawns)? {
+    for pool in rows {
         for group in super::graph::array(pool, "groups")? {
             for option in super::graph::array(group, "options")? {
                 let name = option.get("embeddedName").ok_or("NPC embedded name")?;
@@ -252,12 +252,13 @@ fn localization(component: &Value) -> TestResult<Option<&Value>> {
 
 pub(super) fn items(
     catalog: &Value,
+    rows: &[Value],
     index: &TextIndex<'_>,
     counters: &mut CoverageCounters<'_>,
 ) -> TestResult<()> {
     let presentations = ItemPresentationIndex::new(catalog)?;
     let mut selected = HashSet::new();
-    for item in catalog_v3_consumer::rows(catalog, Kind::Items)? {
+    for item in rows {
         if !selected.insert(record_index(item)?) {
             return Err("duplicate physical Item projection".into());
         }

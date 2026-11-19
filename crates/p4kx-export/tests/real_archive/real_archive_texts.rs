@@ -10,14 +10,18 @@
 //! `@`, ASCII case ignored, the last plain and suffixed declarations with a non-empty plain
 //! value preferred, `\n` decoded and the text trimmed) and does not use the exporter's lookup.
 
+use std::error::Error;
+use std::fmt;
+
 use p4kx_export::{Kind, Language, catalog_schema};
 use p4kx_extraction::{Archive, LocalizationSet};
 use serde_json::Value;
 
+use crate::catalog_v3_consumer;
 pub(crate) use crate::real_archive_canonical_texts::manufacturer_text;
 use crate::real_archive_canonical_texts::{TextIndex, kind_coverage};
 use crate::real_archive_text_oracle::Oracle;
-use crate::real_archive_verification::{TestResult, list, print_line};
+use crate::real_archive_verification::{TestResult, print_line};
 
 #[path = "real_archive_texts_tests.rs"]
 mod tests;
@@ -81,9 +85,6 @@ const GERMAN_FLOORS: [(Kind, usize); 1] = [(Kind::MissionBrokerEntries, 90)];
 /// compared.
 const MISSION_TOKEN: &str = "~mission(";
 
-/// How many keys of a kind a failure message names.
-const SAMPLE: usize = 3;
-
 /// What the catalog holds for the keyed texts of one kind in one language.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub(crate) struct Coverage {
@@ -94,9 +95,6 @@ pub(crate) struct Coverage {
     /// Texts where the catalog contradicts the file: the exporter is wrong.
     contradictions: usize,
     supplemental_contradictions: usize,
-    /// The first keys of the contradictions and of the fallbacks.
-    contradicted: Vec<String>,
-    lacking: Vec<String>,
 }
 
 impl Coverage {
@@ -109,16 +107,9 @@ impl Coverage {
             }
             (None, Some(Value::Null)) => {
                 self.fallback += 1;
-                if self.lacking.len() < SAMPLE {
-                    self.lacking.push(key.to_owned());
-                }
             }
-            (expected, shown) => {
+            _ => {
                 self.contradictions += 1;
-                if self.contradicted.len() < SAMPLE {
-                    self.contradicted
-                        .push(format!("{key}: file {expected:?}, catalog {shown:?}"));
-                }
             }
         }
     }
@@ -131,18 +122,11 @@ impl Coverage {
         if shown.as_str() == Some(expected) {
             if expected.is_empty() {
                 self.fallback += 1;
-                if self.lacking.len() < SAMPLE {
-                    self.lacking.push(key.to_owned());
-                }
             } else {
                 self.resolved += 1;
             }
         } else {
             self.contradictions += 1;
-            if self.contradicted.len() < SAMPLE {
-                self.contradicted
-                    .push(format!("{key}: file {expected:?}, catalog {shown:?}"));
-            }
         }
     }
 
@@ -163,24 +147,30 @@ impl Coverage {
             self.count_canonical(oracle, key, shown);
         } else {
             self.contradictions += 1;
-            if self.contradicted.len() < SAMPLE {
-                self.contradicted.push(format!(
-                    "{key}: source file {expected:?}, catalog {source:?}"
-                ));
-            }
         }
     }
 
     pub(super) fn with_supplemental(mut self, extra: Self) -> Self {
         self.supplemental_contradictions = extra.contradictions;
-        let available = SAMPLE.saturating_sub(self.contradicted.len());
-        self.contradicted
-            .extend(extra.contradicted.into_iter().take(available));
         self
     }
 
     const fn total(&self) -> usize {
         self.resolved + self.fallback + self.contradictions
+    }
+}
+
+impl fmt::Display for Coverage {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "total={} resolved={} fallback={} contradictions={} supplementalContradictions={}",
+            self.total(),
+            self.resolved,
+            self.fallback,
+            self.contradictions,
+            self.supplemental_contradictions,
+        )
     }
 }
 
@@ -232,29 +222,47 @@ fn baseline(kind: Kind) -> Baseline {
 /// and prints the numbers per kind; `baselined` also holds each kind to its [`Baseline`], which
 /// holds for LIVE only.
 pub(crate) fn check_texts(archive: &Archive, catalog: &Value, baselined: bool) -> TestResult {
-    let set = LocalizationSet::read(archive, &[Language::English, Language::German])?;
+    let set = LocalizationSet::read(archive, &[Language::English, Language::German])
+        .map_err(|_| "could not read Archive localization sources")?;
     let (english_oracle, german_oracle) = (
         Oracle::of(&set, Language::English)?,
         Oracle::of(&set, Language::German)?,
     );
+    check_catalog_texts(catalog, &english_oracle, &german_oracle, baselined)
+}
+
+fn check_catalog_texts(
+    catalog: &Value,
+    english_oracle: &Oracle,
+    german_oracle: &Oracle,
+    baselined: bool,
+) -> TestResult {
     let fields = text_fields();
-    let index = TextIndex::new(catalog)?;
+    let index = TextIndex::new(catalog).map_err(|_| "invalid canonical text index")?;
     let mut failures: Vec<String> = Vec::new();
     for kind in Kind::ALL {
-        let (english, german) = kind_coverage(
+        let Ok(rows) = text_rows(catalog, kind) else {
+            failures.push(format!("{kind}: invalid dataset rows or source identities"));
+            continue;
+        };
+        let Ok((english, german)) = kind_coverage(
             catalog,
             &index,
             kind,
+            rows,
             &fields,
-            &english_oracle,
-            &german_oracle,
-        )?;
+            english_oracle,
+            german_oracle,
+        ) else {
+            failures.push(format!("{kind}: invalid text carriers or references"));
+            continue;
+        };
         check_coverage(
             kind,
             &english,
             &german,
             baselined,
-            list(catalog, kind)?.len(),
+            rows.len(),
             &mut failures,
         );
     }
@@ -263,6 +271,15 @@ pub(crate) fn check_texts(archive: &Archive, catalog: &Value, baselined: bool) -
     } else {
         Err(failures.join("\n").into())
     }
+}
+
+pub(super) fn text_rows(catalog: &Value, kind: Kind) -> Result<&[Value], Box<dyn Error>> {
+    let rows = if kind == Kind::Commodities {
+        catalog_v3_consumer::presentations(catalog)?
+    } else {
+        catalog_v3_consumer::rows(catalog, kind)?
+    };
+    Ok(rows.as_slice())
 }
 
 fn floor_verdict(kind: Kind, german: &Coverage, failures: &mut Vec<String>) {
@@ -286,8 +303,7 @@ fn verdict(
     let contradictions = coverage.contradictions + coverage.supplemental_contradictions;
     if contradictions > 0 {
         failures.push(format!(
-            "{kind}: {} {language} texts contradict the global.ini, e.g. {:?}",
-            contradictions, coverage.contradicted
+            "{kind}: {contradictions} {language} texts contradict the global.ini"
         ));
     }
     let fallback = share(coverage.fallback, coverage.total());
@@ -295,8 +311,9 @@ fn verdict(
         && fallback > ceiling
     {
         failures.push(format!(
-            "{kind}: {fallback:.3} of the {language} texts fall back, above the baseline {ceiling:.2}, e.g. {:?}",
-            coverage.lacking
+            "{kind}: {} of {} {language} texts fall back, above the baseline {ceiling:.2}",
+            coverage.fallback,
+            coverage.total()
         ));
     }
 }
@@ -309,8 +326,10 @@ fn check_coverage(
     row_count: usize,
     failures: &mut Vec<String>,
 ) {
-    let keyed = english.total();
-    if keyed == 0 {
+    print_line(&format!(
+        "{kind}: rows={row_count} en [{english}] de [{german}]"
+    ));
+    if english.total() == 0 {
         if baselined
             && matches!(
                 kind,
@@ -339,18 +358,6 @@ fn check_coverage(
         return;
     }
     let baseline = baseline(kind);
-    print_line(&format!(
-        "{kind}: {keyed} keyed texts, en {} resolved / {} unresolved ({:.3}, baseline {:.2}, e.g. {:?}), de {} resolved / {} unresolved ({:.3}, baseline {:.2})",
-        english.resolved,
-        english.fallback,
-        share(english.fallback, keyed),
-        baseline.english,
-        english.lacking,
-        german.resolved,
-        german.fallback,
-        share(german.fallback, keyed),
-        baseline.german,
-    ));
     verdict(
         kind,
         "en",

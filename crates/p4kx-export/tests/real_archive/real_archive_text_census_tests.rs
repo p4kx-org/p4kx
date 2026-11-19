@@ -12,7 +12,7 @@ use crate::catalog_v3_consumer;
 use crate::commodity_v3_fixture::{self as fixture, DcbOrigin};
 use crate::real_archive_canonical_texts::{TextIndex, kind_coverage};
 use crate::real_archive_text_oracle::Oracle;
-use crate::real_archive_texts::{Coverage, check_coverage, text_fields};
+use crate::real_archive_texts::{Coverage, check_coverage, text_fields, text_rows};
 
 #[test]
 fn text_census_matches_a_published_synthetic_catalog() -> TestResult<()> {
@@ -164,9 +164,9 @@ fn compare(
     english: &Oracle,
     german: &Oracle,
 ) -> Result<CheckedKind, String> {
-    let rows = catalog_v3_consumer::rows(document, kind).map_err(|error| error.to_string())?;
+    let rows = text_rows(document, kind).map_err(|error| error.to_string())?;
     let index = TextIndex::new(document).map_err(|error| error.to_string())?;
-    let (english, german) = kind_coverage(document, &index, kind, fields, english, german)
+    let (english, german) = kind_coverage(document, &index, kind, rows, fields, english, german)
         .map_err(|error| error.to_string())?;
     let mut failures = Vec::new();
     check_coverage(kind, &english, &german, false, rows.len(), &mut failures);
@@ -182,7 +182,7 @@ fn compare(
 fn text_census_keeps_physical_entry_identities_without_retaining_the_use_inventory()
 -> TestResult<()> {
     let source_path = r"Data\Libs\GameAudio\Fixture.xml";
-    let normalized_path = "data/libs/gameaudio/fixture.xml";
+    let normalized_path = "Data/Libs/GameAudio/Fixture.xml";
     let radar = entry_table("entry-radar", 7, source_path, normalized_path);
     let flare = entry_table("entry-flare", 11, source_path, normalized_path);
     let input = json!({
@@ -232,6 +232,46 @@ fn text_census_keeps_physical_entry_identities_without_retaining_the_use_invento
     assert!(
         catalog_v3_consumer::rows(&projected, Kind::RadarAudio).is_err(),
         "the compact capture still detects a mismatched physical Entry index",
+    );
+    Ok(())
+}
+
+#[test]
+fn text_census_checks_particle_path_and_physical_binding() -> TestResult<()> {
+    let source_path = r"Data/Libs\Particles/Fixture.XML";
+    let particles = entry_table(
+        "entry-particle",
+        7,
+        source_path,
+        r"data\libs\particles\fixture.xml",
+    );
+    let input = json!({
+        "schemaVersion": SCHEMA_VERSION,
+        "definitions": {"particleLibraries": particles},
+        "provenance": {"sources": [{
+            "id": "entry-particle", "kind": "archiveEntry", "entryIndex": 7,
+            "path": sourced_path(source_path)
+        }]}
+    });
+    let encoded = serde_json::to_vec(&input)?;
+    let mut projected = catalog_paths().read(encoded.as_slice())?;
+    assert_eq!(
+        catalog_v3_consumer::rows(&projected, Kind::ParticleLibraries)?.len(),
+        1,
+        "the Particle Library retains a source-bound Archive Entry",
+    );
+
+    let path = projected
+        .pointer_mut("/definitions/particleLibraries/rows/0/identity/normalizedPath/value")
+        .ok_or("projected Particle Library path")?;
+    *path = json!("data/libs/particles/fixture.xml");
+    let failure = catalog_v3_consumer::rows(&projected, Kind::ParticleLibraries)
+        .expect_err("the Particle Library key uses archive separators");
+    assert!(
+        failure
+            .to_string()
+            .contains("normalized Entry path differs"),
+        "reject an incorrect normalized path after capture",
     );
     Ok(())
 }

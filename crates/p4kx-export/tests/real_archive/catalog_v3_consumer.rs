@@ -148,7 +148,7 @@ fn checked_table<'catalog>(
         kind,
         Kind::ParticleLibraries | Kind::FlareLibraries | Kind::RadarAudio
     ) {
-        entry_identity::check(catalog, rows)?;
+        entry_identity::check(catalog, kind, rows)?;
         return Ok(rows);
     }
     for row in rows {

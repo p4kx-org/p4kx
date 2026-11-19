@@ -37,6 +37,13 @@ pub(crate) struct Blueprints<'catalog> {
 impl<'catalog> Blueprints<'catalog> {
     pub(crate) fn read(catalog: &'catalog Value) -> TestResult<Self> {
         let definitions = catalog_v3_consumer::rows(catalog, Kind::Blueprints)?;
+        Self::from_definitions(catalog, definitions)
+    }
+
+    pub(crate) fn from_definitions(
+        catalog: &'catalog Value,
+        definitions: &'catalog [Value],
+    ) -> TestResult<Self> {
         let mut presentations = HashMap::new();
         for row in array(catalog, "/projections/blueprintPresentation/rows")? {
             let owner = &row["blueprint"];
@@ -67,10 +74,9 @@ impl<'catalog> Blueprints<'catalog> {
                 tiers: tiers.remove(&owner).unwrap_or_default(),
             });
         }
-        assert!(
-            presentations.is_empty() && tiers.is_empty(),
-            "every contextual row has one actual definition"
-        );
+        if !presentations.is_empty() || !tiers.is_empty() {
+            return Err("every contextual row must have one actual definition".into());
+        }
         Ok(Self { rows })
     }
 

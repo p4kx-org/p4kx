@@ -14,7 +14,7 @@ Decided for issue #916. Evidence: LIVE 4.10. Builds on ADR-0054 (additive catalo
     lookup: the key without its `@`, ASCII case ignored, a `key,P=` line standing for `key`, the
     first non-empty text, `\n` decoded and the text trimmed. The catalog's text must equal it; a key
     the file lacks or holds empty must be `null` (the Basetool falls back to English). A
-    contradiction fails and names the kind, the keys and both texts. A contract text with a
+    contradiction fails and is counted by kind and language. A contract text with a
     `~mission(…)` token is rewritten by the exporter, so only its presence is compared;
   - every `name` and every field marked `x-gameText` in the JSON Schema is measured wherever it
     sits in an entry, so a new text field is covered without a change of the test;
@@ -23,7 +23,9 @@ Decided for issue #916. Evidence: LIVE 4.10. Builds on ADR-0054 (additive catalo
     listed has a baseline of zero, so a new kind with untranslated keys names itself and its
     baseline is added on purpose. Other Channels check only the contradictions (ADR-0038: no
     test-channel numbers in committed tests).
-- The numbers of every kind are printed, with the first keys the English file lacks.
+- The report gives each kind's row count and the exact totals, resolutions, fallbacks and
+  contradictions per language. Supplemental contradictions have a separate count. Structural
+  failures are reported by kind and failure category. Checks continue for the remaining kinds.
 - `missionLocationTemplates[].names[]` exports `displayName` as a game text (`x-gameText`) again,
   like every other named kind: #910 had reduced it to the `nameKey` to stay above the German floor.
   The catalog stays additive within schema version 2 (ADR-0054).

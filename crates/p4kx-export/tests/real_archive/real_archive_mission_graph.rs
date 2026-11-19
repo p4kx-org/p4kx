@@ -38,6 +38,14 @@ pub(crate) struct Mission<'catalog> {
 
 pub(crate) fn contexts(catalog: &Value, family: Family) -> Result<Vec<Mission<'_>>> {
     let definitions = table(catalog, "definitions", family)?;
+    contexts_from_definitions(catalog, family, definitions)
+}
+
+pub(crate) fn contexts_from_definitions<'catalog>(
+    catalog: &'catalog Value,
+    family: Family,
+    definitions: &'catalog [Value],
+) -> Result<Vec<Mission<'catalog>>> {
     let mut by_identity = HashMap::new();
     for definition in definitions {
         let physical = (

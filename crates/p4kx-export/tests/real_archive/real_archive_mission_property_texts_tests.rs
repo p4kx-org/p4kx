@@ -7,6 +7,7 @@ use p4kx_export::Kind;
 use serde_json::{Value, json};
 
 use super::{Coverage, Oracle, TestResult, real_archive_canonical_texts, replace_value};
+use crate::real_archive_texts::text_rows;
 
 #[test]
 fn generator_option_text_coverage_counts_every_authored_occurrence() -> TestResult {
@@ -329,6 +330,7 @@ fn mission_coverage(
         catalog,
         &real_archive_canonical_texts::TextIndex::new(catalog)?,
         Kind::MissionPropertySets,
+        text_rows(catalog, Kind::MissionPropertySets)?,
         &[],
         english,
         german,

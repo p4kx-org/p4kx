@@ -30,7 +30,7 @@ use p4kx_extraction::{Language, LocalizationSet};
 use p4kx_testkit::DataForgeBuilder;
 use serde_json::{Value, json};
 
-use super::{Coverage, Oracle, check_coverage};
+use super::{Coverage, Oracle, check_coverage, text_rows};
 use crate::catalog_v3_consumer;
 use crate::commodity_v3_fixture::{self as source, DcbOrigin};
 use crate::real_archive_canonical_texts;
@@ -67,6 +67,7 @@ impl Fixture {
             catalog,
             &index,
             kind,
+            text_rows(catalog, kind)?,
             &[],
             &self.english,
             &self.german,

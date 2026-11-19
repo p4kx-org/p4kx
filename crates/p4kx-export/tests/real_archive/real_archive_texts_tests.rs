@@ -109,6 +109,37 @@ fn a_per_kind_floor_survives_unlimited_source_gaps() {
     assert_eq!(failures.len(), 1, "the resolved-text floor remains binding");
 }
 
+#[test]
+fn text_oracle_checks_later_kinds_after_invalid_rows_without_printing_values()
+-> Result<(), Box<dyn Error>> {
+    let catalog = json!({
+        "texts": {"publicNames": [], "gameTexts": []},
+        "items": {},
+        "paints": [{"name": {
+            "key": "@private_fixture_key", "en": "private_fixture_export", "de": null
+        }}],
+    });
+    let english = Oracle::parse("private_fixture_key=private_fixture_source\n");
+    let german = Oracle::parse("");
+    let report = super::check_catalog_texts(&catalog, &english, &german, false)
+        .expect_err("the oracle must report structural and source failures")
+        .to_string();
+
+    assert!(
+        report.contains("items: invalid dataset rows or source identities"),
+        "report the earlier structural failure by kind",
+    );
+    assert!(
+        report.contains("paints: 1 en texts contradict the global.ini"),
+        "check the later dataset against the independently read source",
+    );
+    assert!(
+        !report.contains("private_fixture"),
+        "the release report omits keys, exported text and original INI text",
+    );
+    Ok(())
+}
+
 fn canonical_catalog() -> Result<Value, Box<dyn Error>> {
     use p4kx_export::CatalogOptions;
     use p4kx_testkit::{ArchiveBuilder, DataForgeBuilder, TestEntry, TestStruct, TestType};
@@ -190,7 +221,9 @@ fn assert_original_locales(archive: &Archive) -> Result<(), Box<dyn Error>> {
 fn canonical_coverage(catalog: &Value) -> Result<(Coverage, Coverage), Box<dyn Error>> {
     let oracle = Oracle::parse("name=Correct\ndescription=  \n");
     let index = super::TextIndex::new(catalog)?;
-    super::kind_coverage(catalog, &index, Kind::Manufacturers, &[], &oracle, &oracle)
+    let kind = Kind::Manufacturers;
+    let rows = super::text_rows(catalog, kind)?;
+    super::kind_coverage(catalog, &index, kind, rows, &[], &oracle, &oracle)
 }
 
 #[test]

@@ -41,11 +41,11 @@ fn installed_live_catalog_texts_match_the_independent_source_oracle() -> TestRes
         return Err("per-kind baselines require the installed LIVE Channel".into());
     }
     verify_build(&archive, &catalog)?;
-    check_texts(&archive, &catalog, true)?;
+    let comparison = check_texts(&archive, &catalog, true);
     watch
         .check()
         .map_err(|_| "Archive changed during source comparison")?;
-    Ok(())
+    comparison
 }
 
 fn write_live_catalog(archive: &Archive) -> census::TestResult<Value> {
