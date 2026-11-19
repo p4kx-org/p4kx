@@ -17,6 +17,9 @@ use serde_json::value::RawValue;
 #[path = "shop_inventory_survey_report.rs"]
 mod survey_report;
 
+#[path = "shop_inventory_sdk_proof.rs"]
+mod sdk;
+
 use survey_report::report;
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
@@ -36,6 +39,7 @@ struct Survey {
     rentals: BTreeMap<&'static str, usize>,
     number_tokens: usize,
     readable: usize,
+    empty: usize,
     malformed: usize,
     unreadable: usize,
 }
@@ -88,7 +92,8 @@ fn physical_shop_inventories_and_resolution_targets_match_the_installed_build() 
         let row = physical
             .get(&u64::from(original.entry_index()))
             .ok_or("actual inventory row")?;
-        verify_file(&archive, original, row, &uses, &mut survey)?;
+        let decoded = bytes(&archive, entry);
+        verify_decoded(original, row, &uses, &mut survey, decoded.as_deref())?;
     }
     watch.check()?;
     report(&archive, definitions.len(), &relations, &survey)
@@ -182,18 +187,24 @@ fn token_index(catalog: &Value) -> TestResult<TokenUses<'_>> {
 }
 
 fn bytes(archive: &Archive, entry: &Entry) -> Option<Vec<u8>> {
-    let mut reader = archive.open_entry(entry).ok()?.reject_overlong();
+    let mut reader = if entry.uncompressed_size() == 0 {
+        archive.open_entry_verified(entry)
+    } else {
+        archive.open_entry(entry)
+    }
+    .ok()?
+    .reject_overlong();
     let mut decoded = Vec::new();
     reader.read_to_end(&mut decoded).ok()?;
     Some(decoded)
 }
 
-fn verify_file(
-    archive: &Archive,
+fn verify_decoded(
     original: ObservedEntry<'_>,
     row: &Value,
     uses: &TokenUses<'_>,
     survey: &mut Survey,
+    decoded: Option<&[u8]>,
 ) -> TestResult {
     let entry = original.entry();
     assert!(
@@ -201,7 +212,7 @@ fn verify_file(
         "exact original path at the physical directory position"
     );
     let document = row.get("document").ok_or("source document")?;
-    let Some(bytes) = bytes(archive, entry) else {
+    let Some(bytes) = decoded else {
         survey.unreadable += 1;
         assert_eq!(
             document["state"], "unreadable",
@@ -209,7 +220,12 @@ fn verify_file(
         );
         return Ok(());
     };
-    if serde_json::from_slice::<&RawValue>(&bytes).is_err() {
+    if bytes.is_empty() && entry.uncompressed_size() == 0 {
+        survey.empty += 1;
+        assert_eq!(document["state"], "absent", "verified empty source payload");
+        return Ok(());
+    }
+    if serde_json::from_slice::<&RawValue>(bytes).is_err() {
         survey.malformed += 1;
         assert_eq!(document["state"], "invalid", "actual invalid source JSON");
         return Ok(());
@@ -228,7 +244,7 @@ fn verify_file(
     );
     let body = document.get("value").ok_or("present document")?;
     let arena = Arena {
-        bytes: &bytes,
+        bytes,
         id: text(row, "inputRef")?,
         values: rows(body, "/source/values")?,
         uses,

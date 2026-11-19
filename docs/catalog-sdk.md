@@ -68,6 +68,13 @@ Entry path and position or, for an out-of-range index, the admitted root directo
 Path and full inventory searches cite the paths they consulted. The query opens neither the
 shop registry nor DataForge.
 
+Set `P4KX_DATA_P4K` and `P4KX_DATA_P4K_B` to the installed Archives to verify one
+original inventory from each Build and an index outside each admitted directory.
+
+```text
+cargo test --locked -p p4kx-export --test real_archive real_archive_shop_inventory_v3::sdk::selective_shop_inventories_match_an_original_inventory_and_missing_index -- --ignored --exact --nocapture --test-threads=1
+```
+
 ## Resolve field origins
 
 Use each query's own `SourceInventory`. `SourcedValue::origin` supplies the encryption filter,
