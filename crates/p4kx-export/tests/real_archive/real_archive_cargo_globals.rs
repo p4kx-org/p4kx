@@ -20,6 +20,7 @@ use serde_json::{Value, json};
 
 use crate::catalog_v3_consumer;
 use crate::real_archive_catalog_pipe::{self as pipe, CountingReader};
+use crate::real_archive_catalog_table_parity::collect_references;
 use crate::real_archive_item_durability::Trace;
 use crate::real_archive_shop_inventory_v3::verify_build;
 
@@ -253,25 +254,6 @@ fn referenced_uses<'wire>(
         .map(serde_json::to_value)
         .collect::<Result<_, _>>()
         .map_err(Into::into)
-}
-
-fn collect_references<'a>(value: &'a Value, references: &mut HashSet<&'a str>) {
-    match value {
-        Value::Object(fields) => {
-            if let Some(ids) = fields.get("sourceUsesRefs").and_then(Value::as_array) {
-                references.extend(ids.iter().filter_map(Value::as_str));
-            }
-            for field in fields.values() {
-                collect_references(field, references);
-            }
-        }
-        Value::Array(values) => {
-            for value in values {
-                collect_references(value, references);
-            }
-        }
-        _ => {}
-    }
 }
 
 fn compare_record<'source>(

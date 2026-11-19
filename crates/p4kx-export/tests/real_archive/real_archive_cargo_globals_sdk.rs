@@ -14,6 +14,7 @@ use serde_json::Value;
 
 use super::TestResult;
 use crate::catalog_v3_consumer;
+use crate::real_archive_catalog_table_parity::first_difference;
 
 #[path = "real_archive_cargo_globals_complete_catalog.rs"]
 mod complete_catalog;
@@ -55,7 +56,7 @@ fn verify_sdk_rows<Row: Serialize>(
         let expected = by_index
             .remove(&record_index(&exported)?)
             .ok_or("selective cargo row lacks a unique canonical physical owner")?;
-        if let Some(path) = first_cargo_difference(expected, &exported) {
+        if let Some(path) = first_difference(expected, &exported) {
             return Err(format!("the selective cargo row differs at {path}").into());
         }
     }
@@ -66,35 +67,4 @@ fn record_index(row: &Value) -> TestResult<u64> {
     row.pointer("/recordIndex/value")
         .and_then(Value::as_u64)
         .ok_or_else(|| "a cargo row needs a physical Record position".into())
-}
-
-fn first_cargo_difference(expected: &Value, actual: &Value) -> Option<String> {
-    if expected == actual {
-        return None;
-    }
-    match (expected, actual) {
-        (Value::Object(expected), Value::Object(actual)) => {
-            for (key, child) in expected {
-                match actual.get(key) {
-                    Some(actual) => {
-                        if let Some(path) = first_cargo_difference(child, actual) {
-                            return Some(format!("/{key}{path}"));
-                        }
-                    }
-                    None => return Some(format!("/{key}")),
-                }
-            }
-            Some("/additionalKey".into())
-        }
-        (Value::Array(expected), Value::Array(actual)) if expected.len() == actual.len() => {
-            expected
-                .iter()
-                .zip(actual)
-                .enumerate()
-                .find_map(|(at, (left, right))| {
-                    first_cargo_difference(left, right).map(|path| format!("/{at}{path}"))
-                })
-        }
-        _ => Some(String::new()),
-    }
 }
