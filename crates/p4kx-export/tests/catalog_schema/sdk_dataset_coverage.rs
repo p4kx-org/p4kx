@@ -21,6 +21,9 @@ const FLARE_LIBRARIES: &str = "/definitions/flareLibraries";
 const RADAR_AUDIO: &str = "/configurations/radarAudio";
 const AMMUNITION: &str = "/definitions/ammoDefinitions";
 const LOCATION_ENTITIES: &str = "/definitions/locationEntityDeclarations";
+const BLUEPRINT_POOLS: &str = "/definitions/blueprintPools";
+const BLUEPRINT_POOL_WEIGHTS: &str = "/projections/blueprintPoolWeights";
+const BLUEPRINT_REWARDS: &str = "/declarations/blueprintRewardSources";
 const PROJECTILE_AMMUNITION: &str = "/projections/weaponProjectileAmmoSelections";
 const MAGAZINE_RESOLUTION: &str = "/projections/weaponMagazineResolutions";
 const WEAPON_COMBAT: &str = "/projections/weaponCombatBases";
@@ -75,6 +78,9 @@ fn sdk_query_witnesses_keep_their_canonical_dataset_contract() -> TestResult {
     for path in [
         LANGUAGE_SOURCES,
         LOCATION_ENTITIES,
+        BLUEPRINT_POOLS,
+        BLUEPRINT_POOL_WEIGHTS,
+        BLUEPRINT_REWARDS,
         SHOP_INVENTORIES,
         FLARE_LIBRARIES,
         RADAR_AUDIO,

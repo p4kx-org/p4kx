@@ -25,6 +25,8 @@ use super::{
     Route, SHOP_INVENTORIES, TestResult, UNRESOLVED, WEAPON_RECOIL,
 };
 
+#[path = "sdk_blueprint_pool_routes.rs"]
+mod blueprint_pools;
 #[path = "sdk_component_definition_routes.rs"]
 mod component_definitions;
 #[path = "sdk_flight_configuration_routes.rs"]
@@ -84,6 +86,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
             "system-root and occurrence query available; root enumeration and installed parity open",
         )?,
     ];
+    routes.extend(blueprint_pools::read()?);
     routes.extend(component_definitions::read()?);
     routes.extend(flight_configurations::read()?);
     Ok(routes)
