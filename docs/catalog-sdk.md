@@ -45,6 +45,14 @@ The callback receives the Build, notes and the result's own SourceInventory. The
 no DataForge Entry and creates no Catalog output. A failed requested read returns an error.
 Publish caller-owned state after the outer query returns successfully.
 
+Verify the original localization Entry metadata on an installed Archive with
+P4KX_DATA_P4K and the configured testkit key. Set P4KX_DATA_P4K_B for a second input.
+The witness checks the original physical Entries and their independently read metadata.
+
+~~~powershell
+cargo test --locked -p p4kx-export --test real_archive real_archive_language_sources_sdk::language_source_sdk_matches_original_archive_entries -- --ignored --exact --nocapture --test-threads=1
+~~~
+
 ## Resolve field origins
 
 Use each query's own `SourceInventory`. `SourcedValue::origin` supplies the encryption filter,
@@ -727,6 +735,14 @@ within its reported coverage. Read the authored bindings separately to inspect
 links that were never followed. Source-body reads are scoped to the selected
 Item and any magazine reached by its primary route. Projectile actions, Ammo
 definitions and localization are outside the query scope.
+
+Verify the primary magazine SDK against one original own container and one
+original linked magazine without generating a Catalog. Set `P4KX_DATA_P4K_B`
+to include a second installed Build.
+
+```powershell
+cargo test --locked -p p4kx-export --test real_archive real_archive_weapon_combat::magazine::weapon_magazine_sdk_matches_original_primary_routes -- --ignored --exact --nocapture --test-threads=1
+```
 
 ## Projectile ammunition
 

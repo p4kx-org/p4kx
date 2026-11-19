@@ -20,6 +20,8 @@ use crate::real_archive_verification;
 
 #[path = "weapon_combat_dependencies.rs"]
 mod dependencies;
+#[path = "weapon_magazine_sdk_proof.rs"]
+mod magazine;
 #[path = "weapon_combat_original.rs"]
 pub(super) mod original;
 #[path = "weapon_combat_projectile_proof.rs"]
@@ -71,6 +73,16 @@ fn with_sdk_samples(
     evidence: &str,
     inspect: impl Fn(&Archive, &DataForgeEntry, &Witness<'_>) -> TestResult,
 ) -> TestResult {
+    with_sdk_archive_samples(label, evidence, |archive| {
+        with_original_witness(archive, &inspect)
+    })
+}
+
+fn with_sdk_archive_samples(
+    label: &str,
+    evidence: &str,
+    verify: impl Fn(&Archive) -> TestResult,
+) -> TestResult {
     let paths = std::iter::once(real_archive_path()?).chain(real_archive_b_path());
     let key = real_archive_key().map_err(|_| "configured Archive key")?;
     for (index, path) in paths.enumerate() {
@@ -88,7 +100,7 @@ fn with_sdk_samples(
         {
             return Err("the source proof requires a complete Build identity".into());
         }
-        with_original_witness(&archive, &inspect)?;
+        verify(&archive)?;
         real_archive_verification::print_line(&format!(
             "{label} SDK source witness {}: {evidence}",
             index + 1

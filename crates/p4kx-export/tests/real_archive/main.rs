@@ -73,6 +73,7 @@ mod real_archive_item_recovery;
 mod real_archive_item_stats;
 mod real_archive_items;
 mod real_archive_jump_drives;
+mod real_archive_language_sources_sdk;
 mod real_archive_law_definitions;
 mod real_archive_leftovers;
 mod real_archive_loadouts;
