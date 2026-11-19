@@ -108,6 +108,7 @@ const fn mode(kind: Kind) -> ExportSourceMode {
         | Kind::ParticleLibraries
         | Kind::FlareLibraries
         | Kind::ClientProfileSettings
+        | Kind::RadarAudio
         | Kind::PlanetResources
         | Kind::Creatures
         | Kind::ClimateAssets

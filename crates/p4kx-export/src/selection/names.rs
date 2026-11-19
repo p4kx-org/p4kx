@@ -77,6 +77,7 @@ impl Kind {
             Self::ParticleLibraries => "particleLibraries",
             Self::FlareLibraries => "flareLibraries",
             Self::ClientProfileSettings => "clientProfileSettings",
+            Self::RadarAudio => "radarAudio",
             Self::PlanetResources => "planetResources",
             Self::Creatures => "creatures",
             Self::ClimateAssets => "climateAssets",

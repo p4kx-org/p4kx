@@ -344,6 +344,7 @@ impl Kind {
             | Self::ParticleLibraries
             | Self::FlareLibraries
             | Self::ClientProfileSettings
+            | Self::RadarAudio
             | Self::PlanetResources
             | Self::Creatures
             | Self::ClimateAssets

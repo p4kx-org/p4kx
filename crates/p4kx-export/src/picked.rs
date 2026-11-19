@@ -227,6 +227,7 @@ impl<'f> Picked<'f> {
             | Kind::ParticleLibraries
             | Kind::FlareLibraries
             | Kind::ClientProfileSettings
+            | Kind::RadarAudio
             | Kind::PlanetResources
             | Kind::Creatures
             | Kind::ClimateAssets

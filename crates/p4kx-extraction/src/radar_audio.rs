@@ -12,6 +12,7 @@ use crate::cryxml::{SourceDeclaration, SourceDeclarationKind, SourceElement};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 #[non_exhaustive]
+#[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
 pub enum RadarAudioElement {
     /// The owning document root.
     Configuration,
@@ -85,6 +86,7 @@ impl RadarAudioElement {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 #[non_exhaustive]
+#[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
 pub enum RadarAudioField {
     /// The lower zoom limit.
     ZoomMin,

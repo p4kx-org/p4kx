@@ -20813,7 +20813,8 @@
           "description": "A named slot and its authored sound-event value.",
           "type": "string"
         }
-      ]
+      ],
+      "x-p4kx-vocabularyClass": "control"
     },
     "RadarAudioField": {
       "description": "The meaning of an unqualified attribute of a recognised `RadarAudioData` element.",
@@ -20858,7 +20859,8 @@
           "description": "The sound-event token assigned to the slot.",
           "type": "string"
         }
-      ]
+      ],
+      "x-p4kx-vocabularyClass": "control"
     },
     "RadarAudioValue": {
       "description": "The state of an authored `RadarAudioData` attribute.",

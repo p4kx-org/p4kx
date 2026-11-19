@@ -45,7 +45,7 @@ pub(super) fn add_defaults(catalog: &mut Value) {
         .get_mut("completeness")
         .and_then(Value::as_object_mut)
     {
-        for name in ["cargoLoadingGlobals", "shopCommodityGlobals"] {
+        for name in ["cargoLoadingGlobals", "shopCommodityGlobals", "radarAudio"] {
             completeness.insert(name.to_owned(), json!({"status": "complete"}));
         }
     }
@@ -55,6 +55,7 @@ pub(super) fn add_defaults(catalog: &mut Value) {
         .and_then(Value::as_object_mut)
     {
         for name in [
+            "radarAudio",
             "radarOptions",
             "flightControllers",
             "ifcs",

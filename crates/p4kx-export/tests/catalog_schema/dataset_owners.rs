@@ -207,6 +207,7 @@ const GROUPS: &[Group] = &[
             "missionProperties",
             "quantumDrives",
             "quantumInterdiction",
+            "radarAudio",
             "radarOptions",
             "reputationTriggers",
             "resourceComponents",

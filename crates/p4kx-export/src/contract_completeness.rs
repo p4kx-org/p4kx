@@ -205,6 +205,8 @@ pub(crate) struct Completeness<'a> {
     pub(crate) ship_store_slugs: KindCompleteness<'a>,
     /// The physical client profile document selection.
     pub(crate) client_profile_settings: KindCompleteness<'a>,
+    /// The physical radar audio XML configuration selection.
+    pub(crate) radar_audio: KindCompleteness<'a>,
 }
 
 impl<'a> Completeness<'a> {
@@ -321,6 +323,7 @@ impl<'a> Completeness<'a> {
             mission_property_sets: completeness,
             ship_store_slugs: completeness,
             client_profile_settings: completeness,
+            radar_audio: completeness,
         }
     }
 }

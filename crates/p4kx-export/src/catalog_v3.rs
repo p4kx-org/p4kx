@@ -97,6 +97,8 @@ mod npc_spawn_definition;
 pub(crate) mod npc_spawn_definitions;
 #[path = "prepared_definition.rs"]
 pub(crate) mod prepared_definition;
+#[path = "radar_audio_configuration.rs"]
+pub(crate) mod radar_audio_configuration;
 #[path = "reputation_blackboard.rs"]
 pub(crate) mod reputation_blackboard;
 #[path = "reputation_context_definition.rs"]

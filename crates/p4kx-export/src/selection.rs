@@ -263,11 +263,13 @@ pub enum Kind {
     ShopCommodityGlobals,
     /// Authored general and VR client profile attribute files.
     ClientProfileSettings,
+    /// Authored `RadarAudioData` XML configurations.
+    RadarAudio,
 }
 
 impl Kind {
     /// Every kind, in the order of the catalog.
-    pub const ALL: [Self; 108] = [
+    pub const ALL: [Self; 109] = [
         Self::Manufacturers,
         Self::Items,
         Self::Ships,
@@ -376,6 +378,7 @@ impl Kind {
         Self::CargoLoadingGlobals,
         Self::ShopCommodityGlobals,
         Self::ClientProfileSettings,
+        Self::RadarAudio,
     ];
 }
 

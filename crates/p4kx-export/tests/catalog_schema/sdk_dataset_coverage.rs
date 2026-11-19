@@ -18,6 +18,7 @@ mod row_schema;
 const LANGUAGE_SOURCES: &str = "/texts/languageSources";
 const SHOP_INVENTORIES: &str = "/definitions/shopInventories";
 const FLARE_LIBRARIES: &str = "/definitions/flareLibraries";
+const RADAR_AUDIO: &str = "/configurations/radarAudio";
 const AMMUNITION: &str = "/definitions/ammoDefinitions";
 const LOCATION_ENTITIES: &str = "/definitions/locationEntityDeclarations";
 const PROJECTILE_AMMUNITION: &str = "/projections/weaponProjectileAmmoSelections";
@@ -76,6 +77,7 @@ fn sdk_query_witnesses_keep_their_canonical_dataset_contract() -> TestResult {
         LOCATION_ENTITIES,
         SHOP_INVENTORIES,
         FLARE_LIBRARIES,
+        RADAR_AUDIO,
         AMMUNITION,
         PROJECTILE_AMMUNITION,
         MAGAZINE_RESOLUTION,

@@ -7,6 +7,7 @@ use p4kx_export::catalog_queries::equipment::{
 };
 use p4kx_export::catalog_queries::flares::{FlareLibrarySelection, read_flare_libraries};
 use p4kx_export::catalog_queries::localization::with_language_sources;
+use p4kx_export::catalog_queries::radar_audio::{RadarAudioSelection, read_radar_audio};
 use p4kx_export::catalog_queries::shops::{ShopInventorySelection, read_shop_inventories};
 use p4kx_export::catalog_queries::starmap::{
     ContainerPlacementSelection, read_container_placements,
@@ -20,8 +21,8 @@ use p4kx_testkit::{
 };
 
 use super::{
-    AMMUNITION, CONTAINERS, FLARE_LIBRARIES, LANGUAGE_SOURCES, LOCATION_ENTITIES, Route,
-    SHOP_INVENTORIES, TestResult, UNRESOLVED, WEAPON_RECOIL,
+    AMMUNITION, CONTAINERS, FLARE_LIBRARIES, LANGUAGE_SOURCES, LOCATION_ENTITIES, RADAR_AUDIO,
+    Route, SHOP_INVENTORIES, TestResult, UNRESOLVED, WEAPON_RECOIL,
 };
 
 #[path = "sdk_projectile_ammo_route.rs"]
@@ -67,6 +68,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
         read_location_entities(&archive)?,
         read_shop_inventory(&archive)?,
         read_flare_library(&archive)?,
+        read_radar_configuration(&archive)?,
         Route::queried_rows(
             CONTAINERS,
             &starmap.container_instances,
@@ -110,6 +112,15 @@ fn read_location_entities(archive: &Archive) -> TestResult<Route> {
         None,
         |snapshot| Route::queried_rows(LOCATION_ENTITIES, &snapshot.rows, None),
     )?
+}
+
+fn read_radar_configuration(archive: &Archive) -> TestResult<Route> {
+    let snapshot = read_radar_audio(archive, RadarAudioSelection::All, None)?;
+    Route::queried_rows(
+        RADAR_AUDIO,
+        &snapshot.rows,
+        "physical configuration query available; installed producer parity open",
+    )
 }
 
 fn read_language_sources(archive: &Archive) -> TestResult<Route> {
@@ -200,6 +211,10 @@ fn fixture() -> TestResult<(tempfile::TempDir, Archive)> {
         .entry(packed(ROOT, "fixturesystem.xml", ROOT_XML))
         .entry(packed(TILE, "tile.xml", b"<ObjectContainer/>"))
         .entry(TestEntry::stored(OFFLINE_SHOP, br#"{"Inventory":[]}"#))
+        .entry(TestEntry::stored(
+            "Data/Libs/GameAudio/RadarAudioData.xml",
+            b"<RadarAudioData><DefaultZoom min='0'/></RadarAudioData>",
+        ))
         .entry(TestEntry::stored(
             FLARE_LIBRARY,
             b"<LensFlareLibrary><FlareItem Name='fixture'/></LensFlareLibrary>",

@@ -90,6 +90,7 @@ pub(crate) fn row_location(kind: Kind) -> Cow<'static, str> {
         Kind::ParticleLibraries => "/definitions/particleLibraries",
         Kind::FlareLibraries => "/definitions/flareLibraries",
         Kind::ClientProfileSettings => "/configurations/clientProfileSettings/documents",
+        Kind::RadarAudio => "/configurations/radarAudio",
         Kind::ExplosionDefinitions => "/definitions/explosionDefinitions",
         Kind::AmmoDefinitions => "/definitions/ammoDefinitions",
         Kind::MissionScenarios => "/definitions/missionScenarios",
@@ -143,7 +144,10 @@ fn checked_table<'catalog>(
     path: &str,
 ) -> TestResult<&'catalog Vec<Value>> {
     let rows = table(catalog, path)?;
-    if matches!(kind, Kind::ParticleLibraries | Kind::FlareLibraries) {
+    if matches!(
+        kind,
+        Kind::ParticleLibraries | Kind::FlareLibraries | Kind::RadarAudio
+    ) {
         entry_identity::check(catalog, rows)?;
         return Ok(rows);
     }

@@ -20,6 +20,7 @@ use crate::catalog_v3::catalog_quantum_drive::QuantumDrive;
 use crate::catalog_v3::catalog_quantum_interdiction::QuantumInterdictionGenerator;
 use crate::catalog_v3::catalog_shield_generator::ShieldGenerator;
 use crate::catalog_v3::catalog_weapon_actions::WeaponActions;
+use crate::catalog_v3::radar_audio_configuration::RadarAudioConfiguration;
 use crate::catalog_v3::reputation_trigger_configuration::ReputationTriggerConfiguration;
 use crate::catalog_v3::weapon_combat_base::countermeasure_emitter::CountermeasureEmitter;
 use crate::schema_fields::every_field_required;
@@ -32,6 +33,7 @@ use crate::template_projection::TemplateProjection;
 #[schemars(transform = every_field_required)]
 pub(crate) struct CatalogConfigurations<'source> {
     pub(crate) client_profile_settings: crate::ClientProfileSettings,
+    pub(crate) radar_audio: CatalogTable<RadarAudioConfiguration>,
     pub(crate) crafting_global: CatalogTable<crate::catalog_v3::crafting_global::CraftingGlobalConfiguration<'source>>,
     pub(crate) reputation_triggers: CatalogTable<ReputationTriggerConfiguration<'source>>,
     pub(crate) mining_global: CatalogTable<crate::catalog_v3::mining_process_catalog::MiningGlobalConfiguration<'source>>,

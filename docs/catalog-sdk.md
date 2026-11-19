@@ -58,6 +58,13 @@ Use `catalog_queries::flares::read_flare_libraries` to read the physical rows fr
 or an exact Archive-relative path. The query reports original parameter origins, directory-only
 texture links, and any required library reads or projections that failed. [Lens flare contract](catalog-flare-libraries.md)
 
+## Radar audio configuration
+
+Use `catalog_queries::radar_audio::read_radar_audio` to read original rows from
+`configurations.radarAudio` by physical Entry or across the selected configuration family.
+The SDK retains ordered nodes, source values, and explicit selector states without decoding
+DataForge. [Radar audio](catalog-radar-audio.md)
+
 ## Localization Entry metadata
 
 Use catalog_queries::localization::with_language_sources for the canonical

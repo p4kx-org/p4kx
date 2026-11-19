@@ -15,6 +15,7 @@ use crate::catalog_v3::faction_identity_definition::{
     self, FactionIdentityDefinition, PreparedFactionIdentity,
 };
 use crate::catalog_v3::flare_library;
+use crate::catalog_v3::radar_audio_configuration::{self, RadarAudioConfiguration};
 use crate::client_profile_settings::{self, ClientProfileSettings};
 use crate::collected::Collected;
 use crate::options::{CatalogRun, CatalogStage};
@@ -123,12 +124,12 @@ pub(super) fn capture_weapon_animation<'source>(
     )
 }
 
-pub(super) fn client_profiles(
+pub(super) fn client_configurations(
     archive: &Archive,
     capture: &EntryCapture<'_>,
     collected: &mut Collected<'_>,
     run: CatalogRun<'_, '_>,
-) -> Result<ClientProfileSettings, crate::CatalogError> {
+) -> Result<(ClientProfileSettings, CatalogTable<RadarAudioConfiguration>), crate::CatalogError> {
     run.begin(CatalogStage::ProjectConfigurations);
     let options = run.options;
     let settings = client_profile_settings::read(
@@ -139,7 +140,16 @@ pub(super) fn client_profiles(
         &mut collected.ledger,
     )?;
     collected.client_profile_count = settings.decoded_documents();
-    Ok(settings)
+    let radar_audio = radar_audio_configuration::read(
+        archive,
+        archive.entries(),
+        capture,
+        options.filter,
+        options.cancel,
+        &mut collected.ledger,
+    )?;
+    collected.radar_audio_count = radar_audio.rows.len();
+    Ok((settings, radar_audio))
 }
 
 pub(super) fn collect_effect_libraries(

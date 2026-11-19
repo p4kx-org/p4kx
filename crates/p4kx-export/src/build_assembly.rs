@@ -94,8 +94,8 @@ pub(super) fn assemble<R>(
         &input,
         options.cancel,
     )?);
-    let client_profile_settings =
-        parts::client_profiles(archive, &entry_capture, &mut collected, run)?;
+    let (client_profile_settings, radar_audio) =
+        parts::client_configurations(archive, &entry_capture, &mut collected, run)?;
     run.begin(CatalogStage::ProjectShops);
     let shop_summary = add_shops(archive, &files, &mut collected, options, &entry_capture)?;
     run.begin(CatalogStage::ResolveJumpOperators);
@@ -295,6 +295,7 @@ pub(super) fn assemble<R>(
         },
         configurations: crate::catalog_configurations::CatalogConfigurations {
             client_profile_settings,
+            radar_audio,
             crafting_global: crate::catalog_v3::crafting_global::table(
                 &forge,
                 collected.crafting_global,

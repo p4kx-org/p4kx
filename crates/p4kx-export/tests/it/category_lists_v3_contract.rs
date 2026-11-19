@@ -327,6 +327,7 @@ const EXPECTED_KINDS: &[&str] = &[
     "cargoLoadingGlobals",
     "shopCommodityGlobals",
     "clientProfileSettings",
+    "radarAudio",
 ];
 
 fn assert_kind_order() {

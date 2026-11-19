@@ -5377,6 +5377,9 @@
         "quantumInterdiction": {
           "$ref": "#/$defs/CatalogTableOfQuantumInterdictionGenerator"
         },
+        "radarAudio": {
+          "$ref": "#/$defs/CatalogTableOfRadarAudioConfiguration"
+        },
         "radarOptions": {
           "$ref": "#/$defs/CatalogTableOfRadarOptionsConfiguration"
         },
@@ -5466,6 +5469,7 @@
         "missionProperties",
         "quantumDrives",
         "quantumInterdiction",
+        "radarAudio",
         "radarOptions",
         "reputationTriggers",
         "resourceComponents",
@@ -8334,6 +8338,25 @@
       ],
       "type": "object"
     },
+    "CatalogTableOfRadarAudioConfiguration": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/RadarAudioConfiguration"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
     "CatalogTableOfRadarOptionsConfiguration": {
       "description": "One named typed dataset with its measured source-family availability.",
       "properties": {
@@ -11004,6 +11027,10 @@
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `qualityQuantizations`."
         },
+        "radarAudio": {
+          "$ref": "#/$defs/KindCompleteness",
+          "description": "The physical radar audio XML configuration selection."
+        },
         "refiningProcesses": {
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `refiningProcesses`."
@@ -11190,6 +11217,7 @@
         "proceduralPlanetAudio",
         "qualityDistributions",
         "qualityQuantizations",
+        "radarAudio",
         "refiningProcesses",
         "reputationContexts",
         "reputationPerks",
@@ -26483,6 +26511,10 @@
         {
           "description": "Authored general and VR client profile attribute files.",
           "value": "clientProfileSettings"
+        },
+        {
+          "description": "Authored `RadarAudioData` XML configurations.",
+          "value": "radarAudio"
         }
       ]
     },
@@ -38197,6 +38229,258 @@
       },
       "required": [
         "rulesets"
+      ],
+      "type": "object"
+    },
+    "RadarAudioBindingStatus": {
+      "description": "The available selector evidence for an authored sound-event slot.",
+      "oneOf": [
+        {
+          "const": "missingValue",
+          "description": "The slot has no authored value attribute.",
+          "type": "string"
+        },
+        {
+          "const": "emptyValue",
+          "description": "The slot has one explicitly empty value.",
+          "type": "string"
+        },
+        {
+          "const": "invalidValue",
+          "description": "The slot has an ill-formed or multiply declared value.",
+          "type": "string"
+        },
+        {
+          "const": "unprovenSelector",
+          "description": "The slot has a value with no evidence of the target selector or namespace.",
+          "type": "string"
+        }
+      ],
+      "x-p4kx-vocabularyClass": "control"
+    },
+    "RadarAudioCell": {
+      "description": "One sourced typed field of a recognised radar-audio element.",
+      "properties": {
+        "field": {
+          "$ref": "#/$defs/RadarAudioField"
+        },
+        "value": {
+          "$ref": "#/$defs/SourcedValueOfRadarAudioDatum"
+        }
+      },
+      "required": [
+        "field",
+        "value"
+      ],
+      "type": "object"
+    },
+    "RadarAudioConfiguration": {
+      "description": "One physical radar-audio configuration and its ordered original elements.",
+      "properties": {
+        "elements": {
+          "items": {
+            "$ref": "#/$defs/RadarAudioNode"
+          },
+          "type": "array"
+        },
+        "identity": {
+          "$ref": "#/$defs/PhysicalEntryIdentity"
+        }
+      },
+      "required": [
+        "elements",
+        "identity"
+      ],
+      "type": "object"
+    },
+    "RadarAudioDatum": {
+      "description": "One typed reading of a radar-audio declaration.",
+      "oneOf": [
+        {
+          "description": "A present attribute with no text.",
+          "properties": {
+            "type": {
+              "const": "empty",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "The decoded original token.",
+          "properties": {
+            "token": {
+              "description": "The exact decoded token.",
+              "type": "string",
+              "x-gameText": true
+            },
+            "type": {
+              "const": "text",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "token"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "An integral decimal token with no fixed integer storage width.",
+          "properties": {
+            "decimal": {
+              "description": "The exact integral spelling, including any sign and leading zeros.",
+              "pattern": "^[+-]?[0-9]+$",
+              "type": "string"
+            },
+            "type": {
+              "const": "integer",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "decimal"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A finite parsed number whose original spelling remains in the authored tree.",
+          "properties": {
+            "type": {
+              "const": "number",
+              "type": "string"
+            },
+            "value": {
+              "description": "The binary64 interpretation.",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "RadarAudioElement": {
+      "description": "A recognised element in the authored `RadarAudioData` hierarchy.",
+      "oneOf": [
+        {
+          "const": "configuration",
+          "description": "The owning document root.",
+          "type": "string"
+        },
+        {
+          "const": "default-zoom",
+          "description": "A declared zoom range.",
+          "type": "string"
+        },
+        {
+          "const": "category-types",
+          "description": "An ordered group of category declarations.",
+          "type": "string"
+        },
+        {
+          "const": "category-type",
+          "description": "A category with authored identification and display attributes.",
+          "type": "string"
+        },
+        {
+          "const": "sound-events",
+          "description": "An ordered group of sound-event declarations.",
+          "type": "string"
+        },
+        {
+          "const": "sound-event",
+          "description": "A named slot and its authored sound-event value.",
+          "type": "string"
+        }
+      ],
+      "x-p4kx-vocabularyClass": "control"
+    },
+    "RadarAudioField": {
+      "description": "The meaning of an unqualified attribute of a recognised `RadarAudioData` element.",
+      "oneOf": [
+        {
+          "const": "zoom-min",
+          "description": "The lower zoom limit.",
+          "type": "string"
+        },
+        {
+          "const": "zoom-max",
+          "description": "The upper zoom limit.",
+          "type": "string"
+        },
+        {
+          "const": "category-name",
+          "description": "The authored category name.",
+          "type": "string"
+        },
+        {
+          "const": "category-value",
+          "description": "The exact integral category value.",
+          "type": "string"
+        },
+        {
+          "const": "display-time",
+          "description": "The authored display time.",
+          "type": "string"
+        },
+        {
+          "const": "display-start-alpha",
+          "description": "The starting display alpha.",
+          "type": "string"
+        },
+        {
+          "const": "sound-event-name",
+          "description": "The named sound-event slot.",
+          "type": "string"
+        },
+        {
+          "const": "sound-event-value",
+          "description": "The sound-event token assigned to the slot.",
+          "type": "string"
+        }
+      ],
+      "x-p4kx-vocabularyClass": "control"
+    },
+    "RadarAudioNode": {
+      "description": "One radar-audio configuration element and the recognised attributes it owns.",
+      "properties": {
+        "authored": {
+          "$ref": "#/$defs/ProfileElement"
+        },
+        "bindingStatus": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourcedValueOfRadarAudioBindingStatus"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "fields": {
+          "items": {
+            "$ref": "#/$defs/RadarAudioCell"
+          },
+          "type": "array"
+        },
+        "role": {
+          "$ref": "#/$defs/SourcedValueOfNullable_RadarAudioElement"
+        }
+      },
+      "required": [
+        "authored",
+        "bindingStatus",
+        "fields",
+        "role"
       ],
       "type": "object"
     },
@@ -105381,6 +105665,143 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfNullable_RadarAudioElement": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/RadarAudioElement"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfNullable_ScopedLocationFilterKind": {
       "allOf": [
         {
@@ -114216,6 +114637,266 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/RadarAudio"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfRadarAudioBindingStatus": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/RadarAudioBindingStatus"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfRadarAudioDatum": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/RadarAudioDatum"
               }
             }
           }
