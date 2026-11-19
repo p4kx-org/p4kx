@@ -19,6 +19,7 @@ use crate::catalog_query_session::checkpoint;
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_ledger::ExportLedger;
 use crate::guid_text::CatalogGuid;
+use crate::playability_rules::Evidence;
 use crate::record_observation::RecordObservation;
 use crate::ship::{ShipSource, source_projection};
 use crate::ship_pool::ShipPool;
@@ -140,13 +141,15 @@ fn project<'source>(
     let entities = Arc::new(Entities::new(input.forge()));
     checkpoint(cancel)?;
     let pool = ShipPool::new(entities, files);
-    let mut ledger = ExportLedger::default();
+    let (playability, mut ledger) =
+        Evidence::read_for_ships(plan.owners.iter().map(|owner| &owner.tree), input, cancel)?;
     let mut rows = Vec::new();
     let mut dependencies = ShipSourceDependencyCoverage::default();
     let projector = ShipQueryProjector {
         input,
         projection,
         pool: &pool,
+        playability: &playability,
         cancel,
     };
     for owner in plan.owners {
@@ -168,6 +171,7 @@ struct ShipQueryProjector<'context, 'source> {
     input: &'source OriginalCatalogInput<'source, 'source>,
     projection: &'context CatalogProjection<'context, 'source>,
     pool: &'context ShipPool<'source>,
+    playability: &'context Evidence,
     cancel: Option<&'context CancelToken>,
 }
 
@@ -212,7 +216,13 @@ impl<'source> ShipQueryProjector<'_, 'source> {
         let aggregates = projected
             .aggregates
             .ok_or(ExportAccountingError::UnobservedFailure)?;
-        let row = ShipSource::from_read(projected.source, aggregates);
+        let playability = projected.source.playability_proof.decide(
+            &owner.tree,
+            projected.source.vehicle,
+            self.playability,
+            self.input,
+        )?;
+        let row = ShipSource::from_read(projected.source, aggregates, playability);
         if !complete::complete(&row) {
             coverage.incomplete_fields.push(owner.record.index());
             dependencies.source_incomplete(owner.record.index());

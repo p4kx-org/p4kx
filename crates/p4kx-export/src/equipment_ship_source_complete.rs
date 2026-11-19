@@ -44,6 +44,7 @@ pub(super) fn complete(row: &ShipSource<'_>) -> bool {
         && manufacturer(row.attachment_manufacturer().manufacturer())
         && known(row.insurance())
         && row.insurance().value().is_none_or(|value| insurance(value))
+        && known(row.playability())
         && known(row.playability_inputs().crew_manifest_component_ordinal())
         && known(row.playability_inputs().crew_manifest())
         && row

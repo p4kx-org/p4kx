@@ -364,6 +364,7 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
                 tree,
                 projected.source,
                 &self.scan.evidence,
+                self.scan.original,
                 read,
                 aggregates,
             )

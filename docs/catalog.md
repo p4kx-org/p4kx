@@ -582,7 +582,7 @@ its key and has absent translation forms.
 | `vehicleManufacturer` | The selected `VehicleComponentParams.manufacturer`, with its original component ordinal |
 | `attachmentManufacturer` | The independently authored `AttachDef.Manufacturer`, with the original attachment component ordinal and AttachDef state |
 | `vehicleDefinition` | Sourced original String/Enum selector, including whitespace, case, separators and empty values. The Archive reader interprets it for lookup. |
-| `playability` | `player`, `ai`, `mission` or `special`, or `null`; see "Playability" below |
+| `playability` | Sourced `player`, `ai`, `mission` or `special`; see "Playability" below |
 | `variantOf` | The `guid` of the base of the ship's variant group, `null` for a base and an ungrouped ship; see "Variant groups" below |
 | `vehicleKind` | `spaceship` or `groundVehicle`, or `null`; see "Ship base data" below |
 | `size` | Sourced original `Components/SAttachableComponentParams/AttachDef/Size` as ResourceNumber with explicit absent, null and unreadable states |
@@ -699,11 +699,12 @@ their own physical Record identity.
 #### Playability
 
 The catalog lists every ship and item Record of the Build, among them AI, mission and event
-variants that no player can own, buy or fit. `playability` tells them apart. It is a closed set of
-strings; the schema keeps a string, so a new value is additive and a reader maps a value it does
-not know to `null` (ADR-0054). It is `null` where no rule below applies: the value is never
-guessed. The rules read Record data only (components, fields, References, Tags, record-path
-folders); no class name or Record name enters them.
+variants that no player can own, buy or fit. `playability` tells them apart. The schema uses a
+string payload, so a reader can retain an unknown classification (ADR-0054). A fully inspected
+entity that matches no rule has state `absent`. An unreadable linked crew or Tag Record is
+`unreadable`. An unproven predicate can leave the cell `unreadable` or allow a `present` value
+with `sourceSetComplete: false`. The rules use Record components, fields, references, tags and
+record-path folders. Class names and Record names do not enter the decision.
 
 | Value | Meaning |
 |-------|---------|
@@ -716,7 +717,7 @@ For a ship or ground vehicle the first rule that holds decides. `inclusionMode` 
 `StaticEntityClassData[EAEntityDataParams].inclusionMode` (`EAEntityDataParams`, believed to
 govern Electronic Access / Arena Commander inclusion). It correlates on LIVE with hangar-listed
 ships; it is used as evidence, not as a definition. Any value other than `ReadyToInclude` and
-`DoNotInclude` leads to `null`, unless rule 1 or 2 holds.
+`DoNotInclude` leaves `playability.value` null unless rule 1 or 2 holds.
 
 1. `ai` when `Components[SEntityComponentCrewManifestParams].crewManifest` links to a
    `CrewManifest` Record whose `crew` array is not empty (the NPC crew; the empty manifest
@@ -734,10 +735,10 @@ ships; it is used as evidence, not as a definition. Any value other than `ReadyT
    count against it: on LIVE every `ReadyToInclude` ship with that hull value and no AI marker
    above is a ship the owner has flown (Basher, Sabre Raven EX, Skylark, Railen, Stingray, Tyilui,
    Constellation Mk V Centaurus; ADR-0245).
-5. Also `null` when the crew manifest or a tag the Record links to could not be read (the
+5. `playability.value` is null when the crew manifest or a tag the Record links to could not be read (the
    catalog reports that Record as a failure), since its evidence is missing; checked before
    rule 1.
-6. Otherwise `null`: no `EAEntityDataParams`, or another `inclusionMode`.
+6. Otherwise `playability.value` is null if there is no `EAEntityDataParams` or another `inclusionMode` applies.
 
 For an item the first rule that holds decides:
 
@@ -2810,10 +2811,10 @@ ones the Archive holds under another name or not at all (e.g. `Mustang Alpha Vin
 w/C8X`, `600i Explorer`, `ATLS`).
 
 Seven of the unmapped slugs have a ship under the store name that the player-only rule excluded,
-because its `playability` is `null` (no rule classifies it): `GAMA_Railen`, `GAMA_Tyilui`,
+because no rule classifies it and its `playability.value` is `null`. They include `GAMA_Railen`, `GAMA_Tyilui`,
 `GLSN_Basher`, `KRIG_S65_Stingray`, `RSI_Skylark`, `RSI_Constellation_Mk5_Centaurus` and
 `AEGS_Sabre_Raven_EX`. They can be mapped once their playability is settled. Before ADR-0167, 119 ships with
-`playability` `player` have no slug; most are event, reward and display variants of a ship that
+`playability.value` of `player` have no slug; most are event, reward and display variants of a ship that
 has one.
 
 To refresh the file, a human fetches the public ship list of the store, reduces it to the

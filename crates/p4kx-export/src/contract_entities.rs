@@ -90,10 +90,9 @@ pub(crate) struct Ship<'a> {
     /// How many cargo grids of the default Loadout have no readable capacity, e.g. because their
     /// container Record does not exist.
     pub(crate) cargo_grids_with_issue: usize,
-    /// Who the ship is for, `null` when no rule applies. Today one of `player`, `ai`, `mission`
-    /// and `special`; the schema keeps a string, as a new value is additive.
-    #[schemars(with = "Option<String>")]
-    pub(crate) playability: Option<Playability>,
+    /// The sourced classification selected by the original Ship rules.
+    #[schemars(with = "SourcedValue<String>")]
+    pub(crate) playability: SourcedValue<Playability>,
     /// The GUID of the base of the variant group the ship belongs to: the ships that share the
     /// vehicle definition and the vehicle implementation after the Modification. `null` for a base
     /// and for a ship that is alone in its group. It is the `guid` of an entry of `ships`.

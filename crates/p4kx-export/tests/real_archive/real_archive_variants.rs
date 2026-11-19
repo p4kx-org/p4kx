@@ -232,7 +232,7 @@ fn print_family(catalog: &Value, needle: &str) {
                 "  {class}: definition {}, playability {}, variantOf {}",
                 ship.pointer("/vehicleDefinition/value")
                     .unwrap_or(&Value::Null),
-                ship["playability"],
+                ship.pointer("/playability/value").unwrap_or(&Value::Null),
                 base.copied().unwrap_or("-")
             ));
         }

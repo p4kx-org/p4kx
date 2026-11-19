@@ -308,7 +308,9 @@ impl<'f> Collected<'f> {
                 self.item_components.extend(components);
             }
             Picked::Ship(entity, vehicle) => {
-                self.playability.ships.count(entity.playability);
+                self.playability
+                    .ships
+                    .count(entity.playability.value().copied());
                 self.ships.push(*entity);
                 self.vehicles.push(vehicle);
             }

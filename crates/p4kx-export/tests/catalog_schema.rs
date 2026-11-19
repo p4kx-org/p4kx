@@ -102,7 +102,7 @@ fn a_new_value_of_a_closed_value_set_is_additive() -> TestResult {
     );
 
     let mut unknown_playability = catalog.clone();
-    unknown_playability["ships"][0]["playability"] = json!("event");
+    unknown_playability["ships"][0]["playability"]["value"] = json!("event");
     assert!(
         validator.is_valid(&unknown_playability),
         "a new playability is valid"

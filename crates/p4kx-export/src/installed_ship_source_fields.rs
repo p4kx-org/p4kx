@@ -13,7 +13,7 @@ use super::{TestResult, wire};
 
 pub(super) struct Wire {
     header: Value,
-    values: [(&'static str, Value); 16],
+    values: [(&'static str, Value); 17],
 }
 
 impl Wire {
@@ -37,6 +37,7 @@ impl Wire {
                 ("massBasis", wire(row.mass_basis())?),
                 ("hullHealth", wire(row.hull_health())?),
                 ("insurance", wire(row.insurance())?),
+                ("playability", wire(row.playability())?),
                 ("playabilityInputs", wire(row.playability_inputs())?),
                 ("publicNames", public),
                 ("gameTexts", protected),

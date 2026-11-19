@@ -208,6 +208,7 @@ pub(crate) fn field<'row>(row: &'row Value, kind: Kind, name: &str) -> TestResul
                 | "size"
                 | "vehicleDefinition"
                 | "insurance"
+                | "playability"
         ),
         _ => all_fields_sourced(kind),
     };

@@ -155,6 +155,12 @@ impl<'a> DataForge<'a> {
         Some(start as u64..end as u64)
     }
 
+    /// Returns the original byte range consulted when indexing stored Record GUIDs.
+    #[must_use]
+    pub fn record_table_span(&self) -> Option<Range<u64>> {
+        self.byte_span(self.records.bytes())
+    }
+
     /// Returns the number of Records.
     #[must_use]
     pub const fn record_count(&self) -> usize {

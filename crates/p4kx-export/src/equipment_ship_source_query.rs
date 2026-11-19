@@ -33,7 +33,7 @@ impl EquipmentSnapshot<'_, ShipSource<'_>, ShipSourceDependencyCoverage> {
     }
 }
 
-/// Supplies canonical original Ship fields plus actual resolved mass and hull cells.
+/// Supplies original Ship fields and sourced mass, hull and playability.
 /// Publish consumer-owned changes only after outer success and coverage checks.
 ///
 /// # Errors

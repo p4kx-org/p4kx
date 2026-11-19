@@ -13,6 +13,7 @@ use crate::catalog_number_capture::{CapturedNumber, NumberCapture};
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::original::OriginalFlowFields;
 use crate::contract_insurance::ShipInsurance;
+use crate::playability_projection::OwnerProof;
 use crate::record_observation::RecordObservation;
 use crate::resource_number::ResourceNumber;
 use crate::source_fields::FieldError;
@@ -45,6 +46,7 @@ pub(crate) struct ShipSourceRead<'read, 'source> {
     pub(crate) vehicle_definition: SourcedValue<&'source str>,
     pub(crate) insurance: SourcedValue<Box<ShipInsurance<'source>>>,
     pub(crate) playability_inputs: ShipPlayabilityInputs<'source>,
+    pub(crate) playability_proof: OwnerProof,
     pub(crate) notes: Vec<FieldError>,
     pub(crate) aggregate: ShipAggregateOperands,
     pub(crate) physics_notes: Vec<FieldError>,
@@ -92,6 +94,13 @@ pub(crate) fn read<'read, 'source>(
     })?;
     let insurance = insurance::read(fields, &insured, &mut notes)?;
     let playability_inputs = fields::crew(fields, &crew, &mut notes)?;
+    let playability_proof = OwnerProof::capture(
+        input,
+        admission.record(),
+        &originals,
+        vehicle.value,
+        crew.value,
+    )?;
     Ok(ShipSourceRead {
         header: CanonicalRecordHeader::read(tree, input.origins())?,
         vehicle: vehicle.value.and_then(|value| match value {
@@ -103,6 +112,7 @@ pub(crate) fn read<'read, 'source>(
         vehicle_definition,
         insurance,
         playability_inputs,
+        playability_proof,
         notes,
         aggregate,
         physics_notes,

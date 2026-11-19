@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use p4kx_extraction::{
-    CancelToken, Guid, Record, RecordTree, StructValue, TreeBuilder, Value, is_placeholder_key,
+    CancelToken, FieldOrigin, Guid, Record, RecordTree, StructValue, TreeBuilder, Value,
+    is_placeholder_key,
 };
 use rayon::prelude::*;
 
 use crate::build::original_input::OriginalCatalogInput;
+use crate::catalog_query_session::checkpoint;
 use crate::export_ledger::ExportLedger;
 use crate::playability::Playability;
 use crate::record_fields::{
@@ -16,6 +18,9 @@ use crate::record_fields::{
 };
 use crate::record_observation::RecordObservation;
 use crate::{CatalogError, CatalogFailure, CatalogReadFailure, Kind};
+
+#[path = "playability_dependency_source.rs"]
+mod dependency_source;
 
 const MANIFEST_TYPE: &str = "CrewManifest";
 const TAG_TYPE: &str = "Tag";
@@ -40,6 +45,7 @@ pub(crate) struct Evidence {
     crewed: HashSet<Guid>,
     unmanned: HashSet<Guid>,
     unreadable: HashSet<Guid>,
+    proofs: HashMap<u32, FieldOrigin>,
 }
 
 fn evidence_record(record: &Record<'_>) -> bool {
@@ -86,15 +92,37 @@ impl Evidence {
 
     pub(crate) fn read_captured<'f>(
         records: &[Record<'f>],
-        input: &OriginalCatalogInput<'_, '_>,
+        input: &OriginalCatalogInput<'_, 'f>,
         cancel: Option<&CancelToken>,
     ) -> Result<(Self, Vec<CatalogReadFailure<'f>>, ExportLedger), CatalogError> {
         Self::read_observed(records, Some(input), cancel)
     }
 
+    /// Reads the physical manifest and tag aliases reached by the selected Ships.
+    pub(crate) fn read_for_ships<'tree, 'source: 'tree>(
+        ships: impl IntoIterator<Item = &'tree RecordTree<'source>>,
+        input: &OriginalCatalogInput<'_, 'source>,
+        cancel: Option<&CancelToken>,
+    ) -> Result<(Self, ExportLedger), CatalogError> {
+        let mut targets = HashSet::new();
+        for tree in ships {
+            checkpoint(cancel)?;
+            targets.extend(manifest_guid(tree));
+            targets.extend(tag_guids(tree));
+        }
+        let mut records = Vec::new();
+        for guid in targets {
+            checkpoint(cancel)?;
+            records.extend(input.forge().records_by_guid(guid));
+        }
+        records.sort_by_key(Record::index);
+        let (evidence, _, ledger) = Self::read_captured(&records, input, cancel)?;
+        Ok((evidence, ledger))
+    }
+
     fn read_observed<'f>(
         records: &[Record<'f>],
-        input: Option<&OriginalCatalogInput<'_, '_>>,
+        input: Option<&OriginalCatalogInput<'_, 'f>>,
         cancel: Option<&CancelToken>,
     ) -> Result<(Self, Vec<CatalogReadFailure<'f>>, ExportLedger), CatalogError> {
         let found = records
@@ -117,24 +145,37 @@ impl Evidence {
                     Kind::Ships,
                     cancel,
                 )?;
+                let proof = input
+                    .map(|input| {
+                        dependency_source::observe(
+                            input,
+                            &admission,
+                            read.tree.as_ref().ok(),
+                            cancel,
+                        )
+                    })
+                    .transpose()?;
                 let outcome = read
                     .tree
                     .map(|tree| project_evidence(&tree))
                     .map_err(|error| CatalogReadFailure::of(record, &error));
-                Ok(Some((outcome, read.ledger)))
+                Ok(Some((outcome, read.ledger, record.index(), proof)))
             })
             .filter_map(Result::transpose)
             .collect::<Result<Vec<_>, CatalogError>>()?;
         let mut ledger = ExportLedger::default();
-        let outcomes = found
-            .into_iter()
-            .map(|(outcome, observed)| {
-                ledger.merge(observed);
-                outcome
-            })
-            .collect();
-        let (evidence, failures) =
+        let mut outcomes = Vec::new();
+        let mut proofs = HashMap::new();
+        for (outcome, observed, index, proof) in found {
+            ledger.merge(observed);
+            outcomes.push(outcome);
+            if let Some(proof) = proof {
+                proofs.insert(index, proof);
+            }
+        }
+        let (mut evidence, failures) =
             Self::gather(outcomes, |failure: &CatalogReadFailure<'f>| failure.guid());
+        evidence.proofs = proofs;
         Ok((evidence, failures, ledger))
     }
 
@@ -167,16 +208,20 @@ fn inclusion_mode<'f>(tree: &RecordTree<'f>) -> Option<&'f str> {
     let Some(Value::Array(entries)) = tree.field("StaticEntityClassData") else {
         return None;
     };
-    entries.iter().find_map(|entry| match entry {
+    entries.iter().find_map(inclusion_text)
+}
+
+pub(crate) fn inclusion_text<'source>(entry: &Value<'source>) -> Option<&'source str> {
+    match entry {
         Value::Struct(value) if value.type_name() == "EAEntityDataParams" => {
             text(Some(value), "inclusionMode")
         }
         _ => None,
-    })
+    }
 }
 
-fn under(tree: &RecordTree<'_>, prefix: &str) -> bool {
-    under_path(tree.record_path(), prefix)
+pub(crate) fn spacecraft(path: &str) -> bool {
+    under_path(path, SPACESHIPS)
 }
 
 fn under_path(path: &str, prefix: &str) -> bool {
@@ -184,10 +229,26 @@ fn under_path(path: &str, prefix: &str) -> bool {
         .is_some_and(|start| start.eq_ignore_ascii_case(prefix))
 }
 
-fn has_tag(tree: &RecordTree<'_>, tags: &HashSet<Guid>) -> bool {
+fn manifest_guid(tree: &RecordTree<'_>) -> Option<Guid> {
+    reference(
+        component(tree, "SEntityComponentCrewManifestParams"),
+        "crewManifest",
+    )
+    .map(|guid| guid.0)
+}
+
+fn tag_guids<'tree, 'source>(
+    tree: &'tree RecordTree<'source>,
+) -> impl Iterator<Item = Guid> + use<'tree, 'source> {
     elements(Some(tree.root()), "tags")
         .iter()
-        .any(|tag| matches!(tag, Value::Reference(tag) if tags.contains(&tag.guid())))
+        .filter_map(|tag| {
+            if let Value::Reference(tag) = tag {
+                Some(tag.guid())
+            } else {
+                None
+            }
+        })
 }
 
 fn explodes_on_death(vehicle: Option<&StructValue<'_>>) -> bool {
@@ -220,29 +281,31 @@ pub(crate) fn ship(
     vehicle: Option<&StructValue<'_>>,
     evidence: &Evidence,
 ) -> Option<Playability> {
-    let manifest_link = reference(
-        component(tree, "SEntityComponentCrewManifestParams"),
-        "crewManifest",
-    );
-    let unreadable_link = manifest_link
-        .is_some_and(|manifest| evidence.unreadable.contains(&manifest.0))
-        || elements(Some(tree.root()), "tags").iter().any(
-            |tag| matches!(tag, Value::Reference(tag) if evidence.unreadable.contains(&tag.guid())),
-        );
+    ship_decision(tree, vehicle, evidence).0
+}
+
+pub(crate) fn ship_decision(
+    tree: &RecordTree<'_>,
+    vehicle: Option<&StructValue<'_>>,
+    evidence: &Evidence,
+) -> (Option<Playability>, bool) {
+    let manifest = manifest_guid(tree);
+    let unreadable_link = manifest.is_some_and(|guid| evidence.unreadable.contains(&guid))
+        || tag_guids(tree).any(|guid| evidence.unreadable.contains(&guid));
     if unreadable_link {
-        return None;
+        return (None, true);
     }
     let inclusion = inclusion_mode(tree);
     let ready = inclusion == Some(READY);
-    let spaceship = under(tree, SPACESHIPS);
+    let spaceship = spacecraft(tree.record_path());
     let hull_explodes = spaceship && explodes_on_death(vehicle);
-    let crewed = manifest_link.is_some_and(|manifest| evidence.crewed.contains(&manifest.0));
+    let crewed = manifest.is_some_and(|guid| evidence.crewed.contains(&guid));
     let critical = spaceship
         && number(vehicle, "criticalPartExplosionChance").is_some_and(|chance| chance > 0.0);
     let ai_authored = tree.tag() == Some(AI_RECORD_TAG);
-    if crewed || critical || ai_authored || (hull_explodes && !ready) {
+    let decision = if crewed || critical || ai_authored || (hull_explodes && !ready) {
         Some(Playability::Ai)
-    } else if has_tag(tree, &evidence.unmanned) {
+    } else if tag_guids(tree).any(|guid| evidence.unmanned.contains(&guid)) {
         Some(Playability::Mission)
     } else if inclusion == Some(NOT_INCLUDED) {
         Some(Playability::Special)
@@ -250,7 +313,8 @@ pub(crate) fn ship(
         Some(Playability::Player)
     } else {
         None
-    }
+    };
+    (decision, false)
 }
 
 fn real_key(key: Option<&str>) -> bool {

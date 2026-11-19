@@ -273,6 +273,7 @@ mod paint_ledger;
 mod paint_port;
 mod picked;
 mod playability;
+mod playability_projection;
 mod playability_rules;
 mod public_api;
 mod quality_catalog;

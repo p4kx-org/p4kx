@@ -44963,11 +44963,8 @@
           "description": "The name, from `vehicleName` of the vehicle parameters."
         },
         "playability": {
-          "description": "Who the ship is for, `null` when no rule applies. Today one of `player`, `ai`, `mission`\nand `special`; the schema keeps a string, as a new value is additive.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The sourced classification selected by the original Ship rules."
         },
         "playabilityInputs": {
           "$ref": "#/$defs/ShipPlayabilityInputs",

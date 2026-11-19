@@ -5,7 +5,7 @@ use std::error::Error;
 use std::sync::Arc;
 
 use p4kx_assembly::{ArchiveFiles, Entities};
-use p4kx_extraction::{Archive, DataForge, DataForgeEntry, Record, SourceInventory};
+use p4kx_extraction::{Archive, DataForge, DataForgeEntry, Record, RecordTree, SourceInventory};
 
 use crate::Kind;
 use crate::build::original_input::OriginalCatalogInput;
@@ -13,6 +13,8 @@ use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::{CatalogProjection, CatalogTextRegistry};
 use crate::catalog_text_contract::{CanonicalText, GameTextRef, PublicNameRef};
 use crate::export_diagnostic::ExportSourceRole;
+use crate::export_ledger::ExportLedger;
+use crate::playability_rules::Evidence;
 use crate::record_observation::RecordObservation;
 use crate::ship::{ShipSource, source_projection};
 use crate::ship_pool::ShipPool;
@@ -51,15 +53,7 @@ pub(crate) fn project<'source, T>(
     let projection = CatalogProjection::new(&texts, &input, &registry).for_kind(Kind::Ships);
     let admission =
         RecordObservation::capture(&input, record).map_err(|_| "admit original Ship Record")?;
-    let mut ledger = crate::export_field_walk::inspect_observed(
-        Some(&input),
-        &tree,
-        &admission,
-        Some(Kind::Ships),
-        ExportSourceRole::Selected,
-        None,
-    )
-    .map_err(|_| "collect original Ship field inspection")?;
+    let (playability, mut ledger) = inspect_inputs(&input, &tree, &admission)?;
     let files = ArchiveFiles::new(archive);
     let pool = ShipPool::new(Arc::new(Entities::new(forge)), &files);
     let projected = source_projection::read(
@@ -78,7 +72,13 @@ pub(crate) fn project<'source, T>(
     let aggregates = projected
         .aggregates
         .ok_or("producer aggregate cells missing")?;
-    let row = ShipSource::from_read(projected.source, aggregates);
+    let playability = projected.source.playability_proof.decide(
+        &tree,
+        projected.source.vehicle,
+        &playability,
+        &input,
+    )?;
+    let row = ShipSource::from_read(projected.source, aggregates, playability);
     let locales = projection
         .finish_rows()
         .map_err(|_| "finish scoped producer text registry")?;
@@ -93,4 +93,24 @@ pub(crate) fn project<'source, T>(
         record_inspections: ledger.field_inspections.len(),
         file_operations: ledger.entries.len(),
     })
+}
+
+fn inspect_inputs<'source>(
+    input: &OriginalCatalogInput<'_, 'source>,
+    tree: &RecordTree<'source>,
+    admission: &RecordObservation<'_, 'source>,
+) -> TestResult<(Evidence, ExportLedger)> {
+    let mut ledger = crate::export_field_walk::inspect_observed(
+        Some(input),
+        tree,
+        admission,
+        Some(Kind::Ships),
+        ExportSourceRole::Selected,
+        None,
+    )
+    .map_err(|_| "collect original Ship field inspection")?;
+    let (playability, observed) = Evidence::read_for_ships([tree], input, None)
+        .map_err(|_| "collect scoped producer playability evidence")?;
+    ledger.merge(observed);
+    Ok((playability, ledger))
 }

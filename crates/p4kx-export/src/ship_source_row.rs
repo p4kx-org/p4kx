@@ -3,7 +3,6 @@
 
 use p4kx_extraction::SourcedValue;
 
-use crate::MassBasis;
 use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_text_contract::{GameTextRef, PublicNameRef};
 use crate::catalog_v3::authored_fields::ship_presentation::{
@@ -13,6 +12,7 @@ use crate::catalog_v3::authored_fields::ship_source_read::{ShipPlayabilityInputs
 use crate::contract_insurance::ShipInsurance;
 use crate::loadout::ledger::ShipAggregateValues;
 use crate::resource_number::ResourceNumber;
+use crate::{MassBasis, Playability};
 
 /// Canonical source-backed fields of one physical Ship, including resolved mass and hull.
 #[derive(Debug)]
@@ -32,12 +32,14 @@ pub struct ShipSource<'source> {
     pub(crate) hull_health: SourcedValue<f64>,
     pub(crate) insurance: SourcedValue<Box<ShipInsurance<'source>>>,
     pub(crate) playability_inputs: ShipPlayabilityInputs<'source>,
+    pub(crate) playability: SourcedValue<Playability>,
 }
 
 impl<'source> ShipSource<'source> {
     pub(crate) fn from_read(
         source: ShipSourceRead<'_, 'source>,
         aggregates: ShipAggregateValues,
+        playability: SourcedValue<Playability>,
     ) -> Self {
         let presentation = source.presentation;
         Self {
@@ -56,6 +58,7 @@ impl<'source> ShipSource<'source> {
             hull_health: aggregates.hull_health,
             insurance: source.insurance,
             playability_inputs: source.playability_inputs,
+            playability,
         }
     }
 
@@ -141,6 +144,12 @@ impl<'source> ShipSource<'source> {
     #[must_use]
     pub const fn insurance(&self) -> &SourcedValue<Box<ShipInsurance<'source>>> {
         &self.insurance
+    }
+
+    /// Borrows the canonical classification and its immediate source evidence.
+    #[must_use]
+    pub const fn playability(&self) -> &SourcedValue<Playability> {
+        &self.playability
     }
 
     /// Borrows the authored crew-manifest inputs.

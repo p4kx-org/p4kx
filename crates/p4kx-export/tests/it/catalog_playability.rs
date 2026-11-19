@@ -8,6 +8,8 @@ use crate::playability_fixture;
 use std::error::Error;
 use std::time::{Duration, UNIX_EPOCH};
 
+use p4kx_export::catalog_queries::equipment::with_ship_sources;
+use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogRecordSelection};
 use p4kx_export::{CatalogOptions, Playability, PlayabilityCounts, build_catalog};
 use p4kx_extraction::Archive;
 use playability_fixture::{Corrupt, write_archive_with};
@@ -75,6 +77,9 @@ fn assert_ships(catalog: &Value, expected: &[(&str, Option<&str>)]) -> TestResul
     }
     Ok(())
 }
+
+#[path = "catalog_ship_playability_sdk.rs"]
+mod sdk;
 
 #[test]
 fn a_ship_without_ai_evidence_that_the_game_ships_is_a_player_ship() -> TestResult {

@@ -345,6 +345,7 @@ pub(crate) fn entity_field<'a>(row: &'a Value, kind: &str, field: &str) -> Optio
                     | "sourceType"
                     | "fileName"
                     | "metadataTag"
+                    | "playability"
             ) =>
         {
             row.get(field)?.get("value")

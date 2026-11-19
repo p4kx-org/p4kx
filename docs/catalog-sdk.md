@@ -904,7 +904,7 @@ Use `equipment::with_ship_sources`, its `_from` form or the session and parsed-v
 GUID order, then physical Record order for ties. The supplied `ShipSource` has immutable typed
 getters for the complete original Header, name/description/role/career, crew size, both
 manufacturer declarations, original vehicle selector, exact size, insurance and authored
-crew-manifest inputs, plus the canonical sourced mass, mass basis and hull health.
+crew-manifest inputs, plus canonical sourced mass, mass basis, hull health and playability.
 
 This query shares the Catalog's original reader, Archive-backed ShipPool and per-call
 Capture. It uses the Entity header index to open the dependencies reached by the selected owners'
@@ -920,8 +920,11 @@ encryption marker independently of source completeness, and resolve every use ag
 result's own `source_inventory()`. Return consumer-owned values from the callback, and replace
 persistent state only after the outer operation succeeds and the required coverage is accepted.
 
-Use a Catalog snapshot for cargo projections, derived vehicle kind and playability, and variant
-choices. See [the Ship contract](catalog.md#ship-dcb-source-fields) and
+The sourced `playability()` getter retains the canonical classification and the original
+rule inputs, including linked crew or tag results and their physical Record lookup. A computed
+classification can carry incomplete source coverage. A failed linked Record read that blocks
+the decision yields `unreadable`. Use a Catalog snapshot for cargo projections, derived vehicle
+kind and variant choices. See [the Ship contract](catalog.md#ship-dcb-source-fields) and
 [ADR-0410](adr/0410-equipment-sdk-shares-original-family-readers-and-canonical-variant-choices.md).
 
 The Catalog's `mass`, `massBasis` and `hullHealth` are immediate sourced aggregate cells.

@@ -34,7 +34,7 @@ pub(super) fn rows() -> Value {
         "hullHealth": present(json!(600.0)),
         "cargoScu": 18.5,
         "cargoGridsWithIssue": 0,
-        "playability": "ai",
+        "playability": present(json!("ai")),
         "variantOf": "a0000000-0000-4000-8000-000000000001",
         "insurance": present(json!({
             "staticElementOrdinal": present(json!(0)),

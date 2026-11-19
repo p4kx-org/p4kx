@@ -4,11 +4,12 @@
 use p4kx_extraction::{RecordTree, StructValue, Value};
 
 use crate::CatalogError;
+use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_v3::authored_fields::ship_source_read::ShipSourceRead;
 use crate::contract::Ship;
 use crate::guid_text::CatalogGuid;
 use crate::paint_port::{PaintPort, VehicleFacts};
-use crate::playability_rules::{self, Evidence};
+use crate::playability_rules::Evidence;
 use crate::record_fields::{component, elements, structure, text};
 use crate::ship_base::ShipRead;
 use crate::variants::ShipKey;
@@ -65,14 +66,17 @@ pub(crate) fn ship<'f>(
     tree: &RecordTree<'f>,
     mut source: ShipSourceRead<'_, 'f>,
     evidence: &Evidence,
+    input: &OriginalCatalogInput<'_, '_>,
     read: &ShipRead,
     aggregates: crate::loadout::ledger::ShipAggregateValues,
 ) -> Result<(Ship<'f>, VehicleFacts), CatalogError> {
     let base = &read.base;
     let identity = ShipIdentity::read(&source.header)?;
-    let playability = playability_rules::ship(tree, source.vehicle, evidence);
+    let playability = source
+        .playability_proof
+        .decide(tree, source.vehicle, evidence, input)?;
     let source_numbers = std::mem::take(&mut source.numbers);
-    let source = ShipSource::from_read(source, aggregates);
+    let source = ShipSource::from_read(source, aggregates, playability);
     let guid = CatalogGuid(tree.guid());
     let ship = Ship {
         source_record_index: tree.record_index(),
@@ -87,7 +91,7 @@ pub(crate) fn ship<'f>(
         vehicle_manufacturer: source.vehicle_manufacturer,
         attachment_manufacturer: source.attachment_manufacturer,
         vehicle_definition: source.vehicle_definition,
-        playability,
+        playability: source.playability,
         vehicle_kind: base.vehicle_kind,
         size: source.size,
         mass: source.mass,

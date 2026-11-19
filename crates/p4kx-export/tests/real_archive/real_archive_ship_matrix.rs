@@ -44,7 +44,7 @@ fn playability_of_the_ships_is_compared_with_the_ship_matrix() -> Result<(), Box
         .filter_map(|ship| {
             Some(CatalogShip {
                 class_name: ship["className"]["value"].as_str()?,
-                playability: ship["playability"].as_str(),
+                playability: ship.pointer("/playability/value").and_then(Value::as_str),
             })
         })
         .collect();
