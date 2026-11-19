@@ -60,9 +60,9 @@ use p4kx_gltf::{
 };
 use p4kx_model::{MaterialStatus, Model, UnresolvedLayers};
 
-#[cfg(feature = "verification")]
-pub use animate::FaceRotationComparison;
 pub use animate::{CharacterAnimations, MAX_ANIMATION_VALUES};
+#[cfg(feature = "verification")]
+pub use animate::{FaceRotationComparison, StandaloneFaceRotationComparison};
 pub use body::BodyVariant;
 pub use dress::{HeadItems, HeadMaterial};
 pub use expressions::Expressions;

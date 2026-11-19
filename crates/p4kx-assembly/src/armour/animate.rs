@@ -8,7 +8,7 @@ mod origins;
 #[path = "face_rotation_verification.rs"]
 mod verification;
 #[cfg(feature = "verification")]
-pub use self::verification::FaceRotationComparison;
+pub use self::verification::{FaceRotationComparison, StandaloneFaceRotationComparison};
 
 use std::collections::HashSet;
 use std::io::Write;

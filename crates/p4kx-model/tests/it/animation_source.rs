@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+#[path = "animation_rotation_identity.rs"]
+mod rotation_identity;
+
 use std::error::Error;
 
 use p4kx_chunks::{ChunkFile, ivo};

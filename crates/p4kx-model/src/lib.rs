@@ -166,7 +166,9 @@ pub use animation_clip_coordinates::{
     AnimationChunkCoordinates, AnimationClipCoordinates, AnimationDatabaseSelection,
     AnimationFrameChannel, AnimationLastFrame,
 };
-pub use animation_controller::{AnimationChannel, AnimationController, DecodedAnimationChannel};
+pub use animation_controller::{
+    AnimationChannel, AnimationController, DecodedAnimationChannel, RotationIdentityEvidence,
+};
 pub use animation_dba::{Dba, DbaHeaders, SkippedAnimation};
 pub use animation_error::{AnimationError, CorruptAnimation};
 pub use animation_header::AnimationHeader;

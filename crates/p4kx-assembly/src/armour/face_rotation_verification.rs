@@ -5,20 +5,26 @@ use std::collections::HashSet;
 
 #[path = "face_control_diagnostic.rs"]
 mod diagnostic;
+#[path = "face_rotation_prepared.rs"]
+mod prepared;
 #[path = "face_rotation_report.rs"]
 mod report;
+#[path = "face_rotation_standalone.rs"]
+mod standalone;
+pub use self::standalone::StandaloneFaceRotationComparison;
 
 use p4kx_character::FacePose;
 use p4kx_gltf::{SampledAnimation, SampledWeights};
 use p4kx_model::{Animation, multiply_quaternions};
 
-use super::super::animate_rig::{Loaded, load};
+use super::super::animate_rig::Loaded;
 use super::super::facial::FaceLink;
 use super::super::sample::{
     evaluate_frames, is_finite, joint_samples_with, turned, weight_samples,
 };
 use super::{Armour, CharacterAnimations, ModelProvider, face_tracks};
 
+use self::prepared::Prepared;
 use self::report::ClipFrames;
 
 const ACTION_NAMES: [&str; 4] = [
@@ -64,54 +70,61 @@ impl Armour {
         models: &dyn ModelProvider,
         frames: &[u16],
     ) -> Result<FaceRotationComparison, String> {
-        if frames.is_empty() || !frames.is_sorted_by(|first, second| first < second) {
-            return Err("comparison frames must be strictly increasing".to_owned());
-        }
-        let clip = ClipFrames::read(animation)?;
-        clip.check(frames)?;
-        if animation.additive || !animation.bind(&self.skeleton.bones).bound.is_empty() {
-            return Err("comparison requires an absolute facial-only clip".to_owned());
-        }
-        let (part, selected, link) = self.face_part().ok_or("character has no facial rig")?;
-        let rig = load(link, models)?;
-        let face = &rig.face;
-        let logic = face.logic();
-        let tracks = face_tracks(animation, logic, &HashSet::new());
-        if tracks.controls.is_empty() || !tracks.skipped.is_empty() {
-            return Err(diagnostic::failure(
-                animation,
-                (part, selected),
-                link,
-                logic,
-                &tracks,
-            ));
-        }
-        let observed = evaluate_frames(logic.controls(), &tracks.controls, frames, |values| {
-            let mut angles = Vec::with_capacity(face.joints());
-            let pose = face.pose_observing_angles(values, |angle| angles.push(angle));
-            (pose, angles)
-        });
-        let (poses, angles_radians): (Vec<_>, Vec<_>) = observed.into_iter().unzip();
-        if !poses.iter().all(is_finite) {
-            return Err("facial comparison pose is not finite".to_owned());
-        }
-        let times: Vec<_> = frames
-            .iter()
-            .map(|&frame| animation.seconds(u32::from(frame)))
-            .collect();
-        let actions = comparison_actions(self, link, &rig, (part, &times), poses, &angles_radians);
-        let joints = report::joint_mapping(&self.skeleton.bones, link, logic.joint_hashes());
-        if joints.len() != face.joints() {
-            return Err("facial rig joint order does not cover the observed angles".to_owned());
-        }
-        Ok(FaceRotationComparison {
-            animations: comparison_animation_set(actions, rig),
-            angles_radians,
-            clip,
-            frames: frames.to_vec(),
-            joints,
-        })
+        let prepared = Prepared::read(self, animation, models, frames)?;
+        complete(self, animation, prepared, frames)
     }
+}
+
+fn complete(
+    armour: &Armour,
+    animation: &Animation,
+    prepared: Prepared<'_>,
+    frames: &[u16],
+) -> Result<FaceRotationComparison, String> {
+    let Prepared {
+        clip,
+        part,
+        selected,
+        link,
+        rig,
+    } = prepared;
+    let face = &rig.face;
+    let logic = face.logic();
+    let tracks = face_tracks(animation, logic, &HashSet::new());
+    if tracks.controls.is_empty() || !tracks.skipped.is_empty() {
+        return Err(diagnostic::failure(
+            animation,
+            (part, selected),
+            link,
+            logic,
+            &tracks,
+        ));
+    }
+    let observed = evaluate_frames(logic.controls(), &tracks.controls, frames, |values| {
+        let mut angles = Vec::with_capacity(face.joints());
+        let pose = face.pose_observing_angles(values, |angle| angles.push(angle));
+        (pose, angles)
+    });
+    let (poses, angles_radians): (Vec<_>, Vec<_>) = observed.into_iter().unzip();
+    if !poses.iter().all(is_finite) {
+        return Err("facial comparison pose is not finite".to_owned());
+    }
+    let times: Vec<_> = frames
+        .iter()
+        .map(|&frame| animation.seconds(u32::from(frame)))
+        .collect();
+    let actions = comparison_actions(armour, link, &rig, (part, &times), poses, &angles_radians);
+    let joints = report::joint_mapping(&armour.skeleton.bones, link, logic.joint_hashes());
+    if joints.len() != face.joints() {
+        return Err("facial rig joint order does not cover the observed angles".to_owned());
+    }
+    Ok(FaceRotationComparison {
+        animations: comparison_animation_set(actions, rig),
+        angles_radians,
+        clip,
+        frames: frames.to_vec(),
+        joints,
+    })
 }
 
 fn comparison_actions(

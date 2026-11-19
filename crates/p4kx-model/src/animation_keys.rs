@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+#[path = "animation_rotation_identity.rs"]
+mod rotation_identity;
+pub(crate) use self::rotation_identity::is_canonical_identity;
+
 use std::ops::Range;
 
 use p4kx_foundation::ParseError;

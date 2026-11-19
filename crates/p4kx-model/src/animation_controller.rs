@@ -5,7 +5,8 @@ use std::ops::Range;
 
 use crate::animation_clip_coordinates::{AnimationFrameChannel, AnimationLastFrame};
 use crate::animation_keys::{
-    EncodedValues, last_frame_bytes, read_rotations, read_times, read_translations,
+    EncodedValues, is_canonical_identity, last_frame_bytes, read_rotations, read_times,
+    read_translations,
 };
 use crate::reader::to_usize;
 use crate::{CorruptAnimation, Keys, Track};
@@ -23,6 +24,34 @@ pub struct DecodedAnimationChannel<const N: usize> {
     pub frame_range: Range<u64>,
     /// The original value-encoding interval, relative to the Entry start.
     pub value_range: Range<u64>,
+}
+
+/// A canonical encoded-rotation verdict and its original file-relative intervals.
+#[derive(Debug, Clone)]
+pub struct RotationIdentityEvidence {
+    canonical: bool,
+    frames: Range<u64>,
+    values: Range<u64>,
+}
+
+impl RotationIdentityEvidence {
+    /// Returns whether every source key has the supported canonical identity encoding.
+    #[must_use]
+    pub const fn is_canonical(&self) -> bool {
+        self.canonical
+    }
+
+    /// Returns the exact encoded-frame interval supplied to the canonical decoder.
+    #[must_use]
+    pub fn frame_range(&self) -> Range<u64> {
+        self.frames.clone()
+    }
+
+    /// Returns the exact encoded-value interval supplied to the canonical decoder.
+    #[must_use]
+    pub fn value_range(&self) -> Range<u64> {
+        self.values.clone()
+    }
 }
 
 /// The stored encoding and offsets of one controller channel.
@@ -190,6 +219,32 @@ impl<'a> AnimationController<'a> {
             self.id,
             |data, start, format, count| read_rotations(data, start, format, count, self.id),
         )
+    }
+
+    /// Returns encoded identity evidence, or `None` for an absent rotation channel.
+    ///
+    /// # Errors
+    /// Returns the same source format and data errors as [`Self::decode_rotation`].
+    pub fn rotation_identity(&self) -> Result<Option<RotationIdentityEvidence>, CorruptAnimation> {
+        self.decode_rotation()?
+            .map(|decoded| {
+                let [_, format] = self.rotation.packed_format.to_le_bytes();
+                let start = self
+                    .entry_at
+                    .saturating_add(to_usize(self.rotation.value_offset));
+                let canonical = is_canonical_identity(
+                    self.data,
+                    start,
+                    format,
+                    usize::from(self.rotation.key_count),
+                )?;
+                Ok(RotationIdentityEvidence {
+                    canonical,
+                    frames: decoded.frame_range,
+                    values: decoded.value_range,
+                })
+            })
+            .transpose()
     }
 
     /// Decodes the translation channel, including its original frame indices.
