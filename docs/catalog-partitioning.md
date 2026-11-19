@@ -42,6 +42,44 @@ request through the [normal file and media exporters](catalog.md#media-files).
 The first normal PTU `13228337` run reached the publication check and stopped on two unmapped
 mission-phase values. That run produced no complete PTU file. [Size investigation](https://github.com/p4kx-org/p4kx/issues/1151)
 
+## Reducing the uncompressed document
+
+The normal writer already emits compact JSON. Domain partitioning changes which data a consumer
+fetches. Reducing the total decoded size requires a more compact representation of repeated data.
+
+| Target | Lossless representation | Evidence |
+| --- | --- | --- |
+| `loadouts` | Store each observed Vehicle XML selection sequence once. A field keeps its local uses and a reference to the exact prefix of that sequence. | The 30.67 GB section contains 10,803 trees and 284,449 ports including descendants. The producer shares selected prefixes in memory and expands them in the JSON of multiple port attributes. |
+| `provenance.uses` | Use a typed table with a column declaration and compact row arrays. Encode the three closed scope, role and encryption vocabularies with one-digit codes. | The exact 88,689,710 use rows repeat six required keys of 62 bytes per row. The keys account for 5,498,762,020 bytes. The three vocabularies save at least 2,128,553,040 more bytes with the proposed codes. |
+| `projections.weaponPlayerAnimationCandidates` | Store physical weapon, actor, branch and clip-option endpoints once and retain the ordered match relationships by reference. | The 8.59 GB section contains candidate relationships with repeated endpoints and original tag evidence. |
+
+The model for the provenance table alone reduces the current 82.67 GB LIVE document to about
+75.04 GB before the small table declarations. Its values, exact coordinates and original IDs
+would remain recoverable. Shorter opaque IDs and dictionaries for repeated coordinate names are
+additional candidates. Each byte saved per use ID removes 88,689,710 bytes from the use inventory,
+plus its occurrences in references. Measure those occurrences and the complete dictionary cost
+before choosing an encoding.
+
+In a synthetic 128-port model, six attributes per port used the same growing selector prefix
+and different local uses. All 768 complete lists were distinct. Sharing the prefixes reduced
+1,451,401 bytes to 134,582 bytes and expanded to the exact original values, immediate markers
+and sorted unique use IDs. The PTU measurement needs the actual byte cost of
+`sourceUsesRefs` per port field. Candidate savings need the real shared-prefix boundaries and
+local-use sizes.
+
+Keep `containsEncryptedSource` and `sourceSetComplete` directly at each datum. The compact
+representation must explicitly identify its encoding and resolve every local use, exact
+selector prefix, physical source and ancestor in the same generation. Match a prefix against
+the observed selection sequence. Provenance inventory order is an independent sort order.
+Whole-list interning and prefix sharing can coexist. Text and content dictionaries preserve
+the existing public and protected text classification.
+
+Compare the full normalized rows, physical occurrence order, original IDs, expanded use sets,
+health and encryption states against the existing writer on synthetic fixtures and the same
+installed Builds. Measure decoded and encoded sizes, reader and writer memory, and selective
+reference closure. A required wire-shape change needs updated contract and consumer fixtures.
+The typed SDK can keep returning the existing domain values and source observations.
+
 ## Earlier sizing runs
 
 The installed LIVE `13165946` Starmap diagnostic export was 2.811 GB of decoded JSON. The
