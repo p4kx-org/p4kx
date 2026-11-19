@@ -105,6 +105,14 @@ pub(crate) fn open_bytes(
     bytes: Vec<u8>,
     origin: DcbOrigin,
 ) -> TestResult<(tempfile::TempDir, Archive)> {
+    open_bytes_with_entries(bytes, origin, [])
+}
+
+pub(crate) fn open_bytes_with_entries(
+    bytes: Vec<u8>,
+    origin: DcbOrigin,
+    extra: impl IntoIterator<Item = TestEntry>,
+) -> TestResult<(tempfile::TempDir, Archive)> {
     let folder = tempfile::tempdir()?;
     let path = folder.path().join("fixture.p4k");
     let dcb = TestEntry::stored("Data\\Game2.dcb", bytes);
@@ -113,7 +121,7 @@ pub(crate) fn open_bytes(
         DcbOrigin::Encrypted => dcb.encrypted(),
         DcbOrigin::Unknown => dcb.encrypted().with_encryption_field(7),
     };
-    ArchiveBuilder::new()
+    let mut builder = ArchiveBuilder::new()
         .entry(dcb)
         .entry(
             TestEntry::stored(Language::English.global_ini_path(), english().as_bytes())
@@ -126,8 +134,11 @@ pub(crate) fn open_bytes(
         .entry(TestEntry::stored(
             "Data/Libs/CosmoTools/LayerRecovery/LayerBackups.xml",
             b"<LayerBackups/>",
-        ))
-        .write_to(&path)?;
+        ));
+    for entry in extra {
+        builder = builder.entry(entry);
+    }
+    builder.write_to(&path)?;
     let archive = Archive::open_with_key(path, Some(p4kx_testkit::test_key()))?;
     Ok((folder, archive))
 }

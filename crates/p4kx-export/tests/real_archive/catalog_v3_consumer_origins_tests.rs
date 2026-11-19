@@ -2,6 +2,8 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_export::Kind;
+use p4kx_extraction::Language;
+use p4kx_testkit::TestEntry;
 use serde_json::{Value, json};
 
 use crate::catalog_v3_consumer as reader;
@@ -185,4 +187,190 @@ fn empty_complete_unknown_origin_is_not_an_authenticated_literal() -> TestResult
         "complete empty contributors carry the known literal marker instead of unknown"
     );
     Ok(())
+}
+
+#[test]
+fn mixed_text_sources_keep_direct_markers_and_protection_in_one_row() -> TestResult {
+    let database = fixture::with_keys("@shared", "@shared", "@resource_name");
+    let french = TestEntry::stored(
+        Language::French.global_ini_path(),
+        "shared=Texte partagé\n".as_bytes(),
+    )
+    .encrypted()
+    .with_encryption_field(7);
+    let (_directory, archive) =
+        fixture::open_bytes_with_entries(database.build(), fixture::DcbOrigin::Plain, [french])?;
+    let mut options = fixture::options();
+    options.publication_mode = p4kx_export::CatalogPublicationMode::DiagnosticPartial;
+    let built = p4kx_export::build_catalog(&archive, &options)?;
+    let catalog: Value = serde_json::from_slice(built.json())?;
+    reader::presentations(&catalog)?;
+
+    let owner = fixture::presentation(&catalog, fixture::ALPHA)?;
+    let public_id = reader::present(fixture::at(owner, "/name")?)?;
+    let protected_id = reader::present(fixture::at(owner, "/description")?)?;
+    assert_ne!(
+        public_id, protected_id,
+        "equal original keys keep distinct text domains"
+    );
+    let public = fixture::text_row(&catalog, "publicNames", public_id)?;
+    let protected = fixture::text_row(&catalog, "gameTexts", protected_id)?;
+    assert!(
+        fixture::text_row(&catalog, "gameTexts", public_id).is_err()
+            && fixture::text_row(&catalog, "publicNames", protected_id).is_err(),
+        "each physical input remains reachable through the correct text domain",
+    );
+    let schema = p4kx_export::catalog_schema();
+    assert_eq!(
+        schema.pointer("/$defs/CommodityPresentation/properties/description/x-gameText"),
+        Some(&Value::Bool(true)),
+        "the protected reference is marked independently of encryption",
+    );
+    assert_ne!(
+        schema.pointer("/$defs/CommodityPresentation/properties/name/x-gameText"),
+        Some(&Value::Bool(true)),
+        "the short name stays public across all three source states",
+    );
+
+    for row in [public, protected] {
+        verify_mixed_translations(&catalog, row)?;
+    }
+    reject_aggregate_only_text_marker(public)
+}
+
+fn verify_mixed_translations(catalog: &Value, row: &Value) -> TestResult {
+    assert_eq!(
+        reader::present(fixture::at(row, "/key")?)?,
+        &json!("@shared"),
+        "the same original key is present in both domains",
+    );
+    assert_eq!(
+        fixture::at(row, "/translations/containsEncryptedSource")?,
+        &json!(true),
+        "the enclosing provenance includes an encrypted locale",
+    );
+    for (language, text, marker) in [
+        (Language::English, "Shared text", Some(true)),
+        (Language::German, "Gemeinsamer Text", Some(false)),
+        (Language::French, "Texte partagé", None),
+    ] {
+        for field in ["sourceText", "displayText"] {
+            let path = format!("/translations/value/{}/{field}", language.code());
+            let carrier = fixture::at(row, &path)?;
+            assert_eq!(
+                reader::present(carrier)?,
+                &json!(text),
+                "{path} retains its original readable text",
+            );
+            assert_eq!(
+                fixture::at(carrier, "/containsEncryptedSource")?,
+                &json!(marker),
+                "{path} carries only its own source marker",
+            );
+            assert_eq!(
+                fixture::at(carrier, "/sourceSetComplete")?,
+                &json!(true),
+                "{path} identifies its complete source set",
+            );
+            verify_locale_use(catalog, carrier, language, marker)?;
+        }
+    }
+    Ok(())
+}
+
+fn reject_aggregate_only_text_marker(public: &Value) -> TestResult {
+    let path = "/translations/value/de/displayText";
+    let mut aggregate_only = public.clone();
+    aggregate_only
+        .pointer_mut(path)
+        .and_then(Value::as_object_mut)
+        .ok_or("original clear translation carrier")?
+        .remove("containsEncryptedSource")
+        .ok_or("original direct marker")?;
+    assert_eq!(
+        fixture::at(&aggregate_only, "/translations/containsEncryptedSource")?,
+        &json!(true),
+        "the mutant retains the aggregate marker",
+    );
+    assert!(
+        reader::present(fixture::at(&aggregate_only, path)?).is_err(),
+        "an aggregate marker cannot replace the required direct field marker",
+    );
+    Ok(())
+}
+
+fn verify_locale_use(
+    catalog: &Value,
+    carrier: &Value,
+    language: Language,
+    marker: Option<bool>,
+) -> TestResult {
+    let refs = fixture::at(carrier, "/sourceUsesRefs")?
+        .as_array()
+        .ok_or("direct text source references")?;
+    let expected_encryption = match marker {
+        Some(true) => "encrypted",
+        Some(false) => "unencrypted",
+        None => "unknown",
+    };
+    let mut locale_payload = false;
+    for id in refs {
+        let used = inventory_row(catalog, "/provenance/uses", id)?;
+        let source = inventory_row(
+            catalog,
+            "/provenance/sources",
+            fixture::at(used, "/source")?,
+        )?;
+        assert_eq!(
+            fixture::at(source, "/kind")?,
+            &json!("archiveEntry"),
+            "a text use closes to an actual Archive Entry",
+        );
+        assert_eq!(
+            fixture::at(used, "/scope")?,
+            &json!("payload"),
+            "the source use addresses original payload bytes",
+        );
+        if used.pointer("/location/type").and_then(Value::as_str) == Some("localizationLookup") {
+            assert_eq!(
+                fixture::at(source, "/path/value")?,
+                &json!(language.global_ini_path()),
+                "the contribution is from the selected language Entry",
+            );
+            assert_eq!(
+                fixture::at(used, "/effectiveEncryption")?,
+                &json!(expected_encryption),
+                "the direct use retains that Entry's declared encryption evidence",
+            );
+            locale_payload |= used.get("role").and_then(Value::as_str) == Some("payload");
+        } else {
+            assert_eq!(
+                fixture::at(source, "/path/value")?,
+                &json!("Data\\Game2.dcb"),
+                "other contributions are original key selectors from the DCB",
+            );
+        }
+    }
+    assert!(
+        locale_payload,
+        "an actual locale payload supplies each present text"
+    );
+    Ok(())
+}
+
+fn inventory_row<'catalog>(
+    catalog: &'catalog Value,
+    path: &str,
+    id: &Value,
+) -> TestResult<&'catalog Value> {
+    let mut matches = fixture::at(catalog, path)?
+        .as_array()
+        .ok_or("actual provenance inventory rows")?
+        .iter()
+        .filter(|row| row.get("id") == Some(id));
+    let row = matches.next().ok_or("closed text provenance reference")?;
+    if matches.next().is_some() {
+        return Err("duplicate referenced provenance identity".into());
+    }
+    Ok(row)
 }
