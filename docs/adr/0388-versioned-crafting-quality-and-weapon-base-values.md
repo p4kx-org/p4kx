@@ -1,12 +1,10 @@
 # Version the crafting quality formula separately from the Catalog
 
-Basetool and VerseKit exchange component Crafting quality by original Blueprint cost position
-and evaluate the same values from Catalog v3. The first agreed formula uses Basetool's ordered
-curve evaluation and VerseKit's aggregation across recipe positions. It compares crafted
-equipment with unmodified factory values. This contract has separate integer formula version 1.
-A measured game result that changes the computation will require a new formula version even if
-the Catalog schema remains the same. The agreement is recorded in the
-[Basetool Exchange amendment](https://github.com/krt-profit/basetool/issues/2821#issuecomment-6878138700).
+Consumers exchange component Crafting quality by original Blueprint cost position and evaluate
+the same values from Catalog v3. Formula version 1 specifies ordered curve evaluation,
+aggregation across recipe positions, and comparison against unmodified factory values. A
+measured game result that changes the computation requires a new formula version even when the
+Catalog schema remains the same.
 
 Catalog v3 publishes exact authored inputs and a versioned factory weapon projection by physical
 component and original fire mode. The separate projection confines the modeling assumptions

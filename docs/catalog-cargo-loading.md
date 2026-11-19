@@ -39,11 +39,9 @@ Price cells preserve the signed value. The outer rows and the sizing blocks
 retain other authored members in `additionalFields`.
 
 The DataForge declarations specify storage types and leave the time and
-currency units open. Basetool's route model treats the base and per-box loading
-and unloading times as seconds and the fees as aUEC. The member name
-`cargoDeckLoadingTimePerSCU` identifies SCU as the denominator. Its time unit
-is unknown. [Downstream route calculation decision](https://github.com/krt-profit/basetool/issues/3456#issuecomment-6899268537),
-[loading-time and fee research](https://github.com/krt-profit/basetool/issues/3453#issuecomment-6898678143).
+currency units open. A consumer may estimate route costs using seconds for base
+and per-box durations and aUEC for fees. `cargoDeckLoadingTimePerSCU` identifies
+SCU as the denominator. Its time unit is unknown.
 
 The two tables report availability independently of how many rows the filter
 selects. The catalog preserves the stored timing and fee inputs. Consumers
