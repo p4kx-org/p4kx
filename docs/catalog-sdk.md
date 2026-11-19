@@ -730,6 +730,16 @@ cargo test --locked -p p4kx-export --test real_archive -- `
     --ignored --exact --test-threads=1
 ```
 
+The installed resource-network test compares original resource-state order, power and heat fields,
+and their physical source coordinates for selected catalog-eligible owners. It uses one decoded
+DataForge Entry and prints the Build and aggregate counts.
+
+```powershell
+cargo test --locked -p p4kx-export --test real_archive -- `
+    real_archive_resource_components::sdk::installed_resource_network_sdk_reconciles_original_components_and_connections `
+    --ignored --exact --test-threads=1
+```
+
 ## Original crafting-global configuration
 
 `catalog_queries::crafting::with_global_params` and `with_global_params_from` return borrowed

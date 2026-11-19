@@ -164,7 +164,7 @@ fn compare_snapshot(
     evidence.verify(
         snapshot,
         owner,
-        ARMOR,
+        &[ARMOR],
         VehicleArmor::owner,
         |row, source, trace| {
             assert!(

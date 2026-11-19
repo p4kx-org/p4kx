@@ -114,7 +114,7 @@ impl ComponentEvidence<'_> {
                 self.verify(
                     &snapshot,
                     index,
-                    LASER,
+                    &[LASER],
                     MiningLaser::owner,
                     |row, original, trace| {
                         let wire = serde_json::to_value(row)?;
@@ -143,7 +143,7 @@ impl ComponentEvidence<'_> {
                 self.verify(
                     &snapshot,
                     index,
-                    ATTACHABLE,
+                    &[ATTACHABLE],
                     AttachableModifier::owner,
                     |row, original, trace| {
                         check_attachable(&serde_json::to_value(row)?, original, trace)?;
@@ -168,7 +168,7 @@ impl ComponentEvidence<'_> {
                 self.verify(
                     &snapshot,
                     index,
-                    CONSUMABLE,
+                    &[CONSUMABLE],
                     Consumable::owner,
                     |row, original, trace| values::consumable(row, original, trace, subtypes),
                 )

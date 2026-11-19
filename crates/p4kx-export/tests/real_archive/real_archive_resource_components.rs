@@ -16,6 +16,8 @@ use crate::real_archive_item_durability as proof;
 
 #[path = "real_archive_resource_component_sample.rs"]
 mod sample;
+#[path = "resource_network_sdk_witness.rs"]
+mod sdk;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
