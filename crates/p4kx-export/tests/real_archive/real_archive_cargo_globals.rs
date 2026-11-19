@@ -23,6 +23,9 @@ use crate::real_archive_catalog_pipe::{self as pipe, CountingReader};
 use crate::real_archive_item_durability::Trace;
 use crate::real_archive_shop_inventory_v3::verify_build;
 
+#[path = "real_archive_cargo_globals_sdk.rs"]
+mod sdk;
+
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 const CARGO: &str = "GlobalCargoLoadingParams";
@@ -113,6 +116,7 @@ fn compare_archive(archive: &Archive) -> TestResult {
     verify_build(archive, &catalog)?;
     verify_selected_health(&summary)?;
     compare_rows(&entry, &owners, &catalog, &summary)?;
+    sdk::verify(archive, &entry, &catalog)?;
     watch
         .check()
         .map_err(|_| "Archive changed during the cargo comparison")?;

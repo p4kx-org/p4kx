@@ -166,8 +166,7 @@ fn read_radar_configuration(archive: &Archive) -> TestResult<Route> {
 }
 
 fn read_cargo_globals(archive: &Archive) -> TestResult<[Route; 2]> {
-    const REMAINING: &str =
-        "installed cargo loading and shop commodity producer parity remains open";
+    const REMAINING: &str = "scoped installed parity proven; full Catalog parity remains open";
     let selection = CatalogRecordSelection::All;
     Ok([
         cargo_globals::with_cargo_loading_globals(archive, selection, None, |snapshot| {
