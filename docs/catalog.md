@@ -2083,18 +2083,22 @@ all are asteroids and wreck sets of the Nyx ring segments, whose containers are 
 times). A Child whose `pos` or `rot` is malformed (not numbers, not three or four parts, a
 quaternion without length), or whose composed position is not a finite number or lies beyond
 1e15 m on an axis (about a tenth of a light year, far outside any star system), and everything
-below it are not placed. The walk counts and skips Children beyond the limit of 4,194,304 per
-system. Child traversal in admitted binary CryXml and text XML is iterative. Text XML must be
-well-formed and contain no DTD. A container already open on the active route counts as a cycle.
-Shared external containers keep each independent use. Skipped Children, cycles and
-unreadable containers are reported by
-`p4kx catalog` (exit code 1); the counts `unreadable_containers` and `malformed_children` are
-counted per reference, not per distinct container, so one container named by ten Children
-counts ten times. A container that a Child names and the Archive does
-not hold (`missing_containers`, also counted per reference; LIVE: two, an event container and a
-module of a Lorville entry) is a fact of the game data, like a patch file the Archive lacks: it is
-counted and listed in `CatalogSummary::starmap_report()` but is no warning. The report keeps at
-most 300 lines of containers and 300 of issues per star system, each at most 300 characters.
+below it are excluded from placement. The default traversal visits all source declarations and
+placement occurrences. Callers can set independent allowances for uniquely parsed Child declarations
+and placement visits per system through `StarmapTraversalBudget`. Exhaustion marks the affected
+scope incomplete and refuses normal publication. Child traversal in admitted binary CryXml and
+text XML is iterative. Text XML must be well-formed and contain no DTD. A container already open
+on the active route counts as a cycle.
+Shared external containers keep each independent use. [ADR-0163](adr/0163-the-starmap-containers-are-parsed-once-and-composed-in-memory.md)
+
+`missing_containers` and `unreadable_containers` count references, so a single external target
+named by ten Children contributes ten occurrences. `malformed_children` counts affected Child
+occurrences. A required target with a complete supported
+lookup and no candidate has `targetStatus.value` of `notFound`. Its original Child and lookup
+evidence remain in `placements.unresolvedContainerLinks` in a diagnostic partial Catalog.
+Missing, ambiguous and unreadable required targets block normal publication. The rendered
+`CatalogSummary::starmap_report()` keeps up to 300 container lines and 300 issue lines per star
+system, each up to 300 characters. [Catalog export health](catalog-export-health.md)
 **Rotation order.** `rot` is read as `w,x,y,z`. The raw values of LIVE settle it: the identity occurs as
 `1,0,0,0`, the rotations of the Nyx ring segments are `a,0,0,b` (about the z axis, the axis of the
 ring) and the small tilts of surface structures `0.98,~0,~0,0.17`; read as `x,y,z,w` the identity would
