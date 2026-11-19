@@ -4,7 +4,7 @@
 use p4kx_extraction::Archive;
 use p4kx_testkit::{ArchiveBuilder, TestEntry};
 
-use super::{DOCKED_XML, LOADOUT_XML, PATCH_XML, SHIP_XML, database_for};
+use super::{DOCKED_XML, LOADOUT_XML, PATCH_XML, SHIP_XML, database_for, ship_with_same_vehicle};
 use crate::commodity_v3_fixture::TestResult;
 
 const SHIP_XML_BYTES: &[u8] = br#"<Vehicle name="FixtureTopology"><Parts><Part name="mount_a" class="ItemPort"><ItemPort flags="invisible"/></Part><Part name="vehicle_only" class="ItemPort"><ItemPort/></Part></Parts></Vehicle>"#;
@@ -31,9 +31,27 @@ pub(in super::super) fn graph_archive() -> TestResult<(tempfile::TempDir, Archiv
 pub(in super::super) fn graph_archive_for(
     source: GraphSource,
 ) -> TestResult<(tempfile::TempDir, Archive)> {
+    graph_archive_from(source, None)
+}
+
+pub(in super::super) fn graph_archive_with_vehicle(
+    contents: &[u8],
+    encrypted: bool,
+) -> TestResult<(tempfile::TempDir, Archive)> {
+    graph_archive_from(GraphSource::Elem, Some((contents, encrypted)))
+}
+
+fn graph_archive_from(
+    source: GraphSource,
+    override_vehicle: Option<(&[u8], bool)>,
+) -> TestResult<(tempfile::TempDir, Archive)> {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("topology.p4k");
-    let database = TestEntry::zstd("Data\\Game2.dcb", database_for(source).build());
+    let mut records = database_for(source);
+    if override_vehicle.is_some() {
+        records = records.record(ship_with_same_vehicle());
+    }
+    let database = TestEntry::zstd("Data\\Game2.dcb", records.build());
     let database = if matches!(source, GraphSource::Database) {
         database.encrypted()
     } else {
@@ -49,16 +67,16 @@ pub(in super::super) fn graph_archive_for(
         }
         _ => SHIP_XML_BYTES,
     };
+    let (vehicle, encrypted) = override_vehicle.unwrap_or((
+        vehicle,
+        matches!(
+            source,
+            GraphSource::Vehicle | GraphSource::Elem | GraphSource::ElemWithoutDisplayValue
+        ),
+    ));
     let mut archive = ArchiveBuilder::new()
         .entry(database)
-        .entry(xml_entry(
-            SHIP_XML,
-            vehicle,
-            matches!(
-                source,
-                GraphSource::Vehicle | GraphSource::Elem | GraphSource::ElemWithoutDisplayValue
-            ),
-        ))
+        .entry(xml_entry(SHIP_XML, vehicle, encrypted))
         .entry(xml_entry(DOCKED_XML, DOCKED_XML_BYTES, false));
     match source {
         GraphSource::Loadout => {

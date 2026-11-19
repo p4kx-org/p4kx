@@ -5,9 +5,9 @@ use std::collections::BTreeSet;
 
 use p4kx_assembly::{
     Attachment, EntityNode, LoadoutError, PortDefinition, PortNode, PortSource, Target,
-    VehicleItemPort,
+    VehicleItemPort, VehiclePortSelection,
 };
-use p4kx_extraction::{SourceUse, SourcedValue};
+use p4kx_extraction::{Archive, SourceUse, SourcedValue};
 
 use crate::CatalogError;
 use crate::catalog_read::original::AuthoredEntryPath;
@@ -35,6 +35,7 @@ impl LoadoutPort {
 pub(crate) struct PortReader<'rows> {
     issues: BTreeSet<&'static str>,
     alignment: Option<&'rows mut dyn AlignmentLookup>,
+    archive: Option<&'rows Archive>,
 }
 
 impl<'rows> PortReader<'rows> {
@@ -43,13 +44,18 @@ impl<'rows> PortReader<'rows> {
         Self {
             issues: BTreeSet::new(),
             alignment: None,
+            archive: None,
         }
     }
 
-    pub(crate) const fn with_alignment(alignment: &'rows mut dyn AlignmentLookup) -> Self {
+    pub(crate) const fn with_alignment(
+        alignment: &'rows mut dyn AlignmentLookup,
+        archive: &'rows Archive,
+    ) -> Self {
         Self {
             issues: BTreeSet::new(),
             alignment: Some(alignment),
+            archive: Some(archive),
         }
     }
 
@@ -72,8 +78,8 @@ impl<'rows> PortReader<'rows> {
         node.ports()
             .iter()
             .map(|port| {
-                let xml = vehicle.and_then(|vehicle| vehicle.item_port(port.name()));
-                self.read_port(port, xml, capture)
+                let xml = vehicle.and_then(|vehicle| vehicle.item_port_with_selection(port.name()));
+                self.read_port(port, xml.as_ref(), node.record_index(), capture)
             })
             .collect()
     }
@@ -81,13 +87,22 @@ impl<'rows> PortReader<'rows> {
     fn read_port(
         &mut self,
         port: &PortNode,
-        xml: Option<&VehicleItemPort>,
+        xml: Option<&VehiclePortSelection<'_>>,
+        record_index: Option<u32>,
         capture: &Capture<'_>,
     ) -> Result<LoadoutPort, CatalogError> {
         let name_proof = capture.port_name_proof(port.name(), port.name_proof())?;
         let name = capture.port_name(port.name(), name_proof.as_ref())?;
-        let shape = read_shape(port.definition(), xml, name, name_proof.as_ref(), capture)?;
-        let (source, visibility) = match (port.source(), xml) {
+        let shape = read_shape(
+            port.definition(),
+            xml,
+            name,
+            name_proof.as_ref(),
+            capture,
+            self.archive,
+            record_index,
+        )?;
+        let (source, visibility) = match (port.source(), xml.map(VehiclePortSelection::port)) {
             (PortSource::Empty, Some(own)) => (VEHICLE_SOURCE, own.visibility().code()),
             (PortSource::Empty, None) => (VEHICLE_SOURCE, port.visibility().code()),
             (source, _) => (source.code(), port.visibility().code()),
@@ -107,7 +122,7 @@ impl<'rows> PortReader<'rows> {
                 shape.ports = port
                     .nested()
                     .iter()
-                    .map(|nested| self.read_port(nested, None, capture))
+                    .map(|nested| self.read_port(nested, None, None, capture))
                     .collect::<Result<_, _>>()?;
             }
             Attachment::Entity(child) => {
@@ -135,10 +150,12 @@ impl<'rows> PortReader<'rows> {
 
 fn read_shape(
     definition: Option<&PortDefinition>,
-    xml: Option<&VehicleItemPort>,
+    xml: Option<&VehiclePortSelection<'_>>,
     name: SourcedValue<String>,
     proof: Option<&AuthoredEntryPath>,
     capture: &Capture<'_>,
+    archive: Option<&Archive>,
+    record_index: Option<u32>,
 ) -> Result<LoadoutPort, CatalogError> {
     let (port, attributes) = match (definition, xml) {
         (Some(definition), _) => (
@@ -146,8 +163,8 @@ fn read_shape(
             capture.definition_attributes(definition, proof)?,
         ),
         (None, Some(xml)) => (
-            read_vehicle(xml, name),
-            capture.vehicle_attributes(xml, proof)?,
+            read_vehicle(xml.port(), name),
+            capture.vehicle_attributes(xml, proof, archive, record_index)?,
         ),
         (None, None) => return Ok(LoadoutPort::named(name)),
     };

@@ -10,6 +10,7 @@ pub(super) const SHIP: u128 = 0x1064_0001;
 pub(super) const RELAY: u128 = 0x1064_0002;
 pub(super) const ACTOR: u128 = 0x1064_0003;
 pub(super) const DOCKED: u128 = 0x1064_0004;
+pub(super) const SHIP_SAME_VEHICLE: u128 = 0x1064_0005;
 pub(super) const PORT_CONTAINER: &str = "SItemPortContainerComponentParams";
 pub(super) const HARDPOINT_LINK: &str = "SInternalHardpointLink";
 pub(super) const RESOURCE_LINK: &str = "SInternalResourceLink";
@@ -23,14 +24,17 @@ const COMPONENT: &str = "DataForgeComponentParams";
 const MANUAL_LOADOUT: &str = "SItemPortLoadoutManualParams";
 const LOADOUT: &str = "SItemPortLoadoutBaseParams";
 const ENTRY: &str = "SItemPortLoadoutEntryParams";
-const SHIP_XML: &str = "Scripts/Entities/Vehicles/Implementations/Xml/fixture_topology.xml";
+pub(super) const SHIP_XML: &str =
+    "Scripts/Entities/Vehicles/Implementations/Xml/fixture_topology.xml";
 const DOCKED_XML: &str = "Scripts/Entities/Vehicles/Implementations/Xml/fixture_docked.xml";
 const LOADOUT_XML: &str = "Scripts/Entities/Vehicles/Loadouts/fixture_topology_loadout.xml";
 const PATCH_XML: &str = "Scripts/Entities/Vehicles/Implementations/Xml/fixture_topology_patch.xml";
 #[path = "catalog_resource_topology_archive.rs"]
 mod archive;
 
-pub(super) use archive::{GraphSource, graph_archive, graph_archive_for};
+pub(super) use archive::{
+    GraphSource, graph_archive, graph_archive_for, graph_archive_with_vehicle,
+};
 
 pub(super) fn database() -> DataForgeBuilder {
     database_for(GraphSource::Database)
@@ -207,6 +211,16 @@ fn ship(source: GraphSource) -> TestRecord {
     } else {
         loadout
     })
+    .record()
+}
+
+fn ship_with_same_vehicle() -> TestRecord {
+    TestEntity::new(
+        SHIP_SAME_VEHICLE,
+        "FixtureTopology",
+        "libs/foundry/records/entities/spaceships/fixture_topology_cache.xml",
+    )
+    .component(node(vehicle(GraphSource::Elem)))
     .record()
 }
 

@@ -165,6 +165,8 @@ impl LoadoutReadObserver for Capture<'_> {
     ) -> ControlFlow<()> {
         if self.observes_vehicle_totals() {
             self.capture_vehicle(record_index, implementation, caller)
+        } else if self.observes_vehicle_port_attributes() {
+            self.bind_loadout_vehicle(record_index, caller)
         } else {
             ControlFlow::Continue(())
         }

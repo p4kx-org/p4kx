@@ -15,7 +15,9 @@ pub(super) fn original_sites(
     attributes: &[(String, String)],
 ) -> AttributeOrigins {
     let mut origins = AttributeOrigins::default();
-    if scope.observes_vehicle_totals() {
+    let totals = scope.observes_vehicle_totals();
+    let selection = totals || scope.observes_vehicle_port_attributes();
+    if selection {
         origins.set_element(scope.vehicle_element_site(node));
         retain(
             &mut origins,
@@ -32,11 +34,7 @@ pub(super) fn original_sites(
         scope,
         attributes,
         "id",
-        if scope.observes_vehicle_totals() {
-            MissingAttribute::Element
-        } else {
-            MissingAttribute::Omit
-        },
+        absence_scope(selection),
     );
     let port = node.name().eq_ignore_ascii_case("ItemPort");
     retain_port_attributes(&mut origins, node, scope, attributes, port);
@@ -48,9 +46,19 @@ pub(super) fn original_sites(
         "flags",
         absence_scope(port),
     );
-    if scope.observes_vehicle_totals() {
-        let is_part = node.name().eq_ignore_ascii_case("Part");
-        for name in ["mass", "damageMax", "skipPart"] {
+    let is_part = node.name().eq_ignore_ascii_case("Part");
+    if selection {
+        retain(
+            &mut origins,
+            node,
+            scope,
+            attributes,
+            "skipPart",
+            absence_scope(is_part),
+        );
+    }
+    if totals {
+        for name in ["mass", "damageMax"] {
             retain(
                 &mut origins,
                 node,

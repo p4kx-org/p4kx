@@ -27,7 +27,9 @@ pub(super) fn base(
     LoadoutError,
 > {
     let mut aggregate = observation
-        .is_some_and(Observation::observes_vehicle_totals)
+        .is_some_and(|reader| {
+            reader.observes_vehicle_totals() || reader.observes_vehicle_port_attributes()
+        })
         .then(VehicleAggregateEvidence::new);
     let result = markup::parse_observed(&document, budget, observation, |root, original, scope| {
         if !root.name.eq_ignore_ascii_case("Vehicle") {

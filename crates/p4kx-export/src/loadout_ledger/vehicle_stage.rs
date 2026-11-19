@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{FieldOrigin, SourceUse, SourceUses};
+use p4kx_extraction::{FieldOrigin, SharedFieldOrigin, SourceUse, SourceUses};
 
 use crate::catalog_read::original::{
     OriginalDatum, RecordSubject, VehicleCaller, VehicleFileSelection,
@@ -52,6 +52,18 @@ impl Default for Contributions {
 }
 
 impl Contributions {
+    pub(super) const fn new(uses: Vec<SourceUse>, complete: bool) -> Self {
+        Self { uses, complete }
+    }
+
+    pub(super) fn shared(&self, sources: &SourceUses) -> SharedFieldOrigin {
+        sources.shared_origin(&self.uses, self.complete)
+    }
+
+    pub(super) fn into_parts(self) -> (Vec<SourceUse>, bool) {
+        (self.uses, self.complete)
+    }
+
     pub(super) fn add(&mut self, datum: OriginalDatum<()>) {
         let (_, uses, complete) = datum.into_parts();
         self.uses.extend(uses);

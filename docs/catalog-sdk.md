@@ -685,8 +685,10 @@ to the nested results.
 `source_min_size()` and `source_max_size()` borrow the canonical size cells that match
 `minSize` and `maxSize` in the Catalog. The value-only getters `min_size()` and `max_size()`
 continue to return `Option<u32>`. Check the sourced state to distinguish absence, null,
-unreadability and invalidity. XML evidence can retain an exact attribute while the complete
-part selection remains unresolved.
+unreadability and invalidity. XML-backed fields cite the selected vehicle and Modification,
+the consulted Part and ItemPort candidates, and the actual attribute or checked absence.
+Cached XML uses still bind the current physical DataForge Record. Unproved sources or
+selection stages keep the field origin incomplete.
 
 `source_flags()`, `source_port_tags()` and `source_required_tags()` borrow the separate
 sourced list cells. Words within one list share the original field or attribute. The value-only

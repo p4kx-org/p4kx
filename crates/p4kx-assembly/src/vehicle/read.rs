@@ -6,83 +6,146 @@ use std::collections::HashMap;
 use p4kx_extraction::SourceValue;
 use p4kx_foundation::read_text_number;
 
+use super::aggregate_evidence::Checkpoint;
 use super::{PartKind, VehicleAggregateEvidence, VehicleItemPort, VehicleItemType, VehiclePart};
 use crate::markup::Element;
 use crate::merge::port_key;
 
-/// Reads the parts below the `Parts` element of a `Vehicle` element; parts marked `skipPart`
-/// are left out with everything below them.
+#[derive(Debug, Clone)]
+pub(super) struct IndexedPort {
+    pub(super) path: Box<[usize]>,
+    pub(super) prefix: Option<Checkpoint>,
+}
+
+impl PartialEq for IndexedPort {
+    fn eq(&self, other: &Self) -> bool {
+        self.path == other.path
+    }
+}
+
+pub(super) struct PartTree {
+    pub(super) parts: Vec<VehiclePart>,
+    pub(super) paths: HashMap<String, IndexedPort>,
+    pub(super) selectors: Option<VehicleAggregateEvidence>,
+}
+
 pub(super) fn parts(
     vehicle: &Element,
-    mut aggregate: Option<&mut VehicleAggregateEvidence>,
-) -> Vec<VehiclePart> {
-    if let Some(evidence) = &mut aggregate {
-        evidence.element(vehicle, "$children");
-    }
+    totals: Option<&mut VehicleAggregateEvidence>,
+    observe_ports: bool,
+) -> PartTree {
+    let mut reader = PartReader {
+        totals,
+        selectors: observe_ports.then(VehicleAggregateEvidence::new),
+        paths: HashMap::new(),
+        path: Vec::new(),
+    };
+    reader.element(vehicle, "$children");
     let mut parts = Vec::new();
     for child in &vehicle.children {
-        if let Some(evidence) = &mut aggregate {
-            evidence.element(child, "$name");
-        }
+        reader.element(child, "$name");
         if child.name.eq_ignore_ascii_case("Parts") {
-            parts.extend(part_list(child, &mut aggregate));
+            reader.append_parts(child, &mut parts);
         }
     }
-    parts
+    PartTree {
+        parts,
+        paths: reader.paths,
+        selectors: reader.selectors,
+    }
 }
 
-fn part_list(
-    container: &Element,
-    aggregate: &mut Option<&mut VehicleAggregateEvidence>,
-) -> Vec<VehiclePart> {
-    if let Some(evidence) = &mut *aggregate {
-        evidence.element(container, "$children");
-    }
-    let mut parts = Vec::new();
-    for child in &container.children {
-        if let Some(evidence) = &mut *aggregate {
-            evidence.element(child, "$name");
-        }
-        if child.name.eq_ignore_ascii_case("Part") {
-            parts.extend(part(child, aggregate));
-        } else if child.name.eq_ignore_ascii_case("Parts") {
-            parts.extend(part_list(child, aggregate));
-        }
-    }
-    parts
+struct PartReader<'scope> {
+    totals: Option<&'scope mut VehicleAggregateEvidence>,
+    selectors: Option<VehicleAggregateEvidence>,
+    paths: HashMap<String, IndexedPort>,
+    path: Vec<usize>,
 }
 
-fn part(
-    element: &Element,
-    aggregate: &mut Option<&mut VehicleAggregateEvidence>,
-) -> Option<VehiclePart> {
-    if let Some(evidence) = &mut *aggregate {
-        evidence.field(element, "skipPart");
+impl PartReader<'_> {
+    fn element(&mut self, element: &Element, field: &str) {
+        if let Some(totals) = &mut self.totals {
+            totals.element(element, field);
+        }
+        if let Some(selectors) = &mut self.selectors {
+            selectors.element(element, field);
+        }
     }
-    if is_set(element.attribute("skipPart")) {
-        return None;
+
+    fn append_parts(&mut self, container: &Element, parts: &mut Vec<VehiclePart>) {
+        self.element(container, "$children");
+        for child in &container.children {
+            self.element(child, "$name");
+            if child.name.eq_ignore_ascii_case("Part") {
+                self.path.push(parts.len());
+                parts.extend(self.part(child));
+                self.path.pop();
+            } else if child.name.eq_ignore_ascii_case("Parts") {
+                self.append_parts(child, parts);
+            }
+        }
     }
-    let class = element.attribute("class").unwrap_or_default();
-    let kind = kind_of(class);
-    Some(VehiclePart {
-        name_proof: element.port_name.clone(),
-        name: element.attribute("name").unwrap_or_default().to_owned(),
-        class: class.to_owned(),
-        kind,
-        mass: number(element.attribute("mass")),
-        damage_max: number(element.attribute("damageMax")),
-        detach_ratio: number(element.attribute("detachRatio")),
-        destroy_ratio: destroy_ratio(element),
-        attributes: element.attributes.clone(),
-        origins: element.origins.clone(),
-        item_port: element.child("ItemPort").map(item_port),
-        tread_wheels: if kind == PartKind::Tread {
-            tread_wheels(element)
+
+    fn part(&mut self, element: &Element) -> Option<VehiclePart> {
+        if let Some(totals) = &mut self.totals {
+            totals.field(element, "skipPart");
+        }
+        if let Some(selectors) = &mut self.selectors {
+            selectors.field(element, "skipPart");
+        }
+        if is_set(element.attribute("skipPart")) {
+            return None;
+        }
+        let name = element.attribute("name").unwrap_or_default();
+        let class = element.attribute("class").unwrap_or_default();
+        let kind = kind_of(class);
+        let port = self.item_port(element, name);
+        let mut children = Vec::new();
+        self.append_parts(element, &mut children);
+        Some(VehiclePart {
+            name_proof: element.port_name.clone(),
+            name: name.to_owned(),
+            class: class.to_owned(),
+            kind,
+            mass: number(element.attribute("mass")),
+            damage_max: number(element.attribute("damageMax")),
+            detach_ratio: number(element.attribute("detachRatio")),
+            destroy_ratio: destroy_ratio(element),
+            attributes: element.attributes.clone(),
+            origins: element.origins.clone(),
+            item_port: port,
+            tread_wheels: if kind == PartKind::Tread {
+                tread_wheels(element)
+            } else {
+                Vec::new()
+            },
+            children,
+        })
+    }
+
+    fn item_port(&mut self, part: &Element, name: &str) -> Option<VehicleItemPort> {
+        let source = if let Some(selectors) = &mut self.selectors {
+            selectors.element(part, "$children");
+            let source = part.children.iter().find(|child| {
+                selectors.element(child, "$name");
+                child.name.eq_ignore_ascii_case("ItemPort")
+            })?;
+            selectors.field(part, "name");
+            source
         } else {
-            Vec::new()
-        },
-        children: part_list(element, aggregate),
-    })
+            part.child("ItemPort")?
+        };
+        self.paths
+            .entry(port_key(name))
+            .or_insert_with(|| IndexedPort {
+                path: self.path.as_slice().into(),
+                prefix: self
+                    .selectors
+                    .as_ref()
+                    .map(VehicleAggregateEvidence::checkpoint),
+            });
+        Some(item_port(source))
+    }
 }
 
 const fn kind_of(class: &str) -> PartKind {
@@ -182,29 +245,4 @@ fn destroy_ratio(part: &Element) -> Option<f64> {
 /// number has none.
 pub(crate) fn number(value: Option<&str>) -> Option<f64> {
     read_text_number(value?).map(|number| number.value())
-}
-
-/// Returns where each item port sits, by lower-case part name: the child indices from the top
-/// level down to the part. The first part of a name decides.
-pub(super) fn port_paths(parts: &[VehiclePart]) -> HashMap<String, Box<[usize]>> {
-    let mut map = HashMap::new();
-    let mut path = Vec::new();
-    collect_paths(parts, &mut path, &mut map);
-    map
-}
-
-fn collect_paths(
-    parts: &[VehiclePart],
-    path: &mut Vec<usize>,
-    map: &mut HashMap<String, Box<[usize]>>,
-) {
-    for (index, part) in parts.iter().enumerate() {
-        path.push(index);
-        if part.item_port.is_some() {
-            map.entry(port_key(&part.name))
-                .or_insert_with(|| path.as_slice().into());
-        }
-        collect_paths(&part.children, path, map);
-        path.pop();
-    }
 }

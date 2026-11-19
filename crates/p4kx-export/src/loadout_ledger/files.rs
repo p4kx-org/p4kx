@@ -159,6 +159,9 @@ impl Capture<'_> {
                 None
             };
             state.stage_vehicle_file(self.input, original, caller)?;
+            if self.input.is_some() && self.kind == crate::Kind::Loadouts {
+                state.port_vehicles.observe(original, caller);
+            }
             let entry = self.file_observation(
                 original,
                 bytes_operation(original.kind()),
@@ -259,6 +262,9 @@ impl Capture<'_> {
                 }
             }
             state.stage_vehicle_file(self.input, original, caller)?;
+            if self.input.is_some() && self.kind == crate::Kind::Loadouts {
+                state.port_vehicles.observe(original, caller);
+            }
             drop(state);
             Ok::<_, CatalogError>(())
         })();

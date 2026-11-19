@@ -13,6 +13,7 @@ mod locate;
 mod origin;
 mod patch;
 mod paths;
+mod port_selection;
 mod read;
 mod request;
 mod structure;
@@ -35,6 +36,7 @@ pub use light_ports::{VehicleLightAttachment, VehicleLightPort};
 pub(crate) use locate::{load, load_observed};
 pub use origin::ValueOrigin;
 pub use patch::ModificationReport;
+pub use port_selection::VehiclePortSelection;
 pub use totals::{OriginTally, PartThreshold, PartialValue, UnreadableValue, VehicleTotals};
 pub use totals::{VehicleTotalFieldPresence, VehicleTotalFieldUse, VehicleTotalMetric};
 pub use xml_evidence::{VehicleAttributeEvidence, VehicleXmlSite};
@@ -230,7 +232,7 @@ pub struct VehicleImplementation {
     pub(crate) elems: Vec<ElemOverride>,
     pub(crate) name: String,
     pub(crate) parts: Vec<VehiclePart>,
-    pub(crate) port_paths: HashMap<String, Box<[usize]>>,
+    port_paths: HashMap<String, read::IndexedPort>,
     pub(crate) issues: Vec<LoadoutError>,
     pub(crate) structure: [u8; 16],
 }
@@ -371,7 +373,11 @@ impl VehicleImplementation {
     /// Returns the first part named `name` that holds an item port, ignoring ASCII case.
     #[must_use]
     pub fn port_part(&self, name: &str) -> Option<&VehiclePart> {
-        let (first, rest) = self.port_paths.get(&port_key(name))?.split_first()?;
+        self.part_at(&self.port_paths.get(&port_key(name))?.path)
+    }
+
+    fn part_at(&self, path: &[usize]) -> Option<&VehiclePart> {
+        let (first, rest) = path.split_first()?;
         let mut part = self.parts.get(*first)?;
         for index in rest {
             part = part.children.get(*index)?;

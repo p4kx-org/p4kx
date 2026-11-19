@@ -1156,8 +1156,11 @@ The name cell retains the original copied name with its own Payload, Selector an
 
 The size cells distinguish an absent declaration, an explicit DataForge null, an unreadable
 source, and an invalid value. A missing size in a selected DataForge definition stays absent.
-An XML cell retains the effective attribute or checked absence and the patch selectors that
-supplied it. Its source set stays incomplete until the preceding part selection is accounted for.
+An XML cell retains the effective attribute or checked absence, the current Record's
+vehicle lookup and its Modification selectors. Its XML source set includes the ordered
+search through the winning Part and its first ItemPort child. A reused XML document cites
+the current physical Record's lookup. Missing original evidence or an unavailable
+interpretation stage leaves the source set incomplete.
 The flag and tag cells use the same selection rule. Authored empty text gives a present empty
 list, while an absent, null, unreadable or invalid source has a null `.value`.
 

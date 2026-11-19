@@ -43,7 +43,7 @@ pub(crate) fn read_rows<'source>(
         LoadoutResolver::with_observed_entities(Arc::clone(entities), capture.clone())
             .with_files(files)
             .stopping_at_docked_vehicles();
-    let mut reader = PortReader::with_alignment(alignment);
+    let mut reader = PortReader::with_alignment(alignment, files.archive());
     let failures = resolve_ordered(
         wanted,
         cancel,
@@ -114,6 +114,10 @@ pub(super) fn read_with<'f: 'worker, 'worker>(
         capture.missing_root();
         return Ok(None);
     };
+    if let Err(error) = capture.begin_loadout_vehicles() {
+        capture.record_error(error);
+        return Ok(None);
+    }
     let node = match resolver.resolve(&record) {
         Ok(node) => node,
         Err(error) => {

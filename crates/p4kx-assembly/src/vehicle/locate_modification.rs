@@ -44,6 +44,9 @@ pub(super) fn apply(
         aggregate: selection.aggregate.take(),
         ..AppliedModification::default()
     };
+    if selection.modification.is_empty() {
+        return Ok(modified);
+    }
     let authored = selection
         .selected
         .and_then(|selected| selected.patch.as_ref());

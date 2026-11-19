@@ -30,8 +30,8 @@ pub enum VehicleAggregateIssue {
     ElementOverridesFailed,
 }
 
-/// Original selection and membership selectors shared by both vehicle sums.
-/// Join these same-read XML witnesses with the current caller and numeric field evidence.
+/// Original selection and membership selectors for a vehicle interpretation.
+/// Join these XML observations with the actual caller and field evidence.
 #[derive(Debug, Clone)]
 pub struct VehicleAggregateEvidence {
     selectors: Vec<Arc<VehicleXmlSite>>,
@@ -67,7 +67,7 @@ impl Hash for SelectorSite {
 }
 
 /// A reversible prefix of staged aggregate evidence.
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub(super) struct Checkpoint {
     selectors: usize,
     issues: usize,
@@ -146,6 +146,21 @@ impl VehicleAggregateEvidence {
         }
     }
 
+    pub(super) fn prefix_selectors(
+        &self,
+        checkpoint: Checkpoint,
+    ) -> impl Iterator<Item = &VehicleXmlSite> {
+        self.selectors().take(checkpoint.selectors)
+    }
+
+    pub(super) fn prefix_complete(&self, checkpoint: Checkpoint) -> bool {
+        checkpoint.issues == 0
+            && checkpoint.selectors <= self.selectors.len()
+            && self
+                .prefix_selectors(checkpoint)
+                .all(|site| site.location().is_some())
+    }
+
     pub(super) fn restore(&mut self, checkpoint: Checkpoint) {
         for site in self.selectors.drain(checkpoint.selectors..) {
             self.seen.remove(&SelectorSite(site));
@@ -159,7 +174,11 @@ impl VehicleImplementation {
     /// Publish owned results only after the outer resolution succeeds.
     #[must_use]
     pub const fn aggregate_evidence(&self) -> Option<&VehicleAggregateEvidence> {
-        self.declarations.aggregate.as_ref()
+        if self.declarations.totals_observed {
+            self.declarations.aggregate.as_ref()
+        } else {
+            None
+        }
     }
 }
 

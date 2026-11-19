@@ -3,6 +3,7 @@
 
 use p4kx_extraction::EntryOrigin;
 
+use super::aggregate_evidence::Checkpoint;
 use super::{VehicleAggregateEvidence, VehicleImplementation};
 
 /// Where the value of a part's attribute comes from once the Modification is applied.
@@ -32,6 +33,9 @@ impl ValueOrigin {
 #[derive(Debug, Clone, Default)]
 pub(super) struct DeclarationOrigins {
     pub(super) aggregate: Option<VehicleAggregateEvidence>,
+    pub(super) totals_observed: bool,
+    pub(super) port_documents: Option<Checkpoint>,
+    pub(super) port_parts: Option<VehicleAggregateEvidence>,
     pub(super) base: Option<EntryOrigin>,
     pub(super) patch: Option<EntryOrigin>,
 }

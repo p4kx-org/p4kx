@@ -64,6 +64,7 @@ struct State {
     classes: class_proofs::ClassProofs,
     graph: FileGraph,
     vehicles: vehicle_stage::VehicleCapture,
+    port_vehicles: port_vehicle_calls::PortVehicles,
     seen: HashSet<u32>,
     proofs: HashSet<u32>,
     error: Option<CatalogError>,
@@ -81,6 +82,7 @@ impl State {
             classes: class_proofs::ClassProofs::default(),
             graph: FileGraph::default(),
             vehicles: vehicle_stage::VehicleCapture::default(),
+            port_vehicles: port_vehicle_calls::PortVehicles::default(),
             seen: HashSet::new(),
             proofs: HashSet::new(),
             error: None,
@@ -233,6 +235,12 @@ mod inspection_tests;
 #[cfg(test)]
 #[path = "loadout_ledger/tests.rs"]
 mod tests;
+
+#[path = "loadout_ledger/port_vehicle_sources.rs"]
+mod port_vehicle_sources;
+
+#[path = "loadout_ledger/port_vehicle_calls.rs"]
+mod port_vehicle_calls;
 
 #[path = "loadout_ledger/request_examples.rs"]
 mod request_examples;

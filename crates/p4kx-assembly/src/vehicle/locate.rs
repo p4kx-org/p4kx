@@ -3,12 +3,12 @@
 
 use std::borrow::Cow;
 
-use super::VehicleImplementation;
 use super::elem::Modification;
 use super::file_read;
 use super::paths;
 use super::paths::DIRECTORY;
 use super::request;
+use super::{VehicleAggregateEvidence, VehicleImplementation};
 use crate::loadout_file_events::Document;
 use crate::loadout_file_trace::FileTrace;
 use crate::markup::{Budget, Element};
@@ -42,7 +42,7 @@ struct Selection<'a> {
     selected: Option<&'a Modification>,
     class_request: &'a LoadoutPath,
     caller: &'a LoadoutRequest,
-    aggregate: Option<super::VehicleAggregateEvidence>,
+    aggregate: Option<VehicleAggregateEvidence>,
 }
 
 pub(crate) fn load(
@@ -97,34 +97,35 @@ pub(crate) fn load_observed(
     let mut issues = Vec::new();
 
     let selected = (!modification.is_empty()).then(|| modification.to_string());
-    let modified = if selected.is_some() {
-        let selection = Selection {
-            path: &path,
-            stem: paths::file_stem(definition),
-            class_name,
-            definition,
-            modification,
-            selected: selected_element.as_ref(),
-            class_request: class_request.as_ref(),
-            caller,
-            aggregate,
-        };
-        modification::apply(
-            files,
-            &mut root,
-            selection,
-            &mut budget,
-            &mut issues,
-            observation,
-            trace,
-        )?
-    } else {
-        AppliedModification {
-            aggregate,
-            ..AppliedModification::default()
-        }
+    let selection = Selection {
+        path: &path,
+        stem: paths::file_stem(definition),
+        class_name,
+        definition,
+        modification,
+        selected: selected_element.as_ref(),
+        class_request: class_request.as_ref(),
+        caller,
+        aggregate,
     };
-    Ok(project(path, selected, &root, modified, issues, physical))
+    let modified = modification::apply(
+        files,
+        &mut root,
+        selection,
+        &mut budget,
+        &mut issues,
+        observation,
+        trace,
+    )?;
+    Ok(project(
+        path,
+        selected,
+        &root,
+        modified,
+        issues,
+        physical,
+        observation,
+    ))
 }
 
 fn project(
@@ -134,13 +135,29 @@ fn project(
     modified: AppliedModification,
     issues: Vec<LoadoutError>,
     physical: Option<p4kx_extraction::EntryOrigin>,
+    observation: Option<&Observation<'_>>,
 ) -> VehicleImplementation {
     let mut aggregate = modified.aggregate;
-    let parts = super::read::parts(root, aggregate.as_mut());
+    let totals_observed = observation.is_some_and(Observation::observes_vehicle_totals);
+    let ports_observed = observation.is_some_and(Observation::observes_vehicle_port_attributes);
+    let port_documents = if ports_observed {
+        aggregate.as_ref().map(VehicleAggregateEvidence::checkpoint)
+    } else {
+        None
+    };
+    let totals = if totals_observed {
+        aggregate.as_mut()
+    } else {
+        None
+    };
+    let parts = super::read::parts(root, totals, ports_observed);
     VehicleImplementation {
         structure: super::structure::digest(root),
         declarations: super::origin::DeclarationOrigins {
             aggregate,
+            totals_observed,
+            port_documents,
+            port_parts: parts.selectors,
             base: physical,
             patch: modified.patch_origin,
         },
@@ -150,8 +167,8 @@ fn project(
         report: modified.report,
         elems: modified.elems,
         name: root.attribute("name").unwrap_or_default().to_owned(),
-        port_paths: super::read::port_paths(&parts),
-        parts,
+        port_paths: parts.paths,
+        parts: parts.parts,
         issues,
     }
 }

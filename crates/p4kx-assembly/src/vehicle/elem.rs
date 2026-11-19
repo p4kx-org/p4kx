@@ -118,6 +118,7 @@ fn assignment_evidence(
     let port = scope.observes_vehicle_port_attributes()
         && PORT_OBSERVED_ATTRIBUTES
             .into_iter()
+            .chain(["name", "skipPart"])
             .any(|field| name.eq_ignore_ascii_case(field));
     if !visibility && !totals && !port {
         return None;

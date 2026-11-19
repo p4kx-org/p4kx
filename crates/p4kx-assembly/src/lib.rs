@@ -317,7 +317,7 @@ pub use vehicle::{
     ElemOverride, LandingGear, ModificationReport, OriginTally, PartKind, PartThreshold,
     PartialValue, PortVisibility, UnreadableValue, ValueOrigin, VehicleAggregateEvidence,
     VehicleAggregateIssue, VehicleAttributeEvidence, VehicleImplementation, VehicleItemPort,
-    VehicleItemType, VehicleLightAttachment, VehicleLightPort, VehiclePart,
+    VehicleItemType, VehicleLightAttachment, VehicleLightPort, VehiclePart, VehiclePortSelection,
     VehicleTotalFieldPresence, VehicleTotalFieldUse, VehicleTotalMetric, VehicleTotals,
     VehicleXmlSite,
 };

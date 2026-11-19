@@ -3,15 +3,15 @@
 
 use std::collections::HashMap;
 
-use p4kx_assembly::{
-    PortDefinition, PortDefinitionPosition, VehicleAttributeEvidence, VehicleItemPort,
+use p4kx_assembly::{PortDefinition, PortDefinitionPosition, VehiclePortSelection};
+use p4kx_extraction::{
+    Archive, SourceUse, SourceUseRole, SourceValue, SourcedValue, StructValue, Value,
 };
-use p4kx_extraction::{SourceUse, SourceUseRole, SourceValue, SourcedValue, StructValue, Value};
 
 use super::Capture;
+use super::port_vehicle_sources::VehiclePortSources;
 use crate::catalog_read::original::{
-    AuthoredEntryPath, EntryCapture, OriginalFlowFields, OriginalValueEdge, OriginalValueFact,
-    OriginalValuePart,
+    AuthoredEntryPath, OriginalFlowFields, OriginalValueEdge, OriginalValueFact, OriginalValuePart,
 };
 use crate::{CatalogError, ExportAccountingError, Kind};
 
@@ -159,97 +159,55 @@ impl Capture<'_> {
 
     pub(crate) fn vehicle_attributes(
         &self,
-        port: &VehicleItemPort,
+        selection: &VehiclePortSelection<'_>,
         name: Option<&AuthoredEntryPath>,
+        archive: Option<&Archive>,
+        record_index: Option<u32>,
     ) -> Result<PortAttributes, CatalogError> {
+        let port = selection.port();
         let (min, min_site) = port.min_size_source();
         let (max, max_site) = port.max_size_source();
         let (flags, flag_site) = port.flags_source();
         let (tags, tag_site) = port.port_tags_source();
         let (required, required_site) = port.required_tags_source();
         let (display_name, display_name_site) = port.display_name_source();
-        let selection = name.map_or_else(
-            || Ok(Vec::new()),
-            |name| name.selector_inputs().map(|(selection, _)| selection),
-        )?;
-        Ok(PortAttributes {
-            min_size: self.vehicle_field(min.clone(), min_site, &selection)?,
-            max_size: self.vehicle_field(max.clone(), max_site, &selection)?,
-            flags: self.vehicle_field(
+        let state = self.lock()?;
+        let source =
+            VehiclePortSources::read(self, &state, selection, name, archive, record_index)?;
+        let attributes = PortAttributes {
+            min_size: source.value(min.clone(), min_site, SourceUseRole::Conversion)?,
+            max_size: source.value(max.clone(), max_site, SourceUseRole::Conversion)?,
+            flags: source.value(
                 flags.map_or(SourceValue::Absent, |value| {
                     SourceValue::Present(flag_words(value))
                 }),
                 flag_site,
-                &selection,
+                SourceUseRole::Conversion,
             )?,
-            port_tags: self.vehicle_field(
+            port_tags: source.value(
                 tags.map_or(SourceValue::Absent, |value| {
                     SourceValue::Present(tag_words(value))
                 }),
                 tag_site,
-                &selection,
+                SourceUseRole::Conversion,
             )?,
-            required_tags: self.vehicle_field(
+            required_tags: source.value(
                 required.map_or(SourceValue::Absent, |value| {
                     SourceValue::Present(tag_words(value))
                 }),
                 required_site,
-                &selection,
+                SourceUseRole::Conversion,
             )?,
-            display_name_key: self.read_vehicle_field(
+            display_name_key: source.value(
                 display_name.map_or(SourceValue::Absent, |name| {
                     SourceValue::Present(name.to_owned())
                 }),
                 display_name_site,
-                &selection,
                 SourceUseRole::Payload,
             )?,
-        })
-    }
-
-    fn vehicle_field<T>(
-        &self,
-        value: SourceValue<T>,
-        evidence: Option<&VehicleAttributeEvidence>,
-        selection: &[SourceUse],
-    ) -> Result<SourcedValue<T>, CatalogError> {
-        self.read_vehicle_field(value, evidence, selection, SourceUseRole::Conversion)
-    }
-
-    fn read_vehicle_field<T>(
-        &self,
-        value: SourceValue<T>,
-        evidence: Option<&VehicleAttributeEvidence>,
-        selection: &[SourceUse],
-        role: SourceUseRole,
-    ) -> Result<SourcedValue<T>, CatalogError> {
-        let (Some(input), Some(evidence)) = (self.input, evidence) else {
-            return Ok(self.name_sources.value(value, selection, false));
         };
-        let entries = EntryCapture::for_input(input);
-        let mut inputs = selection.to_vec();
-        let role = match value {
-            SourceValue::Absent => SourceUseRole::Selector,
-            _ => role,
-        };
-        let state = self.lock()?;
-        for (site, role) in std::iter::once((evidence.original(), role)).chain(
-            evidence
-                .selectors()
-                .iter()
-                .map(|site| (site, SourceUseRole::Selector)),
-        ) {
-            if !state.files.contains(site.file()) {
-                return Err(ExportAccountingError::UnobservedFailure.into());
-            }
-            if site.file().source().entry_origin().is_some() {
-                let (_, source, _) = entries.vehicle_xml_site(site, role)?.into_parts();
-                inputs.extend(source);
-            }
-        }
         drop(state);
-        // The selected attribute does not account for the preceding XML Part searches.
-        Ok(self.name_sources.value(value, &inputs, false))
+        Ok(attributes)
     }
 }
 
