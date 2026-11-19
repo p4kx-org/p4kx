@@ -66,6 +66,15 @@ A byte census of the completed LIVE file attributed 29,873,701,416 bytes to the
 of `loadouts` and 36.14% of the complete decoded file. The census verified the frame and
 reconciled its disjoint counts against all 30,674,479,268 bytes in `loadouts`.
 
+A deterministic one-to-one remap to nine-character ASCII identifiers would retain the current
+string schema. It bounds the six arrays at 8,292,191,628 bytes including quotes, separators
+and brackets, a reduction of at least 21,581,509,788 bytes for this LIVE inventory. The
+identifier strings would change. Each must still resolve to the same source, location, role
+and encryption state throughout the generation. The calculation excludes the rest of the
+Catalog and the runtime cost of the mapping. It does not reduce the number of reference
+occurrences. Sharing prefixes reduces that number, so the savings from the two approaches
+overlap.
+
 In a synthetic 128-port model, six attributes per port used the same growing selector prefix
 and different local uses. All 768 complete lists were distinct. Sharing the prefixes reduced
 1,451,401 bytes to 134,582 bytes and expanded to the exact original values, immediate markers
