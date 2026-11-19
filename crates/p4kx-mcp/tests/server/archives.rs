@@ -104,6 +104,10 @@ fn archive_info_by_channel_name_summarises_the_archive() -> TestResult {
         Some(&json!(false)),
         "root directory words stay plain with an encrypted payload elsewhere"
     );
+    check_summary_origins(
+        &origins,
+        fields.get("provenance").ok_or("source inventory")?,
+    )?;
     assert!(
         fields.remove("provenance").is_some(),
         "the summary carries its source inventory"
@@ -124,16 +128,85 @@ fn archive_info_by_channel_name_summarises_the_archive() -> TestResult {
             "encrypted_count": 1,
             "issue_count": 0,
             "issues": [],
-            "compressed_size": info["compressed_size"],
+            "compressed_size": info.get("compressed_size"),
             "size": 4 + 80 + 50 + 3 + 3 + 5
         }),
         "the summary of LIVE"
     );
     assert!(
-        info["compressed_size"]
-            .as_u64()
+        info.get("compressed_size")
+            .and_then(Value::as_u64)
             .is_some_and(|size| size > 0),
-        "a stored size"
+        "the admitted entries have positive stored sizes"
+    );
+    Ok(())
+}
+
+fn check_summary_origins(origins: &Value, provenance: &Value) -> TestResult {
+    for key in ["entry_count", "encrypted_count", "compressed_size", "size"] {
+        let marker = origins
+            .get(format!("/structuredContent/{key}"))
+            .ok_or("aggregate origin")?;
+        assert_eq!(
+            marker
+                .get("containsEncryptedSource")
+                .and_then(Value::as_bool),
+            Some(false),
+            "the directory independently supplies {key}"
+        );
+        assert_eq!(
+            marker.get("sourceSetComplete").and_then(Value::as_bool),
+            Some(true),
+            "the original admitted directory is complete for {key}"
+        );
+    }
+    let references = origins
+        .get("/structuredContent/encrypted_count")
+        .and_then(|marker| marker.get("sourceUsesRefs"))
+        .and_then(Value::as_array)
+        .ok_or("encrypted count uses")?;
+    let inventory = provenance
+        .get("uses")
+        .and_then(Value::as_array)
+        .ok_or("inventory uses")?;
+    assert!(
+        inventory.iter().any(|site| {
+            site.get("id").is_some_and(|id| references.contains(id))
+                && site.get("scope").and_then(Value::as_str) == Some("archiveDirectoryMetadata")
+                && site.pointer("/location/namespace").and_then(Value::as_str)
+                    == Some("archiveDirectoryAdmittedFields")
+                && site.pointer("/location/field").and_then(Value::as_str)
+                    == Some("encryption_declarations")
+                && site.pointer("/location/indices") == Some(&json!(["0", "6"]))
+        }),
+        "the encrypted count links to directory declarations across the six admitted rows"
+    );
+    check_manifest_origins(origins)
+}
+
+fn check_manifest_origins(origins: &Value) -> TestResult {
+    let build_marker = origins
+        .get("/structuredContent/build/build_id")
+        .ok_or("build ID origin")?;
+    assert_eq!(
+        build_marker
+            .get("sourceSetComplete")
+            .and_then(Value::as_bool),
+        Some(true),
+        "the original manifest ID and parse selectors are available"
+    );
+    assert_eq!(
+        build_marker.get("containsEncryptedSource"),
+        Some(&Value::Null),
+        "the external Build manifest has unknown P4K lineage"
+    );
+    let patch = origins
+        .get("/structuredContent/build/public_patch")
+        .ok_or("patch origin")?;
+    assert_eq!(
+        patch.get("sourceSetComplete").and_then(Value::as_bool),
+        Some(false),
+        "the launcher log input is unbound"
     );
     Ok(())
 }

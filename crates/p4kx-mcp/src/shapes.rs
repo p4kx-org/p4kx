@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_channels::Channel;
-use p4kx_extraction::{ArchiveLayoutInfo, ArchiveLayoutOrigins, Build, Entry, EntryMetadataInfo};
+use p4kx_extraction::{ArchiveLayoutOrigins, ArchiveSummary, Build, Entry, EntryMetadataInfo};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -81,22 +81,13 @@ pub(crate) struct ArchiveInfo {
     pub(crate) channel: Option<String>,
     /// The Build, absent when the manifest cannot be read.
     pub(crate) build: Option<BuildShape>,
-    /// Cached source-layout headers without a lazy-record validation claim.
-    pub(crate) metadata: ArchiveLayoutInfo,
+    /// Cached headers and counts of admitted Entries.
+    #[serde(flatten)]
+    pub(crate) summary: ArchiveSummary,
     #[serde(flatten)]
     pub(crate) origins: ArchiveLayoutOrigins,
-    /// The number of Entries.
-    pub(crate) entry_count: usize,
-    /// The number of encrypted Entries.
-    pub(crate) encrypted_count: usize,
-    /// The number of defects found in the Entries' directory records.
-    pub(crate) issue_count: usize,
-    /// The first of those defects, at most 50.
+    /// The first directory defects, at most 50.
     pub(crate) issues: Vec<IssueShape>,
-    /// The sum of the stored Entry sizes in bytes.
-    pub(crate) compressed_size: u64,
-    /// The sum of the Entry sizes in bytes.
-    pub(crate) size: u64,
 }
 
 /// A defect of one Entry that did not keep the Archive from opening.

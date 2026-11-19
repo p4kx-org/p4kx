@@ -109,8 +109,10 @@ null for the absent layout. Nested ZIP/ZIP64/v2 declarations retain their origin
 source-relative extents. This adds no body reads or lazy-row validation. MCP `archive_info`
 returns the same object. `fieldOrigins` addresses each layout field at `/metadata/…` in the CLI
 and `/structuredContent/metadata/…` in MCP. Resolve each field's `sourceUsesRefs` against
-`provenance`. The companion covers `metadata`. [Archive source layout](media-archive-layout.md)
-defines its contract.
+`provenance`. The companion also addresses the four admitted-directory totals and the original
+Build manifest fields. The launcher-derived `public_patch` has incomplete contributors. Issue
+counts and details have no exact validation receipt in this companion.
+[Archive source layout](media-archive-layout.md) defines the field evidence.
 
 ## `p4kx dcb info <archive> --json`
 

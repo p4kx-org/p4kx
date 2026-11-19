@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_channels::PublicPatches;
-use p4kx_extraction::{Archive, ArchiveLayoutInfo, Filter};
+use p4kx_extraction::{Archive, ArchiveSummary, Filter};
 
 use crate::container::Place;
 use crate::entry_search_origins;
@@ -17,30 +17,15 @@ const MAX_SHOWN_ISSUES: usize = 50;
 
 /// Returns the summary of `archive`, its Build with the public patch `patches` knows.
 pub(crate) fn info(archive: &Archive, patches: &PublicPatches) -> Result<ArchiveInfo, ToolError> {
-    let (metadata, origins) =
-        ArchiveLayoutInfo::project_with_origins(archive, "/structuredContent/metadata")?;
-    let entries = archive.entries();
-    let (encrypted_count, compressed_size, size) =
-        entries
-            .iter()
-            .fold((0, 0_u64, 0_u64), |(encrypted, compressed, size), entry| {
-                (
-                    encrypted + usize::from(entry.is_encrypted()),
-                    compressed.saturating_add(entry.compressed_size()),
-                    size.saturating_add(entry.uncompressed_size()),
-                )
-            });
+    let (summary, origins) = ArchiveSummary::project_with_origins(archive, "/structuredContent")?;
     Ok(ArchiveInfo {
         archive: archive.path().display().to_string(),
         channel: p4kx_channels::channel_name(archive.path()),
         build: archive
             .build()
             .map(|build| BuildShape::from(&patches.attach(build))),
-        metadata,
+        summary,
         origins,
-        entry_count: entries.len(),
-        encrypted_count,
-        issue_count: archive.issue_count(),
         issues: archive
             .issues()
             .iter()
@@ -53,8 +38,6 @@ pub(crate) fn info(archive: &Archive, patches: &PublicPatches) -> Result<Archive
                 issue: issue.to_string(),
             })
             .collect(),
-        compressed_size,
-        size,
     })
 }
 

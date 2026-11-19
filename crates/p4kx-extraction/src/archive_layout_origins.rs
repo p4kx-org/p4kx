@@ -48,21 +48,32 @@ pub(crate) fn capture(
     address: &str,
 ) -> Result<ArchiveLayoutOrigins, ArchiveLayoutOriginError> {
     let uses = SourceUses::with_compact_use_refs();
-    let (scope, complete) = owner(archive, &uses)?;
-    let wire = serde_json::to_value(layout)?;
     let mut fields = FieldOrigins::new();
     let mut path = FieldPath::parse(address)?;
-    let capture = LayoutCapture {
-        uses: &uses,
-        scope: scope.as_ref(),
-        complete,
-        view: archive.metadata_view(),
-    };
-    capture.visit(&wire, &mut fields, &mut path, "")?;
+    write(archive, layout, &uses, &mut fields, &mut path)?;
     Ok(ArchiveLayoutOrigins {
         field_origins: fields,
         provenance: uses.freeze()?,
     })
+}
+
+pub(crate) fn write(
+    archive: &Archive,
+    layout: &ArchiveLayoutInfo,
+    uses: &SourceUses,
+    fields: &mut FieldOrigins,
+    path: &mut FieldPath,
+) -> Result<(), ArchiveLayoutOriginError> {
+    let (scope, complete) = owner(archive, uses)?;
+    let wire = serde_json::to_value(layout)?;
+    let capture = LayoutCapture {
+        uses,
+        scope: scope.as_ref(),
+        complete,
+        view: archive.metadata_view(),
+    };
+    capture.visit(&wire, fields, path, "")?;
+    Ok(())
 }
 
 fn owner(

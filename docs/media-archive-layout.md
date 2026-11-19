@@ -79,8 +79,17 @@ Their `fieldOrigins` records the observed owning directory or Container for each
 Original header facts identify the source-local header extent and logical field. The marker follows
 the containing Entries when reading an already opened nested layout. The root directory does not
 inherit encryption from its Entry payloads. Unknown recovery declarations remain unknown, and the
-tool-authored metadata version has a complete empty contributor set. Human-readable summaries
-retain their existing lines and counting meanings.
+tool-authored metadata version has a complete empty contributor set.
+
+Archive summary totals retain the observed admitted Entry count and each contributing directory
+field. `archiveDirectoryAdmittedFields` uses the half-open original admitted index range
+`[0, entry_count)` with the original size or encryption declaration field. Recovered totals retain
+the observed subset and report incomplete contributors. The sums of original stored and decoded size declarations saturate at
+`u64::MAX`. No Entry payload is read to compute the totals. Build branch, version, change number
+and ID point to their actual completed `build_manifest.id` read. That file has unknown original P4K
+lineage. The public patch retains its manifest selector, with incomplete contributors because the
+winning launcher log occurrence is unavailable. Human-readable summaries retain their existing
+lines.
 
 The reader's [source metadata contract](archive-source-metadata.md) defines record ownership,
 section extents, recovery limits and lazy-access failures.

@@ -5,7 +5,7 @@ use std::io::{self, Write};
 
 use anyhow::Result;
 use p4kx_channels::channel_name;
-use p4kx_extraction::{Archive, ArchiveLayoutInfo, ArchiveLayoutOrigins, Build, Entry};
+use p4kx_extraction::{Archive, ArchiveLayoutOrigins, ArchiveSummary, Build};
 use serde::Serialize;
 
 use crate::cli::InfoArgs;
@@ -14,18 +14,14 @@ use crate::json::{self, BuildJson};
 const UNKNOWN: &str = "unknown";
 
 #[derive(Serialize)]
-struct Summary<'a> {
+struct Info<'a> {
     archive: String,
     channel: Option<String>,
     build: Option<BuildJson<'a>>,
-    metadata: ArchiveLayoutInfo,
+    #[serde(flatten)]
+    summary: ArchiveSummary,
     #[serde(flatten)]
     origins: Option<ArchiveLayoutOrigins>,
-    entry_count: usize,
-    encrypted_count: usize,
-    issue_count: usize,
-    compressed_size: u64,
-    size: u64,
 }
 
 /// Prints the Channel, the Build and a summary of the Archive, one `Label: value` line each.
@@ -37,24 +33,18 @@ pub(crate) fn run(args: &InfoArgs, as_json: bool) -> Result<()> {
     crate::issues::warn(&archive)?;
     let patches = crate::launcher_discovery::patches()?;
     let build = archive.build().map(|build| patches.attach(build));
-    let entries = archive.entries();
-    let (metadata, origins) = if as_json {
-        let (metadata, origins) = ArchiveLayoutInfo::project_with_origins(&archive, "/metadata")?;
-        (metadata, Some(origins))
+    let (summary, origins) = if as_json {
+        let (summary, origins) = ArchiveSummary::project_with_origins(&archive, "")?;
+        (summary, Some(origins))
     } else {
-        (ArchiveLayoutInfo::of(archive.metadata()), None)
+        (ArchiveSummary::of(&archive), None)
     };
-    let info = Summary {
+    let info = Info {
         archive: json::path(archive.path()),
         channel: channel_name(archive.path()),
         build: build.as_ref().map(BuildJson::from),
-        metadata,
+        summary,
         origins,
-        entry_count: entries.len(),
-        encrypted_count: entries.iter().filter(|entry| entry.is_encrypted()).count(),
-        issue_count: archive.issue_count(),
-        compressed_size: entries.iter().map(Entry::compressed_size).sum(),
-        size: entries.iter().map(Entry::uncompressed_size).sum(),
     };
     if as_json {
         json::print(&info)?;
@@ -64,7 +54,7 @@ pub(crate) fn run(args: &InfoArgs, as_json: bool) -> Result<()> {
     Ok(())
 }
 
-fn print_lines(info: &Summary<'_>, build: Option<&Build>) -> io::Result<()> {
+fn print_lines(info: &Info<'_>, build: Option<&Build>) -> io::Result<()> {
     let mut lines: Vec<(&str, String)> = vec![
         ("Archive", info.archive.clone()),
         (
@@ -87,11 +77,11 @@ fn print_lines(info: &Summary<'_>, build: Option<&Build>) -> io::Result<()> {
         lines.push(("Build", UNKNOWN.to_owned()));
     }
     lines.extend([
-        ("Entries", info.entry_count.to_string()),
-        ("Encrypted", info.encrypted_count.to_string()),
-        ("Issues", info.issue_count.to_string()),
-        ("Compressed size", info.compressed_size.to_string()),
-        ("Size", info.size.to_string()),
+        ("Entries", info.summary.entry_count.to_string()),
+        ("Encrypted", info.summary.encrypted_count.to_string()),
+        ("Issues", info.summary.issue_count.to_string()),
+        ("Compressed size", info.summary.compressed_size.to_string()),
+        ("Size", info.summary.size.to_string()),
     ]);
     let mut out = io::stdout().lock();
     for (label, value) in lines {

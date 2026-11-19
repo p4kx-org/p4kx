@@ -20,6 +20,7 @@ mod archive_layout_zip;
 mod archive_material_reference;
 mod archive_metadata_version;
 mod archive_region_info;
+mod archive_summary;
 mod archive_table_declaration;
 pub mod bank;
 pub mod bank_wem_evidence;
@@ -201,6 +202,7 @@ pub use animation_set::{
     AnimationBounds, AnimationChoice, AnimationSet, MAX_ANIMATION_FILE_LEN, UnreadAnimation,
 };
 pub use archive_api::*;
+pub use archive_summary::ArchiveSummary;
 pub use bank::{Bank, BankExtraction, MAX_SOUNDBANK_LEN, WemFailure, WemFormat, WrittenWem};
 pub use chunk_source::{ChunkSource, ChunkTextError, MAX_CHUNK_FILE_LEN};
 pub use conversion_error::ConversionError;
