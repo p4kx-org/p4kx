@@ -209,6 +209,48 @@ fn prove_consumables(
     Ok(())
 }
 
+pub(super) fn verify_linked_tool_definitions<'source>(
+    sdk: &ParsedCatalogQueries<'_>,
+    forge: &'source DataForge<'source>,
+    origin: &DataForgeOrigin,
+    build: &'source Build,
+    globals: impl IntoIterator<Item = u32>,
+    subtypes: impl IntoIterator<Item = u32>,
+) -> TestResult {
+    let evidence = Evidence::new(forge, origin, build)?;
+    for index in globals {
+        sdk.with_mining_laser_globals(
+            CatalogRecordSelection::RecordIndex(index),
+            None,
+            |result| {
+                evidence.verify(
+                    &result,
+                    index,
+                    selection::MINING_LASER_GLOBAL,
+                    MiningLaserGlobalDefinition::source,
+                    values::mining,
+                )
+            },
+        )??;
+    }
+    for index in subtypes {
+        sdk.with_consumable_subtypes(
+            CatalogRecordSelection::RecordIndex(index),
+            None,
+            |result| {
+                evidence.verify(
+                    &result,
+                    index,
+                    selection::CONSUMABLE_SUBTYPE,
+                    ConsumableSubtype::source,
+                    |row, tree, trace| values::text(row.type_name(), tree.field("typeName"), trace),
+                )
+            },
+        )??;
+    }
+    Ok(())
+}
+
 struct Evidence<'source> {
     forge: &'source DataForge<'source>,
     build: &'source Build,

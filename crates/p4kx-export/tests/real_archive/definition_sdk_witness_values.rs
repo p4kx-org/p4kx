@@ -322,7 +322,7 @@ fn single<'source>(
     }
 }
 
-fn text<'source>(
+pub(super) fn text<'source>(
     cell: &SourcedValue<&str>,
     raw: Option<&Original<'source>>,
     trace: &Trace<'_, 'source>,

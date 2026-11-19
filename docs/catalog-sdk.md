@@ -681,6 +681,17 @@ cargo test --locked -p p4kx-export --test real_archive -- `
     --ignored --exact --test-threads=1
 ```
 
+The installed equipment test compares selected mining laser, attachable modifier and consumable
+components with their original fields and source coordinates. It checks linked mining-global and
+consumable-subtype definitions separately when the original references resolve. It uses one decoded
+DataForge Entry and prints aggregate counts and the Build.
+
+```powershell
+cargo test --locked -p p4kx-export --test real_archive -- `
+    real_archive_mining_configurations::sdk::installed_mining_tools_and_consumables_preserve_original_values_and_links `
+    --ignored --exact --test-threads=1
+```
+
 ## Original crafting-global configuration
 
 `catalog_queries::crafting::with_global_params` and `with_global_params_from` return borrowed

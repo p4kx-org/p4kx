@@ -15,6 +15,9 @@ use serde_json::Value;
 use crate::real_archive_item_durability::{self as proof, Trace};
 use crate::real_archive_verification::print_line;
 
+#[path = "mining_tool_sdk_witness.rs"]
+mod sdk;
+
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 #[test]
