@@ -1,9 +1,45 @@
 # Catalog domain partitioning
 
+## Complete LIVE measurement
+
+The packaged Windows AMD64 producer at `37605ecae` completed a normal, unfiltered export for
+installed LIVE `13165946` with two Rayon workers, all eleven installed languages, and Zstandard
+level 3. It wrote 1,206,312,950 encoded bytes with 82,668,352,262 decoded bytes pledged in the frame.
+A streaming read verified the checksum, decoded length and single-frame boundary, and measured
+the canonical sections. It counted 93,806 physical sources and 88,689,710 source uses. The
+section census does not read an independent raw export or validate reference closure.
+
+The producer ran for 19 minutes 27 seconds on a Windows host with 93.67 GiB of system-visible RAM.
+Windows recorded a 26.28 GiB process working-set peak. Sampled available system RAM stayed at
+or above 25.99 GiB, with at least 69.52 GiB of commit headroom. The sealed row spools held
+472,249,284 bytes. Windows reported 1,678,571,916 logical process write bytes, including the
+compressed publication. These figures measure the producer run. The local SDK workflow has
+its own 16 GiB system acceptance gate.
+
+| Decoded section | Exact bytes |
+| --- | ---: |
+| `loadouts` | 30,674,479,268 |
+| `provenance` | 22,358,692,968 |
+| `projections.weaponPlayerAnimationCandidates` | 8,587,490,937 |
+| `configurations.interactions` | 5,000,644,330 |
+| `definitions` | 4,875,971,186 |
+| `placements` | 3,226,353,067 |
+| `texts` | 1,663,834,064 |
+
+Loadouts, provenance and weapon animation candidates together account for 74.54% of the decoded
+document. The target index and source-use inventory need independent parts. Whole-table grouping
+alone would leave several tables above the 1,000,000,000-byte decoded reference limit. At that
+limit the current decoded volume would need at least 83 parts, before extra bundle overhead.
+Measure each encoded part separately because separate frames change compression.
+
+The first normal PTU `13228337` run reached the publication check and stopped on two unmapped
+mission-phase values. That run produced no complete PTU file. [Size investigation](https://github.com/p4kx-org/p4kx/issues/1151)
+
+## Earlier sizing runs
+
 The installed LIVE `13165946` Starmap diagnostic export was 2.811 GB of decoded JSON. The
-PTU `13189690` Nyx Starmap diagnostic export was 2.995 GB. Both measurements predate compact
-source-use IDs. These Filter-scoped exports establish section sizes. Current complete output size,
-compression and peak memory still need to be measured. [Size investigation](https://github.com/p4kx-org/p4kx/issues/1151)
+PTU `13189690` Nyx Starmap diagnostic export was 2.995 GB. Both Filter-scoped measurements
+predate compact source-use IDs.
 
 An unfiltered Windows AMD64 LIVE trial using the release producer for `2f134fbfc`
 reached 46.68 GiB of sampled peak working set during `project-contract-generators`.
