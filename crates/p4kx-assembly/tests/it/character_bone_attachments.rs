@@ -3,6 +3,9 @@
 
 //! The bone attachments of a character definition (`.cdf`) are drawn at their bones.
 
+#[path = "character_drawable_body.rs"]
+mod drawable_body;
+
 use crate::assembly_support::{TestResult, assemble, assemble_with, fixture};
 
 use p4kx_assembly::{ArchiveModels, Assembly, AssemblyOptions, IssueKind, ModelProvider};

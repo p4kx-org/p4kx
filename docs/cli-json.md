@@ -510,12 +510,14 @@ below, such a port is reported as `part_hidden` instead of `unresolved`),
 `gear_not_deployed` (a landing gear has no clip that
 deploys it, or the clip cannot be read or applied to its model; the gear keeps the pose of its
 model; a note, `skipped` is false), `attachments_left_out` (the geometry is
-a character definition, `.cdf`: its skin, else its first attachment, is the part's model, its bone
-attachments are drawn as nodes below the part, and the files of the other attachments, or of a bone
-attachment that cannot be read, are not drawn; reported once per definition, `skipped` is false),
+a character definition, `.cdf`. Its main model comes from its first bound skin. When no skin is
+bound, P4KX uses a declared `Model File` with drawable geometry at the selected LOD. Otherwise it
+uses the first bound attachment, or the declared file when there is no bound attachment. Drawable
+bone attachments have their own nodes below the part. The issue lists other bound attachments and
+unreadable bone attachments once per definition. `skipped` is false),
 `skeleton_missing` and `skeleton_unreadable` (the skeleton file, `Model File`, of a character
-definition is not in the Archive, is larger than 16 MiB or cannot be read as a model; the skin
-is still the part's model; reported once per definition, `skipped` is false),
+definition is not in the Archive, is larger than 16 MiB or cannot be read as a model. The note
+can accompany a drawable main attachment. Reported once per definition, `skipped` is false),
 `loadout_unreadable` (the Loadout of a creature, an Entity whose root geometry is a character file
 below `Objects/Characters` outside `Human`, cannot be read in full, such as an XML Loadout the
 Archive lacks, so its body port stays empty; reported on the root, `skipped` is false, ADR-0289),

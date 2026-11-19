@@ -6,13 +6,15 @@ main thruster of the M50 (`ORIG_M50_Main_Thruster_Nozzle.cdf`) and of the Gladia
 
 ## Decision
 
-- **Reading.** An `Attachment` of type `CA_BONE` with a `BoneName` and a `Binding` is a bone
-  attachment unless it is the drawn model. `RelPosition` (`x,y,z`, metres) and `RelRotation`
+- **Reading.** After selecting the part's model, retain each `CA_BONE` with nonempty `BoneName`
+  and `Binding` as a separate bone attachment. The attachment pass excludes the exact occurrence
+  selected as the part's model. `RelPosition` (`x,y,z`, metres) and `RelRotation`
   (a quaternion `w,x,y,z`, `1,0,0,0` being none) default to no offset; a value that does not read as
   numbers, a rotation without length or a binding that is another definition is listed as left
   out. Every readable bone attachment is retained in source order; `left_out` retains every
   original undrawn occurrence without a count prefix. The numbers are read with the tolerant
   parser of ADR-0145. Source Entry admission and per-definition vertex admission are independent.
+  See [ADR-0150](0150-assembly-lod-fallback-vehicle-only-ports-and-character-definitions.md).
 - **Providing.** `ProvidedModel::attachments` holds one `ProvidedAttachment` per bone attachment
   that was read: its name, bone, offset, rotation, entry and model. A file that is missing or
   cannot be read is listed in `left_out`, so `attachments_left_out` names only what is not drawn.
@@ -27,10 +29,10 @@ main thruster of the M50 (`ORIG_M50_Main_Thruster_Nozzle.cdf`) and of the Gladia
   `Assembly::attached_models`; the indices of the parts are their own. A viewer piece has the path
   `<port path>/<name>`, so the tree lists it.
 - **Limits.** The numbers of an attachment must be finite as `f32`, else it is left out. The
-  models of one definition, skin and attachments together, are read up to
+  models of one definition, the part's model and its bone attachments, are read up to
   `ArchiveModels::with_max_attachment_vertices` (by default `MAX_ASSEMBLY_VERTICES`); an
   attachment that passes it and the ones after it are left out.
-- **Budget.** The vertices of the attachments count with those of the part's skin against the
+- **Budget.** The vertices of the attachments count with those of the part's model against the
   vertex budget, in the wave check and the part-by-part check, and against the bound of the model
   cache.
 

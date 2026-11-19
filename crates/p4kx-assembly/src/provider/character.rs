@@ -21,49 +21,37 @@ struct ReadAttachment {
 }
 
 impl ArchiveModels<'_> {
-    /// Reads the character definition at `entry`: its skin as the model, its bone attachments as
-    /// models of their own, and the files of what it cannot draw.
+    /// Reads the selected model, drawable bone attachments and omitted bindings.
     pub(super) fn character(&self, entry: &str, lod: u32) -> Result<ProvidedModel, ModelFailure> {
         let (definition_origin, read) = self.observed_file(entry, MAX_CDF_BYTES);
         let bytes = read?;
         let unreadable = |reason: String| ModelFailure::Unreadable {
             reason: format!("{entry}: {reason}"),
         };
-        let read = if self.observe_nodes && definition_origin.is_some() {
-            cdf::read_observing_sources
+        let observed = self.observe_nodes && definition_origin.is_some();
+        let (mut character, body) = cdf::read_drawing(&bytes, observed, |path| {
+            self.drawable_declared_body(path, lod)
+        })
+        .map_err(|error| match error {
+            cdf::DrawError::Definition(reason) => unreadable(reason),
+            cdf::DrawError::Body(error) => error,
+        })?;
+        let mut provided = if let Some(body) = body {
+            body
         } else {
-            cdf::read
+            let model_entry = self
+                .entry_of(&character.model)
+                .ok_or_else(|| unreadable(format!("{} does not exist", character.model)))?;
+            self.read_model(model_entry, lod, Vec::new())?
         };
-        let mut character = read(&bytes).map_err(unreadable)?;
-        let model_entry = self
-            .entry_of(&character.model)
-            .ok_or_else(|| unreadable(format!("{} does not exist", character.model)))?;
-        let mut provided = self.read_model(model_entry, lod, Vec::new())?;
         provided.definition_origin = definition_origin;
         provided.cdf_model_sources = character.model_sources.take().map(Arc::new);
-        let mut remaining = self
-            .max_attachment_vertices
-            .saturating_sub(vertices(&provided.model));
-        let mut models = HashMap::new();
-        for bone in &character.bones {
-            if remaining == 0 {
-                character.left_out.push(bone.binding.clone());
-                continue;
-            }
-            match self.attachment(bone, lod, &mut models) {
-                Ok(attachment) if vertices(&attachment.model) <= remaining => {
-                    remaining -= vertices(&attachment.model);
-                    provided.attachments.push(attachment);
-                }
-                Ok(_) => {
-                    remaining = 0;
-                    character.left_out.push(bone.binding.clone());
-                }
-                Err(ModelFailure::Fatal(source)) => return Err(ModelFailure::Fatal(source)),
-                Err(_) => character.left_out.push(bone.binding.clone()),
-            }
-        }
-        drop(models);
+        self.attach_bones(
+            &character.bones,
+            &mut character.left_out,
+            lod,
+            &mut provided,
+        )?;
         provided.left_out = character.left_out;
         provided.skeleton = character
             .skeleton
@@ -73,6 +61,62 @@ impl ArchiveModels<'_> {
             provided.model.material_library = Some(without_mtl(material).to_owned());
         }
         Ok(provided)
+    }
+
+    fn drawable_declared_body(
+        &self,
+        path: &str,
+        lod: u32,
+    ) -> Result<Option<ProvidedModel>, ModelFailure> {
+        let Some(entry) = self.entry_of(path) else {
+            return Ok(None);
+        };
+        match self.read_model(entry, lod, Vec::new()) {
+            Ok(provided)
+                if provided
+                    .model
+                    .lods
+                    .iter()
+                    .any(|lod| lod.drawable_material_ids().next().is_some()) =>
+            {
+                Ok(Some(provided))
+            }
+            Err(failure @ ModelFailure::Fatal(_)) => Err(failure),
+            // Skeleton validation reports the declared input independently of geometry selection.
+            Ok(_) | Err(ModelFailure::Missing | ModelFailure::Unreadable { .. }) => Ok(None),
+        }
+    }
+
+    fn attach_bones(
+        &self,
+        bones: &[BoneAttachment],
+        left_out: &mut Vec<String>,
+        lod: u32,
+        provided: &mut ProvidedModel,
+    ) -> Result<(), ModelFailure> {
+        let mut remaining = self
+            .max_attachment_vertices
+            .saturating_sub(vertices(&provided.model));
+        let mut models = HashMap::new();
+        for bone in bones {
+            if remaining == 0 {
+                left_out.push(bone.binding.clone());
+                continue;
+            }
+            match self.attachment(bone, lod, &mut models) {
+                Ok(attachment) if vertices(&attachment.model) <= remaining => {
+                    remaining -= vertices(&attachment.model);
+                    provided.attachments.push(attachment);
+                }
+                Ok(_) => {
+                    remaining = 0;
+                    left_out.push(bone.binding.clone());
+                }
+                Err(ModelFailure::Fatal(source)) => return Err(ModelFailure::Fatal(source)),
+                Err(_) => left_out.push(bone.binding.clone()),
+            }
+        }
+        Ok(())
     }
 
     fn attachment<'bone>(

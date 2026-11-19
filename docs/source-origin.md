@@ -235,8 +235,8 @@ winning folder or database selectors when used. Parameter locators use
 `gearParameterCryXmlAttribute` for the original node and global attribute
 ordinals.
 
-The actual CDF main model selection is recorded as the winning attachment
-`Binding` or fallback `Model.File`. A `CA_SKIN` preference also records the
+The actual CDF main model selection is recorded as the selected `Model.File`
+or attachment `Binding`. A `CA_SKIN` preference also records the
 winning attachment's `Type`. A CDF `Material` attribute contributes when
 that override supplies a used surface or suppression after applying
 loadout and Entity geometry overrides. Main model attributes use

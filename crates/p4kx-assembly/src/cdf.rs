@@ -10,7 +10,7 @@ use crate::cdf_attachment_source;
 use crate::cdf_attribute_position::CdfCoordinateDomain;
 use crate::cdf_bone::BoneAttachment;
 use crate::cdf_model_sources::CdfModelSources;
-use crate::loadout_xml::Node;
+use crate::loadout_xml::{Node, Scope};
 use crate::markup::{self, Budget, Element};
 
 pub(crate) use p4kx_extraction::model::character_definition::is_definition_path as is_character_definition;
@@ -18,9 +18,7 @@ pub(crate) use p4kx_extraction::model::character_definition::is_definition_path 
 /// The most bytes of a character definition that are read.
 pub(crate) const MAX_CDF_BYTES: u64 = 1 << 20;
 
-/// What is drawn of a character definition (`.cdf`): the model of its first skin attachment, else
-/// of its first attachment, its bone attachments, and the files of the attachments that are not
-/// drawn.
+/// The selected main model, drawable bone attachments and omitted bindings.
 #[derive(Debug, PartialEq)]
 pub(crate) struct Character {
     pub(crate) model: String,
@@ -39,35 +37,70 @@ pub(crate) struct Character {
 pub(crate) fn read(bytes: &[u8]) -> Result<Character, String> {
     let mut budget = Budget::new(bytes.len());
     let root = markup::parse(bytes, &mut budget)?;
-    project(&root, |_| None, |_| None)
+    Drawing::read(&root)?.project(false, |_| None, |_| None)
 }
 
-pub(crate) fn read_observing_sources(bytes: &[u8]) -> Result<Character, String> {
+/// A failed definition parse or read of its declared body.
+#[derive(Debug)]
+pub(crate) enum DrawError<E> {
+    Definition(String),
+    Body(E),
+}
+
+/// Projects the CDF and reuses a drawable declared body returned by `read_body`.
+///
+/// Calls `read_body` only when a direct `Model File` can take precedence over a bound attachment.
+pub(crate) fn read_drawing<T, E>(
+    bytes: &[u8],
+    observe: bool,
+    read_body: impl FnOnce(&str) -> Result<Option<T>, E>,
+) -> Result<(Character, Option<T>), DrawError<E>> {
     let mut budget = Budget::new(bytes.len());
-    markup::parse_with_source(bytes, &mut budget, |root, original, scope| {
-        let children = original.children();
-        let attachments = children
-            .iter()
-            .copied()
-            .find(|child| child.name().eq_ignore_ascii_case("AttachmentList"))
-            .map(Node::children);
-        let attachment = |ordinal| attachments.as_ref()?.get(ordinal).copied();
-        let model = children
-            .iter()
-            .copied()
-            .find(|child| child.name().eq_ignore_ascii_case("Model"));
-        project(
-            &root,
-            |ordinal| Some(cdf_attachment_source::capture(attachment(ordinal)?, scope)),
-            |selected| match selected {
-                MainSelector::Attachment {
-                    ordinal,
-                    preferred_skin,
-                } => CdfModelSources::attachment(attachment(ordinal)?, scope, preferred_skin),
-                MainSelector::ModelFile => CdfModelSources::file(model?, scope),
-            },
-        )
+    let drawing = markup::parse_with_source(bytes, &mut budget, |root, original, scope| {
+        let drawing = Drawing::read(&root)?;
+        let body = match drawing.body_candidate().map_or(Ok(None), read_body) {
+            Ok(body) => body,
+            Err(error) => return Ok(Err(error)),
+        };
+        let character = if observe {
+            project_observed(&drawing, body.is_some(), original, scope)?
+        } else {
+            drawing.project(body.is_some(), |_| None, |_| None)?
+        };
+        Ok(Ok((character, body)))
     })
+    .map_err(DrawError::Definition)?;
+    drawing.map_err(DrawError::Body)
+}
+
+fn project_observed(
+    drawing: &Drawing<'_>,
+    body_drawn: bool,
+    original: Node<'_, '_>,
+    scope: &Scope<'_, '_>,
+) -> Result<Character, String> {
+    let children = original.children();
+    let attachments = children
+        .iter()
+        .copied()
+        .find(|child| child.name().eq_ignore_ascii_case("AttachmentList"))
+        .map(Node::children);
+    let attachment = |ordinal| attachments.as_ref()?.get(ordinal).copied();
+    let model = children
+        .iter()
+        .copied()
+        .find(|child| child.name().eq_ignore_ascii_case("Model"));
+    drawing.project(
+        body_drawn,
+        |ordinal| Some(cdf_attachment_source::capture(attachment(ordinal)?, scope)),
+        |selected| match selected {
+            MainSelector::Attachment {
+                ordinal,
+                preferred_skin,
+            } => CdfModelSources::attachment(attachment(ordinal)?, scope, preferred_skin),
+            MainSelector::ModelFile => CdfModelSources::file(model?, scope),
+        },
+    )
 }
 
 pub(crate) fn read_skeleton_with_position(
@@ -75,7 +108,7 @@ pub(crate) fn read_skeleton_with_position(
 ) -> Result<(Option<String>, Option<SourceLocation>), String> {
     let mut budget = Budget::new(bytes.len());
     markup::parse_with_source(bytes, &mut budget, |root, original, scope| {
-        let character = project(&root, |_| None, |_| None)?;
+        let character = Drawing::read(&root)?.project(false, |_| None, |_| None)?;
         let position = character.skeleton.as_ref().and_then(|_| {
             let node = original
                 .children()
@@ -103,57 +136,87 @@ struct Candidate<'a> {
     element: &'a Element,
 }
 
-fn project(
-    root: &Element,
-    capture: impl FnMut(usize) -> Option<Arc<[CdfAttachmentSite]>>,
-    capture_model: impl FnOnce(MainSelector) -> Option<CdfModelSources>,
-) -> Result<Character, String> {
-    if !root.name.eq_ignore_ascii_case("CharacterDefinition") {
-        return Err(format!(
-            "the root element is {}, not CharacterDefinition",
-            root.name
-        ));
+struct Drawing<'source> {
+    model_file: Option<&'source str>,
+    attachments: Vec<Candidate<'source>>,
+    first_skin: Option<usize>,
+}
+
+impl<'source> Drawing<'source> {
+    fn read(root: &'source Element) -> Result<Self, String> {
+        if !root.name.eq_ignore_ascii_case("CharacterDefinition") {
+            return Err(format!(
+                "the root element is {}, not CharacterDefinition",
+                root.name
+            ));
+        }
+        let attachments: Vec<_> = attachment_candidates(root).collect();
+        let first_skin = attachments.iter().position(|candidate| candidate.skin);
+        Ok(Self {
+            model_file: skeleton_file(root),
+            attachments,
+            first_skin,
+        })
     }
-    let attachments: Vec<_> = attachment_candidates(root).collect();
-    let chosen = attachments
-        .iter()
-        .position(|candidate| candidate.skin)
-        .or_else(|| (!attachments.is_empty()).then_some(0));
-    let (model, material, selected) = match chosen.and_then(|at| attachments.get(at)) {
-        Some(candidate) => (
-            slashes(candidate.binding),
-            candidate.element.attribute("Material").map(slashes),
-            MainSelector::Attachment {
-                ordinal: candidate.ordinal,
-                preferred_skin: candidate.skin,
-            },
-        ),
-        None => (
-            slashes(skeleton_file(root).ok_or("it names no model and no attachment")?),
-            None,
-            MainSelector::ModelFile,
-        ),
-    };
-    if is_character_definition(&model) {
-        return Err("it names another character definition".to_owned());
+
+    fn body_candidate(&self) -> Option<&'source str> {
+        if self.first_skin.is_some() || self.attachments.is_empty() {
+            return None;
+        }
+        self.model_file
+            .filter(|path| !is_character_definition(path))
     }
-    let (bones, left_out) = sort_rest(
-        attachments
-            .iter()
-            .enumerate()
-            .filter(|(at, _)| Some(*at) != chosen)
-            .map(|(_, candidate)| candidate),
-        capture,
-    );
-    let skeleton = skeleton_file(root).map(slashes);
-    Ok(Character {
-        model,
-        material,
-        bones,
-        left_out,
-        skeleton,
-        model_sources: capture_model(selected),
-    })
+
+    fn project(
+        &self,
+        body_drawn: bool,
+        capture: impl FnMut(usize) -> Option<Arc<[CdfAttachmentSite]>>,
+        capture_model: impl FnOnce(MainSelector) -> Option<CdfModelSources>,
+    ) -> Result<Character, String> {
+        let chosen = if body_drawn {
+            None
+        } else {
+            self.first_skin
+                .or_else(|| (!self.attachments.is_empty()).then_some(0))
+        };
+        let (model, material, selected) = match chosen.and_then(|at| self.attachments.get(at)) {
+            Some(candidate) => (
+                slashes(candidate.binding),
+                candidate.element.attribute("Material").map(slashes),
+                MainSelector::Attachment {
+                    ordinal: candidate.ordinal,
+                    preferred_skin: candidate.skin,
+                },
+            ),
+            None => (
+                slashes(
+                    self.model_file
+                        .ok_or("it names no model and no attachment")?,
+                ),
+                None,
+                MainSelector::ModelFile,
+            ),
+        };
+        if is_character_definition(&model) {
+            return Err("it names another character definition".to_owned());
+        }
+        let (bones, left_out) = sort_rest(
+            self.attachments
+                .iter()
+                .enumerate()
+                .filter(|(at, _)| Some(*at) != chosen)
+                .map(|(_, candidate)| candidate),
+            capture,
+        );
+        Ok(Character {
+            model,
+            material,
+            bones,
+            left_out,
+            skeleton: self.model_file.map(slashes),
+            model_sources: capture_model(selected),
+        })
+    }
 }
 
 fn attachment_candidates(root: &Element) -> impl Iterator<Item = Candidate<'_>> {
@@ -212,107 +275,5 @@ pub(crate) fn slashes(path: &str) -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{is_character_definition, read};
-
-    const THRUSTER: &str = r#"<CharacterDefinition>
-  <Model File="Objects\t\nozzle_CHR.chr" LODRatio="40"/>
-  <AttachmentList>
-    <Attachment Type="CA_BONE" AName="Housing" BoneName="housing_attach" Binding="Objects\t\housing.cga" Flags="0"/>
-    <Attachment Type="CA_SKIN" AName="Nozzle" Binding="Objects\t\nozzle.skin" Material="Objects\t\paint.mtl"/>
-  </AttachmentList>
-</CharacterDefinition>"#;
-
-    #[test]
-    fn the_first_skin_is_drawn_and_the_other_attachments_are_listed() {
-        let character = read(THRUSTER.as_bytes()).expect("a character");
-        assert_eq!(character.model, "Objects/t/nozzle.skin");
-        assert_eq!(character.material.as_deref(), Some("Objects/t/paint.mtl"));
-        assert_eq!(character.left_out.len(), 0);
-        let [housing] = character.bones.as_slice() else {
-            panic!("one bone attachment: {:?}", character.bones);
-        };
-        assert_eq!(housing.name, "Housing");
-        assert_eq!(housing.bone, "housing_attach");
-        assert_eq!(housing.binding, "Objects/t/housing.cga");
-        assert_eq!(housing.position, [0.0; 3]);
-        assert_eq!(housing.rotation, [1.0, 0.0, 0.0, 0.0]);
-    }
-
-    #[test]
-    fn a_bone_attachment_reads_its_offset_rotation_and_material() {
-        let text = r#"<CharacterDefinition><AttachmentList>
-            <Attachment Type="CA_SKIN" Binding="s.skin"/>
-            <Attachment Type="CA_BONE" BoneName="b" Binding="x\Part.cga" Material="m.mtl"
-              RelPosition="1,-2.5,3" RelRotation="0,0,1,0"/>
-            </AttachmentList></CharacterDefinition>"#;
-        let character = read(text.as_bytes()).expect("a character");
-        let [part] = character.bones.as_slice() else {
-            panic!("one bone attachment: {:?}", character.bones);
-        };
-        assert_eq!(part.name, "Part");
-        assert_eq!(part.material.as_deref(), Some("m.mtl"));
-        assert_eq!(part.position, [1.0, -2.5, 3.0]);
-        assert_eq!(part.rotation, [0.0, 0.0, 1.0, 0.0]);
-    }
-
-    #[test]
-    fn a_bone_attachment_that_cannot_be_read_is_left_out() {
-        let text = r#"<CharacterDefinition><AttachmentList>
-            <Attachment Type="CA_SKIN" Binding="s.skin"/>
-            <Attachment Type="CA_BONE" Binding="nobone.cga"/>
-            <Attachment Type="CA_BONE" BoneName="b" Binding="badpos.cga" RelPosition="1,2"/>
-            <Attachment Type="CA_BONE" BoneName="b" Binding="zero.cga" RelRotation="0,0,0,0"/>
-            <Attachment Type="CA_BONE" BoneName="b" Binding="nested.cdf"/>
-            <Attachment Type="CA_SKIN" Binding="second.skin"/>
-            </AttachmentList></CharacterDefinition>"#;
-        let character = read(text.as_bytes()).expect("a character");
-        assert_eq!(character.bones.len(), 0);
-        assert_eq!(
-            character.left_out,
-            [
-                "nobone.cga",
-                "badpos.cga",
-                "zero.cga",
-                "nested.cdf",
-                "second.skin"
-            ]
-        );
-    }
-
-    #[test]
-    fn without_a_skin_the_first_attachment_is_drawn() {
-        let text = r#"<CharacterDefinition><AttachmentList>
-            <Attachment Type="CA_BONE" Binding="a.cga"/><Attachment Type="CA_BONE" Binding="b.cga"/>
-            </AttachmentList></CharacterDefinition>"#;
-        let character = read(text.as_bytes()).expect("a character");
-        assert_eq!(character.model, "a.cga");
-        assert_eq!(character.left_out, ["b.cga"]);
-    }
-
-    #[test]
-    fn without_attachments_the_model_file_is_drawn() {
-        let text = r#"<CharacterDefinition><Model File="m.chr"/></CharacterDefinition>"#;
-        let character = read(text.as_bytes()).expect("a character");
-        assert_eq!(character.model, "m.chr");
-        assert_eq!(character.left_out.len(), 0);
-    }
-
-    #[test]
-    fn a_document_that_names_nothing_or_nests_a_definition_is_refused() {
-        assert!(read(b"<CharacterDefinition/>").is_err());
-        assert!(read(b"<Other/>").is_err());
-        let nested = r#"<CharacterDefinition><AttachmentList>
-            <Attachment Type="CA_SKIN" Binding="again.CDF"/></AttachmentList></CharacterDefinition>"#;
-        assert!(read(nested.as_bytes()).is_err());
-        assert!(read(b"not xml").is_err());
-    }
-
-    #[test]
-    fn the_extension_is_matched_ignoring_case() {
-        assert!(is_character_definition("Objects/x/y.CDF"));
-        assert!(!is_character_definition("Objects/x/y.cdfm"));
-        assert!(!is_character_definition(".cdf"));
-        assert!(!is_character_definition("cdf"));
-    }
-}
+#[path = "cdf_tests.rs"]
+mod tests;
