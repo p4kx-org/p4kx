@@ -30,7 +30,10 @@ fn text_census_matches_a_published_synthetic_catalog() -> TestResult<()> {
     assert_eq!(projected["source"], catalog["source"]);
     assert_eq!(projected["texts"], catalog["texts"]);
     assert!(projected.get("placements").is_none());
-    assert!(projected.get("provenance").is_none());
+    assert!(
+        projected.pointer("/provenance/uses").is_none(),
+        "the text census omits use rows"
+    );
 
     let locales = LocalizationSet::read(&archive, &[Language::English, Language::German])?;
     let english = Oracle::of(&locales, Language::English)?;
@@ -93,6 +96,88 @@ fn compare(
     })
 }
 
+#[test]
+fn text_census_keeps_physical_entry_identities_without_retaining_the_use_inventory()
+-> TestResult<()> {
+    let source_path = r"Data\Libs\GameAudio\Fixture.xml";
+    let normalized_path = "data/libs/gameaudio/fixture.xml";
+    let radar = entry_table("entry-radar", 7, source_path, normalized_path);
+    let flare = entry_table("entry-flare", 11, source_path, normalized_path);
+    let input = json!({
+        "schemaVersion": SCHEMA_VERSION,
+        "configurations": {"radarAudio": radar},
+        "definitions": {"flareLibraries": flare},
+        "provenance": {
+            "sources": [
+                {
+                    "id": "entry-radar", "kind": "archiveEntry", "entryIndex": 7,
+                    "path": sourced_path(source_path), "unrelated": {"detail": true}
+                },
+                {
+                    "id": "entry-flare", "kind": "archiveEntryProof", "entryIndex": "11",
+                    "details": "captureLimited"
+                },
+                {"id": "directory", "kind": "archiveDirectory", "admittedEntryCount": "15"}
+            ],
+            "uses": [{"id": "fixture"}]
+        }
+    });
+    let paths = TextPaths::catalog();
+    let mut projected = paths.read(serde_json::to_vec(&input)?.as_slice())?;
+    for kind in [Kind::RadarAudio, Kind::FlareLibraries] {
+        assert_eq!(
+            catalog_v3_consumer::rows(&projected, kind)?,
+            catalog_v3_consumer::rows(&input, kind)?,
+            "the same physical Entry identity is verified after filtering",
+        );
+    }
+    assert!(
+        projected.pointer("/provenance/uses").is_none(),
+        "the large use inventory is outside the text census",
+    );
+    assert_eq!(
+        projected["provenance"]["sources"],
+        json!([
+            {
+                "id": "entry-radar", "kind": "archiveEntry", "entryIndex": 7,
+                "path": sourced_path(source_path)
+            },
+            {"id": "entry-flare", "kind": "archiveEntryProof", "entryIndex": "11"}
+        ]),
+        "strip unrelated evidence while preserving both Entry identity forms",
+    );
+    projected["provenance"]["sources"][0]["entryIndex"] = json!(8);
+    assert!(
+        catalog_v3_consumer::rows(&projected, Kind::RadarAudio).is_err(),
+        "the compact capture still detects a mismatched physical Entry index",
+    );
+    Ok(())
+}
+
+fn entry_table(id: &str, index: u32, path: &str, normalized: &str) -> Value {
+    json!({
+        "availability": "available",
+        "rows": [{
+            "identity": {
+                "inputRef": id,
+                "entryIndex": index,
+                "sourcePath": sourced_path(path),
+                "normalizedPath": sourced_path(normalized)
+            }
+        }]
+    })
+}
+
+fn sourced_path(value: &str) -> Value {
+    json!({
+        "state": "present",
+        "value": value,
+        "containsEncryptedSource": false,
+        "sourceSetComplete": true,
+        "sourceUsesRefs": ["fixture"]
+    })
+}
+
 fn corrupt_german_display(catalog: &mut Value) -> TestResult<()> {
     let row = catalog
         .pointer_mut("/texts/publicNames")
@@ -139,7 +224,10 @@ fn text_census_preserves_mission_positions_and_rejects_invalid_json() -> TestRes
     );
     assert_eq!(projected["projections"], input["projections"]);
     assert!(projected["configurations"].get("irrelevant").is_none());
-    assert!(projected.get("provenance").is_none());
+    assert!(
+        projected.pointer("/provenance/uses").is_none(),
+        "the text census omits use rows"
+    );
     assert!(projected.get("futureField").is_none());
     encoded.extend_from_slice(b" {}");
     assert!(

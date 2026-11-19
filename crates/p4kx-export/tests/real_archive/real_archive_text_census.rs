@@ -88,6 +88,8 @@ impl TextPaths {
             paths.keep(path);
         }
         paths.keep("/definitions/items").projection = Some(item_capture::ITEM_DEFINITIONS);
+        paths.keep("/provenance/sources").projection =
+            Some(item_capture::Projection::ArchiveEntrySources);
         paths
     }
 

@@ -13,6 +13,7 @@ pub(super) enum Projection {
     Whole,
     Fields(&'static [(&'static str, Self)]),
     Array(&'static Self),
+    ArchiveEntrySources,
     Carrier {
         value: &'static Self,
         additional: &'static [(&'static str, Self)],
@@ -20,6 +21,13 @@ pub(super) enum Projection {
 }
 
 use Projection::{Array, Carrier, Fields, Whole};
+
+const ENTRY_SOURCE: Projection = Fields(&[
+    ("id", Whole),
+    ("kind", Whole),
+    ("entryIndex", Whole),
+    ("path", Whole),
+]);
 
 const LOCALIZATION: Projection = Fields(&[("name", Whole), ("description", Whole)]);
 
@@ -68,7 +76,7 @@ impl Projection {
                 "value" => return Some(*value),
                 _ => additional,
             },
-            Self::Whole | Self::Array(_) => return None,
+            Self::Whole | Self::Array(_) | Self::ArchiveEntrySources => return None,
         };
         fields
             .iter()
@@ -96,7 +104,7 @@ impl<'de> Visitor<'de> for Projection {
     }
 
     fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Value, A::Error> {
-        if matches!(self, Self::Array(_)) {
+        if matches!(self, Self::Array(_) | Self::ArchiveEntrySources) {
             return Value::deserialize(MapAccessDeserializer::new(map));
         }
         let mut kept = Map::new();
@@ -111,12 +119,21 @@ impl<'de> Visitor<'de> for Projection {
     }
 
     fn visit_seq<A: SeqAccess<'de>>(self, mut sequence: A) -> Result<Value, A::Error> {
-        let Self::Array(item) = self else {
-            return Value::deserialize(SeqAccessDeserializer::new(sequence));
+        let (item, entries_only) = match self {
+            Self::Array(item) => (*item, false),
+            Self::ArchiveEntrySources => (ENTRY_SOURCE, true),
+            _ => return Value::deserialize(SeqAccessDeserializer::new(sequence)),
         };
         let mut kept = Vec::new();
-        while let Some(item) = sequence.next_element_seed(*item)? {
-            kept.push(item);
+        while let Some(value) = sequence.next_element_seed(item)? {
+            if !entries_only
+                || matches!(
+                    value.get("kind").and_then(Value::as_str),
+                    Some("archiveEntry" | "archiveEntryProof")
+                )
+            {
+                kept.push(value);
+            }
         }
         Ok(Value::Array(kept))
     }

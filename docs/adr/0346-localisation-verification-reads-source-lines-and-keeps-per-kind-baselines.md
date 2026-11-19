@@ -61,6 +61,8 @@ and task-local `TMP` and `TEMP`. By default a catalog writer sends JSON through 
 pipe to the text verification reader. The reader keeps the schema-v3 sections needed by the
 existing per-kind comparisons, including original mission graphs and the shared language tables.
 It discards unrelated sections as it consumes the stream and checks the exact written byte count.
+For Entry-backed families it keeps the physical source IDs, kinds, indices and source paths used
+by the catalog consumer. It discards the provenance use inventory.
 For canonical Item definitions it retains the physical record and component positions, source
 carriers and text references used by the oracle. The decoder still checks the syntax of discarded
 Item fields, and synthetic cases compare the results with a fully decoded document.
