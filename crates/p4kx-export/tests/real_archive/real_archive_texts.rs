@@ -11,7 +11,7 @@
 //! value preferred, `\n` decoded and the text trimmed) and does not use the exporter's lookup.
 
 use p4kx_export::{Kind, Language, catalog_schema};
-use p4kx_extraction::{Archive, LocalizationSet, is_placeholder_key};
+use p4kx_extraction::{Archive, LocalizationSet};
 use serde_json::Value;
 
 pub(crate) use crate::real_archive_canonical_texts::manufacturer_text;
@@ -25,8 +25,12 @@ mod tests;
 #[path = "real_archive_canonical_texts_tests.rs"]
 mod canonical_tests;
 
+#[path = "real_archive_legacy_texts.rs"]
+mod legacy;
 #[path = "real_archive_live_texts.rs"]
 mod live;
+
+pub(crate) use legacy::keyed_texts;
 
 /// The baseline of a kind: the largest share of its keyed texts the English and the German
 /// `global.ini` may lack, as measured on LIVE and rounded up to the hundredth. A kind with keyed
@@ -203,32 +207,6 @@ fn text_fields() -> Vec<String> {
     found.sort();
     found.dedup();
     found
-}
-
-/// Collects the texts with a key below `node`: the value of every field named in `fields` that
-/// is an object with a string `key`, placeholder keys excluded.
-pub(crate) fn keyed_texts<'v>(
-    node: &'v Value,
-    fields: &[String],
-    found: &mut Vec<(&'v str, &'v Value)>,
-) {
-    match node {
-        Value::Object(map) => {
-            for (name, value) in map {
-                if fields.contains(name)
-                    && let Some(key) = value.get("key").and_then(Value::as_str)
-                    && !is_placeholder_key(key)
-                {
-                    found.push((key, value));
-                }
-                keyed_texts(value, fields, found);
-            }
-        }
-        Value::Array(items) => items
-            .iter()
-            .for_each(|item| keyed_texts(item, fields, found)),
-        _ => {}
-    }
 }
 
 #[expect(

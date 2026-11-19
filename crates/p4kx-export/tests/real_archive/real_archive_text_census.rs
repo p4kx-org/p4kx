@@ -80,6 +80,10 @@ fn catalog_paths() -> TextPaths {
     }
     paths.project("/definitions/items", item_capture::ITEM_DEFINITIONS);
     paths.project(
+        &catalog_v3_consumer::row_location(Kind::Loadouts),
+        item_capture::Projection::LoadoutTextRows,
+    );
+    paths.project(
         "/provenance/sources",
         item_capture::Projection::ArchiveEntrySources,
     );

@@ -8,12 +8,16 @@ use serde::de::value::{MapAccessDeserializer, SeqAccessDeserializer};
 use serde::de::{DeserializeSeed, IgnoredAny, MapAccess, SeqAccess, Visitor};
 use serde_json::{Map, Value};
 
+#[path = "real_archive_loadout_text_capture.rs"]
+mod loadouts;
+
 #[derive(Clone, Copy)]
 pub(super) enum Projection {
     Whole,
     Fields(&'static [(&'static str, Self)]),
     Array(&'static Self),
     ArchiveEntrySources,
+    LoadoutTextRows,
     Carrier {
         value: &'static Self,
         additional: &'static [(&'static str, Self)],
@@ -76,7 +80,9 @@ impl Projection {
                 "value" => return Some(*value),
                 _ => additional,
             },
-            Self::Whole | Self::Array(_) | Self::ArchiveEntrySources => return None,
+            Self::Whole | Self::Array(_) | Self::ArchiveEntrySources | Self::LoadoutTextRows => {
+                return None;
+            }
         };
         fields
             .iter()
@@ -88,10 +94,10 @@ impl<'de> DeserializeSeed<'de> for Projection {
     type Value = Value;
 
     fn deserialize<D: serde::Deserializer<'de>>(self, deserializer: D) -> Result<Value, D::Error> {
-        if matches!(self, Self::Whole) {
-            Value::deserialize(deserializer)
-        } else {
-            deserializer.deserialize_any(self)
+        match self {
+            Self::Whole => Value::deserialize(deserializer),
+            Self::LoadoutTextRows => loadouts::read(deserializer),
+            _ => deserializer.deserialize_any(self),
         }
     }
 }

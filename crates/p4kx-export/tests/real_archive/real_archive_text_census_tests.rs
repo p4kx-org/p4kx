@@ -67,6 +67,88 @@ fn text_census_matches_a_published_synthetic_catalog() -> TestResult<()> {
     Ok(())
 }
 
+#[test]
+fn text_census_streams_loadout_rows_without_losing_legacy_candidates() -> TestResult<()> {
+    let english = Oracle::parse("shared=Fixture\nother=Other\n");
+    let german = Oracle::parse("shared=Beispiel\nother=Anders\n");
+    let fields = text_fields();
+    let input = loadout_text_fixture();
+    let encoded = serde_json::to_vec(&input)?;
+    let projected = catalog_paths().read(encoded.as_slice())?;
+
+    let original = compare(&input, Kind::Loadouts, &fields, &english, &german)?;
+    let reduced = compare(&projected, Kind::Loadouts, &fields, &english, &german)?;
+    assert_eq!(
+        reduced, original,
+        "counts, repeated candidate order and German oracle verdicts are identical"
+    );
+    assert_eq!(
+        reduced.row_count, 3,
+        "one retained slot per authored loadout row"
+    );
+    assert!(
+        reduced
+            .failures
+            .iter()
+            .any(|failure| failure.contains("de texts contradict")),
+        "the nested authored candidate still contradicts the German oracle"
+    );
+
+    let collect_keys = |document: &Value| -> TestResult<Vec<String>> {
+        let loadouts = document.get("loadouts").ok_or("loadout array")?;
+        let mut found = Vec::new();
+        crate::real_archive_texts::keyed_texts(loadouts, &fields, &mut found);
+        Ok(found.into_iter().map(|(key, _)| key.to_owned()).collect())
+    };
+    assert_eq!(
+        collect_keys(&projected)?,
+        collect_keys(&input)?,
+        "the precise recursive candidate order and repetitions are retained"
+    );
+    assert_eq!(
+        projected.pointer("/loadouts/1"),
+        Some(&Value::Null),
+        "a text-free Loadout still occupies its authored row position"
+    );
+    assert!(
+        projected.pointer("/loadouts/0/ports/0/unrelated").is_none(),
+        "unrelated loadout payload is discarded"
+    );
+    assert_eq!(
+        projected.get("items"),
+        input.get("items"),
+        "the capture behavior of the other rows is unchanged"
+    );
+    assert!(
+        catalog_paths()
+            .read(br#"{"loadouts":{"ports":[]}}"#.as_slice())
+            .is_err(),
+        "a non-array loadout section cannot silently become an empty row set"
+    );
+    Ok(())
+}
+fn loadout_text_fixture() -> Value {
+    json!({
+        "texts": {"publicNames": [], "gameTexts": []},
+        "items": [{"unchanged": "outside the loadout projection"}],
+        "loadouts": [
+            {
+                "entityGuid": "fixture-loadout",
+                "ports": [{
+                    "name": {
+                        "key": "@shared", "en": "Fixture", "de": "Beispiel",
+                        "description": {"key": "@other", "en": "Other", "de": "Wrong"}
+                    },
+                    "ports": [{"name": {"key": "@shared", "en": "Fixture", "de": "Beispiel"}}],
+                    "unrelated": {"numbers": [1, 2, 3]}
+                }]
+            },
+            {"ports": [{"name": "raw field", "description": {"key": "@loc_placeholder"}}]},
+            {"ports": [[{"name": {"key": "@missing", "en": null, "de": null}}]]}
+        ]
+    })
+}
+
 #[derive(Debug, PartialEq, Eq)]
 struct CheckedKind {
     row_count: usize,
