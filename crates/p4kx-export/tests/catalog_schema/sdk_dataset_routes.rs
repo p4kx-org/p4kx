@@ -25,6 +25,8 @@ use super::{
     Route, SHOP_INVENTORIES, TestResult, UNRESOLVED, WEAPON_RECOIL,
 };
 
+#[path = "sdk_blueprint_physical_routes.rs"]
+mod blueprint_physical;
 #[path = "sdk_blueprint_pool_routes.rs"]
 mod blueprint_pools;
 #[path = "sdk_component_definition_routes.rs"]
@@ -87,6 +89,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
         )?,
     ];
     routes.extend(blueprint_pools::read()?);
+    routes.extend(blueprint_physical::read()?);
     routes.extend(component_definitions::read()?);
     routes.extend(flight_configurations::read()?);
     Ok(routes)

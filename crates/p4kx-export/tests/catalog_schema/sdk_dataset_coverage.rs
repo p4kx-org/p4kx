@@ -24,6 +24,10 @@ const LOCATION_ENTITIES: &str = "/definitions/locationEntityDeclarations";
 const BLUEPRINT_POOLS: &str = "/definitions/blueprintPools";
 const BLUEPRINT_POOL_WEIGHTS: &str = "/projections/blueprintPoolWeights";
 const BLUEPRINT_REWARDS: &str = "/declarations/blueprintRewardSources";
+const BLUEPRINT_DEFINITIONS: &str = "/definitions/blueprints";
+const BLUEPRINT_TIERS: &str = "/configurations/blueprintTiers";
+const BLUEPRINT_PRESENTATION: &str = "/projections/blueprintPresentation";
+const CRAFTING_GLOBAL: &str = "/configurations/craftingGlobal";
 const PROJECTILE_AMMUNITION: &str = "/projections/weaponProjectileAmmoSelections";
 const MAGAZINE_RESOLUTION: &str = "/projections/weaponMagazineResolutions";
 const WEAPON_COMBAT: &str = "/projections/weaponCombatBases";
@@ -81,6 +85,10 @@ fn sdk_query_witnesses_keep_their_canonical_dataset_contract() -> TestResult {
         BLUEPRINT_POOLS,
         BLUEPRINT_POOL_WEIGHTS,
         BLUEPRINT_REWARDS,
+        BLUEPRINT_DEFINITIONS,
+        BLUEPRINT_TIERS,
+        BLUEPRINT_PRESENTATION,
+        CRAFTING_GLOBAL,
         SHOP_INVENTORIES,
         FLARE_LIBRARIES,
         RADAR_AUDIO,
