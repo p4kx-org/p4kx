@@ -7,7 +7,7 @@ use p4kx_export::{CatalogError, Compression, Kind, Language, SCHEMA_VERSION};
 use p4kx_extraction::LocalizationSet;
 use serde_json::{Value, json};
 
-use super::{TestResult, TextPaths, pipe, write_catalog};
+use super::{TestResult, catalog_paths, pipe, write_catalog};
 use crate::catalog_v3_consumer;
 use crate::commodity_v3_fixture::{self as fixture, DcbOrigin};
 use crate::real_archive_canonical_texts::{TextIndex, kind_coverage};
@@ -51,7 +51,7 @@ fn text_census_matches_a_published_synthetic_catalog() -> TestResult<()> {
     let mut corrupted = catalog;
     corrupt_german_display(&mut corrupted)?;
     let serialized = serde_json::to_vec(&corrupted)?;
-    let filtered = TextPaths::catalog().read(serialized.as_slice())?;
+    let filtered = catalog_paths().read(serialized.as_slice())?;
     let expected = compare(&corrupted, Kind::ResourceTypes, &fields, &english, &german)?;
     assert!(
         expected
@@ -122,7 +122,7 @@ fn text_census_keeps_physical_entry_identities_without_retaining_the_use_invento
             "uses": [{"id": "fixture"}]
         }
     });
-    let paths = TextPaths::catalog();
+    let paths = catalog_paths();
     let mut projected = paths.read(serde_json::to_vec(&input)?.as_slice())?;
     for kind in [Kind::RadarAudio, Kind::FlareLibraries] {
         assert_eq!(
@@ -214,7 +214,7 @@ fn text_census_preserves_mission_positions_and_rejects_invalid_json() -> TestRes
         "provenance": {"ignored": ["list", "of", "coordinates"]},
         "futureField": true
     });
-    let paths = TextPaths::catalog();
+    let paths = catalog_paths();
     let mut encoded = serde_json::to_vec(&input)?;
     let projected = paths.read(encoded.as_slice())?;
     assert_eq!(projected["definitions"], input["definitions"]);
@@ -244,7 +244,7 @@ fn text_census_preserves_mission_positions_and_rejects_invalid_json() -> TestRes
 #[test]
 fn text_census_pipe_closes_on_producer_or_consumer_failure() {
     const PAYLOAD_LEN: usize = 256 * 1024;
-    let paths = TextPaths::catalog();
+    let paths = catalog_paths();
     let canceled = pipe::transfer::<()>(&paths, |_writer| Err(CatalogError::Cancelled))
         .expect_err("an early producer failure closes the pipe");
     assert!(matches!(

@@ -6,6 +6,7 @@
 
 mod authored_component_witness;
 mod authored_definition_witness;
+mod catalog_capture;
 mod catalog_v3_blueprint_category_tests;
 mod catalog_v3_consumer;
 mod catalog_v3_loot_consumer_tests;
@@ -87,6 +88,7 @@ mod real_archive_loot_generation_components;
 mod real_archive_loot_source_shapes;
 mod real_archive_mining;
 mod real_archive_mining_configurations;
+mod real_archive_mining_sdk_parity;
 mod real_archive_mining_stats;
 mod real_archive_mining_storage;
 mod real_archive_missile_configuration;
