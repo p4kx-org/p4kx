@@ -101,17 +101,33 @@ mod loadout_read_observer;
 
 pub use loadout_read_observer::LoadoutReadObserver;
 
+struct VehiclePortAttributeCapture;
+
+impl LoadoutReadObserver for VehiclePortAttributeCapture {
+    fn observe(&self, _event: LoadoutReadEvent<'_, '_>) -> ControlFlow<()> {
+        ControlFlow::Continue(())
+    }
+
+    fn observes_vehicle_port_attributes(&self) -> bool {
+        true
+    }
+}
+
 pub(crate) struct Observation<'f> {
     observer: Arc<dyn LoadoutReadObserver + 'f>,
     stopped: AtomicBool,
 }
 
 impl<'f> Observation<'f> {
-    fn new(observer: Arc<dyn LoadoutReadObserver + 'f>) -> Self {
+    pub(crate) fn new(observer: Arc<dyn LoadoutReadObserver + 'f>) -> Self {
         Self {
             observer,
             stopped: AtomicBool::new(false),
         }
+    }
+
+    pub(crate) fn capture_vehicle_port_attributes() -> Self {
+        Self::new(Arc::new(VehiclePortAttributeCapture))
     }
 
     pub(crate) fn observes_port_names(&self) -> bool {

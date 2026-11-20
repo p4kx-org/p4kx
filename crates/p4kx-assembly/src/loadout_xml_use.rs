@@ -4,7 +4,14 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::{LoadoutFileObservation, LoadoutPath};
+use p4kx_extraction::{EntryOrigin, SourceLocation};
+
+use crate::{LoadoutClassSelection, LoadoutFileObservation, LoadoutPath};
+
+#[path = "paint_xml_loadout_attributes.rs"]
+mod capture;
+
+pub(crate) use capture::XmlLoadoutAttributes;
 
 #[derive(Debug)]
 pub(crate) struct XmlInclude {
@@ -39,6 +46,7 @@ impl XmlRoute {
 struct XmlRoot {
     original: LoadoutFileObservation,
     caller: LoadoutPath,
+    paint_attributes: Option<Arc<XmlLoadoutAttributes>>,
 }
 
 /// The actual caller and Include route that supplied an XML class selection.
@@ -75,14 +83,37 @@ impl LoadoutXmlClassUse {
             .map(|route| (&route.edge.parent, &route.edge.child, &route.edge.path))
     }
 
-    pub(crate) fn root(original: LoadoutFileObservation, caller: &LoadoutPath) -> Self {
+    pub(crate) fn root(
+        original: LoadoutFileObservation,
+        caller: &LoadoutPath,
+        paint_attributes: Option<Arc<XmlLoadoutAttributes>>,
+    ) -> Self {
         Self {
             root: Arc::new(XmlRoot {
                 original,
                 caller: caller.clone(),
+                paint_attributes,
             }),
             route: None,
         }
+    }
+
+    pub(crate) fn with_caller(&self, caller: &LoadoutPath) -> Self {
+        Self::root(
+            self.root.original.clone(),
+            caller,
+            self.root.paint_attributes.clone(),
+        )
+    }
+
+    pub(crate) fn paint_attributes(
+        &self,
+        selection: &LoadoutClassSelection,
+    ) -> Option<Vec<(EntryOrigin, SourceLocation)>> {
+        self.root
+            .paint_attributes
+            .as_ref()?
+            .selected(self, selection)
     }
 
     pub(crate) fn with_route(&self, route: Option<Arc<XmlRoute>>) -> Self {

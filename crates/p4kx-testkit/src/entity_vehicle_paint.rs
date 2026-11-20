@@ -2,8 +2,9 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use crate::{
-    DataForgeBuilder, TestEntity, TestEntry, TestInstance, TestModel, TestMtl, TestMtlMaterial,
-    TestPort, TestType, TestValue, entity_schema, tint_palette_record,
+    DataForgeBuilder, TestEntity, TestEntry, TestInstance, TestLoadout, TestModel, TestMtl,
+    TestMtlMaterial, TestPort, TestType, TestValue, entity_schema,
+    entity_schema::attachable_component, tint_palette_record,
 };
 
 const DEFINITION: &str = "Scripts/Entities/Vehicles/Implementations/Xml/TEST_Paint.xml";
@@ -13,18 +14,24 @@ const BLUE: u128 = 0x5612;
 const RED_PALETTE: u128 = 0x5613;
 const BLUE_PALETTE: u128 = 0x5614;
 const BASE_MODEL: &str = "Objects/Test/hull.cgf";
+const EMBEDDED_MODEL: &str = "Objects/Test/hull_painted.cgf";
 const BASE_MATERIAL: &str = "Objects/Test/base";
 const RED_MATERIAL: &str = "Objects/Test/red";
 const BLUE_MATERIAL: &str = "Objects/Test/blue";
+const XML_LOADOUT: &str = "Scripts/Loadouts/fixture-paint.xml";
+const XML_ITEMS: &str = "Scripts/Loadouts/fixture-paint-items.xml";
+const PAINT_INCLUDE: &[u8] = br#"<Loadout><Loadouts><Loadout loadout="Scripts/Loadouts/fixture-paint-items.xml"/></Loadouts></Loadout>"#;
+const PAINT_ITEM: &[u8] = br#"<Loadout><Items><Item portName="hardpoint_livery" itemName="TEST_Paint_Blue"/></Items></Loadout>"#;
 
 const IMPLEMENTATION: &str = r#"<Vehicle name="TEST_Paint">
   <Parts><Part name="hardpoint_livery" class="ItemPort">
-    <ItemPort id="livery" requiredTags="Family_Blue">
+    <ItemPort id="livery" requiredTags="Family_Blue" portTags="UnusedFixtureOffer">
       <Types><Type type="Paints"/></Types>
     </ItemPort>
   </Part></Parts>
   <Modifications><Modification name="Red"><Elems>
     <Elem idRef="livery" name="requiredTags" value="Family_Red"/>
+    <Elem idRef="livery" name="portTags" value="FixturePortOffer"/>
   </Elems></Modification></Modifications>
 </Vehicle>"#;
 
@@ -33,11 +40,16 @@ const IMPLEMENTATION: &str = r#"<Vehicle name="TEST_Paint">
 #[must_use]
 pub fn fitted_paint_vehicle_entries() -> Vec<TestEntry> {
     let cube = TestModel::cube();
+    let painted = TestModel::cube().with_material_library("blue");
     let mut entries = vec![
         TestEntry::zstd("Data\\Game2.dcb", database().build()),
         TestEntry::stored(format!("Data/{DEFINITION}"), IMPLEMENTATION.as_bytes()),
         TestEntry::stored(format!("Data/{BASE_MODEL}"), cube.cgf()),
         TestEntry::stored(format!("Data/{BASE_MODEL}m"), cube.cgfm()),
+        TestEntry::stored(format!("Data/{EMBEDDED_MODEL}"), painted.cgf()),
+        TestEntry::stored(format!("Data/{EMBEDDED_MODEL}m"), painted.cgfm()),
+        TestEntry::stored(format!("Data/{XML_LOADOUT}"), PAINT_INCLUDE).encrypted(),
+        TestEntry::stored(format!("Data/{XML_ITEMS}"), PAINT_ITEM),
     ];
     for (path, name) in [
         (BASE_MATERIAL, "FixtureBaseHull"),
@@ -50,9 +62,17 @@ pub fn fitted_paint_vehicle_entries() -> Vec<TestEntry> {
         } else {
             material.shader("HardSurface").layer("Primary", "1")
         };
+        let library = TestMtl::single(&material);
+        let library = if path == BLUE_MATERIAL {
+            library.with_default_palette(
+                "libs/foundry/records/tintpalettes/brand/test/synthetic_blue.xml",
+            )
+        } else {
+            library
+        };
         entries.push(TestEntry::stored(
             format!("Data/{path}.mtl"),
-            TestMtl::single(&material).cryxml(),
+            library.cryxml(),
         ));
     }
     entries
@@ -84,13 +104,24 @@ fn database() -> DataForgeBuilder {
         .geometry(BASE_MODEL, Some(BASE_MATERIAL))
         .geometry_variant("Blue", "", Some(BLUE_MATERIAL))
         .variant_palette(BLUE_PALETTE, "");
+    let embedded = hull(0x5625, "TEST_Hull_Embedded", "", BLUE)
+        .geometry(BASE_MODEL, None)
+        .geometry_variant("Blue", EMBEDDED_MODEL, None);
     schema()
         .record(red.record())
         .record(blue.record())
         .record(model_less.record())
         .record(nested_hull().record())
-        .record(paint(RED, "TEST_Paint_Red", "Family_Red @Red").record())
-        .record(paint(BLUE, "TEST_Paint_Blue", "Family_Blue @Blue").record())
+        .record(
+            paint(
+                RED,
+                "TEST_Paint_Red",
+                "Family_Red @Red",
+                "FixturePortOffer FixtureHullOffer",
+            )
+            .record(),
+        )
+        .record(paint(BLUE, "TEST_Paint_Blue", "Family_Blue @Blue", "").record())
         .record(tint_palette_record(
             RED_PALETTE,
             "synthetic_red",
@@ -105,6 +136,16 @@ fn database() -> DataForgeBuilder {
             [255; 3],
             [128; 3],
         ))
+        .record(embedded.record())
+        .record(factory_xml_hull().record())
+}
+
+fn factory_xml_hull() -> TestEntity {
+    hull(0x5626, "TEST_Hull_XmlPaint", "", BLUE)
+        .geometry(BASE_MODEL, Some(BASE_MATERIAL))
+        .geometry_variant("Blue", BASE_MODEL, Some(BLUE_MATERIAL))
+        .variant_palette(BLUE_PALETTE, "")
+        .loadout(TestLoadout::Xml(XML_LOADOUT.to_owned()))
 }
 
 fn schema() -> DataForgeBuilder {
@@ -112,12 +153,12 @@ fn schema() -> DataForgeBuilder {
     builder.structs = builder
         .structs
         .into_iter()
-        .map(|structure| {
-            if structure.name == "SMaterialNodeParams" {
+        .map(|structure| match structure.name.as_str() {
+            "SMaterialNodeParams" => {
                 structure.field("Palette", TestType::Class("TintPaletteRef".to_owned()))
-            } else {
-                structure
             }
+            "SItemDefinition" => structure.field("RequiredTags", TestType::String),
+            _ => structure,
         })
         .collect();
     builder
@@ -150,14 +191,21 @@ fn material_hull(guid: u128, name: &str, variants: Vec<TestValue>) -> TestEntity
                 ),
         ),
     );
-    hull(guid, name, "Red", RED).component(TestValue::Struct(
-        TestInstance::new("SGeometryResourceParams")
-            .value("Geometry", TestValue::Struct(model))
-            .value(
-                "Material",
-                TestValue::Struct(material_node("", "", variants)),
-            ),
-    ))
+    hull(guid, name, "Red", RED)
+        .component(TestValue::Struct(
+            TestInstance::new("SGeometryResourceParams")
+                .value("Geometry", TestValue::Struct(model))
+                .value(
+                    "Material",
+                    TestValue::Struct(material_node("", "", variants)),
+                ),
+        ))
+        .component(attachable_component(
+            "NOITEM_Vehicle",
+            None,
+            None,
+            Some("FixtureHullOffer"),
+        ))
 }
 
 fn material_node(tags: &str, path: &str, children: Vec<TestValue>) -> TestInstance {
@@ -177,8 +225,13 @@ fn hull(guid: u128, name: &str, modification: &str, paint: u128) -> TestEntity {
         .port(TestPort::new(PORT).default_item(paint))
 }
 
-fn paint(guid: u128, name: &str, tags: &str) -> TestEntity {
-    TestEntity::new(guid, name, format!("entities/{name}.xml"))
-        .attach_type("Paints")
-        .tags(tags)
+fn paint(guid: u128, name: &str, tags: &str, requirements: &str) -> TestEntity {
+    let definition = TestInstance::new("SItemDefinition")
+        .value("Type", TestValue::text("Paints"))
+        .value("Tags", TestValue::text(tags))
+        .value("RequiredTags", TestValue::text(requirements));
+    TestEntity::new(guid, name, format!("entities/{name}.xml")).component(TestValue::Struct(
+        TestInstance::new("SAttachableComponentParams")
+            .value("AttachDef", TestValue::Struct(definition)),
+    ))
 }

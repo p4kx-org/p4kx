@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use crate::loadout_file_cache::CachedDocument;
 use crate::resolver::VehicleResult;
+use crate::resolver_observation::Observation;
 use crate::spec::EntitySpec;
 use crate::{
     LandingGear, LoadoutError, LoadoutRequest, LoadoutResolver, LoadoutTargetGuid, vehicle,
@@ -16,6 +17,7 @@ pub(crate) struct VehicleCacheKey {
     definition: String,
     modification: Arc<str>,
     class_name: String,
+    capture_paint: bool,
 }
 
 impl LoadoutResolver<'_> {
@@ -35,10 +37,12 @@ impl LoadoutResolver<'_> {
         if vehicle_spec.definition.is_empty() {
             return None;
         }
+        let capture_paint = self.captures_vehicle_appearance();
         let key = VehicleCacheKey {
             definition: vehicle_spec.definition.to_ascii_lowercase(),
             modification: Arc::clone(vehicle_spec.modification.text()),
             class_name: class_name.to_ascii_lowercase(),
+            capture_paint,
         };
         let caller = LoadoutRequest::Vehicle {
             definition: vehicle_spec.definition.clone(),
@@ -50,6 +54,8 @@ impl LoadoutResolver<'_> {
             Entry::Occupied(entry) => entry.into_mut().reused(observation, &caller),
             Entry::Vacant(entry) => Ok(entry
                 .insert(CachedDocument::read(|trace| {
+                    let capture = capture_paint.then(Observation::capture_vehicle_port_attributes);
+                    let observation = observation.or(capture.as_ref());
                     vehicle::load_observed(files, class_name, &caller, observation, trace)
                         .map(Arc::new)
                 }))

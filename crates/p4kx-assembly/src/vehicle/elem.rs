@@ -9,16 +9,17 @@ use crate::{LoadoutPath, VehicleAggregateEvidence, VehicleAttributeEvidence, Veh
 use super::PORT_OBSERVED_ATTRIBUTES;
 
 /// A Modification of the base implementation: its selected patch and Elem overrides.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug)]
 pub(super) struct Modification {
     pub(super) patch: Option<ModificationPatch>,
     pub(super) elems: Vec<ElemOverride>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug)]
 pub(super) struct ModificationPatch {
     pub(super) path: LoadoutPath,
     pub(super) name: LoadoutPath,
+    pub(super) selector: Option<VehicleXmlSite>,
 }
 
 /// Selects the original Modification, preferring an exact name over an ASCII case match.
@@ -33,7 +34,10 @@ pub(super) fn find_modification(
     else {
         return Ok(None);
     };
-    observe_attribute(&mut aggregate, scope, node, "patchFile");
+    let patch_site = scope.vehicle_site(node, "patchFile", MissingAttribute::Element);
+    if let Some(aggregate) = &mut aggregate {
+        aggregate.selection(patch_site.clone());
+    }
     let patch = match node.attribute_ascii("patchFile") {
         Some((name, value)) if !value.trim().is_empty() => Some(ModificationPatch {
             path: scope
@@ -42,6 +46,7 @@ pub(super) fn find_modification(
             name: scope
                 .modification_name(node, authored_name)?
                 .ok_or("the selected Modification name is absent")?,
+            selector: patch_site.filter(|site| !site.checked_absence()),
         }),
         _ => None,
     };

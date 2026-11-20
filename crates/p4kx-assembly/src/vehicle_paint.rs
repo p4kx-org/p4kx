@@ -4,16 +4,21 @@
 use std::sync::Arc;
 
 use p4kx_dataforge::{StructValue, TagTree};
-use p4kx_extraction::SourceLocation;
 
 use crate::geometry_choice::GeometryChoice;
-use crate::paint_provenance::{PaintSelection, PaintSelectionInput, VariantSource};
+use crate::paint_port::PaintOfferSources;
+use crate::paint_provenance::{PaintSelection, VariantSource};
 use crate::read;
 use crate::spec::{EntitySpec, VehicleSpec};
 use crate::{
     Attachment, EntityNode, Geometry, IssueKind, LoadoutResolver, MaterialVariant, PaintPort,
     PaintTagIndex, PortNode, PortSource,
 };
+
+#[path = "vehicle_paint_sources.rs"]
+mod sources;
+
+pub(crate) use sources::record_header;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct PaintItem {
@@ -66,9 +71,12 @@ impl LoadoutResolver<'_> {
         self
     }
 
+    pub(crate) const fn captures_vehicle_appearance(&self) -> bool {
+        self.vehicle_appearance && self.observation.is_none()
+    }
+
     pub(crate) fn prepare_vehicle_paint(&self, spec: &EntitySpec, root: &mut EntityNode) {
-        if self.vehicle_appearance
-            && self.observation.is_none()
+        if self.captures_vehicle_appearance()
             && let Some(appearance) = self.vehicle_paint(spec, root)
         {
             root.paint_appearance = Some(Box::new(appearance));
@@ -86,13 +94,14 @@ impl LoadoutResolver<'_> {
                 .paint()
                 .ok_or("the fitted item is not a paint")
                 .and_then(|paint| {
-                    if port.source() == PortSource::Replaced
-                        && !self.compatible(paint, &tags, &vehicle.attach_tags)
-                    {
-                        return Err(
-                            "the replacement paint does not satisfy the port and vehicle tags",
-                        );
-                    }
+                    let offers = if port.source() == PortSource::Replaced {
+                        Some(
+                            self.replacement_offers(paint, &tags, &vehicle.attach_tags)
+                                .ok_or("the replacement paint does not satisfy the port and vehicle tags")?,
+                        )
+                    } else {
+                        None
+                    };
                     let selector = paint.selector()?;
                     let (geometry, variant) = choose_hull(spec, vehicle, selector)?;
                     Ok((
@@ -103,7 +112,7 @@ impl LoadoutResolver<'_> {
                             attachable: item.attachable_component_ordinal(),
                             tag: selector.to_owned(),
                             variant,
-                            compatibility: selected_replacement_tags(root, port, item, paint),
+                            compatibility: sources::selected(spec, root, port, item, paint, offers),
                         }),
                     ))
                 })
@@ -120,12 +129,17 @@ impl LoadoutResolver<'_> {
         })
     }
 
-    fn compatible(&self, item: &PaintItem, port: &PaintPort, vehicle_tags: &str) -> bool {
+    fn replacement_offers(
+        &self,
+        item: &PaintItem,
+        port: &PaintPort,
+        vehicle_tags: &str,
+    ) -> Option<PaintOfferSources> {
         let tree = self
             .tag_tree
             .get_or_init(|| TagTree::build(self.entities.forge()));
         let tag_index = PaintTagIndex::new(tree);
-        port.accepts(
+        port.accept_with_sources(
             &lowercase_tags(&item.tags),
             &lowercase_tags(&item.required_tags),
             &lowercase_tags(vehicle_tags),
@@ -165,75 +179,6 @@ fn equipped<'node>(
             .or_else(|| record.map(crate::PortDefinition::required_tags));
         (port, item.as_ref(), PaintPort::new(offered, required))
     })
-}
-
-fn selected_replacement_tags(
-    root: &EntityNode,
-    port: &PortNode,
-    item: &EntityNode,
-    paint: &PaintItem,
-) -> Vec<PaintSelectionInput> {
-    let mut sources = Vec::new();
-    if port.source() != PortSource::Replaced {
-        return sources;
-    }
-    let xml = root
-        .vehicle()
-        .and_then(|vehicle| vehicle.item_port(port.name()));
-    push_port_tags(
-        &mut sources,
-        port,
-        xml.map(crate::VehicleItemPort::required_tags_source),
-        "RequiredPortTags",
-        crate::PortDefinition::required_tags,
-    );
-    if !paint.required_tags.trim().is_empty()
-        && let Some(source) = attach_tags(item, "RequiredTags")
-    {
-        sources.push(source);
-    }
-    sources
-}
-
-fn attach_tags(node: &EntityNode, field: &str) -> Option<PaintSelectionInput> {
-    let (record_index, component) = node
-        .record_index()
-        .zip(node.attachable_component_ordinal())?;
-    Some(PaintSelectionInput::DataForge(SourceLocation::DataForge {
-        record_index,
-        field: format!("Components[{component}].AttachDef.{field}"),
-    }))
-}
-
-fn push_port_tags(
-    sources: &mut Vec<PaintSelectionInput>,
-    port: &PortNode,
-    xml: Option<(Option<&str>, Option<&crate::VehicleAttributeEvidence>)>,
-    record_field: &str,
-    value: impl FnOnce(&crate::PortDefinition) -> &str,
-) {
-    if let Some((Some(_), evidence)) = xml {
-        if let Some(evidence) = evidence {
-            for site in std::iter::once(evidence.original()).chain(evidence.selectors()) {
-                if let Some((entry, location)) =
-                    site.file().source().entry_origin().zip(site.location())
-                {
-                    sources.push(PaintSelectionInput::Xml(entry.clone(), location.clone()));
-                }
-            }
-        }
-    } else if let Some(definition) = port
-        .definition()
-        .filter(|definition| !value(definition).trim().is_empty())
-    {
-        let source = definition.position();
-        let component = source.component_ordinal();
-        let port = source.port_ordinal();
-        sources.push(PaintSelectionInput::DataForge(SourceLocation::DataForge {
-            record_index: source.record_index(),
-            field: format!("Components[{component}].Ports[{port}].{record_field}"),
-        }));
-    }
 }
 
 fn choose_hull(

@@ -109,6 +109,11 @@ For a selected paint used by the rendered hull, the entity GLB records the obser
 tag, variant kind, model, material library and palette Record GUID in `asset.extras.p4kxPaintAppearance`.
 The digest-bound companion addresses those exact fields. Package `scene.json` keeps the same
 observation in `paint_provenance`. Missing proof leaves the corresponding identity absent.
+The selection sources observed while resolving the paint also contribute to dependent fields.
+These include a factory loadout's selected Include and item class attributes, effective vehicle XML
+port attributes and the explicit route to a contributing patch. An embedded model material name
+also contributes when it selects the material library and its default palette.
+A field records incomplete source coverage when part of its selection was unobserved.
 
 SDK callers preparing a vehicle model can request the same selection with
 `LoadoutResolver::with_vehicle_appearance()` before building the Assembly.

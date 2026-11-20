@@ -12,6 +12,12 @@ pub struct PaintPort {
     required_tags: Vec<String>,
 }
 
+#[derive(Debug, Clone, Copy, Default)]
+pub(crate) struct PaintOfferSources {
+    pub(crate) port: bool,
+    pub(crate) vehicle: bool,
+}
+
 impl PaintPort {
     /// Reads the port's whitespace-separated offered and required tags.
     #[must_use]
@@ -33,18 +39,42 @@ impl PaintPort {
         vehicle_tags: &[String],
         index: &PaintTagIndex<'_>,
     ) -> bool {
-        !self.required_tags.is_empty()
-            && self
-                .required_tags
-                .iter()
-                .all(|wanted| item_tags.iter().any(|tag| index.matches(tag, wanted)))
-            && item_required_tags.iter().all(|wanted| {
-                self.port_tags
+        self.accept_with_sources(item_tags, item_required_tags, vehicle_tags, index)
+            .is_some()
+    }
+
+    pub(crate) fn accept_with_sources(
+        &self,
+        item_tags: &[String],
+        item_required_tags: &[String],
+        vehicle_tags: &[String],
+        index: &PaintTagIndex<'_>,
+    ) -> Option<PaintOfferSources> {
+        if self.required_tags.is_empty()
+            || !self.required_tags.iter().all(|wanted| {
+                item_tags
                     .iter()
-                    .chain(&self.required_tags)
-                    .chain(vehicle_tags)
                     .any(|offered| index.matches(offered, wanted))
             })
+        {
+            return None;
+        }
+        let mut sources = PaintOfferSources::default();
+        for wanted in item_required_tags {
+            let matches = |offered: &String| index.matches(offered, wanted);
+            if self.port_tags.iter().any(matches) {
+                sources.port = true;
+                continue;
+            }
+            if self.required_tags.iter().any(matches) {
+                continue;
+            }
+            if !vehicle_tags.iter().any(matches) {
+                return None;
+            }
+            sources.vehicle = true;
+        }
+        Some(sources)
     }
 }
 

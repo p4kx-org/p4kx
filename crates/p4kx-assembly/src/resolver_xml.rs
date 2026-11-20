@@ -5,8 +5,20 @@ use std::collections::hash_map::Entry;
 use std::sync::Arc;
 
 use crate::loadout_file_cache::CachedDocument;
+use crate::loadout_file_trace::FileTrace;
+use crate::loadout_xml_use::XmlLoadoutAttributes;
 use crate::resolver::{Entries, EntriesResult};
-use crate::{LoadoutError, LoadoutPath, LoadoutRequest, LoadoutResolver, LoadoutXmlClassUse, xml};
+use crate::resolver_observation::Observation;
+use crate::{
+    LoadoutError, LoadoutFiles, LoadoutPath, LoadoutRequest, LoadoutResolver, LoadoutXmlClassUse,
+    xml,
+};
+
+#[derive(PartialEq, Eq, Hash)]
+pub(crate) struct XmlCacheKey {
+    path: String,
+    capture_paint: bool,
+}
 
 impl LoadoutResolver<'_> {
     pub(crate) fn xml_entries(&mut self, path: &LoadoutPath) -> EntriesResult {
@@ -17,7 +29,12 @@ impl LoadoutResolver<'_> {
         };
         let caller = LoadoutRequest::Xml { path: path.clone() };
         let observation = self.observation.as_deref();
-        let (mut result, original) = match self.xml.entry(path.to_ascii_lowercase()) {
+        let capture_paint = self.captures_vehicle_appearance();
+        let key = XmlCacheKey {
+            path: path.to_ascii_lowercase(),
+            capture_paint,
+        };
+        let (mut result, original) = match self.xml.entry(key) {
             Entry::Occupied(entry) => {
                 let cached = entry.get();
                 (
@@ -27,13 +44,7 @@ impl LoadoutResolver<'_> {
             }
             Entry::Vacant(entry) => {
                 let cached = entry.insert(CachedDocument::read(|trace| {
-                    xml::load_observed(files, path, &caller, observation, trace).map(|loaded| {
-                        Entries {
-                            list: Arc::from(loaded.entries),
-                            issues: Arc::from(loaded.issues),
-                            xml_use: None,
-                        }
-                    })
+                    read_entries(files, path, &caller, observation, capture_paint, trace)
                 }));
                 (cached.value().clone(), cached.xml_root().cloned())
             }
@@ -41,7 +52,10 @@ impl LoadoutResolver<'_> {
         if let (Ok(entries), Some(original)) = (&mut result, original)
             && !entries.list.is_empty()
         {
-            entries.xml_use = Some(LoadoutXmlClassUse::root(original, path));
+            entries.xml_use = Some(entries.xml_use.as_ref().map_or_else(
+                || LoadoutXmlClassUse::root(original, path, None),
+                |usage| usage.with_caller(path),
+            ));
         }
         match &mut result {
             Ok(entries) if entries.issues.iter().any(LoadoutError::is_missing_file) => {
@@ -55,4 +69,28 @@ impl LoadoutResolver<'_> {
         }
         result
     }
+}
+
+fn read_entries(
+    files: &dyn LoadoutFiles,
+    path: &LoadoutPath,
+    caller: &LoadoutRequest,
+    observation: Option<&Observation<'_>>,
+    capture_paint: bool,
+    trace: &mut FileTrace,
+) -> EntriesResult {
+    let attributes = capture_paint.then(|| Arc::new(XmlLoadoutAttributes::default()));
+    let capture = attributes
+        .as_ref()
+        .map(|sites| Observation::new(sites.clone()));
+    let loaded = xml::load_observed(files, path, caller, observation.or(capture.as_ref()), trace)?;
+    let xml_use = attributes.and_then(|sites| {
+        let original = trace.xml_root()?.clone();
+        Some(LoadoutXmlClassUse::root(original, path, Some(sites)))
+    });
+    Ok(Entries {
+        list: Arc::from(loaded.entries),
+        issues: Arc::from(loaded.issues),
+        xml_use,
+    })
 }

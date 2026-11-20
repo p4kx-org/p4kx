@@ -9,6 +9,7 @@ use crate::resolver_observation::{self, LoadoutReadEvent, Observation};
 use crate::vehicle::ElemOverride;
 use crate::vehicle::elem::{Modification, ModificationPatch};
 use crate::vehicle::file_read;
+use crate::vehicle::origin::PatchRoute;
 use crate::vehicle::patch::{self, ModificationReport};
 use crate::vehicle::paths;
 use crate::vehicle::paths::DIRECTORY;
@@ -26,6 +27,7 @@ pub(super) struct AppliedModification {
     pub(super) aggregate: Option<VehicleAggregateEvidence>,
     pub(super) patch_path: Option<String>,
     pub(super) patch_origin: Option<p4kx_extraction::EntryOrigin>,
+    pub(super) patch_route: Option<PatchRoute>,
     pub(super) report: Option<ModificationReport>,
     pub(super) elems: Vec<ElemOverride>,
 }
@@ -67,6 +69,7 @@ pub(super) fn apply(
         observation,
         trace,
     );
+    let route = explicit_patch_route(&read, explicit.as_ref().zip(authored));
     if let Some(wanted) = explicit.filter(|wanted| match &read {
         Ok(Some((path, _))) => !wanted.eq_ignore_ascii_case(path),
         Ok(None) => true,
@@ -81,6 +84,7 @@ pub(super) fn apply(
         )));
     }
     apply_read_patch(root, read, budget, issues, observation, &mut modified)?;
+    modified.patch_route = route.filter(|_| modified.patch_path.is_some());
     apply_elements(
         root,
         selection.selected,
@@ -91,6 +95,21 @@ pub(super) fn apply(
         &mut modified,
     )?;
     Ok(modified)
+}
+
+fn explicit_patch_route(
+    read: &Result<Option<(String, Document)>, LoadoutError>,
+    authored: Option<(&LoadoutPath, &ModificationPatch)>,
+) -> Option<PatchRoute> {
+    let ((selected, document), (requested, original)) =
+        read.as_ref().ok()?.as_ref().zip(authored)?;
+    if !requested.eq_ignore_ascii_case(selected) {
+        return None;
+    }
+    Some(PatchRoute {
+        file: document.observation()?.clone(),
+        selector: original.selector.clone()?,
+    })
 }
 
 fn apply_read_patch(

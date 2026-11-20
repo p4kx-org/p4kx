@@ -6,9 +6,15 @@ use p4kx_assembly::{
     LoadoutChanges, LoadoutResolver, PaletteSelection,
 };
 use p4kx_extraction::{Archive, DataForgeEntry, SourceLocation};
-use p4kx_testkit::{TestEntry, fitted_paint_vehicle_entries};
+use p4kx_testkit::{TestEntry, fitted_paint_vehicle_entries, test_key};
+use serde_json::Value;
 
 use crate::assembly_support::{TestResult, fixture};
+
+#[path = "assembly_vehicle_paint_material.rs"]
+mod material;
+#[path = "assembly_vehicle_paint_patch.rs"]
+mod patch;
 
 const PORT: &str = "hardpoint_livery";
 const BASE_MODEL: &str = "Objects/Test/hull.cgf";
@@ -45,6 +51,107 @@ fn equipped_paint_selects_the_material_tree_and_applied_port_requirement() -> Te
         )
     }));
     Ok(())
+}
+
+#[test]
+fn fitted_paint_origins_distinguish_default_reference_and_accepted_replacement() -> TestResult {
+    let factory = paint_evidence(&assemble("TEST_Hull_Red", &LoadoutChanges::new())?)?;
+    let factory = field_selectors(&factory, "/variantKind")?;
+    let default_at = "Components[0].Ports[0].defaultItem.entityClass";
+    assert!(
+        has_record_field(&factory, 0, default_at),
+        "the physical port default selected the fitted paint"
+    );
+    assert!(
+        has_record_field(&factory, 4, "Components[0].AttachDef.Type"),
+        "the fitted item has the authored paint type"
+    );
+    let changes = LoadoutChanges::new().replace(PORT, "TEST_Paint_Red");
+    let replacement = paint_evidence(&assemble("TEST_Hull_Red", &changes)?)?;
+    let replacement = field_selectors(&replacement, "/variantKind")?;
+    assert!(
+        !has_record_field(&replacement, 0, default_at),
+        "the overridden port default is outside the replacement decision"
+    );
+    assert!(
+        replacement.iter().any(|source| {
+            string_at(source, "/location/namespace") == Some("dataforgeRecordHeader")
+                && string_at(source, "/location/indices/0") == Some("4")
+                && string_at(source, "/location/field") == Some("guid")
+        }),
+        "the record reached by the replacement is the accepted paint"
+    );
+    assert!(
+        has_record_field(&replacement, 4, "Components[0].AttachDef.RequiredTags"),
+        "the replacement's two authored requirements enter the decision"
+    );
+    assert!(
+        has_record_field(&replacement, 0, "Components[3].AttachDef.Tags"),
+        "the hull supplies the required offer absent from the port tags"
+    );
+    let xml_values = replacement
+        .iter()
+        .filter(|source| {
+            string_at(source, "/location/namespace") == Some("textXmlAttribute")
+                && string_at(source, "/location/field") == Some("value")
+        })
+        .count();
+    assert_eq!(
+        xml_values, 2,
+        "the applied XML offer and requirement both contributed"
+    );
+    Ok(())
+}
+
+fn paint_evidence(assembled: &Assembly) -> Result<Value, Box<dyn std::error::Error>> {
+    let evidence = assembled
+        .paint_provenance()?
+        .ok_or("fitted paint origins")?;
+    Ok(serde_json::to_value(evidence)?)
+}
+
+fn field_selectors<'report>(
+    report: &'report Value,
+    name: &str,
+) -> Result<Vec<&'report Value>, Box<dyn std::error::Error>> {
+    let field = report
+        .get("fieldOrigins")
+        .and_then(|fields| fields.get(name))
+        .ok_or("paint field origin")?;
+    assert_eq!(
+        field.get("sourceSetComplete").and_then(Value::as_bool),
+        Some(false),
+        "the selected positive inputs do not establish every competing source"
+    );
+    let ids = field
+        .get("sourceUsesRefs")
+        .and_then(Value::as_array)
+        .ok_or("paint field source-use references")?;
+    let uses = report
+        .pointer("/sourceInventory/uses")
+        .and_then(Value::as_array)
+        .ok_or("observed sources")?;
+    Ok(uses
+        .iter()
+        .filter(|usage| {
+            string_at(usage, "/role") == Some("selector")
+                && usage.get("id").is_some_and(|id| ids.contains(id))
+        })
+        .collect())
+}
+
+fn has_record_field(uses: &[&Value], record: u64, field: &str) -> bool {
+    uses.iter().any(|usage| {
+        usage
+            .pointer("/location/recordIndex")
+            .and_then(Value::as_u64)
+            == Some(record)
+            && string_at(usage, "/location/field") == Some(field)
+    })
+}
+
+fn string_at<'value>(usage: &'value Value, path: &str) -> Option<&'value str> {
+    usage.pointer(path).and_then(Value::as_str)
 }
 
 #[test]
@@ -128,7 +235,12 @@ fn a_missing_root_model_has_no_rendered_paint_provenance() -> TestResult {
     let omitted = [format!("Data/{BASE_MODEL}"), format!("Data/{BASE_MODEL}m")];
     let mut entries = fitted_paint_vehicle_entries();
     entries.retain(|entry| !omitted.iter().any(|path| path == entry.path()));
-    let assembled = assemble_entries("TEST_Hull_Red", &LoadoutChanges::new(), entries)?;
+    let assembled = assemble_entries(
+        "TEST_Hull_Red",
+        &LoadoutChanges::new(),
+        entries,
+        Some(BASE_MATERIAL),
+    )?;
     let root = assembled.root().ok_or("the unresolved hull")?;
     assert!(
         root.model().is_none(),
@@ -138,6 +250,49 @@ fn a_missing_root_model_has_no_rendered_paint_provenance() -> TestResult {
         assembled.paint_provenance()?.is_none(),
         "effective paint evidence belongs to a loaded hull"
     );
+    Ok(())
+}
+
+#[test]
+fn an_encrypted_replacement_port_contributes_to_its_painted_fields() -> TestResult {
+    let entries = fitted_paint_vehicle_entries()
+        .into_iter()
+        .map(|entry| {
+            if entry.path().ends_with("TEST_Paint.xml") {
+                entry.encrypted()
+            } else {
+                entry
+            }
+        })
+        .collect();
+    let changes = LoadoutChanges::new().replace(PORT, "TEST_Paint_Red");
+    let assembled = assemble_entries("TEST_Hull_Red", &changes, entries, Some(BASE_MATERIAL))?;
+    let proof = paint_evidence(&assembled)?;
+    let origins = proof.get("fieldOrigins").ok_or("paint field origins")?;
+    for field in [
+        "/paintGuid",
+        "/appearanceTag",
+        "/variantKind",
+        "/geometry",
+        "/material",
+        "/paletteGuid",
+    ] {
+        let origin = origins
+            .get(field)
+            .ok_or_else(|| format!("missing paint field {field}"))?;
+        assert_eq!(
+            origin
+                .get("containsEncryptedSource")
+                .and_then(Value::as_bool),
+            Some(true),
+            "the encrypted port selection contributes to {field}"
+        );
+        assert_eq!(
+            origin.get("sourceSetComplete").and_then(Value::as_bool),
+            Some(false),
+            "the recorded sources cover only the observed decision for {field}"
+        );
+    }
     Ok(())
 }
 
@@ -156,28 +311,36 @@ fn assemble(
     entity: &str,
     changes: &LoadoutChanges,
 ) -> Result<Assembly, Box<dyn std::error::Error>> {
-    assemble_entries(entity, changes, fitted_paint_vehicle_entries())
+    assemble_entries(
+        entity,
+        changes,
+        fitted_paint_vehicle_entries(),
+        Some(BASE_MATERIAL),
+    )
 }
 
 fn assemble_entries(
     entity: &str,
     changes: &LoadoutChanges,
     entries: Vec<TestEntry>,
+    base_material: Option<&str>,
 ) -> Result<Assembly, Box<dyn std::error::Error>> {
     let fixture = fixture(entries)?;
-    let archive = Archive::open(&fixture.path)?;
+    let archive = Archive::open_with_key(&fixture.path, Some(test_key()))?;
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;
     let files = ArchiveFiles::new(&archive);
     let mut resolver = LoadoutResolver::new(&forge)
         .with_forge_entry(&entry)
-        .with_files(&files)
-        .with_vehicle_appearance();
+        .with_files(&files);
     let record = resolver.entities().find(entity)?;
-    let tree = resolver.resolve_with(&record, changes)?;
+    drop(resolver.resolve_with(&record, changes)?);
+    let tree = resolver
+        .with_vehicle_appearance()
+        .resolve_with(&record, changes)?;
     assert_eq!(
         tree.geometry().and_then(p4kx_assembly::Geometry::material),
-        Some(BASE_MATERIAL),
+        base_material,
         "the resolved Loadout keeps the source geometry"
     );
     Ok(Assembly::build_with_palettes(
@@ -187,3 +350,6 @@ fn assemble_entries(
         &AssemblyOptions::default(),
     )?)
 }
+
+#[path = "assembly_vehicle_paint_factory_xml.rs"]
+mod factory_xml;

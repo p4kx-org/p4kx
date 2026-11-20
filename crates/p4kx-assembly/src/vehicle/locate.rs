@@ -167,6 +167,7 @@ fn project(
             rolling_parts: parts.rolling_selectors,
             base: physical,
             patch: modified.patch_origin,
+            patch_route: modified.patch_route,
         },
         path,
         patch_path: modified.patch_path,

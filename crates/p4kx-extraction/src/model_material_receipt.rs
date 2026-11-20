@@ -5,10 +5,9 @@ use std::collections::BTreeMap;
 use std::ops::Range;
 
 use p4kx_archive::EntryOrigin;
-use p4kx_chunks::{crch, ivo};
 use p4kx_model::{
-    ChunkUsage, Material, MaterialLibrary, MaterialReadField, MaterialReadObservation, Model,
-    ModelFile,
+    ChunkUsage, Material, MaterialLibrary, MaterialName, MaterialReadField,
+    MaterialReadObservation, Model, ModelFile,
 };
 use serde::Serialize;
 use thiserror::Error;
@@ -93,7 +92,7 @@ impl Observations {
                 self.project_library(
                     library,
                     library_entry,
-                    model_entry.zip(material_selector(model)),
+                    model_entry.zip(model_material_selector(model)),
                 )
             })
             .transpose()
@@ -104,7 +103,7 @@ impl Observations {
         &self,
         library: &MaterialLibrary,
         library_entry: Option<&EntryOrigin>,
-        locator: Option<(&EntryOrigin, usize)>,
+        locator: Option<(&EntryOrigin, SourceLocation)>,
     ) -> Result<MaterialFieldReceipt, ReceiptError> {
         use MaterialReadField::{LibraryDefaultPalette, LibrarySingle, LibraryTotal};
 
@@ -141,7 +140,7 @@ impl Observations {
             let mut writer = self.writer(
                 uses,
                 library_entry,
-                model_entry.zip(material_selector(model)),
+                model_entry.zip(model_material_selector(model)),
             )?;
             let materials = model
                 .materials
@@ -171,19 +170,13 @@ impl Observations {
         &'a self,
         uses: &'a SourceUses,
         library_entry: Option<&EntryOrigin>,
-        locator: Option<(&EntryOrigin, usize)>,
+        locator: Option<(&EntryOrigin, SourceLocation)>,
     ) -> Result<Writer<'a>, ReceiptError> {
+        let selector_complete = locator.as_ref().is_some_and(|(entry, _)| complete(entry));
         let selector = locator
-            .map(|(entry, index)| {
+            .map(|(entry, location)| {
                 uses.observe(SourceInput::Archive(entry), InputScope::Payload)?
-                    .at(
-                        SourceLocation::Subresource {
-                            namespace: "modelChunk".into(),
-                            indices: vec![index as u64],
-                            field: "materialLibrary".into(),
-                        },
-                        SourceUseRole::Selector,
-                    )
+                    .at(location, SourceUseRole::Selector)
             })
             .transpose()?;
         let scope = library_entry
@@ -194,8 +187,7 @@ impl Observations {
             uses,
             scope,
             selector,
-            complete: library_entry.is_some_and(complete)
-                && locator.is_some_and(|(entry, _)| complete(entry)),
+            complete: library_entry.is_some_and(complete) && selector_complete,
             fields: FieldOrigins::new(),
         })
     }
@@ -205,16 +197,20 @@ fn complete(entry: &EntryOrigin) -> bool {
     entry.ancestors().all(|item| item.is_some())
 }
 
-fn material_selector(model: &Model) -> Option<usize> {
-    model
-        .chunks
-        .iter()
-        .find(|chunk| {
-            chunk.file == ModelFile::Model
-                && chunk.usage == ChunkUsage::Read
-                && [crch::MTL_NAME, ivo::MTL_NAME, ivo::MTL_NAME_320].contains(&chunk.chunk_type)
-        })
-        .map(|chunk| chunk.index)
+/// Returns the original chunk field that supplied the model's decoded material name.
+#[must_use]
+pub fn model_material_selector(model: &Model) -> Option<SourceLocation> {
+    model.material_library.as_ref()?;
+    let chunk = model.chunks.iter().find(|chunk| {
+        chunk.file == ModelFile::Model
+            && chunk.usage == ChunkUsage::Read
+            && MaterialName::is_chunk_type(chunk.chunk_type)
+    })?;
+    Some(SourceLocation::Subresource {
+        namespace: "modelChunk".into(),
+        indices: vec![chunk.index as u64],
+        field: "materialLibrary".into(),
+    })
 }
 
 struct Writer<'a> {

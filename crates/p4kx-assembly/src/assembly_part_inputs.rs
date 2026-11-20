@@ -3,9 +3,12 @@
 
 use std::sync::Arc;
 
-use p4kx_extraction::{EntryOrigin, MaterialArchiveOrigins, ModelArchiveSource, SourceLocation};
+use p4kx_extraction::{
+    EntryOrigin, MaterialArchiveOrigins, ModelArchiveSource, SourceLocation,
+    model_material_selector,
+};
 
-use p4kx_model::Model;
+use p4kx_model::{Model, ModelFile};
 
 use super::Part;
 use crate::build_models::Loaded;
@@ -59,6 +62,22 @@ impl Part {
     #[must_use]
     pub fn material_selector(&self) -> Option<SourceLocation> {
         self.geometry_selectors.material_field()
+    }
+
+    pub(crate) fn embedded_material_selector(&self) -> Option<(&EntryOrigin, SourceLocation)> {
+        if !self.model_definition.material_from_model {
+            return None;
+        }
+        let (model, files) = if self.is_cdf_rig_only() {
+            let drawable = self.attachments().first()?;
+            (drawable.model(), drawable.model_archive_sources())
+        } else {
+            (self.model()?, self.model_archive_sources())
+        };
+        let source = files
+            .iter()
+            .find(|entry| entry.file() == ModelFile::Model)?;
+        Some((source.origin()?, model_material_selector(model)?))
     }
 
     /// Returns the actual rendered model and its retained deploy-pose evidence.

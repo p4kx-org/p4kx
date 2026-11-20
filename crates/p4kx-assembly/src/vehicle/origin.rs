@@ -5,6 +5,7 @@ use p4kx_extraction::EntryOrigin;
 
 use super::aggregate_evidence::Checkpoint;
 use super::{VehicleAggregateEvidence, VehicleImplementation};
+use crate::{LoadoutFileObservation, VehicleAttributeEvidence, VehicleXmlSite};
 
 /// Where the value of a part's attribute comes from once the Modification is applied.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -40,6 +41,13 @@ pub(super) struct DeclarationOrigins {
     pub(super) rolling_parts: Option<VehicleAggregateEvidence>,
     pub(super) base: Option<EntryOrigin>,
     pub(super) patch: Option<EntryOrigin>,
+    pub(super) patch_route: Option<PatchRoute>,
+}
+
+#[derive(Debug, Clone)]
+pub(super) struct PatchRoute {
+    pub(super) file: LoadoutFileObservation,
+    pub(super) selector: VehicleXmlSite,
 }
 
 impl PartialEq for DeclarationOrigins {
@@ -50,6 +58,17 @@ impl PartialEq for DeclarationOrigins {
 }
 
 impl VehicleImplementation {
+    pub(crate) fn explicit_patch_selector(
+        &self,
+        evidence: &VehicleAttributeEvidence,
+    ) -> Option<&VehicleXmlSite> {
+        let route = self.declarations.patch_route.as_ref()?;
+        std::iter::once(evidence.original())
+            .chain(evidence.selectors())
+            .any(|site| site.file().is_same_operation(&route.file))
+            .then_some(&route.selector)
+    }
+
     /// Returns the original archive input supplying the effective declaration.
     #[must_use]
     pub const fn declaration_origin(&self, origin: ValueOrigin) -> Option<&EntryOrigin> {

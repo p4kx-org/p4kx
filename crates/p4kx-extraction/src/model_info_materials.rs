@@ -10,7 +10,7 @@ pub(crate) mod receipt;
 use crate::material_source_info::{MaterialAuthoredInfo, MaterialLibrarySourceInfo};
 use crate::{ArchiveDefaultMaterial, DefaultMaterialReceipt};
 
-pub use receipt::MaterialPageOrigins;
+pub use receipt::{MaterialPageOrigins, model_material_selector};
 
 /// What reading a model's material library came to.
 #[derive(Debug, Serialize)]

@@ -173,11 +173,10 @@ fn check_palette_sources(fixture: &PaintFixture, rows: &[Value]) -> TestResult {
     );
     assert_eq!(
         palette.get("sourceSetComplete").and_then(Value::as_bool),
-        Some(true),
-        "the named palette has both exact identity contributors"
+        Some(false),
+        "the named palette retains the observed subset of the enclosing decision"
     );
     let uses = uses_of(palette, rows)?;
-    assert_eq!(uses.len(), 2, "both exact palette contributors");
     assert!(
         uses.iter().any(|usage| dataforge(
             usage,
