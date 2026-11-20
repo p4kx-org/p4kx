@@ -239,7 +239,7 @@ pub struct HarvestableOccurrence {
 #[non_exhaustive]
 pub enum HarvestableOccurrenceRoute {
     /// A route reached this occurrence.
-    Reached(ReachedHarvestableOccurrence),
+    Reached(Box<ReachedHarvestableOccurrence>),
     /// The occurrence came from directory inventory outside the routes reached by this walk.
     Unreached,
 }
@@ -250,7 +250,7 @@ pub enum HarvestableOccurrenceRoute {
 pub struct ReachedHarvestableOccurrence {
     /// The exact system root Entry.
     pub root: SourcedValue<PhysicalEntryRef>,
-    /// The root and ordered Child coordinates of this occurrence.
+    /// The physical root, Child ordinals and external document steps of this occurrence.
     pub id: SourcedValue<ContainerInstanceKey>,
     /// The original immediate containing occurrence, when present.
     pub parent: SourcedValue<ContainerInstanceKey>,

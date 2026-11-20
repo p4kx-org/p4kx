@@ -40,8 +40,9 @@ pub(super) fn project(
             .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
         let receipt = container(archive, capture, entry)?;
         let reference = receipt.physical_reference(capture)?;
-        let route =
-            HarvestableOccurrenceRoute::Reached(reached_route(occurrence, &reference, capture)?);
+        let route = HarvestableOccurrenceRoute::Reached(Box::new(reached_route(
+            occurrence, &reference, capture,
+        )?));
         routes.push(project_row(
             &occurrence.opened,
             preset,
