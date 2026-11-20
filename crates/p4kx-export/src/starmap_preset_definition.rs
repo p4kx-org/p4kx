@@ -28,7 +28,7 @@ pub(crate) const SOURCE_TYPE: &str = "StarMapPreset";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct StarmapPresetDefinition<'source> {
+pub struct StarmapPresetDefinition<'source> {
     #[serde(flatten)]
     source: CanonicalRecordHeader<'source>,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
@@ -42,6 +42,24 @@ pub(crate) struct StarmapPresetDefinition<'source> {
 }
 
 impl<'source> StarmapPresetDefinition<'source> {
+    /// Sourced physical Record identity.
+    #[must_use]
+    pub const fn header(&self) -> &CanonicalRecordHeader<'source> {
+        &self.source
+    }
+
+    /// Authored starmap object type reference.
+    #[must_use]
+    pub const fn object_type(&self) -> &SourcedValue<Box<SourceRecordReference<'source>>> {
+        &self.r#type
+    }
+
+    /// Original fields outside the typed projection.
+    #[must_use]
+    pub const fn authored_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.authored_fields
+    }
+
     pub(super) fn read(
         source: CanonicalRecordHeader<'source>,
         fields: Observed<'_, '_, '_, 'source>,

@@ -25,11 +25,15 @@ type RecordLink<'source> = SourcedValue<Box<SourceRecordReference<'source>>>;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct AutoSpawnDefinition<'source> {
+#[non_exhaustive]
+pub struct AutoSpawnDefinition<'source> {
     #[serde(flatten)]
-    source: CanonicalRecordHeader<'source>,
-    auto_spawn_data: SourcedValue<AutoSpawnData<'source>>,
-    authored_fields: SourceArenaOutput<'source>,
+    /// The original physical Record header.
+    pub source: CanonicalRecordHeader<'source>,
+    /// The authored spawn data.
+    pub auto_spawn_data: SourcedValue<AutoSpawnData<'source>>,
+    /// Additional original fields.
+    pub authored_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> AutoSpawnDefinition<'source> {
@@ -53,11 +57,15 @@ impl<'source> AutoSpawnDefinition<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct AutoSpawnSet<'source> {
+#[non_exhaustive]
+pub struct AutoSpawnSet<'source> {
     #[serde(flatten)]
-    source: CanonicalRecordHeader<'source>,
-    auto_spawn_data: SourcedValue<Vec<SourcedValue<AutoSpawnSetEntry<'source>>>>,
-    authored_fields: SourceArenaOutput<'source>,
+    /// The original physical Record header.
+    pub source: CanonicalRecordHeader<'source>,
+    /// The original entries in authored order.
+    pub auto_spawn_data: SourcedValue<Vec<SourcedValue<AutoSpawnSetEntry<'source>>>>,
+    /// Additional original fields.
+    pub authored_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> AutoSpawnSet<'source> {
@@ -82,16 +90,22 @@ impl<'source> AutoSpawnSet<'source> {
     }
 }
 
+/// An authored spawn-set entry and its type-specific payload.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct AutoSpawnSetEntry<'source> {
-    source_type: SourcedValue<&'source str>,
+#[non_exhaustive]
+pub struct AutoSpawnSetEntry<'source> {
+    /// The declared entry type.
+    pub source_type: SourcedValue<&'source str>,
     #[serde(flatten)]
-    data: SetEntryData<'source>,
-    authored_fields: SourceArenaOutput<'source>,
+    /// The typed interpretation of the original entry.
+    pub data: SetEntryData<'source>,
+    /// Additional original fields.
+    pub authored_fields: SourceArenaOutput<'source>,
 }
 
+/// The typed interpretations of one authored spawn-set entry.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(
     tag = "kind",
@@ -99,14 +113,20 @@ struct AutoSpawnSetEntry<'source> {
     rename_all_fields = "camelCase"
 )]
 #[schemars(transform = every_field_required)]
-enum SetEntryData<'source> {
+#[non_exhaustive]
+pub enum SetEntryData<'source> {
+    /// An original reference to a separate spawn declaration.
     Record {
+        /// The authored spawn reference.
         #[schemars(with = "SourcedValue<CatalogRecordReference>")]
         record: RecordLink<'source>,
     },
+    /// A spawn declared inline in this set.
     Manual {
+        /// The authored inline spawn data.
         auto_spawn_data: Box<SourcedValue<AutoSpawnData<'source>>>,
     },
+    /// An additional original entry type retained in authored fields.
     Authored,
 }
 
@@ -149,11 +169,15 @@ impl SetEntryData<'_> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct EncounterIndex<'source> {
+#[non_exhaustive]
+pub struct EncounterIndex<'source> {
     #[serde(flatten)]
-    source: CanonicalRecordHeader<'source>,
-    encounters: SourcedValue<Vec<SourcedValue<EncounterIndexEntry<'source>>>>,
-    authored_fields: SourceArenaOutput<'source>,
+    /// The original physical Record header.
+    pub source: CanonicalRecordHeader<'source>,
+    /// The authored entries in source order.
+    pub encounters: SourcedValue<Vec<SourcedValue<EncounterIndexEntry<'source>>>>,
+    /// Additional original fields.
+    pub authored_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> EncounterIndex<'source> {
@@ -178,14 +202,19 @@ impl<'source> EncounterIndex<'source> {
     }
 }
 
+/// An original encounter preset and its spawn-set references.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct EncounterIndexEntry<'source> {
-    encounter_preset: SourcedValue<&'source str>,
+#[non_exhaustive]
+pub struct EncounterIndexEntry<'source> {
+    /// The original preset token.
+    pub encounter_preset: SourcedValue<&'source str>,
     #[schemars(with = "SourcedValue<Vec<SourcedValue<CatalogRecordReference>>>")]
-    auto_spawns: SourcedValue<Vec<RecordLink<'source>>>,
-    authored_fields: SourceArenaOutput<'source>,
+    /// The original references in authored order.
+    pub auto_spawns: SourcedValue<Vec<RecordLink<'source>>>,
+    /// Additional original fields.
+    pub authored_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> EncounterIndexEntry<'source> {

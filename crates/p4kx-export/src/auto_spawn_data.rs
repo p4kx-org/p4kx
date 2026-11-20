@@ -25,17 +25,26 @@ type SourceField = (&'static str, SourceValueState);
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct AutoSpawnData<'source> {
-    class: SourcedValue<AutoSpawnClass<'source>>,
+#[non_exhaustive]
+pub struct AutoSpawnData<'source> {
+    /// The authored class selector.
+    pub class: SourcedValue<AutoSpawnClass<'source>>,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
-    identity: RecordLink<'source>,
-    initial_activity: SourcedValue<&'source str>,
-    on_spawn_assignment: SourcedValue<SpawnAssignment<'source>>,
+    /// The original identity reference.
+    pub identity: RecordLink<'source>,
+    /// The authored initial activity identifier.
+    pub initial_activity: SourcedValue<&'source str>,
+    /// The authored spawn assignment.
+    pub on_spawn_assignment: SourcedValue<SpawnAssignment<'source>>,
     #[serde(flatten)]
-    limits: SpawnLimits,
-    inventory_items: SourcedValue<Vec<SourcedValue<SpawnInventory<'source>>>>,
-    entity_tags: SourcedValue<SpawnTags<'source>>,
-    authored_fields: SourceArenaOutput<'source>,
+    /// The original group, concurrency and delay limits.
+    pub limits: SpawnLimits,
+    /// The authored inventory slots in source order.
+    pub inventory_items: SourcedValue<Vec<SourcedValue<SpawnInventory<'source>>>>,
+    /// The authored entity tags.
+    pub entity_tags: SourcedValue<SpawnTags<'source>>,
+    /// Additional original fields.
+    pub authored_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> AutoSpawnData<'source> {
@@ -166,24 +175,37 @@ impl SpawnLimits {
     }
 }
 
+/// An authored instruction about where or how to place the spawn.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct SpawnAssignment<'source> {
-    source_type: SourcedValue<&'source str>,
-    kind: AssignmentKind,
-    area_positive_tags: SourcedValue<SpawnTags<'source>>,
-    area_negative_tags: SourcedValue<SpawnTags<'source>>,
-    authored_fields: SourceArenaOutput<'source>,
+#[non_exhaustive]
+pub struct SpawnAssignment<'source> {
+    /// The declared assignment type.
+    pub source_type: SourcedValue<&'source str>,
+    /// The typed interpretation of the assignment.
+    pub kind: AssignmentKind,
+    /// The original positive area tag terms.
+    pub area_positive_tags: SourcedValue<SpawnTags<'source>>,
+    /// The original negative area tag terms.
+    pub area_negative_tags: SourcedValue<SpawnTags<'source>>,
+    /// Additional original fields.
+    pub authored_fields: SourceArenaOutput<'source>,
 }
 
+/// The typed interpretation of an authored spawn assignment.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
-enum AssignmentKind {
+#[non_exhaustive]
+pub enum AssignmentKind {
+    /// The original base assignment.
     Base,
+    /// An original schedule-area assignment.
     ScheduleArea,
+    /// An original defend-area assignment.
     DefendArea,
+    /// An additional original assignment type retained in authored fields.
     Authored,
 }
 

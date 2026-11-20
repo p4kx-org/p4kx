@@ -1783,13 +1783,29 @@
       "x-p4kx-vocabularyClass": "control"
     },
     "AssignmentKind": {
-      "enum": [
-        "base",
-        "scheduleArea",
-        "defendArea",
-        "authored"
+      "description": "The typed interpretation of an authored spawn assignment.",
+      "oneOf": [
+        {
+          "const": "base",
+          "description": "The original base assignment.",
+          "type": "string"
+        },
+        {
+          "const": "scheduleArea",
+          "description": "An original schedule-area assignment.",
+          "type": "string"
+        },
+        {
+          "const": "defendArea",
+          "description": "An original defend-area assignment.",
+          "type": "string"
+        },
+        {
+          "const": "authored",
+          "description": "An additional original assignment type retained in authored fields.",
+          "type": "string"
+        }
       ],
-      "type": "string",
       "x-p4kx-vocabularyClass": "control"
     },
     "AttachableEffect": {
@@ -2219,13 +2235,15 @@
       "description": "An authored selector for a direct class, an archetype, or a class pool.",
       "oneOf": [
         {
+          "description": "The selector declares an entity class directly.",
           "properties": {
             "kind": {
               "const": "targetClass",
               "type": "string"
             },
             "npcClass": {
-              "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+              "$ref": "#/$defs/SourcedValueOfCatalogRecordReference",
+              "description": "The original entity class reference."
             }
           },
           "required": [
@@ -2235,9 +2253,11 @@
           "type": "object"
         },
         {
+          "description": "The selector declares weighted archetypes.",
           "properties": {
             "archetype": {
-              "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfNpcArchetypeWeight"
+              "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfNpcArchetypeWeight",
+              "description": "The candidate archetypes in authored order."
             },
             "kind": {
               "const": "archetype",
@@ -2251,9 +2271,11 @@
           "type": "object"
         },
         {
+          "description": "The selector declares class pools.",
           "properties": {
             "classPool": {
-              "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+              "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference",
+              "description": "The original pool references in authored order."
             },
             "kind": {
               "const": "classPool",
@@ -2267,6 +2289,7 @@
           "type": "object"
         },
         {
+          "description": "An additional original selector type retained in authored fields.",
           "properties": {
             "kind": {
               "const": "authored",
@@ -2281,10 +2304,12 @@
       ],
       "properties": {
         "authoredFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Additional original fields."
         },
         "sourceType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The declared class selector type."
         }
       },
       "required": [
@@ -2297,22 +2322,28 @@
       "description": "The authored settings shared by direct Records and manual set entries.",
       "properties": {
         "authoredFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Additional original fields."
         },
         "class": {
-          "$ref": "#/$defs/SourcedValueOfAutoSpawnClass"
+          "$ref": "#/$defs/SourcedValueOfAutoSpawnClass",
+          "description": "The authored class selector."
         },
         "entityTags": {
-          "$ref": "#/$defs/SourcedValueOfSpawnTags"
+          "$ref": "#/$defs/SourcedValueOfSpawnTags",
+          "description": "The authored entity tags."
         },
         "identity": {
-          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference",
+          "description": "The original identity reference."
         },
         "initialActivity": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The authored initial activity identifier."
         },
         "inventoryItems": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfSpawnInventory"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfSpawnInventory",
+          "description": "The authored inventory slots in source order."
         },
         "maxConcurrentSpawns": {
           "$ref": "#/$defs/SourcedValueOfint32"
@@ -2333,7 +2364,8 @@
           "$ref": "#/$defs/SourcedValueOfResourceFloat32"
         },
         "onSpawnAssignment": {
-          "$ref": "#/$defs/SourcedValueOfSpawnAssignment"
+          "$ref": "#/$defs/SourcedValueOfSpawnAssignment",
+          "description": "The authored spawn assignment."
         }
       },
       "required": [
@@ -2357,10 +2389,12 @@
       "description": "The physical Record for one authored automatic spawn.",
       "properties": {
         "authoredFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Additional original fields."
         },
         "autoSpawnData": {
-          "$ref": "#/$defs/SourcedValueOfAutoSpawnData"
+          "$ref": "#/$defs/SourcedValueOfAutoSpawnData",
+          "description": "The authored spawn data."
         },
         "className": {
           "$ref": "#/$defs/SourcedValueOfstring"
@@ -2405,10 +2439,12 @@
       "description": "A physical set of ordered, individually authored automatic spawn entries.",
       "properties": {
         "authoredFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Additional original fields."
         },
         "autoSpawnData": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfAutoSpawnSetEntry"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfAutoSpawnSetEntry",
+          "description": "The original entries in authored order."
         },
         "className": {
           "$ref": "#/$defs/SourcedValueOfstring"
@@ -2450,15 +2486,18 @@
       "type": "object"
     },
     "AutoSpawnSetEntry": {
+      "description": "An authored spawn-set entry and its type-specific payload.",
       "oneOf": [
         {
+          "description": "An original reference to a separate spawn declaration.",
           "properties": {
             "kind": {
               "const": "record",
               "type": "string"
             },
             "record": {
-              "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+              "$ref": "#/$defs/SourcedValueOfCatalogRecordReference",
+              "description": "The authored spawn reference."
             }
           },
           "required": [
@@ -2468,9 +2507,11 @@
           "type": "object"
         },
         {
+          "description": "A spawn declared inline in this set.",
           "properties": {
             "autoSpawnData": {
-              "$ref": "#/$defs/SourcedValueOfAutoSpawnData"
+              "$ref": "#/$defs/SourcedValueOfAutoSpawnData",
+              "description": "The authored inline spawn data."
             },
             "kind": {
               "const": "manual",
@@ -2484,6 +2525,7 @@
           "type": "object"
         },
         {
+          "description": "An additional original entry type retained in authored fields.",
           "properties": {
             "kind": {
               "const": "authored",
@@ -2498,10 +2540,12 @@
       ],
       "properties": {
         "authoredFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Additional original fields."
         },
         "sourceType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The declared entry type."
         }
       },
       "required": [
@@ -15580,13 +15624,15 @@
       "description": "A physical encounter index and its ordered links to spawn sets.",
       "properties": {
         "authoredFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Additional original fields."
         },
         "className": {
           "$ref": "#/$defs/SourcedValueOfstring"
         },
         "encounters": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfEncounterIndexEntry"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfEncounterIndexEntry",
+          "description": "The authored entries in source order."
         },
         "fileName": {
           "$ref": "#/$defs/SourcedValueOfstring"
@@ -15625,15 +15671,19 @@
       "type": "object"
     },
     "EncounterIndexEntry": {
+      "description": "An original encounter preset and its spawn-set references.",
       "properties": {
         "authoredFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Additional original fields."
         },
         "autoSpawns": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference",
+          "description": "The original references in authored order."
         },
         "encounterPreset": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The original preset token."
         }
       },
       "required": [
@@ -33681,7 +33731,8 @@
       "description": "A physical NPC archetype and its authored identity-specific branches.",
       "properties": {
         "authoredFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Additional original fields."
         },
         "className": {
           "$ref": "#/$defs/SourcedValueOfstring"
@@ -33693,7 +33744,8 @@
           "$ref": "#/$defs/SourcedValueOfGuid"
         },
         "identity": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfNpcIdentityBranch"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfNpcIdentityBranch",
+          "description": "The original identity-specific branches."
         },
         "metadataTag": {
           "$ref": "#/$defs/SourcedValueOfstring"
@@ -33726,15 +33778,18 @@
       "type": "object"
     },
     "NpcArchetypeWeight": {
+      "description": "An authored weighted archetype candidate.",
       "properties": {
         "authoredFields": {
           "$ref": "#/$defs/SourceArenaOutput"
         },
         "record": {
-          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference",
+          "description": "The original archetype reference."
         },
         "weight": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "The authored weight."
         }
       },
       "required": [
@@ -33748,7 +33803,8 @@
       "description": "A physical NPC class pool and its ordered weighted entries.",
       "properties": {
         "authoredFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Additional original fields."
         },
         "className": {
           "$ref": "#/$defs/SourcedValueOfstring"
@@ -33763,7 +33819,8 @@
           "$ref": "#/$defs/SourcedValueOfstring"
         },
         "npcClasses": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfNpcClassPoolEntry"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfNpcClassPoolEntry",
+          "description": "The weighted classes in authored order."
         },
         "recordIndex": {
           "$ref": "#/$defs/SourcedValueOfuint32"
@@ -33793,15 +33850,19 @@
       "type": "object"
     },
     "NpcClassPoolEntry": {
+      "description": "An authored weighted candidate in a class pool.",
       "properties": {
         "authoredFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Additional original fields."
         },
         "npcClass": {
-          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference",
+          "description": "The original class reference."
         },
         "weight": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "The authored weight."
         }
       },
       "required": [
@@ -33812,15 +33873,19 @@
       "type": "object"
     },
     "NpcIdentityBranch": {
+      "description": "An identity-specific branch of an NPC archetype.",
       "properties": {
         "authoredFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Additional original fields."
         },
         "identity": {
-          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference",
+          "description": "The original identity reference."
         },
         "npcPools": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference",
+          "description": "The pool references in authored order."
         }
       },
       "required": [
@@ -136029,21 +136094,27 @@
       "type": "object"
     },
     "SpawnAssignment": {
+      "description": "An authored instruction about where or how to place the spawn.",
       "properties": {
         "areaNegativeTags": {
-          "$ref": "#/$defs/SourcedValueOfSpawnTags"
+          "$ref": "#/$defs/SourcedValueOfSpawnTags",
+          "description": "The original negative area tag terms."
         },
         "areaPositiveTags": {
-          "$ref": "#/$defs/SourcedValueOfSpawnTags"
+          "$ref": "#/$defs/SourcedValueOfSpawnTags",
+          "description": "The original positive area tag terms."
         },
         "authoredFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Additional original fields."
         },
         "kind": {
-          "$ref": "#/$defs/AssignmentKind"
+          "$ref": "#/$defs/AssignmentKind",
+          "description": "The typed interpretation of the assignment."
         },
         "sourceType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The declared assignment type."
         }
       },
       "required": [

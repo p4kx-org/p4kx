@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_testkit::{DataForgeBuilder, TestInstance, TestRecord, TestStruct, TestType, TestValue};
+use p4kx_testkit::{DataForgeBuilder, TestInstance, TestStruct, TestType, TestValue};
+
+use super::npc_fixture::{ARCHETYPE, POOL, record};
 
 pub(super) const SPAWN: u128 = 0x1084_0101;
 pub(super) const SET: u128 = 0x1084_0102;
@@ -193,17 +195,14 @@ fn tag_list<const N: usize>(tags: [TestValue; N]) -> TestValue {
 fn archetype_class() -> TestInstance {
     let weight = class("NPCArchetypeWeight")
         .value("weight", TestValue::Single(0.25))
-        .value("record", TestValue::Reference(super::ARCHETYPE));
+        .value("record", TestValue::Reference(ARCHETYPE));
     class("AutoSpawnArchetype").value("archetype", array([weight.into_value()]))
 }
 
 fn pool_class() -> TestInstance {
     class("AutoSpawnClassPool").value(
         "classPool",
-        array([
-            TestValue::Reference(super::POOL),
-            TestValue::Reference(super::POOL),
-        ]),
+        array([TestValue::Reference(POOL), TestValue::Reference(POOL)]),
     )
 }
 
@@ -211,10 +210,6 @@ fn manual(selector: TestInstance) -> TestValue {
     class("AutoSpawnsDataManual")
         .value("autoSpawnData", spawn_data(selector))
         .into_value()
-}
-
-fn record(guid: u128, source_type: &str, suffix: &str) -> TestRecord {
-    super::record(guid, source_type, suffix)
 }
 
 fn reference(target: &str) -> TestType {

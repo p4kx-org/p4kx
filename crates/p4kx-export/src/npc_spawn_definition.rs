@@ -21,11 +21,15 @@ pub(crate) const ARCHETYPE_TYPE: &str = "NPCArchetype";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct NpcClassPoolDefinition<'source> {
+#[non_exhaustive]
+pub struct NpcClassPoolDefinition<'source> {
     #[serde(flatten)]
-    source: CanonicalRecordHeader<'source>,
-    npc_classes: SourcedValue<Vec<SourcedValue<NpcClassPoolEntry<'source>>>>,
-    authored_fields: SourceArenaOutput<'source>,
+    /// The original physical Record header.
+    pub source: CanonicalRecordHeader<'source>,
+    /// The weighted classes in authored order.
+    pub npc_classes: SourcedValue<Vec<SourcedValue<NpcClassPoolEntry<'source>>>>,
+    /// Additional original fields.
+    pub authored_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> NpcClassPoolDefinition<'source> {
@@ -50,14 +54,19 @@ impl<'source> NpcClassPoolDefinition<'source> {
     }
 }
 
+/// An authored weighted candidate in a class pool.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct NpcClassPoolEntry<'source> {
-    weight: SourcedValue<ResourceFloat32>,
+#[non_exhaustive]
+pub struct NpcClassPoolEntry<'source> {
+    /// The authored weight.
+    pub weight: SourcedValue<ResourceFloat32>,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
-    npc_class: SourcedValue<Box<SourceRecordReference<'source>>>,
-    authored_fields: SourceArenaOutput<'source>,
+    /// The original class reference.
+    pub npc_class: SourcedValue<Box<SourceRecordReference<'source>>>,
+    /// Additional original fields.
+    pub authored_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> NpcClassPoolEntry<'source> {
@@ -83,11 +92,15 @@ impl<'source> NpcClassPoolEntry<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct NpcArchetypeDefinition<'source> {
+#[non_exhaustive]
+pub struct NpcArchetypeDefinition<'source> {
     #[serde(flatten)]
-    source: CanonicalRecordHeader<'source>,
-    identity: SourcedValue<Vec<SourcedValue<NpcIdentityBranch<'source>>>>,
-    authored_fields: SourceArenaOutput<'source>,
+    /// The original physical Record header.
+    pub source: CanonicalRecordHeader<'source>,
+    /// The original identity-specific branches.
+    pub identity: SourcedValue<Vec<SourcedValue<NpcIdentityBranch<'source>>>>,
+    /// Additional original fields.
+    pub authored_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> NpcArchetypeDefinition<'source> {
@@ -111,15 +124,20 @@ impl<'source> NpcArchetypeDefinition<'source> {
     }
 }
 
+/// An identity-specific branch of an NPC archetype.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct NpcIdentityBranch<'source> {
+#[non_exhaustive]
+pub struct NpcIdentityBranch<'source> {
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
-    identity: SourcedValue<Box<SourceRecordReference<'source>>>,
+    /// The original identity reference.
+    pub identity: SourcedValue<Box<SourceRecordReference<'source>>>,
     #[schemars(with = "SourcedValue<Vec<SourcedValue<CatalogRecordReference>>>")]
-    npc_pools: SourcedValue<Vec<SourcedValue<Box<SourceRecordReference<'source>>>>>,
-    authored_fields: SourceArenaOutput<'source>,
+    /// The pool references in authored order.
+    pub npc_pools: SourcedValue<Vec<SourcedValue<Box<SourceRecordReference<'source>>>>>,
+    /// Additional original fields.
+    pub authored_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> NpcIdentityBranch<'source> {

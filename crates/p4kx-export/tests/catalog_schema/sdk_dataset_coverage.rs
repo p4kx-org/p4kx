@@ -251,6 +251,7 @@ fn sdk_query_witnesses_keep_their_canonical_dataset_contract() -> TestResult {
         .chain(routes::contract_datasets())
         .chain(routes::law_datasets())
         .chain(routes::mission_datasets())
+        .chain(routes::starmap_definitions::DATASETS)
     {
         assert_ne!(
             gaps.get(path),

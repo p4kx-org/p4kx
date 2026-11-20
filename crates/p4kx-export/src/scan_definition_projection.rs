@@ -148,7 +148,7 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
         let (value, notes) = NpcSpawnDefinitionsPick::read(
             kind,
             tree,
-            &self.projection,
+            self.projection.original(),
             admission,
             self.scan.options.cancel,
         )?;

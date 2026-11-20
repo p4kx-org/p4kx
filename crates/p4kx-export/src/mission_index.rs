@@ -87,7 +87,7 @@ enum Piece<'f> {
     Item((Guid, u32), MissionItemTexts<'f>),
     Reward(Guid, u32, RewardDependency),
     UnusableRewardCandidate(CatalogReadFailure<'f>, RewardDependency),
-    Locality(Guid, Vec<Guid>),
+    Locality((Guid, u32), Vec<Guid>),
     Broker(Guid, Broker<'f>),
     Faction(Guid, ProtectedKey<'f>),
 }
@@ -105,7 +105,7 @@ pub(crate) struct MissionIndex<'f> {
     organizations: HashMap<Guid, OrganizationTexts<'f>>,
     items: HashMap<(Guid, u32), MissionItemTexts<'f>>,
     rewards: BTreeMap<(Guid, u32), RewardDependency>,
-    localities: HashMap<Guid, Vec<Guid>>,
+    localities: HashMap<(Guid, u32), Vec<Guid>>,
     brokers: HashMap<Guid, Broker<'f>>,
     factions: HashMap<Guid, ProtectedKey<'f>>,
     tags: Tags,
@@ -279,8 +279,8 @@ impl<'f> MissionIndex<'f> {
                     .insert((failure.guid(), failure.record().index()), reward);
                 self.failures.push(failure);
             }
-            Piece::Locality(guid, locations) => {
-                self.localities.insert(guid, locations);
+            Piece::Locality(key, locations) => {
+                self.localities.insert(key, locations);
             }
             Piece::Broker(guid, broker) => {
                 self.brokers.insert(guid, broker);
@@ -339,10 +339,11 @@ impl<'f> MissionIndex<'f> {
         self.factions.get(&guid)
     }
 
-    /// Returns the starmap objects the `MissionLocality` Record `guid` lists as available
-    /// locations, in stored order.
-    pub(crate) fn locality(&self, guid: Guid) -> &[Guid] {
-        self.localities.get(&guid).map_or(&[], Vec::as_slice)
+    /// Returns the original available locations of one physical `MissionLocality` Record.
+    pub(crate) fn locality(&self, guid: Guid, record_index: u32) -> &[Guid] {
+        self.localities
+            .get(&(guid, record_index))
+            .map_or(&[], Vec::as_slice)
     }
 
     /// Returns the actual ordered authored text variants of the chosen dependency.

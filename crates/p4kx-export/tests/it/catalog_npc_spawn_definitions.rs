@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_export::{Filter, build_catalog};
-use p4kx_testkit::{DataForgeBuilder, TestInstance, TestRecord, TestStruct, TestType, TestValue};
 use serde_json::{Value, json};
 
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult, at, guid};
@@ -14,10 +13,10 @@ mod auto_spawn_fixture;
 #[path = "catalog_npc_spawn_cycles.rs"]
 mod cycles;
 
-const ARCHETYPE: u128 = 0x1084_0001;
-const POOL: u128 = 0x1084_0002;
-const EMPTY_POOL: u128 = 0x1084_0003;
-const MISSING: u128 = 0x1084_00ff;
+#[path = "catalog_npc_spawn_fixture.rs"]
+mod npc_fixture;
+
+use npc_fixture::{ARCHETYPE, MISSING, POOL, database};
 
 #[test]
 fn npc_definitions_keep_weighted_occurrences_and_provenance() -> TestResult {
@@ -109,81 +108,4 @@ fn export(filter: Option<&Filter>) -> TestResult<Value> {
     options.filter = filter;
     let built = build_catalog(&archive, &options).map_err(|error| error.to_string())?;
     Ok(serde_json::from_slice(built.json())?)
-}
-
-fn database() -> DataForgeBuilder {
-    DataForgeBuilder::new()
-        .version(8)
-        .structure(TestStruct::new("EntityClassDefinition"))
-        .structure(TestStruct::new("FactionIdentity"))
-        .structure(
-            TestStruct::new("NPCClassPoolEntry")
-                .field("weight", TestType::Single)
-                .field("npcClass", reference("EntityClassDefinition")),
-        )
-        .structure(
-            TestStruct::new("NPCClassPool")
-                .array("npcClasses", TestType::Class("NPCClassPoolEntry".into())),
-        )
-        .structure(
-            TestStruct::new("NPCIdentityToArchetype")
-                .field("identity", reference("FactionIdentity"))
-                .array("npcPools", reference("NPCClassPool")),
-        )
-        .structure(
-            TestStruct::new("NPCArchetype")
-                .array("identity", TestType::Class("NPCIdentityToArchetype".into())),
-        )
-        .record(
-            record(EMPTY_POOL, "NPCClassPool", "pools/empty")
-                .value("npcClasses", TestValue::Array(Vec::new())),
-        )
-        .record(record(POOL, "NPCClassPool", "pools/shared").value(
-            "npcClasses",
-            TestValue::Array(vec![
-                pool_entry(-0.0, TestValue::Null),
-                pool_entry(1.25, TestValue::Reference(MISSING)),
-            ]),
-        ))
-        .record(
-            record(ARCHETYPE, "NPCArchetype", "archetypes/primary").value(
-                "identity",
-                TestValue::Array(vec![
-                    identity_branch(TestValue::Null, vec![TestValue::Reference(POOL); 2]),
-                    identity_branch(
-                        TestValue::Reference(MISSING),
-                        vec![TestValue::Reference(POOL)],
-                    ),
-                ]),
-            ),
-        )
-}
-
-fn record(guid: u128, source_type: &str, suffix: &str) -> TestRecord {
-    TestRecord::new(
-        guid,
-        source_type,
-        format!("{source_type}.Fixture"),
-        format!("libs/foundry/records/npc_fixture/{suffix}.xml"),
-    )
-}
-
-fn reference(target: &str) -> TestType {
-    TestType::ReferenceTo(target.to_owned())
-}
-
-fn pool_entry(weight: f32, npc_class: TestValue) -> TestValue {
-    TestValue::Struct(
-        TestInstance::new("NPCClassPoolEntry")
-            .value("weight", TestValue::Single(weight))
-            .value("npcClass", npc_class),
-    )
-}
-
-fn identity_branch(identity: TestValue, pools: Vec<TestValue>) -> TestValue {
-    TestValue::Struct(
-        TestInstance::new("NPCIdentityToArchetype")
-            .value("identity", identity)
-            .value("npcPools", TestValue::Array(pools)),
-    )
 }

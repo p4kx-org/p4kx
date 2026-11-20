@@ -5,7 +5,11 @@ use p4kx_testkit::{DataForgeBuilder, TestInstance, TestRecord, TestStruct, TestT
 
 pub(super) const OWNER: u128 = 0x7100_0000_0000_4000_8000_0000_0000_0001;
 const CONTRACT: u128 = 0x7200_0000_0000_4000_8000_0000_0000_0001;
-const LOCATION: u128 = 0x7300_0000_0000_4000_8000_0000_0000_0001;
+pub(super) const LOCATION: u128 = 0x7300_0000_0000_4000_8000_0000_0000_0001;
+pub(super) const OTHER_LOCATION: u128 = 0x7300_0000_0000_4000_8000_0000_0002;
+pub(super) const LOCALITY: u128 = 0x7400_0000_0000_4000_8000_0000_0001;
+const LOCALITY_TYPE: &str = "MissionLocality";
+const OTHER_TYPE: &str = "SyntheticLocalityDecoy";
 pub(super) const ACCEPTED_KEY: &str = "@canonical_place";
 pub(super) const REJECTED_KEY: &str = "@excluded_place";
 
@@ -17,23 +21,81 @@ pub(super) enum Case {
 }
 
 pub(super) fn database(case: Case) -> Vec<u8> {
-    let source = schema()
-        .into_iter()
-        .fold(
-            DataForgeBuilder::new().version(8),
-            DataForgeBuilder::structure,
-        )
-        .record(generator());
+    let source = source().record(generator(
+        TestInstance::new("ContractPrerequisite_Location")
+            .value("locationAvailable", TestValue::Reference(LOCATION)),
+    ));
     let source = match case {
-        Case::OutsideOnly => source.record(object("elsewhere/outside", "Outside", REJECTED_KEY)),
+        Case::OutsideOnly => source.record(object(
+            LOCATION,
+            "elsewhere/outside",
+            "Outside",
+            REJECTED_KEY,
+        )),
         Case::OutsideShadow => source
-            .record(object("pu/accepted", "Accepted", ACCEPTED_KEY))
-            .record(object("elsewhere/outside", "Outside", REJECTED_KEY)),
+            .record(object(LOCATION, "pu/accepted", "Accepted", ACCEPTED_KEY))
+            .record(object(
+                LOCATION,
+                "elsewhere/outside",
+                "Outside",
+                REJECTED_KEY,
+            )),
         Case::LeftoverShadow => source
-            .record(object("pu/accepted", "Accepted", ACCEPTED_KEY))
-            .record(object("pu/dev_place", "dev_place", REJECTED_KEY)),
+            .record(object(LOCATION, "pu/accepted", "Accepted", ACCEPTED_KEY))
+            .record(object(LOCATION, "pu/dev_place", "dev_place", REJECTED_KEY)),
     };
     source.build()
+}
+
+#[derive(Clone, Copy)]
+pub(super) enum LocalityCase {
+    SameFamily,
+    ForeignFirst,
+}
+
+pub(super) fn locality_database(case: LocalityCase) -> Vec<u8> {
+    let shape = |name| TestStruct::new(name).array("availableLocations", TestType::Reference);
+    let first = match case {
+        LocalityCase::SameFamily => LOCALITY_TYPE,
+        LocalityCase::ForeignFirst => OTHER_TYPE,
+    };
+    source()
+        .structure(shape(LOCALITY_TYPE))
+        .structure(shape(OTHER_TYPE))
+        .structure(
+            TestStruct::new("ContractPrerequisite_Locality")
+                .parent("ContractPrerequisite")
+                .field("localityAvailable", TestType::Reference),
+        )
+        .record(generator(
+            TestInstance::new("ContractPrerequisite_Locality")
+                .value("localityAvailable", TestValue::Reference(LOCALITY)),
+        ))
+        .record(locality(first, "first", LOCATION))
+        .record(locality(LOCALITY_TYPE, "later", OTHER_LOCATION))
+        .record(object(LOCATION, "pu/accepted", "Accepted", ACCEPTED_KEY))
+        .record(object(OTHER_LOCATION, "pu/other", "Other", REJECTED_KEY))
+        .build()
+}
+
+fn locality(source_type: &str, name: &str, location: u128) -> TestRecord {
+    TestRecord::new(
+        LOCALITY,
+        source_type,
+        format!("{source_type}.{name}"),
+        format!("libs/foundry/records/missiondata/pu_missionlocality/{name}.xml"),
+    )
+    .value(
+        "availableLocations",
+        TestValue::Array(vec![TestValue::Reference(location)]),
+    )
+}
+
+fn source() -> DataForgeBuilder {
+    schema().into_iter().fold(
+        DataForgeBuilder::new().version(8),
+        DataForgeBuilder::structure,
+    )
 }
 
 fn schema() -> [TestStruct; 6] {
@@ -56,16 +118,13 @@ fn pointer(name: &str) -> TestType {
     TestType::StrongPointer(name.to_owned())
 }
 
-fn generator() -> TestRecord {
+fn generator(prerequisite: TestInstance) -> TestRecord {
     let contract = TestInstance::new("Contract")
         .value("id", TestValue::Guid(CONTRACT))
         .value("debugName", TestValue::text("Delivery"))
         .value(
             "additionalPrerequisites",
-            TestValue::Array(vec![TestValue::Struct(
-                TestInstance::new("ContractPrerequisite_Location")
-                    .value("locationAvailable", TestValue::Reference(LOCATION)),
-            )]),
+            TestValue::Array(vec![TestValue::Struct(prerequisite)]),
         );
     TestRecord::new(
         OWNER,
@@ -82,9 +141,9 @@ fn generator() -> TestRecord {
     )
 }
 
-fn object(path: &str, name: &str, key: &str) -> TestRecord {
+fn object(guid: u128, path: &str, name: &str, key: &str) -> TestRecord {
     TestRecord::new(
-        LOCATION,
+        guid,
         "StarMapObject",
         format!("StarMapObject.{name}"),
         format!("libs/foundry/records/starmap/{path}.xml"),

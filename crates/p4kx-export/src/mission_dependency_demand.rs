@@ -14,6 +14,7 @@ use crate::{CatalogError, ExportAccountingError};
 pub(crate) enum DependencyKey {
     Mission(Action, Guid),
     MissionItem { guid: Guid, record_index: u32 },
+    MissionLocality { guid: Guid, record_index: u32 },
     Place(Guid),
 }
 

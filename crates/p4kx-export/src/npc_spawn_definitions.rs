@@ -5,13 +5,23 @@ use p4kx_extraction::{CancelToken, DataForge, Guid, RecordTree};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use super::auto_spawn_definition::{AutoSpawnDefinition, AutoSpawnSet, EncounterIndex};
+pub use super::auto_spawn_class::{AutoSpawnClass, ClassSelector, NpcArchetypeWeight};
+pub use super::auto_spawn_data::{
+    AssignmentKind, AutoSpawnData, SpawnAssignment, SpawnInventory, SpawnLimits, SpawnTags,
+};
+pub use super::auto_spawn_definition::{
+    AutoSpawnDefinition, AutoSpawnSet, AutoSpawnSetEntry, EncounterIndex, EncounterIndexEntry,
+    SetEntryData,
+};
 pub(crate) use super::auto_spawn_definition::{ENCOUNTER_TYPE, SET_TYPE, SPAWN_TYPE};
 pub(crate) use super::npc_spawn_definition::{ARCHETYPE_TYPE, POOL_TYPE};
-use super::npc_spawn_definition::{NpcArchetypeDefinition, NpcClassPoolDefinition};
+pub use super::npc_spawn_definition::{
+    NpcArchetypeDefinition, NpcClassPoolDefinition, NpcClassPoolEntry, NpcIdentityBranch,
+};
 use super::prepared_definition::PreparedDefinition;
+use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_number_capture::CapturedNumber;
-use crate::catalog_projection::CatalogProjection;
+use crate::catalog_row::CatalogRow;
 use crate::catalog_table::CatalogTable;
 use crate::record_observation::RecordObservation;
 use crate::schema_fields::every_field_required;
@@ -29,6 +39,23 @@ pub(crate) fn kind_for_type(source_type: &str) -> Option<Kind> {
     }
 }
 
+/// The canonical rows for one authored NPC spawn definition family.
+#[derive(Debug)]
+#[non_exhaustive]
+#[must_use]
+pub enum NpcSpawnDefinitionRows<'source> {
+    /// Physical NPC archetype Records.
+    Archetypes(Vec<NpcArchetypeDefinition<'source>>),
+    /// Physical weighted NPC class pool Records.
+    ClassPools(Vec<NpcClassPoolDefinition<'source>>),
+    /// Physical automatic spawn Records.
+    Spawns(Vec<AutoSpawnDefinition<'source>>),
+    /// Physical automatic spawn-set Records.
+    Sets(Vec<AutoSpawnSet<'source>>),
+    /// Physical encounter index Records.
+    Encounters(Vec<EncounterIndex<'source>>),
+}
+
 pub(crate) enum NpcSpawnDefinitionsPick<'source> {
     ClassPool(Box<PreparedDefinition<'source, NpcClassPoolDefinition<'source>>>),
     Archetype(Box<PreparedDefinition<'source, NpcArchetypeDefinition<'source>>>),
@@ -41,7 +68,7 @@ impl<'source> NpcSpawnDefinitionsPick<'source> {
     pub(crate) fn read(
         kind: Kind,
         tree: &RecordTree<'source>,
-        projection: &CatalogProjection<'_, 'source>,
+        input: &OriginalCatalogInput<'_, 'source>,
         admission: &RecordObservation<'_, 'source>,
         cancel: Option<&CancelToken>,
     ) -> Result<(Self, Vec<FieldError>), CatalogError> {
@@ -49,44 +76,44 @@ impl<'source> NpcSpawnDefinitionsPick<'source> {
             return Err(ExportAccountingError::ConflictingSourceDatum.into());
         }
         match kind {
-            Kind::NpcClassPools => PreparedDefinition::read(
+            Kind::NpcClassPools => PreparedDefinition::read_original(
                 tree,
-                projection,
+                input,
                 admission,
                 cancel,
-                |source, fields, _, notes| NpcClassPoolDefinition::read(source, fields, notes),
+                NpcClassPoolDefinition::read,
             )
             .map(|(row, notes)| (Self::ClassPool(Box::new(row)), notes)),
-            Kind::NpcArchetypes => PreparedDefinition::read(
+            Kind::NpcArchetypes => PreparedDefinition::read_original(
                 tree,
-                projection,
+                input,
                 admission,
                 cancel,
-                |source, fields, _, notes| NpcArchetypeDefinition::read(source, fields, notes),
+                NpcArchetypeDefinition::read,
             )
             .map(|(row, notes)| (Self::Archetype(Box::new(row)), notes)),
-            Kind::AutoSpawns => PreparedDefinition::read(
+            Kind::AutoSpawns => PreparedDefinition::read_original(
                 tree,
-                projection,
+                input,
                 admission,
                 cancel,
-                |source, fields, _, notes| AutoSpawnDefinition::read(source, fields, notes),
+                AutoSpawnDefinition::read,
             )
             .map(|(row, notes)| (Self::Spawn(Box::new(row)), notes)),
-            Kind::AutoSpawnSets => PreparedDefinition::read(
+            Kind::AutoSpawnSets => PreparedDefinition::read_original(
                 tree,
-                projection,
+                input,
                 admission,
                 cancel,
-                |source, fields, _, notes| AutoSpawnSet::read(source, fields, notes),
+                AutoSpawnSet::read,
             )
             .map(|(row, notes)| (Self::Set(Box::new(row)), notes)),
-            Kind::EncounterIndices => PreparedDefinition::read(
+            Kind::EncounterIndices => PreparedDefinition::read_original(
                 tree,
-                projection,
+                input,
                 admission,
                 cancel,
-                |source, fields, _, notes| EncounterIndex::read(source, fields, notes),
+                EncounterIndex::read,
             )
             .map(|(row, notes)| (Self::Encounter(Box::new(row)), notes)),
             _ => Err(ExportAccountingError::ConflictingSourceDatum.into()),
@@ -144,9 +171,27 @@ impl<'source> NpcSpawnDefinitions<'source> {
         }
     }
 
-    pub(crate) fn sources(
-        &self,
-    ) -> impl Iterator<Item = (Kind, Guid, &'source str, &[CapturedNumber])> {
+    pub(crate) fn catalog_rows(&self) -> impl Iterator<Item = CatalogRow> + '_ {
+        PreparedDefinition::catalog_rows(&self.class_pools, Kind::NpcClassPools)
+            .chain(PreparedDefinition::catalog_rows(
+                &self.archetypes,
+                Kind::NpcArchetypes,
+            ))
+            .chain(PreparedDefinition::catalog_rows(
+                &self.spawns,
+                Kind::AutoSpawns,
+            ))
+            .chain(PreparedDefinition::catalog_rows(
+                &self.sets,
+                Kind::AutoSpawnSets,
+            ))
+            .chain(PreparedDefinition::catalog_rows(
+                &self.encounters,
+                Kind::EncounterIndices,
+            ))
+    }
+
+    fn sources(&self) -> impl Iterator<Item = (Kind, Guid, &'source str, &[CapturedNumber])> {
         PreparedDefinition::sources(Kind::NpcClassPools, &self.class_pools)
             .chain(PreparedDefinition::sources(
                 Kind::NpcArchetypes,
@@ -162,6 +207,26 @@ impl<'source> NpcSpawnDefinitions<'source> {
 
     pub(crate) fn number_groups(&self) -> impl Iterator<Item = (Kind, &[CapturedNumber])> {
         self.sources().map(|(kind, _, _, numbers)| (kind, numbers))
+    }
+
+    pub(crate) fn into_query_rows(
+        self,
+        kind: Kind,
+    ) -> Result<NpcSpawnDefinitionRows<'source>, CatalogError> {
+        fn rows<T>(prepared: Vec<PreparedDefinition<'_, T>>) -> Vec<T> {
+            prepared
+                .into_iter()
+                .map(PreparedDefinition::into_definition)
+                .collect()
+        }
+        Ok(match kind {
+            Kind::NpcArchetypes => NpcSpawnDefinitionRows::Archetypes(rows(self.archetypes)),
+            Kind::NpcClassPools => NpcSpawnDefinitionRows::ClassPools(rows(self.class_pools)),
+            Kind::AutoSpawns => NpcSpawnDefinitionRows::Spawns(rows(self.spawns)),
+            Kind::AutoSpawnSets => NpcSpawnDefinitionRows::Sets(rows(self.sets)),
+            Kind::EncounterIndices => NpcSpawnDefinitionRows::Encounters(rows(self.encounters)),
+            _ => return Err(ExportAccountingError::ConflictingSourceDatum.into()),
+        })
     }
 
     pub(crate) fn into_tables(self, forge: &DataForge<'_>) -> NpcSpawnDefinitionsTables<'source> {

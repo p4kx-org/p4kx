@@ -22,7 +22,7 @@ pub(crate) const SOURCE_TYPE: &str = "StarMapAmenityTypeEntry";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct StarmapAmenityDefinition<'source> {
+pub struct StarmapAmenityDefinition<'source> {
     #[serde(flatten)]
     source: CanonicalRecordHeader<'source>,
     name: SourcedValue<&'source str>,
@@ -34,6 +34,42 @@ pub(crate) struct StarmapAmenityDefinition<'source> {
 }
 
 impl<'source> StarmapAmenityDefinition<'source> {
+    /// Sourced physical Record identity.
+    #[must_use]
+    pub const fn header(&self) -> &CanonicalRecordHeader<'source> {
+        &self.source
+    }
+
+    /// Authored amenity identifier.
+    #[must_use]
+    pub const fn name(&self) -> &SourcedValue<&'source str> {
+        &self.name
+    }
+
+    /// Public localization reference for the amenity label.
+    #[must_use]
+    pub const fn display_name(&self) -> &SourcedValue<PublicNameRef> {
+        &self.display_name
+    }
+
+    /// Authored icon path.
+    #[must_use]
+    pub const fn icon(&self) -> &SourcedValue<&'source str> {
+        &self.icon
+    }
+
+    /// Authored required location entity reference.
+    #[must_use]
+    pub const fn required_entity(&self) -> &SourcedValue<Box<SourceRecordReference<'source>>> {
+        &self.required_entity
+    }
+
+    /// Original fields outside the typed projection.
+    #[must_use]
+    pub const fn authored_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.authored_fields
+    }
+
     pub(super) fn read(
         source: CanonicalRecordHeader<'source>,
         fields: Observed<'_, '_, '_, 'source>,

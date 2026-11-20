@@ -19,7 +19,7 @@ pub(super) const SOURCE_TYPE: &str = "LocationResourceSlot";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct LocationResourceSlot<'source> {
+pub struct LocationResourceSlot<'source> {
     #[serde(flatten)]
     source: CanonicalRecordHeader<'source>,
     number_of_resource_slots_per_entity: SourcedValue<i32>,
@@ -29,6 +29,30 @@ pub(crate) struct LocationResourceSlot<'source> {
 }
 
 impl<'source> LocationResourceSlot<'source> {
+    /// Borrows the physical Record header.
+    #[must_use]
+    pub const fn source(&self) -> &CanonicalRecordHeader<'source> {
+        &self.source
+    }
+
+    /// Borrows the authored number of slots per entity.
+    #[must_use]
+    pub const fn number_of_resource_slots_per_entity(&self) -> &SourcedValue<i32> {
+        &self.number_of_resource_slots_per_entity
+    }
+
+    /// Borrows the original resource slot Tag Reference.
+    #[must_use]
+    pub const fn resource_slot_tag(&self) -> &SourcedValue<Box<SourceRecordReference<'source>>> {
+        &self.resource_slot_tag
+    }
+
+    /// Borrows additional authored fields.
+    #[must_use]
+    pub const fn authored_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.authored_fields
+    }
+
     pub(super) fn read(
         source: CanonicalRecordHeader<'source>,
         fields: Observed<'_, '_, '_, 'source>,

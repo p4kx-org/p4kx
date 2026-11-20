@@ -19,6 +19,9 @@ use crate::starmap_parse::{self, DescriptorScope, Read};
 use crate::starmap_walk::{PlacementRows, SelectedContainerRows, System, SystemRead};
 use crate::{CatalogError, Kind, StarmapTraversalBudget};
 
+#[path = "starmap_definition_query.rs"]
+mod definitions;
+
 pub use crate::catalog_read::original::{PhysicalEntryRef, SourcedXmlAttribute};
 pub use crate::catalog_table::DatasetAvailability;
 pub use crate::export_entry_counts::ExportEntryCounts;
@@ -31,6 +34,11 @@ pub use crate::location_physics::{
 pub use crate::starmap_containers::instance::{ContainerInstance, ContainerInstanceKey};
 pub use crate::starmap_containers::unresolved::{
     ContainerTargetReadStatus, ContainerTargetStatus, UnresolvedChild, UnresolvedContainerLink,
+};
+pub use definitions::{
+    StarmapAmenityDefinition, StarmapDefinitionFamily, StarmapDefinitionRows,
+    StarmapDefinitionSelection, StarmapDefinitionSnapshot, StarmapPresetDefinition,
+    StarmapTypeDefinition, with_starmap_definitions, with_starmap_definitions_from,
 };
 
 /// A canonical physical system root or a Child route within it.

@@ -3,7 +3,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use p4kx_extraction::{Guid, StructValue};
+use p4kx_extraction::{Guid, StructValue, Value};
 
 use crate::contract_missions::PickupPlace;
 use crate::contract_offer::OfferedAt;
@@ -24,8 +24,30 @@ const STAR: &str = "Star";
 /// `ContractPrerequisite_Locality` and the starmap objects of `ContractPrerequisite_Location`.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct Where {
-    pub(crate) localities: Vec<Guid>,
+    localities: Vec<LocalityLink>,
     pub(crate) locations: Vec<Guid>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct LocalityLink {
+    guid: Guid,
+    record_index: Option<u32>,
+}
+
+impl LocalityLink {
+    fn read(prerequisite: &StructValue<'_>) -> Option<Self> {
+        match prerequisite.field("localityAvailable")? {
+            Value::Reference(target) if target.location().is_none() => Some(Self {
+                guid: target.guid(),
+                record_index: Some(target.record_index()),
+            }),
+            Value::Error(error) => error.dangling_guid().map(|guid| Self {
+                guid,
+                record_index: None,
+            }),
+            _ => None,
+        }
+    }
 }
 
 impl Where {
@@ -37,9 +59,7 @@ impl Where {
             .filter_map(crate::blueprint::as_struct)
         {
             match prerequisite.type_name() {
-                LOCALITY => found
-                    .localities
-                    .extend(linked(Some(prerequisite), "localityAvailable").map(|guid| guid.0)),
+                LOCALITY => found.localities.extend(LocalityLink::read(prerequisite)),
                 LOCATION => found
                     .locations
                     .extend(linked(Some(prerequisite), "locationAvailable").map(|guid| guid.0)),
@@ -89,7 +109,14 @@ impl<'s, 'f> Places<'s, 'f> {
         let mut available = Vec::new();
         for level in levels {
             for locality in &level.localities {
-                available.extend(index.lookup_locality(*locality)?.iter().copied());
+                if let Some(record_index) = locality.record_index {
+                    available.extend(
+                        index
+                            .lookup_locality(locality.guid, record_index)?
+                            .iter()
+                            .copied(),
+                    );
+                }
             }
             available.extend(level.locations.iter().copied());
         }
@@ -156,7 +183,7 @@ impl<'s, 'f> Places<'s, 'f> {
         let localities = unique(
             levels
                 .iter()
-                .flat_map(|level| level.localities.iter().copied()),
+                .flat_map(|level| level.localities.iter().map(|locality| locality.guid)),
         );
         let mut locations = unique(
             levels

@@ -76,7 +76,8 @@ impl<'source> Dependencies<'source> {
     ) -> Result<(), CatalogError> {
         let (guid, physical) = match key {
             DependencyKey::Mission(_, guid) | DependencyKey::Place(guid) => (guid, None),
-            DependencyKey::MissionItem { guid, record_index } => (guid, Some(record_index)),
+            DependencyKey::MissionItem { guid, record_index }
+            | DependencyKey::MissionLocality { guid, record_index } => (guid, Some(record_index)),
         };
         let count = physical.map_or_else(|| self.by_guid.get(&guid).map_or(0, Vec::len), |_| 1);
         let mut admitted = false;
@@ -230,6 +231,7 @@ fn candidate(record: &p4kx_extraction::Record<'_>, key: DependencyKey) -> Option
         },
         DependencyKey::Mission(expected, _) => mission(record, expected),
         DependencyKey::MissionItem { .. } => mission(record, Action::Item),
+        DependencyKey::MissionLocality { .. } => mission(record, Action::Locality),
     }
 }
 

@@ -17,7 +17,7 @@ use crate::source_value_catalog::{SourceArenaOutput, SourceRecordReference};
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct LocationClassDefinition<'source> {
+pub struct LocationClassDefinition<'source> {
     #[serde(flatten)]
     source: CanonicalRecordHeader<'source>,
     scopes_visible_to: SourcedValue<Vec<SourcedValue<&'source str>>>,
@@ -25,6 +25,24 @@ pub(crate) struct LocationClassDefinition<'source> {
 }
 
 impl<'source> LocationClassDefinition<'source> {
+    /// Borrows the physical Record header.
+    #[must_use]
+    pub const fn source(&self) -> &CanonicalRecordHeader<'source> {
+        &self.source
+    }
+
+    /// Borrows the ordered authored scope labels.
+    #[must_use]
+    pub const fn scopes_visible_to(&self) -> &SourcedValue<Vec<SourcedValue<&'source str>>> {
+        &self.scopes_visible_to
+    }
+
+    /// Borrows additional authored fields.
+    #[must_use]
+    pub const fn authored_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.authored_fields
+    }
+
     pub(super) fn read(
         source: CanonicalRecordHeader<'source>,
         fields: Observed<'_, '_, '_, 'source>,
@@ -46,13 +64,25 @@ impl<'source> LocationClassDefinition<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct LocationDictionaryEntry<'source> {
+pub struct LocationDictionaryEntry<'source> {
     #[serde(flatten)]
     source: CanonicalRecordHeader<'source>,
     authored_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> LocationDictionaryEntry<'source> {
+    /// Borrows the physical Record header.
+    #[must_use]
+    pub const fn source(&self) -> &CanonicalRecordHeader<'source> {
+        &self.source
+    }
+
+    /// Borrows the original dictionary fields.
+    #[must_use]
+    pub const fn authored_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.authored_fields
+    }
+
     pub(super) fn read(
         source: CanonicalRecordHeader<'source>,
         fields: Observed<'_, '_, '_, 'source>,
@@ -68,7 +98,7 @@ impl<'source> LocationDictionaryEntry<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct LocationRegistry<'source> {
+pub struct LocationRegistry<'source> {
     #[serde(flatten)]
     source: CanonicalRecordHeader<'source>,
     #[schemars(with = "SourcedValue<Vec<SourcedValue<CatalogRecordReference>>>")]
@@ -77,6 +107,26 @@ pub(crate) struct LocationRegistry<'source> {
 }
 
 impl<'source> LocationRegistry<'source> {
+    /// Borrows the physical Record header.
+    #[must_use]
+    pub const fn source(&self) -> &CanonicalRecordHeader<'source> {
+        &self.source
+    }
+
+    /// Borrows the original References in their authored order.
+    #[must_use]
+    pub const fn members(
+        &self,
+    ) -> &SourcedValue<Vec<SourcedValue<Box<SourceRecordReference<'source>>>>> {
+        &self.members
+    }
+
+    /// Borrows additional authored fields.
+    #[must_use]
+    pub const fn authored_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.authored_fields
+    }
+
     pub(super) fn read(
         source: CanonicalRecordHeader<'source>,
         fields: Observed<'_, '_, '_, 'source>,

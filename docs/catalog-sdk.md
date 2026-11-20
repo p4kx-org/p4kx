@@ -32,6 +32,25 @@ with no admitted gameplay-property Record opens no localization payloads and ret
 available list. Compare physical Record indices only within the same DataForge input and resolve
 source uses through each result's own inventory.
 
+## Original location vocabulary
+
+Use `catalog_queries::location_vocabulary::with_location_vocabulary` or its `_from` form
+for the canonical `definitions.locationClasses`, `locationFunctions`, `locationSizes`,
+`locationResourceSlots` and `locationRegistries` rows. Query sessions and parsed views
+expose the same operation.
+
+Choose one `LocationVocabularyFamily`, then select all admitted Records in that family,
+every physical occurrence of a GUID, or a single `CatalogRecordSelection::RecordIndex`.
+The snapshot carries the matching typed row variant, Build, family availability,
+selection coverage and source inventory. The rows follow the Catalog's GUID and physical
+Record order. Scope labels, resource slot tags and registry members keep the authored
+values and original positions. Resolved registry members retain target header evidence.
+Use the target family's query to inspect the reached definition.
+
+The query reads selected DataForge bodies and any required target headers. It opens
+no locale or placement payloads. Before publishing consumer-owned results, check outer
+query success and the selected coverage.
+
 ## Location entity declarations
 
 Use `with_location_entity_declarations` or `with_location_entity_declarations_from` for the
@@ -429,6 +448,31 @@ Each row's `available_locations()` preserves its authored order, repeated
 occurrences, nulls and unresolved GUIDs. A resolved reference carries separate
 source evidence for the array slot and its target header. The query reads no
 localization or contract pickup projections.
+
+## Authored NPC spawn definitions
+
+Use `npc_spawns::with_npc_spawn_definitions`, its decoded-Entry form, or a
+parsed session's `with_npc_spawn_definitions` to query one family by GUID,
+physical Record index or all admitted Records in that family.
+
+| Family | Catalog dataset |
+| --- | --- |
+| `Archetypes` | `definitions.npcArchetypes` |
+| `ClassPools` | `definitions.npcClassPools` |
+| `Spawns` | `definitions.autoSpawns` |
+| `Sets` | `definitions.autoSpawnSets` |
+| `Encounters` | `definitions.encounterIndices` |
+
+The snapshot returns canonical typed rows, Build when available, physical
+Record coverage and the source inventory. Rows sort by GUID then physical
+index. Authored arrays preserve duplicate occurrences, order and null slots.
+Use each sourced value's origin and the returned inventory to trace the original
+body, linked Record header and encryption independently.
+
+The query reads selected bodies and the headers needed to describe their
+references. Query a referenced family separately to read its authored body.
+It opens no locale or world placement inputs and leaves runtime NPC selection,
+conditions and spawning to the game.
 
 ## Mission location templates
 
@@ -1396,6 +1440,21 @@ no Catalog.
 ```powershell
 cargo test --locked -p p4kx-export --test real_archive real_archive_weapon_combat::sdk::weapon_combat_sdk_matches_original_sources -- --ignored --exact --nocapture --test-threads=1
 ```
+
+## Authored Starmap definitions
+
+Use `starmap::with_starmap_definitions` or the corresponding session methods to select
+one physical definition family. `StarmapDefinitionFamily::Types`, `Presets`, and
+`Amenities` return the same typed rows as `definitions.starmapTypes`,
+`definitions.starmapPresets`, and `definitions.starmapAmenities`. Use
+`CatalogRecordSelection` to choose all admitted Records, all physical Records with a
+GUID, or one Record index. The rows retain original field evidence and link statuses.
+Presets include their owned display, visibility, travel, location, and radar settings.
+
+The query returns only the referenced public names and protected texts under the
+session's language policy. It reports family availability, selected Record coverage
+and a separate source inventory. References can consult the original target headers.
+The only payloads read are the selected Record bodies and the requested localization. A parsed session reuses the opened DataForge across repeated selections.
 
 ## Starmap container placements
 

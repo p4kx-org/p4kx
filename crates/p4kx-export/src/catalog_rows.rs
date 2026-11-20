@@ -118,26 +118,29 @@ fn append_explosions_and_ammo(emitted: &mut Vec<CatalogRow>, collected: &Collect
     );
 }
 
-fn append_gameplay_definitions(emitted: &mut Vec<CatalogRow>, collected: &Collected<'_>) {
-    emitted.extend(crate::catalog_v3::cargo_manifest::catalog_rows(
-        &collected.mission_kinds.manifests,
-    ));
+fn append_indexed_gameplay_rows(emitted: &mut Vec<CatalogRow>, collected: &Collected<'_>) {
+    let missions = &collected.mission_kinds;
     emitted.extend(
-        crate::catalog_v3::mission_locality_definition::catalog_rows(
-            &collected.mission_kinds.localities,
-        ),
+        crate::catalog_v3::cargo_manifest::catalog_rows(&missions.manifests)
+            .chain(
+                crate::catalog_v3::mission_locality_definition::catalog_rows(&missions.localities),
+            )
+            .chain(collected.location_vocabulary.catalog_rows())
+            .chain(collected.npc_spawn_definitions.catalog_rows())
+            .chain(collected.starmap_definitions.catalog_rows()),
     );
+}
+
+fn append_gameplay_definitions(emitted: &mut Vec<CatalogRow>, collected: &Collected<'_>) {
+    append_indexed_gameplay_rows(emitted, collected);
     emitted.extend(
         collected
             .law
             .sources()
-            .chain(collected.location_vocabulary.sources())
-            .chain(collected.npc_spawn_definitions.sources())
             .chain(crate::catalog_v3::faction_identity_definition::sources(
                 &collected.faction_identities,
             ))
             .chain(collected.mission_kinds.definition_sources())
-            .chain(collected.starmap_definitions.sources())
             .chain(procedural_planet_audio::sources(
                 &collected.procedural_planet_audio,
             ))

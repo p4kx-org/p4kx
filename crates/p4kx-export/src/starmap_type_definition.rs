@@ -23,7 +23,7 @@ pub(crate) const SOURCE_TYPE: &str = "StarMapObjectType";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct StarmapTypeDefinition<'source> {
+pub struct StarmapTypeDefinition<'source> {
     #[serde(flatten)]
     source: CanonicalRecordHeader<'source>,
     name: SourcedValue<&'source str>,
@@ -43,6 +43,132 @@ pub(crate) struct StarmapTypeDefinition<'source> {
 }
 
 impl<'source> StarmapTypeDefinition<'source> {
+    /// Sourced physical Record identity.
+    #[must_use]
+    pub const fn header(&self) -> &CanonicalRecordHeader<'source> {
+        &self.source
+    }
+
+    /// Authored starmap type identifier.
+    #[must_use]
+    pub const fn name(&self) -> &SourcedValue<&'source str> {
+        &self.name
+    }
+
+    /// Public localization reference for the classification.
+    #[must_use]
+    pub const fn classification(&self) -> &SourcedValue<PublicNameRef> {
+        &self.classification
+    }
+
+    /// Authored world display object facing mode.
+    #[must_use]
+    pub const fn facing_mode(&self) -> &SourcedValue<&'source str> {
+        &self.facing_mode
+    }
+
+    /// Authored minimum display size.
+    #[must_use]
+    pub const fn minimum_display_size(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.minimum_display_size
+    }
+
+    /// Authored rotation speed.
+    #[must_use]
+    pub const fn rotation_speed(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.rotation_speed
+    }
+
+    /// Authored marker configuration reference.
+    #[must_use]
+    pub const fn marker_config(&self) -> &SourcedValue<Box<SourceRecordReference<'source>>> {
+        &self.marker_config
+    }
+
+    /// Authored sub-navigation point class reference.
+    #[must_use]
+    pub const fn sub_nav_point_class(&self) -> &SourcedValue<Box<SourceRecordReference<'source>>> {
+        &self.sub_nav_point_class
+    }
+
+    /// Authored geometry path, when an original geometry declaration exists.
+    #[must_use]
+    pub fn geometry_path(&self) -> Option<&SourcedValue<&'source str>> {
+        self.geometry.value().map(|resource| &resource.path)
+    }
+
+    /// Authored material path, when an original material declaration exists.
+    #[must_use]
+    pub fn material_path(&self) -> Option<&SourcedValue<&'source str>> {
+        self.material.value().map(|resource| &resource.path)
+    }
+
+    /// Authored map selection flag.
+    #[must_use]
+    pub const fn selectable(&self) -> &SourcedValue<bool> {
+        &self.flags.selectable
+    }
+
+    /// Authored fade-behind-parent flag.
+    #[must_use]
+    pub const fn fade_behind_parent(&self) -> &SourcedValue<bool> {
+        &self.flags.fade_behind_parent
+    }
+
+    /// Authored parent-surface flag.
+    #[must_use]
+    pub const fn on_parent_surface(&self) -> &SourcedValue<bool> {
+        &self.flags.on_parent_surface
+    }
+
+    /// Authored nearby objective marker rotation flag.
+    #[must_use]
+    pub const fn rotate_nearby_objective_markers(&self) -> &SourcedValue<bool> {
+        &self.flags.rotate_nearby_objective_markers
+    }
+
+    /// Authored navigation point creation flag.
+    #[must_use]
+    pub const fn spawn_nav_points(&self) -> &SourcedValue<bool> {
+        &self.flags.spawn_nav_points
+    }
+
+    /// Authored routing-obstacle exclusion flag.
+    #[must_use]
+    pub const fn ignore_as_routing_obstacle(&self) -> &SourcedValue<bool> {
+        &self.flags.ignore_as_routing_obstacle
+    }
+
+    /// Authored neighbor display flag.
+    #[must_use]
+    pub const fn show_as_neighbor(&self) -> &SourcedValue<bool> {
+        &self.flags.show_as_neighbor
+    }
+
+    /// Authored inner culling flag.
+    #[must_use]
+    pub const fn inner_culling(&self) -> &SourcedValue<bool> {
+        &self.flags.inner_culling
+    }
+
+    /// Authored map selection list flag.
+    #[must_use]
+    pub const fn show_in_map_select_list(&self) -> &SourcedValue<bool> {
+        &self.flags.show_in_map_select_list
+    }
+
+    /// Authored quantum destination validity flag.
+    #[must_use]
+    pub const fn valid_quantum_travel_destination(&self) -> &SourcedValue<bool> {
+        &self.flags.valid_quantum_travel_destination
+    }
+
+    /// Original fields outside the typed projection.
+    #[must_use]
+    pub const fn authored_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.authored_fields
+    }
+
     pub(super) fn read(
         source: CanonicalRecordHeader<'source>,
         fields: Observed<'_, '_, '_, 'source>,

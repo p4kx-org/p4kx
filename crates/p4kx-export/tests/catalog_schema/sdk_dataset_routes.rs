@@ -12,17 +12,14 @@ use p4kx_export::catalog_queries::shops::{ShopInventorySelection, read_shop_inve
 use p4kx_export::catalog_queries::subsumption_events::{
     SubsumptionEventSelection, read_subsumption_events,
 };
-use p4kx_export::catalog_queries::tags;
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection,
-    with_location_entity_declarations,
 };
 use p4kx_extraction::Archive;
 
 use super::{
     AMMUNITION, FACTION_IDENTITIES, FLARE_LIBRARIES, ITEM_DEFINITIONS, LANGUAGE_SOURCES,
-    LOCATION_ENTITIES, MANUFACTURERS, RADAR_AUDIO, Route, SHOP_INVENTORIES, TestResult,
-    WEAPON_RECOIL,
+    MANUFACTURERS, RADAR_AUDIO, Route, SHOP_INVENTORIES, TestResult, WEAPON_RECOIL,
 };
 
 #[path = "sdk_reputation_definition_routes.rs"]
@@ -75,6 +72,8 @@ mod item_configurations;
 mod law;
 #[path = "sdk_loadout_route.rs"]
 mod loadout;
+#[path = "sdk_location_vocabulary_route.rs"]
+mod location_vocabulary;
 #[path = "sdk_loot_routes.rs"]
 mod loot;
 #[path = "sdk_loot_generation_route.rs"]
@@ -91,6 +90,8 @@ mod mission_locality;
 mod mission_location;
 #[path = "sdk_mission_type_route.rs"]
 mod mission_type;
+#[path = "sdk_npc_spawn_definition_routes.rs"]
+mod npc_spawns;
 #[path = "sdk_planet_resource_route.rs"]
 mod planet_resource;
 #[path = "sdk_projectile_ammo_route.rs"]
@@ -117,6 +118,10 @@ mod resource_groups;
 mod resource_network;
 #[path = "sdk_ship_system_routes.rs"]
 mod ship_systems;
+#[path = "sdk_starmap_definition_routes.rs"]
+pub(super) mod starmap_definitions;
+#[path = "sdk_tag_routes.rs"]
+mod tag_routes;
 #[path = "sdk_vehicle_armor_route.rs"]
 mod vehicle_armor;
 #[path = "sdk_weapon_animation_route.rs"]
@@ -140,7 +145,10 @@ pub(super) fn law_datasets() -> impl Iterator<Item = &'static str> {
 
 pub(super) fn mission_datasets() -> impl Iterator<Item = &'static str> {
     use super::{MISSION_LOCATION_TEMPLATES as LOCATION_TEMPLATES, MISSION_TYPES};
-    [LOCATION_TEMPLATES, MISSION_TYPES, mission_locality::DATASET].into_iter()
+    [LOCATION_TEMPLATES, MISSION_TYPES, mission_locality::DATASET]
+        .into_iter()
+        .chain(location_vocabulary::datasets())
+        .chain(npc_spawns::datasets())
 }
 
 pub(super) fn read() -> TestResult<Vec<Route>> {
@@ -162,7 +170,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
         dismantle::read()?,
         weapon_animation::read()?,
         read_language_sources(&archive)?,
-        read_location_entities(&archive)?,
+        location_vocabulary::read_entities(&archive)?,
         mission_location::read()?,
         mission_type::read()?,
         mission_locality::read()?,
@@ -186,6 +194,7 @@ fn append_domain_routes(routes: &mut Vec<Route>, archive: &Archive) -> TestResul
     routes.extend(blueprint_taxonomy::read()?);
     routes.extend(contracts::read()?);
     routes.extend(generator_facets::read()?);
+    routes.extend(npc_spawns::read()?);
     routes.extend(blueprint_physical::read()?);
     routes.extend(component_definitions::read()?);
     routes.extend(flight_configurations::read()?);
@@ -208,12 +217,13 @@ fn append_domain_routes(routes: &mut Vec<Route>, archive: &Archive) -> TestResul
     routes.extend(read_entity_definitions(archive)?);
     routes.extend(item_configurations::read()?);
     routes.push(loadout::read()?);
-    routes.push(read_entity_tags(archive)?);
-    routes.extend(read_tag_declarations(archive)?);
-    routes.push(read_tag_paths(archive)?);
+    routes.push(tag_routes::entities(archive)?);
+    routes.extend(tag_routes::declarations(archive)?);
+    routes.push(tag_routes::paths(archive)?);
     routes.extend(commodities::read(archive)?);
     routes.extend(loot::read()?);
     routes.extend(law::read()?);
+    routes.extend(location_vocabulary::read()?);
     routes.push(medical_tier::read()?);
     routes.push(mineable_entity::read()?);
     routes.extend(mining_families::read()?);
@@ -221,6 +231,7 @@ fn append_domain_routes(routes: &mut Vec<Route>, archive: &Archive) -> TestResul
     routes.extend(component_tools::read()?);
     routes.extend(authored_reputation::read()?);
     routes.extend(weapon_sources::read()?);
+    routes.extend(starmap_definitions::read()?);
     Ok(())
 }
 
@@ -261,17 +272,6 @@ fn read_faction_identities(archive: &Archive) -> TestResult<Route> {
     )?
 }
 
-fn read_location_entities(archive: &Archive) -> TestResult<Route> {
-    with_location_entity_declarations(
-        archive,
-        CatalogRecordSelection::All,
-        None,
-        CatalogLanguageSelection::Selected(&[]),
-        None,
-        |snapshot| Route::queried_rows(LOCATION_ENTITIES, &snapshot.rows, None),
-    )?
-}
-
 fn read_radar_configuration(archive: &Archive) -> TestResult<Route> {
     let snapshot = read_radar_audio(archive, RadarAudioSelection::All, None)?;
     Route::queried_rows(
@@ -295,45 +295,6 @@ fn read_entity_definitions(archive: &Archive) -> TestResult<[Route; 2]> {
             Route::queried_rows(MANUFACTURERS, &snapshot.rows, REMAINING)
         })??,
     ])
-}
-
-fn read_entity_tags(archive: &Archive) -> TestResult<Route> {
-    tags::with_entity_tags(archive, CatalogRecordSelection::All, None, |snapshot| {
-        Route::queried_rows(
-            super::ENTITY_TAGS,
-            &snapshot.rows,
-            "synthetic source and Catalog parity available; installed producer parity open",
-        )
-    })?
-}
-
-fn read_tag_declarations(archive: &Archive) -> TestResult<[Route; 2]> {
-    const REMAINING: &str =
-        "synthetic source and Catalog parity available; installed producer parity open";
-    tags::with_tag_declarations(
-        archive,
-        tags::TagDeclarationFamily::All,
-        CatalogRecordSelection::All,
-        None,
-        |snapshot| {
-            let definitions = snapshot.definitions.ok_or("Tag definitions")?;
-            let roots = snapshot.roots.ok_or("TagDatabase root arrays")?;
-            Ok([
-                Route::queried_rows(super::TAG_DEFINITIONS, &definitions.rows, REMAINING)?,
-                Route::queried_rows(super::TAG_ROOTS, &roots.rows, REMAINING)?,
-            ])
-        },
-    )?
-}
-
-fn read_tag_paths(archive: &Archive) -> TestResult<Route> {
-    tags::with_tag_paths(archive, CatalogRecordSelection::All, None, |snapshot| {
-        Route::queried_rows(
-            super::TAG_PATHS,
-            &snapshot.rows,
-            "synthetic source and Catalog parity available; installed producer parity open",
-        )
-    })?
 }
 
 fn read_language_sources(archive: &Archive) -> TestResult<Route> {

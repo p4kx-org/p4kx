@@ -12,6 +12,7 @@ use super::starmap_preset_definition::{self, StarmapPresetDefinition};
 use super::starmap_type_definition::{self, StarmapTypeDefinition};
 use crate::catalog_number_capture::CapturedNumber;
 use crate::catalog_projection::CatalogProjection;
+use crate::catalog_row::CatalogRow;
 use crate::catalog_table::CatalogTable;
 use crate::record_observation::RecordObservation;
 use crate::schema_fields::every_field_required;
@@ -91,11 +92,11 @@ pub(crate) struct StarmapDefinitionTables<'source> {
     #[serde(rename = "starmapObjects")]
     objects: CatalogTable<StarmapObjectDefinition<'source>>,
     #[serde(rename = "starmapTypes")]
-    types: CatalogTable<StarmapTypeDefinition<'source>>,
+    pub(crate) types: CatalogTable<StarmapTypeDefinition<'source>>,
     #[serde(rename = "starmapPresets")]
-    presets: CatalogTable<StarmapPresetDefinition<'source>>,
+    pub(crate) presets: CatalogTable<StarmapPresetDefinition<'source>>,
     #[serde(rename = "starmapAmenities")]
-    amenities: CatalogTable<StarmapAmenityDefinition<'source>>,
+    pub(crate) amenities: CatalogTable<StarmapAmenityDefinition<'source>>,
 }
 
 impl<'source> StarmapDefinitions<'source> {
@@ -130,9 +131,23 @@ impl<'source> StarmapDefinitions<'source> {
         }
     }
 
-    pub(crate) fn sources(
-        &self,
-    ) -> impl Iterator<Item = (Kind, Guid, &'source str, &[CapturedNumber])> {
+    pub(crate) fn catalog_rows(&self) -> impl Iterator<Item = CatalogRow> + '_ {
+        PreparedDefinition::catalog_rows(&self.objects, Kind::StarmapObjects)
+            .chain(PreparedDefinition::catalog_rows(
+                &self.types,
+                Kind::StarmapTypes,
+            ))
+            .chain(PreparedDefinition::catalog_rows(
+                &self.presets,
+                Kind::StarmapPresets,
+            ))
+            .chain(PreparedDefinition::catalog_rows(
+                &self.amenities,
+                Kind::StarmapAmenities,
+            ))
+    }
+
+    fn sources(&self) -> impl Iterator<Item = (Kind, Guid, &'source str, &[CapturedNumber])> {
         PreparedDefinition::sources(Kind::StarmapObjects, &self.objects)
             .chain(PreparedDefinition::sources(Kind::StarmapTypes, &self.types))
             .chain(PreparedDefinition::sources(

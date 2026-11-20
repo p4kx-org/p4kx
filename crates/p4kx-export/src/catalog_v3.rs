@@ -89,7 +89,7 @@ pub(crate) mod location_entity_declaration;
 #[path = "location_vocabulary.rs"]
 pub(crate) mod location_vocabulary;
 #[path = "location_vocabulary_definition.rs"]
-mod location_vocabulary_definition;
+pub(crate) mod location_vocabulary_definition;
 #[path = "mission_locality_definition.rs"]
 pub(crate) mod mission_locality_definition;
 #[path = "mission_scenario_definition.rs"]

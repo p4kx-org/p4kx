@@ -23,13 +23,18 @@ type RecordLink<'source> = SourcedValue<Box<SourceRecordReference<'source>>>;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct AutoSpawnClass<'source> {
-    source_type: SourcedValue<&'source str>,
+#[non_exhaustive]
+pub struct AutoSpawnClass<'source> {
+    /// The declared class selector type.
+    pub source_type: SourcedValue<&'source str>,
     #[serde(flatten)]
-    selector: ClassSelector<'source>,
-    authored_fields: SourceArenaOutput<'source>,
+    /// The typed interpretation of the original selector.
+    pub selector: ClassSelector<'source>,
+    /// Additional original fields.
+    pub authored_fields: SourceArenaOutput<'source>,
 }
 
+/// The authored kind of an automatic spawn class selector.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(
     tag = "kind",
@@ -37,18 +42,26 @@ pub(super) struct AutoSpawnClass<'source> {
     rename_all_fields = "camelCase"
 )]
 #[schemars(transform = every_field_required)]
-enum ClassSelector<'source> {
+#[non_exhaustive]
+pub enum ClassSelector<'source> {
+    /// The selector declares an entity class directly.
     TargetClass {
+        /// The original entity class reference.
         #[schemars(with = "SourcedValue<CatalogRecordReference>")]
         npc_class: RecordLink<'source>,
     },
+    /// The selector declares weighted archetypes.
     Archetype {
+        /// The candidate archetypes in authored order.
         archetype: SourcedValue<Vec<SourcedValue<NpcArchetypeWeight<'source>>>>,
     },
+    /// The selector declares class pools.
     ClassPool {
+        /// The original pool references in authored order.
         #[schemars(with = "SourcedValue<Vec<SourcedValue<CatalogRecordReference>>>")]
         class_pool: SourcedValue<Vec<RecordLink<'source>>>,
     },
+    /// An additional original selector type retained in authored fields.
     Authored,
 }
 
@@ -103,13 +116,17 @@ impl ClassSelector<'_> {
     }
 }
 
+/// An authored weighted archetype candidate.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct NpcArchetypeWeight<'source> {
-    weight: SourcedValue<ResourceFloat32>,
+#[non_exhaustive]
+pub struct NpcArchetypeWeight<'source> {
+    /// The authored weight.
+    pub weight: SourcedValue<ResourceFloat32>,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
-    record: RecordLink<'source>,
+    /// The original archetype reference.
+    pub record: RecordLink<'source>,
     authored_fields: SourceArenaOutput<'source>,
 }
 

@@ -5,6 +5,7 @@ use p4kx_testkit::{DataForgeBuilder, TestInstance, TestRecord, TestStruct, TestT
 
 pub(super) const TYPE: u128 = 0x0010_6701;
 pub(super) const PRESET: u128 = 0x0010_6702;
+pub(super) const SECOND_PRESET_DESCRIPTION: &str = "@second_preset_description";
 pub(super) const SECOND: u128 = 0x0010_6703;
 pub(super) const AMENITY: u128 = 0x0010_6704;
 pub(super) const REQUIRED_ENTITY: u128 = 0x0010_6705;
@@ -68,11 +69,7 @@ pub(super) fn database() -> DataForgeBuilder {
         .structure(TestStruct::new(RADAR_TYPE))
         .record(object_type())
         .record(preset())
-        .record(
-            record(SECOND, PRESET_DECL, "selected/preset/second.xml")
-                .value("type", TestValue::Reference(TYPE))
-                .value("quantumTravelData", TestValue::Null),
-        )
+        .record(second_preset())
         .record(
             record(AMENITY, AMENITY_DECL, "outside/amenity.xml")
                 .value("name", TestValue::text("FixtureAmenity"))
@@ -204,6 +201,19 @@ fn preset() -> TestRecord {
             ),
         )
         .value("radarSettings", radar_value())
+}
+
+fn second_preset() -> TestRecord {
+    record(SECOND, PRESET_DECL, "selected/preset/second.xml")
+        .value("type", TestValue::Reference(TYPE))
+        .value(
+            "displaySettings",
+            TestValue::Struct(
+                TestInstance::new(DISPLAY)
+                    .value("description", TestValue::text(SECOND_PRESET_DESCRIPTION)),
+            ),
+        )
+        .value("quantumTravelData", TestValue::Null)
 }
 
 fn display_value() -> TestValue {

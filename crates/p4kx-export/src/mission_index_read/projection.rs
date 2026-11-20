@@ -72,7 +72,10 @@ pub(super) fn project<'f>(
                 ))
             })
             .transpose()?,
-        Action::Locality => Some(Piece::Locality(guid, available_locations(root))),
+        Action::Locality => Some(Piece::Locality(
+            (guid, tree.record_index()),
+            available_locations(root),
+        )),
         Action::Broker => Some(Piece::Broker(
             guid,
             Broker {

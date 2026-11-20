@@ -10,15 +10,17 @@ mod contract_scope_global_params;
 mod location_resource_slot;
 
 use contract_scope_global_params::{ContractScopeGlobalParams, SOURCE_TYPE as SCOPE_SOURCE_TYPE};
-use location_resource_slot::LocationResourceSlot;
+pub use location_resource_slot::LocationResourceSlot;
 
 use super::location_entity_declaration::{self, LocationEntityDeclaration};
 use super::location_vocabulary_definition::{
     LocationClassDefinition, LocationDictionaryEntry, LocationRegistry,
 };
 use super::prepared_definition::PreparedDefinition;
+use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_number_capture::CapturedNumber;
 use crate::catalog_projection::CatalogProjection;
+use crate::catalog_row::CatalogRow;
 use crate::catalog_table::CatalogTable;
 use crate::record_observation::RecordObservation;
 use crate::schema_fields::every_field_required;
@@ -84,25 +86,45 @@ impl<'source> LocationVocabularyPick<'source> {
         admission: &RecordObservation<'_, 'source>,
         cancel: Option<&CancelToken>,
     ) -> Result<(Self, Vec<FieldError>), CatalogError> {
+        match (kind, tree.type_name()) {
+            (Kind::ContractScopes, CONTRACT_SCOPE) => {
+                Self::contract_scope(tree, projection, admission, cancel)
+            }
+            (Kind::LocationEntityDeclarations, location_entity_declaration::SOURCE_TYPE) => {
+                location_entity_declaration::prepare(tree, projection, admission, cancel)
+                    .map(|(row, notes)| (Self::EntityDeclaration(Box::new(row)), notes))
+            }
+            _ => Self::read_original(kind, tree, projection.original(), admission, cancel),
+        }
+    }
+
+    /// Reads the original vocabulary families that require no localized projection.
+    pub(crate) fn read_original(
+        kind: Kind,
+        tree: &RecordTree<'source>,
+        input: &OriginalCatalogInput<'_, 'source>,
+        admission: &RecordObservation<'_, 'source>,
+        cancel: Option<&CancelToken>,
+    ) -> Result<(Self, Vec<FieldError>), CatalogError> {
         if kind_for_type(tree.type_name()) != Some(kind) {
             return Err(ExportAccountingError::ConflictingSourceDatum.into());
         }
         match kind {
-            Kind::LocationClasses => PreparedDefinition::read(
+            Kind::LocationClasses => PreparedDefinition::read_original(
                 tree,
-                projection,
+                input,
                 admission,
                 cancel,
-                |header, fields, _, notes| LocationClassDefinition::read(header, fields, notes),
+                LocationClassDefinition::read,
             )
             .map(|(row, notes)| (Self::Class(Box::new(row)), notes)),
             Kind::LocationFunctions | Kind::LocationSizes => {
-                let (row, notes) = PreparedDefinition::read(
+                let (row, notes) = PreparedDefinition::read_original(
                     tree,
-                    projection,
+                    input,
                     admission,
                     cancel,
-                    |header, fields, _, _| LocationDictionaryEntry::read(header, fields),
+                    |header, fields, _| LocationDictionaryEntry::read(header, fields),
                 )?;
                 let row = Box::new(row);
                 let pick = if kind == Kind::LocationFunctions {
@@ -114,20 +136,13 @@ impl<'source> LocationVocabularyPick<'source> {
             }
             Kind::LocationClassRegistries
             | Kind::LocationFunctionRegistries
-            | Kind::LocationSizeRegistries => {
-                Self::registry(kind, tree, projection, admission, cancel)
-            }
-            Kind::ContractScopes => Self::contract_scope(tree, projection, admission, cancel),
-            Kind::LocationEntityDeclarations => {
-                location_entity_declaration::prepare(tree, projection, admission, cancel)
-                    .map(|(row, notes)| (Self::EntityDeclaration(Box::new(row)), notes))
-            }
-            Kind::LocationResourceSlots => PreparedDefinition::read(
+            | Kind::LocationSizeRegistries => Self::registry(kind, tree, input, admission, cancel),
+            Kind::LocationResourceSlots => PreparedDefinition::read_original(
                 tree,
-                projection,
+                input,
                 admission,
                 cancel,
-                |header, fields, _, notes| LocationResourceSlot::read(header, fields, notes),
+                LocationResourceSlot::read,
             )
             .map(|(row, notes)| (Self::ResourceSlot(Box::new(row)), notes)),
             _ => Err(ExportAccountingError::ConflictingSourceDatum.into()),
@@ -137,7 +152,7 @@ impl<'source> LocationVocabularyPick<'source> {
     fn registry(
         kind: Kind,
         tree: &RecordTree<'source>,
-        projection: &CatalogProjection<'_, 'source>,
+        input: &OriginalCatalogInput<'_, 'source>,
         admission: &RecordObservation<'_, 'source>,
         cancel: Option<&CancelToken>,
     ) -> Result<(Self, Vec<FieldError>), CatalogError> {
@@ -152,14 +167,12 @@ impl<'source> LocationVocabularyPick<'source> {
             ),
             _ => ("locationSizes", SIZE, Self::SizeRegistry as fn(_) -> _),
         };
-        PreparedDefinition::read(
+        PreparedDefinition::read_original(
             tree,
-            projection,
+            input,
             admission,
             cancel,
-            |header, fields, _, notes| {
-                LocationRegistry::read(header, fields, (member, target), notes)
-            },
+            |header, fields, notes| LocationRegistry::read(header, fields, (member, target), notes),
         )
         .map(|(row, notes)| (variant(Box::new(row)), notes))
     }
@@ -199,27 +212,27 @@ pub(crate) struct LocationVocabulary<'source> {
 #[schemars(transform = every_field_required)]
 pub(crate) struct LocationVocabularyTables<'source> {
     #[serde(rename = "locationClasses")]
-    classes: CatalogTable<LocationClassDefinition<'source>>,
+    pub(crate) classes: CatalogTable<LocationClassDefinition<'source>>,
     #[serde(rename = "locationFunctions")]
-    functions: CatalogTable<LocationDictionaryEntry<'source>>,
+    pub(crate) functions: CatalogTable<LocationDictionaryEntry<'source>>,
     #[serde(rename = "locationSizes")]
-    sizes: CatalogTable<LocationDictionaryEntry<'source>>,
+    pub(crate) sizes: CatalogTable<LocationDictionaryEntry<'source>>,
     #[serde(rename = "locationResourceSlots")]
-    resource_slots: CatalogTable<LocationResourceSlot<'source>>,
+    pub(crate) resource_slots: CatalogTable<LocationResourceSlot<'source>>,
     #[serde(rename = "locationEntityDeclarations")]
     entity_declarations: CatalogTable<LocationEntityDeclaration<'source>>,
     #[serde(rename = "locationRegistries")]
-    registries: LocationRegistries<'source>,
+    pub(crate) registries: LocationRegistries<'source>,
     contract_scopes: CatalogTable<ContractScopeGlobalParams<'source>>,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct LocationRegistries<'source> {
-    classes: CatalogTable<LocationRegistry<'source>>,
-    functions: CatalogTable<LocationRegistry<'source>>,
-    sizes: CatalogTable<LocationRegistry<'source>>,
+pub(crate) struct LocationRegistries<'source> {
+    pub(crate) classes: CatalogTable<LocationRegistry<'source>>,
+    pub(crate) functions: CatalogTable<LocationRegistry<'source>>,
+    pub(crate) sizes: CatalogTable<LocationRegistry<'source>>,
 }
 
 impl<'source> LocationVocabulary<'source> {
@@ -264,9 +277,43 @@ impl<'source> LocationVocabulary<'source> {
         }
     }
 
-    pub(crate) fn sources(
-        &self,
-    ) -> impl Iterator<Item = (Kind, Guid, &'source str, &[CapturedNumber])> {
+    pub(crate) fn catalog_rows(&self) -> impl Iterator<Item = CatalogRow> + '_ {
+        PreparedDefinition::catalog_rows(&self.classes, Kind::LocationClasses)
+            .chain(PreparedDefinition::catalog_rows(
+                &self.functions,
+                Kind::LocationFunctions,
+            ))
+            .chain(PreparedDefinition::catalog_rows(
+                &self.sizes,
+                Kind::LocationSizes,
+            ))
+            .chain(PreparedDefinition::catalog_rows(
+                &self.resource_slots,
+                Kind::LocationResourceSlots,
+            ))
+            .chain(PreparedDefinition::catalog_rows(
+                &self.entity_declarations,
+                Kind::LocationEntityDeclarations,
+            ))
+            .chain(PreparedDefinition::catalog_rows(
+                &self.class_registries,
+                Kind::LocationClassRegistries,
+            ))
+            .chain(PreparedDefinition::catalog_rows(
+                &self.function_registries,
+                Kind::LocationFunctionRegistries,
+            ))
+            .chain(PreparedDefinition::catalog_rows(
+                &self.size_registries,
+                Kind::LocationSizeRegistries,
+            ))
+            .chain(PreparedDefinition::catalog_rows(
+                &self.contract_scopes,
+                Kind::ContractScopes,
+            ))
+    }
+
+    fn sources(&self) -> impl Iterator<Item = (Kind, Guid, &'source str, &[CapturedNumber])> {
         PreparedDefinition::sources(Kind::LocationClasses, &self.classes)
             .chain(PreparedDefinition::sources(
                 Kind::LocationFunctions,

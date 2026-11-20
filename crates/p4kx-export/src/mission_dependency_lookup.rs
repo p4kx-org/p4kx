@@ -54,10 +54,14 @@ impl<'source> MissionIndex<'source> {
         Ok(self.faction_name(guid))
     }
 
-    pub(crate) fn lookup_locality(&self, guid: Guid) -> Result<&[Guid], ReadError> {
+    pub(crate) fn lookup_locality(
+        &self,
+        guid: Guid,
+        record_index: u32,
+    ) -> Result<&[Guid], ReadError> {
         self.prepared
-            .require(DependencyKey::Mission(Action::Locality, guid))?;
-        Ok(self.locality(guid))
+            .require(DependencyKey::MissionLocality { guid, record_index })?;
+        Ok(self.locality(guid, record_index))
     }
 
     pub(crate) fn lookup_item(

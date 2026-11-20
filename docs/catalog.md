@@ -1346,7 +1346,8 @@ source state.
 **Pickup places.** The starmap objects named by the prerequisites of the sub contract
 (`additionalPrerequisites`), or, when it names none, of the contract and then of the handler
 (`defaultAvailability.prerequisites`): the `availableLocations` of each
-`ContractPrerequisite_Locality` (a `MissionLocality` Record) and the object of each
+`ContractPrerequisite_Locality` (using the exact physical `MissionLocality` Record resolved from its Reference)
+and the object of each
 `ContractPrerequisite_Location`, in stored order, none twice. A star (`type` `Star`) is left out and
 what is not in `starmapObjects` is skipped. The list is ordered by rank, stably: the star system
 (`SolarSystem`) first, then planets and moons (`Planet`, `Moon`), then every other type. Every
@@ -1358,7 +1359,9 @@ objects out leaves `pickupPlaces` empty.
 
 **Offered at (ADR-0273).** The same prerequisites as the pickup places, read as authored and
 without a filter on the object type. `localityGuids` lists the `MissionLocality` Record of each
-`ContractPrerequisite_Locality`, in stored order and none twice; a consumer reads its places in
+`ContractPrerequisite_Locality`, in stored order and none twice. The GUID list retains nominal identities.
+The original prerequisite Reference carries the resolved physical Record index. A consumer reads
+available places in
 `definitions.missionLocalities.rows[].availableLocations.value` and the names in `definitions.starmapObjects`. `locations` lists the
 object of each `ContractPrerequisite_Location` as stated. A star stays. For a selected object
 `place` carries the same canonical name cell as in `pickupPlaces`. An unresolved or filtered

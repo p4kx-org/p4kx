@@ -84,12 +84,16 @@ pub mod tags;
 pub use mining_definitions::process_api as mining;
 #[path = "location_entity_query.rs"]
 mod location_entity_declarations;
+#[path = "location_vocabulary_query.rs"]
+pub mod location_vocabulary;
 #[path = "mission_locality_query.rs"]
 mod mission_localities;
 #[path = "mission_location_query.rs"]
 mod mission_location_templates;
 #[path = "mission_type_query.rs"]
 mod mission_types;
+#[path = "npc_spawn_definition_query.rs"]
+pub mod npc_spawns;
 #[path = "reputation_query.rs"]
 mod reputation;
 #[path = "reputation_reward_amount_query.rs"]

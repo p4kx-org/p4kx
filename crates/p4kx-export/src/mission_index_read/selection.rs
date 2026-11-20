@@ -9,7 +9,6 @@ const TEMPLATES: &str = "libs/foundry/records/contracts/contracttemplates/";
 const TYPES: &str = "libs/foundry/records/missiontype/";
 const ORGANIZATIONS: &str = "libs/foundry/records/missiondata/pu_organizations/";
 const REWARDS: &str = "libs/foundry/records/reputation/rewards/missionrewards_reputation/";
-const LOCALITIES: &str = "libs/foundry/records/missiondata/pu_missionlocality/";
 const BROKERS: &str = "libs/foundry/records/missionbroker/";
 const FACTIONS: &str = "libs/foundry/records/factions/factionreputation/";
 
@@ -59,12 +58,15 @@ pub(crate) fn choose_dependency(record: &Record<'_>) -> Option<Result<Action, Se
 }
 
 fn choose_at_path(record: &Record<'_>, path: &str) -> Result<Option<Action>, DataForgeError> {
+    let localities = Kind::MissionLocalities.records();
+    if localities.matches_path(path) {
+        return Ok((record.type_name()? == localities.type_name).then_some(Action::Locality));
+    }
     for (prefix, action) in [
         (TEMPLATES, Action::Template),
         (TYPES, Action::Type),
         (ORGANIZATIONS, Action::Organization),
         (REWARDS, Action::Reward),
-        (LOCALITIES, Action::Locality),
         (BROKERS, Action::Broker),
         (FACTIONS, Action::Faction),
     ] {
