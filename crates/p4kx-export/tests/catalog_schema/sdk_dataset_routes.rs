@@ -59,6 +59,8 @@ mod planet_resource;
 mod projectile_ammo;
 #[path = "sdk_quality_routes.rs"]
 mod quality;
+#[path = "sdk_reputation_reward_route.rs"]
+mod reputation_rewards;
 #[path = "sdk_resource_group_routes.rs"]
 mod resource_groups;
 #[path = "sdk_resource_network_routes.rs"]
@@ -117,6 +119,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
     routes.push(vehicle_armor::read()?);
     routes.push(loot_generation::read()?);
     routes.extend(resource_groups::read()?);
+    routes.push(reputation_rewards::read()?);
     routes.extend(resource_network::read()?);
     routes.extend(fuel::read()?);
     routes.extend(read_cargo_globals(&archive)?);

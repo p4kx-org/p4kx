@@ -411,8 +411,20 @@ ordered standing links and retained extras. `StandingDefinition::presentation`, 
 and `additional_fields` expose the complete original standing. `drift_time_hours` remains the
 original Single in hours; no conversion to days or ordinary floating-point normalization is
 performed. Exact integer widths, IEEE bits, source states and result-local origin references
-remain available through the borrowed values. These accessors add no new query families or
-Catalog fields.
+remain available through the borrowed values.
+
+Use `with_reputation_reward_amounts`, `with_reputation_reward_amounts_from` or the session
+method to read `definitions.reputationRewardAmounts` without opening localization payloads.
+`All` traverses the admitted family in GUID and physical Record order. `Guid` retains every
+admitted physical occurrence of the same GUID. `RecordIndex` selects one physical owner in the
+current DataForge. The snapshot reports source-family availability separately from its matching
+rows and selection coverage.
+
+Each `ReputationRewardAmountDefinition` exposes its original header, `editor_name()`, signed
+`reputation_amount()` and additional authored fields through `authored_fields()`. Resolve its
+per-value source-use references in the snapshot's `source_inventory`. This lookup supplies
+the authored reward amount for a resolved reference. Contract reward computation has its own
+source operands.
 
 ## Manufacturers
 

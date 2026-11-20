@@ -144,8 +144,7 @@ impl<'f> MissionKinds<'f> {
             .sort_by_cached_key(|row| (CatalogGuid(row.physical_guid).text(), row.physical_index));
         self.trigger_records
             .sort_by_cached_key(|row| (CatalogGuid(row.physical_guid).text(), row.physical_index));
-        self.reward_amounts
-            .sort_by_cached_key(|row| (CatalogGuid(row.physical_guid).text(), row.physical_index));
+        reputation_reward_amount_definition::order(&mut self.reward_amounts);
         sort_by_guid(&mut self.types, |entity| entity.guid);
         sort_by_guid(&mut self.localities, |entity| entity.guid);
         sort_by_guid(&mut self.scenarios, |entity| entity.guid);

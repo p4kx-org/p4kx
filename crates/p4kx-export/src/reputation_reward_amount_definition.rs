@@ -8,11 +8,12 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::authored_fields::Observed;
+use crate::build::original_input::OriginalCatalogInput;
 use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_number_capture::CapturedNumber;
-use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::original::OriginalFlowFields;
 use crate::catalog_table::CatalogTable;
+use crate::guid_text::CatalogGuid;
 use crate::record_observation::RecordObservation;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
@@ -26,12 +27,38 @@ pub(crate) const SOURCE_TYPE: &str = "SReputationRewardAmount";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ReputationRewardAmountDefinition<'source> {
+pub struct ReputationRewardAmountDefinition<'source> {
     #[serde(flatten)]
     source: CanonicalRecordHeader<'source>,
     editor_name: SourcedValue<&'source str>,
     reputation_amount: SourcedValue<i32>,
     authored_fields: SourceArenaOutput<'source>,
+}
+
+impl<'source> ReputationRewardAmountDefinition<'source> {
+    /// Returns the original physical Record header.
+    #[must_use]
+    pub const fn source(&self) -> &CanonicalRecordHeader<'source> {
+        &self.source
+    }
+
+    /// Returns the authored editor name and its source state.
+    #[must_use]
+    pub const fn editor_name(&self) -> &SourcedValue<&'source str> {
+        &self.editor_name
+    }
+
+    /// Returns the original signed Int32 amount and its source state.
+    #[must_use]
+    pub const fn reputation_amount(&self) -> &SourcedValue<i32> {
+        &self.reputation_amount
+    }
+
+    /// Returns additional authored or unprojectable source fields.
+    #[must_use]
+    pub const fn authored_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.authored_fields
+    }
 }
 
 pub(crate) struct PreparedReputationRewardAmount<'source> {
@@ -50,14 +77,13 @@ pub(crate) struct ReputationRewardAmountRead<'source> {
 /// Reads one physical reputation reward amount Record.
 pub(crate) fn read<'source>(
     tree: &RecordTree<'source>,
-    projection: &CatalogProjection<'_, 'source>,
+    input: &OriginalCatalogInput<'_, 'source>,
     admission: &RecordObservation<'_, 'source>,
     cancel: Option<&CancelToken>,
 ) -> Result<ReputationRewardAmountRead<'source>, CatalogError> {
     if tree.type_name() != SOURCE_TYPE {
         return Err(ExportAccountingError::ConflictingSourceDatum.into());
     }
-    let input = projection.original();
     let scope = input.record_scope(admission.record(), tree)?;
     let originals = OriginalFlowFields::read(&scope, cancel)?;
     let capture = TemplateFieldCapture::new(&originals, input, admission)?;
@@ -73,7 +99,7 @@ pub(crate) fn read<'source>(
     Ok(ReputationRewardAmountRead {
         value: PreparedReputationRewardAmount {
             definition: ReputationRewardAmountDefinition {
-                source: CanonicalRecordHeader::read(tree, projection.origins())?,
+                source: CanonicalRecordHeader::read(tree, input.origins())?,
                 editor_name,
                 reputation_amount,
                 authored_fields,
@@ -85,6 +111,10 @@ pub(crate) fn read<'source>(
         },
         notes,
     })
+}
+
+pub(crate) fn order(rows: &mut [PreparedReputationRewardAmount<'_>]) {
+    rows.sort_by_cached_key(|row| (CatalogGuid(row.physical_guid).text(), row.physical_index));
 }
 
 /// Builds the reputation reward amount table with its physical source-family availability.

@@ -19,6 +19,7 @@ const LANGUAGE_SOURCES: &str = "/texts/languageSources";
 const ITEM_DEFINITIONS: &str = "/definitions/items";
 const MANUFACTURERS: &str = "/definitions/manufacturers";
 const FACTION_IDENTITIES: &str = "/definitions/factionIdentities";
+const REPUTATION_REWARD_AMOUNTS: &str = "/definitions/reputationRewardAmounts";
 const COMMODITY_DEFINITIONS: &str = "/definitions/commodities";
 const COMMODITY_PRESENTATIONS: &str = "/projections/commodityPresentation";
 const SHOP_INVENTORIES: &str = "/definitions/shopInventories";
@@ -110,6 +111,7 @@ const REQUIRED_WITNESSES: &[&str] = &[
     ITEM_DEFINITIONS,
     MANUFACTURERS,
     FACTION_IDENTITIES,
+    REPUTATION_REWARD_AMOUNTS,
     COMMODITY_DEFINITIONS,
     COMMODITY_PRESENTATIONS,
     LOCATION_ENTITIES,

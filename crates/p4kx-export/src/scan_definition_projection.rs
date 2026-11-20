@@ -211,7 +211,7 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
             Kind::ReputationRewardAmounts => {
                 let read = crate::catalog_v3::reputation_reward_amount_definition::read(
                     tree,
-                    &self.projection,
+                    self.projection.original(),
                     admission,
                     self.scan.options.cancel,
                 )?;
