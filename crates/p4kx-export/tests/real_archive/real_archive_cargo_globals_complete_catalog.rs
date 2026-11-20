@@ -7,7 +7,7 @@ use p4kx_export::catalog_queries::{
 use p4kx_extraction::Archive;
 
 use super::{TestResult, record_index};
-use crate::real_archive_catalog_table_parity::{Origins, Table, capture_table, verify_two_tables};
+use crate::real_archive_catalog_table_parity::{Origins, Table, capture_table, verify_tables};
 use crate::real_archive_verification::print_line;
 
 const LOADING: &str = "/configurations/cargoLoadingGlobals";
@@ -16,7 +16,7 @@ const PRICES: &str = "/configurations/shopCommodityGlobals";
 #[test]
 #[ignore = "same Build: set P4KX_DATA_P4K and P4KX_CATALOG_MEASUREMENT_DIR"]
 fn installed_cargo_sdk_matches_the_same_complete_catalog() -> TestResult {
-    let counts = verify_two_tables([LOADING, PRICES], read_sdk)?;
+    let counts = verify_tables([LOADING, PRICES], read_sdk)?;
     let [loading, prices] = counts.rows;
     print_line(&format!(
         "cargo SDK parity: loadingRows={loading} shopRows={prices} sourceUses={} physicalSources={}",

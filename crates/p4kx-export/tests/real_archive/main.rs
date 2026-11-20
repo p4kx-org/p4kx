@@ -107,6 +107,7 @@ mod real_archive_property_sets;
 mod real_archive_quantization;
 mod real_archive_quantum_drives;
 mod real_archive_quantum_interdiction;
+mod real_archive_radar_audio_sdk;
 mod real_archive_radar_options;
 mod real_archive_records;
 mod real_archive_reputation;

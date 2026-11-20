@@ -2,14 +2,13 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::collections::{HashMap, HashSet};
-use std::fmt;
 use std::hash::Hash;
 use std::path::PathBuf;
 
+use p4kx_export::catalog_queries::DatasetAvailability;
 use p4kx_export::catalog_queries::equipment::EquipmentSnapshot;
-use p4kx_extraction::{Archive, ArchiveWatch, SourceUseRole};
+use p4kx_extraction::{Archive, ArchiveWatch, SourceInventory, SourceUseRole};
 use serde::Serialize;
-use serde::de::{self, DeserializeSeed, SeqAccess, Visitor};
 use serde_json::map::Entry;
 use serde_json::{Map, Value};
 
@@ -17,21 +16,26 @@ use crate::catalog_capture::CatalogCapture;
 use crate::real_archive_catalog_size::artifact;
 use crate::real_archive_catalog_size::replay::bindings::Receipt;
 
+#[path = "real_archive_catalog_selected_origins.rs"]
+mod selected_origins;
+
+use selected_origins::SelectedOrigins;
+
 pub(crate) type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
 const USES: &str = "/provenance/uses";
 const SOURCES: &str = "/provenance/sources";
 
-pub(crate) struct Counts {
-    pub(crate) rows: [usize; 2],
+pub(crate) struct Counts<const TABLES: usize> {
+    pub(crate) rows: [usize; TABLES],
     pub(crate) source_uses: usize,
     pub(crate) physical_sources: usize,
 }
 
-pub(crate) fn verify_two_tables(
-    paths: [&str; 2],
-    read_sdk: impl FnOnce(&Archive, &mut Origins) -> TestResult<[Table; 2]>,
-) -> TestResult<Counts> {
+pub(crate) fn verify_tables<const TABLES: usize>(
+    paths: [&str; TABLES],
+    read_sdk: impl FnOnce(&Archive, &mut Origins) -> TestResult<[Table; TABLES]>,
+) -> TestResult<Counts<TABLES>> {
     let directory = std::env::var_os("P4KX_CATALOG_MEASUREMENT_DIR")
         .map(PathBuf::from)
         .ok_or("configure the completed Catalog measurement")?;
@@ -100,16 +104,32 @@ pub(crate) fn capture_table<Row: Serialize, Id: Eq + Hash>(
     {
         return Err("the SDK must read the matching Build and every complete original row".into());
     }
-    let rows: Vec<Value> = serde_json::from_slice(&serde_json::to_vec(sdk.rows())?)?;
+    capture_rows(
+        sdk.availability(),
+        sdk.rows(),
+        sdk.source_inventory(),
+        origins,
+        identity,
+    )
+}
+
+pub(crate) fn capture_rows<Row: Serialize, Id: Eq + Hash>(
+    availability: DatasetAvailability,
+    sdk_rows: &[Row],
+    inventory: &SourceInventory,
+    origins: &mut Origins,
+    identity: impl Fn(&Value) -> TestResult<Id>,
+) -> TestResult<Table> {
+    let rows: Vec<Value> = serde_json::from_slice(&serde_json::to_vec(sdk_rows)?)?;
     let mut physical = HashSet::new();
     for row in &rows {
         if !physical.insert(identity(row)?) {
             return Err("the SDK reports a duplicate physical row identity".into());
         }
     }
-    origins.extend(sdk, &rows)?;
+    origins.extend(inventory, &rows)?;
     Ok(Table {
-        availability: serde_json::to_value(sdk.availability())?,
+        availability: serde_json::to_value(availability)?,
         rows,
     })
 }
@@ -188,7 +208,7 @@ pub(crate) struct Origins {
 }
 
 impl Origins {
-    fn extend<Row>(&mut self, sdk: &EquipmentSnapshot<'_, Row>, rows: &[Value]) -> TestResult {
+    fn extend(&mut self, inventory: &SourceInventory, rows: &[Value]) -> TestResult {
         let mut needed = HashSet::new();
         for row in rows {
             collect_references(row, &mut needed);
@@ -196,7 +216,6 @@ impl Origins {
         if needed.is_empty() {
             return Err("expected original cell provenance".into());
         }
-        let inventory = sdk.source_inventory();
         let mut pending = Vec::new();
         for used in inventory.iter_uses() {
             let id = used.id().as_str();
@@ -267,62 +286,4 @@ fn retain(rows: &mut Map<String, Value>, id: String, row: Value) -> TestResult {
             Ok(())
         }
     }
-}
-
-#[derive(Clone, Copy)]
-struct SelectedOrigins<'scope>(&'scope Map<String, Value>);
-
-impl<'de> DeserializeSeed<'de> for SelectedOrigins<'_> {
-    type Value = Value;
-
-    fn deserialize<D: serde::Deserializer<'de>>(self, deserializer: D) -> Result<Value, D::Error> {
-        deserializer.deserialize_seq(self)
-    }
-}
-
-impl<'de> Visitor<'de> for SelectedOrigins<'_> {
-    type Value = Value;
-
-    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str("a Catalog provenance row array")
-    }
-
-    fn visit_seq<A: SeqAccess<'de>>(self, mut sequence: A) -> Result<Value, A::Error> {
-        let mut selected = Map::new();
-        while let Some(row) = sequence.next_element::<Value>()? {
-            let id = row
-                .get("id")
-                .and_then(Value::as_str)
-                .ok_or_else(|| de::Error::custom("Catalog provenance row has no identifier"))?;
-            if self.0.contains_key(id) && selected.insert(id.to_owned(), row).is_some() {
-                return Err(de::Error::custom(
-                    "duplicate selected Catalog provenance identifier",
-                ));
-            }
-        }
-        Ok(Value::Object(selected))
-    }
-}
-
-#[test]
-fn selected_provenance_keeps_rows_and_rejects_duplicate_keys() -> TestResult {
-    let expected = Map::from_iter([(
-        "selected".to_owned(),
-        serde_json::json!({"id":"selected","role":"payload"}),
-    )]);
-    let mut capture = CatalogCapture::default();
-    capture.project(USES, SelectedOrigins(&expected));
-    let input = br#"{"provenance":{"uses":[{"id":"unused"},{"id":"selected","role":"payload"}]}}"#;
-    let selected = capture.read(input.as_slice())?;
-    assert_eq!(
-        selected.pointer(USES).and_then(Value::as_object),
-        Some(&expected),
-        "only the exact selected source-use row is retained",
-    );
-    let duplicate = br#"{"provenance":{"uses":[{"id":"selected"},{"id":"selected"}]}}"#;
-    assert!(
-        capture.read(duplicate.as_slice()).is_err(),
-        "duplicate selected source rows cannot prove provenance closure",
-    );
-    Ok(())
 }

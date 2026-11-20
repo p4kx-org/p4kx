@@ -34,3 +34,13 @@ positions, and origin receipts with the physical SDK row. Set `P4KX_DATA_P4K`
 and `P4KX_RADAR_AUDIO_BUILD_CHANGE` to the installed Archive and its Build
 change number. Run
 `cargo test --locked -p p4kx-export --lib installed_radar_audio_reconciles_ordered_sound_slots_and_selector_coverage -- --ignored --nocapture`.
+
+For same-Build SDK parity with a completed normal Catalog, set `P4KX_DATA_P4K`
+and `P4KX_CATALOG_MEASUREMENT_DIR` to the original Archive and its measurement.
+Use a producer whose opaque source-use IDs match the SDK revision under test.
+Run the ignored test
+`real_archive_radar_audio_sdk::installed_radar_audio_sdk_matches_the_same_complete_catalog`
+in the `p4kx-export` `real_archive` integration suite. It streams the compressed
+Catalog and keeps only this table, the publication identity and its contributing
+provenance rows. It compares ordered physical rows, values and exact provenance
+closure. Runtime target binding needs separate source evidence.
