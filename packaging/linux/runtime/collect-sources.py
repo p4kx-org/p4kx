@@ -1,7 +1,9 @@
 """Collects the corresponding source and original licences of a static AppImage runtime."""
 
 import argparse
+import http.client
 import json
+import logging
 import os
 from pathlib import Path, PurePosixPath
 import re
@@ -16,25 +18,39 @@ import build_inputs
 from build_inputs import digest
 
 
+DOWNLOAD_ATTEMPTS = 4
+TRANSIENT_HTTP_ERRORS = frozenset((408, 429, 500, 502, 503, 504))
+
+
 def download(url, destination, expected=None):
-    """Downloads an HTTPS source file and checks its expected digest."""
+    """Downloads an HTTPS source file and verifies its expected digest before publishing."""
     if not url.startswith("https://"):
         raise ValueError("source downloads require HTTPS")
-    for attempt in range(4):
-        try:
-            with urllib.request.urlopen(url, timeout=120) as response, destination.open("wb") as output:
-                shutil.copyfileobj(response, output)
-            break
-        except (urllib.error.URLError, TimeoutError, ConnectionError) as error:
-            if isinstance(error, urllib.error.HTTPError) and error.code not in (408, 429, 500, 502, 503, 504):
-                raise
-            if attempt == 3:
-                raise
-            time.sleep(2 ** attempt)
-    actual = digest(destination)
-    if expected is not None and actual != expected:
-        raise ValueError(f"source digest mismatch for {url}")
-    return actual
+    partial = destination.with_name(f".{destination.name}.partial")
+    try:
+        for attempt in range(1, DOWNLOAD_ATTEMPTS + 1):
+            try:
+                with urllib.request.urlopen(url, timeout=120) as response, partial.open("wb") as output:
+                    shutil.copyfileobj(response, output)
+                break
+            except (urllib.error.URLError, TimeoutError, ConnectionError, http.client.IncompleteRead) as error:
+                permanent_http_error = (
+                    isinstance(error, urllib.error.HTTPError) and error.code not in TRANSIENT_HTTP_ERRORS
+                )
+                context = f"Pinned source {destination} failed on download attempt {attempt}/{DOWNLOAD_ATTEMPTS}"
+                if permanent_http_error or attempt == DOWNLOAD_ATTEMPTS:
+                    error.add_note(context)
+                    raise
+                delay = 2 ** (attempt - 1)
+                logging.getLogger(__name__).warning("%s (%s). Retrying in %d s.", context, error, delay)
+                time.sleep(delay)
+        actual = digest(partial)
+        if expected is not None and actual != expected:
+            raise ValueError(f"source digest mismatch for {destination}")
+        partial.replace(destination)
+        return actual
+    finally:
+        partial.unlink(missing_ok=True)
 
 
 def installed_packages():

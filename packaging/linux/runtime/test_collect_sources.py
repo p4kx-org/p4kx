@@ -1,6 +1,7 @@
 """Checks source and native static-link inventory boundaries without Linux execution."""
 
 import hashlib
+import http.client
 import importlib.util
 import io
 from pathlib import Path
@@ -48,6 +49,7 @@ class SourceInventoryTests(unittest.TestCase):
         with patch.object(collect_sources.urllib.request, "urlopen", return_value=io.BytesIO(b"changed")):
             with self.assertRaisesRegex(ValueError, "digest mismatch"):
                 collect_sources.download("https://example.invalid/source", destination, "0" * 64)
+        self.assertEqual(list(self.directory.iterdir()), [])
 
     def test_transient_download_failure_retries_the_same_pinned_source(self):
         """A bounded retry keeps the original source URL and verifies its pinned digest."""
@@ -56,7 +58,10 @@ class SourceInventoryTests(unittest.TestCase):
         expected = hashlib.sha256(payload).hexdigest()
         responses = [collect_sources.urllib.error.URLError("synthetic unreachable"), io.BytesIO(payload)]
         with patch.object(collect_sources.urllib.request, "urlopen", side_effect=responses) as request:
-            with patch.object(collect_sources.time, "sleep") as sleep:
+            with (
+                patch.object(collect_sources.time, "sleep") as sleep,
+                self.assertLogs(collect_sources.__name__, level="WARNING"),
+            ):
                 actual = collect_sources.download("https://example.invalid/source", destination, expected)
         self.assertEqual(actual, expected)
         self.assertEqual(destination.read_bytes(), payload)
@@ -65,16 +70,60 @@ class SourceInventoryTests(unittest.TestCase):
         sleep.assert_called_once_with(1)
 
     def test_download_retry_exhaustion_preserves_the_original_network_error(self):
-        """Four failed attempts stop collection without treating incomplete source as verified."""
-        failure = collect_sources.urllib.error.URLError("synthetic unreachable")
-        with patch.object(collect_sources.urllib.request, "urlopen", side_effect=failure) as request:
-            with patch.object(collect_sources.time, "sleep") as sleep:
-                with self.assertRaises(collect_sources.urllib.error.URLError) as caught:
-                    collect_sources.download("https://example.invalid/source", self.directory / "source.tar")
+        """HTTP 502 retries retain the original network error and identify its input."""
+        destination = self.directory / "synthetic-library" / "aports.tar.gz"
+        destination.parent.mkdir()
+        failure = collect_sources.urllib.error.HTTPError("https://example.invalid/source", 502, "Bad Gateway", None, None)
+        with (
+            patch.object(collect_sources.urllib.request, "urlopen", side_effect=failure) as request,
+            patch.object(collect_sources.time, "sleep") as sleep,
+            self.assertLogs(collect_sources.__name__, level="WARNING") as diagnostics,
+            self.assertRaises(collect_sources.urllib.error.HTTPError) as caught,
+        ):
+            collect_sources.download("https://example.invalid/source", destination, "0" * 64)
         self.assertIs(caught.exception, failure)
         self.assertEqual(request.call_count, 4)
         self.assertEqual([call.args[0] for call in sleep.call_args_list], [1, 2, 4])
-        self.assertFalse((self.directory / "source.tar").exists())
+        self.assertEqual(len(diagnostics.output), 3)
+        for attempt, warning in enumerate(diagnostics.output, 1):
+            self.assertIn(str(destination), warning)
+            self.assertIn(f"attempt {attempt}/4", warning)
+            self.assertIn("HTTP Error 502", warning)
+        self.assertIn(str(destination), caught.exception.__notes__[0])
+        self.assertIn("attempt 4/4", caught.exception.__notes__[0])
+        self.assertEqual(list(destination.parent.iterdir()), [])
+
+    def test_interrupted_body_retries_and_publishes_only_verified_bytes(self):
+        """A short body cannot replace the usable destination during a retry."""
+        destination = self.directory / "source.tar"
+        current = b"current accepted source"
+        destination.write_bytes(current)
+        payload = b"synthetic pinned source"
+        expected = hashlib.sha256(payload).hexdigest()
+
+        class InterruptedBody(io.BytesIO):
+            def read(self, size=-1):
+                chunk = super().read(size)
+                if not chunk:
+                    raise http.client.IncompleteRead(b"", 1)
+                return chunk
+
+        responses = iter([InterruptedBody(b"partial transfer"), io.BytesIO(payload)])
+
+        def open_source(url, timeout):
+            self.assertEqual(destination.read_bytes(), current)
+            return next(responses)
+
+        with (
+            patch.object(collect_sources.urllib.request, "urlopen", side_effect=open_source) as request,
+            patch.object(collect_sources.time, "sleep") as sleep,
+            self.assertLogs(collect_sources.__name__, level="WARNING"),
+        ):
+            self.assertEqual(collect_sources.download("https://example.invalid/source", destination, expected), expected)
+        self.assertEqual(destination.read_bytes(), payload)
+        self.assertEqual(list(self.directory.iterdir()), [destination])
+        self.assertEqual(request.call_count, 2)
+        sleep.assert_called_once_with(1)
 
     def test_missing_or_changed_source_is_not_retried(self):
         """Permanent HTTP failures and digest drift fail without an alternate source or retry."""
