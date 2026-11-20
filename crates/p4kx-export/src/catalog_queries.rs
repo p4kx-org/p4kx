@@ -8,6 +8,8 @@ mod blueprints;
 
 #[path = "blueprint_category_query.rs"]
 mod blueprint_categories;
+#[path = "blueprint_category_list_query.rs"]
+mod blueprint_category_lists;
 #[path = "catalog_record_selection.rs"]
 mod record_selection;
 #[path = "unlocalized_record_query.rs"]
@@ -117,16 +119,6 @@ pub mod radar_audio;
 #[path = "subsumption_event_query.rs"]
 pub mod subsumption_events;
 
-use p4kx_extraction::{
-    Archive, Build, CancelToken, DataForge, DataForgeEntry, SourceInventory, SourcedValue,
-};
-use schemars::JsonSchema;
-use serde::Serialize;
-
-use crate::catalog_v3::blueprint_category_list_read;
-use crate::schema_fields::every_field_required;
-use crate::{CatalogError, Kind};
-
 pub use crate::canonical_record_header::{CanonicalRecordHeader, CatalogRecordSource};
 pub use crate::catalog_query_session::{
     CatalogLanguageSelection, CatalogQuerySession, ParsedCatalogQueries,
@@ -187,6 +179,10 @@ pub use blueprint_categories::{
     BlueprintCategory, BlueprintCategorySnapshot, read_blueprint_categories,
     read_blueprint_categories_from,
 };
+pub use blueprint_category_lists::{
+    BlueprintCategoryList, BlueprintCategoryListSnapshot, read_blueprint_category_lists,
+    read_blueprint_category_lists_from,
+};
 pub use gameplay_properties::{
     CatalogPublicName, GameplayPropertySnapshot, read_gameplay_properties,
     read_gameplay_properties_from,
@@ -239,137 +235,6 @@ pub use contract_generators::{
     ContractGeneratorProjectionFailure, ContractGeneratorProjectionNote, ContractGeneratorSnapshot,
     with_contract_generators, with_contract_generators_from,
 };
-
-/// A category-list declaration with its original ordered reference slots.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-#[non_exhaustive]
-pub struct BlueprintCategoryList {
-    /// The original physical Record identity and header fields.
-    #[serde(flatten)]
-    pub source: CatalogRecordSource,
-    /// The authored slots, including duplicates, nulls and unresolved references.
-    pub categories: SourcedValue<Vec<SourcedValue<CatalogRecordReference>>>,
-}
-
-/// The selected category lists and the source inventory needed to resolve their uses.
-#[derive(Debug)]
-#[non_exhaustive]
-#[must_use]
-pub struct BlueprintCategoryListSnapshot {
-    /// The installed Archive build, when available.
-    pub build: Option<Build>,
-    /// Availability of the category-list source family.
-    pub availability: DatasetAvailability,
-    /// Selected rows in canonical GUID order, then by physical index for tied GUIDs.
-    pub rows: Vec<BlueprintCategoryList>,
-    /// Original sources and uses retained by this query.
-    pub source_inventory: SourceInventory,
-    /// Coverage of the headers and bodies considered by the selection.
-    pub coverage: CatalogRecordCoverage,
-}
-
-/// Reads category-list declarations from the Archive's original DataForge.
-///
-/// # Errors
-///
-/// Returns input, source evidence or cancellation errors. Recoverable Record and field
-/// issues are described in the returned coverage.
-pub fn read_blueprint_category_lists(
-    archive: &Archive,
-    selection: CatalogRecordSelection,
-    cancel: Option<&CancelToken>,
-) -> Result<BlueprintCategoryListSnapshot, CatalogError> {
-    CatalogQuerySession::open(archive, CatalogLanguageSelection::Selected(&[]), cancel)?
-        .read_blueprint_category_lists(selection, cancel)
-}
-
-/// Reads category-list declarations from an already decoded entry of the same Archive.
-///
-/// # Errors
-///
-/// Returns the errors of [`read_blueprint_category_lists`], or [`CatalogError::SourceOriginMismatch`]
-/// if the entry's proven origin does not match the supplied Archive.
-pub fn read_blueprint_category_lists_from(
-    archive: &Archive,
-    entry: &DataForgeEntry,
-    selection: CatalogRecordSelection,
-    cancel: Option<&CancelToken>,
-) -> Result<BlueprintCategoryListSnapshot, CatalogError> {
-    CatalogQuerySession::from_entry(
-        archive,
-        entry,
-        CatalogLanguageSelection::Selected(&[]),
-        cancel,
-    )?
-    .read_blueprint_category_lists(selection, cancel)
-}
-
-impl CatalogQuerySession<'_> {
-    /// Reads category-list declarations and their original ordered references.
-    ///
-    /// # Errors
-    ///
-    /// Returns input, source evidence or cancellation errors. Recoverable gaps appear in coverage.
-    pub fn read_blueprint_category_lists(
-        &self,
-        selection: CatalogRecordSelection,
-        cancel: Option<&CancelToken>,
-    ) -> Result<BlueprintCategoryListSnapshot, CatalogError> {
-        self.parsed(cancel)?
-            .read_blueprint_category_lists(selection, cancel)
-    }
-}
-
-impl ParsedCatalogQueries<'_> {
-    /// Reads category-list declarations and their original ordered references.
-    ///
-    /// # Errors
-    ///
-    /// Returns input, source evidence or cancellation errors. Recoverable gaps appear in coverage.
-    pub fn read_blueprint_category_lists(
-        &self,
-        selection: CatalogRecordSelection,
-        cancel: Option<&CancelToken>,
-    ) -> Result<BlueprintCategoryListSnapshot, CatalogError> {
-        self.project(cancel, |archive, entry, forge| {
-            read_archive(archive, entry, forge, selection, cancel)
-        })
-    }
-}
-
-fn read_archive(
-    archive: &Archive,
-    entry: &DataForgeEntry,
-    forge: &DataForge<'_>,
-    selection: CatalogRecordSelection,
-    cancel: Option<&CancelToken>,
-) -> Result<BlueprintCategoryListSnapshot, CatalogError> {
-    let projected = unlocalized_record_query::read(
-        archive,
-        entry,
-        forge,
-        Kind::BlueprintCategoryLists,
-        selection,
-        cancel,
-        |tree, input, admission| {
-            let read = blueprint_category_list_read::read(tree, input, admission, cancel)?;
-            let row = BlueprintCategoryList {
-                source: read.value.declaration.source.into(),
-                categories: read.value.declaration.categories,
-            };
-            Ok((row, read.notes))
-        },
-    )?;
-    Ok(BlueprintCategoryListSnapshot {
-        build: archive.build().cloned(),
-        availability: projected.availability,
-        rows: projected.rows,
-        source_inventory: projected.source_inventory,
-        coverage: projected.coverage,
-    })
-}
 
 pub use mining_definitions::{
     MineableBaseSignature, MineableCompositionSnapshot, MineableElementSnapshot, MineableEntity,

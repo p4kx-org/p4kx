@@ -3,7 +3,7 @@
 
 use p4kx_extraction::{Archive, CancelToken, DataForgeEntry};
 
-use super::{read, rows};
+use super::{read, weapon_rows};
 use crate::CatalogError;
 use crate::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, ParsedCatalogQueries,
@@ -29,7 +29,7 @@ pub fn with_weapon_combat_bases<T>(
     cancel: Option<&CancelToken>,
     inspect: impl FnOnce(WeaponCombatSnapshot<'_>) -> T,
 ) -> Result<T, CatalogError> {
-    read::with_archive::<rows::WeaponCombatBases, T>(
+    read::with_archive::<weapon_rows::WeaponCombatBases, T>(
         archive,
         None,
         CatalogRecordSelection::RecordIndex(record_index),
@@ -50,7 +50,7 @@ pub fn with_weapon_combat_bases_from<T>(
     cancel: Option<&CancelToken>,
     inspect: impl FnOnce(WeaponCombatSnapshot<'_>) -> T,
 ) -> Result<T, CatalogError> {
-    read::with_archive::<rows::WeaponCombatBases, T>(
+    read::with_archive::<weapon_rows::WeaponCombatBases, T>(
         archive,
         Some(entry),
         CatalogRecordSelection::RecordIndex(record_index),
@@ -88,7 +88,7 @@ impl ParsedCatalogQueries<'_> {
         inspect: impl FnOnce(WeaponCombatSnapshot<'_>) -> T,
     ) -> Result<T, CatalogError> {
         self.project(cancel, |archive, entry, forge| {
-            read::with_parsed::<rows::WeaponCombatBases, T>(
+            read::with_parsed::<weapon_rows::WeaponCombatBases, T>(
                 archive,
                 entry,
                 forge,

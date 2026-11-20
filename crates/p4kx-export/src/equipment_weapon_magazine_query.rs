@@ -3,7 +3,7 @@
 
 use p4kx_extraction::{Archive, CancelToken, DataForgeEntry, Filter};
 
-use super::{read, rows};
+use super::{read, weapon_rows};
 use crate::CatalogError;
 use crate::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, ParsedCatalogQueries,
@@ -73,7 +73,7 @@ pub fn with_weapon_magazine_resolutions<T>(
     cancel: Option<&CancelToken>,
     inspect: impl FnOnce(WeaponMagazineSnapshot<'_>) -> T,
 ) -> Result<T, CatalogError> {
-    read::with_archive::<rows::MagazineResolutions, T>(
+    read::with_archive::<weapon_rows::MagazineResolutions, T>(
         archive,
         None,
         CatalogRecordSelection::RecordIndex(record_index),
@@ -94,7 +94,7 @@ pub fn with_weapon_magazine_resolutions_from<T>(
     cancel: Option<&CancelToken>,
     inspect: impl FnOnce(WeaponMagazineSnapshot<'_>) -> T,
 ) -> Result<T, CatalogError> {
-    read::with_archive::<rows::MagazineResolutions, T>(
+    read::with_archive::<weapon_rows::MagazineResolutions, T>(
         archive,
         Some(entry),
         CatalogRecordSelection::RecordIndex(record_index),
@@ -160,7 +160,7 @@ impl ParsedCatalogQueries<'_> {
                 languages: &[],
                 cancel,
             }
-            .run_with_item_filter::<rows::MagazineDependencies, T>(None, filter, inspect)
+            .run_with_item_filter::<weapon_rows::MagazineDependencies, T>(None, filter, inspect)
         })
     }
 
@@ -175,7 +175,7 @@ impl ParsedCatalogQueries<'_> {
         inspect: impl FnOnce(WeaponMagazineSnapshot<'_>) -> T,
     ) -> Result<T, CatalogError> {
         self.project(cancel, |archive, entry, forge| {
-            read::with_parsed::<rows::MagazineResolutions, T>(
+            read::with_parsed::<weapon_rows::MagazineResolutions, T>(
                 archive,
                 entry,
                 forge,

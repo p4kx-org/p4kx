@@ -4,7 +4,7 @@
 use p4kx_extraction::{Archive, CancelToken, DataForgeEntry};
 
 use super::snapshot::EquipmentSnapshot;
-use super::{read, rows};
+use super::{read, weapon_rows};
 use crate::CatalogError;
 use crate::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, ParsedCatalogQueries,
@@ -33,7 +33,7 @@ pub fn with_weapon_sources<T>(
     cancel: Option<&CancelToken>,
     inspect: impl FnOnce(WeaponSourceSnapshot<'_>) -> T,
 ) -> Result<T, CatalogError> {
-    read::with_archive::<rows::WeaponSources, T>(
+    read::with_archive::<weapon_rows::WeaponSources, T>(
         archive,
         None,
         CatalogRecordSelection::RecordIndex(record_index),
@@ -54,7 +54,7 @@ pub fn with_weapon_sources_from<T>(
     cancel: Option<&CancelToken>,
     inspect: impl FnOnce(WeaponSourceSnapshot<'_>) -> T,
 ) -> Result<T, CatalogError> {
-    read::with_archive::<rows::WeaponSources, T>(
+    read::with_archive::<weapon_rows::WeaponSources, T>(
         archive,
         Some(entry),
         CatalogRecordSelection::RecordIndex(record_index),
@@ -92,7 +92,7 @@ impl ParsedCatalogQueries<'_> {
         inspect: impl FnOnce(WeaponSourceSnapshot<'_>) -> T,
     ) -> Result<T, CatalogError> {
         self.project(cancel, |archive, entry, forge| {
-            read::with_parsed::<rows::WeaponSources, T>(
+            read::with_parsed::<weapon_rows::WeaponSources, T>(
                 archive,
                 entry,
                 forge,

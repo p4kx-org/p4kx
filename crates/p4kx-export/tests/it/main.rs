@@ -397,9 +397,5 @@ mod variants_fixture;
 
 mod broker_full_source_tests;
 mod template_fixtures;
-pub(crate) use template_fixtures::{
-    template_fixture_context, template_fixture_deep_flow, template_fixture_fields,
-    template_fixture_flow, template_fixture_modifiers, template_fixture_options,
-    template_fixture_tags, template_fixture_text,
-};
+pub(crate) use template_fixtures::*;
 mod weapon_player_animation_candidates;

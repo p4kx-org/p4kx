@@ -110,6 +110,8 @@ mod weapon_magazine;
 mod weapon_magazine_dependency_read;
 #[path = "equipment_weapon_recoil_query.rs"]
 mod weapon_recoil;
+#[path = "equipment_weapon_query_rows.rs"]
+mod weapon_rows;
 
 pub use crate::catalog_v3::authored_fields::authored_manufacturer::AuthoredManufacturer;
 pub use crate::catalog_v3::catalog_capacity::ResourceCapacity;
