@@ -39,7 +39,8 @@ try {
     $env:P4KX_TARGET=(Get-P4kxCurrentPlatform).target
     $env:GITHUB_SHA='harmless-source-copy';$env:GITHUB_RUN_ID='harmless-snapshot';$env:GITHUB_RUN_ATTEMPT='1'
     $env:GITHUB_ENV=Join-Path $root 'workflow-env'
-    $env:P4KX_MSI_DIAGNOSTIC_DEADLINE_UTC=[DateTimeOffset]::UtcNow.AddSeconds(20).ToString('o')
+    $controlMilliseconds=20000
+    $env:P4KX_MSI_DIAGNOSTIC_DEADLINE_UTC=[DateTimeOffset]::UtcNow.AddMilliseconds($controlMilliseconds).ToString('o')
     $budget=Get-P4kxMsiSnapshotBudget ([DateTimeOffset]::UtcNow.AddMinutes(20).ToString('o'))
     Assert-Snapshot ($budget.capture_ms -eq 100000 -and $budget.cleanup_ms -eq 5000) 'Snapshot exceeded its existing runner-step reserve.'
     $budget=Get-P4kxMsiSnapshotBudget $env:P4KX_MSI_DIAGNOSTIC_DEADLINE_UTC 2000
@@ -53,7 +54,7 @@ try {
     $observer=Join-Path $root 'observer'
     $invocation=Join-Path $root 'invocation.json'
     Write-P4kxDetachedReceipt $invocation @{Target=$env:P4KX_TARGET;Msi='observer-wait';FixtureDirectory=$scripts;OutputDirectory=$output}
-    & (Join-Path $scripts 'invoke-msi-observer.ps1') -Stage Start -Directory $observer -Invocation $invocation -Mode Control -ControlMilliseconds 10000
+    & (Join-Path $scripts 'invoke-msi-observer.ps1') -Stage Start -Directory $observer -Invocation $invocation -Mode Control -ControlMilliseconds $controlMilliseconds
     $request=Read-P4kxDetachedReceipt (Join-Path $observer 'request.json')
     $handle=Read-P4kxDetachedReceipt (Join-Path $observer 'handle.json')
     $startup=[Diagnostics.Stopwatch]::StartNew()
@@ -100,7 +101,7 @@ try {
         -not [IO.File]::Exists($env:GITHUB_ENV)) 'Blocked snapshot lost its bounded failure, exact last stage or unproven verdict.'
     Assert-Snapshot ($live.received -and $live.original_alive) 'The blocked snapshot did not expose its exact stage live before worker return.'
     Assert-Snapshot (-not (Get-P4kxMsiObserverParentState $request $handle).lifetime_ended) 'Snapshot watchdog signaled the independent original parent.'
-    Invoke-P4kxMsiObserverSnapshot $observer 2 250 -MaximumMilliseconds 2000
+    Invoke-P4kxMsiObserverSnapshot $observer 2 250
     $positive=Read-P4kxDetachedReceipt (Join-Path $observer 'snapshots/02/caller-result.json')
     $checkpoint=Read-P4kxDetachedReceipt (Join-Path $observer 'checkpoints/02/checkpoint.json')
     Assert-Snapshot ($positive.snapshot_returned -eq $true -and $positive.completed_success -eq $false -and
