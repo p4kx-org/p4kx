@@ -90,6 +90,13 @@ It reconciled both runs at 114,513 physical sources, 93,861,565 source uses, 10,
 exactly 11,303,107,764 bytes. Source-use IDs are document-local strings and each field carries
 its original schema-v3 encryption and completeness markers.
 
+On the compact PTU baseline, `provenance.uses` occupies 23,581,982,024 bytes.
+Applying the positional-row and vocabulary model to its 93,861,565 observed rows
+would save at least 8,072,094,590 bytes before table declarations. `loadouts`
+occupies 19,384,075,982 bytes, including 18,568,005,835 bytes in the six port-field
+reference arrays. Pooling the shared selector prefixes targets that remaining
+repetition. The candidate animation relations occupy 8,877,122,157 bytes.
+
 A deterministic one-to-one remap to nine-character ASCII identifiers would retain the current
 string schema. It bounds the six arrays at 8,292,191,628 bytes including quotes, separators
 and brackets, a reduction of at least 21,581,509,788 bytes for this LIVE inventory. The
