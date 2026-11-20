@@ -6,12 +6,10 @@ use p4kx_extraction::{Archive, DataForge, Language, Value as Raw};
 use p4kx_testkit::{ArchiveBuilder, TestEntry};
 use serde_json::{Value, json};
 
-use super::{Layout, OWNER, PORTS, database};
+use super::{Layout, OWNER, PORT_KEY, PORTS, database};
 use crate::commodity_v3_fixture::{TestResult, options};
 use crate::health_origin_assertions as proof;
 use crate::loadouts_support::{loadout, port};
-
-pub(super) const PORT_KEY: &str = "@fixture_port_display";
 
 #[test]
 fn item_ports_supply_canonical_display_names_at_the_original_locale_occurrence() -> TestResult {

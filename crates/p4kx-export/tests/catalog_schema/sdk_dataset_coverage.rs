@@ -17,6 +17,9 @@ mod row_schema;
 
 const LANGUAGE_SOURCES: &str = "/texts/languageSources";
 const ITEM_DEFINITIONS: &str = "/definitions/items";
+const ITEM_PORTS: &str = "/configurations/itemPorts";
+const ATTACHMENT_CONSTRAINTS: &str = "/configurations/itemAttachmentConstraints";
+const ITEM_BOUNDS: &str = "/configurations/itemBounds";
 const ENTITY_TAGS: &str = "/declarations/entityTags";
 const TAG_DEFINITIONS: &str = "/definitions/tags";
 const TAG_ROOTS: &str = "/declarations/tagRoots";
@@ -41,6 +44,7 @@ const AMMO_CONTAINERS: &str = "/configurations/ammoContainers";
 const REPUTATION_TRIGGER_CONFIGURATIONS: &str = "/configurations/reputationTriggers";
 const WEAPON_ACTIONS: &str = "/configurations/weaponActions";
 const LOCATION_ENTITIES: &str = "/definitions/locationEntityDeclarations";
+const MISSION_LOCATION_TEMPLATES: &str = "/missionLocationTemplates";
 const BLUEPRINT_POOLS: &str = "/definitions/blueprintPools";
 const BLUEPRINT_POOL_WEIGHTS: &str = "/projections/blueprintPoolWeights";
 const BLUEPRINT_CATEGORY_LISTS: &str = "/declarations/blueprintCategoryLists";
@@ -135,6 +139,9 @@ impl Route {
 const REQUIRED_WITNESSES: &[&str] = &[
     LANGUAGE_SOURCES,
     ITEM_DEFINITIONS,
+    ITEM_PORTS,
+    ATTACHMENT_CONSTRAINTS,
+    ITEM_BOUNDS,
     ENTITY_TAGS,
     TAG_DEFINITIONS,
     TAG_ROOTS,
@@ -150,6 +157,7 @@ const REQUIRED_WITNESSES: &[&str] = &[
     COMMODITY_DEFINITIONS,
     COMMODITY_PRESENTATIONS,
     LOCATION_ENTITIES,
+    MISSION_LOCATION_TEMPLATES,
     BLUEPRINT_POOLS,
     BLUEPRINT_POOL_WEIGHTS,
     BLUEPRINT_CATEGORY_LISTS,

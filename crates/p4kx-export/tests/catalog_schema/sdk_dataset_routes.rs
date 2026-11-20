@@ -56,6 +56,8 @@ mod flight_configurations;
 mod fuel;
 #[path = "sdk_inventory_container_route.rs"]
 mod inventory_containers;
+#[path = "sdk_item_configuration_routes.rs"]
+mod item_configurations;
 #[path = "sdk_law_route.rs"]
 mod law;
 #[path = "sdk_loot_routes.rs"]
@@ -68,6 +70,8 @@ mod medical_tier;
 mod mineable_entity;
 #[path = "sdk_mining_family_routes.rs"]
 mod mining_families;
+#[path = "sdk_mission_location_route.rs"]
+mod mission_location;
 #[path = "sdk_planet_resource_route.rs"]
 mod planet_resource;
 #[path = "sdk_projectile_ammo_route.rs"]
@@ -127,6 +131,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
         weapon_animation::read()?,
         read_language_sources(&archive)?,
         read_location_entities(&archive)?,
+        mission_location::read()?,
         read_shop_inventory(&archive)?,
         read_flare_library(&archive)?,
         read_faction_identities(&archive)?,
@@ -138,6 +143,11 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
         loot_documents,
         unresolved,
     ];
+    append_domain_routes(&mut routes, &archive)?;
+    Ok(routes)
+}
+
+fn append_domain_routes(routes: &mut Vec<Route>, archive: &Archive) -> TestResult<()> {
     routes.extend(blueprint_pools::read()?);
     routes.extend(blueprint_taxonomy::read()?);
     routes.extend(contracts::read()?);
@@ -154,13 +164,14 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
     routes.extend(resource_network::read()?);
     routes.extend(fuel::read()?);
     routes.push(inventory_containers::read()?);
-    routes.extend(read_cargo_globals(&archive)?);
+    routes.extend(read_cargo_globals(archive)?);
     routes.extend(quality::read()?);
-    routes.extend(read_entity_definitions(&archive)?);
-    routes.push(read_entity_tags(&archive)?);
-    routes.extend(read_tag_declarations(&archive)?);
-    routes.push(read_tag_paths(&archive)?);
-    routes.extend(commodities::read(&archive)?);
+    routes.extend(read_entity_definitions(archive)?);
+    routes.extend(item_configurations::read()?);
+    routes.push(read_entity_tags(archive)?);
+    routes.extend(read_tag_declarations(archive)?);
+    routes.push(read_tag_paths(archive)?);
+    routes.extend(commodities::read(archive)?);
     routes.extend(loot::read()?);
     routes.extend(law::read()?);
     routes.push(medical_tier::read()?);
@@ -170,7 +181,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
     routes.extend(component_tools::read()?);
     routes.extend(authored_reputation::read()?);
     routes.extend(weapon_sources::read()?);
-    Ok(routes)
+    Ok(())
 }
 
 pub(super) fn ammunition() -> TestResult<Route> {
