@@ -84,8 +84,11 @@ The paired native Windows AMD64 producer at `8a23763e`, from integration head `e
 completed on the same PTU Archive stamp and options. The decoded size fell from 85,600,368,941
 to 74,174,978,158 bytes, a reduction of 11,425,390,783 bytes (13.35%). The Zstandard level 3
 file fell from 1,287,882,399 to 1,282,450,554 bytes, a reduction of 5,431,845 bytes (0.42%).
-The source-use IDs remain document-local strings. Domains and encryption markers still use
-the same schema-v3 fields.
+A separate read of the completed candidate frame verified the checksum and exact decoded size.
+It reconciled both runs at 114,513 physical sources, 93,861,565 source uses, 10,340 loadouts,
+290,711 ports and 690,838,290 references across the six dominant fields. The six arrays saved
+exactly 11,303,107,764 bytes. Source-use IDs are document-local strings and each field carries
+its original schema-v3 encryption and completeness markers.
 
 A deterministic one-to-one remap to nine-character ASCII identifiers would retain the current
 string schema. It bounds the six arrays at 8,292,191,628 bytes including quotes, separators
