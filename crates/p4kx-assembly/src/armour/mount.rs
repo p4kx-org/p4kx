@@ -184,6 +184,7 @@ fn mounted(
         frame: RigMount::new(bone, transform),
         source: WornMountSource::new(
             port,
+            mount.forge_origin.clone(),
             holder.bone_source(held.selection),
             skeleton.bone_source(anchor.selection),
             locator,

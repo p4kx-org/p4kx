@@ -40,6 +40,9 @@ impl<'f> LoadoutResolver<'f> {
             &mut self.builder,
             record,
             self.observation.as_deref(),
+            self.forge_origin
+                .as_ref()
+                .filter(|_| record.is_from(self.entities.forge())),
         ));
         self.specs.insert(record.index(), Arc::clone(&spec));
         spec

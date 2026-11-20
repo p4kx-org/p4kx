@@ -2,8 +2,9 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::ops::Range;
+use std::sync::Arc;
 
-use p4kx_extraction::{EntryOrigin, ModelArchiveSource, SourceLocation};
+use p4kx_extraction::{DataForgeOrigin, EntryOrigin, ModelArchiveSource, SourceLocation};
 use p4kx_model::{Model, ModelFile};
 
 use super::ArmourPart;
@@ -14,6 +15,7 @@ use crate::placement::BoneSelection;
 #[derive(Debug, Clone)]
 pub struct WornMountSource {
     port: PortPlacementSource,
+    forge_origin: Option<Arc<DataForgeOrigin>>,
     holder: Option<MountModelSource>,
     skeleton: Option<MountModelSource>,
     item_locator: Option<MountModelSource>,
@@ -22,12 +24,14 @@ pub struct WornMountSource {
 impl WornMountSource {
     pub(super) const fn new(
         port: PortPlacementSource,
+        forge_origin: Option<Arc<DataForgeOrigin>>,
         holder: Option<MountModelSource>,
         skeleton: Option<MountModelSource>,
         item_locator: Option<MountModelSource>,
     ) -> Self {
         Self {
             port,
+            forge_origin,
             holder,
             skeleton,
             item_locator,
@@ -38,6 +42,10 @@ impl WornMountSource {
     #[must_use]
     pub const fn port(&self) -> &PortPlacementSource {
         &self.port
+    }
+
+    pub(super) fn forge_origin(&self) -> Option<&DataForgeOrigin> {
+        self.forge_origin.as_deref()
     }
 
     /// Returns the model bone that supplied the attachment frame.

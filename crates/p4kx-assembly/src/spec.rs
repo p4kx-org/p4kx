@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use p4kx_dataforge::{Guid, RecordTree, StructValue, Value};
+use p4kx_extraction::DataForgeOrigin;
 
 use crate::ItemClassification;
 use crate::LoadoutXmlClassUse;
@@ -132,11 +133,15 @@ pub(crate) struct EntitySpec {
 
 impl EntitySpec {
     /// Reads the ports and the default Loadout from the components of an Entity's tree.
-    pub(crate) fn read(tree: &RecordTree<'_>, paths: &PathRead<'_>) -> Self {
+    pub(crate) fn read(
+        tree: &RecordTree<'_>,
+        paths: &PathRead<'_>,
+        forge_origin: Option<&Arc<DataForgeOrigin>>,
+    ) -> Self {
         let components = components_of(tree);
         let record: Arc<str> = Arc::from(tree.record_path());
         let (loadout, outfit) = read_default_loadout(&components, &record, paths);
-        let (ports, port_flags) = read_ports(tree, paths);
+        let (ports, port_flags) = read_ports(tree, paths, forge_origin);
         let mut port_index = HashMap::with_capacity(ports.len());
         for (at, port) in ports.iter().enumerate() {
             port_index.entry(port_key(&port.name)).or_insert(at);
@@ -250,7 +255,11 @@ fn read_default_loadout(
 
 /// Reads the item ports of the port containers among `components`, and the flags the containers
 /// give all their ports.
-fn read_ports(tree: &RecordTree<'_>, paths: &PathRead<'_>) -> (Vec<PortSpec>, Vec<String>) {
+fn read_ports(
+    tree: &RecordTree<'_>,
+    paths: &PathRead<'_>,
+    forge_origin: Option<&Arc<DataForgeOrigin>>,
+) -> (Vec<PortSpec>, Vec<String>) {
     let record_index = tree.record_index();
     let containers =
         || component_slots(tree).filter(|(_, component)| component.type_name() == PORT_CONTAINER);
@@ -258,7 +267,7 @@ fn read_ports(tree: &RecordTree<'_>, paths: &PathRead<'_>) -> (Vec<PortSpec>, Ve
         .flat_map(|(component_index, component)| {
             indexed_struct_items(component, "Ports").map(move |(port_index, port)| {
                 let name_proof = paths.field(port, "Name", LoadoutPathOperation::PortName);
-                let definition = read_definition(
+                let mut definition = read_definition(
                     port,
                     PortDefinitionPosition {
                         record: record_index,
@@ -266,6 +275,7 @@ fn read_ports(tree: &RecordTree<'_>, paths: &PathRead<'_>) -> (Vec<PortSpec>, Ve
                         port: port_index,
                     },
                 );
+                definition.forge_origin = forge_origin.cloned();
                 paths.port_definition(&definition, port);
                 PortSpec {
                     name: name_proof.value().to_owned(),

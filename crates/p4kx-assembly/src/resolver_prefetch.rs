@@ -39,15 +39,19 @@ impl<'f> LoadoutResolver<'f> {
                 }
             }
             let observation = self.observation.clone();
+            let forge = self.entities.forge();
+            let forge_origin = self.forge_origin.as_ref();
             let read: Vec<(Record<'f>, SpecResult)> = missing
                 .into_par_iter()
                 .map_init(TreeBuilder::new, |builder, record| {
+                    let origin = forge_origin.filter(|_| record.is_from(forge));
                     (
                         record,
                         Arc::new(resolver_observation::read_spec(
                             builder,
                             &record,
                             observation.as_deref(),
+                            origin,
                         )),
                     )
                 })

@@ -2,8 +2,10 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::ops::ControlFlow;
+use std::sync::Arc;
 
 use p4kx_dataforge::{Record, RecordTree};
+use p4kx_extraction::DataForgeOrigin;
 
 use crate::LoadoutError;
 use crate::loadout_path::PathRead;
@@ -15,9 +17,11 @@ pub(crate) fn parse_spec<'source>(
     record: &Record<'source>,
     tree: &RecordTree<'source>,
     observation: Option<&Observation<'_>>,
+    forge_origin: Option<&Arc<DataForgeOrigin>>,
 ) -> Result<EntitySpec, LoadoutError> {
+    let forge_origin = forge_origin.filter(|_| tree.is_from(record));
     with_record_paths(record, tree, observation, |paths| {
-        EntitySpec::read(tree, paths)
+        EntitySpec::read(tree, paths, forge_origin)
     })
 }
 

@@ -35,14 +35,8 @@ impl Holder<'_> {
         let definition = port.definition()?;
         let resolved = port.placement_helper();
         let transform = resolved.transform?;
-        (!definition.is_skin() && !transform.helper().is_empty()).then(|| {
-            Mount::new(
-                holder,
-                definition.position(),
-                transform,
-                resolved.diagnostic,
-            )
-        })
+        (!definition.is_skin() && !transform.helper().is_empty())
+            .then(|| Mount::new(holder, definition, transform, resolved.diagnostic))
     }
 }
 

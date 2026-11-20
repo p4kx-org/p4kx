@@ -6,7 +6,7 @@
 use std::error::Error;
 
 use p4kx_assembly::{ArchiveModels, Armour, AssemblyOptions, BodyVariant, LoadoutResolver, Piece};
-use p4kx_extraction::{Archive, DataForgeEntry};
+use p4kx_extraction::{Archive, DataForgeEntry, SourceEncryptionState, SourceLocation};
 use p4kx_gltf::GlbOptions;
 use p4kx_testkit::{
     CheckedGlb, MOUNT_BONE, MOUNT_COURIER, MOUNT_DRIFTER, SATCHEL_HELPER_Z, check_glb,
@@ -212,5 +212,61 @@ fn a_conflicting_or_incompatible_replacement_never_writes_the_rigid_piece_at_the
             "the skinned holder remains"
         );
     }
+    Ok(())
+}
+
+fn port_evidence(
+    archive: &Archive,
+    entry: &DataForgeEntry,
+    presented_entry: &DataForgeEntry,
+) -> Result<SourceEncryptionState, Box<dyn Error>> {
+    let forge = entry.open()?;
+    let mut resolver = LoadoutResolver::new(&forge).with_forge_entry(presented_entry);
+    let record = resolver.entities().find(MOUNT_COURIER)?;
+    let tree = resolver.resolve(&record)?;
+    let models = ArchiveModels::new(archive).with_model_node_sources();
+    let armour = Armour::build(
+        BodyVariant::Male,
+        &resolver.worn(&tree),
+        &models,
+        &AssemblyOptions::default(),
+    )?;
+    let animated = armour.animate(&[], &models);
+    let (_, emission) = armour.write_glb_animated_observed(
+        &animated,
+        &GlbOptions::default(),
+        &models.textures(),
+        &mut Vec::new(),
+    )?;
+    let (inventory, fields) = armour.worn_mount_origins(&emission)?.into_field_origins()?;
+    assert!(
+        fields.iter().next().is_some(),
+        "the authored mount addresses are exported"
+    );
+    let source = inventory
+        .iter_uses()
+        .find(|source| matches!(source.location(), SourceLocation::DataForge { .. }))
+        .ok_or("the authored port field is observed")?;
+    Ok(source.effective_encryption())
+}
+
+#[test]
+fn mount_port_evidence_keeps_its_original_dataforge_input() -> TestResult {
+    let mounted = fixture(mounted_item_entries())?;
+    let foreign = fixture(mounted_item_entries())?;
+    let archive = Archive::open(&mounted.path)?;
+    let other_archive = Archive::open(&foreign.path)?;
+    let entry = DataForgeEntry::read(&archive)?;
+    let other_entry = DataForgeEntry::read(&other_archive)?;
+    assert_eq!(
+        port_evidence(&archive, &entry, &entry)?,
+        SourceEncryptionState::Unencrypted,
+        "the admitted original entry proves the actual port source"
+    );
+    assert_eq!(
+        port_evidence(&archive, &entry, &other_entry)?,
+        SourceEncryptionState::Unknown,
+        "an identical but separately read database cannot supply this port's provenance"
+    );
     Ok(())
 }

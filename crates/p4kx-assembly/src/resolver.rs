@@ -60,7 +60,7 @@ impl Entries {
 /// tree with the reason.
 pub struct LoadoutResolver<'f> {
     pub(crate) entities: Arc<Entities<'f>>,
-    forge_origin: Option<Arc<DataForgeOrigin>>,
+    pub(crate) forge_origin: Option<Arc<DataForgeOrigin>>,
     pub(crate) files: Option<&'f dyn LoadoutFiles>,
     pub(crate) specs: HashMap<u32, SpecResult>,
     pub(crate) xml: HashMap<String, CachedDocument<EntriesResult>>,
@@ -231,6 +231,9 @@ impl<'f> LoadoutResolver<'f> {
                     entity,
                     tree,
                     self.observation.as_deref(),
+                    self.forge_origin
+                        .as_ref()
+                        .filter(|_| entity.is_from(self.entities.forge())),
                 )),
             );
         }

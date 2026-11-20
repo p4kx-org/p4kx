@@ -91,7 +91,7 @@ fn observed(
     assert!(
         recorder
             .with_record_paths(record, tree, &mut |observer| {
-                result = Some(EntitySpec::read(tree, &PathRead::new(observer, None)));
+                result = Some(EntitySpec::read(tree, &PathRead::new(observer, None), None));
                 ControlFlow::Continue(())
             })
             .is_continue(),
@@ -156,7 +156,7 @@ fn all_actual_guid_getters_keep_opaque_occurrences_without_changing_value_semant
             let spec = observed(&record, &tree, &recorder)?;
             assert_eq!(
                 spec,
-                EntitySpec::read(&tree, &PathRead::new(None, None)),
+                EntitySpec::read(&tree, &PathRead::new(None, None), None),
                 "evidence does not alter GUID, port, vehicle or Loadout equality"
             );
             pairs(

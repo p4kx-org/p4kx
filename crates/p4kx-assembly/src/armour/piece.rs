@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::sync::Arc;
+
 use p4kx_character::Dna;
-use p4kx_extraction::SourceLocation;
+use p4kx_extraction::{DataForgeOrigin, SourceLocation};
 
 use super::layered_worn::OverlayMount;
 use super::{Expressions, HeadMaterial, Look, Wearable};
 use crate::bespoke::Bespoke;
-use crate::{PortDefinitionPosition, PortHelperDiagnostic, PortTransform};
+use crate::{PortDefinition, PortDefinitionPosition, PortHelperDiagnostic, PortTransform};
 
 /// The port an unskinned piece hangs on: the helper of the holder it is placed at, the offset from
 /// it and the helper of the piece that goes there. The offset is kept as the bits of its numbers
@@ -18,6 +20,7 @@ pub(crate) struct Mount {
     pub(crate) holder: Option<String>,
     pub(crate) holder_index: Option<usize>,
     pub(crate) port: PortDefinitionPosition,
+    pub(super) forge_origin: Option<Arc<DataForgeOrigin>>,
     pub(crate) helper: String,
     pub(crate) offset_helper: String,
     pub(crate) helper_diagnostic: Option<Box<PortHelperDiagnostic>>,
@@ -30,14 +33,15 @@ impl Mount {
     /// Returns the mount of an item at the port `port` of `holder`.
     pub(crate) fn new(
         holder: Option<(usize, String)>,
-        position: PortDefinitionPosition,
+        definition: &PortDefinition,
         port: &PortTransform,
         diagnostic: Option<PortHelperDiagnostic>,
     ) -> Self {
         Self {
             holder_index: holder.as_ref().map(|(index, _)| *index),
             holder: holder.map(|(_, label)| label),
-            port: position,
+            port: definition.position(),
+            forge_origin: definition.forge_origin.clone(),
             helper: port.helper().to_owned(),
             offset_helper: port.offset_helper().to_owned(),
             helper_diagnostic: diagnostic.map(Box::new),

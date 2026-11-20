@@ -174,8 +174,8 @@ fn vehicle_value_equality_does_not_depend_on_record_name_authorship() -> TestRes
         .ok_or("the actual vehicle Record is absent")?
         .tree()?;
     let probe = Probe::default();
-    let plain = crate::spec::EntitySpec::read(&tree, &PathRead::new(None, None));
-    let observed = crate::spec::EntitySpec::read(&tree, &PathRead::new(Some(&probe), None));
+    let plain = crate::spec::EntitySpec::read(&tree, &PathRead::new(None, None), None);
+    let observed = crate::spec::EntitySpec::read(&tree, &PathRead::new(Some(&probe), None), None);
     let plain = plain.vehicle.ok_or("the unobserved vehicle is absent")?;
     let observed = observed.vehicle.ok_or("the observed vehicle is absent")?;
     assert!(

@@ -336,6 +336,7 @@ pub(crate) fn read_spec<'f>(
     builder: &mut TreeBuilder<'f>,
     record: &Record<'f>,
     observation: Option<&Observation<'_>>,
+    forge_origin: Option<&Arc<p4kx_extraction::DataForgeOrigin>>,
 ) -> Result<crate::spec::EntitySpec, LoadoutError> {
     if observation.is_some_and(Observation::stopped) {
         return Err(LoadoutError::ObservationStopped);
@@ -358,7 +359,7 @@ pub(crate) fn read_spec<'f>(
         return Err(error);
     }
     let tree = canonical(builder, record, observation)?;
-    parse_spec(record, &tree, observation)
+    parse_spec(record, &tree, observation, forge_origin)
 }
 
 impl LoadoutResolver<'_> {

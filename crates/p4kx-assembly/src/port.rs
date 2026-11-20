@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::sync::Arc;
+
 use p4kx_dataforge::StructValue;
+use p4kx_extraction::DataForgeOrigin;
 
 use crate::port_sub_helper::{self, PortSubHelper, PortSubHelpers};
 use crate::read::{flag, struct_field, struct_items, text, texts, unsigned, xyz};
@@ -14,6 +17,7 @@ const SKIN_ATTACHMENT: &str = "Skin";
 #[derive(Debug, Clone, PartialEq)]
 pub struct PortDefinition {
     pub(crate) position: PortDefinitionPosition,
+    pub(crate) forge_origin: Option<Arc<DataForgeOrigin>>,
     pub(crate) display_name: String,
     pub(crate) flags: String,
     pub(crate) min_size: Option<u32>,
@@ -240,6 +244,7 @@ pub(crate) fn read_definition(
     let kind = attachment.map_or("", attachment_kind);
     PortDefinition {
         position,
+        forge_origin: None,
         display_name: text(port, "DisplayName").to_owned(),
         flags: text(port, "Flags").to_owned(),
         min_size: unsigned(port, "MinSize"),

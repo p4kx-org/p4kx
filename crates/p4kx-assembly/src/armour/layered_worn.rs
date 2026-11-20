@@ -392,7 +392,7 @@ pub(super) fn mount_at(
     }
     Ok(Mount::new(
         holder,
-        definition.position(),
+        definition,
         transform,
         resolved.diagnostic,
     ))

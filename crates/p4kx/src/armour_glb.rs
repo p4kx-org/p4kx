@@ -95,7 +95,9 @@ pub(crate) fn run(args: &ArmourGlbArgs, as_json: bool) -> Result<()> {
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;
     let files = Files::open(ArchiveFiles::new(&archive), args.loadout.as_deref())?;
-    let mut resolver = LoadoutResolver::new(&forge).with_files(&files);
+    let mut resolver = LoadoutResolver::new(&forge)
+        .with_forge_entry(&entry)
+        .with_files(&files);
     let selection = gather(&mut resolver, &files, args)?;
     let variant = body_variant(args, &selection);
     let mut models = ArchiveModels::new(&archive);
@@ -118,9 +120,8 @@ pub(crate) fn run(args: &ArmourGlbArgs, as_json: bool) -> Result<()> {
         &folders,
     )?;
     let animated = armour.animate(&found.animations, &models);
-    let inputs = (&models, entry.origin());
     let guards = (&protection, &cancel);
-    let summary = output::write(&armour, &animated, args, inputs, guards)?;
+    let summary = output::write(&armour, &animated, args, &models, guards)?;
     let layers = match args.materials {
         ChfMaterialsArg::Textures => armour.layer_issues(),
         ChfMaterialsArg::Colours => Vec::new(),
