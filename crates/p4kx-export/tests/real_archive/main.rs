@@ -122,6 +122,7 @@ mod real_archive_ship_b2;
 mod real_archive_ship_base;
 mod real_archive_ship_matrix;
 mod real_archive_ship_systems_sdk;
+mod real_archive_ship_text_source_witness;
 mod real_archive_shop_inventory_v3;
 mod real_archive_shop_items;
 mod real_archive_shops;

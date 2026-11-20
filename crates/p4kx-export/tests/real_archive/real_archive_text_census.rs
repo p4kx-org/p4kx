@@ -17,6 +17,10 @@ mod item_capture;
 mod pipe;
 
 #[cfg(test)]
+#[path = "real_archive_text_census_identity_tests.rs"]
+mod identity_tests;
+
+#[cfg(test)]
 #[path = "real_archive_text_census_tests.rs"]
 mod tests;
 

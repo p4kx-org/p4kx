@@ -55,13 +55,14 @@ const fn baseline_of(kind: Kind, english: f64, german: f64) -> Baseline {
     }
 }
 
-const BASELINES: [Baseline; 18] = [
+const BASELINES: [Baseline; 20] = [
     baseline_of(Kind::Manufacturers, 0.01, 0.06),
     baseline_of(Kind::Items, 0.01, 0.38),
-    baseline_of(Kind::Ships, 0.01, 0.31),
+    baseline_of(Kind::Ships, 0.01, 0.33),
     baseline_of(Kind::Commodities, 0.0, 0.16),
     baseline_of(Kind::Blueprints, 0.0, 1.0),
     baseline_of(Kind::ResourceGroups, 0.0, 0.0),
+    baseline_of(Kind::ResourceTypes, 0.0, 0.33),
     baseline_of(Kind::GameplayProperties, 0.0, 0.97),
     baseline_of(Kind::StarmapObjects, 0.04, 0.67),
     baseline_of(Kind::Contracts, 0.02, 0.53),
@@ -71,6 +72,7 @@ const BASELINES: [Baseline; 18] = [
     baseline_of(Kind::ReputationScopes, 0.24, 0.31),
     baseline_of(Kind::ReputationStandings, 0.08, 0.21),
     baseline_of(Kind::MissionTypes, 0.0, 0.57),
+    baseline_of(Kind::MissionPropertySets, 0.01, 0.97),
     baseline_of(Kind::MissionLocationTemplates, 0.09, 0.99),
     baseline_of(Kind::ContractTemplates, 0.01, 0.99),
     baseline_of(Kind::MissionBrokerEntries, 0.04, 1.0),
@@ -335,6 +337,7 @@ fn check_coverage(
                 kind,
                 Kind::Manufacturers
                     | Kind::Items
+                    | Kind::Ships
                     | Kind::ResourceTypes
                     | Kind::ResourceGroups
                     | Kind::GameplayProperties

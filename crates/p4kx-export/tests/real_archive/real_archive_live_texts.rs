@@ -191,10 +191,7 @@ fn complete_text_scope(summary: &CatalogSummary) -> TestResult {
 }
 
 fn required_kinds() -> impl Iterator<Item = Kind> {
-    BASELINES
-        .into_iter()
-        .map(|baseline| baseline.kind)
-        .chain([Kind::ResourceTypes])
+    BASELINES.into_iter().map(|baseline| baseline.kind)
 }
 
 #[cfg(test)]

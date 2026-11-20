@@ -144,10 +144,7 @@ fn checked_table<'catalog>(
     path: &str,
 ) -> TestResult<&'catalog Vec<Value>> {
     let rows = table(catalog, path)?;
-    if matches!(
-        kind,
-        Kind::ParticleLibraries | Kind::FlareLibraries | Kind::RadarAudio
-    ) {
+    if entry_identity::has_physical_entry_identity(kind) {
         entry_identity::check(catalog, kind, rows)?;
         return Ok(rows);
     }
@@ -258,6 +255,7 @@ const fn all_fields_sourced(kind: Kind) -> bool {
                 | Kind::Jurisdictions
                 | Kind::SecurityNetworkManifests
                 | Kind::MissionModuleDeclarations
+                | Kind::MissionScenarios
                 | Kind::MissionLocationTemplates
                 | Kind::LocationClasses
                 | Kind::LocationFunctions
@@ -364,6 +362,7 @@ const fn has_record_header(kind: Kind) -> bool {
                 | Kind::Jurisdictions
                 | Kind::SecurityNetworkManifests
                 | Kind::MissionModuleDeclarations
+                | Kind::MissionScenarios
                 | Kind::MissionLocationTemplates
                 | Kind::LocationClasses
                 | Kind::LocationFunctions

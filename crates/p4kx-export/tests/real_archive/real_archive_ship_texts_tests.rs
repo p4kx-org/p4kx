@@ -51,6 +51,30 @@ fn the_ship_baseline_counts_name_and_description_and_checks_role_and_career() ->
     Ok(())
 }
 
+#[test]
+fn baselined_ship_rows_require_verifiable_text_occurrences() -> TestResult {
+    let fixture = Fixture::from_database(&database())?;
+    let mut catalog = fixture.catalog.clone();
+    let row = catalog
+        .pointer_mut("/ships/0")
+        .ok_or("selected Ship fixture")?;
+    for field in ["name", "description"] {
+        let carrier = row.get_mut(field).ok_or("required Ship text field")?;
+        replace_value(carrier, "/state", json!("absent"))?;
+        replace_value(carrier, "/value", serde_json::Value::Null)?;
+    }
+    let (english, german) = fixture.coverage(&catalog, Kind::Ships)?;
+    assert_eq!((english.total(), german.total()), (0, 0));
+    let mut failures = Vec::new();
+    super::check_coverage(Kind::Ships, &english, &german, true, 1, &mut failures);
+    assert_eq!(
+        failures.len(),
+        1,
+        "a populated Ship table requires text coverage"
+    );
+    Ok(())
+}
+
 fn database() -> DataForgeBuilder {
     DataForgeBuilder::new()
         .version(8)

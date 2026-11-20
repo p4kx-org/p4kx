@@ -8,6 +8,27 @@ use serde_json::Value;
 
 use super::{TestResult, present};
 
+pub(super) const fn has_physical_entry_identity(kind: Kind) -> bool {
+    uses_archive_key(kind) || matches!(kind, Kind::FlareLibraries | Kind::RadarAudio)
+}
+
+const fn uses_archive_key(kind: Kind) -> bool {
+    matches!(
+        kind,
+        Kind::ParticleLibraries
+            | Kind::PlanetResources
+            | Kind::Creatures
+            | Kind::ClimateAssets
+            | Kind::GeologyAssets
+            | Kind::Ecosystems
+            | Kind::GeologySets
+            | Kind::GeologyTextureSets
+            | Kind::Soils
+            | Kind::SoilTextureSets
+            | Kind::ShadingClasses
+    )
+}
+
 pub(super) fn check(catalog: &Value, kind: Kind, rows: &[Value]) -> TestResult<()> {
     if rows.is_empty() {
         return Ok(());
@@ -26,7 +47,7 @@ pub(super) fn check(catalog: &Value, kind: Kind, rows: &[Value]) -> TestResult<(
         )?;
         let path = entry_path(identity, "sourcePath")?;
         let normalized = entry_path(identity, "normalizedPath")?;
-        let expected = if kind == Kind::ParticleLibraries {
+        let expected = if uses_archive_key(kind) {
             path.trim_start_matches(['/', '\\'])
                 .replace('/', "\\")
                 .to_ascii_lowercase()

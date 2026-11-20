@@ -54,3 +54,16 @@ contract. The oracle now parses decoded source lines independently of the produc
 For duplicate lines it uses the last plain and last suffixed declarations, preferring a non-empty
 plain value; this clarifies the abbreviated first-non-empty rule above. Per-kind baselines and
 German floors remain unchanged.
+
+On LIVE 13165946, the schema-v3 oracle counted 6 English and 2,316 German source gaps
+out of 2,402 MissionPropertySet text occurrences, plus 0 English and 130 German gaps
+out of 403 ResourceType text occurrences. Both comparisons found zero contradictions.
+Their independent ceilings are 0.01/0.97 and 0.00/0.33 for English/German respectively.
+
+On the same LIVE Build the scoped Ship query independently matched the original
+DataForge Locale declarations and both original INI files for all 1,024 Ship Records.
+The two shipped text fields had 2,046 non-placeholder occurrences. German was missing
+318 name occurrences and 339 description occurrences. English had 3 missing and 11
+explicitly empty occurrences. Neither language had a contradiction. The German Ship
+ceiling rounds up from 657/2,046 to 0.33 under the existing rule. English rounds
+up from 14/2,046 to 0.01. A nonempty Ship dataset requires verifiable original keys.
