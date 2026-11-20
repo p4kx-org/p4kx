@@ -47,6 +47,7 @@ pub(super) enum Family {
     Attachments,
     Bounds,
     CargoGrids,
+    InventoryContainers,
     CargoLoadingGlobals,
     ShopCommodityGlobals,
     Configuration(ConfigurationFamily),
@@ -65,6 +66,7 @@ impl Family {
     pub(super) const fn kind(self) -> Kind {
         match self {
             Self::AmmoDefinitions => Kind::AmmoDefinitions,
+            Self::InventoryContainers => Kind::InventoryContainers,
             Self::CargoLoadingGlobals => Kind::CargoLoadingGlobals,
             Self::ShopCommodityGlobals => Kind::ShopCommodityGlobals,
             Self::Definitions
@@ -91,7 +93,7 @@ impl Family {
             Self::Configuration(family) => family.source_types(),
             Self::ItemEquipment(family) => family.source_types(),
             Self::CargoGrids => &[crate::catalog_v3::catalog_facility::CARGO_GRID_SOURCE_TYPE],
-            Self::CargoLoadingGlobals | Self::ShopCommodityGlobals => {
+            Self::InventoryContainers | Self::CargoLoadingGlobals | Self::ShopCommodityGlobals => {
                 return DatasetAvailability::from_source_declarations(forge, |name| {
                     name == self.kind().records().type_name
                 });

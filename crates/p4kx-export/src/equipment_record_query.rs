@@ -6,7 +6,7 @@ macro_rules! unlocalized {
         $(#[$doc])+
         pub type $snapshot<'source> = super::EquipmentSnapshot<'source, $row<'source>>;
 
-        /// Reads canonical configuration rows by physical owner.
+        /// Reads canonical rows by physical owner.
         ///
         /// # Errors
         /// Returns input, source-evidence, Archive-change or cancellation errors.
@@ -48,7 +48,7 @@ macro_rules! unlocalized {
         }
 
         impl crate::catalog_queries::CatalogQuerySession<'_> {
-            /// Reads canonical configuration rows through this Archive session.
+            /// Reads canonical rows through this Archive session.
             ///
             /// # Errors
             /// Returns canonical query, Archive-change or cancellation errors.
@@ -63,7 +63,7 @@ macro_rules! unlocalized {
         }
 
         impl crate::catalog_queries::ParsedCatalogQueries<'_> {
-            /// Reads canonical configuration rows from this parsed DataForge.
+            /// Reads canonical rows from this parsed DataForge.
             ///
             /// # Errors
             /// Returns canonical query, Archive-change or cancellation errors.

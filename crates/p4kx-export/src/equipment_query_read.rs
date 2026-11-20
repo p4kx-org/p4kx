@@ -153,6 +153,7 @@ impl<'query> Query<'query> {
         let mut plan = match family {
             Family::Definitions
             | Family::ItemSources
+            | Family::InventoryContainers
             | Family::CargoLoadingGlobals
             | Family::ShopCommodityGlobals
             | Family::AmmoDefinitions
@@ -201,6 +202,7 @@ fn order(family: Family, owners: &mut [Owner<'_>]) {
         Family::Definitions
         | Family::ItemSources
         | Family::AmmoDefinitions
+        | Family::InventoryContainers
         | Family::CargoLoadingGlobals
         | Family::ShopCommodityGlobals => owners.sort_by_cached_key(|owner| {
             (

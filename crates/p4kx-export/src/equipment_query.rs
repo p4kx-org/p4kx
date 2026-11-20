@@ -80,6 +80,8 @@ mod cargo;
 mod cargo_read;
 #[path = "equipment_item_query.rs"]
 mod definitions;
+#[path = "equipment_inventory_query.rs"]
+mod inventory;
 #[path = "equipment_item_source_query.rs"]
 mod item_sources;
 #[path = "equipment_projectile_ammo_query.rs"]
@@ -135,6 +137,9 @@ pub use cargo::{
     InventoryOpenContainer, InventoryOwnerStorage, with_cargo_grids, with_cargo_grids_from,
 };
 pub use definitions::{with_item_definitions, with_item_definitions_from};
+pub use inventory::{
+    InventoryContainerSnapshot, with_inventory_containers, with_inventory_containers_from,
+};
 #[cfg(test)]
 pub(crate) use item_sources::observe_item_source_query;
 pub use item_sources::{with_item_sources, with_item_sources_from};

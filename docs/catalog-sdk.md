@@ -618,6 +618,21 @@ identifies the affected physical Record. An explicit null target and a proven fo
 remain separate known exclusions. No unrelated configuration projector runs to manufacture that
 coverage result.
 
+## Direct inventory container definitions
+
+Use `catalog_queries::equipment::with_inventory_containers` for the physical rows under
+`definitions.inventoryContainers`. The `_from` entry point accepts the already decoded Entry
+from this Archive. The query session and parsed view also expose `with_inventory_containers`.
+Select all records, every physical owner of a GUID, or one physical Record index in this DataForge.
+The result retains the Catalog's GUID order and physical tie order, including duplicate GUIDs.
+
+The query supplies original interior dimensions, ordered item-type restrictions, concrete open
+or closed storage policies and additional authored fields. Check family availability and the
+selected header, body and field coverage independently. An empty result may follow a valid
+selection even when the source family is available. Use the snapshot's own inventory to decode
+field origins. This query opens the original DataForge with no locale, loadout or placement reads.
+For resolved Cargo Grid capacity and its associated storage component, use `with_cargo_grids`.
+
 ## Direct flight configurations
 
 Use `catalog_queries::equipment::flight` to query `configurations.flightControllers` with

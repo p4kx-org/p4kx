@@ -47,6 +47,8 @@ mod fixtures;
 mod flight_configurations;
 #[path = "sdk_fuel_routes.rs"]
 mod fuel;
+#[path = "sdk_inventory_container_route.rs"]
+mod inventory_containers;
 #[path = "sdk_loot_routes.rs"]
 mod loot;
 #[path = "sdk_loot_generation_route.rs"]
@@ -123,6 +125,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
     routes.push(reputation_rewards::read()?);
     routes.extend(resource_network::read()?);
     routes.extend(fuel::read()?);
+    routes.push(inventory_containers::read()?);
     routes.extend(read_cargo_globals(&archive)?);
     routes.extend(quality::read()?);
     routes.extend(read_entity_definitions(&archive)?);
