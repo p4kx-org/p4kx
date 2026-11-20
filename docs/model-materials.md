@@ -100,9 +100,15 @@ including values from the applied vehicle XML modification.
 
 The fitted item's `@Tag` can select a physical entry in `Geometry.SubGeometry` or
 `Material.materialVariants`. A variant can supply just material or palette. It then uses the
-base model and keeps the selected material or palette coordinates. A matching descendant takes
-precedence over its parent and competing authored rows produce a
+base model and keeps the selected material or palette coordinates. A matching material variant
+descendant takes precedence over its ancestor. Competing matches within SubGeometry or the
+material tree, or across the two families, produce a
 `paint_appearance` diagnostic and use the base appearance.
+
+For a selected paint used by the rendered hull, the entity GLB records the observed paint GUID,
+tag, variant kind, model, material library and palette Record GUID in `asset.extras.p4kxPaintAppearance`.
+The digest-bound companion addresses those exact fields. Package `scene.json` keeps the same
+observation in `paint_provenance`. Missing proof leaves the corresponding identity absent.
 
 SDK callers preparing a vehicle model can request the same selection with
 `LoadoutResolver::with_vehicle_appearance()` before building the Assembly.

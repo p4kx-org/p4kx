@@ -10,8 +10,8 @@ use p4kx_assembly::{
     ForgePalettes, LoadoutResolver, creature_animations,
 };
 use p4kx_extraction::{
-    ConversionError, DataForgeEntry, GlbOptions, GlbSummary, GltfError, MaterialMode, is_same_file,
-    write_replacing_protected,
+    ConversionError, DataForgeEntry, FileReceipt, GlbOptions, GlbSummary, GltfError, MaterialMode,
+    is_same_file, write_replacing_protected,
 };
 use thiserror::Error;
 
@@ -111,6 +111,29 @@ fn write(
         .map_or_else(String::new, |root| root.class_name().to_owned());
     let out: &Path = &args.out;
     let textures = models.textures();
+    if let Some(paint) = assembly.paint_provenance()? {
+        let receipt =
+            FileReceipt::new_with_cancel(out, Some(protection), Some(protection), cancel.clone())?;
+        return Ok(receipt
+            .publish(
+                |mut writer| {
+                    paint
+                        .write_glb_animated_with(animated, &options, &textures, &mut writer)
+                        .map_err(|error| match error {
+                            GltfError::Write(source) => source,
+                            source => io::Error::other(source),
+                        })
+                },
+                |writer, binding, _| paint.write_glb_companion(writer, binding),
+            )
+            .map_err(|error| match error.downcast::<GltfError>() {
+                Ok(source) => ConversionError::Glb { file: name, source },
+                Err(source) => ConversionError::Write {
+                    path: out.to_path_buf(),
+                    source,
+                },
+            })?);
+    }
     Ok(write_replacing_protected(
         out,
         Some(protection),

@@ -231,6 +231,7 @@ fn write_model(
         instances: &[instance],
         rig: None,
         animations: &animations,
+        asset_extras: None,
     };
     write_instances(
         &content,
@@ -287,6 +288,10 @@ pub(crate) fn write_instances(
     let animation_plans = animation_plans(&mut layout, content, single);
     layout.push_images(images.images.iter().map(|image| image.png.len() as u64));
     let mut root = document(content, &layout, &images, &animation_plans);
+    root.asset.extras = content
+        .asset_extras
+        .map(serde_json::value::to_raw_value)
+        .transpose()?;
     if options.material_indices {
         index_materials(&mut root);
     }

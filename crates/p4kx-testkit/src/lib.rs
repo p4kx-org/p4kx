@@ -64,6 +64,7 @@ mod entity_sample;
 mod entity_schema;
 mod entity_skin;
 mod entity_vehicle;
+mod entity_vehicle_paint;
 mod entity_zones;
 mod frames;
 mod gfx;
@@ -240,6 +241,7 @@ pub use entity_schema::{
 };
 pub use entity_skin::{SKIN_BODY, skin_attachment_entries};
 pub use entity_vehicle::landing_system_record;
+pub use entity_vehicle_paint::fitted_paint_vehicle_entries;
 pub use entity_zones::{
     ZONE_JACKET, ZONE_SHIRT, jacketed_entries, zone_entries, zone_entries_with_layer_textures,
 };

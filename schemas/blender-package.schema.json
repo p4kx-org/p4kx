@@ -3975,6 +3975,74 @@
       ],
       "type": "object"
     },
+    "PaintAppearanceValues": {
+      "additionalProperties": false,
+      "description": "Observed identity fields of the selected hull paint and its actual appearance.",
+      "properties": {
+        "appearanceTag": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "geometry": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "material": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "paintGuid": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "paletteGuid": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "variantKind": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/VariantKind"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "PaintProvenance": {
+      "additionalProperties": false,
+      "description": "An appearance with field origins in a shared physical source inventory.",
+      "properties": {
+        "appearance": {
+          "$ref": "#/$defs/PaintAppearanceValues"
+        },
+        "fieldOrigins": {
+          "$ref": "#/$defs/FieldOrigins"
+        },
+        "sourceInventory": {
+          "$ref": "#/$defs/SourceInventory"
+        }
+      },
+      "required": [
+        "appearance",
+        "fieldOrigins",
+        "sourceInventory"
+      ],
+      "type": "object"
+    },
     "Palette": {
       "description": "A tint palette: the colours a livery gives the materials that take a palette entry.\n\nA palette is written once; meshes reference it by id.",
       "properties": {
@@ -6749,6 +6817,13 @@
         }
       ]
     },
+    "VariantKind": {
+      "enum": [
+        "subGeometry",
+        "materialVariant"
+      ],
+      "type": "string"
+    },
     "WornMountProvenance": {
       "properties": {
         "artifact": {
@@ -6893,6 +6968,17 @@
     "options": {
       "$ref": "#/$defs/Options",
       "description": "The choices the package was written with."
+    },
+    "paint_provenance": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PaintProvenance"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Physical inputs for the root vehicle's selected paint."
     },
     "palette_provenance": {
       "anyOf": [

@@ -100,6 +100,7 @@ impl Eq for Geometry {}
 #[derive(Debug, Clone)]
 pub struct GeometryVariant {
     pub(crate) tags: Vec<String>,
+    pub(crate) tag_locations: Box<[SourceLocation]>,
     pub(crate) geometry: Geometry,
 }
 
@@ -190,6 +191,10 @@ impl Geometry {
     #[must_use]
     pub fn model_field(&self) -> Option<SourceLocation> {
         self.origins.model_field()
+    }
+
+    pub(crate) fn variant_position(&self) -> Option<SourceLocation> {
+        self.origins.model.as_ref().map(|position| position.at(""))
     }
 
     pub(crate) fn material_field(&self) -> Option<SourceLocation> {

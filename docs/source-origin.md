@@ -301,6 +301,16 @@ whose contributing reads cannot be proved carry an incomplete origin. A
 successfully written partial model has a companion for its actual bytes and
 retains its existing issue and exit-code behavior.
 
+## Fitted vehicle paint
+
+A `p4kx entity glb` with a selected fitted paint publishes a digest-bound
+`<file>.p4kx-origin.jsonl`. Its `glbJsonField` addresses point into
+`/asset/extras/p4kxPaintAppearance`. The selected appearance kind references the original
+variant occurrence and the fitted paint's tag field. For a compatible explicit replacement it
+also retains the observed required tags, including an effective vehicle XML assignment.
+The material library and palette Record GUID link to the actual selected payloads and
+retained selectors. Unknown contributors keep their field's source set incomplete.
+
 ## Rigid worn mounts
 
 `p4kx armour glb` publishes a sibling `<file>.p4kx-origin.jsonl` for emitted rigid

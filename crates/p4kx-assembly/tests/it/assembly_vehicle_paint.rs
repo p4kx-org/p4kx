@@ -6,33 +6,13 @@ use p4kx_assembly::{
     LoadoutChanges, LoadoutResolver, PaletteSelection,
 };
 use p4kx_extraction::{Archive, DataForgeEntry, SourceLocation};
-use p4kx_testkit::{
-    DataForgeBuilder, TestEntity, TestEntry, TestInstance, TestModel, TestMtl, TestMtlMaterial,
-    TestPort, TestValue, entity_schema, tint_palette_record,
-};
+use p4kx_testkit::{TestEntry, fitted_paint_vehicle_entries};
 
 use crate::assembly_support::{TestResult, fixture};
 
-const DEFINITION: &str = "Scripts/Entities/Vehicles/Implementations/Xml/TEST_Paint.xml";
 const PORT: &str = "hardpoint_livery";
-const RED: u128 = 0x5611;
-const BLUE: u128 = 0x5612;
-const PALETTE: u128 = 0x5613;
 const BASE_MODEL: &str = "Objects/Test/hull.cgf";
 const BASE_MATERIAL: &str = "Objects/Test/base";
-const RED_MATERIAL: &str = "Objects/Test/red";
-const BLUE_MATERIAL: &str = "Objects/Test/blue";
-
-const IMPLEMENTATION: &str = r#"<Vehicle name="TEST_Paint">
-  <Parts><Part name="hardpoint_livery" class="ItemPort">
-    <ItemPort id="livery" requiredTags="Family_Blue">
-      <Types><Type type="Paints"/></Types>
-    </ItemPort>
-  </Part></Parts>
-  <Modifications><Modification name="Red"><Elems>
-    <Elem idRef="livery" name="requiredTags" value="Family_Red"/>
-  </Elems></Modification></Modifications>
-</Vehicle>"#;
 
 #[test]
 fn equipped_paint_selects_the_material_tree_and_applied_port_requirement() -> TestResult {
@@ -143,6 +123,24 @@ fn competing_nested_material_siblings_keep_the_base_appearance() -> TestResult {
     Ok(())
 }
 
+#[test]
+fn a_missing_root_model_has_no_rendered_paint_provenance() -> TestResult {
+    let omitted = [format!("Data/{BASE_MODEL}"), format!("Data/{BASE_MODEL}m")];
+    let mut entries = fitted_paint_vehicle_entries();
+    entries.retain(|entry| !omitted.iter().any(|path| path == entry.path()));
+    let assembled = assemble_entries("TEST_Hull_Red", &LoadoutChanges::new(), entries)?;
+    let root = assembled.root().ok_or("the unresolved hull")?;
+    assert!(
+        root.model().is_none(),
+        "the fixture omits the original hull geometry"
+    );
+    assert!(
+        assembled.paint_provenance()?.is_none(),
+        "effective paint evidence belongs to a loaded hull"
+    );
+    Ok(())
+}
+
 const fn is_paint_issue(issue: &Issue) -> bool {
     matches!(issue.kind(), IssueKind::PaintAppearance { .. })
 }
@@ -158,7 +156,15 @@ fn assemble(
     entity: &str,
     changes: &LoadoutChanges,
 ) -> Result<Assembly, Box<dyn std::error::Error>> {
-    let fixture = fixture(entries())?;
+    assemble_entries(entity, changes, fitted_paint_vehicle_entries())
+}
+
+fn assemble_entries(
+    entity: &str,
+    changes: &LoadoutChanges,
+    entries: Vec<TestEntry>,
+) -> Result<Assembly, Box<dyn std::error::Error>> {
+    let fixture = fixture(entries)?;
     let archive = Archive::open(&fixture.path)?;
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;
@@ -180,107 +186,4 @@ fn assemble(
         &ForgePalettes::new(&forge).with_entry(&entry),
         &AssemblyOptions::default(),
     )?)
-}
-
-fn entries() -> Vec<TestEntry> {
-    let red = hull(0x5621, "TEST_Hull_Red", "Red", RED)
-        .material_choice("Red", RED_MATERIAL)
-        .material_choice("Orphan", BASE_MATERIAL);
-    let blue = hull(0x5622, "TEST_Hull_Blue", "", BLUE)
-        .geometry_variant("Blue", BASE_MODEL, Some(BLUE_MATERIAL))
-        .variant_palette(PALETTE, "");
-    let model_less = hull(0x5623, "TEST_Hull_Model_Less", "", BLUE)
-        .geometry_variant("Blue", "", Some(BLUE_MATERIAL))
-        .variant_palette(PALETTE, "");
-    let forge = entity_schema(DataForgeBuilder::new())
-        .record(red.record())
-        .record(blue.record())
-        .record(model_less.record())
-        .record(nested_hull().record())
-        .record(paint(RED, "TEST_Paint_Red", "Family_Red @Red").record())
-        .record(paint(BLUE, "TEST_Paint_Blue", "Family_Blue @Blue").record())
-        .record(tint_palette_record(
-            PALETTE,
-            "synthetic_blue",
-            [[64, 128, 255]; 3],
-            [255; 3],
-            [128; 3],
-        ))
-        .build();
-    let cube = TestModel::cube();
-    let mut entries = vec![
-        TestEntry::zstd("Data\\Game2.dcb", forge),
-        TestEntry::stored(format!("Data/{DEFINITION}"), IMPLEMENTATION.as_bytes()),
-        TestEntry::stored(format!("Data/{BASE_MODEL}"), cube.cgf()),
-        TestEntry::stored(format!("Data/{BASE_MODEL}m"), cube.cgfm()),
-    ];
-    let library = TestMtl::single(&TestMtlMaterial::new("Hull")).cryxml();
-    for path in [BASE_MATERIAL, RED_MATERIAL, BLUE_MATERIAL] {
-        entries.push(TestEntry::stored(format!("Data/{path}.mtl"), &library[..]));
-    }
-    entries
-}
-
-fn nested_hull() -> TestEntity {
-    let materials = material_node(
-        "",
-        "",
-        vec![material_node(
-            "Red",
-            "",
-            vec![
-                material_node("Red", RED_MATERIAL, Vec::new()),
-                material_node("Red", BLUE_MATERIAL, Vec::new()),
-            ],
-        )],
-    );
-    let model = TestInstance::new("SGeometryNodeParams").value(
-        "Geometry",
-        TestValue::Struct(
-            TestInstance::new("SGeometryDataParams")
-                .value("Geometry", resource("GlobalResourceGeometry", BASE_MODEL))
-                .value(
-                    "Material",
-                    resource("GlobalResourceMaterial", BASE_MATERIAL),
-                ),
-        ),
-    );
-    TestEntity::new(
-        0x5624,
-        "TEST_Hull_Nested_Paint",
-        "entities/test_hull_nested_paint.xml",
-    )
-    .vehicle(DEFINITION, "Red")
-    .port(TestPort::new(PORT).default_item(RED))
-    .component(TestValue::Struct(
-        TestInstance::new("SGeometryResourceParams")
-            .value("Geometry", TestValue::Struct(model))
-            .value("Material", materials),
-    ))
-}
-
-fn material_node(tags: &str, path: &str, children: Vec<TestValue>) -> TestValue {
-    TestValue::Struct(
-        TestInstance::new("SMaterialNodeParams")
-            .value("Tags", TestValue::text(tags))
-            .value("Material", resource("GlobalResourceMaterial", path))
-            .value("materialVariants", TestValue::Array(children)),
-    )
-}
-
-fn resource(kind: &str, path: &str) -> TestValue {
-    TestValue::Struct(TestInstance::new(kind).value("path", TestValue::text(path)))
-}
-
-fn hull(guid: u128, name: &str, modification: &str, paint: u128) -> TestEntity {
-    TestEntity::new(guid, name, format!("entities/{name}.xml"))
-        .vehicle(DEFINITION, modification)
-        .geometry(BASE_MODEL, Some(BASE_MATERIAL))
-        .port(TestPort::new(PORT).default_item(paint))
-}
-
-fn paint(guid: u128, name: &str, tags: &str) -> TestEntity {
-    TestEntity::new(guid, name, format!("entities/{name}.xml"))
-        .attach_type("Paints")
-        .tags(tags)
 }

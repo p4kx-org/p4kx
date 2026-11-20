@@ -2,7 +2,9 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_dataforge::{StructValue, Value};
+use p4kx_extraction::SourceLocation;
 
+use super::origins::Position;
 use super::{Geometry, GeometryComponent, GeometryVariant, model_path};
 use crate::read::{indexed_struct_items, struct_field, text};
 
@@ -17,7 +19,9 @@ pub(crate) struct GeometryVariants {
 #[derive(Debug, Clone)]
 pub(crate) struct AppearanceOnlyVariant {
     pub(crate) tags: Vec<String>,
+    pub(crate) tag_locations: Box<[SourceLocation]>,
     pub(crate) geometry: Geometry,
+    pub(crate) position: Option<SourceLocation>,
     slots: Box<[usize]>,
 }
 
@@ -42,16 +46,32 @@ impl Geometry {
             return GeometryVariants::default();
         };
         let mut variants = GeometryVariants::default();
-        let mut level = vec![(node, Vec::<String>::new(), Vec::<usize>::new())];
+        let mut level = vec![(
+            node,
+            Vec::<String>::new(),
+            Vec::<SourceLocation>::new(),
+            Vec::<usize>::new(),
+        )];
         while !level.is_empty() {
             let mut next = Vec::new();
-            for (parent, inherited, source) in &level {
+            for (parent, inherited, tag_sources, source) in &level {
                 for (slot, sub) in indexed_struct_items(parent, "SubGeometry") {
                     let slots: Vec<_> = source.iter().copied().chain([slot]).collect();
                     let mut tags = inherited.clone();
-                    tags.extend(text(sub, "Tags").split_whitespace().map(str::to_owned));
-                    variants.add(sub, owner, &slots, &tags, hull_base);
-                    next.push((sub, tags, slots));
+                    let mut tag_locations = tag_sources.clone();
+                    let words = text(sub, "Tags").split_whitespace();
+                    if words.clone().next().is_some() {
+                        tags.extend(words.map(str::to_owned));
+                        tag_locations.push(
+                            Position {
+                                owner,
+                                slots: slots.as_slice().into(),
+                            }
+                            .at(".Tags"),
+                        );
+                    }
+                    variants.add(sub, owner, &slots, &tags, &tag_locations, hull_base);
+                    next.push((sub, tags, tag_locations, slots));
                 }
             }
             level = next;
@@ -67,6 +87,7 @@ impl GeometryVariants {
         owner: GeometryComponent,
         slots: &[usize],
         tags: &[String],
+        tag_locations: &[SourceLocation],
         hull_base: Option<&Geometry>,
     ) {
         let Some(data) = struct_field(node, "Geometry") else {
@@ -75,6 +96,7 @@ impl GeometryVariants {
         if let Some(path) = model_path(data) {
             self.models.push(GeometryVariant {
                 tags: tags.to_vec(),
+                tag_locations: tag_locations.into(),
                 geometry: Geometry::from_data(data, owner, slots, path),
             });
         } else if let Some(base) =
@@ -82,10 +104,13 @@ impl GeometryVariants {
         {
             let mut geometry = Geometry::from_data(data, owner, slots, base.path());
             if geometry.material().is_some() || geometry.palette().is_some() {
+                let position = geometry.variant_position();
                 geometry.origins.model.clone_from(&base.origins.model);
                 self.appearance_only.push(AppearanceOnlyVariant {
                     tags: tags.to_vec(),
+                    tag_locations: tag_locations.into(),
                     geometry,
+                    position,
                     slots: slots.into(),
                 });
             }

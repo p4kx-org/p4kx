@@ -128,6 +128,10 @@ impl Assembly {
         Ok(Self {
             parts,
             forge_origin: tree.forge_origin.clone(),
+            paint: drafts
+                .first()
+                .and_then(|draft| tree.rendered_paint(draft.geometry))
+                .cloned(),
             issues,
             lod: options.lod,
             interior: None,

@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::sync::Arc;
+
 use p4kx_dataforge::{StructValue, TagTree};
+use p4kx_extraction::SourceLocation;
 
 use crate::geometry_choice::GeometryChoice;
+use crate::paint_provenance::{PaintSelection, PaintSelectionInput, VariantSource};
 use crate::read;
 use crate::spec::{EntitySpec, VehicleSpec};
 use crate::{
@@ -43,7 +47,10 @@ impl PaintItem {
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum PaintAppearance {
-    Geometry(Geometry),
+    Geometry {
+        geometry: Geometry,
+        selection: Arc<PaintSelection>,
+    },
     Issue(IssueKind),
 }
 
@@ -87,11 +94,25 @@ impl LoadoutResolver<'_> {
                         );
                     }
                     let selector = paint.selector()?;
-                    choose_hull(spec, vehicle, selector)
+                    let (geometry, variant) = choose_hull(spec, vehicle, selector)?;
+                    Ok((
+                        geometry,
+                        Arc::new(PaintSelection {
+                            guid: item.guid(),
+                            record: item.record_index(),
+                            attachable: item.attachable_component_ordinal(),
+                            tag: selector.to_owned(),
+                            variant,
+                            compatibility: selected_replacement_tags(root, port, item, paint),
+                        }),
+                    ))
                 })
         };
         Some(match outcome {
-            Ok(geometry) => PaintAppearance::Geometry(geometry),
+            Ok((geometry, selection)) => PaintAppearance::Geometry {
+                geometry,
+                selection,
+            },
             Err(reason) => PaintAppearance::Issue(IssueKind::PaintAppearance {
                 port: port.name().to_owned(),
                 reason,
@@ -146,33 +167,110 @@ fn equipped<'node>(
     })
 }
 
+fn selected_replacement_tags(
+    root: &EntityNode,
+    port: &PortNode,
+    item: &EntityNode,
+    paint: &PaintItem,
+) -> Vec<PaintSelectionInput> {
+    let mut sources = Vec::new();
+    if port.source() != PortSource::Replaced {
+        return sources;
+    }
+    let xml = root
+        .vehicle()
+        .and_then(|vehicle| vehicle.item_port(port.name()));
+    push_port_tags(
+        &mut sources,
+        port,
+        xml.map(crate::VehicleItemPort::required_tags_source),
+        "RequiredPortTags",
+        crate::PortDefinition::required_tags,
+    );
+    if !paint.required_tags.trim().is_empty()
+        && let Some(source) = attach_tags(item, "RequiredTags")
+    {
+        sources.push(source);
+    }
+    sources
+}
+
+fn attach_tags(node: &EntityNode, field: &str) -> Option<PaintSelectionInput> {
+    let (record_index, component) = node
+        .record_index()
+        .zip(node.attachable_component_ordinal())?;
+    Some(PaintSelectionInput::DataForge(SourceLocation::DataForge {
+        record_index,
+        field: format!("Components[{component}].AttachDef.{field}"),
+    }))
+}
+
+fn push_port_tags(
+    sources: &mut Vec<PaintSelectionInput>,
+    port: &PortNode,
+    xml: Option<(Option<&str>, Option<&crate::VehicleAttributeEvidence>)>,
+    record_field: &str,
+    value: impl FnOnce(&crate::PortDefinition) -> &str,
+) {
+    if let Some((Some(_), evidence)) = xml {
+        if let Some(evidence) = evidence {
+            for site in std::iter::once(evidence.original()).chain(evidence.selectors()) {
+                if let Some((entry, location)) =
+                    site.file().source().entry_origin().zip(site.location())
+                {
+                    sources.push(PaintSelectionInput::Xml(entry.clone(), location.clone()));
+                }
+            }
+        }
+    } else if let Some(definition) = port
+        .definition()
+        .filter(|definition| !value(definition).trim().is_empty())
+    {
+        let source = definition.position();
+        let component = source.component_ordinal();
+        let port = source.port_ordinal();
+        sources.push(PaintSelectionInput::DataForge(SourceLocation::DataForge {
+            record_index: source.record_index(),
+            field: format!("Components[{component}].Ports[{port}].{record_field}"),
+        }));
+    }
+}
+
 fn choose_hull(
     spec: &EntitySpec,
     vehicle: &VehicleSpec,
     selector: &str,
-) -> Result<Geometry, &'static str> {
+) -> Result<(Geometry, VariantSource), &'static str> {
     const AMBIGUOUS: &str = "the appearance tag selects more than one source variant";
-    let model_variants = spec
-        .variants
-        .iter()
-        .map(|variant| (variant.tags(), variant.geometry()));
-    let appearance_only = vehicle
-        .appearance_only
-        .iter()
-        .map(|variant| (variant.tags.as_slice(), &variant.geometry));
+    let model_variants = spec.variants.iter().map(|variant| {
+        (
+            variant.tags(),
+            variant.geometry(),
+            variant.geometry().variant_position(),
+            variant.tag_locations.as_ref(),
+        )
+    });
+    let appearance_only = vehicle.appearance_only.iter().map(|variant| {
+        (
+            variant.tags.as_slice(),
+            &variant.geometry,
+            variant.position.clone(),
+            variant.tag_locations.as_ref(),
+        )
+    });
     let mut geometries = model_variants
         .chain(appearance_only)
-        .filter(|(tags, _)| {
+        .filter(|(tags, _, _, _)| {
             !tags.is_empty() && tags.iter().all(|tag| tag.eq_ignore_ascii_case(selector))
         })
-        .map(|(_, geometry)| geometry);
+        .map(|(_, geometry, position, tag_locations)| (geometry, position, tag_locations));
     let geometry = geometries.next();
     let material = MaterialVariant::select_unique(&spec.material_variants, &[selector])
         .map_err(|_| AMBIGUOUS)?;
     if geometries.next().is_some() || (geometry.is_some() && material.is_some()) {
         return Err(AMBIGUOUS);
     }
-    if let Some(geometry) = geometry {
+    if let Some((geometry, position, tag_locations)) = geometry {
         let mut draw = geometry.clone();
         if let Some(base) = &spec.geometry {
             if draw.material().is_none() {
@@ -180,7 +278,10 @@ fn choose_hull(
             }
             draw.inherit_palette(Some(base));
         }
-        return Ok(draw);
+        return Ok((
+            draw,
+            VariantSource::geometry(position, tag_locations.into()),
+        ));
     }
     if let Some(variant) = material {
         let mut draw = spec
@@ -188,7 +289,10 @@ fn choose_hull(
             .clone()
             .ok_or("the material variant has no base geometry")?;
         draw.apply_material_variant(&variant);
-        return Ok(draw);
+        return Ok((
+            draw,
+            VariantSource::material(variant.location(), variant.tag_locations()),
+        ));
     }
     Err("the appearance tag selects no source variant")
 }
@@ -196,14 +300,27 @@ fn choose_hull(
 impl EntityNode {
     pub(crate) fn painted_geometry(&self) -> Option<&Geometry> {
         match self.paint_appearance.as_deref()? {
-            PaintAppearance::Geometry(geometry) => Some(geometry),
+            PaintAppearance::Geometry { geometry, .. } => Some(geometry),
             PaintAppearance::Issue(_) => None,
         }
     }
 
+    pub(crate) fn rendered_paint(&self, drawn: Option<&Geometry>) -> Option<&Arc<PaintSelection>> {
+        let PaintAppearance::Geometry {
+            geometry,
+            selection,
+        } = self.paint_appearance.as_deref()?
+        else {
+            return None;
+        };
+        drawn
+            .filter(|drawn| std::ptr::eq(*drawn, geometry))
+            .map(|_| selection)
+    }
+
     pub(crate) fn paint_issue(&self) -> Option<&IssueKind> {
         match self.paint_appearance.as_deref()? {
-            PaintAppearance::Geometry(_) => None,
+            PaintAppearance::Geometry { .. } => None,
             PaintAppearance::Issue(issue) => Some(issue),
         }
     }

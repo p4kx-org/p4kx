@@ -156,6 +156,7 @@ mod object_containers;
 mod outfit;
 mod outfit_read;
 mod paint_port;
+mod paint_provenance;
 mod palette;
 mod path_match;
 mod pick;
@@ -281,6 +282,7 @@ pub use object_containers::{ContainerSource, ObjectContainerRef};
 pub use outfit::{Outfit, OutfitReport};
 pub use p4kx_character as character;
 pub use paint_port::{PaintPort, PaintTagIndex};
+pub use paint_provenance::{PaintAppearanceValues, PaintProvenance, PaintProvenanceError};
 pub use palette::{
     ForgePalettes, PaletteFailure, PaletteProvider, PaletteRead, PaletteRecordSelection,
     PaletteRecords, PaletteSelection, PaletteSource,

@@ -135,6 +135,9 @@ pub enum PackageError {
     /// Original tint palette or selection evidence could not be recorded.
     #[error("cannot record package tint palette evidence")]
     PaletteEvidence(#[source] Box<dyn std::error::Error + Send + Sync>),
+    /// The selected paint's source evidence could not be recorded.
+    #[error("cannot record package paint evidence")]
+    PaintEvidence(#[source] Box<dyn std::error::Error + Send + Sync>),
     /// Original entity classification evidence could not be recorded.
     #[error("cannot record package entity classification")]
     EntityEvidence(#[source] Box<dyn std::error::Error + Send + Sync>),

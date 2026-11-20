@@ -130,6 +130,7 @@ mod tests {
 
     fn variant(tags: &str, path: &str) -> GeometryVariant {
         GeometryVariant {
+            tag_locations: Box::default(),
             tags: tags.split_whitespace().map(str::to_owned).collect(),
             geometry: Geometry::fixture(path),
         }

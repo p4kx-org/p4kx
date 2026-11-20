@@ -92,6 +92,7 @@ mod entity_package_materials;
 mod entity_package_parity;
 mod entity_pick;
 mod entity_vehicle;
+mod entity_vehicle_paint;
 mod entry_issues;
 mod entry_listing_origins;
 mod entry_metadata_json;

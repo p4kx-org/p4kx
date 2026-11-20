@@ -19,7 +19,7 @@ use crate::package_receipt::{self, PackageFile};
 use crate::plan::MeshPlan;
 use crate::stage::Staging;
 use crate::textures;
-use crate::{PackageResult, PackageWriteContext, meshes};
+use crate::{PackageError, PackageResult, PackageWriteContext, meshes};
 
 #[path = "write_summary.rs"]
 mod summary;
@@ -298,6 +298,7 @@ fn write_scene_files(
         complete_manifest(&mut manifest, scene, fallback.as_deref(), staging, context)?;
     manifest.palette_provenance =
         crate::package_palette_provenance::capture(items, &plan, &collected, context)?;
+    record_paint_provenance(&mut manifest, scene.classification)?;
     let summary = summarise(&manifest, &outcomes, &written);
     let mut files = package_receipt::scene_files(written, &outcomes, authored_soc_file);
     files.append(&mut authored_files);
@@ -310,6 +311,24 @@ fn write_scene_files(
         files,
         summary,
     )
+}
+
+fn record_paint_provenance(
+    manifest: &mut crate::Manifest,
+    assembly: Option<&Assembly>,
+) -> PackageResult<()> {
+    if let Some(assembly) = assembly
+        && let Some(paint) = assembly
+            .paint_provenance()
+            .map_err(|error| PackageError::PaintEvidence(Box::new(error)))?
+    {
+        manifest.paint_provenance = Some(
+            serde_json::to_value(paint)
+                .map_err(|error| PackageError::PaintEvidence(Box::new(error)))?,
+        );
+        crate::manifest::PAINT_FORMAT_VERSION.clone_into(&mut manifest.version);
+    }
+    Ok(())
 }
 
 fn finish_scene(

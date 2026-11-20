@@ -39,7 +39,7 @@ from .soc_scene import parse_ref as parse_soc_ref
 
 FORMAT_NAME = "p4kx-blender-package"
 SUPPORTED_MAJOR = 1
-SUPPORTED_MINOR = 21
+SUPPORTED_MINOR = 22
 MANIFEST_NAME = "scene.json"
 MAX_MANIFEST_BYTES = 64 * 1024 * 1024
 BLENDER_NAME_BYTES = 63

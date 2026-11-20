@@ -199,7 +199,7 @@ written (there are no `null`s).
 | Field | Meaning |
 | --- | --- |
 | `format` | Always `p4kx-blender-package`. |
-| `version` | `<major>.<minor>` of the package format, matching `^[0-9]+\.[0-9]+$`; `1.21` for current exports. |
+| `version` | `<major>.<minor>` of the package format. Current exports use 1.21, or 1.22 with fitted paint provenance. |
 | `generator` | `name` (`p4kx`) and `version` of the program that wrote the package. |
 | `source` | `channel` (the Channel folder, e.g. `LIVE`), `build` (`branch`, `version`, `public_patch`, `change_number`, `build_id` of the Archive's build manifest) and `entity` (`class_name`, `guid`). `channel` and `build` are absent when unknown. A Character package (1.3) also has `character` (`name`, `body`, `chf`, `loadout`), see "Characters", and puts the Character's name in `entity.class_name` with an empty `guid`. |
 | `coordinates` | `basis` is `gltf_y_up` and `unit` is `metre`. A reader refuses a `basis` or `unit` it does not know. |
@@ -212,6 +212,7 @@ written (there are no `null`s).
 | `default_material` | The optional physical Archive fallback lookup for material IDs that need one, see "Meshes". |
 | `palettes` | The tint palettes, see "Palettes". Added in 1.1; absent in 1.0 packages. |
 | `palette_provenance` | Optional source proof for palette fields and each node's selection. |
+| `paint_provenance` | Optional root hull paint identities and their exact observed origins (1.22). |
 | `issues` | What could not be resolved or written. |
 
 `format`, `basis`, `unit`, `Texture.format`, `colour_space`, `alpha`, `Node.kind`,
@@ -819,6 +820,11 @@ separate DDS normal and smoothness pairs with linked source and per-file evidenc
 **1.20** adds exact primitive bindings to that companion, identifies the texture rendition and
 stores authored material libraries and their field provenance in independent gzip JSONL files.
 **1.21** adds optional per-field provenance for the rigid worn mounts of a Character mesh.
+**1.22** adds `paint_provenance` for a rendered root vehicle hull with an observed fitted paint.
+Its `appearance` carries the same values as the entity GLB's `asset.extras.p4kxPaintAppearance`.
+The keys in `fieldOrigins` are JSON Pointers relative to `appearance` and resolve in
+`sourceInventory`. Earlier readers can still draw the scene through the existing mesh, material
+and palette bindings.
 
 ### Authored Entity Glow
 

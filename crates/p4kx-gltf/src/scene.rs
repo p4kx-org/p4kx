@@ -6,6 +6,7 @@ use std::collections::hash_map::Entry;
 use std::io::Write;
 
 use p4kx_model::{Animation, Bone, Material, MaterialStatus, Model, TintPalette, Transform};
+use serde_json::Value;
 
 use crate::GltfError;
 use crate::glb::{GlbOptions, GlbSummary, MaterialMode, write_instances};
@@ -124,6 +125,7 @@ pub struct Scene<'m> {
     nodes: Vec<SceneNode<'m>>,
     skeleton: Option<&'m [Bone]>,
     animations: Vec<&'m Animation>,
+    asset_extras: Option<&'m Value>,
 }
 
 impl<'m> Scene<'m> {
@@ -134,7 +136,15 @@ impl<'m> Scene<'m> {
             nodes: Vec::new(),
             skeleton: None,
             animations: Vec::new(),
+            asset_extras: None,
         }
+    }
+
+    /// Adds application metadata to the glTF asset.
+    #[must_use]
+    pub const fn with_asset_extras(mut self, extras: &'m Value) -> Self {
+        self.asset_extras = Some(extras);
+        self
     }
 
     /// Writes `animations` as glTF animations of the bones of the scene's skeleton.
@@ -310,6 +320,7 @@ pub(crate) fn write_scene(
         instances: &instances,
         rig: rig.as_ref(),
         animations: &scene.animations,
+        asset_extras: scene.asset_extras,
     };
     write_instances(&content, options, textures, fallbacks, out, visitor)
 }

@@ -3575,6 +3575,8 @@ dependencies = [
  "p4kx-testkit",
  "rayon",
  "roxmltree",
+ "schemars",
+ "serde",
  "serde_json",
  "sha2",
  "tempfile",

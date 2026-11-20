@@ -255,6 +255,7 @@ impl Part {
 pub struct Assembly {
     pub(crate) parts: Vec<Part>,
     pub(crate) forge_origin: Option<Arc<p4kx_extraction::DataForgeOrigin>>,
+    pub(crate) paint: Option<Arc<crate::paint_provenance::PaintSelection>>,
     pub(crate) issues: Vec<Issue>,
     pub(crate) lod: u32,
     pub(crate) interior: Option<crate::EntityInterior>,

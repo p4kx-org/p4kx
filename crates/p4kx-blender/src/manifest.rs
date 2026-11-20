@@ -19,6 +19,8 @@ pub const FORMAT: &str = "p4kx-blender-package";
 /// the meaning of existing ones.
 pub const FORMAT_VERSION: &str = "1.21";
 
+pub(crate) const PAINT_FORMAT_VERSION: &str = "1.22";
+
 /// The name of the manifest file in the package folder.
 pub const MANIFEST_FILE: &str = "scene.json";
 
@@ -156,6 +158,10 @@ pub struct Manifest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schemars(with = "Option<crate::package_palette_provenance::PaletteProvenance>")]
     pub palette_provenance: Option<serde_json::Value>,
+    /// Physical inputs for the root vehicle's selected paint.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<p4kx_assembly::PaintProvenance<'static>>")]
+    pub paint_provenance: Option<serde_json::Value>,
     /// The optional authored SOC scene companion.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub authored_soc: Option<crate::ManifestSocScene>,

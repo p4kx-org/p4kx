@@ -63,20 +63,45 @@ impl<'variant> MaterialVariantSelection<'variant> {
         }
     }
 
+    pub(crate) fn tag_locations(&self) -> Box<[SourceLocation]> {
+        let mut path = self.branch_root();
+        self.slots()
+            .map(|slot| {
+                append_variant(&mut path, slot);
+                self.at(format!("{path}.Tags"))
+            })
+            .collect()
+    }
+
     fn field_location(&self, member: &str) -> SourceLocation {
-        let owner = self.variant.owner;
-        let mut path = format!("Components[{}].Material", owner.ordinal);
-        for slot in self.ancestors.iter().copied().chain([self.variant.slot]) {
-            path.push_str(".materialVariants[");
-            path.push_str(&slot.to_string());
-            path.push(']');
+        let mut path = self.branch_root();
+        for slot in self.slots() {
+            append_variant(&mut path, slot);
         }
         path.push_str(member);
+        self.at(path)
+    }
+
+    fn slots(&self) -> impl Iterator<Item = usize> + '_ {
+        self.ancestors.iter().copied().chain([self.variant.slot])
+    }
+
+    fn branch_root(&self) -> String {
+        format!("Components[{}].Material", self.variant.owner.ordinal)
+    }
+
+    const fn at(&self, field: String) -> SourceLocation {
         SourceLocation::DataForge {
-            record_index: owner.record,
-            field: path,
+            record_index: self.variant.owner.record,
+            field,
         }
     }
+}
+
+fn append_variant(path: &mut String, slot: usize) {
+    path.push_str(".materialVariants[");
+    path.push_str(&slot.to_string());
+    path.push(']');
 }
 
 struct Branch<'variant> {
