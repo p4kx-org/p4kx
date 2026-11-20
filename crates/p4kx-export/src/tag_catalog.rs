@@ -31,4 +31,4 @@ pub(crate) use contract::TagRows;
 pub use contract::{EntityTags, TagDefinition, TagRoots};
 pub(crate) use declaration::{Declaration, read_declaration};
 pub(crate) use entities::read as entity;
-pub(crate) use path_row::TagPath;
+pub use path_row::{TagPath, TagPathParentHeader, TagPathRow};

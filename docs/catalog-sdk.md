@@ -367,6 +367,24 @@ coverage before treating an empty selection as established absence. The query
 reads the selected bodies and resolves target headers without building the
 convenience path tree or loading localization.
 
+## Canonical tag paths
+
+Use `catalog_queries::tags::with_tag_paths`, its `_from` form or the
+parsed session method for `/projections/tagPaths`. The query reads the original
+Tag and TagDatabase graph and shares the Catalog's first-readable GUID and depth-first
+path selection. It reads no localization and invokes no other Catalog domain.
+The full Tag graph supplies ordered roots, ancestors, aliases and competing
+edges even when a caller selects a single Record or GUID.
+
+Paths appear in canonical traversal order. A GUID or selected physical Record
+returns the winner path. A later physical alias can still be queried through
+`with_tag_declarations`. Use the path row's `fields()` method for its typed
+path, depth, listed flag and selected parent header. Field origins retain only
+the selected original contributors. The snapshot's inventory also records
+the original graph observations, and the graph outcome counts explain
+dangling or cut edges independently of the returned rows. Check
+`graph_inventory_complete()` before treating a missing row as an absence.
+
 ## Original Entity tag declarations
 
 Use `catalog_queries::tags::with_entity_tags` or a parsed session's

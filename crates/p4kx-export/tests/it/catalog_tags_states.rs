@@ -93,9 +93,8 @@ fn assert_entity_array_state(
     Ok(())
 }
 
-#[test]
-fn canonical_tag_read_failure_is_health_evidence_without_a_fabricated_definition() -> TestResult {
-    let database = DataForgeBuilder::new()
+pub(crate) fn unreadable_tag_definition() -> DataForgeBuilder {
+    DataForgeBuilder::new()
         .version(8)
         .structure(
             TestStruct::new("Tag")
@@ -107,8 +106,12 @@ fn canonical_tag_read_failure_is_health_evidence_without_a_fabricated_definition
             "Tag",
             "Tag.BadLayout",
             "synthetic/tags.xml",
-        ));
-    let (_, catalog) = fixture::diagnostic(&database)?;
+        ))
+}
+
+#[test]
+fn canonical_tag_read_failure_is_health_evidence_without_a_fabricated_definition() -> TestResult {
+    let (_, catalog) = fixture::diagnostic(&unreadable_tag_definition())?;
     assert!(
         fixture::rows(&catalog, "definitions/tags")?.is_empty(),
         "a failed canonical source produces no fabricated definition"

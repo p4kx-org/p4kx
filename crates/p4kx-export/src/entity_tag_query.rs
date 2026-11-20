@@ -150,3 +150,9 @@ fn project<T>(
         coverage,
     }))
 }
+
+#[path = "tag_path_query.rs"]
+mod paths;
+pub use paths::{
+    TagPath, TagPathParentHeader, TagPathRow, TagPathSnapshot, with_tag_paths, with_tag_paths_from,
+};
