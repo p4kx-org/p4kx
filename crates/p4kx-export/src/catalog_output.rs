@@ -118,6 +118,7 @@ fn staged_row_bytes(catalog: &Catalog<'_>) -> u128 {
         + u128::from(catalog.definitions.blueprints.stored_bytes())
         + u128::from(catalog.definitions.particle_libraries.stored_bytes())
         + u128::from(catalog.definitions.flare_libraries.stored_bytes())
+        + u128::from(catalog.definitions.subsumption_events.stored_bytes())
         + u128::from(catalog.definitions.contract_generators.stored_bytes())
         + u128::from(catalog.definitions.contract_templates.stored_bytes())
         + u128::from(catalog.definitions.mission_broker_entries.stored_bytes())
@@ -181,6 +182,7 @@ fn take_row_spool_failure(catalog: &Catalog<'_>) -> Option<RowSpoolError> {
         .or_else(|| catalog.definitions.mission_broker_entries.take_failure())
         .or_else(|| catalog.definitions.particle_libraries.take_failure())
         .or_else(|| catalog.definitions.flare_libraries.take_failure())
+        .or_else(|| catalog.definitions.subsumption_events.take_failure())
         .or_else(|| {
             catalog
                 .configurations

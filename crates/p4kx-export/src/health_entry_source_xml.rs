@@ -72,6 +72,10 @@ impl<'read> EntrySourceXml<'read> {
         self.receipt.source_uses()
     }
 
+    pub(crate) const fn format(&self) -> p4kx_extraction::cryxml::Format {
+        self.document.format()
+    }
+
     pub(crate) const fn is_lossy(&self) -> bool {
         self.document.is_lossy()
     }

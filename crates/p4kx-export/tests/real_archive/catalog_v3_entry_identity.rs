@@ -9,7 +9,11 @@ use serde_json::Value;
 use super::{TestResult, present};
 
 pub(super) const fn has_physical_entry_identity(kind: Kind) -> bool {
-    uses_archive_key(kind) || matches!(kind, Kind::FlareLibraries | Kind::RadarAudio)
+    uses_archive_key(kind)
+        || matches!(
+            kind,
+            Kind::FlareLibraries | Kind::RadarAudio | Kind::SubsumptionEvents
+        )
 }
 
 const fn uses_archive_key(kind: Kind) -> bool {

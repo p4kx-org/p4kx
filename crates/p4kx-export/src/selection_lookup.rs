@@ -77,6 +77,7 @@ impl Kind {
                 | Self::ShopInventories
                 | Self::ParticleLibraries
                 | Self::FlareLibraries
+                | Self::SubsumptionEvents
                 | Self::ClientProfileSettings
                 | Self::RadarAudio
                 | Self::PlanetResources

@@ -104,7 +104,7 @@ pub(super) fn assemble<R>(
         &mut collected,
         &jump_owners,
     )?;
-    parts::collect_effect_libraries(archive, &entry_capture, &mut collected, run, &origins.uses)?;
+    parts::collect_loose_xml_sources(archive, &entry_capture, &mut collected, run, &origins.uses)?;
     run.begin(CatalogStage::ProjectWeaponAnimation);
     let weapon_animation =
         parts::capture_weapon_animation(archive, &entities, &input, options, &mut collected)?;
@@ -203,6 +203,7 @@ pub(super) fn assemble<R>(
             shop_inventories: collected.shop_inventories,
             particle_libraries: collected.particle_libraries,
             flare_libraries: collected.flare_libraries,
+            subsumption_events: collected.subsumption_events,
             planet_tech: collected.planet_tech,
             inventory_containers: inventory_table(&forge, collected.inventory_containers),
             medical_item_tier_configs: medical_tier_config::table(

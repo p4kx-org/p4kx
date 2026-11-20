@@ -13,6 +13,9 @@ use p4kx_export::catalog_queries::shops::{ShopInventorySelection, read_shop_inve
 use p4kx_export::catalog_queries::starmap::{
     ContainerPlacementSelection, read_container_placements,
 };
+use p4kx_export::catalog_queries::subsumption_events::{
+    SubsumptionEventSelection, read_subsumption_events,
+};
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection,
     with_location_entity_declarations,
@@ -67,6 +70,7 @@ mod worn_gear;
 const ROOT: &str = r"Data\ObjectContainers\PU\system\fixture\fixturesystem.socpak";
 const OFFLINE_SHOP: &str = r"Data\Scripts\ShopInventories\Inv_Fixture.json";
 const FLARE_LIBRARY: &str = r"Data\Libs\Flares\fixture.xml";
+const SUBSUMPTION_FIXTURE: &str = "Data/Libs/Subsumption/Events/synthetic.xml";
 const TILE: &str = r"Data\ObjectContainers\PU\fixture\tile.socpak";
 const ROOT_XML: &[u8] = br#"<ObjectContainer version="14"><ChildObjectContainers>
     <Child external="true" name="Data\ObjectContainers\PU\fixture\tile.socpak" pos="0,0,0" rot="1,0,0,0"/>
@@ -102,6 +106,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
         read_location_entities(&archive)?,
         read_shop_inventory(&archive)?,
         read_flare_library(&archive)?,
+        read_subsumption_event(&archive)?,
         read_radar_configuration(&archive)?,
         Route::queried_rows(
             CONTAINERS,
@@ -246,6 +251,19 @@ fn read_flare_library(archive: &Archive) -> TestResult<Route> {
     )
 }
 
+fn read_subsumption_event(archive: &Archive) -> TestResult<Route> {
+    let snapshot = read_subsumption_events(
+        archive,
+        SubsumptionEventSelection::ArchivePath(SUBSUMPTION_FIXTURE),
+        None,
+    )?;
+    Route::queried_rows(
+        super::SUBSUMPTION_EVENTS,
+        &snapshot.rows,
+        "synthetic producer parity available; installed Event-ID and producer parity open",
+    )
+}
+
 fn read_shop_inventory(archive: &Archive) -> TestResult<Route> {
     let selection = ShopInventorySelection::ArchivePath(OFFLINE_SHOP);
     let snapshot = read_shop_inventories(archive, selection, None)?;
@@ -278,6 +296,10 @@ fn fixture() -> TestResult<(tempfile::TempDir, Archive)> {
         .entry(TestEntry::stored(
             FLARE_LIBRARY,
             b"<LensFlareLibrary><FlareItem Name='fixture'/></LensFlareLibrary>",
+        ))
+        .entry(TestEntry::stored(
+            SUBSUMPTION_FIXTURE,
+            b"<Subsumption><Event ID='00000000-0000-0000-0000-000000000001'/></Subsumption>",
         ))
         .write_to(&path)?;
     Ok((folder, Archive::open(path)?))

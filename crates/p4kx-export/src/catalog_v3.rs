@@ -131,6 +131,8 @@ mod starmap_radar;
 pub(crate) mod starmap_type_definition;
 #[path = "starmap_visibility.rs"]
 mod starmap_visibility;
+#[path = "subsumption_event.rs"]
+pub(crate) mod subsumption_event;
 
 #[path = "ammo_definition.rs"]
 pub(crate) mod ammo_definition;

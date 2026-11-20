@@ -22,6 +22,7 @@ const COMMODITY_DEFINITIONS: &str = "/definitions/commodities";
 const COMMODITY_PRESENTATIONS: &str = "/projections/commodityPresentation";
 const SHOP_INVENTORIES: &str = "/definitions/shopInventories";
 const FLARE_LIBRARIES: &str = "/definitions/flareLibraries";
+const SUBSUMPTION_EVENTS: &str = "/definitions/subsumptionEvents";
 const RADAR_AUDIO: &str = "/configurations/radarAudio";
 const AMMUNITION: &str = "/definitions/ammoDefinitions";
 const LOCATION_ENTITIES: &str = "/definitions/locationEntityDeclarations";
@@ -141,6 +142,7 @@ fn sdk_query_witnesses_keep_their_canonical_dataset_contract() -> TestResult {
         CONSUMABLE_CONFIGURATIONS,
         SHOP_INVENTORIES,
         FLARE_LIBRARIES,
+        SUBSUMPTION_EVENTS,
         RADAR_AUDIO,
         AMMUNITION,
         PROJECTILE_AMMUNITION,

@@ -5795,6 +5795,9 @@
         "subHarvestableMultiConfigs": {
           "$ref": "#/$defs/CatalogTableOfLootDefinition"
         },
+        "subsumptionEvents": {
+          "$ref": "#/$defs/CatalogTableOfSubsumptionEventDocument"
+        },
         "tags": {
           "$ref": "#/$defs/CatalogTableOfTagDefinition"
         },
@@ -5896,6 +5899,7 @@
         "starmapTypes",
         "subHarvestableConfigs",
         "subHarvestableMultiConfigs",
+        "subsumptionEvents",
         "tags",
         "turretHealthModifiers",
         "weaponActionRecoilDefinitions",
@@ -9033,6 +9037,25 @@
       ],
       "type": "object"
     },
+    "CatalogTableOfSubsumptionEventDocument": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/SubsumptionEventDocument"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
     "CatalogTableOfSuitArmor": {
       "description": "One named typed dataset with its measured source-family availability.",
       "properties": {
@@ -11161,6 +11184,9 @@
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `subHarvestableMultiConfigs`."
         },
+        "subsumptionEvents": {
+          "$ref": "#/$defs/KindCompleteness"
+        },
         "tags": {
           "$ref": "#/$defs/KindCompleteness",
           "description": "The global taxonomy selection, independent of the Entity Filter."
@@ -11276,6 +11302,7 @@
         "starmapTypes",
         "subHarvestableConfigs",
         "subHarvestableMultiConfigs",
+        "subsumptionEvents",
         "tags"
       ],
       "type": "object"
@@ -26621,6 +26648,10 @@
         {
           "description": "Original lens flare library XML files in the Archive.",
           "value": "flareLibraries"
+        },
+        {
+          "description": "Original Subsumption event XML files in the Archive.",
+          "value": "subsumptionEvents"
         },
         {
           "description": "Original loose planet resource definitions in the Archive.",
@@ -129598,6 +129629,266 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfSubsumptionEventFormat": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/SubsumptionEventFormat"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfSubsumptionEventValue": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/SubsumptionEventValue"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfSunShadowMode": {
       "allOf": [
         {
@@ -135169,6 +135460,273 @@
         "taggedConfigs"
       ],
       "type": "object"
+    },
+    "SubsumptionEvent": {
+      "description": "A direct Event declaration positioned within its physical document.",
+      "properties": {
+        "controls": {
+          "items": {
+            "$ref": "#/$defs/SubsumptionEventControl"
+          },
+          "type": "array"
+        },
+        "elementIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "id": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "name": {
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "x-gameText": true
+        }
+      },
+      "required": [
+        "controls",
+        "elementIndex",
+        "id",
+        "name"
+      ],
+      "type": "object"
+    },
+    "SubsumptionEventControl": {
+      "description": "An individually sourced control of a Subsumption event.",
+      "properties": {
+        "field": {
+          "$ref": "#/$defs/SubsumptionEventField"
+        },
+        "value": {
+          "$ref": "#/$defs/SourcedValueOfSubsumptionEventValue"
+        }
+      },
+      "required": [
+        "field",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SubsumptionEventDocument": {
+      "description": "A physical XML document with its original markup and ordered event declarations.",
+      "properties": {
+        "elements": {
+          "items": {
+            "$ref": "#/$defs/ProfileElement"
+          },
+          "type": "array"
+        },
+        "events": {
+          "items": {
+            "$ref": "#/$defs/SubsumptionEvent"
+          },
+          "type": "array"
+        },
+        "identity": {
+          "$ref": "#/$defs/PhysicalEntryIdentity"
+        },
+        "sourceFormat": {
+          "$ref": "#/$defs/SourcedValueOfSubsumptionEventFormat"
+        }
+      },
+      "required": [
+        "elements",
+        "events",
+        "identity",
+        "sourceFormat"
+      ],
+      "type": "object"
+    },
+    "SubsumptionEventField": {
+      "description": "A recognised attribute of a Subsumption event declaration.",
+      "oneOf": [
+        {
+          "const": "renamable",
+          "description": "Authored renaming permission.",
+          "type": "string"
+        },
+        {
+          "const": "deletable",
+          "description": "Authored deletion permission.",
+          "type": "string"
+        },
+        {
+          "const": "readOnly",
+          "description": "Authored read-only flag.",
+          "type": "string"
+        },
+        {
+          "const": "static",
+          "description": "Authored static flag.",
+          "type": "string"
+        },
+        {
+          "const": "autoGenerated",
+          "description": "Authored generation flag.",
+          "type": "string"
+        },
+        {
+          "const": "siblingLinkage",
+          "description": "Authored sibling-linkage flag.",
+          "type": "string"
+        },
+        {
+          "const": "propagationType",
+          "description": "Original propagation mode.",
+          "type": "string"
+        },
+        {
+          "const": "maxRespondents",
+          "description": "Authored respondent limit.",
+          "type": "string"
+        },
+        {
+          "const": "volume",
+          "description": "Authored volume value.",
+          "type": "string"
+        },
+        {
+          "const": "range",
+          "description": "Authored range value.",
+          "type": "string"
+        },
+        {
+          "const": "exitRange",
+          "description": "Authored exit-range value.",
+          "type": "string"
+        },
+        {
+          "const": "requiresVisual",
+          "description": "Authored requirement for visual detection.",
+          "type": "string"
+        },
+        {
+          "const": "fovHorizontal",
+          "description": "Authored horizontal field of view.",
+          "type": "string"
+        },
+        {
+          "const": "fovVertical",
+          "description": "Authored vertical field of view.",
+          "type": "string"
+        },
+        {
+          "const": "focusTime",
+          "description": "Authored focus time.",
+          "type": "string"
+        },
+        {
+          "const": "angularOffset",
+          "description": "Authored angular offset.",
+          "type": "string"
+        },
+        {
+          "const": "beingLookedAtCondition",
+          "description": "Original looked-at condition discriminator.",
+          "type": "string"
+        }
+      ],
+      "x-p4kx-vocabularyClass": "control"
+    },
+    "SubsumptionEventFormat": {
+      "description": "Encoding of the original Subsumption event document.",
+      "oneOf": [
+        {
+          "const": "textXml",
+          "description": "Text XML.",
+          "type": "string"
+        },
+        {
+          "const": "cryXmlB",
+          "description": "Binary CryXmlB.",
+          "type": "string"
+        },
+        {
+          "const": "cryXml",
+          "description": "Binary CryXml.",
+          "type": "string"
+        },
+        {
+          "const": "cry3Sdk",
+          "description": "Binary CRY3SDK.",
+          "type": "string"
+        }
+      ],
+      "x-p4kx-vocabularyClass": "control"
+    },
+    "SubsumptionEventValue": {
+      "description": "A typed control value whose original spelling remains in the authored document.",
+      "oneOf": [
+        {
+          "description": "Authored boolean.",
+          "properties": {
+            "kind": {
+              "const": "boolean",
+              "type": "string"
+            },
+            "value": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Authored integral value.",
+          "properties": {
+            "kind": {
+              "const": "integer",
+              "type": "string"
+            },
+            "value": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Finite interpretation of an authored numeric token.",
+          "properties": {
+            "kind": {
+              "const": "number",
+              "type": "string"
+            },
+            "value": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Original propagation token.",
+          "properties": {
+            "kind": {
+              "const": "text",
+              "type": "string"
+            },
+            "value": {
+              "type": "string",
+              "x-gameText": true
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "type": "object"
+        }
+      ]
     },
     "SuitArmor": {
       "description": "One original suit armor component with its resistance definition link.",

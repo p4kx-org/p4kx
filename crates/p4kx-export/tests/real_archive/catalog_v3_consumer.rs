@@ -89,6 +89,7 @@ pub(crate) fn row_location(kind: Kind) -> Cow<'static, str> {
         Kind::ShopInventories => "/definitions/shopInventories",
         Kind::ParticleLibraries => "/definitions/particleLibraries",
         Kind::FlareLibraries => "/definitions/flareLibraries",
+        Kind::SubsumptionEvents => "/definitions/subsumptionEvents",
         Kind::ClientProfileSettings => "/configurations/clientProfileSettings/documents",
         Kind::RadarAudio => "/configurations/radarAudio",
         Kind::ExplosionDefinitions => "/definitions/explosionDefinitions",

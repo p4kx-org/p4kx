@@ -16,6 +16,7 @@ use crate::catalog_v3::faction_identity_definition::{
 };
 use crate::catalog_v3::flare_library;
 use crate::catalog_v3::radar_audio_configuration::{self, RadarAudioConfiguration};
+use crate::catalog_v3::subsumption_event;
 use crate::client_profile_settings::{self, ClientProfileSettings};
 use crate::collected::Collected;
 use crate::options::{CatalogRun, CatalogStage};
@@ -152,7 +153,7 @@ pub(super) fn client_configurations(
     Ok((settings, radar_audio))
 }
 
-pub(super) fn collect_effect_libraries(
+pub(super) fn collect_loose_xml_sources(
     archive: &Archive,
     capture: &EntryCapture<'_>,
     collected: &mut Collected<'_>,
@@ -172,6 +173,18 @@ pub(super) fn collect_effect_libraries(
         &collected.ledger,
     )?;
     collected.flare_libraries = flare_library::stage(
+        archive,
+        capture,
+        options,
+        &mut collected.ledger,
+        &std::env::temp_dir(),
+    )?;
+    run.begin_compacted(
+        CatalogStage::ProjectSubsumptionEvents,
+        origins,
+        &collected.ledger,
+    )?;
+    collected.subsumption_events = subsumption_event::stage(
         archive,
         capture,
         options,

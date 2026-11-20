@@ -16,6 +16,7 @@ fn add_empty_definitions(catalog: &mut Value) {
         "locationEntityDeclarations",
         "particleLibraries",
         "flareLibraries",
+        "subsumptionEvents",
         "planetResources",
         "creatures",
         "climateAssets",

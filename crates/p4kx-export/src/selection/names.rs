@@ -76,6 +76,7 @@ impl Kind {
             Self::ShopInventories => "shopInventories",
             Self::ParticleLibraries => "particleLibraries",
             Self::FlareLibraries => "flareLibraries",
+            Self::SubsumptionEvents => "subsumptionEvents",
             Self::ClientProfileSettings => "clientProfileSettings",
             Self::RadarAudio => "radarAudio",
             Self::PlanetResources => "planetResources",

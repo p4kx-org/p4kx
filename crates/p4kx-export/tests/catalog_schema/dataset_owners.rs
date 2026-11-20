@@ -104,6 +104,7 @@ const GROUPS: &[Group] = &[
             "npcClassPools",
             "particleLibraries",
             "flareLibraries",
+            "subsumptionEvents",
             "planetResources",
             "proceduralPlanetAudio",
             "refiningProcesses",

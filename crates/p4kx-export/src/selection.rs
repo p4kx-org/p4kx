@@ -167,6 +167,8 @@ pub enum Kind {
     ParticleLibraries,
     /// Original lens flare library XML files in the Archive.
     FlareLibraries,
+    /// Original Subsumption event XML files in the Archive.
+    SubsumptionEvents,
     /// Original loose planet resource definitions in the Archive.
     PlanetResources,
     /// Original loose `PlanetTech` fauna definitions in the Archive.
@@ -269,7 +271,7 @@ pub enum Kind {
 
 impl Kind {
     /// Every kind, in the order of the catalog.
-    pub const ALL: [Self; 109] = [
+    pub const ALL: [Self; 110] = [
         Self::Manufacturers,
         Self::Items,
         Self::Ships,
@@ -330,6 +332,7 @@ impl Kind {
         Self::ShopInventories,
         Self::ParticleLibraries,
         Self::FlareLibraries,
+        Self::SubsumptionEvents,
         Self::PlanetResources,
         Self::Creatures,
         Self::ClimateAssets,

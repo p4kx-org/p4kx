@@ -97,6 +97,8 @@ pub mod planet_resources;
 pub mod flares;
 #[path = "radar_audio_query.rs"]
 pub mod radar_audio;
+#[path = "subsumption_event_query.rs"]
+pub mod subsumption_events;
 
 use p4kx_extraction::{
     Archive, Build, CancelToken, DataForge, DataForgeEntry, SourceInventory, SourcedValue,

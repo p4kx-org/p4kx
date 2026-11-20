@@ -35,6 +35,7 @@ use crate::catalog_v3::reputation_scope_definition::ScopeDefinition;
 use crate::catalog_v3::reputation_standing_definition::StandingDefinition;
 use crate::catalog_v3::sandbox_trigger_record_definition::SandboxTriggerRecordDefinition;
 use crate::catalog_v3::starmap_definition_kinds::StarmapDefinitionTables;
+use crate::catalog_v3::subsumption_event::SubsumptionEventDocument;
 use crate::catalog_v3::weapon_action_recoil_definitions::WeaponActionRecoilDefinition;
 use crate::catalog_v3::weapon_procedural_definitions::WeaponProceduralTables;
 use crate::commodity_contract::CommodityDefinition;
@@ -144,6 +145,8 @@ pub(crate) struct CatalogDefinitions<'source> {
     pub(crate) particle_libraries: StagedCatalogTable,
     #[schemars(with = "CatalogTable<FlareLibrary>")]
     pub(crate) flare_libraries: StagedCatalogTable,
+    #[schemars(with = "CatalogTable<SubsumptionEventDocument>")]
+    pub(crate) subsumption_events: StagedCatalogTable,
     #[serde(flatten)]
     pub(crate) planet_tech: PlanetTechDefinitions,
     pub(crate) explosion_definitions: CatalogTable<ExplosionDefinition<'source>>,

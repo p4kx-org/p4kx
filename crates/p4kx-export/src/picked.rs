@@ -226,6 +226,7 @@ impl<'f> Picked<'f> {
             | Kind::ShopInventories
             | Kind::ParticleLibraries
             | Kind::FlareLibraries
+            | Kind::SubsumptionEvents
             | Kind::ClientProfileSettings
             | Kind::RadarAudio
             | Kind::PlanetResources

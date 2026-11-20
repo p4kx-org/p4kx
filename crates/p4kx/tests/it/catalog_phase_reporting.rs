@@ -35,6 +35,7 @@ const CATALOG_PHASES: &[&str] = &[
     "read-independent-configurations",
     "project-particle-libraries",
     "project-flare-libraries",
+    "project-subsumption-events",
     "project-weapon-animation",
     "finalize-projections",
     "project-blueprint-tables",

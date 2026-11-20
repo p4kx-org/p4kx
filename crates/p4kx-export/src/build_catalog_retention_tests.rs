@@ -26,6 +26,7 @@ const RETENTION_STAGES: &[CatalogStage] = &[
     CatalogStage::LinkMissionFactions,
     CatalogStage::ProjectParticleLibraries,
     CatalogStage::ProjectFlareLibraries,
+    CatalogStage::ProjectSubsumptionEvents,
     CatalogStage::FinalizeProjections,
     CatalogStage::ExportHealth,
 ];

@@ -146,6 +146,8 @@ pub enum CatalogStage {
     ProjectParticleLibraries,
     /// Projects authored lens flare libraries.
     ProjectFlareLibraries,
+    /// Projects original Subsumption event declarations.
+    ProjectSubsumptionEvents,
     /// Projects weapon animation sources.
     ProjectWeaponAnimation,
     /// Captures final row counts and their source accounting.
@@ -199,6 +201,7 @@ impl CatalogStage {
             Self::ReadIndependentConfigurations => "read-independent-configurations",
             Self::ProjectParticleLibraries => "project-particle-libraries",
             Self::ProjectFlareLibraries => "project-flare-libraries",
+            Self::ProjectSubsumptionEvents => "project-subsumption-events",
             Self::ProjectWeaponAnimation => "project-weapon-animation",
             Self::FinalizeProjections => "finalize-projections",
             Self::ProjectBlueprintTables => "project-blueprint-tables",

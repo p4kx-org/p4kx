@@ -118,6 +118,7 @@ pub(crate) const fn source_mode(kind: Kind) -> ExportSourceMode {
         | Kind::ShopInventories
         | Kind::ParticleLibraries
         | Kind::FlareLibraries
+        | Kind::SubsumptionEvents
         | Kind::ClientProfileSettings
         | Kind::RadarAudio
         | Kind::PlanetResources
