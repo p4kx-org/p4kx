@@ -20,14 +20,12 @@ lists the native consumer environments and the Linux ARM64 Blender version bound
 
 ## System memory
 
-With 16 GiB total system RAM, the packaged CLI, GUI and MCP must support normal
-operation, including the local consumer workflows that read the installed Archive.
-The operating system, desktop, background services and all running processes share
-those 16 GiB. Verify a cold cache, a refresh after a Build change and a warm cache.
-
-Complete unfiltered Catalog v3 exports are verified on a producer host with at
-least 64 GiB total RAM. Record the actual peak memory and disk use for both LIVE
-and current PTU. [Catalog memory acceptance](catalog-partitioning.md#system-memory-acceptance)
+A complete unfiltered Catalog v3 export must run on a system with 64 GiB total RAM.
+Individual SDK queries and the reduced Basetool catalog must run on a system with
+16 GiB total RAM. In each case the operating system, desktop, background services
+and running processes share the stated capacity. Verify both LIVE and current PTU
+with the packaged full producer. Record memory and temporary storage separately.
+[Catalog memory acceptance](catalog-partitioning.md#system-memory-acceptance)
 
 ## Build and test contract
 

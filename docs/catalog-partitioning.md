@@ -13,8 +13,9 @@ The producer ran for 19 minutes 27 seconds on a Windows host with 93.67 GiB of s
 Windows recorded a 26.28 GiB process working-set peak. Sampled available system RAM stayed at
 or above 25.99 GiB, with at least 69.52 GiB of commit headroom. The sealed row spools held
 472,249,284 bytes. Windows reported 1,678,571,916 logical process write bytes, including the
-compressed publication. These figures measure the producer run. The local SDK workflow has
-its own 16 GiB system acceptance gate.
+compressed publication. These figures profile the producer on that host. Acceptance requires a 64 GiB system
+for the complete catalog and a 16 GiB system for individual SDK queries and the reduced
+Basetool catalog.
 
 | Decoded section | LIVE bytes | PTU bytes |
 | --- | ---: | ---: |
@@ -339,19 +340,20 @@ work. Keep those measurements distinct from the package reader and the transfer 
 
 ## System memory acceptance
 
-Verify normal packaged CLI, GUI and MCP operation and the local consumer
-workflow on a system with 16 GiB total physical or assigned RAM. The operating
-system, desktop, background services and all running processes share those
-16 GiB. Measure cold-cache, changed-Build and warm-cache runs. Verify that the
-local path reads only the required data and its dependencies, keeps the previous
-cache on failure and leaves the desktop usable during refresh.
+Verify individual SDK queries and the reduced Basetool catalog on a system
+with 16 GiB total physical or assigned RAM. Verify generation and import of
+the agreed reduced export. For SDK queries used in a cached consumer workflow,
+measure cold-cache, changed-Build and warm-cache runs. Verify that each query
+reads the requested data and its dependencies, keeps the previous cache on
+failure and leaves the desktop usable during refresh.
 
 Run the complete unfiltered LIVE and current PTU Catalog exports with the
-normal packaged command on a producer host with at least 64 GiB total RAM.
-The producer may use more than 16 GiB. This host class defines the verification
-environment. Each result retains every field, language, cross-domain reference
-and per-value origin of the complete schema-v3 document. Use ordinary OS
-paging settings and record the baseline and background workload.
+normal packaged command on a system with 64 GiB total physical or assigned RAM.
+Each result retains every field, language, cross-domain reference and per-value
+origin of the complete schema-v3 document. The operating system, desktop,
+background services and running processes share the available RAM in both test
+environments. Use ordinary OS paging and record the baseline and background
+workload for each run. Measurements on larger systems are producer profiles.
 
 Record total system RAM, OS, CPU and the running system's baseline memory
 before launch. Measure the producer's peak working set and private bytes,

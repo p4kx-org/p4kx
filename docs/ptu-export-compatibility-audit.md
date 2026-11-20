@@ -145,8 +145,8 @@ matching intro grants. The original Generator arena retains prerequisite groupin
 [ContractGenerator catalog contract](catalog-contract-generators.md#intro-prerequisites)
 
 The raw source receipts are private. This section records source structure, exact scope counts
-and implementation ownership. The full packaged export and the 16 GiB local-workflow test are
-separate requirements.
+and implementation ownership. System-memory acceptance uses 64 GiB total RAM for the full
+packaged catalog and 16 GiB total RAM for individual SDK queries and the reduced Basetool catalog.
 
 ## PTU 13189690 follow-through
 
