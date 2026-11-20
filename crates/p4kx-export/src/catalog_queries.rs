@@ -72,6 +72,8 @@ mod manufacturers;
 mod mining_definitions;
 #[path = "resource_group_query.rs"]
 mod resource_groups;
+#[path = "entity_tag_query.rs"]
+pub mod tags;
 
 /// Canonical mining globals and refining processes without world discovery.
 pub use mining_definitions::process_api as mining;

@@ -349,6 +349,20 @@ state to distinguish absent and unreadable input. A retained membership cell pre
 value state, encryption marker, completeness and original source uses, including unavailable
 option evidence. This status describes the declaration and does not infer an alignment transform.
 
+## Original Entity tag declarations
+
+Use `catalog_queries::tags::with_entity_tags` or a parsed session's
+`with_entity_tags` to read `/declarations/entityTags`. Select all Entities
+admitted by the normal Catalog policy, all physical Records with a GUID, or
+one physical Record index. The snapshot contains Build identity, declaration
+availability, Record coverage and the original source inventory.
+
+The shared projector preserves each root `tags[]` occurrence in authored order,
+including repeated, null and unresolved references. The Entity Record owns the
+occurrence. A readable physical Tag Record supplies its own target-header
+evidence. The query uses DataForge and resolves these original headers directly.
+See the [Tag contract](catalog-tags.md) for the declaration shape.
+
 ## Mission location templates
 
 Use `with_mission_location_templates`, its `_from` variant or the parsed session method

@@ -25,6 +25,7 @@ pub(crate) use capture::{
     CapturedTagTree, CapturedTags, ContextualTagPath, TagConsumers, TagDatum, TagDependencies,
     TagNameSelector, TagPathLookup, TagPathMeaning, read,
 };
-pub(crate) use contract::{EntityTags, TagDefinition, TagRoots, TagRows};
+pub use contract::EntityTags;
+pub(crate) use contract::{TagDefinition, TagRoots, TagRows};
 pub(crate) use entities::read as entity;
 pub(crate) use path_row::TagPath;

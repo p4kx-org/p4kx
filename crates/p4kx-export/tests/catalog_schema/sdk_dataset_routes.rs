@@ -13,6 +13,7 @@ use p4kx_export::catalog_queries::shops::{ShopInventorySelection, read_shop_inve
 use p4kx_export::catalog_queries::subsumption_events::{
     SubsumptionEventSelection, read_subsumption_events,
 };
+use p4kx_export::catalog_queries::tags;
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection,
     with_location_entity_declarations,
@@ -137,6 +138,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
     routes.extend(read_cargo_globals(&archive)?);
     routes.extend(quality::read()?);
     routes.extend(read_entity_definitions(&archive)?);
+    routes.push(read_entity_tags(&archive)?);
     routes.extend(commodities::read(&archive)?);
     routes.extend(loot::read()?);
     routes.extend(law::read()?);
@@ -231,6 +233,16 @@ fn read_entity_definitions(archive: &Archive) -> TestResult<[Route; 2]> {
             Route::queried_rows(MANUFACTURERS, &snapshot.rows, REMAINING)
         })??,
     ])
+}
+
+fn read_entity_tags(archive: &Archive) -> TestResult<Route> {
+    tags::with_entity_tags(archive, CatalogRecordSelection::All, None, |snapshot| {
+        Route::queried_rows(
+            super::ENTITY_TAGS,
+            &snapshot.rows,
+            "synthetic source and Catalog parity available; installed producer parity open",
+        )
+    })?
 }
 
 fn read_language_sources(archive: &Archive) -> TestResult<Route> {

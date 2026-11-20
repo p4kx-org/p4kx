@@ -7,6 +7,7 @@ use serde::Serialize;
 
 use super::header::TagHeader;
 use super::path_row::TagPath;
+use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_record_reference::CatalogRecordReference;
 use crate::guid_text::{CatalogGuid, GuidText};
 use crate::schema_fields::every_field_required;
@@ -37,13 +38,25 @@ pub(crate) struct TagRoots<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct EntityTags<'source> {
+pub struct EntityTags<'source> {
     #[serde(flatten)]
     pub(crate) source: TagHeader<'source>,
     pub(crate) tags: SourcedValue<Vec<SourcedValue<CatalogRecordReference>>>,
 }
 
-impl EntityTags<'_> {
+impl<'source> EntityTags<'source> {
+    /// Returns the original Entity's physical Record header.
+    #[must_use]
+    pub const fn source(&self) -> &CanonicalRecordHeader<'source> {
+        &self.source.header
+    }
+
+    /// Returns the authored GUID-tag occurrences in their original array order.
+    #[must_use]
+    pub const fn tags(&self) -> &SourcedValue<Vec<SourcedValue<CatalogRecordReference>>> {
+        &self.tags
+    }
+
     pub(crate) fn order_key(&self) -> (GuidText, u32) {
         (
             CatalogGuid(self.source.physical.guid).text(),
