@@ -22,8 +22,7 @@ pub enum IssueKind {
         /// The path the Record names.
         path: String,
     },
-    /// The sub-geometry the port's flags choose does not exist, so the part keeps the main
-    /// geometry of its Entity.
+    /// The port's tagged sub-geometry is absent, so the part uses its main geometry.
     #[error("the sub-geometry {path} does not exist; the main geometry is used")]
     SubGeometryMissing {
         /// The path of the sub-geometry.
@@ -38,8 +37,7 @@ pub enum IssueKind {
         /// The path of the sub-geometry.
         path: String,
     },
-    /// A worn item names only a prop of the world (a cardboard box) as its geometry and no model
-    /// for the body, so the part has no model.
+    /// A worn item names only world-prop geometry, so it has no worn model.
     #[error("the geometry {path} is a prop of the world, not a model of the worn item")]
     WorldPropNotWorn {
         /// The path of the prop the Record names.
@@ -53,15 +51,13 @@ pub enum IssueKind {
         /// What is wrong.
         reason: String,
     },
-    /// The material library of the model is missing or unreadable, so the engine's default
-    /// material is used.
+    /// The engine's default material replaces a missing or unreadable model material library.
     #[error("{reason}")]
     MaterialLibrary {
         /// What is wrong.
         reason: String,
     },
-    /// A tint palette the Entity or its material library names cannot be resolved, so the part
-    /// falls back to the next palette or to the colours of its library.
+    /// An unresolved tint palette falls back to the next palette or the library's colours.
     #[error("{reason}")]
     Palette {
         /// What is wrong.

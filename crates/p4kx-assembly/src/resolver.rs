@@ -136,25 +136,16 @@ impl<'f> LoadoutResolver<'f> {
         self
     }
 
-    /// Stops at docked vehicles: an Entity whose `AttachDef.Type` starts with `NOITEM_Vehicle`
-    /// stays attached to its port and is marked, but its Loadout and ports are not built unless
-    /// it is the Entity being resolved, which is never marked. By default docked vehicles are expanded like any Entity.
+    /// Marks attached docked vehicles and leaves their Loadouts unexpanded while resolving the root normally.
+    /// A docked vehicle has an `AttachDef.Type` beginning with `NOITEM_Vehicle`.
     #[must_use]
     pub const fn stopping_at_docked_vehicles(mut self) -> Self {
         self.stop_at_docked = true;
         self
     }
 
-    /// Prepares the root vehicle's fitted paint for model assembly.
-    #[must_use]
-    pub const fn with_vehicle_appearance(mut self) -> Self {
-        self.vehicle_appearance = true;
-        self
-    }
-
-    /// Polls `stop` while resolving with [`resolve_with`](Self::resolve_with), between the ports
-    /// it builds and the levels it reads ahead; once it returns `true` the resolution ends with
-    /// [`ChangeError::Cancelled`]. Only `resolve_with` ends that way; `resolve` ignores it.
+    /// Cancels [`Self::resolve_with`] with [`ChangeError::Cancelled`] when `stop` returns `true`.
+    /// That entry point polls between ports and read-ahead levels.
     #[must_use]
     pub fn with_stop(mut self, stop: &'f (dyn Fn() -> bool + Sync)) -> Self {
         self.stop = Some(stop);

@@ -52,6 +52,13 @@ pub(crate) const fn is_paint_type(kind: &str) -> bool {
 }
 
 impl LoadoutResolver<'_> {
+    /// Prepares the root vehicle's fitted paint for model assembly.
+    #[must_use]
+    pub const fn with_vehicle_appearance(mut self) -> Self {
+        self.vehicle_appearance = true;
+        self
+    }
+
     pub(crate) fn prepare_vehicle_paint(&self, spec: &EntitySpec, root: &mut EntityNode) {
         if self.vehicle_appearance
             && self.observation.is_none()
