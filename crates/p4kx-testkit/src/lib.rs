@@ -205,7 +205,7 @@ pub use entity_loadout::{TestLoadout, TestLoadoutEntry};
 pub use entity_module_sample::{ENTITY_MODULE_CARRIER, ENTITY_MODULE_CLASS, entity_module_entries};
 pub use entity_mount::{
     MOUNT_BONE, MOUNT_COURIER, MOUNT_DRIFTER, SATCHEL_HELPER_Z, mounted_item_entries,
-    mounted_overlay_entries,
+    mounted_overlay_entries, mounted_unresolved_helper_entries,
 };
 pub use entity_npc::{
     NPC_BROW_SKIN, NPC_CLASS, NPC_EYES_MATERIAL, NPC_FILES_CLASS, NPC_HAIR_BLONDE, NPC_HAIR_BROWN,

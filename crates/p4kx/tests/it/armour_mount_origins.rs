@@ -7,13 +7,17 @@ use std::io::{self, Write as _};
 use std::path::{Path, PathBuf};
 
 use p4kx_extraction::OriginDigestWriter;
-use p4kx_testkit::{MOUNT_BONE, MOUNT_COURIER, check_glb, mounted_item_entries, test_key};
+use p4kx_testkit::{
+    CheckedGlb, MOUNT_BONE, MOUNT_COURIER, TestEntry, check_glb, mounted_item_entries, test_key,
+};
 use serde_json::Value;
+
+#[path = "armour_subhelper_fallback.rs"]
+mod subhelper_fallback;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
-fn exact_mount_paths(bytes: &[u8]) -> Result<(String, String), Box<dyn Error>> {
-    let glb = check_glb(bytes)?;
+fn exact_mount_paths(glb: &CheckedGlb) -> Result<(String, String), Box<dyn Error>> {
     let bone = glb
         .document
         .nodes()
@@ -99,7 +103,7 @@ fn check_proof(bytes: &[u8], text: &str, encrypted: Option<bool>) -> TestResult 
         .map(serde_json::from_str::<Value>)
         .collect::<Result<Vec<_>, _>>()?;
     check_artifact_binding(bytes, &rows)?;
-    let (parent_path, translation_path) = exact_mount_paths(bytes)?;
+    let (parent_path, translation_path) = exact_mount_paths(&check_glb(bytes)?)?;
     let parent = contributors(&rows, &parent_path, encrypted)?;
     let pose = contributors(&rows, &translation_path, encrypted)?;
     let has = |sources: &[&Value], leaf: &str, role: &str| {
@@ -161,7 +165,7 @@ fn mounted_armour_glb_receipt_binds_physical_port_and_applied_model_fields() -> 
     for (label, encrypted) in [("encrypted", Some(true)), ("plain", None)] {
         let case = directory.path().join(label);
         fs::create_dir(&case)?;
-        let archive = mount_archive(&case, encrypted.is_some())?;
+        let archive = mount_archive(&case, mounted_item_entries(), encrypted.is_some())?;
         let mut command = p4kx_testkit::p4kx()?;
         command
             .args(["armour", "glb"])
@@ -190,8 +194,12 @@ fn mounted_armour_glb_receipt_binds_physical_port_and_applied_model_fields() -> 
     Ok(())
 }
 
-fn mount_archive(folder: &Path, encrypted: bool) -> Result<PathBuf, Box<dyn Error>> {
-    let entries = mounted_item_entries()
+fn mount_archive(
+    folder: &Path,
+    entries: Vec<TestEntry>,
+    encrypted: bool,
+) -> Result<PathBuf, Box<dyn Error>> {
+    let entries = entries
         .into_iter()
         .map(|entry| {
             let dataforge = Path::new(entry.path())
@@ -217,7 +225,7 @@ fn character_package_worn_mount_provenance_binds_glb_with_optional_vertex_maps()
     ] {
         let case = directory.path().join(label);
         fs::create_dir(&case)?;
-        let archive = mount_archive(&case, encrypted.is_some())?;
+        let archive = mount_archive(&case, mounted_item_entries(), encrypted.is_some())?;
         let out = case.join("character");
         let mut command = p4kx_testkit::p4kx()?;
         command
@@ -279,7 +287,7 @@ fn check_package_mount(mesh: &Value, bytes: &[u8], encrypted: Option<bool>) -> T
         Some(&serde_json::to_value(measured.finish()?)?),
         "the proof binds exactly the bytes written in the package",
     );
-    let (parent, translation) = exact_mount_paths(bytes)?;
+    let (parent, translation) = exact_mount_paths(&check_glb(bytes)?)?;
     let fields = proof
         .get("fieldOrigins")
         .and_then(Value::as_object)

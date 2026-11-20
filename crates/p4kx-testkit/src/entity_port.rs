@@ -11,6 +11,7 @@ pub struct TestPort {
     types: Vec<(String, Vec<String>)>,
     helper: Option<(String, [f32; 3], [f32; 3])>,
     item_helper: String,
+    sub_helpers: Vec<TestValue>,
     skin: bool,
     default_item: Option<u128>,
     flags: String,
@@ -29,6 +30,7 @@ impl TestPort {
             types: Vec::new(),
             helper: None,
             item_helper: String::new(),
+            sub_helpers: Vec::new(),
             skin: false,
             default_item: None,
             flags: String::new(),
@@ -106,6 +108,11 @@ impl TestPort {
         self
     }
 
+    pub(crate) fn sub_helpers(mut self, children: Vec<TestValue>) -> Self {
+        self.sub_helpers = children;
+        self
+    }
+
     /// Makes the attachment of the port a skin, with or without a helper.
     #[must_use]
     pub const fn skin(mut self) -> Self {
@@ -171,7 +178,12 @@ impl TestPort {
             let kind = if self.skin { "Skin" } else { "Bone" };
             instance = instance.value(
                 "AttachmentImplementation",
-                attachment(kind, self.helper.as_ref(), &self.item_helper),
+                attachment(
+                    kind,
+                    self.helper.as_ref(),
+                    &self.item_helper,
+                    &self.sub_helpers,
+                ),
             );
         }
         TestValue::Struct(instance)
@@ -203,18 +215,27 @@ fn attachment(
     kind: &str,
     helper: Option<&(String, [f32; 3], [f32; 3])>,
     item_helper: &str,
+    children: &[TestValue],
 ) -> TestValue {
     let mut instance = TestInstance::new(format!("SItemPortDefAttachmentImplementation{kind}"));
     if let Some((name, position, rotation)) = helper {
-        instance = instance.value(
-            "Helper",
-            helper_node(name, item_helper, *position, *rotation),
-        );
+        let mut root = helper_node(name, item_helper, *position, *rotation);
+        if !children.is_empty() {
+            root = root
+                .value("Tags", TestValue::text(""))
+                .value("SubHelpers", TestValue::Array(children.to_vec()));
+        }
+        instance = instance.value("Helper", TestValue::Struct(root));
     }
     TestValue::Struct(instance)
 }
 
-fn helper_node(name: &str, item_helper: &str, position: [f32; 3], rotation: [f32; 3]) -> TestValue {
+pub(crate) fn helper_node(
+    name: &str,
+    item_helper: &str,
+    position: [f32; 3],
+    rotation: [f32; 3],
+) -> TestInstance {
     let xyz = |type_name: &str, [x, y, z]: [f32; 3]| {
         TestValue::Struct(
             TestInstance::new(type_name)
@@ -230,7 +251,5 @@ fn helper_node(name: &str, item_helper: &str, position: [f32; 3], rotation: [f32
         .value("Name", TestValue::text(name))
         .value("ItemOffsetHelperName", TestValue::text(item_helper))
         .value("Offset", TestValue::Struct(offset));
-    TestValue::Struct(
-        TestInstance::new("SItemPortDefHelperNode").value("Helper", TestValue::Struct(helper)),
-    )
+    TestInstance::new("SItemPortDefHelperNode").value("Helper", TestValue::Struct(helper))
 }

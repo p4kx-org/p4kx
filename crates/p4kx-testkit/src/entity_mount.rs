@@ -2,9 +2,10 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use crate::entity_armour::{MALE_ARMOUR, armour_database, armour_files};
+use crate::entity_port::helper_node;
 use crate::{
-    DataForgeBuilder, TestEntity, TestEntry, TestLoadout, TestLoadoutEntry, TestModel, TestNode,
-    TestPort,
+    DataForgeBuilder, TestEntity, TestEntry, TestInstance, TestLoadout, TestLoadoutEntry,
+    TestModel, TestNode, TestPort, TestType, TestValue,
 };
 
 /// The class name of the character whose backpack hangs on a bone its armour has.
@@ -45,16 +46,18 @@ fn satchel_model() -> TestModel {
     ])
 }
 
-fn carrier(guid: u128, class: &str, helper: &str) -> TestEntity {
+fn satchel_port(helper: &str) -> TestPort {
+    TestPort::new("pack")
+        .item_type("Char_Armor_Backpack", Vec::<String>::new())
+        .helper(helper, [0.0, 0.1, 0.2], [0.0; 3])
+        .item_helper("satchel_loc")
+}
+
+fn carrier(guid: u128, class: &str, port: TestPort) -> TestEntity {
     TestEntity::new(guid, class, format!("entities/scitem/{class}.xml"))
         .attach_type("Char_Armor_Torso")
         .geometry_variant("Male", format!("{MALE_ARMOUR}/plain.skin"), None)
-        .port(
-            TestPort::new("pack")
-                .item_type("Char_Armor_Backpack", Vec::<String>::new())
-                .helper(helper, [0.0, 0.1, 0.2], [0.0; 3])
-                .item_helper("satchel_loc"),
-        )
+        .port(port)
         .loadout(TestLoadout::Manual(vec![TestLoadoutEntry::class(
             "pack",
             "Mount_Satchel",
@@ -68,13 +71,17 @@ fn character(guid: u128, class: &str, torso: &str) -> TestEntity {
 }
 
 fn database() -> DataForgeBuilder {
+    database_with_carrier(satchel_port("cloth"))
+}
+
+fn database_with_carrier(port: TestPort) -> DataForgeBuilder {
     let satchel = TestEntity::new(0x40, "Mount_Satchel", "entities/scitem/mount_satchel.xml")
         .attach_type("Char_Armor_Backpack")
         .geometry_variant("Male", format!("{MALE_ARMOUR}/satchel.cgf"), None);
     [
         satchel,
-        carrier(0x41, "Mount_Carrier", "cloth"),
-        carrier(0x42, "Mount_Lost", "nowhere"),
+        carrier(0x41, "Mount_Carrier", port),
+        carrier(0x42, "Mount_Lost", satchel_port("nowhere")),
         character(0x43, MOUNT_COURIER, "Mount_Carrier"),
         character(0x44, MOUNT_DRIFTER, "Mount_Lost"),
     ]
@@ -98,6 +105,36 @@ fn database() -> DataForgeBuilder {
 #[must_use]
 pub fn mounted_item_entries() -> Vec<TestEntry> {
     mounted_entries(&database())
+}
+
+/// Returns the mounted-item fixture with a tagged alternative at original helper ordinals [1, 0].
+#[must_use]
+pub fn mounted_unresolved_helper_entries() -> Vec<TestEntry> {
+    let node_type = "SItemPortDefHelperNode";
+    let alternative = helper_node("pelvis", "satchel", [0.0, 0.1, 0.8], [0.0; 3])
+        .value("Tags", TestValue::text("FixtureUnresolvedTag"));
+    let group = TestInstance::new(node_type)
+        .value("Tags", TestValue::text(""))
+        .value(
+            "SubHelpers",
+            TestValue::Array(vec![TestValue::Struct(alternative)]),
+        );
+    let port = satchel_port("cloth").sub_helpers(vec![TestValue::Null, TestValue::Struct(group)]);
+    let mut database = database_with_carrier(port);
+    database.structs = database
+        .structs
+        .into_iter()
+        .map(|structure| {
+            if structure.name == node_type {
+                structure
+                    .field("Tags", TestType::String)
+                    .array("SubHelpers", TestType::StrongPointer(node_type.to_owned()))
+            } else {
+                structure
+            }
+        })
+        .collect();
+    mounted_entries(&database)
 }
 
 fn mounted_entries(database: &DataForgeBuilder) -> Vec<TestEntry> {
