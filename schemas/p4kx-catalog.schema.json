@@ -15256,6 +15256,7 @@
       "required": []
     },
     "EmitterRoute": {
+      "description": "The original container slot, projectile role and ammunition of an emitter.",
       "properties": {
         "ammoRecordIndex": {
           "$ref": "#/$defs/SourcedValueOfuint32"
