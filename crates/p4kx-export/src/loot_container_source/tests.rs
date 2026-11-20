@@ -31,7 +31,7 @@ fn malformed_xml_does_not_hide_a_later_readable_entity() -> TestResult {
         ));
     let (_folder, archive) = opened(&container)?;
     let read = crate::catalog_read::original::with_entry_capture(&archive, |capture| {
-        super::read(&archive, 0, None, capture)
+        super::read(&archive, 0, None, capture, None)
     })?;
     assert!(
         matches!(read.unreadable, Some(Unreadable::EntityXml(_))),
@@ -67,7 +67,7 @@ fn a_malformed_config_keeps_other_declared_links_with_field_diagnostics() -> Tes
     ));
     let (_folder, archive) = opened(&container)?;
     let read = crate::catalog_read::original::with_entry_capture(&archive, |capture| {
-        super::read(&archive, 0, None, capture)
+        super::read(&archive, 0, None, capture, None)
     })?;
     let [(_, link)] = read.links.as_slice() else {
         return Err("one partially projected source expected".into());
@@ -109,7 +109,7 @@ fn a_large_source_keeps_the_link_after_the_full_entity_document() -> TestResult 
     let container = TestContainer::new().entry(TestEntry::deflated("entdata/full.entxml", xml));
     let (_folder, archive) = opened(&container)?;
     let read = crate::catalog_read::original::with_entry_capture(&archive, |capture| {
-        super::read(&archive, 0, None, capture)
+        super::read(&archive, 0, None, capture, None)
     })?;
     let [(_, link)] = read.links.as_slice() else {
         return Err("the original link at the end of the source must survive".into());
@@ -130,7 +130,7 @@ fn an_overlong_entity_source_cannot_publish_its_valid_prefix() -> TestResult {
         .with_uncompressed_size(u64::try_from(xml.len())?);
     let (_folder, archive) = opened(&TestContainer::new().entry(entry))?;
     let read = crate::catalog_read::original::with_entry_capture(&archive, |capture| {
-        super::read(&archive, 0, None, capture)
+        super::read(&archive, 0, None, capture, None)
     })?;
     assert_eq!(
         read.links.len(),
@@ -151,7 +151,7 @@ fn a_checksum_mismatch_cannot_supply_an_authored_selector() -> TestResult {
     let entry = TestEntry::stored("entdata/damaged.entxml", xml).with_crc32(0);
     let (_folder, archive) = opened(&TestContainer::new().entry(entry))?;
     let read = crate::catalog_read::original::with_entry_capture(&archive, |capture| {
-        super::read(&archive, 0, None, capture)
+        super::read(&archive, 0, None, capture, None)
     })?;
     assert!(
         read.links.is_empty(),
@@ -172,7 +172,7 @@ fn duplicate_paths_preserve_distinct_physical_entry_indices() -> TestResult {
         .entry(TestEntry::stored("entdata/same.entxml", "invalid"));
     let (_folder, archive) = opened(&container)?;
     let read = crate::catalog_read::original::with_entry_capture(&archive, |capture| {
-        super::read(&archive, 0, None, capture)
+        super::read(&archive, 0, None, capture, None)
     })?;
     let [_, first, second] = read.ledger.entries.as_slice() else {
         return Err("both physical source Entries expected".into());

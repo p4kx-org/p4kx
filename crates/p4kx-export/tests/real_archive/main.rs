@@ -85,6 +85,7 @@ mod real_archive_location_configuration;
 mod real_archive_location_entities;
 mod real_archive_location_vocabulary;
 mod real_archive_loot;
+mod real_archive_loot_document_sdk;
 mod real_archive_loot_generation_components;
 mod real_archive_loot_source_shapes;
 mod real_archive_mining;

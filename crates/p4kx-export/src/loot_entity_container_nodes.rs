@@ -18,12 +18,44 @@ use crate::{CatalogError, ExportAccountingError};
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct LootEntityLinkNode {
+pub struct LootEntityLinkNode {
     node_index: SourcedValue<u32>,
     parent_node_index: SourcedValue<u32>,
     entity_node_index: SourcedValue<u32>,
     name: SourcedValue<String>,
     attributes: Vec<SourcedXmlAttribute>,
+}
+
+impl LootEntityLinkNode {
+    /// Borrows the original node index.
+    #[must_use]
+    pub const fn node_index(&self) -> &SourcedValue<u32> {
+        &self.node_index
+    }
+
+    /// Borrows the original XML parent index.
+    #[must_use]
+    pub const fn parent_node_index(&self) -> &SourcedValue<u32> {
+        &self.parent_node_index
+    }
+
+    /// Borrows the nearest original Entity node index.
+    #[must_use]
+    pub const fn entity_node_index(&self) -> &SourcedValue<u32> {
+        &self.entity_node_index
+    }
+
+    /// Borrows the original XML element name.
+    #[must_use]
+    pub const fn name(&self) -> &SourcedValue<String> {
+        &self.name
+    }
+
+    /// Borrows the attributes in original order.
+    #[must_use]
+    pub fn attributes(&self) -> &[SourcedXmlAttribute] {
+        &self.attributes
+    }
 }
 
 pub(super) struct CapturedNodes {

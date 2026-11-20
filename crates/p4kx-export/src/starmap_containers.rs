@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{Archive, CancelToken, Guid};
+use p4kx_extraction::{Archive, CancelToken, DataForge, Guid};
 use std::collections::hash_map::Entry as MapEntry;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -14,7 +14,7 @@ use crate::export_ledger::ExportLedger;
 use crate::starmap_index::{Index, unreferenced};
 use crate::starmap_report::{ContainerCounts, Placement, StarmapReport, apart, clip};
 use crate::starmap_walk::{Opened, SystemRead};
-use crate::{CatalogError, ExportAccountingError, Kind};
+use crate::{CatalogError, ExportAccountingError, Filter, Kind};
 
 use jump_endpoint::JumpEndpoint;
 use jump_operating::OperatingResolver;
@@ -69,6 +69,10 @@ mod collect_tests;
 #[path = "starmap_harvest_placement_tests.rs"]
 mod harvest_placement_tests;
 
+#[cfg(test)]
+#[path = "starmap_loot_placement_tests.rs"]
+mod loot_placement_tests;
+
 pub(crate) use crate::StarmapTraversalBudget as Limits;
 
 /// The catalog scope that requires reading system containers.
@@ -76,6 +80,31 @@ pub(crate) use crate::StarmapTraversalBudget as Limits;
 pub(crate) enum PlacementScope {
     RecordSelection,
     ArchiveInventory,
+}
+
+impl PlacementScope {
+    pub(crate) fn for_catalog(forge: &DataForge<'_>, filter: Option<&Filter>) -> Option<Self> {
+        let wanted = forge.records().any(|record| {
+            record
+                .record_path()
+                .is_ok_and(|path| Self::admits_loot_path(path, filter))
+        });
+        if wanted {
+            Some(Self::RecordSelection)
+        } else {
+            filter.is_none().then_some(Self::ArchiveInventory)
+        }
+    }
+
+    pub(crate) fn admits_loot_path(path: &str, filter: Option<&Filter>) -> bool {
+        [
+            Kind::StarmapObjects.records(),
+            Kind::HarvestableProviderPresets.records(),
+        ]
+        .iter()
+        .any(|rule| rule.matches_path(path))
+            && filter.is_none_or(|filter| filter.matches(path))
+    }
 }
 
 #[derive(Debug, Default)]

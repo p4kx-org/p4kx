@@ -16,15 +16,18 @@ mod nodes;
 #[path = "loot_entity_container_targets.rs"]
 mod targets;
 
-use nodes::LootEntityLinkNode;
+pub use nodes::LootEntityLinkNode;
 use targets::LootContainerTargets;
+pub use targets::{
+    LootContainerLookupRepair, LootContainerLookupRepairKind, LootContainerTargetStatus,
+};
 pub(crate) use targets::{SelectedTarget, literal_candidates};
 
 /// One original `EntXML` document with container-link attributes reached by the Loot walk.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct LootEntityContainerDocument {
+pub struct LootEntityContainerDocument {
     containing_container: SourcedValue<PhysicalEntryRef>,
     document: SourcedValue<PhysicalEntryRef>,
     nodes: SourcedValue<Vec<LootEntityLinkNode>>,
@@ -36,7 +39,7 @@ pub(crate) struct LootEntityContainerDocument {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct LootEntityContainerLink {
+pub struct LootEntityContainerLink {
     node_index: SourcedValue<u32>,
     attribute_ordinal: SourcedValue<u64>,
     declared_path: SourcedValue<String>,
@@ -48,7 +51,7 @@ struct LootEntityContainerLink {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct LootEntityConfigReference {
+pub struct LootEntityConfigReference {
     node_index: SourcedValue<u32>,
     attribute_ordinal: SourcedValue<u64>,
     guid: SourcedValue<CatalogGuid>,
@@ -172,12 +175,100 @@ impl CapturedDocument {
 }
 
 impl LootEntityContainerDocument {
+    /// Borrows the containing physical Archive Entry.
+    #[must_use]
+    pub const fn containing_container(&self) -> &SourcedValue<PhysicalEntryRef> {
+        &self.containing_container
+    }
+
+    /// Borrows the physical nested `EntXML` Entry.
+    #[must_use]
+    pub const fn document(&self) -> &SourcedValue<PhysicalEntryRef> {
+        &self.document
+    }
+
+    /// Borrows the normalized original XML nodes.
+    #[must_use]
+    pub const fn nodes(&self) -> &SourcedValue<Vec<LootEntityLinkNode>> {
+        &self.nodes
+    }
+
+    /// Borrows the ordered original container-link attributes.
+    #[must_use]
+    pub const fn links(&self) -> &SourcedValue<Vec<LootEntityContainerLink>> {
+        &self.links
+    }
+
+    /// Borrows the ordered original configuration references.
+    #[must_use]
+    pub const fn config_references(&self) -> &SourcedValue<Vec<LootEntityConfigReference>> {
+        &self.config_references
+    }
+
     pub(crate) fn physical_index(&self) -> Result<u32, CatalogError> {
         let original = self
             .document
             .value()
             .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
         Ok(original.entry_index())
+    }
+}
+
+impl LootEntityContainerLink {
+    /// Borrows the original XML node index.
+    #[must_use]
+    pub const fn node_index(&self) -> &SourcedValue<u32> {
+        &self.node_index
+    }
+
+    /// Borrows the original attribute ordinal.
+    #[must_use]
+    pub const fn attribute_ordinal(&self) -> &SourcedValue<u64> {
+        &self.attribute_ordinal
+    }
+
+    /// Borrows the unchanged original selector.
+    #[must_use]
+    pub const fn declared_path(&self) -> &SourcedValue<String> {
+        &self.declared_path
+    }
+
+    /// Borrows the resolved selector state.
+    #[must_use]
+    pub const fn target_status(&self) -> &SourcedValue<LootContainerTargetStatus> {
+        &self.targets.target_status
+    }
+
+    /// Borrows the candidate Entries in physical order.
+    #[must_use]
+    pub const fn target_candidates(&self) -> &SourcedValue<Vec<SourcedValue<PhysicalEntryRef>>> {
+        &self.targets.target_candidates
+    }
+
+    /// Borrows the source-backed repair used for a supported authoring path.
+    #[must_use]
+    pub fn target_lookup_repair(&self) -> Option<&LootContainerLookupRepair> {
+        self.targets.lookup_repair.as_deref()
+    }
+}
+
+impl LootEntityConfigReference {
+    /// Borrows the original XML node index.
+    #[must_use]
+    pub const fn node_index(&self) -> &SourcedValue<u32> {
+        &self.node_index
+    }
+
+    /// Borrows the original attribute ordinal.
+    #[must_use]
+    pub const fn attribute_ordinal(&self) -> &SourcedValue<u64> {
+        &self.attribute_ordinal
+    }
+
+    /// Borrows the parsed configuration GUID or its original invalid state.
+    #[must_use]
+    pub const fn guid(&self) -> &SourcedValue<CatalogGuid> {
+        &self.guid
     }
 }
 

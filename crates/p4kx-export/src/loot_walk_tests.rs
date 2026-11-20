@@ -10,7 +10,9 @@ use p4kx_testkit::{
 };
 
 use super::*;
+use crate::Kind;
 use crate::export_entry_ledger::EntryOperation;
+use crate::export_ledger::SourceDisposition;
 
 fn explore(
     archive: &Archive,

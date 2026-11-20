@@ -5,22 +5,23 @@
 
 use std::collections::{HashMap, HashSet};
 
-use p4kx_extraction::{Archive, CancelToken, Guid, SourceUse};
-use rayon::prelude::*;
+use p4kx_extraction::{Archive, CancelToken, Guid};
+use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 
-use crate::catalog_read::original::{AuthoredEntryPath, EntryCapture};
+use crate::CatalogError;
+use crate::catalog_read::original::EntryCapture;
 use crate::catalog_rows::staged::{IndexedCatalogRows, StagedCatalogTable};
 use crate::catalog_table::DatasetAvailability;
-use crate::entry_source::{self, EntrySource};
-use crate::export_ledger::{ExportLedger, SourceDisposition};
-use crate::loot_entxml::documents::{
-    LootEntityContainerDocument, SelectedTarget, literal_candidates,
-};
-use crate::loot_entxml::{CapturedEntityLink, EntityLink};
+use crate::export_ledger::ExportLedger;
+use crate::loot_entxml::documents::LootEntityContainerDocument;
 use crate::loot_unreadable::Unreadable;
 use crate::starmap_index::Index;
 use crate::starmap_walk::Opened;
-use crate::{CatalogError, ExportAccountingError, Kind};
+
+#[path = "loot_walk_container.rs"]
+mod container;
+
+use container::ContainerRead;
 
 /// An entity of a container that carries a multi config.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -76,225 +77,133 @@ pub(crate) fn explore(
     cancel: Option<&CancelToken>,
     capture: &EntryCapture<'_>,
 ) -> Result<Explored, CatalogError> {
-    let mut ledger = ExportLedger::default();
-    let directory = capture
-        .source_uses()
-        .observe_root_directory_paths(archive)?;
     let scratch = std::env::temp_dir();
     let mut originals = IndexedCatalogRows::new(&scratch, cancel);
     let mut available = false;
-    let mut unknown = crate::export_archive_health::inventory(archive).is_some();
-    let mut summaries: HashMap<usize, Summary> = HashMap::new();
-    let mut frontier: Vec<usize> = opened.iter().map(|root| root.entry).collect();
-    while !frontier.is_empty() && !cancel.is_some_and(CancelToken::is_cancelled) {
-        frontier.sort_unstable();
-        frontier.dedup();
-        frontier.retain(|entry| !summaries.contains_key(entry));
-        let read: Vec<_> = frontier
-            .par_iter()
-            .filter(|_| !cancel.is_some_and(CancelToken::is_cancelled))
-            .map(|&entry| {
-                summarise(archive, index, entry, cancel, capture, directory.as_ref())
-                    .map(|read| (entry, read))
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        frontier = read
-            .iter()
-            .flat_map(|(_, read)| read.summary.nested.iter().copied())
-            .collect();
-        for (entry, read) in read {
-            for document in read.documents {
-                originals.append((entry, document.physical_index()?), &document)?;
-                available = true;
-            }
-            unknown |= read.scope_unknown;
-            summaries.insert(entry, read.summary);
-            ledger.merge(read.ledger);
-        }
-    }
+    let walked = visit_documents(
+        archive,
+        index,
+        opened,
+        cancel,
+        capture,
+        None,
+        |entry, document| {
+            originals.append((entry, document.physical_index()?), &document)?;
+            available = true;
+            Ok(())
+        },
+    )?;
     let availability = if available {
         DatasetAvailability::Available
-    } else if unknown {
+    } else if !walked.documents_complete {
         DatasetAvailability::Unavailable
     } else {
         DatasetAvailability::Absent
     };
     Ok(Explored {
-        ledger,
-        summaries,
+        ledger: walked.ledger,
+        summaries: walked.summaries,
         original_documents: originals.finish_with_availability(availability)?,
     })
 }
 
-struct ContainerRead {
-    summary: Summary,
-    ledger: ExportLedger,
-    documents: Vec<LootEntityContainerDocument>,
-    scope_unknown: bool,
+/// One selected containing Entry and optional original nested Entry index.
+#[derive(Clone, Copy)]
+pub(crate) struct SelectedDocument {
+    pub(crate) container_position: usize,
+    pub(crate) entity_index: Option<usize>,
 }
 
-fn summarise(
+pub(crate) struct Walked {
+    pub(crate) ledger: ExportLedger,
+    pub(crate) summaries: HashMap<usize, Summary>,
+    pub(crate) documents_complete: bool,
+    pub(crate) routes_complete: bool,
+    pub(crate) found_owner: bool,
+}
+
+pub(crate) fn visit_documents(
     archive: &Archive,
     index: &Index<'_>,
-    entry: usize,
+    opened: &[Opened],
     cancel: Option<&CancelToken>,
     capture: &EntryCapture<'_>,
-    directory: Option<&SourceUse>,
-) -> Result<ContainerRead, CatalogError> {
-    let read = crate::loot_container_source::read(archive, entry, cancel, capture)?;
-    let mut ledger = read.ledger;
-    let scope_unknown = read.unreadable.is_some() || read.original_scope_unknown;
-    let mut documents = Vec::new();
-    let mut summary = Summary {
-        unreadable: read.unreadable,
-        ..Summary::default()
+    selected: Option<SelectedDocument>,
+    mut visit: impl FnMut(usize, LootEntityContainerDocument) -> Result<(), CatalogError>,
+) -> Result<Walked, CatalogError> {
+    let directory = capture
+        .source_uses()
+        .observe_root_directory_paths(archive)?;
+    let inventory_complete = crate::export_archive_health::inventory(archive).is_none();
+    let mut walked = Walked {
+        ledger: ExportLedger::default(),
+        summaries: HashMap::new(),
+        documents_complete: inventory_complete,
+        routes_complete: inventory_complete,
+        found_owner: false,
     };
-    for (path, mut link) in read.links {
-        let original = retain_original(
-            &mut link,
+    let mut frontier: Vec<usize> = opened.iter().map(|root| root.entry).collect();
+    let read = |position, member| {
+        container::summarise(
             archive,
             index,
-            directory,
-            capture,
+            position,
             cancel,
-            &mut documents,
-        )?;
-        let (link, selected) = link.into_parts();
-        let EntityLink {
-            container: written,
-            config,
-            several,
-            malformed_config: _,
-        } = link;
-        if several {
-            summary.several.push(path);
+            capture,
+            directory.as_ref(),
+            member,
+        )
+    };
+    while !frontier.is_empty() {
+        crate::catalog_query_session::checkpoint(cancel)?;
+        frontier.sort_unstable();
+        frontier.dedup();
+        frontier.retain(|entry| !walked.summaries.contains_key(entry));
+        if let Some(wanted) = selected
+            && frontier.binary_search(&wanted.container_position).is_ok()
+        {
+            let selected_read = read(wanted.container_position, wanted.entity_index)?;
+            walked.found_owner = true;
+            walked.documents_complete = !selected_read.scope_unknown;
+            walked.merge(wanted.container_position, selected_read, &mut visit)?;
+            crate::catalog_query_session::checkpoint(cancel)?;
+            return Ok(walked);
         }
-        let target = if let Some(path) = written.as_deref() {
-            let selector = selected.ok_or(ExportAccountingError::UnboundHealthSubject)?;
-            if selector.as_str() != path {
-                return Err(ExportAccountingError::ConflictingSourceDatum.into());
-            }
-            let (candidates, absence_proved) = original.map_or_else(
-                || (literal_candidates(index, path).unwrap_or_default(), false),
-                |selected| (selected.candidates, selected.absence_proved),
-            );
-            resolve_target(
-                archive,
-                capture,
-                &mut ledger,
-                selector,
-                candidates,
-                absence_proved,
-            )?
-        } else {
-            PlacedTarget::Missing
-        };
-        summary.add(archive, config, written, target);
+        let layer: Vec<_> = frontier
+            .par_iter()
+            .map(|&entry| {
+                let mut outcome = read(entry, None)?;
+                if selected.is_some() {
+                    outcome.documents = Vec::new();
+                }
+                Ok((entry, outcome))
+            })
+            .collect::<Result<Vec<_>, CatalogError>>()?;
+        frontier.clear();
+        for (entry, outcome) in layer {
+            frontier.extend(outcome.summary.nested.iter().copied());
+            walked.merge(entry, outcome, &mut visit)?;
+        }
     }
-    summary.nested.sort_unstable();
-    summary.nested.dedup();
-    Ok(ContainerRead {
-        summary,
-        ledger,
-        documents,
-        scope_unknown,
-    })
+    crate::catalog_query_session::checkpoint(cancel)?;
+    Ok(walked)
 }
 
-fn retain_original<'index>(
-    link: &mut CapturedEntityLink,
-    archive: &Archive,
-    index: &'index Index<'_>,
-    directory: Option<&SourceUse>,
-    capture: &EntryCapture<'_>,
-    cancel: Option<&CancelToken>,
-    documents: &mut Vec<LootEntityContainerDocument>,
-) -> Result<Option<SelectedTarget<'index>>, CatalogError> {
-    let Some(original) = link.take_original() else {
-        return Ok(None);
-    };
-    let selected = if link.value().several || link.value().malformed_config {
-        None
-    } else {
-        link.selected_container()
-    };
-    let projected = original.project(archive, index, directory, capture, cancel, selected)?;
-    documents.push(projected.document);
-    Ok(projected.selected_target)
-}
-
-impl Summary {
-    fn add(
+impl Walked {
+    fn merge(
         &mut self,
-        archive: &Archive,
-        config: Option<Guid>,
-        written: Option<String>,
-        target: PlacedTarget,
-    ) {
-        if let Some(found) = target.entry() {
-            self.nested.push(found);
+        entry: usize,
+        read: ContainerRead,
+        visit: &mut impl FnMut(usize, LootEntityContainerDocument) -> Result<(), CatalogError>,
+    ) -> Result<(), CatalogError> {
+        for document in read.documents {
+            visit(entry, document)?;
         }
-        if let Some(config) = config {
-            self.placed
-                .push(configured_placement(archive, config, written, target));
-        }
-    }
-}
-
-fn configured_placement(
-    archive: &Archive,
-    config: Guid,
-    written: Option<String>,
-    target: PlacedTarget,
-) -> Placed {
-    let path = target.entry().map_or_else(
-        || written.unwrap_or_default(),
-        |found| path_of(archive, found).to_owned(),
-    );
-    Placed {
-        config,
-        path,
-        target,
-    }
-}
-
-fn resolve_target(
-    archive: &Archive,
-    capture: &EntryCapture<'_>,
-    ledger: &mut ExportLedger,
-    selector: AuthoredEntryPath,
-    candidates: &[usize],
-    absence_proved: bool,
-) -> Result<PlacedTarget, CatalogError> {
-    match candidates {
-        [entry] => Ok(PlacedTarget::Resolved(*entry)),
-        [] if absence_proved => {
-            EntrySource::authored_missing(selector).record(
-                ledger,
-                Kind::LootContainers,
-                SourceDisposition::VerifiedMissingReference,
-            );
-            Ok(PlacedTarget::VerifiedMissing)
-        }
-        [] => {
-            EntrySource::authored_missing(selector).record(
-                ledger,
-                Kind::LootContainers,
-                SourceDisposition::ReadFailed,
-            );
-            Ok(PlacedTarget::Missing)
-        }
-        candidates => {
-            entry_source::record_ambiguous_outer_entries(
-                archive,
-                capture,
-                ledger,
-                Kind::LootContainers,
-                Some(&selector),
-                candidates,
-            )?;
-            Ok(PlacedTarget::Ambiguous)
-        }
+        self.documents_complete &= !read.scope_unknown;
+        self.routes_complete &= !read.route_unknown && !read.scope_unknown;
+        self.summaries.insert(entry, read.summary);
+        self.ledger.merge(read.ledger);
+        Ok(())
     }
 }
 

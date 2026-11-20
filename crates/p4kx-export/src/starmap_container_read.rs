@@ -1,27 +1,26 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Instant;
 
 use p4kx_extraction::{Archive, CancelToken};
-#[cfg(test)]
-use rayon::prelude::*;
 
 use super::jump_class::JumpEndpointRecords;
 use super::{Limits, PlacementScope, PlacementSpools, Placements};
 use crate::catalog_read::original::EntryCapture;
-use crate::catalog_rows::spool::RowSpoolWriter;
 use crate::catalog_table::DatasetAvailability;
 use crate::entry_source;
 use crate::export_ledger::ExportLedger;
 use crate::harvest_locations::HarvestSurvey;
 use crate::starmap_index::Index;
-use crate::starmap_parse::{Body, DescriptorScope, Read};
-use crate::starmap_walk::{PlacementRows, System, SystemRead};
+use crate::starmap_parse::{DescriptorScope, Read};
+use crate::starmap_walk::SystemRead;
 use crate::{CatalogError, ExportAccountingError, Kind};
+
+#[path = "starmap_container_systems.rs"]
+mod systems;
 
 #[derive(Clone, Copy)]
 enum PlacementStorage<'directory> {
@@ -29,14 +28,17 @@ enum PlacementStorage<'directory> {
     #[cfg(test)]
     Typed,
     Harvest(&'directory HarvestSurvey<'directory>),
+    OpenedContainers,
 }
 
 impl PlacementStorage<'_> {
     const fn descriptor_scope(self, jump_endpoints: bool) -> DescriptorScope {
-        if matches!(self, Self::Harvest(_)) {
-            DescriptorScope::Harvest
-        } else {
-            DescriptorScope::Catalog { jump_endpoints }
+        match self {
+            Self::Harvest(_) => DescriptorScope::Harvest,
+            Self::OpenedContainers => DescriptorScope::OpenedContainers,
+            Self::Spool(_) => DescriptorScope::Catalog { jump_endpoints },
+            #[cfg(test)]
+            Self::Typed => DescriptorScope::Catalog { jump_endpoints },
         }
     }
 }
@@ -109,6 +111,24 @@ impl Placements {
         )
     }
 
+    pub(crate) fn read_loot_seeds(
+        archive: &Archive,
+        cancel: Option<&CancelToken>,
+        limits: Limits,
+        capture: &EntryCapture<'_>,
+        scope: PlacementScope,
+    ) -> Result<Self, CatalogError> {
+        Self::read_scoped(
+            archive,
+            cancel,
+            limits,
+            capture,
+            scope,
+            None,
+            PlacementStorage::OpenedContainers,
+        )
+    }
+
     fn empty_inventory(archive: &Archive, endpoint_inventory_complete: bool) -> Self {
         Self {
             instance_availability: Some(DatasetAvailability::Absent),
@@ -161,7 +181,7 @@ impl Placements {
             capture,
         )?;
         check_cancelled(cancel)?;
-        let (read, mut spools) = walk_systems(
+        let (read, mut spools) = systems::walk_systems(
             &index,
             &bodies,
             &systems,
@@ -283,108 +303,4 @@ pub(crate) fn unique_system_roots(
         }
     }
     Ok(unique)
-}
-
-fn walk_systems(
-    index: &Index<'_>,
-    bodies: &HashMap<usize, Body>,
-    systems: &[(Arc<str>, usize)],
-    cancel: Option<&CancelToken>,
-    limits: Limits,
-    (archive, capture, endpoints): (&Archive, &EntryCapture<'_>, Option<&JumpEndpointRecords>),
-    storage: PlacementStorage<'_>,
-) -> Result<(Vec<SystemRead>, PlacementSpools), CatalogError> {
-    if systems.is_empty() {
-        return Ok((Vec::new(), PlacementSpools::default()));
-    }
-    match storage {
-        PlacementStorage::Spool(directory) => walk_spooled_systems(
-            index,
-            bodies,
-            systems,
-            cancel,
-            limits,
-            (archive, capture, endpoints),
-            directory,
-        ),
-        PlacementStorage::Harvest(harvest) => {
-            let reads = systems
-                .iter()
-                .map(|(name, entry)| {
-                    System::run_with_output(
-                        index,
-                        bodies,
-                        name,
-                        *entry,
-                        cancel,
-                        limits,
-                        (archive, capture, None, PlacementRows::Harvest(harvest)),
-                    )
-                })
-                .collect::<Result<_, _>>()?;
-            Ok((reads, PlacementSpools::default()))
-        }
-        #[cfg(test)]
-        PlacementStorage::Typed => {
-            let reads = systems
-                .par_iter()
-                .map(|(name, entry)| {
-                    System::run(
-                        index,
-                        bodies,
-                        name,
-                        *entry,
-                        cancel,
-                        limits,
-                        (archive, capture, endpoints),
-                    )
-                })
-                .collect::<Result<_, _>>()?;
-            Ok((reads, PlacementSpools::default()))
-        }
-    }
-}
-
-fn walk_spooled_systems(
-    index: &Index<'_>,
-    bodies: &HashMap<usize, Body>,
-    systems: &[(Arc<str>, usize)],
-    cancel: Option<&CancelToken>,
-    limits: Limits,
-    (archive, capture, endpoints): (&Archive, &EntryCapture<'_>, Option<&JumpEndpointRecords>),
-    directory: &Path,
-) -> Result<(Vec<SystemRead>, PlacementSpools), CatalogError> {
-    let mut containers = RowSpoolWriter::new(directory)?;
-    let mut locations = RowSpoolWriter::new(directory)?;
-    let mut unresolved = RowSpoolWriter::new(directory)?;
-    let mut reads = Vec::with_capacity(systems.len());
-    for (name, entry) in systems {
-        reads.push(System::run_with_output(
-            index,
-            bodies,
-            name,
-            *entry,
-            cancel,
-            limits,
-            (
-                archive,
-                capture,
-                endpoints,
-                PlacementRows::Spool {
-                    containers: &mut containers,
-                    locations: &mut locations,
-                    unresolved: &mut unresolved,
-                },
-            ),
-        )?);
-    }
-    let grid = crate::location_physics::stage::write(&reads, directory, cancel)?;
-    let spools = PlacementSpools {
-        containers: Some(containers.finish(cancel)?),
-        locations: Some(locations.finish(cancel)?),
-        unresolved: Some(unresolved.finish(cancel)?),
-        location_physics_grids: grid.spool,
-        location_physics_availability: Some(grid.availability),
-    };
-    Ok((reads, spools))
 }

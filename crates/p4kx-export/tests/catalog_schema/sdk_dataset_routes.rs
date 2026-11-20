@@ -84,7 +84,7 @@ pub(super) fn loot_datasets() -> impl Iterator<Item = &'static str> {
 
 pub(super) fn read() -> TestResult<Vec<Route>> {
     let (_directory, archive) = fixtures::open()?;
-    let [containers, location_physics, unresolved] =
+    let [containers, location_physics, loot_documents, unresolved] =
         container_placements::read(&archive, fixtures::ROOT)?;
     let independent_ammo = read_ammunition(&archive)?;
     let [projectile, reached_ammo, combat, magazine] = projectile_ammo::read()?;
@@ -107,6 +107,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
         read_radar_configuration(&archive)?,
         containers,
         location_physics,
+        loot_documents,
         unresolved,
     ];
     routes.extend(blueprint_pools::read()?);

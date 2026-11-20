@@ -58,7 +58,7 @@ pub(super) fn read(
         (None, None)
     };
     let mut file = ContainerFile::from_xml(&xml, files.capture)?;
-    if bounds.scope.resolves_placements() {
+    if bounds.scope.reads_location_physics() {
         file.location_physics = crate::location_physics::read(
             read,
             &xml,

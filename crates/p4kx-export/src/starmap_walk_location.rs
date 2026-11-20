@@ -46,7 +46,7 @@ impl System<'_> {
                 rows.instances.push(row);
                 Ok(())
             }
-            PlacementRows::Harvest(_) => Ok(()),
+            PlacementRows::Harvest(_) | PlacementRows::OpenedContainers => Ok(()),
         }
     }
 
@@ -86,7 +86,9 @@ impl System<'_> {
                     .locations
                     .push(occurrence.project(location, file, self.capture)?);
             }
-            PlacementRows::Harvest(_) | PlacementRows::SelectedContainers(_) => return Ok(()),
+            PlacementRows::Harvest(_)
+            | PlacementRows::SelectedContainers(_)
+            | PlacementRows::OpenedContainers => return Ok(()),
         }
         path.parent_location = Some(Arc::clone(route));
         Ok(())

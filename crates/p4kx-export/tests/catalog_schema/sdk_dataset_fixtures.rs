@@ -31,8 +31,16 @@ pub(super) fn open() -> TestResult<(tempfile::TempDir, Archive)> {
             Language::German.global_ini_path(),
             b"fixture=Fixture\n",
         ))
-        .entry(packed(ROOT, "fixturesystem.xml", ROOT_XML))
-        .entry(packed(TILE, "tile.xml", b"<ObjectContainer/>"))
+        .entry(packed(
+            ROOT,
+            "fixturesystem.xml",
+            ROOT_XML,
+            [TestEntry::stored(
+                "entdata/loot.entxml",
+                br#"<Entity objectContainer="Data/ObjectContainers/PU/fixture/loot.socpak"/>"#,
+            )],
+        ))
+        .entry(packed(TILE, "tile.xml", b"<ObjectContainer/>", []))
         .entry(TestEntry::stored(OFFLINE_SHOP, br#"{"Inventory":[]}"#))
         .entry(TestEntry::stored(
             "Data/Libs/GameAudio/RadarAudioData.xml",
@@ -107,7 +115,18 @@ fn fixture_database() -> DataForgeBuilder {
             .record(),
         )
         .record(commodities::fixture_record());
-    with_faction_identity(database)
+    with_starmap(with_faction_identity(database))
+}
+
+fn with_starmap(database: DataForgeBuilder) -> DataForgeBuilder {
+    database
+        .structure(TestStruct::new("StarMapObject"))
+        .record(TestRecord::new(
+            10,
+            "StarMapObject",
+            "StarMapObject.Fixture",
+            "libs/foundry/records/starmap/pu/system/fixture/loot.xml",
+        ))
 }
 
 fn with_faction_identity(database: DataForgeBuilder) -> DataForgeBuilder {
@@ -121,11 +140,18 @@ fn with_faction_identity(database: DataForgeBuilder) -> DataForgeBuilder {
         ))
 }
 
-fn packed(path: &str, file: &str, xml: &[u8]) -> TestEntry {
+fn packed(
+    path: &str,
+    file: &str,
+    xml: &[u8],
+    members: impl IntoIterator<Item = TestEntry>,
+) -> TestEntry {
+    let container = TestContainer::new().entry(TestEntry::stored(file, xml));
     TestEntry::stored(
         path,
-        TestContainer::new()
-            .entry(TestEntry::stored(file, xml))
+        members
+            .into_iter()
+            .fold(container, TestContainer::entry)
             .build(),
     )
 }

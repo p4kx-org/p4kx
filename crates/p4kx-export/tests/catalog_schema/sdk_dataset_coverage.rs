@@ -67,6 +67,7 @@ const WEAPON_RECOIL: &str = "/definitions/weaponActionRecoilDefinitions";
 const WEAPON_ANIMATION: &str = "/projections/weaponPlayerAnimationCandidates";
 const CONTAINERS: &str = "/placements/containerInstances";
 const LOCATION_PHYSICS_GRIDS: &str = "/placements/locationPhysicsGrids";
+const LOOT_DOCUMENTS: &str = "/declarations/lootEntityContainerDocuments";
 const UNRESOLVED: &str = "/placements/unresolvedContainerLinks";
 const NO_WITNESS: &str = "no query witness recorded by the audit";
 const EXPORT_ATTEMPT_FIELDS: &[&str] = &["/schemaVersion", "/completeness", "/exportHealth"];
@@ -159,6 +160,7 @@ const REQUIRED_WITNESSES: &[&str] = &[
     WEAPON_ANIMATION,
     CONTAINERS,
     LOCATION_PHYSICS_GRIDS,
+    LOOT_DOCUMENTS,
     UNRESOLVED,
 ];
 

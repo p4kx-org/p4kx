@@ -6,6 +6,7 @@ use std::convert::Infallible;
 
 use p4kx_extraction::{CancelToken, Guid};
 
+use crate::catalog_query_session::checkpoint;
 use crate::catalog_read::original::{AuthoredEntryPath, EntryCapture, EntryRead, EntryXml};
 use crate::{CatalogError, ExportAccountingError};
 
@@ -70,7 +71,7 @@ impl CapturedEntityLink {
 #[cfg(test)]
 pub(crate) fn read(bytes: &[u8]) -> Result<EntityLink, XmlError> {
     let document = Document::parse(bytes)?;
-    let result = link_below(document.root(), |_, _| Ok::<_, Infallible>(None));
+    let result = link_below(document.root(), || Ok(()), |_, _| Ok::<_, Infallible>(None));
     Ok(match result {
         Ok(link) => link.value,
         Err(never) => match never {},
@@ -95,10 +96,14 @@ fn read_document(
     cancel: Option<&CancelToken>,
 ) -> Result<CapturedEntityLink, CatalogError> {
     let mut has_container_attribute = false;
-    let mut link = link_below(document.root(), |node, ordinal| {
-        has_container_attribute = true;
-        document.attribute_at(node, ordinal)
-    })?;
+    let mut link = link_below(
+        document.root(),
+        || checkpoint(cancel),
+        |node, ordinal| {
+            has_container_attribute = true;
+            document.attribute_at(node, ordinal)
+        },
+    )?;
     if link.value.container.is_some() && link.selected.is_none() {
         return Err(ExportAccountingError::UnboundHealthSubject.into());
     }
@@ -120,6 +125,7 @@ fn container_attribute<'document>(node: impl Node<'document>) -> Option<(usize, 
 
 fn link_below<'document, N: Node<'document>, E>(
     root: N,
+    mut checkpoint: impl FnMut() -> Result<(), E>,
     mut select_container: impl FnMut(N, usize) -> Result<Option<AuthoredEntryPath>, E>,
 ) -> Result<CapturedEntityLink, E> {
     let mut link = CapturedEntityLink {
@@ -130,6 +136,7 @@ fn link_below<'document, N: Node<'document>, E>(
     };
     let mut pending = vec![root];
     while let Some(node) = pending.pop() {
+        checkpoint()?;
         if let Some((ordinal, path)) = container_attribute(node) {
             let selected = select_container(node, ordinal)?;
             if !path.is_empty() {
@@ -176,6 +183,30 @@ mod selector_witness;
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cancelled_link_scan_stops_before_visiting_the_next_node() -> Result<(), XmlError> {
+        let document = Document::parse(
+            br#"<Root objectContainer="first.socpak"><Child objectContainer="next.socpak"/></Root>"#,
+        )?;
+        let cancel = CancelToken::new();
+        let mut visited = 0;
+        let result = link_below(
+            document.root(),
+            || checkpoint(Some(&cancel)),
+            |_, _| {
+                visited += 1;
+                cancel.cancel();
+                Ok(None)
+            },
+        );
+        assert!(matches!(result, Err(CatalogError::Cancelled)));
+        assert_eq!(
+            visited, 1,
+            "no further authored selector is read after cancellation"
+        );
+        Ok(())
+    }
 
     fn read(bytes: &[u8]) -> EntityLink {
         super::read(bytes).expect("valid source XML")

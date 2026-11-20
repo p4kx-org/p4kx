@@ -15,11 +15,15 @@ use serde_json::{Map, Value};
 
 use crate::catalog_capture::CatalogCapture;
 use crate::real_archive_catalog_size::artifact;
-use crate::real_archive_catalog_size::replay::bindings::Receipt;
+use crate::real_archive_catalog_size::replay::bindings::{Binding, Receipt};
+
+#[path = "real_archive_catalog_compare_rows.rs"]
+mod compare_rows;
 
 #[path = "real_archive_catalog_selected_origins.rs"]
 mod selected_origins;
 
+use compare_rows::{ComparedRows, Projection};
 use selected_origins::SelectedOrigins;
 
 pub(crate) type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -37,6 +41,22 @@ pub(crate) fn verify_tables<const TABLES: usize>(
     paths: [&str; TABLES],
     read_sdk: impl FnOnce(&Archive, &mut Origins) -> TestResult<[Table; TABLES]>,
 ) -> TestResult<Counts<TABLES>> {
+    with_bound_measurement(|archive, measurement| {
+        let mut origins = Origins::default();
+        let tables = read_sdk(archive, &mut origins)?;
+        measurement.verify_tables(paths, &tables, &origins)
+    })
+}
+
+pub(crate) struct BoundMeasurement {
+    directory: PathBuf,
+    binding: Binding,
+    watch: ArchiveWatch,
+}
+
+pub(crate) fn with_bound_measurement<T>(
+    verify: impl FnOnce(&Archive, &BoundMeasurement) -> TestResult<T>,
+) -> TestResult<T> {
     let directory = std::env::var_os("P4KX_CATALOG_MEASUREMENT_DIR")
         .map(PathBuf::from)
         .ok_or("configure the completed Catalog measurement")?;
@@ -49,40 +69,61 @@ pub(crate) fn verify_tables<const TABLES: usize>(
     watch.check()?;
     binding.check_archive(&archive)?;
 
-    let mut origins = Origins::default();
-    let tables = read_sdk(&archive, &mut origins)?;
-    watch.check()?;
+    let measurement = BoundMeasurement {
+        directory,
+        binding,
+        watch,
+    };
+    let result = verify(&archive, &measurement);
+    measurement.watch.check()?;
+    result
+}
 
-    let mut capture = CatalogCapture::default();
-    for path in [
-        "/schemaVersion",
-        "/source",
-        "/completeness",
-        "/exportHealth/status",
-        "/exportHealth/read",
-        "/exportHealth/projection",
-        "/exportHealth/publicationMode",
-    ]
-    .into_iter()
-    .chain(paths)
-    {
-        capture.keep(path);
+impl BoundMeasurement {
+    pub(crate) fn verify_tables<const TABLES: usize>(
+        &self,
+        paths: [&str; TABLES],
+        tables: &[Table; TABLES],
+        origins: &Origins,
+    ) -> TestResult<Counts<TABLES>> {
+        self.watch.check()?;
+        let mut capture = CatalogCapture::default();
+        for path in [
+            "/schemaVersion",
+            "/source",
+            "/exportHealth/status",
+            "/exportHealth/read",
+            "/exportHealth/projection",
+            "/exportHealth/publicationMode",
+        ] {
+            capture.keep(path);
+        }
+        capture.project("/completeness", Projection::CompleteSelection);
+        for (path, table) in paths.iter().zip(tables) {
+            capture.keep(&format!("{path}/availability"));
+            capture.project(
+                &format!("{path}/rows"),
+                Projection::Rows(ComparedRows::new(path, &table.rows)),
+            );
+        }
+        capture.project(USES, Projection::Origins(SelectedOrigins(&origins.uses)));
+        capture.project(
+            SOURCES,
+            Projection::Origins(SelectedOrigins(&origins.sources)),
+        );
+        let catalog = artifact::read_completed(&self.directory, |input| Ok(capture.read(input)?))?;
+        self.binding.check_catalog(&catalog)?;
+        for (path, table) in paths.into_iter().zip(tables) {
+            check_table(&catalog, path, table)?;
+        }
+        origins.verify(&catalog)?;
+        self.watch.check()?;
+        Ok(Counts {
+            rows: tables.each_ref().map(|table| table.rows.len()),
+            source_uses: origins.uses.len(),
+            physical_sources: origins.sources.len(),
+        })
     }
-    capture.project(USES, SelectedOrigins(&origins.uses));
-    capture.project(SOURCES, SelectedOrigins(&origins.sources));
-    let catalog = artifact::read_completed(&directory, |input| Ok(capture.read(input)?))?;
-    binding.check_catalog(&catalog)?;
-
-    for (path, table) in paths.into_iter().zip(&tables) {
-        compare_table(&catalog, path, table)?;
-    }
-    origins.verify(&catalog)?;
-    watch.check()?;
-    Ok(Counts {
-        rows: tables.each_ref().map(|table| table.rows.len()),
-        source_uses: origins.uses.len(),
-        physical_sources: origins.sources.len(),
-    })
 }
 
 pub(crate) struct Table {
@@ -121,12 +162,14 @@ pub(crate) fn capture_rows<Row: Serialize, Id: Eq + Hash>(
     origins: &mut Origins,
     identity: impl Fn(&Value) -> TestResult<Id>,
 ) -> TestResult<Table> {
-    let rows: Vec<Value> = serde_json::from_slice(&serde_json::to_vec(sdk_rows)?)?;
+    let mut rows = Vec::with_capacity(sdk_rows.len());
     let mut physical = HashSet::new();
-    for row in &rows {
-        if !physical.insert(identity(row)?) {
+    for row in sdk_rows {
+        let row = wire_row(row)?;
+        if !physical.insert(identity(&row)?) {
             return Err("the SDK reports a duplicate physical row identity".into());
         }
+        rows.push(row);
     }
     origins.extend(inventory, &rows)?;
     Ok(Table {
@@ -135,19 +178,15 @@ pub(crate) fn capture_rows<Row: Serialize, Id: Eq + Hash>(
     })
 }
 
-fn compare_table(catalog: &Value, path: &str, sdk: &Table) -> TestResult {
+pub(crate) fn wire_row(row: &impl Serialize) -> TestResult<Value> {
+    Ok(serde_json::from_slice(&serde_json::to_vec(row)?)?)
+}
+
+fn check_table(catalog: &Value, path: &str, sdk: &Table) -> TestResult {
     let table = catalog.pointer(path).ok_or("required full Catalog table")?;
-    let rows = table
-        .get("rows")
-        .and_then(Value::as_array)
-        .ok_or("required full Catalog rows")?;
-    if table.get("availability") != Some(&sdk.availability) || rows.len() != sdk.rows.len() {
+    let count = Value::from(sdk.rows.len());
+    if table.get("availability") != Some(&sdk.availability) || table.get("rows") != Some(&count) {
         return Err(format!("Catalog and SDK inventories differ at {path}").into());
-    }
-    for (index, (actual, expected)) in rows.iter().zip(&sdk.rows).enumerate() {
-        if let Some(field) = first_difference(actual, expected) {
-            return Err(format!("Catalog and SDK differ at {path}/rows/{index}{field}").into());
-        }
     }
     Ok(())
 }
@@ -202,7 +241,7 @@ pub(crate) fn first_difference(expected: &Value, actual: &Value) -> Option<Strin
     }
 }
 
-#[derive(Default)]
+#[derive(Default, PartialEq)]
 pub(crate) struct Origins {
     uses: Map<String, Value>,
     sources: Map<String, Value>,

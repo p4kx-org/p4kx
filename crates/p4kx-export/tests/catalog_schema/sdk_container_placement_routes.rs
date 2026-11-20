@@ -2,26 +2,37 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_export::StarmapTraversalBudget;
+use p4kx_export::catalog_queries::loot::{
+    LootDocumentQuery, LootDocumentSelection, read_loot_documents,
+};
 use p4kx_export::catalog_queries::starmap::{
     ContainerPlacementSelection, read_container_placements,
 };
 use p4kx_extraction::Archive;
 
-use super::super::{CONTAINERS, LOCATION_PHYSICS_GRIDS, UNRESOLVED};
+use super::super::{CONTAINERS, LOCATION_PHYSICS_GRIDS, LOOT_DOCUMENTS, UNRESOLVED};
 use super::{Route, TestResult};
 
 const REMAINING: &str =
     "system-root and occurrence query available; root enumeration and installed parity open";
 
-pub(super) fn read(archive: &Archive, root_path: &str) -> TestResult<[Route; 3]> {
+pub(super) fn read(archive: &Archive, root_path: &str) -> TestResult<[Route; 4]> {
     let root = archive
         .entries()
         .iter()
         .find(|entry| entry.path() == root_path)
         .ok_or("original root archive Entry")?;
+    let root_index = u32::try_from(root.index())?;
+    let documents = read_loot_documents(
+        archive,
+        LootDocumentQuery::new(LootDocumentSelection::Container {
+            container_entry_index: root_index,
+        }),
+        None,
+    )?;
     let starmap = read_container_placements(
         archive,
-        ContainerPlacementSelection::SystemRoot(u32::try_from(root.index())?),
+        ContainerPlacementSelection::SystemRoot(root_index),
         StarmapTraversalBudget::new(),
         None,
     )?;
@@ -34,6 +45,11 @@ pub(super) fn read(archive: &Archive, root_path: &str) -> TestResult<[Route; 3]>
             LOCATION_PHYSICS_GRIDS,
             grid.as_ref(),
             "direct descriptor and its native producer-stage parity verified; installed canonical occurrence parity open",
+        )?,
+        Route::queried_rows(
+            LOOT_DOCUMENTS,
+            &documents.rows,
+            "physical document selection and synthetic Catalog parity; installed normal-Catalog parity open",
         )?,
         Route::queried_rows(UNRESOLVED, &starmap.unresolved_container_links, REMAINING)?,
     ])

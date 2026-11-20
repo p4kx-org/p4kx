@@ -211,17 +211,34 @@ impl Binding {
         {
             return Err("replay requires a complete normal publication".into());
         }
-        if completeness
-            .values()
-            .any(|selection| selection.status != "complete")
-            || Kind::ALL
-                .iter()
-                .any(|kind| !completeness.contains_key(kind.name()))
-        {
-            return Err("replay requires a complete unfiltered selection".into());
-        }
-        Ok(())
+        check_complete_selection(completeness)
     }
+}
+
+pub(crate) fn check_catalog_selection(value: &Value) -> TestResult {
+    check_complete_selection(&BTreeMap::deserialize(value)?)
+}
+
+fn check_complete_selection(completeness: &BTreeMap<String, Selection>) -> TestResult {
+    let missing: Vec<_> = Kind::ALL
+        .iter()
+        .map(|kind| kind.name())
+        .filter(|name| !completeness.contains_key(*name))
+        .collect();
+    if !missing.is_empty() {
+        return Err(format!(
+            "replay requires a complete unfiltered selection (missing: {})",
+            missing.join(", "),
+        )
+        .into());
+    }
+    if completeness
+        .values()
+        .any(|selection| selection.status != "complete")
+    {
+        return Err("replay requires a complete unfiltered selection (incomplete coverage)".into());
+    }
+    Ok(())
 }
 
 fn stamp_seconds(stamp: &str) -> TestResult<String> {

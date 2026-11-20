@@ -136,6 +136,7 @@ pub(crate) enum DescriptorScope {
     Catalog { jump_endpoints: bool },
     ContainerPlacements,
     Harvest,
+    OpenedContainers,
 }
 
 impl DescriptorScope {
@@ -145,6 +146,10 @@ impl DescriptorScope {
 
     const fn resolves_placements(self) -> bool {
         !matches!(self, Self::Harvest)
+    }
+
+    const fn reads_location_physics(self) -> bool {
+        matches!(self, Self::Catalog { .. } | Self::ContainerPlacements)
     }
 
     const fn reads_jump_endpoints(self) -> bool {
@@ -235,7 +240,7 @@ fn parse_body(
         return Ok(Body::Unparsed);
     };
     let loss = children::source_loss(&mut root, &entities, capture.source_uses(), bounds.cancel)?;
-    let grid_failed = bounds.scope.resolves_placements()
+    let grid_failed = bounds.scope.reads_location_physics()
         && matches!(
             file.location_physics,
             crate::location_physics::GridRead::Unavailable

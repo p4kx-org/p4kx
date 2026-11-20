@@ -20,6 +20,20 @@ pub use crate::contract_loot::{
 #[path = "loot_query_read.rs"]
 mod read;
 
+#[path = "loot_document_query.rs"]
+mod documents;
+pub use crate::catalog_read::original::{PhysicalEntryRef, SourcedXmlAttribute};
+pub use crate::guid_text::CatalogGuid;
+pub use crate::loot_entxml::documents::{
+    LootContainerLookupRepair, LootContainerLookupRepairKind, LootContainerTargetStatus,
+    LootEntityConfigReference, LootEntityContainerDocument, LootEntityContainerLink,
+    LootEntityLinkNode,
+};
+pub use documents::{
+    LootDocumentAdmission, LootDocumentCoverage, LootDocumentQuery, LootDocumentReachability,
+    LootDocumentSelection, LootDocumentSnapshot, read_loot_documents,
+};
+
 /// The selected physical definitions and any weighted views of those owners.
 #[derive(Debug)]
 #[non_exhaustive]

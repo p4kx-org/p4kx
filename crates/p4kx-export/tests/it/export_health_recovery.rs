@@ -65,7 +65,7 @@ fn archive(damaged: bool) -> Result<(tempfile::TempDir, Archive), Box<dyn std::e
     Ok((directory, archive))
 }
 
-fn remove_directory_record_and_end(bytes: &mut Vec<u8>) -> TestResult {
+pub(crate) fn remove_directory_record_and_end(bytes: &mut Vec<u8>) -> TestResult {
     let central: Vec<_> = bytes
         .windows(CENTRAL.len())
         .enumerate()

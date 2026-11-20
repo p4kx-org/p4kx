@@ -8,8 +8,18 @@ const VIRTUAL_ROOT: &str = "data/objectcontainers/";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(rename = "LootContainerLookupRepairKind", extend("x-p4kx-vocabularyClass" = "control"))]
-pub(super) enum RepairKind {
+#[schemars(
+    rename = "LootContainerLookupRepairKind",
+    description = "",
+    extend("x-p4kx-vocabularyClass" = "control")
+)]
+#[expect(
+    missing_docs,
+    reason = "variant docs would change the shared schema representation"
+)]
+#[non_exhaustive]
+/// The authored path form that supplied a proven virtual lookup key.
+pub enum RepairKind {
     DriveQualified,
     ParentRelative,
     TimestampedAnnotation,

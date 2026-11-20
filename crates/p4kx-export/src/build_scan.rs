@@ -4,7 +4,7 @@
 use std::sync::Arc;
 
 use p4kx_assembly::{ArchiveFiles, Entities};
-use p4kx_extraction::{Archive, CancelToken, DataForge};
+use p4kx_extraction::{Archive, CancelToken};
 
 use crate::build::original_input::OriginalCatalogInput;
 use crate::build_harvest::add_harvest_locations;
@@ -34,7 +34,7 @@ pub(super) fn scan<'f>(
     run.begin(CatalogStage::WorldPlacements);
     let options = run.options;
     let forge = original.forge();
-    let scope = placement_scope(forge, options);
+    let scope = PlacementScope::for_catalog(forge, options.filter);
     let mut placements = read_placements(archive, scope, original, options)?;
     run.begin(CatalogStage::Records);
     #[cfg(test)]
@@ -122,25 +122,4 @@ pub(super) fn project_locations(
     add_harvest_locations(archive, placements, collected, cancel, capture)?;
     add_loot_containers(archive, placements, collected, cancel, capture)?;
     Ok(summary)
-}
-
-fn placement_scope(forge: &DataForge<'_>, options: &CatalogOptions<'_>) -> Option<PlacementScope> {
-    let rules = [
-        crate::Kind::StarmapObjects.records(),
-        crate::Kind::HarvestableProviderPresets.records(),
-    ];
-    let wanted = forge.records().any(|record| {
-        record.record_path().is_ok_and(|path| {
-            rules.iter().any(|rule| rule.matches_path(path))
-                && options.filter.is_none_or(|filter| filter.matches(path))
-        })
-    });
-    if wanted {
-        Some(PlacementScope::RecordSelection)
-    } else {
-        options
-            .filter
-            .is_none()
-            .then_some(PlacementScope::ArchiveInventory)
-    }
 }

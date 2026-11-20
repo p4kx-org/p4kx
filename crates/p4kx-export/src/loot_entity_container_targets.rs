@@ -15,12 +15,19 @@ use crate::{CatalogError, ExportAccountingError};
 #[path = "loot_authoring_path.rs"]
 mod authoring_path;
 
-use authoring_path::{AuthoringPath, RepairKind};
+use authoring_path::AuthoringPath;
+pub use authoring_path::RepairKind as LootContainerLookupRepairKind;
 
 #[derive(Debug, Clone, Copy, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
-enum LootContainerTargetStatus {
+#[schemars(description = "", extend("x-p4kx-vocabularyClass" = "control"))]
+#[expect(
+    missing_docs,
+    reason = "variant docs would change the shared schema representation"
+)]
+#[non_exhaustive]
+/// The observed outcome of one authored container selector.
+pub enum LootContainerTargetStatus {
     Resolved,
     NotFound,
     Ambiguous,
@@ -32,20 +39,35 @@ enum LootContainerTargetStatus {
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(super) struct LootContainerTargets {
-    target_status: SourcedValue<LootContainerTargetStatus>,
-    target_candidates: SourcedValue<Vec<SourcedValue<PhysicalEntryRef>>>,
+    pub(super) target_status: SourcedValue<LootContainerTargetStatus>,
+    pub(super) target_candidates: SourcedValue<Vec<SourcedValue<PhysicalEntryRef>>>,
     #[serde(rename = "targetLookupRepair")]
-    lookup_repair: Option<Box<LootContainerLookupRepair>>,
+    pub(super) lookup_repair: Option<Box<LootContainerLookupRepair>>,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-struct LootContainerLookupRepair {
+#[schemars(description = "", transform = every_field_required)]
+/// One proven conversion from an authored path to an exact physical Archive candidate.
+pub struct LootContainerLookupRepair {
     /// The admitted authoring path form.
-    kind: SourcedValue<RepairKind>,
+    kind: SourcedValue<LootContainerLookupRepairKind>,
     /// The complete normalized virtual Archive lookup key.
     normalized_path: SourcedValue<String>,
+}
+
+impl LootContainerLookupRepair {
+    /// Borrows the admitted authoring path form.
+    #[must_use]
+    pub const fn kind(&self) -> &SourcedValue<LootContainerLookupRepairKind> {
+        &self.kind
+    }
+
+    /// Borrows the exact normalized virtual Archive lookup key.
+    #[must_use]
+    pub const fn normalized_path(&self) -> &SourcedValue<String> {
+        &self.normalized_path
+    }
 }
 
 #[derive(Clone, Copy)]

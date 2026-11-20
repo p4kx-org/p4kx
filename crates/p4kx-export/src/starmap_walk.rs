@@ -201,17 +201,22 @@ pub(crate) enum PlacementRows<'writer> {
     Typed,
     Harvest(&'writer HarvestSurvey<'writer>),
     SelectedContainers(&'writer mut SelectedContainerRows),
+    OpenedContainers,
 }
 
 impl PlacementRows<'_> {
     fn includes_container(&self, route: Option<&PlacementStep>) -> bool {
         match self {
             Self::SelectedContainers(rows) => rows.matches(route),
-            Self::Harvest(_) => false,
+            Self::Harvest(_) | Self::OpenedContainers => false,
             Self::Spool { .. } => true,
             #[cfg(test)]
             Self::Typed => true,
         }
+    }
+
+    const fn records_objects(&self) -> bool {
+        !matches!(self, Self::SelectedContainers(_) | Self::OpenedContainers)
     }
 }
 
@@ -291,7 +296,7 @@ impl System<'_> {
         path: &WalkPath,
         under: Option<Guid>,
     ) -> Result<(), CatalogError> {
-        if matches!(&self.rows, PlacementRows::SelectedContainers(_)) {
+        if !self.rows.records_objects() {
             return Ok(());
         }
         let Some(record) = child.record else {

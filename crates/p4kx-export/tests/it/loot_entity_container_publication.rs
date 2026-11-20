@@ -6,6 +6,7 @@ use std::fs;
 use p4kx_export::{
     CatalogError, CatalogFile, Compression, build_catalog_from, catalog_schema, write_catalog_from,
 };
+
 use p4kx_testkit::{TestContainer, TestEntry};
 use serde_json::{Value, json};
 
@@ -15,6 +16,8 @@ use crate::health_origin_fixture::{self as fixture, Fixture, TestResult};
 
 #[path = "loot_entity_container_publication_assertions.rs"]
 mod assertions;
+#[path = "loot_entity_container_sdk.rs"]
+mod sdk;
 
 const ROOT: &str = "Data/ObjectContainers/PU/system/synthetic/syntheticsystem.socpak";
 const TARGET: &str = "Data/ObjectContainers/PU/synthetic/missing.socpak";

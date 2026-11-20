@@ -71,7 +71,7 @@ impl System<'_> {
                 rows.unresolved.push(row);
                 Ok(())
             }
-            PlacementRows::Harvest(_) => Ok(()),
+            PlacementRows::Harvest(_) | PlacementRows::OpenedContainers => Ok(()),
         }
     }
 }

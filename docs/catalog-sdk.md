@@ -482,9 +482,20 @@ Entity inventory. The source strategy is the physical containing Entry plus nest
 node/attribute ordinals; repeated placement roots and equal GUIDs do not replace that identity.
 The normalized nodes/configuration references and exact lookup candidates are documented in
 [the Loot source contract](catalog-loot-source.md#original-container-link-documents-reached-by-the-loot-walk).
-This additive table has no direct-query SDK adapter yet. A future adapter must reuse the same
-source-owned reader, reached scope, original content/directory surveys and failure handling. The
-existing global first-pair convenience derivation remains a separate limitation.
+Use `catalog_queries::loot::read_loot_documents` or the corresponding Archive session or parsed
+view. `LootDocumentSelection` permits the complete selected scope, a physical containing Entry,
+or an exact nested Entry under that containing Entry. Equal paths do not identify an occurrence.
+By default the query applies the normal Catalog placement admission. Supply `catalog_filter` to
+match a filtered Catalog's original Record scope. The result includes the exact admission Record
+when one activates the Loot scope.
+
+The query reads the shared placement descriptors, system-folder fallback sources and original
+EntXML reachability. A positively reached exact owner can be read even when another route is
+unknown. A missing row under incomplete coverage has unavailable status. The diagnostic Catalog
+can still report the documents it observed under partial reachability. Rows use physical Entry
+order. The query opens the DataForge Record header index and skips Record bodies, mission and
+reward projectors, geometry, location physics grids and SOC tag counts. The complete selection stores the returned typed rows in
+memory. Exact selection stops the Loot search as soon as its containing physical Entry is admitted.
 
 ## Physical mineable entities
 
