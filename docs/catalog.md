@@ -13,6 +13,13 @@ Callers may independently limit physical declarations and instantiated visits pe
 `StarmapTraversalBudget`; exhaustion remains incomplete and normal publication is refused before
 output creation. The CLI and GUI select no Child-count allowance.
 
+## System memory
+
+Verify the complete unfiltered Catalog with 64 GiB total system RAM. Verify individual SDK
+queries and generation and import of the reduced Basetool catalog with 16 GiB total system RAM.
+The operating system, desktop and other processes share each capacity.
+[System memory acceptance](catalog-partitioning.md#system-memory-acceptance) specifies the tests.
+
 ## Media files
 
 The catalog carries media references and metadata, such as Archive paths, physical Entry

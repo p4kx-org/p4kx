@@ -227,7 +227,8 @@ aggregate row and source counts and coverage on successful requests. It writes n
 or persistent cache files. A successful read includes its observed coverage. Inspect that
 coverage when deciding which snapshots your application can use.
 
-For a memory acceptance run, measure the built executable directly on the target host.
+Measure individual SDK queries on a system with 16 GiB total RAM, including the operating
+system and representative desktop activity. Run the built executable directly on that system.
 Record the exact SDK revision and executable digest, process and helper peaks, minimum
 available system RAM, paging and temporary disk usage. A harness run measures the local
 SDK and this cache policy. The integrated application also needs its normal desktop workflow
