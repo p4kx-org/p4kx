@@ -3,9 +3,15 @@
 
 use std::collections::BTreeSet;
 
+use schemars::{Schema, transform::transform_subschemas};
 use serde_json::Value;
 
 use super::TestResult;
+
+pub(super) fn remove_descriptions(schema: &mut Schema) {
+    schema.remove("description");
+    transform_subschemas(&mut remove_descriptions, schema);
+}
 
 pub(super) fn compare(
     catalog: &Value,
@@ -72,4 +78,35 @@ fn reference_target<'s>(schema: &'s Value, reference: &str) -> TestResult<&'s Va
     schema
         .pointer(path)
         .ok_or_else(|| format!("missing row schema reference {reference}").into())
+}
+
+#[test]
+fn removing_schema_descriptions_preserves_data_fields_and_constraints() {
+    let mut schema = schemars::json_schema!({
+        "description": "SDK row documentation",
+        "type": "object",
+        "properties": {
+            "description": {
+                "description": "Documentation about this field",
+                "const": {"description": "Authored value"},
+                "x-gameText": true
+            }
+        },
+        "required": ["description"]
+    });
+    remove_descriptions(&mut schema);
+    assert_eq!(
+        schema,
+        schemars::json_schema!({
+            "type": "object",
+            "properties": {
+                "description": {
+                    "const": {"description": "Authored value"},
+                    "x-gameText": true
+                }
+            },
+            "required": ["description"]
+        }),
+        "documentation annotations are outside row shape while authored values and vocabulary remain"
+    );
 }

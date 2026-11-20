@@ -33,8 +33,9 @@ pub(crate) struct GameplayPropertyDefinition<'source> {
 }
 
 /// A gameplay-property declaration and its original physical Record identity.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(transform = every_field_required)]
 #[non_exhaustive]
 pub struct GameplayProperty {
     /// The original physical Record identity and header fields.

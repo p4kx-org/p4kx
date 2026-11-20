@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use crate::gameplay_v3_schema as schema;
+use super::gameplay_v3_schema as schema;
 use p4kx_testkit::{DataForgeBuilder, TestInstance, TestRecord, TestValue};
 
 pub(crate) const FIRST: u128 = 0xc201;

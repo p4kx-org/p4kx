@@ -30,6 +30,8 @@ use super::{
 mod blueprint_physical;
 #[path = "sdk_blueprint_pool_routes.rs"]
 mod blueprint_pools;
+#[path = "sdk_blueprint_taxonomy_routes.rs"]
+mod blueprint_taxonomy;
 #[path = "sdk_commodity_routes.rs"]
 mod commodities;
 #[path = "sdk_component_definition_routes.rs"]
@@ -124,6 +126,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
         unresolved,
     ];
     routes.extend(blueprint_pools::read()?);
+    routes.extend(blueprint_taxonomy::read()?);
     routes.extend(contracts::read()?);
     routes.extend(blueprint_physical::read()?);
     routes.extend(component_definitions::read()?);

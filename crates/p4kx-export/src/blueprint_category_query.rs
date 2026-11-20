@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_extraction::{Archive, Build, CancelToken, DataForge, DataForgeEntry, SourceInventory};
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::unlocalized_record_query;
@@ -9,10 +10,12 @@ use super::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordCoverage, CatalogRecordSelection,
     CatalogRecordSource, DatasetAvailability, ParsedCatalogQueries,
 };
+use crate::schema_fields::every_field_required;
 use crate::{CatalogError, Kind, blueprint_category};
 
 /// One physical Blueprint Category with its eight original header fields.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
+#[schemars(transform = every_field_required)]
 #[non_exhaustive]
 pub struct BlueprintCategory {
     /// Directly sourced physical identity of the category Record.

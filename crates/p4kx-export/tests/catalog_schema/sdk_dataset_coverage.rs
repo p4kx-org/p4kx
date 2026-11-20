@@ -4,7 +4,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
-use schemars::JsonSchema;
+use schemars::{JsonSchema, Schema};
 use serde_json::{Value, json};
 
 use super::super::schema_navigation::{resolve, schema_at};
@@ -39,6 +39,9 @@ const WEAPON_ACTIONS: &str = "/configurations/weaponActions";
 const LOCATION_ENTITIES: &str = "/definitions/locationEntityDeclarations";
 const BLUEPRINT_POOLS: &str = "/definitions/blueprintPools";
 const BLUEPRINT_POOL_WEIGHTS: &str = "/projections/blueprintPoolWeights";
+const BLUEPRINT_CATEGORY_LISTS: &str = "/declarations/blueprintCategoryLists";
+const BLUEPRINT_CATEGORIES: &str = "/definitions/blueprintCategories";
+const GAMEPLAY_PROPERTIES: &str = "/definitions/gameplayProperties";
 const BLUEPRINT_REWARDS: &str = "/declarations/blueprintRewardSources";
 const BLUEPRINT_DEFINITIONS: &str = "/definitions/blueprints";
 const BLUEPRINT_TIERS: &str = "/configurations/blueprintTiers";
@@ -108,6 +111,7 @@ impl Route {
             dataset,
             schema: schemars::generate::SchemaSettings::draft2020_12()
                 .for_serialize()
+                .with_transform(row_schema::remove_descriptions)
                 .into_generator()
                 .into_root_schema_for::<Vec<Row>>()
                 .to_value(),
@@ -133,6 +137,9 @@ const REQUIRED_WITNESSES: &[&str] = &[
     LOCATION_ENTITIES,
     BLUEPRINT_POOLS,
     BLUEPRINT_POOL_WEIGHTS,
+    BLUEPRINT_CATEGORY_LISTS,
+    BLUEPRINT_CATEGORIES,
+    GAMEPLAY_PROPERTIES,
     BLUEPRINT_REWARDS,
     BLUEPRINT_DEFINITIONS,
     BLUEPRINT_TIERS,
@@ -187,7 +194,7 @@ fn sdk_query_witnesses_keep_their_canonical_dataset_contract() -> TestResult {
     let schema = p4kx_export::catalog_schema();
     let registered = dataset_owners::entries();
     let witnesses = routes::read()?;
-    let gaps = audit(&schema, &registered, &witnesses)?;
+    let gaps = audit(schema, &registered, &witnesses)?;
     for path in REQUIRED_WITNESSES
         .iter()
         .copied()
@@ -213,7 +220,7 @@ fn acknowledged_new_dataset_still_needs_a_query() -> TestResult {
         .and_then(Value::as_object_mut)
         .ok_or("catalog root properties")?;
     properties.insert("fixtureRows".to_owned(), json!({"type":"array","items":{}}));
-    let gaps = audit(&schema, &registered, &[]);
+    let gaps = audit(schema.clone(), &registered, &[]);
     assert!(
         gaps.is_err(),
         "a dataset without ownership fails the strategy audit"
@@ -225,7 +232,7 @@ fn acknowledged_new_dataset_still_needs_a_query() -> TestResult {
             shape: Shape::Array,
         },
     );
-    let gaps = audit(&schema, &registered, &[])?;
+    let gaps = audit(schema, &registered, &[])?;
     assert_eq!(
         gaps.get("/fixtureRows"),
         Some(&NO_WITNESS),
@@ -244,7 +251,7 @@ fn a_public_query_cannot_discharge_a_different_dataset_or_value_shape() -> TestR
         ..route
     };
     assert!(
-        audit(&schema, &registered, &[incorrect]).is_err(),
+        audit(schema.clone(), &registered, &[incorrect]).is_err(),
         "a different physical row type cannot satisfy a table-shaped route"
     );
     let float = schema
@@ -252,7 +259,7 @@ fn a_public_query_cannot_discharge_a_different_dataset_or_value_shape() -> TestR
         .ok_or("referenced numeric field schema")?;
     *float = json!({"type":"string"});
     assert!(
-        audit(&schema, &registered, &[routes::ammunition()?]).is_err(),
+        audit(schema, &registered, &[routes::ammunition()?]).is_err(),
         "a changed reachable field shape cannot use the old query witness"
     );
     Ok(())
@@ -262,7 +269,7 @@ fn a_public_query_cannot_discharge_a_different_dataset_or_value_shape() -> TestR
 #[ignore = "strict SDK dataset gate: run explicitly to list outstanding routes"]
 fn every_catalog_v3_dataset_has_a_verified_sdk_query() -> TestResult {
     let schema = p4kx_export::catalog_schema();
-    let gaps = audit(&schema, &dataset_owners::entries(), &routes::read()?)?;
+    let gaps = audit(schema, &dataset_owners::entries(), &routes::read()?)?;
     if gaps.is_empty() {
         return Ok(());
     }
@@ -290,14 +297,17 @@ impl fmt::Debug for CoverageGaps {
 impl std::error::Error for CoverageGaps {}
 
 fn audit(
-    schema: &Value,
+    schema: Value,
     registered: &BTreeMap<String, Entry>,
     witnesses: &[Route],
 ) -> TestResult<BTreeMap<String, &'static str>> {
-    let drift = super::compare(schema, registered)?;
+    let drift = super::compare(&schema, registered)?;
     if !drift.is_empty() {
         return Err(format!("catalog ownership drift: {drift:?}").into());
     }
+    let mut schema = Schema::try_from(schema)?;
+    row_schema::remove_descriptions(&mut schema);
+    let schema = schema.to_value();
     let mut gaps: BTreeMap<_, _> = registered
         .keys()
         .filter(|path| !EXPORT_ATTEMPT_FIELDS.contains(&path.as_str()))
@@ -311,12 +321,12 @@ fn audit(
         if !seen.insert(route.dataset) || EXPORT_ATTEMPT_FIELDS.contains(&route.dataset) {
             return Err(format!("invalid SDK route claim for {}", route.dataset).into());
         }
-        let catalog_row = canonical_value(schema, route.dataset, entry.shape)?;
+        let catalog_row = canonical_value(&schema, route.dataset, entry.shape)?;
         let query_row = resolve(
             &route.schema,
             route.schema.get("items").ok_or("SDK row list")?,
         )?;
-        row_schema::compare(schema, catalog_row, &route.schema, query_row)
+        row_schema::compare(&schema, catalog_row, &route.schema, query_row)
             .map_err(|error| format!("SDK route {}: {error}", route.dataset))?;
         match route.remaining {
             Some(reason) => {

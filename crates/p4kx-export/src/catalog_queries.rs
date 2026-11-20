@@ -118,9 +118,11 @@ pub mod subsumption_events;
 use p4kx_extraction::{
     Archive, Build, CancelToken, DataForge, DataForgeEntry, SourceInventory, SourcedValue,
 };
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::catalog_v3::blueprint_category_list_read;
+use crate::schema_fields::every_field_required;
 use crate::{CatalogError, Kind};
 
 pub use crate::canonical_record_header::{CanonicalRecordHeader, CatalogRecordSource};
@@ -231,8 +233,9 @@ pub use contract_generators::{
 };
 
 /// A category-list declaration with its original ordered reference slots.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(transform = every_field_required)]
 #[non_exhaustive]
 pub struct BlueprintCategoryList {
     /// The original physical Record identity and header fields.
