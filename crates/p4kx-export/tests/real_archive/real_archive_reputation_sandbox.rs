@@ -101,7 +101,7 @@ fn check_family(
     Ok(slots)
 }
 
-fn check_reward(
+pub(super) fn check_reward(
     row: &Value,
     amount: Option<&Original<'_>>,
     name: Option<&Original<'_>>,

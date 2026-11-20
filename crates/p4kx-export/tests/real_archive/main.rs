@@ -112,6 +112,7 @@ mod real_archive_radar_options;
 mod real_archive_records;
 mod real_archive_reputation;
 mod real_archive_reputation_perks;
+mod real_archive_reputation_reward_sdk;
 mod real_archive_reputation_sandbox;
 mod real_archive_reputation_standings;
 mod real_archive_resource_components;
