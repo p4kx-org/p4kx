@@ -38,6 +38,7 @@ const COMMODITY_PRESENTATIONS: &str = "/projections/commodityPresentation";
 const SHOP_INVENTORIES: &str = "/definitions/shopInventories";
 const FLARE_LIBRARIES: &str = "/definitions/flareLibraries";
 const SUBSUMPTION_EVENTS: &str = "/definitions/subsumptionEvents";
+const CLIENT_PROFILE_DOCUMENTS: &str = "/configurations/clientProfileSettings/documents";
 const RADAR_AUDIO: &str = "/configurations/radarAudio";
 const AMMUNITION: &str = "/definitions/ammoDefinitions";
 const AMMO_BINDINGS: &str = "/declarations/ammoBindings";
@@ -210,6 +211,7 @@ const REQUIRED_WITNESSES: &[&str] = &[
     SHOP_INVENTORIES,
     FLARE_LIBRARIES,
     SUBSUMPTION_EVENTS,
+    CLIENT_PROFILE_DOCUMENTS,
     RADAR_AUDIO,
     AMMUNITION,
     AMMO_BINDINGS,

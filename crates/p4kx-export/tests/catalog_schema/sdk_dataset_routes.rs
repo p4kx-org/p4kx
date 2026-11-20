@@ -34,6 +34,8 @@ mod blueprint_physical;
 mod blueprint_pools;
 #[path = "sdk_blueprint_taxonomy_routes.rs"]
 mod blueprint_taxonomy;
+#[path = "sdk_client_profile_route.rs"]
+mod client_profiles;
 #[path = "sdk_commodity_routes.rs"]
 mod commodities;
 #[path = "sdk_component_definition_routes.rs"]
@@ -169,6 +171,7 @@ fn append_domain_routes(routes: &mut Vec<Route>, archive: &Archive) -> TestResul
     routes.extend(resource_network::read()?);
     routes.extend(fuel::read()?);
     routes.push(inventory_containers::read()?);
+    routes.push(client_profiles::read()?);
     routes.extend(read_cargo_globals(archive)?);
     routes.extend(quality::read()?);
     routes.extend(read_entity_definitions(archive)?);

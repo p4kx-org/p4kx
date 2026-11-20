@@ -94,6 +94,15 @@ Use `catalog_queries::radar_audio::read_radar_audio` to read original rows from
 The SDK retains ordered nodes, source values, and explicit selector states without decoding
 DataForge. [Radar audio](catalog-radar-audio.md)
 
+## Client profile documents
+
+Use `read_client_profile_settings` for both documents or `read_client_profile_settings_for` with
+`ProfileKind::General` or `ProfileKind::VirtualReality` for one payload. The typed rows match
+`configurations.clientProfileSettings.documents` in General then VR order. A single-profile
+query retains the unselected document's directory candidates and status. Both calls return the
+Archive Build and the source inventory for their field origins.
+[Profile document contract](client-profile-settings.md).
+
 ## Localization Entry metadata
 
 Use catalog_queries::localization::with_language_sources for the canonical
