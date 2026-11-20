@@ -4,16 +4,16 @@
 use std::error::Error;
 use std::time::UNIX_EPOCH;
 
-use p4kx_export::{CatalogOptions, Language, build_catalog};
+use p4kx_export::{CatalogOptions, build_catalog};
 use p4kx_extraction::Archive;
-use p4kx_testkit::{
-    ArchiveBuilder, DataForgeBuilder, GlobalIniBuilder, TestEntry, TestRecord, TestStruct,
-    TestType, TestValue,
-};
+use p4kx_testkit::TestType;
 use serde_json::Value;
 
 use super::TestResult;
 use crate::text_forms_assertions::{direct, forms, present};
+
+#[path = "mission_type_fixture.rs"]
+mod original;
 
 pub(super) fn protected<'catalog>(
     catalog: &'catalog Value,
@@ -38,10 +38,22 @@ fn mission_type_accepts_original_locale_and_legacy_string_keys() -> TestResult {
 
     for storage in [TestType::Locale, TestType::String] {
         let catalog = fixture(storage)?;
-        let [selected, placeholder, literal, empty] = proof::rows(&catalog, "/missionTypes")?
+        let [selected, placeholder, literal, empty] =
+            proof::rows(&catalog, "/definitions/missionTypes/rows")?
         else {
             return Err("expected a selected, placeholder, literal and empty mission type".into());
         };
+        assert!(
+            catalog.get("missionTypes").is_none(),
+            "the canonical definition has no parallel root array"
+        );
+        let guid = proof::present(
+            selected,
+            "guid",
+            &serde_json::json!("00000000-0000-0000-0000-000000000001"),
+            Some(true),
+        )?;
+        proof::header(&catalog, guid, 0, "guid", "payload", "archiveEntry")?;
         check_selected_name(&catalog, selected)?;
 
         for row in [placeholder, literal, empty] {
@@ -105,38 +117,9 @@ fn check_selected_name(catalog: &Value, selected: &Value) -> TestResult {
 }
 
 fn fixture(storage: TestType) -> Result<Value, Box<dyn Error>> {
-    let mut database = DataForgeBuilder::new()
-        .version(8)
-        .structure(TestStruct::new("MissionType").field("LocalisedTypeName", storage));
-    for (ordinal, key) in [
-        (1, "@fixture_type"),
-        (2, "@LOC_PLACEHOLDER"),
-        (3, "literal"),
-        (4, ""),
-    ] {
-        database = database.record(
-            TestRecord::new(
-                ordinal,
-                "MissionType",
-                format!("MissionType.missiontype.fixture{ordinal}"),
-                format!("libs/foundry/records/missiontype/fixture{ordinal}.xml"),
-            )
-            .value("LocalisedTypeName", TestValue::text(key)),
-        );
-    }
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("Data.p4k");
-    let locale = |language: Language, value| {
-        TestEntry::stored(
-            language.global_ini_path(),
-            GlobalIniBuilder::new().text("fixture_type", value).build(),
-        )
-    };
-    ArchiveBuilder::new()
-        .entry(TestEntry::zstd("Data\\Game2.dcb", database.build()).encrypted())
-        .entry(locale(Language::English, "A\\nMission"))
-        .entry(locale(Language::French, "Une mission"))
-        .write_to(&path)?;
+    original::write(&path, storage)?;
     let archive = Archive::open_with_key(&path, Some(p4kx_testkit::test_key()))?;
     let output = build_catalog(&archive, &CatalogOptions::new(UNIX_EPOCH))?;
     Ok(serde_json::from_slice(output.json())?)

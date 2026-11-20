@@ -4842,6 +4842,7 @@
       "type": "object"
     },
     "CargoFillCapacity": {
+      "description": "The original fill type, range and ordered resource slots.",
       "properties": {
         "authoredFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -5099,6 +5100,7 @@
       "type": "object"
     },
     "CargoQuantityAlgorithm": {
+      "description": "The selected authored quantity algorithm and its original operands.",
       "properties": {
         "authoredFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -5122,6 +5124,7 @@
       "type": "object"
     },
     "CargoResource": {
+      "description": "The resource and probability owned by an allocation.",
       "properties": {
         "authoredFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -5145,6 +5148,7 @@
       "type": "object"
     },
     "CargoResourceSlot": {
+      "description": "An authored direct resource or allocation occurrence.",
       "properties": {
         "authoredFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -5180,6 +5184,7 @@
       "type": "object"
     },
     "CargoSpawnRule": {
+      "description": "An ordered authored spawn rule and its original inputs.",
       "properties": {
         "authoredFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -5693,6 +5698,9 @@
         "missionScenarios": {
           "$ref": "#/$defs/CatalogTableOfMissionScenarioDefinition"
         },
+        "missionTypes": {
+          "$ref": "#/$defs/CatalogTableOfMissionType"
+        },
         "npcArchetypes": {
           "$ref": "#/$defs/CatalogTableOfNpcArchetypeDefinition"
         },
@@ -5856,6 +5864,7 @@
         "missionItems",
         "missionModuleDeclarations",
         "missionScenarios",
+        "missionTypes",
         "npcArchetypes",
         "npcClassPools",
         "particleLibraries",
@@ -8142,6 +8151,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/MissionTitles"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfMissionType": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/MissionType"
           },
           "type": "array"
         }
@@ -32739,16 +32767,28 @@
       "description": "A mission type: a `MissionType` Record under `missiontype`.",
       "properties": {
         "className": {
-          "description": "The Record name without its type, e.g. `missiontype.job`.",
-          "type": "string"
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "guid": {
-          "$ref": "#/$defs/Guid",
-          "description": "The GUID of the Record, the target of `contracts[].missionTypeGuid`."
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "recordPath": {
-          "description": "The record path, without `.xml`.",
-          "type": "string"
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "typeName": {
           "$ref": "#/$defs/SourcedValueOfGameTextRef",
@@ -32758,8 +32798,13 @@
       },
       "required": [
         "className",
+        "fileName",
         "guid",
+        "metadataTag",
+        "recordIndex",
+        "recordName",
         "recordPath",
+        "sourceType",
         "typeName"
       ],
       "type": "object"
@@ -141092,13 +141137,6 @@
       },
       "type": "array"
     },
-    "missionTypes": {
-      "description": "The mission types, the targets of `contracts[].missionTypeGuid`, ordered by GUID.",
-      "items": {
-        "$ref": "#/$defs/MissionType"
-      },
-      "type": "array"
-    },
     "paints": {
       "description": "The paints with the ships they fit, ordered by the GUID of the item.",
       "items": {
@@ -141189,7 +141227,6 @@
     "missionLocalities",
     "missionLocationTemplates",
     "missionPropertySets",
-    "missionTypes",
     "paints",
     "placements",
     "projections",

@@ -50,6 +50,7 @@ const REPUTATION_TRIGGER_CONFIGURATIONS: &str = "/configurations/reputationTrigg
 const WEAPON_ACTIONS: &str = "/configurations/weaponActions";
 const LOCATION_ENTITIES: &str = "/definitions/locationEntityDeclarations";
 const MISSION_LOCATION_TEMPLATES: &str = "/missionLocationTemplates";
+const MISSION_TYPES: &str = "/definitions/missionTypes";
 const BLUEPRINT_POOLS: &str = "/definitions/blueprintPools";
 const BLUEPRINT_POOL_WEIGHTS: &str = "/projections/blueprintPoolWeights";
 const BLUEPRINT_CATEGORY_LISTS: &str = "/declarations/blueprintCategoryLists";
@@ -77,6 +78,7 @@ const RESOURCE_CONNECTIONS: &str = "/configurations/resourceConnections";
 const FUEL_TANKS: &str = "/configurations/fuelTanks";
 const FUEL_INTAKES: &str = "/configurations/fuelIntakes";
 const RESOURCE_CONTAINERS: &str = "/configurations/resourceContainers";
+const CARGO_MANIFESTS: &str = "/definitions/cargoManifests";
 const CARGO_LOADING_GLOBALS: &str = "/configurations/cargoLoadingGlobals";
 const SHOP_COMMODITY_GLOBALS: &str = "/configurations/shopCommodityGlobals";
 const SHIELD_GENERATORS: &str = "/configurations/shieldGenerators";
@@ -168,6 +170,7 @@ const REQUIRED_WITNESSES: &[&str] = &[
     COMMODITY_PRESENTATIONS,
     LOCATION_ENTITIES,
     MISSION_LOCATION_TEMPLATES,
+    MISSION_TYPES,
     BLUEPRINT_POOLS,
     BLUEPRINT_POOL_WEIGHTS,
     BLUEPRINT_CATEGORY_LISTS,
@@ -195,6 +198,7 @@ const REQUIRED_WITNESSES: &[&str] = &[
     FUEL_TANKS,
     FUEL_INTAKES,
     RESOURCE_CONTAINERS,
+    CARGO_MANIFESTS,
     CARGO_LOADING_GLOBALS,
     SHOP_COMMODITY_GLOBALS,
     SHIELD_GENERATORS,

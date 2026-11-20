@@ -20,6 +20,9 @@ use crate::source_fields::FieldError;
 use crate::source_value_catalog::{SourceArenaOutput, SourceRecordReference};
 use crate::{CatalogError, ExportAccountingError, Kind};
 
+#[path = "cargo_manifest_accessors.rs"]
+mod accessors;
+
 pub(crate) const SOURCE_TYPE: &str = "CargoManifest";
 
 type RecordLink<'source> = SourcedValue<Box<SourceRecordReference<'source>>>;
@@ -29,7 +32,7 @@ type OrderedSlots<T> = SourcedValue<Vec<SourcedValue<T>>>;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct CargoManifestDefinition<'source> {
+pub struct CargoManifestDefinition<'source> {
     #[serde(flatten)]
     source: CanonicalRecordHeader<'source>,
     lock_cargo_grids_on_spawn: SourcedValue<bool>,
@@ -38,10 +41,11 @@ pub(crate) struct CargoManifestDefinition<'source> {
     authored_fields: SourceArenaOutput<'source>,
 }
 
+/// The original fill type, range and ordered resource slots.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct CargoFillCapacity<'source> {
+pub struct CargoFillCapacity<'source> {
     source_type: SourcedValue<&'source str>,
     min_capacity_range: SourcedValue<ResourceNumber>,
     max_capacity_range: SourcedValue<ResourceNumber>,
@@ -49,10 +53,11 @@ struct CargoFillCapacity<'source> {
     authored_fields: SourceArenaOutput<'source>,
 }
 
+/// An authored direct resource or allocation occurrence.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct CargoResourceSlot<'source> {
+pub struct CargoResourceSlot<'source> {
     source_type: SourcedValue<&'source str>,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
     resource: RecordLink<'source>,
@@ -63,10 +68,11 @@ struct CargoResourceSlot<'source> {
     authored_fields: SourceArenaOutput<'source>,
 }
 
+/// The resource and probability owned by an allocation.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct CargoResource<'source> {
+pub struct CargoResource<'source> {
     source_type: SourcedValue<&'source str>,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
     resource: RecordLink<'source>,
@@ -74,10 +80,11 @@ struct CargoResource<'source> {
     authored_fields: SourceArenaOutput<'source>,
 }
 
+/// An ordered authored spawn rule and its original inputs.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct CargoSpawnRule<'source> {
+pub struct CargoSpawnRule<'source> {
     source_type: SourcedValue<&'source str>,
     probability: SourcedValue<ResourceNumber>,
     #[schemars(with = "OrderedSlots<CatalogRecordReference>")]
@@ -88,10 +95,11 @@ struct CargoSpawnRule<'source> {
     authored_fields: SourceArenaOutput<'source>,
 }
 
+/// The selected authored quantity algorithm and its original operands.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct CargoQuantityAlgorithm<'source> {
+pub struct CargoQuantityAlgorithm<'source> {
     source_type: SourcedValue<&'source str>,
     quantity: SourcedValue<ResourceNumber>,
     proportion: SourcedValue<ResourceNumber>,

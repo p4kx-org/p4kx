@@ -263,7 +263,7 @@ fn contract_dependency_consumes_only_the_original_faction_display_name() -> Test
     let filter = Filter::new("missiontype");
     let catalog = export(&archive, Some(&filter))?;
     check(&catalog, "/definitions/factionReputations/rows", &json!([]))?;
-    let name = at(&catalog, "/missionTypes/0/typeName")?;
+    let name = at(&catalog, "/definitions/missionTypes/rows/0/typeName")?;
     check(name, "/containsEncryptedSource", &json!(true))?;
     check(
         text_row(&catalog, "gameTexts", at(name, "/value")?)?,

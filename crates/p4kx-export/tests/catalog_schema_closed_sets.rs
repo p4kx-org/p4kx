@@ -8,6 +8,7 @@
 mod catalog_schema_support;
 
 use catalog_schema_support::minimal_catalog;
+use p4kx_extraction::{SourceUses, SourceValue};
 use serde_json::{Map, Value, json};
 
 const VOCABULARY_CLASS: &str = "x-p4kx-vocabularyClass";
@@ -92,8 +93,6 @@ const CONTROL_TYPES: &[&str] = &[
 const OPEN_TYPES: &[&str] = &[
     "ArchiveKeyState",
     "BlueprintSource",
-    "CargoFillType",
-    "CargoSpawnKind",
     "CommsTiming",
     "Comparison",
     "EndReason",
@@ -235,6 +234,46 @@ fn every_open_vocabulary_accepts_known_and_unknown_strings() -> TestResult {
         for invalid in [json!(42), json!(true), json!({}), json!([]), Value::Null] {
             assert!(!validator.is_valid(&invalid), "{name} rejects {invalid}");
         }
+    }
+    Ok(())
+}
+
+#[test]
+fn cargo_source_types_accept_raw_sourced_strings() -> TestResult {
+    let schema = p4kx_export::catalog_schema();
+    let definitions = &schema["$defs"];
+    let uses = SourceUses::new();
+    let invalid = json!(uses.value(SourceValue::Present(42), &[], false));
+    for (name, known, future) in [
+        (
+            "CargoFillCapacity",
+            "CargoFillCapacityValue_Even",
+            "CargoFillCapacityValue_Future",
+        ),
+        (
+            "CargoSpawnRule",
+            "CargoSpawnEntityDef",
+            "CargoSpawnFutureDef",
+        ),
+    ] {
+        let property = &definitions[name]["properties"]["sourceType"];
+        assert!(property.is_object(), "{name} declares a sourceType schema");
+        let validator = jsonschema::validator_for(&json!({
+            "$schema": schema["$schema"],
+            "$defs": definitions,
+            "allOf": [property],
+        }))?;
+        for tag in [known, future] {
+            let observed = json!(uses.value(SourceValue::Present(tag), &[], false));
+            assert!(
+                validator.is_valid(&observed),
+                "{name} accepts raw type {tag}"
+            );
+        }
+        assert!(
+            !validator.is_valid(&invalid),
+            "{name} rejects a numeric source type"
+        );
     }
     Ok(())
 }

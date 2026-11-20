@@ -408,6 +408,15 @@ occurrence. A readable physical Tag Record supplies its own target-header
 evidence. The query uses DataForge and resolves these original headers directly.
 See the [Tag contract](catalog-tags.md) for the declaration shape.
 
+## Mission type definitions
+
+Use `with_mission_types`, its decoded-Entry variant or the parsed session method to
+read `definitions.missionTypes` by GUID, physical Record index or for the dataset.
+Each row has the physical Record header and the protected `LocalisedTypeName`
+reference. Use `snapshot.game_text(reference)` to look up its requested translations.
+The query reads the selected mission types and their requested localization inputs.
+Use the per-field source uses and the snapshot's inventory to trace their origin.
+
 ## Mission location templates
 
 Use `with_mission_location_templates`, its `_from` variant or the parsed session method
@@ -1419,6 +1428,23 @@ rejected before a dependency body read.
 
 This query covers authored configuration and the reached inventory definition. Installed ship
 totals and `placements.facilityInstances` use the global Loadout order and a separate projection.
+
+## Original cargo manifests
+
+Use `catalog_queries::cargo_manifests::with_cargo_manifests` for
+`definitions.cargoManifests`. The `_from` form accepts a decoded Entry from the
+same Archive. Reuse `with_cargo_manifests` on a query session or parsed view. Select
+all original manifests, every admitted physical occurrence of a GUID, or one
+`CatalogRecordSelection::RecordIndex` in this DataForge. Equal GUIDs and paths retain
+each physical Record index. The canonical table orders rows by GUID and Record index.
+
+Typed getters expose original fill settings, ordered resource slots and allocation
+bounds, ordered spawn rules, quantity algorithms and remaining authored fields.
+The snapshot includes Build identity, family availability, selected Record coverage
+and the source inventory for its values. Resource and entity references retain original
+target identities. Query the target's own dataset to read its body. This route reads
+only admitted manifest bodies and the metadata needed to resolve reached references.
+Publish consumer-owned results after query success and after checking the required coverage.
 
 ## Cargo loading and shop fees
 

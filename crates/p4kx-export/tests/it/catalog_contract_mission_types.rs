@@ -57,11 +57,11 @@ fn the_mission_type_is_the_nearest_override_else_the_template_type() -> TestResu
         "the original override's GUID"
     );
     let definition = catalog
-        .get("missionTypes")
+        .pointer("/definitions/missionTypes/rows")
         .and_then(Value::as_array)
         .ok_or("mission types")?
         .iter()
-        .find(|definition| definition.get("guid") == Some(guid))
+        .find(|definition| definition.pointer("/guid/value") == Some(guid))
         .ok_or("selected mission type definition")?;
     assert_eq!(
         handler.get("missionType"),
@@ -77,7 +77,7 @@ fn filtered_type_definitions_keep_the_original_contract_name_dependency() -> Tes
     let (_, catalog) = build(Some(&filter))?;
     assert!(
         catalog
-            .get("missionTypes")
+            .pointer("/definitions/missionTypes/rows")
             .and_then(Value::as_array)
             .ok_or("mission types")?
             .is_empty(),

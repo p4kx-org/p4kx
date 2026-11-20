@@ -10,7 +10,7 @@ use crate::catalog_v3_consumer as reader;
 use crate::commodity_v3_fixture::{self as fixture, TestResult};
 use crate::real_archive_verification;
 
-const OWNERS: [(Kind, u128, &str, &str); 2] = [
+const OWNERS: [(Kind, u128, &str, &str); 4] = [
     (
         Kind::ContractTemplates,
         0x9e01,
@@ -22,6 +22,18 @@ const OWNERS: [(Kind, u128, &str, &str); 2] = [
         0x9e02,
         "MissionBrokerEntry",
         "libs/foundry/records/missionbroker/Acceptance.xml",
+    ),
+    (
+        Kind::CargoManifests,
+        0x9e03,
+        "CargoManifest",
+        "libs/foundry/records/cargomanifest/Acceptance.xml",
+    ),
+    (
+        Kind::MissionTypes,
+        0x9e04,
+        "MissionType",
+        "libs/foundry/records/missiontype/Acceptance.xml",
     ),
 ];
 
@@ -54,12 +66,25 @@ fn mission_definition_inventory_uses_original_physical_headers() -> TestResult {
             return Err(format!("one actual canonical {kind} definition").into());
         };
         let record = forge.record(index).ok_or("actual original mission owner")?;
-        assert_eq!(reader::identity(row, kind)?, record.guid().to_string());
-        assert_eq!(reader::field(row, kind, "sourceType")?, record.type_name()?);
-        assert_eq!(reader::field(row, kind, "recordIndex")?, &json!(index));
+        assert_eq!(
+            reader::identity(row, kind)?,
+            record.guid().to_string(),
+            "{kind} retains the original GUID"
+        );
+        assert_eq!(
+            reader::field(row, kind, "sourceType")?,
+            record.type_name()?,
+            "{kind} retains the original declaration type"
+        );
+        assert_eq!(
+            reader::field(row, kind, "recordIndex")?,
+            &json!(index),
+            "{kind} retains the physical Record position"
+        );
         assert_eq!(
             reader::field(row, kind, "fileName")?,
-            record.stored_file_name()?
+            record.stored_file_name()?,
+            "{kind} retains the original stored file name"
         );
         legacy_distraction(&catalog, kind, row)?;
     }

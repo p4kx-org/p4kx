@@ -22,12 +22,14 @@ pub(super) const fn uses_named_definition_table(kind: Kind) -> bool {
             | Kind::SoilTextureSets
             | Kind::ShadingClasses
             | Kind::InventoryContainers
+            | Kind::CargoManifests
             | Kind::MedicalItemTierConfigs
             | Kind::ParticleLibraries
             | Kind::FlareLibraries
             | Kind::SubsumptionEvents
             | Kind::EncounterIndices
             | Kind::MissionItems
+            | Kind::MissionTypes
             | Kind::BlueprintPools
             | Kind::ProceduralPlanetAudio
             | Kind::ResourceNetworkGlobals

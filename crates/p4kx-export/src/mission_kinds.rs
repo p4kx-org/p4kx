@@ -31,7 +31,8 @@ use crate::catalog_v3::reputation_standing_definition::{
 use crate::catalog_v3::sandbox_trigger_record_definition::{
     self, PreparedSandboxTriggerRecord, SandboxTriggerRecordDefinition,
 };
-use crate::contract::{ContractScenario, MissionLocality, MissionType};
+use crate::contract::{ContractScenario, MissionLocality};
+use crate::contract_mission_data::MissionType;
 use crate::guid_text::{CatalogGuid, sort_by_guid};
 use crate::mission_data::{contract_scenario, mission_locality};
 
@@ -52,7 +53,7 @@ pub(crate) enum MissionPick<'f> {
     /// A reputation context.
     Context(Box<PreparedContext<'f>>),
     /// A mission type.
-    Type(MissionType<'f>),
+    Type(Box<MissionType<'f>>),
     /// A mission locality.
     Locality(MissionLocality<'f>),
     /// A contract scenario.
@@ -89,7 +90,7 @@ pub(crate) struct MissionKinds<'f> {
     pub(crate) trigger_records: Vec<PreparedSandboxTriggerRecord<'f>>,
     pub(crate) reward_amounts: Vec<PreparedReputationRewardAmount<'f>>,
     pub(crate) contexts: Vec<PreparedContext<'f>>,
-    pub(crate) types: Vec<MissionType<'f>>,
+    types: Vec<MissionType<'f>>,
     pub(crate) localities: Vec<MissionLocality<'f>>,
     pub(crate) scenarios: Vec<ContractScenario<'f>>,
     pub(crate) scenario_definitions: Vec<PreparedMissionScenario<'f>>,
@@ -119,7 +120,7 @@ impl<'f> MissionKinds<'f> {
             MissionPick::SandboxTriggerRecord(entity) => self.trigger_records.push(*entity),
             MissionPick::RewardAmount(entity) => self.reward_amounts.push(*entity),
             MissionPick::Context(entity) => self.contexts.push(*entity),
-            MissionPick::Type(entity) => self.types.push(entity),
+            MissionPick::Type(entity) => self.types.push(*entity),
             MissionPick::Locality(entity) => self.localities.push(entity),
             MissionPick::Scenario(entity) => self.scenarios.push(entity),
             MissionPick::ScenarioDefinition(entity) => self.scenario_definitions.push(*entity),
@@ -144,9 +145,13 @@ impl<'f> MissionKinds<'f> {
         self.trigger_records
             .sort_by_cached_key(|row| (CatalogGuid(row.physical_guid).text(), row.physical_index));
         reputation_reward_amount_definition::order(&mut self.reward_amounts);
-        sort_by_guid(&mut self.types, |entity| entity.guid);
         sort_by_guid(&mut self.localities, |entity| entity.guid);
         sort_by_guid(&mut self.scenarios, |entity| entity.guid);
+    }
+
+    /// Takes the physical mission types into their catalog table.
+    pub(crate) fn take_types(&mut self, forge: &DataForge<'_>) -> CatalogTable<MissionType<'f>> {
+        MissionType::table(forge, std::mem::take(&mut self.types))
     }
 
     /// Takes the physical mission scenario definitions into their catalog table.

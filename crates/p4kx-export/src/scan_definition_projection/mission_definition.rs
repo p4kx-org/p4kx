@@ -23,7 +23,10 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
             admission,
             self.scan.options.cancel,
         )?;
-        Ok((Picked::Mission(MissionPick::Type(definition)), Vec::new()))
+        Ok((
+            Picked::Mission(MissionPick::Type(Box::new(definition))),
+            Vec::new(),
+        ))
     }
 
     pub(super) fn mission_item_definition(

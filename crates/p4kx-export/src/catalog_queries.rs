@@ -17,6 +17,9 @@ mod unlocalized_record_query;
 
 pub use record_selection::{CatalogRecordCoverage, CatalogRecordSelection};
 
+#[path = "cargo_manifest_query.rs"]
+pub mod cargo_manifests;
+
 #[path = "commodity_query.rs"]
 pub mod commodities;
 #[path = "loot_query.rs"]
@@ -83,6 +86,8 @@ pub use mining_definitions::process_api as mining;
 mod location_entity_declarations;
 #[path = "mission_location_query.rs"]
 mod mission_location_templates;
+#[path = "mission_type_query.rs"]
+mod mission_types;
 #[path = "reputation_query.rs"]
 mod reputation;
 #[path = "reputation_reward_amount_query.rs"]
@@ -202,6 +207,9 @@ pub use manufacturers::{ManufacturerSnapshot, with_manufacturers, with_manufactu
 pub use mission_location_templates::{
     MissionLocationTemplateSnapshot, with_mission_location_templates,
     with_mission_location_templates_from,
+};
+pub use mission_types::{
+    MissionType, MissionTypeSnapshot, with_mission_types, with_mission_types_from,
 };
 pub use reputation::{
     ReputationContextDefinition, ReputationPerk, ReputationPerkEntry, ReputationPerkList,

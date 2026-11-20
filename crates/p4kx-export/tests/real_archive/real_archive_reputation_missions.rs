@@ -6,6 +6,7 @@
 use std::collections::HashSet;
 use std::error::Error;
 
+use p4kx_export::Kind;
 use serde_json::Value;
 
 use super::{TestResult, assert_resolve, catalog, list, print_line, text};
@@ -66,7 +67,7 @@ fn check_mission_type_names(catalog: &Value, types: &[Value]) -> TestResult {
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn mission_types_localities_and_scenarios_of_a_real_archive_are_linked() -> TestResult {
     let catalog = catalog()?;
-    let types = list(&catalog, "missionTypes")?;
+    let types = crate::catalog_v3_consumer::rows(&catalog, Kind::MissionTypes)?;
     let localities = list(&catalog, "missionLocalities")?;
     let scenarios = list(&catalog, "contractScenarios")?;
     let objects = canonical_guids(&catalog, "starmapObjects")?;

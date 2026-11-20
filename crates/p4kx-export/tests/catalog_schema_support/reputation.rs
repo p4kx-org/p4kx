@@ -127,12 +127,17 @@ pub(super) fn contexts() -> serde_json::Value {
 }
 
 pub(super) fn mission_types() -> serde_json::Value {
-    json!([{
-        "guid": "50000000-0000-4000-8000-000000000001",
-        "className": "missiontype.job",
-        "recordPath": "libs/foundry/records/missiontype/missiontype.job",
+    json!({"availability": "available", "rows": [{
+        "guid": values::present(json!("50000000-0000-4000-8000-000000000001")),
+        "recordName": values::present(json!("MissionType.missiontype.job")),
+        "className": values::present(json!("missiontype.job")),
+        "recordPath": values::present(json!("libs/foundry/records/missiontype/missiontype.job")),
+        "recordIndex": values::present(json!(0)),
+        "sourceType": values::present(json!("MissionType")),
+        "fileName": values::present(json!("libs/foundry/records/missiontype/missiontype.job.xml")),
+        "metadataTag": values::source(SourceValue::Absent),
         "typeName": values::present(json!("text:9:@type_job"))
-    }])
+    }]})
 }
 
 pub(super) fn mission_type_text() -> serde_json::Value {

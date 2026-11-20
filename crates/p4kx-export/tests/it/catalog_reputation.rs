@@ -247,15 +247,20 @@ fn a_context_names_its_primary_and_listed_scopes() -> TestResult {
 #[test]
 fn a_mission_type_and_a_locality_keep_their_links() -> TestResult {
     let (_, catalog) = build(None)?;
-    let mission_type = entry(&catalog, "missionTypes", MISSION_TYPE)?;
+    let id = json!(guid(MISSION_TYPE));
+    let mission_type = proof::rows(&catalog, "/definitions/missionTypes/rows")?
+        .iter()
+        .find(|row| row.pointer("/guid/value") == Some(&id))
+        .ok_or("mission type definition")?;
     assert_eq!(
-        *mission_type,
-        json!({
-            "guid": guid(MISSION_TYPE),
-            "className": "missiontype.job",
-            "recordPath": "libs/foundry/records/missiontype/missiontype.job",
-            "typeName": mission_type.get("typeName").ok_or("type name")?
-        })
+        mission_type.pointer("/className/value"),
+        Some(&json!("missiontype.job")),
+        "source class name"
+    );
+    assert_eq!(
+        mission_type.pointer("/recordPath/value"),
+        Some(&json!("libs/foundry/records/missiontype/missiontype.job")),
+        "normalized source record path"
     );
     let reference = proof::cell(mission_type, "typeName", "present")?;
     let row = mission_type_texts::protected(&catalog, reference)?;
@@ -315,7 +320,11 @@ fn a_scenario_lists_the_tiers_of_each_faction() -> TestResult {
 fn a_filter_marks_the_kinds_partial_and_selects_by_record_path() -> TestResult {
     let filter = Filter::new("*/missiontype/*");
     let (built, catalog) = build(Some(&filter))?;
-    assert_eq!(catalog["missionTypes"].as_array().map(Vec::len), Some(1));
+    assert_eq!(
+        proof::rows(&catalog, "/definitions/missionTypes/rows")?.len(),
+        1,
+        "only the selected mission type"
+    );
     assert_eq!(
         proof::at(&catalog, "/definitions/factionReputations/rows")?,
         &json!([])

@@ -36,6 +36,8 @@ pub(super) fn check_rows(rows: &[Value], kind: Kind) -> TestResult {
             Kind::BlueprintCategories => source_type == "BlueprintCategoryRecord",
             Kind::BlueprintPools => source_type == "BlueprintPoolRecord",
             Kind::BlueprintCategoryLists => source_type == "BlueprintCategoryDatabaseRecord",
+            Kind::CargoManifests => source_type == "CargoManifest",
+            Kind::MissionTypes => source_type == "MissionType",
             Kind::GameplayProperties => source_type == "CraftingGameplayPropertyDef",
             Kind::ExplosionDefinitions => source_type == "ExplosionRecord",
             Kind::AmmoDefinitions => source_type == "AmmoParams",

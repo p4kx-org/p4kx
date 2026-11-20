@@ -29,7 +29,7 @@ pub(crate) use crate::contract_loadout::Loadout;
 pub(crate) use crate::contract_loot::{LootArchetype, LootContainer, LootTable};
 pub(crate) use crate::contract_loot_legacy::{LegacyLootArchetype, LegacyLootTable};
 pub(crate) use crate::contract_mining::MineableEntity;
-pub(crate) use crate::contract_mission_data::{ContractScenario, MissionLocality, MissionType};
+pub(crate) use crate::contract_mission_data::{ContractScenario, MissionLocality};
 pub(crate) use crate::contract_missions::ContractEntry;
 pub(crate) use crate::contract_rewards::DismantleProcess;
 pub(crate) use crate::contract_shops::Shop;
@@ -106,8 +106,6 @@ pub(crate) struct Catalog<'a> {
     pub(crate) loot_containers: Vec<LootContainer>,
     /// The shops of the shop registry with kind, brand and place, ordered by `key`.
     pub(crate) shops: Vec<Shop>,
-    /// The mission types, the targets of `contracts[].missionTypeGuid`, ordered by GUID.
-    pub(crate) mission_types: Vec<MissionType<'a>>,
     /// The mission localities, sets of starmap objects, ordered by GUID.
     pub(crate) mission_localities: Vec<MissionLocality<'a>>,
     /// The contract scenarios with their reward tiers, ordered by GUID.

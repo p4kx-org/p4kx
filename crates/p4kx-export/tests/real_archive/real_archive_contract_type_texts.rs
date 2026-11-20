@@ -23,7 +23,7 @@ pub(super) fn count(
             .ok_or("contract type name cell")?;
         let mut matching = types
             .iter()
-            .filter(|row| row.get("guid") == Some(guid))
+            .filter(|row| row.pointer("/guid/value") == Some(guid))
             .peekable();
         if matching.peek().is_some() && !matching.any(|row| row.get("typeName") == Some(name)) {
             return Err("contract name does not match its canonical mission type".into());

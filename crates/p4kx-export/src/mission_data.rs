@@ -6,6 +6,7 @@ use p4kx_extraction::{
 };
 
 use crate::CatalogError;
+use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_projection::{CatalogProjection, ProtectedKey};
 use crate::catalog_read::original::OriginalFlowFields;
 
@@ -38,9 +39,7 @@ pub(crate) fn mission_type<'source>(
     let fields = OriginalFlowFields::read(&scope, cancel)?;
     let type_name = projection.finish_protected_key(mission_type_key(&fields)?)?;
     Ok(MissionType {
-        guid: CatalogGuid(tree.guid()),
-        class_name: class_name(tree),
-        record_path: tree.record_path(),
+        source: CanonicalRecordHeader::read(tree, projection.origins())?,
         type_name,
     })
 }

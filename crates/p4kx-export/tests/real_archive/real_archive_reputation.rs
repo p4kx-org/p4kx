@@ -40,13 +40,6 @@ fn list<'c>(catalog: &'c Value, kind: &str) -> Result<&'c Vec<Value>, String> {
         .ok_or_else(|| format!("the {kind} array"))
 }
 
-fn guids<'c>(catalog: &'c Value, kind: &str) -> Result<HashSet<&'c str>, Box<dyn Error>> {
-    Ok(list(catalog, kind)?
-        .iter()
-        .filter_map(|entry| entry["guid"].as_str())
-        .collect())
-}
-
 fn faction<'catalog>(
     catalog: &'catalog Value,
     class: &str,
@@ -252,7 +245,7 @@ fn check_requirement(requirement: &Value, [factions, scopes, standings]: [&HashS
 fn a_contract_of_a_real_archive_names_its_type_and_standing_range() -> TestResult {
     let catalog = catalog()?;
     let contracts = crate::real_archive_contracts::v3::rows(&catalog)?;
-    let types = guids(&catalog, "missionTypes")?;
+    let types = canonical_guids(&catalog, "missionTypes")?;
     let standings = canonical_guids(&catalog, "reputationStandings")?;
     let scopes = canonical_guids(&catalog, "reputationScopes")?;
     let factions = canonical_guids(&catalog, "factionReputations")?;

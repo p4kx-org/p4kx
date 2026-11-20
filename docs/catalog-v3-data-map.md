@@ -129,7 +129,7 @@ Source inventory is current contract.rs:69-181 and generated schema's top requir
 | reputationTriggerRecords | D.reputationTriggerRecords | reusable physical sandbox definitions with original ordered manual trigger slots |
 | reputationRewardAmounts | D.reputationRewardAmounts | physical reward amount Records with their exact signed amounts |
 | reputationContexts | D.reputationContexts | physical contexts, authored sort order, ordered scope occurrences, protected and original dynamic display properties |
-| missionTypes | D.missionTypes | mission-type definitions and source text |
+| missionTypes | D.missionTypes | canonical physical Record headers, per-field provenance and protected source text |
 | missionLocalities | D.missionLocalities | stored starmap-object membership |
 | missionScenarios | D.missionScenarios | physical MissionScenario identity, authored variables, cycles, schedule and flags |
 | contractScenarios | D.contractScenarios | faction reward tiers/progression, source flags, no active state |

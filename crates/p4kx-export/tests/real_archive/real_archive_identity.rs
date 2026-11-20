@@ -29,7 +29,11 @@ pub(crate) fn check_unique_guids(catalog: &Value) -> TestResult {
         .into_iter()
         .filter(|kind| !kind.is_derived() && !matches!(kind, Kind::Contracts | Kind::Crafters));
     for kind in kinds {
-        if kind == Kind::BlueprintCategoryLists {
+        let physical_aliases = matches!(
+            kind,
+            Kind::BlueprintCategoryLists | Kind::CargoManifests | Kind::MissionTypes
+        );
+        if physical_aliases {
             definition_identity::check(catalog, kind)?;
         }
         if matches!(
@@ -49,17 +53,16 @@ pub(crate) fn check_unique_guids(catalog: &Value) -> TestResult {
             definition_identity::check(catalog, kind)?;
             continue;
         }
+        let allows_aliases = physical_aliases || kind == Kind::Items;
         let mut family = HashSet::new();
         for entity in list(catalog, kind)? {
             let guid = catalog_v3_consumer::identity(entity, kind)?;
-            if !family.insert(guid) && !matches!(kind, Kind::BlueprintCategoryLists | Kind::Items) {
+            if !family.insert(guid) && !allows_aliases {
                 return Err(format!("{guid} occurs twice inside {kind}").into());
             }
             if let Some((previous_kind, previous)) = seen.get(guid) {
-                let same_list = kind == Kind::BlueprintCategoryLists && *previous_kind == kind;
-                let same_items = kind == Kind::Items && *previous_kind == kind;
-                if !same_list
-                    && !same_items
+                let allowed_alias = allows_aliases && *previous_kind == kind;
+                if !allowed_alias
                     && !same_resource_fallback(*previous_kind, previous, kind, entity)?
                 {
                     return Err(format!("{guid} occurs twice, also in {kind}").into());

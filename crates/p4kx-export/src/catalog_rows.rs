@@ -114,7 +114,9 @@ fn append_explosions_and_ammo(emitted: &mut Vec<CatalogRow>, collected: &Collect
 }
 
 fn append_gameplay_definitions(emitted: &mut Vec<CatalogRow>, collected: &Collected<'_>) {
-    emitted.extend(crate::catalog_v3::cargo_manifest::catalog_rows(&collected.mission_kinds.manifests));
+    emitted.extend(crate::catalog_v3::cargo_manifest::catalog_rows(
+        &collected.mission_kinds.manifests,
+    ));
     emitted.extend(
         collected
             .law

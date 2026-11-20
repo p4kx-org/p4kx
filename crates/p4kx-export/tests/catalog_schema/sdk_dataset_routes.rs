@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_export::catalog_queries::equipment::cargo_globals;
 use p4kx_export::catalog_queries::equipment::{
     with_ammo_definitions, with_weapon_recoil_definitions,
 };
@@ -21,9 +20,9 @@ use p4kx_export::catalog_queries::{
 use p4kx_extraction::Archive;
 
 use super::{
-    AMMUNITION, CARGO_LOADING_GLOBALS, FACTION_IDENTITIES, FLARE_LIBRARIES, ITEM_DEFINITIONS,
-    LANGUAGE_SOURCES, LOCATION_ENTITIES, MANUFACTURERS, RADAR_AUDIO, Route, SHOP_COMMODITY_GLOBALS,
-    SHOP_INVENTORIES, TestResult, WEAPON_RECOIL,
+    AMMUNITION, FACTION_IDENTITIES, FLARE_LIBRARIES, ITEM_DEFINITIONS, LANGUAGE_SOURCES,
+    LOCATION_ENTITIES, MANUFACTURERS, RADAR_AUDIO, Route, SHOP_INVENTORIES, TestResult,
+    WEAPON_RECOIL,
 };
 
 #[path = "sdk_reputation_definition_routes.rs"]
@@ -34,6 +33,8 @@ mod blueprint_physical;
 mod blueprint_pools;
 #[path = "sdk_blueprint_taxonomy_routes.rs"]
 mod blueprint_taxonomy;
+#[path = "sdk_cargo_routes.rs"]
+mod cargo;
 #[path = "sdk_client_profile_route.rs"]
 mod client_profiles;
 #[path = "sdk_commodity_routes.rs"]
@@ -84,6 +85,8 @@ mod mineable_entity;
 mod mining_families;
 #[path = "sdk_mission_location_route.rs"]
 mod mission_location;
+#[path = "sdk_mission_type_route.rs"]
+mod mission_type;
 #[path = "sdk_planet_resource_route.rs"]
 mod planet_resource;
 #[path = "sdk_projectile_ammo_route.rs"]
@@ -151,6 +154,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
         read_language_sources(&archive)?,
         read_location_entities(&archive)?,
         mission_location::read()?,
+        mission_type::read()?,
         read_shop_inventory(&archive)?,
         read_flare_library(&archive)?,
         read_faction_identities(&archive)?,
@@ -187,7 +191,8 @@ fn append_domain_routes(routes: &mut Vec<Route>, archive: &Archive) -> TestResul
     routes.push(inventory_containers::read_configurations()?);
     routes.push(facilities::read()?);
     routes.push(client_profiles::read()?);
-    routes.extend(read_cargo_globals(archive)?);
+    routes.extend(cargo::read_globals(archive)?);
+    routes.push(cargo::read_manifests()?);
     routes.extend(quality::read()?);
     routes.extend(read_entity_definitions(archive)?);
     routes.extend(item_configurations::read()?);
@@ -263,19 +268,6 @@ fn read_radar_configuration(archive: &Archive) -> TestResult<Route> {
         &snapshot.rows,
         "physical configuration query available; installed producer parity open",
     )
-}
-
-fn read_cargo_globals(archive: &Archive) -> TestResult<[Route; 2]> {
-    const REMAINING: &str = "scoped installed parity proven; full Catalog parity remains open";
-    let selection = CatalogRecordSelection::All;
-    Ok([
-        cargo_globals::with_cargo_loading_globals(archive, selection, None, |snapshot| {
-            Route::queried_rows(CARGO_LOADING_GLOBALS, snapshot.rows(), REMAINING)
-        })??,
-        cargo_globals::with_shop_commodity_globals(archive, selection, None, |snapshot| {
-            Route::queried_rows(SHOP_COMMODITY_GLOBALS, snapshot.rows(), REMAINING)
-        })??,
-    ])
 }
 
 fn read_entity_definitions(archive: &Archive) -> TestResult<[Route; 2]> {

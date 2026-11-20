@@ -305,7 +305,7 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `definitions.npcArchetypes`, `definitions.npcClassPools`, `definitions.autoSpawns`, `definitions.autoSpawnSets` and `definitions.encounterIndices` | Physical NPC and encounter definitions with ordered identity branches, weighted entries, class alternatives and declared References. [NPC spawn definitions](catalog-npc-spawn-definitions.md) |
 | `definitions.locationClasses`, `definitions.locationFunctions`, `definitions.locationSizes` and `definitions.locationRegistries` | Physical definitions and ordered registry members for mission location classification. [Location vocabulary](catalog-location-vocabulary.md) |
 | `definitions.reputationContexts` | Physical reputation contexts with authored scope order, original references and display properties |
-| `missionTypes` | The mission types, the targets of `contracts[].missionTypeGuid`, ordered by GUID |
+| `definitions.missionTypes` | Physical mission-type definitions, linked by `contracts[].missionTypeGuid`, in GUID order |
 | `missionLocalities` | The mission localities, named sets of starmap objects, ordered by GUID |
 | `contractScenarios` | The contract scenarios with the reward tiers of each faction, ordered by GUID |
 | `cargoManifests` | `definitions.cargoManifests`, the physical cargo manifests with their fill and spawn rules |
@@ -1608,7 +1608,9 @@ configuration from the installed DataForge. Its Record Filter is
 `libs/foundry/records/*reputation/*`. The test compares physical identity, authored order,
 field states, original values and selected source coordinates in one diagnostic export.
 
-**Mission types (`missionTypes`).** `typeName` is a sourced protected reference from
+**Mission types (`definitions.missionTypes`).** Match `contracts[].missionTypeGuid` to
+`definitions.missionTypes.rows[].guid.value`. Each row uses the canonical sourced Record header.
+`typeName` is a sourced protected reference from
 `LocalisedTypeName`. Join its `value` to `texts.gameTexts[].id.value` to read the original key and
 the available source and display forms. A missing, placeholder or literal name provides no
 reference. Every `missionTypeGuid` of `contracts` points to a mission type.
@@ -1752,7 +1754,7 @@ additive rule of ADR-0054 is not touched.
 | `guid`, `className`, `recordPath` | The Record |
 | `notForRelease`, `workInProgress` | The flags as stored, `null` when absent |
 | `title` | The first display string (game text); `null` texts for the placeholder most templates have |
-| `missionTypeGuid` | The `MissionType` of the display info, an entry of `missionTypes` |
+| `missionTypeGuid` | The `MissionType` of the display info, an entry of `definitions.missionTypes.rows` |
 | `illegal`, `showLifeTimeInMobiGlas`, `preShowObjectives` | The flags of the display info |
 | `classType`, `settings` | The struct of the contract class (`ContractClass_Contract`, one template is a `ContractClass_PVPBounty`) and its `ActiveContractSettings`: `canBeShared`, `hasCompleteButton`, `handlesAbandonRequest`, `displayAlliedMarkers`, `onlyOwnerCanComplete`; `null` when absent |
 | `autoFinish` | The `ContractAutoFinishSettings`: `failIfSentToPrison`, `failIfBecameCriminal`, `failIfLeavePrison` and the deadline as stored: `completionTime`, `autoEnd`, `resultAfterTimerEnd` (an objective state), `remainingTimeToShowTimer`; the Archive does not state the unit of the times; `null` without the block |
@@ -1874,7 +1876,7 @@ contract templates (see there).
 |-------|---------|
 | `guid`, `className`, `recordPath`, `notForRelease` | The Record and its flag as stored |
 | `debugName`, `title`, `hudTitle`, `description`, `missionGiver`, `commsChannelName`, `giverFragmentTags` | The `playerFacingDebugName`, the five game texts and the `missionGiverFragmentTags` |
-| `missionTypeGuid`, `locationGuid`, `localityGuid` | Links to `missionTypes`, `starmapObjects` (the `locationMissionAvailable`) and `missionLocalities` |
+| `missionTypeGuid`, `locationGuid`, `localityGuid` | Links to `definitions.missionTypes.rows`, `starmapObjects` (the `locationMissionAvailable`) and `missionLocalities` |
 | `giverGuid` | The `missionGiverRecord`; no kind lists these Records |
 | `invitationMissionGuid`, `linkedMissionGuid`, `associatedMissionGuids`, `requiredMissionGuids`, `unlessAvailableMissionGuids` | Links to entries of this kind (`invitationMission`, `linkedMission`, `associatedMissions`, `requiredMissions`, `onlyAvailableIfAllMissionsNotAvailable`); a GUID the Archive lacks is kept |
 | `journalEntriesOnComplete`, `journalEntriesOnRemove` | GUIDs of journal Records; no kind lists these |
