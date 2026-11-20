@@ -15,6 +15,7 @@ use crate::catalog_v3::ammo_definition::{
 use crate::catalog_v3::catalog_item_components;
 use crate::catalog_v3::catalog_weapon_actions::WeaponActions;
 use crate::catalog_v3::catalog_weapon_projectile_ammo::{self, WeaponProjectileAmmoSelection};
+use crate::catalog_v3::weapon_combat_base::countermeasure_emitter::{self, CountermeasureEmitter};
 use crate::export_diagnostic::ExportDiagnosticSeverity;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
 use crate::record_observation::RecordObservation;
@@ -28,6 +29,8 @@ pub struct ProjectileAmmoOwner<'source> {
     pub selections: Vec<WeaponProjectileAmmoSelection>,
     /// Readable selected Ammo definitions in Catalog order, deduplicated by physical index.
     pub ammo_definitions: Vec<AmmoDefinition<'source>>,
+    /// One proved launcher row per distinct original countermeasure role and ammunition.
+    pub countermeasure_emitters: Vec<CountermeasureEmitter>,
     /// Body and field coverage of the admitted magazines and Ammo definitions.
     pub dependency_coverage: CatalogRecordCoverage,
 }
@@ -36,6 +39,7 @@ pub(super) struct ProjectileInputs<'source> {
     pub(super) actions: Vec<WeaponActions<'source>>,
     pub(super) selections: Vec<WeaponProjectileAmmoSelection>,
     pub(super) ammunition: Vec<PreparedAmmoDefinition<'source>>,
+    countermeasure_emitters: Vec<CountermeasureEmitter>,
     coverage: CatalogRecordCoverage,
 }
 
@@ -48,6 +52,7 @@ impl<'source> ProjectileInputs<'source> {
                 .into_iter()
                 .map(PreparedAmmoDefinition::into_definition)
                 .collect(),
+            countermeasure_emitters: self.countermeasure_emitters,
             dependency_coverage: self.coverage,
         }
     }
@@ -98,6 +103,12 @@ pub(super) fn read_inputs<'source>(
         cancel,
         &mut coverage,
     )?;
+    let countermeasure_emitters = countermeasure_emitter::rows(
+        &projection.origins().uses,
+        &routes.value.selections,
+        &ammunition,
+        cancel,
+    )?;
     coverage.unreadable_bodies.sort_unstable();
     coverage.unreadable_bodies.dedup();
     coverage.incomplete_fields.sort_unstable();
@@ -106,6 +117,7 @@ pub(super) fn read_inputs<'source>(
         actions: routes.actions,
         selections: routes.selections,
         ammunition,
+        countermeasure_emitters,
         coverage,
     }))
 }

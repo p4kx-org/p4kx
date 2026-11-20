@@ -7,12 +7,7 @@ use p4kx_testkit::{ArchiveBuilder, TestEntry, test_key};
 
 use super::super::{AMMO_BINDINGS, AMMO_CONTAINERS, Route, TestResult, WEAPON_ACTIONS};
 
-#[expect(
-    dead_code,
-    reason = "The schema witness reuses only the readable own-container fixture."
-)]
-#[path = "../it/catalog_weapon_projectile_ammo_fixture.rs"]
-mod fixture;
+use super::projectile_ammo_fixture as fixture;
 
 pub(super) fn read() -> TestResult<[Route; 3]> {
     let folder = tempfile::tempdir()?;

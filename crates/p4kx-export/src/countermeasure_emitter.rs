@@ -21,20 +21,61 @@ use crate::{CatalogError, ExportAccountingError};
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct CountermeasureEmitter {
+pub struct CountermeasureEmitter {
     #[serde(flatten)]
     owner: ComponentOwner,
     route: SourcedValue<EmitterRoute>,
 }
 
+/// The original container slot, projectile role and ammunition of an emitter.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct EmitterRoute {
+pub struct EmitterRoute {
     ammo_role: SourcedValue<ProjectileAmmoRole>,
     container_record_index: SourcedValue<u32>,
     container_component_ordinal: SourcedValue<u32>,
     ammo_record_index: SourcedValue<u32>,
+}
+
+impl CountermeasureEmitter {
+    /// Returns the original owner and weapon component position.
+    #[must_use]
+    pub const fn owner(&self) -> &ComponentOwner {
+        &self.owner
+    }
+
+    /// Returns the proved route and its contributing origins.
+    #[must_use]
+    pub const fn route(&self) -> &SourcedValue<EmitterRoute> {
+        &self.route
+    }
+}
+
+impl EmitterRoute {
+    /// Returns the originally selected ammunition role.
+    #[must_use]
+    pub const fn ammo_role(&self) -> &SourcedValue<ProjectileAmmoRole> {
+        &self.ammo_role
+    }
+
+    /// Returns the physical Record owning the container component.
+    #[must_use]
+    pub const fn container_record_index(&self) -> &SourcedValue<u32> {
+        &self.container_record_index
+    }
+
+    /// Returns the original container component position within its owner.
+    #[must_use]
+    pub const fn container_component_ordinal(&self) -> &SourcedValue<u32> {
+        &self.container_component_ordinal
+    }
+
+    /// Returns the physical Record of the selected ammunition.
+    #[must_use]
+    pub const fn ammo_record_index(&self) -> &SourcedValue<u32> {
+        &self.ammo_record_index
+    }
 }
 
 struct EmitterEvidence<'rows> {
@@ -80,6 +121,20 @@ pub(super) fn table(
     ammunition: &[PreparedAmmoDefinition<'_>],
     cancel: Option<&CancelToken>,
 ) -> Result<CatalogTable<CountermeasureEmitter>, CatalogError> {
+    let rows = rows(sources, selections, ammunition, cancel)?;
+    Ok(CatalogTable::new(
+        forge,
+        &[authored_projectile::COUNTERMEASURE],
+        rows,
+    ))
+}
+
+pub(crate) fn rows(
+    sources: &SourceUses,
+    selections: &[WeaponProjectileAmmoSelection],
+    ammunition: &[PreparedAmmoDefinition<'_>],
+    cancel: Option<&CancelToken>,
+) -> Result<Vec<CountermeasureEmitter>, CatalogError> {
     let projectiles = countermeasure_origins(ammunition, cancel)?;
     let mut emitters = BTreeMap::<EmitterKey, EmitterEvidence<'_>>::new();
     for selection in selections {
@@ -122,18 +177,13 @@ pub(super) fn table(
             .origins
             .push(selection.origin());
     }
-    let rows = emitters
+    emitters
         .into_iter()
         .map(|(key, evidence)| {
             check_cancel(cancel)?;
             key.row(&evidence, sources)
         })
-        .collect::<Result<_, _>>()?;
-    Ok(CatalogTable::new(
-        forge,
-        &[authored_projectile::COUNTERMEASURE],
-        rows,
-    ))
+        .collect()
 }
 
 fn countermeasure_origins<'rows>(

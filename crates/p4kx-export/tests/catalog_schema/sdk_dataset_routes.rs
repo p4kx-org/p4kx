@@ -48,6 +48,8 @@ mod component_tools;
 mod container_placements;
 #[path = "sdk_contract_routes.rs"]
 mod contracts;
+#[path = "sdk_countermeasure_emitter_route.rs"]
+mod countermeasure_emitters;
 #[path = "sdk_faction_trigger_configuration_route.rs"]
 mod faction_trigger_configuration;
 #[path = "sdk_dataset_fixtures.rs"]
@@ -82,6 +84,12 @@ mod mission_location;
 mod planet_resource;
 #[path = "sdk_projectile_ammo_route.rs"]
 mod projectile_ammo;
+#[expect(
+    dead_code,
+    reason = "The schema witnesses select readable own-container projectile fixtures."
+)]
+#[path = "../it/catalog_weapon_projectile_ammo_fixture.rs"]
+mod projectile_ammo_fixture;
 #[path = "sdk_quality_routes.rs"]
 mod quality;
 #[path = "sdk_reputation_routes.rs"]
@@ -134,6 +142,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
         combat,
         magazine,
         read_weapon_recoil(&archive)?,
+        countermeasure_emitters::read()?,
         weapon_animation::read()?,
         read_language_sources(&archive)?,
         read_location_entities(&archive)?,

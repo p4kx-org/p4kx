@@ -148,8 +148,9 @@ pub use inventory::{
 pub(crate) use item_sources::observe_item_source_query;
 pub use item_sources::{with_item_sources, with_item_sources_from};
 pub use projectile_ammo::{
-    ProjectileAmmoChoice, ProjectileAmmoOwner, ProjectileAmmoRole, ProjectileAmmoSnapshot,
-    WeaponProjectileAmmoSelection, with_projectile_ammo, with_projectile_ammo_from,
+    CountermeasureEmitter, CountermeasureEmitterRoute, ProjectileAmmoChoice, ProjectileAmmoOwner,
+    ProjectileAmmoRole, ProjectileAmmoSnapshot, WeaponProjectileAmmoSelection,
+    with_projectile_ammo, with_projectile_ammo_from,
 };
 pub use snapshot::{
     AttachmentConstraintSnapshot, EquipmentSnapshot, ItemBoundsSnapshot, ItemDefinitionSnapshot,

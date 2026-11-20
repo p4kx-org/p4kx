@@ -1283,6 +1283,14 @@ as absence. A proved route can still name an unreadable Ammo body in dependency 
 `AmmoSelection` reflects the unfiltered Catalog admission policy. The query returns the
 source inputs for each action, while combat-base projections apply separate rules.
 
+Read `ProjectileAmmoOwner::countermeasure_emitters` for the selected Item's
+`configurations.countermeasureEmitters` rows. One row identifies a proved physical
+weapon component, ammunition role, container component and countermeasure Ammo
+Record. Repeated actions using that same combination share one row. The sourced
+route and its fields retain the original contributor evidence. Join the route's
+`ammo_record_index()` to `ammo_definitions` for the projectile parameters.
+Check `dependency_coverage` before treating an empty emitter list as absence.
+
 With `P4KX_DATA_P4K` set to an installed Archive, this verification checks one independently
 selected weapon action, its original route and its reached Ammo. Set `P4KX_DATA_P4K_B` to
 check a second Archive in the same run. Each check reads DataForge once and creates no Catalog.

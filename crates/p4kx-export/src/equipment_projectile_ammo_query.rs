@@ -14,7 +14,11 @@ pub use crate::catalog_v3::catalog_weapon_projectile_ammo::{
     ProjectileAmmoChoice, ProjectileAmmoRole, WeaponProjectileAmmoSelection,
 };
 
-/// Original projectile routes and reached Ammo definitions with their source inventory.
+pub use crate::catalog_v3::weapon_combat_base::countermeasure_emitter::{
+    CountermeasureEmitter, EmitterRoute as CountermeasureEmitterRoute,
+};
+
+/// Original projectile routes, countermeasure emitters and reached ammunition.
 pub type ProjectileAmmoSnapshot<'source> =
     super::EquipmentSnapshot<'source, ProjectileAmmoOwner<'source>>;
 
