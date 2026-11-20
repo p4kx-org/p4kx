@@ -16,7 +16,7 @@ use crate::schema_fields::every_field_required;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct TagDefinition<'source> {
+pub struct TagDefinition<'source> {
     #[serde(flatten)]
     pub(crate) source: TagHeader<'source>,
     pub(crate) tag_name: SourcedValue<&'source str>,
@@ -24,14 +24,65 @@ pub(crate) struct TagDefinition<'source> {
     pub(crate) children: SourcedValue<Vec<SourcedValue<CatalogRecordReference>>>,
 }
 
+impl<'source> TagDefinition<'source> {
+    /// Returns the physical Tag Record's original header.
+    #[must_use]
+    pub const fn source(&self) -> &CanonicalRecordHeader<'source> {
+        &self.source.header
+    }
+
+    /// Returns the authored name.
+    #[must_use]
+    pub const fn tag_name(&self) -> &SourcedValue<&'source str> {
+        &self.tag_name
+    }
+
+    /// Returns the original legacy identity.
+    #[must_use]
+    pub const fn legacy_guid(&self) -> &SourcedValue<u32> {
+        &self.legacy_guid
+    }
+
+    /// Returns the authored child slots in array order.
+    #[must_use]
+    pub const fn children(&self) -> &SourcedValue<Vec<SourcedValue<CatalogRecordReference>>> {
+        &self.children
+    }
+
+    pub(crate) fn order_key(&self) -> (GuidText, u32) {
+        (
+            CatalogGuid(self.source.physical.guid).text(),
+            self.source.physical.record_index,
+        )
+    }
+}
+
 /// One `TagDatabase`'s original root array with every stored occurrence.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct TagRoots<'source> {
+pub struct TagRoots<'source> {
     #[serde(flatten)]
     pub(crate) source: TagHeader<'source>,
     pub(crate) tags: SourcedValue<Vec<SourcedValue<CatalogRecordReference>>>,
+}
+
+impl<'source> TagRoots<'source> {
+    /// Returns the physical `TagDatabase` Record's original header.
+    #[must_use]
+    pub const fn source(&self) -> &CanonicalRecordHeader<'source> {
+        &self.source.header
+    }
+
+    /// Returns the authored root slots in array order.
+    #[must_use]
+    pub const fn tags(&self) -> &SourcedValue<Vec<SourcedValue<CatalogRecordReference>>> {
+        &self.tags
+    }
+
+    pub(crate) const fn order_key(&self) -> u32 {
+        self.source.physical.record_index
+    }
 }
 
 /// One selected Entity's root GUID-tag declaration, separate from `AttachDef` words.

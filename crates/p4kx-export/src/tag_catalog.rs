@@ -5,6 +5,8 @@
 mod capture;
 #[path = "tag_contract.rs"]
 mod contract;
+#[path = "tag_declaration.rs"]
+mod declaration;
 #[path = "tag_dependent_origins.rs"]
 pub(crate) mod dependent_origins;
 #[path = "tag_diagnostics.rs"]
@@ -25,7 +27,8 @@ pub(crate) use capture::{
     CapturedTagTree, CapturedTags, ContextualTagPath, TagConsumers, TagDatum, TagDependencies,
     TagNameSelector, TagPathLookup, TagPathMeaning, read,
 };
-pub use contract::EntityTags;
-pub(crate) use contract::{TagDefinition, TagRoots, TagRows};
+pub(crate) use contract::TagRows;
+pub use contract::{EntityTags, TagDefinition, TagRoots};
+pub(crate) use declaration::{Declaration, read_declaration};
 pub(crate) use entities::read as entity;
 pub(crate) use path_row::TagPath;

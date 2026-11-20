@@ -99,6 +99,7 @@ mod catalog_shops;
 mod catalog_size_warning;
 mod catalog_spawns;
 mod catalog_starmap;
+mod catalog_tag_declarations_sdk;
 mod catalog_tags_fixture;
 mod catalog_tags_origin;
 mod catalog_tags_schema;

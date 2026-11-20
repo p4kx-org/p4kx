@@ -1,7 +1,15 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Selective access to original Entity GUID-tag declarations.
+//! Selective access to original tag declarations.
+
+#[path = "tag_declaration_query.rs"]
+mod declarations;
+
+pub use declarations::{
+    TagDeclarationFamily, TagDeclarationRows, TagDeclarationSnapshot, TagDefinition, TagRoots,
+    with_tag_declarations, with_tag_declarations_from,
+};
 
 use p4kx_assembly::ENTITY_TYPE;
 use p4kx_extraction::{Archive, Build, CancelToken, DataForge, DataForgeEntry, SourceInventory};

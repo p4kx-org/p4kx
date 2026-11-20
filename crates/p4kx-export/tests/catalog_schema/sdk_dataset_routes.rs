@@ -141,6 +141,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
     routes.extend(quality::read()?);
     routes.extend(read_entity_definitions(&archive)?);
     routes.push(read_entity_tags(&archive)?);
+    routes.extend(read_tag_declarations(&archive)?);
     routes.extend(commodities::read(&archive)?);
     routes.extend(loot::read()?);
     routes.extend(law::read()?);
@@ -246,6 +247,25 @@ fn read_entity_tags(archive: &Archive) -> TestResult<Route> {
             "synthetic source and Catalog parity available; installed producer parity open",
         )
     })?
+}
+
+fn read_tag_declarations(archive: &Archive) -> TestResult<[Route; 2]> {
+    const REMAINING: &str =
+        "synthetic source and Catalog parity available; installed producer parity open";
+    tags::with_tag_declarations(
+        archive,
+        tags::TagDeclarationFamily::All,
+        CatalogRecordSelection::All,
+        None,
+        |snapshot| {
+            let definitions = snapshot.definitions.ok_or("Tag definitions")?;
+            let roots = snapshot.roots.ok_or("TagDatabase root arrays")?;
+            Ok([
+                Route::queried_rows(super::TAG_DEFINITIONS, &definitions.rows, REMAINING)?,
+                Route::queried_rows(super::TAG_ROOTS, &roots.rows, REMAINING)?,
+            ])
+        },
+    )?
 }
 
 fn read_language_sources(archive: &Archive) -> TestResult<Route> {

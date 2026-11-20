@@ -4,23 +4,21 @@
 use std::collections::BTreeMap;
 
 use p4kx_extraction::{
-    CancelToken, DataForge, DataForgeError, Guid, Record, RecordTree, TagBuildEvent,
-    TagPathEdgeKind, TagPathIncoming, TagRelationIssue, TagTree,
+    CancelToken, DataForge, DataForgeError, Guid, Record, RecordTree, TAG_DATABASE_TYPE,
+    TagBuildEvent, TagPathIncoming, TagRelationIssue, TagTree,
 };
 
 use super::contract::{TagDefinition, TagRoots, TagRows};
+use super::declaration::{self, Declaration};
+use super::diagnostics;
 use super::path_capture::{ChosenPath, NameEvidence, PathCapture};
-use super::{diagnostics, fields, header};
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_read::CatalogFields;
 use crate::catalog_read::original::TagRelationReceipts;
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
 use crate::export_tag_read::Capture as DependencyCapture;
-use crate::guid_text::CatalogGuid;
 use crate::health_diagnostic_observation::ExampleObservation;
 use crate::record_observation::RecordObservation;
-use crate::source_fields::FieldError;
 use crate::{CatalogError, CatalogReadFailure, Kind};
 
 #[path = "captured_tags.rs"]
@@ -133,14 +131,8 @@ fn finish_rows(
     cancel: Option<&CancelToken>,
 ) -> Result<(), CatalogError> {
     rows.paths = context.path_rows(cancel)?;
-    rows.definitions.sort_by_key(|row| {
-        (
-            CatalogGuid(row.source.physical.guid).text(),
-            row.source.physical.record_index,
-        )
-    });
-    rows.roots
-        .sort_by_key(|row| row.source.physical.record_index);
+    rows.definitions.sort_by_key(TagDefinition::order_key);
+    rows.roots.sort_by_key(TagRoots::order_key);
     Ok(())
 }
 
@@ -236,7 +228,10 @@ impl<'source> Capture<'_, 'source> {
         outcome: Result<&RecordTree<'source>, &DataForgeError>,
     ) -> Result<(), CatalogError> {
         let admission = RecordObservation::capture(self.input, record)?;
-        let role = if record.type_name().is_ok_and(|name| name == "TagDatabase") {
+        let role = if record
+            .type_name()
+            .is_ok_and(|name| name == TAG_DATABASE_TYPE)
+        {
             ExportSourceRole::Dependency
         } else {
             ExportSourceRole::Selected
@@ -257,13 +252,26 @@ impl<'source> Capture<'_, 'source> {
                 role,
                 self.cancel,
             )?);
-        let notes = self.project_fields(record, tree)?;
+        let projected = declaration::read_declaration(
+            tree,
+            self.input,
+            &admission,
+            Some(&mut self.relations),
+            self.cancel,
+        )?;
+        if let Some(name) = projected.path_name {
+            self.names.insert(record.index(), name);
+        }
+        match projected.row {
+            Declaration::Definition(row) => self.rows.definitions.push(row),
+            Declaration::Roots(row) => self.rows.roots.push(row),
+        }
         crate::source_projection_notes::record(
             Kind::Tags,
             role,
             &admission,
             tree,
-            notes,
+            projected.notes,
             &mut self.ledger,
         )?;
         self.ledger.observe(admission.source(
@@ -272,65 +280,6 @@ impl<'source> Capture<'_, 'source> {
             SourceDisposition::Projected,
         )?);
         Ok(())
-    }
-
-    fn project_fields(
-        &mut self,
-        record: &Record<'source>,
-        tree: &RecordTree<'source>,
-    ) -> Result<Vec<FieldError>, CatalogError> {
-        let mut notes = Vec::new();
-        let context = self.input.origins().record(tree.record_index());
-        let scope = self.input.record_scope(record, tree)?;
-        let original =
-            crate::catalog_read::original::OriginalFlowFields::read(&scope, self.cancel)?;
-        let admission = RecordObservation::capture(self.input, record)?;
-        let capture = crate::template_field_capture::TemplateFieldCapture::new(
-            &original, self.input, &admission,
-        )?;
-        let fields = CatalogFields::observed(tree.root(), "", &context, &capture)?;
-        let relation_kind = if tree.type_name() == "TagDatabase" {
-            TagPathEdgeKind::Root
-        } else {
-            TagPathEdgeKind::Child
-        };
-        self.relations
-            .capture(relation_kind, tree, &original, capture.example_body())?;
-        if tree.type_name() == "TagDatabase" {
-            fields.check_observed(&["tags"], &mut notes)?;
-            self.rows.roots.push(TagRoots {
-                source: header::read(tree, self.input.origins())?,
-                tags: fields::references(&fields, "tags", &mut notes, self.cancel)?,
-            });
-        } else {
-            fields.check_observed(&["tagName", "legacyGUID", "children"], &mut notes)?;
-            let (tag_name, name) = fields::name(&fields, &original, &mut notes)?;
-            self.names.insert(record.index(), name);
-            let legacy_guid = fields::legacy_guid(&fields, &mut notes)?;
-            self.rows.definitions.push(TagDefinition {
-                source: header::read(tree, self.input.origins())?,
-                tag_name,
-                legacy_guid,
-                children: fields::references(&fields, "children", &mut notes, self.cancel)?,
-            });
-        }
-        if tree.guid() == Guid::default() {
-            notes.push(
-                FieldError::Malformed {
-                    source_type: tree.type_name().to_owned(),
-                    field: "$guid".to_owned(),
-                    expected: "a non-nil Record identity",
-                }
-                .with_body(
-                    crate::catalog_read::original::ExampleBodyReceipt::technical(
-                        self.input,
-                        admission.subject().clone(),
-                        "$guid",
-                    )?,
-                ),
-            );
-        }
-        Ok(notes)
     }
 
     fn failed(

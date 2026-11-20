@@ -115,7 +115,35 @@ fn fixture_database() -> DataForgeBuilder {
             .record(),
         )
         .record(commodities::fixture_record());
-    with_starmap(with_faction_identity(database))
+    with_tag_declarations(with_starmap(with_faction_identity(database)))
+}
+
+fn with_tag_declarations(database: DataForgeBuilder) -> DataForgeBuilder {
+    database
+        .structure(
+            TestStruct::new("Tag")
+                .field("tagName", TestType::String)
+                .field("legacyGUID", TestType::UInt32)
+                .array("children", TestType::ReferenceTo("Tag".to_owned())),
+        )
+        .structure(
+            TestStruct::new("TagDatabase").array("tags", TestType::ReferenceTo("Tag".to_owned())),
+        )
+        .record(
+            TestRecord::new(11, "Tag", "Tag.Fixture", "fixtures/tag.xml")
+                .value("tagName", TestValue::text("Fixture"))
+                .value("legacyGUID", TestValue::UInt32(0))
+                .value("children", TestValue::Array(Vec::new())),
+        )
+        .record(
+            TestRecord::new(
+                12,
+                "TagDatabase",
+                "TagDatabase.Fixture",
+                "fixtures/tag_database.xml",
+            )
+            .value("tags", TestValue::Array(vec![TestValue::Reference(11)])),
+        )
 }
 
 fn with_starmap(database: DataForgeBuilder) -> DataForgeBuilder {

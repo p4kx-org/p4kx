@@ -349,6 +349,23 @@ state to distinguish absent and unreadable input. A retained membership cell pre
 value state, encryption marker, completeness and original source uses, including unavailable
 option evidence. This status describes the declaration and does not infer an alignment transform.
 
+## Original tag definitions and root declarations
+
+Use `catalog_queries::tags::with_tag_declarations` or a parsed session's
+`with_tag_declarations` for `/definitions/tags` and `/declarations/tagRoots`.
+Choose `TagDeclarationFamily::Definitions`, `Roots` or `All`, then select all
+physical Records, every occurrence of a GUID, or one physical Record index.
+Definition rows preserve duplicate GUIDs and order by GUID and Record index.
+TagDatabase rows order by physical Record index.
+
+Each authored array retains null, dangling, wrong-type and repeated references.
+A resolved reference identifies the original target by its physical header. To
+read a target's values, use a second declaration query for that Record index.
+An empty selection keeps its source family's availability. Check scoped
+coverage before treating an empty selection as established absence. The query
+reads the selected bodies and resolves target headers without building the
+convenience path tree or loading localization.
+
 ## Original Entity tag declarations
 
 Use `catalog_queries::tags::with_entity_tags` or a parsed session's
