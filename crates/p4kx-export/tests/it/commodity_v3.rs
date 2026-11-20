@@ -168,3 +168,231 @@ fn assert_resource_backfill(catalog: &Value) -> TestResult {
     );
     Ok(())
 }
+
+#[test]
+fn sdk_commodities_match_the_selected_catalog_rows_and_their_original_sources() -> TestResult {
+    use p4kx_export::catalog_queries::{
+        CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection,
+    };
+
+    let (_folder, archive) = fixture::open(&fixture::database(), fixture::DcbOrigin::Encrypted)?;
+    let built = build_catalog(&archive, &fixture::options())?;
+    let catalog = serde_json::from_slice(built.json())?;
+    let session =
+        CatalogQuerySession::open(&archive, CatalogLanguageSelection::AllAvailable, None)?;
+    let parsed = session.parsed(None)?;
+    let alpha = fixture::guid(fixture::ALPHA).parse()?;
+    let fallback = fixture::guid(fixture::RESOURCE_FALLBACK).parse()?;
+    let represented = fixture::guid(fixture::RESOURCE).parse()?;
+    let alpha_index = u32::try_from(fixture::ALPHA_INDEX)?;
+    for (selection, wanted) in [
+        (CatalogRecordSelection::All, None),
+        (CatalogRecordSelection::Guid(alpha), Some(fixture::ALPHA)),
+        (
+            CatalogRecordSelection::Guid(fallback),
+            Some(fixture::RESOURCE_FALLBACK),
+        ),
+        (
+            CatalogRecordSelection::RecordIndex(alpha_index),
+            Some(fixture::ALPHA),
+        ),
+        (
+            CatalogRecordSelection::RecordIndex(1),
+            Some(fixture::RESOURCE_FALLBACK),
+        ),
+    ] {
+        parsed.with_commodities(selection, None, |snapshot| {
+            assert_commodity_snapshot(&snapshot, &catalog, wanted)
+        })??;
+    }
+    parsed.with_commodities(
+        CatalogRecordSelection::Guid(represented),
+        None,
+        |snapshot| {
+            assert!(
+                snapshot.definitions.is_empty(),
+                "a represented ResourceType is not a Commodity fallback"
+            );
+            assert_eq!(
+                snapshot.presentations.len(),
+                0,
+                "a represented resource has no fallback presentation"
+            );
+        },
+    )?;
+    Ok(())
+}
+
+fn assert_commodity_snapshot(
+    snapshot: &p4kx_export::catalog_queries::commodities::CommoditySnapshot<'_>,
+    catalog: &Value,
+    wanted: Option<u128>,
+) -> TestResult {
+    for (scope, failures) in [
+        ("selected headers", &snapshot.coverage.unreadable_headers),
+        ("selected bodies", &snapshot.coverage.unreadable_bodies),
+        (
+            "dependency headers",
+            &snapshot.dependency_coverage.unreadable_headers,
+        ),
+        (
+            "dependency bodies",
+            &snapshot.dependency_coverage.unreadable_bodies,
+        ),
+    ] {
+        assert_eq!(
+            failures.as_slice(),
+            &[] as &[u32],
+            "the fixture reads all {scope}"
+        );
+    }
+    assert_eq!(
+        &json!(snapshot.availability),
+        fixture::at(catalog, "/definitions/commodities/availability")?,
+        "definition availability matches the catalog"
+    );
+    let definitions: Vec<Value> =
+        serde_json::from_slice(&serde_json::to_vec(&snapshot.definitions)?)?;
+    let presentations: Vec<Value> =
+        serde_json::from_slice(&serde_json::to_vec(&snapshot.presentations)?)?;
+    if let Some(wanted) = wanted {
+        assert_eq!(
+            definitions.as_slice(),
+            std::slice::from_ref(fixture::definition(catalog, wanted)?),
+            "selected definition matches its catalog row"
+        );
+        assert_eq!(
+            presentations.as_slice(),
+            std::slice::from_ref(fixture::presentation(catalog, wanted)?),
+            "selected presentation matches its catalog row"
+        );
+    } else {
+        assert_eq!(
+            &json!(definitions),
+            fixture::at(catalog, "/definitions/commodities/rows")?,
+            "all definitions match the canonical catalog order and values"
+        );
+        assert_eq!(
+            &json!(presentations),
+            fixture::at(catalog, "/projections/commodityPresentation/rows")?,
+            "all presentations match the canonical catalog order and values"
+        );
+    }
+    assert_commodity_source_uses(
+        definitions.iter().chain(&presentations),
+        &snapshot.source_inventory,
+        catalog,
+    )
+}
+
+fn assert_commodity_source_uses<'row>(
+    rows: impl Iterator<Item = &'row Value>,
+    inventory: &p4kx_extraction::SourceInventory,
+    catalog: &Value,
+) -> TestResult {
+    let mut needed = BTreeSet::new();
+    for row in rows {
+        collect_commodity_refs(row, &mut needed);
+    }
+    assert!(
+        !needed.is_empty(),
+        "the fixtures retain original source uses"
+    );
+    let sources: std::collections::BTreeMap<_, _> = inventory
+        .iter_sources()
+        .map(|source| (source.id().as_str(), source))
+        .collect();
+    let catalog_uses = crate::health_origin_assertions::rows(catalog, "/provenance/uses")?;
+    let catalog_uses: std::collections::BTreeMap<_, _> = catalog_uses
+        .iter()
+        .filter_map(|row| Some((row.get("id")?.as_str()?, row)))
+        .collect();
+    for used in inventory.iter_uses() {
+        let id = used.id().as_str();
+        if needed.remove(id) {
+            let catalog_use = catalog_uses.get(id).ok_or("Catalog source use")?;
+            assert_eq!(
+                serde_json::to_value(used)?,
+                **catalog_use,
+                "source use {id} is identical"
+            );
+            let source = used.source().as_str();
+            assert_eq!(
+                serde_json::to_value(sources.get(source).ok_or("SDK physical source")?)?,
+                *crate::health_origin_assertions::source(catalog, catalog_use)?,
+                "physical source {source} is identical"
+            );
+        }
+    }
+    assert!(
+        needed.is_empty(),
+        "every returned field resolves in the snapshot"
+    );
+    Ok(())
+}
+
+fn collect_commodity_refs<'row>(value: &'row Value, output: &mut BTreeSet<&'row str>) {
+    match value {
+        Value::Array(values) => {
+            for value in values {
+                collect_commodity_refs(value, output);
+            }
+        }
+        Value::Object(fields) => {
+            if let Some(ids) = fields.get("sourceUsesRefs").and_then(Value::as_array) {
+                output.extend(ids.iter().filter_map(Value::as_str));
+            }
+            for child in fields.values() {
+                collect_commodity_refs(child, output);
+            }
+        }
+        _ => {}
+    }
+}
+
+#[test]
+fn commodity_sdk_guid_selection_keeps_physical_aliases_and_point_reads_stay_local() -> TestResult {
+    use p4kx_export::catalog_queries::{
+        CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection,
+    };
+    use p4kx_extraction::SourceLocation;
+    use p4kx_testkit::TestRecord;
+
+    let database = fixture::database().record(TestRecord::new(
+        fixture::ALPHA,
+        "EntityClassDefinition",
+        "EntityClassDefinition.AlphaAlias",
+        "libs/foundry/records/entities/commodities/alpha_alias.xml",
+    ));
+    let (_folder, archive) = fixture::open(&database, fixture::DcbOrigin::Plain)?;
+    let session =
+        CatalogQuerySession::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?;
+    let parsed = session.parsed(None)?;
+    let guid = fixture::guid(fixture::ALPHA).parse()?;
+    let first = u32::try_from(fixture::ALPHA_INDEX)?;
+    let positions =
+        parsed.with_commodities(CatalogRecordSelection::Guid(guid), None, |snapshot| {
+            snapshot
+                .definitions
+                .iter()
+                .filter_map(|row| row.source().record_index().value().copied())
+                .collect::<Vec<_>>()
+        })?;
+    let [a, alias] = positions.as_slice() else {
+        return Err("expected both physical GUID aliases".into());
+    };
+    assert_eq!(*a, first, "the original physical row comes first");
+    assert!(*alias > first, "the alias retains its later physical index");
+
+    parsed.with_commodities(CatalogRecordSelection::RecordIndex(*alias), None, |snapshot| {
+        assert_eq!(snapshot.definitions.len(), 1, "only the selected definition is returned");
+        assert_eq!(snapshot.presentations.len(), 1, "only the selected presentation is returned");
+        assert!(snapshot.source_inventory.iter_uses().all(|used| {
+            !matches!(
+                used.location(),
+                SourceLocation::DataForge { record_index, .. } if record_index != alias
+            )
+        }), "the unlinked alias does not open other Commodity, Resource, group or quantization bodies");
+    })?;
+    Ok(())
+}

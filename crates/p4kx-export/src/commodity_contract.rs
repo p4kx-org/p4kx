@@ -15,7 +15,8 @@ use crate::schema_fields::every_field_required;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct CommodityDefinition<'source> {
+#[non_exhaustive]
+pub struct CommodityDefinition<'source> {
     #[serde(flatten)]
     pub(crate) source: CanonicalRecordHeader<'source>,
     pub(crate) selection: SourcedValue<CommoditySelection>,
@@ -35,7 +36,8 @@ pub(crate) enum CommoditySelection {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct CommodityPresentation {
+#[non_exhaustive]
+pub struct CommodityPresentation {
     /// The Commodity identity, matching the source GUID in the definitions table.
     pub(crate) commodity_guid: SourcedValue<CatalogGuid>,
     pub(crate) name: SourcedValue<Option<PublicNameRef>>,
@@ -61,4 +63,75 @@ pub(crate) struct Commodity<'source> {
     pub(crate) relationship_inputs: Vec<SourceUse>,
     pub(crate) crafter_inputs: Vec<SourceUse>,
     pub(crate) crafter_complete: bool,
+}
+
+impl<'source> CommodityDefinition<'source> {
+    /// Borrows the original physical Record header.
+    #[must_use]
+    pub const fn source(&self) -> &CanonicalRecordHeader<'source> {
+        &self.source
+    }
+
+    /// Returns whether this row is supplied by an otherwise unrepresented `ResourceType`.
+    #[must_use]
+    pub fn resource_fallback(&self) -> SourcedValue<bool> {
+        self.selection
+            .map_ref(|selection| matches!(selection, CommoditySelection::ResourceFallback))
+    }
+
+    /// Borrows the original bindings, when the row has a physical Entity.
+    #[must_use]
+    pub const fn entity(&self) -> &SourcedValue<CommodityAuthoring<'source>> {
+        &self.entity
+    }
+}
+
+impl CommodityPresentation {
+    /// Borrows the original Commodity identity.
+    #[must_use]
+    pub const fn commodity_guid(&self) -> &SourcedValue<CatalogGuid> {
+        &self.commodity_guid
+    }
+
+    /// Borrows the selected public name.
+    #[must_use]
+    pub const fn name(&self) -> &SourcedValue<Option<PublicNameRef>> {
+        &self.name
+    }
+
+    /// Borrows the selected protected description.
+    #[must_use]
+    pub const fn description(&self) -> &SourcedValue<Option<GameTextRef>> {
+        &self.description
+    }
+
+    /// Borrows the selected protected display type.
+    #[must_use]
+    pub const fn display_type(&self) -> &SourcedValue<Option<GameTextRef>> {
+        &self.display_type
+    }
+
+    /// Borrows the first directly containing `ResourceTypeGroup`.
+    #[must_use]
+    pub const fn type_guid(&self) -> &SourcedValue<Option<CatalogGuid>> {
+        &self.type_guid
+    }
+
+    /// Borrows the nullable and non-unique `ResourceType` relationship.
+    #[must_use]
+    pub const fn subtype_guid(&self) -> &SourcedValue<Option<CatalogGuid>> {
+        &self.subtype_guid
+    }
+
+    /// Borrows the finite density in grams per cubic centimetre.
+    #[must_use]
+    pub const fn density_grams_per_cubic_centimetre(&self) -> &SourcedValue<Option<f32>> {
+        &self.density_grams_per_cubic_centimetre
+    }
+
+    /// Borrows the resolved refined `ResourceType` relationship.
+    #[must_use]
+    pub const fn refined_subtype_guid(&self) -> &SourcedValue<Option<CatalogGuid>> {
+        &self.refined_subtype_guid
+    }
 }

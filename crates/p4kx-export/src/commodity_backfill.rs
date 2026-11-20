@@ -4,18 +4,19 @@
 use std::collections::HashSet;
 
 use p4kx_extraction::{
-    Guid, RecordTree, SharedFieldOrigin, SourceUse, SourceUseRole, SourceValue, SourcedValue,
+    Guid, Record, RecordTree, SharedFieldOrigin, SourceUse, SourceUseRole, SourceValue,
+    SourcedValue,
 };
 
 use crate::CatalogError;
-use crate::blueprint_catalog_rows::BlueprintRow;
+use crate::blueprint_backfill_source::BlueprintResources;
 use crate::catalog_origins::CatalogOrigins;
 use crate::commodity_contract::{Commodity, CommoditySelection};
 use crate::commodity_inputs::CommodityInputs;
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_ledger::ExportLedger;
 use crate::picked::Picked;
-use crate::quality_catalog::QualityRows;
+use crate::quality_catalog::Fallbacks;
 use crate::record_header_field::{RecordHeaderField, RecordHeaderInput};
 use crate::selection::Kind;
 
@@ -38,15 +39,11 @@ impl CommodityPresence {
     pub(crate) fn observe(&mut self, pick: &mut Picked<'_>) {
         match pick {
             Picked::Commodity(row) => {
-                self.represented.extend(row.subtype_guid.map(|guid| guid.0));
-                self.inputs
-                    .extend(std::mem::take(&mut row.relationship_inputs));
-                self.crafter(row);
+                self.observe_entity(row, false);
             }
             Picked::Crafted(inner, _) => {
                 if let Picked::Commodity(row) = inner.as_mut() {
-                    drop(std::mem::take(&mut row.relationship_inputs));
-                    self.crafter(row);
+                    self.observe_entity(row, true);
                 }
             }
             _ => {}
@@ -57,33 +54,67 @@ impl CommodityPresence {
         self.represented.contains(guid)
     }
 
+    pub(crate) fn observe_entity(&mut self, row: &mut Commodity<'_>, crafter: bool) {
+        self.observe_source(
+            row.subtype_guid.map(|guid| guid.0),
+            std::mem::take(&mut row.relationship_inputs),
+            std::mem::take(&mut row.crafter_inputs),
+            row.crafter_complete,
+            crafter,
+        );
+    }
+
+    pub(crate) fn observe_source(
+        &mut self,
+        resource: Option<Guid>,
+        links: Vec<SourceUse>,
+        crafter_inputs: Vec<SourceUse>,
+        complete: bool,
+        crafter: bool,
+    ) {
+        if !crafter {
+            self.represented.extend(resource);
+            self.inputs.extend(links);
+        }
+        self.inputs.extend(crafter_inputs);
+        self.complete &= complete;
+    }
+
     pub(crate) fn into_origin(
         self,
         scanned: &ExportLedger,
         origins: &CatalogOrigins,
     ) -> SharedFieldOrigin {
-        let complete = self.complete
-            && scanned.sources.iter().all(|source| {
-                !source.disposition.failed()
-                    || !(source.kind == Some(Kind::Commodities)
-                        || (source.kind.is_none()
-                            && source.role == ExportSourceRole::SelectionCandidate))
-            });
-        origins.uses.shared_origin(&self.inputs, complete)
+        let complete = scanned.sources.iter().all(|source| {
+            !source.disposition.failed() || !failure_affects_presence(source.kind, source.role)
+        });
+        self.finish(complete, origins)
     }
 
-    fn crafter(&mut self, row: &mut Commodity<'_>) {
-        self.inputs.extend(std::mem::take(&mut row.crafter_inputs));
-        self.complete &= row.crafter_complete;
+    pub(crate) fn finish(self, complete: bool, origins: &CatalogOrigins) -> SharedFieldOrigin {
+        origins
+            .uses
+            .shared_origin(&self.inputs, complete && self.complete)
     }
 }
 
+/// Returns whether the failed header could hide an admitted Commodity.
+pub(crate) fn header_failure_affects_presence(record: &Record<'_>) -> bool {
+    let kind = crate::scan_health::SourceTrace::new(record).selection_candidate_kind();
+    failure_affects_presence(kind, ExportSourceRole::SelectionCandidate)
+}
+
+fn failure_affects_presence(kind: Option<Kind>, role: ExportSourceRole) -> bool {
+    kind == Some(Kind::Commodities)
+        || (kind.is_none() && role == ExportSourceRole::SelectionCandidate)
+}
+
 /// Retains actual eligibility and representation inputs only on the backfill-presence decision.
-pub(crate) fn for_resource(
+pub(crate) fn for_resource<'evidence>(
     tree: &RecordTree<'_>,
     representation: &SharedFieldOrigin,
-    blueprints: &[BlueprintRow<'_>],
-    quality: &QualityRows<'_>,
+    blueprints: impl IntoIterator<Item = &'evidence BlueprintResources>,
+    quality: &Fallbacks,
     origins: &CatalogOrigins,
 ) -> Result<SourcedValue<CommoditySelection>, CatalogError> {
     let mut inputs = CommodityInputs::new(origins);
@@ -97,9 +128,9 @@ pub(crate) fn for_resource(
     }
     let mut eligibility = false;
     for blueprint in blueprints {
-        eligibility |= blueprint.resources.observe(tree.guid(), &mut inputs)?;
+        eligibility |= blueprint.observe(tree.guid(), &mut inputs)?;
     }
-    if let Some(members) = quality.fallbacks.evidence(tree.guid()) {
+    if let Some(members) = quality.evidence(tree.guid()) {
         for original in members {
             inputs.extend_retained(original.inputs(), original.complete)?;
         }

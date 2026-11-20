@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 mod assemble;
+mod commodity_dependencies;
 mod fault;
 mod mode;
 mod project;
@@ -15,6 +16,7 @@ use crate::export_ledger::ExportLedger;
 
 use super::Crafting;
 
+pub(crate) use commodity_dependencies::CommodityDependencies;
 pub(crate) use mode::ReadMode;
 pub(crate) use read::{read, read_catalog};
 pub(crate) use selection::{gameplay_property, pool_record};

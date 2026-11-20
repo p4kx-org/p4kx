@@ -18,6 +18,8 @@ mod row_schema;
 const LANGUAGE_SOURCES: &str = "/texts/languageSources";
 const ITEM_DEFINITIONS: &str = "/definitions/items";
 const MANUFACTURERS: &str = "/definitions/manufacturers";
+const COMMODITY_DEFINITIONS: &str = "/definitions/commodities";
+const COMMODITY_PRESENTATIONS: &str = "/projections/commodityPresentation";
 const SHOP_INVENTORIES: &str = "/definitions/shopInventories";
 const FLARE_LIBRARIES: &str = "/definitions/flareLibraries";
 const RADAR_AUDIO: &str = "/configurations/radarAudio";
@@ -32,6 +34,10 @@ const BLUEPRINT_PRESENTATION: &str = "/projections/blueprintPresentation";
 const CRAFTING_GLOBAL: &str = "/configurations/craftingGlobal";
 const SUIT_ARMOR: &str = "/configurations/suitArmor";
 const VEHICLE_ARMOR: &str = "/configurations/vehicleArmor";
+const RESOURCE_GROUPS: &str = "/definitions/resourceGroups";
+const RESOURCE_GROUP_MEMBERS: &str = "/declarations/resourceGroupMembers";
+const RESOURCE_GROUP_PARENTS: &str = "/projections/resourceGroupParents";
+const RESOURCE_TYPES: &str = "/definitions/resourceTypes";
 const RESOURCE_COMPONENTS: &str = "/configurations/resourceComponents";
 const RESOURCE_CONNECTIONS: &str = "/configurations/resourceConnections";
 const FUEL_TANKS: &str = "/configurations/fuelTanks";
@@ -102,6 +108,8 @@ fn sdk_query_witnesses_keep_their_canonical_dataset_contract() -> TestResult {
         LANGUAGE_SOURCES,
         ITEM_DEFINITIONS,
         MANUFACTURERS,
+        COMMODITY_DEFINITIONS,
+        COMMODITY_PRESENTATIONS,
         LOCATION_ENTITIES,
         BLUEPRINT_POOLS,
         BLUEPRINT_POOL_WEIGHTS,
@@ -112,6 +120,10 @@ fn sdk_query_witnesses_keep_their_canonical_dataset_contract() -> TestResult {
         CRAFTING_GLOBAL,
         SUIT_ARMOR,
         VEHICLE_ARMOR,
+        RESOURCE_GROUPS,
+        RESOURCE_GROUP_MEMBERS,
+        RESOURCE_GROUP_PARENTS,
+        RESOURCE_TYPES,
         RESOURCE_COMPONENTS,
         RESOURCE_CONNECTIONS,
         FUEL_TANKS,

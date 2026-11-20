@@ -42511,7 +42511,7 @@
       "type": "object"
     },
     "ResourceType": {
-      "description": "A selected resource definition with independent internal selection identity.",
+      "description": "Canonical resource data values with immediate source provenance.",
       "properties": {
         "className": {
           "$ref": "#/$defs/SourcedValueOfstring"

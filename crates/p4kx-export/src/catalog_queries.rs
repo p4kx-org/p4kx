@@ -15,6 +15,9 @@ mod unlocalized_record_query;
 
 pub use record_selection::CatalogRecordSelection;
 
+#[path = "commodity_query.rs"]
+pub mod commodities;
+
 #[path = "contract_query.rs"]
 mod contracts;
 pub use contracts::{

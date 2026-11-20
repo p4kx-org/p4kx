@@ -16,15 +16,17 @@ use crate::{CatalogError, Kind};
 
 /// A `ResourceType`'s reverse membership dependency prepared once on canonical demand.
 #[derive(Default)]
-pub(super) struct Dependencies {
+pub(in crate::build::catalog_queries) struct Dependencies {
     groups: Option<Groups>,
     signature_slot: Option<SignatureSlot>,
     observer: Option<Arc<dyn CanonicalReadObserver>>,
-    pub(super) coverage: CatalogRecordCoverage,
+    pub(in crate::build::catalog_queries) coverage: CatalogRecordCoverage,
 }
 
 impl Dependencies {
-    pub(super) fn new(observer: Option<Arc<dyn CanonicalReadObserver>>) -> Self {
+    pub(in crate::build::catalog_queries) fn new(
+        observer: Option<Arc<dyn CanonicalReadObserver>>,
+    ) -> Self {
         Self {
             observer,
             ..Self::default()
@@ -61,13 +63,22 @@ impl Dependencies {
         input: &OriginalCatalogInput<'_, '_>,
         cancel: Option<&CancelToken>,
     ) -> Result<ResourceMemberships, CatalogError> {
-        if let Some(groups) = &self.groups {
-            return Ok(groups.all_of_resource(&resource));
+        Ok(self.groups(input, cancel)?.0.all_of_resource(&resource))
+    }
+
+    pub(in crate::build::catalog_queries) fn groups(
+        &mut self,
+        input: &OriginalCatalogInput<'_, '_>,
+        cancel: Option<&CancelToken>,
+    ) -> Result<(&Groups, &CatalogRecordCoverage), CatalogError> {
+        if self.groups.is_none() {
+            self.groups = Some(self.prepare(input, cancel)?);
         }
-        let groups = self.prepare(input, cancel)?;
-        let memberships = groups.all_of_resource(&resource);
-        self.groups = Some(groups);
-        Ok(memberships)
+        let groups = self
+            .groups
+            .as_ref()
+            .ok_or(crate::ExportAccountingError::ConflictingSourceDatum)?;
+        Ok((groups, &self.coverage))
     }
 
     fn prepare(

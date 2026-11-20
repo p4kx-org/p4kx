@@ -270,8 +270,12 @@ impl<'f> Scan<'_, '_, 'f> {
         let selection = commodity_backfill::for_resource(
             &tree,
             &context.representation,
-            &context.collected.blueprints,
-            &context.collected.quality,
+            context
+                .collected
+                .blueprints
+                .iter()
+                .map(|row| &row.resources),
+            &context.collected.quality.fallbacks,
             self.projection.origins(),
         )?;
         let projection = self.projection.for_kind(Kind::Commodities);

@@ -33,6 +33,8 @@ use super::{
 mod blueprint_physical;
 #[path = "sdk_blueprint_pool_routes.rs"]
 mod blueprint_pools;
+#[path = "sdk_commodity_routes.rs"]
+mod commodities;
 #[path = "sdk_component_definition_routes.rs"]
 mod component_definitions;
 #[path = "sdk_equipment_component_parity.rs"]
@@ -49,6 +51,8 @@ mod mineable_entity;
 mod planet_resource;
 #[path = "sdk_projectile_ammo_route.rs"]
 mod projectile_ammo;
+#[path = "sdk_resource_group_routes.rs"]
+mod resource_groups;
 #[path = "sdk_resource_network_routes.rs"]
 mod resource_network;
 #[path = "sdk_ship_system_routes.rs"]
@@ -117,10 +121,12 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
     routes.extend(ship_systems::read()?);
     routes.extend(worn_gear::read()?);
     routes.push(vehicle_armor::read()?);
+    routes.extend(resource_groups::read()?);
     routes.extend(resource_network::read()?);
     routes.extend(fuel::read()?);
     routes.extend(read_cargo_globals(&archive)?);
     routes.extend(read_entity_definitions(&archive)?);
+    routes.extend(commodities::read(&archive)?);
     routes.push(mineable_entity::read()?);
     routes.push(planet_resource::read()?);
     routes.extend(component_tools::read()?);
@@ -333,6 +339,7 @@ fn fixture_database() -> DataForgeBuilder {
             .attach_type("Misc")
             .record(),
         )
+        .record(commodities::fixture_record())
 }
 
 fn packed(path: &str, file: &str, xml: &[u8]) -> TestEntry {

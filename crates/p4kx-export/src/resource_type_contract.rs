@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::borrow::Cow;
+
 use p4kx_extraction::SourcedValue;
-use schemars::JsonSchema;
+use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::Serialize;
 
 use crate::canonical_record_header::CanonicalRecordHeader;
@@ -15,7 +17,7 @@ use crate::resource_property_contract::{ResourceCargoSlot, ResourceProperty};
 use crate::schema_fields::every_field_required;
 
 /// A selected resource definition with independent internal selection identity.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize)]
 pub(crate) struct ResourceType<'source> {
     #[serde(skip)]
     pub(crate) guid: CatalogGuid,
@@ -25,6 +27,16 @@ pub(crate) struct ResourceType<'source> {
     pub(crate) numbers: Vec<CapturedNumber>,
     #[serde(flatten)]
     pub(crate) data: ResourceDefinition<'source>,
+}
+
+impl JsonSchema for ResourceType<'_> {
+    fn schema_name() -> Cow<'static, str> {
+        "ResourceType".into()
+    }
+
+    fn json_schema(generator: &mut SchemaGenerator) -> Schema {
+        ResourceDefinition::json_schema(generator)
+    }
 }
 
 /// Canonical resource data values with immediate source provenance.

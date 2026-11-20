@@ -49,7 +49,7 @@ fn compare_nodes<'schema>(
                         right.as_str().ok_or("query schema reference string")?,
                     ));
                 } else {
-                    compare_nodes(left, right, scope, references)?;
+                    compare_nodes(left, right, &format!("{scope}/{key}"), references)?;
                 }
             }
         }

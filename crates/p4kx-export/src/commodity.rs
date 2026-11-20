@@ -164,7 +164,7 @@ fn entity_selection(
     Ok(inputs.value(CommoditySelection::Entity))
 }
 
-fn representation_headers(
+pub(crate) fn representation_headers(
     tree: &RecordTree<'_>,
     sources: Vec<SourceUse>,
     complete: bool,

@@ -39,8 +39,7 @@ pub(crate) fn entity<'source>(
     let origins = projection.origins();
     let context = origins.record(tree.record_index());
     let components = BindingArray::new(tree, origins, "Components", notes)?;
-    let (crafter_inputs, crafter_complete) =
-        components.first_type_inputs(tree.record_index(), origins, "CrafterComponentParams")?;
+    let (crafter_inputs, crafter_complete) = crafter_inputs(tree, origins, &components)?;
     let static_data = BindingArray::new(tree, origins, "StaticEntityClassData", notes)?;
     let purchases = commodity_binding_read::collect(
         tree,
@@ -81,6 +80,22 @@ pub(crate) fn entity<'source>(
         crafter_complete,
     }
     .finish(origins))
+}
+
+pub(crate) fn crafter_evidence(
+    tree: &RecordTree<'_>,
+    origins: &CatalogOrigins,
+) -> Result<(Vec<SourceUse>, bool), CatalogError> {
+    let components = BindingArray::new(tree, origins, "Components", &mut Vec::new())?;
+    crafter_inputs(tree, origins, &components)
+}
+
+fn crafter_inputs(
+    tree: &RecordTree<'_>,
+    origins: &CatalogOrigins,
+    components: &BindingArray<'_, '_>,
+) -> Result<(Vec<SourceUse>, bool), CatalogError> {
+    components.first_type_inputs(tree.record_index(), origins, "CrafterComponentParams")
 }
 
 struct AuthoredBindings<'source> {

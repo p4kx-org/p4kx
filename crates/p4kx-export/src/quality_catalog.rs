@@ -28,6 +28,7 @@ mod assembly;
 mod rows;
 
 pub(crate) use assembly::{Assembly, Input, Retention, Step};
+pub(crate) use fallbacks::Fallbacks;
 pub(crate) use rows::QualityRows;
 
 fn check_cancel(cancel: Option<&p4kx_extraction::CancelToken>) -> Result<(), crate::CatalogError> {

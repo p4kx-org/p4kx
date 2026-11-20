@@ -4,7 +4,7 @@
 #[path = "mineable_composition_query.rs"]
 mod compositions;
 #[path = "resource_query_dependencies.rs"]
-mod dependencies;
+pub(super) mod dependencies;
 #[path = "mineable_element_query.rs"]
 mod elements;
 #[path = "mineable_entity_query.rs"]

@@ -153,6 +153,11 @@ impl SourceTrace {
         }
     }
 
+    /// Returns the initial family indicated by the readable Record header fields.
+    pub(crate) const fn selection_candidate_kind(&self) -> Option<Kind> {
+        self.kind
+    }
+
     /// Records the kind whose source metadata is being checked.
     pub(crate) const fn candidate(&mut self, kind: Kind) {
         self.kind = Some(kind);

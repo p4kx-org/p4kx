@@ -90,6 +90,21 @@ members of the same inverse do not contribute to that Commodity. Every original 
 selector is retained. Unreadable inputs remain attempted evidence with explicit incompleteness.
 Source-use buffer allocation failures abort catalog preparation before publication.
 
+## Selective SDK access
+
+Use `p4kx_export::catalog_queries::commodities::with_commodities` or the corresponding method on a
+`CatalogQuerySession` or `ParsedCatalogQueries`. The callback receives two typed lists in the same
+order. Each definition exposes its physical Record header and each presentation occupies the same
+position as its definition. `All` selects the whole Commodity region, `Guid` keeps all matching
+physical rows and `RecordIndex` addresses one physical row. A ResourceType contributes a Commodity
+only when the same fallback policy admits it.
+
+A selected Commodity Entity consults its linked resource and the needed direct resource-group
+memberships. A candidate fallback additionally checks Commodity representation, Blueprint costs and
+quality quantization dependencies. Neither path writes a Catalog or a persistent cache. The result
+carries selected language texts, exact per-value source uses, owner coverage and dependency coverage.
+Publish a consumer-owned result after the query returns successfully and after examining both
+coverage reports.
 ## Consumer migration and evidence
 
 For each old Commodity row, find its definition by `guid.value` and its presentation by
