@@ -17,6 +17,7 @@ mod row_schema;
 
 const LANGUAGE_SOURCES: &str = "/texts/languageSources";
 const ITEM_DEFINITIONS: &str = "/definitions/items";
+const LOADOUTS: &str = "/loadouts";
 const ITEM_PORTS: &str = "/configurations/itemPorts";
 const ATTACHMENT_CONSTRAINTS: &str = "/configurations/itemAttachmentConstraints";
 const ITEM_BOUNDS: &str = "/configurations/itemBounds";
@@ -141,6 +142,7 @@ impl Route {
 const REQUIRED_WITNESSES: &[&str] = &[
     LANGUAGE_SOURCES,
     ITEM_DEFINITIONS,
+    LOADOUTS,
     ITEM_PORTS,
     ATTACHMENT_CONSTRAINTS,
     ITEM_BOUNDS,

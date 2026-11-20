@@ -62,6 +62,8 @@ mod inventory_containers;
 mod item_configurations;
 #[path = "sdk_law_route.rs"]
 mod law;
+#[path = "sdk_loadout_route.rs"]
+mod loadout;
 #[path = "sdk_loot_routes.rs"]
 mod loot;
 #[path = "sdk_loot_generation_route.rs"]
@@ -171,6 +173,7 @@ fn append_domain_routes(routes: &mut Vec<Route>, archive: &Archive) -> TestResul
     routes.extend(quality::read()?);
     routes.extend(read_entity_definitions(archive)?);
     routes.extend(item_configurations::read()?);
+    routes.push(loadout::read()?);
     routes.push(read_entity_tags(archive)?);
     routes.extend(read_tag_declarations(archive)?);
     routes.push(read_tag_paths(archive)?);
