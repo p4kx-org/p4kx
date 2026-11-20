@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use p4kx_extraction::{DataForgeOrigin, InputScope, SourceEncryption, SourceInput, SourceUses};
 use serde_json::{Value, json};
@@ -89,6 +89,72 @@ impl<'catalog> Origins<'catalog> {
             "field": header,
         });
         self.locations(cell, &[caller, target])
+    }
+
+    /// Resolves a DataForge row's immediate contributors to their original observations.
+    pub(crate) fn with_resolved_contributors(&self, row: &Value) -> TestResult<Value> {
+        let mut result = row.clone();
+        self.resolve(&mut result)?;
+        Ok(result)
+    }
+
+    fn resolve(&self, row: &mut Value) -> TestResult {
+        match row {
+            Value::Object(fields) => {
+                for (field, value) in fields {
+                    if field == "sourceUsesRefs" {
+                        *value = Value::Array(self.contributors(value)?);
+                    } else {
+                        self.resolve(value)?;
+                    }
+                }
+            }
+            Value::Array(values) => {
+                for value in values {
+                    self.resolve(value)?;
+                }
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    fn contributors(&self, refs: &Value) -> TestResult<Vec<Value>> {
+        let references = refs.as_array().ok_or("immediate contributor references")?;
+        let mut distinct = HashSet::new();
+        let mut contributors = Vec::new();
+        for reference in references {
+            let id = reference.as_str().ok_or("original contributor id")?;
+            if !distinct.insert(id) {
+                return Err("an immediate source set repeats a contributor".into());
+            }
+            let observation = self
+                .uses
+                .get(id)
+                .ok_or("original contributor is unresolved")?;
+            if observation.get("source").and_then(Value::as_str) != Some(self.input.as_str())
+                || observation.get("scope").and_then(Value::as_str) != Some("payload")
+                || !matches!(
+                    observation.get("role").and_then(Value::as_str),
+                    Some("payload" | "selector" | "conversion")
+                )
+                || observation.get("location").is_none()
+                || observation.get("effectiveEncryption").is_none()
+            {
+                return Err(
+                    "the contributor does not establish original DataForge evidence".into(),
+                );
+            }
+            let mut semantic = observation
+                .as_object()
+                .ok_or("original source use object")?
+                .clone();
+            semantic.remove("id");
+            semantic.remove("source");
+            contributors.push(Value::Object(semantic));
+        }
+        contributors.sort_by_cached_key(ToString::to_string);
+        Ok(contributors)
     }
 
     fn locations(&self, cell: &Value, expected: &[Value]) -> TestResult {

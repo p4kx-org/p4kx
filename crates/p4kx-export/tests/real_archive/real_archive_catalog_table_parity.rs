@@ -9,6 +9,7 @@ use p4kx_export::catalog_queries::DatasetAvailability;
 use p4kx_export::catalog_queries::equipment::EquipmentSnapshot;
 use p4kx_extraction::{Archive, ArchiveWatch, SourceInventory, SourceUseRole};
 use serde::Serialize;
+use serde::de::DeserializeSeed;
 use serde_json::map::Entry;
 use serde_json::{Map, Value};
 
@@ -208,7 +209,7 @@ pub(crate) struct Origins {
 }
 
 impl Origins {
-    fn extend(&mut self, inventory: &SourceInventory, rows: &[Value]) -> TestResult {
+    pub(crate) fn extend(&mut self, inventory: &SourceInventory, rows: &[Value]) -> TestResult {
         let mut needed = HashSet::new();
         for row in rows {
             collect_references(row, &mut needed);
@@ -266,15 +267,37 @@ impl Origins {
     }
 
     fn verify(&self, catalog: &Value) -> TestResult {
-        for (path, expected) in [(USES, &self.uses), (SOURCES, &self.sources)] {
-            if catalog.pointer(path).and_then(Value::as_object) != Some(expected) {
-                return Err(
-                    format!("Catalog and SDK contributing provenance differ at {path}").into(),
-                );
-            }
+        for (path, expected) in self.inventories() {
+            verify_inventory(path, catalog.pointer(path), expected)?;
         }
         Ok(())
     }
+
+    pub(crate) fn verify_in_document(&self, catalog: &Value) -> TestResult {
+        for (path, expected) in self.inventories() {
+            let entries = catalog
+                .pointer(path)
+                .ok_or("missing Catalog provenance array")?;
+            let actual = SelectedOrigins(expected).deserialize(entries)?;
+            verify_inventory(path, Some(&actual), expected)?;
+        }
+        Ok(())
+    }
+
+    const fn inventories(&self) -> [(&'static str, &Map<String, Value>); 2] {
+        [(USES, &self.uses), (SOURCES, &self.sources)]
+    }
+}
+
+fn verify_inventory(
+    path: &str,
+    actual: Option<&Value>,
+    expected: &Map<String, Value>,
+) -> TestResult {
+    if actual.and_then(Value::as_object) != Some(expected) {
+        return Err(format!("Catalog and SDK contributing provenance differ at {path}").into());
+    }
+    Ok(())
 }
 
 fn retain(rows: &mut Map<String, Value>, id: String, row: Value) -> TestResult {

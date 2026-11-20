@@ -18,6 +18,9 @@ use crate::catalog_v3_consumer as consumer;
 use crate::real_archive_auto_spawns::original::Locations;
 use crate::real_archive_auto_spawns::provenance::Origins;
 
+#[path = "real_archive_loot_generation_sdk.rs"]
+mod sdk;
+
 const COMPONENT: &str = "LootGenerationComponentParams";
 const ENTITY: &str = "EntityClassDefinition";
 const COMPONENTS: &str = "Components";
@@ -38,7 +41,8 @@ fn loot_generation_components_match_filtered_physical_owners() -> TestResult {
             .to_str()
             .ok_or("configured loot owner filter is not UTF-8")?;
         verify(&archive, &entry, &forge, &owners, &Filter::parse(value)?)?;
-    } else if let Some((_, _, _, path)) = representatives {
+    } else {
+        let (_, _, _, path) = representatives.ok_or("no eligible original Loot component owner")?;
         verify(&archive, &entry, &forge, &owners, &Filter::new(path))?;
     }
     watch
@@ -138,7 +142,11 @@ fn verify(
     crate::real_archive_shop_inventory_v3::verify_build(archive, &catalog)?;
     let origins = Origins::read(&catalog, input.origin())?;
     let table = catalog.pointer(TABLE).ok_or("physical loot table")?;
-    let mut rows = array(field(table, "rows")?)?.iter();
+    if field(table, "availability")?.as_str() != Some("available") {
+        return Err("the filtered Catalog lacks the original Loot component family".into());
+    }
+    let expected = array(field(table, "rows")?)?;
+    let mut rows = expected.iter();
     let mut checked = 0;
     let mut trees = TreeBuilder::new();
     for (index, _) in owners.iter().filter(|(_, path)| filter.matches(path)) {
@@ -161,8 +169,9 @@ fn verify(
         checked > 0,
         "verification filter selected actual original components"
     );
+    sdk::compare(archive, input, expected, &origins)?;
     crate::real_archive_verification::print_line(&format!(
-        "Loot component Catalog rows reconciled: {checked}"
+        "Loot component Catalog and SDK rows reconciled: {checked}"
     ));
     Ok(())
 }

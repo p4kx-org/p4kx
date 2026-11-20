@@ -5,6 +5,10 @@ use std::collections::BTreeSet;
 use std::error::Error;
 use std::time::UNIX_EPOCH;
 
+use p4kx_export::catalog_queries::faction_identities::with_faction_identities_from;
+use p4kx_export::catalog_queries::{
+    CatalogLanguageSelection, CatalogRecordSelection, DatasetAvailability,
+};
 use p4kx_export::{CatalogOptions, CatalogPublicationMode, Filter, Kind, build_catalog_from};
 use p4kx_extraction::{
     Archive, ArchiveWatch, DataForge, DataForgeEntry, RecordTree, TreeBuilder, Value as Original,
@@ -15,6 +19,9 @@ use serde_json::Value;
 use crate::authored_definition_witness::{field, verify_array, verify_link, verify_state};
 use crate::catalog_v3_consumer as consumer;
 use crate::real_archive_verification::print_line;
+
+#[path = "real_archive_faction_identity_sdk.rs"]
+mod sdk;
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
@@ -32,20 +39,81 @@ fn faction_identity_definitions_match_authored_records() -> TestResult {
     let filter = std::env::var("P4KX_FACTION_IDENTITY_FILTER")
         .map_err(|_| "configured identity Record filter")?;
     let filter = Filter::parse(&filter)?;
-    let options = CatalogOptions {
-        filter: Some(&filter),
-        publication_mode: CatalogPublicationMode::DiagnosticPartial,
-        ..CatalogOptions::new(UNIX_EPOCH)
-    };
-    let built = build_catalog_from(&archive, &entry, &options)
-        .map_err(|_| "build selected faction identities")?;
-    let catalog: Value = serde_json::from_slice(built.json())?;
-    crate::real_archive_shop_inventory_v3::verify_build(&archive, &catalog)?;
+    let catalog = read_selected_catalog(&archive, &entry, &filter)?;
     verify(&forge, &catalog, &watch, &filter)?;
+    sdk::verify(&archive, &entry, &catalog)?;
+    print_line("Physical faction identities and protected text match their SDK source closure");
     watch
         .check()
         .map_err(|_| "Archive changed during verification")?;
     Ok(())
+}
+
+#[test]
+#[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
+fn undeclared_faction_identity_family_is_absent_in_the_catalog_and_sdk() -> TestResult {
+    let path = real_archive_path().map_err(|_| "configured Archive path")?;
+    let key = real_archive_key().map_err(|_| "configured Archive key")?;
+    let archive = Archive::open_with_key(path, Some(key)).map_err(|_| "open configured Archive")?;
+    let watch = ArchiveWatch::new(&archive);
+    let entry = DataForgeEntry::read(&archive).map_err(|_| "read original DataForge")?;
+    let forge = entry.open().map_err(|_| "open original DataForge")?;
+    for declaration in forge.structs() {
+        if declaration.name()? == SOURCE_TYPE {
+            return Err(
+                "this witness requires a Build without the original family declaration".into(),
+            );
+        }
+    }
+    let catalog = read_selected_catalog(&archive, &entry, &Filter::new("factionidentit"))?;
+    if catalog
+        .pointer("/definitions/factionIdentities/availability")
+        .and_then(Value::as_str)
+        != Some("absent")
+        || !consumer::rows(&catalog, Kind::FactionIdentities)?.is_empty()
+    {
+        return Err("an absent declared family must have an empty catalog table".into());
+    }
+    with_faction_identities_from(
+        &archive,
+        &entry,
+        CatalogRecordSelection::All,
+        CatalogLanguageSelection::AllAvailable,
+        None,
+        |snapshot| -> TestResult {
+            if snapshot.build.as_ref() != archive.build()
+                || !matches!(snapshot.availability, DatasetAvailability::Absent)
+                || !snapshot.rows.is_empty()
+                || !snapshot.game_texts.is_empty()
+                || !snapshot.available_languages.is_empty()
+            {
+                return Err("an absent declared family must have scoped empty SDK coverage".into());
+            }
+            Ok(())
+        },
+    )??;
+    watch
+        .check()
+        .map_err(|_| "Archive changed during verification")?;
+    print_line("Verified absent FactionIdentity declaration against the Catalog and SDK");
+    Ok(())
+}
+
+fn read_selected_catalog(
+    archive: &Archive,
+    entry: &DataForgeEntry,
+    filter: &Filter,
+) -> TestResult<Value> {
+    let options = CatalogOptions {
+        filter: Some(filter),
+        publication_mode: CatalogPublicationMode::DiagnosticPartial,
+        ..CatalogOptions::new(UNIX_EPOCH)
+    };
+    let built = build_catalog_from(archive, entry, &options)
+        .map_err(|_| "build selected faction identities")?;
+    let catalog: Value = serde_json::from_slice(built.json())?;
+    crate::real_archive_shop_inventory_v3::verify_build(archive, &catalog)?;
+    Ok(catalog)
 }
 
 fn verify(
