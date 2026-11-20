@@ -20,6 +20,7 @@ const COMPONENT: &str = "EntityComponentParams";
 const EFFECTS: &str = "SEntityComponentEffects";
 const MULTIPLIER: &str = "SEntityEffectSystem_MultiplierModifier";
 const MIN_MAX: &str = "SEntityEffectSystem_MinMaxModifier";
+const OVERRIDE: &str = "SEntityEffectSystem_OverrideValueModifier";
 const UNKNOWN: &str = "SyntheticFutureModifier";
 const MODIFIERS_PATH: &str = "/tagEffects/0/propertyLinks/0/modifiers";
 
@@ -75,6 +76,7 @@ fn verify_modifiers(
         component.declaration.pointer(MODIFIERS_PATH),
         Some(&json!([
             {"$type": MULTIPLIER, "multiplier": 0.5},
+            {"$type": OVERRIDE, "overrideValue": 1.25},
             {"$type": MIN_MAX, "minimum": -0.25, "maximum": 0.75},
             {"$type": MULTIPLIER, "multiplier": 2.25},
             {"$type": UNKNOWN, "factor": "NaN"},
@@ -83,10 +85,11 @@ fn verify_modifiers(
     );
     for (field, expected) in [
         ("0/multiplier", 0.5),
-        ("1/minimum", -0.25),
-        ("1/maximum", 0.75),
-        ("2/multiplier", 2.25),
-        ("3/factor", f32::NAN),
+        ("1/overrideValue", 1.25),
+        ("2/minimum", -0.25),
+        ("2/maximum", 0.75),
+        ("3/multiplier", 2.25),
+        ("4/factor", f32::NAN),
     ] {
         verify_modifier_origin(component, inventory, input, field, expected)?;
     }
@@ -240,6 +243,11 @@ fn modifier_shapes(builder: DataForgeBuilder) -> DataForgeBuilder {
                 .field("maximum", TestType::Single),
         )
         .structure(
+            TestStruct::new(OVERRIDE)
+                .parent("Modifier")
+                .field("overrideValue", TestType::Single),
+        )
+        .structure(
             TestStruct::new(UNKNOWN)
                 .parent("Modifier")
                 .field("factor", TestType::Single),
@@ -248,12 +256,13 @@ fn modifier_shapes(builder: DataForgeBuilder) -> DataForgeBuilder {
 
 fn effect() -> TestValue {
     let scale_down = TestInstance::new(MULTIPLIER).value("multiplier", TestValue::Single(0.5));
+    let overwrite = TestInstance::new(OVERRIDE).value("overrideValue", TestValue::Single(1.25));
     let clamp = TestInstance::new(MIN_MAX)
         .value("minimum", TestValue::Single(-0.25))
         .value("maximum", TestValue::Single(0.75));
     let scale_up = TestInstance::new(MULTIPLIER).value("multiplier", TestValue::Single(2.25));
     let unknown = TestInstance::new(UNKNOWN).value("factor", TestValue::Single(f32::NAN));
-    let modifiers = [scale_down, clamp, scale_up, unknown]
+    let modifiers = [scale_down, overwrite, clamp, scale_up, unknown]
         .into_iter()
         .map(TestValue::Struct)
         .collect();
