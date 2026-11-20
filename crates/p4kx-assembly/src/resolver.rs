@@ -99,8 +99,7 @@ impl<'f> LoadoutResolver<'f> {
         Self::with_entities(Arc::new(Entities::new(forge)))
     }
 
-    /// Creates a resolver over the DataForge of `entities`, sharing the index with every other
-    /// resolver built from the same `Arc`, so that the Records are walked once.
+    /// Creates a resolver that reuses the Record index of `entities`.
     #[must_use]
     pub fn with_entities(entities: Arc<Entities<'f>>) -> Self {
         Self {
@@ -205,9 +204,7 @@ impl<'f> LoadoutResolver<'f> {
         Ok(node)
     }
 
-    /// Resolves the default Loadout of `entity` like [`resolve`](Self::resolve), taking the
-    /// Entity's own Record from `tree`, which the caller already built from it, so that the
-    /// Record is not built again. A `tree` of another Record is ignored.
+    /// Resolves the default Loadout of `entity`, reusing `tree` when it belongs to that Record.
     ///
     /// # Errors
     ///
@@ -336,8 +333,7 @@ impl<'f> LoadoutResolver<'f> {
             .map_err(Clone::clone)
     }
 
-    /// Reads what `entity` offers to be worn on a body: its geometry and its sub-geometry per body
-    /// tag. Its Loadout is not resolved.
+    /// Reads worn geometry and sub-geometry by body tag without resolving the Loadout.
     ///
     /// # Errors
     ///
