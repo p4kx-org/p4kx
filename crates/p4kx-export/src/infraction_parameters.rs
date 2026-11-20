@@ -20,24 +20,40 @@ const SOURCE_TYPE: &str = "InfractionParameters";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct InfractionParameters<'source> {
-    source_type: SourcedValue<&'source str>,
+#[non_exhaustive]
+pub struct InfractionParameters<'source> {
+    /// Original concrete declaration name.
+    pub source_type: SourcedValue<&'source str>,
     #[serde(flatten)]
-    flags: InfractionFlags,
-    grace_allowance: SourcedValue<i32>,
-    grace_allowance_cooldown: SourcedValue<ResourceFloat32>,
-    grace_period: SourcedValue<ResourceFloat32>,
-    grace_cooloff_scale: SourcedValue<ResourceFloat32>,
+    /// Original integer controls and their source states.
+    pub flags: InfractionFlags,
+    /// Authored allowance for the grace rule.
+    pub grace_allowance: SourcedValue<i32>,
+    /// Authored cooldown associated with the grace allowance.
+    pub grace_allowance_cooldown: SourcedValue<ResourceFloat32>,
+    /// Authored duration of the grace period.
+    pub grace_period: SourcedValue<ResourceFloat32>,
+    /// Authored scaling of the grace cooldown.
+    pub grace_cooloff_scale: SourcedValue<ResourceFloat32>,
     #[schemars(extend("x-gameText" = true))]
-    grace_warnings: SourcedValue<Vec<SourcedValue<GameTextRef>>>,
-    escalated_payment_fine_multiplier: SourcedValue<ResourceFloat32>,
-    early_payment_period: SourcedValue<ResourceFloat32>,
-    lifetime: SourcedValue<ResourceFloat32>,
-    cool_off_time: SourcedValue<ResourceFloat32>,
-    press_charges_notification_time: SourcedValue<ResourceFloat32>,
-    remove_time_seconds: SourcedValue<ResourceFloat32>,
-    felony_merits: SourcedValue<i32>,
-    authored_fields: SourceArenaOutput<'source>,
+    /// Ordered protected warning text references.
+    pub grace_warnings: SourcedValue<Vec<SourcedValue<GameTextRef>>>,
+    /// Authored multiplier for the escalated payment fine.
+    pub escalated_payment_fine_multiplier: SourcedValue<ResourceFloat32>,
+    /// Authored period for early payment.
+    pub early_payment_period: SourcedValue<ResourceFloat32>,
+    /// Authored lifetime of the infraction.
+    pub lifetime: SourcedValue<ResourceFloat32>,
+    /// Authored cool-off duration.
+    pub cool_off_time: SourcedValue<ResourceFloat32>,
+    /// Authored interval for the press-charges notification.
+    pub press_charges_notification_time: SourcedValue<ResourceFloat32>,
+    /// Authored removal time in seconds.
+    pub remove_time_seconds: SourcedValue<ResourceFloat32>,
+    /// Authored felony merit amount.
+    pub felony_merits: SourcedValue<i32>,
+    /// Original fields outside the typed parameter set.
+    pub authored_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> InfractionParameters<'source> {
@@ -116,12 +132,19 @@ impl<'source> InfractionParameters<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct InfractionFlags {
-    is_felony: SourcedValue<i32>,
-    display_grace_time: SourcedValue<i32>,
-    ignore_if_against_party_member: SourcedValue<i32>,
-    hide_crime_notification: SourcedValue<i32>,
-    hide_crime_in_journal: SourcedValue<i32>,
+/// Original integer controls for infraction behavior.
+#[non_exhaustive]
+pub struct InfractionFlags {
+    /// Raw integer used for the felony control.
+    pub is_felony: SourcedValue<i32>,
+    /// Raw integer controlling grace-time display.
+    pub display_grace_time: SourcedValue<i32>,
+    /// Raw integer for the party-member exception.
+    pub ignore_if_against_party_member: SourcedValue<i32>,
+    /// Raw integer controlling crime-notification visibility.
+    pub hide_crime_notification: SourcedValue<i32>,
+    /// Raw integer controlling journal visibility.
+    pub hide_crime_in_journal: SourcedValue<i32>,
 }
 
 impl InfractionFlags {

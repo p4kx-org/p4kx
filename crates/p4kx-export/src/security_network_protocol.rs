@@ -9,9 +9,10 @@ use crate::CatalogError;
 use crate::catalog_record_reference::CatalogRecordReference;
 use crate::catalog_v3::authored_fields::Observed;
 use crate::catalog_v3::catalog_unit_source::UnitSource;
-use crate::catalog_v3::interaction_source::{InteractionList, RecordLink, RecordLinks};
+use crate::catalog_v3::interaction_source::InteractionList;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
+use crate::source_value_catalog::SourceRecordReference;
 
 const PROTOCOL_TYPE: &str = "SecurityNetworkProtocol";
 const PERMISSIONS_TYPE: &str = "SecurityNetworkPermissions";
@@ -28,14 +29,21 @@ const TAG_LIST: &str = "TagList";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct SecurityNetworkProtocol<'source> {
+/// Original access protocol for a network or a selected room.
+#[non_exhaustive]
+pub struct SecurityNetworkProtocol<'source> {
     #[serde(flatten)]
-    source: UnitSource<'source>,
-    permissions_with_clearance: SourcedValue<SecurityPermissions<'source>>,
-    permissions_without_clearance: SourcedValue<SecurityPermissions<'source>>,
-    accepted_clearance: SourcedValue<SecurityClearance<'source>>,
+    /// Concrete declaration and additional authored fields.
+    pub source: UnitSource<'source>,
+    /// Permissions declared for a user with clearance.
+    pub permissions_with_clearance: SourcedValue<SecurityPermissions<'source>>,
+    /// Permissions declared for a user without clearance.
+    pub permissions_without_clearance: SourcedValue<SecurityPermissions<'source>>,
+    /// Authored clearance conditions.
+    pub accepted_clearance: SourcedValue<SecurityClearance<'source>>,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
-    owner_faction: RecordLink<'source>,
+    /// Original faction reference for this protocol.
+    pub owner_faction: SourcedValue<Box<SourceRecordReference<'source>>>,
 }
 
 impl<'source> SecurityNetworkProtocol<'source> {
@@ -98,11 +106,16 @@ impl<'source> SecurityNetworkProtocol<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct SecurityPermissions<'source> {
+/// Original access and trespass permissions for a clearance case.
+#[non_exhaustive]
+pub struct SecurityPermissions<'source> {
     #[serde(flatten)]
-    source: UnitSource<'source>,
-    access: SourcedValue<&'source str>,
-    trespass: SourcedValue<&'source str>,
+    /// Concrete declaration and additional authored fields.
+    pub source: UnitSource<'source>,
+    /// Original access permission label.
+    pub access: SourcedValue<&'source str>,
+    /// Original trespass permission label.
+    pub trespass: SourcedValue<&'source str>,
 }
 
 impl<'source> SecurityPermissions<'source> {
@@ -127,11 +140,15 @@ impl<'source> SecurityPermissions<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct SecurityClearance<'source> {
+/// Authored clearance tokens accepted by a protocol.
+#[non_exhaustive]
+pub struct SecurityClearance<'source> {
     #[serde(flatten)]
-    source: UnitSource<'source>,
+    /// Concrete declaration and additional authored fields.
+    pub source: UnitSource<'source>,
     #[schemars(with = "SourcedValue<Vec<SourcedValue<CatalogRecordReference>>>")]
-    tokens: RecordLinks<'source>,
+    /// Ordered original clearance-token links.
+    pub tokens: SourcedValue<Vec<SourcedValue<Box<SourceRecordReference<'source>>>>>,
 }
 
 impl<'source> SecurityClearance<'source> {
@@ -148,11 +165,16 @@ impl<'source> SecurityClearance<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct SecurityProtocolOverride<'source> {
+/// Original protocol selected by a room condition.
+#[non_exhaustive]
+pub struct SecurityProtocolOverride<'source> {
     #[serde(flatten)]
-    source: UnitSource<'source>,
-    room_identifiers: SourcedValue<RoomIdentifiers<'source>>,
-    protocol: SourcedValue<SecurityNetworkProtocol<'source>>,
+    /// Concrete declaration and additional authored fields.
+    pub source: UnitSource<'source>,
+    /// Authored selectors for the rooms this protocol applies to.
+    pub room_identifiers: SourcedValue<RoomIdentifiers<'source>>,
+    /// Original protocol for this room condition.
+    pub protocol: SourcedValue<SecurityNetworkProtocol<'source>>,
 }
 
 impl<'source> SecurityProtocolOverride<'source> {
@@ -188,11 +210,15 @@ impl<'source> SecurityProtocolOverride<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct RoomIdentifiers<'source> {
+/// Original identifiers selecting rooms for a protocol override.
+#[non_exhaustive]
+pub struct RoomIdentifiers<'source> {
     #[serde(flatten)]
-    source: UnitSource<'source>,
+    /// Concrete declaration and additional authored fields.
+    pub source: UnitSource<'source>,
     #[schemars(with = "SourcedValue<Vec<SourcedValue<CatalogRecordReference>>>")]
-    tags: RecordLinks<'source>,
+    /// Ordered original room Tag links.
+    pub tags: SourcedValue<Vec<SourcedValue<Box<SourceRecordReference<'source>>>>>,
 }
 
 impl<'source> RoomIdentifiers<'source> {
@@ -209,21 +235,33 @@ impl<'source> RoomIdentifiers<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct HostilityRules<'source> {
+/// Original hostility controls associated with a selector.
+#[non_exhaustive]
+pub struct HostilityRules<'source> {
     #[serde(flatten)]
-    source: UnitSource<'source>,
+    /// Concrete declaration and additional authored fields.
+    pub source: UnitSource<'source>,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
-    tag: RecordLink<'source>,
-    use_reputation_hostility: SourcedValue<bool>,
-    use_personal_hostility: SourcedValue<bool>,
-    use_faction_hostility: SourcedValue<bool>,
-    polices_lawful_trespass: SourcedValue<bool>,
-    hostile_to_criminals: SourcedValue<bool>,
-    hostile_to_stolen_vehicles: SourcedValue<bool>,
+    /// Original rule selector Tag link.
+    pub tag: SourcedValue<Box<SourceRecordReference<'source>>>,
+    /// Whether this declaration considers reputation hostility.
+    pub use_reputation_hostility: SourcedValue<bool>,
+    /// Whether this declaration considers personal hostility.
+    pub use_personal_hostility: SourcedValue<bool>,
+    /// Whether this declaration considers faction hostility.
+    pub use_faction_hostility: SourcedValue<bool>,
+    /// Whether this declaration polices lawful trespass.
+    pub polices_lawful_trespass: SourcedValue<bool>,
+    /// Authored hostility control for criminals.
+    pub hostile_to_criminals: SourcedValue<bool>,
+    /// Authored hostility control for stolen vehicles.
+    pub hostile_to_stolen_vehicles: SourcedValue<bool>,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
-    faction_override: RecordLink<'source>,
+    /// Original link supplying the override faction.
+    pub faction_override: SourcedValue<Box<SourceRecordReference<'source>>>,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
-    faction_to_override: RecordLink<'source>,
+    /// Original link identifying the faction to override.
+    pub faction_to_override: SourcedValue<Box<SourceRecordReference<'source>>>,
 }
 
 impl<'source> HostilityRules<'source> {

@@ -29,27 +29,43 @@ const IMPOUND_TRIGGER: &str = "EImpoundingTrigger";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct JurisdictionDefinition<'source> {
+#[non_exhaustive]
+pub struct JurisdictionDefinition<'source> {
     #[serde(flatten)]
-    source: CanonicalRecordHeader<'source>,
-    subsumption_jurisdiction: SourcedValue<&'source str>,
-    name: SourcedValue<PublicNameRef>,
-    logo_path: SourcedValue<&'source str>,
+    /// Physical identity and original Record header.
+    pub source: CanonicalRecordHeader<'source>,
+    /// Original jurisdiction selector used by Subsumption.
+    pub subsumption_jurisdiction: SourcedValue<&'source str>,
+    /// Public name referenced by the jurisdiction.
+    pub name: SourcedValue<PublicNameRef>,
+    /// Original logo path, without following its payload.
+    pub logo_path: SourcedValue<&'source str>,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
-    parent_jurisdiction: SourcedValue<Box<SourceRecordReference<'source>>>,
-    respects_parent_jurisdiction_laws: SourcedValue<bool>,
-    infractions: SourcedValue<Vec<SourcedValue<InfractionUse<'source>>>>,
+    /// Authored parent link, without aggregating inherited rules.
+    pub parent_jurisdiction: SourcedValue<Box<SourceRecordReference<'source>>>,
+    /// Whether the definition declares respect for the parent's laws.
+    pub respects_parent_jurisdiction_laws: SourcedValue<bool>,
+    /// Infraction occurrences authored on this jurisdiction.
+    pub infractions: SourcedValue<Vec<SourcedValue<InfractionUse<'source>>>>,
     #[schemars(with = "SourcedValue<Vec<SourcedValue<CatalogRecordReference>>>")]
-    infraction_sets: SourcedValue<Vec<SourcedValue<Box<SourceRecordReference<'source>>>>>,
+    /// Ordered authored references to reusable sets.
+    pub infraction_sets: SourcedValue<Vec<SourcedValue<Box<SourceRecordReference<'source>>>>>,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
-    journal_entry: SourcedValue<Box<SourceRecordReference<'source>>>,
+    /// Original reference to the jurisdiction's journal entry.
+    pub journal_entry: SourcedValue<Box<SourceRecordReference<'source>>>,
     #[serde(flatten)]
-    possession: JurisdictionPossession<'source>,
-    base_fine: SourcedValue<i32>,
-    early_payment_period: SourcedValue<ResourceFloat32>,
-    is_prison: SourcedValue<bool>,
-    impounding_definitions: SourcedValue<Vec<SourcedValue<ImpoundingDefinition<'source>>>>,
-    authored_fields: SourceArenaOutput<'source>,
+    /// Directly authored possession rules.
+    pub possession: JurisdictionPossession<'source>,
+    /// Authored base fine before any game-side calculation.
+    pub base_fine: SourcedValue<i32>,
+    /// Authored period for early payment.
+    pub early_payment_period: SourcedValue<ResourceFloat32>,
+    /// Original prison designation.
+    pub is_prison: SourcedValue<bool>,
+    /// Ordered impounding declarations with their own conditions.
+    pub impounding_definitions: SourcedValue<Vec<SourcedValue<ImpoundingDefinition<'source>>>>,
+    /// Original fields outside the typed jurisdiction.
+    pub authored_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> JurisdictionDefinition<'source> {
@@ -120,13 +136,19 @@ impl<'source> JurisdictionDefinition<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct JurisdictionPossession<'source> {
-    max_stolen_goods_possession_scu: SourcedValue<ResourceFloat32>,
+/// Possession limits and goods restrictions authored on a jurisdiction.
+#[non_exhaustive]
+pub struct JurisdictionPossession<'source> {
+    /// Authored maximum for stolen goods in SCU.
+    pub max_stolen_goods_possession_scu: SourcedValue<ResourceFloat32>,
     #[schemars(with = "SourcedValue<Vec<SourcedValue<CatalogRecordReference>>>")]
-    prohibited_goods: SourcedValue<Vec<SourcedValue<Box<SourceRecordReference<'source>>>>>,
+    /// Ordered original links to prohibited goods.
+    pub prohibited_goods: SourcedValue<Vec<SourcedValue<Box<SourceRecordReference<'source>>>>>,
     #[schemars(with = "SourcedValue<Vec<SourcedValue<CatalogRecordReference>>>")]
-    prohibited_resources: SourcedValue<Vec<SourcedValue<Box<SourceRecordReference<'source>>>>>,
-    controlled_substance_classes:
+    /// Ordered original links to prohibited resources.
+    pub prohibited_resources: SourcedValue<Vec<SourcedValue<Box<SourceRecordReference<'source>>>>>,
+    /// Ordered controlled-substance classifications and limits.
+    pub controlled_substance_classes:
         SourcedValue<Vec<SourcedValue<ControlledSubstanceClass<'source>>>>,
 }
 
@@ -174,14 +196,21 @@ impl<'source> JurisdictionPossession<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct ControlledSubstanceClass<'source> {
-    source_type: SourcedValue<&'source str>,
+/// An authored grouping of commodities and resources subject to a possession limit.
+#[non_exhaustive]
+pub struct ControlledSubstanceClass<'source> {
+    /// Original concrete declaration name.
+    pub source_type: SourcedValue<&'source str>,
     #[schemars(with = "SourcedValue<Vec<SourcedValue<CatalogRecordReference>>>")]
-    commodities: SourcedValue<Vec<SourcedValue<Box<SourceRecordReference<'source>>>>>,
+    /// Ordered commodity links authored in this class.
+    pub commodities: SourcedValue<Vec<SourcedValue<Box<SourceRecordReference<'source>>>>>,
     #[schemars(with = "SourcedValue<Vec<SourcedValue<CatalogRecordReference>>>")]
-    resources: SourcedValue<Vec<SourcedValue<Box<SourceRecordReference<'source>>>>>,
-    max_possession_scu: SourcedValue<ResourceFloat32>,
-    authored_fields: SourceArenaOutput<'source>,
+    /// Ordered resource links authored in this class.
+    pub resources: SourcedValue<Vec<SourcedValue<Box<SourceRecordReference<'source>>>>>,
+    /// Authored maximum for this class in SCU.
+    pub max_possession_scu: SourcedValue<ResourceFloat32>,
+    /// Original fields outside the typed class.
+    pub authored_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> ControlledSubstanceClass<'source> {
@@ -210,14 +239,23 @@ impl<'source> ControlledSubstanceClass<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct ImpoundingDefinition<'source> {
-    source_type: SourcedValue<&'source str>,
-    name: SourcedValue<PublicNameRef>,
-    trigger: SourcedValue<&'source str>,
-    impounding_time_seconds: SourcedValue<ResourceFloat32>,
-    impounding_fine_uec: SourcedValue<i32>,
-    ignore_if_against_party_member: SourcedValue<bool>,
-    authored_fields: SourceArenaOutput<'source>,
+/// An authored impounding rule associated with a jurisdiction.
+#[non_exhaustive]
+pub struct ImpoundingDefinition<'source> {
+    /// Original concrete declaration name.
+    pub source_type: SourcedValue<&'source str>,
+    /// Public name referenced by this rule.
+    pub name: SourcedValue<PublicNameRef>,
+    /// Original impounding trigger label.
+    pub trigger: SourcedValue<&'source str>,
+    /// Authored duration of impounding in seconds.
+    pub impounding_time_seconds: SourcedValue<ResourceFloat32>,
+    /// Authored impounding fine in UEC.
+    pub impounding_fine_uec: SourcedValue<i32>,
+    /// Whether this rule declares a party-member exception.
+    pub ignore_if_against_party_member: SourcedValue<bool>,
+    /// Original fields outside the typed rule.
+    pub authored_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> ImpoundingDefinition<'source> {

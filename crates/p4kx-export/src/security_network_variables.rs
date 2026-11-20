@@ -10,10 +10,11 @@ use crate::CatalogError;
 use crate::catalog_record_reference::CatalogRecordReference;
 use crate::catalog_v3::authored_fields::Observed;
 use crate::catalog_v3::catalog_unit_source::UnitSource;
-use crate::catalog_v3::interaction_source::{InteractionList, RecordLink, WeakLink};
+use crate::catalog_v3::interaction_source::InteractionList;
 use crate::catalog_v3::interaction_state_edges::STATE;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
+use crate::source_value_catalog::{SourceRecordReference, SourceWeakReference};
 
 const VARIABLE: &str = "SecurityNetworkVariable";
 const VALUE_FAMILY: &str = "SecurityNetworkVariableValue_Base";
@@ -23,12 +24,17 @@ const EFFECT_FAMILY: &str = "SecurityNetworkVariableEffect_Base";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct SecurityNetworkVariable<'source> {
+/// An authored variable and the Tag that identifies it.
+#[non_exhaustive]
+pub struct SecurityNetworkVariable<'source> {
     #[serde(flatten)]
-    source: UnitSource<'source>,
+    /// Concrete declaration and additional authored fields.
+    pub source: UnitSource<'source>,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
-    tag: RecordLink<'source>,
-    value: SourcedValue<SecurityVariableValue<'source>>,
+    /// Original Tag link identifying the variable.
+    pub tag: SourcedValue<Box<SourceRecordReference<'source>>>,
+    /// Original typed or retained authored value.
+    pub value: SourcedValue<SecurityVariableValue<'source>>,
 }
 
 impl<'source> SecurityNetworkVariable<'source> {
@@ -58,19 +64,34 @@ impl<'source> SecurityNetworkVariable<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct SecurityVariableValue<'source> {
+/// A concrete authored value of a network variable.
+#[non_exhaustive]
+pub struct SecurityVariableValue<'source> {
     #[serde(flatten)]
-    source: UnitSource<'source>,
+    /// Concrete declaration and additional authored fields.
+    pub source: UnitSource<'source>,
     #[serde(flatten)]
-    value: VariableValue,
+    /// Known value shape or preserved authored variant.
+    pub value: VariableValue,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-enum VariableValue {
-    Bool { value: SourcedValue<bool> },
-    Int { value: SourcedValue<i32> },
+/// Value of a security variable according to its concrete declaration.
+#[non_exhaustive]
+pub enum VariableValue {
+    /// A variable declared as Boolean.
+    Bool {
+        /// The authored Boolean value.
+        value: SourcedValue<bool>,
+    },
+    /// A variable declared as a signed integer.
+    Int {
+        /// The authored signed value.
+        value: SourcedValue<i32>,
+    },
+    /// An unclassified concrete variant retained in its source arena.
     Authored,
 }
 
@@ -109,11 +130,16 @@ impl<'source> SecurityVariableValue<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct SecurityVariableEffects<'source> {
+/// Original effects associated with a network variable value.
+#[non_exhaustive]
+pub struct SecurityVariableEffects<'source> {
     #[serde(flatten)]
-    source: UnitSource<'source>,
-    variable_value: SourcedValue<SecurityNetworkVariable<'source>>,
-    effects: InteractionList<SecurityVariableEffect<'source>>,
+    /// Concrete declaration and additional authored fields.
+    pub source: UnitSource<'source>,
+    /// Authored variable value to which these effects belong.
+    pub variable_value: SourcedValue<SecurityNetworkVariable<'source>>,
+    /// Ordered original effect occurrences.
+    pub effects: SourcedValue<Vec<SourcedValue<SecurityVariableEffect<'source>>>>,
 }
 
 impl<'source> SecurityVariableEffects<'source> {
@@ -158,23 +184,34 @@ impl<'source> SecurityVariableEffects<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct SecurityVariableEffect<'source> {
+/// One authored effect on a network variable.
+#[non_exhaustive]
+pub struct SecurityVariableEffect<'source> {
     #[serde(flatten)]
-    source: UnitSource<'source>,
+    /// Concrete declaration and additional authored fields.
+    pub source: UnitSource<'source>,
     #[serde(flatten)]
-    effect: VariableEffect<'source>,
+    /// Known effect shape or preserved authored variant.
+    pub effect: VariableEffect<'source>,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-enum VariableEffect<'source> {
+/// A known security effect or an authored variant whose semantics are unclassified.
+#[non_exhaustive]
+pub enum VariableEffect<'source> {
+    /// An effect declaring an interaction-state transition.
     SetInteractionState {
-        state: WeakLink<'source>,
+        /// Weak link to the original target state.
+        state: SourcedValue<Box<SourceWeakReference<'source>>>,
     },
+    /// An effect specifying hostility rules.
     SetHostilityRules {
+        /// Rules authored on the effect.
         rules: SourcedValue<Box<HostilityRules<'source>>>,
     },
+    /// An unclassified concrete variant retained in its source arena.
     Authored,
 }
 

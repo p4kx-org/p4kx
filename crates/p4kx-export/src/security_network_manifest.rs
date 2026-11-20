@@ -13,15 +13,14 @@ use crate::CatalogError;
 use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_v3::authored_fields::Observed;
-use crate::catalog_v3::interaction_source::InteractionList;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 use crate::source_value_catalog::SourceArenaOutput;
 
 #[path = "security_network_protocol.rs"]
-mod security_network_protocol;
+pub(crate) mod security_network_protocol;
 #[path = "security_network_variables.rs"]
-mod security_network_variables;
+pub(crate) mod security_network_variables;
 
 pub(super) const SOURCE_TYPE: &str = "SecurityNetworkManifest";
 
@@ -29,17 +28,27 @@ pub(super) const SOURCE_TYPE: &str = "SecurityNetworkManifest";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct SecurityNetworkManifest<'source> {
+#[non_exhaustive]
+pub struct SecurityNetworkManifest<'source> {
     #[serde(flatten)]
-    source: CanonicalRecordHeader<'source>,
-    default_protocol: SourcedValue<SecurityNetworkProtocol<'source>>,
-    room_protocols: InteractionList<SecurityProtocolOverride<'source>>,
-    variables: InteractionList<SecurityNetworkVariable<'source>>,
-    hostility_rules: InteractionList<HostilityRules<'source>>,
-    variable_effects: InteractionList<SecurityVariableEffects<'source>>,
-    is_neutral_territory: SourcedValue<bool>,
-    teleport_player_out: SourcedValue<bool>,
-    additional_fields: SourceArenaOutput<'source>,
+    /// Physical identity and original Record header.
+    pub source: CanonicalRecordHeader<'source>,
+    /// Original fallback protocol for the network.
+    pub default_protocol: SourcedValue<SecurityNetworkProtocol<'source>>,
+    /// Ordered room-specific overrides.
+    pub room_protocols: SourcedValue<Vec<SourcedValue<SecurityProtocolOverride<'source>>>>,
+    /// Original variable declarations.
+    pub variables: SourcedValue<Vec<SourcedValue<SecurityNetworkVariable<'source>>>>,
+    /// Ordered hostility declarations.
+    pub hostility_rules: SourcedValue<Vec<SourcedValue<HostilityRules<'source>>>>,
+    /// Ordered effects bound to authored variable values.
+    pub variable_effects: SourcedValue<Vec<SourcedValue<SecurityVariableEffects<'source>>>>,
+    /// Original neutral-territory designation.
+    pub is_neutral_territory: SourcedValue<bool>,
+    /// Original player-removal control.
+    pub teleport_player_out: SourcedValue<bool>,
+    /// Original fields outside the typed manifest.
+    pub additional_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> SecurityNetworkManifest<'source> {

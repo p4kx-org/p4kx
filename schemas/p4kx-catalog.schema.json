@@ -12943,21 +12943,27 @@
       "type": "object"
     },
     "ControlledSubstanceClass": {
+      "description": "An authored grouping of commodities and resources subject to a possession limit.",
       "properties": {
         "authoredFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Original fields outside the typed class."
         },
         "commodities": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference",
+          "description": "Ordered commodity links authored in this class."
         },
         "maxPossessionScu": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored maximum for this class in SCU."
         },
         "resources": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference",
+          "description": "Ordered resource links authored in this class."
         },
         "sourceType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original concrete declaration name."
         }
       },
       "required": [
@@ -21418,40 +21424,49 @@
       "type": "object"
     },
     "HostilityRules": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "Original hostility controls associated with a selector.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
         },
         "factionOverride": {
-          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference",
+          "description": "Original link supplying the override faction."
         },
         "factionToOverride": {
-          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference",
+          "description": "Original link identifying the faction to override."
         },
         "hostileToCriminals": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Authored hostility control for criminals."
         },
         "hostileToStolenVehicles": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Authored hostility control for stolen vehicles."
         },
         "policesLawfulTrespass": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Whether this declaration polices lawful trespass."
         },
         "sourceType": {
           "$ref": "#/$defs/SourcedValueOfstring"
         },
         "tag": {
-          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference",
+          "description": "Original rule selector Tag link."
         },
         "useFactionHostility": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Whether this declaration considers faction hostility."
         },
         "usePersonalHostility": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Whether this declaration considers personal hostility."
         },
         "useReputationHostility": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Whether this declaration considers reputation hostility."
         }
       },
       "required": [
@@ -22555,27 +22570,35 @@
       "type": "object"
     },
     "ImpoundingDefinition": {
+      "description": "An authored impounding rule associated with a jurisdiction.",
       "properties": {
         "authoredFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Original fields outside the typed rule."
         },
         "ignoreIfAgainstPartyMember": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Whether this rule declares a party-member exception."
         },
         "impoundingFineUec": {
-          "$ref": "#/$defs/SourcedValueOfint32"
+          "$ref": "#/$defs/SourcedValueOfint32",
+          "description": "Authored impounding fine in UEC."
         },
         "impoundingTimeSeconds": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored duration of impounding in seconds."
         },
         "name": {
-          "$ref": "#/$defs/SourcedValueOfPublicNameRef"
+          "$ref": "#/$defs/SourcedValueOfPublicNameRef",
+          "description": "Public name referenced by this rule."
         },
         "sourceType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original concrete declaration name."
         },
         "trigger": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original impounding trigger label."
         }
       },
       "required": [
@@ -22593,16 +22616,19 @@
       "description": "One physical definition of an authored infraction.",
       "properties": {
         "authoredFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Original fields outside the typed definition."
         },
         "className": {
           "$ref": "#/$defs/SourcedValueOfstring"
         },
         "defaultParameters": {
-          "$ref": "#/$defs/SourcedValueOfInfractionParameters"
+          "$ref": "#/$defs/SourcedValueOfInfractionParameters",
+          "description": "Authored default values for this infraction."
         },
         "description": {
           "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "description": "Protected description referenced by the definition.",
           "x-gameText": true
         },
         "fileName": {
@@ -22615,7 +22641,8 @@
           "$ref": "#/$defs/SourcedValueOfstring"
         },
         "name": {
-          "$ref": "#/$defs/SourcedValueOfPublicNameRef"
+          "$ref": "#/$defs/SourcedValueOfPublicNameRef",
+          "description": "Public name referenced by the definition."
         },
         "recordIndex": {
           "$ref": "#/$defs/SourcedValueOfuint32"
@@ -22630,7 +22657,8 @@
           "$ref": "#/$defs/SourcedValueOfstring"
         },
         "triggers": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfstring",
+          "description": "Original trigger labels in declaration order, including repeats."
         }
       },
       "required": [
@@ -22654,62 +22682,81 @@
       "description": "One original default or override occurrence of the declared penalty parameters.",
       "properties": {
         "authoredFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Original fields outside the typed parameter set."
         },
         "coolOffTime": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored cool-off duration."
         },
         "displayGraceTime": {
-          "$ref": "#/$defs/SourcedValueOfint32"
+          "$ref": "#/$defs/SourcedValueOfint32",
+          "description": "Raw integer controlling grace-time display."
         },
         "earlyPaymentPeriod": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored period for early payment."
         },
         "escalatedPaymentFineMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored multiplier for the escalated payment fine."
         },
         "felonyMerits": {
-          "$ref": "#/$defs/SourcedValueOfint32"
+          "$ref": "#/$defs/SourcedValueOfint32",
+          "description": "Authored felony merit amount."
         },
         "graceAllowance": {
-          "$ref": "#/$defs/SourcedValueOfint32"
+          "$ref": "#/$defs/SourcedValueOfint32",
+          "description": "Authored allowance for the grace rule."
         },
         "graceAllowanceCooldown": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored cooldown associated with the grace allowance."
         },
         "graceCooloffScale": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored scaling of the grace cooldown."
         },
         "gracePeriod": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored duration of the grace period."
         },
         "graceWarnings": {
           "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfGameTextRef",
+          "description": "Ordered protected warning text references.",
           "x-gameText": true
         },
         "hideCrimeInJournal": {
-          "$ref": "#/$defs/SourcedValueOfint32"
+          "$ref": "#/$defs/SourcedValueOfint32",
+          "description": "Raw integer controlling journal visibility."
         },
         "hideCrimeNotification": {
-          "$ref": "#/$defs/SourcedValueOfint32"
+          "$ref": "#/$defs/SourcedValueOfint32",
+          "description": "Raw integer controlling crime-notification visibility."
         },
         "ignoreIfAgainstPartyMember": {
-          "$ref": "#/$defs/SourcedValueOfint32"
+          "$ref": "#/$defs/SourcedValueOfint32",
+          "description": "Raw integer for the party-member exception."
         },
         "isFelony": {
-          "$ref": "#/$defs/SourcedValueOfint32"
+          "$ref": "#/$defs/SourcedValueOfint32",
+          "description": "Raw integer used for the felony control."
         },
         "lifetime": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored lifetime of the infraction."
         },
         "pressChargesNotificationTime": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored interval for the press-charges notification."
         },
         "removeTimeSeconds": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored removal time in seconds."
         },
         "sourceType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original concrete declaration name."
         }
       },
       "required": [
@@ -22739,7 +22786,8 @@
       "description": "One reusable physical set of ordered infraction uses.",
       "properties": {
         "authoredFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Original fields outside the typed set."
         },
         "className": {
           "$ref": "#/$defs/SourcedValueOfstring"
@@ -22751,7 +22799,8 @@
           "$ref": "#/$defs/SourcedValueOfGuid"
         },
         "infractions": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfInfractionUse"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfInfractionUse",
+          "description": "Ordered authored occurrences with their own parameter overrides."
         },
         "metadataTag": {
           "$ref": "#/$defs/SourcedValueOfstring"
@@ -22848,16 +22897,20 @@
       "description": "A declared infraction link with its own parameters.",
       "properties": {
         "authoredFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Original fields outside the typed occurrence."
         },
         "definition": {
-          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference",
+          "description": "Authored link to the physical infraction definition."
         },
         "parameterOverrides": {
-          "$ref": "#/$defs/SourcedValueOfInfractionParameters"
+          "$ref": "#/$defs/SourcedValueOfInfractionParameters",
+          "description": "Parameters authored on this occurrence."
         },
         "sourceType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original concrete declaration name."
         }
       },
       "required": [
@@ -26331,19 +26384,23 @@
       "description": "A physical jurisdiction and the law facts authored directly on it.",
       "properties": {
         "authoredFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Original fields outside the typed jurisdiction."
         },
         "baseFine": {
-          "$ref": "#/$defs/SourcedValueOfint32"
+          "$ref": "#/$defs/SourcedValueOfint32",
+          "description": "Authored base fine before any game-side calculation."
         },
         "className": {
           "$ref": "#/$defs/SourcedValueOfstring"
         },
         "controlledSubstanceClasses": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfControlledSubstanceClass"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfControlledSubstanceClass",
+          "description": "Ordered controlled-substance classifications and limits."
         },
         "earlyPaymentPeriod": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored period for early payment."
         },
         "fileName": {
           "$ref": "#/$defs/SourcedValueOfstring"
@@ -26352,40 +26409,51 @@
           "$ref": "#/$defs/SourcedValueOfGuid"
         },
         "impoundingDefinitions": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfImpoundingDefinition"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfImpoundingDefinition",
+          "description": "Ordered impounding declarations with their own conditions."
         },
         "infractionSets": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference",
+          "description": "Ordered authored references to reusable sets."
         },
         "infractions": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfInfractionUse"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfInfractionUse",
+          "description": "Infraction occurrences authored on this jurisdiction."
         },
         "isPrison": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Original prison designation."
         },
         "journalEntry": {
-          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference",
+          "description": "Original reference to the jurisdiction's journal entry."
         },
         "logoPath": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original logo path, without following its payload."
         },
         "maxStolenGoodsPossessionScu": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "Authored maximum for stolen goods in SCU."
         },
         "metadataTag": {
           "$ref": "#/$defs/SourcedValueOfstring"
         },
         "name": {
-          "$ref": "#/$defs/SourcedValueOfPublicNameRef"
+          "$ref": "#/$defs/SourcedValueOfPublicNameRef",
+          "description": "Public name referenced by the jurisdiction."
         },
         "parentJurisdiction": {
-          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference",
+          "description": "Authored parent link, without aggregating inherited rules."
         },
         "prohibitedGoods": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference",
+          "description": "Ordered original links to prohibited goods."
         },
         "prohibitedResources": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference",
+          "description": "Ordered original links to prohibited resources."
         },
         "recordIndex": {
           "$ref": "#/$defs/SourcedValueOfuint32"
@@ -26397,13 +26465,15 @@
           "$ref": "#/$defs/SourcedValueOfstring"
         },
         "respectsParentJurisdictionLaws": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Whether the definition declares respect for the parent's laws."
         },
         "sourceType": {
           "$ref": "#/$defs/SourcedValueOfstring"
         },
         "subsumptionJurisdiction": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original jurisdiction selector used by Subsumption."
         }
       },
       "required": [
@@ -43143,7 +43213,7 @@
       "type": "object"
     },
     "RoomIdentifiers": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "Original identifiers selecting rooms for a protocol override.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -43152,7 +43222,8 @@
           "$ref": "#/$defs/SourcedValueOfstring"
         },
         "tags": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference",
+          "description": "Ordered original room Tag links."
         }
       },
       "required": [
@@ -44125,7 +44196,7 @@
       "type": "object"
     },
     "SecurityClearance": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "Authored clearance tokens accepted by a protocol.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -44134,7 +44205,8 @@
           "$ref": "#/$defs/SourcedValueOfstring"
         },
         "tokens": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference",
+          "description": "Ordered original clearance-token links."
         }
       },
       "required": [
@@ -44148,13 +44220,15 @@
       "description": "A physical security network with its authored protocols, hostility rules and effects.",
       "properties": {
         "additionalFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Original fields outside the typed manifest."
         },
         "className": {
           "$ref": "#/$defs/SourcedValueOfstring"
         },
         "defaultProtocol": {
-          "$ref": "#/$defs/SourcedValueOfSecurityNetworkProtocol"
+          "$ref": "#/$defs/SourcedValueOfSecurityNetworkProtocol",
+          "description": "Original fallback protocol for the network."
         },
         "fileName": {
           "$ref": "#/$defs/SourcedValueOfstring"
@@ -44163,10 +44237,12 @@
           "$ref": "#/$defs/SourcedValueOfGuid"
         },
         "hostilityRules": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfHostilityRules"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfHostilityRules",
+          "description": "Ordered hostility declarations."
         },
         "isNeutralTerritory": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Original neutral-territory designation."
         },
         "metadataTag": {
           "$ref": "#/$defs/SourcedValueOfstring"
@@ -44181,19 +44257,23 @@
           "$ref": "#/$defs/SourcedValueOfstring"
         },
         "roomProtocols": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfSecurityProtocolOverride"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfSecurityProtocolOverride",
+          "description": "Ordered room-specific overrides."
         },
         "sourceType": {
           "$ref": "#/$defs/SourcedValueOfstring"
         },
         "teleportPlayerOut": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Original player-removal control."
         },
         "variableEffects": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfSecurityVariableEffects"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfSecurityVariableEffects",
+          "description": "Ordered effects bound to authored variable values."
         },
         "variables": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfSecurityNetworkVariable"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfSecurityNetworkVariable",
+          "description": "Original variable declarations."
         }
       },
       "required": [
@@ -44217,22 +44297,26 @@
       "type": "object"
     },
     "SecurityNetworkProtocol": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "Original access protocol for a network or a selected room.",
       "properties": {
         "acceptedClearance": {
-          "$ref": "#/$defs/SourcedValueOfSecurityClearance"
+          "$ref": "#/$defs/SourcedValueOfSecurityClearance",
+          "description": "Authored clearance conditions."
         },
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
         },
         "ownerFaction": {
-          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference",
+          "description": "Original faction reference for this protocol."
         },
         "permissionsWithClearance": {
-          "$ref": "#/$defs/SourcedValueOfSecurityPermissions"
+          "$ref": "#/$defs/SourcedValueOfSecurityPermissions",
+          "description": "Permissions declared for a user with clearance."
         },
         "permissionsWithoutClearance": {
-          "$ref": "#/$defs/SourcedValueOfSecurityPermissions"
+          "$ref": "#/$defs/SourcedValueOfSecurityPermissions",
+          "description": "Permissions declared for a user without clearance."
         },
         "sourceType": {
           "$ref": "#/$defs/SourcedValueOfstring"
@@ -44249,7 +44333,7 @@
       "type": "object"
     },
     "SecurityNetworkVariable": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "An authored variable and the Tag that identifies it.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -44258,10 +44342,12 @@
           "$ref": "#/$defs/SourcedValueOfstring"
         },
         "tag": {
-          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference",
+          "description": "Original Tag link identifying the variable."
         },
         "value": {
-          "$ref": "#/$defs/SourcedValueOfSecurityVariableValue"
+          "$ref": "#/$defs/SourcedValueOfSecurityVariableValue",
+          "description": "Original typed or retained authored value."
         }
       },
       "required": [
@@ -44273,10 +44359,11 @@
       "type": "object"
     },
     "SecurityPermissions": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "Original access and trespass permissions for a clearance case.",
       "properties": {
         "access": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original access permission label."
         },
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -44285,7 +44372,8 @@
           "$ref": "#/$defs/SourcedValueOfstring"
         },
         "trespass": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original trespass permission label."
         }
       },
       "required": [
@@ -44297,16 +44385,18 @@
       "type": "object"
     },
     "SecurityProtocolOverride": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "Original protocol selected by a room condition.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
         },
         "protocol": {
-          "$ref": "#/$defs/SourcedValueOfSecurityNetworkProtocol"
+          "$ref": "#/$defs/SourcedValueOfSecurityNetworkProtocol",
+          "description": "Original protocol for this room condition."
         },
         "roomIdentifiers": {
-          "$ref": "#/$defs/SourcedValueOfRoomIdentifiers"
+          "$ref": "#/$defs/SourcedValueOfRoomIdentifiers",
+          "description": "Authored selectors for the rooms this protocol applies to."
         },
         "sourceType": {
           "$ref": "#/$defs/SourcedValueOfstring"
@@ -44321,16 +44411,18 @@
       "type": "object"
     },
     "SecurityVariableEffect": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "One authored effect on a network variable.",
       "oneOf": [
         {
+          "description": "An effect declaring an interaction-state transition.",
           "properties": {
             "kind": {
               "const": "setInteractionState",
               "type": "string"
             },
             "state": {
-              "$ref": "#/$defs/SourcedValueOfSourceWeakReference"
+              "$ref": "#/$defs/SourcedValueOfSourceWeakReference",
+              "description": "Weak link to the original target state."
             }
           },
           "required": [
@@ -44340,13 +44432,15 @@
           "type": "object"
         },
         {
+          "description": "An effect specifying hostility rules.",
           "properties": {
             "kind": {
               "const": "setHostilityRules",
               "type": "string"
             },
             "rules": {
-              "$ref": "#/$defs/SourcedValueOfHostilityRules"
+              "$ref": "#/$defs/SourcedValueOfHostilityRules",
+              "description": "Rules authored on the effect."
             }
           },
           "required": [
@@ -44356,6 +44450,7 @@
           "type": "object"
         },
         {
+          "description": "An unclassified concrete variant retained in its source arena.",
           "properties": {
             "kind": {
               "const": "authored",
@@ -44383,19 +44478,21 @@
       "type": "object"
     },
     "SecurityVariableEffects": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "Original effects associated with a network variable value.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
         },
         "effects": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfSecurityVariableEffect"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfSecurityVariableEffect",
+          "description": "Ordered original effect occurrences."
         },
         "sourceType": {
           "$ref": "#/$defs/SourcedValueOfstring"
         },
         "variableValue": {
-          "$ref": "#/$defs/SourcedValueOfSecurityNetworkVariable"
+          "$ref": "#/$defs/SourcedValueOfSecurityNetworkVariable",
+          "description": "Authored variable value to which these effects belong."
         }
       },
       "required": [
@@ -44407,16 +44504,18 @@
       "type": "object"
     },
     "SecurityVariableValue": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "A concrete authored value of a network variable.",
       "oneOf": [
         {
+          "description": "A variable declared as Boolean.",
           "properties": {
             "kind": {
               "const": "bool",
               "type": "string"
             },
             "value": {
-              "$ref": "#/$defs/SourcedValueOfboolean"
+              "$ref": "#/$defs/SourcedValueOfboolean",
+              "description": "The authored Boolean value."
             }
           },
           "required": [
@@ -44426,13 +44525,15 @@
           "type": "object"
         },
         {
+          "description": "A variable declared as a signed integer.",
           "properties": {
             "kind": {
               "const": "int",
               "type": "string"
             },
             "value": {
-              "$ref": "#/$defs/SourcedValueOfint32"
+              "$ref": "#/$defs/SourcedValueOfint32",
+              "description": "The authored signed value."
             }
           },
           "required": [
@@ -44442,6 +44543,7 @@
           "type": "object"
         },
         {
+          "description": "An unclassified concrete variant retained in its source arena.",
           "properties": {
             "kind": {
               "const": "authored",

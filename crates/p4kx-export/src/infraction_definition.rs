@@ -25,15 +25,22 @@ const TRIGGER_TYPE: &str = "EInfractionTrigger";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct InfractionDefinition<'source> {
+#[non_exhaustive]
+pub struct InfractionDefinition<'source> {
     #[serde(flatten)]
-    source: CanonicalRecordHeader<'source>,
-    name: SourcedValue<PublicNameRef>,
+    /// Physical identity and original Record header.
+    pub source: CanonicalRecordHeader<'source>,
+    /// Public name referenced by the definition.
+    pub name: SourcedValue<PublicNameRef>,
     #[schemars(extend("x-gameText" = true))]
-    description: SourcedValue<GameTextRef>,
-    triggers: SourcedValue<Vec<SourcedValue<&'source str>>>,
-    default_parameters: SourcedValue<InfractionParameters<'source>>,
-    authored_fields: SourceArenaOutput<'source>,
+    /// Protected description referenced by the definition.
+    pub description: SourcedValue<GameTextRef>,
+    /// Original trigger labels in declaration order, including repeats.
+    pub triggers: SourcedValue<Vec<SourcedValue<&'source str>>>,
+    /// Authored default values for this infraction.
+    pub default_parameters: SourcedValue<InfractionParameters<'source>>,
+    /// Original fields outside the typed definition.
+    pub authored_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> InfractionDefinition<'source> {
@@ -69,11 +76,15 @@ impl<'source> InfractionDefinition<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct InfractionSetDefinition<'source> {
+#[non_exhaustive]
+pub struct InfractionSetDefinition<'source> {
     #[serde(flatten)]
-    source: CanonicalRecordHeader<'source>,
-    infractions: SourcedValue<Vec<SourcedValue<InfractionUse<'source>>>>,
-    authored_fields: SourceArenaOutput<'source>,
+    /// Physical identity and original Record header.
+    pub source: CanonicalRecordHeader<'source>,
+    /// Ordered authored occurrences with their own parameter overrides.
+    pub infractions: SourcedValue<Vec<SourcedValue<InfractionUse<'source>>>>,
+    /// Original fields outside the typed set.
+    pub authored_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> InfractionSetDefinition<'source> {
@@ -98,12 +109,17 @@ impl<'source> InfractionSetDefinition<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct InfractionUse<'source> {
-    source_type: SourcedValue<&'source str>,
+#[non_exhaustive]
+pub struct InfractionUse<'source> {
+    /// Original concrete declaration name.
+    pub source_type: SourcedValue<&'source str>,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
-    definition: SourcedValue<Box<SourceRecordReference<'source>>>,
-    parameter_overrides: SourcedValue<InfractionParameters<'source>>,
-    authored_fields: SourceArenaOutput<'source>,
+    /// Authored link to the physical infraction definition.
+    pub definition: SourcedValue<Box<SourceRecordReference<'source>>>,
+    /// Parameters authored on this occurrence.
+    pub parameter_overrides: SourcedValue<InfractionParameters<'source>>,
+    /// Original fields outside the typed occurrence.
+    pub authored_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> InfractionUse<'source> {

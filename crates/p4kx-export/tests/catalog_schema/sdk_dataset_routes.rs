@@ -49,6 +49,8 @@ mod flight_configurations;
 mod fuel;
 #[path = "sdk_inventory_container_route.rs"]
 mod inventory_containers;
+#[path = "sdk_law_route.rs"]
+mod law;
 #[path = "sdk_loot_routes.rs"]
 mod loot;
 #[path = "sdk_loot_generation_route.rs"]
@@ -82,6 +84,10 @@ pub(super) fn contract_datasets() -> impl Iterator<Item = &'static str> {
 
 pub(super) fn loot_datasets() -> impl Iterator<Item = &'static str> {
     loot::datasets()
+}
+
+pub(super) fn law_datasets() -> impl Iterator<Item = &'static str> {
+    law::PATHS.into_iter()
 }
 
 pub(super) fn read() -> TestResult<Vec<Route>> {
@@ -131,6 +137,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
     routes.extend(read_entity_definitions(&archive)?);
     routes.extend(commodities::read(&archive)?);
     routes.extend(loot::read()?);
+    routes.extend(law::read()?);
     routes.push(mineable_entity::read()?);
     routes.push(planet_resource::read()?);
     routes.extend(component_tools::read()?);

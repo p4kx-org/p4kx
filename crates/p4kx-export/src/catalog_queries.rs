@@ -23,6 +23,9 @@ pub mod loot;
 #[path = "faction_identity_query.rs"]
 pub mod faction_identities;
 
+#[path = "law_query.rs"]
+pub mod law;
+
 #[path = "contract_query.rs"]
 mod contracts;
 pub use contracts::{

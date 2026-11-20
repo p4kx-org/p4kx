@@ -74,7 +74,7 @@ pub(crate) mod flare_library;
 #[path = "infraction_definition.rs"]
 pub(crate) mod infraction_definition;
 #[path = "infraction_parameters.rs"]
-mod infraction_parameters;
+pub(crate) mod infraction_parameters;
 #[path = "jurisdiction_definition.rs"]
 pub(crate) mod jurisdiction_definition;
 #[path = "law_kinds.rs"]

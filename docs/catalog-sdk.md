@@ -378,6 +378,28 @@ The snapshot carries protected name rows for the requested locales and the sourc
 inventory for the returned sourced cells. Read the callback's data into consumer-owned
 values and publish them after the query succeeds.
 
+## Law and security definitions
+
+Use `catalog_queries::law::with_law` or `with_law_from` to read the canonical
+`definitions.infractions`, `definitions.infractionSets`, `definitions.jurisdictions` and
+`definitions.securityNetworkManifests` rows. The query session and parsed view expose
+`with_law` to reuse the admitted DataForge. Choose one family or `LawFamily::All`, then
+select all matching Records, one GUID with its aliases, or a physical Record index.
+
+The result contains the requested tables in canonical GUID and physical Record order,
+plus original coverage and a source inventory. A requested family with no matching
+rows still has an availability state. Unrequested tables are absent from the result.
+Infraction sets retain repeated uses, overrides and unresolved links. Jurisdictions
+retain their original parent and possession rules. Security manifests keep protocol,
+hostility and variable-effect declarations. A reference records the original target
+resolution and does not cause the target body to be read.
+
+Requested locale inputs supply public names and protected descriptions, warnings and
+impounding names referenced by admitted rows. A security-manifest-only query or one
+with no admitted rows opens no locale payload. Query the corresponding target family
+separately when you need facts from a referenced definition. The returned records
+describe authored data and do not evaluate in-game enforcement or jurisdiction inheritance.
+
 ## Reputation
 
 Use `with_reputation`, `with_reputation_from` or the parsed session's `with_reputation` to

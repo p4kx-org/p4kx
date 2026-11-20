@@ -20,7 +20,7 @@ use crate::source_fields::FieldError;
 use crate::{CatalogError, ExportAccountingError, Kind};
 
 #[path = "security_network_manifest.rs"]
-mod security_network_manifest;
+pub(crate) mod security_network_manifest;
 
 pub(crate) const SECURITY_NETWORK_TYPE: &str = security_network_manifest::SOURCE_TYPE;
 
@@ -103,10 +103,10 @@ pub(crate) struct LawKinds<'source> {
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct LawTables<'source> {
-    infractions: CatalogTable<InfractionDefinition<'source>>,
-    infraction_sets: CatalogTable<InfractionSetDefinition<'source>>,
-    jurisdictions: CatalogTable<JurisdictionDefinition<'source>>,
-    security_network_manifests: CatalogTable<SecurityNetworkManifest<'source>>,
+    pub(crate) infractions: CatalogTable<InfractionDefinition<'source>>,
+    pub(crate) infraction_sets: CatalogTable<InfractionSetDefinition<'source>>,
+    pub(crate) jurisdictions: CatalogTable<JurisdictionDefinition<'source>>,
+    pub(crate) security_network_manifests: CatalogTable<SecurityNetworkManifest<'source>>,
 }
 
 impl<'source> LawKinds<'source> {
