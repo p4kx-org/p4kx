@@ -9,7 +9,7 @@ use crate::format_error::FormatError;
 use crate::issue::{Directory, IssueLog};
 use crate::local_header_match::{LOCAL_HEADER_LEN, LocalStart};
 use crate::source::Source;
-use crate::{Checksum, Entry, EntryIssue};
+use crate::{Checksum, Entry, EntryIssue, ObservedRecoveryDataOutsideFile};
 
 #[cfg(test)]
 mod tests;
@@ -235,7 +235,8 @@ fn finish(
         .checked_add(entry.compressed_size)
         .is_none_or(|data_end| data_end > candidate)
     {
-        log.record(index, EntryIssue::DataOutsideFile);
+        let observed = ObservedRecoveryDataOutsideFile::read(&entry, &local, &header.bounds)?;
+        log.record_recovery_data_outside_file(index, observed);
     }
     log.record_empty_folder_issues(&entry, count_before);
     Ok(Outcome::Found(Box::new(Found {

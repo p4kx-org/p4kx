@@ -4,9 +4,9 @@
 use std::error::Error;
 
 use p4kx_extraction::{
-    Archive, ArchiveLayoutKind, ArchiveSummary, EntryIssue, FieldOrigin, FieldPath, InputScope,
-    MetadataRange, ObservedV2DataOutsideFile, OpenOptions, SourceEncryptionState, SourceInventory,
-    SourceLocation, SourceUseRole,
+    Archive, ArchiveSummary, EntryIssue, FieldOrigin, FieldPath, InputScope, MetadataRange,
+    ObservedV2DataOutsideFile, OpenOptions, SourceEncryptionState, SourceInventory, SourceLocation,
+    SourceUseRole,
 };
 use p4kx_testkit::{ArchiveBuilder, TestEntry};
 use serde_json::Value;
@@ -18,10 +18,9 @@ const V2_DIRECTORY_POINTER: usize = 16;
 const V2_COMPRESSED_SIZE: usize = 10;
 const V2_DATA_OFFSET: usize = 26;
 const V2_PAYLOAD_END: u64 = 64;
-const V1_CENTRAL: [u8; 4] = [0x50, 0x4b, 0x01, 0x02];
-const V1_ZIP64_END: [u8; 4] = [0x50, 0x4b, 0x06, 0x06];
-const ZIP_CENTRAL_FIXED_BYTES: usize = 46;
-const ZIP64_EXTRA_COMPRESSED_WORD: usize = 12;
+#[path = "recovered_archive_issue_origins.rs"]
+mod recovered;
+
 const ENTRY: &str = "Data\\fixture.txt";
 
 #[test]
@@ -192,51 +191,6 @@ fn v2_archive_issue_origins_do_not_replace_overflow_or_exact_boundary() -> TestR
     Ok(())
 }
 
-#[test]
-fn v2_archive_issue_origins_leave_recovery_data_extent_unknown() -> TestResult {
-    let mut bytes = ArchiveBuilder::new()
-        .entry(TestEntry::stored(ENTRY, b"data"))
-        .build();
-    let directory = marker(&bytes, V1_CENTRAL)?;
-    let zip64_end = marker(&bytes, V1_ZIP64_END)?;
-    put_word(
-        &mut bytes,
-        directory + ZIP_CENTRAL_FIXED_BYTES + ENTRY.len() + ZIP64_EXTRA_COMPRESSED_WORD,
-        5,
-    )?;
-    bytes.truncate(zip64_end);
-    let (_directory, archive) = open(&bytes, true)?;
-    assert_eq!(
-        archive.metadata().layout(),
-        ArchiveLayoutKind::RecoveredUnknown,
-        "the fixture reached ZIP recovery",
-    );
-    let position = archive
-        .issues()
-        .iter()
-        .position(|(_, issue)| *issue == EntryIssue::DataOutsideFile)
-        .ok_or("ZIP recovery reports its own data extent defect")?;
-    assert!(
-        archive.observed_v2_data_outside_file(position).is_none(),
-        "ZIP recovery lacks the v2 trailer operands",
-    );
-    let (_, output) = ArchiveSummary::project_with_issue_origins(&archive, "", position + 1)?;
-    let origin = output
-        .field_origins
-        .get(&FieldPath::parse(&format!("/issues/{position}/issue"))?)
-        .ok_or("recovery issue field origin")?;
-    assert_eq!(
-        origin.contains_encrypted_source(),
-        None,
-        "unknown direct source marker"
-    );
-    assert!(
-        !origin.source_set_complete() && origin.source_uses_refs().is_empty(),
-        "an unsupported recovery check has no fabricated bound operands",
-    );
-    Ok(())
-}
-
 fn check_use(
     inventory: &SourceInventory,
     origin: &FieldOrigin,
@@ -308,13 +262,6 @@ fn v2_fixture(offset: u64, size: u64) -> TestResult<Vec<u8>> {
     put_word(&mut bytes, directory + V2_COMPRESSED_SIZE, size)?;
     put_word(&mut bytes, directory + V2_DATA_OFFSET, offset)?;
     Ok(bytes)
-}
-
-fn marker(bytes: &[u8], signature: [u8; 4]) -> TestResult<usize> {
-    bytes
-        .windows(signature.len())
-        .position(|window| window == signature)
-        .ok_or_else(|| "synthetic ZIP section".into())
 }
 
 fn open(bytes: &[u8], recover: bool) -> TestResult<(tempfile::TempDir, Archive)> {

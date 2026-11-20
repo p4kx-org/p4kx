@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_archive::{Archive, Entry, EntryIssue, StoredEncryptionDeclaration};
+use p4kx_archive::{
+    Archive, Entry, EntryIssue, ObservedRecoveryDataOutsideFile, ObservedRecoveryZip64Selection,
+    StoredEncryptionDeclaration,
+};
 
 use crate::{
     ArchiveLayoutOriginError, FieldOrigin, FieldOrigins, FieldPath, SourceDetails,
@@ -62,7 +65,12 @@ fn observe(
         source.path.clone()
     };
     let check_origin = match *issue {
-        EntryIssue::DataOutsideFile => v2_data_range_origin(archive, position, &source, uses)?,
+        EntryIssue::DataOutsideFile => {
+            match archive.observed_recovery_data_outside_file(position) {
+                Some(bounds) => recovery_data_range_origin(bounds, &source)?,
+                None => v2_data_range_origin(archive, position, &source, uses)?,
+            }
+        }
         EntryIssue::HashBlockSize { .. } => hash_block_origin(archive, position, &source)?,
         EntryIssue::PathNotUtf8 if lossy => {
             let value = source.directory_fact("path", SourceUseRole::Conversion)?;
@@ -126,6 +134,62 @@ fn v2_data_range_origin(
             role,
         )?,
     ]))
+}
+
+fn recovery_data_range_origin(
+    bounds: ObservedRecoveryDataOutsideFile,
+    source: &EntryDirectorySource,
+) -> Result<FieldOrigin, SourceEvidenceError> {
+    let mut contributors = Vec::new();
+    for (namespace, field, word) in [
+        (
+            "entryDirectoryRecord",
+            "local_header_offset",
+            bounds.local_header_offset(),
+        ),
+        ("zipLocalHeader", "nameLength", bounds.local_name_length()),
+        ("zipLocalHeader", "extraLength", bounds.local_extra_length()),
+        (
+            "entryDirectoryRecord",
+            "compressed_size",
+            bounds.compressed_size(),
+        ),
+    ] {
+        contributors.push(source.directory_subresource(
+            directory_range(namespace, field, word.range()),
+            SourceUseRole::Conversion,
+        )?);
+    }
+    contributors.push(source.directory_subresource(
+        directory_range(
+            "zipRecoveryBoundary",
+            "centralHeaderSignature",
+            bounds.candidate_signature(),
+        ),
+        SourceUseRole::Selector,
+    )?);
+    let selection = bounds.zip64_selection();
+    if let Some(selection) = selection {
+        let coordinates = [
+            ("sizeMarkers", Some(selection.size_words())),
+            ("localOffsetMarker", Some(selection.local_offset_word())),
+            ("extraLength", Some(selection.extra_length_word())),
+            ("winningHeader", selection.header()),
+        ];
+        for (field, range) in coordinates
+            .into_iter()
+            .filter_map(|(field, range)| range.map(|range| (field, range)))
+        {
+            contributors.push(source.directory_subresource(
+                directory_range("zip64OperandSelection", field, range),
+                SourceUseRole::Selector,
+            )?);
+        }
+    }
+    Ok(source.origin_when(
+        &contributors,
+        selection.is_none_or(ObservedRecoveryZip64Selection::complete),
+    ))
 }
 
 fn hash_block_origin(

@@ -5,13 +5,16 @@ use crate::format_error::FormatError;
 use crate::source::Source;
 
 pub(crate) const LOCAL_HEADER_LEN: usize = 30;
-const LOCAL_NAME_AT: usize = 26;
+pub(crate) const LOCAL_NAME_AT: usize = 26;
+pub(crate) const LOCAL_EXTRA_AT: usize = 28;
 const LOCAL_SIGNATURE: [u8; 4] = 0x0403_4B50_u32.to_le_bytes();
 const LOCAL_CIG_SIGNATURE: [u8; 4] = 0x1403_4B50_u32.to_le_bytes();
 
 pub(crate) struct LocalStart {
     pub(crate) data_start: u64,
     pub(crate) cig: bool,
+    pub(crate) name_len: u16,
+    pub(crate) extra_len: u16,
 }
 
 /// Matches an original local header and its complete original name without reading payload bytes.
@@ -48,7 +51,12 @@ pub(crate) fn read(
         .checked_add(LOCAL_HEADER_LEN as u64)
         .and_then(|start| start.checked_add(u64::from(name_len)))
         .and_then(|start| start.checked_add(u64::from(extra_len)));
-    Ok(data_start.map(|data_start| LocalStart { data_start, cig }))
+    Ok(data_start.map(|data_start| LocalStart {
+        data_start,
+        cig,
+        name_len,
+        extra_len,
+    }))
 }
 
 fn local_lengths(fixed: &[u8; LOCAL_HEADER_LEN]) -> Option<(u16, u16)> {

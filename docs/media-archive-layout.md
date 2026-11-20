@@ -98,9 +98,13 @@ Invalid UTF-8, encryption word and encryption block length messages use the actu
 directory data. A ZIP hash-block length issue uses the original type and length words of
 the reported block. A normal v2 `DataOutsideFile` issue resolves to the original Entry data offset,
 stored compressed size and trailer payload-end word, including when the offset addition
-overflows. Root directory evidence has its own encryption state. Recovery and other issues
-whose checker operands are unavailable carry incomplete origins. The full `issue_count` has
-an explicit unknown marker, independently of the listed sample.
+overflows. A recovered ZIP data-extent issue retains the selected central offset and size words,
+the local header's name and extra lengths and the observed position of the matching central
+signature. ZIP64 selection cites the fixed selector words and the winning extra header.
+A sentinel with a nonempty extra field and no observed winning header has incomplete provenance.
+Recovery's global layout and original directory ordinal remain unknown. Root directory framing
+and metadata have their own encryption state. The full `issue_count` has an explicit unknown
+marker when the original count is unavailable, independently of the listed sample.
 
 The reader's [source metadata contract](archive-source-metadata.md) defines record ownership,
 section extents, recovery limits and lazy-access failures.

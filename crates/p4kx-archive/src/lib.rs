@@ -76,6 +76,7 @@ mod observed_entry_binding;
 mod open_options;
 mod origin_ancestor;
 mod recovery;
+mod recovery_data_outside_file;
 mod source;
 mod source_encryption;
 mod stored_hash;
@@ -146,6 +147,9 @@ pub use observed_entry::ObservedEntry;
 pub use observed_entry_binding::ObservedEntryBinding;
 pub use open_options::OpenOptions;
 pub use recovery::{MAX_RECOVERED_ENTRIES, MAX_RECOVERY_SCAN};
+pub use recovery_data_outside_file::{
+    ObservedRecoveryDataOutsideFile, ObservedRecoveryWord, ObservedRecoveryZip64Selection,
+};
 pub use source_encryption::SourceEncryption;
 pub use v2_data_outside_file::{ObservedV2BoundWord, ObservedV2DataOutsideFile};
 pub use v2_directory_metadata::V2DirectoryMetadata;

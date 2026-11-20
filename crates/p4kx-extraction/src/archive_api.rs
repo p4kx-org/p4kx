@@ -32,4 +32,7 @@ pub use p4kx_archive::{
     V2DirectoryMetadata, Zip64EndMetadata, Zip64LocatorMetadata, ZipDirectoryMetadata,
     ZipEndMetadata,
 };
-pub use p4kx_archive::{ObservedV2BoundWord, ObservedV2DataOutsideFile};
+pub use p4kx_archive::{
+    ObservedRecoveryDataOutsideFile, ObservedRecoveryWord, ObservedRecoveryZip64Selection,
+    ObservedV2BoundWord, ObservedV2DataOutsideFile,
+};

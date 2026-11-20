@@ -6,9 +6,26 @@ use std::sync::Arc;
 
 use crate::origin_ancestor::OriginAncestor;
 
-use crate::{Archive, ArchiveInputOrigin, Entry, EntryOrigin, EntryOriginStep, ObservedEntry};
+use crate::{
+    Archive, ArchiveInputOrigin, Entry, EntryIssue, EntryOrigin, EntryOriginStep, ObservedEntry,
+    ObservedRecoveryDataOutsideFile,
+};
 
 impl Archive {
+    /// Returns the original operands of a retained recovery data-extent issue.
+    ///
+    /// The candidate signature bounds this check without proving a global directory boundary.
+    #[must_use]
+    pub fn observed_recovery_data_outside_file(
+        &self,
+        issue_position: usize,
+    ) -> Option<ObservedRecoveryDataOutsideFile> {
+        let (index, EntryIssue::DataOutsideFile) = self.issues().get(issue_position)? else {
+            return None;
+        };
+        self.log.recovery_data_bounds(*index)
+    }
+
     /// Borrows evidence for an exact admitted Entry without copying variable source details.
     /// Foreign Entries and detached clones return None.
     #[must_use]

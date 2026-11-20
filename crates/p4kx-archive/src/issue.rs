@@ -6,7 +6,7 @@ use std::borrow::Cow;
 use thiserror::Error;
 
 use crate::archive_metadata::ArchiveMetadata;
-use crate::{Entry, ObservedHashBlockSize};
+use crate::{Entry, ObservedHashBlockSize, ObservedRecoveryDataOutsideFile};
 
 /// How many Entry issues [`Archive::issues`](crate::Archive::issues) lists at most;
 /// [`Archive::issue_count`](crate::Archive::issue_count) still counts all of them.
@@ -19,7 +19,7 @@ pub const MAX_ENTRY_ISSUES: usize = 1024;
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 #[non_exhaustive]
 pub enum EntryIssue {
-    /// The Entry's data ends behind the start of the trailer or beyond the file; reading it fails.
+    /// The declared data extent overflows or crosses the boundary used to admit the Entry.
     #[error("its data lies outside the file")]
     DataOutsideFile,
     /// The encryption field is neither 0 nor 1; the Entry is read as encrypted.
@@ -86,6 +86,7 @@ pub(crate) struct IssueLog {
     pub(crate) empty_folder_issues: usize,
     pub(crate) raw_paths: Vec<(usize, Box<[u8]>)>,
     pub(crate) hash_block_sizes: Vec<(usize, ObservedHashBlockSize)>,
+    recovery_data_bounds: Vec<(usize, ObservedRecoveryDataOutsideFile)>,
     seen: (usize, u8),
 }
 
@@ -136,6 +137,29 @@ impl IssueLog {
             .map(|(_, observed)| *observed)
     }
 
+    pub(crate) fn record_recovery_data_outside_file(
+        &mut self,
+        index: usize,
+        observed: ObservedRecoveryDataOutsideFile,
+    ) {
+        if self.record_sample(index, EntryIssue::DataOutsideFile) {
+            self.recovery_data_bounds.push((index, observed));
+        }
+    }
+
+    pub(crate) fn recovery_data_bounds(
+        &self,
+        index: usize,
+    ) -> Option<ObservedRecoveryDataOutsideFile> {
+        let at = self
+            .recovery_data_bounds
+            .binary_search_by_key(&index, |(at, _)| *at)
+            .ok()?;
+        self.recovery_data_bounds
+            .get(at)
+            .map(|(_, observed)| *observed)
+    }
+
     /// Retains the diagnostic count of an Entry removed by container admission.
     pub(crate) fn record_empty_folder_issues(&mut self, entry: &Entry, count_before: usize) {
         if entry.is_empty_folder() {
@@ -147,11 +171,16 @@ impl IssueLog {
     pub(crate) fn absorb(&mut self, other: Self) {
         self.empty_folder_issues += other.empty_folder_issues;
         let mut hashes = other.hash_block_sizes.into_iter().peekable();
+        let mut recovery = other.recovery_data_bounds.into_iter().peekable();
         for (index, issue) in other.listed {
             if let EntryIssue::HashBlockSize { size } = issue
                 && let Some((_, observed)) = hashes.next_if(|(at, _)| *at == index)
             {
                 self.record_hash_block_size(index, size, observed);
+            } else if issue == EntryIssue::DataOutsideFile
+                && let Some((_, observed)) = recovery.next_if(|(at, _)| *at == index)
+            {
+                self.record_recovery_data_outside_file(index, observed);
             } else {
                 self.record(index, issue);
             }

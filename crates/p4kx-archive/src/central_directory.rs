@@ -12,6 +12,7 @@ use crate::extra_block_header::ExtraBlockHeader;
 use crate::format_error::FormatError;
 use crate::issue::{Directory, IssueLog, decode_path};
 use crate::metadata_range::MetadataRange;
+use crate::recovery_data_outside_file::{Zip64BoundOffsets, ZipBoundWords};
 use crate::{
     Checksum, Compression, DosTimestamp, Entry, EntryIssue, EntryMetadata, ObservedHashBlockSize,
     ZipHeaderMetadata,
@@ -55,6 +56,7 @@ struct ExtraFields {
     encryption: EncryptionDeclarationsBuilder,
     sha256: Option<[u8; 32]>,
     zip64_block: bool,
+    zip64_offsets: Zip64BoundOffsets,
 }
 
 /// Parses `count` Entries from the central directory bytes, which start at file offset `base`.
@@ -95,6 +97,7 @@ pub(crate) struct ParsedHeader<'a> {
     pub(crate) name: &'a [u8],
     pub(crate) len: usize,
     pub(crate) zip64_block: bool,
+    pub(crate) bounds: ZipBoundWords,
 }
 
 /// Parses the standalone header at `base` as Entry `index`, without an original directory ordinal.
@@ -111,14 +114,7 @@ pub(crate) fn parse_header<'a>(
         original_directory_ordinal: None,
         source_len,
     };
-    let (entry, name, zip64_block) = parse_entry_parts(&mut reader, position, log)?;
-    let len = bytes.len() - reader.remaining();
-    Ok(ParsedHeader {
-        entry,
-        name,
-        len,
-        zip64_block,
-    })
+    parse_entry_parts(&mut reader, position, log)
 }
 
 fn parse_entry(
@@ -126,14 +122,14 @@ fn parse_entry(
     position: RecordPosition,
     log: &mut IssueLog,
 ) -> Result<Entry, FormatError> {
-    parse_entry_parts(reader, position, log).map(|(entry, _, _)| entry)
+    parse_entry_parts(reader, position, log).map(|header| header.entry)
 }
 
 fn parse_entry_parts<'a>(
     reader: &mut ByteReader<'a>,
     position: RecordPosition,
     log: &mut IssueLog,
-) -> Result<(Entry, &'a [u8], bool), FormatError> {
+) -> Result<ParsedHeader<'a>, FormatError> {
     let RecordPosition {
         index,
         original_directory_ordinal,
@@ -145,6 +141,7 @@ fn parse_entry_parts<'a>(
     let path = decode_path(name, index, log).into_owned();
     let extra_offset = reader.offset();
     let extra = reader.read_bytes(fixed.extra_len)?;
+    let extra_len = extra.len() as u64;
     reader.skip(fixed.comment_len)?;
     let extra = parse_extra(extra, extra_offset, &fixed, index, log)?;
     let record_len = reader
@@ -175,7 +172,18 @@ fn parse_entry_parts<'a>(
         local_header: true,
         installed_bytes: None,
     };
-    Ok((entry, name, zip64_block))
+    Ok(ParsedHeader {
+        entry,
+        name,
+        len: CENTRAL_HEADER_LEN + fixed.name_len + fixed.extra_len + fixed.comment_len,
+        zip64_block,
+        bounds: ZipBoundWords {
+            offsets: extra.zip64_offsets,
+            extra_len,
+            has_size_marker: fixed.compressed_size == ZIP64_MARKER_32,
+            has_offset_marker: fixed.local_header_offset == ZIP64_MARKER_32,
+        },
+    })
 }
 
 fn read_fixed_fields(reader: &mut ByteReader<'_>, offset: u64) -> Result<FixedFields, FormatError> {
@@ -252,6 +260,7 @@ fn parse_extra(
         encryption: EncryptionDeclarationsBuilder::default(),
         sha256: None,
         zip64_block: false,
+        zip64_offsets: Zip64BoundOffsets::default(),
     };
     let mut reader = ByteReader::with_base(extra, base);
     while reader.remaining() >= BLOCK_HEADER_LEN {
@@ -270,7 +279,7 @@ fn parse_extra(
         match id {
             BLOCK_ZIP64 => {
                 fields.zip64_block = true;
-                read_zip64(&mut block, fixed, &mut fields)?;
+                read_zip64(&mut block, block_offset, fixed, &mut fields)?;
             }
             BLOCK_CIG_ENCRYPTION => {
                 fields.encrypted = read_encryption(
@@ -356,6 +365,7 @@ fn encryption_defect(len: u16, value: Option<u16>, index: usize, log: &mut Issue
 
 fn read_zip64(
     block: &mut ByteReader<'_>,
+    block_offset: u64,
     fixed: &FixedFields,
     fields: &mut ExtraFields,
 ) -> Result<(), ParseError> {
@@ -363,10 +373,16 @@ fn read_zip64(
         fields.uncompressed_size = block.read_u64()?;
     }
     if fixed.compressed_size == ZIP64_MARKER_32 {
+        let at = block.offset();
         fields.compressed_size = block.read_u64()?;
+        fields.zip64_offsets.compressed_size = Some(at);
+        fields.zip64_offsets.header = Some(block_offset);
     }
     if fixed.local_header_offset == ZIP64_MARKER_32 {
+        let at = block.offset();
         fields.local_header_offset = block.read_u64()?;
+        fields.zip64_offsets.local_header_offset = Some(at);
+        fields.zip64_offsets.header = Some(block_offset);
     }
     Ok(())
 }
